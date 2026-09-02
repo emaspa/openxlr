@@ -5,7 +5,7 @@
 %global _build_id_links none
 
 Name:           openxlr
-Version:        0.1.9
+Version:        0.1.10
 Release:        1%{?dist}
 Summary:        Control suite and PipeWire submixer for Elgato XLR interfaces
 License:        GPL-3.0-only
@@ -137,6 +137,13 @@ MSG
 %{_datadir}/openxlr/
 
 %changelog
+* Wed Sep 02 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.10-1
+- XLR Dock MK.2 (0fd9:00c7): registered on the Wave XLR MK.2 backend
+  after a reported USB descriptor matched the MK.2's; udev rule added.
+  Not yet run on hardware, testers wanted.
+- UI: the daemon-at-login unit and the window autostart entry point at
+  the package's bin/ wrappers when present, which the Nix layout needs.
+
 * Wed Sep 02 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.9-1
 - UI: "Start daemon at login" on packaged installs wrote a user unit with
   a build-tree ExecStart that does not exist, shadowing the packaged unit:

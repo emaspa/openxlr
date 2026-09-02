@@ -1,6 +1,6 @@
 <Project>
   <PropertyGroup>
-    <Version>0.1.9</Version>
+    <Version>0.1.10</Version>
     <!-- Distro-packaged .NET 10 (Arch/CachyOS) ships the ASP.NET Core shared
          framework but omits the targeting pack's prune manifest, tripping
          NETSDK1226. Disabling the prune optimization is harmless (it only trims

@@ -1,3 +1,13 @@
+openxlr (0.1.10) resolute; urgency=medium
+
+  * XLR Dock MK.2 (0fd9:00c7): registered on the Wave XLR MK.2 backend
+    after a reported USB descriptor matched the MK.2's; udev rule added.
+    Not yet run on hardware, testers wanted.
+  * UI: the daemon-at-login unit and the window autostart entry point at
+    the package's bin/ wrappers when present, which the Nix layout needs.
+
+ -- Emanuele Sparvoli <sparvoli@gmail.com>  Wed, 02 Sep 2026 09:45:49 +0100
+
 openxlr (0.1.9) resolute; urgency=medium
 
   * UI: "Start daemon at login" on packaged installs wrote a user unit with
