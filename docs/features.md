@@ -83,8 +83,12 @@ active or bypassed, a bypass button, and a gear that opens the plugin's
 controls in their own window. The picker shows every installed LV2
 plugin that fits the slot (mono for inputs, stereo for mixes), grouped
 by category. The controls window is generated from the plugin's port
-descriptions, grouped by parameter family, with a Defaults button.
-Chains are saved with the mixer and recalled by profiles.
+descriptions: toggled ports become switches, enumerations become named
+selectors, integer ports use stepped controls, logarithmic ports get an
+appropriate response curve, and the declared unit is shown beside the
+value. Controls are grouped by parameter family and include the port's
+range, default, and symbol as a tooltip, plus a Defaults button. Chains
+are saved with the mixer and recalled by profiles.
 
 Every chain is a PipeWire filter-chain node, the same mechanism as the
 software low cut and ClipGuard, so plugins run inside PipeWire's graph
@@ -93,8 +97,11 @@ plugin. Plugins are found in the standard LV2 directories
 (`/usr/lib/lv2`, `~/.lv2`, or wherever `LV2_PATH` points); the daemon
 reads them through lilv. `lsp-plugins-lv2` is the set used during
 development. Plugins that ship a custom GUI still load; the generated
-controls are shown instead of their window. VST and CLAP plugins are
-not supported; loading them would need a plugin host.
+controls configure the live PipeWire-hosted instance instead of opening
+their toolkit-specific window. A native LV2 window cannot be attached to
+that separate PipeWire instance without replacing the current plugin host.
+VST and CLAP plugins are not supported; loading them would likewise need
+a plugin host.
 
 The submixer can be switched off in Options. The daemon then controls
 the hardware only, restarts itself, and leaves the sound card in its

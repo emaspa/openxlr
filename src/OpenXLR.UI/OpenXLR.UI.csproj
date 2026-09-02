@@ -20,4 +20,8 @@
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="OpenXLR.Tests" />
+  </ItemGroup>
 </Project>

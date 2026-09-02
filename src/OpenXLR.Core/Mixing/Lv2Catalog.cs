@@ -45,6 +45,8 @@ public static class Lv2Catalog
             IntPtr enumeration = Lilv.lilv_new_uri(world, "http://lv2plug.in/ns/lv2core#enumeration");
             IntPtr logarithmic = Lilv.lilv_new_uri(world, "http://lv2plug.in/ns/ext/port-props#logarithmic");
             IntPtr notOnGui = Lilv.lilv_new_uri(world, "http://lv2plug.in/ns/ext/port-props#notOnGUI");
+            IntPtr unit = Lilv.lilv_new_uri(world, "http://lv2plug.in/ns/extensions/units#unit");
+            IntPtr unitSymbol = Lilv.lilv_new_uri(world, "http://lv2plug.in/ns/extensions/units#symbol");
 
             IntPtr plugins = Lilv.lilv_world_get_all_plugins(world);
             for (IntPtr it = Lilv.lilv_plugins_begin(plugins); !Lilv.lilv_plugins_is_end(plugins, it); it = Lilv.lilv_plugins_next(plugins, it))
@@ -53,12 +55,13 @@ public static class Lv2Catalog
                 try
                 {
                     PluginInfo? info = Describe(world, plugin, controlPort, audioPort, inputPort, outputPort,
-                        toggled, integer, enumeration, logarithmic, notOnGui);
+                        toggled, integer, enumeration, logarithmic, notOnGui, unit, unitSymbol);
                     if (info is not null) result.Add(info);
                 }
                 catch (Exception) { /* one broken bundle must not hide the rest */ }
             }
-            foreach (IntPtr n in new[] { controlPort, audioPort, inputPort, outputPort, toggled, integer, enumeration, logarithmic, notOnGui })
+            foreach (IntPtr n in new[] { controlPort, audioPort, inputPort, outputPort, toggled, integer,
+                         enumeration, logarithmic, notOnGui, unit, unitSymbol })
                 Lilv.lilv_node_free(n);
         }
         finally
@@ -70,7 +73,8 @@ public static class Lv2Catalog
     }
 
     private static PluginInfo? Describe(IntPtr world, IntPtr plugin, IntPtr controlPort, IntPtr audioPort,
-        IntPtr inputPort, IntPtr outputPort, IntPtr toggled, IntPtr integer, IntPtr enumeration, IntPtr logarithmic, IntPtr notOnGui)
+        IntPtr inputPort, IntPtr outputPort, IntPtr toggled, IntPtr integer, IntPtr enumeration,
+        IntPtr logarithmic, IntPtr notOnGui, IntPtr unit, IntPtr unitSymbol)
     {
         string? uri = Lilv.Str(Lilv.lilv_node_as_uri(Lilv.lilv_plugin_get_uri(plugin)));
         if (uri is null) return null;
@@ -125,12 +129,13 @@ public static class Lv2Catalog
             float min = float.IsNaN(mins[i]) ? 0 : mins[i];
             float max = float.IsNaN(maxs[i]) ? 1 : maxs[i];
             float def = float.IsNaN(defs[i]) ? min : defs[i];
+            string? symbol = ReadUnitSymbol(world, plugin, port, unit, unitSymbol);
             pars.Add(new PluginParam(sym, pname, min, max, def,
                 Lilv.lilv_port_has_property(plugin, port, toggled),
                 Lilv.lilv_port_has_property(plugin, port, integer),
                 Lilv.lilv_port_has_property(plugin, port, logarithmic),
                 Lilv.lilv_port_has_property(plugin, port, enumeration),
-                points));
+                [.. points.OrderBy(p => p.Value)], symbol));
         }
         if (audioIns == 0 || audioOuts == 0 || inSym is null || outSym is null) return null;   // generators and analysers are not inserts
 
@@ -148,6 +153,25 @@ public static class Lv2Catalog
         return new PluginInfo("lv2", uri, name, category, audioIns, audioOuts, inSym, outSym, pars, features, inSyms, outSyms);
     }
 
+    /// <summary>
+    /// Resolve units:unit to units:symbol. The unit may be a standard URI
+    /// (units:db, units:hz, ...) or an inline blank node supplied by a plugin;
+    /// querying the loaded lilv world handles both without a hard-coded table.
+    /// </summary>
+    private static string? ReadUnitSymbol(IntPtr world, IntPtr plugin, IntPtr port, IntPtr unit, IntPtr unitSymbol)
+    {
+        IntPtr unitNode = Lilv.lilv_port_get(plugin, port, unit);
+        if (unitNode == IntPtr.Zero) return null;
+        try
+        {
+            IntPtr symbolNode = Lilv.lilv_world_get(world, unitNode, unitSymbol, IntPtr.Zero);
+            if (symbolNode == IntPtr.Zero) return null;
+            try { return Lilv.Str(Lilv.lilv_node_as_string(symbolNode)); }
+            finally { Lilv.lilv_node_free(symbolNode); }
+        }
+        finally { Lilv.lilv_node_free(unitNode); }
+    }
+
     /// <summary>The slice of liblilv this catalog uses.</summary>
     private static class Lilv
     {
@@ -157,6 +181,7 @@ public static class Lv2Catalog
         [DllImport(Lib)] public static extern void lilv_world_free(IntPtr world);
         [DllImport(Lib)] public static extern void lilv_world_load_all(IntPtr world);
         [DllImport(Lib)] public static extern IntPtr lilv_world_get_all_plugins(IntPtr world);
+        [DllImport(Lib)] public static extern IntPtr lilv_world_get(IntPtr world, IntPtr subject, IntPtr predicate, IntPtr obj);
         [DllImport(Lib)] public static extern IntPtr lilv_new_uri(IntPtr world, [MarshalAs(UnmanagedType.LPUTF8Str)] string uri);
         [DllImport(Lib)] public static extern void lilv_node_free(IntPtr node);
         [DllImport(Lib)] public static extern IntPtr lilv_node_as_uri(IntPtr node);
@@ -184,6 +209,7 @@ public static class Lv2Catalog
         [DllImport(Lib)] public static extern IntPtr lilv_port_get_symbol(IntPtr plugin, IntPtr port);
         [DllImport(Lib)] public static extern IntPtr lilv_port_get_name(IntPtr plugin, IntPtr port);
         [DllImport(Lib)] public static extern IntPtr lilv_port_get_scale_points(IntPtr plugin, IntPtr port);
+        [DllImport(Lib)] public static extern IntPtr lilv_port_get(IntPtr plugin, IntPtr port, IntPtr predicate);
 
         [DllImport(Lib)] public static extern IntPtr lilv_scale_points_begin(IntPtr sps);
         [DllImport(Lib)] public static extern IntPtr lilv_scale_points_get(IntPtr sps, IntPtr iter);

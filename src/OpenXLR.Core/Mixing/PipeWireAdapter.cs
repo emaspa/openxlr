@@ -335,8 +335,13 @@ public sealed class PipeWireAdapter
             if (info is null || info.InputSymbols.Count < channels || info.OutputSymbols.Count < channels)
                 continue;   // unknown or wrong-width plugin: skipped, reported by the caller
             string name = $"i{k++}";
-            string controls = ins.Params.Count == 0 ? "" :
-                " control = { " + string.Join(' ', ins.Params.Select(p => $"\"{p.Key}\" = {p.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}")) + " }";
+            // Emit only catalog-declared symbols. Besides keeping old presets
+            // compatible across plugin updates, this prevents arbitrary API
+            // keys from becoming filter-chain configuration syntax.
+            string[] values = [.. info.Params
+                .Where(p => ins.Params.ContainsKey(p.Symbol))
+                .Select(p => $"\"{p.Symbol}\" = {p.Normalize(ins.Params[p.Symbol]).ToString(System.Globalization.CultureInfo.InvariantCulture)}")];
+            string controls = values.Length == 0 ? "" : " control = { " + string.Join(' ', values) + " }";
             stages.Add(($"{{ type = lv2 name = {name} plugin = \"{ins.Plugin}\"{controls} }}",
                 [.. info.InputSymbols.Take(channels).Select(s => $"{name}:{s}")],
                 [.. info.OutputSymbols.Take(channels).Select(s => $"{name}:{s}")]));

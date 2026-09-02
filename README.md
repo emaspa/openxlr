@@ -52,7 +52,8 @@ Collect diagnostics).
   microphones) and Aux (sent to the USB Aux port); per-send levels and
   mutes, level meters, the monitor mix on several outputs at once.
 - **Inserts**: LV2 plugin chains on each XLR input and each mix, with a
-  plugin picker, generated control windows and bypass LEDs.
+  plugin picker, generated control windows (switches, named selectors,
+  unit-aware and logarithmic sliders) and bypass LEDs.
 - **Application routing**: audio clients are detected from their
   PipeWire registration and routed to a channel by name rules, with the
   assignment remembered per app. Electron apps are identified by their

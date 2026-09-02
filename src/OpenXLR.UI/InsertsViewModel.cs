@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
@@ -26,6 +27,14 @@ public sealed class InsertsViewModel : ViewModelBase
     private readonly int _channels;
     private bool _applying;
     private bool _pluginsRequested;
+    private bool _catalogReady;
+
+    /// <summary>
+    /// Raised only after the complete catalog has been populated. Emitting
+    /// collection changes for each plugin is not a readiness signal: an insert
+    /// may appear near the end of a large LV2 installation.
+    /// </summary>
+    internal event EventHandler? CatalogLoaded;
 
     /// <param name="channel">Insert key: "xlr1", "xlr2", or "mix:&lt;id&gt;".</param>
     /// <param name="channels">1 for the mono mic path, 2 for a stereo mix.</param>
@@ -89,35 +98,55 @@ public sealed class InsertsViewModel : ViewModelBase
         _pluginsRequested = true;
         Note = "Scanning LV2 plugins…";
         JsonNode? plugins = await CatalogAsync(_client);
-        Dispatcher.UIThread.Post(() =>
-        {
-            PluginChoices.Clear();
-            if (plugins is not JsonArray arr) { Note = "Plugin list unavailable"; _pluginsRequested = false; _catalogTask = null; return; }
-            foreach (JsonNode? p in arr)
-            {
-                if (p is null) continue;
-                // Mono chains take mono in / mono out plugins; stereo chains take
-                // plugins with at least two ins and two outs (extra ports stay unlinked).
-                int ins = p["audioIns"]?.GetValue<int>() ?? 0, outs = p["audioOuts"]?.GetValue<int>() ?? 0;
-                bool fits = _channels == 1 ? ins == 1 && outs == 1 : ins >= 2 && outs >= 2;
-                if (!fits) continue;
-                PluginChoices.Add(new PluginChoice(
-                    p["plugin"]!.GetValue<string>(),
-                    p["name"]?.GetValue<string>() ?? p["plugin"]!.GetValue<string>(),
-                    p["category"]?.GetValue<string>() ?? "",
-                    p["params"] ?? new JsonArray()));
-            }
-            string width = _channels == 1 ? "mono" : "stereo";
-            Note = PluginChoices.Count == 0
-                ? $"No {width} LV2 plugins found (install e.g. lsp-plugins-lv2 or x42-plugins)"
-                : $"{PluginChoices.Count} {width} LV2 plugins available";
-        });
+        Dispatcher.UIThread.Post(() => ApplyCatalog(plugins));
     }
 
-    public void ResetForNewConnection() { _pluginsRequested = false; _catalogTask = null; }
+    /// <summary>Populate one chain's view of the shared daemon catalog atomically.</summary>
+    internal void ApplyCatalog(JsonNode? plugins)
+    {
+        _catalogReady = false;
+        Raise(nameof(CatalogReady));
+        PluginChoices.Clear();
+        if (plugins is not JsonArray arr)
+        {
+            Note = "Plugin list unavailable";
+            _pluginsRequested = false;
+            _catalogTask = null;
+            return;
+        }
+        foreach (JsonNode? p in arr)
+        {
+            if (p is null) continue;
+            // Mono chains take mono in / mono out plugins; stereo chains take
+            // plugins with at least two ins and two outs (extra ports stay unlinked).
+            int ins = p["audioIns"]?.GetValue<int>() ?? 0, outs = p["audioOuts"]?.GetValue<int>() ?? 0;
+            bool fits = _channels == 1 ? ins == 1 && outs == 1 : ins >= 2 && outs >= 2;
+            if (!fits) continue;
+            PluginChoices.Add(new PluginChoice(
+                p["plugin"]!.GetValue<string>(),
+                p["name"]?.GetValue<string>() ?? p["plugin"]!.GetValue<string>(),
+                p["category"]?.GetValue<string>() ?? "",
+                p["params"] ?? new JsonArray()));
+        }
+        string width = _channels == 1 ? "mono" : "stereo";
+        Note = PluginChoices.Count == 0
+            ? $"No {width} LV2 plugins found (install e.g. lsp-plugins-lv2 or x42-plugins)"
+            : $"{PluginChoices.Count} {width} LV2 plugins available";
+        _catalogReady = true;
+        Raise(nameof(CatalogReady));
+        CatalogLoaded?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void ResetForNewConnection()
+    {
+        _pluginsRequested = false;
+        _catalogReady = false;
+        Raise(nameof(CatalogReady));
+        _catalogTask = null;
+    }
 
     /// <summary>Whether the catalog has arrived for this chain.</summary>
-    public bool CatalogReady => PluginChoices.Count > 0;
+    public bool CatalogReady => _catalogReady;
 
     /// <summary>Apply the daemon's view of this channel's chain.</summary>
     public void Apply(JsonNode? chain)
@@ -210,6 +239,8 @@ public sealed class InsertsViewModel : ViewModelBase
 public sealed class InsertViewModel : ViewModelBase
 {
     private readonly InsertsViewModel _owner;
+    private bool _paramsBuilt;
+    private bool _waitingForCatalog;
 
     public InsertViewModel(InsertsViewModel owner, string id, string plugin, string label)
     {
@@ -249,11 +280,15 @@ public sealed class InsertViewModel : ViewModelBase
     public bool IsActive => !Bypass && !HasError;
 
     public ObservableCollection<InsertParamViewModel> Params { get; } = [];
+    public bool HasParams => Params.Count > 0;
+    public string ControlsNote => !_paramsBuilt ? "Reading LV2 control metadata…"
+        : HasParams ? $"{Params.Count} configurable controls"
+        : "This plugin declares no configurable input control ports.";
 
     /// <summary>
-    /// Controls grouped for the window. LV2 has no control-port grouping in
-    /// practice (LSP groups only its audio ports), so groups come from a
-    /// name heuristic; a plugin with few controls stays one flat list.
+    /// Controls grouped for the window. Many plugins, including LSP, group
+    /// their audio ports but leave control ports ungrouped, so the portable
+    /// fallback is a name heuristic; a plugin with few controls stays flat.
     /// </summary>
     public ObservableCollection<InsertParamGroup> Groups { get; } = [];
 
@@ -264,16 +299,20 @@ public sealed class InsertViewModel : ViewModelBase
     /// </summary>
     public void EnsureParams()
     {
-        if (Params.Count > 0) return;
+        if (_paramsBuilt) return;
         if (_owner.CatalogReady) { BuildParams(); return; }
-        void OnCatalog(object? s, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
-        {
-            if (!_owner.CatalogReady || Params.Count > 0) return;
-            _owner.PluginChoices.CollectionChanged -= OnCatalog;
-            BuildParams();
-        }
-        _owner.PluginChoices.CollectionChanged += OnCatalog;
+        if (_waitingForCatalog) return;
+        _waitingForCatalog = true;
+        _owner.CatalogLoaded += OnCatalogLoaded;
         _owner.EnsurePluginsLoaded();
+    }
+
+    private void OnCatalogLoaded(object? sender, EventArgs e)
+    {
+        if (!_owner.CatalogReady || _paramsBuilt) return;
+        _owner.CatalogLoaded -= OnCatalogLoaded;
+        _waitingForCatalog = false;
+        BuildParams();
     }
 
     private static readonly (string Group, string[] Keys)[] GroupRules =
@@ -346,20 +385,38 @@ public sealed class InsertViewModel : ViewModelBase
 
     private void BuildParams()
     {
-        if (_owner.ParamsFor(Plugin) is not JsonArray arr) return;
+        if (_paramsBuilt) return;
+        _paramsBuilt = true;
+        if (_owner.ParamsFor(Plugin) is not JsonArray arr)
+        {
+            Raise(nameof(HasParams));
+            Raise(nameof(ControlsNote));
+            return;
+        }
         foreach (JsonNode? p in arr)
         {
             if (p is null) continue;
             string sym = p["symbol"]!.GetValue<string>();
+            var options = new List<PluginParamOption>();
+            if (p["scalePoints"] is JsonArray points)
+                foreach (JsonNode? point in points)
+                    if (point is not null)
+                        options.Add(new PluginParamOption(
+                            point["label"]?.GetValue<string>() ?? "",
+                            point["value"]?.GetValue<double>() ?? 0));
             var vm = new InsertParamViewModel(this, sym, p["name"]?.GetValue<string>() ?? sym,
                 p["min"]?.GetValue<double>() ?? 0, p["max"]?.GetValue<double>() ?? 1,
                 p["default"]?.GetValue<double>() ?? 0,
                 p["toggled"]?.GetValue<bool>() ?? false, p["integer"]?.GetValue<bool>() ?? false,
-                p["logarithmic"]?.GetValue<bool>() ?? false);
+                p["logarithmic"]?.GetValue<bool>() ?? false,
+                p["enumeration"]?.GetValue<bool>() ?? false, options,
+                p["unitSymbol"]?.GetValue<string>());
             if (_params.TryGetValue(sym, out double cur)) vm.ApplyFromDaemon(cur);
             Params.Add(vm);
         }
         RebuildGroups();
+        Raise(nameof(HasParams));
+        Raise(nameof(ControlsNote));
     }
 
     internal void SendParam(string symbol, double value)
@@ -382,14 +439,21 @@ public sealed class InsertViewModel : ViewModelBase
 /// <summary>A titled run of controls in the controls window.</summary>
 public sealed record InsertParamGroup(string Name, bool ShowHeader, IReadOnlyList<InsertParamViewModel> Params);
 
-/// <summary>One control port as a slider or switch.</summary>
+/// <summary>One named value of an LV2 enumeration control.</summary>
+public sealed record PluginParamOption(string Label, double Value)
+{
+    public override string ToString() => Label;
+}
+
+/// <summary>One LV2 control port represented as a slider, switch, or selector.</summary>
 public sealed class InsertParamViewModel : ViewModelBase
 {
     private readonly InsertViewModel _owner;
     private bool _applying;
 
     public InsertParamViewModel(InsertViewModel owner, string symbol, string name,
-        double min, double max, double def, bool toggled, bool integer, bool logarithmic)
+        double min, double max, double def, bool toggled, bool integer, bool logarithmic,
+        bool enumeration, IReadOnlyList<PluginParamOption> options, string? unitSymbol)
     {
         _owner = owner;
         Symbol = symbol;
@@ -399,8 +463,11 @@ public sealed class InsertParamViewModel : ViewModelBase
         Toggled = toggled;
         Integer = integer;
         Logarithmic = logarithmic;
-        Default = def;
-        _value = def;
+        Enumeration = enumeration;
+        Options = [.. options.OrderBy(o => o.Value)];
+        UnitSymbol = unitSymbol;
+        Default = Normalize(def);
+        _value = Default;
     }
 
     public string Symbol { get; }
@@ -411,8 +478,25 @@ public sealed class InsertParamViewModel : ViewModelBase
     public bool Toggled { get; }
     public bool Integer { get; }
     public bool Logarithmic { get; }
-    public bool IsSlider => !Toggled;
-    public double Step => Integer ? 1 : 0;
+    public bool Enumeration { get; }
+    public string? UnitSymbol { get; }
+    public IReadOnlyList<PluginParamOption> Options { get; }
+    public bool IsEnumeration => !Toggled && Enumeration && Options.Count > 0;
+    public bool IsSlider => !Toggled && !IsEnumeration;
+    public bool UsesLogarithmicScale => IsSlider && Logarithmic && Max > Min;
+    public double SliderMinimum => UsesLogarithmicScale ? 0 : Min;
+    public double SliderMaximum => UsesLogarithmicScale ? 1 : Max;
+    public double SliderStep => Integer && !UsesLogarithmicScale ? 1 : 0;
+
+    /// <summary>
+    /// Slider-facing value. Logarithmic ports use a normalized position while
+    /// Value always remains the real number sent to PipeWire.
+    /// </summary>
+    public double SliderValue
+    {
+        get => ToSliderPosition(_value, Min, Max, UsesLogarithmicScale);
+        set => Value = FromSliderPosition(value, Min, Max, UsesLogarithmicScale);
+    }
 
     private double _value;
     public double Value
@@ -420,9 +504,12 @@ public sealed class InsertParamViewModel : ViewModelBase
         get => _value;
         set
         {
+            value = Normalize(value);
             if (!Set(ref _value, value)) return;
             Raise(nameof(ValueText));
             Raise(nameof(On));
+            Raise(nameof(SelectedOption));
+            Raise(nameof(SliderValue));
             if (!_applying) _owner.SendParam(Symbol, value);
         }
     }
@@ -434,11 +521,60 @@ public sealed class InsertParamViewModel : ViewModelBase
         set => Value = value ? 1 : 0;
     }
 
-    public string ValueText => Toggled ? (On ? "on" : "off")
-        : Integer ? ((int)Math.Round(_value)).ToString()
-        : Math.Abs(_value) >= 100 ? _value.ToString("0")
-        : Math.Abs(_value) >= 10 ? _value.ToString("0.0")
-        : _value.ToString("0.000");
+    public PluginParamOption? SelectedOption
+    {
+        get => Options.Count == 0 ? null : Options.MinBy(o => Math.Abs(o.Value - _value));
+        set { if (value is not null) Value = value.Value; }
+    }
+
+    public string ValueText
+    {
+        get
+        {
+            if (Toggled) return On ? "on" : "off";
+            if (IsEnumeration) return SelectedOption?.Label ?? FormatNumber(_value);
+            string value = FormatNumber(_value);
+            return string.IsNullOrWhiteSpace(UnitSymbol) ? value : $"{value} {UnitSymbol}";
+        }
+    }
+
+    public string Description => $"{Symbol} • range {FormatNumber(Min)} to {FormatNumber(Max)}" +
+        $" • default {FormatNumber(Default)}" +
+        (string.IsNullOrWhiteSpace(UnitSymbol) ? "" : $" {UnitSymbol}");
+
+    private string FormatNumber(double value) => Integer ? ((int)Math.Round(value)).ToString(CultureInfo.CurrentCulture)
+        : Math.Abs(value) >= 100 ? value.ToString("0", CultureInfo.CurrentCulture)
+        : Math.Abs(value) >= 10 ? value.ToString("0.0", CultureInfo.CurrentCulture)
+        : value.ToString("0.###", CultureInfo.CurrentCulture);
+
+    private double Normalize(double value)
+    {
+        if (!double.IsFinite(value)) return Default;
+        double low = Math.Min(Min, Max), high = Math.Max(Min, Max);
+        value = Math.Clamp(value, low, high);
+        if (Toggled) return value >= 0.5 ? 1 : 0;
+        if (IsEnumeration) return Options.MinBy(o => Math.Abs(o.Value - value))!.Value;
+        if (Integer) value = Math.Round(value);
+        return Math.Clamp(value, low, high);
+    }
+
+    internal static double ToSliderPosition(double value, double min, double max, bool logarithmic)
+    {
+        if (!logarithmic || max <= min) return value;
+        value = Math.Clamp(value, min, max);
+        if (min > 0)
+            return Math.Log(value / min) / Math.Log(max / min);
+        double normalized = (value - min) / (max - min);
+        return Math.Cbrt(normalized);
+    }
+
+    internal static double FromSliderPosition(double position, double min, double max, bool logarithmic)
+    {
+        if (!logarithmic || max <= min) return Math.Clamp(position, Math.Min(min, max), Math.Max(min, max));
+        position = Math.Clamp(position, 0, 1);
+        if (min > 0) return min * Math.Pow(max / min, position);
+        return min + (max - min) * position * position * position;
+    }
 
     public void ApplyFromDaemon(double v)
     {

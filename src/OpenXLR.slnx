@@ -2,5 +2,6 @@
   <Project Path="OpenXLR.Core/OpenXLR.Core.csproj" />
   <Project Path="OpenXLR.Daemon/OpenXLR.Daemon.csproj" />
   <Project Path="OpenXLR.Probe/OpenXLR.Probe.csproj" />
+  <Project Path="OpenXLR.Tests/OpenXLR.Tests.csproj" />
   <Project Path="OpenXLR.UI/OpenXLR.UI.csproj" />
 </Solution>

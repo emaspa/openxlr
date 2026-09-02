@@ -523,9 +523,27 @@ public sealed class Mixer : IDisposable
     {
         lock (_gate)
         {
-            _inserts[channel] = [.. inserts.Select(i => i with { Params = new Dictionary<string, double>(i.Params) })];
+            _inserts[channel] = [.. inserts.Select(NormalizeInsertDefinition)];
             if (_built) RewireInsertKeyLocked(channel);
         }
+    }
+
+    /// <summary>
+    /// Keep only controls the installed plugin actually declares and apply its
+    /// LV2 range/type rules. Missing plugins retain their values so a saved
+    /// chain can recover after the package is reinstalled.
+    /// </summary>
+    private static InsertDefinition NormalizeInsertDefinition(InsertDefinition insert)
+    {
+        PluginInfo? info = insert.Kind == "lv2" ? Lv2Catalog.Find(insert.Plugin) : null;
+        if (info is null)
+            return insert with { Params = new Dictionary<string, double>(insert.Params) };
+
+        var values = new Dictionary<string, double>();
+        foreach (PluginParam parameter in info.Params)
+            if (insert.Params.TryGetValue(parameter.Symbol, out double value))
+                values[parameter.Symbol] = parameter.Normalize(value);
+        return insert with { Params = values };
     }
 
     /// <summary>Bypass or re-enable one insert; rewires when built.</summary>
@@ -558,6 +576,11 @@ public sealed class Mixer : IDisposable
             if (!_inserts.TryGetValue(channel, out List<InsertDefinition>? list)) return;
             int idx = list.FindIndex(i => i.Id == insertId);
             if (idx < 0) return;
+            PluginInfo info = Lv2Catalog.Find(list[idx].Plugin)
+                ?? throw new InvalidOperationException($"plugin {list[idx].Plugin} is not installed");
+            PluginParam parameter = info.Params.FirstOrDefault(p => p.Symbol == symbol)
+                ?? throw new InvalidOperationException($"plugin {info.Name} has no input control named {symbol}");
+            value = parameter.Normalize(value);
             list[idx].Params[symbol] = value;
             if (!_built || list[idx].Bypass || _insertErrors.ContainsKey(channel)
                 || !_chains.TryGetValue(channel, out FilterHandle? chain)) return;
@@ -714,7 +737,7 @@ public sealed class Mixer : IDisposable
             if (s.Inserts.Count > 0)
             {
                 foreach ((string channel, List<InsertDefinition> list) in s.Inserts)
-                    _inserts[channel] = [.. list];
+                    _inserts[channel] = [.. list.Select(NormalizeInsertDefinition)];
                 rewire = true;
             }
             if (rewire) WireInputFeedsLocked();
@@ -785,7 +808,7 @@ public sealed class Mixer : IDisposable
             {
                 _inserts.Clear();
                 foreach ((string channel, List<InsertDefinition> list) in s.Inserts)
-                    _inserts[channel] = [.. list];
+                    _inserts[channel] = [.. list.Select(NormalizeInsertDefinition)];
                 rewire = true;
             }
             if (rewire) WireInputFeedsLocked();

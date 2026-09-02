@@ -10,7 +10,7 @@ Messages from the daemon, each a JSON object with a `type` field:
 |---|---|---|
 | `state` | on connect and on every change | device state, capabilities, mixer state, the device list, the app registry, profile names |
 | `meters` | 15 Hz while the mixer is built | live stereo levels per channel and mix |
-| `plugins` | in answer to `listPlugins` | the installed LV2 plugins |
+| `plugins` | in answer to `listPlugins` | installed LV2 plugins and their input-control metadata (range, default, type hints, scale points and unit) |
 | `error` | when a command is rejected | `message` |
 
 Commands are single JSON objects with a `type` field:
@@ -31,7 +31,7 @@ Commands are single JSON objects with a `type` field:
 | `listPlugins` | none | the installed LV2 plugins, answered with a `plugins` message |
 | `setInserts` | `channel`, `inserts[]` | replace a chain; `channel` is `xlr1`, `xlr2` or `mix:<id>`, each insert is `{id, kind:"lv2", plugin:<uri>, label?, bypass?, params?}` |
 | `setInsertBypass` | `channel`, `insertId`, `value` | bypass one insert |
-| `setInsertParam` | `channel`, `insertId`, `symbol`, `value` | one plugin control, by its LV2 port symbol |
+| `setInsertParam` | `channel`, `insertId`, `symbol`, `value` | one plugin control by its LV2 port symbol; the daemon rejects unknown ports and clamps/quantises values to the declared contract |
 | `assignApp` | `identity`, `channel`, `label?` | route an app (creates a registry entry if unseen) |
 | `assignStream` | `streamId`, `channel` | route one live stream by its PipeWire id; also remembered for the app |
 | `forgetApp` | `identity` | drop an app and its remembered channel |

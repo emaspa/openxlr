@@ -142,8 +142,11 @@ const paramInfo = (uri, symbol) => catalog.get(uri)?.params?.find((p) => p.symbo
 // Value to 0..100 along the control's own scale.
 function paramPct(p, v) {
   if (p.toggled) return v > 0 ? 100 : 0;
-  if (p.logarithmic && p.min > 0 && p.max > p.min)
-    return Math.round((Math.log(v / p.min) / Math.log(p.max / p.min)) * 100);
+  if (p.logarithmic && p.max > p.min) {
+    if (p.min > 0)
+      return Math.round((Math.log(v / p.min) / Math.log(p.max / p.min)) * 100);
+    return Math.round(Math.cbrt((v - p.min) / (p.max - p.min)) * 100);
+  }
   if (p.max === p.min) return 0;
   return Math.round(((v - p.min) / (p.max - p.min)) * 100);
 }
@@ -151,9 +154,9 @@ function paramText(p, v) {
   if (p.toggled) return v > 0 ? "ON" : "OFF";
   const sp = p.scalePoints?.find((s) => Math.abs(s.value - v) < 1e-6);
   if (sp) return sp.label;
-  if (p.integer) return String(Math.round(v));
+  if (p.integer) return `${Math.round(v)}${p.unitSymbol ? ` ${p.unitSymbol}` : ""}`;
   const a = Math.abs(v);
-  return v.toFixed(a >= 100 ? 0 : a >= 10 ? 1 : 2);
+  return `${v.toFixed(a >= 100 ? 0 : a >= 10 ? 1 : 2)}${p.unitSymbol ? ` ${p.unitSymbol}` : ""}`;
 }
 // One dial tick along the control's scale; enumerations step through
 // their scale points, toggles flip on any movement.
@@ -167,8 +170,12 @@ function paramStep(p, v, ticks) {
     return pts[Math.min(pts.length - 1, Math.max(0, i + Math.sign(ticks)))].value;
   }
   if (p.integer) return clamp(Math.round(v) + ticks);
-  if (p.logarithmic && p.min > 0 && p.max > p.min)
-    return clamp(v * Math.pow(p.max / p.min, ticks / 100));
+  if (p.logarithmic && p.max > p.min) {
+    if (p.min > 0) return clamp(v * Math.pow(p.max / p.min, ticks / 100));
+    const pos = Math.cbrt((clamp(v) - p.min) / (p.max - p.min));
+    const next = Math.min(1, Math.max(0, pos + ticks / 100));
+    return p.min + (p.max - p.min) * next * next * next;
+  }
   return clamp(v + ((p.max - p.min) / 100) * ticks);
 }
 

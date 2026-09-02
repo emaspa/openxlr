@@ -30,12 +30,39 @@ public sealed record InsertDefinition
 /// <summary>An insert as pushed to clients: its definition plus live status.</summary>
 public sealed record InsertStatus(InsertDefinition Insert, string? Error);
 
-/// <summary>A control port of a plugin, enough to build a sensible slider.</summary>
+/// <summary>
+/// A plugin control port as declared by LV2. Clients use this metadata to
+/// choose a switch, an enumeration selector, or a correctly scaled slider
+/// without requiring the plugin's toolkit-specific native UI.
+/// </summary>
 public sealed record PluginParam(
     string Symbol, string Name,
     double Min, double Max, double Default,
     bool Toggled, bool Integer, bool Logarithmic, bool Enumeration,
-    IReadOnlyList<ScalePoint> ScalePoints);
+    IReadOnlyList<ScalePoint> ScalePoints,
+    string? UnitSymbol = null)
+{
+    /// <summary>
+    /// Clamp and quantise an external value according to the port contract.
+    /// This is enforced in the daemon as well as represented in the UI, so a
+    /// hand-written WebSocket client cannot send invalid plugin state.
+    /// </summary>
+    public double Normalize(double value)
+    {
+        if (!double.IsFinite(value))
+            throw new ArgumentOutOfRangeException(nameof(value), "LV2 control values must be finite");
+
+        double low = Math.Min(Min, Max);
+        double high = Math.Max(Min, Max);
+        if (double.IsFinite(low) && double.IsFinite(high)) value = Math.Clamp(value, low, high);
+
+        if (Toggled) return value >= 0.5 ? 1.0 : 0.0;
+        if (Enumeration && ScalePoints.Count > 0)
+            return ScalePoints.MinBy(p => Math.Abs(p.Value - value))!.Value;
+        if (Integer) value = Math.Round(value);
+        return double.IsFinite(low) && double.IsFinite(high) ? Math.Clamp(value, low, high) : value;
+    }
+}
 
 public sealed record ScalePoint(string Label, double Value);
 

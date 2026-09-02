@@ -47,6 +47,7 @@
           <TextBlock Text="{Binding StateText}" Classes="h" VerticalAlignment="Center"/>
         </StackPanel>
         <TextBlock Text="{Binding Plugin}" Classes="h" FontSize="11"/>
+        <TextBlock Text="{Binding ControlsNote}" Classes="h" FontSize="11"/>
         <TextBlock Text="{Binding Error}" Foreground="#e0a05a" FontSize="11" IsVisible="{Binding HasError}"/>
       </StackPanel>
       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
@@ -70,16 +71,20 @@
               <ItemsControl ItemsSource="{Binding Params}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:InsertParamViewModel">
-                    <Grid ColumnDefinitions="200,*,72" Margin="0,0,0,4">
+                    <Grid ColumnDefinitions="200,*,110" Margin="0,0,0,4">
                       <TextBlock Text="{Binding Name}" Classes="h" VerticalAlignment="Center"
-                                 TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Symbol}"/>
-                      <Slider Grid.Column="1" Minimum="{Binding Min}" Maximum="{Binding Max}"
-                              Value="{Binding Value, Mode=TwoWay}" IsVisible="{Binding IsSlider}"
-                              TickFrequency="{Binding Step}" IsSnapToTickEnabled="{Binding Integer}"/>
+                                 TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Description}"/>
+                      <Slider Grid.Column="1" Minimum="{Binding SliderMinimum}" Maximum="{Binding SliderMaximum}"
+                              Value="{Binding SliderValue, Mode=TwoWay}" IsVisible="{Binding IsSlider}"
+                              TickFrequency="{Binding SliderStep}" IsSnapToTickEnabled="{Binding Integer}"/>
                       <CheckBox Grid.Column="1" IsChecked="{Binding On, Mode=TwoWay}" IsVisible="{Binding Toggled}"
                                 MinHeight="0" VerticalAlignment="Center"/>
+                      <ComboBox Grid.Column="1" ItemsSource="{Binding Options}"
+                                SelectedItem="{Binding SelectedOption, Mode=TwoWay}"
+                                IsVisible="{Binding IsEnumeration}" MinHeight="0"/>
                       <TextBlock Grid.Column="2" Text="{Binding ValueText}" Classes="val" FontSize="12"
-                                 VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                                 VerticalAlignment="Center" HorizontalAlignment="Right"
+                                 TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Description}"/>
                     </Grid>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
