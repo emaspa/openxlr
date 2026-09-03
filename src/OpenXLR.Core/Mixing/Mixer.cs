@@ -112,6 +112,11 @@ public sealed class Mixer : IDisposable
             foreach (MixDefinition mix in config.Mixes)
             {
                 _pw.CreateNullSink(mix.SinkName, $"OpenXLR {mix.Name}");
+                // A freshly loaded sink's own mute flag isn't guaranteed unmuted
+                // (PipeWire/WirePlumber may carry over a muted state from a prior
+                // node with this name), so assert it explicitly rather than
+                // trusting the module's default.
+                _pw.SetSinkMuted(mix.SinkName, mix.Muted);
                 _mixVolume[mix.Id] = mix.Volume;
                 if (mix.Muted) _mixMuted.Add(mix.Id);
             }
@@ -130,6 +135,9 @@ public sealed class Mixer : IDisposable
                 _combineModules[ch.Id] = _pw.CreateCombineSink(ch.SinkName,
                     config.Mixes.Select(m => m.SinkName),
                     $"OpenXLR {ch.Name}");
+                // Channels have no whole-channel mute concept (only per-mix
+                // legs do), so the sink itself must always come up unmuted.
+                _pw.SetSinkMuted(ch.SinkName, false);
             }
             DiscoverLegsLocked();
 
@@ -143,6 +151,9 @@ public sealed class Mixer : IDisposable
             foreach (MixDefinition mix in config.Mixes.Where(m => m.Kind == MixKind.VirtualMic))
             {
                 _pw.CreateNullSink(mix.PostSinkName, $"OpenXLR {mix.Name} (post)");
+                // The post sink has no mute concept of its own; a muted sink
+                // silences its monitor too, which would starve the virtual mic.
+                _pw.SetSinkMuted(mix.PostSinkName, false);
                 _pw.CreateVirtualMic(mix.VirtualMicName, $"{mix.PostSinkName}.monitor", $"OpenXLR {mix.Name}");
             }
 
