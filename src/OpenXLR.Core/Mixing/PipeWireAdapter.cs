@@ -469,6 +469,11 @@ public sealed class PipeWireAdapter
                 $"PipeWire filter chain did not create the required ports for {missing}" +
                 (detail.Length == 0 ? "" : $": {detail}"));
         }
+        // Same as every other sink this adapter creates: a freshly loaded
+        // node's own mute flag isn't guaranteed unmuted, so assert it rather
+        // than trusting the module's default. A muted capture half here
+        // silences the signal completely despite audio flowing into it.
+        SetSinkMuted(sinkName, false);
         return handle;
     }
 
