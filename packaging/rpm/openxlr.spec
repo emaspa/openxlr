@@ -5,7 +5,7 @@
 %global _build_id_links none
 
 Name:           openxlr
-Version:        0.1.22
+Version:        0.1.23
 Release:        1%{?dist}
 Summary:        Control suite and PipeWire submixer for Elgato XLR interfaces
 License:        GPL-3.0-only
@@ -133,6 +133,15 @@ MSG
 %{_datadir}/openxlr/
 
 %changelog
+* Sat Sep 05 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.23-1
+- Interfaces without settings memory (Wave XLR, XLR Dock) get their last settings back on every connect, and can be reset to the firmware defaults recorded after a power cycle.
+- Fedora COPR and Ubuntu PPA install channels; the README opens with the banner.
+- Control API token: every client presents a per-session token first; update the window and the OpenDeck plugin together with the daemon.
+- A device that hangs three USB transfers in one run is set aside instead of reconnected for ever; the window shows why.
+- Mixer settings that cannot be written are retried and shown in the window instead of vanishing; monitor feed commands are validated.
+- Private configuration files (0700/0600, UMask in the unit), deadlines on the control socket, bounded helper processes, quoted paths in generated units.
+- Release assets carry SHA-256 checksums and a build provenance attestation; the build pipeline is pinned.
+
 * Sat Sep 05 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.22-1
 - Daemon watchdog (Carina Schoppe, PR #18): the packaged unit is now a
   systemd notify service with a 60 s watchdog gated on device and mixer
