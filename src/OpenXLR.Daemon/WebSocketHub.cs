@@ -101,48 +101,18 @@ public sealed class WebSocketHub
         var buf = new byte[8 * 1024];
         while (client.Socket.State == WebSocketState.Open)
         {
-            using var ms = new MemoryStream();
-            WebSocketReceiveResult res;
-            do
-            {
-                try
-                {
-                    res = await client.Socket.ReceiveAsync(buf, _stopping);
-                }
-                catch (OperationCanceledException) when (_stopping.IsCancellationRequested)
-                {
-                    using var grace = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-                    try { await client.Socket.CloseAsync(WebSocketCloseStatus.EndpointUnavailable, "daemon stopping", grace.Token); }
-                    catch (Exception) { /* the client may already be gone */ }
-                    return;
-                }
-                if (res.MessageType == WebSocketMessageType.Close)
-                {
-                    await client.Socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
-                    return;
-                }
-                if (res.MessageType != WebSocketMessageType.Text)
-                {
-                    await client.Socket.CloseAsync(WebSocketCloseStatus.InvalidMessageType,
-                        "text messages only", CancellationToken.None);
-                    return;
-                }
-                if (ms.Length + res.Count > MaxCommandBytes)
-                {
-                    await client.Socket.CloseAsync(WebSocketCloseStatus.MessageTooBig,
-                        $"command exceeds {MaxCommandBytes} bytes", CancellationToken.None);
-                    return;
-                }
-                ms.Write(buf, 0, res.Count);
-            } while (!res.EndOfMessage);
+            // Every close in here is bounded and every fragmented message is
+            // on a deadline (SocketGuard), so a stalled peer frees its slot.
+            (SocketGuard.Outcome outcome, byte[]? message) = await SocketGuard.ReceiveMessageAsync(
+                client.Socket, buf, MaxCommandBytes, SocketGuard.MessageDeadline, _stopping);
+            if (outcome != SocketGuard.Outcome.Message || message is null) return;
 
             if (!client.Budget.TryTake())
             {
-                await client.Socket.CloseAsync(WebSocketCloseStatus.PolicyViolation,
-                    "too many commands", CancellationToken.None);
+                await SocketGuard.CloseAsync(client.Socket, WebSocketCloseStatus.PolicyViolation, "too many commands");
                 return;
             }
-            await Dispatch(client, Encoding.UTF8.GetString(ms.ToArray()));
+            await Dispatch(client, Encoding.UTF8.GetString(message));
         }
     }
 

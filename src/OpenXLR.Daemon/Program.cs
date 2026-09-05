@@ -47,7 +47,14 @@ app.Map("/ws", async (HttpContext ctx, WebSocketHub hub) =>
         ctx.Response.StatusCode = 403;
         return;
     }
-    using var socket = await ctx.WebSockets.AcceptWebSocketAsync();
+    // Transport pings every 30 s; a peer that stops answering them for 30 s
+    // is dropped, while a quiet but live client (the window listens for
+    // hours without sending) is never touched.
+    using var socket = await ctx.WebSockets.AcceptWebSocketAsync(new WebSocketAcceptContext
+    {
+        KeepAliveInterval = SocketGuard.KeepAliveInterval,
+        KeepAliveTimeout = SocketGuard.KeepAliveTimeout,
+    });
     await hub.HandleAsync(socket);
 });
 
