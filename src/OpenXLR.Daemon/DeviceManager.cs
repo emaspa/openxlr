@@ -231,14 +231,40 @@ public sealed class DeviceManager : BackgroundService
     /// </summary>
     private string? _lastUsbFault;
 
+    private readonly HungTransferPolicy _hung = new();
+    private string? _setAsideWarning;
+
+    /// <summary>
+    /// A condition about the hardware the user should see, or null: today,
+    /// a device set aside after repeated hung transfers.
+    /// </summary>
+    public string? Warning { get { lock (_gate) return _setAsideWarning; } }
+
     private void NoteHung(UsbHungException ex)
     {
-        string device = _device is null ? "no device"
-            : $"{_device.Info.DisplayName} {_device.Info.VendorId:x4}:{_device.Info.ProductId:x4}";
+        IAudioDevice? dev = _device;
+        string device = dev is null ? "no device"
+            : $"{dev.Info.DisplayName} {dev.Info.VendorId:x4}:{dev.Info.ProductId:x4}";
         _lastUsbFault = $"{DateTime.UtcNow:O} {device}, kernel {KernelRelease()}: {ex.Message}";
-        _log.LogError("{fault}. The device is dropped and reconnected in {s} s. " +
-                      "Please collect diagnostics (Options, SUPPORT) and attach the archive to an issue.",
-            _lastUsbFault, (int)HungReconnectDelay.TotalSeconds);
+        bool setAside = dev is not null && _hung.NoteHung(dev.Info.ProductId);
+        if (setAside)
+        {
+            // Every hung transfer leaves a parked thread and a handle behind;
+            // reconnecting for ever would collect them for ever. Everything
+            // else (the mixer, another interface) keeps running.
+            _setAsideWarning = $"{dev!.Info.DisplayName} hung {HungTransferPolicy.Limit} USB transfers in this run and is no longer driven; " +
+                               "unplug it and plug it back in, or restart the daemon, to try again.";
+            _log.LogError("{fault}. That is hung transfer {n} of {limit}: the device is set aside until it is replugged or the daemon restarts. " +
+                          "Please collect diagnostics (Options, SUPPORT) and attach the archive to an issue.",
+                _lastUsbFault, HungTransferPolicy.Limit, HungTransferPolicy.Limit);
+        }
+        else
+        {
+            _log.LogError("{fault}. The device is dropped and reconnected in {s} s (hung transfer {n} of {limit} before it is set aside). " +
+                          "Please collect diagnostics (Options, SUPPORT) and attach the archive to an issue.",
+                _lastUsbFault, (int)HungReconnectDelay.TotalSeconds,
+                dev is null ? 0 : _hung.HungCount(dev.Info.ProductId), HungTransferPolicy.Limit);
+        }
         _reconnectNotBefore = DateTime.UtcNow + HungReconnectDelay;
         Drop();
     }
@@ -257,12 +283,24 @@ public sealed class DeviceManager : BackgroundService
             _detected = [.. all.Select(d => d.Info)];
             foreach (ushort driven in _driven)
                 if (!all.Any(d => d.Info.ProductId == driven)) _absent.Add(driven);
+            // A device set aside for hanging gets a fresh start once it has
+            // been off the bus and back (its firmware restarted with it).
+            foreach (ushort aside in _hung.SetAside.ToList())
+            {
+                if (_absent.Contains(aside) && all.Any(d => d.Info.ProductId == aside))
+                {
+                    _hung.Returned(aside);
+                    _setAsideWarning = null;
+                    _log.LogInformation("{pid:x4} is back on the bus after being set aside; driving it again", aside);
+                }
+            }
             if (_device is { Connected: true }) return;
             if (DateTime.UtcNow < _reconnectNotBefore) return;
+            List<IAudioDevice> usable = [.. all.Where(d => !_hung.IsSetAside(d.Info.ProductId))];
             IAudioDevice? dev = _preferredPid is ushort pid
-                ? all.FirstOrDefault(d => d.Info.ProductId == pid) ?? (all.Count > 0 ? all[0] : null)
-                : all.Count > 0 ? all[0] : null;
-            if (dev is null) return;                    // nothing attached; try again next tick
+                ? usable.FirstOrDefault(d => d.Info.ProductId == pid) ?? (usable.Count > 0 ? usable[0] : null)
+                : usable.Count > 0 ? usable[0] : null;
+            if (dev is null) return;                    // nothing usable attached; try again next tick
             dev.Connect();
             _device = dev;
             _last = null;
