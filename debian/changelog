@@ -1,3 +1,21 @@
+openxlr (0.1.22) resolute; urgency=medium
+
+  * Daemon watchdog (Carina Schoppe, PR #18): the packaged unit is now a
+    systemd notify service with a 60 s watchdog gated on device and mixer
+    progress, restart on failure with a start limit, and a graceful stop
+    signal; a missing audio server degrades to device control instead of
+    restarting.
+  * Update notice (Carina Schoppe, PR #23): Options, UPDATES offers a manual
+    check against the project's releases and an opt-in daily check at
+    startup; off by default, nothing is downloaded or installed.
+  * About window: a thanks line with a link to the credits, and a link to
+    the new OpenXLR Discord server and subreddit, also in the README and the
+    manual.
+  * README: logo, Discord and release badges, credits listing every merged
+    and open pull request; roadmap brought to 0.1.22.
+
+ -- Emanuele Sparvoli <sparvoli@gmail.com>  Sat, 05 Sep 2026 18:04:53 +0100
+
 openxlr (0.1.21) resolute; urgency=medium
 
   * Application routing: an app can be set to "ignore" in its dropdown; its

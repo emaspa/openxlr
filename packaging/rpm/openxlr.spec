@@ -5,7 +5,7 @@
 %global _build_id_links none
 
 Name:           openxlr
-Version:        0.1.21
+Version:        0.1.22
 Release:        1%{?dist}
 Summary:        Control suite and PipeWire submixer for Elgato XLR interfaces
 License:        GPL-3.0-only
@@ -133,6 +133,21 @@ MSG
 %{_datadir}/openxlr/
 
 %changelog
+* Sat Sep 05 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.22-1
+- Daemon watchdog (Carina Schoppe, PR #18): the packaged unit is now a
+  systemd notify service with a 60 s watchdog gated on device and mixer
+  progress, restart on failure with a start limit, and a graceful stop
+  signal; a missing audio server degrades to device control instead of
+  restarting.
+- Update notice (Carina Schoppe, PR #23): Options, UPDATES offers a manual
+  check against the project's releases and an opt-in daily check at
+  startup; off by default, nothing is downloaded or installed.
+- About window: a thanks line with a link to the credits, and a link to
+  the new OpenXLR Discord server and subreddit, also in the README and the
+  manual.
+- README: logo, Discord and release badges, credits listing every merged
+  and open pull request; roadmap brought to 0.1.22.
+
 * Sat Sep 05 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.21-1
 - Application routing: an app can be set to "ignore" in its dropdown; its
   streams go back to the system default output and stay wherever the

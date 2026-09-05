@@ -12,7 +12,7 @@ behaviour verified on hardware before it ships. The project is small on
 purpose. It prefers one small, idiomatic change over a framework, and a
 feature that is measured over one that is described.
 
-## Where it stands (0.1.21)
+## Where it stands (0.1.22)
 
 - [x] Wave XLR Pro, XLR Dock (MK.1 and MK.2 modules), Wave XLR, Wave XLR
   MK.2: hardware controls, verified by owners of each device.
@@ -122,15 +122,13 @@ host mechanism stable than two half-finished ones.
 
 ## Next: daemon and integrations
 
-- [ ] Watchdog: systemd notify with a progress gate, restart on failure
+- [x] Watchdog: systemd notify with a progress gate, restart on failure
   with a start limit, a Restart button in the window, and a graceful
   signal so teardown always runs. Never a restart loop when the audio
-  server is down; the daemon degrades to device control instead. Merged
-  (#18), ships with the next release, which turns the packaged unit into
-  a notify service.
-- [ ] Update notice: an opt-in, throttled check against the project's
-  releases, presented once, never automatic installation. Merged (#23),
-  ships with the next release.
+  server is down; the daemon degrades to device control instead. The
+  packaged unit is a notify service since 0.1.22.
+- [x] Update notice: an opt-in, throttled check against the project's
+  releases, presented once, never automatic installation.
 - [ ] A documented, versioned local API for third parties, once client
   authentication exists on top of the origin check; today the WebSocket
   on the loopback is the API and the OpenDeck plugin is its reference

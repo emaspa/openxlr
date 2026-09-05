@@ -1,4 +1,11 @@
+<p align="center"><img src="src/OpenXLR.UI/Assets/icon-256.png" width="128" alt="OpenXLR"></p>
+
 # OpenXLR
+
+[![Discord](https://img.shields.io/badge/Discord-join%20the%20server-5865F2?logo=discord&logoColor=white)](https://discord.gg/4bswtnGPW4)
+[![Reddit](https://img.shields.io/badge/Reddit-r%2FOpenXLR-FF4500?logo=reddit&logoColor=white)](https://www.reddit.com/r/OpenXLR/)
+[![Latest release](https://img.shields.io/github/v/release/emaspa/openxlr?label=release)](https://github.com/emaspa/openxlr/releases)
+[![AUR](https://img.shields.io/aur/version/openxlr?label=AUR)](https://aur.archlinux.org/packages/openxlr)
 
 Native Linux control suite for Elgato XLR interfaces: full hardware
 control over reverse-engineered USB protocols, a Wave Link style
@@ -189,9 +196,10 @@ user service, updating and uninstalling:
 ## Community
 
 Support, hardware reports, feature requests and release news also live
-on the OpenXLR Discord server: [discord.gg/4bswtnGPW4](https://discord.gg/4bswtnGPW4).
-The window links to it from Options, About. Confirmed bugs still end up
-as GitHub issues, so either place works to start.
+on the OpenXLR Discord server, [discord.gg/4bswtnGPW4](https://discord.gg/4bswtnGPW4),
+and on Reddit at [r/OpenXLR](https://www.reddit.com/r/OpenXLR/). The
+window links to both from Options, About. Confirmed bugs still end up
+as GitHub issues, so any of the three works to start.
 
 ## Reporting problems
 

@@ -369,8 +369,9 @@ transfer, and that is what makes the report actionable.
 ### 5.8 Reporting a problem
 
 Ask on the OpenXLR Discord server (<https://discord.gg/4bswtnGPW4>,
-one post per problem in its support forum) or open a GitHub issue;
-either way, attach the diagnostics archive described below.
+one post per problem in its support forum), on Reddit at
+<https://www.reddit.com/r/OpenXLR/>, or open a GitHub issue; whichever
+you pick, attach the diagnostics archive described below.
 
 Options, SUPPORT, Collect diagnostics. It writes
 `~/openxlr-diagnostics-<timestamp>.tar.gz` with the daemon's state and
