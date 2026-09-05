@@ -73,7 +73,7 @@ Collect diagnostics).
   and recalled from the UI, the API or a Stream Deck key. One profile
   per device can be recalled on connect, so an interface comes up in a
   known scene at login or after a power cycle. Interfaces without
-  settings memory (Wave XLR, the XLR Dock modules) come back as they
+  settings memory (Wave XLR, the first XLR Dock) come back as they
   were left even without a profile, with a reset to firmware defaults.
 - **OpenDeck plugin**: key and dial actions for every switch, mute,
   level and insert, rendered with level meters and status LEDs. It is a

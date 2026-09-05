@@ -210,8 +210,8 @@ known scene at every login. The reconnect after a passing USB error
 does not count, so the recall never undoes changes you made since.
 Pick "(none)" to stop.
 
-**Interfaces without settings memory.** The Wave XLR and the XLR Dock
-modules keep nothing on board; unplugged, they come back with the
+**Interfaces without settings memory.** The Wave XLR and the first XLR
+Dock keep nothing on board; unplugged, they come back with the
 firmware's own values (full gain, headphones at 100%). For them the
 daemon remembers every change and writes it back whenever the
 interface connects fresh, so a reboot or a replug leaves you where you

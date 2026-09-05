@@ -59,6 +59,6 @@ public sealed class DeviceStateStoreTests
         Assert.True(new WaveXlrMk2Device().Capabilities.RetainsSettings);
         Assert.False(new WaveXlrMk1Device().Capabilities.RetainsSettings);
         Assert.False(new XlrDockDevice().Capabilities.RetainsSettings);
-        Assert.False(new XlrDockMk2Device().Capabilities.RetainsSettings);
+        Assert.True(new XlrDockMk2Device().Capabilities.RetainsSettings);   // verified: settings survive a replug
     }
 }

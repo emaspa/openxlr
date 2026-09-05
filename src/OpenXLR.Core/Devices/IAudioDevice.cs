@@ -112,8 +112,8 @@ public sealed record DeviceCapabilities
 
     /// <summary>
     /// Whether the hardware keeps its settings across a power cycle. The
-    /// Wave XLR Pro does; the Wave XLR and the XLR Dock modules have no
-    /// memory and come up with firmware defaults, so the daemon restores
+    /// Wave XLR Pro and the MK.2 family do; the Wave XLR and the first XLR
+    /// Dock have no memory and come up with firmware defaults, so the daemon restores
     /// the last settings it saw (or the recall-on-connect profile) whenever
     /// one of them connects fresh, and offers a reset to those defaults.
     /// </summary>

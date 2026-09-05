@@ -141,7 +141,7 @@ public sealed class MainViewModel : ViewModelBase
     private bool _capPhysicalControls = true;
     public bool CapPhysicalControls { get => _capPhysicalControls; set => Set(ref _capPhysicalControls, value); }
 
-    // Interfaces without settings memory (Wave XLR, the XLR Dock modules)
+    // Interfaces without settings memory (Wave XLR, the first XLR Dock)
     // get their last settings back on connect and can be reset to the
     // firmware defaults; devices that keep their own settings need neither.
     private bool _capRetainsSettings = true;
