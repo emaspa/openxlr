@@ -3,7 +3,7 @@
 [![Latest release](https://img.shields.io/github/v/release/emaspa/openxlr?label=release)](https://github.com/emaspa/openxlr/releases)
 [![AUR](https://img.shields.io/aur/version/openxlr?label=AUR)](https://aur.archlinux.org/packages/openxlr)
 [![COPR](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcopr.fedorainfracloud.org%2Fapi_3%2Fpackage%3Fownername%3Demaspa%26projectname%3Dopenxlr%26packagename%3Dopenxlr%26with_latest_succeeded_build%3DTrue&query=%24.builds.latest_succeeded.source_package.version&label=COPR&logo=fedora&logoColor=white&color=51A2DA)](https://copr.fedorainfracloud.org/coprs/emaspa/openxlr/)
-[![PPA](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.launchpad.net%2F1.0%2F~sparvoli%2F%2Barchive%2Fubuntu%2Fopenxlr%3Fws.op%3DgetPublishedSources%26distro_series%3Dhttps%3A%2F%2Fapi.launchpad.net%2F1.0%2Fubuntu%2Fnoble%26order_by_date%3Dtrue&query=%24.entries%5B0%5D.source_package_version&label=PPA&logo=ubuntu&logoColor=white&color=E95420)](https://launchpad.net/~sparvoli/+archive/ubuntu/openxlr)
+[![PPA](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.launchpad.net%2F1.0%2F~sparvoli%2F%2Barchive%2Fubuntu%2Fopenxlr%3Fws.op%3DgetPublishedSources%26distro_series%3Dhttps%3A%2F%2Fapi.launchpad.net%2F1.0%2Fubuntu%2Fresolute%26order_by_date%3Dtrue&query=%24.entries%5B0%5D.source_package_version&label=PPA&logo=ubuntu&logoColor=white&color=E95420)](https://launchpad.net/~sparvoli/+archive/ubuntu/openxlr)
 
 [![Discord](https://img.shields.io/badge/Discord-join%20the%20server-5865F2?logo=discord&logoColor=white)](https://discord.gg/4bswtnGPW4)
 [![Reddit](https://img.shields.io/badge/Reddit-r%2FOpenXLR-FF4500?logo=reddit&logoColor=white)](https://www.reddit.com/r/OpenXLR/)
