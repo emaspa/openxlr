@@ -170,8 +170,12 @@ public sealed class DeviceManager : BackgroundService
     /// </summary>
     public event Action<string>? DeviceArrived;
     private bool _everConnected;
-    private bool _sawAbsent;
     private ushort _lastPid;
+    // Every model this run has driven, and which of those have since been
+    // off the bus: a return after that is a power cycle for the model, even
+    // when the daemon fell back to another interface meanwhile.
+    private readonly HashSet<ushort> _driven = [];
+    private readonly HashSet<ushort> _absent = [];
 
     public StateMessage Snapshot()
     {
@@ -258,7 +262,8 @@ public sealed class DeviceManager : BackgroundService
         {
             IReadOnlyList<IAudioDevice> all = DeviceRegistry.DetectAll();
             _detected = [.. all.Select(d => d.Info)];
-            if (_everConnected && !all.Any(d => d.Info.ProductId == _lastPid)) _sawAbsent = true;
+            foreach (ushort driven in _driven)
+                if (!all.Any(d => d.Info.ProductId == driven)) _absent.Add(driven);
             if (_device is { Connected: true }) return;
             if (DateTime.UtcNow < _reconnectNotBefore) return;
             IAudioDevice? dev = _preferredPid is ushort pid
@@ -274,8 +279,8 @@ public sealed class DeviceManager : BackgroundService
             // poll wpctl for two minutes and then warn about a profile that
             // never exists.
             if (dev.Capabilities.OutputRouting) EnsureCardProfile(dev.Info);
-            bool fresh = !_everConnected || _sawAbsent || _lastPid != dev.Info.ProductId;
-            bool powerCycled = _sawAbsent;
+            bool powerCycled = _absent.Remove(dev.Info.ProductId);
+            bool fresh = !_everConnected || powerCycled || _lastPid != dev.Info.ProductId;
             if (fresh && !dev.Capabilities.RetainsSettings)
             {
                 // A device without settings memory: what it answers now is
@@ -298,8 +303,8 @@ public sealed class DeviceManager : BackgroundService
             }
             RaiseFromLocked();                          // push the initial state
             _everConnected = true;
-            _sawAbsent = false;
             _lastPid = dev.Info.ProductId;
+            _driven.Add(dev.Info.ProductId);
             if (fresh) DeviceArrived?.Invoke($"{dev.Info.VendorId:x4}:{dev.Info.ProductId:x4}");
         }
     }
