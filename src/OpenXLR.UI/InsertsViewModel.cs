@@ -9,7 +9,7 @@ using Avalonia.Threading;
 namespace OpenXLR.UI;
 
 /// <summary>A plugin the picker offers (mono in / mono out only for the mic path).</summary>
-public sealed record PluginChoice(string Uri, string Name, string Category, JsonNode Params)
+public sealed record PluginChoice(string Uri, string Name, string Category, JsonNode Params, bool NativeEditorAvailable = false)
 {
     public override string ToString() => Category.Length > 0 ? $"{Name}  ({Category})" : Name;
 }
@@ -39,6 +39,9 @@ public sealed class InsertsViewModel : ViewModelBase
 
     /// <summary>What the chain belongs to, for window titles ("XLR 1", "Stream mix").</summary>
     public string Title { get; }
+
+    public Task ShowNativeEditorAsync(InsertViewModel insert)
+        => _client.ShowInsertUiAsync(_channel, insert.Id);
 
     /// <summary>Picker header: which plugins fit this chain.</summary>
     public string PickerHint => _channels == 1
@@ -106,7 +109,8 @@ public sealed class InsertsViewModel : ViewModelBase
                     p["plugin"]!.GetValue<string>(),
                     p["name"]?.GetValue<string>() ?? p["plugin"]!.GetValue<string>(),
                     p["category"]?.GetValue<string>() ?? "",
-                    p["params"] ?? new JsonArray()));
+                    p["params"] ?? new JsonArray(),
+                    p["nativeEditorAvailable"]?.GetValue<bool>() == true));
             }
             string width = _channels == 1 ? "mono" : "stereo";
             Note = PluginChoices.Count == 0
@@ -138,7 +142,8 @@ public sealed class InsertsViewModel : ViewModelBase
                 string id = ins["id"]!.GetValue<string>();
                 if (!byId.TryGetValue(id, out InsertViewModel? vm))
                     vm = new InsertViewModel(this, id, ins["plugin"]!.GetValue<string>(), ins["label"]?.GetValue<string>() ?? id);
-                vm.ApplyFromDaemon(ins, entry?["error"]?.GetValue<string>());
+                vm.ApplyFromDaemon(ins, entry?["error"]?.GetValue<string>(),
+                    entry?["nativeHostRunning"]?.GetValue<bool>() == true);
                 next.Add(vm);
             }
             if (!next.SequenceEqual(Items))
@@ -226,6 +231,8 @@ public sealed class InsertViewModel : ViewModelBase
 
     /// <summary>The channel chain this insert belongs to (row buttons route through it).</summary>
     public InsertsViewModel Owner => _owner;
+    public bool NativeEditorSupported => _owner.PluginChoices.Any(p => p.Uri == Plugin && p.NativeEditorAvailable);
+    public bool NativeEditorAvailable => NativeEditorSupported && !Bypass && !HasError && NativeHostRunning;
 
     private readonly Dictionary<string, double> _params = [];
 
@@ -233,16 +240,23 @@ public sealed class InsertViewModel : ViewModelBase
     public bool Bypass
     {
         get => _bypass;
-        set { if (Set(ref _bypass, value)) { Raise(nameof(StateText)); Raise(nameof(IsActive)); _owner.SendBypass(this, value); } }
+        set { if (Set(ref _bypass, value)) { Raise(nameof(StateText)); Raise(nameof(IsActive)); Raise(nameof(NativeEditorAvailable)); _owner.SendBypass(this, value); } }
     }
 
     private string? _error;
     public string? Error
     {
         get => _error;
-        private set { if (Set(ref _error, value)) { Raise(nameof(HasError)); Raise(nameof(StateText)); Raise(nameof(IsActive)); } }
+        private set { if (Set(ref _error, value)) { Raise(nameof(HasError)); Raise(nameof(StateText)); Raise(nameof(IsActive)); Raise(nameof(NativeEditorAvailable)); } }
     }
     public bool HasError => _error is not null;
+
+    private bool _nativeHostRunning;
+    public bool NativeHostRunning
+    {
+        get => _nativeHostRunning;
+        private set { if (Set(ref _nativeHostRunning, value)) Raise(nameof(NativeEditorAvailable)); }
+    }
 
     public string StateText => HasError ? "problem" : Bypass ? "bypassed" : "active";
 
@@ -317,13 +331,15 @@ public sealed class InsertViewModel : ViewModelBase
                 Groups.Add(new InsertParamGroup(g, true, l));
     }
 
-    public void ApplyFromDaemon(JsonNode ins, string? error)
+    public void ApplyFromDaemon(JsonNode ins, string? error, bool nativeHostRunning)
     {
         _bypass = ins["bypass"]?.GetValue<bool>() ?? false;
         Raise(nameof(Bypass));
         Raise(nameof(StateText));
         Raise(nameof(IsActive));
+        Raise(nameof(NativeEditorAvailable));
         Error = error;
+        NativeHostRunning = nativeHostRunning;
         _params.Clear();
         if (ins["params"] is JsonObject po)
             foreach ((string k, JsonNode? v) in po)
@@ -347,6 +363,8 @@ public sealed class InsertViewModel : ViewModelBase
 
     private void BuildParams()
     {
+        Raise(nameof(NativeEditorSupported));
+        Raise(nameof(NativeEditorAvailable));
         if (_owner.ParamsFor(Plugin) is not JsonArray arr) return;
         foreach (JsonNode? p in arr)
         {

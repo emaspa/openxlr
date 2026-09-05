@@ -195,6 +195,7 @@ public sealed class WebSocketHub
             case "setInserts":
             case "setInsertBypass":
             case "setInsertParam":
+            case "showInsertUi":
                 string? mixErr = _mixer.Apply(cmd);                     // broadcasts on success
                 if (mixErr is not null)
                 {

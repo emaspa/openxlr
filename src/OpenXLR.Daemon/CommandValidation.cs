@@ -93,8 +93,9 @@ public static class CommandValidation
                 }
                 return null;
             case "setInsertBypass":
-                if (cmd.Channel is not null && !layout.IsInsertKey(cmd.Channel)) return $"setInsertBypass: '{Short(cmd.Channel)}' has no insert chain";
-                return TooLong(cmd.InsertId, MaxInsertId) ? "setInsertBypass: insert id too long" : null;
+            case "showInsertUi":
+                if (cmd.Channel is not null && !layout.IsInsertKey(cmd.Channel)) return $"{cmd.Cmd}: '{Short(cmd.Channel)}' has no insert chain";
+                return TooLong(cmd.InsertId, MaxInsertId) ? $"{cmd.Cmd}: insert id too long" : null;
             case "setInsertParam":
                 if (cmd.Channel is not null && !layout.IsInsertKey(cmd.Channel)) return $"setInsertParam: '{Short(cmd.Channel)}' has no insert chain";
                 if (TooLong(cmd.InsertId, MaxInsertId) || TooLong(cmd.Symbol, MaxText)) return "setInsertParam: id or symbol too long";

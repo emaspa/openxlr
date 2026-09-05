@@ -389,13 +389,13 @@ public sealed class Mixer : IDisposable, ILayoutInfo
             foreach (MixDefinition mix in _config.Mixes)
             {
                 string key = MixKey(mix);
-                if (_chains.TryGetValue(key, out FilterHandle? c) && c.Process.HasExited)
+                if (_chains.TryGetValue(key, out FilterHandle? c) && !c.IsAlive)
                 {
                     WireMixChainLocked(mix);
                     changed = true;
                 }
             }
-            bool inputBroken = _chains.Where(e => !e.Key.StartsWith("mix:", StringComparison.Ordinal)).Any(e => e.Value.Process.HasExited)
+            bool inputBroken = _chains.Where(e => !e.Key.StartsWith("mix:", StringComparison.Ordinal)).Any(e => !e.Value.IsAlive)
                 || _chainOuts.Values.Any(l => _pw.EnsureLinks(l) == LinkHealth.Broken);
             if (inputBroken) { WireInputFeedsLocked(); changed = true; }
             return changed;
@@ -710,6 +710,41 @@ public sealed class Mixer : IDisposable, ILayoutInfo
     /// Set one control of an insert. Applied live to the running chain when
     /// possible (no dropout); a chain that cannot take it is rebuilt.
     /// </summary>
+    public void ShowInsertUi(string channel, string insertId)
+    {
+        lock (_gate)
+        {
+            NativePluginHost? host = _chains.GetValueOrDefault(channel)?.InsertStages
+                .FirstOrDefault(stage => stage.Id == insertId).Stage?.NativeHost;
+            if (host is null)
+                throw new InvalidOperationException("No native editor is running for this insert. Enable it and install the optional native host.");
+            host.ShowUi();
+        }
+    }
+
+    /// <summary>Collect editor changes on the same path used to persist ordinary controls.</summary>
+    public bool SyncPluginControls()
+    {
+        lock (_gate)
+        {
+            bool changed = false;
+            foreach ((string channel, FilterHandle chain) in _chains)
+                foreach ((string id, FilterHandle stage) in chain.InsertStages)
+                {
+                    if (stage.NativeHost is not { } host) continue;
+                    foreach ((string symbol, double value) in host.DrainChanges())
+                    {
+                        InsertDefinition? insert = InsertsFor(channel).FirstOrDefault(i => i.Id == id);
+                        PluginParam? parameter = insert is null ? null : Lv2Catalog.Find(insert.Plugin)?.Params.FirstOrDefault(p => p.Symbol == symbol);
+                        if (parameter is null || !double.IsFinite(value)) continue;
+                        insert!.Params[symbol] = Math.Clamp(value, parameter.Min, parameter.Max);
+                        changed = true;
+                    }
+                }
+            return changed;
+        }
+    }
+
     public void SetInsertParam(string channel, string insertId, string symbol, double value)
     {
         lock (_gate)
@@ -736,10 +771,15 @@ public sealed class Mixer : IDisposable, ILayoutInfo
         var result = new Dictionary<string, IReadOnlyList<InsertStatus>>();
         foreach ((string channel, List<InsertDefinition> list) in _inserts)
         {
-            result[channel] = [.. list.Select(i => new InsertStatus(i,
-                Lv2Catalog.Find(i.Plugin) is null ? "plugin not installed"
-                : !i.Bypass && _insertErrors.TryGetValue(channel, out string? err) ? err
-                : null))];
+            result[channel] = [.. list.Select(i =>
+            {
+                NativePluginHost? host = _chains.GetValueOrDefault(channel)?.InsertStages
+                    .FirstOrDefault(stage => stage.Id == i.Id).Stage?.NativeHost;
+                return new InsertStatus(i,
+                    Lv2Catalog.Find(i.Plugin) is null ? "plugin not installed"
+                    : !i.Bypass && _insertErrors.TryGetValue(channel, out string? err) ? err
+                    : null, host?.Meters, host?.IsRunning == true);
+            })];
         }
         return result;
     }

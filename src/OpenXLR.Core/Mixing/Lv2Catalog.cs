@@ -167,10 +167,53 @@ public static class Lv2Catalog
             }
             Lilv.lilv_nodes_free(req);
         }
+        IReadOnlyList<string>? uiFeatures = X11UiRequiredFeatures(world, plugin);
         return new PluginInfo("lv2", uri, name, category, audioIns, audioOuts, inSym, outSym, pars, features, inSyms, outSyms)
         {
             UnsupportedFeatures = UnsupportedFeatures(features),
+            HasNativeUi = uiFeatures is not null,
+            NativeUiRequiredFeatures = uiFeatures ?? [],
         };
+    }
+
+    /// <summary>
+    /// Required features of the X11 UI the native helper will select (the
+    /// first one in lilv's catalog order), or null when there is no X11 UI.
+    /// </summary>
+    private static IReadOnlyList<string>? X11UiRequiredFeatures(IntPtr world, IntPtr plugin)
+    {
+        IntPtr uis = Lilv.lilv_plugin_get_uis(plugin);
+        if (uis == IntPtr.Zero) return null;
+        IntPtr type = Lilv.lilv_new_uri(world, "http://lv2plug.in/ns/extensions/ui#X11UI");
+        IntPtr requiredFeature = Lilv.lilv_new_uri(world, "http://lv2plug.in/ns/lv2core#requiredFeature");
+        try
+        {
+            for (IntPtr it = Lilv.lilv_uis_begin(uis); !Lilv.lilv_uis_is_end(uis, it); it = Lilv.lilv_uis_next(uis, it))
+            {
+                IntPtr ui = Lilv.lilv_uis_get(uis, it);
+                if (!Lilv.lilv_ui_is_a(ui, type)) continue;
+                var features = new List<string>();
+                IntPtr required = Lilv.lilv_world_find_nodes(
+                    world, Lilv.lilv_ui_get_uri(ui), requiredFeature, IntPtr.Zero);
+                if (required != IntPtr.Zero)
+                {
+                    for (IntPtr fit = Lilv.lilv_nodes_begin(required); !Lilv.lilv_nodes_is_end(required, fit); fit = Lilv.lilv_nodes_next(required, fit))
+                    {
+                        string? feature = Lilv.Str(Lilv.lilv_node_as_uri(Lilv.lilv_nodes_get(required, fit)));
+                        if (feature is not null) features.Add(feature);
+                    }
+                    Lilv.lilv_nodes_free(required);
+                }
+                return features;
+            }
+            return null;
+        }
+        finally
+        {
+            Lilv.lilv_node_free(requiredFeature);
+            Lilv.lilv_node_free(type);
+            Lilv.lilv_uis_free(uis);
+        }
     }
 
     /// <summary>The slice of liblilv this catalog uses.</summary>
@@ -182,6 +225,7 @@ public static class Lv2Catalog
         [DllImport(Lib)] public static extern void lilv_world_free(IntPtr world);
         [DllImport(Lib)] public static extern void lilv_world_load_all(IntPtr world);
         [DllImport(Lib)] public static extern IntPtr lilv_world_get_all_plugins(IntPtr world);
+        [DllImport(Lib)] public static extern IntPtr lilv_world_find_nodes(IntPtr world, IntPtr subject, IntPtr predicate, IntPtr obj);
         [DllImport(Lib)] public static extern IntPtr lilv_new_uri(IntPtr world, [MarshalAs(UnmanagedType.LPUTF8Str)] string uri);
         [DllImport(Lib)] public static extern void lilv_node_free(IntPtr node);
         [DllImport(Lib)] public static extern IntPtr lilv_node_as_uri(IntPtr node);
@@ -203,6 +247,14 @@ public static class Lv2Catalog
         [DllImport(Lib)] public static extern IntPtr lilv_plugin_get_port_by_index(IntPtr plugin, uint index);
         [DllImport(Lib)] public static extern void lilv_plugin_get_port_ranges_float(IntPtr plugin, float[] mins, float[] maxs, float[] defs);
         [DllImport(Lib)] public static extern IntPtr lilv_plugin_get_required_features(IntPtr plugin);
+        [DllImport(Lib)] public static extern IntPtr lilv_plugin_get_uis(IntPtr plugin);
+        [DllImport(Lib)] public static extern IntPtr lilv_uis_begin(IntPtr uis);
+        [DllImport(Lib)][return: MarshalAs(UnmanagedType.I1)] public static extern bool lilv_uis_is_end(IntPtr uis, IntPtr iterator);
+        [DllImport(Lib)] public static extern IntPtr lilv_uis_next(IntPtr uis, IntPtr iterator);
+        [DllImport(Lib)] public static extern IntPtr lilv_uis_get(IntPtr uis, IntPtr iterator);
+        [DllImport(Lib)] public static extern IntPtr lilv_ui_get_uri(IntPtr ui);
+        [DllImport(Lib)][return: MarshalAs(UnmanagedType.I1)] public static extern bool lilv_ui_is_a(IntPtr ui, IntPtr type);
+        [DllImport(Lib)] public static extern void lilv_uis_free(IntPtr uis);
 
         [DllImport(Lib)] [return: MarshalAs(UnmanagedType.I1)] public static extern bool lilv_port_is_a(IntPtr plugin, IntPtr port, IntPtr cls);
         [DllImport(Lib)] [return: MarshalAs(UnmanagedType.I1)] public static extern bool lilv_port_has_property(IntPtr plugin, IntPtr port, IntPtr prop);

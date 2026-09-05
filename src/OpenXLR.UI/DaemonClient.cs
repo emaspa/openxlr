@@ -272,6 +272,10 @@ public sealed class DaemonClient : IAsyncDisposable
         => SendAsync(new Dictionary<string, object>
         { ["cmd"] = "setInsertBypass", ["channel"] = channel, ["insertId"] = insertId, ["value"] = bypass });
 
+    public Task ShowInsertUiAsync(string channel, string insertId)
+        => SendAsync(new Dictionary<string, object>
+        { ["cmd"] = "showInsertUi", ["channel"] = channel, ["insertId"] = insertId });
+
     public Task SetInsertParamAsync(string channel, string insertId, string symbol, double value)
         => SendAsync(new Dictionary<string, object>
         { ["cmd"] = "setInsertParam", ["channel"] = channel, ["insertId"] = insertId, ["symbol"] = symbol, ["value"] = value });
