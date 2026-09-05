@@ -888,6 +888,10 @@ public sealed class MainViewModel : ViewModelBase
                 (c, vm) => vm.ApplyFromDaemon(c),
                 c => new ChannelViewModel(_client, c["id"]!.GetValue<string>(), c["name"]!.GetValue<string>(),
                     [.. Mixes.Select(m => m.Id)]));
+            // Send rows carry the mix's name, not its id.
+            foreach (ChannelViewModel c in Channels)
+                foreach (SendViewModel send in c.Sends)
+                    send.MixName = Mixes.FirstOrDefault(m => m.Id == send.MixId)?.Name ?? send.MixId;
             // Hardware input tiles only make sense for jacks the active
             // device has; without a device, show everything as before.
             foreach (ChannelViewModel c in Channels)
@@ -1193,10 +1197,14 @@ public sealed class SendViewModel : ViewModelBase
 
     public SendViewModel(DaemonClient client, string channelId, string mixId)
     {
-        _client = client; _channelId = channelId; MixId = mixId;
+        _client = client; _channelId = channelId; MixId = mixId; _mixName = mixId;
     }
 
     public string MixId { get; }
+
+    private string _mixName;
+    /// <summary>The mix's display name for the row header (the id until the mixes are known).</summary>
+    public string MixName { get => _mixName; set => Set(ref _mixName, value); }
 
     private bool _visible = true;
     public bool Visible { get => _visible; set => Set(ref _visible, value); }

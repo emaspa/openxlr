@@ -439,12 +439,13 @@
                           Content="{Binding MonitorSummary}">
             <DropDownButton.Flyout>
               <Flyout Placement="BottomEdgeAlignedLeft">
-                <ItemsControl ItemsSource="{Binding MonitorOutputs}" Width="460">
+                <ItemsControl ItemsSource="{Binding MonitorOutputs}" Width="400">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:MonitorOutputItem">
-                      <!-- fixed row width: the label trims, the feed picker keeps
-                           its place, and the flyout never scrolls sideways -->
-                      <Grid ColumnDefinitions="*,116">
+                      <!-- fixed row width under the flyout presenter's default
+                           maximum (456 px including its padding): the label
+                           trims, the feed picker keeps its place, nothing clips -->
+                      <Grid ColumnDefinitions="*,120">
                         <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" Padding="8,4"
                                   HorizontalAlignment="Stretch" ToolTip.Tip="{Binding Label}">
                           <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis"/>
@@ -607,7 +608,7 @@
                         <DataTemplate x:DataType="vm:SendViewModel">
                           <StackPanel Margin="0,0,0,8" Spacing="1" IsVisible="{Binding Visible}">
                             <Grid ColumnDefinitions="*,Auto">
-                              <TextBlock Text="{Binding MixId}" Classes="h" FontSize="11"/>
+                              <TextBlock Text="{Binding MixName}" Classes="h" FontSize="11"/>
                               <TextBlock Grid.Column="1" Text="{Binding LevelText}" Classes="val" FontSize="11"/>
                             </Grid>
                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
