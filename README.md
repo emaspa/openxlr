@@ -1,6 +1,4 @@
-<p align="center"><img src="src/OpenXLR.UI/Assets/icon-256.png" width="128" alt="OpenXLR"></p>
-
-# OpenXLR
+![OpenXLR](docs/banner.png)
 
 [![Discord](https://img.shields.io/badge/Discord-join%20the%20server-5865F2?logo=discord&logoColor=white)](https://discord.gg/4bswtnGPW4)
 [![Reddit](https://img.shields.io/badge/Reddit-r%2FOpenXLR-FF4500?logo=reddit&logoColor=white)](https://www.reddit.com/r/OpenXLR/)
