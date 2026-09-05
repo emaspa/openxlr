@@ -6,5 +6,8 @@
          NETSDK1226. Disabling the prune optimization is harmless (it only trims
          framework-provided transitive packages, which we don't rely on). -->
     <AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
+    <!-- packages.lock.json per project: CI restores in locked mode, so a
+         build only ever sees the package graph that was committed. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
 </Project>

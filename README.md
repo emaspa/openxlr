@@ -109,7 +109,9 @@ mute, level and insert is a target.
 
 Packages exist for Arch (AUR), Ubuntu (PPA), Fedora (COPR) and NixOS
 (flake); every release also carries a `.deb` and an `.rpm` for a manual
-install. Pick your distribution:
+install, with SHA-256 checksums and a GitHub build provenance
+attestation (`gh attestation verify <file> --owner emaspa`). Pick your
+distribution:
 
 **Arch Linux**, from the
 [AUR](https://aur.archlinux.org/packages/openxlr):
