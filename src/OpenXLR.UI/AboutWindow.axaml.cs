@@ -18,6 +18,7 @@ public partial class AboutWindow : Window
 
     private void OnRepo(object? sender, RoutedEventArgs e) => OpenUrl("https://github.com/emaspa/openxlr");
     private void OnCredits(object? sender, RoutedEventArgs e) => OpenUrl("https://github.com/emaspa/openxlr#credits");
+    private void OnDiscord(object? sender, RoutedEventArgs e) => OpenUrl("https://discord.gg/4bswtnGPW4");
     private void OnCoffee(object? sender, RoutedEventArgs e) => OpenUrl("https://buymeacoffee.com/emaspa");
     private void OnClose(object? sender, RoutedEventArgs e) => Close();
 }

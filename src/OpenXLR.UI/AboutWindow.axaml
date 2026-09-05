@@ -40,6 +40,7 @@
     <StackPanel Spacing="2" Margin="0,4,0,0">
       <Button Classes="link" Content="github.com/emaspa/openxlr" Click="OnRepo"/>
       <Button Classes="link" Content="Contributors and credits" Click="OnCredits"/>
+      <Button Classes="link" Content="Discord community" Click="OnDiscord"/>
       <Button Classes="link" Content="Buy me a coffee ☕" Click="OnCoffee"/>
     </StackPanel>
 

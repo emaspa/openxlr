@@ -186,12 +186,20 @@ user service, updating and uninstalling:
 - [USB capture guide](docs/usb-capture.md): how to capture Wave Link
   traffic for an untested device
 
+## Community
+
+Support, hardware reports, feature requests and release news also live
+on the OpenXLR Discord server: [discord.gg/4bswtnGPW4](https://discord.gg/4bswtnGPW4).
+The window links to it from Options, About. Confirmed bugs still end up
+as GitHub issues, so either place works to start.
+
 ## Reporting problems
 
 Open Options, then SUPPORT, then Collect diagnostics. It writes
 `~/openxlr-diagnostics-<timestamp>.tar.gz` with the app and device
 state, a raw vendor-block dump, the PipeWire graph, daemon logs and
-configs. Nothing gets uploaded; attach the archive to an issue yourself.
+configs. Nothing gets uploaded; attach the archive to an issue, or to a
+post in the Discord support forum, yourself.
 
 ## Credits
 
