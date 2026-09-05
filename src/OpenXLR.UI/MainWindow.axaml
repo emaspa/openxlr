@@ -439,16 +439,20 @@
                           Content="{Binding MonitorSummary}">
             <DropDownButton.Flyout>
               <Flyout Placement="BottomEdgeAlignedLeft">
-                <ItemsControl ItemsSource="{Binding MonitorOutputs}" MinWidth="320">
+                <ItemsControl ItemsSource="{Binding MonitorOutputs}" Width="460">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:MonitorOutputItem">
-                      <Grid ColumnDefinitions="*,Auto">
-                        <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                  Padding="8,4" HorizontalAlignment="Stretch"/>
+                      <!-- fixed row width: the label trims, the feed picker keeps
+                           its place, and the flyout never scrolls sideways -->
+                      <Grid ColumnDefinitions="*,116">
+                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" Padding="8,4"
+                                  HorizontalAlignment="Stretch" ToolTip.Tip="{Binding Label}">
+                          <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis"/>
+                        </CheckBox>
                         <ComboBox Grid.Column="1" ItemsSource="{Binding Feeds}" SelectedItem="{Binding Feed}"
-                                  FontSize="11" MinWidth="100" Margin="8,0,0,0" VerticalAlignment="Center"
+                                  FontSize="11" HorizontalAlignment="Stretch" Margin="8,0,0,0" VerticalAlignment="Center"
                                   IsVisible="{Binding IsSelected}"
-                                  ToolTip.Tip="Which monitor mix this output hears. Monitor 2 gets its own column in the submixer once an output uses it, so a headset with a game side and a chat side can hear two different selections."/>
+                                  ToolTip.Tip="Which monitor mix this output hears, so a headset with a game side and a chat side can hear two different selections."/>
                       </Grid>
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>

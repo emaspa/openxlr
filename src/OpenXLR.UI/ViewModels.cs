@@ -874,17 +874,7 @@ public sealed class MainViewModel : ViewModelBase
             // once the channels have synced).
             foreach (MixViewModel mv in Mixes.Where(mv => mv.IsAuxPort))
                 mv.Visible = !DeviceConnected || CapOutputRouting;
-            // A second monitor mix earns its column once an output is fed by
-            // it (the MONITOR card's per-output feed picker); until then it
-            // stays out of the way.
-            string? primaryMonitor = Mixes.FirstOrDefault(m => m.Kind == "monitor")?.Id;
-            var fedMixes = (mixer["monitorFeeds"] as JsonObject)?
-                .Select(kv => kv.Value?.GetValue<string>()).Where(v => v is not null).ToHashSet() ?? [];
-            foreach (MixViewModel mv in Mixes.Where(m => m.Kind == "monitor" && m.Id != primaryMonitor))
-            {
-                mv.IsSecondaryMonitor = true;
-                mv.Visible = fedMixes.Contains(mv.Id);
-            }
+
             foreach (MixViewModel mv in Mixes)
             {
                 mv.Inserts.Apply(mixer["inserts"]?[$"mix:{mv.Id}"]);
@@ -910,9 +900,6 @@ public sealed class MainViewModel : ViewModelBase
                 };
                 foreach (SendViewModel send in c.Sends.Where(s => s.MixId == "auxout"))
                     send.Visible = !DeviceConnected || CapOutputRouting;
-                foreach (SendViewModel send in c.Sends)
-                    if (Mixes.FirstOrDefault(m => m.Id == send.MixId) is { IsSecondaryMonitor: true } second)
-                        send.Visible = second.Visible;
             }
         }
     }
@@ -1101,9 +1088,6 @@ public sealed class MixViewModel : ViewModelBase, IHasId
 
     /// <summary>"monitor", "virtualMic" or "auxPort", as the daemon reports it.</summary>
     public string Kind { get; set; } = "monitor";
-
-    /// <summary>A monitor mix other than the first: shown only while an output is fed by it.</summary>
-    public bool IsSecondaryMonitor { get; set; }
 
     private double _volume = 1.0;
     public double Volume

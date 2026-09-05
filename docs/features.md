@@ -67,7 +67,7 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
 - Channels for the hardware inputs (XLR 1, XLR 2, Aux In) and for
   application groups (Game, Music, Browser, System, Voice Chat, SFX)
 - Five mixes: Monitor (what you hear), Monitor 2 (a second selection
-  for outputs that should hear something else, shown once one uses it),
+  for outputs that should hear something else),
   Stream and Chat (published as the capture devices `OpenXLR Stream` and
   `OpenXLR Chat`, selectable in OBS or Discord like a microphone), and
   Aux (what a second computer on the USB Aux port receives)
