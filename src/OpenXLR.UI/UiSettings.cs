@@ -18,6 +18,12 @@ public sealed record UiSettings
     public bool OpenWindowAtLogin { get; init; }
     public bool MinimizeToTray { get; init; }
     public bool StartMinimized { get; init; }
+    /// <summary>Opt-in only. False means the UI performs no startup network request.</summary>
+    public bool CheckForUpdates { get; init; }
+    /// <summary>Successful or failed automatic checks are limited to once per day.</summary>
+    public DateTimeOffset? LastUpdateCheckUtc { get; init; }
+    /// <summary>Release tag whose banner the user dismissed.</summary>
+    public string? DismissedUpdate { get; init; }
     /// <summary>Names of the main window's tiles the user collapsed (INPUTS, HEADPHONES, ...).</summary>
     public IReadOnlyList<string> CollapsedSections { get; init; } = [];
 
@@ -27,16 +33,7 @@ public sealed record UiSettings
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     };
 
-    public static string ConfigDir
-    {
-        get
-        {
-            string baseDir = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME") is { Length: > 0 } x
-                ? x
-                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config");
-            return Path.Combine(baseDir, "openxlr");
-        }
-    }
+    public static string ConfigDir => OpenXlrPaths.ConfigDir;
 
     private static string FilePath => Path.Combine(ConfigDir, "ui.json");
 
@@ -53,13 +50,7 @@ public sealed record UiSettings
 
     public void Save()
     {
-        try
-        {
-            Directory.CreateDirectory(ConfigDir);
-            string tmp = FilePath + ".tmp";
-            File.WriteAllText(tmp, JsonSerializer.Serialize(this, Json));
-            File.Move(tmp, FilePath, overwrite: true);
-        }
+        try { OpenXlrPaths.WriteAtomicJson(FilePath, this, Json); }
         catch (Exception) { /* best effort */ }
     }
 }
@@ -93,13 +84,7 @@ public sealed record DaemonPrefs
         return new DaemonPrefs();
     }
 
-    public void Save()
-    {
-        Directory.CreateDirectory(UiSettings.ConfigDir);
-        string tmp = FilePath + ".tmp";
-        File.WriteAllText(tmp, JsonSerializer.Serialize(this, Json));
-        File.Move(tmp, FilePath, overwrite: true);
-    }
+    public void Save() => OpenXlrPaths.WriteAtomicJson(FilePath, this, Json);
 }
 
 /// <summary>
@@ -119,9 +104,7 @@ public static class StartupIntegration
 
     private static string HomeDir => Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
-    private static string ConfigHome =>
-        Environment.GetEnvironmentVariable("XDG_CONFIG_HOME") is { Length: > 0 } x
-            ? x : Path.Combine(HomeDir, ".config");
+    private static string ConfigHome => OpenXlrPaths.ConfigHome;
 
     /// <summary>System unit directories, highest precedence first (systemd.unit(5)).</summary>
     private static readonly string[] SystemUnitDirs =
@@ -182,8 +165,8 @@ public static class StartupIntegration
             foreach (string line in File.ReadLines(UnitPath))
             {
                 if (!line.StartsWith("ExecStart=", StringComparison.Ordinal)) continue;
-                string exe = line["ExecStart=".Length..].Trim().Split(' ')[0];
-                return exe.Length > 0 && !File.Exists(exe);
+                string? exe = ExecStartBinary(line["ExecStart=".Length..]);
+                return exe is { Length: > 0 } && !File.Exists(exe);
             }
         }
         catch (IOException) { /* unreadable: leave it alone */ }
@@ -206,6 +189,66 @@ public static class StartupIntegration
         catch (Exception) { /* best effort */ }
     }
 
+    /// <summary>
+    /// A path as one ExecStart argument (systemd.service(5)): double quoted,
+    /// backslash and quote escaped, and '%' doubled since specifiers expand
+    /// inside quotes too. A source tree under "My Projects" or a home with a
+    /// percent sign would otherwise split or expand.
+    /// </summary>
+    internal static string SystemdQuote(string path)
+        => "\"" + path.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("%", "%%") + "\"";
+
+    /// <summary>
+    /// The first argument of an ExecStart value, unquoted: the plain word
+    /// up to the first space, or a double or single quoted argument with
+    /// backslash escapes and '%%' folded back.
+    /// </summary>
+    internal static string? ExecStartBinary(string value)
+    {
+        value = value.TrimStart();
+        // Leading option characters (systemd's -, @, :, +, !, !!) are not part of the path.
+        value = value.TrimStart('-', '@', ':', '+', '!').TrimStart();
+        if (value.Length == 0) return null;
+        var sb = new System.Text.StringBuilder();
+        if (value[0] is '"' or '\'')
+        {
+            char quote = value[0];
+            for (int i = 1; i < value.Length; i++)
+            {
+                char c = value[i];
+                if (c == quote) break;
+                if (c == '\\' && i + 1 < value.Length) { sb.Append(value[++i]); continue; }
+                sb.Append(c);
+            }
+        }
+        else
+        {
+            foreach (char c in value)
+            {
+                if (char.IsWhiteSpace(c)) break;
+                sb.Append(c);
+            }
+        }
+        return sb.ToString().Replace("%%", "%");
+    }
+
+    /// <summary>
+    /// A path as the Exec value of a desktop entry: quoted, with the
+    /// characters the spec reserves inside quotes escaped, the backslashes
+    /// doubled once more for the file's own string escaping, and '%'
+    /// doubled so it is not read as a field code.
+    /// </summary>
+    internal static string DesktopExec(string path)
+    {
+        string inner = path
+            .Replace("\\", "\\\\")     // backslash for the quoting layer
+            .Replace("\"", "\\\"")
+            .Replace("`", "\\`")
+            .Replace("$", "\\$")
+            .Replace("%", "%%");
+        return "\"" + inner.Replace("\\", "\\\\") + "\"";   // and once more for the string layer
+    }
+
     public static void SetDaemonAtLogin(bool enabled)
     {
         if (enabled)
@@ -221,12 +264,20 @@ public static class StartupIntegration
                 if (DaemonBinary is not { } daemon) return;
                 Directory.CreateDirectory(Path.GetDirectoryName(UnitPath)!);
                 File.WriteAllText(UnitPath, $"""
+                    # Written by the OpenXLR window for a source build (Options, Start at login).
                     [Unit]
                     Description=OpenXLR audio daemon
                     After=pipewire-pulse.service wireplumber.service
+                    StartLimitIntervalSec=300
+                    StartLimitBurst=3
 
                     [Service]
-                    ExecStart={daemon}
+                    Type=notify
+                    NotifyAccess=main
+                    WatchdogSec=60
+                    WatchdogSignal=SIGTERM
+                    TimeoutStartSec=120
+                    ExecStart={SystemdQuote(daemon)}
                     Environment=OPENXLR_BUILD_MIXER=1
                     TimeoutStopSec=45
                     Restart=on-failure
@@ -237,6 +288,7 @@ public static class StartupIntegration
                     ProtectControlGroups=true
                     ProtectKernelTunables=true
                     RestrictSUIDSGID=true
+                    UMask=0077
 
                     [Install]
                     WantedBy=default.target
@@ -263,7 +315,7 @@ public static class StartupIntegration
                 Type=Application
                 Name=OpenXLR
                 Comment=OpenXLR mixer window
-                Exec={UiBinary}
+                Exec={DesktopExec(UiBinary)}
                 Icon=openxlr
                 Terminal=false
                 X-GNOME-Autostart-enabled=true
@@ -286,13 +338,10 @@ public static class StartupIntegration
     {
         try
         {
-            var psi = new ProcessStartInfo("systemctl") { RedirectStandardOutput = true, RedirectStandardError = true };
-            psi.ArgumentList.Add("--user");
-            foreach (string a in args) psi.ArgumentList.Add(a);
-            using Process? p = Process.Start(psi);
-            if (p is null) return false;
-            p.WaitForExit(15000);
-            return p.HasExited && p.ExitCode == 0;
+            // Bounded: a systemctl that hangs (a stuck user manager) is
+            // killed after 15 s instead of being left behind.
+            return ProcessRunner.Run("systemctl", ["--user", .. args], TimeSpan.FromSeconds(15),
+                stdoutCap: 64 * 1024, stderrCap: 64 * 1024).Ok;
         }
         catch (Exception) { return false; }
     }

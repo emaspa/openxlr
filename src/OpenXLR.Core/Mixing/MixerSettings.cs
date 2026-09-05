@@ -38,8 +38,11 @@ public sealed record MixerSettings
     /// <summary>Single monitor output from older files; superseded by MonitorOutputs.</summary>
     public string? MonitorOutput { get; init; }
 
-    /// <summary>All selected monitor outputs (the monitor mix can feed several).</summary>
+    /// <summary>All selected monitor outputs (the monitor mixes can feed several).</summary>
     public List<string> MonitorOutputs { get; init; } = [];
+
+    /// <summary>Output name to the monitor mix feeding it; absent = the first monitor mix.</summary>
+    public Dictionary<string, string> MonitorFeeds { get; init; } = [];
 
     /// <summary>Application identity to channel id, from manual assignments.</summary>
     public Dictionary<string, string> AppOverrides { get; init; } = [];
@@ -78,16 +81,7 @@ public sealed record MixerSettings
     };
 
     /// <summary>~/.config/openxlr/mixer.json, honouring XDG_CONFIG_HOME.</summary>
-    public static string DefaultPath
-    {
-        get
-        {
-            string baseDir = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME") is { Length: > 0 } x
-                ? x
-                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config");
-            return Path.Combine(baseDir, "openxlr", "mixer.json");
-        }
-    }
+    public static string DefaultPath => OpenXlrPaths.ConfigFile("mixer.json");
 
     /// <summary>Read settings, or null when there is no file or it is unreadable.</summary>
     public static MixerSettings? Load(string? path = null)
@@ -104,21 +98,23 @@ public sealed record MixerSettings
         }
     }
 
-    /// <summary>Write atomically so a crash mid-write cannot corrupt the file.</summary>
-    public void Save(string? path = null)
+    /// <summary>
+    /// Write atomically so a crash mid-write cannot corrupt the file. Never
+    /// throws for a failed write (losing one is not worth taking the daemon
+    /// down) but returns the reason, so the caller can keep the change
+    /// pending, retry, and tell the user.
+    /// </summary>
+    public string? Save(string? path = null)
     {
         path ??= DefaultPath;
         try
         {
-            string dir = Path.GetDirectoryName(path)!;
-            Directory.CreateDirectory(dir);
-            string tmp = path + ".tmp";
-            File.WriteAllText(tmp, JsonSerializer.Serialize(this, Json));
-            File.Move(tmp, path, overwrite: true);
+            OpenXlrPaths.WriteAtomicJson(path, this, Json);
+            return null;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // Losing a settings write is not worth taking the daemon down.
+            return $"{path}: {ex.Message}";
         }
     }
 }

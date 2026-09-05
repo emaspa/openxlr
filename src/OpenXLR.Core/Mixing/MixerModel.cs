@@ -29,7 +29,11 @@ public sealed record MixerConfig
     {
         Mixes =
         [
-            new MixDefinition("monitor", "Monitor", MixKind.Monitor) { Volume = 1.0 },
+            new MixDefinition("monitor", "Monitor A", MixKind.Monitor) { Volume = 1.0 },
+            // A second monitor mix for outputs that should hear a different
+            // selection (issue #21: a headset with a game side and a chat
+            // side). Each monitor output chooses which of the two feeds it.
+            new MixDefinition("monitor2", "Monitor B", MixKind.Monitor) { Volume = 1.0 },
             new MixDefinition("stream", "Stream", MixKind.VirtualMic) { Volume = 1.0 },
             new MixDefinition("chat", "Chat", MixKind.VirtualMic) { Volume = 1.0 },
             // What the second computer on the USB Aux port receives.
@@ -37,15 +41,15 @@ public sealed record MixerConfig
         ],
         Channels =
         [
-            new ChannelDefinition("xlr1", "XLR 1") { Levels = Level(1.0, 1.0, 1.0, 1.0), MutedIn = new HashSet<string> { "monitor" }, InputPair = 0 },
-            new ChannelDefinition("xlr2", "XLR 2") { Levels = Level(1.0, 1.0, 1.0, 1.0), MutedIn = new HashSet<string> { "monitor" }, InputPair = 1 },
+            new ChannelDefinition("xlr1", "XLR 1") { Levels = Level(1.0, 1.0, 1.0, 1.0), MutedIn = new HashSet<string> { "monitor", "monitor2" }, InputPair = 0 },
+            new ChannelDefinition("xlr2", "XLR 2") { Levels = Level(1.0, 1.0, 1.0, 1.0), MutedIn = new HashSet<string> { "monitor", "monitor2" }, InputPair = 1 },
             // The third hardware input stage is shared: the USB Aux port and the
             // Line In jack both arrive on capture pair 2 (verified live with a
             // MacBook on USB Aux; every other capture channel stayed at digital
             // zero). One channel therefore serves both.
             // Aux In must NEVER feed the Aux mix: that would loop the second
             // computer's audio straight back to it.
-            new ChannelDefinition("aux", "Aux In") { Levels = Level(1.0, 1.0, 1.0, 0.0), MutedIn = new HashSet<string> { "monitor", "auxout" }, InputPair = 2 },
+            new ChannelDefinition("aux", "Aux In") { Levels = Level(1.0, 1.0, 1.0, 0.0), MutedIn = new HashSet<string> { "monitor", "monitor2", "auxout" }, InputPair = 2 },
             new ChannelDefinition("game", "Game") { Levels = Level(0.5, 0.5, 0.5, 0.5) },
             new ChannelDefinition("music", "Music") { Levels = Level(1.0, 1.0, 1.0, 1.0) },
             new ChannelDefinition("browser", "Browser") { Levels = Level(1.0, 1.0, 1.0, 1.0) },
@@ -55,8 +59,10 @@ public sealed record MixerConfig
         ],
     };
 
+    // Monitor B starts as a copy of Monitor A, so an output moved to it hears
+    // the same until its sends are edited.
     private static Dictionary<string, double> Level(double monitor, double stream, double chat, double auxout)
-        => new() { ["monitor"] = monitor, ["stream"] = stream, ["chat"] = chat, ["auxout"] = auxout };
+        => new() { ["monitor"] = monitor, ["monitor2"] = monitor, ["stream"] = stream, ["chat"] = chat, ["auxout"] = auxout };
 }
 
 public enum MixKind
@@ -114,8 +120,14 @@ public sealed record MixerState
     /// <summary>First selected monitor output, or null (legacy single view).</summary>
     public string? MonitorOutput { get; init; }
 
-    /// <summary>node.names of every sink the monitor mix feeds.</summary>
+    /// <summary>node.names of every sink the monitor mixes feed.</summary>
     public IReadOnlyList<string> MonitorOutputs { get; init; } = [];
+
+    /// <summary>
+    /// Which monitor mix feeds an output, by output name; an output absent
+    /// here is fed by the first monitor mix.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> MonitorFeeds { get; init; } = new Dictionary<string, string>();
 
     /// <summary>Volume of the selected output device (0..1), or null.</summary>
     public double? OutputVolume { get; init; }
@@ -147,7 +159,8 @@ public sealed record MixerState
     public IReadOnlyList<StreamAssignment> Streams { get; init; } = [];
 }
 
-public sealed record MixStatus(string Id, string Name, double Volume, bool Muted);
+/// <param name="Kind">"monitor", "virtualMic" or "auxPort", so clients can tell monitor mixes apart.</param>
+public sealed record MixStatus(string Id, string Name, double Volume, bool Muted, string Kind = "monitor");
 
 public sealed record ChannelStatus(string Id, string Name,
     IReadOnlyDictionary<string, double> Levels,

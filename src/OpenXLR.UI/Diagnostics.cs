@@ -72,7 +72,7 @@ public static class Diagnostics
             string outPath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                 $"openxlr-diagnostics-{stamp}.tar.gz");
-            await using (var fs = File.Create(outPath))
+            await using (var fs = OpenXlrPaths.CreatePrivate(outPath))
             await using (var gz = new GZipStream(fs, CompressionLevel.SmallestSize))
                 await TarFile.CreateFromDirectoryAsync(work, gz, includeBaseDirectory: false);
             return outPath;
@@ -90,15 +90,12 @@ public static class Diagnostics
     {
         try
         {
-            var psi = new ProcessStartInfo(exe)
-            { RedirectStandardOutput = true, RedirectStandardError = true };
-            foreach (string a in args) psi.ArgumentList.Add(a);
-            using var p = Process.Start(psi)!;
-            Task<string> outTask = p.StandardOutput.ReadToEndAsync();
-            Task<string> errTask = p.StandardError.ReadToEndAsync();
-            if (await Task.WhenAny(p.WaitForExitAsync(), Task.Delay(15000)) is { } && !p.HasExited)
-            { try { p.Kill(); } catch (InvalidOperationException) { } }
-            return Redact(await outTask + await errTask);
+            // 15 s and 8 MiB per command; a helper that goes past either is
+            // killed with its children and the archive says so.
+            ProcessResult r = await ProcessRunner.RunAsync(exe, args, TimeSpan.FromSeconds(15),
+                stdoutCap: 8 * 1024 * 1024, stderrCap: 64 * 1024, cLocale: false);
+            string note = r.TimedOut ? $"\n[{exe} killed after 15 s]" : r.Truncated ? $"\n[{exe} output truncated at 8 MiB]" : "";
+            return Redact(r.StdoutText + r.Stderr + note);
         }
         catch (Exception ex) { return Redact($"failed to run {exe}: {ex.Message}"); }
     }

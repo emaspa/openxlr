@@ -64,6 +64,7 @@ public sealed class WebSocketHub
         _devices.Snapshot() with
         {
             DaemonVersion = OpenXLR.Daemon.DaemonVersion.Current,
+            Warning = string.Join(" ", new[] { _devices.Warning, _mixer.PersistenceWarning }.Where(w => w is not null)) is { Length: > 0 } w ? w : null,
             ActiveProfile = ActiveDeviceId() is string apId && _activeProfile.TryGetValue(apId, out string? ap) ? ap : null,
             Mixer = _mixer.Snapshot(),
             Devices = _mixer.Devices(),
@@ -72,14 +73,21 @@ public sealed class WebSocketHub
             Detected = [.. _devices.Detected().Select(d => new DetectedDevice(d.UsbId, d.Name, d.Active))],
         };
 
+    /// <summary>A client has this long to present the token before it is dropped.</summary>
+    private static readonly TimeSpan AuthDeadline = TimeSpan.FromSeconds(5);
+
     /// <summary>Serve one client for the life of its socket.</summary>
     public async Task HandleAsync(WebSocket socket)
     {
+        if (!await AuthenticateAsync(socket)) return;
         var client = new Client(socket, _stopping);
-        _clients[client.Id] = client;
         try
         {
-            await client.SendAsync(Serialize(Snapshot()));   // initial state
+            // The first thing a client reads is a whole state: register it
+            // for broadcasts only once that is queued, so no meters frame
+            // can slip in ahead of it.
+            await client.SendAsync(Serialize(Snapshot()));
+            _clients[client.Id] = client;
             await ReceiveLoop(client);
         }
         catch (Exception ex) when (ex is WebSocketException or OperationCanceledException
@@ -96,53 +104,49 @@ public sealed class WebSocketHub
         }
     }
 
+    /// <summary>
+    /// The first message must be the token (see <see cref="ApiToken"/>);
+    /// nothing is sent before it. A peer that presents anything else, or
+    /// nothing within the deadline, is closed with 1008 and told why.
+    /// </summary>
+    private async Task<bool> AuthenticateAsync(WebSocket socket)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(_stopping);
+        deadline.CancelAfter(AuthDeadline);
+        (SocketGuard.Outcome outcome, byte[]? message) = await SocketGuard.ReceiveMessageAsync(
+            socket, new byte[4 * 1024], MaxCommandBytes, SocketGuard.MessageDeadline, deadline.Token);
+        if (outcome != SocketGuard.Outcome.Message || message is null)
+        {
+            if (!_stopping.IsCancellationRequested)
+                await SocketGuard.CloseAsync(socket, WebSocketCloseStatus.PolicyViolation, "authentication timeout");
+            return false;
+        }
+        if (!ApiToken.Accepts(message))
+        {
+            _log.LogWarning("control API: a client presented no valid token and was refused");
+            await SocketGuard.CloseAsync(socket, WebSocketCloseStatus.PolicyViolation, "unauthorized");
+            return false;
+        }
+        return true;
+    }
+
     private async Task ReceiveLoop(Client client)
     {
         var buf = new byte[8 * 1024];
         while (client.Socket.State == WebSocketState.Open)
         {
-            using var ms = new MemoryStream();
-            WebSocketReceiveResult res;
-            do
-            {
-                try
-                {
-                    res = await client.Socket.ReceiveAsync(buf, _stopping);
-                }
-                catch (OperationCanceledException) when (_stopping.IsCancellationRequested)
-                {
-                    using var grace = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-                    try { await client.Socket.CloseAsync(WebSocketCloseStatus.EndpointUnavailable, "daemon stopping", grace.Token); }
-                    catch (Exception) { /* the client may already be gone */ }
-                    return;
-                }
-                if (res.MessageType == WebSocketMessageType.Close)
-                {
-                    await client.Socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
-                    return;
-                }
-                if (res.MessageType != WebSocketMessageType.Text)
-                {
-                    await client.Socket.CloseAsync(WebSocketCloseStatus.InvalidMessageType,
-                        "text messages only", CancellationToken.None);
-                    return;
-                }
-                if (ms.Length + res.Count > MaxCommandBytes)
-                {
-                    await client.Socket.CloseAsync(WebSocketCloseStatus.MessageTooBig,
-                        $"command exceeds {MaxCommandBytes} bytes", CancellationToken.None);
-                    return;
-                }
-                ms.Write(buf, 0, res.Count);
-            } while (!res.EndOfMessage);
+            // Every close in here is bounded and every fragmented message is
+            // on a deadline (SocketGuard), so a stalled peer frees its slot.
+            (SocketGuard.Outcome outcome, byte[]? message) = await SocketGuard.ReceiveMessageAsync(
+                client.Socket, buf, MaxCommandBytes, SocketGuard.MessageDeadline, _stopping);
+            if (outcome != SocketGuard.Outcome.Message || message is null) return;
 
             if (!client.Budget.TryTake())
             {
-                await client.Socket.CloseAsync(WebSocketCloseStatus.PolicyViolation,
-                    "too many commands", CancellationToken.None);
+                await SocketGuard.CloseAsync(client.Socket, WebSocketCloseStatus.PolicyViolation, "too many commands");
                 return;
             }
-            await Dispatch(client, Encoding.UTF8.GetString(ms.ToArray()));
+            await Dispatch(client, Encoding.UTF8.GetString(message));
         }
     }
 
@@ -155,6 +159,8 @@ public sealed class WebSocketHub
 
         switch (cmd.Cmd)
         {
+            case "auth":
+                break;   // already authenticated on this socket; a repeat is harmless
             case "getState":
                 await client.SendAsync(Serialize(Snapshot()));
                 break;
@@ -180,6 +186,7 @@ public sealed class WebSocketHub
             case "forgetApp":
             case "setMonitorOutput":
             case "setMonitorOutputs":
+            case "setMonitorFeed":
             case "setOutputVolume":
             case "setEnforcedDefaults":
             case "setAuxPortEnabled":
@@ -215,6 +222,11 @@ public sealed class WebSocketHub
                 string? recallErr = HandleRecallOnConnect(cmd);
                 if (recallErr is not null) await client.SendAsync(Serialize(new ErrorMessage(recallErr)));
                 else Broadcast(Snapshot());
+                break;
+            case "resetDevice":
+                string? resetErr = _devices.ResetToDefaults();   // the state change broadcasts itself
+                if (resetErr is not null) await client.SendAsync(Serialize(new ErrorMessage(resetErr)));
+                else _log.LogInformation("reset {dev} to its firmware defaults", ActiveDeviceId());
                 break;
             default:
                 await client.SendAsync(Serialize(new ErrorMessage($"unknown cmd '{cmd.Cmd}'")));
@@ -271,13 +283,26 @@ public sealed class WebSocketHub
     {
         string? name;
         try { name = OpenXLR.Core.ProfileStore.RecallOnConnect(devId); }
-        catch (Exception ex) { _log.LogWarning("recall on connect: {msg}", ex.Message); return; }
-        if (name is null) return;
+        catch (Exception ex) { _log.LogWarning("recall on connect: {msg}", ex.Message); name = null; }
+        if (name is null)
+        {
+            // No profile chosen: a device without settings memory gets the
+            // last settings back (device half only, so no wait for the
+            // graph); one with memory needs nothing.
+            string? status = _devices.RestoreLastState();
+            if (status is not null)
+            {
+                _log.LogInformation("{status}", status);
+                Broadcast(Snapshot());
+            }
+            return;
+        }
         DateTime deadline = DateTime.UtcNow + TimeSpan.FromSeconds(60);
         while (_mixer.SubmixerEnabled && !_mixer.Built && DateTime.UtcNow < deadline && !_stopping.IsCancellationRequested)
             await Task.Delay(250, _stopping).ContinueWith(_ => { }, TaskScheduler.Default);
-        if (_stopping.IsCancellationRequested || ActiveDeviceId() != devId) return;
+        if (_stopping.IsCancellationRequested || ActiveDeviceId() != devId) { _devices.MarkRestored(); return; }
         string? err = ApplyNamedProfile(devId, name);
+        _devices.MarkRestored();
         if (err is null) _log.LogInformation("recalled profile '{name}' on connect of {dev}", name, devId);
         else _log.LogWarning("recall of profile '{name}' on connect of {dev}: {err}", name, devId, err);
         Broadcast(Snapshot());

@@ -19,12 +19,16 @@ public sealed class PipeWireAdapter
     private const string ClipGuardPluginFile = "hard_limiter_1413.so";
 
     private readonly Func<DspFeatureAvailability>? _clipGuardAvailabilityOverride;
+    private readonly Action? _progress;
     private readonly List<uint> _modules = [];
     private readonly List<Process> _loopbacks = [];
     private readonly List<Process> _filters = [];
     private readonly HashSet<NativePluginHost> _nativeHosts = [];
 
     public PipeWireAdapter() { }
+
+    /// <summary>Report completed helper operations, including failures, to the daemon's progress gate.</summary>
+    public PipeWireAdapter(Action progress) => _progress = progress;
 
     internal PipeWireAdapter(Func<DspFeatureAvailability> clipGuardAvailabilityOverride)
         => _clipGuardAvailabilityOverride = clipGuardAvailabilityOverride;
@@ -700,6 +704,26 @@ public sealed class PipeWireAdapter
             TryRun("pactl", "list", "sinks", "short") ?? "",
             streamSerial, sinkName);
 
+    /// <summary>The sink a stream currently plays into, by name, or null.</summary>
+    public string? StreamSinkName(int streamSerial)
+        => StreamSinkName(TryRun("pactl", "list", "sink-inputs", "short") ?? "",
+                          TryRun("pactl", "list", "sinks", "short") ?? "", streamSerial);
+
+    internal static string? StreamSinkName(string sinkInputs, string sinks, int streamSerial)
+    {
+        string? sinkId = sinkInputs.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Split('\t'))
+            .Where(columns => columns.Length >= 2 && columns[0] == streamSerial.ToString())
+            .Select(columns => columns[1])
+            .FirstOrDefault();
+        if (sinkId is null || sinkId == uint.MaxValue.ToString()) return null;
+        return sinks.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Split('\t'))
+            .Where(columns => columns.Length >= 2 && columns[0] == sinkId)
+            .Select(columns => columns[1])
+            .FirstOrDefault();
+    }
+
     internal static bool IsStreamOnSink(string sinkInputs, string sinks, int streamSerial, string sinkName)
     {
         string? sinkId = sinkInputs.Split('\n', StringSplitOptions.RemoveEmptyEntries)
@@ -1179,7 +1203,7 @@ public sealed class PipeWireAdapter
 
     // Kept as UTF-8 bytes and parsed from them: the string form is twice
     // the size and was the bulk of the daemon's large-object garbage.
-    private static byte[] DumpJson()
+    private byte[] DumpJson()
     {
         lock (DumpGate)
         {
@@ -1190,49 +1214,47 @@ public sealed class PipeWireAdapter
         }
     }
 
-    private static byte[] RunBytes(string exe, params string[] args)
+    private byte[] RunBytes(string exe, params string[] args)
     {
-        var psi = new ProcessStartInfo(exe) { RedirectStandardOutput = true, RedirectStandardError = true };
-        psi.Environment["LC_ALL"] = "C";
-        foreach (string a in args) psi.ArgumentList.Add(a);
-        using Process p = Process.Start(psi) ?? throw new InvalidOperationException($"failed to start {exe}");
-        var stdout = new MemoryStream();
-        Task copy = p.StandardOutput.BaseStream.CopyToAsync(stdout);
-        Task<string> stderrTask = DrainKeepingHead(p.StandardError.BaseStream);
-        if (!p.WaitForExit(5000))
-        {
-            try { p.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
-            throw new InvalidOperationException($"{exe} {string.Join(' ', args)} timed out after 5 seconds");
-        }
-        copy.GetAwaiter().GetResult();
-        if (p.ExitCode != 0)
-            throw new InvalidOperationException($"{exe} {string.Join(' ', args)}: {stderrTask.GetAwaiter().GetResult().Trim()}");
-        return stdout.ToArray();
+        try { return RunBytesCore(exe, args); }
+        finally { _progress?.Invoke(); }
     }
 
-    private static string Run(string exe, params string[] args)
+    private static byte[] RunBytesCore(string exe, params string[] args)
     {
-        var psi = new ProcessStartInfo(exe) { RedirectStandardOutput = true, RedirectStandardError = true };
+        // Bounded: 5 s, 64 MiB of output (a large graph dump is 2 MB), the
+        // process tree killed past either, so a runaway helper never grows
+        // the daemon's heap.
+        ProcessResult r = ProcessRunner.Run(exe, args);
+        if (r.TimedOut)
+            throw new InvalidOperationException($"{exe} {string.Join(' ', args)} timed out after {ProcessRunner.DefaultTimeout.TotalSeconds:0} seconds");
+        if (r.Truncated)
+            throw new InvalidOperationException($"{exe} {string.Join(' ', args)} produced more than {ProcessRunner.DefaultStdoutCap} bytes");
+        if (r.ExitCode != 0)
+            throw new InvalidOperationException($"{exe} {string.Join(' ', args)}: {r.Stderr.Trim()}");
+        return r.Stdout;
+    }
+
+    internal string Run(string exe, params string[] args)
+    {
+        try { return RunCore(exe, args); }
+        finally { _progress?.Invoke(); }
+    }
+
+    private static string RunCore(string exe, params string[] args)
+    {
         // pactl's human-readable output is parsed ("Sink Input #", "Owner
         // Module:") and pactl is localised; a German desktop would break
-        // every fader. Every helper runs in the C locale.
-        psi.Environment["LC_ALL"] = "C";
-        psi.Environment["LANGUAGE"] = "C";
-        foreach (string a in args) psi.ArgumentList.Add(a);
-        using Process p = Process.Start(psi) ?? throw new InvalidOperationException($"failed to start {exe}");
-        Task<string> stdoutTask = p.StandardOutput.ReadToEndAsync();
-        Task<string> stderrTask = p.StandardError.ReadToEndAsync();
-        if (!p.WaitForExit(5000))
-        {
-            try { p.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
-            throw new InvalidOperationException(
-                $"{exe} {string.Join(' ', args)} timed out after 5 seconds");
-        }
-        string stdout = stdoutTask.GetAwaiter().GetResult();
-        string stderr = stderrTask.GetAwaiter().GetResult();
-        if (p.ExitCode != 0)
-            throw new InvalidOperationException($"{exe} {string.Join(' ', args)} failed: {stderr.Trim()}");
-        return stdout;
+        // every fader. The runner puts every helper in the C locale and
+        // bounds its time and output.
+        ProcessResult r = ProcessRunner.Run(exe, args);
+        if (r.TimedOut)
+            throw new InvalidOperationException($"{exe} {string.Join(' ', args)} timed out after {ProcessRunner.DefaultTimeout.TotalSeconds:0} seconds");
+        if (r.Truncated)
+            throw new InvalidOperationException($"{exe} {string.Join(' ', args)} produced more than {ProcessRunner.DefaultStdoutCap} bytes");
+        if (r.ExitCode != 0)
+            throw new InvalidOperationException($"{exe} {string.Join(' ', args)} failed: {r.Stderr.Trim()}");
+        return r.StdoutText;
     }
 }
 

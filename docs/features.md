@@ -66,17 +66,21 @@ does not reach the speakers until unmuted.
 Built from PipeWire nodes, no kernel modules or custom drivers:
 - Channels for the hardware inputs (XLR 1, XLR 2, Aux In) and for
   application groups (Game, Music, Browser, System, Voice Chat, SFX)
-- Four mixes: Monitor (what you hear), Stream and Chat (published as the
-  capture devices `OpenXLR Stream` and `OpenXLR Chat`, selectable in OBS
-  or Discord like a microphone), and Aux (what a second computer on the
-  USB Aux port receives)
+- Five mixes: Monitor A (what you hear), Monitor B (a second selection
+  for outputs that should hear something else),
+  Stream and Chat (published as the capture devices `OpenXLR Stream` and
+  `OpenXLR Chat`, selectable in OBS or Discord like a microphone), and
+  Aux (what a second computer on the USB Aux port receives)
 - Per-channel, per-mix send levels and mutes; per-mix masters
-- The monitor mix can play on several outputs at once, hardware outputs
-  included
+- The monitor mixes can play on several outputs at once, hardware
+  outputs included; each output picks which monitor mix feeds it, or
+  both summed (Monitor A+B), so a headset with a game sink and a chat
+  sink hears two selections, and one pair of headphones can hear the
+  desktop from A with a separately processed mic from B
 - Level meters throughout, dB-scaled, pushed at 15 Hz
 
 Each channel is a combine sink with one internal stream per mix; that
-stream's volume is the send fader. The 9 by 4 matrix is 13 sinks and no
+stream's volume is the send fader. The 9 by 5 matrix is 14 sinks and no
 loopback processes. Details in [architecture.md](architecture.md).
 
 On the Wave XLR Pro the headphone jacks are fed by a mix inside the
@@ -138,6 +142,9 @@ restores the split profile when it stops.
   Discord
 - A Manage dialog shows the full registry, and an installed-application
   picker pre-assigns channels from `.desktop` entries
+- An app can be marked "ignore": the mixer hands its streams back to
+  the system default output and never touches them again, so a headset
+  with separate game and chat sinks keeps its own routing for that app
 
 ## Profiles
 
@@ -146,8 +153,12 @@ levels, mutes, masters, monitor outputs, aux state, insert chains with
 their parameters). Saved per device and recalled from the header, over
 the API, or from a Stream Deck key. One profile per device can be
 marked to recall on connect: at daemon start, after a replug or power
-cycle, or when switching to that device. App routing and the enforced system defaults are global and
-not part of a profile, so recalling one does not rewire the desktop.
+cycle, or when switching to that device. Interfaces without settings
+memory (Wave XLR, the first XLR Dock) get their last settings back
+on every fresh connect without a profile, and can be reset to the
+firmware defaults recorded after a power cycle. App routing and the
+enforced system defaults are global and not part of a profile, so
+recalling one does not rewire the desktop.
 
 ## OpenDeck plugin
 
@@ -168,7 +179,8 @@ Keys render a button with an icon and a status LED: red for a mute,
 green for an engaged feature or the active monitor output. Every
 hardware switch and mute is a key target, plus the software low cut
 (its frequency shown on the LED, cycling Off, 80, 120), ClipGuard, gain
-lock, and switching the monitor output to a specific device. Each key
+lock, switching the monitor output to a specific device, and flipping
+an output between Monitor A and Monitor B. Each key
 can pick its icon, and a typed title replaces the built-in label.
 
 ![Keys](plugin-keys.png)

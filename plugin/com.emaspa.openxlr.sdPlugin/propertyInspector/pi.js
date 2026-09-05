@@ -87,6 +87,19 @@ function fillMonitors(outputs, wanted) {
     group.appendChild(opt);
   }
   sel.appendChild(group);
+  // The same outputs again as feed switches: the key flips the output
+  // between Monitor A and Monitor B (only meaningful once it is ticked
+  // as a monitor output in the window).
+  const feeds = document.createElement("optgroup");
+  feeds.id = "feed-group";
+  feeds.label = "Monitor feed (cycles A, B, A+B)";
+  for (const o of outputs) {
+    const opt = document.createElement("option");
+    opt.value = "feed:" + o.name;
+    opt.textContent = (o.description || o.name) + ": Monitor A / B";
+    feeds.appendChild(opt);
+  }
+  sel.appendChild(feeds);
   // A previously saved monitor target may not have existed as an <option>
   // until now, so re-apply the selection once the group is present.
   if (wanted) sel.value = wanted;

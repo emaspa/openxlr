@@ -117,6 +117,22 @@ systemctl --user enable --now openxlr-daemon.service
 journalctl --user -u openxlr-daemon.service -f   # watch it come up
 ```
 
+The supplied unit uses systemd notifications with a 60-second watchdog.
+Heartbeats require recent device and mixer progress, including completed steps
+inside graph operations. Failed polls still count as progress; a missing audio
+server leaves device control running rather than causing a restart loop.
+Startup timeout extensions are sent only while the workers make progress.
+
+On a watchdog timeout systemd sends SIGTERM, allowing normal graph teardown.
+Failed starts are limited to three attempts in five minutes. After fixing a
+persistent failure, use `systemctl --user reset-failed openxlr-daemon` followed
+by `systemctl --user start openxlr-daemon`. Manual launches without
+`NOTIFY_SOCKET` do not enable the watchdog.
+
+OpenXLR does not install a file-descriptor-limit override for pipewire-pulse.
+If its journal reports exhausted descriptors, inspect that service's limits
+and configure a user override explicitly for your environment.
+
 
 ## 7. OpenDeck plugin (optional)
 

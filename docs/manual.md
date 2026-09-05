@@ -41,6 +41,12 @@ If you only want hardware control and no mixer, turn the submixer off
 in Options (section 3.8). The daemon restarts in hardware-control mode
 and the `OpenXLR …` devices disappear.
 
+Update checks are also controlled in Options. They are off by default. You can
+make one explicit check with **Check now**, or opt into a background check at
+startup; opted-in checks run at most once per 24 hours. A notice contains the
+upstream stable release notes as plain text and a link to GitHub. OpenXLR never
+downloads or installs an update.
+
 ## 2. Concepts
 
 **Channels** are where audio enters the mixer. Three carry the
@@ -49,11 +55,12 @@ the Pro's Line In and USB Aux input) and six carry application groups:
 Game, Music, Browser, System, Voice Chat, SFX. Each channel is a
 PipeWire output device an application can play into.
 
-**Mixes** are where audio leaves. There are four:
+**Mixes** are where audio leaves. There are five:
 
 | Mix | What it is | Where it goes |
 |---|---|---|
-| Monitor | what you hear | the outputs ticked in the MONITOR card |
+| Monitor A | what you hear | the ticked outputs in the MONITOR card, unless their feed is set to Monitor B |
+| Monitor B | a second selection to hear | the ticked outputs whose feed is set to Monitor B, or summed with A on outputs set to Monitor A+B |
 | Stream | what your audience hears | the `OpenXLR Stream` virtual microphone, for OBS or any recorder |
 | Chat | what your call partners hear | the `OpenXLR Chat` virtual microphone, for Discord, Zoom and the like |
 | Aux | what a second computer receives | the interface's USB Aux port (Wave XLR Pro only) |
@@ -61,7 +68,7 @@ PipeWire output device an application can play into.
 Every channel has a **send** into every mix: a level and a mute. The
 SUBMIXER card shows them as a grid, channels down, mixes across. Each
 mix also has a **master** level and mute. A typical setup keeps Music
-loud in Monitor and lower in Stream, and out of Chat entirely.
+loud in Monitor A and lower in Stream, and out of Chat entirely.
 
 **Application routing**: when an app starts playing, the daemon reads
 its name from PipeWire and picks a channel by rules: browsers to
@@ -101,12 +108,22 @@ configuration.
 
 ### 3.2 Choose what you hear and how loud
 
-1. In the MONITOR card, tick every device the Monitor mix should play
+1. In the MONITOR card, tick every device the monitor mixes should play
    on: your speakers, a headset, or several at once. On the Wave XLR
    Pro its own outputs (Headphones 1, Headphones 2, Line Out) appear
    here too; ticking one switches the hardware's output routing.
-2. The Volume slider sets the level of the selected devices.
-3. The HEADPHONES card holds the interface's own headphone volume,
+2. Next to a ticked device, the feed picker says which monitor mix it
+   hears. Leave it on Monitor A, or choose Monitor B for an output that
+   should hear a different selection: a headset whose game side and
+   chat side are two sinks, for instance, gets the voice channels on
+   Monitor B and everything else on Monitor A. Monitor B has its own
+   sends and master in the SUBMIXER card. Monitor A+B plays both mixes
+   summed on one output: put the desktop on A and only the microphone
+   on B, add a denoiser under the Monitor B master, and one pair of
+   headphones hears both, with the plugin touching only your voice.
+   The Pro's own jacks share one feed.
+3. The Volume slider sets the level of the selected devices.
+4. The HEADPHONES card holds the interface's own headphone volume,
    low-impedance mode, and on the Pro the Mic ↔ PC crossfade, which is
    the zero-latency direct monitor inside the device: left is only your
    microphone, right is only computer audio.
@@ -133,7 +150,15 @@ PipeWire as an audio client; a green light means it is playing.
    from the installed-application list, choose a channel and press Add.
    The identity is guessed from its launcher; if the app reports a
    different name on first play it shows up as a new entry.
-3. Forget, in the same window, drops an app and its remembered channel.
+3. To keep OpenXLR's hands off an app, choose "ignore" in its dropdown.
+   Its streams go back to the system default output at once and from
+   then on stay wherever you or the desktop route them, which is what
+   you want for an app that must reach a specific side of a headset
+   with its own game and chat sinks. The app stays listed as ignored so
+   you can bring it back by picking a channel.
+4. Forget, in the same window, drops an app and its remembered channel.
+   A running app re-registers on the next sweep and is routed by the
+   rules again; use "ignore" for a lasting opt-out.
 
 An app that is missing from the card is not registered with PipeWire
 as a client. That happens with some applications until they start
@@ -183,11 +208,23 @@ profile (section 4).
 **Recall on connect.** The "On connect" picker under the list names a
 profile the daemon recalls by itself whenever the interface connects
 fresh: at daemon start (so at login), after a replug or a power cycle,
-and when you switch to it in the device picker. Use it for an
-interface that comes up with its own defaults after a reboot, or to
-land on a known scene at every login. The reconnect after a passing
-USB error does not count, so the recall never undoes changes you made
-since. Pick "(none)" to stop.
+and when you switch to it in the device picker. Use it to land on a
+known scene at every login. The reconnect after a passing USB error
+does not count, so the recall never undoes changes you made since.
+Pick "(none)" to stop.
+
+**Interfaces without settings memory.** The Wave XLR and the first XLR
+Dock keep nothing on board; unplugged, they come back with the
+firmware's own values (full gain, headphones at 100%). For them the
+daemon remembers every change and writes it back whenever the
+interface connects fresh, so a reboot or a replug leaves you where you
+were, with no profile needed. The picker shows "(last settings)" in
+place of "(none)" on these devices; a chosen profile takes precedence.
+"Reset device to defaults" under the picker writes the firmware
+defaults back and forgets the remembered settings (saved profiles
+stay). The defaults are recorded the first time the interface connects
+after a power cycle, so the button asks for one replug on a fresh
+install.
 
 ### 3.7 Hold the system default devices
 
@@ -217,9 +254,9 @@ Options, STARTUP:
   minimized to tray" starts with no window at all; the tray icon shows
   it the first time you click it.
 
-To land on a known scene at every login, or after the interface
-powers up with its own defaults, mark a profile to recall on connect
-(section 3.6).
+To land on a known scene at every login, mark a profile to recall on
+connect (section 3.6). An interface without settings memory comes back
+as you left it without one.
 
 The window also remembers which of its sections (INPUTS, HEADPHONES,
 MONITOR, APPLICATIONS, SUBMIXER) you collapsed with the chevron in
@@ -238,6 +275,11 @@ systemctl --user restart openxlr-daemon
 Until then the window offers only the controls the old daemon reports.
 Toggling the submixer in Options also restarts the daemon.
 
+Since 0.1.23 every client presents a token the daemon writes at start
+(section 6). A window or OpenDeck plugin older than the daemon is
+refused with "unauthorized" until it is updated too; the plugin zip on
+the release page matches the daemon of that release.
+
 ## 4. Stream Deck (OpenDeck)
 
 The plugin has two actions. Both are clients of the daemon and show
@@ -247,7 +289,9 @@ its live state, so what a key displays is what the mixer window shows.
 phantom, low cut, expander, voice tune, ClipGuard, compressor, low
 impedance, the Pro's output selectors, the aux level lock, the gain
 lock), the software low cut (cycling Off, 80, 120), a mix or send mute,
-the monitor output (switching the Monitor mix to one specific device),
+the monitor output (switching the monitor mixes to one specific device),
+an output's feed (cycling Monitor A, Monitor B and Monitor A+B, lit
+when not on A),
 the bypass of one insert or of a whole chain, or a profile to recall.
 The key's LED is green for an engaged feature, red for a mute, and grey
 when the daemon is offline or the target does not exist on the
@@ -338,11 +382,20 @@ be restarted by hand.
 
 Since 0.1.11 a USB transfer that never returns fails after a few
 seconds instead of stalling the daemon; the device is dropped and
-reconnected after 10 seconds, and the fault is recorded. Collect
-diagnostics afterwards (section 5.8): the archive contains the exact
-transfer, and that is what makes the report actionable.
+reconnected after 10 seconds, and the fault is recorded. Each such hang
+leaves a stuck thread behind, so after three in one run the daemon
+stops driving that interface and says so under the window's header,
+while the submixer and any other interface keep working. Unplug the
+interface and plug it back in, or restart the daemon, to try again.
+Collect diagnostics afterwards (section 5.8): the archive contains the
+exact transfer, and that is what makes the report actionable.
 
 ### 5.8 Reporting a problem
+
+Ask on the OpenXLR Discord server (<https://discord.gg/4bswtnGPW4>,
+one post per problem in its support forum), on Reddit at
+<https://www.reddit.com/r/OpenXLR/>, or open a GitHub issue; whichever
+you pick, attach the diagnostics archive described below.
 
 Options, SUPPORT, Collect diagnostics. It writes
 `~/openxlr-diagnostics-<timestamp>.tar.gz` with the daemon's state and
@@ -361,6 +414,9 @@ it to a public issue. Nothing is uploaded automatically.
 | `~/.config/openxlr/mixer.json` | every mixer decision, written by the daemon |
 | `~/.config/openxlr/profiles/<vid-pid>/<name>.json` | saved profiles, one file each |
 | `~/.config/openxlr/profiles/<vid-pid>/recall-on-connect` | the profile recalled when that interface connects, when one is chosen |
+| `$XDG_RUNTIME_DIR/openxlr/token` | the control API token for this daemon run, readable by your user only; the window and the OpenDeck plugin read it, a daemon older than the window will not have it (section 3.10) |
+| `~/.config/openxlr/devices/<vid-pid>/last-state.json` | the settings restored on connect to an interface without settings memory |
+| `~/.config/openxlr/devices/<vid-pid>/defaults.json` | the firmware defaults of such an interface, recorded after a power cycle, written back by "Reset device to defaults" |
 | `~/.config/openxlr/daemon.json` | the submixer on/off preference |
 | `~/.config/openxlr/gainlock.json` | which devices have the gain lock set |
 | `~/.config/openxlr/ui.json` | window preferences |

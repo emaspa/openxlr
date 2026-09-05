@@ -19,6 +19,7 @@ public sealed class DeviceManager : BackgroundService
     private DeviceState? _last;
     private IReadOnlyList<DeviceInfo> _detected = [];
     private ushort? _preferredPid;
+    internal ServiceProgress Progress { get; } = new();
 
     // Whether this run builds the submixer (same decision MixerService
     // makes). Only then does the card need the pro-audio profile; in
@@ -92,10 +93,7 @@ public sealed class DeviceManager : BackgroundService
     // set, so every client honors it without needing its own logic.
     private readonly HashSet<string> _gainLocked = LoadGainLocks();
 
-    private static string GainLockPath => Path.Combine(
-        Environment.GetEnvironmentVariable("XDG_CONFIG_HOME")
-            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config"),
-        "openxlr", "gainlock.json");
+    private static string GainLockPath => OpenXlrPaths.ConfigFile("gainlock.json");
 
     private static HashSet<string> LoadGainLocks()
     {
@@ -105,11 +103,7 @@ public sealed class DeviceManager : BackgroundService
 
     private void SaveGainLocks()
     {
-        try
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(GainLockPath)!);
-            File.WriteAllText(GainLockPath, JsonSerializer.Serialize(_gainLocked));
-        }
+        try { OpenXlrPaths.WriteAtomic(GainLockPath, JsonSerializer.Serialize(_gainLocked)); }
         catch (Exception) { /* best effort */ }
     }
 
@@ -169,8 +163,12 @@ public sealed class DeviceManager : BackgroundService
     /// </summary>
     public event Action<string>? DeviceArrived;
     private bool _everConnected;
-    private bool _sawAbsent;
     private ushort _lastPid;
+    // Every model this run has driven, and which of those have since been
+    // off the bus: a return after that is a power cycle for the model, even
+    // when the daemon fell back to another interface meanwhile.
+    private readonly HashSet<ushort> _driven = [];
+    private readonly HashSet<ushort> _absent = [];
 
     public StateMessage Snapshot()
     {
@@ -196,8 +194,11 @@ public sealed class DeviceManager : BackgroundService
             try
             {
                 EnsureConnected();
+                Progress.Mark();
                 PollOnce();
+                Progress.Mark();
                 TryParkCardProfile();
+                FlushLastState(force: false);
             }
             catch (UsbHungException ex)
             {
@@ -208,8 +209,10 @@ public sealed class DeviceManager : BackgroundService
                 _log.LogWarning("device loop: {msg}", ex.Message);
                 Drop();
             }
+            Progress.Mark(); // a completed failed poll is responsive too
             await Task.Delay(100, stop).ContinueWith(_ => { }, TaskScheduler.Default);
         }
+        FlushLastState(force: true);
         Drop();
         RestoreCardProfile();
     }
@@ -228,14 +231,40 @@ public sealed class DeviceManager : BackgroundService
     /// </summary>
     private string? _lastUsbFault;
 
+    private readonly HungTransferPolicy _hung = new();
+    private string? _setAsideWarning;
+
+    /// <summary>
+    /// A condition about the hardware the user should see, or null: today,
+    /// a device set aside after repeated hung transfers.
+    /// </summary>
+    public string? Warning { get { lock (_gate) return _setAsideWarning; } }
+
     private void NoteHung(UsbHungException ex)
     {
-        string device = _device is null ? "no device"
-            : $"{_device.Info.DisplayName} {_device.Info.VendorId:x4}:{_device.Info.ProductId:x4}";
+        IAudioDevice? dev = _device;
+        string device = dev is null ? "no device"
+            : $"{dev.Info.DisplayName} {dev.Info.VendorId:x4}:{dev.Info.ProductId:x4}";
         _lastUsbFault = $"{DateTime.UtcNow:O} {device}, kernel {KernelRelease()}: {ex.Message}";
-        _log.LogError("{fault}. The device is dropped and reconnected in {s} s. " +
-                      "Please collect diagnostics (Options, SUPPORT) and attach the archive to an issue.",
-            _lastUsbFault, (int)HungReconnectDelay.TotalSeconds);
+        bool setAside = dev is not null && _hung.NoteHung(dev.Info.ProductId);
+        if (setAside)
+        {
+            // Every hung transfer leaves a parked thread and a handle behind;
+            // reconnecting for ever would collect them for ever. Everything
+            // else (the mixer, another interface) keeps running.
+            _setAsideWarning = $"{dev!.Info.DisplayName} hung {HungTransferPolicy.Limit} USB transfers in this run and is no longer driven; " +
+                               "unplug it and plug it back in, or restart the daemon, to try again.";
+            _log.LogError("{fault}. That is hung transfer {n} of {limit}: the device is set aside until it is replugged or the daemon restarts. " +
+                          "Please collect diagnostics (Options, SUPPORT) and attach the archive to an issue.",
+                _lastUsbFault, HungTransferPolicy.Limit, HungTransferPolicy.Limit);
+        }
+        else
+        {
+            _log.LogError("{fault}. The device is dropped and reconnected in {s} s (hung transfer {n} of {limit} before it is set aside). " +
+                          "Please collect diagnostics (Options, SUPPORT) and attach the archive to an issue.",
+                _lastUsbFault, (int)HungReconnectDelay.TotalSeconds,
+                dev is null ? 0 : _hung.HungCount(dev.Info.ProductId), HungTransferPolicy.Limit);
+        }
         _reconnectNotBefore = DateTime.UtcNow + HungReconnectDelay;
         Drop();
     }
@@ -252,13 +281,26 @@ public sealed class DeviceManager : BackgroundService
         {
             IReadOnlyList<IAudioDevice> all = DeviceRegistry.DetectAll();
             _detected = [.. all.Select(d => d.Info)];
-            if (_everConnected && !all.Any(d => d.Info.ProductId == _lastPid)) _sawAbsent = true;
+            foreach (ushort driven in _driven)
+                if (!all.Any(d => d.Info.ProductId == driven)) _absent.Add(driven);
+            // A device set aside for hanging gets a fresh start once it has
+            // been off the bus and back (its firmware restarted with it).
+            foreach (ushort aside in _hung.SetAside.ToList())
+            {
+                if (_absent.Contains(aside) && all.Any(d => d.Info.ProductId == aside))
+                {
+                    _hung.Returned(aside);
+                    _setAsideWarning = null;
+                    _log.LogInformation("{pid:x4} is back on the bus after being set aside; driving it again", aside);
+                }
+            }
             if (_device is { Connected: true }) return;
             if (DateTime.UtcNow < _reconnectNotBefore) return;
+            List<IAudioDevice> usable = [.. all.Where(d => !_hung.IsSetAside(d.Info.ProductId))];
             IAudioDevice? dev = _preferredPid is ushort pid
-                ? all.FirstOrDefault(d => d.Info.ProductId == pid) ?? (all.Count > 0 ? all[0] : null)
-                : all.Count > 0 ? all[0] : null;
-            if (dev is null) return;                    // nothing attached; try again next tick
+                ? usable.FirstOrDefault(d => d.Info.ProductId == pid) ?? (usable.Count > 0 ? usable[0] : null)
+                : usable.Count > 0 ? usable[0] : null;
+            if (dev is null) return;                    // nothing usable attached; try again next tick
             dev.Connect();
             _device = dev;
             _last = null;
@@ -268,12 +310,125 @@ public sealed class DeviceManager : BackgroundService
             // poll wpctl for two minutes and then warn about a profile that
             // never exists.
             if (dev.Capabilities.OutputRouting) EnsureCardProfile(dev.Info);
+            bool powerCycled = _absent.Remove(dev.Info.ProductId);
+            bool fresh = !_everConnected || powerCycled || _lastPid != dev.Info.ProductId;
+            if (fresh && !dev.Capabilities.RetainsSettings)
+            {
+                // A device without settings memory: what it answers now is
+                // either what it booted with (firmware defaults, worth
+                // recording when we know the bus lost it) or what it was
+                // left at. Either way nothing is persisted until the
+                // arrival handler has restored the last settings, so the
+                // boot values never overwrite them.
+                _restorePending = true;
+                _dirtyAt = null;
+                try
+                {
+                    _last = Stamp(dev.ReadState());
+                    if (powerCycled) DeviceStateStore.SaveDefaults(DevId(dev), _last);
+                }
+                catch (Exception ex) when (ex is not UsbHungException)
+                {
+                    _log.LogWarning("initial read of {dev}: {msg}", dev.Info.DisplayName, ex.Message);
+                }
+            }
             RaiseFromLocked();                          // push the initial state
-            bool fresh = !_everConnected || _sawAbsent || _lastPid != dev.Info.ProductId;
             _everConnected = true;
-            _sawAbsent = false;
             _lastPid = dev.Info.ProductId;
+            _driven.Add(dev.Info.ProductId);
             if (fresh) DeviceArrived?.Invoke($"{dev.Info.VendorId:x4}:{dev.Info.ProductId:x4}");
+        }
+    }
+
+    // Last-settings memory for devices that have none of their own (see
+    // DeviceCapabilities.RetainsSettings): every change marks the snapshot
+    // dirty and the poll loop writes it a second later, so a slider drag
+    // costs one file write, not hundreds.
+    private bool _restorePending;
+    private DateTime? _dirtyAt;
+    private static readonly TimeSpan PersistDelay = TimeSpan.FromSeconds(1);
+
+    private void NoteChangedLocked()
+    {
+        if (_device is null || _device.Capabilities.RetainsSettings || _restorePending) return;
+        _dirtyAt ??= DateTime.UtcNow;
+    }
+
+    private void FlushLastState(bool force)
+    {
+        lock (_gate)
+        {
+            if (_dirtyAt is not DateTime since) return;
+            if (!force && DateTime.UtcNow - since < PersistDelay) return;
+            _dirtyAt = null;
+            if (_device is null || _last is null) return;
+            try { DeviceStateStore.SaveLast(DevId(_device), _last); }
+            catch (Exception ex) { _log.LogWarning("saving last settings: {msg}", ex.Message); }
+        }
+    }
+
+    /// <summary>
+    /// For a device without settings memory that just connected fresh and
+    /// has no recall-on-connect profile: write back the last settings the
+    /// daemon saw on it. Returns null when there was nothing to restore
+    /// (a device that keeps its own settings, or one never seen before),
+    /// otherwise a status line for the log. Persistence resumes either way.
+    /// </summary>
+    public string? RestoreLastState()
+    {
+        lock (_gate)
+        {
+            if (_device is null || !_device.Connected) { _restorePending = false; return null; }
+            if (_device.Capabilities.RetainsSettings) { _restorePending = false; return null; }
+            string id = DevId(_device);
+            DeviceState? last;
+            try { last = DeviceStateStore.LoadLast(id); }
+            catch (Exception ex) { last = null; _log.LogWarning("loading last settings of {dev}: {msg}", id, ex.Message); }
+            _restorePending = false;
+            if (last is null) return null;
+            string? err = ApplyProfile(last);
+            NoteChangedLocked();
+            return err is null ? $"restored the last settings of {id}" : $"restoring the last settings of {id}: {err}";
+        }
+    }
+
+    /// <summary>
+    /// Called after a recall-on-connect profile was applied instead of the
+    /// last settings: persistence resumes and the recalled state is what
+    /// gets remembered.
+    /// </summary>
+    public void MarkRestored()
+    {
+        lock (_gate)
+        {
+            _restorePending = false;
+            NoteChangedLocked();
+        }
+    }
+
+    /// <summary>
+    /// Write the firmware defaults recorded after the device's last power
+    /// cycle and forget the last settings, for a device without memory of
+    /// its own. Null on success, else the reason.
+    /// </summary>
+    public string? ResetToDefaults()
+    {
+        lock (_gate)
+        {
+            if (_device is null || !_device.Connected) return "no device connected";
+            if (_device.Capabilities.RetainsSettings) return "resetDevice: this interface keeps its own settings";
+            string id = DevId(_device);
+            DeviceState? defaults;
+            try { defaults = DeviceStateStore.LoadDefaults(id); }
+            catch (Exception ex) { return ex.Message; }
+            if (defaults is null)
+                return "no defaults recorded for this interface yet: unplug it and plug it back in once, then try again";
+            string? err = ApplyProfile(defaults);
+            if (err is not null) return err;
+            _dirtyAt = null;
+            try { DeviceStateStore.ClearLast(id); }
+            catch (Exception ex) { _log.LogWarning("clearing last settings of {dev}: {msg}", id, ex.Message); }
+            return null;
         }
     }
 
@@ -361,6 +516,7 @@ public sealed class DeviceManager : BackgroundService
             if (_last is null || now != _last)
             {
                 _last = now;
+                NoteChangedLocked();
                 RaiseFromLocked();
             }
         }
@@ -438,6 +594,7 @@ public sealed class DeviceManager : BackgroundService
             // Reflect immediately; the poll loop will also catch it, but this
             // makes the client's own change feel instant.
             _last = Stamp(_device.ReadState());
+            NoteChangedLocked();
             RaiseFromLocked();
             return null;
         }
@@ -532,6 +689,7 @@ public sealed class DeviceManager : BackgroundService
                 return ex.Message;
             }
             _last = Stamp(_device.ReadState());
+            NoteChangedLocked();
             RaiseFromLocked();
             // Not an error: the profile loaded and the state was broadcast.
             // The lock is visible to every client in the state itself.

@@ -20,6 +20,7 @@ public sealed class OptionsViewModel : ViewModelBase
 
     /// <summary>Exposed for the diagnostics collector in the Options window.</summary>
     public DaemonClient Client => _client;
+    public UpdatesViewModel Updates => _main.Updates;
 
     public OptionsViewModel(DaemonClient client, MainViewModel main)
     {
@@ -31,6 +32,7 @@ public sealed class OptionsViewModel : ViewModelBase
         _openWindowAtLogin = s.OpenWindowAtLogin;
         _minimizeToTray = s.MinimizeToTray;
         _startMinimized = s.StartMinimized;
+        _checkForUpdates = s.CheckForUpdates;
         // No saved choice means the daemon runs whatever its unit asked for,
         // which for every shipped unit is the submixer on.
         _submixer = DaemonPrefs.Load().Submixer ?? true;
@@ -46,6 +48,13 @@ public sealed class OptionsViewModel : ViewModelBase
     }
 
     // --- startup behaviour ---
+
+    private bool _checkForUpdates;
+    public bool CheckForUpdates
+    {
+        get => _checkForUpdates;
+        set { if (Set(ref _checkForUpdates, value)) Persist(); }
+    }
 
     private bool _startDaemonAtLogin;
     public bool StartDaemonAtLogin
@@ -134,6 +143,7 @@ public sealed class OptionsViewModel : ViewModelBase
         OpenWindowAtLogin = _openWindowAtLogin,
         MinimizeToTray = _minimizeToTray,
         StartMinimized = _startMinimized,
+        CheckForUpdates = _checkForUpdates,
     }).Save();
 
     // --- enforced system defaults ---

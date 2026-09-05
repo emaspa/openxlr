@@ -16,7 +16,10 @@ public sealed class MixerService : IHostedService, IDisposable
     private readonly ILogger<MixerService> _log;
     private readonly IConfiguration _config;
     private readonly DeviceManager _devices;
-    private readonly Mixer _mixer = new();
+    private readonly Mixer _mixer;
+    private readonly ServiceProgress _progress = new();
+    private volatile bool _checkingProgress;
+    internal bool IsResponsive(TimeSpan limit) => !_checkingProgress || _progress.IsRecent(limit);
     private Timer? _streamSweep;
     private Timer? _saveDebounce;
     private Timer? _meterPush;
@@ -36,6 +39,7 @@ public sealed class MixerService : IHostedService, IDisposable
         _log = log;
         _config = config;
         _devices = devices;
+        _mixer = new(new PipeWireAdapter(_progress.Mark));
     }
 
     /// <summary>
@@ -83,7 +87,10 @@ public sealed class MixerService : IHostedService, IDisposable
         // to carry the mic there, and the hardware path would double it.
         bool anyJack = suffixes.Contains("hp1") || suffixes.Contains("hp2") || suffixes.Contains("lineout");
         bool jacksOnly = anyJack && _mixer.MonitorOutputs.All(o => o.Contains('#'));
-        bool micDirect = jacksOnly && !_mixer.IsChannelMutedIn("xlr1", "monitor");
+        // With a summed feed (A+B) the mic rides the hardware path as soon as
+        // any of the summed mixes carries it.
+        bool micDirect = jacksOnly && OpenXLR.Core.Mixing.MonitorFeed.Parts(_mixer.JackMonitorMix ?? "monitor")
+            .Any(m => !_mixer.IsChannelMutedIn("xlr1", m));
         _mixer.SetHardwareMicMonitor(micDirect);
         if (anyJack && _devices.EnsureHeadphoneMix(monitorReturn: true, micDirect: micDirect) && _mixer.Built)
             _mixer.BounceMonitorHardwareOutput();
@@ -122,6 +129,8 @@ public sealed class MixerService : IHostedService, IDisposable
             return Task.CompletedTask;
         }
         OpenXLR.Core.Mixing.Lv2Catalog.Warm();   // plugin inserts: scan LV2 bundles off the startup path
+        _progress.Mark();
+        _checkingProgress = true;
 
         // Optional: the physical sink the monitor mix feeds. Without it the
         // monitor mix exists but isn't routed anywhere audible.
@@ -203,7 +212,11 @@ public sealed class MixerService : IHostedService, IDisposable
                     }
                     else _log.LogDebug("stream sweep: {msg}", ex.Message);
                 }
-                finally { Volatile.Write(ref _sweepRunning, 0); }
+                finally
+                {
+                    _progress.Mark();
+                    Volatile.Write(ref _sweepRunning, 0);
+                }
             }, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
 
             // Meters refresh far more often than state; 15 Hz looks smooth
@@ -240,6 +253,8 @@ public sealed class MixerService : IHostedService, IDisposable
             // A partial graph is worse than none: half the sinks exist but no
             // routing, and a later rebuild would double up. Remove what was made.
             try { _mixer.TearDown(); } catch (Exception) { /* best effort */ }
+            // No audio server is a degraded operating mode, not a deadlock.
+            _checkingProgress = false;
         }
         return Task.CompletedTask;
     }
@@ -270,7 +285,7 @@ public sealed class MixerService : IHostedService, IDisposable
         _meterPush = null;
         if (_mixer.Built)
         {
-            try { _mixer.ExportSettings().Save(); } catch (Exception) { /* best effort */ }
+            if (_mixer.ExportSettings().Save() is string stopErr) _log.LogWarning("settings not saved at stop: {err}", stopErr);
             _mixer.TearDown();
             _log.LogInformation("submix graph torn down");
         }
@@ -325,6 +340,11 @@ public sealed class MixerService : IHostedService, IDisposable
                 case "setMonitorOutputs":
                     _mixer.SetMonitorOutputs(cmd.Devices ?? []);
                     SyncOutputSelectors();
+                    break;
+                case "setMonitorFeed":
+                    if (cmd.Device is null || cmd.Mix is null) return "setMonitorFeed: need 'device' and 'mix'";
+                    if (_mixer.SetMonitorFeed(cmd.Device, cmd.Mix) is string feedErr) return $"setMonitorFeed: {feedErr}";
+                    SyncOutputSelectors();   // the jacks may now follow another mix's XLR 1 send
                     break;
                 case "setOutputVolume":
                     _mixer.SetOutputVolume(cmd.Value.GetDouble());
@@ -398,6 +418,22 @@ public sealed class MixerService : IHostedService, IDisposable
     /// </summary>
     private readonly object _saveGate = new();
     private bool _saveDirty;
+    private static readonly TimeSpan SaveDelay = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan MaxRetryDelay = TimeSpan.FromSeconds(60);
+    private TimeSpan _retryDelay = SaveDelay;
+    private string? _lastSaveError;
+
+    /// <summary>
+    /// Why the mixer settings are not on disk, or null while they are. A
+    /// failed write (a full disk, a read-only home) keeps the change pending
+    /// and retries with backoff; meanwhile every client sees this in the
+    /// state so the user knows the window's changes would not survive a
+    /// restart yet.
+    /// </summary>
+    public string? PersistenceWarning
+    {
+        get { lock (_saveGate) return _lastSaveError is null ? null : $"Mixer settings are not being saved ({_lastSaveError}); retrying."; }
+    }
 
     private void ScheduleSave()
     {
@@ -405,22 +441,46 @@ public sealed class MixerService : IHostedService, IDisposable
         {
             _saveDirty = true;
             _saveDebounce ??= new Timer(_ => SaveNow(), null, Timeout.Infinite, Timeout.Infinite);
-            _saveDebounce.Change(TimeSpan.FromSeconds(2), Timeout.InfiniteTimeSpan);
+            _saveDebounce.Change(SaveDelay, Timeout.InfiniteTimeSpan);
         }
     }
 
     // One writer at a time, and only when something changed since the last
     // write; Dispose flushes a pending save so a change made just before
-    // shutdown is not lost.
+    // shutdown is not lost. A failed write stays dirty and is retried with
+    // backoff; the failure is logged once per distinct reason and shown to
+    // clients until a write succeeds.
     private void SaveNow()
     {
+        bool changed = false;
         lock (_saveGate)
         {
             if (!_saveDirty) return;
-            _saveDirty = false;
-            try { _mixer.ExportSettings().Save(); }
-            catch (Exception ex) { _log.LogDebug("settings save: {msg}", ex.Message); }
+            string? err = _mixer.ExportSettings().Save();
+            if (err is null)
+            {
+                _saveDirty = false;
+                _retryDelay = SaveDelay;
+                if (_lastSaveError is not null)
+                {
+                    _log.LogInformation("mixer settings saved again");
+                    _lastSaveError = null;
+                    changed = true;
+                }
+            }
+            else
+            {
+                if (err != _lastSaveError)
+                {
+                    _log.LogWarning("mixer settings not saved: {err}; retrying", err);
+                    _lastSaveError = err;
+                    changed = true;
+                }
+                _retryDelay = TimeSpan.FromTicks(Math.Min(_retryDelay.Ticks * 2, MaxRetryDelay.Ticks));
+                _saveDebounce?.Change(_retryDelay, Timeout.InfiniteTimeSpan);
+            }
         }
+        if (changed) Changed?.Invoke();
     }
 
     public void Dispose()

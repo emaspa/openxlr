@@ -5,7 +5,7 @@
 %global _build_id_links none
 
 Name:           openxlr
-Version:        0.1.20
+Version:        0.1.23
 Release:        1%{?dist}
 Summary:        Control suite and PipeWire submixer for Elgato XLR interfaces
 License:        GPL-3.0-only
@@ -133,6 +133,46 @@ MSG
 %{_datadir}/openxlr/
 
 %changelog
+* Sat Sep 05 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.23-1
+- Interfaces without settings memory (Wave XLR, XLR Dock) get their last settings back on every connect, and can be reset to the firmware defaults recorded after a power cycle.
+- Fedora COPR and Ubuntu PPA install channels; the README opens with the banner.
+- Control API token: every client presents a per-session token first; update the window and the OpenDeck plugin together with the daemon.
+- A device that hangs three USB transfers in one run is set aside instead of reconnected for ever; the window shows why.
+- Mixer settings that cannot be written are retried and shown in the window instead of vanishing; monitor feed commands are validated.
+- Private configuration files (0700/0600, UMask in the unit), deadlines on the control socket, bounded helper processes, quoted paths in generated units.
+- Release assets carry SHA-256 checksums and a build provenance attestation; the build pipeline is pinned.
+
+* Sat Sep 05 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.22-1
+- Daemon watchdog (Carina Schoppe, PR #18): the packaged unit is now a
+  systemd notify service with a 60 s watchdog gated on device and mixer
+  progress, restart on failure with a start limit, and a graceful stop
+  signal; a missing audio server degrades to device control instead of
+  restarting.
+- Update notice (Carina Schoppe, PR #23): Options, UPDATES offers a manual
+  check against the project's releases and an opt-in daily check at
+  startup; off by default, nothing is downloaded or installed.
+- About window: a thanks line with a link to the credits, and a link to
+  the new OpenXLR Discord server and subreddit, also in the README and the
+  manual.
+- README: logo, Discord and release badges, credits listing every merged
+  and open pull request; roadmap brought to 0.1.22.
+
+* Sat Sep 05 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.21-1
+- Application routing: an app can be set to "ignore" in its dropdown; its
+  streams go back to the system default output and stay wherever the
+  desktop routes them, for headsets with separate game and chat sinks
+  (issue #21). assignApp and assignStream accept the pseudo-channel.
+- Submixer: the monitor mix is now two, Monitor A and Monitor B; each
+  ticked monitor output picks which of them feeds it, so two outputs can
+  hear different selections. New setMonitorFeed command and monitorFeeds
+  state field; feeds are saved with the mixer and with profiles; the Pro's
+  own jacks share one feed. Send rows show mix names.
+- Window: the monitor output flyout no longer clips or scrolls sideways;
+  the Applications window's scrollbar keeps off the Forget buttons; the
+  About text lists the XLR Dock MK.2.
+- Docs: manual, features, API and README updated; roadmap header at
+  0.1.20; credits list every merged and open pull request.
+
 * Sat Sep 05 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.20-1
 - XLR Dock MK.2 verified on hardware: its vendor blocks live at the Pro's
   wIndex 0x0103 (the backend now takes the wIndex per model), every

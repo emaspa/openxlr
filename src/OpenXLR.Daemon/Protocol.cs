@@ -37,7 +37,8 @@ public sealed record Command
     [JsonPropertyName("streamId")] public int? StreamId { get; init; }
 
     /// <summary>
-    /// "setMonitorOutput": PipeWire node.name (null disconnects); or
+    /// "setMonitorOutput": PipeWire node.name (null disconnects);
+    /// "setMonitorFeed": the selected output whose feed changes (with "mix"); or
     /// "setActiveDevice": the interface's vvvv:pppp id.
     /// </summary>
     [JsonPropertyName("device")] public string? Device { get; init; }
@@ -88,6 +89,12 @@ public sealed record StateMessage
     /// restart prompt; a daemon older than 0.1.13 omits the field).
     /// </summary>
     [JsonPropertyName("daemonVersion")] public string? DaemonVersion { get; init; }
+    /// <summary>
+    /// A condition the user should know about, in one sentence, or null:
+    /// today, mixer settings that cannot be written to disk. Clients show
+    /// it where they show the daemon's status.
+    /// </summary>
+    [JsonPropertyName("warning")] public string? Warning { get; init; }
     [JsonPropertyName("connected")] public bool Connected { get; init; }
     [JsonPropertyName("device")] public DeviceDescriptor? Device { get; init; }
     [JsonPropertyName("capabilities")] public DeviceCapabilities? Capabilities { get; init; }

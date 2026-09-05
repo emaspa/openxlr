@@ -73,7 +73,7 @@ public class WaveXlrMk2Device : IAudioDevice
     /// <param name="model">Must match the device's iProduct string minus the
     /// vendor, since the daemon derives the PipeWire node-name hint from it.</param>
     /// <param name="vIndex">wIndex of the vendor transfers, see <see cref="_vIndex"/>.</param>
-    protected WaveXlrMk2Device(ushort productId, string model, bool physicalControls, ushort vIndex)
+    protected WaveXlrMk2Device(ushort productId, string model, bool physicalControls, ushort vIndex, bool retainsSettings = true)
     {
         _vIndex = vIndex;
         Info = new DeviceInfo("Elgato", model, VendorId, productId);
@@ -81,6 +81,7 @@ public class WaveXlrMk2Device : IAudioDevice
         {
             Gain = true,
             PhysicalControls = physicalControls,
+            RetainsSettings = retainsSettings,
             Mute = true,
             LowCut = true,
             Expander = true,

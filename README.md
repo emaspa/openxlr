@@ -1,4 +1,13 @@
-# OpenXLR
+![OpenXLR](docs/banner.png)
+
+[![Latest release](https://img.shields.io/github/v/release/emaspa/openxlr?label=release)](https://github.com/emaspa/openxlr/releases)
+[![AUR](https://img.shields.io/aur/version/openxlr?label=AUR)](https://aur.archlinux.org/packages/openxlr)
+[![COPR](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcopr.fedorainfracloud.org%2Fapi_3%2Fpackage%3Fownername%3Demaspa%26projectname%3Dopenxlr%26packagename%3Dopenxlr%26with_latest_succeeded_build%3DTrue&query=%24.builds.latest_succeeded.source_package.version&label=COPR&logo=fedora&logoColor=white&color=51A2DA)](https://copr.fedorainfracloud.org/coprs/emaspa/openxlr/)
+[![PPA](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.launchpad.net%2F1.0%2F~sparvoli%2F%2Barchive%2Fubuntu%2Fopenxlr%3Fws.op%3DgetPublishedSources%26distro_series%3Dhttps%3A%2F%2Fapi.launchpad.net%2F1.0%2Fubuntu%2Fresolute%26order_by_date%3Dtrue&query=%24.entries%5B0%5D.source_package_version&label=PPA&logo=ubuntu&logoColor=white&color=E95420)](https://launchpad.net/~sparvoli/+archive/ubuntu/openxlr)
+[![OpenDeck plugin](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Femaspa%2Fopenxlr%2Fmain%2Fplugin%2Fcom.emaspa.openxlr.sdPlugin%2Fmanifest.json&query=%24.Version&label=OpenDeck%20plugin&color=3b82f6)](https://github.com/emaspa/openxlr/releases/latest)
+
+[![Discord](https://img.shields.io/badge/Discord-join%20the%20server-5865F2?logo=discord&logoColor=white)](https://discord.gg/4bswtnGPW4)
+[![Reddit](https://img.shields.io/badge/Reddit-r%2FOpenXLR-FF4500?logo=reddit&logoColor=white)](https://www.reddit.com/r/OpenXLR/)
 
 Native Linux control suite for Elgato XLR interfaces: full hardware
 control over reverse-engineered USB protocols, a Wave Link style
@@ -7,7 +16,7 @@ LV2 plugin inserts, multi-output monitoring, a dedicated mix for a
 second computer on the USB Aux port, and an OpenDeck plugin for Stream
 Deck control.
 
-![OpenXLR mixer](docs/screenshot-mixer.png)
+![OpenXLR mixer](docs/screenshot-mixer-0122.png)
 
 Elgato ships no Linux software. These devices enumerate as
 class-compliant USB audio interfaces, so audio flows out of the box.
@@ -48,20 +57,25 @@ Collect diagnostics).
 - **Submixer** built from PipeWire nodes (null sinks, remap sources,
   filter chains), no kernel modules. Channels for the hardware inputs
   and for application groups (Game, Music, Browser, System, Voice Chat,
-  SFX); four mixes: Monitor, Stream and Chat (published as virtual
-  microphones) and Aux (sent to the USB Aux port); per-send levels and
-  mutes, level meters, the monitor mix on several outputs at once.
+  SFX); five mixes: Monitor A and Monitor B (what you hear, each output
+  choosing which of the two it follows), Stream and Chat (published as
+  virtual microphones) and Aux (sent to the USB Aux port); per-send
+  levels and mutes, level meters, the monitor mixes on several outputs
+  at once.
 - **Inserts**: LV2 plugin chains on each XLR input and each mix, with a
   plugin picker, generated control windows and bypass LEDs.
 - **Application routing**: audio clients are detected from their
   PipeWire registration and routed to a channel by name rules, with the
-  assignment remembered per app. Electron apps are identified by their
-  process binary rather than the "Chromium" name they report.
+  assignment remembered per app; an app can also be left to the
+  desktop's own routing. Electron apps are identified by their process
+  binary rather than the "Chromium" name they report.
 - **Profiles**: named scenes holding the hardware settings and the
   whole submix (levels, mutes, outputs, insert chains), saved per device
   and recalled from the UI, the API or a Stream Deck key. One profile
   per device can be recalled on connect, so an interface comes up in a
-  known scene at login or after a power cycle.
+  known scene at login or after a power cycle. Interfaces without
+  settings memory (Wave XLR, the first XLR Dock) come back as they
+  were left even without a profile, with a reset to firmware defaults.
 - **OpenDeck plugin**: key and dial actions for every switch, mute,
   level and insert, rendered with level meters and status LEDs. It is a
   client of the daemon's API, so it reflects changes made in the UI or
@@ -71,6 +85,9 @@ Collect diagnostics).
   and source once a second, and serves a WebSocket API on
   127.0.0.1:37890. The UI has a routing graph view, a tray icon and a
   diagnostics archive exporter.
+- **Optional update notice**: the UI can check the upstream GitHub release
+  feed for a newer stable release. Startup checks are off by default and,
+  when enabled, run at most once per day. Nothing is installed automatically.
 
 The full feature list, area by area: [docs/features.md](docs/features.md).
 
@@ -90,7 +107,14 @@ mute, level and insert is a target.
 
 ## Install
 
-**Arch Linux** (AUR):
+Packages exist for Arch (AUR), Ubuntu (PPA), Fedora (COPR) and NixOS
+(flake); every release also carries a `.deb` and an `.rpm` for a manual
+install, with SHA-256 checksums and a GitHub build provenance
+attestation (`gh attestation verify <file> --owner emaspa`). Pick your
+distribution:
+
+**Arch Linux**, from the
+[AUR](https://aur.archlinux.org/packages/openxlr):
 
 ```sh
 yay -S openxlr        # or: paru -S openxlr
@@ -98,23 +122,33 @@ systemctl --user enable --now openxlr-daemon
 openxlr               # the mixer UI, also in your application menu
 ```
 
-**Ubuntu** 24.04 or newer: download the `.deb` from the
-[latest release](https://github.com/emaspa/openxlr/releases/latest), then
+**Ubuntu** 24.04 and 26.04, from the
+[PPA](https://launchpad.net/~sparvoli/+archive/ubuntu/openxlr):
 
 ```sh
-sudo apt install ./openxlr_*_amd64.deb
+sudo add-apt-repository ppa:sparvoli/openxlr
+sudo apt install openxlr
 systemctl --user enable --now openxlr-daemon
 openxlr
 ```
 
-**Fedora** 44 or newer: download the `.rpm` from the
-[latest release](https://github.com/emaspa/openxlr/releases/latest), then
+Without the PPA, download the `.deb` from the
+[latest release](https://github.com/emaspa/openxlr/releases/latest) and
+run `sudo apt install ./openxlr_*_amd64.deb`.
+
+**Fedora** 44 or newer, from the
+[COPR repository](https://copr.fedorainfracloud.org/coprs/emaspa/openxlr/):
 
 ```sh
-sudo dnf install ./openxlr-*.x86_64.rpm
+sudo dnf copr enable emaspa/openxlr
+sudo dnf install openxlr
 systemctl --user enable --now openxlr-daemon
 openxlr
 ```
+
+Without COPR, download the `.rpm` from the
+[latest release](https://github.com/emaspa/openxlr/releases/latest) and
+run `sudo dnf install ./openxlr-*.x86_64.rpm`.
 
 **NixOS**: the repo is a flake with a package and a module. The module
 enables the daemon itself; after a rebuild, `openxlr` is in the
@@ -180,12 +214,21 @@ user service, updating and uninstalling:
 - [USB capture guide](docs/usb-capture.md): how to capture Wave Link
   traffic for an untested device
 
+## Community
+
+Support, hardware reports, feature requests and release news also live
+on the OpenXLR Discord server, [discord.gg/4bswtnGPW4](https://discord.gg/4bswtnGPW4),
+and on Reddit at [r/OpenXLR](https://www.reddit.com/r/OpenXLR/). The
+window links to both from Options, About. Confirmed bugs still end up
+as GitHub issues, so any of the three works to start.
+
 ## Reporting problems
 
 Open Options, then SUPPORT, then Collect diagnostics. It writes
 `~/openxlr-diagnostics-<timestamp>.tar.gz` with the app and device
 state, a raw vendor-block dump, the PipeWire graph, daemon logs and
-configs. Nothing gets uploaded; attach the archive to an issue yourself.
+configs. Nothing gets uploaded; attach the archive to an issue, or to a
+post in the Discord support forum, yourself.
 
 ## Credits
 
@@ -205,8 +248,10 @@ Code:
   coalesced state broadcasts ([#15](https://github.com/emaspa/openxlr/pull/15)),
   the Restart daemon button ([#16](https://github.com/emaspa/openxlr/pull/16))
   and the API document fix ([#17](https://github.com/emaspa/openxlr/pull/17));
-  the daemon watchdog ([#18](https://github.com/emaspa/openxlr/pull/18)) and
+  the progress-gated systemd watchdog ([#18](https://github.com/emaspa/openxlr/pull/18))
+  and the opt-in update notice ([#23](https://github.com/emaspa/openxlr/pull/23));
   the native LV2 plugin editors ([#19](https://github.com/emaspa/openxlr/pull/19))
+  and the editable mixer layout ([#22](https://github.com/emaspa/openxlr/pull/22))
   in review, split out of her larger proposal
   ([#10](https://github.com/emaspa/openxlr/pull/10)).
 - [Michael Brooks](https://github.com/Michael-Brooks): the stream-sweep

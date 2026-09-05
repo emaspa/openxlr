@@ -15,6 +15,7 @@ public sealed class DaemonClientTests
             while (!stop.IsCancellationRequested)
             {
                 var command = await SocketTestServer.Receive(socket, stop);
+                if (command["cmd"]!.GetValue<string>() == "auth") continue;   // every connection opens with the token
                 if (command["cmd"]!.GetValue<string>() == "listPlugins")
                 {
                     Interlocked.Increment(ref requests);
@@ -52,6 +53,7 @@ public sealed class DaemonClientTests
         {
             if (Interlocked.Increment(ref connections) == 1)
             {
+                Assert.Equal("auth", (await SocketTestServer.Receive(socket, stop))["cmd"]!.GetValue<string>());
                 await SocketTestServer.Receive(socket, stop);
                 Interlocked.Increment(ref requests);
                 socket.Abort();

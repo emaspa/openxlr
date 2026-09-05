@@ -24,10 +24,11 @@
     <Border Classes="card">
       <StackPanel Spacing="6">
         <TextBlock Text="KNOWN APPLICATIONS" Classes="h"/>
-        <TextBlock Text="Every app OpenXLR has routed, playing or silent. Assignments apply to the next stream the app opens; Forget drops the app and its remembered channel."
+        <TextBlock Text="Every app OpenXLR has routed, playing or silent. Assignments apply to the next stream the app opens; ignore hands the app back to the desktop's own routing and keeps it that way; Forget drops the app and its remembered channel."
                    FontSize="11" Foreground="#6b7285" TextWrapping="Wrap"/>
         <ScrollViewer MaxHeight="480" VerticalScrollBarVisibility="Auto">
-          <ItemsControl ItemsSource="{Binding Apps}">
+          <!-- the overlay scrollbar would sit on the Forget column -->
+          <ItemsControl ItemsSource="{Binding Apps}" Margin="0,0,16,0">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:AppStreamViewModel">
                 <Grid ColumnDefinitions="10,8,*,130,8,Auto" Margin="0,3">

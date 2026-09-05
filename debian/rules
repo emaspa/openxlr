@@ -4,6 +4,19 @@ export DOTNET_CLI_TELEMETRY_OPTOUT = 1
 export DOTNET_NOLOGO = 1
 export DOTNET_SKIP_FIRST_TIME_EXPERIENCE = 1
 
+# The SDK and NuGet get a home inside the build tree: PPA builders have
+# no writable one, and nothing from a developer's caches leaks in.
+export HOME = $(CURDIR)/debian/.home
+export DOTNET_CLI_HOME = $(HOME)
+export NUGET_PACKAGES = $(HOME)/.nuget/packages
+
+# Launchpad builders are offline; packaging/ppa/make-source.sh vendors
+# the NuGet packages into vendor/nuget and the restore reads only that.
+VENDOR = $(CURDIR)/vendor/nuget
+ifneq (,$(wildcard $(VENDOR)))
+RESTORE_SOURCE = --source $(VENDOR)
+endif
+
 OUT = $(CURDIR)/debian/out
 PKG = $(CURDIR)/debian/openxlr
 
@@ -12,9 +25,9 @@ PKG = $(CURDIR)/debian/openxlr
 
 override_dh_auto_build:
 	dotnet publish src/OpenXLR.Daemon -c Release -r linux-x64 \
-		--self-contained false -o $(OUT)/daemon
+		--self-contained false $(RESTORE_SOURCE) -o $(OUT)/daemon
 	dotnet publish src/OpenXLR.UI -c Release -r linux-x64 \
-		--self-contained false -o $(OUT)/ui
+		--self-contained false $(RESTORE_SOURCE) -o $(OUT)/ui
 
 override_dh_auto_install:
 	install -dm755 $(PKG)/usr/lib/openxlr
@@ -63,7 +76,7 @@ override_dh_auto_install:
 	find $(PKG)/usr/share/openxlr -type d -exec chmod 755 {} +
 
 override_dh_auto_clean:
-	rm -rf $(OUT) src/*/bin src/*/obj
+	rm -rf $(OUT) $(HOME) src/*/bin src/*/obj
 
 override_dh_auto_test:
 

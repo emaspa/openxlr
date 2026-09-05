@@ -118,6 +118,12 @@ public sealed class DaemonClient : IAsyncDisposable
                 using var connect = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
                 connect.CancelAfter(TimeSpan.FromSeconds(5));
                 await socket.ConnectAsync(_uri, connect.Token);
+                // First message: the token the daemon wrote for this session
+                // (read fresh at every connect, since each daemon start makes
+                // a new one). Without it the daemon sends nothing.
+                string auth = JsonSerializer.Serialize(new Dictionary<string, object>
+                    { ["cmd"] = "auth", ["token"] = OpenXlrPaths.ReadToken() ?? "" });
+                await socket.SendAsync(Encoding.UTF8.GetBytes(auth), WebSocketMessageType.Text, true, connect.Token);
                 ConnectionChanged?.Invoke(true);
                 await ReceiveLoop(socket);
             }
@@ -156,7 +162,12 @@ public sealed class DaemonClient : IAsyncDisposable
             do
             {
                 res = await socket.ReceiveAsync(buf, _cts.Token);
-                if (res.MessageType == WebSocketMessageType.Close) return;
+                if (res.MessageType == WebSocketMessageType.Close)
+                {
+                    if (res.CloseStatus == WebSocketCloseStatus.PolicyViolation && res.CloseStatusDescription is { Length: > 0 } why)
+                        ErrorReceived?.Invoke($"daemon refused this window: {why}");
+                    return;
+                }
                 if (res.MessageType != WebSocketMessageType.Text || ms.Length + res.Count > MaxMessageBytes)
                     throw new WebSocketException("Invalid or oversized daemon message.");
                 ms.Write(buf, 0, res.Count);
@@ -194,6 +205,10 @@ public sealed class DaemonClient : IAsyncDisposable
     public Task SetRecallOnConnectAsync(string? name)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setRecallOnConnect", ["name"] = name ?? "" });
 
+    /// <summary>Reset an interface without settings memory to its firmware defaults.</summary>
+    public Task ResetDeviceAsync()
+        => SendAsync(new Dictionary<string, object> { ["cmd"] = "resetDevice" });
+
     public Task SetControlAsync(string control, object value)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "set", ["control"] = control, ["value"] = value });
 
@@ -218,6 +233,10 @@ public sealed class DaemonClient : IAsyncDisposable
     /// <summary>Every output the monitor mix should feed (empty = disconnect).</summary>
     public Task SetMonitorOutputsAsync(IReadOnlyList<string> devices)
         => SendAsync(new Dictionary<string, object?> { ["cmd"] = "setMonitorOutputs", ["devices"] = devices });
+
+    /// <summary>Which monitor mix feeds one selected output.</summary>
+    public Task SetMonitorFeedAsync(string device, string mix)
+        => SendAsync(new Dictionary<string, object?> { ["cmd"] = "setMonitorFeed", ["device"] = device, ["mix"] = mix });
 
     /// <summary>Volume of the selected output device (0..1).</summary>
     public Task SetOutputVolumeAsync(double value)

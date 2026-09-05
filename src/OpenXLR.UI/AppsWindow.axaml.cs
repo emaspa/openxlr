@@ -14,7 +14,7 @@ public partial class AppsWindow : Window
         Opened += (_, _) =>
         {
             if (DataContext is MainViewModel vm)
-                ChannelPicker.ItemsSource = vm.Channels.Select(c => c.Id).ToList();
+                ChannelPicker.ItemsSource = vm.Channels.Select(c => c.Id).Append(AppStreamViewModel.Ignore).ToList();
         };
     }
 

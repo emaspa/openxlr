@@ -22,3 +22,7 @@ debian/debhelper-build-stamp
 debian/*.debhelper
 debian/*.debhelper.log
 debian/*.substvars
+
+# PPA source packages and the vendored NuGet feed (packaging/ppa/make-source.sh)
+dist/
+vendor/

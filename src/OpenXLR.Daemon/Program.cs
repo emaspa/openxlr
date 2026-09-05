@@ -7,6 +7,10 @@ const int ApiPort = 37890;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Start the notifier before graph construction so progressing startup work
+// can extend systemd's deadline. Readiness still waits for ApplicationStarted.
+builder.Services.AddHostedService<ServiceWatchdog>();
+
 // The DeviceManager is both a singleton (queried by the hub) and the hosted
 // background service that runs the poll/reconnect loop.
 builder.Services.AddSingleton<DeviceManager>();
@@ -32,6 +36,10 @@ builder.WebHost.ConfigureKestrel(k =>
 var app = builder.Build();
 app.Services.GetRequiredService<WebSocketHub>();   // construct so it subscribes to StateChanged
 
+// A fresh token for this run, written before anything can connect. Every
+// client presents it as its first message (see ApiToken).
+app.Logger.LogInformation("control API token written to {path}", ApiToken.Initialize());
+
 app.UseWebSockets();
 
 app.Map("/ws", async (HttpContext ctx, WebSocketHub hub) =>
@@ -43,7 +51,14 @@ app.Map("/ws", async (HttpContext ctx, WebSocketHub hub) =>
         ctx.Response.StatusCode = 403;
         return;
     }
-    using var socket = await ctx.WebSockets.AcceptWebSocketAsync();
+    // Transport pings every 30 s; a peer that stops answering them for 30 s
+    // is dropped, while a quiet but live client (the window listens for
+    // hours without sending) is never touched.
+    using var socket = await ctx.WebSockets.AcceptWebSocketAsync(new WebSocketAcceptContext
+    {
+        KeepAliveInterval = SocketGuard.KeepAliveInterval,
+        KeepAliveTimeout = SocketGuard.KeepAliveTimeout,
+    });
     await hub.HandleAsync(socket);
 });
 

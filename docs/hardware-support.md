@@ -121,6 +121,11 @@ Blocks 0x0002 and 0x0006 exist and are not decoded.
 - Per-device profiles: named scenes of hardware state plus the whole
   submix, recalled from the UI, the API or a Stream Deck key, and one
   of them on connect if chosen
+- Last settings restored on connect for the devices without settings
+  memory (Wave XLR, XLR Dock), plus a reset to the firmware defaults
+  recorded after a power cycle. The Pro and the MK.2 family, the XLR
+  Dock MK.2 included, keep their settings on board (verified by
+  replugging the dock)
 - Multi-device switching: a header picker chooses which interface
   OpenXLR drives; the mixer's input channels follow it
 - On switch, the hardware channels' monitor sends come up muted, so the

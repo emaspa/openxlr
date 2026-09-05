@@ -196,6 +196,10 @@
                               ItemsSource="{Binding RecallChoices}"
                               SelectedItem="{Binding RecallOnConnectChoice}"/>
                   </Grid>
+                  <Button Content="Reset device to defaults" FontSize="12" Margin="0,6,0,0"
+                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                          IsVisible="{Binding ShowResetDefaults}" Click="OnResetDevice"
+                          ToolTip.Tip="Write the firmware defaults back to the interface and forget the settings OpenXLR restores on connect. Recorded the first time the interface is plugged in after a power cycle."/>
                 </StackPanel>
               </Flyout>
             </DropDownButton.Flyout>
@@ -214,6 +218,17 @@
 
     <TextBlock Text="{Binding DaemonRestart.Status}" Classes="h" TextWrapping="Wrap"
                Margin="0,0,0,8" IsVisible="{Binding DaemonRestart.Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+    <TextBlock Text="{Binding DaemonWarning}" Foreground="#e0a030" TextWrapping="Wrap" FontSize="12"
+               Margin="0,0,0,8" IsVisible="{Binding DaemonWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+    <Border Classes="card" Margin="0,0,0,8" IsVisible="{Binding Updates.BannerVisible}">
+      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+        <TextBlock Text="{Binding Updates.Title}" Foreground="#5ba8f5"
+                   TextWrapping="Wrap" VerticalAlignment="Center"/>
+        <Button Grid.Column="1" Content="View changes" Click="OnUpdates"/>
+        <Button Grid.Column="2" Content="Dismiss" Click="OnDismissUpdate" Background="Transparent"/>
+      </Grid>
+    </Border>
 
     <!-- a daemon left running across an upgrade offers the old version's controls -->
     <Border Classes="card" Margin="0,0,0,8" IsVisible="{Binding DaemonVersionMismatch}">
@@ -428,7 +443,7 @@
           <StackPanel Orientation="Horizontal" Spacing="6">
             <TextBlock Text="MONITOR" Classes="h" VerticalAlignment="Center"/>
             <TextBlock Text="&#x24D8;" Classes="h" FontSize="12" VerticalAlignment="Center" Margin="0,-1,0,0" Cursor="Help"
-                       ToolTip.Tip="Tick every device the Monitor mix should play on. The Wave XLR Pro's own outputs (Headphones 1/2, USB Aux, Line Out) switch the hardware when ticked. The USB Aux port is fed by the dedicated Aux mix in the submixer instead. XLR 1, XLR 2 and Line In feed their channels automatically. System default devices for apps are set in Options."/>
+                       ToolTip.Tip="Tick every device the monitor mixes should play on; next to a ticked device, choose which of the two it hears: Monitor A, or Monitor B for a second selection. The Wave XLR Pro's own outputs (Headphones 1/2, USB Aux, Line Out) switch the hardware when ticked and share one feed. The USB Aux port is fed by the dedicated Aux mix in the submixer instead. XLR 1, XLR 2 and Line In feed their channels automatically. System default devices for apps are set in Options."/>
           </StackPanel>
         </Expander.Header>
       <StackPanel Classes="dev" Spacing="4">
@@ -439,11 +454,22 @@
                           Content="{Binding MonitorSummary}">
             <DropDownButton.Flyout>
               <Flyout Placement="BottomEdgeAlignedLeft">
-                <ItemsControl ItemsSource="{Binding MonitorOutputs}" MinWidth="320">
+                <ItemsControl ItemsSource="{Binding MonitorOutputs}" Width="400">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:MonitorOutputItem">
-                      <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                Padding="8,4" HorizontalAlignment="Stretch"/>
+                      <!-- fixed row width under the flyout presenter's default
+                           maximum (456 px including its padding): the label
+                           trims, the feed picker keeps its place, nothing clips -->
+                      <Grid ColumnDefinitions="*,120">
+                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" Padding="8,4"
+                                  HorizontalAlignment="Stretch" ToolTip.Tip="{Binding Label}">
+                          <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis"/>
+                        </CheckBox>
+                        <ComboBox Grid.Column="1" ItemsSource="{Binding Feeds}" SelectedItem="{Binding Feed}"
+                                  FontSize="11" HorizontalAlignment="Stretch" Margin="8,0,0,0" VerticalAlignment="Center"
+                                  IsVisible="{Binding IsSelected}"
+                                  ToolTip.Tip="Which monitor mix this output hears, so a headset with a game side and a chat side can hear two different selections."/>
+                      </Grid>
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
@@ -597,7 +623,7 @@
                         <DataTemplate x:DataType="vm:SendViewModel">
                           <StackPanel Margin="0,0,0,8" Spacing="1" IsVisible="{Binding Visible}">
                             <Grid ColumnDefinitions="*,Auto">
-                              <TextBlock Text="{Binding MixId}" Classes="h" FontSize="11"/>
+                              <TextBlock Text="{Binding MixName}" Classes="h" FontSize="11"/>
                               <TextBlock Grid.Column="1" Text="{Binding LevelText}" Classes="val" FontSize="11"/>
                             </Grid>
                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">

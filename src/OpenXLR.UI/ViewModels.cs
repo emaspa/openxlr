@@ -33,6 +33,7 @@ public abstract class ViewModelBase : INotifyPropertyChanged
 public sealed class MainViewModel : ViewModelBase
 {
     public DaemonRestartViewModel DaemonRestart { get; } = new();
+    public UpdatesViewModel Updates { get; } = new();
 
     private readonly DaemonClient _client;
     private bool _applying;
@@ -139,6 +140,15 @@ public sealed class MainViewModel : ViewModelBase
 
     private bool _capPhysicalControls = true;
     public bool CapPhysicalControls { get => _capPhysicalControls; set => Set(ref _capPhysicalControls, value); }
+
+    // Interfaces without settings memory (Wave XLR, the first XLR Dock)
+    // get their last settings back on connect and can be reset to the
+    // firmware defaults; devices that keep their own settings need neither.
+    private bool _capRetainsSettings = true;
+    public bool CapRetainsSettings { get => _capRetainsSettings; set => Set(ref _capRetainsSettings, value); }
+
+    private bool _showResetDefaults;
+    public bool ShowResetDefaults { get => _showResetDefaults; private set => Set(ref _showResetDefaults, value); }
 
     // The daemon-side gain lock cannot stop a physical dial, so it only
     // shows for devices without one.
@@ -529,10 +539,15 @@ public sealed class MainViewModel : ViewModelBase
         $"The daemon is {(DaemonVersion is null ? "an older version" : "v" + DaemonVersion)}; this window is v{AppVersion.Current}. " +
         "Restart the daemon to run the installed version.";
 
+    private string _daemonWarning = "";
+    /// <summary>A condition the daemon wants the user to see (settings not being saved), or empty.</summary>
+    public string DaemonWarning { get => _daemonWarning; private set => Set(ref _daemonWarning, value); }
+
     /// <summary>Apply a state push from the daemon without echoing it back.</summary>
     private void Apply(JsonNode node)
     {
         _applying = true;
+        DaemonWarning = node["warning"]?.GetValue<string>() ?? "";
         try
         {
             DaemonConnected = true;
@@ -557,6 +572,7 @@ public sealed class MainViewModel : ViewModelBase
                 CapAuxInput = Cap("auxInput");
                 CapOutputRouting = Cap("outputRouting");
                 CapPhysicalControls = Cap("physicalControls");
+                CapRetainsSettings = caps["retainsSettings"]?.GetValue<bool>() ?? true;
             }
 
             if (node["state"] is JsonNode s)
@@ -605,6 +621,7 @@ public sealed class MainViewModel : ViewModelBase
             ShowSoftLowCut = DeviceConnected && !CapLowCut && HasMixer;
             ShowSoftClipGuard = DeviceConnected && !CapClipGuard && HasMixer;
             ShowGainLock = DeviceConnected && !CapPhysicalControls;
+            ShowResetDefaults = DeviceConnected && !CapRetainsSettings;
             Status = DeviceConnected ? "ready" : "no device";
         }
         finally { _applying = false; }
@@ -656,10 +673,18 @@ public sealed class MainViewModel : ViewModelBase
         foreach (string n in names) Profiles.Add(n);
     }
 
-    /// <summary>The "none" entry of the recall picker; parentheses cannot occur in a profile name.</summary>
+    /// <summary>
+    /// The "no profile" entry of the recall picker; parentheses cannot occur
+    /// in a profile name. An interface without settings memory gets its last
+    /// settings back in that case, so the entry says so there.
+    /// </summary>
     public const string NoRecall = "(none)";
+    public const string LastSettings = "(last settings)";
 
-    /// <summary>Recall picker entries: "(none)" then every saved profile.</summary>
+    private string NoRecallLabel => CapRetainsSettings ? NoRecall : LastSettings;
+    private static bool IsNoRecall(string value) => value is NoRecall or LastSettings;
+
+    /// <summary>Recall picker entries: the "no profile" entry then every saved profile.</summary>
     public ObservableCollection<string> RecallChoices { get; } = [NoRecall];
 
     private string _recallChoice = NoRecall;
@@ -674,13 +699,13 @@ public sealed class MainViewModel : ViewModelBase
         set
         {
             if (value is null || !Set(ref _recallChoice, value) || _applying) return;
-            _ = _client.SetRecallOnConnectAsync(value == NoRecall ? null : value);
+            _ = _client.SetRecallOnConnectAsync(IsNoRecall(value) ? null : value);
         }
     }
 
     private void ApplyRecallOnConnect(JsonNode? recall)
     {
-        var choices = new List<string> { NoRecall };
+        var choices = new List<string> { NoRecallLabel };
         choices.AddRange(Profiles);
         if (!choices.SequenceEqual(RecallChoices))
         {
@@ -688,9 +713,12 @@ public sealed class MainViewModel : ViewModelBase
             foreach (string c in choices) RecallChoices.Add(c);
             _recallChoice = "";   // the combo lost its selection with the items; force the re-set below
         }
-        string want = recall?.GetValue<string>() is string r && Profiles.Contains(r) ? r : NoRecall;
+        string want = recall?.GetValue<string>() is string r && Profiles.Contains(r) ? r : NoRecallLabel;
         RecallOnConnectChoice = want;
     }
+
+    /// <summary>Write the firmware defaults back to an interface without settings memory.</summary>
+    public void ResetDevice() => _ = _client.ResetDeviceAsync();
 
     public void SaveProfile(string name) => _ = _client.SaveProfileAsync(name);
     public void LoadProfile(string name) => _ = _client.LoadProfileAsync(name);
@@ -731,7 +759,7 @@ public sealed class MainViewModel : ViewModelBase
         {
             MonitorOutputs.Clear();
             foreach (AudioDeviceItem s in wanted)
-                MonitorOutputs.Add(new MonitorOutputItem(s.Name, s.Label, OnMonitorSelectionChanged));
+                MonitorOutputs.Add(new MonitorOutputItem(s.Name, s.Label, OnMonitorSelectionChanged, OnMonitorFeedChanged));
         }
 
         EnforcedDefaultSink = mixer?["enforcedDefaultSink"]?.GetValue<string>();
@@ -744,7 +772,38 @@ public sealed class MainViewModel : ViewModelBase
             (mixer?["monitorOutputs"] as JsonArray)?.Select(n => n?.GetValue<string>())
                 .Where(n => n is not null).Select(n => n!) ?? []);
         foreach (MonitorOutputItem item in MonitorOutputs) item.Sync(current.Contains(item.Name));
+
+        // Every monitor mix is a possible feed for an output; the first one is
+        // the default for outputs the daemon lists no exception for.
+        var monitorMixes = (mixer?["mixes"] as JsonArray)?
+            .Where(m => m is not null && (m["kind"]?.GetValue<string>() ?? "monitor") == "monitor")
+            .Select(m => new MixOption(m!["id"]!.GetValue<string>(), m["name"]?.GetValue<string>() ?? m["id"]!.GetValue<string>()))
+            .ToList() ?? [];
+        // With two or more monitor mixes an output can also hear them all,
+        // summed: "Monitor A+B" for headphones that want the desktop from A
+        // and a separately processed mic from B.
+        if (monitorMixes.Count > 1)
+            monitorMixes.Add(new MixOption(string.Join("+", monitorMixes.Select(m => m.Id)), SummedName(monitorMixes.Select(m => m.Name))));
+        var feeds = mixer?["monitorFeeds"] as JsonObject;
+        string primaryMonitor = monitorMixes.FirstOrDefault()?.Id ?? "monitor";
+        foreach (MonitorOutputItem item in MonitorOutputs)
+            item.SyncFeed(monitorMixes, feeds?[item.Name]?.GetValue<string>() ?? primaryMonitor);
         Raise(nameof(MonitorSummary));
+    }
+
+    /// <summary>"Monitor A" and "Monitor B" read "Monitor A+B"; names without a shared first word are joined whole.</summary>
+    internal static string SummedName(IEnumerable<string> names)
+    {
+        List<string> list = [.. names];
+        string[] firstWords = [.. list.Select(n => n.Split(' ', 2)[0])];
+        if (list.Count > 1 && firstWords.Distinct().Count() == 1 && list.All(n => n.Contains(' ')))
+            return firstWords[0] + " " + string.Join("+", list.Select(n => n.Split(' ', 2)[1]));
+        return string.Join("+", list);
+    }
+
+    private void OnMonitorFeedChanged(string output, string mixId)
+    {
+        if (!_applying) _ = _client.SetMonitorFeedAsync(output, mixId);
     }
 
     /// <summary>AudioNodeKind arrives as the enum's number (0 = Sink) or name.</summary>
@@ -809,7 +868,7 @@ public sealed class MainViewModel : ViewModelBase
             AppStreamViewModel? existing = Apps.FirstOrDefault(a =>
                 string.Equals(a.Identity, f.Identity, StringComparison.OrdinalIgnoreCase));
             if (existing is null)
-                Apps.Add(new AppStreamViewModel(_client, f.Identity, f.Label, [.. Channels.Select(c => c.Id)])
+                Apps.Add(new AppStreamViewModel(_client, f.Identity, f.Label, [.. Channels.Select(c => c.Id), AppStreamViewModel.Ignore])
                     { ChannelId = f.Channel, Active = f.Active, Running = f.Running });
             else
                 existing.ApplyFromDaemon(f.Channel, f.Active, f.Running, f.Label);
@@ -849,7 +908,8 @@ public sealed class MainViewModel : ViewModelBase
         {
             SyncList(Mixes, mixes, m => m["id"]!.GetValue<string>(),
                 (m, vm) => vm.ApplyFromDaemon(m),
-                m => new MixViewModel(_client, m["id"]!.GetValue<string>(), m["name"]!.GetValue<string>()));
+                m => new MixViewModel(_client, m["id"]!.GetValue<string>(), m["name"]!.GetValue<string>())
+                    { Kind = m["kind"]?.GetValue<string>() ?? "monitor" });
             bool auxOn = mixer["auxPortEnabled"]?.GetValue<bool>() ?? true;
             foreach (MixViewModel mv in Mixes.Where(mv => mv.IsAuxPort)) mv.ApplyAuxPort(auxOn);
             // The Aux mix only exists to feed the device's USB Aux port; hide
@@ -857,6 +917,7 @@ public sealed class MainViewModel : ViewModelBase
             // once the channels have synced).
             foreach (MixViewModel mv in Mixes.Where(mv => mv.IsAuxPort))
                 mv.Visible = !DeviceConnected || CapOutputRouting;
+
             foreach (MixViewModel mv in Mixes)
             {
                 mv.Inserts.Apply(mixer["inserts"]?[$"mix:{mv.Id}"]);
@@ -870,6 +931,10 @@ public sealed class MainViewModel : ViewModelBase
                 (c, vm) => vm.ApplyFromDaemon(c),
                 c => new ChannelViewModel(_client, c["id"]!.GetValue<string>(), c["name"]!.GetValue<string>(),
                     [.. Mixes.Select(m => m.Id)]));
+            // Send rows carry the mix's name, not its id.
+            foreach (ChannelViewModel c in Channels)
+                foreach (SendViewModel send in c.Sends)
+                    send.MixName = Mixes.FirstOrDefault(m => m.Id == send.MixId)?.Name ?? send.MixId;
             // Hardware input tiles only make sense for jacks the active
             // device has; without a device, show everything as before.
             foreach (ChannelViewModel c in Channels)
@@ -911,6 +976,9 @@ public interface IHasId { string Id { get; } }
 /// <summary>An application that is playing, and the channel it is routed to.</summary>
 public sealed class AppStreamViewModel : ViewModelBase
 {
+    /// <summary>The daemon's "not managed" pseudo-channel: the app keeps the desktop's routing.</summary>
+    public const string Ignore = "ignore";
+
     private readonly DaemonClient _client;
     private bool _applying;
 
@@ -978,18 +1046,60 @@ public sealed record AudioDeviceItem(string Name, string Description, bool IsOwn
 /// state. Toggling notifies the owning view model, which sends the full
 /// selection to the daemon.
 /// </summary>
+/// <summary>A monitor mix as a feed choice for an output; shows its name in pickers.</summary>
+public sealed record MixOption(string Id, string Name)
+{
+    public override string ToString() => Name;
+}
+
 public sealed class MonitorOutputItem : ViewModelBase
 {
     private readonly Action _changed;
-    public MonitorOutputItem(string name, string label, Action changed)
+    private readonly Action<string, string> _feedChanged;
+    private bool _syncing;
+
+    public MonitorOutputItem(string name, string label, Action changed, Action<string, string> feedChanged)
     {
         Name = name;
         Label = label;
         _changed = changed;
+        _feedChanged = feedChanged;
     }
 
     public string Name { get; }
     public string Label { get; }
+
+    /// <summary>The monitor mixes this output can be fed by.</summary>
+    public ObservableCollection<MixOption> Feeds { get; } = [];
+
+    private MixOption? _feed;
+    /// <summary>The monitor mix feeding this output; picking one tells the daemon.</summary>
+    public MixOption? Feed
+    {
+        get => _feed;
+        set
+        {
+            if (value is null || !Set(ref _feed, value) || _syncing) return;
+            _feedChanged(Name, value.Id);
+        }
+    }
+
+    /// <summary>Set the choices and the current feed without notifying the daemon.</summary>
+    public void SyncFeed(IReadOnlyList<MixOption> options, string mixId)
+    {
+        _syncing = true;
+        try
+        {
+            if (!options.Select(o => o.Id).SequenceEqual(Feeds.Select(f => f.Id)))
+            {
+                Feeds.Clear();
+                foreach (MixOption o in options) Feeds.Add(o);
+                _feed = null;   // the combo lost its selection with the items
+            }
+            Feed = Feeds.FirstOrDefault(f => f.Id == mixId) ?? Feeds.FirstOrDefault();
+        }
+        finally { _syncing = false; }
+    }
 
     /// <summary>Set without notifying the daemon (state pushes).</summary>
     public void Sync(bool selected) { if (Set(ref _isSelected, selected, nameof(IsSelected))) { } }
@@ -1022,6 +1132,9 @@ public sealed class MixViewModel : ViewModelBase, IHasId
 
     private bool _visible = true;
     public bool Visible { get => _visible; set => Set(ref _visible, value); }
+
+    /// <summary>"monitor", "virtualMic" or "auxPort", as the daemon reports it.</summary>
+    public string Kind { get; set; } = "monitor";
 
     private double _volume = 1.0;
     public double Volume
@@ -1066,6 +1179,7 @@ public sealed class MixViewModel : ViewModelBase, IHasId
             if (!SliderSync.RecentlyTouched($"mixvol:{Id}"))
                 Volume = n["volume"]?.GetValue<double>() ?? 1.0;
             Muted = n["muted"]?.GetValue<bool>() ?? false;
+            Kind = n["kind"]?.GetValue<string>() ?? Kind;
         }
         finally { _applying = false; }
     }
@@ -1126,10 +1240,14 @@ public sealed class SendViewModel : ViewModelBase
 
     public SendViewModel(DaemonClient client, string channelId, string mixId)
     {
-        _client = client; _channelId = channelId; MixId = mixId;
+        _client = client; _channelId = channelId; MixId = mixId; _mixName = mixId;
     }
 
     public string MixId { get; }
+
+    private string _mixName;
+    /// <summary>The mix's display name for the row header (the id until the mixes are known).</summary>
+    public string MixName { get => _mixName; set => Set(ref _mixName, value); }
 
     private bool _visible = true;
     public bool Visible { get => _visible; set => Set(ref _visible, value); }
