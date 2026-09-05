@@ -23,6 +23,8 @@ public sealed record MixerScene
     /// empty list means disconnect every monitor output.
     /// </summary>
     public List<string>? MonitorOutputs { get; init; }
+    /// <summary>Output name to the monitor mix feeding it; null in profiles saved before Monitor 2.</summary>
+    public Dictionary<string, string>? MonitorFeeds { get; init; }
     public bool AuxPortEnabled { get; init; }
     public double? OutputVolume { get; init; }
     /// <summary>Software low cut (0, 80, or 120 Hz); absent in older profiles.</summary>

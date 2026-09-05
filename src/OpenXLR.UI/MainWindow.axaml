@@ -428,7 +428,7 @@
           <StackPanel Orientation="Horizontal" Spacing="6">
             <TextBlock Text="MONITOR" Classes="h" VerticalAlignment="Center"/>
             <TextBlock Text="&#x24D8;" Classes="h" FontSize="12" VerticalAlignment="Center" Margin="0,-1,0,0" Cursor="Help"
-                       ToolTip.Tip="Tick every device the Monitor mix should play on. The Wave XLR Pro's own outputs (Headphones 1/2, USB Aux, Line Out) switch the hardware when ticked. The USB Aux port is fed by the dedicated Aux mix in the submixer instead. XLR 1, XLR 2 and Line In feed their channels automatically. System default devices for apps are set in Options."/>
+                       ToolTip.Tip="Tick every device the Monitor mix should play on; next to a ticked device, choose which monitor mix it hears (Monitor, or Monitor 2 for a second selection). The Wave XLR Pro's own outputs (Headphones 1/2, USB Aux, Line Out) switch the hardware when ticked and share one feed. The USB Aux port is fed by the dedicated Aux mix in the submixer instead. XLR 1, XLR 2 and Line In feed their channels automatically. System default devices for apps are set in Options."/>
           </StackPanel>
         </Expander.Header>
       <StackPanel Classes="dev" Spacing="4">
@@ -442,8 +442,14 @@
                 <ItemsControl ItemsSource="{Binding MonitorOutputs}" MinWidth="320">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:MonitorOutputItem">
-                      <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                Padding="8,4" HorizontalAlignment="Stretch"/>
+                      <Grid ColumnDefinitions="*,Auto">
+                        <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                  Padding="8,4" HorizontalAlignment="Stretch"/>
+                        <ComboBox Grid.Column="1" ItemsSource="{Binding Feeds}" SelectedItem="{Binding Feed}"
+                                  FontSize="11" MinWidth="100" Margin="8,0,0,0" VerticalAlignment="Center"
+                                  IsVisible="{Binding IsSelected}"
+                                  ToolTip.Tip="Which monitor mix this output hears. Monitor 2 gets its own column in the submixer once an output uses it, so a headset with a game side and a chat side can hear two different selections."/>
+                      </Grid>
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>

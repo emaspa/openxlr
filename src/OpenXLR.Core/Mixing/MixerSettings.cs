@@ -38,8 +38,11 @@ public sealed record MixerSettings
     /// <summary>Single monitor output from older files; superseded by MonitorOutputs.</summary>
     public string? MonitorOutput { get; init; }
 
-    /// <summary>All selected monitor outputs (the monitor mix can feed several).</summary>
+    /// <summary>All selected monitor outputs (the monitor mixes can feed several).</summary>
     public List<string> MonitorOutputs { get; init; } = [];
+
+    /// <summary>Output name to the monitor mix feeding it; absent = the first monitor mix.</summary>
+    public Dictionary<string, string> MonitorFeeds { get; init; } = [];
 
     /// <summary>Application identity to channel id, from manual assignments.</summary>
     public Dictionary<string, string> AppOverrides { get; init; } = [];

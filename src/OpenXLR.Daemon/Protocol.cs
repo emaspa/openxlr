@@ -37,7 +37,8 @@ public sealed record Command
     [JsonPropertyName("streamId")] public int? StreamId { get; init; }
 
     /// <summary>
-    /// "setMonitorOutput": PipeWire node.name (null disconnects); or
+    /// "setMonitorOutput": PipeWire node.name (null disconnects);
+    /// "setMonitorFeed": the selected output whose feed changes (with "mix"); or
     /// "setActiveDevice": the interface's vvvv:pppp id.
     /// </summary>
     [JsonPropertyName("device")] public string? Device { get; init; }

@@ -66,17 +66,19 @@ does not reach the speakers until unmuted.
 Built from PipeWire nodes, no kernel modules or custom drivers:
 - Channels for the hardware inputs (XLR 1, XLR 2, Aux In) and for
   application groups (Game, Music, Browser, System, Voice Chat, SFX)
-- Four mixes: Monitor (what you hear), Stream and Chat (published as the
-  capture devices `OpenXLR Stream` and `OpenXLR Chat`, selectable in OBS
-  or Discord like a microphone), and Aux (what a second computer on the
-  USB Aux port receives)
+- Five mixes: Monitor (what you hear), Monitor 2 (a second selection
+  for outputs that should hear something else, shown once one uses it),
+  Stream and Chat (published as the capture devices `OpenXLR Stream` and
+  `OpenXLR Chat`, selectable in OBS or Discord like a microphone), and
+  Aux (what a second computer on the USB Aux port receives)
 - Per-channel, per-mix send levels and mutes; per-mix masters
-- The monitor mix can play on several outputs at once, hardware outputs
-  included
+- The monitor mixes can play on several outputs at once, hardware
+  outputs included; each output picks which monitor mix feeds it, so a
+  headset with a game sink and a chat sink hears two selections
 - Level meters throughout, dB-scaled, pushed at 15 Hz
 
 Each channel is a combine sink with one internal stream per mix; that
-stream's volume is the send fader. The 9 by 4 matrix is 13 sinks and no
+stream's volume is the send fader. The 9 by 5 matrix is 14 sinks and no
 loopback processes. Details in [architecture.md](architecture.md).
 
 On the Wave XLR Pro the headphone jacks are fed by a mix inside the

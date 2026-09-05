@@ -83,7 +83,7 @@ public sealed class MixerService : IHostedService, IDisposable
         // to carry the mic there, and the hardware path would double it.
         bool anyJack = suffixes.Contains("hp1") || suffixes.Contains("hp2") || suffixes.Contains("lineout");
         bool jacksOnly = anyJack && _mixer.MonitorOutputs.All(o => o.Contains('#'));
-        bool micDirect = jacksOnly && !_mixer.IsChannelMutedIn("xlr1", "monitor");
+        bool micDirect = jacksOnly && !_mixer.IsChannelMutedIn("xlr1", _mixer.JackMonitorMix ?? "monitor");
         _mixer.SetHardwareMicMonitor(micDirect);
         if (anyJack && _devices.EnsureHeadphoneMix(monitorReturn: true, micDirect: micDirect) && _mixer.Built)
             _mixer.BounceMonitorHardwareOutput();
@@ -320,6 +320,11 @@ public sealed class MixerService : IHostedService, IDisposable
                 case "setMonitorOutputs":
                     _mixer.SetMonitorOutputs(cmd.Devices ?? []);
                     SyncOutputSelectors();
+                    break;
+                case "setMonitorFeed":
+                    if (cmd.Device is null || cmd.Mix is null) return "setMonitorFeed: need 'device' and 'mix'";
+                    _mixer.SetMonitorFeed(cmd.Device, cmd.Mix);
+                    SyncOutputSelectors();   // the jacks may now follow another mix's XLR 1 send
                     break;
                 case "setOutputVolume":
                     _mixer.SetOutputVolume(cmd.Value.GetDouble());

@@ -180,6 +180,7 @@ public sealed class WebSocketHub
             case "forgetApp":
             case "setMonitorOutput":
             case "setMonitorOutputs":
+            case "setMonitorFeed":
             case "setOutputVolume":
             case "setEnforcedDefaults":
             case "setAuxPortEnabled":

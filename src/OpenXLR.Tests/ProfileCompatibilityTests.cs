@@ -20,4 +20,19 @@ public sealed class ProfileCompatibilityTests
         Assert.NotNull(scene.MonitorOutputs);
         Assert.Empty(scene.MonitorOutputs);
     }
+
+    [Fact]
+    public void OldSceneWithoutMonitorFeedsKeepsTheCurrentFeeds()
+    {
+        MixerScene scene = JsonSerializer.Deserialize<MixerScene>("""{"MonitorOutputs":["a"]}""")!;
+        Assert.Null(scene.MonitorFeeds);
+    }
+
+    [Fact]
+    public void SceneFeedsRoundTrip()
+    {
+        var scene = new MixerScene { MonitorFeeds = new() { ["alsa_output.chat"] = "monitor2" } };
+        MixerScene back = JsonSerializer.Deserialize<MixerScene>(JsonSerializer.Serialize(scene))!;
+        Assert.Equal("monitor2", back.MonitorFeeds!["alsa_output.chat"]);
+    }
 }

@@ -9,7 +9,7 @@ public sealed class CommandLimitsTests
     private sealed class Layout : ILayoutInfo
     {
         public bool HasChannel(string id) => id is "system" or "xlr1";
-        public bool HasMix(string id) => id is "monitor" or "stream";
+        public bool HasMix(string id) => id is "monitor" or "monitor2" or "stream";
         public bool IsInsertKey(string key) => key is "xlr1" or "mix:monitor";
         public int OverrideCount { get; set; }
     }
@@ -29,6 +29,8 @@ public sealed class CommandLimitsTests
 
     [Theory]
     [InlineData("""{"cmd":"setLevel","channel":"system","mix":"monitor","value":0.5}""", null)]
+    [InlineData("""{"cmd":"setMonitorFeed","device":"alsa_output.headset","mix":"monitor2"}""", null)]
+    [InlineData("""{"cmd":"setMonitorFeed","device":"alsa_output.headset","mix":"nope"}""", "unknown mix")]
     [InlineData("""{"cmd":"setLevel","channel":"nope","mix":"monitor","value":0.5}""", "unknown channel")]
     [InlineData("""{"cmd":"setLevel","channel":"system","mix":"nope","value":0.5}""", "unknown mix")]
     [InlineData("""{"cmd":"setLevel","channel":"system","mix":"monitor","value":"loud"}""", "finite number")]

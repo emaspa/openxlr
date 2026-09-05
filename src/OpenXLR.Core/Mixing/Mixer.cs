@@ -39,6 +39,9 @@ public sealed class Mixer : IDisposable, ILayoutInfo
     // route (the Wave XLR Pro's jacks all ride its monitor bus) make one link.
     private readonly Dictionary<string, PortLink> _monitorRoutes = [];
     private readonly List<string> _monitorOutputs = [];
+    // Output name -> id of the monitor mix feeding it. Absent = the first
+    // monitor mix, so the dictionary only holds the exceptions (issue #21).
+    private readonly Dictionary<string, string> _monitorFeeds = [];
     private readonly Dictionary<string, PortLink> _inputFeeds = [];
     private string? _inputDevice;   // the capture device the feeds come from
     private long _inputChainGeneration;
@@ -205,8 +208,7 @@ public sealed class Mixer : IDisposable, ILayoutInfo
         // unmutes deliberately.
         if (previousInput is not null && previousInput != nextInput)
         {
-            MixDefinition? mon = _config.Mixes.FirstOrDefault(m => m.Kind == MixKind.Monitor);
-            if (mon is not null)
+            foreach (MixDefinition mon in _config.Mixes.Where(m => m.Kind == MixKind.Monitor))
                 foreach (ChannelDefinition hw in _config.Channels.Where(c => c.InputPair is not null))
                 {
                     _muted.Add(Cell(hw.Id, mon.Id));
@@ -775,6 +777,7 @@ public sealed class Mixer : IDisposable, ILayoutInfo
                 Levels = new Dictionary<string, double>(_levels),
                 ChannelMuted = [.. _muted],
                 MonitorOutputs = [.. _monitorOutputs],
+                MonitorFeeds = new Dictionary<string, string>(_monitorFeeds),
                 AppOverrides = new Dictionary<string, string>(Matcher.Overrides),
                 KnownApps = [.. _apps.Values.Select(a => new SavedApp(a.Identity, a.Label, a.ChannelId))],
                 EnforcedDefaultSink = _enforcedSink,
@@ -826,6 +829,8 @@ public sealed class Mixer : IDisposable, ILayoutInfo
             IReadOnlyList<string> savedOutputs = s.MonitorOutputs is { Count: > 0 }
                 ? s.MonitorOutputs
                 : s.MonitorOutput is not null ? [s.MonitorOutput] : [];
+            _monitorFeeds.Clear();
+            foreach ((string output, string mixId) in s.MonitorFeeds) _monitorFeeds[output] = mixId;
             SetMonitorOutputsLocked(savedOutputs);
             _enforcedSink = s.EnforcedDefaultSink;
             _enforcedSource = s.EnforcedDefaultSource;
@@ -881,6 +886,7 @@ public sealed class Mixer : IDisposable, ILayoutInfo
                 Levels = new Dictionary<string, double>(_levels),
                 ChannelMuted = [.. _muted],
                 MonitorOutputs = [.. _monitorOutputs],
+                MonitorFeeds = new Dictionary<string, string>(_monitorFeeds),
                 AuxPortEnabled = _auxPortEnabled,
                 OutputVolume = _outputVolume,
                 LowCutHz = _lowCutHz,
@@ -917,8 +923,15 @@ public sealed class Mixer : IDisposable, ILayoutInfo
             // An empty list is a real scene choice: disconnect every monitor
             // route. Null belongs to an older profile that did not store this
             // field, so preserve the current route for backwards compatibility.
+            if (s.MonitorFeeds is not null)
+            {
+                _monitorFeeds.Clear();
+                foreach ((string output, string mixId) in s.MonitorFeeds) _monitorFeeds[output] = mixId;
+            }
             if (s.MonitorOutputs is not null)
                 SetMonitorOutputsLocked(s.MonitorOutputs);
+            else if (s.MonitorFeeds is not null)
+                SetMonitorOutputsLocked([.. _monitorOutputs]);   // relink with the recalled feeds
             _auxPortEnabled = s.AuxPortEnabled;
             WireAuxRouteLocked();
 
@@ -1061,8 +1074,7 @@ public sealed class Mixer : IDisposable, ILayoutInfo
         {
             if (_hardwareMicMonitor == on) return;
             _hardwareMicMonitor = on;
-            MixDefinition? monitor = _config.Mixes.FirstOrDefault(m => m.Kind == MixKind.Monitor);
-            if (_built && monitor is not null) ApplyCellLocked("xlr1", monitor.Id);
+            if (_built && JackFeedLocked() is string jackMix) ApplyCellLocked("xlr1", jackMix);
         }
     }
 
@@ -1117,11 +1129,71 @@ public sealed class Mixer : IDisposable, ILayoutInfo
             if (name.EndsWith("#usbaux", StringComparison.Ordinal)) continue;
             _monitorOutputs.Add(name);
         }
-        MixDefinition? monitor = _config.Mixes.FirstOrDefault(m => m.Kind == MixKind.Monitor);
-        if (monitor is null) return;
-        (string tapNode, string tapPrefix) = MixTapLocked(monitor);
+        // Feeds only make sense for selected outputs; drop the rest so a
+        // stale choice never resurfaces when the output is ticked again.
+        foreach (string stale in _monitorFeeds.Keys.Where(o => !_monitorOutputs.Contains(o)).ToList())
+            _monitorFeeds.Remove(stale);
         foreach ((string key, string target) in MonitorRouteTargetsLocked())
+        {
+            if (MixForOutputLocked(target) is not MixDefinition mix) return;
+            (string tapNode, string tapPrefix) = MixTapLocked(mix);
             _monitorRoutes[key] = _pw.RouteTapToOutput(tapNode, tapPrefix, target);
+        }
+    }
+
+    /// <summary>The first monitor mix, the one outputs are fed by unless told otherwise.</summary>
+    private MixDefinition? PrimaryMonitorLocked() => _config.Mixes.FirstOrDefault(m => m.Kind == MixKind.Monitor);
+
+    /// <summary>The monitor mix feeding an output, falling back to the first one.</summary>
+    private MixDefinition? MixForOutputLocked(string output)
+    {
+        if (_monitorFeeds.TryGetValue(output, out string? id)
+            && _config.Mixes.FirstOrDefault(m => m.Id == id && m.Kind == MixKind.Monitor) is MixDefinition chosen)
+            return chosen;
+        return PrimaryMonitorLocked();
+    }
+
+    /// <summary>
+    /// Id of the monitor mix that reaches the Wave XLR Pro's own jacks (its
+    /// pseudo-outputs share one return bus, so they follow one feed), or the
+    /// first monitor mix when no jack is selected.
+    /// </summary>
+    private string? JackFeedLocked()
+    {
+        string? jack = _monitorOutputs.FirstOrDefault(o => o.Contains('#'));
+        return (jack is null ? PrimaryMonitorLocked() : MixForOutputLocked(jack))?.Id;
+    }
+
+    /// <summary>Id of the monitor mix feeding the interface's own jacks (see <see cref="JackFeedLocked"/>).</summary>
+    public string? JackMonitorMix { get { lock (_gate) return JackFeedLocked(); } }
+
+    /// <summary>The monitor mix feeding one selected output, by id.</summary>
+    public string? MonitorFeedOf(string output) { lock (_gate) return MixForOutputLocked(output)?.Id; }
+
+    /// <summary>
+    /// Choose which monitor mix feeds a selected output. The Pro's
+    /// pseudo-outputs ride one return bus, so a choice on one applies to
+    /// every jack of that device. An unknown mix or an unselected output is
+    /// ignored; the first monitor mix is stored as "no exception".
+    /// </summary>
+    public void SetMonitorFeed(string output, string mixId)
+    {
+        lock (_gate)
+        {
+            if (!_built || !_monitorOutputs.Contains(output)) return;
+            if (!_config.Mixes.Any(m => m.Id == mixId && m.Kind == MixKind.Monitor)) return;
+            bool primary = PrimaryMonitorLocked()?.Id == mixId;
+            int marker = output.IndexOf('#');
+            IEnumerable<string> affected = marker < 0
+                ? [output]
+                : _monitorOutputs.Where(o => o.StartsWith(output[..(marker + 1)], StringComparison.Ordinal));
+            foreach (string o in affected)
+            {
+                if (primary) _monitorFeeds.Remove(o);
+                else _monitorFeeds[o] = mixId;
+            }
+            SetMonitorOutputsLocked([.. _monitorOutputs]);
+        }
     }
 
     /// <summary>
@@ -1151,8 +1223,6 @@ public sealed class Mixer : IDisposable, ILayoutInfo
         lock (_gate)
         {
             if (!_built || _monitorOutputs.Count == 0) return false;
-            MixDefinition? monitor = _config.Mixes.FirstOrDefault(m => m.Kind == MixKind.Monitor);
-            if (monitor is null) return false;
             bool changed = false;
             foreach ((string key, string target) in MonitorRouteTargetsLocked())
             {
@@ -1164,7 +1234,8 @@ public sealed class Mixer : IDisposable, ILayoutInfo
                     if (health == LinkHealth.Relinked) { changed = true; continue; }
                     _pw.Unlink(route);   // Broken: the port names themselves are stale
                 }
-                (string tapNode, string tapPrefix) = MixTapLocked(monitor);
+                if (MixForOutputLocked(target) is not MixDefinition mix) return changed;
+                (string tapNode, string tapPrefix) = MixTapLocked(mix);
                 _monitorRoutes[key] = _pw.RouteTapToOutput(tapNode, tapPrefix, target);
                 changed |= _monitorRoutes[key].Pairs.Count > 0;
             }
@@ -1461,13 +1532,14 @@ public sealed class Mixer : IDisposable, ILayoutInfo
                 Mixes = [.. _config.Mixes.Select(m => new MixStatus(
                     m.Id, m.Name,
                     _mixVolume.GetValueOrDefault(m.Id, 1.0),
-                    _mixMuted.Contains(m.Id)))],
+                    _mixMuted.Contains(m.Id), KindName(m.Kind)))],
                 Channels = [.. _config.Channels.Select(c => new ChannelStatus(
                     c.Id, c.Name,
                     _config.Mixes.ToDictionary(m => m.Id, m => _levels.GetValueOrDefault(Cell(c.Id, m.Id), 0.0)),
                     [.. _config.Mixes.Where(m => _muted.Contains(Cell(c.Id, m.Id))).Select(m => m.Id)]))],
                 MonitorOutput = _monitorOutputs.FirstOrDefault(),
                 MonitorOutputs = [.. _monitorOutputs],
+                MonitorFeeds = new Dictionary<string, string>(_monitorFeeds),
                 OutputVolume = _outputVolume,
                 LowCutHz = _lowCutHz,
                 SoftClipGuard = _softClipGuard,
@@ -1483,14 +1555,20 @@ public sealed class Mixer : IDisposable, ILayoutInfo
         }
     }
 
+    private static string KindName(MixKind kind) => kind switch
+    {
+        MixKind.Monitor => "monitor",
+        MixKind.VirtualMic => "virtualMic",
+        _ => "auxPort",
+    };
+
     /// <summary>Cell level x mix master, applied to the combine leg's stream.</summary>
     private void ApplyCellLocked(string channelId, string mixId)
     {
         string cell = Cell(channelId, mixId);
         double level = _levels.GetValueOrDefault(cell, 0.0) * _mixVolume.GetValueOrDefault(mixId, 1.0);
         bool muted = _muted.Contains(cell) || _mixMuted.Contains(mixId);
-        if (_hardwareMicMonitor && channelId == "xlr1"
-            && _config.Mixes.FirstOrDefault(m => m.Kind == MixKind.Monitor)?.Id == mixId)
+        if (_hardwareMicMonitor && channelId == "xlr1" && JackFeedLocked() == mixId)
             muted = true;   // the hardware direct path carries it to the jacks
 
         if (!_legIndex.TryGetValue(cell, out int idx)) { DiscoverLegsLocked(); if (!_legIndex.TryGetValue(cell, out idx)) return; }
@@ -1524,6 +1602,7 @@ public sealed class Mixer : IDisposable, ILayoutInfo
         foreach (PortLink route in _monitorRoutes.Values) _pw.Unlink(route);
         _monitorRoutes.Clear();
         _monitorOutputs.Clear();
+        _monitorFeeds.Clear();
         if (_auxRoute is not null) { _pw.Unlink(_auxRoute); _auxRoute = null; }
         foreach (PortLink feed in _inputFeeds.Values) _pw.Unlink(feed);
         _inputFeeds.Clear();

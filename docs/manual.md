@@ -49,11 +49,12 @@ the Pro's Line In and USB Aux input) and six carry application groups:
 Game, Music, Browser, System, Voice Chat, SFX. Each channel is a
 PipeWire output device an application can play into.
 
-**Mixes** are where audio leaves. There are four:
+**Mixes** are where audio leaves. There are five:
 
 | Mix | What it is | Where it goes |
 |---|---|---|
 | Monitor | what you hear | the outputs ticked in the MONITOR card |
+| Monitor 2 | a second selection to hear | the ticked outputs whose feed is set to Monitor 2; hidden until one is |
 | Stream | what your audience hears | the `OpenXLR Stream` virtual microphone, for OBS or any recorder |
 | Chat | what your call partners hear | the `OpenXLR Chat` virtual microphone, for Discord, Zoom and the like |
 | Aux | what a second computer receives | the interface's USB Aux port (Wave XLR Pro only) |
@@ -105,8 +106,15 @@ configuration.
    on: your speakers, a headset, or several at once. On the Wave XLR
    Pro its own outputs (Headphones 1, Headphones 2, Line Out) appear
    here too; ticking one switches the hardware's output routing.
-2. The Volume slider sets the level of the selected devices.
-3. The HEADPHONES card holds the interface's own headphone volume,
+2. Next to a ticked device, the feed picker says which monitor mix it
+   hears. Leave it on Monitor, or choose Monitor 2 for an output that
+   should hear a different selection: a headset whose game side and
+   chat side are two sinks, for instance, gets the voice channels on
+   Monitor 2 and everything else on Monitor. Monitor 2 then appears as
+   a column in the SUBMIXER card with its own sends and master. The
+   Pro's own jacks share one feed.
+3. The Volume slider sets the level of the selected devices.
+4. The HEADPHONES card holds the interface's own headphone volume,
    low-impedance mode, and on the Pro the Mic ↔ PC crossfade, which is
    the zero-latency direct monitor inside the device: left is only your
    microphone, right is only computer audio.

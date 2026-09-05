@@ -219,6 +219,10 @@ public sealed class DaemonClient : IAsyncDisposable
     public Task SetMonitorOutputsAsync(IReadOnlyList<string> devices)
         => SendAsync(new Dictionary<string, object?> { ["cmd"] = "setMonitorOutputs", ["devices"] = devices });
 
+    /// <summary>Which monitor mix feeds one selected output.</summary>
+    public Task SetMonitorFeedAsync(string device, string mix)
+        => SendAsync(new Dictionary<string, object?> { ["cmd"] = "setMonitorFeed", ["device"] = device, ["mix"] = mix });
+
     /// <summary>Volume of the selected output device (0..1).</summary>
     public Task SetOutputVolumeAsync(double value)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setOutputVolume", ["value"] = value });

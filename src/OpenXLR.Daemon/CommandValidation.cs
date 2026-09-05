@@ -54,6 +54,10 @@ public static class CommandValidation
                 return null;
             case "setRecallOnConnect":
                 return TooLong(cmd.Name, MaxText) ? "setRecallOnConnect: name too long" : null;
+            case "setMonitorFeed":
+                if (TooLong(cmd.Device, MaxText)) return "setMonitorFeed: device name too long";
+                if (cmd.Mix is null || !layout.HasMix(cmd.Mix)) return $"setMonitorFeed: unknown mix '{Short(cmd.Mix ?? "")}'";
+                return null;
             case "setEnforcedDefaults":
                 if (TooLong(cmd.Sink, MaxText) || TooLong(cmd.Source, MaxText)) return "setEnforcedDefaults: device name too long";
                 return null;

@@ -20,8 +20,8 @@ const CHANNELS = {
   music: "Music", browser: "Browser", system: "System",
   voicechat: "Voice Chat", sfx: "SFX",
 };
-const MIXES = { monitor: "Monitor", stream: "Stream", chat: "Chat", auxout: "Aux" };
-const MIX_SHORT = { monitor: "Mon", stream: "Str", chat: "Cht", auxout: "Aux", all: "All" };
+const MIXES = { monitor: "Monitor", monitor2: "Monitor 2", stream: "Stream", chat: "Chat", auxout: "Aux" };
+const MIX_SHORT = { monitor: "Mon", monitor2: "Mo2", stream: "Str", chat: "Cht", auxout: "Aux", all: "All" };
 
 // Toggle targets on the device state block, with short key labels.
 const DEVICE_TOGGLES = {
