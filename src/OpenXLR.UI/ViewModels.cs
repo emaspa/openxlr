@@ -539,10 +539,15 @@ public sealed class MainViewModel : ViewModelBase
         $"The daemon is {(DaemonVersion is null ? "an older version" : "v" + DaemonVersion)}; this window is v{AppVersion.Current}. " +
         "Restart the daemon to run the installed version.";
 
+    private string _daemonWarning = "";
+    /// <summary>A condition the daemon wants the user to see (settings not being saved), or empty.</summary>
+    public string DaemonWarning { get => _daemonWarning; private set => Set(ref _daemonWarning, value); }
+
     /// <summary>Apply a state push from the daemon without echoing it back.</summary>
     private void Apply(JsonNode node)
     {
         _applying = true;
+        DaemonWarning = node["warning"]?.GetValue<string>() ?? "";
         try
         {
             DaemonConnected = true;

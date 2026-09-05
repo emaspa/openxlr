@@ -20,7 +20,7 @@ Messages from the daemon, each a JSON object with a `type` field:
 
 | Type | When | Content |
 |---|---|---|
-| `state` | on connect and on every change | `daemonVersion`, device state, capabilities, mixer state, the device list, the app registry, profile names, `activeProfile` (the profile last recalled or saved for the active device; not cleared by later manual changes), `recallOnConnect` (the profile recalled when the device connects, or null) |
+| `state` | on connect and on every change | `daemonVersion`, device state, capabilities, mixer state, the device list, the app registry, profile names, `activeProfile` (the profile last recalled or saved for the active device; not cleared by later manual changes), `recallOnConnect` (the profile recalled when the device connects, or null), `warning` (one sentence the user should see, or null: today, mixer settings that cannot be written to disk; the daemon keeps retrying with backoff) |
 | `meters` | 15 Hz while the mixer is built | live stereo levels per channel and mix |
 | `plugins` | in answer to `listPlugins` | the installed LV2 plugins with their controls; `supported` is false, with `unsupportedFeatures` listed, for a plugin that needs a host feature the PipeWire chain lacks |
 | `error` | when a command is rejected | `message` |
@@ -38,7 +38,7 @@ Commands are single JSON objects with a `cmd` field:
 | `setMixVolume` / `setMixMuted` | `mix`, `value` | mix masters |
 | `setMonitorOutputs` | `devices[]` | every sink the monitor mixes feed; a newly listed output is fed by the first monitor mix |
 | `setMonitorOutput` | `device` | a single monitor sink; `null` disconnects the route |
-| `setMonitorFeed` | `device`, `mix` | which monitor mix (`monitor` for Monitor A, `monitor2` for Monitor B) feeds one selected output; the Pro's own jacks follow one feed together. The state's `monitorFeeds` lists the exceptions from the first mix |
+| `setMonitorFeed` | `device`, `mix` | which monitor mix (`monitor` for Monitor A, `monitor2` for Monitor B) feeds one selected output; the Pro's own jacks follow one feed together. The state's `monitorFeeds` lists the exceptions from the first mix. An error when the mix is not a monitor mix or the output is not selected |
 | `setAuxPortEnabled` | `value` | send the Aux mix to the USB Aux port |
 | `setOutputVolume` | `value` | volume of the selected monitor devices |
 | `listPlugins` | none | the installed LV2 plugins, answered with a `plugins` message |

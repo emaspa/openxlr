@@ -98,17 +98,23 @@ public sealed record MixerSettings
         }
     }
 
-    /// <summary>Write atomically so a crash mid-write cannot corrupt the file.</summary>
-    public void Save(string? path = null)
+    /// <summary>
+    /// Write atomically so a crash mid-write cannot corrupt the file. Never
+    /// throws for a failed write (losing one is not worth taking the daemon
+    /// down) but returns the reason, so the caller can keep the change
+    /// pending, retry, and tell the user.
+    /// </summary>
+    public string? Save(string? path = null)
     {
         path ??= DefaultPath;
         try
         {
             OpenXlrPaths.WriteAtomicJson(path, this, Json);
+            return null;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // Losing a settings write is not worth taking the daemon down.
+            return $"{path}: {ex.Message}";
         }
     }
 }

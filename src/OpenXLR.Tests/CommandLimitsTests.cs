@@ -10,6 +10,8 @@ public sealed class CommandLimitsTests
     {
         public bool HasChannel(string id) => id is "system" or "xlr1";
         public bool HasMix(string id) => id is "monitor" or "monitor2" or "stream";
+        public bool IsMonitorMix(string id) => id is "monitor" or "monitor2";
+        public bool IsMonitorOutput(string device) => device is "alsa_output.headset" or "alsa_output.katana" or "alsa_output.pro#";
         public bool IsInsertKey(string key) => key is "xlr1" or "mix:monitor";
         public int OverrideCount { get; set; }
     }

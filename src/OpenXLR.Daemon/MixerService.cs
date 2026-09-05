@@ -277,7 +277,7 @@ public sealed class MixerService : IHostedService, IDisposable
         _meterPush = null;
         if (_mixer.Built)
         {
-            try { _mixer.ExportSettings().Save(); } catch (Exception) { /* best effort */ }
+            if (_mixer.ExportSettings().Save() is string stopErr) _log.LogWarning("settings not saved at stop: {err}", stopErr);
             _mixer.TearDown();
             _log.LogInformation("submix graph torn down");
         }
@@ -335,7 +335,7 @@ public sealed class MixerService : IHostedService, IDisposable
                     break;
                 case "setMonitorFeed":
                     if (cmd.Device is null || cmd.Mix is null) return "setMonitorFeed: need 'device' and 'mix'";
-                    _mixer.SetMonitorFeed(cmd.Device, cmd.Mix);
+                    if (_mixer.SetMonitorFeed(cmd.Device, cmd.Mix) is string feedErr) return $"setMonitorFeed: {feedErr}";
                     SyncOutputSelectors();   // the jacks may now follow another mix's XLR 1 send
                     break;
                 case "setOutputVolume":
@@ -406,6 +406,22 @@ public sealed class MixerService : IHostedService, IDisposable
     /// </summary>
     private readonly object _saveGate = new();
     private bool _saveDirty;
+    private static readonly TimeSpan SaveDelay = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan MaxRetryDelay = TimeSpan.FromSeconds(60);
+    private TimeSpan _retryDelay = SaveDelay;
+    private string? _lastSaveError;
+
+    /// <summary>
+    /// Why the mixer settings are not on disk, or null while they are. A
+    /// failed write (a full disk, a read-only home) keeps the change pending
+    /// and retries with backoff; meanwhile every client sees this in the
+    /// state so the user knows the window's changes would not survive a
+    /// restart yet.
+    /// </summary>
+    public string? PersistenceWarning
+    {
+        get { lock (_saveGate) return _lastSaveError is null ? null : $"Mixer settings are not being saved ({_lastSaveError}); retrying."; }
+    }
 
     private void ScheduleSave()
     {
@@ -413,22 +429,46 @@ public sealed class MixerService : IHostedService, IDisposable
         {
             _saveDirty = true;
             _saveDebounce ??= new Timer(_ => SaveNow(), null, Timeout.Infinite, Timeout.Infinite);
-            _saveDebounce.Change(TimeSpan.FromSeconds(2), Timeout.InfiniteTimeSpan);
+            _saveDebounce.Change(SaveDelay, Timeout.InfiniteTimeSpan);
         }
     }
 
     // One writer at a time, and only when something changed since the last
     // write; Dispose flushes a pending save so a change made just before
-    // shutdown is not lost.
+    // shutdown is not lost. A failed write stays dirty and is retried with
+    // backoff; the failure is logged once per distinct reason and shown to
+    // clients until a write succeeds.
     private void SaveNow()
     {
+        bool changed = false;
         lock (_saveGate)
         {
             if (!_saveDirty) return;
-            _saveDirty = false;
-            try { _mixer.ExportSettings().Save(); }
-            catch (Exception ex) { _log.LogDebug("settings save: {msg}", ex.Message); }
+            string? err = _mixer.ExportSettings().Save();
+            if (err is null)
+            {
+                _saveDirty = false;
+                _retryDelay = SaveDelay;
+                if (_lastSaveError is not null)
+                {
+                    _log.LogInformation("mixer settings saved again");
+                    _lastSaveError = null;
+                    changed = true;
+                }
+            }
+            else
+            {
+                if (err != _lastSaveError)
+                {
+                    _log.LogWarning("mixer settings not saved: {err}; retrying", err);
+                    _lastSaveError = err;
+                    changed = true;
+                }
+                _retryDelay = TimeSpan.FromTicks(Math.Min(_retryDelay.Ticks * 2, MaxRetryDelay.Ticks));
+                _saveDebounce?.Change(_retryDelay, Timeout.InfiniteTimeSpan);
+            }
         }
+        if (changed) Changed?.Invoke();
     }
 
     public void Dispose()

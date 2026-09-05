@@ -218,6 +218,8 @@
 
     <TextBlock Text="{Binding DaemonRestart.Status}" Classes="h" TextWrapping="Wrap"
                Margin="0,0,0,8" IsVisible="{Binding DaemonRestart.Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+    <TextBlock Text="{Binding DaemonWarning}" Foreground="#e0a030" TextWrapping="Wrap" FontSize="12"
+               Margin="0,0,0,8" IsVisible="{Binding DaemonWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 
     <Border Classes="card" Margin="0,0,0,8" IsVisible="{Binding Updates.BannerVisible}">
       <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">

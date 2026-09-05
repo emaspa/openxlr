@@ -59,6 +59,8 @@ public static class CommandValidation
             case "setMonitorFeed":
                 if (TooLong(cmd.Device, MaxText)) return "setMonitorFeed: device name too long";
                 if (cmd.Mix is null || !layout.HasMix(cmd.Mix)) return $"setMonitorFeed: unknown mix '{Short(cmd.Mix ?? "")}'";
+                if (!layout.IsMonitorMix(cmd.Mix)) return $"setMonitorFeed: '{Short(cmd.Mix)}' is not a monitor mix";
+                if (cmd.Device is null || !layout.IsMonitorOutput(cmd.Device)) return $"setMonitorFeed: '{Short(cmd.Device ?? "")}' is not a selected monitor output";
                 return null;
             case "setEnforcedDefaults":
                 if (TooLong(cmd.Sink, MaxText) || TooLong(cmd.Source, MaxText)) return "setEnforcedDefaults: device name too long";

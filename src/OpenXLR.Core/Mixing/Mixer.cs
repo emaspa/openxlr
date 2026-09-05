@@ -502,6 +502,19 @@ public sealed class Mixer : IDisposable, ILayoutInfo
     // ILayoutInfo, for command validation ahead of the mixer methods.
     public bool HasChannel(string id) { lock (_gate) return _config.Channels.Any(c => c.Id == id); }
     public bool HasMix(string id) { lock (_gate) return _config.Mixes.Any(m => m.Id == id); }
+    public bool IsMonitorMix(string id) { lock (_gate) return _config.Mixes.Any(m => m.Id == id && m.Kind == MixKind.Monitor); }
+    public bool IsMonitorOutput(string device) { lock (_gate) return MonitorOutputsForLocked(device).Any(); }
+
+    /// <summary>
+    /// The selected outputs a feed command names: the output itself, or every
+    /// pseudo-output of one device when the name ends at the '#' marker.
+    /// </summary>
+    private IEnumerable<string> MonitorOutputsForLocked(string output)
+    {
+        if (_monitorOutputs.Contains(output)) return [output];
+        int marker = output.IndexOf('#');
+        return marker < 0 ? [] : _monitorOutputs.Where(o => o.StartsWith(output[..(marker + 1)], StringComparison.Ordinal));
+    }
     public bool IsInsertKey(string key) { lock (_gate) return IsInsertChannel(key); }
     public int OverrideCount { get { lock (_gate) return Matcher.Overrides.Count; } }
 
@@ -1176,23 +1189,23 @@ public sealed class Mixer : IDisposable, ILayoutInfo
     /// every jack of that device. An unknown mix or an unselected output is
     /// ignored; the first monitor mix is stored as "no exception".
     /// </summary>
-    public void SetMonitorFeed(string output, string mixId)
+    /// <summary>Choose which monitor mix feeds one selected output. Null on success, else why nothing changed.</summary>
+    public string? SetMonitorFeed(string output, string mixId)
     {
         lock (_gate)
         {
-            if (!_built || !_monitorOutputs.Contains(output)) return;
-            if (!_config.Mixes.Any(m => m.Id == mixId && m.Kind == MixKind.Monitor)) return;
+            if (!_built) return "mixer not built";
+            List<string> affected = [.. MonitorOutputsForLocked(output)];
+            if (affected.Count == 0) return $"'{output}' is not a selected monitor output";
+            if (!_config.Mixes.Any(m => m.Id == mixId && m.Kind == MixKind.Monitor)) return $"'{mixId}' is not a monitor mix";
             bool primary = PrimaryMonitorLocked()?.Id == mixId;
-            int marker = output.IndexOf('#');
-            IEnumerable<string> affected = marker < 0
-                ? [output]
-                : _monitorOutputs.Where(o => o.StartsWith(output[..(marker + 1)], StringComparison.Ordinal));
             foreach (string o in affected)
             {
                 if (primary) _monitorFeeds.Remove(o);
                 else _monitorFeeds[o] = mixId;
             }
             SetMonitorOutputsLocked([.. _monitorOutputs]);
+            return null;
         }
     }
 
