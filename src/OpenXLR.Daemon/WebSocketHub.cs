@@ -216,6 +216,11 @@ public sealed class WebSocketHub
                 if (recallErr is not null) await client.SendAsync(Serialize(new ErrorMessage(recallErr)));
                 else Broadcast(Snapshot());
                 break;
+            case "resetDevice":
+                string? resetErr = _devices.ResetToDefaults();   // the state change broadcasts itself
+                if (resetErr is not null) await client.SendAsync(Serialize(new ErrorMessage(resetErr)));
+                else _log.LogInformation("reset {dev} to its firmware defaults", ActiveDeviceId());
+                break;
             default:
                 await client.SendAsync(Serialize(new ErrorMessage($"unknown cmd '{cmd.Cmd}'")));
                 break;
@@ -271,13 +276,26 @@ public sealed class WebSocketHub
     {
         string? name;
         try { name = OpenXLR.Core.ProfileStore.RecallOnConnect(devId); }
-        catch (Exception ex) { _log.LogWarning("recall on connect: {msg}", ex.Message); return; }
-        if (name is null) return;
+        catch (Exception ex) { _log.LogWarning("recall on connect: {msg}", ex.Message); name = null; }
+        if (name is null)
+        {
+            // No profile chosen: a device without settings memory gets the
+            // last settings back (device half only, so no wait for the
+            // graph); one with memory needs nothing.
+            string? status = _devices.RestoreLastState();
+            if (status is not null)
+            {
+                _log.LogInformation("{status}", status);
+                Broadcast(Snapshot());
+            }
+            return;
+        }
         DateTime deadline = DateTime.UtcNow + TimeSpan.FromSeconds(60);
         while (_mixer.SubmixerEnabled && !_mixer.Built && DateTime.UtcNow < deadline && !_stopping.IsCancellationRequested)
             await Task.Delay(250, _stopping).ContinueWith(_ => { }, TaskScheduler.Default);
-        if (_stopping.IsCancellationRequested || ActiveDeviceId() != devId) return;
+        if (_stopping.IsCancellationRequested || ActiveDeviceId() != devId) { _devices.MarkRestored(); return; }
         string? err = ApplyNamedProfile(devId, name);
+        _devices.MarkRestored();
         if (err is null) _log.LogInformation("recalled profile '{name}' on connect of {dev}", name, devId);
         else _log.LogWarning("recall of profile '{name}' on connect of {dev}: {err}", name, devId, err);
         Broadcast(Snapshot());

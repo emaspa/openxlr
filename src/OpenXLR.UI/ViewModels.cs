@@ -141,6 +141,15 @@ public sealed class MainViewModel : ViewModelBase
     private bool _capPhysicalControls = true;
     public bool CapPhysicalControls { get => _capPhysicalControls; set => Set(ref _capPhysicalControls, value); }
 
+    // Interfaces without settings memory (Wave XLR, the XLR Dock modules)
+    // get their last settings back on connect and can be reset to the
+    // firmware defaults; devices that keep their own settings need neither.
+    private bool _capRetainsSettings = true;
+    public bool CapRetainsSettings { get => _capRetainsSettings; set => Set(ref _capRetainsSettings, value); }
+
+    private bool _showResetDefaults;
+    public bool ShowResetDefaults { get => _showResetDefaults; private set => Set(ref _showResetDefaults, value); }
+
     // The daemon-side gain lock cannot stop a physical dial, so it only
     // shows for devices without one.
     private bool _showGainLock;
@@ -558,6 +567,7 @@ public sealed class MainViewModel : ViewModelBase
                 CapAuxInput = Cap("auxInput");
                 CapOutputRouting = Cap("outputRouting");
                 CapPhysicalControls = Cap("physicalControls");
+                CapRetainsSettings = caps["retainsSettings"]?.GetValue<bool>() ?? true;
             }
 
             if (node["state"] is JsonNode s)
@@ -606,6 +616,7 @@ public sealed class MainViewModel : ViewModelBase
             ShowSoftLowCut = DeviceConnected && !CapLowCut && HasMixer;
             ShowSoftClipGuard = DeviceConnected && !CapClipGuard && HasMixer;
             ShowGainLock = DeviceConnected && !CapPhysicalControls;
+            ShowResetDefaults = DeviceConnected && !CapRetainsSettings;
             Status = DeviceConnected ? "ready" : "no device";
         }
         finally { _applying = false; }
@@ -657,10 +668,18 @@ public sealed class MainViewModel : ViewModelBase
         foreach (string n in names) Profiles.Add(n);
     }
 
-    /// <summary>The "none" entry of the recall picker; parentheses cannot occur in a profile name.</summary>
+    /// <summary>
+    /// The "no profile" entry of the recall picker; parentheses cannot occur
+    /// in a profile name. An interface without settings memory gets its last
+    /// settings back in that case, so the entry says so there.
+    /// </summary>
     public const string NoRecall = "(none)";
+    public const string LastSettings = "(last settings)";
 
-    /// <summary>Recall picker entries: "(none)" then every saved profile.</summary>
+    private string NoRecallLabel => CapRetainsSettings ? NoRecall : LastSettings;
+    private static bool IsNoRecall(string value) => value is NoRecall or LastSettings;
+
+    /// <summary>Recall picker entries: the "no profile" entry then every saved profile.</summary>
     public ObservableCollection<string> RecallChoices { get; } = [NoRecall];
 
     private string _recallChoice = NoRecall;
@@ -675,13 +694,13 @@ public sealed class MainViewModel : ViewModelBase
         set
         {
             if (value is null || !Set(ref _recallChoice, value) || _applying) return;
-            _ = _client.SetRecallOnConnectAsync(value == NoRecall ? null : value);
+            _ = _client.SetRecallOnConnectAsync(IsNoRecall(value) ? null : value);
         }
     }
 
     private void ApplyRecallOnConnect(JsonNode? recall)
     {
-        var choices = new List<string> { NoRecall };
+        var choices = new List<string> { NoRecallLabel };
         choices.AddRange(Profiles);
         if (!choices.SequenceEqual(RecallChoices))
         {
@@ -689,9 +708,12 @@ public sealed class MainViewModel : ViewModelBase
             foreach (string c in choices) RecallChoices.Add(c);
             _recallChoice = "";   // the combo lost its selection with the items; force the re-set below
         }
-        string want = recall?.GetValue<string>() is string r && Profiles.Contains(r) ? r : NoRecall;
+        string want = recall?.GetValue<string>() is string r && Profiles.Contains(r) ? r : NoRecallLabel;
         RecallOnConnectChoice = want;
     }
+
+    /// <summary>Write the firmware defaults back to an interface without settings memory.</summary>
+    public void ResetDevice() => _ = _client.ResetDeviceAsync();
 
     public void SaveProfile(string name) => _ = _client.SaveProfileAsync(name);
     public void LoadProfile(string name) => _ = _client.LoadProfileAsync(name);

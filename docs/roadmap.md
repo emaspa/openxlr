@@ -20,8 +20,10 @@ feature that is measured over one that is described.
   Monitor B, Stream, Chat, Aux), virtual microphones, monitoring on
   several outputs with each output choosing which monitor mix feeds it,
   the USB Aux port as a second computer's feed, live meters, profiles,
-  one profile per device recalled on connect, and an app can be left to
-  the desktop's own routing.
+  one profile per device recalled on connect, interfaces without
+  settings memory restored to their last settings on connect with a
+  reset to firmware defaults, and an app can be left to the desktop's
+  own routing.
 - [x] Software low cut and ClipGuard for devices without the hardware
   versions.
 - [x] Plugin inserts: LV2 chains on each XLR input and on every mix, hosted

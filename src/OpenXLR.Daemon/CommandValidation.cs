@@ -54,6 +54,8 @@ public static class CommandValidation
                 return null;
             case "setRecallOnConnect":
                 return TooLong(cmd.Name, MaxText) ? "setRecallOnConnect: name too long" : null;
+            case "resetDevice":
+                return null;   // no arguments; the device manager checks the device
             case "setMonitorFeed":
                 if (TooLong(cmd.Device, MaxText)) return "setMonitorFeed: device name too long";
                 if (cmd.Mix is null || !layout.HasMix(cmd.Mix)) return $"setMonitorFeed: unknown mix '{Short(cmd.Mix ?? "")}'";

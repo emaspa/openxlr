@@ -194,6 +194,10 @@ public sealed class DaemonClient : IAsyncDisposable
     public Task SetRecallOnConnectAsync(string? name)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setRecallOnConnect", ["name"] = name ?? "" });
 
+    /// <summary>Reset an interface without settings memory to its firmware defaults.</summary>
+    public Task ResetDeviceAsync()
+        => SendAsync(new Dictionary<string, object> { ["cmd"] = "resetDevice" });
+
     public Task SetControlAsync(string control, object value)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "set", ["control"] = control, ["value"] = value });
 

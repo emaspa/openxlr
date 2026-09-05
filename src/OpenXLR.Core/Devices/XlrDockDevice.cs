@@ -69,6 +69,7 @@ public sealed class XlrDockDevice : IAudioDevice
         LowImpedance = true,
         XlrInputs = 1,
         HpOutputs = 1,
+        RetainsSettings = false,
     };
 
     public bool Connected => _card >= 0;

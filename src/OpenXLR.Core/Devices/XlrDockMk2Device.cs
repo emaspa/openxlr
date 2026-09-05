@@ -12,10 +12,12 @@ namespace OpenXLR.Core.Devices;
 /// through software. Every control verified on hardware: gain, mute and
 /// headphone volume cross-checked against the kernel's ALSA mirror of the
 /// feature units, phantom power with a condenser microphone, the rest by ear.
+/// Like the first dock it is bus powered with no settings memory of its own,
+/// so the daemon restores the last settings whenever it connects fresh.
 /// </summary>
 public sealed class XlrDockMk2Device : WaveXlrMk2Device
 {
     public new const ushort ProductId = 0x00C7;
 
-    public XlrDockMk2Device() : base(ProductId, "Wave XLR Dock MK.2", physicalControls: false, vIndex: 0x0103) { }
+    public XlrDockMk2Device() : base(ProductId, "Wave XLR Dock MK.2", physicalControls: false, vIndex: 0x0103, retainsSettings: false) { }
 }

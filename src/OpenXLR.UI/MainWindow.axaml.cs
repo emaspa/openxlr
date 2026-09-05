@@ -129,9 +129,9 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Small in-app confirmation dialog; true when the user accepts.</summary>
-    private async Task<bool> ConfirmAsync(string title, string message)
+    private async Task<bool> ConfirmAsync(string title, string message, string yesLabel = "Overwrite")
     {
-        var yes = new Button { Content = "Overwrite", Background = Avalonia.Media.Brush.Parse("#a03434") };
+        var yes = new Button { Content = yesLabel, Background = Avalonia.Media.Brush.Parse("#a03434") };
         var no = new Button { Content = "Cancel" };
         var dialog = new Window
         {
@@ -173,6 +173,16 @@ public partial class MainWindow : Window
     private void OnProfileDelete(object? sender, RoutedEventArgs e)
     {
         if ((sender as Button)?.Tag is string name) _vm.DeleteProfile(name);
+    }
+
+    private async void OnResetDevice(object? sender, RoutedEventArgs e)
+    {
+        if (!await ConfirmAsync("Reset device to defaults?",
+                "The interface goes back to the settings its firmware starts with, and the " +
+                "settings OpenXLR restores when it connects are forgotten. Saved profiles stay.",
+                yesLabel: "Reset"))
+            return;
+        _vm.ResetDevice();
     }
 
     private void OnPickDevice(object? sender, RoutedEventArgs e)

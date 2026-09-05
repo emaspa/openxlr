@@ -151,8 +151,12 @@ levels, mutes, masters, monitor outputs, aux state, insert chains with
 their parameters). Saved per device and recalled from the header, over
 the API, or from a Stream Deck key. One profile per device can be
 marked to recall on connect: at daemon start, after a replug or power
-cycle, or when switching to that device. App routing and the enforced system defaults are global and
-not part of a profile, so recalling one does not rewire the desktop.
+cycle, or when switching to that device. Interfaces without settings
+memory (Wave XLR, the XLR Dock modules) get their last settings back
+on every fresh connect without a profile, and can be reset to the
+firmware defaults recorded after a power cycle. App routing and the
+enforced system defaults are global and not part of a profile, so
+recalling one does not rewire the desktop.
 
 ## OpenDeck plugin
 

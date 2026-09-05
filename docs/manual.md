@@ -205,11 +205,23 @@ profile (section 4).
 **Recall on connect.** The "On connect" picker under the list names a
 profile the daemon recalls by itself whenever the interface connects
 fresh: at daemon start (so at login), after a replug or a power cycle,
-and when you switch to it in the device picker. Use it for an
-interface that comes up with its own defaults after a reboot, or to
-land on a known scene at every login. The reconnect after a passing
-USB error does not count, so the recall never undoes changes you made
-since. Pick "(none)" to stop.
+and when you switch to it in the device picker. Use it to land on a
+known scene at every login. The reconnect after a passing USB error
+does not count, so the recall never undoes changes you made since.
+Pick "(none)" to stop.
+
+**Interfaces without settings memory.** The Wave XLR and the XLR Dock
+modules keep nothing on board; unplugged, they come back with the
+firmware's own values (full gain, headphones at 100%). For them the
+daemon remembers every change and writes it back whenever the
+interface connects fresh, so a reboot or a replug leaves you where you
+were, with no profile needed. The picker shows "(last settings)" in
+place of "(none)" on these devices; a chosen profile takes precedence.
+"Reset device to defaults" under the picker writes the firmware
+defaults back and forgets the remembered settings (saved profiles
+stay). The defaults are recorded the first time the interface connects
+after a power cycle, so the button asks for one replug on a fresh
+install.
 
 ### 3.7 Hold the system default devices
 
@@ -239,9 +251,9 @@ Options, STARTUP:
   minimized to tray" starts with no window at all; the tray icon shows
   it the first time you click it.
 
-To land on a known scene at every login, or after the interface
-powers up with its own defaults, mark a profile to recall on connect
-(section 3.6).
+To land on a known scene at every login, mark a profile to recall on
+connect (section 3.6). An interface without settings memory comes back
+as you left it without one.
 
 The window also remembers which of its sections (INPUTS, HEADPHONES,
 MONITOR, APPLICATIONS, SUBMIXER) you collapsed with the chevron in
@@ -390,6 +402,8 @@ it to a public issue. Nothing is uploaded automatically.
 | `~/.config/openxlr/mixer.json` | every mixer decision, written by the daemon |
 | `~/.config/openxlr/profiles/<vid-pid>/<name>.json` | saved profiles, one file each |
 | `~/.config/openxlr/profiles/<vid-pid>/recall-on-connect` | the profile recalled when that interface connects, when one is chosen |
+| `~/.config/openxlr/devices/<vid-pid>/last-state.json` | the settings restored on connect to an interface without settings memory |
+| `~/.config/openxlr/devices/<vid-pid>/defaults.json` | the firmware defaults of such an interface, recorded after a power cycle, written back by "Reset device to defaults" |
 | `~/.config/openxlr/daemon.json` | the submixer on/off preference |
 | `~/.config/openxlr/gainlock.json` | which devices have the gain lock set |
 | `~/.config/openxlr/ui.json` | window preferences |

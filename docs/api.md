@@ -51,7 +51,8 @@ Commands are single JSON objects with a `cmd` field:
 | `setEnforcedDefaults` | `sink`, `source` | system defaults to hold |
 | `setActiveDevice` | `device` | switch to another attached interface (`vvvv:pppp`) |
 | `saveProfile` / `loadProfile` / `deleteProfile` | `name` | named scenes, scoped to the active device |
-| `setRecallOnConnect` | `name` | the profile recalled whenever the active device connects fresh (daemon start, replug, switch to it); empty clears it |
+| `setRecallOnConnect` | `name` | the profile recalled whenever the active device connects fresh (daemon start, replug, switch to it); empty clears it. With none chosen, a device whose capabilities say `retainsSettings: false` gets the last settings the daemon saw on it instead |
+| `resetDevice` | none | write the firmware defaults back to a device without settings memory and forget its last settings; an error until the daemon has seen the device connect after a power cycle once |
 | `getDiagnostics` | none | vendor block dump for bug reports |
 
 The OpenDeck plugin in `plugin/` is a client of this API; the command
@@ -68,6 +69,11 @@ All under `~/.config/openxlr/` (or `$XDG_CONFIG_HOME/openxlr/`):
 - `profiles/<vid-pid>/<name>.json`: the named scenes, one file each
 - `profiles/<vid-pid>/recall-on-connect`: the name of the profile
   recalled when that device connects, when one is chosen
+- `devices/<vid-pid>/last-state.json`: for a device without settings
+  memory, the hardware settings the daemon last saw, written a second
+  after a change and restored on every fresh connect
+- `devices/<vid-pid>/defaults.json`: the settings such a device answered
+  with after a power cycle, what `resetDevice` writes back
 - `gainlock.json`: which devices have the gain lock set
 - `daemon.json`: the daemon's own preferences, read once at start.
   `submixer` (true/false/absent) turns the submixer on or off; absent

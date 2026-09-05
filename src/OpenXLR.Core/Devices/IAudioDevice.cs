@@ -109,4 +109,13 @@ public sealed record DeviceCapabilities
 
     /// <summary>Number of headphone outputs (the Pro has two).</summary>
     public int HpOutputs { get; init; } = 1;
+
+    /// <summary>
+    /// Whether the hardware keeps its settings across a power cycle. The
+    /// Wave XLR Pro does; the Wave XLR and the XLR Dock modules have no
+    /// memory and come up with firmware defaults, so the daemon restores
+    /// the last settings it saw (or the recall-on-connect profile) whenever
+    /// one of them connects fresh, and offers a reset to those defaults.
+    /// </summary>
+    public bool RetainsSettings { get; init; } = true;
 }

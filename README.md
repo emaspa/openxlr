@@ -72,7 +72,9 @@ Collect diagnostics).
   whole submix (levels, mutes, outputs, insert chains), saved per device
   and recalled from the UI, the API or a Stream Deck key. One profile
   per device can be recalled on connect, so an interface comes up in a
-  known scene at login or after a power cycle.
+  known scene at login or after a power cycle. Interfaces without
+  settings memory (Wave XLR, the XLR Dock modules) come back as they
+  were left even without a profile, with a reset to firmware defaults.
 - **OpenDeck plugin**: key and dial actions for every switch, mute,
   level and insert, rendered with level meters and status LEDs. It is a
   client of the daemon's API, so it reflects changes made in the UI or

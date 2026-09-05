@@ -196,6 +196,10 @@
                               ItemsSource="{Binding RecallChoices}"
                               SelectedItem="{Binding RecallOnConnectChoice}"/>
                   </Grid>
+                  <Button Content="Reset device to defaults" FontSize="12" Margin="0,6,0,0"
+                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                          IsVisible="{Binding ShowResetDefaults}" Click="OnResetDevice"
+                          ToolTip.Tip="Write the firmware defaults back to the interface and forget the settings OpenXLR restores on connect. Recorded the first time the interface is plugged in after a power cycle."/>
                 </StackPanel>
               </Flyout>
             </DropDownButton.Flyout>
