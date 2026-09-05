@@ -277,13 +277,10 @@ public static class StartupIntegration
     {
         try
         {
-            var psi = new ProcessStartInfo("systemctl") { RedirectStandardOutput = true, RedirectStandardError = true };
-            psi.ArgumentList.Add("--user");
-            foreach (string a in args) psi.ArgumentList.Add(a);
-            using Process? p = Process.Start(psi);
-            if (p is null) return false;
-            p.WaitForExit(15000);
-            return p.HasExited && p.ExitCode == 0;
+            // Bounded: a systemctl that hangs (a stuck user manager) is
+            // killed after 15 s instead of being left behind.
+            return ProcessRunner.Run("systemctl", ["--user", .. args], TimeSpan.FromSeconds(15),
+                stdoutCap: 64 * 1024, stderrCap: 64 * 1024).Ok;
         }
         catch (Exception) { return false; }
     }
