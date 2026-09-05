@@ -423,7 +423,9 @@ function toggleLabel(target, inst) {
     const sink = target.slice(8);
     const d = daemonState?.devices?.find((x) => x.name === sink);
     const name = d?.description ?? sink.split(".").pop();
-    return "Monitor\n" + name;
+    // The output follows Monitor A unless its feed was switched to B.
+    const feed = (mixer()?.monitorFeeds?.[sink] ?? "monitor") === "monitor2" ? "B" : "A";
+    return `Monitor ${feed}\n${name}`;
   }
   if (target.startsWith("feed:")) {
     const sink = target.slice(5);
