@@ -5,7 +5,7 @@
 %global _build_id_links none
 
 Name:           openxlr
-Version:        0.1.20
+Version:        0.1.21
 Release:        1%{?dist}
 Summary:        Control suite and PipeWire submixer for Elgato XLR interfaces
 License:        GPL-3.0-only
@@ -133,6 +133,22 @@ MSG
 %{_datadir}/openxlr/
 
 %changelog
+* Sat Sep 05 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.21-1
+- Application routing: an app can be set to "ignore" in its dropdown; its
+  streams go back to the system default output and stay wherever the
+  desktop routes them, for headsets with separate game and chat sinks
+  (issue #21). assignApp and assignStream accept the pseudo-channel.
+- Submixer: the monitor mix is now two, Monitor A and Monitor B; each
+  ticked monitor output picks which of them feeds it, so two outputs can
+  hear different selections. New setMonitorFeed command and monitorFeeds
+  state field; feeds are saved with the mixer and with profiles; the Pro's
+  own jacks share one feed. Send rows show mix names.
+- Window: the monitor output flyout no longer clips or scrolls sideways;
+  the Applications window's scrollbar keeps off the Forget buttons; the
+  About text lists the XLR Dock MK.2.
+- Docs: manual, features, API and README updated; roadmap header at
+  0.1.20; credits list every merged and open pull request.
+
 * Sat Sep 05 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.20-1
 - XLR Dock MK.2 verified on hardware: its vendor blocks live at the Pro's
   wIndex 0x0103 (the backend now takes the wIndex per model), every
