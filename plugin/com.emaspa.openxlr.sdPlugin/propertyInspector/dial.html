@@ -29,79 +29,6 @@
       <option value="auxLevel">Aux In level</option>
       <option value="crossfade">Mic / PC crossfade</option>
     </optgroup>
-    <optgroup label="Mix masters">
-      <option value="mixvol:monitor">Monitor A mix master</option>
-      <option value="mixvol:monitor2">Monitor B mix master</option>
-      <option value="mixvol:stream">Stream mix master</option>
-      <option value="mixvol:chat">Chat mix master</option>
-      <option value="mixvol:auxout">Aux mix master</option>
-    </optgroup>
-    <optgroup label="Sends: all mixes">
-      <option value="send:xlr1:all">XLR 1 in all mixes</option>
-      <option value="send:xlr2:all">XLR 2 in all mixes</option>
-      <option value="send:aux:all">Aux In in all mixes</option>
-      <option value="send:game:all">Game in all mixes</option>
-      <option value="send:music:all">Music in all mixes</option>
-      <option value="send:browser:all">Browser in all mixes</option>
-      <option value="send:system:all">System in all mixes</option>
-      <option value="send:voicechat:all">Voice Chat in all mixes</option>
-      <option value="send:sfx:all">SFX in all mixes</option>
-    </optgroup>
-    <optgroup label="Sends: Monitor A">
-      <option value="send:xlr1:monitor">XLR 1 in Monitor A</option>
-      <option value="send:xlr2:monitor">XLR 2 in Monitor A</option>
-      <option value="send:aux:monitor">Aux In in Monitor A</option>
-      <option value="send:game:monitor">Game in Monitor A</option>
-      <option value="send:music:monitor">Music in Monitor A</option>
-      <option value="send:browser:monitor">Browser in Monitor A</option>
-      <option value="send:system:monitor">System in Monitor A</option>
-      <option value="send:voicechat:monitor">Voice Chat in Monitor A</option>
-      <option value="send:sfx:monitor">SFX in Monitor A</option>
-    </optgroup>
-    <optgroup label="Sends: Monitor B">
-      <option value="send:xlr1:monitor2">XLR 1 in Monitor B</option>
-      <option value="send:xlr2:monitor2">XLR 2 in Monitor B</option>
-      <option value="send:aux:monitor2">Aux In in Monitor B</option>
-      <option value="send:game:monitor2">Game in Monitor B</option>
-      <option value="send:music:monitor2">Music in Monitor B</option>
-      <option value="send:browser:monitor2">Browser in Monitor B</option>
-      <option value="send:system:monitor2">System in Monitor B</option>
-      <option value="send:voicechat:monitor2">Voice Chat in Monitor B</option>
-      <option value="send:sfx:monitor2">SFX in Monitor B</option>
-    </optgroup>
-    <optgroup label="Sends: Stream">
-      <option value="send:xlr1:stream">XLR 1 in Stream</option>
-      <option value="send:xlr2:stream">XLR 2 in Stream</option>
-      <option value="send:aux:stream">Aux In in Stream</option>
-      <option value="send:game:stream">Game in Stream</option>
-      <option value="send:music:stream">Music in Stream</option>
-      <option value="send:browser:stream">Browser in Stream</option>
-      <option value="send:system:stream">System in Stream</option>
-      <option value="send:voicechat:stream">Voice Chat in Stream</option>
-      <option value="send:sfx:stream">SFX in Stream</option>
-    </optgroup>
-    <optgroup label="Sends: Chat">
-      <option value="send:xlr1:chat">XLR 1 in Chat</option>
-      <option value="send:xlr2:chat">XLR 2 in Chat</option>
-      <option value="send:aux:chat">Aux In in Chat</option>
-      <option value="send:game:chat">Game in Chat</option>
-      <option value="send:music:chat">Music in Chat</option>
-      <option value="send:browser:chat">Browser in Chat</option>
-      <option value="send:system:chat">System in Chat</option>
-      <option value="send:voicechat:chat">Voice Chat in Chat</option>
-      <option value="send:sfx:chat">SFX in Chat</option>
-    </optgroup>
-    <optgroup label="Sends: Aux">
-      <option value="send:xlr1:auxout">XLR 1 in Aux</option>
-      <option value="send:xlr2:auxout">XLR 2 in Aux</option>
-      <option value="send:aux:auxout">Aux In in Aux</option>
-      <option value="send:game:auxout">Game in Aux</option>
-      <option value="send:music:auxout">Music in Aux</option>
-      <option value="send:browser:auxout">Browser in Aux</option>
-      <option value="send:system:auxout">System in Aux</option>
-      <option value="send:voicechat:auxout">Voice Chat in Aux</option>
-      <option value="send:sfx:auxout">SFX in Aux</option>
-    </optgroup>
   </select>
   <button id="add">Add to stack</button>
   <ul id="stack"></ul>
@@ -110,6 +37,7 @@
     <label style="display:inline"><input type="radio" name="gesture" value="tap" checked> Screen tap</label>
     <label style="display:inline; margin-left:14px"><input type="radio" name="gesture" value="push"> Dial press</label>
   </div>
+  <script src="layout-options.js"></script>
   <script>
     let ws = null, piUuid = null, settings = {};
 
@@ -131,13 +59,19 @@
           });
         render();
         // The plugin lists the loaded inserts' controls from live state.
-        ws.send(JSON.stringify({ event: "sendToPlugin", context: actionInfo.context,
-                                 payload: { request: "inserts" } }));
+        for (const request of ["layout", "inserts"])
+          ws.send(JSON.stringify({ event: "sendToPlugin", context: actionInfo.context,
+                                   payload: { request } }));
       };
       ws.onmessage = (e) => {
         let m;
         try { m = JSON.parse(e.data); } catch { return; }
-        if (m.event !== "sendToPropertyInspector" || !Array.isArray(m.payload?.params)) return;
+        if (m.event !== "sendToPropertyInspector") return;
+        if (Array.isArray(m.payload?.levelGroups)) {
+          replaceLayoutOptions(m.payload.levelGroups);
+          render();
+        }
+        if (!Array.isArray(m.payload?.params)) return;
         const sel = document.getElementById("target");
         if (document.getElementById("param-group") || !m.payload.params.length) return;
         const group = document.createElement("optgroup");
@@ -163,7 +97,7 @@
       ws.send(JSON.stringify({ event: "setSettings", context: piUuid, payload: settings }));
     }
     function labelFor(v) {
-      const o = document.querySelector('#target option[value="' + v + '"]');
+      const o = Array.from(document.getElementById("target").options).find(option => option.value === v);
       return o ? o.textContent : v;
     }
     function render() {
