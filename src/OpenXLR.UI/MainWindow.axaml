@@ -215,6 +215,15 @@
     <TextBlock Text="{Binding DaemonRestart.Status}" Classes="h" TextWrapping="Wrap"
                Margin="0,0,0,8" IsVisible="{Binding DaemonRestart.Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 
+    <Border Classes="card" Margin="0,0,0,8" IsVisible="{Binding Updates.BannerVisible}">
+      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+        <TextBlock Text="{Binding Updates.Title}" Foreground="#5ba8f5"
+                   TextWrapping="Wrap" VerticalAlignment="Center"/>
+        <Button Grid.Column="1" Content="View changes" Click="OnUpdates"/>
+        <Button Grid.Column="2" Content="Dismiss" Click="OnDismissUpdate" Background="Transparent"/>
+      </Grid>
+    </Border>
+
     <!-- a daemon left running across an upgrade offers the old version's controls -->
     <Border Classes="card" Margin="0,0,0,8" IsVisible="{Binding DaemonVersionMismatch}">
       <DockPanel>

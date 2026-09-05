@@ -41,6 +41,12 @@ If you only want hardware control and no mixer, turn the submixer off
 in Options (section 3.8). The daemon restarts in hardware-control mode
 and the `OpenXLR …` devices disappear.
 
+Update checks are also controlled in Options. They are off by default. You can
+make one explicit check with **Check now**, or opt into a background check at
+startup; opted-in checks run at most once per 24 hours. A notice contains the
+upstream stable release notes as plain text and a link to GitHub. OpenXLR never
+downloads or installs an update.
+
 ## 2. Concepts
 
 **Channels** are where audio enters the mixer. Three carry the

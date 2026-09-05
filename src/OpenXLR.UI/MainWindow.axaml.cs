@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -15,6 +16,8 @@ public partial class MainWindow : Window
     private readonly MainViewModel _vm;
     private TrayIcon? _tray;
     private bool _reallyExit;
+    private readonly CancellationTokenSource _lifetime = new();
+    private bool _automaticUpdateCheckStarted;
 
     public MainWindow()
     {
@@ -25,6 +28,12 @@ public partial class MainWindow : Window
         HeaderVersion.Text = $"v{AppVersion.Current}";
         SetupTray();
         RestoreSectionState();
+        Opened += async (_, _) =>
+        {
+            if (_automaticUpdateCheckStarted) return;
+            _automaticUpdateCheckStarted = true;
+            await _vm.Updates.CheckAsync(manual: false, cancellation: _lifetime.Token);
+        };
 
         // Start hidden in the tray when configured (and a tray actually
         // exists; otherwise the window must show or nothing is reachable).
@@ -48,8 +57,10 @@ public partial class MainWindow : Window
         };
         Closed += async (_, _) =>
         {
+            _lifetime.Cancel();
             _tray?.Dispose();
             await _client.DisposeAsync();
+            _lifetime.Dispose();
             // A window that started hidden is not the lifetime's MainWindow,
             // so closing it for real must end the process explicitly.
             if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
@@ -97,6 +108,12 @@ public partial class MainWindow : Window
 
     private void OnAbout(object? sender, RoutedEventArgs e)
         => new AboutWindow().ShowDialog(this);
+
+    private void OnUpdates(object? sender, RoutedEventArgs e)
+        => new UpdatesWindow { DataContext = _vm.Updates }.ShowDialog(this);
+
+    private void OnDismissUpdate(object? sender, RoutedEventArgs e)
+        => _vm.Updates.DismissBanner();
 
     private async void OnProfileSave(object? sender, RoutedEventArgs e)
     {

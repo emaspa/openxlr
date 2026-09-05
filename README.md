@@ -74,6 +74,9 @@ Collect diagnostics).
   and source once a second, and serves a WebSocket API on
   127.0.0.1:37890. The UI has a routing graph view, a tray icon and a
   diagnostics archive exporter.
+- **Optional update notice**: the UI can check the upstream GitHub release
+  feed for a newer stable release. Startup checks are off by default and,
+  when enabled, run at most once per day. Nothing is installed automatically.
 
 The full feature list, area by area: [docs/features.md](docs/features.md).
 

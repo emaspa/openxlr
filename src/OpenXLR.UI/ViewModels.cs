@@ -33,6 +33,7 @@ public abstract class ViewModelBase : INotifyPropertyChanged
 public sealed class MainViewModel : ViewModelBase
 {
     public DaemonRestartViewModel DaemonRestart { get; } = new();
+    public UpdatesViewModel Updates { get; } = new();
 
     private readonly DaemonClient _client;
     private bool _applying;

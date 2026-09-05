@@ -18,6 +18,12 @@ public sealed record UiSettings
     public bool OpenWindowAtLogin { get; init; }
     public bool MinimizeToTray { get; init; }
     public bool StartMinimized { get; init; }
+    /// <summary>Opt-in only. False means the UI performs no startup network request.</summary>
+    public bool CheckForUpdates { get; init; }
+    /// <summary>Successful or failed automatic checks are limited to once per day.</summary>
+    public DateTimeOffset? LastUpdateCheckUtc { get; init; }
+    /// <summary>Release tag whose banner the user dismissed.</summary>
+    public string? DismissedUpdate { get; init; }
     /// <summary>Names of the main window's tiles the user collapsed (INPUTS, HEADPHONES, ...).</summary>
     public IReadOnlyList<string> CollapsedSections { get; init; } = [];
 

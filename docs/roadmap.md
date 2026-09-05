@@ -106,7 +106,7 @@ plugin world, and it has to keep the audio path inside PipeWire.
   with a start limit, a Restart button in the window, and a graceful
   signal so teardown always runs. Never a restart loop when the audio
   server is down; the daemon degrades to device control instead.
-- [ ] Update notice: an opt-in, throttled check against the project's
+- [x] Update notice: an opt-in, throttled check against the project's
   releases, presented once, never automatic installation.
 - [ ] A documented, versioned local API for third parties, once client
   authentication exists on top of the origin check; today the WebSocket
