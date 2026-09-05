@@ -19,6 +19,7 @@ public sealed class DeviceManager : BackgroundService
     private DeviceState? _last;
     private IReadOnlyList<DeviceInfo> _detected = [];
     private ushort? _preferredPid;
+    internal ServiceProgress Progress { get; } = new();
 
     // Whether this run builds the submixer (same decision MixerService
     // makes). Only then does the card need the pro-audio profile; in
@@ -196,7 +197,9 @@ public sealed class DeviceManager : BackgroundService
             try
             {
                 EnsureConnected();
+                Progress.Mark();
                 PollOnce();
+                Progress.Mark();
                 TryParkCardProfile();
             }
             catch (UsbHungException ex)
@@ -208,6 +211,7 @@ public sealed class DeviceManager : BackgroundService
                 _log.LogWarning("device loop: {msg}", ex.Message);
                 Drop();
             }
+            Progress.Mark(); // a completed failed poll is responsive too
             await Task.Delay(100, stop).ContinueWith(_ => { }, TaskScheduler.Default);
         }
         Drop();

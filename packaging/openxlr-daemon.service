@@ -1,8 +1,15 @@
 [Unit]
 Description=OpenXLR audio daemon
 After=pipewire-pulse.service wireplumber.service
+StartLimitIntervalSec=300
+StartLimitBurst=3
 
 [Service]
+Type=notify
+NotifyAccess=main
+WatchdogSec=60
+WatchdogSignal=SIGTERM
+TimeoutStartSec=120
 # %h is your home directory; adjust the path to where you cloned the repo.
 ExecStart=%h/openxlr/src/OpenXLR.Daemon/bin/Release/net10.0/OpenXLR.Daemon
 Environment=OPENXLR_BUILD_MIXER=1

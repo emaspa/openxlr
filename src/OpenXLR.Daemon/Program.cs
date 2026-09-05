@@ -7,6 +7,10 @@ const int ApiPort = 37890;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Start the notifier before graph construction so progressing startup work
+// can extend systemd's deadline. Readiness still waits for ApplicationStarted.
+builder.Services.AddHostedService<ServiceWatchdog>();
+
 // The DeviceManager is both a singleton (queried by the hub) and the hosted
 // background service that runs the poll/reconnect loop.
 builder.Services.AddSingleton<DeviceManager>();

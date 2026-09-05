@@ -224,8 +224,15 @@ public static class StartupIntegration
                     [Unit]
                     Description=OpenXLR audio daemon
                     After=pipewire-pulse.service wireplumber.service
+                    StartLimitIntervalSec=300
+                    StartLimitBurst=3
 
                     [Service]
+                    Type=notify
+                    NotifyAccess=main
+                    WatchdogSec=60
+                    WatchdogSignal=SIGTERM
+                    TimeoutStartSec=120
                     ExecStart={daemon}
                     Environment=OPENXLR_BUILD_MIXER=1
                     TimeoutStopSec=45

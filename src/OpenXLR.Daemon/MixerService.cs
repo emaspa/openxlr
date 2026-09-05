@@ -16,7 +16,10 @@ public sealed class MixerService : IHostedService, IDisposable
     private readonly ILogger<MixerService> _log;
     private readonly IConfiguration _config;
     private readonly DeviceManager _devices;
-    private readonly Mixer _mixer = new();
+    private readonly Mixer _mixer;
+    private readonly ServiceProgress _progress = new();
+    private volatile bool _checkingProgress;
+    internal bool IsResponsive(TimeSpan limit) => !_checkingProgress || _progress.IsRecent(limit);
     private Timer? _streamSweep;
     private Timer? _saveDebounce;
     private Timer? _meterPush;
@@ -36,6 +39,7 @@ public sealed class MixerService : IHostedService, IDisposable
         _log = log;
         _config = config;
         _devices = devices;
+        _mixer = new(new PipeWireAdapter(_progress.Mark));
     }
 
     /// <summary>
@@ -122,6 +126,8 @@ public sealed class MixerService : IHostedService, IDisposable
             return Task.CompletedTask;
         }
         OpenXLR.Core.Mixing.Lv2Catalog.Warm();   // plugin inserts: scan LV2 bundles off the startup path
+        _progress.Mark();
+        _checkingProgress = true;
 
         // Optional: the physical sink the monitor mix feeds. Without it the
         // monitor mix exists but isn't routed anywhere audible.
@@ -198,7 +204,11 @@ public sealed class MixerService : IHostedService, IDisposable
                     }
                     else _log.LogDebug("stream sweep: {msg}", ex.Message);
                 }
-                finally { Volatile.Write(ref _sweepRunning, 0); }
+                finally
+                {
+                    _progress.Mark();
+                    Volatile.Write(ref _sweepRunning, 0);
+                }
             }, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
 
             // Meters refresh far more often than state; 15 Hz looks smooth
@@ -235,6 +245,8 @@ public sealed class MixerService : IHostedService, IDisposable
             // A partial graph is worse than none: half the sinks exist but no
             // routing, and a later rebuild would double up. Remove what was made.
             try { _mixer.TearDown(); } catch (Exception) { /* best effort */ }
+            // No audio server is a degraded operating mode, not a deadlock.
+            _checkingProgress = false;
         }
         return Task.CompletedTask;
     }

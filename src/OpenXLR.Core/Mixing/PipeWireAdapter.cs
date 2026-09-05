@@ -19,11 +19,15 @@ public sealed class PipeWireAdapter
     private const string ClipGuardPluginFile = "hard_limiter_1413.so";
 
     private readonly Func<DspFeatureAvailability>? _clipGuardAvailabilityOverride;
+    private readonly Action? _progress;
     private readonly List<uint> _modules = [];
     private readonly List<Process> _loopbacks = [];
     private readonly List<Process> _filters = [];
 
     public PipeWireAdapter() { }
+
+    /// <summary>Report completed helper operations, including failures, to the daemon's progress gate.</summary>
+    public PipeWireAdapter(Action progress) => _progress = progress;
 
     internal PipeWireAdapter(Func<DspFeatureAvailability> clipGuardAvailabilityOverride)
         => _clipGuardAvailabilityOverride = clipGuardAvailabilityOverride;
@@ -1110,7 +1114,7 @@ public sealed class PipeWireAdapter
 
     // Kept as UTF-8 bytes and parsed from them: the string form is twice
     // the size and was the bulk of the daemon's large-object garbage.
-    private static byte[] DumpJson()
+    private byte[] DumpJson()
     {
         lock (DumpGate)
         {
@@ -1121,7 +1125,13 @@ public sealed class PipeWireAdapter
         }
     }
 
-    private static byte[] RunBytes(string exe, params string[] args)
+    private byte[] RunBytes(string exe, params string[] args)
+    {
+        try { return RunBytesCore(exe, args); }
+        finally { _progress?.Invoke(); }
+    }
+
+    private static byte[] RunBytesCore(string exe, params string[] args)
     {
         var psi = new ProcessStartInfo(exe) { RedirectStandardOutput = true, RedirectStandardError = true };
         psi.Environment["LC_ALL"] = "C";
@@ -1141,7 +1151,13 @@ public sealed class PipeWireAdapter
         return stdout.ToArray();
     }
 
-    private static string Run(string exe, params string[] args)
+    internal string Run(string exe, params string[] args)
+    {
+        try { return RunCore(exe, args); }
+        finally { _progress?.Invoke(); }
+    }
+
+    private static string RunCore(string exe, params string[] args)
     {
         var psi = new ProcessStartInfo(exe) { RedirectStandardOutput = true, RedirectStandardError = true };
         // pactl's human-readable output is parsed ("Sink Input #", "Owner
