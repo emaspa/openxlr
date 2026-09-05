@@ -29,11 +29,11 @@ public sealed record MixerConfig
     {
         Mixes =
         [
-            new MixDefinition("monitor", "Monitor", MixKind.Monitor) { Volume = 1.0 },
+            new MixDefinition("monitor", "Monitor A", MixKind.Monitor) { Volume = 1.0 },
             // A second monitor mix for outputs that should hear a different
             // selection (issue #21: a headset with a game side and a chat
             // side). Each monitor output chooses which of the two feeds it.
-            new MixDefinition("monitor2", "Monitor 2", MixKind.Monitor) { Volume = 1.0 },
+            new MixDefinition("monitor2", "Monitor B", MixKind.Monitor) { Volume = 1.0 },
             new MixDefinition("stream", "Stream", MixKind.VirtualMic) { Volume = 1.0 },
             new MixDefinition("chat", "Chat", MixKind.VirtualMic) { Volume = 1.0 },
             // What the second computer on the USB Aux port receives.
@@ -59,7 +59,7 @@ public sealed record MixerConfig
         ],
     };
 
-    // Monitor 2 starts as a copy of Monitor, so an output moved to it hears
+    // Monitor B starts as a copy of Monitor A, so an output moved to it hears
     // the same until its sends are edited.
     private static Dictionary<string, double> Level(double monitor, double stream, double chat, double auxout)
         => new() { ["monitor"] = monitor, ["monitor2"] = monitor, ["stream"] = stream, ["chat"] = chat, ["auxout"] = auxout };

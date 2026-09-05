@@ -66,7 +66,7 @@ does not reach the speakers until unmuted.
 Built from PipeWire nodes, no kernel modules or custom drivers:
 - Channels for the hardware inputs (XLR 1, XLR 2, Aux In) and for
   application groups (Game, Music, Browser, System, Voice Chat, SFX)
-- Five mixes: Monitor (what you hear), Monitor 2 (a second selection
+- Five mixes: Monitor A (what you hear), Monitor B (a second selection
   for outputs that should hear something else),
   Stream and Chat (published as the capture devices `OpenXLR Stream` and
   `OpenXLR Chat`, selectable in OBS or Discord like a microphone), and

@@ -428,7 +428,7 @@
           <StackPanel Orientation="Horizontal" Spacing="6">
             <TextBlock Text="MONITOR" Classes="h" VerticalAlignment="Center"/>
             <TextBlock Text="&#x24D8;" Classes="h" FontSize="12" VerticalAlignment="Center" Margin="0,-1,0,0" Cursor="Help"
-                       ToolTip.Tip="Tick every device the Monitor mix should play on; next to a ticked device, choose which monitor mix it hears (Monitor, or Monitor 2 for a second selection). The Wave XLR Pro's own outputs (Headphones 1/2, USB Aux, Line Out) switch the hardware when ticked and share one feed. The USB Aux port is fed by the dedicated Aux mix in the submixer instead. XLR 1, XLR 2 and Line In feed their channels automatically. System default devices for apps are set in Options."/>
+                       ToolTip.Tip="Tick every device the monitor mixes should play on; next to a ticked device, choose which of the two it hears: Monitor A, or Monitor B for a second selection. The Wave XLR Pro's own outputs (Headphones 1/2, USB Aux, Line Out) switch the hardware when ticked and share one feed. The USB Aux port is fed by the dedicated Aux mix in the submixer instead. XLR 1, XLR 2 and Line In feed their channels automatically. System default devices for apps are set in Options."/>
           </StackPanel>
         </Expander.Header>
       <StackPanel Classes="dev" Spacing="4">

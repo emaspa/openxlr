@@ -38,7 +38,7 @@ Commands are single JSON objects with a `cmd` field:
 | `setMixVolume` / `setMixMuted` | `mix`, `value` | mix masters |
 | `setMonitorOutputs` | `devices[]` | every sink the monitor mixes feed; a newly listed output is fed by the first monitor mix |
 | `setMonitorOutput` | `device` | a single monitor sink; `null` disconnects the route |
-| `setMonitorFeed` | `device`, `mix` | which monitor mix (`monitor` or `monitor2`) feeds one selected output; the Pro's own jacks follow one feed together. The state's `monitorFeeds` lists the exceptions from the first mix |
+| `setMonitorFeed` | `device`, `mix` | which monitor mix (`monitor` for Monitor A, `monitor2` for Monitor B) feeds one selected output; the Pro's own jacks follow one feed together. The state's `monitorFeeds` lists the exceptions from the first mix |
 | `setAuxPortEnabled` | `value` | send the Aux mix to the USB Aux port |
 | `setOutputVolume` | `value` | volume of the selected monitor devices |
 | `listPlugins` | none | the installed LV2 plugins, answered with a `plugins` message |

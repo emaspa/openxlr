@@ -53,8 +53,8 @@ PipeWire output device an application can play into.
 
 | Mix | What it is | Where it goes |
 |---|---|---|
-| Monitor | what you hear | the outputs ticked in the MONITOR card |
-| Monitor 2 | a second selection to hear | the ticked outputs whose feed is set to Monitor 2 |
+| Monitor A | what you hear | the ticked outputs in the MONITOR card, unless their feed is set to Monitor B |
+| Monitor B | a second selection to hear | the ticked outputs whose feed is set to Monitor B |
 | Stream | what your audience hears | the `OpenXLR Stream` virtual microphone, for OBS or any recorder |
 | Chat | what your call partners hear | the `OpenXLR Chat` virtual microphone, for Discord, Zoom and the like |
 | Aux | what a second computer receives | the interface's USB Aux port (Wave XLR Pro only) |
@@ -62,7 +62,7 @@ PipeWire output device an application can play into.
 Every channel has a **send** into every mix: a level and a mute. The
 SUBMIXER card shows them as a grid, channels down, mixes across. Each
 mix also has a **master** level and mute. A typical setup keeps Music
-loud in Monitor and lower in Stream, and out of Chat entirely.
+loud in Monitor A and lower in Stream, and out of Chat entirely.
 
 **Application routing**: when an app starts playing, the daemon reads
 its name from PipeWire and picks a channel by rules: browsers to
@@ -102,15 +102,15 @@ configuration.
 
 ### 3.2 Choose what you hear and how loud
 
-1. In the MONITOR card, tick every device the Monitor mix should play
+1. In the MONITOR card, tick every device the monitor mixes should play
    on: your speakers, a headset, or several at once. On the Wave XLR
    Pro its own outputs (Headphones 1, Headphones 2, Line Out) appear
    here too; ticking one switches the hardware's output routing.
 2. Next to a ticked device, the feed picker says which monitor mix it
-   hears. Leave it on Monitor, or choose Monitor 2 for an output that
+   hears. Leave it on Monitor A, or choose Monitor B for an output that
    should hear a different selection: a headset whose game side and
    chat side are two sinks, for instance, gets the voice channels on
-   Monitor 2 and everything else on Monitor. Monitor 2 has its own
+   Monitor B and everything else on Monitor A. Monitor B has its own
    sends and master in the SUBMIXER card. The Pro's own jacks share one
    feed.
 3. The Volume slider sets the level of the selected devices.

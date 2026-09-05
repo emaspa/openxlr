@@ -48,7 +48,7 @@ Collect diagnostics).
 - **Submixer** built from PipeWire nodes (null sinks, remap sources,
   filter chains), no kernel modules. Channels for the hardware inputs
   and for application groups (Game, Music, Browser, System, Voice Chat,
-  SFX); five mixes: Monitor and Monitor 2 (what you hear, each output
+  SFX); five mixes: Monitor A and Monitor B (what you hear, each output
   choosing which of the two it follows), Stream and Chat (published as
   virtual microphones) and Aux (sent to the USB Aux port); per-send
   levels and mutes, level meters, the monitor mixes on several outputs
