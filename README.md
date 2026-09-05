@@ -110,7 +110,8 @@ Packages exist for Arch (AUR), Ubuntu (PPA), Fedora (COPR) and NixOS
 (flake); every release also carries a `.deb` and an `.rpm` for a manual
 install. Pick your distribution:
 
-**Arch Linux** (AUR):
+**Arch Linux**, from the
+[AUR](https://aur.archlinux.org/packages/openxlr):
 
 ```sh
 yay -S openxlr        # or: paru -S openxlr
