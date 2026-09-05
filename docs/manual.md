@@ -263,7 +263,9 @@ its live state, so what a key displays is what the mixer window shows.
 phantom, low cut, expander, voice tune, ClipGuard, compressor, low
 impedance, the Pro's output selectors, the aux level lock, the gain
 lock), the software low cut (cycling Off, 80, 120), a mix or send mute,
-the monitor output (switching the Monitor mix to one specific device),
+the monitor output (switching the monitor mixes to one specific device),
+an output's feed (flipping it between Monitor A and Monitor B, lit on
+B),
 the bypass of one insert or of a whole chain, or a profile to recall.
 The key's LED is green for an engaged feature, red for a mute, and grey
 when the daemon is offline or the target does not exist on the

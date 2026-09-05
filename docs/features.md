@@ -173,7 +173,8 @@ Keys render a button with an icon and a status LED: red for a mute,
 green for an engaged feature or the active monitor output. Every
 hardware switch and mute is a key target, plus the software low cut
 (its frequency shown on the LED, cycling Off, 80, 120), ClipGuard, gain
-lock, and switching the monitor output to a specific device. Each key
+lock, switching the monitor output to a specific device, and flipping
+an output between Monitor A and Monitor B. Each key
 can pick its icon, and a typed title replaces the built-in label.
 
 ![Keys](plugin-keys.png)
