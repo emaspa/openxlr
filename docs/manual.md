@@ -272,6 +272,11 @@ systemctl --user restart openxlr-daemon
 Until then the window offers only the controls the old daemon reports.
 Toggling the submixer in Options also restarts the daemon.
 
+Since 0.1.23 every client presents a token the daemon writes at start
+(section 6). A window or OpenDeck plugin older than the daemon is
+refused with "unauthorized" until it is updated too; the plugin zip on
+the release page matches the daemon of that release.
+
 ## 4. Stream Deck (OpenDeck)
 
 The plugin has two actions. Both are clients of the daemon and show
@@ -402,6 +407,7 @@ it to a public issue. Nothing is uploaded automatically.
 | `~/.config/openxlr/mixer.json` | every mixer decision, written by the daemon |
 | `~/.config/openxlr/profiles/<vid-pid>/<name>.json` | saved profiles, one file each |
 | `~/.config/openxlr/profiles/<vid-pid>/recall-on-connect` | the profile recalled when that interface connects, when one is chosen |
+| `$XDG_RUNTIME_DIR/openxlr/token` | the control API token for this daemon run, readable by your user only; the window and the OpenDeck plugin read it, a daemon older than the window will not have it (section 3.10) |
 | `~/.config/openxlr/devices/<vid-pid>/last-state.json` | the settings restored on connect to an interface without settings memory |
 | `~/.config/openxlr/devices/<vid-pid>/defaults.json` | the firmware defaults of such an interface, recorded after a power cycle, written back by "Reset device to defaults" |
 | `~/.config/openxlr/daemon.json` | the submixer on/off preference |

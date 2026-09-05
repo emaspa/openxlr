@@ -44,6 +44,28 @@ public static class OpenXlrPaths
     public static string ConfigFile(string name) => Path.Combine(ConfigDir, name);
 
     /// <summary>
+    /// The control API token: written by the daemon at every start, read by
+    /// each client before it connects. Under the runtime directory (tmpfs,
+    /// per login session, gone at logout) when the session has one, else
+    /// under the configuration directory; private either way.
+    /// </summary>
+    public static string TokenPath =>
+        Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR") is { Length: > 0 } run
+            ? Path.Combine(run, "openxlr", "token")
+            : ConfigFile("token");
+
+    /// <summary>The current token, or null when the daemon has not written one.</summary>
+    public static string? ReadToken()
+    {
+        try
+        {
+            string t = File.ReadAllText(TokenPath).Trim();
+            return t.Length == 0 ? null : t;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return null; }
+    }
+
+    /// <summary>
     /// Create a directory under the configuration directory, private to the
     /// user, and tighten it if an earlier version created it world-readable.
     /// </summary>

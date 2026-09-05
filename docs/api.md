@@ -7,6 +7,22 @@ cannot drive the hardware; native clients send no Origin. If the port
 is busy at startup (it sits inside the kernel's ephemeral range) the
 daemon waits for it instead of touching PipeWire.
 
+Token. The first message on every connection must be
+`{"cmd":"auth","token":"<token>"}`, where the token is the content of
+`$XDG_RUNTIME_DIR/openxlr/token` (or `~/.config/openxlr/token` in a
+session without a runtime directory), a file only your user can read
+that the daemon rewrites at every start. Nothing is sent before it;
+anything else as a first message, or nothing within 5 s, closes the
+socket with code 1008 and the reason `unauthorized` or `authentication
+timeout`. Another local user cannot read the file, so the loopback
+port alone does not hand them the mixer. The window and the OpenDeck
+plugin read the file themselves; a script does the same:
+
+```sh
+TOKEN=$(cat "${XDG_RUNTIME_DIR:-$HOME/.config}/openxlr/token")
+printf '{"cmd":"auth","token":"%s"}\n{"cmd":"getState"}\n' "$TOKEN" | websocat ws://127.0.0.1:37890/ws
+```
+
 Limits. Commands are validated before the mixer sees them: unknown
 channel or mix ids, plugins that are not installed or need a host
 feature the PipeWire chain lacks, undeclared parameter symbols,
@@ -75,6 +91,9 @@ All under `~/.config/openxlr/` (or `$XDG_CONFIG_HOME/openxlr/`):
 - `devices/<vid-pid>/defaults.json`: the settings such a device answered
   with after a power cycle, what `resetDevice` writes back
 - `gainlock.json`: which devices have the gain lock set
+- `$XDG_RUNTIME_DIR/openxlr/token` (or `token` here without a runtime
+  directory): the control API token for this daemon run, 0600, see the
+  top of this page
 - `daemon.json`: the daemon's own preferences, read once at start.
   `submixer` (true/false/absent) turns the submixer on or off; absent
   means the unit's environment decides (`OPENXLR_BUILD_MIXER`). Written

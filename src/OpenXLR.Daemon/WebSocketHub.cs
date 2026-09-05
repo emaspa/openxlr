@@ -73,9 +73,13 @@ public sealed class WebSocketHub
             Detected = [.. _devices.Detected().Select(d => new DetectedDevice(d.UsbId, d.Name, d.Active))],
         };
 
+    /// <summary>A client has this long to present the token before it is dropped.</summary>
+    private static readonly TimeSpan AuthDeadline = TimeSpan.FromSeconds(5);
+
     /// <summary>Serve one client for the life of its socket.</summary>
     public async Task HandleAsync(WebSocket socket)
     {
+        if (!await AuthenticateAsync(socket)) return;
         var client = new Client(socket, _stopping);
         _clients[client.Id] = client;
         try
@@ -95,6 +99,32 @@ public sealed class WebSocketHub
             _clients.TryRemove(client.Id, out _);
             client.Dispose();
         }
+    }
+
+    /// <summary>
+    /// The first message must be the token (see <see cref="ApiToken"/>);
+    /// nothing is sent before it. A peer that presents anything else, or
+    /// nothing within the deadline, is closed with 1008 and told why.
+    /// </summary>
+    private async Task<bool> AuthenticateAsync(WebSocket socket)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(_stopping);
+        deadline.CancelAfter(AuthDeadline);
+        (SocketGuard.Outcome outcome, byte[]? message) = await SocketGuard.ReceiveMessageAsync(
+            socket, new byte[4 * 1024], MaxCommandBytes, SocketGuard.MessageDeadline, deadline.Token);
+        if (outcome != SocketGuard.Outcome.Message || message is null)
+        {
+            if (!_stopping.IsCancellationRequested)
+                await SocketGuard.CloseAsync(socket, WebSocketCloseStatus.PolicyViolation, "authentication timeout");
+            return false;
+        }
+        if (!ApiToken.Accepts(message))
+        {
+            _log.LogWarning("control API: a client presented no valid token and was refused");
+            await SocketGuard.CloseAsync(socket, WebSocketCloseStatus.PolicyViolation, "unauthorized");
+            return false;
+        }
+        return true;
     }
 
     private async Task ReceiveLoop(Client client)
@@ -126,6 +156,8 @@ public sealed class WebSocketHub
 
         switch (cmd.Cmd)
         {
+            case "auth":
+                break;   // already authenticated on this socket; a repeat is harmless
             case "getState":
                 await client.SendAsync(Serialize(Snapshot()));
                 break;

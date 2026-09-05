@@ -4,6 +4,8 @@
 // and dials stay in sync with the UI (and with the hardware) for free.
 
 import process from "node:process";
+import fs from "node:fs";
+import os from "node:os";
 
 // ---------- launch arguments ----------
 const arg = (name) => {
@@ -59,6 +61,15 @@ function scheduleDaemonReconnect(generation) {
   reconnectDelayMs = Math.min(reconnectDelayMs * 2, 10000);
 }
 
+// The daemon writes a fresh token at every start; it is the first message
+// on every connection, or the daemon sends nothing.
+function readDaemonToken() {
+  const run = process.env.XDG_RUNTIME_DIR;
+  const cfg = process.env.XDG_CONFIG_HOME || `${os.homedir()}/.config`;
+  const path = run ? `${run}/openxlr/token` : `${cfg}/openxlr/token`;
+  try { return fs.readFileSync(path, "utf8").trim(); } catch { return ""; }
+}
+
 function connectDaemon() {
   const socket = new WebSocket("ws://127.0.0.1:37890/ws");
   const generation = ++connectionGeneration;
@@ -67,6 +78,7 @@ function connectDaemon() {
     if (daemon !== socket) return;
     daemonUp = true;
     reconnectDelayMs = 500;
+    cmd({ cmd: "auth", token: readDaemonToken() });
     cmd({ cmd: "listPlugins" });
     refreshAll();
   };
@@ -82,8 +94,9 @@ function connectDaemon() {
     }
     else if (m.type === "error") console.error("OpenXLR daemon:", m.message);
   };
-  socket.onclose = () => {
+  socket.onclose = (e) => {
     if (daemon !== socket) return;
+    if (e && e.code === 1008) console.error("OpenXLR daemon refused the plugin:", e.reason);
     daemonUp = false; daemonState = null; refreshAll();
     scheduleDaemonReconnect(generation);
   };

@@ -36,6 +36,10 @@ builder.WebHost.ConfigureKestrel(k =>
 var app = builder.Build();
 app.Services.GetRequiredService<WebSocketHub>();   // construct so it subscribes to StateChanged
 
+// A fresh token for this run, written before anything can connect. Every
+// client presents it as its first message (see ApiToken).
+app.Logger.LogInformation("control API token written to {path}", ApiToken.Initialize());
+
 app.UseWebSockets();
 
 app.Map("/ws", async (HttpContext ctx, WebSocketHub hub) =>
