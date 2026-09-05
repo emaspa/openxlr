@@ -1,0 +1,31 @@
+{
+  "openapi": "3.0.3",
+  "info": {"title": "OpenXLR local API", "version": "1"},
+  "servers": [{"url": "http://127.0.0.1:37890"}],
+  "security": [{"localToken": []}],
+  "paths": {
+    "/healthz": {"get": {"security": [], "responses": {"200": {"description": "Process alive, not hardware readiness"}}}},
+    "/api/v1": {"get": {"responses": {"200": {"description": "Endpoint discovery"}, "401": {"description": "Credential required"}}}},
+    "/api/v1/state": {"get": {"responses": {"200": {"description": "Combined state message"}, "401": {"description": "Credential required"}}}},
+    "/api/v1/plugins": {"get": {"responses": {"200": {"description": "v1 result containing plugins message"}, "401": {"description": "Credential required"}}}},
+    "/api/v1/commands": {"post": {
+      "description": "Execute the existing cmd protocol. Foreign browser origins are rejected. Maximum UTF-8 body size is 65536 bytes, including chunked requests.",
+      "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "required": ["cmd"], "properties": {"cmd": {"type": "string"}}, "additionalProperties": true}}}},
+      "responses": {
+        "200": {"description": "Executed", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CommandResult"}}}},
+        "400": {"description": "Invalid or rejected command", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CommandResult"}}}},
+        "401": {"description": "Credential required"}, "403": {"description": "Foreign Origin"},
+        "408": {"description": "Body-read deadline"}, "413": {"description": "Body too large"},
+        "415": {"description": "UTF-8 application/json required"}, "429": {"description": "Budget exhausted or command in flight"}
+      }
+    }},
+    "/api/v1/events": {"get": {"description": "Authenticated WebSocket upgrade; the existing state, meters and command protocol", "responses": {"101": {"description": "WebSocket connected"}, "400": {"description": "Upgrade required"}, "401": {"description": "Credential required"}}}}
+  },
+  "components": {
+    "securitySchemes": {"localToken": {"type": "http", "scheme": "bearer", "description": "Existing per-session token from OpenXlrPaths.TokenPath"}},
+    "schemas": {"CommandResult": {"type": "object", "required": ["apiVersion", "ok", "messages"], "properties": {
+      "apiVersion": {"type": "string", "enum": ["1"]}, "ok": {"type": "boolean"},
+      "messages": {"type": "array", "items": {"type": "object", "additionalProperties": true}}
+    }}}
+  }
+}
