@@ -4,6 +4,8 @@
 [![Reddit](https://img.shields.io/badge/Reddit-r%2FOpenXLR-FF4500?logo=reddit&logoColor=white)](https://www.reddit.com/r/OpenXLR/)
 [![Latest release](https://img.shields.io/github/v/release/emaspa/openxlr?label=release)](https://github.com/emaspa/openxlr/releases)
 [![AUR](https://img.shields.io/aur/version/openxlr?label=AUR)](https://aur.archlinux.org/packages/openxlr)
+[![COPR](https://img.shields.io/badge/Fedora-COPR%20emaspa%2Fopenxlr-51A2DA?logo=fedora&logoColor=white)](https://copr.fedorainfracloud.org/coprs/emaspa/openxlr/)
+[![PPA](https://img.shields.io/badge/Ubuntu-PPA%20sparvoli%2Fopenxlr-E95420?logo=ubuntu&logoColor=white)](https://launchpad.net/~sparvoli/+archive/ubuntu/openxlr)
 
 Native Linux control suite for Elgato XLR interfaces: full hardware
 control over reverse-engineered USB protocols, a Wave Link style
@@ -100,6 +102,10 @@ mute, level and insert is a target.
 ![Keys](docs/plugin-keys.png)
 
 ## Install
+
+Packages exist for Arch (AUR), Ubuntu (PPA), Fedora (COPR) and NixOS
+(flake); every release also carries a `.deb` and an `.rpm` for a manual
+install. Pick your distribution:
 
 **Arch Linux** (AUR):
 
