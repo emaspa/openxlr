@@ -809,7 +809,7 @@ public sealed class MainViewModel : ViewModelBase
             AppStreamViewModel? existing = Apps.FirstOrDefault(a =>
                 string.Equals(a.Identity, f.Identity, StringComparison.OrdinalIgnoreCase));
             if (existing is null)
-                Apps.Add(new AppStreamViewModel(_client, f.Identity, f.Label, [.. Channels.Select(c => c.Id)])
+                Apps.Add(new AppStreamViewModel(_client, f.Identity, f.Label, [.. Channels.Select(c => c.Id), AppStreamViewModel.Ignore])
                     { ChannelId = f.Channel, Active = f.Active, Running = f.Running });
             else
                 existing.ApplyFromDaemon(f.Channel, f.Active, f.Running, f.Label);
@@ -911,6 +911,9 @@ public interface IHasId { string Id { get; } }
 /// <summary>An application that is playing, and the channel it is routed to.</summary>
 public sealed class AppStreamViewModel : ViewModelBase
 {
+    /// <summary>The daemon's "not managed" pseudo-channel: the app keeps the desktop's routing.</summary>
+    public const string Ignore = "ignore";
+
     private readonly DaemonClient _client;
     private bool _applying;
 

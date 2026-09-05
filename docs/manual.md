@@ -133,7 +133,15 @@ PipeWire as an audio client; a green light means it is playing.
    from the installed-application list, choose a channel and press Add.
    The identity is guessed from its launcher; if the app reports a
    different name on first play it shows up as a new entry.
-3. Forget, in the same window, drops an app and its remembered channel.
+3. To keep OpenXLR's hands off an app, choose "ignore" in its dropdown.
+   Its streams go back to the system default output at once and from
+   then on stay wherever you or the desktop route them, which is what
+   you want for an app that must reach a specific side of a headset
+   with its own game and chat sinks. The app stays listed as ignored so
+   you can bring it back by picking a channel.
+4. Forget, in the same window, drops an app and its remembered channel.
+   A running app re-registers on the next sweep and is routed by the
+   rules again; use "ignore" for a lasting opt-out.
 
 An app that is missing from the card is not registered with PipeWire
 as a client. That happens with some applications until they start

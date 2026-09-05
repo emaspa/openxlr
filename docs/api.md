@@ -44,8 +44,8 @@ Commands are single JSON objects with a `cmd` field:
 | `setInserts` | `channel`, `inserts[]` | replace a chain; `channel` is `xlr1`, `xlr2` or `mix:<id>`, each insert is `{id, kind:"lv2", plugin:<uri>, label?, bypass?, params?}` |
 | `setInsertBypass` | `channel`, `insertId`, `value` | bypass one insert |
 | `setInsertParam` | `channel`, `insertId`, `symbol`, `value` | one plugin control, by its LV2 port symbol |
-| `assignApp` | `identity`, `channel`, `label?` | route an app (creates a registry entry if unseen) |
-| `assignStream` | `streamId`, `channel` | route one live stream by its PipeWire id; also remembered for the app |
+| `assignApp` | `identity`, `channel`, `label?` | route an app (creates a registry entry if unseen); `channel: "ignore"` stops managing it, its streams go back to the system default output and stay wherever the desktop routes them |
+| `assignStream` | `streamId`, `channel` | route one live stream by its PipeWire id; also remembered for the app; `ignore` works here too |
 | `forgetApp` | `identity` | drop an app and its remembered channel |
 | `setEnforcedDefaults` | `sink`, `source` | system defaults to hold |
 | `setActiveDevice` | `device` | switch to another attached interface (`vvvv:pppp`) |

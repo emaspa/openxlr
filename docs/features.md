@@ -138,6 +138,9 @@ restores the split profile when it stops.
   Discord
 - A Manage dialog shows the full registry, and an installed-application
   picker pre-assigns channels from `.desktop` entries
+- An app can be marked "ignore": the mixer hands its streams back to
+  the system default output and never touches them again, so a headset
+  with separate game and chat sinks keeps its own routing for that app
 
 ## Profiles
 

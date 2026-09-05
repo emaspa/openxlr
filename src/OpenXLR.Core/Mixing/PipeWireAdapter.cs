@@ -613,6 +613,26 @@ public sealed class PipeWireAdapter
             TryRun("pactl", "list", "sinks", "short") ?? "",
             streamSerial, sinkName);
 
+    /// <summary>The sink a stream currently plays into, by name, or null.</summary>
+    public string? StreamSinkName(int streamSerial)
+        => StreamSinkName(TryRun("pactl", "list", "sink-inputs", "short") ?? "",
+                          TryRun("pactl", "list", "sinks", "short") ?? "", streamSerial);
+
+    internal static string? StreamSinkName(string sinkInputs, string sinks, int streamSerial)
+    {
+        string? sinkId = sinkInputs.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Split('\t'))
+            .Where(columns => columns.Length >= 2 && columns[0] == streamSerial.ToString())
+            .Select(columns => columns[1])
+            .FirstOrDefault();
+        if (sinkId is null || sinkId == uint.MaxValue.ToString()) return null;
+        return sinks.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Split('\t'))
+            .Where(columns => columns.Length >= 2 && columns[0] == sinkId)
+            .Select(columns => columns[1])
+            .FirstOrDefault();
+    }
+
     internal static bool IsStreamOnSink(string sinkInputs, string sinks, int streamSerial, string sinkName)
     {
         string? sinkId = sinkInputs.Split('\n', StringSplitOptions.RemoveEmptyEntries)

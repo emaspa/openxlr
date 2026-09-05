@@ -1252,6 +1252,20 @@ public sealed class Mixer : IDisposable, ILayoutInfo
                 if (_streams.ContainsKey(s.Id)) continue;
 
                 string channelId = Matcher.Match(s);
+                if (channelId == StreamMatcher.Ignore)
+                {
+                    // Not managed: the stream stays where the desktop put it.
+                    // The one exception is a stream the session manager
+                    // restored onto an OpenXLR channel from the time the app
+                    // was managed; that one goes back to the default output.
+                    try { ReleaseStreamLocked(s.Serial); }
+                    catch (InvalidOperationException) { continue; }
+                    var left = new StreamAssignment(s.Id, s.Serial, s.Label, s.Identity, StreamMatcher.Ignore);
+                    _streams[s.Id] = left;
+                    if (!PipeWireAdapter.IsPlumbingIdentity(s.Identity)) _apps[s.Identity] = left;
+                    changed = true;
+                    continue;
+                }
                 ChannelDefinition? ch = _config.Channels.FirstOrDefault(c => c.Id == channelId)
                                         ?? _config.Channels.FirstOrDefault();
                 if (ch is null) continue;
@@ -1332,6 +1346,21 @@ public sealed class Mixer : IDisposable, ILayoutInfo
     }
 
     /// <summary>
+    /// Hand a stream back to the desktop: if it sits on one of the mixer's
+    /// channel sinks, move it to the system default output. A stream already
+    /// elsewhere is left alone, and so is everything when the default output
+    /// is unknown.
+    /// </summary>
+    private void ReleaseStreamLocked(int serial)
+    {
+        string? current = _pw.StreamSinkName(serial);
+        if (current is null || !_config.Channels.Any(c => c.SinkName == current)) return;
+        string? fallback = _pw.GetDefaultSink();
+        if (string.IsNullOrEmpty(fallback) || fallback == current) return;
+        _pw.MoveStreamToSink(serial, fallback);
+    }
+
+    /// <summary>
     /// Drop an application from the registry and forget its channel override.
     /// A still-running app simply re-registers on the next sweep.
     /// </summary>
@@ -1352,8 +1381,27 @@ public sealed class Mixer : IDisposable, ILayoutInfo
     {
         lock (_gate)
         {
+            if (string.IsNullOrWhiteSpace(identity)) return;
+            if (channelId == StreamMatcher.Ignore)
+            {
+                // Stop managing the app: remember the choice, hand its live
+                // streams back to the desktop, keep it listed as ignored.
+                Matcher.SetOverride(identity, StreamMatcher.Ignore);
+                foreach ((int id, StreamAssignment placed) in _streams.ToList())
+                    if (placed.Identity == identity)
+                    {
+                        try { ReleaseStreamLocked(placed.Serial); }
+                        catch (InvalidOperationException) { /* the sweep retries */ }
+                        _streams.Remove(id);   // the next sweep lists it as unmanaged
+                    }
+                if (_apps.TryGetValue(identity, out StreamAssignment? ignored))
+                    _apps[identity] = ignored with { ChannelId = StreamMatcher.Ignore };
+                else
+                    _apps[identity] = new StreamAssignment(0, 0, label ?? identity, identity, StreamMatcher.Ignore) { Active = false, Running = false };
+                return;
+            }
             ChannelDefinition? ch = _config.Channels.FirstOrDefault(c => c.Id == channelId);
-            if (ch is null || string.IsNullOrWhiteSpace(identity)) return;
+            if (ch is null) return;
             Matcher.SetOverride(identity, channelId);
 
             foreach ((int id, StreamAssignment placed) in _streams.ToList())
@@ -1381,6 +1429,14 @@ public sealed class Mixer : IDisposable, ILayoutInfo
     {
         lock (_gate)
         {
+            if (channelId == StreamMatcher.Ignore)
+            {
+                if (!_streams.TryGetValue(streamId, out StreamAssignment? managed)) return;
+                Matcher.SetOverride(managed.Identity, StreamMatcher.Ignore);
+                ReleaseStreamLocked(managed.Serial);
+                _streams.Remove(streamId);   // the next sweep lists it as unmanaged
+                return;
+            }
             ChannelDefinition? ch = _config.Channels.FirstOrDefault(c => c.Id == channelId);
             if (ch is null) return;
 

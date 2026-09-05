@@ -36,10 +36,10 @@ public static class CommandValidation
             case "setOutputVolume":
                 return Finite(cmd, "value");
             case "assignStream":
-                if (cmd.Channel is not null && !layout.HasChannel(cmd.Channel)) return $"assignStream: unknown channel '{Short(cmd.Channel)}'";
+                if (cmd.Channel is not null && !IsChannelOrIgnore(layout, cmd.Channel)) return $"assignStream: unknown channel '{Short(cmd.Channel)}'";
                 return null;
             case "assignApp":
-                if (cmd.Channel is not null && !layout.HasChannel(cmd.Channel)) return $"assignApp: unknown channel '{Short(cmd.Channel)}'";
+                if (cmd.Channel is not null && !IsChannelOrIgnore(layout, cmd.Channel)) return $"assignApp: unknown channel '{Short(cmd.Channel)}'";
                 if (TooLong(cmd.Identity, MaxText)) return "assignApp: identity too long";
                 if (TooLong(cmd.Label, MaxText)) return "assignApp: label too long";
                 if (layout.OverrideCount >= MaxOverrides) return $"assignApp: {MaxOverrides} remembered applications already; forget some first";
@@ -104,4 +104,8 @@ public static class CommandValidation
     private static bool TooLong(string? s, int max) => s is not null && s.Length > max;
     private static string Short(string s) => s.Length <= 40 ? s : s[..40] + "...";
     private static string Tail(string uri) => uri[(uri.LastIndexOfAny(['#', '/']) + 1)..];
+
+    /// <summary>A real channel, or the "ignore" pseudo-channel that leaves an app to the desktop.</summary>
+    private static bool IsChannelOrIgnore(ILayoutInfo layout, string id)
+        => id == OpenXLR.Core.Mixing.StreamMatcher.Ignore || layout.HasChannel(id);
 }

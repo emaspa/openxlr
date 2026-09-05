@@ -55,8 +55,9 @@ Collect diagnostics).
   plugin picker, generated control windows and bypass LEDs.
 - **Application routing**: audio clients are detected from their
   PipeWire registration and routed to a channel by name rules, with the
-  assignment remembered per app. Electron apps are identified by their
-  process binary rather than the "Chromium" name they report.
+  assignment remembered per app; an app can also be left to the
+  desktop's own routing. Electron apps are identified by their process
+  binary rather than the "Chromium" name they report.
 - **Profiles**: named scenes holding the hardware settings and the
   whole submix (levels, mutes, outputs, insert chains), saved per device
   and recalled from the UI, the API or a Stream Deck key. One profile
