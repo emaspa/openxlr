@@ -502,7 +502,21 @@ public sealed class Mixer : IDisposable, ILayoutInfo
     // ILayoutInfo, for command validation ahead of the mixer methods.
     public bool HasChannel(string id) { lock (_gate) return _config.Channels.Any(c => c.Id == id); }
     public bool HasMix(string id) { lock (_gate) return _config.Mixes.Any(m => m.Id == id); }
-    public bool IsMonitorMix(string id) { lock (_gate) return _config.Mixes.Any(m => m.Id == id && m.Kind == MixKind.Monitor); }
+    public bool IsMonitorFeed(string feed) { lock (_gate) return NormalizeFeedLocked(feed) is not null; }
+
+    /// <summary>
+    /// A feed as the mixer stores it: the monitor mixes it names, in the
+    /// layout's order, joined with '+'. Null when it names anything else,
+    /// nothing, or the same mix twice.
+    /// </summary>
+    private string? NormalizeFeedLocked(string feed)
+    {
+        IReadOnlyList<string> parts = MonitorFeed.Parts(feed);
+        if (parts.Count == 0 || parts.Distinct().Count() != parts.Count) return null;
+        List<MixDefinition> monitors = [.. _config.Mixes.Where(m => m.Kind == MixKind.Monitor)];
+        if (parts.Any(p => monitors.All(m => m.Id != p))) return null;
+        return MonitorFeed.Join(monitors.Where(m => parts.Contains(m.Id)).Select(m => m.Id));
+    }
     public bool IsMonitorOutput(string device) { lock (_gate) return MonitorOutputsForLocked(device).Any(); }
 
     /// <summary>
@@ -1148,22 +1162,50 @@ public sealed class Mixer : IDisposable, ILayoutInfo
             _monitorFeeds.Remove(stale);
         foreach ((string key, string target) in MonitorRouteTargetsLocked())
         {
-            if (MixForOutputLocked(target) is not MixDefinition mix) return;
-            (string tapNode, string tapPrefix) = MixTapLocked(mix);
-            _monitorRoutes[key] = _pw.RouteTapToOutput(tapNode, tapPrefix, target);
+            PortLink? route = RouteFeedLocked(target);
+            if (route is null) return;
+            _monitorRoutes[key] = route;
         }
+    }
+
+    /// <summary>
+    /// Link every mix of an output's feed into that output. PipeWire sums
+    /// what arrives on one input port, so "A+B" is simply both taps linked
+    /// to the same playback ports. Null without a monitor mix at all.
+    /// </summary>
+    private PortLink? RouteFeedLocked(string target)
+    {
+        List<MixDefinition> mixes = MixesForOutputLocked(target);
+        if (mixes.Count == 0) return null;
+        var pairs = new List<(string From, string To)>();
+        foreach (MixDefinition mix in mixes)
+        {
+            (string tapNode, string tapPrefix) = MixTapLocked(mix);
+            pairs.AddRange(_pw.RouteTapToOutput(tapNode, tapPrefix, target).Pairs);
+        }
+        return new PortLink(pairs);
     }
 
     /// <summary>The first monitor mix, the one outputs are fed by unless told otherwise.</summary>
     private MixDefinition? PrimaryMonitorLocked() => _config.Mixes.FirstOrDefault(m => m.Kind == MixKind.Monitor);
 
-    /// <summary>The monitor mix feeding an output, falling back to the first one.</summary>
-    private MixDefinition? MixForOutputLocked(string output)
+    /// <summary>The monitor mixes feeding an output (one, or several summed), falling back to the first one.</summary>
+    private List<MixDefinition> MixesForOutputLocked(string output)
     {
-        if (_monitorFeeds.TryGetValue(output, out string? id)
-            && _config.Mixes.FirstOrDefault(m => m.Id == id && m.Kind == MixKind.Monitor) is MixDefinition chosen)
-            return chosen;
-        return PrimaryMonitorLocked();
+        if (_monitorFeeds.TryGetValue(output, out string? feed))
+        {
+            IReadOnlyList<string> parts = MonitorFeed.Parts(feed);
+            List<MixDefinition> chosen = [.. _config.Mixes.Where(m => m.Kind == MixKind.Monitor && parts.Contains(m.Id))];
+            if (chosen.Count > 0) return chosen;
+        }
+        return PrimaryMonitorLocked() is MixDefinition primary ? [primary] : [];
+    }
+
+    /// <summary>An output's feed as a string (see <see cref="MonitorFeed"/>), or null without a monitor mix.</summary>
+    private string? FeedOfLocked(string output)
+    {
+        List<MixDefinition> mixes = MixesForOutputLocked(output);
+        return mixes.Count == 0 ? null : MonitorFeed.Join(mixes.Select(m => m.Id));
     }
 
     /// <summary>
@@ -1174,14 +1216,14 @@ public sealed class Mixer : IDisposable, ILayoutInfo
     private string? JackFeedLocked()
     {
         string? jack = _monitorOutputs.FirstOrDefault(o => o.Contains('#'));
-        return (jack is null ? PrimaryMonitorLocked() : MixForOutputLocked(jack))?.Id;
+        return jack is null ? PrimaryMonitorLocked()?.Id : FeedOfLocked(jack);
     }
 
-    /// <summary>Id of the monitor mix feeding the interface's own jacks (see <see cref="JackFeedLocked"/>).</summary>
+    /// <summary>The feed of the interface's own jacks (see <see cref="JackFeedLocked"/> and <see cref="MonitorFeed"/>).</summary>
     public string? JackMonitorMix { get { lock (_gate) return JackFeedLocked(); } }
 
-    /// <summary>The monitor mix feeding one selected output, by id.</summary>
-    public string? MonitorFeedOf(string output) { lock (_gate) return MixForOutputLocked(output)?.Id; }
+    /// <summary>The feed of one selected output (see <see cref="MonitorFeed"/>).</summary>
+    public string? MonitorFeedOf(string output) { lock (_gate) return FeedOfLocked(output); }
 
     /// <summary>
     /// Choose which monitor mix feeds a selected output. The Pro's
@@ -1189,20 +1231,24 @@ public sealed class Mixer : IDisposable, ILayoutInfo
     /// every jack of that device. An unknown mix or an unselected output is
     /// ignored; the first monitor mix is stored as "no exception".
     /// </summary>
-    /// <summary>Choose which monitor mix feeds one selected output. Null on success, else why nothing changed.</summary>
-    public string? SetMonitorFeed(string output, string mixId)
+    /// <summary>
+    /// Choose what feeds one selected output: a monitor mix, or several
+    /// summed ("monitor+monitor2", see <see cref="MonitorFeed"/>). Null on
+    /// success, else why nothing changed.
+    /// </summary>
+    public string? SetMonitorFeed(string output, string feed)
     {
         lock (_gate)
         {
             if (!_built) return "mixer not built";
             List<string> affected = [.. MonitorOutputsForLocked(output)];
             if (affected.Count == 0) return $"'{output}' is not a selected monitor output";
-            if (!_config.Mixes.Any(m => m.Id == mixId && m.Kind == MixKind.Monitor)) return $"'{mixId}' is not a monitor mix";
-            bool primary = PrimaryMonitorLocked()?.Id == mixId;
+            if (NormalizeFeedLocked(feed) is not string normalized) return $"'{feed}' is not a monitor mix or a sum of monitor mixes";
+            bool primary = PrimaryMonitorLocked()?.Id == normalized;
             foreach (string o in affected)
             {
                 if (primary) _monitorFeeds.Remove(o);
-                else _monitorFeeds[o] = mixId;
+                else _monitorFeeds[o] = normalized;
             }
             SetMonitorOutputsLocked([.. _monitorOutputs]);
             return null;
@@ -1247,10 +1293,10 @@ public sealed class Mixer : IDisposable, ILayoutInfo
                     if (health == LinkHealth.Relinked) { changed = true; continue; }
                     _pw.Unlink(route);   // Broken: the port names themselves are stale
                 }
-                if (MixForOutputLocked(target) is not MixDefinition mix) return changed;
-                (string tapNode, string tapPrefix) = MixTapLocked(mix);
-                _monitorRoutes[key] = _pw.RouteTapToOutput(tapNode, tapPrefix, target);
-                changed |= _monitorRoutes[key].Pairs.Count > 0;
+                PortLink? fresh = RouteFeedLocked(target);
+                if (fresh is null) return changed;
+                _monitorRoutes[key] = fresh;
+                changed |= fresh.Pairs.Count > 0;
             }
             return changed;
         }
@@ -1581,7 +1627,7 @@ public sealed class Mixer : IDisposable, ILayoutInfo
         string cell = Cell(channelId, mixId);
         double level = _levels.GetValueOrDefault(cell, 0.0) * _mixVolume.GetValueOrDefault(mixId, 1.0);
         bool muted = _muted.Contains(cell) || _mixMuted.Contains(mixId);
-        if (_hardwareMicMonitor && channelId == "xlr1" && JackFeedLocked() == mixId)
+        if (_hardwareMicMonitor && channelId == "xlr1" && MonitorFeed.Includes(JackFeedLocked(), mixId))
             muted = true;   // the hardware direct path carries it to the jacks
 
         if (!_legIndex.TryGetValue(cell, out int idx)) { DiscoverLegsLocked(); if (!_legIndex.TryGetValue(cell, out idx)) return; }

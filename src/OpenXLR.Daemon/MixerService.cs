@@ -87,7 +87,10 @@ public sealed class MixerService : IHostedService, IDisposable
         // to carry the mic there, and the hardware path would double it.
         bool anyJack = suffixes.Contains("hp1") || suffixes.Contains("hp2") || suffixes.Contains("lineout");
         bool jacksOnly = anyJack && _mixer.MonitorOutputs.All(o => o.Contains('#'));
-        bool micDirect = jacksOnly && !_mixer.IsChannelMutedIn("xlr1", _mixer.JackMonitorMix ?? "monitor");
+        // With a summed feed (A+B) the mic rides the hardware path as soon as
+        // any of the summed mixes carries it.
+        bool micDirect = jacksOnly && OpenXLR.Core.Mixing.MonitorFeed.Parts(_mixer.JackMonitorMix ?? "monitor")
+            .Any(m => !_mixer.IsChannelMutedIn("xlr1", m));
         _mixer.SetHardwareMicMonitor(micDirect);
         if (anyJack && _devices.EnsureHeadphoneMix(monitorReturn: true, micDirect: micDirect) && _mixer.Built)
             _mixer.BounceMonitorHardwareOutput();

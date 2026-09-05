@@ -34,7 +34,7 @@ public sealed class PersistenceTests
     {
         public bool HasChannel(string id) => id is "system";
         public bool HasMix(string id) => id is "monitor" or "monitor2" or "stream";
-        public bool IsMonitorMix(string id) => id is "monitor" or "monitor2";
+        public bool IsMonitorFeed(string feed) => feed is "monitor" or "monitor2" or "monitor+monitor2";
         public bool IsMonitorOutput(string device) => device is "alsa_output.katana" or "alsa_output.pro#";
         public bool IsInsertKey(string key) => key is "xlr1";
         public int OverrideCount => 0;
@@ -46,8 +46,9 @@ public sealed class PersistenceTests
     [InlineData("""{"cmd":"setMonitorFeed","device":"alsa_output.katana","mix":"monitor2"}""", null)]
     [InlineData("""{"cmd":"setMonitorFeed","device":"alsa_output.pro#","mix":"monitor"}""", null)]
     [InlineData("""{"cmd":"setMonitorFeed","device":"alsa_output.katana","mix":"stream"}""", "not a monitor mix")]
+    [InlineData("""{"cmd":"setMonitorFeed","device":"alsa_output.katana","mix":"monitor+monitor2"}""", null)]
     [InlineData("""{"cmd":"setMonitorFeed","device":"alsa_output.gone","mix":"monitor2"}""", "not a selected monitor output")]
-    [InlineData("""{"cmd":"setMonitorFeed","device":"alsa_output.katana","mix":"nope"}""", "unknown mix")]
+    [InlineData("""{"cmd":"setMonitorFeed","device":"alsa_output.katana","mix":"nope"}""", "not a monitor mix")]
     public void AMonitorFeedCommandIsRejectedBeforeItCouldSilentlyDoNothing(string json, string? expected)
     {
         string? err = CommandValidation.Check(Cmd(json), new Layout(), _ => null);

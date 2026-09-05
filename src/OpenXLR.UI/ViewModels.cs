@@ -779,11 +779,26 @@ public sealed class MainViewModel : ViewModelBase
             .Where(m => m is not null && (m["kind"]?.GetValue<string>() ?? "monitor") == "monitor")
             .Select(m => new MixOption(m!["id"]!.GetValue<string>(), m["name"]?.GetValue<string>() ?? m["id"]!.GetValue<string>()))
             .ToList() ?? [];
+        // With two or more monitor mixes an output can also hear them all,
+        // summed: "Monitor A+B" for headphones that want the desktop from A
+        // and a separately processed mic from B.
+        if (monitorMixes.Count > 1)
+            monitorMixes.Add(new MixOption(string.Join("+", monitorMixes.Select(m => m.Id)), SummedName(monitorMixes.Select(m => m.Name))));
         var feeds = mixer?["monitorFeeds"] as JsonObject;
         string primaryMonitor = monitorMixes.FirstOrDefault()?.Id ?? "monitor";
         foreach (MonitorOutputItem item in MonitorOutputs)
             item.SyncFeed(monitorMixes, feeds?[item.Name]?.GetValue<string>() ?? primaryMonitor);
         Raise(nameof(MonitorSummary));
+    }
+
+    /// <summary>"Monitor A" and "Monitor B" read "Monitor A+B"; names without a shared first word are joined whole.</summary>
+    internal static string SummedName(IEnumerable<string> names)
+    {
+        List<string> list = [.. names];
+        string[] firstWords = [.. list.Select(n => n.Split(' ', 2)[0])];
+        if (list.Count > 1 && firstWords.Distinct().Count() == 1 && list.All(n => n.Contains(' ')))
+            return firstWords[0] + " " + string.Join("+", list.Select(n => n.Split(' ', 2)[1]));
+        return string.Join("+", list);
     }
 
     private void OnMonitorFeedChanged(string output, string mixId)

@@ -400,13 +400,13 @@ function toggleValue(target, inst) {
     const outs = mixer()?.monitorOutputs;
     return outs ? outs.includes(target.slice(8)) : null;
   }
-  // Which monitor mix feeds an output: lit = Monitor B, dark = Monitor A,
+  // What feeds an output: dark = Monitor A, lit = Monitor B or A+B;
   // disabled while the output is not a monitor output at all.
   if (target.startsWith("feed:")) {
     const out = target.slice(5);
     const outs = mixer()?.monitorOutputs;
     if (!outs || !outs.includes(out)) return null;
-    return (mixer()?.monitorFeeds?.[out] ?? "monitor") === "monitor2";
+    return feedOf(out) !== "monitor";
   }
   if (target.startsWith("mixmute:")) return mixOf(target.slice(8))?.muted ?? null;
   if (target.startsWith("sendmute:")) {
@@ -416,6 +416,14 @@ function toggleValue(target, inst) {
   if (Object.hasOwn(DEVICE_TOGGLES, target) && !deviceTargetSupported(target)) return null;
   return dev()?.[target] ?? null;
 }
+
+// An output's feed as the daemon stores it: one monitor mix id, or ids
+// joined with '+' when the output hears them summed.
+const feedOf = (sink) => mixer()?.monitorFeeds?.[sink] ?? "monitor";
+const FEED_LETTER = { monitor: "A", monitor2: "B" };
+const feedLetters = (feed) => feed.split("+").map((id) => FEED_LETTER[id] ?? id).join("+");
+// The feed key cycles A, B, A+B.
+const nextFeed = (feed) => feed === "monitor" ? "monitor2" : feed === "monitor2" ? "monitor+monitor2" : "monitor";
 
 function toggleLabel(target, inst) {
   if (!target) return "OpenXLR";
@@ -436,16 +444,14 @@ function toggleLabel(target, inst) {
     const sink = target.slice(8);
     const d = daemonState?.devices?.find((x) => x.name === sink);
     const name = d?.description ?? sink.split(".").pop();
-    // The output follows Monitor A unless its feed was switched to B.
-    const feed = (mixer()?.monitorFeeds?.[sink] ?? "monitor") === "monitor2" ? "B" : "A";
-    return `Monitor ${feed}\n${name}`;
+    // The output follows Monitor A unless its feed was switched.
+    return `Monitor ${feedLetters(feedOf(sink))}\n${name}`;
   }
   if (target.startsWith("feed:")) {
     const sink = target.slice(5);
     const d = daemonState?.devices?.find((x) => x.name === sink);
     const name = d?.description ?? sink.split(".").pop();
-    const feed = (mixer()?.monitorFeeds?.[sink] ?? "monitor") === "monitor2" ? "B" : "A";
-    return `${name}\nMonitor ${feed}`;
+    return `${name}\nMonitor ${feedLetters(feedOf(sink))}`;
   }
   if (target.startsWith("mixmute:")) return `${MIXES[target.slice(8)] ?? target.slice(8)}\nMute`;
   if (target.startsWith("sendmute:")) {
@@ -555,7 +561,7 @@ function onKeyDown(context, inst) {
   else if (t === "softClipGuard") cmd({ cmd: "setSoftClipGuard", value: !cur });
   else if (t === "gainLocked") cmd({ cmd: "set", control: "gainLock", value: !cur });
   else if (t.startsWith("monitor:")) cmd({ cmd: "setMonitorOutputs", devices: [t.slice(8)] });
-  else if (t.startsWith("feed:")) cmd({ cmd: "setMonitorFeed", device: t.slice(5), mix: cur ? "monitor" : "monitor2" });
+  else if (t.startsWith("feed:")) cmd({ cmd: "setMonitorFeed", device: t.slice(5), mix: nextFeed(feedOf(t.slice(5))) });
   else if (t.startsWith("mixmute:"))
     cmd({ cmd: "setMixMuted", mix: t.slice(8), value: !cur });
   else if (t.startsWith("sendmute:")) {

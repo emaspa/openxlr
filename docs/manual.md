@@ -60,7 +60,7 @@ PipeWire output device an application can play into.
 | Mix | What it is | Where it goes |
 |---|---|---|
 | Monitor A | what you hear | the ticked outputs in the MONITOR card, unless their feed is set to Monitor B |
-| Monitor B | a second selection to hear | the ticked outputs whose feed is set to Monitor B |
+| Monitor B | a second selection to hear | the ticked outputs whose feed is set to Monitor B, or summed with A on outputs set to Monitor A+B |
 | Stream | what your audience hears | the `OpenXLR Stream` virtual microphone, for OBS or any recorder |
 | Chat | what your call partners hear | the `OpenXLR Chat` virtual microphone, for Discord, Zoom and the like |
 | Aux | what a second computer receives | the interface's USB Aux port (Wave XLR Pro only) |
@@ -117,8 +117,11 @@ configuration.
    should hear a different selection: a headset whose game side and
    chat side are two sinks, for instance, gets the voice channels on
    Monitor B and everything else on Monitor A. Monitor B has its own
-   sends and master in the SUBMIXER card. The Pro's own jacks share one
-   feed.
+   sends and master in the SUBMIXER card. Monitor A+B plays both mixes
+   summed on one output: put the desktop on A and only the microphone
+   on B, add a denoiser under the Monitor B master, and one pair of
+   headphones hears both, with the plugin touching only your voice.
+   The Pro's own jacks share one feed.
 3. The Volume slider sets the level of the selected devices.
 4. The HEADPHONES card holds the interface's own headphone volume,
    low-impedance mode, and on the Pro the Mic ↔ PC crossfade, which is
@@ -287,8 +290,8 @@ phantom, low cut, expander, voice tune, ClipGuard, compressor, low
 impedance, the Pro's output selectors, the aux level lock, the gain
 lock), the software low cut (cycling Off, 80, 120), a mix or send mute,
 the monitor output (switching the monitor mixes to one specific device),
-an output's feed (flipping it between Monitor A and Monitor B, lit on
-B),
+an output's feed (cycling Monitor A, Monitor B and Monitor A+B, lit
+when not on A),
 the bypass of one insert or of a whole chain, or a profile to recall.
 The key's LED is green for an engaged feature, red for a mute, and grey
 when the daemon is offline or the target does not exist on the

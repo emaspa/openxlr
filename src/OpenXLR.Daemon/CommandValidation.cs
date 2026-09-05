@@ -58,8 +58,7 @@ public static class CommandValidation
                 return null;   // no arguments; the device manager checks the device
             case "setMonitorFeed":
                 if (TooLong(cmd.Device, MaxText)) return "setMonitorFeed: device name too long";
-                if (cmd.Mix is null || !layout.HasMix(cmd.Mix)) return $"setMonitorFeed: unknown mix '{Short(cmd.Mix ?? "")}'";
-                if (!layout.IsMonitorMix(cmd.Mix)) return $"setMonitorFeed: '{Short(cmd.Mix)}' is not a monitor mix";
+                if (cmd.Mix is null || !layout.IsMonitorFeed(cmd.Mix)) return $"setMonitorFeed: '{Short(cmd.Mix ?? "")}' is not a monitor mix or a sum of monitor mixes";
                 if (cmd.Device is null || !layout.IsMonitorOutput(cmd.Device)) return $"setMonitorFeed: '{Short(cmd.Device ?? "")}' is not a selected monitor output";
                 return null;
             case "setEnforcedDefaults":

@@ -92,7 +92,7 @@ function fillMonitors(outputs, wanted) {
   // as a monitor output in the window).
   const feeds = document.createElement("optgroup");
   feeds.id = "feed-group";
-  feeds.label = "Monitor feed (A or B)";
+  feeds.label = "Monitor feed (cycles A, B, A+B)";
   for (const o of outputs) {
     const opt = document.createElement("option");
     opt.value = "feed:" + o.name;

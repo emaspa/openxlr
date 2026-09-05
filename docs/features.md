@@ -73,8 +73,10 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
   Aux (what a second computer on the USB Aux port receives)
 - Per-channel, per-mix send levels and mutes; per-mix masters
 - The monitor mixes can play on several outputs at once, hardware
-  outputs included; each output picks which monitor mix feeds it, so a
-  headset with a game sink and a chat sink hears two selections
+  outputs included; each output picks which monitor mix feeds it, or
+  both summed (Monitor A+B), so a headset with a game sink and a chat
+  sink hears two selections, and one pair of headphones can hear the
+  desktop from A with a separately processed mic from B
 - Level meters throughout, dB-scaled, pushed at 15 Hz
 
 Each channel is a combine sink with one internal stream per mix; that
