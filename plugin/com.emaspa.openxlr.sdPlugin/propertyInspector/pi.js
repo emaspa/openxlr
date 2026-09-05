@@ -12,7 +12,7 @@ function connect(inPort, inPropertyInspectorUUID, inRegisterEvent, inInfo, inAct
   const actionInfo = JSON.parse(inActionInfo);
   actionContext = actionInfo.context;
   const settings = actionInfo.payload?.settings ?? {};
-  const wanted = settings.target;
+  let wanted = settings.target;
 
   ws = new WebSocket("ws://localhost:" + inPort);
   ws.onopen = () => {
@@ -23,6 +23,7 @@ function connect(inPort, inPropertyInspectorUUID, inRegisterEvent, inInfo, inAct
     if (iconSel && settings.icon) iconSel.value = settings.icon;
     const save = () => {
       settings.target = sel.value;
+      wanted = sel.value;
       if (iconSel) settings.icon = iconSel.value;
       // Insert options carry {plugin, index} so the key survives a chain
       // rebuild that hands the insert a new id.
@@ -37,7 +38,7 @@ function connect(inPort, inPropertyInspectorUUID, inRegisterEvent, inInfo, inAct
     iconSel?.addEventListener("change", save);
     // Ask the plugin for the live output-device list, the insert chains and
     // the saved profiles.
-    for (const request of ["outputs", "inserts", "profiles"])
+    for (const request of ["layout", "outputs", "inserts", "profiles"])
       ws.send(JSON.stringify({ event: "sendToPlugin", context: actionContext, payload: { request } }));
   };
 
@@ -45,6 +46,7 @@ function connect(inPort, inPropertyInspectorUUID, inRegisterEvent, inInfo, inAct
     let m;
     try { m = JSON.parse(e.data); } catch { return; }
     if (m.event !== "sendToPropertyInspector") return;
+    if (Array.isArray(m.payload?.toggleGroups)) replaceLayoutOptions(m.payload.toggleGroups, wanted);
     if (Array.isArray(m.payload?.outputs)) fillMonitors(m.payload.outputs, wanted);
     if (Array.isArray(m.payload?.inserts)) {
       fillGroup("insert-group", "Insert bypass", m.payload.inserts, wanted);

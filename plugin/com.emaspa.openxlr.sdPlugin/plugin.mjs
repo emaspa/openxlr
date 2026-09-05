@@ -4,6 +4,7 @@
 // and dials stay in sync with the UI (and with the hardware) for free.
 
 import process from "node:process";
+import { channelName, mixName, mixShortName, layoutChoices } from "./layout-choices.mjs";
 import fs from "node:fs";
 import os from "node:os";
 
@@ -17,14 +18,6 @@ const pluginUUID = arg("-pluginUUID");
 const registerEvent = arg("-registerEvent");
 
 // ---------- static naming ----------
-const CHANNELS = {
-  xlr1: "XLR 1", xlr2: "XLR 2", aux: "Aux In", game: "Game",
-  music: "Music", browser: "Browser", system: "System",
-  voicechat: "Voice Chat", sfx: "SFX",
-};
-const MIXES = { monitor: "Monitor A", monitor2: "Monitor B", stream: "Stream", chat: "Chat", auxout: "Aux" };
-const MIX_SHORT = { monitor: "MonA", monitor2: "MonB", stream: "Str", chat: "Cht", auxout: "Aux", all: "All" };
-
 // Toggle targets on the device state block, with short key labels.
 const DEVICE_TOGGLES = {
   mute: "XLR 1\nMute", mute2: "XLR 2\nMute",
@@ -44,6 +37,16 @@ const MUTE_LIKE = new Set(["mute", "mute2"]);
 
 // ---------- daemon connection ----------
 let daemon = null;
+const layoutInspectors = new Set();
+let lastLayout = "";
+function publishLayout() {
+  const choices = layoutChoices(daemonState?.mixer);
+  const serialized = JSON.stringify(choices);
+  if (serialized === lastLayout) return;
+  lastLayout = serialized;
+  for (const context of layoutInspectors)
+    send({ event: "sendToPropertyInspector", context, payload: choices });
+}
 let daemonState = null;   // last full {"type":"state"} message
 let daemonUp = false;
 let meterLevels = null;   // last {"type":"meters"} levels, keyed ch:/mix:
@@ -86,7 +89,7 @@ function connectDaemon() {
     if (daemon !== socket) return;
     let m;
     try { m = JSON.parse(e.data); } catch { return; }
-    if (m.type === "state") { daemonState = m; refreshAll(); }
+    if (m.type === "state") { daemonState = m; refreshAll(); publishLayout(); }
     else if (m.type === "meters") { meterLevels = m.levels; refreshMeters(); }
     else if (m.type === "plugins") {
       catalog = new Map((m.plugins ?? []).map((p) => [p.plugin, p]));
@@ -150,9 +153,9 @@ const isInsertTarget = (t) =>
 
 // Chains the daemon exposes, in the order the UI shows them.
 const chainName = (ch) =>
-  ch.startsWith("mix:") ? `${MIXES[ch.slice(4)] ?? ch.slice(4)} mix` : CHANNELS[ch] ?? ch;
+  ch.startsWith("mix:") ? `${mixName(mixer(), ch.slice(4))} mix` : channelName(mixer(), ch);
 const chainShort = (ch) =>
-  ch.startsWith("mix:") ? `${MIX_SHORT[ch.slice(4)] ?? ch.slice(4)} mix` : CHANNELS[ch] ?? ch;
+  ch.startsWith("mix:") ? `${mixShortName(mixer(), ch.slice(4))} mix` : channelName(mixer(), ch);
 const insertsOf = (ch) => (mixer()?.inserts?.[ch] ?? []).map((s) => s.insert ?? s);
 
 // A short plugin name for a key face: drop the vendor prefix and the
@@ -308,7 +311,12 @@ host.onmessage = (e) => {
       break;
     }
     case "sendToPlugin":
-      if (m.payload?.request === "outputs")
+      if (m.payload?.request === "layout") {
+        layoutInspectors.add(m.context);
+        send({ event: "sendToPropertyInspector", context: m.context,
+               payload: layoutChoices(daemonState?.mixer) });
+      }
+      else if (m.payload?.request === "outputs")
         send({ event: "sendToPropertyInspector", context: m.context,
                payload: { outputs: outputDevices() } });
       else if (m.payload?.request === "inserts")
@@ -317,6 +325,9 @@ host.onmessage = (e) => {
       else if (m.payload?.request === "profiles")
         send({ event: "sendToPropertyInspector", context: m.context,
                payload: { profiles: profileChoices() } });
+      break;
+    case "propertyInspectorDidDisappear":
+      layoutInspectors.delete(m.context);
       break;
   }
 };
@@ -453,10 +464,10 @@ function toggleLabel(target, inst) {
     const name = d?.description ?? sink.split(".").pop();
     return `${name}\nMonitor ${feedLetters(feedOf(sink))}`;
   }
-  if (target.startsWith("mixmute:")) return `${MIXES[target.slice(8)] ?? target.slice(8)}\nMute`;
+  if (target.startsWith("mixmute:")) return `${mixName(mixer(), target.slice(8))}\nMute`;
   if (target.startsWith("sendmute:")) {
     const [, ch, mix] = target.split(":");
-    return `${CHANNELS[ch] ?? ch}\n· ${MIX_SHORT[mix] ?? mix}`;
+    return `${channelName(mixer(), ch)}\n· ${mixShortName(mixer(), mix)}`;
   }
   return DEVICE_TOGGLES[target] ?? target;
 }
@@ -485,8 +496,8 @@ function dialValue(target, inst) {
     const muted = mix === "all"
       ? Object.keys(ch.levels ?? {}).every((m) => ch.mutedIn?.includes(m))
       : ch.mutedIn?.includes(mix) ?? false;
-    return { pin: CHANNELS[chId] ?? chId,
-             scroll: mix === "all" ? "All mixes" : MIXES[mix] ?? mix,
+    return { pin: channelName(mixer(), chId),
+             scroll: mix === "all" ? "All mixes" : mixName(mixer(), mix),
              pct: pct(v), text: muted ? "MUTED" : `${pct(v)}%`, muted };
   }
   if (target.startsWith("mixvol:")) {
