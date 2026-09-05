@@ -1,5 +1,8 @@
 # WebSocket API
 
+The [versioned local HTTP API](http-api.md) provides request/response access to
+the same commands and uses the same per-session credential.
+
 The daemon serves `ws://127.0.0.1:37890/ws` on the loopback interface
 only. A handshake that carries a browser `Origin` header from anywhere
 but localhost is refused with 403, so a web page you happen to visit

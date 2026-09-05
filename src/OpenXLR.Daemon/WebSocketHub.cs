@@ -60,7 +60,7 @@ public sealed class WebSocketHub
     // Last recalled or saved profile per device id, for the state message.
     private readonly ConcurrentDictionary<string, string> _activeProfile = new();
 
-    private StateMessage Snapshot() =>
+    internal StateMessage Snapshot() =>
         _devices.Snapshot() with
         {
             DaemonVersion = OpenXLR.Daemon.DaemonVersion.Current,
@@ -150,32 +150,42 @@ public sealed class WebSocketHub
         }
     }
 
-    private async Task Dispatch(Client client, string text)
+    private Task Dispatch(Client client, string text)
+        => DispatchAsync(message => client.SendAsync(Serialize(message)), text);
+
+    internal async Task<ApiCommandResult> ExecuteForApiAsync(string text)
+    {
+        var messages = new List<object>();
+        await DispatchAsync(message => { messages.Add(message); return Task.CompletedTask; }, text);
+        return new("1", !messages.Any(message => message is ErrorMessage), messages);
+    }
+
+    private async Task DispatchAsync(Func<object, Task> reply, string text)
     {
         Command? cmd;
         try { cmd = JsonSerializer.Deserialize<Command>(text, Json); }
-        catch (JsonException ex) { await client.SendAsync(Serialize(new ErrorMessage($"bad json: {ex.Message}"))); return; }
-        if (cmd is null) return;
+        catch (JsonException ex) { await reply(new ErrorMessage($"bad json: {ex.Message}")); return; }
+        if (cmd is null) { await reply(new ErrorMessage("command must be an object")); return; }
 
         switch (cmd.Cmd)
         {
             case "auth":
                 break;   // already authenticated on this socket; a repeat is harmless
             case "getState":
-                await client.SendAsync(Serialize(Snapshot()));
+                await reply(Snapshot());
                 break;
             case "getDiagnostics":
-                await client.SendAsync(Serialize(new DiagnosticsMessage(_devices.DumpBlocks())));
+                await reply(new DiagnosticsMessage(_devices.DumpBlocks()));
                 break;
             case "listPlugins":
                 // The first call may block on lilv's scan; keep it off the socket loop's thread.
                 IReadOnlyList<OpenXLR.Core.Mixing.PluginInfo> plugins = await Task.Run(() => OpenXLR.Core.Mixing.Lv2Catalog.Plugins);
-                await client.SendAsync(Serialize(new PluginsMessage(plugins)));
+                await reply(new PluginsMessage(plugins));
                 break;
             case "set":
-                if (cmd.Control is null) { await client.SendAsync(Serialize(new ErrorMessage("set: missing 'control'"))); break; }
+                if (cmd.Control is null) { await reply(new ErrorMessage("set: missing 'control'")); break; }
                 string? err = _devices.Apply(cmd.Control, cmd.Value);  // broadcasts on success
-                if (err is not null) await client.SendAsync(Serialize(new ErrorMessage(err)));
+                if (err is not null) await reply(new ErrorMessage(err));
                 break;
             case "setLevel":
             case "setChannelMuted":
@@ -198,37 +208,37 @@ public sealed class WebSocketHub
                 string? mixErr = _mixer.Apply(cmd);                     // broadcasts on success
                 if (mixErr is not null)
                 {
-                    await client.SendAsync(Serialize(new ErrorMessage(mixErr)));
+                    await reply(new ErrorMessage(mixErr));
                     // Controls are optimistic in both clients. Follow an error
                     // with authoritative state so a rejected ClipGuard/plugin
                     // change snaps back instead of looking enabled forever.
-                    await client.SendAsync(Serialize(Snapshot()));
+                    await reply(Snapshot());
                 }
                 break;
             case "setActiveDevice":
-                if (cmd.Device is null) { await client.SendAsync(Serialize(new ErrorMessage("setActiveDevice: missing 'device'"))); break; }
+                if (cmd.Device is null) { await reply(new ErrorMessage("setActiveDevice: missing 'device'")); break; }
                 string? devSelErr = _devices.SetActiveDevice(cmd.Device);
-                if (devSelErr is not null) await client.SendAsync(Serialize(new ErrorMessage(devSelErr)));
+                if (devSelErr is not null) await reply(new ErrorMessage(devSelErr));
                 break;
             case "saveProfile":
             case "loadProfile":
             case "deleteProfile":
                 string? profErr = HandleProfile(cmd);
-                if (profErr is not null) await client.SendAsync(Serialize(new ErrorMessage(profErr)));
+                if (profErr is not null) await reply(new ErrorMessage(profErr));
                 else Broadcast(Snapshot());   // list (and loaded state) changed
                 break;
             case "setRecallOnConnect":
                 string? recallErr = HandleRecallOnConnect(cmd);
-                if (recallErr is not null) await client.SendAsync(Serialize(new ErrorMessage(recallErr)));
+                if (recallErr is not null) await reply(new ErrorMessage(recallErr));
                 else Broadcast(Snapshot());
                 break;
             case "resetDevice":
                 string? resetErr = _devices.ResetToDefaults();   // the state change broadcasts itself
-                if (resetErr is not null) await client.SendAsync(Serialize(new ErrorMessage(resetErr)));
+                if (resetErr is not null) await reply(new ErrorMessage(resetErr));
                 else _log.LogInformation("reset {dev} to its firmware defaults", ActiveDeviceId());
                 break;
             default:
-                await client.SendAsync(Serialize(new ErrorMessage($"unknown cmd '{cmd.Cmd}'")));
+                await reply(new ErrorMessage($"unknown cmd '{cmd.Cmd}'"));
                 break;
         }
     }
