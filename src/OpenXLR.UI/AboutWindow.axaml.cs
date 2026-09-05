@@ -17,6 +17,7 @@ public partial class AboutWindow : Window
         => Process.Start(new ProcessStartInfo("xdg-open", url) { UseShellExecute = false });
 
     private void OnRepo(object? sender, RoutedEventArgs e) => OpenUrl("https://github.com/emaspa/openxlr");
+    private void OnCredits(object? sender, RoutedEventArgs e) => OpenUrl("https://github.com/emaspa/openxlr#credits");
     private void OnCoffee(object? sender, RoutedEventArgs e) => OpenUrl("https://buymeacoffee.com/emaspa");
     private void OnClose(object? sender, RoutedEventArgs e) => Close();
 }
