@@ -1,11 +1,12 @@
 ![OpenXLR](docs/banner.png)
 
-[![Discord](https://img.shields.io/badge/Discord-join%20the%20server-5865F2?logo=discord&logoColor=white)](https://discord.gg/4bswtnGPW4)
-[![Reddit](https://img.shields.io/badge/Reddit-r%2FOpenXLR-FF4500?logo=reddit&logoColor=white)](https://www.reddit.com/r/OpenXLR/)
 [![Latest release](https://img.shields.io/github/v/release/emaspa/openxlr?label=release)](https://github.com/emaspa/openxlr/releases)
 [![AUR](https://img.shields.io/aur/version/openxlr?label=AUR)](https://aur.archlinux.org/packages/openxlr)
 [![COPR](https://img.shields.io/badge/Fedora-COPR%20emaspa%2Fopenxlr-51A2DA?logo=fedora&logoColor=white)](https://copr.fedorainfracloud.org/coprs/emaspa/openxlr/)
 [![PPA](https://img.shields.io/badge/Ubuntu-PPA%20sparvoli%2Fopenxlr-E95420?logo=ubuntu&logoColor=white)](https://launchpad.net/~sparvoli/+archive/ubuntu/openxlr)
+
+[![Discord](https://img.shields.io/badge/Discord-join%20the%20server-5865F2?logo=discord&logoColor=white)](https://discord.gg/4bswtnGPW4)
+[![Reddit](https://img.shields.io/badge/Reddit-r%2FOpenXLR-FF4500?logo=reddit&logoColor=white)](https://www.reddit.com/r/OpenXLR/)
 
 Native Linux control suite for Elgato XLR interfaces: full hardware
 control over reverse-engineered USB protocols, a Wave Link style
