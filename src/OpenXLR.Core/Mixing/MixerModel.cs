@@ -3,8 +3,8 @@ namespace OpenXLR.Core.Mixing;
 /// <summary>
 /// The submixer model, mirroring what Wave Link provides: application audio is
 /// grouped into channels, and every channel feeds every mix at its own level.
-/// One mix is what you hear (monitor), the others are published as virtual
-/// capture devices other apps can select (stream/chat).
+/// One mix is what you hear (monitor), user-created outputs are published as
+/// virtual capture devices, and Aux can feed the second computer.
 ///
 /// In PipeWire this becomes one combine sink per channel feeding one null sink
 /// per mix. Each combine's internal stream into a mix is that cell's fader, so
@@ -17,8 +17,8 @@ public sealed record MixerConfig
     public required IReadOnlyList<ChannelDefinition> Channels { get; init; }
 
     /// <summary>
-    /// The layout carried over from the user's Wave Link setup: three mixes
-    /// (monitor / stream / chat), one channel per hardware input of the Wave
+    /// The initial layout carried over from the user's Wave Link setup: Monitor,
+    /// Stream, Chat and Aux, one channel per hardware input of the Wave
     /// XLR Pro (XLR 1, XLR 2, Line In, each wired to its capture channel pair),
     /// and the application channel set. The hardware inputs are muted in the
     /// monitor mix by default, exactly like Wave Link mutes the mic locally:
@@ -54,6 +54,108 @@ public sealed record MixerConfig
             new ChannelDefinition("sfx", "SFX") { Levels = Level(1.0, 1.0, 1.0, 1.0) },
         ],
     };
+
+    /// <summary>
+    /// Build the graph layout stored in mixer.json. Hardware inputs, Monitor,
+    /// and the hardware Aux bus are structural and always remain; application
+    /// channels and virtual-microphone mixes are user-managed. Null layout
+    /// lists mean a pre-layout settings file and therefore keep the defaults.
+    /// Invalid hand-edited entries are ignored instead of preventing audio from
+    /// starting.
+    /// </summary>
+    public static MixerConfig FromSettings(MixerSettings? settings)
+    {
+        MixerConfig defaults = Default();
+
+        IReadOnlyList<UserMixDefinition> userMixes = settings?.UserMixes is null
+            ? [.. defaults.Mixes.Where(m => m.Kind == MixKind.VirtualMic)
+                .Select(m => new UserMixDefinition(m.Id, m.Name))]
+            : ValidMixes(settings.UserMixes);
+
+        var mixes = new List<MixDefinition>();
+        mixes.AddRange(defaults.Mixes.Where(m => m.Kind == MixKind.Monitor));
+        mixes.AddRange(userMixes.Select(m => new MixDefinition(m.Id, m.Name, MixKind.VirtualMic)));
+        mixes.AddRange(defaults.Mixes.Where(m => m.Kind == MixKind.AuxPort));
+
+        IReadOnlyList<UserChannelDefinition> userChannels = settings?.UserChannels is null
+            ? [.. defaults.Channels.Where(c => c.InputPair is null)
+                .Select(c => new UserChannelDefinition(c.Id, c.Name))]
+            : ValidChannels(settings.UserChannels);
+        // At least one application sink is required as a safe destination for
+        // new streams. A corrupt or hand-edited empty layout heals to System.
+        if (userChannels.Count == 0) userChannels = [new UserChannelDefinition("system", "System")];
+
+        var channels = new List<ChannelDefinition>();
+        channels.AddRange(defaults.Channels.Where(c => c.InputPair is not null)
+            .Select(c => Normalize(c, mixes)));
+        foreach (UserChannelDefinition saved in userChannels)
+        {
+            ChannelDefinition seed = defaults.Channels.FirstOrDefault(c => c.Id == saved.Id)
+                ?? new ChannelDefinition(saved.Id, saved.Name);
+            channels.Add(Normalize(seed with { Name = saved.Name }, mixes));
+        }
+
+        return new MixerConfig { Mixes = mixes, Channels = channels };
+
+        static ChannelDefinition Normalize(ChannelDefinition channel, IReadOnlyList<MixDefinition> mixList)
+        {
+            var levels = new Dictionary<string, double>();
+            var muted = new HashSet<string>();
+            foreach (MixDefinition mix in mixList)
+            {
+                double fallback = channel.Id == "aux" && mix.Kind == MixKind.AuxPort ? 0.0 : 1.0;
+                levels[mix.Id] = channel.Levels.TryGetValue(mix.Id, out double value) ? value : fallback;
+                if (channel.MutedIn.Contains(mix.Id) || channel.Id == "aux" && mix.Kind == MixKind.AuxPort)
+                    muted.Add(mix.Id);
+            }
+            return channel with { Levels = levels, MutedIn = muted };
+        }
+    }
+
+    /// <summary>Create a safe stable PipeWire id from a display name.</summary>
+    public static string NewId(string name, string prefix, IEnumerable<string> existing)
+    {
+        string slug = new(name.Trim().ToLowerInvariant()
+            .Select(c => c is >= 'a' and <= 'z' or >= '0' and <= '9' ? c : '-')
+            .ToArray());
+        slug = string.Join('-', slug.Split('-', StringSplitOptions.RemoveEmptyEntries));
+        if (slug.Length == 0) slug = prefix;
+        if (!char.IsLetter(slug[0])) slug = $"{prefix}-{slug}";
+        if (slug.Length > 28) slug = slug[..28].TrimEnd('-');
+        var used = new HashSet<string>(existing, StringComparer.OrdinalIgnoreCase);
+        string id = slug;
+        for (int suffix = 2; used.Contains(id); suffix++) id = $"{slug}-{suffix}";
+        return id;
+    }
+
+    private static IReadOnlyList<UserMixDefinition> ValidMixes(IEnumerable<UserMixDefinition> source)
+        => Valid(source, new HashSet<string> { "monitor", "auxout" })
+            .Select(x => new UserMixDefinition(x.Id, x.Name)).ToList();
+
+    private static IReadOnlyList<UserChannelDefinition> ValidChannels(IEnumerable<UserChannelDefinition> source)
+        => Valid(source, new HashSet<string> { "xlr1", "xlr2", "aux" })
+            .Select(x => new UserChannelDefinition(x.Id, x.Name)).ToList();
+
+    private static IReadOnlyList<(string Id, string Name)> Valid<T>(IEnumerable<T> source, IReadOnlySet<string> reserved)
+    {
+        var result = new List<(string, string)>();
+        var ids = new HashSet<string>(reserved, StringComparer.OrdinalIgnoreCase);
+        foreach (T item in source)
+        {
+            (string id, string name) = item switch
+            {
+                UserMixDefinition m => (m.Id, m.Name),
+                UserChannelDefinition c => (c.Id, c.Name),
+                _ => ("", ""),
+            };
+            bool safe = id.Length is > 0 and <= 36 && id[0] is >= 'a' and <= 'z' &&
+                        id.All(c => c is >= 'a' and <= 'z' or >= '0' and <= '9' or '-' or '_');
+            name = name.Trim();
+            if (!safe || name.Length is 0 or > 60 || !ids.Add(id)) continue;
+            result.Add((id, name));
+        }
+        return result;
+    }
 
     private static Dictionary<string, double> Level(double monitor, double stream, double chat, double auxout)
         => new() { ["monitor"] = monitor, ["stream"] = stream, ["chat"] = chat, ["auxout"] = auxout };
@@ -103,6 +205,8 @@ public sealed record ChannelDefinition(string Id, string Name)
 
     /// <summary>PipeWire node name of the sink applications play into.</summary>
     public string SinkName => $"OpenXLR_ch_{Id}";
+    /// <summary>Post-insert internal distribution node; hardware channels use their sink directly.</summary>
+    public string FanOutSinkName => InputPair is null ? $"OpenXLR_fanout_{Id}" : SinkName;
 }
 
 /// <summary>Live mixer state pushed to clients.</summary>
@@ -147,11 +251,13 @@ public sealed record MixerState
     public IReadOnlyList<StreamAssignment> Streams { get; init; } = [];
 }
 
-public sealed record MixStatus(string Id, string Name, double Volume, bool Muted);
+public sealed record MixStatus(string Id, string Name, double Volume, bool Muted,
+    bool IsMonitor, bool IsVirtualMic, bool IsAuxPort, bool CanDelete);
 
 public sealed record ChannelStatus(string Id, string Name,
     IReadOnlyDictionary<string, double> Levels,
-    IReadOnlyList<string> MutedIn);
+    IReadOnlyList<string> MutedIn,
+    bool IsHardware, bool AcceptsApps, bool CanDelete);
 
 
 /// <summary>

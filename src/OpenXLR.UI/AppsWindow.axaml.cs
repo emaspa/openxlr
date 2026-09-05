@@ -14,7 +14,8 @@ public partial class AppsWindow : Window
         Opened += (_, _) =>
         {
             if (DataContext is MainViewModel vm)
-                ChannelPicker.ItemsSource = vm.Channels.Select(c => c.Id).ToList();
+                ChannelPicker.ItemsSource = vm.Channels.Where(c => c.AcceptsApps)
+                    .Select(c => new ChannelOption(c.Id, c.Name)).ToList();
         };
     }
 
@@ -22,8 +23,8 @@ public partial class AppsWindow : Window
     {
         if (DataContext is not MainViewModel vm) return;
         if (InstalledPicker.SelectedItem is not InstalledApp app) return;
-        if (ChannelPicker.SelectedItem is not string channel || channel.Length == 0) return;
-        vm.AddApp(app.Identity, app.Name, channel);
+        if (ChannelPicker.SelectedItem is not ChannelOption channel) return;
+        vm.AddApp(app.Identity, app.Name, channel.Id);
         InstalledPicker.SelectedItem = null;
     }
 

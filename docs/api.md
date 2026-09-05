@@ -20,12 +20,15 @@ Messages from the daemon, each a JSON object with a `type` field:
 
 | Type | When | Content |
 |---|---|---|
-| `state` | on connect and on every change | `daemonVersion`, device state, capabilities, mixer state, the device list, the app registry, profile names, `activeProfile` (the profile last recalled or saved for the active device; not cleared by later manual changes), `recallOnConnect` (the profile recalled when the device connects, or null) |
+| `state` | on connect and on every change | `daemonVersion`, protocol `features`, device state, capabilities, mixer state, the device list, the app registry, profile names, `activeProfile` (the profile last recalled or saved for the active device; not cleared by later manual changes), `recallOnConnect` (the profile recalled when the device connects, or null) |
 | `meters` | 15 Hz while the mixer is built | live stereo levels per channel and mix |
 | `plugins` | in answer to `listPlugins` | the installed LV2 plugins with their controls; `supported` is false, with `unsupportedFeatures` listed, for a plugin that needs a host feature the PipeWire chain lacks |
 | `error` | when a command is rejected | `message` |
+| `commandResult` | after a command carrying `requestId` | the same `requestId` and a nullable `error`; an authoritative `state` is sent first |
 
-Commands are single JSON objects with a `cmd` field:
+Commands are single JSON objects with a `cmd` field. Mixer commands may add a
+`requestId`; the daemon then returns a correlated `commandResult`. The layout
+editor uses this so it reports success only after `mixer.json` is durable.
 
 | Command | Fields | Purpose |
 |---|---|---|
@@ -36,6 +39,12 @@ Commands are single JSON objects with a `cmd` field:
 | `setLevel` | `channel`, `mix`, `value` | one send fader |
 | `setChannelMuted` | `channel`, `mix`, `value` | one send mute |
 | `setMixVolume` / `setMixMuted` | `mix`, `value` | mix masters |
+| `createChannel` | `name` | add an application channel incrementally without replacing existing channel or virtual-microphone nodes |
+| `renameChannel` | `channel`, `name` | update its node descriptions while keeping its stable id and references |
+| `deleteChannel` | `channel` | delete an application channel; assigned apps move to the first remaining application channel |
+| `createMix` | `name` | add a virtual output mix and publish its `OpenXLR <name>` recording device |
+| `renameMix` | `mix`, `name` | update an output's node descriptions while keeping its stable id and sends |
+| `deleteMix` | `mix` | delete a user-created virtual output, its sends, inserts and PipeWire devices |
 | `setMonitorOutputs` | `devices[]` | every sink the monitor mix feeds |
 | `setMonitorOutput` | `device` | a single monitor sink; `null` disconnects the route |
 | `setAuxPortEnabled` | `value` | send the Aux mix to the USB Aux port |
@@ -61,9 +70,9 @@ handler is `WebSocketHub.cs` and the message shapes are in
 
 All under `~/.config/openxlr/` (or `$XDG_CONFIG_HOME/openxlr/`):
 
-- `mixer.json`: every mixer decision: levels, mutes, device choices, the
-  app registry, enforced defaults, the software low cut, the insert
-  chains. Written by the daemon.
+- `mixer.json`: every mixer decision: the user-managed channel/output
+  layout, levels, mutes, device choices, the app registry, enforced
+  defaults, the software low cut, and insert chains. Written by the daemon.
 - `profiles/<vid-pid>/<name>.json`: the named scenes, one file each
 - `profiles/<vid-pid>/recall-on-connect`: the name of the profile
   recalled when that device connects, when one is chosen

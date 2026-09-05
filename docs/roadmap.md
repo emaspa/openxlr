@@ -38,17 +38,14 @@ feature that is measured over one that is described.
 
 ## Next: mixer layout and customization
 
-The submixer's shape is fixed today (nine channels, four mixes). Making it
-the user's own is the next block of work, and it is also where the UI
-work lives.
+The submixer can now be shaped around the user's applications and outputs.
 
-- [ ] Editable application channels and virtual-microphone mixes: add,
-  rename, delete, reorder, with stable ids separate from display names so
-  PipeWire node names, profiles and Stream Deck keys survive a rename.
-  Hardware inputs and the Monitor and Aux buses stay structural. A pull
-  request (#10) implements this; it lands once renames no longer rebuild
-  the whole graph (a rename is a description change) and creation adds
-  nodes incrementally, so existing streams are never dropped.
+- [x] Editable application channels and virtual-microphone mixes: add,
+  rename and delete with stable ids separate from display names. Hardware
+  inputs and the Monitor and Aux buses stay structural. Channel creation is
+  incremental and renames update descriptions, so existing application and
+  virtual-microphone endpoints are not dropped.
+- [ ] Reorder editable channels and mixes without changing their stable ids.
 - [ ] Per-mix customization: icon, colour and order per mix and channel,
   hide a channel without deleting its routing, a compact layout that
   keeps one selected channel visible. Icons and colours also reach the

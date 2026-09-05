@@ -1,0 +1,35 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:OpenXLR.UI"
+        x:Class="OpenXLR.UI.ChannelEditorWindow" x:DataType="vm:ChannelViewModel"
+        Title="{Binding Name}" Width="480" Height="520" MinWidth="360" MinHeight="280"
+        Background="#16181d" WindowStartupLocation="CenterOwner">
+  <DockPanel Margin="20">
+    <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,16">
+      <TextBlock Text="{Binding Name}" FontSize="22" FontWeight="Bold" Foreground="#e6e9f0"/>
+      <TextBlock Text="Each send affects only this channel in the selected output mix."
+                 TextWrapping="Wrap" Foreground="#8b93a7"/>
+      <TextBlock Name="ConnectionNote" Foreground="#e0a84a" TextWrapping="Wrap"/>
+    </StackPanel>
+    <Button DockPanel.Dock="Bottom" Content="Close" Click="OnClose" HorizontalAlignment="Right"/>
+    <ScrollViewer>
+      <ItemsControl Name="SendsEditor" ItemsSource="{Binding Sends}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:SendViewModel">
+            <Border Background="#23262f" Padding="14" CornerRadius="8" Margin="0,0,0,10"
+                    IsVisible="{Binding Visible}">
+              <StackPanel Spacing="8">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Text="{Binding MixName}" Foreground="#e6e9f0" FontWeight="SemiBold"/>
+                  <TextBlock Grid.Column="1" Text="{Binding LevelText}" Foreground="#4fb3d9"/>
+                </Grid>
+                <Slider Minimum="0" Maximum="1" Value="{Binding Level, Mode=TwoWay}"/>
+                <ToggleSwitch Content="Mute this send" IsChecked="{Binding Muted, Mode=TwoWay}"/>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+  </DockPanel>
+</Window>

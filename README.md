@@ -46,17 +46,17 @@ Collect diagnostics).
   Devices without onboard DSP get a software low cut, ClipGuard and
   gain lock in the PipeWire layer instead.
 - **Submixer** built from PipeWire nodes (null sinks, remap sources,
-  filter chains), no kernel modules. Channels for the hardware inputs
-  and for application groups (Game, Music, Browser, System, Voice Chat,
-  SFX); four mixes: Monitor, Stream and Chat (published as virtual
-  microphones) and Aux (sent to the USB Aux port); per-send levels and
-  mutes, level meters, the monitor mix on several outputs at once.
+  filter chains), no kernel modules. Hardware inputs plus user-managed
+  application channels that can be added, renamed, or removed; Monitor and Aux plus any number of user-managed
+  output mixes published as virtual microphones; per-send levels and
+  mutes, level meters, and the monitor mix on several outputs at once.
 - **Inserts**: LV2 plugin chains on each XLR input and each mix, with a
   plugin picker, generated control windows and bypass LEDs.
 - **Application routing**: audio clients are detected from their
   PipeWire registration and routed to a channel by name rules, with the
   assignment remembered per app. Electron apps are identified by their
-  process binary rather than the "Chromium" name they report.
+  process binary rather than the "Chromium" name they report. Routing can
+  also be changed directly on the application nodes in the Flow window.
 - **Profiles**: named scenes holding the hardware settings and the
   whole submix (levels, mutes, outputs, insert chains), saved per device
   and recalled from the UI, the API or a Stream Deck key. One profile
@@ -65,7 +65,8 @@ Collect diagnostics).
 - **OpenDeck plugin**: key and dial actions for every switch, mute,
   level and insert, rendered with level meters and status LEDs. It is a
   client of the daemon's API, so it reflects changes made in the UI or
-  on the hardware.
+  on the hardware. Mixer choices come from live channel and output state,
+  so added, renamed and removed layout entries appear correctly.
 - **Daemon and UI**: the daemon owns the device and the graph, keeps
   running with the window closed, re-asserts the chosen default sink
   and source once a second, and serves a WebSocket API on

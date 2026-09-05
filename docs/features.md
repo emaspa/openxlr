@@ -64,20 +64,26 @@ does not reach the speakers until unmuted.
 ## Submixer
 
 Built from PipeWire nodes, no kernel modules or custom drivers:
-- Channels for the hardware inputs (XLR 1, XLR 2, Aux In) and for
-  application groups (Game, Music, Browser, System, Voice Chat, SFX)
-- Four mixes: Monitor (what you hear), Stream and Chat (published as the
-  capture devices `OpenXLR Stream` and `OpenXLR Chat`, selectable in OBS
-  or Discord like a microphone), and Aux (what a second computer on the
-  USB Aux port receives)
+- Structural channels for the hardware inputs (XLR 1, XLR 2, Aux In) and
+  user-managed application channels. Game, Music, Browser, System, Voice
+  Chat, and SFX are the initial layout; they can be added, renamed, or removed.
+- Structural Monitor (what you hear) and Aux (what a second computer on
+  the USB Aux port receives) mixes, plus user-managed output mixes. Stream
+  and Chat are the initial outputs; every added output is published as an
+  `OpenXLR <name>` virtual microphone for OBS, Discord, or another app.
 - Per-channel, per-mix send levels and mutes; per-mix masters
 - The monitor mix can play on several outputs at once, hardware outputs
   included
 - Level meters throughout, dB-scaled, pushed at 15 Hz
 
-Each channel is a combine sink with one internal stream per mix; that
-stream's volume is the send fader. The 9 by 4 matrix is 13 sinks and no
-loopback processes. Details in [architecture.md](architecture.md).
+Each channel has an internal combine sink with one stream per mix; that
+stream's volume is the send fader. Application audio enters through a stable
+public sink in front of that fan-out. The Channels & outputs dialog stores
+stable internal ids: adding a channel is incremental and renames update only
+descriptions, so running apps and virtual microphones retain their nodes.
+Deleting a matrix row or column and adding an output may briefly rebuild the
+owned graph. Details in
+[architecture.md](architecture.md).
 
 On the Wave XLR Pro the headphone jacks are fed by a mix inside the
 device. Whenever a Pro jack is a monitor output the daemon makes sure
@@ -138,6 +144,8 @@ restores the split profile when it stops.
   Discord
 - A Manage dialog shows the full registry, and an installed-application
   picker pre-assigns channels from `.desktop` entries
+- The Flow graph puts a channel picker on every running application node,
+  so an app can be assigned while its signal path is visible
 
 ## Profiles
 
@@ -155,7 +163,8 @@ not part of a profile, so recalling one does not rewire the desktop.
 [OpenDeck](https://github.com/nekename/OpenDeck) plugin with two
 actions, Dial and Toggle (key). Both are clients of the daemon's
 WebSocket API, so they reflect changes made in the UI or on the
-hardware.
+hardware. Their mixer choices are generated from the live channel and
+mix lists, using stable ids for saved actions and current names for labels.
 
 Dials render a touch panel: a knob with a needle, a level meter, the
 value readout, and a mute overlay. Every send, mix master, gain,
@@ -196,7 +205,7 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
 
 ## Other
 
-- Audio Flow window: a graph of the current routing, sources through
+- Audio Flow window: an interactive graph of the current routing, sources through
   outputs, with the filter chains (built-in low cut and ClipGuard, LV2
   inserts) drawn where they sit in the path and each stage marked active,
   bypassed or broken

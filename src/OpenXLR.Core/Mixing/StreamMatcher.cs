@@ -63,6 +63,9 @@ public sealed class StreamMatcher
 
     public void ClearOverride(string identity) => _overrides.Remove(identity);
 
+    /// <summary>Replace the saved routing table while rebuilding the graph.</summary>
+    public void ClearOverrides() => _overrides.Clear();
+
     public IReadOnlyDictionary<string, string> Overrides => _overrides;
 
     /// <summary>The channel this stream should play into.</summary>

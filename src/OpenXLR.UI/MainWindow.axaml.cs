@@ -95,6 +95,9 @@ public partial class MainWindow : Window
     private void OnManageApps(object? sender, RoutedEventArgs e)
         => new AppsWindow { DataContext = _vm }.ShowDialog(this);
 
+    private void OnMixerSetup(object? sender, RoutedEventArgs e)
+        => new MixerSetupWindow { DataContext = _vm }.ShowDialog(this);
+
     private void OnAbout(object? sender, RoutedEventArgs e)
         => new AboutWindow().ShowDialog(this);
 

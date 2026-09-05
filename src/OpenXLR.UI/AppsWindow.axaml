@@ -39,7 +39,7 @@
                              ToolTip.Tip="{Binding Identity}"/>
                   <ComboBox Grid.Column="3" HorizontalAlignment="Stretch"
                             ItemsSource="{Binding Channels}"
-                            SelectedItem="{Binding ChannelId, Mode=TwoWay}"/>
+                            SelectedItem="{Binding SelectedChannel, Mode=TwoWay}"/>
                   <Button Grid.Column="5" Content="Forget" Padding="10,3" FontSize="12"
                           Click="OnForget"/>
                 </Grid>

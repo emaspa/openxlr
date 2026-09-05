@@ -21,6 +21,9 @@ public sealed record Command
     /// </summary>
     [JsonPropertyName("cmd")] public string Cmd { get; init; } = "";
 
+    /// <summary>Optional correlation ID for an acknowledged mixer command.</summary>
+    [JsonPropertyName("requestId")] public string? RequestId { get; init; }
+
     /// <summary>For "set": the control name (see <see cref="ControlNames"/>).</summary>
     [JsonPropertyName("control")] public string? Control { get; init; }
 
@@ -56,7 +59,8 @@ public sealed record Command
     [JsonPropertyName("source")] public string? Source { get; init; }
 
     /// <summary>"saveProfile" / "loadProfile" / "deleteProfile": the profile name;
-    /// "setRecallOnConnect": the profile to recall on connect, empty to clear.</summary>
+    /// "setRecallOnConnect": the profile to recall on connect, empty to clear;
+    /// create/rename layout commands: the display name.</summary>
     [JsonPropertyName("name")] public string? Name { get; init; }
 
     /// <summary>"setInserts": the channel's whole insert chain, in order.</summary>
@@ -88,6 +92,8 @@ public sealed record StateMessage
     /// restart prompt; a daemon older than 0.1.13 omits the field).
     /// </summary>
     [JsonPropertyName("daemonVersion")] public string? DaemonVersion { get; init; }
+    /// <summary>Protocol features, independent of release and hardware capabilities.</summary>
+    [JsonPropertyName("features")] public string[] Features { get; init; } = [];
     [JsonPropertyName("connected")] public bool Connected { get; init; }
     [JsonPropertyName("device")] public DeviceDescriptor? Device { get; init; }
     [JsonPropertyName("capabilities")] public DeviceCapabilities? Capabilities { get; init; }
@@ -144,6 +150,12 @@ public sealed record ErrorMessage
 
     [JsonPropertyName("type")] public string Type => "error";
     [JsonPropertyName("message")] public string Message { get; }
+}
+
+/// <summary>Correlated result for a command that supplied a requestId.</summary>
+public sealed record CommandResultMessage(string RequestId, string? Error)
+{
+    [JsonPropertyName("type")] public string Type => "commandResult";
 }
 
 /// <summary>Canonical control names accepted by "set".</summary>

@@ -4,19 +4,19 @@ namespace OpenXLR.Core.Mixing;
 /// Builds and maintains the submix graph, entirely from PipeWire filter sinks so
 /// every node is clocked by construction and audio always flows:
 ///
-///   application -> channel (combine sink over all mixes) -> mixes (null
-///   sinks) -> direct port links -> the chosen output device.
+///   application -> stable public channel sink -> optional inserts -> internal
+///   fan-out (combine sink over all mixes) -> mix buses -> output devices.
 ///
 /// A combine sink runs one internal stream per mix it feeds, and each of those
 /// streams has its own volume and mute: those streams ARE the faders, so the
-/// whole matrix needs only 7 channel sinks and 3 mix sinks. Everything is
+/// whole matrix needs one sink per channel plus one per mix. Everything is
 /// clocked through the output device via the direct links (an earlier
 /// loopback-based design stalled because its islands had no clock driver, and
 /// a remap-cell design worked but exposed 21 extra sinks, which overwhelmed
 /// desktop applets and helped exhaust pipewire-pulse's file descriptors).
 ///
-/// The graph is built once; level changes touch only stream volumes, so audio
-/// is never interrupted.
+/// Level changes touch only stream volumes. New application channels are added
+/// alongside the running graph, and renames change descriptions only.
 /// </summary>
 public sealed class Mixer : IDisposable, ILayoutInfo
 {
@@ -74,6 +74,10 @@ public sealed class Mixer : IDisposable, ILayoutInfo
 
     // channel id -> its combine module; "channel|mix" -> that leg's sink-input index
     private readonly Dictionary<string, uint> _combineModules = [];
+    private readonly Dictionary<string, uint> _channelInputModules = [];
+    private readonly Dictionary<string, uint> _mixModules = [];
+    private readonly Dictionary<string, uint> _mixPostModules = [];
+    private readonly Dictionary<string, uint> _virtualMicModules = [];
     private readonly Dictionary<string, int> _legIndex = [];
 
     /// <summary>Map every combine's internal streams to their (channel, mix) cells.</summary>
@@ -115,7 +119,8 @@ public sealed class Mixer : IDisposable, ILayoutInfo
             // Mixes first: the cells attach to them as masters.
             foreach (MixDefinition mix in config.Mixes)
             {
-                _pw.CreateNullSink(mix.SinkName, $"OpenXLR {mix.Name}");
+                _mixModules[mix.Id] = _pw.CreateNullSink(
+                    mix.SinkName, $"OpenXLR {mix.Name} (internal mix bus)", isInternal: true);
                 _mixVolume[mix.Id] = mix.Volume;
                 if (mix.Muted) _mixMuted.Add(mix.Id);
             }
@@ -131,10 +136,12 @@ public sealed class Mixer : IDisposable, ILayoutInfo
                     if (ch.MutedIn.Contains(mix.Id)) _muted.Add(cell);
                     _cells.Add(cell);
                 }
-                _combineModules[ch.Id] = _pw.CreateCombineSink(ch.SinkName,
+                if (ch.InputPair is null)
+                    _channelInputModules[ch.Id] = _pw.CreateNullSink(ch.SinkName, $"OpenXLR {ch.Name}");
+                _combineModules[ch.Id] = _pw.CreateCombineSink(ch.FanOutSinkName,
                     config.Mixes.Select(m => m.SinkName),
-                    $"OpenXLR {ch.Name}",
-                    visible: ch.InputPair is null);   // hardware inputs are not playback devices
+                    $"OpenXLR {ch.Name} (internal distribution)",
+                    needsMonitor: ch.InputPair is not null);
             }
             DiscoverLegsLocked();
 
@@ -147,8 +154,10 @@ public sealed class Mixer : IDisposable, ILayoutInfo
             // the capture device an app is recording from.
             foreach (MixDefinition mix in config.Mixes.Where(m => m.Kind == MixKind.VirtualMic))
             {
-                _pw.CreateNullSink(mix.PostSinkName, $"OpenXLR {mix.Name} (post)");
-                _pw.CreateVirtualMic(mix.VirtualMicName, $"{mix.PostSinkName}.monitor", $"OpenXLR {mix.Name}");
+                _mixPostModules[mix.Id] = _pw.CreateNullSink(
+                    mix.PostSinkName, $"OpenXLR {mix.Name} (internal capture tap)", isInternal: true);
+                _virtualMicModules[mix.Id] = _pw.CreateVirtualMic(
+                    mix.VirtualMicName, $"{mix.PostSinkName}.monitor", $"OpenXLR {mix.Name}");
             }
 
             // Meter every channel and mix so the UI can show what is flowing.
@@ -163,6 +172,110 @@ public sealed class Mixer : IDisposable, ILayoutInfo
             WireInputFeedsLocked();
             WireAuxRouteLocked();
             foreach (MixDefinition mix in config.Mixes) WireMixChainLocked(mix);
+            foreach (ChannelDefinition channel in config.Channels.Where(c => c.InputPair is null))
+                WireAppChainLocked(channel);
+        }
+    }
+
+    /// <summary>
+    /// Add one application channel without rebuilding the existing graph.
+    /// Existing application streams stay attached to their public sinks and
+    /// every virtual microphone remains the same PipeWire node.
+    /// </summary>
+    public void AddApplicationChannel(string id, string name)
+    {
+        lock (_gate)
+        {
+            if (!_built) throw new InvalidOperationException("mixer is not built");
+            if (_config.Channels.Any(c => c.Id.Equals(id, StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException($"channel '{id}' already exists");
+
+            var levels = _config.Mixes.ToDictionary(m => m.Id, _ => 1.0);
+            var channel = new ChannelDefinition(id, name) { Levels = levels };
+            uint inputModule = 0, fanOutModule = 0;
+            MixerConfig previous = _config;
+            try
+            {
+                inputModule = _pw.CreateNullSink(channel.SinkName, $"OpenXLR {channel.Name}");
+                fanOutModule = _pw.CreateCombineSink(channel.FanOutSinkName,
+                    _config.Mixes.Select(m => m.SinkName),
+                    $"OpenXLR {channel.Name} (internal distribution)", needsMonitor: false);
+
+                _config = _config with { Channels = [.. _config.Channels, channel] };
+                _channelInputModules[id] = inputModule;
+                _combineModules[id] = fanOutModule;
+                foreach (MixDefinition mix in _config.Mixes)
+                {
+                    string cell = Cell(id, mix.Id);
+                    _levels[cell] = 1.0;
+                    _cells.Add(cell);
+                }
+                DiscoverLegsLocked();
+                foreach (MixDefinition mix in _config.Mixes) ApplyCellLocked(id, mix.Id);
+                WireAppChainLocked(channel);
+                _meters.Add($"ch:{id}", channel.SinkName);
+            }
+            catch
+            {
+                if (_appFeeds.Remove(id, out PortLink? feed)) _pw.Unlink(feed);
+                if (_appOutputs.Remove(id, out PortLink? output)) _pw.Unlink(output);
+                if (_chains.Remove(id, out FilterHandle? chain)) _pw.StopFilter(chain);
+                _meters.Remove($"ch:{id}");
+                _channelInputModules.Remove(id);
+                _combineModules.Remove(id);
+                foreach (string cell in _cells.Where(c => c.StartsWith(id + "|", StringComparison.Ordinal)).ToList())
+                {
+                    _cells.Remove(cell);
+                    _levels.Remove(cell);
+                    _muted.Remove(cell);
+                    _legIndex.Remove(cell);
+                }
+                _config = previous;
+                if (fanOutModule != 0) _pw.UnloadModule(fanOutModule);
+                if (inputModule != 0) _pw.UnloadModule(inputModule);
+                DiscoverLegsLocked();
+                throw;
+            }
+        }
+    }
+
+    /// <summary>Rename an application channel by changing descriptions only.</summary>
+    public void RenameApplicationChannel(string id, string name)
+    {
+        lock (_gate)
+        {
+            int index = _config.Channels.ToList().FindIndex(c => c.Id == id);
+            if (index < 0) throw new InvalidOperationException($"unknown channel '{id}'");
+            ChannelDefinition channel = _config.Channels[index];
+            if (channel.InputPair is not null)
+                throw new InvalidOperationException("hardware input channels cannot be renamed");
+
+            _pw.SetSinkDescription(channel.SinkName, $"OpenXLR {name}");
+            _pw.SetSinkDescription(channel.FanOutSinkName,
+                $"OpenXLR {name} (internal distribution)");
+            var channels = _config.Channels.ToList();
+            channels[index] = channel with { Name = name };
+            _config = _config with { Channels = channels };
+        }
+    }
+
+    /// <summary>Rename a user output by updating the existing node descriptions.</summary>
+    public void RenameVirtualMix(string id, string name)
+    {
+        lock (_gate)
+        {
+            int index = _config.Mixes.ToList().FindIndex(m => m.Id == id);
+            if (index < 0) throw new InvalidOperationException($"unknown mix '{id}'");
+            MixDefinition mix = _config.Mixes[index];
+            if (mix.Kind != MixKind.VirtualMic)
+                throw new InvalidOperationException("Monitor and hardware Aux mixes cannot be renamed");
+
+            _pw.SetSinkDescription(mix.SinkName, $"OpenXLR {name} (internal mix bus)");
+            _pw.SetSinkDescription(mix.PostSinkName, $"OpenXLR {name} (internal capture tap)");
+            _pw.SetSourceDescription(mix.VirtualMicName, $"OpenXLR {name}");
+            var mixes = _config.Mixes.ToList();
+            mixes[index] = mix with { Name = name };
+            _config = _config with { Mixes = mixes };
         }
     }
 
@@ -322,7 +435,8 @@ public sealed class Mixer : IDisposable, ILayoutInfo
             if (!nextFeeds.TryGetValue(key, out PortLink? keep) || !ReferenceEquals(old, keep))
                 _pw.Unlink(old);
         foreach (PortLink old in _chainOuts.Values) _pw.Unlink(old);
-        foreach (string key in _chains.Keys.Where(k => !k.StartsWith("mix:", StringComparison.Ordinal)).ToList())
+        foreach (string key in _chains.Keys.Where(k =>
+                     _config.Channels.Any(c => c.Id == k && c.InputPair is not null)).ToList())
         {
             _pw.StopFilter(_chains[key]);
             _chains.Remove(key);
@@ -381,7 +495,7 @@ public sealed class Mixer : IDisposable, ILayoutInfo
     {
         lock (_gate)
         {
-            if (!_built || _chains.Count == 0) return false;
+            if (!_built) return false;
             bool changed = false;
             // Mix chains heal individually; input chains re-wire the whole input path.
             foreach (MixDefinition mix in _config.Mixes)
@@ -393,7 +507,25 @@ public sealed class Mixer : IDisposable, ILayoutInfo
                     changed = true;
                 }
             }
-            bool inputBroken = _chains.Where(e => !e.Key.StartsWith("mix:", StringComparison.Ordinal)).Any(e => e.Value.Process.HasExited)
+            foreach (ChannelDefinition channel in _config.Channels.Where(c => c.InputPair is null))
+            {
+                bool wantsChain = InsertsFor(channel.Id).Any(i => !i.Bypass);
+                bool shouldRunChain = wantsChain && !_insertErrors.ContainsKey(channel.Id);
+                bool feedBroken = !_appFeeds.TryGetValue(channel.Id, out PortLink? feed)
+                    || _pw.EnsureLinks(feed) == LinkHealth.Broken;
+                bool chainBroken = shouldRunChain &&
+                    (!_chains.TryGetValue(channel.Id, out FilterHandle? appChain)
+                     || appChain.Process.HasExited
+                     || !_appOutputs.TryGetValue(channel.Id, out PortLink? output)
+                     || _pw.EnsureLinks(output) == LinkHealth.Broken);
+                if (feedBroken || chainBroken)
+                {
+                    WireAppChainLocked(channel);
+                    changed = true;
+                }
+            }
+            bool inputBroken = _chains.Where(e => _config.Channels.Any(c => c.Id == e.Key && c.InputPair is not null))
+                    .Any(e => e.Value.Process.HasExited)
                 || _chainOuts.Values.Any(l => _pw.EnsureLinks(l) == LinkHealth.Broken);
             if (inputBroken) { WireInputFeedsLocked(); changed = true; }
             return changed;
@@ -488,14 +620,16 @@ public sealed class Mixer : IDisposable, ILayoutInfo
     private readonly Dictionary<string, PortLink> _chainOuts = new();   // input chains: source half into the channel sink
     private readonly Dictionary<string, PortLink> _mixTaps = new();     // mix key: mix monitor into chain or post sink
     private readonly Dictionary<string, PortLink> _mixPostLinks = new(); // mix key: chain source into the post sink
+    private readonly Dictionary<string, PortLink> _appFeeds = new();     // public app sink into chain/fan-out
+    private readonly Dictionary<string, PortLink> _appOutputs = new();   // app chain into fan-out
 
     // Plugin insert chains by key, and why a key's last build fell back to
     // running without its inserts.
     private readonly Dictionary<string, List<InsertDefinition>> _inserts = new();
     private readonly Dictionary<string, string> _insertErrors = new();
 
-    /// <summary>Insert keys: the mono XLR inputs (Aux In is stereo) and "mix:&lt;id&gt;" for every mix.</summary>
-    private bool IsInsertChannel(string key) => key is "xlr1" or "xlr2" || MixForKey(key) is not null;
+    /// <summary>Insert keys: every channel ID and "mix:&lt;id&gt;" for every mix.</summary>
+    private bool IsInsertChannel(string key) => _config.Channels.Any(c => c.Id == key) || MixForKey(key) is not null;
 
     // ILayoutInfo, for command validation ahead of the mixer methods.
     public bool HasChannel(string id) { lock (_gate) return _config.Channels.Any(c => c.Id == id); }
@@ -507,6 +641,42 @@ public sealed class Mixer : IDisposable, ILayoutInfo
         => key.StartsWith("mix:", StringComparison.Ordinal) ? _config.Mixes.FirstOrDefault(m => m.Id == key[4..]) : null;
 
     private static string MixKey(MixDefinition mix) => $"mix:{mix.Id}";
+
+    /// <summary>
+    /// Keep the public application sink stable, process it once, then feed the
+    /// internal combine whose legs are the per-mix send faders.
+    /// </summary>
+    private void WireAppChainLocked(ChannelDefinition channel)
+    {
+        string key = channel.Id;
+        if (_appFeeds.Remove(key, out PortLink? feed)) _pw.Unlink(feed);
+        if (_appOutputs.Remove(key, out PortLink? output)) _pw.Unlink(output);
+        if (_chains.Remove(key, out FilterHandle? old)) _pw.StopFilter(old);
+        _insertErrors.Remove(key);
+        if (InsertsFor(key).Any(i => !i.Bypass))
+        {
+            try
+            {
+                FilterHandle chain = _pw.CreateMixChain($"ch_{key}", $"OpenXLR {channel.Name} Inserts", InsertsFor(key));
+                _chains[key] = chain;
+                _appFeeds[key] = _pw.LinkNodes(channel.SinkName, "monitor", chain.SinkName, "playback");
+                _appOutputs[key] = _pw.LinkNodes(chain.SourceName, "capture", channel.FanOutSinkName, "input");
+                if (_appFeeds[key].Pairs.Count < 2 || _appOutputs[key].Pairs.Count < 2)
+                    throw new InvalidOperationException("Could not connect the application channel's stereo insert chain.");
+                return;
+            }
+            catch (Exception ex)
+            {
+                if (_appFeeds.Remove(key, out PortLink? failedFeed)) _pw.Unlink(failedFeed);
+                if (_appOutputs.Remove(key, out PortLink? failedOutput)) _pw.Unlink(failedOutput);
+                if (_chains.Remove(key, out FilterHandle? failed)) _pw.StopFilter(failed);
+                _insertErrors[key] = ex.Message;
+            }
+        }
+        _appFeeds[key] = _pw.LinkNodes(channel.SinkName, "monitor", channel.FanOutSinkName, "input");
+        if (_appFeeds[key].Pairs.Count < 2)
+            throw new InvalidOperationException($"Could not connect channel '{key}' to its sends.");
+    }
 
     /// <summary>Where a mix's consumers should read from: its insert chain when one runs, else its own monitor.</summary>
     private (string Node, string Prefix) MixTapLocked(MixDefinition mix)
@@ -674,6 +844,8 @@ public sealed class Mixer : IDisposable, ILayoutInfo
     private void RewireInsertKeyLocked(string key)
     {
         if (MixForKey(key) is MixDefinition mix) WireMixChainLocked(mix);
+        else if (_config.Channels.FirstOrDefault(c => c.Id == key && c.InputPair is null) is { } appChannel)
+            WireAppChainLocked(appChannel);
         else if (IsInsertChannel(key)) WireInputFeedsLocked();
     }
 
@@ -770,6 +942,10 @@ public sealed class Mixer : IDisposable, ILayoutInfo
         {
             return new MixerSettings
             {
+                UserChannels = [.. _config.Channels.Where(c => c.InputPair is null)
+                    .Select(c => new UserChannelDefinition(c.Id, c.Name))],
+                UserMixes = [.. _config.Mixes.Where(m => m.Kind == MixKind.VirtualMic)
+                    .Select(m => new UserMixDefinition(m.Id, m.Name))],
                 MixVolumes = new Dictionary<string, double>(_mixVolume),
                 MixMuted = [.. _mixMuted],
                 Levels = new Dictionary<string, double>(_levels),
@@ -797,7 +973,8 @@ public sealed class Mixer : IDisposable, ILayoutInfo
             foreach ((string mixId, double vol) in s.MixVolumes)
                 if (_mixVolume.ContainsKey(mixId)) _mixVolume[mixId] = Math.Clamp(vol, 0, 1);
             _mixMuted.Clear();
-            foreach (string mixId in s.MixMuted) _mixMuted.Add(mixId);
+            foreach (string mixId in s.MixMuted)
+                if (_mixVolume.ContainsKey(mixId)) _mixMuted.Add(mixId);
 
             foreach ((string cell, double lvl) in s.Levels)
                 if (_cells.Contains(cell)) _levels[cell] = Math.Clamp(lvl, 0, 1);
@@ -805,8 +982,24 @@ public sealed class Mixer : IDisposable, ILayoutInfo
             foreach (string cell in s.ChannelMuted)
                 if (_cells.Contains(cell)) _muted.Add(cell);
 
+            var validAppChannels = _config.Channels.Where(c => c.InputPair is null).Select(c => c.Id)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            string fallbackChannel = validAppChannels.FirstOrDefault()
+                ?? _config.Channels.FirstOrDefault()?.Id ?? "system";
+            Matcher.ClearOverrides();
             foreach ((string identity, string channelId) in s.AppOverrides)
-                Matcher.SetOverride(StreamMatcher.MigrateIdentity(Sanitize(identity)), channelId);
+                Matcher.SetOverride(StreamMatcher.MigrateIdentity(Sanitize(identity)),
+                    validAppChannels.Contains(channelId) ? channelId : fallbackChannel);
+
+            // A live reconfiguration keeps the registry in memory. Move any
+            // app whose channel was removed onto the safe application channel.
+            foreach ((string identity, StreamAssignment app) in _apps.ToList())
+            {
+                string channel = Matcher.Overrides.TryGetValue(identity, out string? assigned)
+                    ? assigned
+                    : validAppChannels.Contains(app.ChannelId) ? app.ChannelId : fallbackChannel;
+                _apps[identity] = app with { ChannelId = channel };
+            }
 
             // Remembered apps come back inactive until a stream appears.
             // Identities saved before the "(deleted)" fix are migrated here so
@@ -815,8 +1008,11 @@ public sealed class Mixer : IDisposable, ILayoutInfo
             {
                 string identity = StreamMatcher.MigrateIdentity(Sanitize(app.Identity));
                 if (PipeWireAdapter.IsPlumbingIdentity(identity)) continue;   // pre-filter leftovers
+                string channel = validAppChannels.Contains(app.ChannelId) ? app.ChannelId : fallbackChannel;
                 if (!_apps.ContainsKey(identity))
-                    _apps[identity] = new StreamAssignment(0, 0, Sanitize(app.Label), identity, app.ChannelId) { Active = false, Running = false };
+                    _apps[identity] = new StreamAssignment(0, 0, Sanitize(app.Label), identity, channel) { Active = false, Running = false };
+                else
+                    _apps[identity] = _apps[identity] with { ChannelId = channel };
             }
 
             static string Sanitize(string v) => v.EndsWith(" (deleted)", StringComparison.Ordinal) ? v[..^10] : v;
@@ -856,13 +1052,11 @@ public sealed class Mixer : IDisposable, ILayoutInfo
                     rewireInputs = true;
                 }
             }
-            if (s.Inserts.Count > 0)
-            {
-                foreach ((string channel, List<InsertDefinition> list) in s.Inserts)
-                    _inserts[channel] = [.. list];
-                rewireInputs = true;
-                rewireMixes = true;
-            }
+            _inserts.Clear();
+            foreach ((string channel, List<InsertDefinition> list) in s.Inserts)
+                if (IsInsertChannel(channel)) _inserts[channel] = [.. list];
+            rewireInputs = true;
+            rewireMixes = true;
             if (rewireInputs) WireInputFeedsLocked();
             if (rewireMixes)
                 foreach (MixDefinition mix in _config.Mixes) WireMixChainLocked(mix);
@@ -904,7 +1098,8 @@ public sealed class Mixer : IDisposable, ILayoutInfo
             foreach ((string mixId, double vol) in s.MixVolumes)
                 if (_mixVolume.ContainsKey(mixId)) _mixVolume[mixId] = Math.Clamp(vol, 0, 1);
             _mixMuted.Clear();
-            foreach (string mixId in s.MixMuted) _mixMuted.Add(mixId);
+            foreach (string mixId in s.MixMuted)
+                if (_mixVolume.ContainsKey(mixId)) _mixMuted.Add(mixId);
 
             foreach ((string cell, double lvl) in s.Levels)
                 if (_cells.Contains(cell)) _levels[cell] = Math.Clamp(lvl, 0, 1);
@@ -941,7 +1136,7 @@ public sealed class Mixer : IDisposable, ILayoutInfo
             {
                 _inserts.Clear();
                 foreach ((string channel, List<InsertDefinition> list) in s.Inserts)
-                    _inserts[channel] = [.. list];
+                    if (IsInsertChannel(channel)) _inserts[channel] = [.. list];
                 rewireInputs = true;
                 rewireMixes = true;
             }
@@ -1253,6 +1448,7 @@ public sealed class Mixer : IDisposable, ILayoutInfo
 
                 string channelId = Matcher.Match(s);
                 ChannelDefinition? ch = _config.Channels.FirstOrDefault(c => c.Id == channelId)
+                                        ?? _config.Channels.FirstOrDefault(c => c.InputPair is null)
                                         ?? _config.Channels.FirstOrDefault();
                 if (ch is null) continue;
 
@@ -1296,8 +1492,14 @@ public sealed class Mixer : IDisposable, ILayoutInfo
                 runningIdentities.Add(identity);
                 if (!_apps.ContainsKey(identity))
                 {
+                    string matched = Matcher.Match(client);
+                    string channel = _config.Channels.Any(c => c.Id == matched && c.InputPair is null)
+                        ? matched
+                        : _config.Channels.FirstOrDefault(c => c.InputPair is null)?.Id
+                          ?? _config.Channels.FirstOrDefault()?.Id ?? "system";
                     _apps[identity] = new StreamAssignment(0, 0, client.Label, identity,
-                        Matcher.Match(client)) { Active = false, Running = true };
+                        channel)
+                    { Active = false, Running = true };
                     changed = true;
                 }
                 else if (!_apps[identity].Active && _apps[identity].Label != client.Label &&
@@ -1321,8 +1523,10 @@ public sealed class Mixer : IDisposable, ILayoutInfo
                 {
                     _apps[identity] = app with
                     {
-                        Active = activeNow, Running = runningNow,
-                        Id = activeNow ? app.Id : 0, Serial = activeNow ? app.Serial : 0,
+                        Active = activeNow,
+                        Running = runningNow,
+                        Id = activeNow ? app.Id : 0,
+                        Serial = activeNow ? app.Serial : 0,
                     };
                     changed = true;
                 }
@@ -1352,7 +1556,7 @@ public sealed class Mixer : IDisposable, ILayoutInfo
     {
         lock (_gate)
         {
-            ChannelDefinition? ch = _config.Channels.FirstOrDefault(c => c.Id == channelId);
+            ChannelDefinition? ch = _config.Channels.FirstOrDefault(c => c.Id == channelId && c.InputPair is null);
             if (ch is null || string.IsNullOrWhiteSpace(identity)) return;
             Matcher.SetOverride(identity, channelId);
 
@@ -1405,11 +1609,18 @@ public sealed class Mixer : IDisposable, ILayoutInfo
                 Mixes = [.. _config.Mixes.Select(m => new MixStatus(
                     m.Id, m.Name,
                     _mixVolume.GetValueOrDefault(m.Id, 1.0),
-                    _mixMuted.Contains(m.Id)))],
+                    _mixMuted.Contains(m.Id),
+                    m.Kind == MixKind.Monitor,
+                    m.Kind == MixKind.VirtualMic,
+                    m.Kind == MixKind.AuxPort,
+                    m.Kind == MixKind.VirtualMic))],
                 Channels = [.. _config.Channels.Select(c => new ChannelStatus(
                     c.Id, c.Name,
                     _config.Mixes.ToDictionary(m => m.Id, m => _levels.GetValueOrDefault(Cell(c.Id, m.Id), 0.0)),
-                    [.. _config.Mixes.Where(m => _muted.Contains(Cell(c.Id, m.Id))).Select(m => m.Id)]))],
+                    [.. _config.Mixes.Where(m => _muted.Contains(Cell(c.Id, m.Id))).Select(m => m.Id)],
+                    c.InputPair is not null,
+                    c.InputPair is null,
+                    c.InputPair is null))],
                 MonitorOutput = _monitorOutputs.FirstOrDefault(),
                 MonitorOutputs = [.. _monitorOutputs],
                 OutputVolume = _outputVolume,
@@ -1473,9 +1684,18 @@ public sealed class Mixer : IDisposable, ILayoutInfo
         _inputFeeds.Clear();
         RemoveInputChainsLocked();
         RemoveMixChainsLocked();
+        foreach (PortLink link in _appFeeds.Values.Concat(_appOutputs.Values)) _pw.Unlink(link);
+        _appFeeds.Clear();
+        _appOutputs.Clear();
+        foreach (FilterHandle chain in _chains.Values) _pw.StopFilter(chain);
+        _chains.Clear();
         _inputDevice = null;
         _pw.TearDown();     // unloads modules in reverse order: combines, then mixes
         _combineModules.Clear();
+        _channelInputModules.Clear();
+        _mixModules.Clear();
+        _mixPostModules.Clear();
+        _virtualMicModules.Clear();
         _legIndex.Clear();
         _streams.Clear();
         _cells.Clear();

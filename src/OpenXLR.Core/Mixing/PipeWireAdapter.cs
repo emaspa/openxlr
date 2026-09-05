@@ -17,6 +17,12 @@ namespace OpenXLR.Core.Mixing;
 public sealed class PipeWireAdapter
 {
     private const string ClipGuardPluginFile = "hard_limiter_1413.so";
+    // These strings pass through the module-argument parser and then the
+    // nested property-list parser. JSON quoting preserves whitespace, quotes,
+    // apostrophes and backslashes without allowing a label to inject another
+    // PipeWire property.
+    private static readonly JsonSerializerOptions PropertyJson = new()
+    { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
     private readonly Func<DspFeatureAvailability>? _clipGuardAvailabilityOverride;
     private readonly List<uint> _modules = [];
@@ -28,20 +34,9 @@ public sealed class PipeWireAdapter
     internal PipeWireAdapter(Func<DspFeatureAvailability> clipGuardAvailabilityOverride)
         => _clipGuardAvailabilityOverride = clipGuardAvailabilityOverride;
 
-    /// <summary>
-    /// pactl joins its arguments into one module-argument string, and PipeWire's
-    /// module parser splits that on whitespace, honouring double quotes; the
-    /// value of sink_properties is then parsed again as key=value pairs,
-    /// honouring single quotes. So the whole property list goes in double
-    /// quotes and a description with spaces in single quotes. The earlier
-    /// form (a backslash-escaped description, no outer quotes) kept the
-    /// description but silently dropped every property after it: the
-    /// channels ran for months without priority.session, without
-    /// suspend-on-idle=false, and flagged node.virtual, which KDE's audio
-    /// applet hides. Verified on PipeWire 1.6 with all four properties.
-    /// </summary>
-    private static string PropList(string props) => '"' + props + '"';
-    private static string PropValue(string value) => "'" + value.Replace("\\", "\\\\").Replace("'", "\\'") + "'";
+    internal static string ModuleProperties(string description, string extra)
+        => JsonSerializer.Serialize(
+            $"node.description={JsonSerializer.Serialize(description, PropertyJson)} {extra}", PropertyJson);
 
     /// <summary>
     /// Check the optional LADSPA dependency before changing a live graph. PipeWire
@@ -127,7 +122,7 @@ public sealed class PipeWireAdapter
     }
 
     /// <summary>Load a null sink; returns its module id for later unload.</summary>
-    public uint CreateNullSink(string nodeName, string description)
+    public uint CreateNullSink(string nodeName, string description, bool isInternal = false)
     {
         // suspend-on-idle must be off: an idle channel sink would otherwise be
         // suspended by PipeWire and drop the first moment of audio (or all of it)
@@ -141,8 +136,8 @@ public sealed class PipeWireAdapter
             // (which silently swallows the user's desktop audio).
             // node.virtual=false: KDE's audio applet hides virtual devices,
             // and these are devices the user assigns applications to.
-            "sink_properties=" + PropList($"node.description={PropValue(description)}" +
-            " node.suspend-on-idle=false priority.session=100 node.virtual=false"));
+            "sink_properties=" + ModuleProperties(description,
+                "node.suspend-on-idle=false priority.session=100" + InternalProperties(isInternal)));
         uint id = uint.Parse(outp.Trim());
         _modules.Add(id);
         return id;
@@ -160,24 +155,20 @@ public sealed class PipeWireAdapter
             "load-module", "module-remap-sink",
             $"sink_name={nodeName}",
             $"master={masterSink}",
-            "sink_properties=" + PropList($"node.description={PropValue(description)} priority.session=90"));
+            "sink_properties=" + ModuleProperties(description, "priority.session=90"));
         uint id = uint.Parse(outp.Trim());
         _modules.Add(id);
         return id;
     }
 
     /// <summary>
-    /// A combine sink duplicates its input into several slave sinks. One per
-    /// channel: applications play into it and every mix receives the audio
-    /// through that channel's remap cells.
+    /// A combine sink duplicates its input into several mix sinks. Application
+    /// channels feed it from a separate stable public sink; hardware inputs use
+    /// its monitor directly. Its per-slave streams are the send faders.
     /// </summary>
-    /// <param name="visible">
-    /// Whether desktop audio applets should list the sink as a playback
-    /// device. Application channels are (users assign apps to them);
-    /// hardware input channels are not, since nothing should play into a
-    /// channel that carries a microphone.
-    /// </param>
-    public uint CreateCombineSink(string nodeName, IEnumerable<string> slaveSinks, string description, bool visible = true)
+    /// <param name="needsMonitor">True for hardware channels whose monitor is
+    /// linked from the capture device; false for an internal app fan-out.</param>
+    public uint CreateCombineSink(string nodeName, IEnumerable<string> slaveSinks, string description, bool needsMonitor)
     {
         string outp = Run("pactl",
             "load-module", "module-combine-sink",
@@ -186,12 +177,40 @@ public sealed class PipeWireAdapter
             // suspend-on-idle=false keeps the combine's monitor source running;
             // a suspended monitor makes the channel's level meter read silence
             // even while audio flows through the sink.
-            "sink_properties=" + PropList($"node.description={PropValue(description)}" +
-            $" priority.session=100 node.suspend-on-idle=false node.virtual={(visible ? "false" : "true")}"));
+            "sink_properties=" + ModuleProperties(description,
+                "priority.session=100 node.suspend-on-idle=false" + InternalProperties(true) +
+                (needsMonitor ? "" : " media.class=Audio/Filter node.autoconnect=false " +
+                    "adapter.auto-port-config=\"{ mode = dsp monitor = true position = preserve }\"")));
         uint id = uint.Parse(outp.Trim());
         _modules.Add(id);
         return id;
     }
+
+    private static string InternalProperties(bool isInternal)
+        => isInternal ? " openxlr.internal=true device.class=filter node.virtual=true" : " node.virtual=false";
+
+    internal static bool IsInternalDevice(JsonElement properties)
+        => properties.TryGetProperty("openxlr.internal", out JsonElement value)
+            && (value.ValueKind == JsonValueKind.True ||
+                value.ValueKind == JsonValueKind.String && value.GetString() == "true");
+
+    /// <summary>Unload one module created by this adapter.</summary>
+    public void UnloadModule(uint id)
+    {
+        _modules.Remove(id);
+        try { Run("pactl", "unload-module", id.ToString()); }
+        catch (InvalidOperationException) { /* already gone */ }
+    }
+
+    /// <summary>Update presentation metadata without recreating the audio node.</summary>
+    public void SetSinkDescription(string nodeName, string description)
+        => Run("pactl", "update-sink-proplist", nodeName,
+            $"node.description={JsonSerializer.Serialize(description, PropertyJson)}");
+
+    /// <summary>Update a virtual microphone's presentation metadata in place.</summary>
+    public void SetSourceDescription(string nodeName, string description)
+        => Run("pactl", "update-source-proplist", nodeName,
+            $"node.description={JsonSerializer.Serialize(description, PropertyJson)}");
 
     /// <summary>A "sink#suffix" pseudo-device address without its suffix.</summary>
     private static string BareSink(string sinkName)
@@ -331,8 +350,9 @@ public sealed class PipeWireAdapter
             // Both properties: apps read one or the other depending on the API.
             // Low priority.session so WirePlumber never promotes a virtual mic
             // to system default capture on its own.
-            "source_properties=" + PropList($"device.description={PropValue(description)}" +
-            $" node.description={PropValue(description)} priority.session=100 node.virtual=false"));
+            "source_properties=" + ModuleProperties(description,
+                $"device.description={JsonSerializer.Serialize(description, PropertyJson)} " +
+                "priority.session=100 node.virtual=false"));
         uint id = uint.Parse(outp.Trim());
         _modules.Add(id);
         return id;
@@ -831,6 +851,7 @@ public sealed class PipeWireAdapter
                     !(t.GetString()?.EndsWith("Node", StringComparison.Ordinal) ?? false)) continue;
                 if (!o.TryGetProperty("info", out JsonElement info) ||
                     !info.TryGetProperty("props", out JsonElement props)) continue;
+                if (IsInternalDevice(props)) continue;
 
                 string? name = props.TryGetProperty("node.name", out JsonElement n) ? n.GetString() : null;
                 if (name is null) continue;

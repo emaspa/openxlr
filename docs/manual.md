@@ -18,10 +18,10 @@ When the daemon starts with the submixer on (the default), these things
 happen on your system:
 
 - New audio devices appear in your desktop's sound settings, all named
-  `OpenXLR …`: one output per channel (`OpenXLR Game`, `OpenXLR Music`,
-  `OpenXLR Browser`, `OpenXLR System`, `OpenXLR Voice Chat`, `OpenXLR
-  SFX`, and the hardware channels) and two inputs, `OpenXLR Stream` and
-  `OpenXLR Chat`, which are the virtual microphones.
+  `OpenXLR …`: one output per hardware or application channel and one
+  virtual microphone per output mix. The initial layout includes the six
+  application channels plus `OpenXLR Stream` and `OpenXLR Chat`; it can be
+  changed from Channels & outputs.
 - Applications that play audio are moved onto a channel output by name
   (section 2). They keep playing; only the device they play into
   changes.
@@ -43,13 +43,15 @@ and the `OpenXLR …` devices disappear.
 
 ## 2. Concepts
 
-**Channels** are where audio enters the mixer. Three carry the
+**Channels** are where audio enters the mixer. Three structural channels carry the
 interface's inputs (XLR 1, XLR 2 where the device has one, Aux In for
 the Pro's Line In and USB Aux input) and six carry application groups:
-Game, Music, Browser, System, Voice Chat, SFX. Each channel is a
-PipeWire output device an application can play into.
+Game, Music, Browser, System, Voice Chat, SFX initially. Application
+channels can be added, renamed, or deleted. Each channel is a PipeWire output device
+an application can play into.
 
-**Mixes** are where audio leaves. There are four:
+**Mixes** are where audio leaves. Monitor and Aux are structural. Stream
+and Chat are the initial user-managed virtual outputs:
 
 | Mix | What it is | Where it goes |
 |---|---|---|
@@ -134,6 +136,16 @@ PipeWire as an audio client; a green light means it is playing.
    The identity is guessed from its launcher; if the app reports a
    different name on first play it shows up as a new entry.
 3. Forget, in the same window, drops an app and its remembered channel.
+
+The same dropdown is available on every application node in Flow, and clicking
+a channel node opens its send editor. To add, rename, or remove application
+channels and output mixes, use Channels & outputs in
+the SUBMIXER card. A new output immediately gets a master, a send on every
+channel, an insert chain, and a selectable `OpenXLR <name>` virtual
+microphone. Deleting one removes its PipeWire devices; deleting a channel
+moves its assigned apps to the first remaining application channel. Adding a
+channel and all renames preserve existing endpoints; output creation and either
+kind of deletion can briefly rebuild the owned graph.
 
 An app that is missing from the card is not registered with PipeWire
 as a client. That happens with some applications until they start

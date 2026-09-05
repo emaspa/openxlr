@@ -64,6 +64,7 @@ public sealed class WebSocketHub
         _devices.Snapshot() with
         {
             DaemonVersion = OpenXLR.Daemon.DaemonVersion.Current,
+            Features = ["editableLayout", "commandResults"],
             ActiveProfile = ActiveDeviceId() is string apId && _activeProfile.TryGetValue(apId, out string? ap) ? ap : null,
             Mixer = _mixer.Snapshot(),
             Devices = _mixer.Devices(),
@@ -175,6 +176,12 @@ public sealed class WebSocketHub
             case "setChannelMuted":
             case "setMixVolume":
             case "setMixMuted":
+            case "createChannel":
+            case "renameChannel":
+            case "deleteChannel":
+            case "createMix":
+            case "renameMix":
+            case "deleteMix":
             case "assignStream":
             case "assignApp":
             case "forgetApp":
@@ -189,9 +196,17 @@ public sealed class WebSocketHub
             case "setInsertBypass":
             case "setInsertParam":
                 string? mixErr = _mixer.Apply(cmd);                     // broadcasts on success
+                if (cmd.RequestId is not null)
+                {
+                    // State first: after the result arrives an editor can
+                    // re-enable controls against the authoritative layout.
+                    await client.SendAsync(Serialize(Snapshot()));
+                    await client.SendAsync(Serialize(new CommandResultMessage(cmd.RequestId, mixErr)));
+                }
                 if (mixErr is not null)
                 {
-                    await client.SendAsync(Serialize(new ErrorMessage(mixErr)));
+                    if (cmd.RequestId is null)
+                        await client.SendAsync(Serialize(new ErrorMessage(mixErr)));
                     // Controls are optimistic in both clients. Follow an error
                     // with authoritative state so a rejected ClipGuard/plugin
                     // change snaps back instead of looking enabled forever.

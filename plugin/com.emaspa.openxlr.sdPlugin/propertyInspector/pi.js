@@ -37,7 +37,7 @@ function connect(inPort, inPropertyInspectorUUID, inRegisterEvent, inInfo, inAct
     iconSel?.addEventListener("change", save);
     // Ask the plugin for the live output-device list, the insert chains and
     // the saved profiles.
-    for (const request of ["outputs", "inserts", "profiles"])
+    for (const request of ["outputs", "inserts", "profiles", "layout"])
       ws.send(JSON.stringify({ event: "sendToPlugin", context: actionContext, payload: { request } }));
   };
 
@@ -52,6 +52,9 @@ function connect(inPort, inPropertyInspectorUUID, inRegisterEvent, inInfo, inAct
     }
     if (Array.isArray(m.payload?.profiles))
       fillGroup("profile-group", "Profiles (recall)", m.payload.profiles, wanted);
+    if (Array.isArray(m.payload?.toggleGroups))
+      for (const group of m.payload.toggleGroups)
+        fillGroup(group.id, group.label, group.items ?? [], wanted);
   };
 }
 

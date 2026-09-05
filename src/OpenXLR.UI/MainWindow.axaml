@@ -478,7 +478,7 @@
                            ToolTip.Tip="{Binding StatusText}"/>
                   <TextBlock Text="{Binding Label}" Foreground="#e6e9f0" VerticalAlignment="Center"/>
                   <ComboBox ItemsSource="{Binding Channels}" MinWidth="110"
-                            SelectedItem="{Binding ChannelId, Mode=TwoWay}"/>
+                            SelectedItem="{Binding SelectedChannel, Mode=TwoWay}"/>
                 </StackPanel>
               </Border>
             </DataTemplate>
@@ -500,6 +500,12 @@
       <Expander Name="SubmixerTile" Classes="tile" Theme="{StaticResource TileExpanderTheme}" IsExpanded="True">
         <Expander.Header><TextBlock Text="SUBMIXER" Classes="h"/></Expander.Header>
       <DockPanel>
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,8" IsVisible="{Binding HasMixer}">
+          <TextBlock Text="Create application channels and virtual outputs; every change is applied to PipeWire."
+                     FontSize="11" Foreground="#6b7285" VerticalAlignment="Center" TextWrapping="Wrap"/>
+          <Button Grid.Column="1" Content="Channels &amp; outputs…" Padding="12,4" Margin="8,0,0,0"
+                  IsEnabled="{Binding CanEditLayout}" Click="OnMixerSetup"/>
+        </Grid>
         <TextBlock DockPanel.Dock="Top" Text="{Binding MixerPlaceholder}" TextWrapping="Wrap"
                    Foreground="#6b7285" IsVisible="{Binding !HasMixer}"/>
 
@@ -597,7 +603,8 @@
                         <DataTemplate x:DataType="vm:SendViewModel">
                           <StackPanel Margin="0,0,0,8" Spacing="1" IsVisible="{Binding Visible}">
                             <Grid ColumnDefinitions="*,Auto">
-                              <TextBlock Text="{Binding MixId}" Classes="h" FontSize="11"/>
+                              <TextBlock Text="{Binding MixName}" Classes="h" FontSize="11"
+                                         TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding MixName}"/>
                               <TextBlock Grid.Column="1" Text="{Binding LevelText}" Classes="val" FontSize="11"/>
                             </Grid>
                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">

@@ -4,6 +4,7 @@
 // and dials stay in sync with the UI (and with the hardware) for free.
 
 import process from "node:process";
+import { channelName, layoutChoices, mixName, mixShortName } from "./layout-choices.mjs";
 
 // ---------- launch arguments ----------
 const arg = (name) => {
@@ -13,15 +14,6 @@ const arg = (name) => {
 const port = arg("-port");
 const pluginUUID = arg("-pluginUUID");
 const registerEvent = arg("-registerEvent");
-
-// ---------- static naming ----------
-const CHANNELS = {
-  xlr1: "XLR 1", xlr2: "XLR 2", aux: "Aux In", game: "Game",
-  music: "Music", browser: "Browser", system: "System",
-  voicechat: "Voice Chat", sfx: "SFX",
-};
-const MIXES = { monitor: "Monitor", stream: "Stream", chat: "Chat", auxout: "Aux" };
-const MIX_SHORT = { monitor: "Mon", stream: "Str", chat: "Cht", auxout: "Aux", all: "All" };
 
 // Toggle targets on the device state block, with short key labels.
 const DEVICE_TOGGLES = {
@@ -137,9 +129,9 @@ const isInsertTarget = (t) =>
 
 // Chains the daemon exposes, in the order the UI shows them.
 const chainName = (ch) =>
-  ch.startsWith("mix:") ? `${MIXES[ch.slice(4)] ?? ch.slice(4)} mix` : CHANNELS[ch] ?? ch;
+  ch.startsWith("mix:") ? `${mixName(mixer(), ch.slice(4))} mix` : channelName(mixer(), ch);
 const chainShort = (ch) =>
-  ch.startsWith("mix:") ? `${MIX_SHORT[ch.slice(4)] ?? ch.slice(4)} mix` : CHANNELS[ch] ?? ch;
+  ch.startsWith("mix:") ? `${mixShortName(mixer(), ch.slice(4))} mix` : channelName(mixer(), ch);
 const insertsOf = (ch) => (mixer()?.inserts?.[ch] ?? []).map((s) => s.insert ?? s);
 
 // A short plugin name for a key face: drop the vendor prefix and the
@@ -304,6 +296,9 @@ host.onmessage = (e) => {
       else if (m.payload?.request === "profiles")
         send({ event: "sendToPropertyInspector", context: m.context,
                payload: { profiles: profileChoices() } });
+      else if (m.payload?.request === "layout")
+        send({ event: "sendToPropertyInspector", context: m.context,
+               payload: layoutChoices(mixer()) });
       break;
   }
 };
@@ -417,10 +412,10 @@ function toggleLabel(target, inst) {
     const name = d?.description ?? sink.split(".").pop();
     return "Monitor\n" + name;
   }
-  if (target.startsWith("mixmute:")) return `${MIXES[target.slice(8)] ?? target.slice(8)}\nMute`;
+  if (target.startsWith("mixmute:")) return `${mixName(mixer(), target.slice(8))}\nMute`;
   if (target.startsWith("sendmute:")) {
     const [, ch, mix] = target.split(":");
-    return `${CHANNELS[ch] ?? ch}\n· ${MIX_SHORT[mix] ?? mix}`;
+    return `${channelName(mixer(), ch)}\n· ${mixShortName(mixer(), mix)}`;
   }
   return DEVICE_TOGGLES[target] ?? target;
 }
@@ -449,8 +444,8 @@ function dialValue(target, inst) {
     const muted = mix === "all"
       ? Object.keys(ch.levels ?? {}).every((m) => ch.mutedIn?.includes(m))
       : ch.mutedIn?.includes(mix) ?? false;
-    return { pin: CHANNELS[chId] ?? chId,
-             scroll: mix === "all" ? "All mixes" : MIXES[mix] ?? mix,
+    return { pin: channelName(mixer(), chId),
+             scroll: mix === "all" ? "All mixes" : mixName(mixer(), mix),
              pct: pct(v), text: muted ? "MUTED" : `${pct(v)}%`, muted };
   }
   if (target.startsWith("mixvol:")) {

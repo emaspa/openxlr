@@ -1,0 +1,108 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:OpenXLR.UI"
+        x:Class="OpenXLR.UI.MixerSetupWindow"
+        x:DataType="vm:MainViewModel"
+        Title="OpenXLR Channels &amp; Outputs" Width="720" Height="620" MinWidth="560" MinHeight="440"
+        WindowStartupLocation="CenterOwner" Background="#16181d">
+  <Window.Styles>
+    <Style Selector="TextBlock.h">
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Foreground" Value="#8b93a7"/>
+    </Style>
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="#1d2027"/>
+      <Setter Property="CornerRadius" Value="8"/>
+      <Setter Property="Padding" Value="14"/>
+    </Style>
+    <Style Selector="Button.danger">
+      <Setter Property="Background" Value="#7d3035"/>
+      <Setter Property="Foreground" Value="#ffffff"/>
+    </Style>
+  </Window.Styles>
+
+  <DockPanel Margin="16">
+    <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+      <TextBlock Text="Mixer layout" FontSize="20" FontWeight="Bold" Foreground="#e6e9f0"/>
+      <TextBlock Text="Application channels become PipeWire playback sinks. Virtual outputs become selectable recording devices for OBS, Discord, and any other app. Adding a channel and renaming nodes keep existing application and virtual-microphone endpoints alive."
+                 FontSize="11" Foreground="#7d8496" TextWrapping="Wrap"/>
+      <TextBlock Text="{Binding LayoutNote}" FontSize="11" Foreground="#e0a84a"
+                 Margin="0,4,0,0" TextWrapping="Wrap"/>
+    </StackPanel>
+    <Button DockPanel.Dock="Bottom" Content="Close" HorizontalAlignment="Right" Padding="18,6"
+            Margin="0,12,0,0" Click="OnClose"/>
+
+    <Grid ColumnDefinitions="*,12,*">
+      <Border Classes="card">
+        <DockPanel>
+          <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,8,Auto" Margin="0,10,0,0">
+            <TextBox Name="ChannelName" PlaceholderText="e.g. Podcast" MaxLength="60"/>
+            <Button Grid.Column="2" Content="Add channel" Padding="12,4"
+                    IsEnabled="{Binding CanEditLayout}" Click="OnAddChannel"/>
+          </Grid>
+          <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <TextBlock Text="APPLICATION CHANNELS" Classes="h"/>
+            <TextBlock Text="Route programs into these channels in the Applications card or directly in Flow. Hardware inputs stay fixed."
+                       FontSize="11" Foreground="#6b7285" TextWrapping="Wrap"/>
+          </StackPanel>
+          <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Channels}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ChannelViewModel">
+                  <Border Background="#23262f" CornerRadius="6" Padding="10,7" Margin="0,0,0,6">
+                    <Grid ColumnDefinitions="*,Auto,6,Auto">
+                      <StackPanel>
+                        <TextBlock Text="{Binding Name}" Foreground="#e6e9f0" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding Id}" Foreground="#6b7285" FontFamily="monospace" FontSize="10"/>
+                      </StackPanel>
+                      <Button Grid.Column="1" Content="Rename" Padding="9,3"
+                              IsVisible="{Binding CanDelete}" Click="OnRenameChannel"/>
+                      <Button Grid.Column="3" Content="Delete" Classes="danger" Padding="9,3"
+                              IsVisible="{Binding CanDelete}" Click="OnDeleteChannel"/>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </DockPanel>
+      </Border>
+
+      <Border Grid.Column="2" Classes="card">
+        <DockPanel>
+          <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,8,Auto" Margin="0,10,0,0">
+            <TextBox Name="MixName" PlaceholderText="e.g. Podcast" MaxLength="60"/>
+            <Button Grid.Column="2" Content="Add output" Padding="12,4"
+                    IsEnabled="{Binding CanEditLayout}" Click="OnAddMix"/>
+          </Grid>
+          <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <TextBlock Text="OUTPUT MIXES" Classes="h"/>
+            <TextBlock Text="Each added output gets its own master, per-channel sends, inserts, and an OpenXLR virtual microphone."
+                       FontSize="11" Foreground="#6b7285" TextWrapping="Wrap"/>
+          </StackPanel>
+          <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Mixes}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:MixViewModel">
+                  <Border Background="#23262f" CornerRadius="6" Padding="10,7" Margin="0,0,0,6">
+                    <Grid ColumnDefinitions="*,Auto,6,Auto">
+                      <StackPanel>
+                        <TextBlock Text="{Binding Name}" Foreground="#e6e9f0" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding Id}" Foreground="#6b7285" FontFamily="monospace" FontSize="10"/>
+                      </StackPanel>
+                      <Button Grid.Column="1" Content="Rename" Padding="9,3"
+                              IsVisible="{Binding CanDelete}" Click="OnRenameMix"/>
+                      <Button Grid.Column="3" Content="Delete" Classes="danger" Padding="9,3"
+                              IsVisible="{Binding CanDelete}" Click="OnDeleteMix"/>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </DockPanel>
+      </Border>
+    </Grid>
+  </DockPanel>
+</Window>

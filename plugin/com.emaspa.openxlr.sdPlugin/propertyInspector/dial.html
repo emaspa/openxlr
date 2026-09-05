@@ -29,67 +29,6 @@
       <option value="auxLevel">Aux In level</option>
       <option value="crossfade">Mic / PC crossfade</option>
     </optgroup>
-    <optgroup label="Mix masters">
-      <option value="mixvol:monitor">Monitor mix master</option>
-      <option value="mixvol:stream">Stream mix master</option>
-      <option value="mixvol:chat">Chat mix master</option>
-      <option value="mixvol:auxout">Aux mix master</option>
-    </optgroup>
-    <optgroup label="Sends: all mixes">
-      <option value="send:xlr1:all">XLR 1 in all mixes</option>
-      <option value="send:xlr2:all">XLR 2 in all mixes</option>
-      <option value="send:aux:all">Aux In in all mixes</option>
-      <option value="send:game:all">Game in all mixes</option>
-      <option value="send:music:all">Music in all mixes</option>
-      <option value="send:browser:all">Browser in all mixes</option>
-      <option value="send:system:all">System in all mixes</option>
-      <option value="send:voicechat:all">Voice Chat in all mixes</option>
-      <option value="send:sfx:all">SFX in all mixes</option>
-    </optgroup>
-    <optgroup label="Sends: Monitor">
-      <option value="send:xlr1:monitor">XLR 1 in Monitor</option>
-      <option value="send:xlr2:monitor">XLR 2 in Monitor</option>
-      <option value="send:aux:monitor">Aux In in Monitor</option>
-      <option value="send:game:monitor">Game in Monitor</option>
-      <option value="send:music:monitor">Music in Monitor</option>
-      <option value="send:browser:monitor">Browser in Monitor</option>
-      <option value="send:system:monitor">System in Monitor</option>
-      <option value="send:voicechat:monitor">Voice Chat in Monitor</option>
-      <option value="send:sfx:monitor">SFX in Monitor</option>
-    </optgroup>
-    <optgroup label="Sends: Stream">
-      <option value="send:xlr1:stream">XLR 1 in Stream</option>
-      <option value="send:xlr2:stream">XLR 2 in Stream</option>
-      <option value="send:aux:stream">Aux In in Stream</option>
-      <option value="send:game:stream">Game in Stream</option>
-      <option value="send:music:stream">Music in Stream</option>
-      <option value="send:browser:stream">Browser in Stream</option>
-      <option value="send:system:stream">System in Stream</option>
-      <option value="send:voicechat:stream">Voice Chat in Stream</option>
-      <option value="send:sfx:stream">SFX in Stream</option>
-    </optgroup>
-    <optgroup label="Sends: Chat">
-      <option value="send:xlr1:chat">XLR 1 in Chat</option>
-      <option value="send:xlr2:chat">XLR 2 in Chat</option>
-      <option value="send:aux:chat">Aux In in Chat</option>
-      <option value="send:game:chat">Game in Chat</option>
-      <option value="send:music:chat">Music in Chat</option>
-      <option value="send:browser:chat">Browser in Chat</option>
-      <option value="send:system:chat">System in Chat</option>
-      <option value="send:voicechat:chat">Voice Chat in Chat</option>
-      <option value="send:sfx:chat">SFX in Chat</option>
-    </optgroup>
-    <optgroup label="Sends: Aux">
-      <option value="send:xlr1:auxout">XLR 1 in Aux</option>
-      <option value="send:xlr2:auxout">XLR 2 in Aux</option>
-      <option value="send:aux:auxout">Aux In in Aux</option>
-      <option value="send:game:auxout">Game in Aux</option>
-      <option value="send:music:auxout">Music in Aux</option>
-      <option value="send:browser:auxout">Browser in Aux</option>
-      <option value="send:system:auxout">System in Aux</option>
-      <option value="send:voicechat:auxout">Voice Chat in Aux</option>
-      <option value="send:sfx:auxout">SFX in Aux</option>
-    </optgroup>
   </select>
   <button id="add">Add to stack</button>
   <ul id="stack"></ul>
@@ -118,28 +57,39 @@
             save();
           });
         render();
-        // The plugin lists the loaded inserts' controls from live state.
-        ws.send(JSON.stringify({ event: "sendToPlugin", context: actionInfo.context,
-                                 payload: { request: "inserts" } }));
+        // The plugin lists both the editable mixer layout and loaded insert
+        // controls from live daemon state.
+        for (const request of ["layout", "inserts"])
+          ws.send(JSON.stringify({ event: "sendToPlugin", context: actionInfo.context,
+                                   payload: { request } }));
       };
       ws.onmessage = (e) => {
         let m;
         try { m = JSON.parse(e.data); } catch { return; }
-        if (m.event !== "sendToPropertyInspector" || !Array.isArray(m.payload?.params)) return;
+        if (m.event !== "sendToPropertyInspector") return;
         const sel = document.getElementById("target");
-        if (document.getElementById("param-group") || !m.payload.params.length) return;
-        const group = document.createElement("optgroup");
-        group.id = "param-group";
-        group.label = "Insert plugin controls";
-        for (const it of m.payload.params) {
-          const opt = document.createElement("option");
-          opt.value = it.target;
-          opt.textContent = it.label;
-          opt.dataset.meta = JSON.stringify(it.meta);
-          group.appendChild(opt);
+        const addGroup = (id, label, items) => {
+          if (document.getElementById(id) || !items?.length) return;
+          const group = document.createElement("optgroup");
+          group.id = id;
+          group.label = label;
+          for (const it of items) {
+            const opt = document.createElement("option");
+            opt.value = it.target;
+            opt.textContent = it.label;
+            if (it.meta) opt.dataset.meta = JSON.stringify(it.meta);
+            group.appendChild(opt);
+          }
+          sel.appendChild(group);
+        };
+        if (Array.isArray(m.payload?.levelGroups)) {
+          for (const group of m.payload.levelGroups)
+            addGroup(group.id, group.label, group.items);
         }
-        sel.appendChild(group);
-        render();   // stack entries for insert controls now have readable labels
+        if (Array.isArray(m.payload?.params)) {
+          addGroup("param-group", "Insert plugin controls", m.payload.params);
+        }
+        render();   // dynamic controls now have readable labels
       };
     }
     window.connectElgatoStreamDeckSocket = connect;

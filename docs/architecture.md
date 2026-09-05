@@ -45,18 +45,28 @@
 Everything is built with standard PipeWire modules and tools, no kernel
 modules or custom drivers:
 
-- One null sink per mix (`pactl load-module module-null-sink`), 4 in
-  all.
+- One null sink per mix (`pactl load-module module-null-sink`). Monitor
+  and Aux are structural; every user-created output adds another one.
 - One combine sink per channel (`module-combine-sink`) whose internal
   streams, one per mix, are the send faders: setting a send is setting
-  that stream's volume. Applications play into these sinks. 9 channels
-  make 9 combine sinks, so the 9 by 4 matrix is 13 sinks and no
-  loopback processes.
-- For the Stream and Chat mixes, a post sink fed from the mix (directly
+  that stream's volume. Each application channel has a stable public null
+  sink feeding its internal combine, optionally through an insert chain;
+  hardware channels feed their combines from the capture device. The graph
+  uses no loopback processes.
+- For every user-created virtual output mix, a post sink fed from the mix (directly
   or through the mix's insert chain) and a remap source
   (`module-remap-source`) reading its monitor: the virtual microphone an
   application records from. The indirection means adding inserts later
   never recreates the device the application is recording.
+- Adding an application channel creates only its public sink and internal
+  fan-out alongside the live graph. Existing application sinks and virtual
+  microphones keep the same PipeWire nodes. Renaming a channel or virtual
+  output updates node descriptions only; stable ids keep application
+  assignments, profile cells, insert keys, and controller references valid.
+- Adding or deleting a virtual output, and deleting an application channel,
+  still changes every matrix row or column and briefly rebuilds the owned
+  graph under the daemon lock. If that rebuild fails, the previous layout is
+  restored.
 - Filter chains (the software low cut and ClipGuard, and the LV2
   inserts on inputs and mixes) are `filter-chain` nodes, each held by a
   long-lived `pw-cli -m` process for the life of the chain; their
@@ -71,12 +81,11 @@ modules or custom drivers:
   and node volumes, and `parec` on the sinks' monitors feeds the level
   meters. Helpers run in the C locale, since `pactl`'s output is parsed
   and localised.
-- Sink and source properties reach `pactl` as one double-quoted list
-  with descriptions single-quoted inside (PipeWire's module parser
-  splits the argument on whitespace, then parses the list). Application
-  channels and the virtual microphones carry `node.virtual=false` so
-  desktop applets list them; hardware input channels keep the flag and
-  stay hidden.
+- Sink and source property lists use nested JSON quoting before they reach
+  `pactl`, preserving spaces, quotes, apostrophes and backslashes in editable
+  display names. Public application channels and virtual microphones remain
+  visible to desktop applets; internal mix, capture-tap and fan-out nodes carry
+  `openxlr.internal=true` and are filtered from OpenXLR's device lists.
 
 ## The device protocols
 
