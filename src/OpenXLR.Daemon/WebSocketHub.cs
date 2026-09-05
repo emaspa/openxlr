@@ -64,7 +64,7 @@ public sealed class WebSocketHub
         _devices.Snapshot() with
         {
             DaemonVersion = OpenXLR.Daemon.DaemonVersion.Current,
-            Warning = _mixer.PersistenceWarning,
+            Warning = string.Join(" ", new[] { _devices.Warning, _mixer.PersistenceWarning }.Where(w => w is not null)) is { Length: > 0 } w ? w : null,
             ActiveProfile = ActiveDeviceId() is string apId && _activeProfile.TryGetValue(apId, out string? ap) ? ap : null,
             Mixer = _mixer.Snapshot(),
             Devices = _mixer.Devices(),
@@ -81,10 +81,13 @@ public sealed class WebSocketHub
     {
         if (!await AuthenticateAsync(socket)) return;
         var client = new Client(socket, _stopping);
-        _clients[client.Id] = client;
         try
         {
-            await client.SendAsync(Serialize(Snapshot()));   // initial state
+            // The first thing a client reads is a whole state: register it
+            // for broadcasts only once that is queued, so no meters frame
+            // can slip in ahead of it.
+            await client.SendAsync(Serialize(Snapshot()));
+            _clients[client.Id] = client;
             await ReceiveLoop(client);
         }
         catch (Exception ex) when (ex is WebSocketException or OperationCanceledException
