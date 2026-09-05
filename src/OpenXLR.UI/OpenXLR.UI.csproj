@@ -4,7 +4,13 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <DefineConstants>$(DefineConstants);OPENXLR_UI</DefineConstants>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Shared with the daemon (see the file): XDG paths and private atomic writes. -->
+    <Compile Include="../OpenXLR.Core/OpenXlrPaths.cs" Link="OpenXlrPaths.cs" />
+  </ItemGroup>
 
   <ItemGroup>
     <AvaloniaResource Include="Assets/**"/>

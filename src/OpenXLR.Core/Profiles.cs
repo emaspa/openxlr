@@ -62,15 +62,7 @@ public static class ProfileStore
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
-    private static string Root
-    {
-        get
-        {
-            string root = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME")
-                ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config");
-            return Path.Combine(root, "openxlr", "profiles");
-        }
-    }
+    private static string Root => Path.Combine(OpenXlrPaths.ConfigDir, "profiles");
 
     private static string Dir(string deviceId) => Path.Combine(Root, deviceId.Replace(':', '-'));
 
@@ -91,7 +83,7 @@ public static class ProfileStore
             string proDir = Dir("0fd9:00b4");
             foreach (string f in Directory.EnumerateFiles(Root, "*.json"))
             {
-                Directory.CreateDirectory(proDir);
+                OpenXlrPaths.EnsurePrivateDir(proDir);
                 File.Move(f, Path.Combine(proDir, Path.GetFileName(f)), overwrite: false);
             }
         }
@@ -127,11 +119,7 @@ public static class ProfileStore
     public static void Save(string deviceId, string name, Profile profile)
     {
         MigrateOnce();
-        Directory.CreateDirectory(Dir(deviceId));
-        string path = Path.Combine(Dir(deviceId), name + ".json");
-        string tmp = path + ".tmp";
-        File.WriteAllText(tmp, JsonSerializer.Serialize(profile, Json));
-        File.Move(tmp, path, overwrite: true);
+        OpenXlrPaths.WriteAtomicJson(Path.Combine(Dir(deviceId), name + ".json"), profile, Json);
     }
 
     public static Profile? Load(string deviceId, string name)
@@ -181,9 +169,6 @@ public static class ProfileStore
             if (File.Exists(path)) File.Delete(path);
             return;
         }
-        Directory.CreateDirectory(Dir(deviceId));
-        string tmp = path + ".tmp";
-        File.WriteAllText(tmp, name);
-        File.Move(tmp, path, overwrite: true);
+        OpenXlrPaths.WriteAtomic(path, name);
     }
 }

@@ -80,6 +80,7 @@ in
         ProtectControlGroups = true;
         ProtectKernelTunables = true;
         RestrictSUIDSGID = true;
+        UMask = "0077";
       };
     };
   };

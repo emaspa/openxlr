@@ -22,15 +22,7 @@ public static class DeviceStateStore
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
-    private static string Root
-    {
-        get
-        {
-            string root = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME")
-                ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config");
-            return Path.Combine(root, "openxlr", "devices");
-        }
-    }
+    private static string Root => Path.Combine(OpenXlrPaths.ConfigDir, "devices");
 
     private static string Dir(string deviceId) => Path.Combine(Root, deviceId.Replace(':', '-'));
     private static string LastPath(string deviceId) => Path.Combine(Dir(deviceId), "last-state.json");
@@ -74,10 +66,5 @@ public static class DeviceStateStore
     }
 
     private static void Save(string deviceId, string path, DeviceState state)
-    {
-        Directory.CreateDirectory(Dir(deviceId));
-        string tmp = path + ".tmp";
-        File.WriteAllText(tmp, JsonSerializer.Serialize(Hardware(state), Json));
-        File.Move(tmp, path, overwrite: true);
-    }
+        => OpenXlrPaths.WriteAtomicJson(path, Hardware(state), Json);
 }

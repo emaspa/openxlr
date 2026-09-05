@@ -93,10 +93,7 @@ public sealed class DeviceManager : BackgroundService
     // set, so every client honors it without needing its own logic.
     private readonly HashSet<string> _gainLocked = LoadGainLocks();
 
-    private static string GainLockPath => Path.Combine(
-        Environment.GetEnvironmentVariable("XDG_CONFIG_HOME")
-            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config"),
-        "openxlr", "gainlock.json");
+    private static string GainLockPath => OpenXlrPaths.ConfigFile("gainlock.json");
 
     private static HashSet<string> LoadGainLocks()
     {
@@ -106,11 +103,7 @@ public sealed class DeviceManager : BackgroundService
 
     private void SaveGainLocks()
     {
-        try
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(GainLockPath)!);
-            File.WriteAllText(GainLockPath, JsonSerializer.Serialize(_gainLocked));
-        }
+        try { OpenXlrPaths.WriteAtomic(GainLockPath, JsonSerializer.Serialize(_gainLocked)); }
         catch (Exception) { /* best effort */ }
     }
 

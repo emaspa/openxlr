@@ -81,16 +81,7 @@ public sealed record MixerSettings
     };
 
     /// <summary>~/.config/openxlr/mixer.json, honouring XDG_CONFIG_HOME.</summary>
-    public static string DefaultPath
-    {
-        get
-        {
-            string baseDir = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME") is { Length: > 0 } x
-                ? x
-                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config");
-            return Path.Combine(baseDir, "openxlr", "mixer.json");
-        }
-    }
+    public static string DefaultPath => OpenXlrPaths.ConfigFile("mixer.json");
 
     /// <summary>Read settings, or null when there is no file or it is unreadable.</summary>
     public static MixerSettings? Load(string? path = null)
@@ -113,11 +104,7 @@ public sealed record MixerSettings
         path ??= DefaultPath;
         try
         {
-            string dir = Path.GetDirectoryName(path)!;
-            Directory.CreateDirectory(dir);
-            string tmp = path + ".tmp";
-            File.WriteAllText(tmp, JsonSerializer.Serialize(this, Json));
-            File.Move(tmp, path, overwrite: true);
+            OpenXlrPaths.WriteAtomicJson(path, this, Json);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

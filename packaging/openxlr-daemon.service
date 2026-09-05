@@ -22,6 +22,7 @@ ProtectSystem=strict
 ProtectControlGroups=true
 ProtectKernelTunables=true
 RestrictSUIDSGID=true
+UMask=0077
 
 [Install]
 WantedBy=default.target

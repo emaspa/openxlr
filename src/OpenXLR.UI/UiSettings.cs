@@ -33,16 +33,7 @@ public sealed record UiSettings
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     };
 
-    public static string ConfigDir
-    {
-        get
-        {
-            string baseDir = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME") is { Length: > 0 } x
-                ? x
-                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config");
-            return Path.Combine(baseDir, "openxlr");
-        }
-    }
+    public static string ConfigDir => OpenXlrPaths.ConfigDir;
 
     private static string FilePath => Path.Combine(ConfigDir, "ui.json");
 
@@ -59,13 +50,7 @@ public sealed record UiSettings
 
     public void Save()
     {
-        try
-        {
-            Directory.CreateDirectory(ConfigDir);
-            string tmp = FilePath + ".tmp";
-            File.WriteAllText(tmp, JsonSerializer.Serialize(this, Json));
-            File.Move(tmp, FilePath, overwrite: true);
-        }
+        try { OpenXlrPaths.WriteAtomicJson(FilePath, this, Json); }
         catch (Exception) { /* best effort */ }
     }
 }
@@ -99,13 +84,7 @@ public sealed record DaemonPrefs
         return new DaemonPrefs();
     }
 
-    public void Save()
-    {
-        Directory.CreateDirectory(UiSettings.ConfigDir);
-        string tmp = FilePath + ".tmp";
-        File.WriteAllText(tmp, JsonSerializer.Serialize(this, Json));
-        File.Move(tmp, FilePath, overwrite: true);
-    }
+    public void Save() => OpenXlrPaths.WriteAtomicJson(FilePath, this, Json);
 }
 
 /// <summary>
@@ -125,9 +104,7 @@ public static class StartupIntegration
 
     private static string HomeDir => Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
-    private static string ConfigHome =>
-        Environment.GetEnvironmentVariable("XDG_CONFIG_HOME") is { Length: > 0 } x
-            ? x : Path.Combine(HomeDir, ".config");
+    private static string ConfigHome => OpenXlrPaths.ConfigHome;
 
     /// <summary>System unit directories, highest precedence first (systemd.unit(5)).</summary>
     private static readonly string[] SystemUnitDirs =
@@ -250,6 +227,7 @@ public static class StartupIntegration
                     ProtectControlGroups=true
                     ProtectKernelTunables=true
                     RestrictSUIDSGID=true
+                    UMask=0077
 
                     [Install]
                     WantedBy=default.target
