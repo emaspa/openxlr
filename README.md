@@ -109,23 +109,33 @@ systemctl --user enable --now openxlr-daemon
 openxlr               # the mixer UI, also in your application menu
 ```
 
-**Ubuntu** 24.04 or newer: download the `.deb` from the
-[latest release](https://github.com/emaspa/openxlr/releases/latest), then
+**Ubuntu** 24.04 and 26.04, from the
+[PPA](https://launchpad.net/~sparvoli/+archive/ubuntu/openxlr):
 
 ```sh
-sudo apt install ./openxlr_*_amd64.deb
+sudo add-apt-repository ppa:sparvoli/openxlr
+sudo apt install openxlr
 systemctl --user enable --now openxlr-daemon
 openxlr
 ```
 
-**Fedora** 44 or newer: download the `.rpm` from the
-[latest release](https://github.com/emaspa/openxlr/releases/latest), then
+Without the PPA, download the `.deb` from the
+[latest release](https://github.com/emaspa/openxlr/releases/latest) and
+run `sudo apt install ./openxlr_*_amd64.deb`.
+
+**Fedora** 44 or newer, from the
+[COPR repository](https://copr.fedorainfracloud.org/coprs/emaspa/openxlr/):
 
 ```sh
-sudo dnf install ./openxlr-*.x86_64.rpm
+sudo dnf copr enable emaspa/openxlr
+sudo dnf install openxlr
 systemctl --user enable --now openxlr-daemon
 openxlr
 ```
+
+Without COPR, download the `.rpm` from the
+[latest release](https://github.com/emaspa/openxlr/releases/latest) and
+run `sudo dnf install ./openxlr-*.x86_64.rpm`.
 
 **NixOS**: the repo is a flake with a package and a module. The module
 enables the daemon itself; after a rebuild, `openxlr` is in the

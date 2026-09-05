@@ -147,11 +147,12 @@ host mechanism stable than two half-finished ones.
 
 ## Next: distribution
 
-- [ ] Fedora COPR and Ubuntu PPA, so `dnf` and `apt` pick up new releases
-  on their own instead of a download per release. The build recipes are
-  the spec and the debian directory already used by the release
-  workflows; the PPA needs the NuGet packages vendored into the source
-  package because Launchpad builders have no network.
+- [x] Fedora COPR (`emaspa/openxlr`) and Ubuntu PPA (`ppa:sparvoli/openxlr`),
+  so `dnf` and `apt` pick up new releases on their own instead of a
+  download per release. The build recipes are the spec and the debian
+  directory already used by the release workflows; the PPA source package
+  carries the NuGet packages (packaging/ppa/make-source.sh) because
+  Launchpad builders have no network.
 - [ ] Flatpak, after the repositories above, first as a manifest in this
   repo and then on Flathub. The sandbox cannot install the udev rules,
   the WirePlumber rules, the UCM profile or the systemd unit, so the
