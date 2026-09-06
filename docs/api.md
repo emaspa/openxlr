@@ -42,9 +42,16 @@ Messages from the daemon, each a JSON object with a `type` field:
 | `state` | on connect and on every change | `daemonVersion`, device state, capabilities, mixer state, the device list, the app registry, profile names, `activeProfile` (the profile last recalled or saved for the active device; not cleared by later manual changes), `recallOnConnect` (the profile recalled when the device connects, or null), `warning` (one sentence the user should see, or null: mixer settings that cannot be written to disk, which the daemon keeps retrying with backoff, or a device set aside after three hung USB transfers in one run) |
 | `meters` | 15 Hz while the mixer is built | live stereo levels per channel and mix |
 | `plugins` | in answer to `listPlugins` | the installed LV2 plugins with their controls; `supported` is false, with `unsupportedFeatures` listed, for a plugin that needs a host feature the PipeWire chain lacks |
-| `error` | when a command is rejected | `message` |
+| `error` | when a command without a `requestId` is rejected | `message` |
+| `commandResult` | in answer to a command that carried a `requestId` | `requestId`, `error` (null on success); preceded by the state the result refers to |
 
-Commands are single JSON objects with a `cmd` field:
+Commands are single JSON objects with a `cmd` field. The layout commands
+(`createChannel` through `setLayoutOrder` below) succeed only after the
+new layout is written to `mixer.json`; a failed write restores the previous
+layout and answers with an error. Any command may carry a `requestId`; the
+daemon then answers with a `commandResult {requestId, error}` message after
+the state that reflects the outcome (`error` is null on success) instead of
+a bare `error` message, so an editor can wait for the acknowledgement:
 
 | Command | Fields | Purpose |
 |---|---|---|
@@ -53,8 +60,13 @@ Commands are single JSON objects with a `cmd` field:
 | `setLowCutHz` | `value` | software low cut: 0, 80, or 120 |
 | `setSoftClipGuard` | `value` | software ClipGuard (post-ADC limiter at -3 dB); enabling is rejected if `swh-plugins` is unavailable, without replacing or disconnecting the live microphone route |
 | `setLevel` | `channel`, `mix`, `value` | one send fader |
-| `createChannel` | `name` | add an application channel without rebuilding existing nodes; succeeds only after settings are saved, with its generated stable ID in the next state |
-| `setLayoutOrder` | `channels[]`, `mixes[]` | complete ordered lists of application-channel and virtual-microphone IDs; structural nodes stay fixed; succeeds only after saving |
+| `createChannel` | `name` | add an application channel, muted in every mix, without touching existing nodes; its generated stable id is in the next state |
+| `renameChannel` | `channel`, `name` | rename an application channel; its playback device is reloaded under the new name and the streams on it are put back (a short gap on that channel only) |
+| `deleteChannel` | `channel` | remove an application channel; apps and remembered assignments on it move to the first remaining application channel. The last application channel cannot be removed |
+| `createMix` | `name` | add a virtual microphone; every channel gets a muted send into it before the capture device is published |
+| `renameMix` | `mix`, `name` | rename a virtual microphone in OpenXLR; the PipeWire device keeps its old description until the daemon restarts (reloading it would throw recording apps off), and the state's `renamedSinceStart` says so |
+| `deleteMix` | `mix` | remove a virtual microphone with its sends, inserts and capture device |
+| `setLayoutOrder` | `channels[]`, `mixes[]` | complete ordered lists of application-channel and virtual-microphone ids; structural nodes stay fixed |
 | `setChannelMuted` | `channel`, `mix`, `value` | one send mute |
 | `setMixVolume` / `setMixMuted` | `mix`, `value` | mix masters |
 | `setMonitorOutputs` | `devices[]` | every sink the monitor mixes feed; a newly listed output is fed by the first monitor mix |

@@ -91,6 +91,9 @@ sed 's|^ExecStart=.*|ExecStart=%{_bindir}/openxlr-daemon|' \
     packaging/openxlr-daemon.service > openxlr-daemon.service
 install -Dm644 openxlr-daemon.service \
     %{buildroot}%{_userunitdir}/openxlr-daemon.service
+%{_userunitdir}/pipewire-pulse.service.d/openxlr.conf
+install -Dm644 packaging/pipewire-pulse-openxlr.conf \
+    %{buildroot}%{_userunitdir}/pipewire-pulse.service.d/openxlr.conf
 
 install -Dm644 packaging/openxlr.desktop \
     %{buildroot}%{_datadir}/applications/openxlr.desktop

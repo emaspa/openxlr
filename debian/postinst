@@ -6,6 +6,9 @@ if [ "$1" = "configure" ] && [ -z "$2" ]; then
 OpenXLR: replug your interface once so the udev rule applies.
 Start the daemon:  systemctl --user enable --now openxlr-daemon
 Start the mixer:   openxlr   (or from your application menu)
+The package raises pipewire-pulse's open-file limit (a drop-in under
+/usr/lib/systemd/user/pipewire-pulse.service.d); it applies at your next
+login, or now with:  systemctl --user daemon-reload; systemctl --user restart pipewire-pulse
 Stream Deck via OpenDeck:
   cp -r /usr/share/openxlr/com.emaspa.openxlr.sdPlugin ~/.config/opendeck/plugins/
 MSG

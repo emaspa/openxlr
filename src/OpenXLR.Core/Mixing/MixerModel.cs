@@ -80,8 +80,10 @@ public sealed record MixDefinition(string Id, string Name, MixKind Kind)
     public double Volume { get; init; } = 1.0;
     public bool Muted { get; init; }
 
+    /// <summary>Every mix sink shares this prefix; the channel combines follow it as a pattern.</summary>
+    public const string SinkPrefix = "OpenXLR_mix_";
     /// <summary>PipeWire node name of this mix's sink.</summary>
-    public string SinkName => $"OpenXLR_mix_{Id}";
+    public string SinkName => $"{SinkPrefix}{Id}";
     /// <summary>PipeWire node name of the published virtual capture device.</summary>
     public string VirtualMicName => $"OpenXLR_{Id}";
     /// <summary>
@@ -157,6 +159,13 @@ public sealed record MixerState
 
     /// <summary>Application streams currently placed in channels.</summary>
     public IReadOnlyList<StreamAssignment> Streams { get; init; } = [];
+
+    /// <summary>
+    /// True after a virtual microphone was renamed while running: its PipeWire
+    /// device keeps the old description until the daemon restarts, so other
+    /// applications still list the old name.
+    /// </summary>
+    public bool RenamedSinceStart { get; init; }
 }
 
 /// <param name="Kind">"monitor", "virtualMic" or "auxPort", so clients can tell monitor mixes apart.</param>
@@ -164,7 +173,8 @@ public sealed record MixStatus(string Id, string Name, double Volume, bool Muted
 
 public sealed record ChannelStatus(string Id, string Name,
     IReadOnlyDictionary<string, double> Levels,
-    IReadOnlyList<string> MutedIn);
+    IReadOnlyList<string> MutedIn,
+    bool Hardware = false);
 
 
 /// <summary>

@@ -29,6 +29,89 @@ public sealed partial record MixerConfig
         }
     }
 
+    /// <summary>The application channel with one display name changed; everything else identical.</summary>
+    public MixerConfig WithChannelName(string id, string name)
+    {
+        ChannelDefinition channel = Channels.FirstOrDefault(c => c.Id == id && c.InputPair is null)
+            ?? throw new InvalidOperationException($"'{id}' is not an application channel");
+        return this with { Channels = [.. Channels.Select(c => ReferenceEquals(c, channel) ? c with { Name = name } : c)] };
+    }
+
+    /// <summary>The virtual microphone with one display name changed; everything else identical.</summary>
+    public MixerConfig WithMixName(string id, string name)
+    {
+        MixDefinition mix = Mixes.FirstOrDefault(m => m.Id == id && m.Kind == MixKind.VirtualMic)
+            ?? throw new InvalidOperationException($"'{id}' is not a virtual microphone");
+        return this with { Mixes = [.. Mixes.Select(m => ReferenceEquals(m, mix) ? m with { Name = name } : m)] };
+    }
+
+    /// <summary>Without one application channel. The last application channel stays: streams need a destination.</summary>
+    public MixerConfig WithoutChannel(string id)
+    {
+        if (!Channels.Any(c => c.Id == id && c.InputPair is null))
+            throw new InvalidOperationException($"'{id}' is not an application channel");
+        if (Channels.Count(c => c.InputPair is null) == 1)
+            throw new InvalidOperationException("the last application channel cannot be deleted");
+        return this with { Channels = [.. Channels.Where(c => c.Id != id)] };
+    }
+
+    /// <summary>Without one virtual microphone; the per-channel sends into it go with it.</summary>
+    public MixerConfig WithoutMix(string id)
+    {
+        if (!Mixes.Any(m => m.Id == id && m.Kind == MixKind.VirtualMic))
+            throw new InvalidOperationException($"'{id}' is not a virtual microphone");
+        return this with
+        {
+            Mixes = [.. Mixes.Where(m => m.Id != id)],
+            Channels = [.. Channels.Select(c => c with
+            {
+                Levels = c.Levels.Where(l => l.Key != id).ToDictionary(),
+                MutedIn = c.MutedIn.Where(m => m != id).ToHashSet(),
+            })],
+        };
+    }
+
+    /// <summary>
+    /// With a new virtual microphone after the existing ones, ahead of Aux.
+    /// Every channel gets a muted full-level send into it, so nothing reaches
+    /// the new microphone until the user opens a send.
+    /// </summary>
+    public MixerConfig WithMix(MixDefinition mix)
+    {
+        if (mix.Kind != MixKind.VirtualMic) throw new InvalidOperationException("only virtual microphones can be added");
+        if (Mixes.Count(m => m.Kind == MixKind.VirtualMic) >= MaxVirtualMixes)
+            throw new InvalidOperationException("virtual microphone limit reached");
+        if (Mixes.Any(m => m.Id.Equals(mix.Id, StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException($"mix '{mix.Id}' already exists");
+        return this with
+        {
+            Mixes = [.. Mixes.Where(m => m.Kind != MixKind.AuxPort), mix, .. Mixes.Where(m => m.Kind == MixKind.AuxPort)],
+            Channels = [.. Channels.Select(c => c with
+            {
+                Levels = c.Levels.Append(new(mix.Id, 1.0)).ToDictionary(),
+                MutedIn = c.MutedIn.Append(mix.Id).ToHashSet(),
+            })],
+        };
+    }
+
+    /// <summary>
+    /// A stable id from a display name: lowercase ASCII letters and digits with
+    /// hyphens, starting with a letter, at most 28 characters, unique among
+    /// <paramref name="existing"/> (case-insensitive) with a numeric suffix.
+    /// </summary>
+    public static string NewId(string name, string fallback, IEnumerable<string> existing)
+    {
+        string slug = new(name.ToLowerInvariant().Select(c => char.IsAsciiLetterOrDigit(c) ? c : '-').ToArray());
+        slug = string.Join('-', slug.Split('-', StringSplitOptions.RemoveEmptyEntries));
+        if (slug.Length == 0) slug = fallback;
+        if (!char.IsAsciiLetter(slug[0])) slug = $"{fallback}-{slug}";
+        if (slug.Length > 28) slug = slug[..28].TrimEnd('-');
+        var used = new HashSet<string>(existing, StringComparer.OrdinalIgnoreCase);
+        string id = slug;
+        for (int n = 2; used.Contains(id); n++) id = $"{slug}-{n}";
+        return id;
+    }
+
     /// <summary>Keep obsolete app rules out of hardware inputs after a layout change.</summary>
     public string ResolveApplicationChannel(string requested)
         => requested == StreamMatcher.Ignore ? requested

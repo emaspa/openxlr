@@ -32,18 +32,43 @@ save and restart. Removed application destinations fall back to the first
 application channel, never a hardware input; ignored applications stay ignored.
 Existing monitor-feed settings and profile semantics are unchanged.
 
-The `createChannel {name}` command adds an application channel while running,
-without rebuilding existing nodes. It succeeds only after the new layout is
-saved. A failed save removes the new channel and reports an error; existing
-channels and virtual microphones remain in place. Ordinary fader saves retain
-their best-effort retry behavior.
+## Editing while running
 
-`setLayoutOrder {channels, mixes}` changes the list order while running. Supply
-every application-channel ID in `channels` and every virtual-microphone ID in
-`mixes`, each exactly once. Hardware inputs, Monitor A/B and Aux are excluded
-and remain in their structural positions. Duplicate, missing and unknown IDs
-are errors. Success means the order was saved; a failed write restores the
-previous order. No PipeWire node or link changes during this operation.
+The window's Edit layout button, and the commands below over the API,
+change the layout without stopping audio. Each one is saved before it is
+acknowledged; a failed save restores the previous layout and reports an
+error. Ordinary fader saves keep their debounced, retried behaviour.
 
-Other manual changes, including external PipeWire descriptions, take effect at
-startup. The desktop layout editor is not yet provided.
+- `createChannel {name}` adds an application channel. Only its sink is
+  loaded; it starts muted in every mix.
+- `renameChannel {channel, name}` saves the name and reloads that channel's
+  playback device under it, so desktop applets show the new name at once.
+  PipeWire parks the streams that were playing into it on the default
+  output for the moment the sink is away, and the daemon puts them back.
+- `deleteChannel {channel}` moves the apps routed to it, remembered
+  assignments included, to the first remaining application channel and
+  unloads its sink. The last application channel stays.
+- `createMix {name}` adds a virtual microphone. The channel sinks feed the
+  mix sinks by name pattern, so every channel grows a send into the new mix
+  by itself, muted before the capture device is published.
+- `renameMix {mix, name}` changes the name in OpenXLR only. Reloading the
+  capture device would drop every app recording from it onto another
+  source, so its PipeWire description keeps the old name until the daemon
+  restarts; the state carries `renamedSinceStart` and the window shows a
+  restart hint.
+- `deleteMix {mix}` removes the virtual microphone, its sends, inserts and
+  capture device. Anything recording from it loses the device.
+- `setLayoutOrder {channels, mixes}` reorders the editable ids. Supply every
+  application-channel id and every virtual-microphone id exactly once;
+  hardware inputs, Monitor A/B and Aux keep their positions. No node changes.
+
+Every added channel or mix costs pipewire-pulse a few dozen open files;
+the daemon refuses an addition the server has no room for, and the packages
+raise the server's limit (manual, section 5.8).
+
+Ids are generated from names (lowercase letters, digits and hyphens,
+starting with a letter, unique with a numeric suffix) and never change
+afterwards, so node names, profiles and Stream Deck keys survive a rename.
+
+Other manual changes, including external PipeWire descriptions, take effect
+at startup.

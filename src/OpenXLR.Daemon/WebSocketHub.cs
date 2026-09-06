@@ -64,7 +64,7 @@ public sealed class WebSocketHub
         _devices.Snapshot() with
         {
             DaemonVersion = OpenXLR.Daemon.DaemonVersion.Current,
-            Warning = string.Join(" ", new[] { _devices.Warning, _mixer.PersistenceWarning }.Where(w => w is not null)) is { Length: > 0 } w ? w : null,
+            Warning = string.Join(" ", new[] { _devices.Warning, _mixer.PersistenceWarning, _mixer.ResourceWarning }.Where(w => w is not null)) is { Length: > 0 } w ? w : null,
             ActiveProfile = ActiveDeviceId() is string apId && _activeProfile.TryGetValue(apId, out string? ap) ? ap : null,
             Mixer = _mixer.Snapshot(),
             Devices = _mixer.Devices(),
@@ -157,7 +157,7 @@ public sealed class WebSocketHub
     {
         var messages = new List<object>();
         await DispatchAsync(message => { messages.Add(message); return Task.CompletedTask; }, text);
-        return new("1", !messages.Any(message => message is ErrorMessage), messages);
+        return new("1", !messages.Any(message => message is ErrorMessage or CommandResultMessage { Error: not null }), messages);
     }
 
     private async Task DispatchAsync(Func<object, Task> reply, string text)
@@ -188,6 +188,11 @@ public sealed class WebSocketHub
                 if (err is not null) await reply(new ErrorMessage(err));
                 break;
             case "createChannel":
+            case "renameChannel":
+            case "deleteChannel":
+            case "createMix":
+            case "renameMix":
+            case "deleteMix":
             case "setLayoutOrder":
             case "setLevel":
             case "setChannelMuted":
@@ -208,6 +213,14 @@ public sealed class WebSocketHub
             case "setInsertBypass":
             case "setInsertParam":
                 string? mixErr = _mixer.Apply(cmd);                     // broadcasts on success
+                if (cmd.RequestId is not null)
+                {
+                    // The state first, so a waiting editor re-enables its
+                    // controls against the layout the result refers to.
+                    await reply(Snapshot());
+                    await reply(new CommandResultMessage(cmd.RequestId, mixErr));
+                    break;
+                }
                 if (mixErr is not null)
                 {
                     await reply(new ErrorMessage(mixErr));

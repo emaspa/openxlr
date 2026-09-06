@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
+using System.Threading.Tasks;
 using Avalonia.Threading;
 
 namespace OpenXLR.UI;
@@ -63,7 +64,7 @@ public sealed class MainViewModel : ViewModelBase
     // --- connection / device identity ---
 
     private bool _daemonConnected;
-    public bool DaemonConnected { get => _daemonConnected; private set { if (SetAndRaiseMismatch(ref _daemonConnected, value)) { Raise(nameof(StatusLine)); Raise(nameof(MixerPlaceholder)); } } }
+    public bool DaemonConnected { get => _daemonConnected; private set { if (SetAndRaiseMismatch(ref _daemonConnected, value)) { Raise(nameof(StatusLine)); Raise(nameof(MixerPlaceholder)); Raise(nameof(CanEditLayout)); } } }
 
     /// <summary>What the empty SUBMIXER tile says: the two reasons differ.</summary>
     public string MixerPlaceholder => !DaemonConnected
@@ -511,7 +512,48 @@ public sealed class MainViewModel : ViewModelBase
     public string OutputVolumeText => $"{_outputVolume * 100:0}%";
 
     private bool _hasMixer;
-    public bool HasMixer { get => _hasMixer; private set { if (Set(ref _hasMixer, value)) Raise(nameof(MixerPlaceholder)); } }
+    public bool HasMixer { get => _hasMixer; private set { if (Set(ref _hasMixer, value)) { Raise(nameof(MixerPlaceholder)); Raise(nameof(CanEditLayout)); } } }
+
+    /// <summary>The layout editor needs a live daemon with a built graph.</summary>
+    public bool CanEditLayout => DaemonConnected && HasMixer;
+
+    private bool _renamedSinceStart;
+    /// <summary>
+    /// A virtual microphone was renamed while the daemon runs. Other apps
+    /// keep listing the old device name until the daemon restarts.
+    /// </summary>
+    public bool RenamedSinceStart { get => _renamedSinceStart; private set => Set(ref _renamedSinceStart, value); }
+
+    // --- layout editing: the daemon answers after the new layout is saved ---
+
+    public Task<string?> CreateChannel(string name) => Edit(_client.CreateChannelAsync(name));
+    public Task<string?> RenameChannel(string id, string name) => Edit(_client.RenameChannelAsync(id, name));
+    public Task<string?> DeleteChannel(string id) => Edit(_client.DeleteChannelAsync(id));
+    public Task<string?> CreateMix(string name) => Edit(_client.CreateMixAsync(name));
+    public Task<string?> RenameMix(string id, string name) => Edit(_client.RenameMixAsync(id, name));
+    public Task<string?> DeleteMix(string id) => Edit(_client.DeleteMixAsync(id));
+
+    /// <summary>Move one editable channel or mix one step; the whole order is sent.</summary>
+    public Task<string?> MoveChannel(string id, int delta) => Reorder(id, delta, isMix: false);
+    public Task<string?> MoveMix(string id, int delta) => Reorder(id, delta, isMix: true);
+
+    private Task<string?> Reorder(string id, int delta, bool isMix)
+    {
+        List<string> channels = [.. Channels.Where(c => c.IsEditable).Select(c => c.Id)];
+        List<string> mixes = [.. Mixes.Where(m => m.IsEditable).Select(m => m.Id)];
+        List<string> list = isMix ? mixes : channels;
+        int from = list.IndexOf(id), to = from + delta;
+        if (from < 0 || to < 0 || to >= list.Count) return Task.FromResult<string?>(null);
+        (list[from], list[to]) = (list[to], list[from]);
+        return Edit(_client.SetLayoutOrderAsync(channels, mixes));
+    }
+
+    private async Task<string?> Edit(Task<string?> result)
+    {
+        string? error = await result;
+        if (error is not null) Status = error;
+        return error;
+    }
 
     private bool SetAndRaiseMismatch(ref bool field, bool value)
     {
@@ -862,16 +904,22 @@ public sealed class MainViewModel : ViewModelBase
                        s["active"]?.GetValue<bool>() ?? true,
                        s["running"]?.GetValue<bool>() ?? true));
         }
+        // Apps route to application channels only; "not managed" leaves them to the desktop.
+        List<ChannelChoice> choices = [.. Channels.Where(c => c.IsEditable).Select(c => new ChannelChoice(c.Id, c.Name)),
+            new ChannelChoice(AppStreamViewModel.Ignore, "Not managed")];
         // Update in place so an open dropdown is not closed by a state push.
         foreach (var f in fresh)
         {
             AppStreamViewModel? existing = Apps.FirstOrDefault(a =>
                 string.Equals(a.Identity, f.Identity, StringComparison.OrdinalIgnoreCase));
             if (existing is null)
-                Apps.Add(new AppStreamViewModel(_client, f.Identity, f.Label, [.. Channels.Select(c => c.Id), AppStreamViewModel.Ignore])
+                Apps.Add(new AppStreamViewModel(_client, f.Identity, f.Label, choices)
                     { ChannelId = f.Channel, Active = f.Active, Running = f.Running });
             else
+            {
+                existing.SyncChannels(choices);
                 existing.ApplyFromDaemon(f.Channel, f.Active, f.Running, f.Label);
+            }
         }
         for (int i = Apps.Count - 1; i >= 0; i--)
             if (!fresh.Any(f => string.Equals(f.Identity, Apps[i].Identity, StringComparison.OrdinalIgnoreCase))) Apps.RemoveAt(i);
@@ -895,8 +943,9 @@ public sealed class MainViewModel : ViewModelBase
 
     private void ApplyMixer(JsonNode? mixer)
     {
-        if (mixer is null) { HasMixer = false; return; }
+        if (mixer is null) { HasMixer = false; RenamedSinceStart = false; return; }
         HasMixer = true;
+        RenamedSinceStart = mixer["renamedSinceStart"]?.GetValue<bool>() ?? false;
         SoftLowCutHz = mixer["lowCutHz"]?.GetValue<int>() ?? 0;
         SoftClipGuardAvailable = mixer["softClipGuardAvailable"]?.GetValue<bool>() ?? false;
         SoftClipGuardError = mixer["softClipGuardError"]?.GetValue<string>();
@@ -927,10 +976,10 @@ public sealed class MainViewModel : ViewModelBase
 
         if (mixer["channels"] is JsonArray channels)
         {
+            string[] mixIds = [.. Mixes.Select(m => m.Id)];
             SyncList(Channels, channels, c => c["id"]!.GetValue<string>(),
-                (c, vm) => vm.ApplyFromDaemon(c),
-                c => new ChannelViewModel(_client, c["id"]!.GetValue<string>(), c["name"]!.GetValue<string>(),
-                    [.. Mixes.Select(m => m.Id)]));
+                (c, vm) => { vm.SyncSends(mixIds); vm.ApplyFromDaemon(c); },
+                c => new ChannelViewModel(_client, c["id"]!.GetValue<string>(), c["name"]!.GetValue<string>(), mixIds));
             // Send rows carry the mix's name, not its id.
             foreach (ChannelViewModel c in Channels)
                 foreach (SendViewModel send in c.Sends)
@@ -982,17 +1031,40 @@ public sealed class AppStreamViewModel : ViewModelBase
     private readonly DaemonClient _client;
     private bool _applying;
 
-    public AppStreamViewModel(DaemonClient client, string identity, string label, IReadOnlyList<string> channels)
+    public AppStreamViewModel(DaemonClient client, string identity, string label, IReadOnlyList<ChannelChoice> channels)
     {
         _client = client; Identity = identity; _label = label;
-        foreach (string c in channels) Channels.Add(c);
+        foreach (ChannelChoice c in channels) Channels.Add(c);
     }
 
     public string Identity { get; }
 
     private string _label;
     public string Label { get => _label; private set => Set(ref _label, value); }
-    public ObservableCollection<string> Channels { get; } = [];
+
+    /// <summary>The application channels by name, plus "not managed".</summary>
+    public ObservableCollection<ChannelChoice> Channels { get; } = [];
+
+    /// <summary>Replace the choices when the layout changed; the selection is re-pointed by id.</summary>
+    public void SyncChannels(IReadOnlyList<ChannelChoice> channels)
+    {
+        if (Channels.Select(c => (c.Id, c.Name)).SequenceEqual(channels.Select(c => (c.Id, c.Name)))) return;
+        _applying = true;
+        try
+        {
+            Channels.Clear();
+            foreach (ChannelChoice c in channels) Channels.Add(c);
+            Raise(nameof(SelectedChannel));
+        }
+        finally { _applying = false; }
+    }
+
+    /// <summary>The picker's selection, mapped onto <see cref="ChannelId"/>.</summary>
+    public ChannelChoice? SelectedChannel
+    {
+        get => Channels.FirstOrDefault(c => c.Id == _channelId);
+        set { if (value is not null) ChannelId = value.Id; }
+    }
 
     private bool _active = true;
     public bool Active
@@ -1015,7 +1087,14 @@ public sealed class AppStreamViewModel : ViewModelBase
     public string ChannelId
     {
         get => _channelId;
-        set { if (Set(ref _channelId, value) && !_applying && value.Length > 0) _ = _client.AssignAppAsync(Identity, value); }
+        set
+        {
+            if (Set(ref _channelId, value))
+            {
+                Raise(nameof(SelectedChannel));
+                if (!_applying && value.Length > 0) _ = _client.AssignAppAsync(Identity, value);
+            }
+        }
     }
 
     public void ApplyFromDaemon(string channelId, bool active, bool running, string? label = null)
@@ -1033,6 +1112,12 @@ public sealed class AppStreamViewModel : ViewModelBase
     public string StatusText => Active ? "playing" : Running ? "running" : "not running";
 
     public void Forget() => _ = _client.ForgetAppAsync(Identity);
+}
+
+/// <summary>An application channel as a picker entry: stable id, current name.</summary>
+public sealed record ChannelChoice(string Id, string Name)
+{
+    public override string ToString() => Name;
 }
 
 /// <summary>One selectable sink or source. Own nodes are OpenXLR's own.</summary>
@@ -1120,12 +1205,21 @@ public sealed class MixViewModel : ViewModelBase, IHasId
 
     public MixViewModel(DaemonClient client, string id, string name)
     {
-        _client = client; Id = id; Name = name;
+        _client = client; Id = id; _name = name;
         Inserts = new InsertsViewModel(client, $"mix:{id}", channels: 2, title: $"{name} mix");
     }
 
     public string Id { get; }
-    public string Name { get; }
+
+    private string _name;
+    /// <summary>Display name; the daemon renames virtual microphones live.</summary>
+    public string Name { get => _name; set => Set(ref _name, value); }
+
+    /// <summary>Editable: a virtual microphone. Monitors and Aux are structural.</summary>
+    public bool IsEditable => Kind == "virtualMic";
+
+    /// <summary>What a structural mix is, for the layout editor.</summary>
+    public string KindLabel => Kind switch { "monitor" => "monitor mix", "auxPort" => "USB Aux port", _ => "" };
 
     /// <summary>This mix's stereo plugin insert chain.</summary>
     public InsertsViewModel Inserts { get; }
@@ -1133,8 +1227,9 @@ public sealed class MixViewModel : ViewModelBase, IHasId
     private bool _visible = true;
     public bool Visible { get => _visible; set => Set(ref _visible, value); }
 
+    private string _kind = "monitor";
     /// <summary>"monitor", "virtualMic" or "auxPort", as the daemon reports it.</summary>
-    public string Kind { get; set; } = "monitor";
+    public string Kind { get => _kind; set { if (Set(ref _kind, value)) { Raise(nameof(IsEditable)); Raise(nameof(KindLabel)); } } }
 
     private double _volume = 1.0;
     public double Volume
@@ -1180,6 +1275,7 @@ public sealed class MixViewModel : ViewModelBase, IHasId
                 Volume = n["volume"]?.GetValue<double>() ?? 1.0;
             Muted = n["muted"]?.GetValue<bool>() ?? false;
             Kind = n["kind"]?.GetValue<string>() ?? Kind;
+            if (n["name"]?.GetValue<string>() is { Length: > 0 } name) Name = name;
         }
         finally { _applying = false; }
     }
@@ -1197,13 +1293,32 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
 {
     public ChannelViewModel(DaemonClient client, string id, string name, IReadOnlyList<string> mixIds)
     {
-        Id = id; Name = name;
+        _client = client; Id = id; _name = name;
         foreach (string mixId in mixIds) Sends.Add(new SendViewModel(client, id, mixId));
     }
 
+    private readonly DaemonClient _client;
     public string Id { get; }
-    public string Name { get; }
+
+    private string _name;
+    /// <summary>Display name; the daemon renames application channels live.</summary>
+    public string Name { get => _name; set => Set(ref _name, value); }
+
+    private bool _isHardware;
+    /// <summary>A hardware input (XLR 1, XLR 2, Aux In): structural, not editable.</summary>
+    public bool IsHardware { get => _isHardware; set { if (Set(ref _isHardware, value)) Raise(nameof(IsEditable)); } }
+    public bool IsEditable => !IsHardware;
+
     public ObservableCollection<SendViewModel> Sends { get; } = [];
+
+    /// <summary>Keep one send per mix as mixes come and go.</summary>
+    public void SyncSends(IReadOnlyList<string> mixIds)
+    {
+        for (int i = Sends.Count - 1; i >= 0; i--)
+            if (!mixIds.Contains(Sends[i].MixId)) Sends.RemoveAt(i);
+        foreach (string mixId in mixIds)
+            if (Sends.All(s => s.MixId != mixId)) Sends.Add(new SendViewModel(_client, Id, mixId));
+    }
 
     private bool _visible = true;
     public bool Visible { get => _visible; set => Set(ref _visible, value); }
@@ -1215,6 +1330,8 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
 
     public void ApplyFromDaemon(JsonNode n)
     {
+        if (n["name"]?.GetValue<string>() is { Length: > 0 } name) Name = name;
+        IsHardware = n["hardware"]?.GetValue<bool>() ?? false;
         var muted = new HashSet<string>();
         if (n["mutedIn"] is JsonArray arr)
             foreach (JsonNode? m in arr) if (m is not null) muted.Add(m.GetValue<string>());

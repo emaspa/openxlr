@@ -72,6 +72,9 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
   `OpenXLR Chat`, selectable in OBS or Discord like a microphone), and
   Aux (what a second computer on the USB Aux port receives)
 - Per-channel, per-mix send levels and mutes; per-mix masters
+- An editable layout: add, rename, reorder and remove application
+  channels and virtual microphones while audio plays, from the window or
+  the API, with stable ids so profiles and Stream Deck keys survive
 - The monitor mixes can play on several outputs at once, hardware
   outputs included; each output picks which monitor mix feeds it, or
   both summed (Monitor A+B), so a headset with a game sink and a chat
@@ -93,8 +96,8 @@ muted, you do not. With another device in the monitor set the software
 send carries the microphone to everything instead.
 
 Channels appear as playback devices in the desktop's audio applet, and
-the Stream and Chat virtual microphones as recording devices; the
-hardware input channels are hidden from it.
+the virtual microphones (Stream and Chat by default) as recording
+devices; the hardware input channels are hidden from it.
 
 ## Inserts
 

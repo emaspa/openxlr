@@ -27,6 +27,8 @@ public sealed class DaemonClient : IAsyncDisposable
     private Task? _disposeTask;
     private bool _disposed;
     private readonly Dictionary<string, PendingQuery> _queries = new();
+    // Layout edits wait for the daemon's commandResult with their requestId.
+    private readonly Dictionary<string, TaskCompletionSource<string?>> _edits = new();
     private const int MaxMessageBytes = 8 * 1024 * 1024;
 
     private sealed class PendingQuery
@@ -144,6 +146,8 @@ public sealed class DaemonClient : IAsyncDisposable
                 {
                     foreach (var query in _queries.Values) query.Reply.TrySetResult(null);
                     _queries.Clear();
+                    foreach (var edit in _edits.Values) edit.TrySetResult("Connection lost. Check the layout before retrying.");
+                    _edits.Clear();
                 }
                 ConnectionChanged?.Invoke(false);
             }
@@ -184,6 +188,12 @@ public sealed class DaemonClient : IAsyncDisposable
             else if (type == "state") { LastStateJson = text; StateReceived?.Invoke(node); }
             else if (type == "diagnostics") CompleteQuery(type, node);
             else if (type == "plugins") CompleteQuery(type, node["plugins"]);
+            else if (type == "commandResult" && node["requestId"]?.GetValue<string>() is string requestId)
+            {
+                TaskCompletionSource<string?>? edit;
+                lock (_lifecycle) _edits.TryGetValue(requestId, out edit);
+                edit?.TrySetResult(node["error"]?.GetValue<string>());
+            }
             else if (type == "meters" && node["levels"] is JsonNode levels) MetersReceived?.Invoke(levels);
         }
     }
@@ -225,6 +235,47 @@ public sealed class DaemonClient : IAsyncDisposable
 
     public Task SetMixMutedAsync(string mix, bool muted)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setMixMuted", ["mix"] = mix, ["value"] = muted });
+
+    // --- layout editing: each call resolves to null on success or the daemon's error ---
+
+    public Task<string?> CreateChannelAsync(string name)
+        => EditLayoutAsync(new() { ["cmd"] = "createChannel", ["name"] = name });
+    public Task<string?> RenameChannelAsync(string channel, string name)
+        => EditLayoutAsync(new() { ["cmd"] = "renameChannel", ["channel"] = channel, ["name"] = name });
+    public Task<string?> DeleteChannelAsync(string channel)
+        => EditLayoutAsync(new() { ["cmd"] = "deleteChannel", ["channel"] = channel });
+    public Task<string?> CreateMixAsync(string name)
+        => EditLayoutAsync(new() { ["cmd"] = "createMix", ["name"] = name });
+    public Task<string?> RenameMixAsync(string mix, string name)
+        => EditLayoutAsync(new() { ["cmd"] = "renameMix", ["mix"] = mix, ["name"] = name });
+    public Task<string?> DeleteMixAsync(string mix)
+        => EditLayoutAsync(new() { ["cmd"] = "deleteMix", ["mix"] = mix });
+    public Task<string?> SetLayoutOrderAsync(IReadOnlyList<string> channels, IReadOnlyList<string> mixes)
+        => EditLayoutAsync(new() { ["cmd"] = "setLayoutOrder", ["channels"] = channels, ["mixes"] = mixes });
+
+    /// <summary>
+    /// Send a layout command and wait for its commandResult. The daemon
+    /// answers only after the new layout is saved, and sends the matching
+    /// state first, so a null result means the change is visible and durable.
+    /// </summary>
+    private async Task<string?> EditLayoutAsync(Dictionary<string, object> payload)
+    {
+        string requestId = Guid.NewGuid().ToString("N");
+        var waiter = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (_lifecycle)
+        {
+            if (_disposed) return "Daemon disconnected; no change was sent.";
+            _edits[requestId] = waiter;
+        }
+        payload["requestId"] = requestId;
+        try
+        {
+            if (!await SendAsync(payload, reportErrors: false)) return "Daemon disconnected; no change was sent.";
+            return await waiter.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        }
+        catch (TimeoutException) { return "No answer from the daemon. Check the layout before retrying."; }
+        finally { lock (_lifecycle) _edits.Remove(requestId); }
+    }
 
     /// <summary>Send the monitor mix to a different output (null disconnects).</summary>
     public Task SetMonitorOutputAsync(string? device)

@@ -49,23 +49,20 @@ the routing model and the daemon's service behaviour both changed in
 0.1.21 and the release after it, and they get to settle in users' hands
 first.
 
-- [ ] Editable application channels and virtual-microphone mixes: add,
+- [x] Editable application channels and virtual-microphone mixes: add,
   rename, delete, reorder, with stable ids separate from display names so
   PipeWire node names, profiles and Stream Deck keys survive a rename.
-  Hardware inputs, Monitor A, Monitor B and Aux stay structural. A pull
-  request (#22) implements an earlier shape of this on a single monitor
-  mix; it is being rebuilt on the two-monitor model in four pieces, each
-  mergeable on its own: the editable channels and mixes, strict
-  persistence for structural changes (a layout command is acknowledged
-  only after its save succeeded, and a failed write is an error), the
-  desktop layout editor, and Stream Deck choices generated from daemon
-  state while the monitor feed keys keep working. Renames must not
-  rebuild the graph and creation must add nodes incrementally, so
-  existing streams are never dropped. Landed so far: the Stream Deck
-  choices (#25), the saved layout format read at graph build (#33,
-  [docs/mixer-layout.md](mixer-layout.md)), live channel creation with
-  strict persistence (#34) and the saved channel and mix order (#35);
-  rename, delete and the desktop editor follow.
+  Hardware inputs, Monitor A, Monitor B and Aux stay structural. Every
+  layout command is acknowledged only after its save succeeded, a failed
+  write is an error, and no untouched node is rebuilt: the channel sinks
+  feed the mix sinks by name pattern, so a new mix grows its sends on its
+  own. Landed in pieces: the Stream Deck choices (#25), the saved layout
+  format (#33, [docs/mixer-layout.md](mixer-layout.md)), live channel
+  creation (#34), the saved order (#35), then rename, delete, mix
+  creation and the desktop editor. One known limit: a renamed virtual
+  microphone keeps its old device name in other apps until the daemon
+  restarts, since reloading the device would drop the apps recording
+  from it.
 - [ ] Per-mix customization: icon, colour and order per mix and channel,
   hide a channel without deleting its routing, a compact layout that
   keeps one selected channel visible. Icons and colours also reach the

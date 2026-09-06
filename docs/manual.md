@@ -280,6 +280,37 @@ Since 0.1.23 every client presents a token the daemon writes at start
 refused with "unauthorized" until it is updated too; the plugin zip on
 the release page matches the daemon of that release.
 
+### 3.11 Edit the mixer layout
+
+The default channels and mixes are a starting point. Edit layout… in the
+SUBMIXER card opens the layout editor: application channels on the left,
+mixes on the right, each with move up and down, Rename and Delete, and a
+box at the bottom to add one. The hardware inputs, Monitor A, Monitor B
+and Aux are listed but fixed.
+
+- A new channel appears as a playback device at once and starts muted in
+  every mix, so route an app to it and open the sends you want.
+- A new virtual microphone receives nothing until you open a send; then
+  pick it in OBS, Discord or any recorder like a microphone.
+- Renaming a channel reloads its playback device under the new name.
+  Apps playing into it keep playing after a short gap; nothing else is
+  touched.
+- Renaming a mix changes the name in OpenXLR and on the Stream Deck right
+  away. Other applications keep listing the old microphone name until the
+  daemon restarts, because reloading the device would throw them off it.
+  The window shows a restart hint; restart when nothing is recording.
+- Deleting a channel moves its apps to the first remaining application
+  channel. Deleting a mix removes its virtual microphone, and anything
+  recording from it loses the device.
+
+Every change is saved before the editor confirms it. If the settings
+file cannot be written the change is undone and the editor says why. The
+same happens when pipewire-pulse has no room for more streams; section
+5.8 explains the limit and the drop-in that raises it.
+Ids are generated from names and never change afterwards, so profiles
+and Stream Deck keys survive a rename. The layout file is described in
+[mixer-layout.md](mixer-layout.md).
+
 ## 4. Stream Deck (OpenDeck)
 
 The plugin has two actions. Both are clients of the daemon and show
@@ -393,7 +424,32 @@ daemon, to try again.
 Collect diagnostics afterwards (section 5.8): the archive contains the
 exact transfer, and that is what makes the report actionable.
 
-### 5.8 Reporting a problem
+### 5.8 Channels or mixes vanish after adding one
+
+pipewire-pulse, PipeWire's PulseAudio server, inherits systemd's default
+limit of 1024 open files. OpenXLR's send faders are streams inside that
+server, so a layout with a few channels or mixes beyond the default
+reaches the limit, and past it the server drops nodes at random: sinks
+disappear, apps fall back to the default output, and the window shows
+"Sink not found" errors from pactl.
+
+OpenXLR refuses to add a channel or mix when the server has no room left
+and says so in the editor, and the header shows a warning once the server
+is at three quarters of its limit. The packages install a drop-in under
+`/usr/lib/systemd/user/pipewire-pulse.service.d/` that raises the limit
+to 65536. It applies at the next login, or right away with
+
+```sh
+systemctl --user daemon-reload
+systemctl --user restart pipewire-pulse
+```
+
+Restarting pipewire-pulse reconnects every PulseAudio client for a moment.
+Check with `systemctl --user show pipewire-pulse -p LimitNOFILESoft`.
+A source checkout without the package can put the same two lines into
+`~/.config/systemd/user/pipewire-pulse.service.d/openxlr.conf` by hand.
+
+### 5.9 Reporting a problem
 
 Ask on the OpenXLR Discord server (<https://discord.gg/4bswtnGPW4>,
 one post per problem in its support forum), on Reddit at

@@ -72,29 +72,22 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
 
     public MixerConfig Config => _config;
 
-    /// <summary>Save an order change without touching any PipeWire node or link.</summary>
-    public void SetLayoutOrder(IReadOnlyList<string> channels, IReadOnlyList<string> mixes,
-        Func<MixerSettings, string?> persist)
-    {
-        ArgumentNullException.ThrowIfNull(persist);
-        lock (_gate)
-        {
-            if (!_built) throw new InvalidOperationException("mixer is not built");
-            MixerConfig previous = _config;
-            _config = _config.WithOrder(channels, mixes);
-            try
-            {
-                if (persist(ExportSettings()) is string error) throw new IOException(error);
-            }
-            catch { _config = previous; throw; }
-        }
-    }
     public bool Built => _built;
 
     private static string Cell(string channel, string mix) => $"{channel}|{mix}";
 
     // channel id -> its combine module; "channel|mix" -> that leg's sink-input index
     private readonly Dictionary<string, uint> _combineModules = [];
+    // mix id -> its sink module, and for virtual microphones the post sink
+    // and the published capture device, so one mix can be removed alone.
+    private readonly Dictionary<string, uint> _mixModules = [];
+    private readonly Dictionary<string, uint> _postModules = [];
+    private readonly Dictionary<string, uint> _virtualMicModules = [];
+    // A virtual microphone renamed while running keeps its old PipeWire
+    // description until the next build; clients show a restart hint.
+    private bool _renamedSinceBuild;
+    /// <summary>Every channel combine feeds every mix sink, present or future.</summary>
+    private const string MixSinkPattern = "~" + MixDefinition.SinkPrefix;
     private readonly Dictionary<string, int> _legIndex = [];
 
     /// <summary>Map every combine's internal streams to their (channel, mix) cells.</summary>
@@ -136,7 +129,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             // Mixes first: the cells attach to them as masters.
             foreach (MixDefinition mix in config.Mixes)
             {
-                _pw.CreateNullSink(mix.SinkName, $"OpenXLR {mix.Name}");
+                _mixModules[mix.Id] = _pw.CreateNullSink(mix.SinkName, $"OpenXLR {mix.Name}");
                 _mixVolume[mix.Id] = mix.Volume;
                 if (mix.Muted) _mixMuted.Add(mix.Id);
             }
@@ -152,8 +145,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                     if (ch.MutedIn.Contains(mix.Id)) _muted.Add(cell);
                     _cells.Add(cell);
                 }
-                _combineModules[ch.Id] = _pw.CreateCombineSink(ch.SinkName,
-                    config.Mixes.Select(m => m.SinkName),
+                _combineModules[ch.Id] = _pw.CreateCombineSink(ch.SinkName, MixSinkPattern,
                     $"OpenXLR {ch.Name}",
                     visible: ch.InputPair is null);   // hardware inputs are not playback devices
             }
@@ -168,8 +160,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             // the capture device an app is recording from.
             foreach (MixDefinition mix in config.Mixes.Where(m => m.Kind == MixKind.VirtualMic))
             {
-                _pw.CreateNullSink(mix.PostSinkName, $"OpenXLR {mix.Name} (post)");
-                _pw.CreateVirtualMic(mix.VirtualMicName, $"{mix.PostSinkName}.monitor", $"OpenXLR {mix.Name}");
+                _postModules[mix.Id] = _pw.CreateNullSink(mix.PostSinkName, $"OpenXLR {mix.Name} (post)");
+                _virtualMicModules[mix.Id] = _pw.CreateVirtualMic(mix.VirtualMicName, $"{mix.PostSinkName}.monitor", $"OpenXLR {mix.Name}");
             }
 
             // Meter every channel and mix so the UI can show what is flowing.
@@ -520,6 +512,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     // ILayoutInfo, for command validation ahead of the mixer methods.
     public bool HasChannel(string id) { lock (_gate) return _config.Channels.Any(c => c.Id == id); }
     public bool HasMix(string id) { lock (_gate) return _config.Mixes.Any(m => m.Id == id); }
+    public bool HasApplicationChannel(string id) { lock (_gate) return _config.Channels.Any(c => c.Id == id && c.InputPair is null); }
+    public bool HasVirtualMix(string id) { lock (_gate) return _config.Mixes.Any(m => m.Id == id && m.Kind == MixKind.VirtualMic); }
     public bool IsMonitorFeed(string feed) { lock (_gate) return NormalizeFeedLocked(feed) is not null; }
 
     /// <summary>
@@ -1617,7 +1611,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 Channels = [.. _config.Channels.Select(c => new ChannelStatus(
                     c.Id, c.Name,
                     _config.Mixes.ToDictionary(m => m.Id, m => _levels.GetValueOrDefault(Cell(c.Id, m.Id), 0.0)),
-                    [.. _config.Mixes.Where(m => _muted.Contains(Cell(c.Id, m.Id))).Select(m => m.Id)]))],
+                    [.. _config.Mixes.Where(m => _muted.Contains(Cell(c.Id, m.Id))).Select(m => m.Id)],
+                    c.InputPair is not null))],
+                RenamedSinceStart = _renamedSinceBuild,
                 MonitorOutput = _monitorOutputs.FirstOrDefault(),
                 MonitorOutputs = [.. _monitorOutputs],
                 MonitorFeeds = new Dictionary<string, string>(_monitorFeeds),
@@ -1692,6 +1688,10 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         _inputDevice = null;
         _pw.TearDown();     // unloads modules in reverse order: combines, then mixes
         _combineModules.Clear();
+        _mixModules.Clear();
+        _postModules.Clear();
+        _virtualMicModules.Clear();
+        _renamedSinceBuild = false;
         _legIndex.Clear();
         _streams.Clear();
         _cells.Clear();

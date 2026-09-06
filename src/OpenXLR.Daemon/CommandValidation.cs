@@ -25,8 +25,20 @@ public static class CommandValidation
         switch (cmd.Cmd)
         {
             case "createChannel":
-                return cmd.Name is null || cmd.Name.Length > 60 || string.IsNullOrWhiteSpace(cmd.Name) || cmd.Name.Any(char.IsControl)
-                    ? "createChannel: name must contain 1 to 60 printable characters" : null;
+            case "createMix":
+                return BadName(cmd.Name) ? $"{cmd.Cmd}: name must contain 1 to 60 printable characters" : null;
+            case "renameChannel":
+            case "deleteChannel":
+                if (cmd.Channel is null) return $"{cmd.Cmd}: need 'channel'";
+                if (TooLong(cmd.Channel, 36) || !layout.HasApplicationChannel(cmd.Channel))
+                    return $"{cmd.Cmd}: '{Short(cmd.Channel)}' is not an application channel";
+                return cmd.Cmd == "renameChannel" && BadName(cmd.Name) ? "renameChannel: name must contain 1 to 60 printable characters" : null;
+            case "renameMix":
+            case "deleteMix":
+                if (cmd.Mix is null) return $"{cmd.Cmd}: need 'mix'";
+                if (TooLong(cmd.Mix, 36) || !layout.HasVirtualMix(cmd.Mix))
+                    return $"{cmd.Cmd}: '{Short(cmd.Mix)}' is not a virtual microphone";
+                return cmd.Cmd == "renameMix" && BadName(cmd.Name) ? "renameMix: name must contain 1 to 60 printable characters" : null;
             case "setLayoutOrder":
                 if (cmd.Channels is null || cmd.Mixes is null) return "setLayoutOrder: need 'channels' and 'mixes'";
                 if (cmd.Channels.Count > MixerConfig.MaxApplicationChannels || cmd.Mixes.Count > MixerConfig.MaxVirtualMixes)
@@ -119,6 +131,8 @@ public static class CommandValidation
             ? null : $"{cmd.Cmd}: '{field}' must be a finite number";
 
     private static bool TooLong(string? s, int max) => s is not null && s.Length > max;
+    private static bool BadName(string? name)
+        => name is null || name.Length > 60 || string.IsNullOrWhiteSpace(name) || name.Any(char.IsControl);
     private static string Short(string s) => s.Length <= 40 ? s : s[..40] + "...";
     private static string Tail(string uri) => uri[(uri.LastIndexOfAny(['#', '/']) + 1)..];
 

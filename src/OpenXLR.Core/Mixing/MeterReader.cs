@@ -66,6 +66,18 @@ public sealed class MeterReader : IDisposable
         }
     }
 
+    /// <summary>Stop metering one sink; its process goes with it.</summary>
+    public void Remove(string id)
+    {
+        lock (_gate)
+        {
+            if (!_meters.Remove(id, out Meter? meter)) return;
+            try { if (!meter.Process.HasExited) meter.Process.Kill(entireProcessTree: true); }
+            catch (Exception) { /* already gone */ }
+            meter.Process.Dispose();
+        }
+    }
+
     /// <summary>
     /// Sum the squares of every complete stereo float frame in
     /// <paramref name="buf"/>[0..<paramref name="length"/>), move any trailing

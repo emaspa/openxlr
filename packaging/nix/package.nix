@@ -72,6 +72,8 @@ buildDotnetModule {
     install -Dm644 packaging/50-xlr-dock-capture-hold.conf \
       packaging/51-openxlr-pro-raw-names.conf \
       -t $out/share/wireplumber/wireplumber.conf.d
+    install -Dm644 packaging/pipewire-pulse-openxlr.conf \
+      $out/lib/systemd/user/pipewire-pulse.service.d/openxlr.conf
     install -Dm644 packaging/openxlr.desktop -t $out/share/applications
     for s in 16 32 48 64 128 256; do
       install -Dm644 src/OpenXLR.UI/Assets/icon-$s.png \

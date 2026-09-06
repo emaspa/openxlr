@@ -193,6 +193,18 @@ public sealed class MixerService : IHostedService, IDisposable
                         | _mixer.EnsureFilterRoutes()
                         | _mixer.EnsureMonitorRoutes()) Changed?.Invoke();
                     SyncOutputSelectors();
+                    // Once a minute: is the PulseAudio server close to its
+                    // open-file limit? Cheap (one /proc directory listing).
+                    if (++_sweepCount % 60 == 1)
+                    {
+                        string? warning = _mixer.PulseFileWarning();
+                        if (warning != Volatile.Read(ref _resourceWarning))
+                        {
+                            if (warning is not null) _log.LogWarning("{msg}", warning);
+                            Volatile.Write(ref _resourceWarning, warning);
+                            Changed?.Invoke();
+                        }
+                    }
                     if (_lastSweepError is not null)
                     {
                         _lastSweepError = null;
@@ -284,13 +296,28 @@ public sealed class MixerService : IHostedService, IDisposable
             switch (cmd.Cmd)
             {
                 case "createChannel":
+                case "renameChannel":
+                case "deleteChannel":
+                case "createMix":
+                case "renameMix":
+                case "deleteMix":
                 case "setLayoutOrder":
+                    // Layout commands save synchronously, under the same gate
+                    // as the debounced fader saves, and succeed only once the
+                    // new layout is on disk.
                     lock (_saveGate)
                     {
-                        if (cmd.Cmd == "createChannel")
-                            _mixer.CreateApplicationChannel(cmd.Name!, settings => settings.Save());
-                        else
-                            _mixer.SetLayoutOrder(cmd.Channels!, cmd.Mixes!, settings => settings.Save());
+                        Func<MixerSettings, string?> save = settings => settings.Save();
+                        switch (cmd.Cmd)
+                        {
+                            case "createChannel": _mixer.CreateApplicationChannel(cmd.Name!, save); break;
+                            case "renameChannel": _mixer.RenameApplicationChannel(cmd.Channel!, cmd.Name!, save); break;
+                            case "deleteChannel": _mixer.DeleteApplicationChannel(cmd.Channel!, save); break;
+                            case "createMix": _mixer.CreateVirtualMix(cmd.Name!, save); break;
+                            case "renameMix": _mixer.RenameVirtualMix(cmd.Mix!, cmd.Name!, save); break;
+                            case "deleteMix": _mixer.DeleteVirtualMix(cmd.Mix!, save); break;
+                            default: _mixer.SetLayoutOrder(cmd.Channels!, cmd.Mixes!, save); break;
+                        }
                         _saveDirty = false;
                         _lastSaveError = null;
                         _retryDelay = SaveDelay;
@@ -422,6 +449,12 @@ public sealed class MixerService : IHostedService, IDisposable
     /// state so the user knows the window's changes would not survive a
     /// restart yet.
     /// </summary>
+    private int _sweepCount;
+    private string? _resourceWarning;
+
+    /// <summary>pipewire-pulse close to its open-file limit, or null.</summary>
+    public string? ResourceWarning => Volatile.Read(ref _resourceWarning);
+
     public string? PersistenceWarning
     {
         get { lock (_saveGate) return _lastSaveError is null ? null : $"Mixer settings are not being saved ({_lastSaveError}); retrying."; }

@@ -46,6 +46,11 @@ in
     # records silence.
     services.pipewire.wireplumber.configPackages = [ cfg.package ];
 
+    # The submixer's send faders are PulseAudio-side streams inside
+    # pipewire-pulse, which reaches systemd's default 1024 open files with a
+    # few channels or mixes beyond the default layout and then drops nodes.
+    systemd.user.services.pipewire-pulse.serviceConfig.LimitNOFILE = 65536;
+
     systemd.user.services.openxlr-daemon = {
       description = "OpenXLR audio daemon";
       after = [ "pipewire-pulse.service" "wireplumber.service" ];

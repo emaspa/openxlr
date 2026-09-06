@@ -242,6 +242,18 @@
       </DockPanel>
     </Border>
 
+    <!-- a virtual microphone renamed while running keeps its old device name elsewhere -->
+    <Border Classes="card" Margin="0,0,0,8" IsVisible="{Binding RenamedSinceStart}">
+      <DockPanel>
+        <Button DockPanel.Dock="Right" Content="Restart daemon" Padding="10,3" FontSize="12"
+                IsEnabled="{Binding DaemonRestart.CanRestart}"
+                VerticalAlignment="Center" Click="OnRestartDaemon"
+                ToolTip.Tip="systemctl --user restart openxlr-daemon"/>
+        <TextBlock Text="A renamed virtual microphone keeps its old name in other applications until the daemon restarts. Restart when nothing is recording from it."
+                   Classes="h" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0"/>
+      </DockPanel>
+    </Border>
+
     <!-- device controls -->
     <Border Classes="card" Margin="0,0,0,8">
       <Expander Name="InputsTile" Classes="tile" Theme="{StaticResource TileExpanderTheme}" IsExpanded="True">
@@ -504,7 +516,7 @@
                            ToolTip.Tip="{Binding StatusText}"/>
                   <TextBlock Text="{Binding Label}" Foreground="#e6e9f0" VerticalAlignment="Center"/>
                   <ComboBox ItemsSource="{Binding Channels}" MinWidth="110"
-                            SelectedItem="{Binding ChannelId, Mode=TwoWay}"/>
+                            SelectedItem="{Binding SelectedChannel, Mode=TwoWay}"/>
                 </StackPanel>
               </Border>
             </DataTemplate>
@@ -526,6 +538,12 @@
       <Expander Name="SubmixerTile" Classes="tile" Theme="{StaticResource TileExpanderTheme}" IsExpanded="True">
         <Expander.Header><TextBlock Text="SUBMIXER" Classes="h"/></Expander.Header>
       <DockPanel>
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,8" IsVisible="{Binding HasMixer}">
+          <TextBlock Text="Application channels and virtual microphones can be added, renamed, reordered and removed while audio plays."
+                     FontSize="11" Foreground="#6b7285" VerticalAlignment="Center" TextWrapping="Wrap"/>
+          <Button Grid.Column="1" Content="Edit layout…" Padding="12,4" Margin="8,0,0,0"
+                  IsEnabled="{Binding CanEditLayout}" Click="OnEditLayout"/>
+        </Grid>
         <TextBlock DockPanel.Dock="Top" Text="{Binding MixerPlaceholder}" TextWrapping="Wrap"
                    Foreground="#6b7285" IsVisible="{Binding !HasMixer}"/>
 

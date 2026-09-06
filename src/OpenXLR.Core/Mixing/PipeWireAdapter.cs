@@ -181,12 +181,19 @@ public sealed class PipeWireAdapter
     /// hardware input channels are not, since nothing should play into a
     /// channel that carries a microphone.
     /// </param>
-    public uint CreateCombineSink(string nodeName, IEnumerable<string> slaveSinks, string description, bool visible = true)
+    /// <param name="slaves">
+    /// The mix sinks to feed: explicit node names separated by commas, or a
+    /// "~pattern" regular expression. PipeWire's combine sink keeps watching
+    /// the registry, so with a pattern a mix sink created later gets its own
+    /// stream (leg) without reloading the combine, and a removed mix drops
+    /// its leg. Verified on PipeWire 1.6 through pactl.
+    /// </param>
+    public uint CreateCombineSink(string nodeName, string slaves, string description, bool visible = true)
     {
         string outp = Run("pactl",
             "load-module", "module-combine-sink",
             $"sink_name={nodeName}",
-            $"slaves={string.Join(',', slaveSinks)}",
+            $"slaves={slaves}",
             // suspend-on-idle=false keeps the combine's monitor source running;
             // a suspended monitor makes the channel's level meter read silence
             // even while audio flows through the sink.
@@ -257,6 +264,64 @@ public sealed class PipeWireAdapter
                 legs[name] = index;
         }
         return legs;
+    }
+
+    /// <summary>
+    /// pipewire-pulse's open files against its soft limit, or null when the
+    /// process or its /proc entries cannot be read. Every combine leg, meter
+    /// and module costs the PulseAudio server a handful of descriptors, and
+    /// systemd's default soft limit of 1024 is reached with a few extra
+    /// channels or mixes; past it the server drops nodes at random.
+    /// </summary>
+    public (int Used, int Limit)? PulseFileUsage()
+    {
+        try
+        {
+            foreach (string dir in Directory.EnumerateDirectories("/proc"))
+            {
+                string name = Path.GetFileName(dir);
+                if (!name.All(char.IsAsciiDigit)) continue;
+                string comm;
+                try { comm = File.ReadAllText(Path.Combine(dir, "comm")).Trim(); }
+                catch (Exception) { continue; }
+                if (comm != "pipewire-pulse") continue;
+                int? limit = File.ReadLines(Path.Combine(dir, "limits"))
+                    .Where(line => line.StartsWith("Max open files", StringComparison.Ordinal))
+                    .Select(line => line[14..].Split(' ', StringSplitOptions.RemoveEmptyEntries))
+                    .Where(columns => columns.Length >= 1 && int.TryParse(columns[0], out _))
+                    .Select(columns => (int?)int.Parse(columns[0]))
+                    .FirstOrDefault();
+                if (limit is null) return null;
+                int used = Directory.EnumerateFileSystemEntries(Path.Combine(dir, "fd")).Count();
+                return (used, limit.Value);
+            }
+        }
+        catch (Exception) { /* no /proc, or not ours to read */ }
+        return null;
+    }
+
+    /// <summary>Like <see cref="FindCombineLegs"/>, but null when pactl fails or stalls.</summary>
+    public IReadOnlyDictionary<string, int>? TryFindCombineLegs(uint combineModule)
+    {
+        try { return FindCombineLegs(combineModule); }
+        catch (InvalidOperationException) { return null; }
+    }
+
+    /// <summary>The serials of every stream currently playing into a sink.</summary>
+    public IReadOnlyList<int> StreamSerialsOnSink(string sinkName)
+    {
+        string sinks = TryRun("pactl", "list", "sinks", "short") ?? "";
+        string? sinkId = sinks.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Split('\t'))
+            .Where(columns => columns.Length >= 2 && columns[1] == sinkName)
+            .Select(columns => columns[0])
+            .FirstOrDefault();
+        if (sinkId is null) return [];
+        return [.. (TryRun("pactl", "list", "sink-inputs", "short") ?? "")
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Split('\t'))
+            .Where(columns => columns.Length >= 2 && columns[1] == sinkId && int.TryParse(columns[0], out _))
+            .Select(columns => int.Parse(columns[0]))];
     }
 
     /// <summary>Volume of a sink as 0..1, parsed from pactl (first channel).</summary>

@@ -21,6 +21,13 @@ public sealed record Command
     /// </summary>
     [JsonPropertyName("cmd")] public string Cmd { get; init; } = "";
 
+    /// <summary>
+    /// Optional correlation id. When present, a mixer command is answered
+    /// with a <c>commandResult</c> message carrying it, after the state that
+    /// reflects the outcome, so an editor can wait for the acknowledgement.
+    /// </summary>
+    [JsonPropertyName("requestId")] public string? RequestId { get; init; }
+
     /// <summary>For "set": the control name (see <see cref="ControlNames"/>).</summary>
     [JsonPropertyName("control")] public string? Control { get; init; }
 
@@ -155,6 +162,14 @@ public sealed record ErrorMessage
 
     [JsonPropertyName("type")] public string Type => "error";
     [JsonPropertyName("message")] public string Message { get; }
+}
+
+/// <summary>The outcome of a command that carried a requestId; error is null on success.</summary>
+public sealed record CommandResultMessage(
+    [property: JsonPropertyName("requestId")] string RequestId,
+    [property: JsonPropertyName("error")] string? Error)
+{
+    [JsonPropertyName("type")] public string Type => "commandResult";
 }
 
 /// <summary>Canonical control names accepted by "set".</summary>

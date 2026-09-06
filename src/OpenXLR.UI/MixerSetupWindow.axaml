@@ -1,0 +1,129 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:OpenXLR.UI"
+        x:Class="OpenXLR.UI.MixerSetupWindow"
+        x:DataType="vm:MainViewModel"
+        Title="OpenXLR Mixer layout" Width="760" Height="640" MinWidth="600" MinHeight="460"
+        WindowStartupLocation="CenterOwner" Background="#16181d">
+  <Window.Styles>
+    <Style Selector="TextBlock.h">
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Foreground" Value="#8b93a7"/>
+    </Style>
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="#1d2027"/>
+      <Setter Property="CornerRadius" Value="8"/>
+      <Setter Property="Padding" Value="14"/>
+    </Style>
+    <Style Selector="Button.small">
+      <Setter Property="Padding" Value="8,2"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="MinWidth" Value="0"/>
+    </Style>
+    <Style Selector="Button.danger">
+      <Setter Property="Background" Value="#7d3035"/>
+      <Setter Property="Foreground" Value="#ffffff"/>
+    </Style>
+  </Window.Styles>
+
+  <DockPanel Margin="16">
+    <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12" Spacing="4">
+      <TextBlock Text="Mixer layout" FontSize="20" FontWeight="Bold" Foreground="#e6e9f0"/>
+      <TextBlock Text="Application channels are the playback devices you route programs into. Virtual microphones are the recording devices OBS, Discord and other apps pick up. Every change is saved before it is confirmed, and audio on the other channels keeps flowing."
+                 FontSize="11" Foreground="#7d8496" TextWrapping="Wrap"/>
+      <TextBlock Name="Note" FontSize="11" Foreground="#e0a84a" TextWrapping="Wrap"
+                 IsVisible="False"/>
+    </StackPanel>
+    <Button DockPanel.Dock="Bottom" Content="Close" HorizontalAlignment="Right" Padding="18,6"
+            Margin="0,12,0,0" Click="OnClose"/>
+
+    <Grid ColumnDefinitions="*,12,*">
+      <Border Classes="card">
+        <DockPanel>
+          <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,8,Auto" Margin="0,10,0,0">
+            <TextBox Name="ChannelName" PlaceholderText="New channel, e.g. Podcast" MaxLength="60"
+                     KeyDown="OnChannelNameKey"/>
+            <Button Grid.Column="2" Content="Add channel" Padding="12,4"
+                    IsEnabled="{Binding CanEditLayout}" Click="OnAddChannel"/>
+          </Grid>
+          <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <TextBlock Text="CHANNELS" Classes="h"/>
+            <TextBlock Text="A new channel starts muted in every mix. Hardware inputs stay where they are."
+                       FontSize="11" Foreground="#6b7285" TextWrapping="Wrap"/>
+          </StackPanel>
+          <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Channels}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ChannelViewModel">
+                  <Border Background="#23262f" CornerRadius="6" Padding="10,7" Margin="0,0,0,6"
+                          IsVisible="{Binding Visible}">
+                    <Grid ColumnDefinitions="*,Auto,4,Auto,8,Auto,4,Auto">
+                      <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Name}" Foreground="#e6e9f0" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding Id}" Foreground="#6b7285" FontFamily="monospace" FontSize="10"/>
+                      </StackPanel>
+                      <TextBlock Grid.Column="1" Text="hardware input" Foreground="#6b7285" FontSize="11"
+                                 VerticalAlignment="Center" IsVisible="{Binding IsHardware}"/>
+                      <Button Grid.Column="1" Content="▲" Classes="small" ToolTip.Tip="Move up"
+                              IsVisible="{Binding IsEditable}" Click="OnChannelUp"/>
+                      <Button Grid.Column="3" Content="▼" Classes="small" ToolTip.Tip="Move down"
+                              IsVisible="{Binding IsEditable}" Click="OnChannelDown"/>
+                      <Button Grid.Column="5" Content="Rename" Classes="small"
+                              IsVisible="{Binding IsEditable}" Click="OnRenameChannel"/>
+                      <Button Grid.Column="7" Content="Delete" Classes="small danger"
+                              IsVisible="{Binding IsEditable}" Click="OnDeleteChannel"/>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </DockPanel>
+      </Border>
+
+      <Border Grid.Column="2" Classes="card">
+        <DockPanel>
+          <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,8,Auto" Margin="0,10,0,0">
+            <TextBox Name="MixName" PlaceholderText="New virtual microphone, e.g. Recording" MaxLength="60"
+                     KeyDown="OnMixNameKey"/>
+            <Button Grid.Column="2" Content="Add microphone" Padding="12,4"
+                    IsEnabled="{Binding CanEditLayout}" Click="OnAddMix"/>
+          </Grid>
+          <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <TextBlock Text="MIXES" Classes="h"/>
+            <TextBlock Text="Each virtual microphone has its own master, sends and inserts. A new one receives nothing until you open a send. Monitor A, Monitor B and Aux stay where they are."
+                       FontSize="11" Foreground="#6b7285" TextWrapping="Wrap"/>
+          </StackPanel>
+          <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Mixes}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:MixViewModel">
+                  <Border Background="#23262f" CornerRadius="6" Padding="10,7" Margin="0,0,0,6"
+                          IsVisible="{Binding Visible}">
+                    <Grid ColumnDefinitions="*,Auto,4,Auto,8,Auto,4,Auto">
+                      <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Name}" Foreground="#e6e9f0" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding Id}" Foreground="#6b7285" FontFamily="monospace" FontSize="10"/>
+                      </StackPanel>
+                      <TextBlock Grid.Column="1" Text="{Binding KindLabel}" Foreground="#6b7285" FontSize="11"
+                                 VerticalAlignment="Center" IsVisible="{Binding !IsEditable}"/>
+                      <Button Grid.Column="1" Content="▲" Classes="small" ToolTip.Tip="Move up"
+                              IsVisible="{Binding IsEditable}" Click="OnMixUp"/>
+                      <Button Grid.Column="3" Content="▼" Classes="small" ToolTip.Tip="Move down"
+                              IsVisible="{Binding IsEditable}" Click="OnMixDown"/>
+                      <Button Grid.Column="5" Content="Rename" Classes="small"
+                              IsVisible="{Binding IsEditable}" Click="OnRenameMix"/>
+                      <Button Grid.Column="7" Content="Delete" Classes="small danger"
+                              IsVisible="{Binding IsEditable}" Click="OnDeleteMix"/>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </DockPanel>
+      </Border>
+    </Grid>
+  </DockPanel>
+</Window>
