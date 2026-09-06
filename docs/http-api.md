@@ -4,7 +4,8 @@ The daemon listens on `127.0.0.1:37890`. HTTP requests use the same per-session
 token as the existing WebSocket clients, presented as `Authorization: Bearer
 <token>`. Read it from `$XDG_RUNTIME_DIR/openxlr/token`, or from
 `$XDG_CONFIG_HOME/openxlr/token` (`~/.config/openxlr/token`) when the runtime
-directory is unset. The daemon creates the private token file at startup.
+directory is unset. The daemon writes the private token file once it is
+listening, and not before.
 There is no second credential or change to the existing UI/OpenDeck login.
 
 Foreign browser Origins are refused even with a valid token. JSON commands
@@ -35,11 +36,13 @@ This reports execution, not a new durability guarantee: saving follows each
 existing command's behavior. Never automatically retry a mutation after losing
 the connection; it may already have executed.
 
-Error status codes: 401 missing/wrong token, 403 foreign Origin, 408 body-read
-deadline, 413 body over 64 KiB, 415 wrong Content-Type, 429 budget exhausted or
-another HTTP mutation in flight. Chunked bodies have the same 64 KiB cap and
+Error status codes: 400 a body that is not valid UTF-8, or a plain request
+on the events route without a WebSocket upgrade; 401 missing/wrong token;
+403 foreign Origin; 408 body-read deadline; 413 body over 64 KiB; 415 wrong
+Content-Type; 429 budget exhausted or another HTTP mutation in flight. Chunked bodies have the same 64 KiB cap and
 five-second deadline. One HTTP command runs at a time, with no waiting queue.
 All authenticated HTTP responses use `Cache-Control: no-store`.
 
 The [OpenAPI document](openapi-v1.json) describes the HTTP endpoints. Restarting
-the daemon rotates its existing per-session token; clients must reread it.
+the daemon rotates its per-session token once the new instance listens;
+clients must reread it.

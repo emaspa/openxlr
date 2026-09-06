@@ -40,7 +40,10 @@ acknowledged; a failed save restores the previous layout and reports an
 error. Ordinary fader saves keep their debounced, retried behaviour.
 
 - `createChannel {name}` adds an application channel. Only its sink is
-  loaded; it starts muted in every mix.
+  loaded; it starts muted in every mix. The sink's sends into the mixes
+  must appear within three seconds, or the sink is unloaded again and
+  the command fails: a send that showed up later would carry PipeWire's
+  defaults, full level and unmuted, instead of the stored fader.
 - `renameChannel {channel, name}` saves the name and reloads that channel's
   playback device under it, so desktop applets show the new name at once.
   PipeWire parks the streams that were playing into it on the default
@@ -50,7 +53,9 @@ error. Ordinary fader saves keep their debounced, retried behaviour.
   unloads its sink. The last application channel stays.
 - `createMix {name}` adds a virtual microphone. The channel sinks feed the
   mix sinks by name pattern, so every channel grows a send into the new mix
-  by itself, muted before the capture device is published.
+  by itself, muted before the capture device is published. If a channel's
+  send has not appeared within three seconds the mix is removed again and
+  the command fails, for the same reason.
 - `renameMix {mix, name}` changes the name in OpenXLR only. Reloading the
   capture device would drop every app recording from it onto another
   source, so its PipeWire description keeps the old name until the daemon

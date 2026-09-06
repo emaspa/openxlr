@@ -29,15 +29,21 @@ prerequisites and the build. The checks CI runs:
 
 ```sh
 dotnet restore src/OpenXLR.slnx --locked-mode   # the committed lock files must match
-dotnet build src/OpenXLR.slnx -c Release --no-restore
+dotnet build src/OpenXLR.slnx -c Release --no-restore -warnaserror
 dotnet test src/OpenXLR.slnx -c Release --no-build
 node --check plugin/com.emaspa.openxlr.sdPlugin/plugin.mjs
-node --test plugin/tests/
+node --test plugin/tests/*.test.mjs
+python3 -m json.tool plugin/com.emaspa.openxlr.sdPlugin/manifest.json >/dev/null
+shellcheck --severity=error tools/check-version.sh tools/check-locked-restore.sh packaging/ppa/make-source.sh
 tools/check-version.sh                          # the five version locations agree
+tools/check-locked-restore.sh                   # every packaging path restores locked
+tools/check-openapi.py docs/openapi-v1.json     # the HTTP API document keeps its shape
+tools/check-spec.py packaging/rpm/openxlr.spec  # every installed file is in %files
 ```
 
-If you add or change a NuGet package, regenerate the lock files
-(`dotnet restore src/OpenXLR.slnx -r linux-x64`, then a plain restore)
+If you add or change a NuGet package, regenerate the lock files with a
+plain `dotnet restore src/OpenXLR.slnx` (the linux-x64 graph is part of
+the projects' runtime identifiers, so one restore covers it)
 and the Nix dependency list
 (`nix build .#openxlr.passthru.fetch-deps -o /tmp/fd && /tmp/fd packaging/nix/deps.json`)
 and commit both. Do not bump the version: releases do that in one

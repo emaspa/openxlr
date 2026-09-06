@@ -1,8 +1,8 @@
 # Hardware support
 
 The state of every device OpenXLR supports, control by control. The
-last two rows need owners; the section at the bottom explains how to
-help.
+Wave XLR row still needs an owner; the section at the bottom explains
+how to help.
 
 | Device | USB id | Status |
 |---|---|---|

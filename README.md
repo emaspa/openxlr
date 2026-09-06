@@ -59,7 +59,7 @@ Collect diagnostics).
 - **Submixer** built from PipeWire nodes (null sinks, remap sources,
   filter chains), no kernel modules. Channels for the hardware inputs
   and for application groups; mixes for what you hear (Monitor A and
-  Monitor B, each output choosing which of the two it follows), for
+  Monitor B, each output choosing one of the two or both summed), for
   virtual microphones other apps record from, and for the USB Aux port.
   The default layout is Game, Music, Browser, System, Voice Chat and
   SFX with Stream and Chat microphones; channels and microphones can be

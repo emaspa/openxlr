@@ -129,9 +129,21 @@ persistent failure, use `systemctl --user reset-failed openxlr-daemon` followed
 by `systemctl --user start openxlr-daemon`. Manual launches without
 `NOTIFY_SOCKET` do not enable the watchdog.
 
-OpenXLR does not install a file-descriptor-limit override for pipewire-pulse.
-If its journal reports exhausted descriptors, inspect that service's limits
-and configure a user override explicitly for your environment.
+The packages raise pipewire-pulse's open-file limit with a systemd
+drop-in; a source install has to create it itself, or the daemon refuses
+to grow the mixer layout once the server nears systemd's default of 1024
+open files:
+
+```sh
+mkdir -p ~/.config/systemd/user/pipewire-pulse.service.d
+cp packaging/pipewire-pulse-openxlr.conf ~/.config/systemd/user/pipewire-pulse.service.d/openxlr.conf
+systemctl --user daemon-reload
+systemctl --user restart pipewire-pulse
+```
+
+The restart takes OpenXLR's nodes with it; the daemon notices and
+restarts itself to rebuild them. The manual's
+[open-files section](manual.md#open-files) has the background and the check.
 
 
 ## 7. OpenDeck plugin (optional)
@@ -162,6 +174,8 @@ rm ~/.config/systemd/user/openxlr-daemon.service
 sudo rm /etc/udev/rules.d/70-openxlr.rules
 rm -rf ~/.config/openxlr ~/.config/opendeck/plugins/com.emaspa.openxlr.sdPlugin
 rm ~/.config/wireplumber/wireplumber.conf.d/50-xlr-dock-capture-hold.conf
+rm -r ~/.config/systemd/user/pipewire-pulse.service.d   # the open-file drop-in, if you created it
+systemctl --user daemon-reload
 ```
 
 ## Environment variables

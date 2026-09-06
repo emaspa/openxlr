@@ -14,7 +14,9 @@ Token. The first message on every connection must be
 `{"cmd":"auth","token":"<token>"}`, where the token is the content of
 `$XDG_RUNTIME_DIR/openxlr/token` (or `~/.config/openxlr/token` in a
 session without a runtime directory), a file only your user can read
-that the daemon rewrites at every start. Nothing is sent before it;
+that the daemon replaces the moment it is listening (never earlier, so
+a second instance waiting for the port leaves the running daemon's
+clients alone). Nothing is sent before it;
 anything else as a first message, or nothing within 5 s, closes the
 socket with code 1008 and the reason `unauthorized` or `authentication
 timeout`. Another local user cannot read the file, so the loopback
@@ -33,7 +35,12 @@ non-finite numbers, and over-long strings or lists all come back as an
 `error` message instead of being silently ignored. A client may send
 bursts of up to 300 commands and a sustained 100 per second; beyond
 that it is disconnected with close code 1008. At most 32 clients can be
-connected at once.
+connected at once. The plugin catalog is bounded too: a plugin with a
+URI over 512 characters, more than 4096 ports, or one that would push
+the catalog past 6 MiB is left out of `plugins` altogether, and at most
+512 controls, 256 scale points and 64 required features are read per
+plugin; a plugin that is listed with `supported: false` is a different
+case, one the chain host cannot run.
 
 Messages from the daemon, each a JSON object with a `type` field:
 
@@ -60,10 +67,10 @@ a bare `error` message, so an editor can wait for the acknowledgement:
 | `setLowCutHz` | `value` | software low cut: 0, 80, or 120 |
 | `setSoftClipGuard` | `value` | software ClipGuard (post-ADC limiter at -3 dB); enabling is rejected if `swh-plugins` is unavailable, without replacing or disconnecting the live microphone route |
 | `setLevel` | `channel`, `mix`, `value` | one send fader |
-| `createChannel` | `name` | add an application channel, muted in every mix, without touching existing nodes; its generated stable id is in the next state |
+| `createChannel` | `name` | add an application channel, muted in every mix, without touching existing nodes; its generated stable id is in the next state. Undone with an error when its sends have not appeared within 3 s |
 | `renameChannel` | `channel`, `name` | rename an application channel; its playback device is reloaded under the new name and the streams on it are put back (a short gap on that channel only) |
 | `deleteChannel` | `channel` | remove an application channel; apps and remembered assignments on it move to the first remaining application channel. The last application channel cannot be removed |
-| `createMix` | `name` | add a virtual microphone; every channel gets a muted send into it before the capture device is published |
+| `createMix` | `name` | add a virtual microphone; every channel gets a muted send into it before the capture device is published. Undone with an error when a channel's send has not appeared within 3 s |
 | `renameMix` | `mix`, `name` | rename a virtual microphone in OpenXLR; the PipeWire device keeps its old description until the daemon restarts (reloading it would throw recording apps off), and the mixer state's `renamedSinceStart` says so |
 | `deleteMix` | `mix` | remove a virtual microphone with its sends, inserts and capture device |
 | `setLayoutOrder` | `channels[]`, `mixes[]` | complete ordered lists of application-channel and virtual-microphone ids; structural nodes stay fixed |
@@ -112,6 +119,9 @@ All under `~/.config/openxlr/` (or `$XDG_CONFIG_HOME/openxlr/`):
 - `$XDG_RUNTIME_DIR/openxlr/token` (or `token` here without a runtime
   directory): the control API token for this daemon run, 0600, see the
   top of this page
+- `$XDG_RUNTIME_DIR/openxlr/daemon.lock`: held by the running daemon for
+  the life of the process; a second daemon for the same user finds it
+  held and exits with code 75 at once
 - `daemon.json`: the daemon's own preferences, read once at start.
   `submixer` (true/false/absent) turns the submixer on or off; absent
   means the unit's environment decides (`OPENXLR_BUILD_MIXER`). Written

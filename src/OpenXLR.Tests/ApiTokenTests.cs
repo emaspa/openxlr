@@ -81,5 +81,23 @@ public sealed class ApiTokenTests
     }
 
     [Fact]
+    public void TheDaemonLockIsExclusiveAndReleasedWithItsHolder()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "openxlr-test-" + Guid.NewGuid().ToString("N"));
+        string path = Path.Combine(dir, "daemon.lock");
+        try
+        {
+            using (FileStream? first = DaemonLock.TryAcquire(path))
+            {
+                Assert.NotNull(first);
+                Assert.Null(DaemonLock.TryAcquire(path));   // a second instance is refused
+            }
+            using FileStream? again = DaemonLock.TryAcquire(path);   // the holder is gone, the lock is free
+            Assert.NotNull(again);
+        }
+        finally { try { Directory.Delete(dir, recursive: true); } catch (IOException) { } }
+    }
+
+    [Fact]
     public void NothingMatchesBeforeATokenExists() => Assert.False(ApiToken.Matches(null, Bytes("{\"cmd\":\"auth\",\"token\":\"\"}")));
 }

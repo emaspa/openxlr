@@ -18,6 +18,7 @@
 
   ~/.config/openxlr: mixer.json, profiles/, devices/, gainlock.json (daemon); daemon.json, ui.json (UI)
   $XDG_RUNTIME_DIR/openxlr/token: the control API token, one per daemon run
+  $XDG_RUNTIME_DIR/openxlr/daemon.lock: held by the running daemon, one instance per user
 ```
 
 - `OpenXLR.Daemon` owns the device and the graph: it opens the
@@ -125,7 +126,11 @@ stdout. Every transfer runs under a watchdog (the libusb timeout plus
 operating system reclaims the stuck thread and the device handle, the
 device is dropped and reconnected through a fresh helper, and the
 daemon keeps serving. After three hangs of one device without a replug
-the daemon sets it aside instead of retrying.
+the daemon sets it aside instead of retrying. A helper whose device
+could not be opened at all (no permission yet, a busy interface) is
+killed at once, and the next attempt waits two seconds, so a device the
+udev rule has not reached yet never turns into a stream of helper
+processes.
 
 ## Repository layout
 
@@ -133,7 +138,9 @@ the daemon sets it aside instead of retrying.
 src/            .NET solution: Core (device + mixer), Daemon, UI, Probe, Tests
 plugin/         the OpenDeck (Stream Deck) plugin
 docs/           this documentation, protocol write-up, capture guides
-tools/          proprobe.py, a standalone Python probe for the vendor protocol
+tools/          proprobe.py, a standalone Python probe for the vendor protocol,
+                and the CI checks (versions, locked restores, the OpenAPI
+                document's shape, the rpm recipe's %files)
 packaging/      systemd unit, the pipewire-pulse open-file drop-in, udev rule,
                 WirePlumber rules, UCM profile, rpm and nix packaging, OpenDeck patches
 debian/         Debian/Ubuntu packaging

@@ -327,8 +327,10 @@ and Aux are listed but fixed.
 
 Every change is saved before the editor confirms it. If the settings
 file cannot be written the change is undone and the editor says why. The
-same happens when pipewire-pulse has no room for more streams;
-[section 5.8](#open-files) explains the limit and the drop-in that raises it.
+same happens when pipewire-pulse has no room for more streams
+([section 5.8](#open-files) explains the limit and the drop-in that raises
+it), and when the new channel's or mix's sends have not appeared within
+three seconds: nothing is kept that the daemon could not set.
 Ids are generated from names and never change afterwards, so profiles
 and Stream Deck keys survive a rename. The layout file is described in
 [mixer-layout.md](mixer-layout.md).
@@ -400,6 +402,9 @@ restart WirePlumber.
   before 0.1.9; opening the mixer window once repairs it, or remove the
   file, `systemctl --user daemon-reload`, then
   `systemctl --user enable --now openxlr-daemon`.
+- "another OpenXLR daemon is already running for this user": a second
+  daemon was started by hand while the service runs. It stops at once;
+  stop the service first if you meant to run the daemon by hand.
 - "port 37890 busy": another program holds the daemon's API port,
   which sits inside the kernel's ephemeral range. The daemon waits up
   to a minute for it and otherwise exits for systemd to retry; nothing
@@ -451,7 +456,9 @@ a hang, so nothing stays stuck inside the daemon. After three hangs in
 one run the daemon stops driving that interface and says so under the
 window's header, while the submixer and any other interface keep
 working. Unplug the interface and plug it back in, or restart the
-daemon, to try again.
+daemon, to try again. A helper whose device could not be opened at all
+(the udev rule not applied yet, see [section 5.1](#no-device)) is
+killed straight away and the daemon tries again two seconds later.
 Collect diagnostics afterwards ([section 5.9](#reporting)): the archive contains the
 exact transfer, and that is what makes the report actionable.
 
@@ -525,7 +532,8 @@ it to a public issue. Nothing is uploaded automatically.
 | `~/.config/openxlr/mixer.json` | every mixer decision, the layout included (`userChannels`, `userMixes`, see [mixer-layout.md](mixer-layout.md)), written by the daemon |
 | `~/.config/openxlr/profiles/<vid-pid>/<name>.json` | saved profiles, one file each |
 | `~/.config/openxlr/profiles/<vid-pid>/recall-on-connect` | the profile recalled when that interface connects, when one is chosen |
-| `$XDG_RUNTIME_DIR/openxlr/token` | the control API token for this daemon run, readable by your user only; the window and the OpenDeck plugin read it, a daemon older than the window will not have it ([section 3.10](#upgrade)) |
+| `$XDG_RUNTIME_DIR/openxlr/token` (or `~/.config/openxlr/token` without a runtime directory) | the control API token for this daemon run, readable by your user only; the window and the OpenDeck plugin read it, a daemon older than the window will not have it ([section 3.10](#upgrade)) |
+| `$XDG_RUNTIME_DIR/openxlr/daemon.lock` | held by the running daemon; a second daemon started for the same user stops at once instead of waiting for the port |
 | `~/.config/openxlr/devices/<vid-pid>/last-state.json` | the settings restored on connect to an interface without settings memory |
 | `~/.config/openxlr/devices/<vid-pid>/defaults.json` | the firmware defaults of such an interface, recorded after a power cycle, written back by "Reset device to defaults" |
 | `~/.config/openxlr/daemon.json` | the submixer on/off preference |

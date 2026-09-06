@@ -45,6 +45,9 @@ jobs:
       - name: Locked restore enforced on every packaging path
         run: tools/check-locked-restore.sh
 
+      - name: RPM recipe claims every file it installs
+        run: tools/check-spec.py packaging/rpm/openxlr.spec
+
       - name: Validate packaged service inputs
         run: |
           test -f packaging/openxlr-daemon.service

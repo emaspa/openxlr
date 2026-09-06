@@ -42,6 +42,16 @@ jobs:
       - name: Lint package
         run: lintian --fail-on error dist/openxlr_*.deb
 
+      - name: Package contents
+        run: |
+          dpkg -c dist/openxlr_*.deb > contents.txt
+          for f in usr/lib/systemd/user/openxlr-daemon.service \
+                   usr/lib/systemd/user/pipewire-pulse.service.d/openxlr.conf \
+                   usr/lib/udev/rules.d/70-openxlr.rules \
+                   usr/bin/openxlr usr/bin/openxlr-daemon; do
+            grep -q " ./$f\$" contents.txt || { echo "missing from the package: $f"; exit 1; }
+          done
+
       - name: Checksums
         run: cd dist && sha256sum openxlr_*.deb > SHA256SUMS-deb.txt && cat SHA256SUMS-deb.txt
 

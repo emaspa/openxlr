@@ -71,6 +71,14 @@ app.Map("/ws", async (HttpContext ctx, WebSocketHub hub) =>
 
 app.MapGet("/", () => Results.Text($"OpenXLR daemon. Control API: ws://127.0.0.1:{ApiPort}/ws"));
 
+// One daemon per user, before anything else is touched.
+using FileStream? instanceLock = DaemonLock.TryAcquire();
+if (instanceLock is null)
+{
+    app.Logger.LogError("another OpenXLR daemon is already running for this user (it holds {Lock}); exiting", DaemonLock.Path);
+    return 75;
+}
+
 // The hosted services (device connect, PipeWire graph build) start before
 // Kestrel binds, so a busy port used to mean: build the whole submix graph,
 // fail to bind, abort with a core dump, get restarted by systemd, repeat.

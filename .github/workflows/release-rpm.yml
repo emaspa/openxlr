@@ -57,6 +57,7 @@ jobs:
           test -f /usr/lib/udev/rules.d/70-openxlr.rules
           test -f /usr/share/wireplumber/wireplumber.conf.d/50-xlr-dock-capture-hold.conf
           test -f /usr/lib/systemd/user/openxlr-daemon.service
+          test -f /usr/lib/systemd/user/pipewire-pulse.service.d/openxlr.conf
 
       - name: Checksums
         run: cd dist && sha256sum openxlr-*.rpm > SHA256SUMS-rpm.txt && cat SHA256SUMS-rpm.txt

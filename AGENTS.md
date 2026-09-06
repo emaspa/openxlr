@@ -34,14 +34,20 @@ read before touching the tree.
 
 ```sh
 dotnet restore src/OpenXLR.slnx --locked-mode
-dotnet build src/OpenXLR.slnx -c Release --no-restore
+dotnet build src/OpenXLR.slnx -c Release --no-restore -warnaserror
 dotnet test src/OpenXLR.slnx -c Release --no-build
 node --check plugin/com.emaspa.openxlr.sdPlugin/plugin.mjs
-node --test plugin/tests/
+node --test plugin/tests/*.test.mjs
+python3 -m json.tool plugin/com.emaspa.openxlr.sdPlugin/manifest.json >/dev/null
+shellcheck --severity=error tools/check-version.sh tools/check-locked-restore.sh packaging/ppa/make-source.sh
 tools/check-version.sh
+tools/check-locked-restore.sh
+tools/check-openapi.py docs/openapi-v1.json
+tools/check-spec.py packaging/rpm/openxlr.spec
 ```
 
-A build counts as clean only with `0 Error(s)` and no new warnings.
+CI runs exactly these; the build treats warnings as errors, so a build
+counts as clean only with `0 Error(s)` and `0 Warning(s)`.
 After a package change, regenerate the lock files with a plain
 `dotnet restore src/OpenXLR.slnx` and the Nix dependency list with
 `nix build .#openxlr.passthru.fetch-deps -o /tmp/fd && /tmp/fd packaging/nix/deps.json`,
