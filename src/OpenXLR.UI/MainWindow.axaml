@@ -524,12 +524,15 @@
     <!-- mixer -->
     <Border Classes="card">
       <Expander Name="SubmixerTile" Classes="tile" Theme="{StaticResource TileExpanderTheme}" IsExpanded="True">
-        <Expander.Header><TextBlock Text="SUBMIXER" Classes="h"/></Expander.Header>
+        <Expander.Header>
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <TextBlock Text="SUBMIXER" Classes="h" VerticalAlignment="Center"/>
+            <Button Content="Edit layout…" Padding="8,1" FontSize="11" MinHeight="0" VerticalAlignment="Center"
+                    IsVisible="{Binding HasMixer}" IsEnabled="{Binding CanEditLayout}" Click="OnEditLayout"
+                    ToolTip.Tip="Add, rename, reorder and remove application channels and virtual microphones while audio plays"/>
+          </StackPanel>
+        </Expander.Header>
       <DockPanel>
-        <Button DockPanel.Dock="Top" Content="Edit layout…" Padding="12,4" Margin="0,0,0,8"
-                HorizontalAlignment="Right" IsVisible="{Binding HasMixer}" IsEnabled="{Binding CanEditLayout}"
-                Click="OnEditLayout"
-                ToolTip.Tip="Add, rename, reorder and remove application channels and virtual microphones while audio plays"/>
         <TextBlock DockPanel.Dock="Top" Text="{Binding MixerPlaceholder}" TextWrapping="Wrap"
                    Foreground="#6b7285" IsVisible="{Binding !HasMixer}"/>
 

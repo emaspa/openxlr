@@ -245,29 +245,28 @@ work.
 
 Code:
 
-- [Carina Schoppe](https://github.com/CarinaSchoppe): routing and device
-  control hardening, transactional graph changes, the bounded WebSocket
-  send queue, diagnostics redaction, systemd sandboxing, the xUnit test
-  project and the CI workflow ([#4](https://github.com/emaspa/openxlr/pull/4));
-  verified stream moves ([#12](https://github.com/emaspa/openxlr/pull/12)),
-  multi-batch `pw-dump` parsing ([#13](https://github.com/emaspa/openxlr/pull/13)),
-  the hardened window daemon client ([#14](https://github.com/emaspa/openxlr/pull/14)),
-  coalesced state broadcasts ([#15](https://github.com/emaspa/openxlr/pull/15)),
-  the Restart daemon button ([#16](https://github.com/emaspa/openxlr/pull/16))
-  and the API document fix ([#17](https://github.com/emaspa/openxlr/pull/17));
-  the progress-gated systemd watchdog ([#18](https://github.com/emaspa/openxlr/pull/18))
-  and the opt-in update notice ([#23](https://github.com/emaspa/openxlr/pull/23));
-  the versioned HTTP API on the session token ([#24](https://github.com/emaspa/openxlr/pull/24),
-  [#32](https://github.com/emaspa/openxlr/pull/32))
-  and the OpenDeck choices generated from daemon state ([#25](https://github.com/emaspa/openxlr/pull/25));
-  the saved mixer layout ([#33](https://github.com/emaspa/openxlr/pull/33)),
-  live application-channel creation ([#34](https://github.com/emaspa/openxlr/pull/34))
-  and the saved channel and mix order ([#35](https://github.com/emaspa/openxlr/pull/35)),
-  the first pieces of the editable layout;
-  the native LV2 plugin editors ([#19](https://github.com/emaspa/openxlr/pull/19))
-  and the editable mixer layout ([#22](https://github.com/emaspa/openxlr/pull/22))
-  in review, split out of her larger proposal
-  ([#10](https://github.com/emaspa/openxlr/pull/10)).
+- [Carina Schoppe](https://github.com/CarinaSchoppe) laid much of the
+  daemon's hardening: routing and device control that fail safely,
+  transactional graph changes, the bounded WebSocket send queue,
+  diagnostics redaction, systemd sandboxing, the xUnit test project and
+  the CI workflow ([#4](https://github.com/emaspa/openxlr/pull/4)), then
+  verified stream moves, multi-batch `pw-dump` parsing, the hardened
+  window client, coalesced state broadcasts and the Restart daemon button
+  ([#12](https://github.com/emaspa/openxlr/pull/12) to
+  [#16](https://github.com/emaspa/openxlr/pull/16)), the progress-gated
+  systemd watchdog ([#18](https://github.com/emaspa/openxlr/pull/18)) and
+  the opt-in update notice ([#23](https://github.com/emaspa/openxlr/pull/23)).
+  She built the versioned HTTP API on the session token
+  ([#24](https://github.com/emaspa/openxlr/pull/24),
+  [#32](https://github.com/emaspa/openxlr/pull/32)), the OpenDeck choices
+  generated from daemon state ([#25](https://github.com/emaspa/openxlr/pull/25)),
+  and the first pieces of the editable layout: the saved layout format,
+  live channel creation and the saved order
+  ([#33](https://github.com/emaspa/openxlr/pull/33) to
+  [#35](https://github.com/emaspa/openxlr/pull/35)), all split out of her
+  larger proposal ([#10](https://github.com/emaspa/openxlr/pull/10)). Her
+  native LV2 plugin editors ([#19](https://github.com/emaspa/openxlr/pull/19))
+  are in review.
 - [Michael Brooks](https://github.com/Michael-Brooks): the stream-sweep
   starvation fix ([#7](https://github.com/emaspa/openxlr/pull/7)) and the
   diagnosis that led to it.
