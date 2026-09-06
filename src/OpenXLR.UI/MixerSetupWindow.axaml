@@ -36,7 +36,7 @@
                  IsVisible="False"/>
       <!-- the daemon's own notes for this window: the open-file limit, and a mix renamed since start -->
       <DockPanel IsVisible="{Binding LayoutWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-        <Button DockPanel.Dock="Right" Content="Manual, 5.8" Padding="10,3" FontSize="12" VerticalAlignment="Center"
+        <Button DockPanel.Dock="Right" Content="Manual" Padding="10,3" FontSize="12" VerticalAlignment="Center"
                 Click="OnFileLimitManual" ToolTip.Tip="Open the manual section on the pipewire-pulse open-file limit"/>
         <TextBlock Text="{Binding LayoutWarning}" FontSize="11" Foreground="#e0a84a" TextWrapping="Wrap"
                    VerticalAlignment="Center" Margin="0,0,12,0"/>
