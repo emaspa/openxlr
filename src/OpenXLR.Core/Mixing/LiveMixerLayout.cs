@@ -27,7 +27,7 @@ public sealed partial class Mixer
     {
         if (_pw.PulseFileUsage() is not (int used, int limit)) return null;
         return used * 4 >= limit * 3
-            ? $"pipewire-pulse has {used} of its {limit} open files in use; past the limit it drops audio nodes. Raise the limit with the pipewire-pulse drop-in OpenXLR installs and restart pipewire-pulse (manual, section 5.8)."
+            ? $"pipewire-pulse has {used} of its {limit} open files in use; past the limit it drops audio nodes. Raise the limit with the pipewire-pulse drop-in OpenXLR installs and restart pipewire-pulse."
             : null;
     }
 
@@ -38,7 +38,7 @@ public sealed partial class Mixer
         int needed = newStreams * FilesPerStream + newNodes * FilesPerNode + FileReserve;
         if (used + needed <= limit) return;
         throw new InvalidOperationException(
-            $"pipewire-pulse is near its open-file limit ({used} of {limit} in use, about {needed} more needed); past it the server drops audio nodes. Raise the limit with the pipewire-pulse drop-in OpenXLR installs and restart pipewire-pulse (manual, section 5.8).");
+            $"pipewire-pulse is near its open-file limit ({used} of {limit} in use, about {needed} more needed); past it the server drops audio nodes. Raise the limit with the pipewire-pulse drop-in OpenXLR installs and restart pipewire-pulse.");
     }
 
     /// <summary>

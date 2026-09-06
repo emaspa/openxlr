@@ -34,6 +34,20 @@
                  FontSize="11" Foreground="#7d8496" TextWrapping="Wrap"/>
       <TextBlock Name="Note" FontSize="11" Foreground="#e0a84a" TextWrapping="Wrap"
                  IsVisible="False"/>
+      <!-- the daemon's own notes for this window: the open-file limit, and a mix renamed since start -->
+      <DockPanel IsVisible="{Binding LayoutWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+        <Button DockPanel.Dock="Right" Content="Manual, 5.8" Padding="10,3" FontSize="12" VerticalAlignment="Center"
+                Click="OnFileLimitManual" ToolTip.Tip="Open the manual section on the pipewire-pulse open-file limit"/>
+        <TextBlock Text="{Binding LayoutWarning}" FontSize="11" Foreground="#e0a84a" TextWrapping="Wrap"
+                   VerticalAlignment="Center" Margin="0,0,12,0"/>
+      </DockPanel>
+      <DockPanel IsVisible="{Binding RenamedSinceStart}">
+        <Button DockPanel.Dock="Right" Content="Restart daemon" Padding="10,3" FontSize="12"
+                IsEnabled="{Binding DaemonRestart.CanRestart}" VerticalAlignment="Center"
+                Click="OnRestartDaemon" ToolTip.Tip="systemctl --user restart openxlr-daemon"/>
+        <TextBlock Text="A renamed virtual microphone keeps its old name in other applications until the daemon restarts. Restart when nothing is recording from it."
+                   FontSize="11" Foreground="#e0a84a" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0"/>
+      </DockPanel>
     </StackPanel>
     <Button DockPanel.Dock="Bottom" Content="Close" HorizontalAlignment="Right" Padding="18,6"
             Margin="0,12,0,0" Click="OnClose"/>

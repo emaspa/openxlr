@@ -434,8 +434,8 @@ disappear, apps fall back to the default output, and the window shows
 "Sink not found" errors from pactl.
 
 OpenXLR refuses to add a channel or mix when the server has no room left
-and says so in the editor, and the header shows a warning once the server
-is at three quarters of its limit. The packages install a drop-in under
+and says so in the editor, which also shows a note once the server is at
+three quarters of its limit. The packages install a drop-in under
 `/usr/lib/systemd/user/pipewire-pulse.service.d/` that raises the limit
 to 65536. It applies at the next login, or right away with
 

@@ -106,7 +106,7 @@ public sealed class MixerService : IHostedService, IDisposable
     public event Action? Changed;
 
     /// <summary>Null until the graph is built.</summary>
-    public MixerState? Snapshot() => _mixer.Built ? _mixer.Snapshot() : null;
+    public MixerState? Snapshot() => _mixer.Built ? _mixer.Snapshot() with { LayoutWarning = ResourceWarning } : null;
 
     /// <summary>Selectable sinks and sources, or null when the mixer is off.</summary>
     public IReadOnlyList<AudioNode>? Devices() => _mixer.Built ? _mixer.ListDevices() : null;

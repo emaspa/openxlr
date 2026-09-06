@@ -64,7 +64,7 @@ a bare `error` message, so an editor can wait for the acknowledgement:
 | `renameChannel` | `channel`, `name` | rename an application channel; its playback device is reloaded under the new name and the streams on it are put back (a short gap on that channel only) |
 | `deleteChannel` | `channel` | remove an application channel; apps and remembered assignments on it move to the first remaining application channel. The last application channel cannot be removed |
 | `createMix` | `name` | add a virtual microphone; every channel gets a muted send into it before the capture device is published |
-| `renameMix` | `mix`, `name` | rename a virtual microphone in OpenXLR; the PipeWire device keeps its old description until the daemon restarts (reloading it would throw recording apps off), and the state's `renamedSinceStart` says so |
+| `renameMix` | `mix`, `name` | rename a virtual microphone in OpenXLR; the PipeWire device keeps its old description until the daemon restarts (reloading it would throw recording apps off), and the mixer state's `renamedSinceStart` says so. The mixer state's `layoutWarning` carries a sentence when pipewire-pulse nears its open-file limit |
 | `deleteMix` | `mix` | remove a virtual microphone with its sends, inserts and capture device |
 | `setLayoutOrder` | `channels[]`, `mixes[]` | complete ordered lists of application-channel and virtual-microphone ids; structural nodes stay fixed |
 | `setChannelMuted` | `channel`, `mix`, `value` | one send mute |

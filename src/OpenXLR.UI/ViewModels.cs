@@ -524,6 +524,10 @@ public sealed class MainViewModel : ViewModelBase
     /// </summary>
     public bool RenamedSinceStart { get => _renamedSinceStart; private set => Set(ref _renamedSinceStart, value); }
 
+    private string _layoutWarning = "";
+    /// <summary>pipewire-pulse near its open-file limit, or empty; shown in the layout editor.</summary>
+    public string LayoutWarning { get => _layoutWarning; private set => Set(ref _layoutWarning, value); }
+
     // --- layout editing: the daemon answers after the new layout is saved ---
 
     public Task<string?> CreateChannel(string name) => Edit(_client.CreateChannelAsync(name));
@@ -943,9 +947,10 @@ public sealed class MainViewModel : ViewModelBase
 
     private void ApplyMixer(JsonNode? mixer)
     {
-        if (mixer is null) { HasMixer = false; RenamedSinceStart = false; return; }
+        if (mixer is null) { HasMixer = false; RenamedSinceStart = false; LayoutWarning = ""; return; }
         HasMixer = true;
         RenamedSinceStart = mixer["renamedSinceStart"]?.GetValue<bool>() ?? false;
+        LayoutWarning = mixer["layoutWarning"]?.GetValue<string>() ?? "";
         SoftLowCutHz = mixer["lowCutHz"]?.GetValue<int>() ?? 0;
         SoftClipGuardAvailable = mixer["softClipGuardAvailable"]?.GetValue<bool>() ?? false;
         SoftClipGuardError = mixer["softClipGuardError"]?.GetValue<string>();

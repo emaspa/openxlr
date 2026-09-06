@@ -166,6 +166,12 @@ public sealed record MixerState
     /// applications still list the old name.
     /// </summary>
     public bool RenamedSinceStart { get; init; }
+
+    /// <summary>
+    /// pipewire-pulse close to its open-file limit (see the manual, 5.8), or
+    /// null. Shown in the layout editor, where the next addition would hit it.
+    /// </summary>
+    public string? LayoutWarning { get; init; }
 }
 
 /// <param name="Kind">"monitor", "virtualMic" or "auxPort", so clients can tell monitor mixes apart.</param>

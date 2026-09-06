@@ -190,5 +190,16 @@ public partial class MixerSetupWindow : Window
         return await done.Task;
     }
 
+    private const string FileLimitManual =
+        "https://github.com/emaspa/openxlr/blob/main/docs/manual.md#58-channels-or-mixes-vanish-after-adding-one";
+
+    private void OnFileLimitManual(object? sender, RoutedEventArgs e)
+        => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("xdg-open", FileLimitManual) { UseShellExecute = false });
+
+    private async void OnRestartDaemon(object? sender, RoutedEventArgs e)
+    {
+        if (Vm is { } vm) await vm.DaemonRestart.RestartAsync();
+    }
+
     private void OnClose(object? sender, RoutedEventArgs e) => Close();
 }
