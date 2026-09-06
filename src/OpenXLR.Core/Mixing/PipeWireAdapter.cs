@@ -621,8 +621,8 @@ public sealed class PipeWireAdapter
 
     private bool WaitForPorts(string node, string prefix, bool output, TimeSpan timeout, Process owner)
     {
-        DateTime end = DateTime.UtcNow + timeout;
-        while (DateTime.UtcNow < end)
+        long end = Environment.TickCount64 + (long)timeout.TotalMilliseconds;
+        while (Environment.TickCount64 < end)
         {
             if (owner.HasExited) return false;
             if (ListPorts(node, prefix, output).Count > 0) return true;
@@ -1181,8 +1181,8 @@ public sealed class PipeWireAdapter
 
     private bool WaitForNode(string nodeName, TimeSpan timeout)
     {
-        DateTime end = DateTime.UtcNow + timeout;
-        while (DateTime.UtcNow < end)
+        long end = Environment.TickCount64 + (long)timeout.TotalMilliseconds;
+        while (Environment.TickCount64 < end)
         {
             if (FindNodeId(nodeName) is not null) return true;
             Thread.Sleep(100);
@@ -1215,7 +1215,7 @@ public sealed class PipeWireAdapter
     // whole sweep. Staleness is bounded by the window below.
     private static readonly object DumpGate = new();
     private static byte[]? _dumpJson;
-    private static DateTime _dumpAt;
+    private static long _dumpAt;   // monotonic ms
     private static readonly TimeSpan DumpWindow = TimeSpan.FromMilliseconds(400);
 
     // Kept as UTF-8 bytes and parsed from them: the string form is twice
@@ -1224,9 +1224,9 @@ public sealed class PipeWireAdapter
     {
         lock (DumpGate)
         {
-            if (_dumpJson is not null && DateTime.UtcNow - _dumpAt < DumpWindow) return _dumpJson;
+            if (_dumpJson is not null && Environment.TickCount64 - _dumpAt < DumpWindow.TotalMilliseconds) return _dumpJson;
             _dumpJson = RunBytes("pw-dump");
-            _dumpAt = DateTime.UtcNow;
+            _dumpAt = Environment.TickCount64;
             return _dumpJson;
         }
     }

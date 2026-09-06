@@ -110,6 +110,10 @@ public static class Lv2Catalog
     internal const int MaxControls = 512;
     internal const int MaxScalePoints = 256;
     internal const int MaxText = 200;
+    /// <summary>A plugin URI longer than this is not one the chain host will ever be asked for; the bundle is skipped.</summary>
+    internal const int MaxUri = 512;
+    /// <summary>Required features beyond this count are not read; no real plugin declares more than a handful.</summary>
+    internal const int MaxFeatures = 64;
     /// <summary>Rough serialized size the whole catalog may reach; the window reads at most 8 MiB per message.</summary>
     internal const int CatalogBudgetBytes = 6 * 1024 * 1024;
 
@@ -209,14 +213,15 @@ public static class Lv2Catalog
         }
         if (audioIns == 0 || audioOuts == 0 || inSym is null || outSym is null) return null;   // generators and analysers are not inserts
 
+        if (uri.Length > MaxUri) return null;
         var features = new List<string>();
         IntPtr req = Lilv.lilv_plugin_get_required_features(plugin);
         if (req != IntPtr.Zero)
         {
-            for (IntPtr fit = Lilv.lilv_nodes_begin(req); !Lilv.lilv_nodes_is_end(req, fit); fit = Lilv.lilv_nodes_next(req, fit))
+            for (IntPtr fit = Lilv.lilv_nodes_begin(req); !Lilv.lilv_nodes_is_end(req, fit) && features.Count < MaxFeatures; fit = Lilv.lilv_nodes_next(req, fit))
             {
                 string? f = Lilv.Str(Lilv.lilv_node_as_uri(Lilv.lilv_nodes_get(req, fit)));
-                if (f is not null) features.Add(f);
+                if (f is not null) features.Add(f.Length <= MaxUri ? f : f[..MaxUri]);
             }
             Lilv.lilv_nodes_free(req);
         }

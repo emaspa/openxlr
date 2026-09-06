@@ -324,8 +324,8 @@ public sealed class WebSocketHub
             }
             return;
         }
-        DateTime deadline = DateTime.UtcNow + TimeSpan.FromSeconds(60);
-        while (_mixer.SubmixerEnabled && !_mixer.Built && DateTime.UtcNow < deadline && !_stopping.IsCancellationRequested)
+        long deadline = Environment.TickCount64 + 60_000;
+        while (_mixer.SubmixerEnabled && !_mixer.Built && Environment.TickCount64 < deadline && !_stopping.IsCancellationRequested)
             await Task.Delay(250, _stopping).ContinueWith(_ => { }, TaskScheduler.Default);
         if (_stopping.IsCancellationRequested || ActiveDeviceId() != devId) { _devices.MarkRestored(); return; }
         string? err = ApplyNamedProfile(devId, name);

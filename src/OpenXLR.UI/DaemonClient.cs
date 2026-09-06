@@ -26,7 +26,12 @@ public sealed class DaemonClient : IAsyncDisposable
     private Task? _runTask;
     private Task? _disposeTask;
     private bool _disposed;
+    // Queries in flight by reply type (so concurrent callers share one
+    // request) and by requestId (so the daemon's commandResult, which follows
+    // the reply on the socket, completes exactly the query it belongs to).
     private readonly Dictionary<string, PendingQuery> _queries = new();
+    private readonly Dictionary<string, PendingQuery> _queriesById = new();
+    private readonly Dictionary<string, JsonNode?> _lastReply = new();
     // Layout edits wait for the daemon's commandResult with their requestId.
     private readonly Dictionary<string, TaskCompletionSource<string?>> _edits = new();
     private const int MaxMessageBytes = 8 * 1024 * 1024;
@@ -34,6 +39,8 @@ public sealed class DaemonClient : IAsyncDisposable
     private sealed class PendingQuery
     {
         public readonly TaskCompletionSource<JsonNode?> Reply = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public readonly string Id = Guid.NewGuid().ToString("N");
+        public required string Type;
         public int Callers;
     }
 
@@ -61,12 +68,12 @@ public sealed class DaemonClient : IAsyncDisposable
         {
             if (_disposed) return null;
             send = !_queries.TryGetValue(type, out query!);
-            if (send) _queries[type] = query = new();
+            if (send) { query = new PendingQuery { Type = type }; _queries[type] = query; _queriesById[query.Id] = query; }
             query.Callers++;
         }
         try
         {
-            if (send && !await SendAsync(new { cmd = command }, reportErrors: false))
+            if (send && !await SendAsync(new { cmd = command, requestId = query.Id }, reportErrors: false))
                 query.Reply.TrySetResult(null);
             return await query.Reply.Task.WaitAsync(timeout);
         }
@@ -76,17 +83,31 @@ public sealed class DaemonClient : IAsyncDisposable
             lock (_lifecycle)
             {
                 // One impatient caller must not remove the reply slot still
-                // used by other windows waiting for the same catalog.
+                // used by other windows waiting for the same catalog. Once
+                // nobody waits, a new call sends a fresh request; the old
+                // one's late reply is consumed by its own commandResult.
                 if (--query.Callers == 0 && _queries.TryGetValue(type, out var current)
                     && ReferenceEquals(current, query)) _queries.Remove(type);
             }
         }
     }
 
-    private void CompleteQuery(string type, JsonNode? reply)
+    /// <summary>A reply message: the commandResult that follows it says which query it answers.</summary>
+    private void StoreReply(string type, JsonNode? reply)
+    {
+        lock (_lifecycle) _lastReply[type] = reply;
+    }
+
+    /// <summary>The daemon's commandResult for one of our queries: complete exactly that one.</summary>
+    private void CompleteQuery(string requestId)
     {
         lock (_lifecycle)
-            if (_queries.TryGetValue(type, out var query)) query.Reply.TrySetResult(reply);
+        {
+            if (!_queriesById.Remove(requestId, out PendingQuery? query)) return;
+            _lastReply.Remove(query.Type, out JsonNode? reply);
+            query.Reply.TrySetResult(reply);
+            if (_queries.TryGetValue(query.Type, out var current) && ReferenceEquals(current, query)) _queries.Remove(query.Type);
+        }
     }
 
     /// <summary>Raised when an error message arrives from the daemon.</summary>
@@ -144,8 +165,10 @@ public sealed class DaemonClient : IAsyncDisposable
                 _socket = null;
                 lock (_lifecycle)
                 {
-                    foreach (var query in _queries.Values) query.Reply.TrySetResult(null);
+                    foreach (var query in _queriesById.Values) query.Reply.TrySetResult(null);
                     _queries.Clear();
+                    _queriesById.Clear();
+                    _lastReply.Clear();
                     foreach (var edit in _edits.Values) edit.TrySetResult("Connection lost. Check the layout before retrying.");
                     _edits.Clear();
                 }
@@ -186,10 +209,11 @@ public sealed class DaemonClient : IAsyncDisposable
             string? type = node["type"]?.GetValue<string>();
             if (type == "error") ErrorReceived?.Invoke(node["message"]?.GetValue<string>() ?? "unknown error");
             else if (type == "state") { LastStateJson = text; StateReceived?.Invoke(node); }
-            else if (type == "diagnostics") CompleteQuery(type, node);
-            else if (type == "plugins") CompleteQuery(type, node["plugins"]);
+            else if (type == "diagnostics") StoreReply(type, node);
+            else if (type == "plugins") StoreReply(type, node["plugins"]);
             else if (type == "commandResult" && node["requestId"]?.GetValue<string>() is string requestId)
             {
+                CompleteQuery(requestId);
                 TaskCompletionSource<string?>? edit;
                 lock (_lifecycle) _edits.TryGetValue(requestId, out edit);
                 edit?.TrySetResult(node["error"]?.GetValue<string>());

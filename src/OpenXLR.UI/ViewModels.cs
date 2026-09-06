@@ -1421,14 +1421,14 @@ public sealed class SendViewModel : ViewModelBase
 /// </summary>
 internal static class SliderSync
 {
-    private static readonly System.Collections.Generic.Dictionary<string, DateTime> Touched = [];
+    private static readonly System.Collections.Generic.Dictionary<string, long> Touched = [];   // monotonic ms
     private static readonly System.Collections.Generic.Dictionary<string, Action> Pending = [];
     private static DispatcherTimer? _timer;
 
-    public static void Touch(string key) => Touched[key] = DateTime.UtcNow;
+    public static void Touch(string key) => Touched[key] = Environment.TickCount64;
 
     public static bool RecentlyTouched(string key)
-        => Touched.TryGetValue(key, out DateTime t) && DateTime.UtcNow - t < TimeSpan.FromMilliseconds(800);
+        => Touched.TryGetValue(key, out long t) && Environment.TickCount64 - t < 800;
 
     public static void Send(string key, Action send)
     {

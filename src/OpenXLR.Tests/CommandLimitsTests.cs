@@ -74,11 +74,11 @@ public sealed class CommandLimitsTests
     [Fact]
     public void BudgetAllowsBurstsAndRefills()
     {
-        DateTime now = new(2026, 9, 4, 12, 0, 0, DateTimeKind.Utc);
+        long now = 1_000_000;   // monotonic milliseconds
         var budget = new CommandBudget(capacity: 10, refillPerSecond: 5, clock: () => now);
         for (int i = 0; i < 10; i++) Assert.True(budget.TryTake());
         Assert.False(budget.TryTake());
-        now = now.AddSeconds(1);            // 5 tokens back
+        now += 1000;                        // 5 tokens back
         for (int i = 0; i < 5; i++) Assert.True(budget.TryTake());
         Assert.False(budget.TryTake());
     }

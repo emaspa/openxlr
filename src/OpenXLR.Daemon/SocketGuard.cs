@@ -31,7 +31,7 @@ internal static class SocketGuard
         WebSocket socket, byte[] buf, int maxBytes, TimeSpan messageDeadline, CancellationToken stopping)
     {
         using var ms = new MemoryStream();
-        DateTime? due = null;   // set by the first fragment of a multi-frame message
+        long? due = null;   // monotonic ms, set by the first fragment of a multi-frame message
         WebSocketReceiveResult res;
         do
         {
@@ -39,12 +39,12 @@ internal static class SocketGuard
             try
             {
                 recv = socket.ReceiveAsync(buf, stopping);
-                if (due is DateTime d)
+                if (due is long d)
                 {
                     // Cancelling a pending receive would abort the socket
                     // without a word to the peer, so race it with the clock
                     // and close properly when the clock wins.
-                    TimeSpan left = d - DateTime.UtcNow;
+                    TimeSpan left = TimeSpan.FromMilliseconds(d - Environment.TickCount64);
                     if (left <= TimeSpan.Zero || await Task.WhenAny(recv, Task.Delay(left, stopping)) != recv)
                     {
                         if (stopping.IsCancellationRequested)
@@ -82,7 +82,7 @@ internal static class SocketGuard
             ms.Write(buf, 0, res.Count);
             // The clock starts with the first fragment, so a quiet client
             // between commands is never on it.
-            if (due is null && !res.EndOfMessage) due = DateTime.UtcNow + messageDeadline;
+            if (due is null && !res.EndOfMessage) due = Environment.TickCount64 + (long)messageDeadline.TotalMilliseconds;
         } while (!res.EndOfMessage);
         return (Outcome.Message, ms.ToArray());
     }

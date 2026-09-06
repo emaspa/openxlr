@@ -78,7 +78,7 @@ app.MapGet("/", () => Results.Text($"OpenXLR daemon. Control API: ws://127.0.0.1
 // kernel's ephemeral range, so any local program's outgoing connection can
 // hold it for a while (the packages reserve it via sysctl; source installs
 // may not). Wait for the port first, before anything touches PipeWire.
-DateTime deadline = DateTime.UtcNow.AddSeconds(60);
+long deadline = Environment.TickCount64 + 60_000;
 for (int attempt = 0; ; attempt++)
 {
     try
@@ -88,7 +88,7 @@ for (int attempt = 0; ; attempt++)
         probe.Stop();
         break;
     }
-    catch (SocketException) when (DateTime.UtcNow < deadline)
+    catch (SocketException) when (Environment.TickCount64 < deadline)
     {
         if (attempt % 10 == 0)
             app.Logger.LogWarning("port {Port} is in use by another local socket; waiting for it", ApiPort);

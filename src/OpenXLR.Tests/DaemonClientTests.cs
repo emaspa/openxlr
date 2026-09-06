@@ -16,6 +16,8 @@ public sealed class DaemonClientTests
             {
                 var command = await SocketTestServer.Receive(socket, stop);
                 if (command["cmd"]!.GetValue<string>() == "auth") continue;   // every connection opens with the token
+                // Like the daemon: the reply, then the commandResult for the requestId.
+                string requestId = command["requestId"]!.GetValue<string>();
                 if (command["cmd"]!.GetValue<string>() == "listPlugins")
                 {
                     Interlocked.Increment(ref requests);
@@ -24,6 +26,7 @@ public sealed class DaemonClientTests
                 }
                 else
                     await SocketTestServer.Send(socket, new { type = "diagnostics" }, stop);
+                await SocketTestServer.Send(socket, new { type = "commandResult", requestId }, stop);
             }
         });
         await using var client = new DaemonClient(server.Url);
@@ -43,6 +46,41 @@ public sealed class DaemonClientTests
         Assert.NotNull(await client.RequestDiagnosticsAsync(TimeSpan.FromSeconds(5)));
         Assert.Equal(1, requests);
         Assert.Equal(1, connections);
+    }
+
+    [Fact]
+    public async Task ALateReplyToATimedOutQueryNeverAnswersTheNextOne()
+    {
+        // The first catalog request is answered only after a second one was
+        // sent; the answers arrive in order, each followed by its
+        // commandResult, and the second caller must get the second answer.
+        var release = Completion();
+        var answers = new System.Collections.Concurrent.ConcurrentQueue<(string Id, string Name)>();
+        await using var server = await SocketTestServer.Start(async (socket, stop) =>
+        {
+            while (!stop.IsCancellationRequested)
+            {
+                var command = await SocketTestServer.Receive(socket, stop);
+                if (command["cmd"]!.GetValue<string>() == "auth") continue;
+                answers.Enqueue((command["requestId"]!.GetValue<string>(), answers.Count == 0 ? "OLD" : "NEW"));
+                if (answers.Count < 2) { await release.Task.WaitAsync(stop); continue; }
+                while (answers.TryDequeue(out var a))
+                {
+                    await SocketTestServer.Send(socket, new { type = "plugins", plugins = new[] { new { name = a.Name } } }, stop);
+                    await SocketTestServer.Send(socket, new { type = "commandResult", requestId = a.Id }, stop);
+                }
+            }
+        });
+        await using var client = new DaemonClient(server.Url);
+        var connected = Completion();
+        client.ConnectionChanged += up => { if (up) connected.TrySetResult(); };
+        client.Start();
+        await connected.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Null(await client.RequestPluginsAsync(TimeSpan.FromMilliseconds(200)));   // gives up; its reply is still owed
+        Task<System.Text.Json.Nodes.JsonNode?> second = client.RequestPluginsAsync(TimeSpan.FromSeconds(5));
+        release.SetResult();
+        Assert.Equal("NEW", (await second)![0]!["name"]!.GetValue<string>());
     }
 
     [Fact]

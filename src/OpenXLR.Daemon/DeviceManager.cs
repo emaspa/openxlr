@@ -238,7 +238,7 @@ public sealed class DeviceManager : BackgroundService
     internal static TimeSpan HungReconnectDelay = TimeSpan.FromSeconds(10);
     /// <summary>After an ordinary open failure (permissions, a busy device): shorter, still not a tight loop.</summary>
     internal static TimeSpan OpenRetryDelay = TimeSpan.FromSeconds(2);
-    private DateTime _reconnectNotBefore = DateTime.MinValue;
+    private long _reconnectNotBefore;   // monotonic ms
     private string? _lastLoopError;
 
     /// <summary>
@@ -283,7 +283,7 @@ public sealed class DeviceManager : BackgroundService
                 _lastUsbFault, (int)HungReconnectDelay.TotalSeconds,
                 dev is null ? 0 : _hung.HungCount(dev.Info.ProductId), HungTransferPolicy.Limit);
         }
-        _reconnectNotBefore = DateTime.UtcNow + HungReconnectDelay;
+        _reconnectNotBefore = Environment.TickCount64 + (long)HungReconnectDelay.TotalMilliseconds;
         Drop();
     }
 
@@ -313,7 +313,7 @@ public sealed class DeviceManager : BackgroundService
                 }
             }
             if (_device is { Connected: true }) return;
-            if (DateTime.UtcNow < _reconnectNotBefore) return;
+            if (Environment.TickCount64 < _reconnectNotBefore) return;
             List<IAudioDevice> usable = [.. all.Where(d => !_hung.IsSetAside(d.Info.ProductId))];
             IAudioDevice? dev = _preferredPid is ushort pid
                 ? usable.FirstOrDefault(d => d.Info.ProductId == pid) ?? (usable.Count > 0 ? usable[0] : null)
@@ -327,7 +327,7 @@ public sealed class DeviceManager : BackgroundService
                 // cannot be opened (a udev rule not yet applied) ten times a
                 // second.
                 dev.Dispose();
-                if (ex is not UsbHungException) _reconnectNotBefore = DateTime.UtcNow + OpenRetryDelay;
+                if (ex is not UsbHungException) _reconnectNotBefore = Environment.TickCount64 + (long)OpenRetryDelay.TotalMilliseconds;
                 throw;
             }
             _device = dev;

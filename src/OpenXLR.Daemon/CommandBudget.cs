@@ -10,23 +10,23 @@ public sealed class CommandBudget
 {
     private readonly int _capacity;
     private readonly double _refillPerSecond;
-    private readonly Func<DateTime> _clock;
+    private readonly Func<long> _clock;   // monotonic milliseconds
     private double _tokens;
-    private DateTime _last;
+    private long _last;
 
-    public CommandBudget(int capacity = 300, double refillPerSecond = 100, Func<DateTime>? clock = null)
+    public CommandBudget(int capacity = 300, double refillPerSecond = 100, Func<long>? clock = null)
     {
         _capacity = capacity;
         _refillPerSecond = refillPerSecond;
-        _clock = clock ?? (() => DateTime.UtcNow);
+        _clock = clock ?? (() => Environment.TickCount64);
         _tokens = capacity;
         _last = _clock();
     }
 
     public bool TryTake()
     {
-        DateTime now = _clock();
-        _tokens = Math.Min(_capacity, _tokens + (now - _last).TotalSeconds * _refillPerSecond);
+        long now = _clock();
+        _tokens = Math.Min(_capacity, _tokens + (now - _last) / 1000.0 * _refillPerSecond);
         _last = now;
         if (_tokens < 1) return false;
         _tokens -= 1;
