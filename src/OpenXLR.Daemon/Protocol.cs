@@ -21,7 +21,7 @@ public sealed record Command
     /// </summary>
     [JsonPropertyName("cmd")] public string Cmd { get; init; } = "";
 
-    /// <summary>Optional correlation ID for an acknowledged mixer command.</summary>
+    /// <summary>Optional correlation id for a mutation that wants an explicit result.</summary>
     [JsonPropertyName("requestId")] public string? RequestId { get; init; }
 
     /// <summary>For "set": the control name (see <see cref="ControlNames"/>).</summary>
@@ -36,11 +36,16 @@ public sealed record Command
     /// <summary>Mixer commands: which mix.</summary>
     [JsonPropertyName("mix")] public string? Mix { get; init; }
 
+    /// <summary>setLayoutOrder: complete ordered lists of editable stable IDs.</summary>
+    [JsonPropertyName("channels")] public List<string>? Channels { get; init; }
+    [JsonPropertyName("mixes")] public List<string>? Mixes { get; init; }
+
     /// <summary>"assignStream": the PipeWire stream (sink-input) id to route.</summary>
     [JsonPropertyName("streamId")] public int? StreamId { get; init; }
 
     /// <summary>
-    /// "setMonitorOutput": PipeWire node.name (null disconnects); or
+    /// "setMonitorOutput": PipeWire node.name (null disconnects);
+    /// "setMonitorFeed": the selected output whose feed changes (with "mix"); or
     /// "setActiveDevice": the interface's vvvv:pppp id.
     /// </summary>
     [JsonPropertyName("device")] public string? Device { get; init; }
@@ -60,7 +65,7 @@ public sealed record Command
 
     /// <summary>"saveProfile" / "loadProfile" / "deleteProfile": the profile name;
     /// "setRecallOnConnect": the profile to recall on connect, empty to clear;
-    /// create/rename layout commands: the display name.</summary>
+    /// editable-layout create/rename commands: the display name.</summary>
     [JsonPropertyName("name")] public string? Name { get; init; }
 
     /// <summary>"setInserts": the channel's whole insert chain, in order.</summary>
@@ -92,8 +97,12 @@ public sealed record StateMessage
     /// restart prompt; a daemon older than 0.1.13 omits the field).
     /// </summary>
     [JsonPropertyName("daemonVersion")] public string? DaemonVersion { get; init; }
-    /// <summary>Protocol features, independent of release and hardware capabilities.</summary>
-    [JsonPropertyName("features")] public string[] Features { get; init; } = [];
+    /// <summary>
+    /// A condition the user should know about, in one sentence, or null:
+    /// today, mixer settings that cannot be written to disk. Clients show
+    /// it where they show the daemon's status.
+    /// </summary>
+    [JsonPropertyName("warning")] public string? Warning { get; init; }
     [JsonPropertyName("connected")] public bool Connected { get; init; }
     [JsonPropertyName("device")] public DeviceDescriptor? Device { get; init; }
     [JsonPropertyName("capabilities")] public DeviceCapabilities? Capabilities { get; init; }
@@ -152,7 +161,7 @@ public sealed record ErrorMessage
     [JsonPropertyName("message")] public string Message { get; }
 }
 
-/// <summary>Correlated result for a command that supplied a requestId.</summary>
+/// <summary>Correlated result for a command that supplied requestId.</summary>
 public sealed record CommandResultMessage(string RequestId, string? Error)
 {
     [JsonPropertyName("type")] public string Type => "commandResult";

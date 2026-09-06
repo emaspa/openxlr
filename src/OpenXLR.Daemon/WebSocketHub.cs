@@ -8,8 +8,7 @@ namespace OpenXLR.Daemon;
 
 /// <summary>
 /// Fans device state out to every connected WebSocket client and routes their
-/// "set" commands into the <see cref="DeviceManager"/>. One client's change is
-/// broadcast to all, so the UI, the OpenDeck plugin, and any CLI stay in sync.
+/// commands into the device and mixer services.
 /// </summary>
 public sealed class WebSocketHub
 {
@@ -24,10 +23,6 @@ public sealed class WebSocketHub
     private readonly MixerService _mixer;
     private readonly ILogger<WebSocketHub> _log;
     private readonly ConcurrentDictionary<Guid, Client> _clients = new();
-    // Receive loops must observe shutdown: an open socket otherwise keeps
-    // Kestrel's graceful stop waiting for the whole host timeout (30 s), long
-    // enough for systemd to SIGKILL the daemon before the other services
-    // ever get to tear down.
     private readonly CancellationToken _stopping;
     private readonly StateBroadcastQueue _stateBroadcasts;
 
@@ -38,8 +33,6 @@ public sealed class WebSocketHub
         _mixer = mixer;
         _log = log;
         _stopping = lifetime.ApplicationStopping;
-        // Either half changing pushes the combined state, so clients always see
-        // device and mixer consistently in one message.
         _stateBroadcasts = new(() =>
         {
             if (!_clients.IsEmpty) Broadcast(Snapshot());
@@ -50,21 +43,19 @@ public sealed class WebSocketHub
         _ = _stateBroadcasts.RunAsync(_stopping);
         _mixer.MetersUpdated += () =>
         {
-            if (_clients.IsEmpty) return;                    // nobody watching
+            if (_clients.IsEmpty) return;
             IReadOnlyDictionary<string, double[]>? levels = _mixer.Meters();
             if (levels is { Count: > 0 }) Broadcast(new MetersMessage(levels));
         };
     }
 
-    /// <summary>Device state plus mixer state, as one message.</summary>
-    // Last recalled or saved profile per device id, for the state message.
     private readonly ConcurrentDictionary<string, string> _activeProfile = new();
 
-    private StateMessage Snapshot() =>
+    internal StateMessage Snapshot() =>
         _devices.Snapshot() with
         {
             DaemonVersion = OpenXLR.Daemon.DaemonVersion.Current,
-            Features = ["editableLayout", "commandResults"],
+            Warning = string.Join(" ", new[] { _devices.Warning, _mixer.PersistenceWarning }.Where(w => w is not null)) is { Length: > 0 } w ? w : null,
             ActiveProfile = ActiveDeviceId() is string apId && _activeProfile.TryGetValue(apId, out string? ap) ? ap : null,
             Mixer = _mixer.Snapshot(),
             Devices = _mixer.Devices(),
@@ -73,22 +64,21 @@ public sealed class WebSocketHub
             Detected = [.. _devices.Detected().Select(d => new DetectedDevice(d.UsbId, d.Name, d.Active))],
         };
 
-    /// <summary>Serve one client for the life of its socket.</summary>
+    private static readonly TimeSpan AuthDeadline = TimeSpan.FromSeconds(5);
+
     public async Task HandleAsync(WebSocket socket)
     {
+        if (!await AuthenticateAsync(socket)) return;
         var client = new Client(socket, _stopping);
-        _clients[client.Id] = client;
         try
         {
-            await client.SendAsync(Serialize(Snapshot()));   // initial state
+            await client.SendAsync(Serialize(Snapshot()));
+            _clients[client.Id] = client;
             await ReceiveLoop(client);
         }
         catch (Exception ex) when (ex is WebSocketException or OperationCanceledException
                                    or IOException or InvalidOperationException)
         {
-            // A client that vanished without a close handshake (killed
-            // process, dropped connection), a send that failed or timed out
-            // in the pump, or a queue drop: all ordinary disconnects.
         }
         finally
         {
@@ -97,96 +87,100 @@ public sealed class WebSocketHub
         }
     }
 
+    private async Task<bool> AuthenticateAsync(WebSocket socket)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(_stopping);
+        deadline.CancelAfter(AuthDeadline);
+        (SocketGuard.Outcome outcome, byte[]? message) = await SocketGuard.ReceiveMessageAsync(
+            socket, new byte[4 * 1024], MaxCommandBytes, SocketGuard.MessageDeadline, deadline.Token);
+        if (outcome != SocketGuard.Outcome.Message || message is null)
+        {
+            if (!_stopping.IsCancellationRequested)
+                await SocketGuard.CloseAsync(socket, WebSocketCloseStatus.PolicyViolation, "authentication timeout");
+            return false;
+        }
+        if (!ApiToken.Accepts(message))
+        {
+            _log.LogWarning("control API: a client presented no valid token and was refused");
+            await SocketGuard.CloseAsync(socket, WebSocketCloseStatus.PolicyViolation, "unauthorized");
+            return false;
+        }
+        return true;
+    }
+
     private async Task ReceiveLoop(Client client)
     {
         var buf = new byte[8 * 1024];
         while (client.Socket.State == WebSocketState.Open)
         {
-            using var ms = new MemoryStream();
-            WebSocketReceiveResult res;
-            do
-            {
-                try
-                {
-                    res = await client.Socket.ReceiveAsync(buf, _stopping);
-                }
-                catch (OperationCanceledException) when (_stopping.IsCancellationRequested)
-                {
-                    using var grace = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-                    try { await client.Socket.CloseAsync(WebSocketCloseStatus.EndpointUnavailable, "daemon stopping", grace.Token); }
-                    catch (Exception) { /* the client may already be gone */ }
-                    return;
-                }
-                if (res.MessageType == WebSocketMessageType.Close)
-                {
-                    await client.Socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
-                    return;
-                }
-                if (res.MessageType != WebSocketMessageType.Text)
-                {
-                    await client.Socket.CloseAsync(WebSocketCloseStatus.InvalidMessageType,
-                        "text messages only", CancellationToken.None);
-                    return;
-                }
-                if (ms.Length + res.Count > MaxCommandBytes)
-                {
-                    await client.Socket.CloseAsync(WebSocketCloseStatus.MessageTooBig,
-                        $"command exceeds {MaxCommandBytes} bytes", CancellationToken.None);
-                    return;
-                }
-                ms.Write(buf, 0, res.Count);
-            } while (!res.EndOfMessage);
+            (SocketGuard.Outcome outcome, byte[]? message) = await SocketGuard.ReceiveMessageAsync(
+                client.Socket, buf, MaxCommandBytes, SocketGuard.MessageDeadline, _stopping);
+            if (outcome != SocketGuard.Outcome.Message || message is null) return;
 
             if (!client.Budget.TryTake())
             {
-                await client.Socket.CloseAsync(WebSocketCloseStatus.PolicyViolation,
-                    "too many commands", CancellationToken.None);
+                await SocketGuard.CloseAsync(client.Socket, WebSocketCloseStatus.PolicyViolation, "too many commands");
                 return;
             }
-            await Dispatch(client, Encoding.UTF8.GetString(ms.ToArray()));
+            await Dispatch(client, Encoding.UTF8.GetString(message));
         }
     }
 
-    private async Task Dispatch(Client client, string text)
+    private Task Dispatch(Client client, string text)
+        => DispatchAsync(message => client.SendAsync(Serialize(message)), text);
+
+    internal async Task<ApiCommandResult> ExecuteForApiAsync(string text)
+    {
+        var messages = new List<object>();
+        await DispatchAsync(message => { messages.Add(message); return Task.CompletedTask; }, text);
+        bool success = !messages.Any(message => message is ErrorMessage ||
+            message is CommandResultMessage { Error: not null });
+        return new("1", success, messages);
+    }
+
+    private async Task DispatchAsync(Func<object, Task> reply, string text)
     {
         Command? cmd;
         try { cmd = JsonSerializer.Deserialize<Command>(text, Json); }
-        catch (JsonException ex) { await client.SendAsync(Serialize(new ErrorMessage($"bad json: {ex.Message}"))); return; }
-        if (cmd is null) return;
+        catch (JsonException ex) { await reply(new ErrorMessage($"bad json: {ex.Message}")); return; }
+        if (cmd is null) { await reply(new ErrorMessage("command must be an object")); return; }
 
         switch (cmd.Cmd)
         {
+            case "auth":
+                break;
             case "getState":
-                await client.SendAsync(Serialize(Snapshot()));
+                await reply(Snapshot());
                 break;
             case "getDiagnostics":
-                await client.SendAsync(Serialize(new DiagnosticsMessage(_devices.DumpBlocks())));
+                await reply(new DiagnosticsMessage(_devices.DumpBlocks()));
                 break;
             case "listPlugins":
-                // The first call may block on lilv's scan; keep it off the socket loop's thread.
                 IReadOnlyList<OpenXLR.Core.Mixing.PluginInfo> plugins = await Task.Run(() => OpenXLR.Core.Mixing.Lv2Catalog.Plugins);
-                await client.SendAsync(Serialize(new PluginsMessage(plugins)));
+                await reply(new PluginsMessage(plugins));
                 break;
             case "set":
-                if (cmd.Control is null) { await client.SendAsync(Serialize(new ErrorMessage("set: missing 'control'"))); break; }
-                string? err = _devices.Apply(cmd.Control, cmd.Value);  // broadcasts on success
-                if (err is not null) await client.SendAsync(Serialize(new ErrorMessage(err)));
+                if (cmd.Control is null) { await reply(new ErrorMessage("set: missing 'control'")); break; }
+                string? err = _devices.Apply(cmd.Control, cmd.Value);
+                if (err is not null) await reply(new ErrorMessage(err));
                 break;
-            case "setLevel":
-            case "setChannelMuted":
-            case "setMixVolume":
-            case "setMixMuted":
             case "createChannel":
             case "renameChannel":
             case "deleteChannel":
             case "createMix":
             case "renameMix":
             case "deleteMix":
+            case "setLayoutOrder":
+            case "setLevel":
+            case "setChannelMuted":
+            case "setMixVolume":
+            case "setMixMuted":
             case "assignStream":
             case "assignApp":
             case "forgetApp":
             case "setMonitorOutput":
             case "setMonitorOutputs":
+            case "setMonitorFeed":
             case "setOutputVolume":
             case "setEnforcedDefaults":
             case "setAuxPortEnabled":
@@ -195,53 +189,49 @@ public sealed class WebSocketHub
             case "setInserts":
             case "setInsertBypass":
             case "setInsertParam":
-                string? mixErr = _mixer.Apply(cmd);                     // broadcasts on success
+                string? mixErr = _mixer.Apply(cmd);
                 if (cmd.RequestId is not null)
                 {
-                    // State first: after the result arrives an editor can
-                    // re-enable controls against the authoritative layout.
-                    await client.SendAsync(Serialize(Snapshot()));
-                    await client.SendAsync(Serialize(new CommandResultMessage(cmd.RequestId, mixErr)));
+                    // Authoritative state is deliberately queued before the
+                    // matching result. After the result, an editor can safely
+                    // re-enable controls against the layout that actually won.
+                    await reply(Snapshot());
+                    await reply(new CommandResultMessage(cmd.RequestId, mixErr));
                 }
-                if (mixErr is not null)
+                else if (mixErr is not null)
                 {
-                    if (cmd.RequestId is null)
-                        await client.SendAsync(Serialize(new ErrorMessage(mixErr)));
-                    // Controls are optimistic in both clients. Follow an error
-                    // with authoritative state so a rejected ClipGuard/plugin
-                    // change snaps back instead of looking enabled forever.
-                    await client.SendAsync(Serialize(Snapshot()));
+                    await reply(new ErrorMessage(mixErr));
+                    await reply(Snapshot());
                 }
                 break;
             case "setActiveDevice":
-                if (cmd.Device is null) { await client.SendAsync(Serialize(new ErrorMessage("setActiveDevice: missing 'device'"))); break; }
+                if (cmd.Device is null) { await reply(new ErrorMessage("setActiveDevice: missing 'device'")); break; }
                 string? devSelErr = _devices.SetActiveDevice(cmd.Device);
-                if (devSelErr is not null) await client.SendAsync(Serialize(new ErrorMessage(devSelErr)));
+                if (devSelErr is not null) await reply(new ErrorMessage(devSelErr));
                 break;
             case "saveProfile":
             case "loadProfile":
             case "deleteProfile":
                 string? profErr = HandleProfile(cmd);
-                if (profErr is not null) await client.SendAsync(Serialize(new ErrorMessage(profErr)));
-                else Broadcast(Snapshot());   // list (and loaded state) changed
+                if (profErr is not null) await reply(new ErrorMessage(profErr));
+                else Broadcast(Snapshot());
                 break;
             case "setRecallOnConnect":
                 string? recallErr = HandleRecallOnConnect(cmd);
-                if (recallErr is not null) await client.SendAsync(Serialize(new ErrorMessage(recallErr)));
+                if (recallErr is not null) await reply(new ErrorMessage(recallErr));
                 else Broadcast(Snapshot());
                 break;
+            case "resetDevice":
+                string? resetErr = _devices.ResetToDefaults();
+                if (resetErr is not null) await reply(new ErrorMessage(resetErr));
+                else _log.LogInformation("reset {dev} to its firmware defaults", ActiveDeviceId());
+                break;
             default:
-                await client.SendAsync(Serialize(new ErrorMessage($"unknown cmd '{cmd.Cmd}'")));
+                await reply(new ErrorMessage($"unknown cmd '{cmd.Cmd}'"));
                 break;
         }
     }
 
-    /// <summary>
-    /// Recall a saved profile onto the device and the mixer. Both halves are
-    /// tried and the first failure reported, so a missing device does not
-    /// block the mixer scene (and the other way round). The mixer half is
-    /// skipped when this run has no submixer. Null on success.
-    /// </summary>
     private string? ApplyNamedProfile(string devId, string name)
     {
         OpenXLR.Core.Profile? p = OpenXLR.Core.ProfileStore.Load(devId, name);
@@ -252,7 +242,6 @@ public sealed class WebSocketHub
         return devErr ?? mixErr;
     }
 
-    /// <summary>Choose (or with an empty name clear) the profile recalled on connect.</summary>
     private string? HandleRecallOnConnect(Command cmd)
     {
         if (ActiveDeviceId() is not string devId) return "setRecallOnConnect: no device connected";
@@ -275,32 +264,34 @@ public sealed class WebSocketHub
         }
     }
 
-    /// <summary>
-    /// A device connected fresh (see <see cref="DeviceManager.DeviceArrived"/>):
-    /// recall its chosen profile, once the submix graph is up so the mixer
-    /// half lands too (at daemon start the graph follows the device by a few
-    /// seconds).
-    /// </summary>
     private async Task RecallOnArrivalAsync(string devId)
     {
         string? name;
         try { name = OpenXLR.Core.ProfileStore.RecallOnConnect(devId); }
-        catch (Exception ex) { _log.LogWarning("recall on connect: {msg}", ex.Message); return; }
-        if (name is null) return;
+        catch (Exception ex) { _log.LogWarning("recall on connect: {msg}", ex.Message); name = null; }
+        if (name is null)
+        {
+            string? status = _devices.RestoreLastState();
+            if (status is not null)
+            {
+                _log.LogInformation("{status}", status);
+                Broadcast(Snapshot());
+            }
+            return;
+        }
         DateTime deadline = DateTime.UtcNow + TimeSpan.FromSeconds(60);
         while (_mixer.SubmixerEnabled && !_mixer.Built && DateTime.UtcNow < deadline && !_stopping.IsCancellationRequested)
             await Task.Delay(250, _stopping).ContinueWith(_ => { }, TaskScheduler.Default);
-        if (_stopping.IsCancellationRequested || ActiveDeviceId() != devId) return;
+        if (_stopping.IsCancellationRequested || ActiveDeviceId() != devId) { _devices.MarkRestored(); return; }
         string? err = ApplyNamedProfile(devId, name);
+        _devices.MarkRestored();
         if (err is null) _log.LogInformation("recalled profile '{name}' on connect of {dev}", name, devId);
         else _log.LogWarning("recall of profile '{name}' on connect of {dev}: {err}", name, devId, err);
         Broadcast(Snapshot());
     }
 
-    /// <summary>The active device's usb id, or null while disconnected.</summary>
     private string? ActiveDeviceId() => _devices.Snapshot().Device?.UsbId;
 
-    /// <summary>Save, load, or delete a named profile (per device). Null on success.</summary>
     private string? HandleProfile(Command cmd)
     {
         string? name = OpenXLR.Core.ProfileStore.SanitizeName(cmd.Name);
@@ -340,16 +331,11 @@ public sealed class WebSocketHub
         try { text = Serialize(message); }
         catch (Exception ex)
         {
-            // A serialization fault here would otherwise vanish: this runs from a
-            // timer callback with nobody awaiting it.
             _log.LogError("cannot serialize {type}: {msg}", message.GetType().Name, ex.Message);
             return;
         }
         foreach (Client c in _clients.Values)
         {
-            // State is level-triggered and meters are transient, so dropping a
-            // frame for a client that cannot keep up is safer than accumulating
-            // unbounded tasks and memory. Its next state frame catches it up.
             if (!c.TrySend(text))
                 _log.LogDebug("client {id} send queue full; dropping {type}",
                     c.Id, message.GetType().Name);
@@ -358,11 +344,6 @@ public sealed class WebSocketHub
 
     private static string Serialize(object o) => JsonSerializer.Serialize(o, Json);
 
-    /// <summary>
-    /// A connection with one bounded send pump. WebSocket forbids concurrent
-    /// sends; the bounded channel also prevents a slow or suspended local
-    /// client from growing the daemon's memory indefinitely.
-    /// </summary>
     private sealed class Client : IDisposable
     {
         private const int QueueCapacity = 32;
@@ -397,10 +378,6 @@ public sealed class WebSocketHub
             if (Socket.State != WebSocketState.Open) return Task.CompletedTask;
             var sent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             if (_outgoing.Writer.TryWrite(new PendingSend(text, sent))) return sent.Task;
-            // The queue holds about two seconds of meter frames. A client that
-            // has not drained it is stuck; drop it rather than let the send
-            // fault propagate through the command pipeline. The receive loop
-            // ends on the aborted socket and the handler cleans up.
             try { Socket.Abort(); } catch (ObjectDisposedException) { }
             return Task.CompletedTask;
         }
@@ -431,9 +408,6 @@ public sealed class WebSocketHub
             finally
             {
                 failure ??= new OperationCanceledException("client connection closed");
-                // Nothing will drain the queue any more: refuse further writes
-                // so a send racing the abort fails fast instead of waiting on
-                // a completion that never comes.
                 _outgoing.Writer.TryComplete(failure);
                 while (_outgoing.Reader.TryRead(out PendingSend? pending))
                     pending.Completion?.TrySetException(failure);

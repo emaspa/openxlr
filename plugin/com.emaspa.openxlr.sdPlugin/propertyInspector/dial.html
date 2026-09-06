@@ -29,6 +29,9 @@
       <option value="auxLevel">Aux In level</option>
       <option value="crossfade">Mic / PC crossfade</option>
     </optgroup>
+    <!-- The mix master and send groups are generated from the daemon's
+         state and inserted here, ahead of the insert groups. -->
+    <optgroup data-layout-anchor hidden></optgroup>
   </select>
   <button id="add">Add to stack</button>
   <ul id="stack"></ul>
@@ -37,6 +40,7 @@
     <label style="display:inline"><input type="radio" name="gesture" value="tap" checked> Screen tap</label>
     <label style="display:inline; margin-left:14px"><input type="radio" name="gesture" value="push"> Dial press</label>
   </div>
+  <script src="layout-options.js"></script>
   <script>
     let ws = null, piUuid = null, settings = {};
 
@@ -57,8 +61,7 @@
             save();
           });
         render();
-        // The plugin lists both the editable mixer layout and loaded insert
-        // controls from live daemon state.
+        // The plugin lists the loaded inserts' controls from live state.
         for (const request of ["layout", "inserts"])
           ws.send(JSON.stringify({ event: "sendToPlugin", context: actionInfo.context,
                                    payload: { request } }));
@@ -67,29 +70,25 @@
         let m;
         try { m = JSON.parse(e.data); } catch { return; }
         if (m.event !== "sendToPropertyInspector") return;
-        const sel = document.getElementById("target");
-        const addGroup = (id, label, items) => {
-          if (document.getElementById(id) || !items?.length) return;
-          const group = document.createElement("optgroup");
-          group.id = id;
-          group.label = label;
-          for (const it of items) {
-            const opt = document.createElement("option");
-            opt.value = it.target;
-            opt.textContent = it.label;
-            if (it.meta) opt.dataset.meta = JSON.stringify(it.meta);
-            group.appendChild(opt);
-          }
-          sel.appendChild(group);
-        };
         if (Array.isArray(m.payload?.levelGroups)) {
-          for (const group of m.payload.levelGroups)
-            addGroup(group.id, group.label, group.items);
+          replaceLayoutOptions(m.payload.levelGroups);
+          render();
         }
-        if (Array.isArray(m.payload?.params)) {
-          addGroup("param-group", "Insert plugin controls", m.payload.params);
+        if (!Array.isArray(m.payload?.params)) return;
+        const sel = document.getElementById("target");
+        if (document.getElementById("param-group") || !m.payload.params.length) return;
+        const group = document.createElement("optgroup");
+        group.id = "param-group";
+        group.label = "Insert plugin controls";
+        for (const it of m.payload.params) {
+          const opt = document.createElement("option");
+          opt.value = it.target;
+          opt.textContent = it.label;
+          opt.dataset.meta = JSON.stringify(it.meta);
+          group.appendChild(opt);
         }
-        render();   // dynamic controls now have readable labels
+        sel.appendChild(group);
+        render();   // stack entries for insert controls now have readable labels
       };
     }
     window.connectElgatoStreamDeckSocket = connect;
@@ -101,7 +100,7 @@
       ws.send(JSON.stringify({ event: "setSettings", context: piUuid, payload: settings }));
     }
     function labelFor(v) {
-      const o = document.querySelector('#target option[value="' + v + '"]');
+      const o = Array.from(document.getElementById("target").options).find(option => option.value === v);
       return o ? o.textContent : v;
     }
     function render() {

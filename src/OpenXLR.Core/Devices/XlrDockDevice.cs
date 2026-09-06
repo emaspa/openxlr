@@ -1,3 +1,4 @@
+using OpenXLR.Core;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 
@@ -50,8 +51,6 @@ public sealed class XlrDockDevice : IAudioDevice
     private const int OffPhantom = 6;
     private const int OffLowZ = 33;
 
-    private static IntPtr _ctx = IntPtr.Zero;
-    private IntPtr _handle = IntPtr.Zero;
 
     private int _card = -1;
     private DeviceState? _cached;
@@ -69,6 +68,7 @@ public sealed class XlrDockDevice : IAudioDevice
         LowImpedance = true,
         XlrInputs = 1,
         HpOutputs = 1,
+        RetainsSettings = false,
     };
 
     public bool Connected => _card >= 0;
@@ -97,42 +97,27 @@ public sealed class XlrDockDevice : IAudioDevice
     // before the udev rule applies) gain, mute, and headphone volume still work
     // through ALSA; USB-backed setters report the permission problem instead
     // of pretending the write succeeded.
+    private readonly IUsbTransport _usb = UsbTransport.Create();
+
     private void OpenUsb()
     {
-        if (_ctx == IntPtr.Zero && LibUsb.libusb_init(out _ctx) != 0) return;
-        _handle = LibUsb.libusb_open_device_with_vid_pid(_ctx, VendorId, ProductId);
+        try { _usb.Open(VendorId, ProductId); }
+        catch (Exception) { /* USB-backed setters report the problem when used */ }
     }
 
     public void Disconnect()
     {
         _card = -1;
-        if (_handle != IntPtr.Zero) { LibUsb.libusb_close(_handle); _handle = IntPtr.Zero; }
+        _usb.Close();
     }
 
     private string Amixer(params string[] args)
     {
-        var psi = new ProcessStartInfo("amixer")
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-        };
-        psi.ArgumentList.Add("-c");
-        psi.ArgumentList.Add(_card.ToString());
-        foreach (string a in args) psi.ArgumentList.Add(a);
-        using var p = Process.Start(psi)
-            ?? throw new InvalidOperationException("could not start amixer");
-        Task<string> outTask = p.StandardOutput.ReadToEndAsync();
-        Task<string> errTask = p.StandardError.ReadToEndAsync();
-        if (!p.WaitForExit(2000))
-        {
-            try { p.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
-            throw new TimeoutException($"amixer {string.Join(' ', args)} timed out");
-        }
-        string outText = outTask.GetAwaiter().GetResult();
-        string errText = errTask.GetAwaiter().GetResult();
-        if (p.ExitCode != 0)
-            throw new InvalidOperationException($"amixer {string.Join(' ', args)}: {errText.Trim()}");
-        return outText;
+        ProcessResult r = ProcessRunner.Run("amixer", ["-c", _card.ToString(), .. args], TimeSpan.FromSeconds(2),
+            stdoutCap: 1024 * 1024, stderrCap: 64 * 1024);
+        if (r.TimedOut) throw new TimeoutException($"amixer {string.Join(' ', args)} timed out");
+        if (r.ExitCode != 0) throw new InvalidOperationException($"amixer {string.Join(' ', args)}: {r.Stderr.Trim()}");
+        return r.StdoutText;
     }
 
 
@@ -143,10 +128,7 @@ public sealed class XlrDockDevice : IAudioDevice
     /// and Connected turns false so the daemon reconnects with a new one.
     /// </summary>
     private int Transfer(byte requestType, byte request, ushort value, byte[] data, int length)
-    {
-        try { return LibUsb.ControlTransfer(_handle, requestType, request, value, UsbIndex, data, (ushort)length, 1000); }
-        catch (UsbHungException) { _handle = IntPtr.Zero; throw; }
-    }
+        => _usb.ControlTransfer(requestType, request, value, UsbIndex, data, (ushort)length, 1000);
 
     private byte[] ReadConfig()
     {
@@ -160,7 +142,7 @@ public sealed class XlrDockDevice : IAudioDevice
 
     private (bool Phantom, bool LowZ) ReadUsbFlags()
     {
-        if (_handle == IntPtr.Zero) return (false, false);
+        if (!_usb.IsOpen) return (false, false);
         try
         {
             byte[] c = ReadConfig();
@@ -171,7 +153,7 @@ public sealed class XlrDockDevice : IAudioDevice
 
     private void SetConfigByte(int offset, byte value, string what)
     {
-        if (_handle == IntPtr.Zero)
+        if (!_usb.IsOpen)
             throw new InvalidOperationException(
                 $"XLR Dock USB handle not open; {what} needs the udev rule");
         lock (_lock)
@@ -255,7 +237,7 @@ public sealed class XlrDockDevice : IAudioDevice
             {
                 ["alsa"] = $"card={_card} gain={Get(GainCtl)} capture={Get(MuteCtl)} hp={Get(HpCtl)}",
             };
-            if (_handle != IntPtr.Zero)
+            if (_usb.IsOpen)
             {
                 try { blocks["config"] = Convert.ToHexString(ReadConfig()); }
                 catch (Exception ex) { blocks["config"] = $"error: {ex.Message}"; }

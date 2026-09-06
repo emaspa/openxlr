@@ -1,0 +1,19 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:OpenXLR.UI" x:Class="OpenXLR.UI.UpdatesWindow" x:DataType="vm:UpdatesViewModel"
+        Title="OpenXLR updates" Width="660" Height="520" MinWidth="420" MinHeight="300"
+        WindowStartupLocation="CenterOwner" Background="#16181d">
+  <Grid Margin="18" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="12">
+    <TextBlock Text="{Binding Title}" FontSize="19" FontWeight="SemiBold"
+               Foreground="#e6e9f0" TextWrapping="Wrap"/>
+    <TextBlock Grid.Row="1" Text="Release notes are plain text. OpenXLR never installs an update automatically."
+               Foreground="#8b93a7" TextWrapping="Wrap"/>
+    <ScrollViewer Grid.Row="2">
+      <SelectableTextBlock Text="{Binding Details}" TextWrapping="Wrap" Foreground="#d2d6df"/>
+    </ScrollViewer>
+    <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+      <Button Content="Check again" Click="OnCheck" IsEnabled="{Binding !Busy}"/>
+      <Button Content="Open on GitHub" Click="OnOpen" IsVisible="{Binding Available}"/>
+      <Button Content="Close" Click="OnClose"/>
+    </StackPanel>
+  </Grid>
+</Window>

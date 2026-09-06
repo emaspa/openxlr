@@ -1,0 +1,76 @@
+using System.Security.Cryptography;
+using System.Text.Json;
+using OpenXLR.Core;
+
+namespace OpenXLR.Daemon;
+
+/// <summary>
+/// The control API's credential. The loopback bind and the Origin check
+/// keep other machines and web pages out; the token keeps other local
+/// users out: it lives in a file only this user can read, is new at every
+/// daemon start, and a client's first message must present it before the
+/// daemon sends anything or accepts a command.
+/// </summary>
+public static class ApiToken
+{
+    private static string? _current;
+
+    /// <summary>The token in force, or null before <see cref="Initialize"/>.</summary>
+    public static string? Current => _current;
+
+    /// <summary>
+    /// Remove any token an earlier run left behind and publish a fresh one
+    /// only once the host is listening, so no client ever hands a token
+    /// that will be valid on this daemon to whoever squats the port before
+    /// it binds, and a second instance that never binds never publishes.
+    /// </summary>
+    public static void PublishWhenListening(IHostApplicationLifetime lifetime, ILogger log)
+    {
+        Clear();
+        lifetime.ApplicationStarted.Register(() =>
+        {
+            try { log.LogInformation("control API token written to {path}", Initialize()); }
+            catch (Exception ex) { log.LogError("control API token could not be written: {msg}; no client can connect", ex.Message); }
+        });
+    }
+
+    /// <summary>Forget the current token and delete the file, so clients present nothing valid.</summary>
+    public static void Clear()
+    {
+        _current = null;
+        try { File.Delete(OpenXlrPaths.TokenPath); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* nothing to remove, or not ours */ }
+    }
+
+    /// <summary>Generate a fresh token and write it for the clients. Returns the file path.</summary>
+    public static string Initialize()
+    {
+        string token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+        OpenXlrPaths.WriteAtomic(OpenXlrPaths.TokenPath, token + "\n");
+        _current = token;
+        return OpenXlrPaths.TokenPath;
+    }
+
+    /// <summary>Whether a client's first message is an "auth" carrying the current token.</summary>
+    public static bool Accepts(ReadOnlySpan<byte> firstMessage) => Matches(_current, firstMessage);
+
+    /// <summary>Pure check, for tests: the message must be {"cmd":"auth","token":expected}.</summary>
+    public static bool Matches(string? expected, ReadOnlySpan<byte> message)
+    {
+        if (expected is null) return false;
+        string? presented;
+        try
+        {
+            using var doc = JsonDocument.Parse(message.ToArray());
+            if (doc.RootElement.ValueKind != JsonValueKind.Object) return false;
+            if (!doc.RootElement.TryGetProperty("cmd", out JsonElement cmd) || cmd.ValueKind != JsonValueKind.String || cmd.GetString() != "auth") return false;
+            if (!doc.RootElement.TryGetProperty("token", out JsonElement tok) || tok.ValueKind != JsonValueKind.String) return false;
+            presented = tok.GetString();
+        }
+        catch (JsonException) { return false; }
+        if (presented is null) return false;
+        // Constant time, so the comparison leaks nothing about how much matched.
+        return CryptographicOperations.FixedTimeEquals(
+            System.Text.Encoding.UTF8.GetBytes(presented), System.Text.Encoding.UTF8.GetBytes(expected));
+    }
+}

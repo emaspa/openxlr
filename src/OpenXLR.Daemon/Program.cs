@@ -5,7 +5,15 @@ using OpenXLR.Daemon;
 
 const int ApiPort = 37890;
 
+// The same binary is its own USB helper (see UsbHelperMain): nothing of the
+// host below runs in that mode.
+if (args.Length == 1 && args[0] == "--usb-helper") return UsbHelperMain.Run();
+
 var builder = WebApplication.CreateBuilder(args);
+
+// Start the notifier before graph construction so progressing startup work
+// can extend systemd's deadline. Readiness still waits for ApplicationStarted.
+builder.Services.AddHostedService<ServiceWatchdog>();
 
 // The DeviceManager is both a singleton (queried by the hub) and the hosted
 // background service that runs the poll/reconnect loop.
@@ -32,7 +40,14 @@ builder.WebHost.ConfigureKestrel(k =>
 var app = builder.Build();
 app.Services.GetRequiredService<WebSocketHub>();   // construct so it subscribes to StateChanged
 
+// The token every client presents as its first message (see ApiToken) is
+// published only after Kestrel owns the port. Written earlier, a process
+// squatting the port would receive it from our own clients and could use
+// it here once it let go of the port.
+ApiToken.PublishWhenListening(app.Lifetime, app.Logger);
+
 app.UseWebSockets();
+ApiEndpoints.Map(app);
 
 app.Map("/ws", async (HttpContext ctx, WebSocketHub hub) =>
 {
@@ -43,7 +58,14 @@ app.Map("/ws", async (HttpContext ctx, WebSocketHub hub) =>
         ctx.Response.StatusCode = 403;
         return;
     }
-    using var socket = await ctx.WebSockets.AcceptWebSocketAsync();
+    // Transport pings every 30 s; a peer that stops answering them for 30 s
+    // is dropped, while a quiet but live client (the window listens for
+    // hours without sending) is never touched.
+    using var socket = await ctx.WebSockets.AcceptWebSocketAsync(new WebSocketAcceptContext
+    {
+        KeepAliveInterval = SocketGuard.KeepAliveInterval,
+        KeepAliveTimeout = SocketGuard.KeepAliveTimeout,
+    });
     await hub.HandleAsync(socket);
 });
 

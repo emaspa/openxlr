@@ -4,7 +4,9 @@
 // and dials stay in sync with the UI (and with the hardware) for free.
 
 import process from "node:process";
-import { channelName, layoutChoices, mixName, mixShortName } from "./layout-choices.mjs";
+import { channelName, mixName, mixShortName, layoutChoices } from "./layout-choices.mjs";
+import fs from "node:fs";
+import os from "node:os";
 
 // ---------- launch arguments ----------
 const arg = (name) => {
@@ -15,6 +17,7 @@ const port = arg("-port");
 const pluginUUID = arg("-pluginUUID");
 const registerEvent = arg("-registerEvent");
 
+// ---------- static naming ----------
 // Toggle targets on the device state block, with short key labels.
 const DEVICE_TOGGLES = {
   mute: "XLR 1\nMute", mute2: "XLR 2\nMute",
@@ -34,6 +37,16 @@ const MUTE_LIKE = new Set(["mute", "mute2"]);
 
 // ---------- daemon connection ----------
 let daemon = null;
+const layoutInspectors = new Set();
+let lastLayout = "";
+function publishLayout() {
+  const choices = layoutChoices(daemonState?.mixer);
+  const serialized = JSON.stringify(choices);
+  if (serialized === lastLayout) return;
+  lastLayout = serialized;
+  for (const context of layoutInspectors)
+    send({ event: "sendToPropertyInspector", context, payload: choices });
+}
 let daemonState = null;   // last full {"type":"state"} message
 let daemonUp = false;
 let meterLevels = null;   // last {"type":"meters"} levels, keyed ch:/mix:
@@ -51,6 +64,15 @@ function scheduleDaemonReconnect(generation) {
   reconnectDelayMs = Math.min(reconnectDelayMs * 2, 10000);
 }
 
+// The daemon writes a fresh token at every start; it is the first message
+// on every connection, or the daemon sends nothing.
+function readDaemonToken() {
+  const run = process.env.XDG_RUNTIME_DIR;
+  const cfg = process.env.XDG_CONFIG_HOME || `${os.homedir()}/.config`;
+  const path = run ? `${run}/openxlr/token` : `${cfg}/openxlr/token`;
+  try { return fs.readFileSync(path, "utf8").trim(); } catch { return ""; }
+}
+
 function connectDaemon() {
   const socket = new WebSocket("ws://127.0.0.1:37890/ws");
   const generation = ++connectionGeneration;
@@ -59,6 +81,7 @@ function connectDaemon() {
     if (daemon !== socket) return;
     daemonUp = true;
     reconnectDelayMs = 500;
+    cmd({ cmd: "auth", token: readDaemonToken() });
     cmd({ cmd: "listPlugins" });
     refreshAll();
   };
@@ -66,7 +89,7 @@ function connectDaemon() {
     if (daemon !== socket) return;
     let m;
     try { m = JSON.parse(e.data); } catch { return; }
-    if (m.type === "state") { daemonState = m; refreshAll(); }
+    if (m.type === "state") { daemonState = m; refreshAll(); publishLayout(); }
     else if (m.type === "meters") { meterLevels = m.levels; refreshMeters(); }
     else if (m.type === "plugins") {
       catalog = new Map((m.plugins ?? []).map((p) => [p.plugin, p]));
@@ -74,8 +97,9 @@ function connectDaemon() {
     }
     else if (m.type === "error") console.error("OpenXLR daemon:", m.message);
   };
-  socket.onclose = () => {
+  socket.onclose = (e) => {
     if (daemon !== socket) return;
+    if (e && e.code === 1008) console.error("OpenXLR daemon refused the plugin:", e.reason);
     daemonUp = false; daemonState = null; refreshAll();
     scheduleDaemonReconnect(generation);
   };
@@ -287,7 +311,12 @@ host.onmessage = (e) => {
       break;
     }
     case "sendToPlugin":
-      if (m.payload?.request === "outputs")
+      if (m.payload?.request === "layout") {
+        layoutInspectors.add(m.context);
+        send({ event: "sendToPropertyInspector", context: m.context,
+               payload: layoutChoices(daemonState?.mixer) });
+      }
+      else if (m.payload?.request === "outputs")
         send({ event: "sendToPropertyInspector", context: m.context,
                payload: { outputs: outputDevices() } });
       else if (m.payload?.request === "inserts")
@@ -296,9 +325,9 @@ host.onmessage = (e) => {
       else if (m.payload?.request === "profiles")
         send({ event: "sendToPropertyInspector", context: m.context,
                payload: { profiles: profileChoices() } });
-      else if (m.payload?.request === "layout")
-        send({ event: "sendToPropertyInspector", context: m.context,
-               payload: layoutChoices(mixer()) });
+      break;
+    case "propertyInspectorDidDisappear":
+      layoutInspectors.delete(m.context);
       break;
   }
 };
@@ -382,6 +411,14 @@ function toggleValue(target, inst) {
     const outs = mixer()?.monitorOutputs;
     return outs ? outs.includes(target.slice(8)) : null;
   }
+  // What feeds an output: dark = Monitor A, lit = Monitor B or A+B;
+  // disabled while the output is not a monitor output at all.
+  if (target.startsWith("feed:")) {
+    const out = target.slice(5);
+    const outs = mixer()?.monitorOutputs;
+    if (!outs || !outs.includes(out)) return null;
+    return feedOf(out) !== "monitor";
+  }
   if (target.startsWith("mixmute:")) return mixOf(target.slice(8))?.muted ?? null;
   if (target.startsWith("sendmute:")) {
     const [, ch, mix] = target.split(":");
@@ -390,6 +427,14 @@ function toggleValue(target, inst) {
   if (Object.hasOwn(DEVICE_TOGGLES, target) && !deviceTargetSupported(target)) return null;
   return dev()?.[target] ?? null;
 }
+
+// An output's feed as the daemon stores it: one monitor mix id, or ids
+// joined with '+' when the output hears them summed.
+const feedOf = (sink) => mixer()?.monitorFeeds?.[sink] ?? "monitor";
+const FEED_LETTER = { monitor: "A", monitor2: "B" };
+const feedLetters = (feed) => feed.split("+").map((id) => FEED_LETTER[id] ?? id).join("+");
+// The feed key cycles A, B, A+B.
+const nextFeed = (feed) => feed === "monitor" ? "monitor2" : feed === "monitor2" ? "monitor+monitor2" : "monitor";
 
 function toggleLabel(target, inst) {
   if (!target) return "OpenXLR";
@@ -410,7 +455,14 @@ function toggleLabel(target, inst) {
     const sink = target.slice(8);
     const d = daemonState?.devices?.find((x) => x.name === sink);
     const name = d?.description ?? sink.split(".").pop();
-    return "Monitor\n" + name;
+    // The output follows Monitor A unless its feed was switched.
+    return `Monitor ${feedLetters(feedOf(sink))}\n${name}`;
+  }
+  if (target.startsWith("feed:")) {
+    const sink = target.slice(5);
+    const d = daemonState?.devices?.find((x) => x.name === sink);
+    const name = d?.description ?? sink.split(".").pop();
+    return `${name}\nMonitor ${feedLetters(feedOf(sink))}`;
   }
   if (target.startsWith("mixmute:")) return `${mixName(mixer(), target.slice(8))}\nMute`;
   if (target.startsWith("sendmute:")) {
@@ -520,6 +572,7 @@ function onKeyDown(context, inst) {
   else if (t === "softClipGuard") cmd({ cmd: "setSoftClipGuard", value: !cur });
   else if (t === "gainLocked") cmd({ cmd: "set", control: "gainLock", value: !cur });
   else if (t.startsWith("monitor:")) cmd({ cmd: "setMonitorOutputs", devices: [t.slice(8)] });
+  else if (t.startsWith("feed:")) cmd({ cmd: "setMonitorFeed", device: t.slice(5), mix: nextFeed(feedOf(t.slice(5))) });
   else if (t.startsWith("mixmute:"))
     cmd({ cmd: "setMixMuted", mix: t.slice(8), value: !cur });
   else if (t.startsWith("sendmute:")) {
@@ -664,7 +717,7 @@ function glyphFor(t) {
   if (t === "mute" || t === "mute2") return "mic";
   if (t === "outHp1" || t === "outHp2" || t === "lowImpedance") return "headphones";
   if (t === "outLineOut") return "jack";
-  if (t.startsWith("monitor:") || t.startsWith("mixmute:")) return "speaker";
+  if (t.startsWith("monitor:") || t.startsWith("feed:") || t.startsWith("mixmute:")) return "speaker";
   if (t.startsWith("sendmute:")) return "fader";
   if (isProfileTarget(t)) return "scene";
   return null;

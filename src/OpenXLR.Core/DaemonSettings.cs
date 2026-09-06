@@ -23,16 +23,7 @@ public sealed record DaemonSettings
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     };
 
-    public static string ConfigDir
-    {
-        get
-        {
-            string baseDir = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME") is { Length: > 0 } x
-                ? x
-                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config");
-            return Path.Combine(baseDir, "openxlr");
-        }
-    }
+    public static string ConfigDir => OpenXlrPaths.ConfigDir;
 
     private static string FilePath => Path.Combine(ConfigDir, "daemon.json");
 
@@ -47,13 +38,7 @@ public sealed record DaemonSettings
         return new DaemonSettings();
     }
 
-    public void Save()
-    {
-        Directory.CreateDirectory(ConfigDir);
-        string tmp = FilePath + ".tmp";
-        File.WriteAllText(tmp, JsonSerializer.Serialize(this, Json));
-        File.Move(tmp, FilePath, overwrite: true);
-    }
+    public void Save() => OpenXlrPaths.WriteAtomicJson(FilePath, this, Json);
 
     /// <summary>
     /// The effective submixer switch: the saved choice when there is one,

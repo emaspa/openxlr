@@ -40,6 +40,9 @@
       <option value="outLineOut">Line Out</option>
       <option value="auxPort">Aux mix to USB Aux port</option>
     </optgroup>
+    <!-- The mix and send groups are generated from the daemon's state and
+         inserted here, ahead of the feed, insert and profile groups. -->
+    <optgroup data-layout-anchor hidden></optgroup>
   </select>
   <label for="icon" style="margin-top:12px">Key icon</label>
   <select id="icon">
@@ -51,5 +54,6 @@
     <option value="fader">Faders</option>
     <option value="knob">Knob</option>
   </select>
+  <script src="layout-options.js"></script>
   <script src="pi.js"></script>
 </body></html>

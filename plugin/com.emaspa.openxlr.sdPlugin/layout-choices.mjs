@@ -7,7 +7,7 @@ const LEGACY_CHANNELS = {
   music: "Music", browser: "Browser", system: "System",
   voicechat: "Voice Chat", sfx: "SFX",
 };
-const LEGACY_MIXES = { monitor: "Monitor", stream: "Stream", chat: "Chat", auxout: "Aux" };
+const LEGACY_MIXES = { monitor: "Monitor A", monitor2: "Monitor B", stream: "Stream", chat: "Chat", auxout: "Aux" };
 
 export function channelName(mixer, id) {
   return mixer?.channels?.find((channel) => channel.id === id)?.name
@@ -22,6 +22,8 @@ export function mixName(mixer, id) {
 export function mixShortName(mixer, id) {
   if (id === "all") return "All";
   const name = mixName(mixer, id);
+  if (id === "monitor" && name === "Monitor A") return "MonA";
+  if (id === "monitor2" && name === "Monitor B") return "MonB";
   return name.length <= 5 ? name : `${name.slice(0, 4)}…`;
 }
 

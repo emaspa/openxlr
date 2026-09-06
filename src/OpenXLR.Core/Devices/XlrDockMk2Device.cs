@@ -12,6 +12,9 @@ namespace OpenXLR.Core.Devices;
 /// through software. Every control verified on hardware: gain, mute and
 /// headphone volume cross-checked against the kernel's ALSA mirror of the
 /// feature units, phantom power with a condenser microphone, the rest by ear.
+/// Unlike the first dock it keeps its settings across a power cycle (verified
+/// by replugging: the gain came back as set), so the daemon treats it like
+/// the Pro and does not restore anything on connect.
 /// </summary>
 public sealed class XlrDockMk2Device : WaveXlrMk2Device
 {

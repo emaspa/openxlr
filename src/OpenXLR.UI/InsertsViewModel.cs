@@ -34,14 +34,11 @@ public sealed class InsertsViewModel : ViewModelBase
         _client = client;
         _channel = channel;
         _channels = channels;
-        _title = title ?? channel;
+        Title = title ?? channel;
     }
 
     /// <summary>What the chain belongs to, for window titles ("XLR 1", "Stream mix").</summary>
-    private string _title;
-    public string Title { get => _title; private set => Set(ref _title, value); }
-
-    public void SetTitle(string title) => Title = title;
+    public string Title { get; }
 
     /// <summary>Picker header: which plugins fit this chain.</summary>
     public string PickerHint => _channels == 1

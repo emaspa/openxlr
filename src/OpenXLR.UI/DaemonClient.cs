@@ -38,17 +38,12 @@ public sealed class DaemonClient : IAsyncDisposable
 
     public DaemonClient(string url = "ws://127.0.0.1:37890/ws") => _uri = new Uri(url);
 
-    /// <summary>Raised on every state push (already on a background thread).</summary>
     public event Action<JsonNode>? StateReceived;
-
-    /// <summary>The raw JSON of the newest state push, for diagnostics.</summary>
     public string? LastStateJson { get; private set; }
 
-    /// <summary>Request the daemon's vendor-block dump; null on timeout.</summary>
     public Task<JsonNode?> RequestDiagnosticsAsync(TimeSpan timeout)
         => QueryAsync("diagnostics", "getDiagnostics", timeout);
 
-    /// <summary>Request the daemon's plugin catalog (the "plugins" array); null on timeout.</summary>
     public Task<JsonNode?> RequestPluginsAsync(TimeSpan timeout)
         => QueryAsync("plugins", "listPlugins", timeout);
 
@@ -74,8 +69,6 @@ public sealed class DaemonClient : IAsyncDisposable
         {
             lock (_lifecycle)
             {
-                // One impatient caller must not remove the reply slot still
-                // used by other windows waiting for the same catalog.
                 if (--query.Callers == 0 && _queries.TryGetValue(type, out var current)
                     && ReferenceEquals(current, query)) _queries.Remove(type);
             }
@@ -88,13 +81,8 @@ public sealed class DaemonClient : IAsyncDisposable
             if (_queries.TryGetValue(type, out var query)) query.Reply.TrySetResult(reply);
     }
 
-    /// <summary>Raised when an error message arrives from the daemon.</summary>
     public event Action<string>? ErrorReceived;
-
-    /// <summary>Raised on every meter frame (id to peak, 0..1 and above when clipping).</summary>
     public event Action<JsonNode>? MetersReceived;
-
-    /// <summary>Raised when the connection comes up or goes down.</summary>
     public event Action<bool>? ConnectionChanged;
 
     public void Start()
@@ -119,6 +107,9 @@ public sealed class DaemonClient : IAsyncDisposable
                 using var connect = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
                 connect.CancelAfter(TimeSpan.FromSeconds(5));
                 await socket.ConnectAsync(_uri, connect.Token);
+                string auth = JsonSerializer.Serialize(new Dictionary<string, object>
+                    { ["cmd"] = "auth", ["token"] = OpenXlrPaths.ReadToken() ?? "" });
+                await socket.SendAsync(Encoding.UTF8.GetBytes(auth), WebSocketMessageType.Text, true, connect.Token);
                 ConnectionChanged?.Invoke(true);
                 await ReceiveLoop(socket);
             }
@@ -128,9 +119,7 @@ public sealed class DaemonClient : IAsyncDisposable
             }
             catch (Exception)
             {
-                // daemon not up yet, or the link dropped, so fall through and retry
             }
-
             finally
             {
                 _socket?.Dispose();
@@ -160,7 +149,12 @@ public sealed class DaemonClient : IAsyncDisposable
             do
             {
                 res = await socket.ReceiveAsync(buf, _cts.Token);
-                if (res.MessageType == WebSocketMessageType.Close) return;
+                if (res.MessageType == WebSocketMessageType.Close)
+                {
+                    if (res.CloseStatus == WebSocketCloseStatus.PolicyViolation && res.CloseStatusDescription is { Length: > 0 } why)
+                        ErrorReceived?.Invoke($"daemon refused this window: {why}");
+                    return;
+                }
                 if (res.MessageType != WebSocketMessageType.Text || ms.Length + res.Count > MaxMessageBytes)
                     throw new WebSocketException("Invalid or oversized daemon message.");
                 ms.Write(buf, 0, res.Count);
@@ -187,7 +181,6 @@ public sealed class DaemonClient : IAsyncDisposable
         }
     }
 
-    /// <summary>Set a hardware control (gain, mute, lowCut, …).</summary>
     public Task SetActiveDeviceAsync(string usbId)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setActiveDevice", ["device"] = usbId });
 
@@ -200,9 +193,11 @@ public sealed class DaemonClient : IAsyncDisposable
     public Task DeleteProfileAsync(string name)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "deleteProfile", ["name"] = name });
 
-    /// <summary>The profile recalled when the device connects; null clears it.</summary>
     public Task SetRecallOnConnectAsync(string? name)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setRecallOnConnect", ["name"] = name ?? "" });
+
+    public Task ResetDeviceAsync()
+        => SendAsync(new Dictionary<string, object> { ["cmd"] = "resetDevice" });
 
     public Task SetControlAsync(string control, object value)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "set", ["control"] = control, ["value"] = value });
@@ -254,45 +249,38 @@ public sealed class DaemonClient : IAsyncDisposable
             if (!await SendAsync(payload)) return "Daemon disconnected; no change was sent.";
             return await waiter.Task.WaitAsync(TimeSpan.FromSeconds(45));
         }
-        catch (TimeoutException) { return "No confirmation from daemon. Check the layout before retrying."; }
+        catch (TimeoutException) { return "No confirmation from daemon. Check the current layout before retrying."; }
         finally { lock (_lifecycle) _commands.Remove(id); }
     }
 
-    /// <summary>Send the monitor mix to a different output (null disconnects).</summary>
     public Task SetMonitorOutputAsync(string? device)
         => SendAsync(new Dictionary<string, object?> { ["cmd"] = "setMonitorOutput", ["device"] = device });
 
-    /// <summary>Every output the monitor mix should feed (empty = disconnect).</summary>
     public Task SetMonitorOutputsAsync(IReadOnlyList<string> devices)
         => SendAsync(new Dictionary<string, object?> { ["cmd"] = "setMonitorOutputs", ["devices"] = devices });
 
-    /// <summary>Volume of the selected output device (0..1).</summary>
+    public Task SetMonitorFeedAsync(string device, string mix)
+        => SendAsync(new Dictionary<string, object?> { ["cmd"] = "setMonitorFeed", ["device"] = device, ["mix"] = mix });
+
     public Task SetOutputVolumeAsync(double value)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setOutputVolume", ["value"] = value });
 
-    /// <summary>Devices the daemon should hold as system defaults (null = don't enforce).</summary>
     public Task SetEnforcedDefaultsAsync(string? sink, string? source)
         => SendAsync(new Dictionary<string, object?>
         { ["cmd"] = "setEnforcedDefaults", ["sink"] = sink, ["source"] = source });
 
-    /// <summary>Move an application's audio to a channel, remembered for next launch.</summary>
-    /// <summary>Route an app (by identity) to a channel, silent or not.</summary>
     public Task AssignAppAsync(string identity, string channel, string? label = null)
         => SendAsync(new Dictionary<string, object?> { ["cmd"] = "assignApp", ["identity"] = identity, ["channel"] = channel, ["label"] = label });
 
-    /// <summary>Send or stop sending the Aux mix to the USB Aux port.</summary>
     public Task SetAuxPortEnabledAsync(bool on)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setAuxPortEnabled", ["value"] = on });
 
-    /// <summary>Software low cut on the first XLR channel: 0, 80, or 120 Hz.</summary>
     public Task SetLowCutHzAsync(int hz)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setLowCutHz", ["value"] = hz });
 
-    /// <summary>Software ClipGuard (host-side limiter) on or off.</summary>
     public Task SetSoftClipGuardAsync(bool on)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setSoftClipGuard", ["value"] = on });
 
-    /// <summary>Replace a channel's plugin insert chain (ordered).</summary>
     public Task SetInsertsAsync(string channel, IReadOnlyList<object> inserts)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setInserts", ["channel"] = channel, ["inserts"] = inserts });
 
@@ -304,7 +292,6 @@ public sealed class DaemonClient : IAsyncDisposable
         => SendAsync(new Dictionary<string, object>
         { ["cmd"] = "setInsertParam", ["channel"] = channel, ["insertId"] = insertId, ["symbol"] = symbol, ["value"] = value });
 
-    /// <summary>Remove an app from the registry and forget its override.</summary>
     public Task ForgetAppAsync(string identity)
         => SendAsync(new Dictionary<string, object?> { ["cmd"] = "forgetApp", ["identity"] = identity });
 
@@ -358,8 +345,6 @@ public sealed class DaemonClient : IAsyncDisposable
     {
         await _cts.CancelAsync();
         if (_runTask is not null) await _runTask;
-        // Sends may still be releasing the semaphore. It has no native handle;
-        // let it be collected instead of disposing under those continuations.
         _cts.Dispose();
     }
 }

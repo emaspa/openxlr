@@ -17,6 +17,14 @@ namespace OpenXLR.Core.Mixing;
 /// </summary>
 public sealed class StreamMatcher
 {
+    /// <summary>
+    /// The pseudo-channel that means "not managed": the mixer leaves the
+    /// app's streams wherever the desktop routes them (issue #21, a headset
+    /// with a game side and a chat side that the user balances by hand).
+    /// Stored like any other override and shown in the app list.
+    /// </summary>
+    public const string Ignore = "ignore";
+
     /// <summary>Ordered rules; the first match wins.</summary>
     public sealed record Rule(string ChannelId, IReadOnlyList<string> Patterns);
 
@@ -62,9 +70,6 @@ public sealed class StreamMatcher
     }
 
     public void ClearOverride(string identity) => _overrides.Remove(identity);
-
-    /// <summary>Replace the saved routing table while rebuilding the graph.</summary>
-    public void ClearOverrides() => _overrides.Clear();
 
     public IReadOnlyDictionary<string, string> Overrides => _overrides;
 

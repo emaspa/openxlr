@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
 
+# Actions are pinned to commit SHAs (the tag is in the comment) so a moved
+# tag upstream cannot change what runs here.
 permissions:
   contents: read
 
@@ -12,14 +14,17 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: 10.0.x
 
-      - name: Restore
-        run: dotnet restore src/OpenXLR.slnx
+      - name: Versions agree everywhere
+        run: tools/check-version.sh
+
+      - name: Restore (locked to packages.lock.json)
+        run: dotnet restore src/OpenXLR.slnx --locked-mode
 
       - name: Build
         run: dotnet build src/OpenXLR.slnx -c Release --no-restore
@@ -31,6 +36,12 @@ jobs:
         run: |
           node --check plugin/com.emaspa.openxlr.sdPlugin/plugin.mjs
           python3 -m json.tool plugin/com.emaspa.openxlr.sdPlugin/manifest.json >/dev/null
+
+      - name: Lint shell scripts
+        run: shellcheck --severity=error tools/check-version.sh tools/check-locked-restore.sh packaging/ppa/make-source.sh
+
+      - name: Locked restore enforced on every packaging path
+        run: tools/check-locked-restore.sh
 
       - name: Validate packaged service inputs
         run: |

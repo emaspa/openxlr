@@ -17,7 +17,7 @@
 
 buildDotnetModule {
   pname = "openxlr";
-  version = "0.1.20";
+  version = "0.1.24";
 
   src = ../..;
 
@@ -26,6 +26,16 @@ buildDotnetModule {
     "src/OpenXLR.UI/OpenXLR.UI.csproj"
   ];
   nugetDeps = ./deps.json;
+
+  # deps.json already pins every package by hash and the builder restores
+  # from its own feed, whose repacked archives fail the lock files' content
+  # hash check (NU1403). The lock files stay authoritative for CI and the
+  # distribution packages; this build drops them and restores without one.
+  postPatch = ''
+    rm -f src/*/packages.lock.json
+  '';
+  dotnetRestoreFlags = [ "-p:RestorePackagesWithLockFile=false" ];
+  dotnetBuildFlags = [ "-p:RestorePackagesWithLockFile=false" ];
 
   dotnet-sdk = dotnetCorePackages.sdk_10_0;
   dotnet-runtime = dotnetCorePackages.aspnetcore_10_0;

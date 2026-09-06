@@ -8,6 +8,8 @@ namespace OpenXLR.Core;
 /// control transfers. Mirrors the validated Python/ctypes prototype rather than
 /// depending on a higher-level wrapper for the critical path. The vendor
 /// interface (3) is unclaimed by any kernel driver, so no detach is needed.
+/// Only <see cref="InProcessUsbTransport"/> calls into it; in the daemon that
+/// transport runs inside the USB helper process (see HelperUsbTransport).
 /// </summary>
 internal static class LibUsb
 {

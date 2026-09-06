@@ -17,26 +17,35 @@ namespace OpenXLR.Core.Mixing;
 public sealed class PipeWireAdapter
 {
     private const string ClipGuardPluginFile = "hard_limiter_1413.so";
-    // These strings pass through the module-argument parser and then the
-    // nested property-list parser. JSON quoting preserves whitespace, quotes,
-    // apostrophes and backslashes without allowing a label to inject another
-    // PipeWire property.
-    private static readonly JsonSerializerOptions PropertyJson = new()
-    { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
     private readonly Func<DspFeatureAvailability>? _clipGuardAvailabilityOverride;
+    private readonly Action? _progress;
     private readonly List<uint> _modules = [];
     private readonly List<Process> _loopbacks = [];
     private readonly List<Process> _filters = [];
 
     public PipeWireAdapter() { }
 
+    /// <summary>Report completed helper operations, including failures, to the daemon's progress gate.</summary>
+    public PipeWireAdapter(Action progress) => _progress = progress;
+
     internal PipeWireAdapter(Func<DspFeatureAvailability> clipGuardAvailabilityOverride)
         => _clipGuardAvailabilityOverride = clipGuardAvailabilityOverride;
 
-    internal static string ModuleProperties(string description, string extra)
-        => JsonSerializer.Serialize(
-            $"node.description={JsonSerializer.Serialize(description, PropertyJson)} {extra}", PropertyJson);
+    /// <summary>
+    /// pactl joins its arguments into one module-argument string, and PipeWire's
+    /// module parser splits that on whitespace, honouring double quotes; the
+    /// value of sink_properties is then parsed again as key=value pairs,
+    /// honouring single quotes. So the whole property list goes in double
+    /// quotes and a description with spaces in single quotes. The earlier
+    /// form (a backslash-escaped description, no outer quotes) kept the
+    /// description but silently dropped every property after it: the
+    /// channels ran for months without priority.session, without
+    /// suspend-on-idle=false, and flagged node.virtual, which KDE's audio
+    /// applet hides. Verified on PipeWire 1.6 with all four properties.
+    /// </summary>
+    private static string PropList(string props) => '"' + props + '"';
+    private static string PropValue(string value) => "'" + value.Replace("\\", "\\\\").Replace("'", "\\'") + "'";
 
     /// <summary>
     /// Check the optional LADSPA dependency before changing a live graph. PipeWire
@@ -122,7 +131,7 @@ public sealed class PipeWireAdapter
     }
 
     /// <summary>Load a null sink; returns its module id for later unload.</summary>
-    public uint CreateNullSink(string nodeName, string description, bool isInternal = false)
+    public uint CreateNullSink(string nodeName, string description)
     {
         // suspend-on-idle must be off: an idle channel sink would otherwise be
         // suspended by PipeWire and drop the first moment of audio (or all of it)
@@ -136,8 +145,8 @@ public sealed class PipeWireAdapter
             // (which silently swallows the user's desktop audio).
             // node.virtual=false: KDE's audio applet hides virtual devices,
             // and these are devices the user assigns applications to.
-            "sink_properties=" + ModuleProperties(description,
-                "node.suspend-on-idle=false priority.session=100" + InternalProperties(isInternal)));
+            "sink_properties=" + PropList($"node.description={PropValue(description)}" +
+            " node.suspend-on-idle=false priority.session=100 node.virtual=false"));
         uint id = uint.Parse(outp.Trim());
         _modules.Add(id);
         return id;
@@ -155,20 +164,24 @@ public sealed class PipeWireAdapter
             "load-module", "module-remap-sink",
             $"sink_name={nodeName}",
             $"master={masterSink}",
-            "sink_properties=" + ModuleProperties(description, "priority.session=90"));
+            "sink_properties=" + PropList($"node.description={PropValue(description)} priority.session=90"));
         uint id = uint.Parse(outp.Trim());
         _modules.Add(id);
         return id;
     }
 
     /// <summary>
-    /// A combine sink duplicates its input into several mix sinks. Application
-    /// channels feed it from a separate stable public sink; hardware inputs use
-    /// its monitor directly. Its per-slave streams are the send faders.
+    /// A combine sink duplicates its input into several slave sinks. One per
+    /// channel: applications play into it and every mix receives the audio
+    /// through that channel's remap cells.
     /// </summary>
-    /// <param name="needsMonitor">True for hardware channels whose monitor is
-    /// linked from the capture device; false for an internal app fan-out.</param>
-    public uint CreateCombineSink(string nodeName, IEnumerable<string> slaveSinks, string description, bool needsMonitor)
+    /// <param name="visible">
+    /// Whether desktop audio applets should list the sink as a playback
+    /// device. Application channels are (users assign apps to them);
+    /// hardware input channels are not, since nothing should play into a
+    /// channel that carries a microphone.
+    /// </param>
+    public uint CreateCombineSink(string nodeName, IEnumerable<string> slaveSinks, string description, bool visible = true)
     {
         string outp = Run("pactl",
             "load-module", "module-combine-sink",
@@ -177,40 +190,20 @@ public sealed class PipeWireAdapter
             // suspend-on-idle=false keeps the combine's monitor source running;
             // a suspended monitor makes the channel's level meter read silence
             // even while audio flows through the sink.
-            "sink_properties=" + ModuleProperties(description,
-                "priority.session=100 node.suspend-on-idle=false" + InternalProperties(true) +
-                (needsMonitor ? "" : " media.class=Audio/Filter node.autoconnect=false " +
-                    "adapter.auto-port-config=\"{ mode = dsp monitor = true position = preserve }\"")));
+            "sink_properties=" + PropList($"node.description={PropValue(description)}" +
+            $" priority.session=100 node.suspend-on-idle=false node.virtual={(visible ? "false" : "true")}"));
         uint id = uint.Parse(outp.Trim());
         _modules.Add(id);
         return id;
     }
 
-    private static string InternalProperties(bool isInternal)
-        => isInternal ? " openxlr.internal=true device.class=filter node.virtual=true" : " node.virtual=false";
-
-    internal static bool IsInternalDevice(JsonElement properties)
-        => properties.TryGetProperty("openxlr.internal", out JsonElement value)
-            && (value.ValueKind == JsonValueKind.True ||
-                value.ValueKind == JsonValueKind.String && value.GetString() == "true");
-
-    /// <summary>Unload one module created by this adapter.</summary>
+    /// <summary>Remove one owned module, retaining it for teardown if unloading fails.</summary>
     public void UnloadModule(uint id)
     {
+        if (!_modules.Contains(id)) throw new InvalidOperationException("module is not owned by this mixer");
+        Run("pactl", "unload-module", id.ToString());
         _modules.Remove(id);
-        try { Run("pactl", "unload-module", id.ToString()); }
-        catch (InvalidOperationException) { /* already gone */ }
     }
-
-    /// <summary>Update presentation metadata without recreating the audio node.</summary>
-    public void SetSinkDescription(string nodeName, string description)
-        => Run("pactl", "update-sink-proplist", nodeName,
-            $"node.description={JsonSerializer.Serialize(description, PropertyJson)}");
-
-    /// <summary>Update a virtual microphone's presentation metadata in place.</summary>
-    public void SetSourceDescription(string nodeName, string description)
-        => Run("pactl", "update-source-proplist", nodeName,
-            $"node.description={JsonSerializer.Serialize(description, PropertyJson)}");
 
     /// <summary>A "sink#suffix" pseudo-device address without its suffix.</summary>
     private static string BareSink(string sinkName)
@@ -350,9 +343,8 @@ public sealed class PipeWireAdapter
             // Both properties: apps read one or the other depending on the API.
             // Low priority.session so WirePlumber never promotes a virtual mic
             // to system default capture on its own.
-            "source_properties=" + ModuleProperties(description,
-                $"device.description={JsonSerializer.Serialize(description, PropertyJson)} " +
-                "priority.session=100 node.virtual=false"));
+            "source_properties=" + PropList($"device.description={PropValue(description)}" +
+            $" node.description={PropValue(description)} priority.session=100 node.virtual=false"));
         uint id = uint.Parse(outp.Trim());
         _modules.Add(id);
         return id;
@@ -633,6 +625,26 @@ public sealed class PipeWireAdapter
             TryRun("pactl", "list", "sinks", "short") ?? "",
             streamSerial, sinkName);
 
+    /// <summary>The sink a stream currently plays into, by name, or null.</summary>
+    public string? StreamSinkName(int streamSerial)
+        => StreamSinkName(TryRun("pactl", "list", "sink-inputs", "short") ?? "",
+                          TryRun("pactl", "list", "sinks", "short") ?? "", streamSerial);
+
+    internal static string? StreamSinkName(string sinkInputs, string sinks, int streamSerial)
+    {
+        string? sinkId = sinkInputs.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Split('\t'))
+            .Where(columns => columns.Length >= 2 && columns[0] == streamSerial.ToString())
+            .Select(columns => columns[1])
+            .FirstOrDefault();
+        if (sinkId is null || sinkId == uint.MaxValue.ToString()) return null;
+        return sinks.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Split('\t'))
+            .Where(columns => columns.Length >= 2 && columns[0] == sinkId)
+            .Select(columns => columns[1])
+            .FirstOrDefault();
+    }
+
     internal static bool IsStreamOnSink(string sinkInputs, string sinks, int streamSerial, string sinkName)
     {
         string? sinkId = sinkInputs.Split('\n', StringSplitOptions.RemoveEmptyEntries)
@@ -851,7 +863,6 @@ public sealed class PipeWireAdapter
                     !(t.GetString()?.EndsWith("Node", StringComparison.Ordinal) ?? false)) continue;
                 if (!o.TryGetProperty("info", out JsonElement info) ||
                     !info.TryGetProperty("props", out JsonElement props)) continue;
-                if (IsInternalDevice(props)) continue;
 
                 string? name = props.TryGetProperty("node.name", out JsonElement n) ? n.GetString() : null;
                 if (name is null) continue;
@@ -1111,7 +1122,7 @@ public sealed class PipeWireAdapter
 
     // Kept as UTF-8 bytes and parsed from them: the string form is twice
     // the size and was the bulk of the daemon's large-object garbage.
-    private static byte[] DumpJson()
+    private byte[] DumpJson()
     {
         lock (DumpGate)
         {
@@ -1122,49 +1133,47 @@ public sealed class PipeWireAdapter
         }
     }
 
-    private static byte[] RunBytes(string exe, params string[] args)
+    private byte[] RunBytes(string exe, params string[] args)
     {
-        var psi = new ProcessStartInfo(exe) { RedirectStandardOutput = true, RedirectStandardError = true };
-        psi.Environment["LC_ALL"] = "C";
-        foreach (string a in args) psi.ArgumentList.Add(a);
-        using Process p = Process.Start(psi) ?? throw new InvalidOperationException($"failed to start {exe}");
-        var stdout = new MemoryStream();
-        Task copy = p.StandardOutput.BaseStream.CopyToAsync(stdout);
-        Task<string> stderrTask = DrainKeepingHead(p.StandardError.BaseStream);
-        if (!p.WaitForExit(5000))
-        {
-            try { p.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
-            throw new InvalidOperationException($"{exe} {string.Join(' ', args)} timed out after 5 seconds");
-        }
-        copy.GetAwaiter().GetResult();
-        if (p.ExitCode != 0)
-            throw new InvalidOperationException($"{exe} {string.Join(' ', args)}: {stderrTask.GetAwaiter().GetResult().Trim()}");
-        return stdout.ToArray();
+        try { return RunBytesCore(exe, args); }
+        finally { _progress?.Invoke(); }
     }
 
-    private static string Run(string exe, params string[] args)
+    private static byte[] RunBytesCore(string exe, params string[] args)
     {
-        var psi = new ProcessStartInfo(exe) { RedirectStandardOutput = true, RedirectStandardError = true };
+        // Bounded: 5 s, 64 MiB of output (a large graph dump is 2 MB), the
+        // process tree killed past either, so a runaway helper never grows
+        // the daemon's heap.
+        ProcessResult r = ProcessRunner.Run(exe, args);
+        if (r.TimedOut)
+            throw new InvalidOperationException($"{exe} {string.Join(' ', args)} timed out after {ProcessRunner.DefaultTimeout.TotalSeconds:0} seconds");
+        if (r.Truncated)
+            throw new InvalidOperationException($"{exe} {string.Join(' ', args)} produced more than {ProcessRunner.DefaultStdoutCap} bytes");
+        if (r.ExitCode != 0)
+            throw new InvalidOperationException($"{exe} {string.Join(' ', args)}: {r.Stderr.Trim()}");
+        return r.Stdout;
+    }
+
+    internal string Run(string exe, params string[] args)
+    {
+        try { return RunCore(exe, args); }
+        finally { _progress?.Invoke(); }
+    }
+
+    private static string RunCore(string exe, params string[] args)
+    {
         // pactl's human-readable output is parsed ("Sink Input #", "Owner
         // Module:") and pactl is localised; a German desktop would break
-        // every fader. Every helper runs in the C locale.
-        psi.Environment["LC_ALL"] = "C";
-        psi.Environment["LANGUAGE"] = "C";
-        foreach (string a in args) psi.ArgumentList.Add(a);
-        using Process p = Process.Start(psi) ?? throw new InvalidOperationException($"failed to start {exe}");
-        Task<string> stdoutTask = p.StandardOutput.ReadToEndAsync();
-        Task<string> stderrTask = p.StandardError.ReadToEndAsync();
-        if (!p.WaitForExit(5000))
-        {
-            try { p.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
-            throw new InvalidOperationException(
-                $"{exe} {string.Join(' ', args)} timed out after 5 seconds");
-        }
-        string stdout = stdoutTask.GetAwaiter().GetResult();
-        string stderr = stderrTask.GetAwaiter().GetResult();
-        if (p.ExitCode != 0)
-            throw new InvalidOperationException($"{exe} {string.Join(' ', args)} failed: {stderr.Trim()}");
-        return stdout;
+        // every fader. The runner puts every helper in the C locale and
+        // bounds its time and output.
+        ProcessResult r = ProcessRunner.Run(exe, args);
+        if (r.TimedOut)
+            throw new InvalidOperationException($"{exe} {string.Join(' ', args)} timed out after {ProcessRunner.DefaultTimeout.TotalSeconds:0} seconds");
+        if (r.Truncated)
+            throw new InvalidOperationException($"{exe} {string.Join(' ', args)} produced more than {ProcessRunner.DefaultStdoutCap} bytes");
+        if (r.ExitCode != 0)
+            throw new InvalidOperationException($"{exe} {string.Join(' ', args)} failed: {r.Stderr.Trim()}");
+        return r.StdoutText;
     }
 }
 

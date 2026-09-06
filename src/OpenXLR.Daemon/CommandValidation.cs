@@ -19,11 +19,39 @@ public static class CommandValidation
     public const int MaxInsertId = 64;
     public const int MaxParamsPerInsert = 256;
     public const int MaxOverrides = 512;     // remembered app assignments
+    public const int MaxRequestId = 128;
 
     public static string? Check(Command cmd, ILayoutInfo layout, Func<string, PluginInfo?> findPlugin)
     {
+        if (cmd.RequestId is { Length: > MaxRequestId } || cmd.RequestId?.Any(char.IsControl) == true)
+            return $"requestId must be at most {MaxRequestId} printable characters";
+
         switch (cmd.Cmd)
         {
+            case "createChannel":
+            case "createMix":
+                return LayoutName(cmd.Name, cmd.Cmd);
+            case "renameChannel":
+                if (cmd.Channel is null) return "renameChannel: need 'channel'";
+                if (!layout.HasChannel(cmd.Channel)) return $"renameChannel: unknown channel '{Short(cmd.Channel)}'";
+                return LayoutName(cmd.Name, cmd.Cmd);
+            case "deleteChannel":
+                if (cmd.Channel is null) return "deleteChannel: need 'channel'";
+                return layout.HasChannel(cmd.Channel) ? null : $"deleteChannel: unknown channel '{Short(cmd.Channel)}'";
+            case "renameMix":
+                if (cmd.Mix is null) return "renameMix: need 'mix'";
+                if (!layout.HasMix(cmd.Mix)) return $"renameMix: unknown mix '{Short(cmd.Mix)}'";
+                return LayoutName(cmd.Name, cmd.Cmd);
+            case "deleteMix":
+                if (cmd.Mix is null) return "deleteMix: need 'mix'";
+                return layout.HasMix(cmd.Mix) ? null : $"deleteMix: unknown mix '{Short(cmd.Mix)}'";
+            case "setLayoutOrder":
+                if (cmd.Channels is null || cmd.Mixes is null) return "setLayoutOrder: need 'channels' and 'mixes'";
+                if (cmd.Channels.Count > MixerConfig.MaxApplicationChannels || cmd.Mixes.Count > MixerConfig.MaxVirtualMixes)
+                    return "setLayoutOrder: too many IDs";
+                if (cmd.Channels.Concat(cmd.Mixes).Any(id => id is null || id.Length is 0 or > 36))
+                    return "setLayoutOrder: invalid ID";
+                return null; // The mixer validates exact membership under its state lock.
             case "setLevel":
             case "setChannelMuted":
                 if (cmd.Channel is not null && !layout.HasChannel(cmd.Channel)) return $"{cmd.Cmd}: unknown channel '{Short(cmd.Channel)}'";
@@ -36,10 +64,10 @@ public static class CommandValidation
             case "setOutputVolume":
                 return Finite(cmd, "value");
             case "assignStream":
-                if (cmd.Channel is not null && !layout.HasChannel(cmd.Channel)) return $"assignStream: unknown channel '{Short(cmd.Channel)}'";
+                if (cmd.Channel is not null && !IsChannelOrIgnore(layout, cmd.Channel)) return $"assignStream: unknown channel '{Short(cmd.Channel)}'";
                 return null;
             case "assignApp":
-                if (cmd.Channel is not null && !layout.HasChannel(cmd.Channel)) return $"assignApp: unknown channel '{Short(cmd.Channel)}'";
+                if (cmd.Channel is not null && !IsChannelOrIgnore(layout, cmd.Channel)) return $"assignApp: unknown channel '{Short(cmd.Channel)}'";
                 if (TooLong(cmd.Identity, MaxText)) return "assignApp: identity too long";
                 if (TooLong(cmd.Label, MaxText)) return "assignApp: label too long";
                 if (layout.OverrideCount >= MaxOverrides) return $"assignApp: {MaxOverrides} remembered applications already; forget some first";
@@ -54,6 +82,13 @@ public static class CommandValidation
                 return null;
             case "setRecallOnConnect":
                 return TooLong(cmd.Name, MaxText) ? "setRecallOnConnect: name too long" : null;
+            case "resetDevice":
+                return null;   // no arguments; the device manager checks the device
+            case "setMonitorFeed":
+                if (TooLong(cmd.Device, MaxText)) return "setMonitorFeed: device name too long";
+                if (cmd.Mix is null || !layout.IsMonitorFeed(cmd.Mix)) return $"setMonitorFeed: '{Short(cmd.Mix ?? "")}' is not a monitor mix or a sum of monitor mixes";
+                if (cmd.Device is null || !layout.IsMonitorOutput(cmd.Device)) return $"setMonitorFeed: '{Short(cmd.Device ?? "")}' is not a selected monitor output";
+                return null;
             case "setEnforcedDefaults":
                 if (TooLong(cmd.Sink, MaxText) || TooLong(cmd.Source, MaxText)) return "setEnforcedDefaults: device name too long";
                 return null;
@@ -97,6 +132,10 @@ public static class CommandValidation
         }
     }
 
+    private static string? LayoutName(string? name, string command)
+        => name is null || name.Length > 60 || string.IsNullOrWhiteSpace(name) || name.Any(char.IsControl)
+            ? $"{command}: name must contain 1 to 60 printable characters" : null;
+
     private static string? Finite(Command cmd, string field)
         => cmd.Value.ValueKind == JsonValueKind.Number && cmd.Value.TryGetDouble(out double d) && double.IsFinite(d)
             ? null : $"{cmd.Cmd}: '{field}' must be a finite number";
@@ -104,4 +143,8 @@ public static class CommandValidation
     private static bool TooLong(string? s, int max) => s is not null && s.Length > max;
     private static string Short(string s) => s.Length <= 40 ? s : s[..40] + "...";
     private static string Tail(string uri) => uri[(uri.LastIndexOfAny(['#', '/']) + 1)..];
+
+    /// <summary>A real channel, or the "ignore" pseudo-channel that leaves an app to the desktop.</summary>
+    private static bool IsChannelOrIgnore(ILayoutInfo layout, string id)
+        => id == OpenXLR.Core.Mixing.StreamMatcher.Ignore || layout.HasChannel(id);
 }

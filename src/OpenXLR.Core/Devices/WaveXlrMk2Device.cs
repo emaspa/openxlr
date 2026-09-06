@@ -52,8 +52,6 @@ public class WaveXlrMk2Device : IAudioDevice
     private const byte CompressorMask = 0x80;
     private const byte LowZMask = 0x02;
 
-    private static IntPtr _ctx = IntPtr.Zero;
-    private IntPtr _handle = IntPtr.Zero;
     private readonly object _lock = new();
 
     /// <summary>
@@ -73,7 +71,7 @@ public class WaveXlrMk2Device : IAudioDevice
     /// <param name="model">Must match the device's iProduct string minus the
     /// vendor, since the daemon derives the PipeWire node-name hint from it.</param>
     /// <param name="vIndex">wIndex of the vendor transfers, see <see cref="_vIndex"/>.</param>
-    protected WaveXlrMk2Device(ushort productId, string model, bool physicalControls, ushort vIndex)
+    protected WaveXlrMk2Device(ushort productId, string model, bool physicalControls, ushort vIndex, bool retainsSettings = true)
     {
         _vIndex = vIndex;
         Info = new DeviceInfo("Elgato", model, VendorId, productId);
@@ -81,6 +79,7 @@ public class WaveXlrMk2Device : IAudioDevice
         {
             Gain = true,
             PhysicalControls = physicalControls,
+            RetainsSettings = retainsSettings,
             Mute = true,
             LowCut = true,
             Expander = true,
@@ -96,37 +95,26 @@ public class WaveXlrMk2Device : IAudioDevice
         };
     }
 
-    public bool Connected => _handle != IntPtr.Zero;
+    private readonly IUsbTransport _usb = UsbTransport.Create();
+
+    public bool Connected => _usb.IsOpen;
 
     public void Connect()
     {
-        if (_ctx == IntPtr.Zero)
-        {
-            int rc = LibUsb.libusb_init(out _ctx);
-            if (rc != 0) throw new InvalidOperationException($"libusb_init failed: {LibUsb.StrError(rc)}");
-        }
-        _handle = LibUsb.libusb_open_device_with_vid_pid(_ctx, VendorId, Info.ProductId);
-        if (_handle == IntPtr.Zero)
+        if (!_usb.Open(VendorId, Info.ProductId))
             throw new InvalidOperationException($"{Info.Model} present but could not be opened (udev rule?)");
     }
 
-    public void Disconnect()
-    {
-        if (_handle != IntPtr.Zero) { LibUsb.libusb_close(_handle); _handle = IntPtr.Zero; }
-    }
-
+    public void Disconnect() => _usb.Close();
 
     /// <summary>
     /// All control transfers go through here. A transfer that never returns
-    /// (issue #6) throws UsbHungException; the handle is then abandoned
-    /// without libusb_close, since the stuck native call may still use it,
-    /// and Connected turns false so the daemon reconnects with a new one.
+    /// (issue #6) throws UsbHungException; the transport has dropped the
+    /// device by then (the helper process is killed), Connected turns false
+    /// and the daemon reconnects with a fresh one.
     /// </summary>
     private int Transfer(byte requestType, byte request, ushort value, byte[] data, int length)
-    {
-        try { return LibUsb.ControlTransfer(_handle, requestType, request, value, _vIndex, data, (ushort)length, 1000); }
-        catch (UsbHungException) { _handle = IntPtr.Zero; throw; }
-    }
+        => _usb.ControlTransfer(requestType, request, value, _vIndex, data, (ushort)length, 1000);
 
     // libusb's LIBUSB_ERROR_IO. The XLR Dock MK.2 returns it on roughly one
     // block read in several hundred while its audio interface is streaming

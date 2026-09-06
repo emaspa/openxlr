@@ -2,6 +2,8 @@ using OpenXLR.Core;
 
 namespace OpenXLR.Tests;
 
+// Both stores read XDG_CONFIG_HOME, which these tests redirect, so they must not run in parallel.
+[Collection("xdg-config")]
 public sealed class ProfileRecallTests
 {
     [Fact]

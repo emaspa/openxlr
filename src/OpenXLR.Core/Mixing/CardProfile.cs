@@ -1,3 +1,4 @@
+using OpenXLR.Core;
 using System.Diagnostics;
 using System.Text.Json;
 
@@ -78,20 +79,10 @@ public static class CardProfile
 
     private static string Run(string cmd, params string[] args)
     {
-        var psi = new ProcessStartInfo(cmd) { RedirectStandardOutput = true, RedirectStandardError = true };
-        psi.Environment["LC_ALL"] = "C";
-        foreach (string a in args) psi.ArgumentList.Add(a);
-        using var p = Process.Start(psi) ?? throw new InvalidOperationException($"could not start {cmd}");
-        Task<string> outTask = p.StandardOutput.ReadToEndAsync();
-        Task<string> errTask = p.StandardError.ReadToEndAsync();
-        if (!p.WaitForExit(5000))
-        {
-            try { p.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
-            throw new TimeoutException($"{cmd} timed out after 5 seconds");
-        }
-        string outText = outTask.GetAwaiter().GetResult();
-        string errText = errTask.GetAwaiter().GetResult();
-        if (p.ExitCode != 0) throw new InvalidOperationException($"{cmd}: {errText.Trim()}");
-        return outText;
+        ProcessResult r = ProcessRunner.Run(cmd, args, TimeSpan.FromSeconds(5), stdoutCap: 16 * 1024 * 1024, stderrCap: 64 * 1024);
+        if (r.TimedOut) throw new TimeoutException($"{cmd} timed out after 5 seconds");
+        if (r.Truncated) throw new InvalidOperationException($"{cmd}: output over the 16 MiB cap");
+        if (r.ExitCode != 0) throw new InvalidOperationException($"{cmd}: {r.Stderr.Trim()}");
+        return r.StdoutText;
     }
 }

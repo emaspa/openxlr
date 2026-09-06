@@ -1,0 +1,21 @@
+# rpmlint configuration for the release workflow. Every filter here is a
+# finding that was looked at and judged not to be a defect; anything else
+# rpmlint reports as an error fails the build.
+Filters = [
+    # Words rpmlint's dictionary does not know; all three are correct.
+    "spelling-error .*(submixer|replug|systemctl)",
+    # The daemon and the window load these libraries with dlopen (libusb,
+    # lilv, PulseAudio, X11 through Avalonia), so rpm's automatic dependency
+    # generator never sees them and the explicit Requires are the only thing
+    # that pulls them in.
+    "explicit-lib-dependency (libusb1|lilv-libs|pulseaudio-libs|libX11|libSM|libICE)",
+    # The %post scriptlet prints instructions for the user; the 'cp' and the
+    # '~' rpmlint flags are inside the here-document text, not executed.
+    "use-of-home-in-%post",
+    "dangerous-command-in-%post cp",
+    # SkiaSharp and HarfBuzzSharp ship prebuilt from NuGet; stripping them
+    # is not ours to do and does not change how they run.
+    "unstripped-binary-or-object .*/lib(SkiaSharp|HarfBuzzSharp)\\.so",
+    # Manual pages are on the roadmap; the README and the manual cover both binaries.
+    "no-manual-page-for-binary",
+]

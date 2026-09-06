@@ -16,7 +16,7 @@ namespace OpenXLR.Core.Mixing;
 /// </summary>
 public static class Lv2Catalog
 {
-    private static readonly Lazy<IReadOnlyList<PluginInfo>> Scan = new(ScanNow, LazyThreadSafetyMode.ExecutionAndPublication);
+    private static readonly Lazy<IReadOnlyList<PluginInfo>> Scan = new(() => ScanNow(), LazyThreadSafetyMode.ExecutionAndPublication);
 
     /// <summary>
     /// The host features PipeWire's filter-chain LV2 loader provides (read
@@ -48,7 +48,12 @@ public static class Lv2Catalog
 
     public static PluginInfo? Find(string uri) => Plugins.FirstOrDefault(p => p.Plugin == uri);
 
-    private static IReadOnlyList<PluginInfo> ScanNow()
+    /// <summary>
+    /// A fresh scan outside the cached one. With <paramref name="lv2Path"/>
+    /// only those directories are read (tests point it at their own
+    /// bundles); otherwise lilv's default search path applies.
+    /// </summary>
+    internal static IReadOnlyList<PluginInfo> ScanNow(string? lv2Path = null)
     {
         var result = new List<PluginInfo>();
         IntPtr world;
@@ -57,6 +62,12 @@ public static class Lv2Catalog
         if (world == IntPtr.Zero) return result;
         try
         {
+            if (lv2Path is not null)
+            {
+                IntPtr pathNode = Lilv.lilv_new_string(world, lv2Path);
+                Lilv.lilv_world_set_option(world, "http://drobilla.net/ns/lilv#lv2-path", pathNode);
+                Lilv.lilv_node_free(pathNode);
+            }
             Lilv.lilv_world_load_all(world);
             IntPtr controlPort = Lilv.lilv_new_uri(world, "http://lv2plug.in/ns/lv2core#ControlPort");
             IntPtr audioPort = Lilv.lilv_new_uri(world, "http://lv2plug.in/ns/lv2core#AudioPort");
@@ -88,7 +99,45 @@ public static class Lv2Catalog
             Lilv.lilv_world_free(world);
         }
         result.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
-        return result;
+        return WithinBudget(result);
+    }
+
+    // Limits on what a bundle can make the daemon hold. lilv reports whatever
+    // the bundle declares, and a broken or hostile one could declare
+    // millions of ports; a real plugin has a few hundred at most (the
+    // largest LSP and x42 plugins sit well under these).
+    internal const int MaxPorts = 4096;
+    internal const int MaxControls = 512;
+    internal const int MaxScalePoints = 256;
+    internal const int MaxText = 200;
+    /// <summary>Rough serialized size the whole catalog may reach; the window reads at most 8 MiB per message.</summary>
+    internal const int CatalogBudgetBytes = 6 * 1024 * 1024;
+
+    private static string Clip(string s) => s.Length <= MaxText ? s : s[..MaxText];
+
+    /// <summary>A plugin's approximate footprint in the serialized catalog.</summary>
+    internal static int Footprint(PluginInfo p)
+        => 160 + p.Plugin.Length + p.Name.Length + p.Category.Length
+           + p.Params.Sum(q => 120 + q.Symbol.Length + q.Name.Length + q.ScalePoints.Sum(sp => 24 + sp.Label.Length))
+           + p.RequiredFeatures.Sum(f => f.Length + 4) + (p.InputSymbols.Count + p.OutputSymbols.Count) * 16;
+
+    /// <summary>
+    /// Keep the catalog under the budget by dropping the largest plugins
+    /// first: a handful of monsters must not push every ordinary plugin
+    /// out of the window's picker.
+    /// </summary>
+    internal static List<PluginInfo> WithinBudget(List<PluginInfo> all)
+    {
+        long total = all.Sum(p => (long)Footprint(p));
+        if (total <= CatalogBudgetBytes) return all;
+        var keep = new HashSet<PluginInfo>(all);
+        foreach (PluginInfo p in all.OrderByDescending(Footprint))
+        {
+            if (total <= CatalogBudgetBytes) break;
+            keep.Remove(p);
+            total -= Footprint(p);
+        }
+        return [.. all.Where(keep.Contains)];
     }
 
     private static PluginInfo? Describe(IntPtr world, IntPtr plugin, IntPtr controlPort, IntPtr audioPort,
@@ -100,13 +149,14 @@ public static class Lv2Catalog
         // own GUI and bridges; inside a headless filter-chain they are dead
         // weight, and their declared features look like any other plugin's.
         if (uri.StartsWith("http://kxstudio.sf.net/carla", StringComparison.Ordinal)) return null;
-        string name = Lilv.OwnedString(Lilv.lilv_plugin_get_name(plugin)) ?? uri;
+        string name = Clip(Lilv.OwnedString(Lilv.lilv_plugin_get_name(plugin)) ?? uri);
         string category = "";
         IntPtr cls = Lilv.lilv_plugin_get_class(plugin);
         if (cls != IntPtr.Zero)
-            category = Lilv.Str(Lilv.lilv_node_as_string(Lilv.lilv_plugin_class_get_label(cls))) ?? "";
+            category = Clip(Lilv.Str(Lilv.lilv_node_as_string(Lilv.lilv_plugin_class_get_label(cls))) ?? "");
 
         uint n = Lilv.lilv_plugin_get_num_ports(plugin);
+        if (n > MaxPorts) return null;   // nothing real declares this many; a bundle like that is skipped
         var mins = new float[n]; var maxs = new float[n]; var defs = new float[n];
         Lilv.lilv_plugin_get_port_ranges_float(plugin, mins, maxs, defs);
 
@@ -123,24 +173,27 @@ public static class Lv2Catalog
             string sym = Lilv.Str(Lilv.lilv_node_as_string(Lilv.lilv_port_get_symbol(plugin, port))) ?? $"port{i}";
             if (Lilv.lilv_port_is_a(plugin, port, audioPort))
             {
-                if (isIn) { audioIns++; inSym ??= sym; inSyms.Add(sym); }
-                else if (Lilv.lilv_port_is_a(plugin, port, outputPort)) { audioOuts++; outSym ??= sym; outSyms.Add(sym); }
+                    if (isIn) { audioIns++; inSym ??= sym; if (inSyms.Count < MaxControls) inSyms.Add(Clip(sym)); }
+                else if (Lilv.lilv_port_is_a(plugin, port, outputPort)) { audioOuts++; outSym ??= sym; if (outSyms.Count < MaxControls) outSyms.Add(Clip(sym)); }
                 continue;
             }
             if (!isIn || !Lilv.lilv_port_is_a(plugin, port, controlPort)) continue;
             if (Lilv.lilv_port_has_property(plugin, port, notOnGui)) continue;
-            string pname = Lilv.OwnedString(Lilv.lilv_port_get_name(plugin, port)) ?? sym;
+            if (pars.Count >= MaxControls) continue;   // the first controls are the ones a picker can show anyway
+            sym = Clip(sym);
+            string pname = Clip(Lilv.OwnedString(Lilv.lilv_port_get_name(plugin, port)) ?? sym);
             var points = new List<ScalePoint>();
             IntPtr sps = Lilv.lilv_port_get_scale_points(plugin, port);
             if (sps != IntPtr.Zero)
             {
                 for (IntPtr sit = Lilv.lilv_scale_points_begin(sps); !Lilv.lilv_scale_points_is_end(sps, sit); sit = Lilv.lilv_scale_points_next(sps, sit))
                 {
+                    if (points.Count >= MaxScalePoints) break;
                     IntPtr sp = Lilv.lilv_scale_points_get(sps, sit);
                     string? lbl = Lilv.Str(Lilv.lilv_node_as_string(Lilv.lilv_scale_point_get_label(sp)));
                     IntPtr vn = Lilv.lilv_scale_point_get_value(sp);
                     double v = Lilv.lilv_node_is_float(vn) || Lilv.lilv_node_is_int(vn) ? Lilv.lilv_node_as_float(vn) : 0;
-                    if (lbl is not null) points.Add(new ScalePoint(lbl, v));
+                    if (lbl is not null) points.Add(new ScalePoint(Clip(lbl), v));
                 }
                 Lilv.lilv_scale_points_free(sps);
             }
@@ -183,6 +236,8 @@ public static class Lv2Catalog
         [DllImport(Lib)] public static extern void lilv_world_load_all(IntPtr world);
         [DllImport(Lib)] public static extern IntPtr lilv_world_get_all_plugins(IntPtr world);
         [DllImport(Lib)] public static extern IntPtr lilv_new_uri(IntPtr world, [MarshalAs(UnmanagedType.LPUTF8Str)] string uri);
+        [DllImport(Lib)] public static extern IntPtr lilv_new_string(IntPtr world, [MarshalAs(UnmanagedType.LPUTF8Str)] string str);
+        [DllImport(Lib)] public static extern void lilv_world_set_option(IntPtr world, [MarshalAs(UnmanagedType.LPUTF8Str)] string uri, IntPtr value);
         [DllImport(Lib)] public static extern void lilv_node_free(IntPtr node);
         [DllImport(Lib)] public static extern IntPtr lilv_node_as_uri(IntPtr node);
         [DllImport(Lib)] public static extern IntPtr lilv_node_as_string(IntPtr node);

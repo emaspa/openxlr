@@ -112,42 +112,28 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
     public const int VoiceTuneStrengthMax = 100;
     public const int CrossfadeMax = 200;
 
-    private IntPtr _ctx;
-    private IntPtr _handle;
+    private readonly IUsbTransport _usb = UsbTransport.Create();
     private readonly object _lock = new();
 
-    public bool Connected => _handle != IntPtr.Zero;
+    public bool Connected => _usb.IsOpen;
 
     public void Connect()
     {
-        if (_ctx == IntPtr.Zero)
-        {
-            int rc = LibUsb.libusb_init(out _ctx);
-            if (rc != 0) throw new InvalidOperationException($"libusb_init failed: {LibUsb.StrError(rc)}");
-        }
-        _handle = LibUsb.libusb_open_device_with_vid_pid(_ctx, VendorId, ProductId);
-        if (_handle == IntPtr.Zero)
+        if (!_usb.Open(VendorId, ProductId))
             throw new InvalidOperationException(
                 "Wave XLR Pro not found or no permission (install the udev rule for 0fd9:00b4).");
     }
 
-    public void Disconnect()
-    {
-        if (_handle != IntPtr.Zero) { LibUsb.libusb_close(_handle); _handle = IntPtr.Zero; }
-    }
-
+    public void Disconnect() => _usb.Close();
 
     /// <summary>
     /// All control transfers go through here. A transfer that never returns
-    /// (issue #6) throws UsbHungException; the handle is then abandoned
-    /// without libusb_close, since the stuck native call may still use it,
-    /// and Connected turns false so the daemon reconnects with a new one.
+    /// (issue #6) throws UsbHungException; the transport has dropped the
+    /// device by then (the helper process is killed), Connected turns false
+    /// and the daemon reconnects with a fresh one.
     /// </summary>
     private int Transfer(byte requestType, byte request, ushort value, byte[] data, int length)
-    {
-        try { return LibUsb.ControlTransfer(_handle, requestType, request, value, VIndex, data, (ushort)length, 1000); }
-        catch (UsbHungException) { _handle = IntPtr.Zero; throw; }
-    }
+        => _usb.ControlTransfer(requestType, request, value, VIndex, data, (ushort)length, 1000);
 
     private byte[] Read(ushort block, int length)
     {
@@ -411,9 +397,5 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
         return blocks;
     }
 
-    public void Dispose()
-    {
-        Disconnect();
-        if (_ctx != IntPtr.Zero) { LibUsb.libusb_exit(_ctx); _ctx = IntPtr.Zero; }
-    }
+    public void Dispose() => _usb.Dispose();
 }

@@ -12,21 +12,25 @@ behaviour verified on hardware before it ships. The project is small on
 purpose. It prefers one small, idiomatic change over a framework, and a
 feature that is measured over one that is described.
 
-## Where it stands (0.1.20)
+## Where it stands (0.1.24)
 
 - [x] Wave XLR Pro, XLR Dock (MK.1 and MK.2 modules), Wave XLR, Wave XLR
   MK.2: hardware controls, verified by owners of each device.
-- [x] Submixer: hardware and application channels, four mixes (Monitor,
-  Stream, Chat, Aux), virtual microphones, multi-output monitoring, the
-  USB Aux port as a second computer's feed, live meters, profiles,
-  one profile per device recalled on connect.
+- [x] Submixer: hardware and application channels, five mixes (Monitor A,
+  Monitor B, Stream, Chat, Aux), virtual microphones, monitoring on
+  several outputs with each output choosing which monitor mix feeds it,
+  the USB Aux port as a second computer's feed, live meters, profiles,
+  one profile per device recalled on connect, interfaces without
+  settings memory restored to their last settings on connect with a
+  reset to firmware defaults, and an app can be left to the desktop's
+  own routing.
 - [x] Software low cut and ClipGuard for devices without the hardware
   versions.
 - [x] Plugin inserts: LV2 chains on each XLR input and on every mix, hosted
   by PipeWire's filter-chain, with generated controls; bypass and
   controls on the Stream Deck.
 - [x] OpenDeck plugin: dials and keys drawn like the hardware, profile
-  keys, insert keys and dials.
+  keys, insert keys and dials, monitor feed keys.
 - [x] Packages: AUR, Debian/Ubuntu, Fedora, NixOS flake and module.
 - [x] Daemon recovery basics: fast shutdown, busy-port wait, self-healing
   input feeds, UCM coexistence on the Pro.
@@ -38,23 +42,40 @@ feature that is measured over one that is described.
 
 ## Next: mixer layout and customization
 
-The submixer can now be shaped around the user's applications and outputs.
+The submixer's shape is fixed today (nine channels, five mixes). Making it
+the user's own is the next block of work, and it is also where the UI
+work lives. This block comes before anything in the plugins section:
+the routing model and the daemon's service behaviour both changed in
+0.1.21 and the release after it, and they get to settle in users' hands
+first.
 
-- [x] Editable application channels and virtual-microphone mixes: add,
-  rename and delete with stable ids separate from display names. Hardware
-  inputs and the Monitor and Aux buses stay structural. Channel creation is
-  incremental and renames update descriptions, so existing application and
-  virtual-microphone endpoints are not dropped.
-- [ ] Reorder editable channels and mixes without changing their stable ids.
+- [ ] Editable application channels and virtual-microphone mixes: add,
+  rename, delete, reorder, with stable ids separate from display names so
+  PipeWire node names, profiles and Stream Deck keys survive a rename.
+  Hardware inputs, Monitor A, Monitor B and Aux stay structural. A pull
+  request (#22) implements an earlier shape of this on a single monitor
+  mix; it is being rebuilt on the two-monitor model in four pieces, each
+  mergeable on its own: the editable channels and mixes, strict
+  persistence for structural changes (a layout command is acknowledged
+  only after its save succeeded, and a failed write is an error), the
+  desktop layout editor, and Stream Deck choices generated from daemon
+  state while the monitor feed keys keep working. Renames must not
+  rebuild the graph and creation must add nodes incrementally, so
+  existing streams are never dropped. Landed so far: the Stream Deck
+  choices (#25), the saved layout format read at graph build (#33,
+  [docs/mixer-layout.md](mixer-layout.md)), live channel creation with
+  strict persistence (#34) and the saved channel and mix order (#35);
+  rename, delete and the desktop editor follow.
 - [ ] Per-mix customization: icon, colour and order per mix and channel,
   hide a channel without deleting its routing, a compact layout that
   keeps one selected channel visible. Icons and colours also reach the
   Stream Deck keys.
-- [ ] Listen to any mix: pick which mix the monitor outputs play, not only
-  Monitor.
-- [ ] Many-to-many mix-to-output matrix: send different mixes to
-  different physical outputs at the same time, the way Wave Link 3 does.
-  This changes the monitor route model and comes after the layout work.
+- [ ] Listen to any mix: an output can already follow Monitor A or
+  Monitor B; letting it follow Stream, Chat or Aux as well is the rest.
+- [ ] Many-to-many mix-to-output matrix: two monitor mixes with
+  per-output feeds cover the common case (a headset with a game side and
+  a chat side). The general form, any mix to any output with a level per
+  route, the way Wave Link 3 does it, comes after the layout work.
 - [ ] Any PipeWire capture source as an input channel (a second
   microphone, a capture card, a headset), and inputs from more than one
   attached Wave interface at once.
@@ -76,16 +97,24 @@ every view binds to.
   for touch.
 - [ ] Localization infrastructure and the first translations.
 
-## Next: plugins
+## Later: plugins
 
 Stage 1 (LV2 through filter-chain) is shipped. Stage 2 is the rest of the
-plugin world, and it has to keep the audio path inside PipeWire.
+plugin world, and it has to keep the audio path inside PipeWire. It waits
+for the mixer layout block above; the maintainer would rather have one
+host mechanism stable than two half-finished ones.
 
 - [ ] Native plugin editors: open an LV2 plugin's own window on the
   instance that processes audio. This needs the instance out of
   filter-chain and into a host process that exposes a PipeWire filter
   node; the design has to keep filter-chain for inserts that have no
-  editor, and must not make the .NET build depend on a C toolchain.
+  editor, and must not make the .NET build depend on a C toolchain. A
+  pull request (#19) meets those constraints with an optional C helper
+  and stays open until the layout work is done. Before it ships, native
+  hosting becomes a per-insert choice so an existing chain does not
+  change host on upgrade, and the helper is packaged on every channel
+  (its libraries already ship with the daemon; only build-time headers
+  and a compiler are new).
 - [ ] VST3 and CLAP, and Windows VST3 through yabridge, in the same host
   process model, one plugin per process, supervised and fail-open so a
   crashed plugin is bypassed and audio continues.
@@ -99,16 +128,17 @@ plugin world, and it has to keep the audio path inside PipeWire.
 
 ## Next: daemon and integrations
 
-- [ ] Watchdog: systemd notify with a progress gate, restart on failure
+- [x] Watchdog: systemd notify with a progress gate, restart on failure
   with a start limit, a Restart button in the window, and a graceful
   signal so teardown always runs. Never a restart loop when the audio
-  server is down; the daemon degrades to device control instead.
-- [ ] Update notice: an opt-in, throttled check against the project's
+  server is down; the daemon degrades to device control instead. The
+  packaged unit is a notify service since 0.1.22.
+- [x] Update notice: an opt-in, throttled check against the project's
   releases, presented once, never automatic installation.
-- [ ] A documented, versioned local API for third parties, once client
-  authentication exists on top of the origin check; today the WebSocket
-  on the loopback is the API and the OpenDeck plugin is its reference
-  client.
+- [x] A documented, versioned local API for third parties: `/api/v1`
+  over HTTP on the session token, with an OpenAPI document, next to the
+  WebSocket the window and the OpenDeck plugin use
+  ([docs/http-api.md](http-api.md)).
 - [ ] Route the focused application to a channel from a key, with a
   portal-based approach that works on Wayland.
 - [ ] Generic PipeWire output volume and mute keys, and a main-output
@@ -120,6 +150,28 @@ plugin world, and it has to keep the audio path inside PipeWire.
 - [ ] Client authentication for the control API (a per-user secret), on
   top of the origin check that exists, before any API is documented as
   a public contract.
+
+## Next: distribution
+
+- [x] Fedora COPR (`emaspa/openxlr`) and Ubuntu PPA (`ppa:sparvoli/openxlr`),
+  so `dnf` and `apt` pick up new releases on their own instead of a
+  download per release. The build recipes are the spec and the debian
+  directory already used by the release workflows; the PPA source package
+  carries the NuGet packages (packaging/ppa/make-source.sh) because
+  Launchpad builders have no network.
+- [ ] Flatpak, after the repositories above, first as a manifest in this
+  repo and then on Flathub. The sandbox cannot install the udev rules,
+  the WirePlumber rules, the UCM profile or the systemd unit, so the
+  work is a Flatpak mode before the manifest: the window starts the
+  daemon as a child process and uses the background portal for login
+  start, the daemon logs to a file instead of the journal, the
+  WirePlumber rules are written to the user's config directory, the
+  udev rules ship inside the app with a first-run notice giving the copy
+  command, and the UCM profile stays a documented manual step. LV2
+  inserts follow the Flathub audio plugin extension instead of host
+  plugins. The watchdog does not work in the sandbox, so the packaged
+  units stay the recommended install and the Flatpak covers the
+  distributions without a package.
 
 ## Devices
 
