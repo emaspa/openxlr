@@ -37,7 +37,7 @@ jobs:
           node --check plugin/com.emaspa.openxlr.sdPlugin/plugin.mjs
           python3 -m json.tool plugin/com.emaspa.openxlr.sdPlugin/manifest.json >/dev/null
           python3 -m json.tool docs/openapi-v1.json >/dev/null
-          node --test plugin/tests/
+          node --test plugin/tests/*.test.mjs
 
       - name: Lint shell scripts
         run: shellcheck --severity=error tools/check-version.sh tools/check-locked-restore.sh packaging/ppa/make-source.sh
