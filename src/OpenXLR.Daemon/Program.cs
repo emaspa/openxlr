@@ -111,4 +111,4 @@ catch (IOException ex) when (ex.InnerException is AddressInUseException)
     app.Logger.LogError("port {Port} was taken between probe and bind; exiting for systemd to retry", ApiPort);
     return 75;
 }
-return 0;
+return RestartRequest.ExitCode;   // 0, or a service asked to be started afresh

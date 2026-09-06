@@ -40,12 +40,41 @@ public sealed class MixerService : IHostedService, IDisposable
     private int _sweepRunning;
     private string? _lastSweepError;
 
-    public MixerService(ILogger<MixerService> log, IConfiguration config, DeviceManager devices)
+    private readonly IHostApplicationLifetime? _lifetime;
+    private int _graphMissing;
+
+    public MixerService(ILogger<MixerService> log, IConfiguration config, DeviceManager devices,
+        IHostApplicationLifetime? lifetime = null)
     {
         _log = log;
         _config = config;
         _devices = devices;
+        _lifetime = lifetime;
         _mixer = new(new PipeWireAdapter(_progress.Mark));
+    }
+
+    /// <summary>
+    /// pipewire-pulse restarted underneath the daemon: every module it hosted
+    /// is gone and the module ids are being reused by other clients. Nothing
+    /// can be unloaded or healed piecemeal, so the graph is forgotten and the
+    /// daemon asks to be started afresh; systemd brings it back in seconds
+    /// with the saved layout. Two consecutive sightings, so a momentary pactl
+    /// hiccup does not trigger it.
+    /// </summary>
+    private bool GraphLost()
+    {
+        if (_mixer.GraphPresent() is not false) { _graphMissing = 0; return false; }
+        if (++_graphMissing < 2) return false;
+        _log.LogWarning("the submixer graph is gone (pipewire-pulse restarted?); restarting the daemon to rebuild it");
+        lock (_saveGate)
+        {
+            if (_saveDirty && _mixer.ExportSettings().Save() is string err) _log.LogWarning("settings not saved before the restart: {err}", err);
+            _saveDirty = false;
+        }
+        _mixer.ForgetGraph();
+        RestartRequest.Ask(RestartRequest.TemporaryFailure);
+        _lifetime?.StopApplication();
+        return true;
     }
 
     /// <summary>
@@ -180,6 +209,7 @@ public sealed class MixerService : IHostedService, IDisposable
                 if (Interlocked.CompareExchange(ref _sweepRunning, 1, 0) != 0) return;
                 try
                 {
+                    if (GraphLost()) return;
                     // Channel feeds follow the actively driven interface; the
                     // node name contains the model with underscores for spaces.
                     _mixer.SetInputDeviceHint(

@@ -1707,6 +1707,35 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         lock (_gate) TearDownLocked();
     }
 
+    /// <summary>
+    /// Whether the built graph is still published: false once pipewire-pulse
+    /// restarted underneath the daemon and took every module with it. Null
+    /// when the question cannot be answered right now.
+    /// </summary>
+    public bool? GraphPresent()
+    {
+        lock (_gate)
+        {
+            if (!_built) return null;
+            MixDefinition? probe = _config.Mixes.FirstOrDefault();
+            return probe is null ? null : _pw.SinkExists(probe.SinkName);
+        }
+    }
+
+    /// <summary>
+    /// Forget a graph that is already gone. The holder processes are stopped
+    /// and the bookkeeping cleared, but no module is unloaded: their ids now
+    /// belong to whatever loaded after the restart.
+    /// </summary>
+    public void ForgetGraph()
+    {
+        lock (_gate)
+        {
+            _pw.ForgetModules();
+            TearDownLocked();
+        }
+    }
+
     public void Dispose()
     {
         TearDown();

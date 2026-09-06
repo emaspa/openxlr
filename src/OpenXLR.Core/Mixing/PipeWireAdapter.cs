@@ -300,6 +300,21 @@ public sealed class PipeWireAdapter
         return null;
     }
 
+    /// <summary>Whether a sink of this name is published right now (null when pactl is unavailable).</summary>
+    public bool? SinkExists(string sinkName)
+    {
+        string? sinks = TryRun("pactl", "list", "sinks", "short");
+        if (sinks is null) return null;
+        return sinks.Split('\n').Any(line => line.Split('\t') is { Length: >= 2 } columns && columns[1] == sinkName);
+    }
+
+    /// <summary>
+    /// Drop the module bookkeeping without unloading anything: after a
+    /// pipewire-pulse restart the modules are gone and their ids are being
+    /// handed to other clients, so unloading them would hit someone else.
+    /// </summary>
+    public void ForgetModules() => _modules.Clear();
+
     /// <summary>Like <see cref="FindCombineLegs"/>, but null when pactl fails or stalls.</summary>
     public IReadOnlyDictionary<string, int>? TryFindCombineLegs(uint combineModule)
     {

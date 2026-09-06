@@ -470,8 +470,10 @@ systemctl --user daemon-reload
 systemctl --user restart pipewire-pulse
 ```
 
-Restarting pipewire-pulse reconnects every PulseAudio client for a moment.
-Check with `systemctl --user show pipewire-pulse -p LimitNOFILESoft`.
+Restarting pipewire-pulse reconnects every PulseAudio client for a moment
+and takes OpenXLR's nodes with it; the daemon notices within two seconds
+and restarts itself to rebuild the graph from the saved layout. Check the
+limit afterwards with `systemctl --user show pipewire-pulse -p LimitNOFILESoft`.
 A source checkout without the package can put the same two lines into
 `~/.config/systemd/user/pipewire-pulse.service.d/openxlr.conf` by hand.
 

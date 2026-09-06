@@ -9,6 +9,7 @@ Start the mixer:   openxlr   (or from your application menu)
 The package raises pipewire-pulse's open-file limit (a drop-in under
 /usr/lib/systemd/user/pipewire-pulse.service.d); it applies at your next
 login, or now with:  systemctl --user daemon-reload; systemctl --user restart pipewire-pulse
+(the daemon rebuilds its graph by itself after that restart)
 Stream Deck via OpenDeck:
   cp -r /usr/share/openxlr/com.emaspa.openxlr.sdPlugin ~/.config/opendeck/plugins/
 MSG
