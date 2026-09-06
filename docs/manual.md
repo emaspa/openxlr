@@ -4,8 +4,11 @@ How to use OpenXLR day to day: what it changes on your system, the
 concepts behind the mixer window, step-by-step tasks, and what to do
 when something does not work. For installing, see the README; for the
 full list of controls per device, [hardware-support.md](hardware-support.md);
-for scripting, [api.md](api.md).
+for scripting, [api.md](api.md). Every section carries a fixed anchor
+(the `<a name>` before its heading), so a link like `manual.md#open-files`
+keeps working when sections are renumbered.
 
+<a name="first-run"></a>
 ## 1. First run
 
 OpenXLR is two programs. The daemon (`openxlr-daemon`, a systemd user
@@ -23,22 +26,22 @@ happen on your system:
   SFX`, and the hardware channels) and two inputs, `OpenXLR Stream` and
   `OpenXLR Chat`, which are the virtual microphones.
 - Applications that play audio are moved onto a channel output by name
-  (section 2). They keep playing; only the device they play into
+  ([section 2](#concepts)). They keep playing; only the device they play into
   changes.
 - Your system default output and input are left as they were. The
   daemon remembers them at start and puts them back if the session
   manager switches to one of the new devices in the following seconds.
-  If you set defaults in Options (section 3.7), those are held instead.
+  If you set defaults in Options ([section 3.7](#default-devices)), those are held instead.
 - On the Wave XLR Pro the daemon parks the card on its pro-audio
   profile while it runs, so the raw multichannel device is available to
   the mixer, and restores the previous profile when it stops.
 
 The window's header shows the connected interface with a green dot.
 "No device" means the daemon cannot open the interface: replug it once
-after installing so the udev rule applies (section 5.1).
+after installing so the udev rule applies ([section 5.1](#no-device)).
 
 If you only want hardware control and no mixer, turn the submixer off
-in Options (section 3.8). The daemon restarts in hardware-control mode
+in Options ([section 3.8](#hardware-only)). The daemon restarts in hardware-control mode
 and the `OpenXLR …` devices disappear.
 
 Update checks are also controlled in Options. They are off by default. You can
@@ -47,6 +50,7 @@ startup; opted-in checks run at most once per 24 hours. A notice contains the
 upstream stable release notes as plain text and a link to GitHub. OpenXLR never
 downloads or installs an update.
 
+<a name="concepts"></a>
 ## 2. Concepts
 
 **Channels** are where audio enters the mixer. Three carry the
@@ -77,7 +81,7 @@ Zoom, Slack and other chat apps to Voice Chat; Steam, Lutris, Heroic
 and games to Game; anything else to System. Electron apps report
 "Chromium", so the process name is used instead, which is how Discord
 lands in Voice Chat. An app you move to another channel is remembered
-(section 3.3).
+([section 3.3](#apps)).
 
 **Profiles** are named scenes: the interface's hardware settings plus
 the whole submixer (sends, masters, monitor outputs, aux state, insert
@@ -90,8 +94,10 @@ each XLR input, a stereo chain on each mix. The XLR Dock and the
 original Wave XLR have no onboard DSP, so on those OpenXLR also offers
 a software low cut and ClipGuard on XLR 1.
 
+<a name="tasks"></a>
 ## 3. Tasks
 
+<a name="mic-to-call"></a>
 ### 3.1 Send your microphone to a call or a recording
 
 1. In the SUBMIXER card, make sure XLR 1 is unmuted in the Stream and
@@ -103,9 +109,10 @@ a software low cut and ClipGuard on XLR 1.
    comes from the Monitor mix, which is separate.
 
 Options has a tip for step 2: enforcing `OpenXLR Chat` as the system
-default input (section 3.7) makes every voice app pick it up without
+default input ([section 3.7](#default-devices)) makes every voice app pick it up without
 configuration.
 
+<a name="monitor"></a>
 ### 3.2 Choose what you hear and how loud
 
 1. In the MONITOR card, tick every device the monitor mixes should play
@@ -135,6 +142,7 @@ zero latency; muted, you do not. If another device (speakers, a headset)
 is ticked as well, the microphone reaches everything through the
 software mix instead, with a few milliseconds of delay.
 
+<a name="apps"></a>
 ### 3.3 Put an application on a different channel
 
 The APPLICATIONS card lists every app that is currently registered with
@@ -164,6 +172,7 @@ An app that is missing from the card is not registered with PipeWire
 as a client. That happens with some applications until they start
 playing.
 
+<a name="usb-aux"></a>
 ### 3.4 Feed a second computer over USB Aux (Wave XLR Pro)
 
 1. Connect the second computer to the Pro's USB Aux port. It sees the
@@ -177,6 +186,7 @@ playing.
 The USB Aux *input* (what the second computer sends back) is the Aux In
 channel, with its level and lock in the INPUTS card.
 
+<a name="plugins"></a>
 ### 3.5 Add a plugin to the signal path
 
 1. Under XLR 1, XLR 2 or a mix, press "Add plugin…". The picker lists
@@ -194,6 +204,7 @@ The plugin's own graphical interface, if it has one, is not shown; the
 generated controls cover every parameter the plugin exposes. VST and
 CLAP plugins cannot be loaded.
 
+<a name="profiles"></a>
 ### 3.6 Save and recall a scene
 
 1. Set everything the way you want it: hardware controls, sends,
@@ -203,7 +214,7 @@ CLAP plugins cannot be loaded.
 
 Profiles belong to the interface they were saved with; another device
 shows its own list. With the OpenDeck plugin a key can recall a
-profile (section 4).
+profile ([section 4](#stream-deck)).
 
 **Recall on connect.** The "On connect" picker under the list names a
 profile the daemon recalls by itself whenever the interface connects
@@ -226,6 +237,7 @@ stay). The defaults are recorded the first time the interface connects
 after a power cycle, so the button asks for one replug on a fresh
 install.
 
+<a name="default-devices"></a>
 ### 3.7 Hold the system default devices
 
 Session managers like to switch the system default output to a newly
@@ -234,6 +246,7 @@ SYSTEM DEFAULT DEVICES, choose the output and input OpenXLR should
 hold; it re-asserts them once a second and reverts any outside change.
 "(don't enforce)" leaves the system alone.
 
+<a name="hardware-only"></a>
 ### 3.8 Hardware control only
 
 Options, Submixer: off. The daemon restarts in hardware-control mode:
@@ -242,6 +255,7 @@ profile where one is installed), and the `OpenXLR …` devices, mixes,
 virtual microphones and inserts go away. The INPUTS and HEADPHONES
 cards keep working. Turn it on again the same way.
 
+<a name="autostart"></a>
 ### 3.9 Start at login, tray
 
 Options, STARTUP:
@@ -255,13 +269,14 @@ Options, STARTUP:
   it the first time you click it.
 
 To land on a known scene at every login, mark a profile to recall on
-connect (section 3.6). An interface without settings memory comes back
+connect ([section 3.6](#profiles)). An interface without settings memory comes back
 as you left it without one.
 
 The window also remembers which of its sections (INPUTS, HEADPHONES,
 MONITOR, APPLICATIONS, SUBMIXER) you collapsed with the chevron in
 their header, across restarts.
 
+<a name="upgrade"></a>
 ### 3.10 Upgrade
 
 Packages do not restart a running daemon. After an upgrade the window
@@ -276,10 +291,11 @@ Until then the window offers only the controls the old daemon reports.
 Toggling the submixer in Options also restarts the daemon.
 
 Since 0.1.23 every client presents a token the daemon writes at start
-(section 6). A window or OpenDeck plugin older than the daemon is
+([section 6](#files)). A window or OpenDeck plugin older than the daemon is
 refused with "unauthorized" until it is updated too; the plugin zip on
 the release page matches the daemon of that release.
 
+<a name="layout"></a>
 ### 3.11 Edit the mixer layout
 
 The default channels and mixes are a starting point. Edit layout… in the
@@ -305,12 +321,13 @@ and Aux are listed but fixed.
 
 Every change is saved before the editor confirms it. If the settings
 file cannot be written the change is undone and the editor says why. The
-same happens when pipewire-pulse has no room for more streams; section
-5.8 explains the limit and the drop-in that raises it.
+same happens when pipewire-pulse has no room for more streams;
+[section 5.8](#open-files) explains the limit and the drop-in that raises it.
 Ids are generated from names and never change afterwards, so profiles
 and Stream Deck keys survive a rename. The layout file is described in
 [mixer-layout.md](mixer-layout.md).
 
+<a name="stream-deck"></a>
 ## 4. Stream Deck (OpenDeck)
 
 The plugin has two actions. Both are clients of the daemon and show
@@ -343,8 +360,10 @@ install-from-file, or the folder the package ships in
 (copied, not linked; OpenDeck does not serve assets through a symlink).
 Restart OpenDeck after installing or updating the plugin.
 
+<a name="troubleshooting"></a>
 ## 5. Troubleshooting
 
+<a name="no-device"></a>
 ### 5.1 "No device" in the header
 
 - The interface must be replugged once after installing so the udev
@@ -356,6 +375,7 @@ Restart OpenDeck after installing or updating the plugin.
 - With more than one supported interface attached, the header shows a
   picker; the mixer's input channels follow the chosen one.
 
+<a name="dock-silent"></a>
 ### 5.2 Microphone silent on the XLR Dock
 
 The kernel starves the dock's capture when playback to it starts before
@@ -365,6 +385,7 @@ WirePlumber rule that keeps the dock's capture source always active
 `packaging/` into `~/.config/wireplumber/wireplumber.conf.d/` and
 restart WirePlumber.
 
+<a name="daemon-not-starting"></a>
 ### 5.3 Daemon does not start after an upgrade, or after a reboot
 
 - `systemctl --user status openxlr-daemon` shows the state. "203/EXEC"
@@ -378,6 +399,7 @@ restart WirePlumber.
   to a minute for it and otherwise exits for systemd to retry; nothing
   needs to be configured.
 
+<a name="missing-plugins"></a>
 ### 5.4 ClipGuard greyed out, empty plugin picker
 
 - The software ClipGuard needs the SWH LADSPA plugins (`swh-plugins`).
@@ -387,13 +409,15 @@ restart WirePlumber.
   directories (`/usr/lib/lv2`, `~/.lv2`, or `LV2_PATH`). An empty
   picker means no LV2 plugins are installed, or lilv is missing.
 
+<a name="wrong-device"></a>
 ### 5.5 Sound comes out of the wrong device
 
 The session manager switched the system default when a new device
-appeared. Set the defaults in Options (section 3.7), or pick the device
+appeared. Set the defaults in Options ([section 3.7](#default-devices)), or pick the device
 you want in your desktop's sound settings once; the daemon defends the
 defaults it saw at start only for the first seconds.
 
+<a name="control-not-applied"></a>
 ### 5.6 A control changes in the window but not on the device
 
 The daemon writes to the interface and reads the state back; if the
@@ -401,8 +425,9 @@ device ignores the write, the control snaps back. On the Wave XLR Pro
 the mute button shows a countdown after every 48V change: the firmware
 holds that input muted for about 13 seconds and unmutes it itself. On
 other devices this would be new information: collect diagnostics
-(section 5.8) and open an issue.
+([section 5.9](#reporting)) and open an issue.
 
+<a name="daemon-hang"></a>
 ### 5.7 The daemon froze, or a control hung the window
 
 The header's **Restart daemon** button restarts the systemd user service.
@@ -421,9 +446,10 @@ one run the daemon stops driving that interface and says so under the
 window's header, while the submixer and any other interface keep
 working. Unplug the interface and plug it back in, or restart the
 daemon, to try again.
-Collect diagnostics afterwards (section 5.8): the archive contains the
+Collect diagnostics afterwards ([section 5.9](#reporting)): the archive contains the
 exact transfer, and that is what makes the report actionable.
 
+<a name="open-files"></a>
 ### 5.8 Channels or mixes vanish after adding one
 
 pipewire-pulse, PipeWire's PulseAudio server, inherits systemd's default
@@ -449,6 +475,7 @@ Check with `systemctl --user show pipewire-pulse -p LimitNOFILESoft`.
 A source checkout without the package can put the same two lines into
 `~/.config/systemd/user/pipewire-pulse.service.d/openxlr.conf` by hand.
 
+<a name="reporting"></a>
 ### 5.9 Reporting a problem
 
 Ask on the OpenXLR Discord server (<https://discord.gg/4bswtnGPW4>,
@@ -466,6 +493,7 @@ text files and inside the hex dump of the vendor blocks (the XLR Dock
 stores its serial in one); review the archive anyway before attaching
 it to a public issue. Nothing is uploaded automatically.
 
+<a name="files"></a>
 ## 6. Files and services
 
 | Path | What it is |
@@ -473,7 +501,7 @@ it to a public issue. Nothing is uploaded automatically.
 | `~/.config/openxlr/mixer.json` | every mixer decision, written by the daemon |
 | `~/.config/openxlr/profiles/<vid-pid>/<name>.json` | saved profiles, one file each |
 | `~/.config/openxlr/profiles/<vid-pid>/recall-on-connect` | the profile recalled when that interface connects, when one is chosen |
-| `$XDG_RUNTIME_DIR/openxlr/token` | the control API token for this daemon run, readable by your user only; the window and the OpenDeck plugin read it, a daemon older than the window will not have it (section 3.10) |
+| `$XDG_RUNTIME_DIR/openxlr/token` | the control API token for this daemon run, readable by your user only; the window and the OpenDeck plugin read it, a daemon older than the window will not have it ([section 3.10](#upgrade)) |
 | `~/.config/openxlr/devices/<vid-pid>/last-state.json` | the settings restored on connect to an interface without settings memory |
 | `~/.config/openxlr/devices/<vid-pid>/defaults.json` | the firmware defaults of such an interface, recorded after a power cycle, written back by "Reset device to defaults" |
 | `~/.config/openxlr/daemon.json` | the submixer on/off preference |

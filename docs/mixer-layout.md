@@ -64,7 +64,7 @@ error. Ordinary fader saves keep their debounced, retried behaviour.
 
 Every added channel or mix costs pipewire-pulse a few dozen open files;
 the daemon refuses an addition the server has no room for, and the packages
-raise the server's limit (manual, section 5.8).
+raise the server's limit ([manual, section 5.8](manual.md#open-files)).
 
 Ids are generated from names (lowercase letters, digits and hyphens,
 starting with a letter, unique with a numeric suffix) and never change
