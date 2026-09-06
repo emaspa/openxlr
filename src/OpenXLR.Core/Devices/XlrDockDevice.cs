@@ -73,6 +73,9 @@ public sealed class XlrDockDevice : IAudioDevice
 
     public bool Connected => _card >= 0;
 
+    /// <summary>Release the USB transport and its helper process.</summary>
+    public void Dispose() => _usb.Dispose();
+
     public void Connect()
     {
         foreach (string dir in Directory.EnumerateDirectories("/proc/asound").OrderBy(d => d))

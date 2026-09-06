@@ -42,7 +42,7 @@ public sealed class Lv2BundleTests
             File.WriteAllText(Path.Combine(monster, "monster.ttl"), Bundle("monster", "urn:openxlr:test:monster", Lv2Catalog.MaxPorts + 10));
             // lilv is told the path directly: native code never sees a .NET environment change.
             IReadOnlyList<PluginInfo> found = Lv2Catalog.ScanNow(dir);
-            Assert.Equal(1, found.Count);   // only this directory was scanned
+            Assert.Single(found);   // only this directory was scanned
             Assert.Contains(found, p => p.Plugin == "urn:openxlr:test:good" && p.Params.Count == 3 && p.AudioIns == 1 && p.AudioOuts == 1);
             Assert.DoesNotContain(found, p => p.Plugin == "urn:openxlr:test:monster");
         }

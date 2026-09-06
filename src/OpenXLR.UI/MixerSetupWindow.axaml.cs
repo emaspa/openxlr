@@ -193,8 +193,7 @@ public partial class MixerSetupWindow : Window
     private const string FileLimitManual =
         "https://github.com/emaspa/openxlr/blob/main/docs/manual.md#open-files";
 
-    private void OnFileLimitManual(object? sender, RoutedEventArgs e)
-        => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("xdg-open", FileLimitManual) { UseShellExecute = false });
+    private void OnFileLimitManual(object? sender, RoutedEventArgs e) => ExternalLink.Open(FileLimitManual);
 
     private async void OnRestartDaemon(object? sender, RoutedEventArgs e)
     {

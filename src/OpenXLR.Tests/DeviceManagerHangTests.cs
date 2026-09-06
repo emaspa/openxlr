@@ -15,6 +15,8 @@ public sealed class DeviceManagerHangTests
     private sealed class FlakyDevice : IAudioDevice
     {
         public bool Hanging;
+        public int Disposals;
+        public void Dispose() => Disposals++;
         public int Connects, Hangs;
         public DeviceInfo Info { get; } = new("Elgato", "Wave XLR", 0x0fd9, 0x007d);
         public DeviceCapabilities Capabilities { get; } = new() { Gain = true, Mute = true, HpVolume = true };

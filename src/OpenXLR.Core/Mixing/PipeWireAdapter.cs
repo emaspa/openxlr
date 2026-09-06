@@ -277,27 +277,45 @@ public sealed class PipeWireAdapter
     {
         try
         {
+            // Our own session's server: the one running as our user. On a
+            // shared machine another user's pipewire-pulse is not ours to
+            // read, and would answer for the wrong session if it were.
+            string? uid = ProcUid("/proc/self");
+            if (uid is null) return null;
             foreach (string dir in Directory.EnumerateDirectories("/proc"))
             {
-                string name = Path.GetFileName(dir);
-                if (!name.All(char.IsAsciiDigit)) continue;
-                string comm;
-                try { comm = File.ReadAllText(Path.Combine(dir, "comm")).Trim(); }
-                catch (Exception) { continue; }
-                if (comm != "pipewire-pulse") continue;
-                int? limit = File.ReadLines(Path.Combine(dir, "limits"))
-                    .Where(line => line.StartsWith("Max open files", StringComparison.Ordinal))
-                    .Select(line => line[14..].Split(' ', StringSplitOptions.RemoveEmptyEntries))
-                    .Where(columns => columns.Length >= 1 && int.TryParse(columns[0], out _))
-                    .Select(columns => (int?)int.Parse(columns[0]))
-                    .FirstOrDefault();
-                if (limit is null) return null;
-                int used = Directory.EnumerateFileSystemEntries(Path.Combine(dir, "fd")).Count();
-                return (used, limit.Value);
+                if (!Path.GetFileName(dir).All(char.IsAsciiDigit)) continue;
+                try
+                {
+                    if (File.ReadAllText(Path.Combine(dir, "comm")).Trim() != "pipewire-pulse" || ProcUid(dir) != uid) continue;
+                    int? limit = File.ReadLines(Path.Combine(dir, "limits"))
+                        .Where(line => line.StartsWith("Max open files", StringComparison.Ordinal))
+                        .Select(line => line[14..].Split(' ', StringSplitOptions.RemoveEmptyEntries))
+                        .Where(columns => columns.Length >= 1 && int.TryParse(columns[0], out _))
+                        .Select(columns => (int?)int.Parse(columns[0]))
+                        .FirstOrDefault();
+                    if (limit is null) continue;
+                    int used = Directory.EnumerateFileSystemEntries(Path.Combine(dir, "fd")).Count();
+                    return (used, limit.Value);
+                }
+                catch (Exception) { /* gone meanwhile, or not readable: keep looking */ }
             }
         }
-        catch (Exception) { /* no /proc, or not ours to read */ }
+        catch (Exception) { /* no /proc */ }
         return null;
+    }
+
+    /// <summary>The real uid of a /proc entry, from its status file.</summary>
+    private static string? ProcUid(string procDir)
+    {
+        try
+        {
+            return File.ReadLines(Path.Combine(procDir, "status"))
+                .Where(line => line.StartsWith("Uid:", StringComparison.Ordinal))
+                .Select(line => line[4..].Split((char[])['\t', ' '], StringSplitOptions.RemoveEmptyEntries).FirstOrDefault())
+                .FirstOrDefault();
+        }
+        catch (Exception) { return null; }
     }
 
     /// <summary>Whether a sink of this name is published right now (null when pactl is unavailable).</summary>

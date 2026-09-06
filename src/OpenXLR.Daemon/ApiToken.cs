@@ -19,14 +19,17 @@ public static class ApiToken
     public static string? Current => _current;
 
     /// <summary>
-    /// Remove any token an earlier run left behind and publish a fresh one
-    /// only once the host is listening, so no client ever hands a token
-    /// that will be valid on this daemon to whoever squats the port before
-    /// it binds, and a second instance that never binds never publishes.
+    /// Publish a fresh token only once the host is listening, so no client
+    /// ever hands a token that will be valid on this daemon to whoever
+    /// squats the port before it binds, and a second instance that never
+    /// binds never publishes. The file an earlier run left behind is
+    /// replaced atomically at that moment and not touched before: while a
+    /// second instance waits for the port, the running daemon's clients
+    /// keep reconnecting with the token that is still theirs.
     /// </summary>
     public static void PublishWhenListening(IHostApplicationLifetime lifetime, ILogger log)
     {
-        Clear();
+        _current = null;
         lifetime.ApplicationStarted.Register(() =>
         {
             try { log.LogInformation("control API token written to {path}", Initialize()); }

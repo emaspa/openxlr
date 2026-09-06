@@ -8,7 +8,7 @@ namespace OpenXLR.Core.Devices;
 /// <see cref="Capabilities"/> tells clients which fields a given device honours,
 /// so setters for unsupported controls are simply no-ops.
 /// </summary>
-public interface IAudioDevice
+public interface IAudioDevice : IDisposable
 {
     /// <summary>Stable identity of the device model (for UI labels, logs, plugin routing).</summary>
     DeviceInfo Info { get; }

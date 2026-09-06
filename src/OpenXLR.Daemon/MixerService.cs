@@ -305,7 +305,7 @@ public sealed class MixerService : IHostedService, IDisposable
         _meterPush = null;
         // No default-device write may land after the graph is gone.
         _stopping.Cancel();
-        try { await _defaultDefense.WaitAsync(TimeSpan.FromSeconds(3), ct); }
+        try { await _defaultDefense.WaitAsync(TimeSpan.FromSeconds(4), ct); }   // one in-flight pactl call at most, 3 s
         catch (Exception ex) when (ex is TimeoutException or OperationCanceledException) { _log.LogWarning("default defense did not stop in time"); }
         if (_mixer.Built)
         {

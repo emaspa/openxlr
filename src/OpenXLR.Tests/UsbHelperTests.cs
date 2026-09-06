@@ -76,6 +76,34 @@ public sealed class UsbHelperTests
     }
 
     [Fact]
+    public void AHelperThatCannotOpenTheDeviceIsNotLeftRunning()
+    {
+        // A helper that answers every open with "not opened", as libusb does
+        // without permission on the device. The device loop retries; each
+        // retry must not leave one more process behind.
+        const string script = """
+            import sys, struct
+            def rd(n):
+                b = b''
+                while len(b) < n:
+                    c = sys.stdin.buffer.read(n - len(b))
+                    if not c: sys.exit(0)
+                    b += c
+                return b
+            while True:
+                n = struct.unpack('<I', rd(4))[0]; rd(n)
+                sys.stdout.buffer.write(struct.pack('<I', 4) + struct.pack('<i', 1)); sys.stdout.buffer.flush()
+            """;
+        using var usb = new HelperUsbTransport("python3", ["-c", script]);
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            Assert.False(usb.Open(0x0fd9, 0x00b4));
+            Assert.False(usb.IsOpen);
+            Assert.False(usb.HelperAlive);
+        }
+    }
+
+    [Fact]
     public void AHelperThatStopsAnsweringIsKilledAndTheTransferReportsAHang()
     {
         // A helper that answers the open, then never again: it swallows the

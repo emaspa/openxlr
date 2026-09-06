@@ -53,7 +53,7 @@
       ws = new WebSocket("ws://localhost:" + inPort);
       ws.onopen = () => {
         ws.send(JSON.stringify({ event: inRegisterEvent, uuid: piUuid }));
-        const g = settings.cycleGesture ?? "tap";
+        const g = ["tap", "push"].includes(settings.cycleGesture) ? settings.cycleGesture : "tap";
         document.querySelector('input[name="gesture"][value="' + g + '"]').checked = true;
         for (const r of document.querySelectorAll('input[name="gesture"]'))
           r.addEventListener("change", () => {

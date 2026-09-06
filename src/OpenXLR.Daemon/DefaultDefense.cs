@@ -26,13 +26,17 @@ internal static class DefaultDefense
                 try { await Task.Delay(delayMs, stop); }
                 catch (OperationCanceledException) { return; }
                 if (stop.IsCancellationRequested) return;
+                // Each helper call can take seconds; check between them so a
+                // stop that arrives mid-pass never lets a later write land.
+                string Guarded(string[] args) { stop.ThrowIfCancellationRequested(); return run(args); }
                 try
                 {
-                    if (wantSink is { Length: > 0 } && run(["get-default-sink"]) != wantSink)
-                        run(["set-default-sink", wantSink]);
-                    if (wantSource is { Length: > 0 } && run(["get-default-source"]) != wantSource)
-                        run(["set-default-source", wantSource]);
+                    if (wantSink is { Length: > 0 } && Guarded(["get-default-sink"]) != wantSink)
+                        Guarded(["set-default-sink", wantSink]);
+                    if (wantSource is { Length: > 0 } && Guarded(["get-default-source"]) != wantSource)
+                        Guarded(["set-default-source", wantSource]);
                 }
+                catch (OperationCanceledException) { return; }
                 catch (Exception ex) { onError?.Invoke(ex.Message); }
             }
         }, CancellationToken.None);

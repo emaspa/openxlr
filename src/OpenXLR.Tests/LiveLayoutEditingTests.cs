@@ -142,5 +142,18 @@ public sealed class LiveLayoutEditingTests
         ApiCommandResult plain = await hub.ExecuteForApiAsync("""{"cmd":"createMix","name":"Podcast"}""");
         Assert.False(plain.Ok);
         Assert.Contains(plain.Messages, m => m is ErrorMessage);
+
+        // The contract holds for every command, not only the mixer's, and for a read.
+        ApiCommandResult device = await hub.ExecuteForApiAsync("""{"cmd":"set","requestId":"r2"}""");
+        var deviceResult = Assert.IsType<CommandResultMessage>(device.Messages[^1]);
+        Assert.Equal("r2", deviceResult.RequestId);
+        Assert.Contains("missing 'control'", deviceResult.Error);
+        ApiCommandResult unknown = await hub.ExecuteForApiAsync("""{"cmd":"nothing","requestId":"r3"}""");
+        Assert.Contains("unknown cmd", Assert.IsType<CommandResultMessage>(unknown.Messages[^1]).Error);
+        ApiCommandResult read = await hub.ExecuteForApiAsync("""{"cmd":"getState","requestId":"r4"}""");
+        Assert.True(read.Ok);
+        Assert.Null(Assert.IsType<CommandResultMessage>(read.Messages[^1]).Error);
+        ApiCommandResult tooLong = await hub.ExecuteForApiAsync("{\"cmd\":\"getState\",\"requestId\":\"" + new string('x', 65) + "\"}");
+        Assert.Contains(tooLong.Messages, m => m is ErrorMessage);
     }
 }

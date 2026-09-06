@@ -75,7 +75,8 @@ public sealed partial class Mixer
                     _levels[cell] = 1.0;
                     _muted.Add(cell);
                 }
-                WaitForLegsLocked([module], _config.Mixes.Select(m => m.SinkName));
+                if (!WaitForLegsLocked([module], _config.Mixes.Select(m => m.SinkName)))
+                    throw new InvalidOperationException("the channel's sends did not come up within 3 s; nothing was changed");
                 foreach (MixDefinition mix in _config.Mixes) ApplyCellLocked(id, mix.Id);
                 PersistLocked(persist);
             }
@@ -214,7 +215,8 @@ public sealed partial class Mixer
                     _levels[cell] = 1.0;
                     _muted.Add(cell);
                 }
-                WaitForLegsLocked([.. _combineModules.Values], [mix.SinkName]);
+                if (!WaitForLegsLocked([.. _combineModules.Values], [mix.SinkName]))
+                    throw new InvalidOperationException("not every channel grew a send into the new mix within 3 s; nothing was changed");
                 foreach (ChannelDefinition ch in _config.Channels) ApplyCellLocked(ch.Id, id);
                 _postModules[id] = _pw.CreateNullSink(mix.PostSinkName, $"OpenXLR {name} (post)");
                 _virtualMicModules[id] = _pw.CreateVirtualMic(mix.VirtualMicName, $"{mix.PostSinkName}.monitor", $"OpenXLR {name}");
@@ -376,7 +378,7 @@ public sealed partial class Mixer
     private void FinishReloadLocked(ChannelDefinition channel, uint module, IEnumerable<int> streamSerials)
     {
         _combineModules[channel.Id] = module;
-        WaitForLegsLocked([module], _config.Mixes.Select(m => m.SinkName));
+        bool complete = WaitForLegsLocked([module], _config.Mixes.Select(m => m.SinkName));
         foreach (MixDefinition mix in _config.Mixes) ApplyCellLocked(channel.Id, mix.Id);
         foreach (int serial in streamSerials)
         {
@@ -384,25 +386,32 @@ public sealed partial class Mixer
             catch (InvalidOperationException) { /* the stream ended meanwhile */ }
         }
         _meters.Add($"ch:{channel.Id}", channel.SinkName);
+        if (!complete)
+            throw new InvalidOperationException(
+                "the name was saved, but not every send of the reloaded channel came up within 3 s; check its sends, or restart the daemon");
     }
 
     /// <summary>
     /// A combine loaded with a name pattern grows its legs as the registry
     /// scan reports the matching sinks, a moment after the load returns. Wait
-    /// for the named ones, then refresh the leg table.
+    /// for the named ones, then refresh the leg table. False when the
+    /// deadline passed with a leg still missing: a leg that appears later
+    /// would carry PipeWire's defaults (full level, unmuted) instead of the
+    /// stored fader, so callers treat that as a failed edit.
     /// </summary>
-    private void WaitForLegsLocked(IReadOnlyList<uint> modules, IEnumerable<string> sinkNames)
+    private bool WaitForLegsLocked(IReadOnlyList<uint> modules, IEnumerable<string> sinkNames)
     {
         var wanted = sinkNames.ToHashSet(StringComparer.Ordinal);
         var pending = modules.ToHashSet();
-        var deadline = DateTime.UtcNow + LegTimeout;
-        while (pending.Count > 0 && DateTime.UtcNow < deadline)
+        long deadline = Environment.TickCount64 + (long)LegTimeout.TotalMilliseconds;
+        while (pending.Count > 0 && Environment.TickCount64 < deadline)
         {
             foreach (uint module in pending.ToList())
                 if (_pw.TryFindCombineLegs(module) is { } legs && wanted.All(legs.ContainsKey)) pending.Remove(module);
             if (pending.Count > 0) Thread.Sleep(100);
         }
         DiscoverLegsLocked();
+        return pending.Count == 0;
     }
 
     /// <summary>The fader state of removed cells, so a failed save can put them back.</summary>

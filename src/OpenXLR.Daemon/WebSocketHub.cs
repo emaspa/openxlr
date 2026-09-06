@@ -73,6 +73,9 @@ public sealed class WebSocketHub
             Detected = [.. _devices.Detected().Select(d => new DetectedDevice(d.UsbId, d.Name, d.Active))],
         };
 
+    /// <summary>A correlation id longer than this is refused rather than echoed.</summary>
+    internal const int MaxRequestId = 64;
+
     /// <summary>A client has this long to present the token before it is dropped.</summary>
     private static readonly TimeSpan AuthDeadline = TimeSpan.FromSeconds(5);
 
@@ -167,6 +170,18 @@ public sealed class WebSocketHub
         catch (JsonException ex) { await reply(new ErrorMessage($"bad json: {ex.Message}")); return; }
         if (cmd is null) { await reply(new ErrorMessage("command must be an object")); return; }
 
+        if (cmd.RequestId is { Length: > MaxRequestId })
+        {
+            await reply(new ErrorMessage($"requestId: at most {MaxRequestId} characters"));
+            return;
+        }
+
+        // Every command ends here with one outcome. A requestId gets the
+        // state that reflects it and then a commandResult, success or not;
+        // without one, a failure is an error message, followed by the state
+        // for the optimistic mixer controls so a rejected change snaps back.
+        string? error = null;
+        bool stateOnError = false;
         switch (cmd.Cmd)
         {
             case "auth":
@@ -183,9 +198,7 @@ public sealed class WebSocketHub
                 await reply(new PluginsMessage(plugins));
                 break;
             case "set":
-                if (cmd.Control is null) { await reply(new ErrorMessage("set: missing 'control'")); break; }
-                string? err = _devices.Apply(cmd.Control, cmd.Value);  // broadcasts on success
-                if (err is not null) await reply(new ErrorMessage(err));
+                error = cmd.Control is null ? "set: missing 'control'" : _devices.Apply(cmd.Control, cmd.Value);  // broadcasts on success
                 break;
             case "createChannel":
             case "renameChannel":
@@ -212,49 +225,39 @@ public sealed class WebSocketHub
             case "setInserts":
             case "setInsertBypass":
             case "setInsertParam":
-                string? mixErr = _mixer.Apply(cmd);                     // broadcasts on success
-                if (cmd.RequestId is not null)
-                {
-                    // The state first, so a waiting editor re-enables its
-                    // controls against the layout the result refers to.
-                    await reply(Snapshot());
-                    await reply(new CommandResultMessage(cmd.RequestId, mixErr));
-                    break;
-                }
-                if (mixErr is not null)
-                {
-                    await reply(new ErrorMessage(mixErr));
-                    // Controls are optimistic in both clients. Follow an error
-                    // with authoritative state so a rejected ClipGuard/plugin
-                    // change snaps back instead of looking enabled forever.
-                    await reply(Snapshot());
-                }
+                error = _mixer.Apply(cmd);                     // broadcasts on success
+                stateOnError = true;
                 break;
             case "setActiveDevice":
-                if (cmd.Device is null) { await reply(new ErrorMessage("setActiveDevice: missing 'device'")); break; }
-                string? devSelErr = _devices.SetActiveDevice(cmd.Device);
-                if (devSelErr is not null) await reply(new ErrorMessage(devSelErr));
+                error = cmd.Device is null ? "setActiveDevice: missing 'device'" : _devices.SetActiveDevice(cmd.Device);
                 break;
             case "saveProfile":
             case "loadProfile":
             case "deleteProfile":
-                string? profErr = HandleProfile(cmd);
-                if (profErr is not null) await reply(new ErrorMessage(profErr));
-                else Broadcast(Snapshot());   // list (and loaded state) changed
+                error = HandleProfile(cmd);
+                if (error is null) Broadcast(Snapshot());   // list (and loaded state) changed
                 break;
             case "setRecallOnConnect":
-                string? recallErr = HandleRecallOnConnect(cmd);
-                if (recallErr is not null) await reply(new ErrorMessage(recallErr));
-                else Broadcast(Snapshot());
+                error = HandleRecallOnConnect(cmd);
+                if (error is null) Broadcast(Snapshot());
                 break;
             case "resetDevice":
-                string? resetErr = _devices.ResetToDefaults();   // the state change broadcasts itself
-                if (resetErr is not null) await reply(new ErrorMessage(resetErr));
-                else _log.LogInformation("reset {dev} to its firmware defaults", ActiveDeviceId());
+                error = _devices.ResetToDefaults();   // the state change broadcasts itself
+                if (error is null) _log.LogInformation("reset {dev} to its firmware defaults", ActiveDeviceId());
                 break;
             default:
-                await reply(new ErrorMessage($"unknown cmd '{cmd.Cmd}'"));
+                error = $"unknown cmd '{cmd.Cmd}'";
                 break;
+        }
+        if (cmd.RequestId is not null)
+        {
+            await reply(Snapshot());
+            await reply(new CommandResultMessage(cmd.RequestId, error));
+        }
+        else if (error is not null)
+        {
+            await reply(new ErrorMessage(error));
+            if (stateOnError) await reply(Snapshot());
         }
     }
 

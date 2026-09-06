@@ -66,6 +66,9 @@ public abstract class Mk1ClassProtocolDevice : IAudioDevice
 
     public bool Connected => _usb.IsOpen;
 
+    /// <summary>Release the USB transport and its helper process.</summary>
+    public void Dispose() => _usb.Dispose();
+
     public void Connect()
     {
         if (!_usb.Open(VendorId, Info.ProductId))

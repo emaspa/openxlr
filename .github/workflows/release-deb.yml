@@ -29,7 +29,7 @@ jobs:
       - name: Run tests
         run: |
           dotnet restore src/OpenXLR.slnx --locked-mode
-          dotnet build src/OpenXLR.slnx -c Release --no-restore
+          dotnet build src/OpenXLR.slnx -c Release --no-restore -warnaserror
           dotnet test src/OpenXLR.slnx -c Release --no-build
 
       - name: Build package

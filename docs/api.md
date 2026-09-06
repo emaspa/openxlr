@@ -48,7 +48,7 @@ Messages from the daemon, each a JSON object with a `type` field:
 Commands are single JSON objects with a `cmd` field. The layout commands
 (`createChannel` through `setLayoutOrder` below) succeed only after the
 new layout is written to `mixer.json`; a failed write restores the previous
-layout and answers with an error. Any command may carry a `requestId`; the
+layout and answers with an error. Any command may carry a `requestId` of up to 64 characters; the
 daemon then answers with a `commandResult {requestId, error}` message after
 the state that reflects the outcome (`error` is null on success) instead of
 a bare `error` message, so an editor can wait for the acknowledgement:

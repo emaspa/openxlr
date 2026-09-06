@@ -13,8 +13,7 @@ public partial class AboutWindow : Window
         VersionText.Text = $"v{AppVersion.Current}";
     }
 
-    private static void OpenUrl(string url)
-        => Process.Start(new ProcessStartInfo("xdg-open", url) { UseShellExecute = false });
+    private static void OpenUrl(string url) => ExternalLink.Open(url);
 
     private void OnRepo(object? sender, RoutedEventArgs e) => OpenUrl("https://github.com/emaspa/openxlr");
     private void OnCredits(object? sender, RoutedEventArgs e) => OpenUrl("https://github.com/emaspa/openxlr#credits");

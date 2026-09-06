@@ -50,7 +50,7 @@ public sealed class ApiTokenTests
     }
 
     [Fact]
-    public async Task TheTokenIsPublishedOnlyOnceTheHostListensAndAStaleOneIsRemovedFirst()
+    public async Task TheTokenIsPublishedOnlyOnceTheHostListensAndTheOldOneStaysUntilThen()
     {
         string dir = Path.Combine(Path.GetTempPath(), "openxlr-test-" + Guid.NewGuid().ToString("N"));
         string? prev = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
@@ -64,10 +64,12 @@ public sealed class ApiTokenTests
             builder.Logging.ClearProviders();
             await using var app = builder.Build();
             ApiToken.PublishWhenListening(app.Lifetime, app.Logger);
-            Assert.False(File.Exists(path));            // the stale token is gone before anything listens
+            // Another daemon may own that token and the port right now: it
+            // stays valid for its clients until this host really listens.
+            Assert.Equal("stale-token-from-an-earlier-run", OpenXlrPaths.ReadToken());
             Assert.Null(ApiToken.Current);
             await app.StartAsync();
-            Assert.True(File.Exists(path));             // and the new one exists only now
+            Assert.NotEqual("stale-token-from-an-earlier-run", OpenXlrPaths.ReadToken());   // replaced only now
             Assert.Equal(ApiToken.Current, OpenXlrPaths.ReadToken());
             await app.StopAsync();
         }

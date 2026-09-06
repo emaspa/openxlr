@@ -44,6 +44,10 @@ public sealed class HelperUsbTransport : IUsbTransport
             byte[] reply = Exchange(UsbHelperProtocol.Open(vendorId, productId), OpenDeadline,
                 () => new InvalidOperationException("the USB helper did not answer an open request in time"));
             _open = BinaryPrimitives.ReadInt32LittleEndian(reply) == 0;
+            // A helper with nothing open is a process for nothing; the device
+            // loop retries every few seconds and each retry would otherwise
+            // leave one more behind.
+            if (!_open) Kill();
             return _open;
         }
     }
@@ -138,6 +142,9 @@ public sealed class HelperUsbTransport : IUsbTransport
         }
         return reply;
     }
+
+    /// <summary>For tests: whether a helper process is alive right now.</summary>
+    internal bool HelperAlive { get { lock (_gate) return _helper is { HasExited: false }; } }
 
     private void Kill()
     {

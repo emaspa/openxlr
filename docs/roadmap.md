@@ -149,9 +149,10 @@ host mechanism stable than two half-finished ones.
   every second; the daemon should subscribe to registry events (pw-mon,
   or libpipewire directly) and keep an incremental view, which is what
   finally brings its memory and CPU to what a control daemon should use.
-- [ ] Client authentication for the control API (a per-user secret), on
-  top of the origin check that exists, before any API is documented as
-  a public contract.
+- [x] Client authentication for the control API: a per-session token the
+  daemon writes at start, presented by every client, on top of the
+  origin check. Still open: binding the API to a Unix socket with peer
+  credentials instead of a loopback port, so no token file is needed.
 
 ## Next: distribution
 

@@ -222,7 +222,11 @@ public sealed class DeviceManager : BackgroundService
         }
         catch (Exception ex)
         {
-            _log.LogWarning("device loop: {msg}", ex.Message);
+            // Once per distinct message at warning; the retries that follow
+            // every few seconds go to debug.
+            if (ex.Message != _lastLoopError) _log.LogWarning("device loop: {msg}", ex.Message);
+            else _log.LogDebug("device loop: {msg}", ex.Message);
+            _lastLoopError = ex.Message;
             Drop();
         }
         Progress.Mark(); // a completed failed poll is responsive too
@@ -232,7 +236,10 @@ public sealed class DeviceManager : BackgroundService
     // a device that hangs at once again is not worth a tight loop, so wait
     // before retrying. Tests shorten it.
     internal static TimeSpan HungReconnectDelay = TimeSpan.FromSeconds(10);
+    /// <summary>After an ordinary open failure (permissions, a busy device): shorter, still not a tight loop.</summary>
+    internal static TimeSpan OpenRetryDelay = TimeSpan.FromSeconds(2);
     private DateTime _reconnectNotBefore = DateTime.MinValue;
+    private string? _lastLoopError;
 
     /// <summary>
     /// The last transfer that never returned, kept for the diagnostics
@@ -312,10 +319,21 @@ public sealed class DeviceManager : BackgroundService
                 ? usable.FirstOrDefault(d => d.Info.ProductId == pid) ?? (usable.Count > 0 ? usable[0] : null)
                 : usable.Count > 0 ? usable[0] : null;
             if (dev is null) return;                    // nothing usable attached; try again next tick
-            dev.Connect();
+            try { dev.Connect(); }
+            catch (Exception ex)
+            {
+                // The candidate owns a transport, and a helper process once it
+                // tried to open: release it, and do not hammer a device that
+                // cannot be opened (a udev rule not yet applied) ten times a
+                // second.
+                dev.Dispose();
+                if (ex is not UsbHungException) _reconnectNotBefore = DateTime.UtcNow + OpenRetryDelay;
+                throw;
+            }
             _device = dev;
             _last = null;
             _log.LogInformation("connected {dev}", dev.Info.DisplayName);
+            _lastLoopError = null;
             // The UCM split profile that hides the raw multichannel nodes exists
             // for the Wave XLR Pro only; on the other devices the check would
             // poll wpctl for two minutes and then warn about a profile that
@@ -820,6 +838,7 @@ public sealed class DeviceManager : BackgroundService
         lock (_gate)
         {
             try { _device?.Disconnect(); } catch { /* ignore */ }
+            try { _device?.Dispose(); } catch { /* the helper is gone either way */ }
             bool was = _device is not null;
             _device = null;
             _last = null;
