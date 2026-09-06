@@ -10,20 +10,24 @@ namespace OpenXLR.UI;
 
 public partial class MixerSetupWindow : Window
 {
-    private readonly DaemonClient _client = new();
+    private static readonly DaemonClient SharedClient = CreateSharedClient();
+    private readonly DaemonClient _client = SharedClient;
     private MainViewModel? _main;
     private bool _editorConnected;
     private bool _busy;
 
+    private static DaemonClient CreateSharedClient()
+    {
+        var client = new DaemonClient();
+        client.Start();
+        return client;
+    }
+
     public MixerSetupWindow()
     {
         InitializeComponent();
-        _client.ErrorReceived += message => Dispatcher.UIThread.Post(() => StatusText.Text = message);
-        _client.ConnectionChanged += connected => Dispatcher.UIThread.Post(() =>
-        {
-            _editorConnected = connected;
-            Refresh();
-        });
+        _client.ErrorReceived += OnClientError;
+        _client.ConnectionChanged += OnClientConnectionChanged;
         Opened += (_, _) =>
         {
             _main = DataContext as MainViewModel;
@@ -32,18 +36,29 @@ public partial class MixerSetupWindow : Window
                 _main.StateApplied += Refresh;
                 Refresh();
             }
-            _client.Start();
         };
         Closed += (_, _) =>
         {
             if (_main is not null) _main.StateApplied -= Refresh;
-            _ = _client.DisposeAsync().AsTask();
+            _client.ErrorReceived -= OnClientError;
+            _client.ConnectionChanged -= OnClientConnectionChanged;
         };
     }
+
+    private void OnClientError(string message)
+        => Dispatcher.UIThread.Post(() => StatusText.Text = message);
+
+    private void OnClientConnectionChanged(bool connected)
+        => Dispatcher.UIThread.Post(() =>
+        {
+            _editorConnected = connected;
+            Refresh();
+        });
 
     private void Refresh()
     {
         if (_main is null) return;
+        SyncChannelSends();
         ChannelItems.ItemsSource = _main.Channels
             .Where(channel => channel.Id is not ("xlr1" or "xlr2" or "aux"))
             .ToList();
@@ -57,6 +72,37 @@ public partial class MixerSetupWindow : Window
             StatusText.Text = "Connecting to the daemon…";
         else if (!_main.HasMixer)
             StatusText.Text = "Enable the submixer before editing its layout.";
+    }
+
+    /// <summary>
+    /// Current upstream updates existing channel cards in place. A newly added
+    /// mix therefore needs its send row inserted explicitly (and a deleted mix
+    /// needs its row removed) so the open main window matches the daemon state
+    /// immediately rather than only after a UI restart.
+    /// </summary>
+    private void SyncChannelSends()
+    {
+        if (_main is null || !_main.HasMixer) return;
+        var mixes = _main.Mixes.ToList();
+        foreach (ChannelViewModel channel in _main.Channels)
+        {
+            foreach (MixViewModel mix in mixes)
+            {
+                SendViewModel? send = channel.Sends.FirstOrDefault(s => s.MixId == mix.Id);
+                if (send is null)
+                {
+                    send = new SendViewModel(_client, channel.Id, mix.Id) { MixName = mix.Name };
+                    // createMix defines every new virtual-mix send as 1.0,
+                    // unmuted. ApplyFromDaemon initializes without echoing it.
+                    send.ApplyFromDaemon(1.0, false);
+                    channel.Sends.Add(send);
+                }
+                else send.MixName = mix.Name;
+            }
+            for (int i = channel.Sends.Count - 1; i >= 0; i--)
+                if (!mixes.Any(mix => mix.Id == channel.Sends[i].MixId))
+                    channel.Sends.RemoveAt(i);
+        }
     }
 
     private async void OnAddChannel(object? sender, RoutedEventArgs e)
