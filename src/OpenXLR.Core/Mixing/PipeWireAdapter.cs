@@ -1169,6 +1169,7 @@ public sealed class PipeWireAdapter
         "pipewire", "pipewire-pulse", "wireplumber", "pactl", "parec", "paplay",
         "pw-cli", "pw-dump", "pw-cat", "pw-play", "pw-record", "pw-loopback",
         "pw-link", "pw-mon", "speech-dispatcher", "OpenXLR.Daemon", "OpenXLR.UI",
+        "openxlr-lv2-host",   // an insert's own plugin host, not an application
         "libcanberra", "xdg-desktop-portal", "xdg-desktop-portal-kde",
         "xdg-desktop-portal-gnome", "pavucontrol",
     ];

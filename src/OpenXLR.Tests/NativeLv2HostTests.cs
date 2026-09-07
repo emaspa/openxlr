@@ -20,6 +20,16 @@ public sealed class NativeLv2HostTests
         => Assert.Equal(supported, NativePluginHost.SupportsFeatures([feature]));
 
     [Fact]
+    public void TheHelperIsPlumbing()
+    {
+        // Its PipeWire client would otherwise be offered as an application to
+        // route, which is what a user saw after the first release with it.
+        Assert.True(PipeWireAdapter.IsPlumbingIdentity("openxlr-lv2-host"));
+        Assert.True(PipeWireAdapter.IsPlumbingIdentity("OpenXLR.Daemon"));
+        Assert.False(PipeWireAdapter.IsPlumbingIdentity("Spotify"));
+    }
+
+    [Fact]
     public void EveryFeatureTheHelperAcceptsIsOneItImplements()
     {
         // The C source is the other half of this contract: it refuses to load
