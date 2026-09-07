@@ -69,7 +69,9 @@ internal sealed class NativePluginHost : IDisposable
         TimeSpan? patience = null)
     {
         if (patience is { } chosen) _patience = chosen;
-        if (!File.Exists(executable)) throw new InvalidOperationException("Native LV2 host is missing; rebuild/install the complete OpenXLR package.");
+        if (!File.Exists(executable))
+            throw new InvalidOperationException(
+                "The native LV2 host is not installed. Build it with -p:EnableNativeLv2Host=true, or switch this insert back to the filter chain.");
         var start = new ProcessStartInfo(executable)
         {
             RedirectStandardInput = true,

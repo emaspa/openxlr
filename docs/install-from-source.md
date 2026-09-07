@@ -66,6 +66,10 @@ Ubuntu). Without the flag nothing native is built and inserts use
 PipeWire's filter chain, which is also the default when the helper is
 present. The manual describes the feature in 3.12.
 
+Build with the flag every time once you rely on it. A later build without it
+removes the helper again, and inserts set to the native host then report that
+it is not installed.
+
 ## 3. Device access (udev rule, then replug the device):
 
 ```sh
