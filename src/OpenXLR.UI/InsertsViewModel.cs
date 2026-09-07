@@ -9,7 +9,7 @@ using Avalonia.Threading;
 namespace OpenXLR.UI;
 
 /// <summary>A plugin the picker offers (mono in / mono out only for the mic path).</summary>
-public sealed record PluginChoice(string Uri, string Name, string Category, JsonNode Params)
+public sealed record PluginChoice(string Uri, string Name, string Category, JsonNode Params, bool NativeEditorAvailable = false)
 {
     public override string ToString() => Category.Length > 0 ? $"{Name}  ({Category})" : Name;
 }
@@ -39,6 +39,9 @@ public sealed class InsertsViewModel : ViewModelBase
 
     /// <summary>What the chain belongs to, for window titles ("XLR 1", "Stream mix").</summary>
     public string Title { get; }
+
+    public Task ShowNativeEditorAsync(InsertViewModel insert)
+        => _client.ShowInsertUiAsync(_channel, insert.Id);
 
     /// <summary>Picker header: which plugins fit this chain.</summary>
     public string PickerHint => _channels == 1
@@ -106,7 +109,8 @@ public sealed class InsertsViewModel : ViewModelBase
                     p["plugin"]!.GetValue<string>(),
                     p["name"]?.GetValue<string>() ?? p["plugin"]!.GetValue<string>(),
                     p["category"]?.GetValue<string>() ?? "",
-                    p["params"] ?? new JsonArray()));
+                    p["params"] ?? new JsonArray(),
+                    p["nativeEditorAvailable"]?.GetValue<bool>() == true));
             }
             string width = _channels == 1 ? "mono" : "stereo";
             Note = PluginChoices.Count == 0
@@ -226,6 +230,7 @@ public sealed class InsertViewModel : ViewModelBase
 
     /// <summary>The channel chain this insert belongs to (row buttons route through it).</summary>
     public InsertsViewModel Owner => _owner;
+    public bool NativeEditorAvailable => !Bypass && _owner.PluginChoices.Any(p => p.Uri == Plugin && p.NativeEditorAvailable);
 
     private readonly Dictionary<string, double> _params = [];
 
@@ -233,7 +238,7 @@ public sealed class InsertViewModel : ViewModelBase
     public bool Bypass
     {
         get => _bypass;
-        set { if (Set(ref _bypass, value)) { Raise(nameof(StateText)); Raise(nameof(IsActive)); _owner.SendBypass(this, value); } }
+        set { if (Set(ref _bypass, value)) { Raise(nameof(StateText)); Raise(nameof(IsActive)); Raise(nameof(NativeEditorAvailable)); _owner.SendBypass(this, value); } }
     }
 
     private string? _error;
@@ -347,6 +352,7 @@ public sealed class InsertViewModel : ViewModelBase
 
     private void BuildParams()
     {
+        Raise(nameof(NativeEditorAvailable));
         if (_owner.ParamsFor(Plugin) is not JsonArray arr) return;
         foreach (JsonNode? p in arr)
         {

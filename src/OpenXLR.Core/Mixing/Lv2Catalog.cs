@@ -228,7 +228,22 @@ public static class Lv2Catalog
         return new PluginInfo("lv2", uri, name, category, audioIns, audioOuts, inSym, outSym, pars, features, inSyms, outSyms)
         {
             UnsupportedFeatures = UnsupportedFeatures(features),
+            HasNativeUi = HasX11Ui(world, plugin),
         };
+    }
+
+    private static bool HasX11Ui(IntPtr world, IntPtr plugin)
+    {
+        IntPtr uis = Lilv.lilv_plugin_get_uis(plugin);
+        if (uis == IntPtr.Zero) return false;
+        IntPtr type = Lilv.lilv_new_uri(world, "http://lv2plug.in/ns/extensions/ui#X11UI");
+        try
+        {
+            for (IntPtr it = Lilv.lilv_uis_begin(uis); !Lilv.lilv_uis_is_end(uis, it); it = Lilv.lilv_uis_next(uis, it))
+                if (Lilv.lilv_ui_is_a(Lilv.lilv_uis_get(uis, it), type)) return true;
+            return false;
+        }
+        finally { Lilv.lilv_node_free(type); Lilv.lilv_uis_free(uis); }
     }
 
     /// <summary>The slice of liblilv this catalog uses.</summary>
@@ -263,6 +278,13 @@ public static class Lv2Catalog
         [DllImport(Lib)] public static extern IntPtr lilv_plugin_get_port_by_index(IntPtr plugin, uint index);
         [DllImport(Lib)] public static extern void lilv_plugin_get_port_ranges_float(IntPtr plugin, float[] mins, float[] maxs, float[] defs);
         [DllImport(Lib)] public static extern IntPtr lilv_plugin_get_required_features(IntPtr plugin);
+        [DllImport(Lib)] public static extern IntPtr lilv_plugin_get_uis(IntPtr plugin);
+        [DllImport(Lib)] public static extern IntPtr lilv_uis_begin(IntPtr uis);
+        [DllImport(Lib)][return: MarshalAs(UnmanagedType.I1)] public static extern bool lilv_uis_is_end(IntPtr uis, IntPtr iterator);
+        [DllImport(Lib)] public static extern IntPtr lilv_uis_next(IntPtr uis, IntPtr iterator);
+        [DllImport(Lib)] public static extern IntPtr lilv_uis_get(IntPtr uis, IntPtr iterator);
+        [DllImport(Lib)][return: MarshalAs(UnmanagedType.I1)] public static extern bool lilv_ui_is_a(IntPtr ui, IntPtr type);
+        [DllImport(Lib)] public static extern void lilv_uis_free(IntPtr uis);
 
         [DllImport(Lib)] [return: MarshalAs(UnmanagedType.I1)] public static extern bool lilv_port_is_a(IntPtr plugin, IntPtr port, IntPtr cls);
         [DllImport(Lib)] [return: MarshalAs(UnmanagedType.I1)] public static extern bool lilv_port_has_property(IntPtr plugin, IntPtr port, IntPtr prop);

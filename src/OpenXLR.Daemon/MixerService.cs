@@ -226,6 +226,11 @@ public sealed class MixerService : IHostedService, IDisposable
                         | _mixer.EnsureInputFeeds() | _mixer.EnsureAuxRoute()
                         | _mixer.EnsureFilterRoutes()
                         | _mixer.EnsureMonitorRoutes()) Changed?.Invoke();
+                    if (_mixer.SyncPluginControls())
+                    {
+                        ScheduleSave();
+                        Changed?.Invoke();
+                    }
                     SyncOutputSelectors();
                     // Once a minute: is the PulseAudio server close to its
                     // open-file limit? Cheap (one /proc directory listing).
@@ -437,6 +442,10 @@ public sealed class MixerService : IHostedService, IDisposable
                         return "setInsertParam: need 'channel', 'insertId', and 'symbol'";
                     _mixer.SetInsertParam(cmd.Channel, cmd.InsertId, cmd.Symbol, cmd.Value.GetDouble());
                     break;
+                case "showInsertUi":
+                    if (cmd.Channel is null || cmd.InsertId is null) return "showInsertUi: need 'channel' and 'insertId'";
+                    _mixer.ShowInsertUi(cmd.Channel, cmd.InsertId);
+                    return null;
                 default:
                     return $"unknown mixer command '{cmd.Cmd}'";
             }

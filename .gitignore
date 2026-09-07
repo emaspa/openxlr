@@ -4,6 +4,7 @@ fork/
 # build output
 src/*/bin/
 src/*/obj/
+native/openxlr-lv2-host
 
 # Local working material, never shipped: personal Windows exports, USB capture
 # analysis, third-party clones, caches.
