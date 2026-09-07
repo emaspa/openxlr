@@ -298,27 +298,43 @@ Run neither on Arch or NixOS: their packages put `yabridgectl` where every
 shell already looks, and `fish_add_path` answers "Skipping non-existent
 path" because nothing was unpacked there.
 
-With both in place, run the plugin's Windows installer with Wine:
+With both in place, run the plugin's Windows installer with Wine and let
+it install where it offers to:
 
 ```sh
 wine ~/Downloads/PluginSetup.exe
 ```
 
-and install the folder it created, usually
-`~/.wine/drive_c/Program Files/Common Files/VST3`, with "Install
-folder…". OpenXLR adds that folder to yabridge and runs its sync, and the
-Options window says how many folders are bridged; "Sync Windows plugins"
-bridges again after another installer has run. A plugin that comes as a
-bare Windows `.vst3` or `.clap` file works the same way when picked as a
-file. VST2 `.dll` files are left out, since OpenXLR cannot load VST2.
+Then open Options and press one button. Which one depends on whether
+yabridge has seen that folder before:
 
-Wine keeps its Windows drive in `~/.wine` unless `WINEPREFIX` says
-otherwise. OpenXLR looks there for the folders a Windows installer writes
-to, `Program Files/Common Files/VST3` and the same for CLAP, and offers
-them in Options as "Bridge Wine's plugins", so there is no need to find
-them in a file dialog, which hides `~/.wine` as a dotted folder. An
-installer that wrote somewhere else is picked with "Install folder…"; use
-Ctrl+H there to show hidden folders.
+| The button | When to press it |
+|---|---|
+| Bridge Wine's plugins | The first Windows plugin, and any later one installed somewhere new. The button names what it found and disappears once that folder is bridged |
+| Sync Windows plugins | Every plugin after that, when the installer wrote into a folder already bridged. This is the usual case |
+| Install folder… | An installer that wrote outside Wine's usual folders. Press Ctrl+H in the dialog to see `~/.wine`, which is hidden |
+| Rescan | Plugins that arrived by other means, such as a package from your distribution. Nothing to press after a bridge or a sync, since both read the catalogues again |
+
+Bridging and syncing end the same way: yabridge wraps each Windows plugin
+in a bundle under `~/.vst3/yabridge`, OpenXLR reads its catalogues again,
+and the plugin is in the picker with a VST3 or CLAP badge. Nothing else
+has to be restarted.
+
+The first press is the one that needs explaining. Wine keeps its Windows
+drive in `~/.wine` unless `WINEPREFIX` says otherwise, and an installer
+writes into `Program Files/Common Files/VST3` inside it, or the same for
+CLAP. That is a dotted folder, which file dialogs hide, so OpenXLR looks
+there itself and offers what it finds as "Bridge Wine's plugins" rather
+than asking you to go and find it. Once a folder is bridged, yabridge keeps
+it on its own list, so a second plugin installed into it needs only the
+sync, and the Bridge button has nothing left to offer.
+
+A plugin that comes as a bare Windows `.vst3` or `.clap` file, with no
+installer, is picked with "Install file…". Put it in a folder of its own
+first: OpenXLR bridges the folder a Windows plugin sits in, and a file
+picked straight out of Downloads would hand yabridge your whole Downloads
+folder. VST2 `.dll` files are left out either way, since OpenXLR cannot
+load VST2.
 
 <a name="memlock"></a>
 **"Low memory locking limit".** yabridge prints this when it starts, in

@@ -145,7 +145,10 @@ help: an archive to extract, a Windows installer to run with Wine first,
 a VST2 file. The catalogues are read again afterwards, and every open
 chain fetches the list, so the plugin is in the picker a moment later.
 The Options window says where plugins go, whether yabridge and Wine are
-installed and how many folders they bridge, with a rescan and a sync.
+installed and how many folders they bridge. It offers the plugin folders
+found in Wine's own drive, which file dialogs hide, so the first Windows
+plugin is one press rather than a hunt; the ones after it, installed into
+a folder already bridged, take the sync beside it.
 
 The list a window is sent has a size limit. The same plugin often ships
 in more than one format, and while everything fits every copy is offered;
