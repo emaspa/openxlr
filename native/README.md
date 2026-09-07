@@ -73,6 +73,17 @@ that assigns a new display. `XAUTHORITY`, when set, has to point at a cookie
 file the daemon can read; display managers commonly put it under `/run/user`.
 Use the session's own value rather than a copy, and never `xhost +`.
 
+## Tracing a VST3 plugin
+
+With `OPENXLR_HOST_TRACE` set in the helper's environment, the VST3 backend
+writes the plugin's bus layout, the result of switching processing on and the
+first four audio cycles to stderr, which the daemon forwards to its log. Run
+the helper by hand for a quick look:
+
+```sh
+OPENXLR_HOST_TRACE=1 native/openxlr-lv2-host vst3 /usr/lib/vst3/Plugin.vst3 <class-id> test 2 48000
+```
+
 ## Scope
 
 For the plugin: URID map and unmap, the worker extension, options, and the

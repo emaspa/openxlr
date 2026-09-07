@@ -44,6 +44,10 @@ using namespace Steinberg::Vst;
 
 namespace {
 
+// OPENXLR_HOST_TRACE in the environment: describe buses and the first
+// cycles on stderr. Read once, since the audio thread may not ask.
+bool trace_enabled = getenv("OPENXLR_HOST_TRACE") != nullptr;
+
 enum { MAX_TIMERS = 32, MAX_FDS = 32 };
 
 bool same_iid(const TUID iid, const TUID other) {
@@ -459,7 +463,10 @@ struct Vst3 {
   PlugFrame *frame = nullptr;
   std::vector<Record *> records;
   ParameterChanges in_changes, out_changes;
-  AudioBusBuffers in_bus, out_bus;
+  // One entry per bus in each direction, active or not: a plugin indexes
+  // its sidechain by bus number and must find something there.
+  std::vector<AudioBusBuffers> in_buses, out_buses;
+  int32 main_in = 0, main_out = 0;
   float *in_ptrs[MAX_CHANNELS] = {}, *out_ptrs[MAX_CHANNELS] = {};
   ProcessData data;
   bool active = false, processing = false;
@@ -776,19 +783,25 @@ bool instantiate(Vst3 *v, const TUID cid) {
   return true;
 }
 
-int main_bus_channels(Vst3 *v, BusDirection direction) {
+// The main bus in one direction: the first marked main, else the first.
+int32 main_bus(Vst3 *v, BusDirection direction) {
   int32 count = v->component->getBusCount(kAudio, direction);
-  int fallback = 0;
   for (int32 i = 0; i < count; ++i) {
     BusInfo info;
-    if (v->component->getBusInfo(kAudio, direction, i, info) != kResultOk)
-      continue;
-    if (info.busType == kMain)
-      return info.channelCount;
-    if (i == 0)
-      fallback = info.channelCount;
+    if (v->component->getBusInfo(kAudio, direction, i, info) == kResultOk &&
+        info.busType == kMain)
+      return i;
   }
-  return fallback;
+  return 0;
+}
+
+int main_bus_channels(Vst3 *v, BusDirection direction) {
+  BusInfo info;
+  if (v->component->getBusCount(kAudio, direction) == 0 ||
+      v->component->getBusInfo(kAudio, direction, main_bus(v, direction),
+                               info) != kResultOk)
+    return 0;
+  return info.channelCount;
 }
 
 bool editor_available(Vst3 *v) {
@@ -861,9 +874,12 @@ bool vst3_load(Host *h, char **arguments) {
     return false;
   }
   // Only the main buses carry audio; everything else stays off.
+  v->main_in = main_bus(v, kInput);
+  v->main_out = main_bus(v, kOutput);
   for (BusDirection direction : {kInput, kOutput})
     for (int32 i = 0; i < v->component->getBusCount(kAudio, direction); ++i)
-      v->component->activateBus(kAudio, direction, i, i == 0);
+      v->component->activateBus(kAudio, direction, i,
+                                i == (direction == kInput ? v->main_in : v->main_out));
   for (BusDirection direction : {kInput, kOutput})
     for (int32 i = 0; i < v->component->getBusCount(kEvent, direction); ++i)
       v->component->activateBus(kEvent, direction, i, false);
@@ -921,16 +937,39 @@ bool vst3_activate(Host *h) {
     return false;
   }
   v->active = true;
-  v->in_bus.numChannels = (int32)host_channels(h);
-  v->in_bus.channelBuffers32 = v->in_ptrs;
-  v->out_bus.numChannels = (int32)host_channels(h);
-  v->out_bus.channelBuffers32 = v->out_ptrs;
+  if (trace_enabled) {
+    for (BusDirection direction : {kInput, kOutput})
+      for (int32 i = 0; i < v->component->getBusCount(kAudio, direction); ++i) {
+        BusInfo info;
+        SpeakerArrangement arrangement = 0;
+        v->component->getBusInfo(kAudio, direction, i, info);
+        v->processor->getBusArrangement(direction, i, arrangement);
+        fprintf(stderr, "trace: %s bus %d: %d channels, type %d, flags %u, arrangement %llx, main=%d\n",
+                direction == kInput ? "in" : "out", i, info.channelCount, info.busType, info.flags,
+                (unsigned long long)arrangement, i == (direction == kInput ? v->main_in : v->main_out));
+      }
+    fprintf(stderr, "trace: latency %u, tail %u\n", v->processor->getLatencySamples(), v->processor->getTailSamples());
+  }
+  // Processing is switched on here, on the main thread after activation, as
+  // hosts do in practice: a plugin may allocate in it, and its answer is not
+  // a verdict on whether it will process, so it is not treated as one.
+  tresult processing = v->processor->setProcessing(true);
+  if (trace_enabled)
+    fprintf(stderr, "trace: setProcessing -> %d\n", (int)processing);
+  v->processing = true;
+  // Every bus gets an entry; the inactive ones carry no channels.
+  v->in_buses.assign((size_t)v->component->getBusCount(kAudio, kInput), AudioBusBuffers());
+  v->out_buses.assign((size_t)v->component->getBusCount(kAudio, kOutput), AudioBusBuffers());
+  v->in_buses[(size_t)v->main_in].numChannels = (int32)host_channels(h);
+  v->in_buses[(size_t)v->main_in].channelBuffers32 = v->in_ptrs;
+  v->out_buses[(size_t)v->main_out].numChannels = (int32)host_channels(h);
+  v->out_buses[(size_t)v->main_out].channelBuffers32 = v->out_ptrs;
   v->data.processMode = kRealtime;
   v->data.symbolicSampleSize = kSample32;
-  v->data.numInputs = 1;
-  v->data.numOutputs = 1;
-  v->data.inputs = &v->in_bus;
-  v->data.outputs = &v->out_bus;
+  v->data.numInputs = (int32)v->in_buses.size();
+  v->data.numOutputs = (int32)v->out_buses.size();
+  v->data.inputs = v->in_buses.data();
+  v->data.outputs = v->out_buses.data();
   v->data.inputParameterChanges = &v->in_changes;
   v->data.outputParameterChanges = &v->out_changes;
   return true;
@@ -980,16 +1019,6 @@ void vst3_process(Host *h, uint32_t frames, float *const *in,
                   float *const *out) {
   Vst3 *v = of(h);
   unsigned channels = host_channels(h);
-  if (!v->processing) {
-    // setProcessing belongs on the audio thread, where this is the first
-    // call.
-    if (v->processor->setProcessing(true) != kResultOk) {
-      for (unsigned i = 0; i < channels; ++i)
-        memset(out[i], 0, frames * sizeof(float));
-      return;
-    }
-    v->processing = true;
-  }
   for (unsigned i = 0; i < channels; ++i) {
     v->in_ptrs[i] = in[i];
     v->out_ptrs[i] = out[i];
@@ -1009,11 +1038,26 @@ void vst3_process(Host *h, uint32_t frames, float *const *in,
     r->last_sent = wanted;
   }
   v->data.numSamples = (int32)frames;
-  v->in_bus.silenceFlags = 0;
-  v->out_bus.silenceFlags = 0;
-  if (v->processor->process(v->data) != kResultOk)
+  for (AudioBusBuffers &bus : v->in_buses)
+    bus.silenceFlags = 0;
+  for (AudioBusBuffers &bus : v->out_buses)
+    bus.silenceFlags = 0;
+  tresult result = v->processor->process(v->data);
+  if (result != kResultOk)
     for (unsigned i = 0; i < channels; ++i)
       memset(out[i], 0, frames * sizeof(float));
+  static int traced = 0;
+  if (traced < 4 && trace_enabled) {
+    float in_peak = 0, out_peak = 0;
+    for (uint32_t i = 0; i < frames; ++i) {
+      in_peak = std::max(in_peak, std::abs(in[0][i]));
+      out_peak = std::max(out_peak, std::abs(out[0][i]));
+    }
+    fprintf(stderr, "trace: process -> %d, frames %u, in peak %.3f, out peak %.3f, out silence flags %llx, changes in %d\n",
+            (int)result, frames, in_peak, out_peak,
+            (unsigned long long)v->out_buses[(size_t)v->main_out].silenceFlags, v->in_changes.getParameterCount());
+    ++traced;
+  }
   // What the processor changed on its own: meters, and a plugin that moves
   // its own parameters.
   for (int32 i = 0; i < v->out_changes.getParameterCount(); ++i) {
