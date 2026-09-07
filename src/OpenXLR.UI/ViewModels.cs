@@ -154,7 +154,7 @@ public sealed class MainViewModel : ViewModelBase
 
     /// <summary>What the reset button does on this device, for its tooltip and confirmation.</summary>
     public string ResetDescription => CapRetainsSettings
-        ? "Write OpenXLR's baseline to the interface: gain 30 dB on both inputs, every processing stage and phantom power off, headphones, crossfade and aux level at half. Output routing stays. Saved profiles stay."
+        ? "Write OpenXLR's baseline to the interface: gain 30 dB on both inputs, every processing stage and phantom power off, headphones and aux level at half, the crossfade fully on PC. Output routing stays. Saved profiles stay."
         : "The interface goes back to the settings its firmware starts with, and the settings OpenXLR restores when it connects are forgotten. Saved profiles stay.";
 
     private bool _showResetDefaults;

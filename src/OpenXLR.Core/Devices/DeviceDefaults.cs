@@ -5,7 +5,8 @@ namespace OpenXLR.Core.Devices;
 /// memory. Such a device never boots to a clean state, so there is nothing
 /// to record after a power cycle; instead a known, safe set is written on
 /// request: a moderate gain, every processing stage and phantom power off,
-/// every level at half. Output routing and the monitor mix membership are
+/// every level at half, the headphone crossfade fully on PC. Output routing
+/// and the monitor mix membership are
 /// left as they are, since the daemon drives those from the mixer.
 /// </summary>
 public static class DeviceDefaults
@@ -30,7 +31,7 @@ public static class DeviceDefaults
             Compressor = false, Compressor2 = false,
             HpVolumeDb = -30, Hp2VolumeDb = -30,   // half of the 60 dB attenuator range
             LowImpedance = false,
-            Crossfade = 100,                       // centre
+            Crossfade = 200,                       // all the way to PC: the mixer's monitor mix, not the direct mic
             AuxLevelDb = -30,                      // half of the -60..0 dB range
             AuxLevelLock = false,
         };

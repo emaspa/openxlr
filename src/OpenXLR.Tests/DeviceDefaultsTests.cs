@@ -19,7 +19,7 @@ public sealed class DeviceDefaultsTests
         DeviceState b = DeviceDefaults.Baseline(info, current)!;
         Assert.Equal((30, 30), (b.GainDb, b.Gain2Db));
         Assert.False(b.Phantom || b.Phantom2 || b.ClipGuard || b.Compressor || b.LowCut || b.Expander || b.VoiceTune || b.Mute || b.LowImpedance || b.AuxLevelLock);
-        Assert.Equal((-30.0, -30.0, 100, -30.0, 50), (b.HpVolumeDb, b.Hp2VolumeDb, b.Crossfade, b.AuxLevelDb, b.VoiceTuneStrength));
+        Assert.Equal((-30.0, -30.0, 200, -30.0, 50), (b.HpVolumeDb, b.Hp2VolumeDb, b.Crossfade, b.AuxLevelDb, b.VoiceTuneStrength));
         // Routing and mix membership are the mixer's business and stay.
         Assert.Equal((true, false, true, false), (b.OutHp1, b.OutHp2, b.OutUsbAux, b.OutLineOut));
         Assert.Equal((true, false, true), (b.HpMixMonitorReturn, b.HpMixMicDirect, b.AuxReturnEnabled));

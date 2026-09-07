@@ -247,9 +247,9 @@ The Wave XLR Pro keeps its settings in its own memory, so there is no
 clean state to record and whatever is set on Linux is what Wave Link
 finds on Windows, and the other way round. For it the same button
 writes OpenXLR's baseline instead: gain 30 dB on both inputs, every
-processing stage and phantom power off, headphones, crossfade and aux
-level at half. Output routing and saved profiles stay. The gain lock
-has to be off.
+processing stage and phantom power off, headphones and aux level at
+half, the crossfade fully on PC. Output routing and saved profiles
+stay. The gain lock has to be off.
 
 <a name="default-devices"></a>
 ### 3.7 Hold the system default devices
