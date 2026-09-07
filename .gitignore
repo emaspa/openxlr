@@ -5,6 +5,7 @@ fork/
 src/*/bin/
 src/*/obj/
 native/openxlr-lv2-host
+native/*.o
 # nix build output symlink
 result
 

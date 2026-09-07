@@ -64,23 +64,6 @@ struct Clap {
 
 static Clap *of(const clap_host_t *host) { return host->host_data; }
 
-// Any plugin callback that may touch X runs inside the escape, so a lost
-// display costs the editor and not the process.
-static void run_guarded(Host *h, void (*call)(void *), void *argument) {
-  if (x_escape_armed) {
-    call(argument);
-    return;
-  }
-  if (sigsetjmp(x_escape, 0)) {
-    x_escape_armed = 0;
-    host_editor_lost(h);
-    return;
-  }
-  x_escape_armed = 1;
-  call(argument);
-  x_escape_armed = 0;
-}
-
 // --- host services ----------------------------------------------------------
 
 static void host_log(const clap_host_t *host, clap_log_severity severity,
@@ -157,7 +140,7 @@ static void fire_timer(void *p) {
 static void timer_fired(void *data, uint64_t expirations) {
   Timer *t = data;
   if (t->c->timer_support)
-    run_guarded(t->c->h, fire_timer, t);
+    host_run_guarded(t->c->h, fire_timer, t);
 }
 
 static bool timer_register(const clap_host_t *host, uint32_t period_ms,
@@ -227,7 +210,7 @@ static void fd_ready(void *data, int fd, uint32_t mask) {
     call.flags |= CLAP_POSIX_FD_WRITE;
   if (mask & (SPA_IO_ERR | SPA_IO_HUP))
     call.flags |= CLAP_POSIX_FD_ERROR;
-  run_guarded(f->c->h, fire_fd, &call);
+  host_run_guarded(f->c->h, fire_fd, &call);
 }
 
 static Fd *fd_slot(Clap *c, int fd) {
@@ -595,7 +578,7 @@ static void on_main_thread(void *p) {
 static void clap_main_thread(Host *h) {
   Clap *c = h->impl;
   if (atomic_exchange(&c->callback_requested, false))
-    run_guarded(h, on_main_thread, c);
+    host_run_guarded(h, on_main_thread, c);
   // A plugin that is not being processed flushes parameter changes here
   // instead; once the node runs, every process call carries them.
   if (atomic_exchange(&c->flush_requested, false) && c->params &&
@@ -657,6 +640,7 @@ const Backend clap_backend = {
     .editor_close = clap_editor_close,
     .editor_idle = clap_editor_idle,
     .editor_lost = clap_editor_lost,
+    .editor_resized = NULL,
     .main_thread = clap_main_thread,
     .unload = clap_unload,
 };

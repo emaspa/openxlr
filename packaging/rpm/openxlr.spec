@@ -18,6 +18,7 @@ BuildRequires:  systemd-rpm-macros
 # The optional LV2 host is a small C program built beside the daemon. Its
 # libraries are already runtime dependencies below; only the headers are new.
 BuildRequires:  gcc
+BuildRequires:  gcc-c++
 BuildRequires:  make
 BuildRequires:  pkgconf-pkg-config
 BuildRequires:  pipewire-devel

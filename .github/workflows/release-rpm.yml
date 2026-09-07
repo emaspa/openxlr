@@ -21,7 +21,7 @@ jobs:
         run: |
           dnf install -y --setopt=install_weak_deps=False \
             rpm-build rpmlint git-core dotnet-sdk-10.0 systemd-rpm-macros \
-            gcc make pkgconf-pkg-config pipewire-devel lilv-devel lv2-devel libX11-devel
+            gcc gcc-c++ make pkgconf-pkg-config pipewire-devel lilv-devel lv2-devel libX11-devel
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 

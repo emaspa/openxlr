@@ -39,7 +39,7 @@ tools/check-version.sh                          # the five version locations agr
 tools/check-locked-restore.sh                   # every packaging path restores locked
 tools/check-openapi.py docs/openapi-v1.json     # the HTTP API document keeps its shape
 tools/check-spec.py packaging/rpm/openxlr.spec  # every installed file is in %files
-make -C native  # optional LV2 host; needs the PipeWire, lilv, LV2 and X11 headers
+make -C native  # the plugin host; needs a C and C++ compiler and the PipeWire, lilv, LV2 and X11 headers
 ```
 
 If you add or change a NuGet package, regenerate the lock files with a

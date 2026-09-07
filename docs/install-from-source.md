@@ -59,10 +59,11 @@ dotnet build -c Release -p:EnableNativeLv2Host=true
 ```
 
 That step compiles the sources under `native/` and copies the helper next to the
-daemon. It needs a C compiler, make, pkg-config and the development files
-for PipeWire, lilv, LV2 and X11 (`base-devel`, `pipewire`, `lilv`, `lv2`
-and `libx11` on Arch; the `-dev` packages of the same on Debian and
-Ubuntu). Without the flag nothing native is built and inserts use
+daemon. It needs a C and a C++ compiler, make, pkg-config and the development
+files for PipeWire, lilv, LV2 and X11 (`base-devel`, `pipewire`, `lilv`,
+`lv2` and `libx11` on Arch; `g++` and the `-dev` packages of the same on
+Debian and Ubuntu). The CLAP and VST3 interface headers are part of the
+tree. Without the flag nothing native is built and inserts use
 PipeWire's filter chain, which is also the default when the helper is
 present. The manual describes the feature in 3.12.
 

@@ -294,8 +294,8 @@ public sealed class InsertViewModel : ViewModelBase
             }
         }
     }
-    /// <summary>A CLAP plugin has nowhere else to run, so there is nothing to choose.</summary>
-    public bool CanChooseNativeHost => Kind != "clap" && (NativeEditorSupported || NativeHost);
+    /// <summary>Only an LV2 plugin has a filter chain to choose over the host.</summary>
+    public bool CanChooseNativeHost => Kind == "lv2" && (NativeEditorSupported || NativeHost);
 
     private readonly Dictionary<string, double> _params = [];
 

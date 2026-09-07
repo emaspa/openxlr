@@ -124,14 +124,22 @@ development. A plugin that requires a host feature the chain does not
 provide is left out of the picker and refused by the daemon rather than
 failing when the chain is built.
 
-CLAP plugins are offered in the same picker, found in the standard CLAP
-directories (`/usr/lib/clap`, `~/.clap`, or wherever `CLAP_PATH` points).
-A CLAP plugin has no filter chain to run in, so it always runs in the
-native host described below, and its row carries no host switch. The
-daemon never loads CLAP code itself: the host describes each bundle in a
-process of its own, so a plugin that misbehaves while being asked about
-its ports costs that bundle and nothing else. VST plugins are not
-supported.
+CLAP and VST3 plugins are offered in the same picker, found in the
+standard directories (`/usr/lib/clap` and `~/.clap`, `/usr/lib/vst3` and
+`~/.vst3`, or wherever `CLAP_PATH` and `VST3_PATH` point). Neither has a
+filter chain to run in, so both always run in the native host described
+below, and their rows carry no host switch. The daemon never loads their
+code itself: the host describes each bundle in a process of its own, so a
+plugin that misbehaves while being asked about its ports costs that
+bundle and nothing else, and what it learns is kept until the bundle
+changes. Windows VST3 plugins come through yabridge, which presents them
+as ordinary bundles under `~/.vst3`. VST2 plugins are not supported.
+
+The list a window is sent has a size limit. The same plugin often ships
+in more than one format, and while everything fits every copy is offered;
+past the limit, LV2 stays whole and the other formats fill what room is
+left, copies of a plugin already listed going last. A set installed twice,
+as LV2 and as VST3, therefore shows once rather than pushing anything out.
 
 Plugins that ship their own editor still load, and the generated controls
 are shown for them. The editor itself can be opened through a small host

@@ -28,30 +28,112 @@ public static class ClapCatalog
     }
 
     internal static IReadOnlyList<PluginInfo> ScanNow(IEnumerable<string>? directories = null)
+        => HostScan.Run("clap", "scan-clap", directories ?? SearchPath(),
+            directory => Directory.EnumerateFiles(directory, "*.clap", SearchOption.AllDirectories));
+
+    internal static IReadOnlyList<PluginInfo> Parse(string json) => HostScan.Parse(json, "clap");
+}
+
+/// <summary>
+/// The installed VST3 plugins, read the same way: a bundle is a directory
+/// (or, for older plugins, a file) named .vst3, and the native host
+/// describes it in a process of its own. A plugin is named by its class id,
+/// since one module carries many.
+/// </summary>
+public static class Vst3Catalog
+{
+    private static readonly Lazy<IReadOnlyList<PluginInfo>> Scan = new(() => ScanNow(), LazyThreadSafetyMode.ExecutionAndPublication);
+
+    public static IReadOnlyList<PluginInfo> Plugins => Scan.Value;
+
+    public static IReadOnlyList<string> SearchPath()
     {
-        var result = new List<PluginInfo>();
-        if (!NativePluginHost.HostInstalled) return result;
-        foreach (string directory in directories ?? SearchPath())
+        string? configured = Environment.GetEnvironmentVariable("VST3_PATH");
+        if (!string.IsNullOrWhiteSpace(configured))
+            return [.. configured.Split(':', StringSplitOptions.RemoveEmptyEntries)];
+        string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        return [Path.Combine(home, ".vst3"), "/usr/lib/vst3", "/usr/local/lib/vst3"];
+    }
+
+    /// <summary>Bundles at any depth, since yabridge keeps its own directory under ~/.vst3, never descending into one.</summary>
+    internal static IEnumerable<string> Bundles(string directory)
+    {
+        var found = new List<string>();
+        var pending = new Stack<string>([directory]);
+        while (pending.Count > 0)
         {
-            if (!Directory.Exists(directory)) continue;
-            IEnumerable<string> bundles;
-            try { bundles = Directory.EnumerateFiles(directory, "*.clap", SearchOption.AllDirectories).OrderBy(f => f, StringComparer.Ordinal); }
+            string current = pending.Pop();
+            IEnumerable<string> entries;
+            try { entries = Directory.EnumerateFileSystemEntries(current); }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { continue; }
-            foreach (string bundle in bundles)
+            foreach (string entry in entries)
             {
-                ProcessResult scan;
-                try { scan = ProcessRunner.Run(NativePluginHost.Executable, ["scan-clap", bundle], TimeSpan.FromSeconds(10)); }
-                catch (Exception) { continue; }
-                if (scan.ExitCode != 0 || scan.TimedOut || scan.Truncated) continue;
-                try { result.AddRange(Parse(System.Text.Encoding.UTF8.GetString(scan.Stdout))); }
-                catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException) { /* one bad bundle */ }
+                if (entry.EndsWith(".vst3", StringComparison.OrdinalIgnoreCase)) found.Add(entry);
+                else if (Directory.Exists(entry)) pending.Push(entry);
             }
         }
+        return found;
+    }
+
+    internal static IReadOnlyList<PluginInfo> ScanNow(IEnumerable<string>? directories = null)
+        => HostScan.Run("vst3", "scan-vst3", directories ?? SearchPath(), Bundles);
+
+    internal static IReadOnlyList<PluginInfo> Parse(string json) => HostScan.Parse(json, "vst3");
+}
+
+/// <summary>What the two scanners share: running the helper per bundle, and reading its JSON.</summary>
+internal static class HostScan
+{
+    internal static IReadOnlyList<PluginInfo> Run(string kind, string command, IEnumerable<string> directories,
+        Func<string, IEnumerable<string>> bundlesIn)
+    {
+        // Nothing here may throw: the catalogue is read once and kept, so an
+        // exception would be kept with it, and every lookup after would fail.
+        var result = new List<PluginInfo>();
+        try
+        {
+            if (!NativePluginHost.HostInstalled) return result;
+            var cache = new ScanCache(ScanCache.DefaultDirectory);
+            foreach (string directory in directories)
+            {
+                if (!Directory.Exists(directory)) continue;
+                IEnumerable<string> bundles;
+                try { bundles = bundlesIn(directory).OrderBy(f => f, StringComparer.Ordinal).ToList(); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { continue; }
+                foreach (string bundle in bundles)
+                {
+                    byte[]? description = cache.Lookup(bundle);
+                    if (description is null)
+                    {
+                        // A module that carries hundreds of plugins is created and
+                        // released plugin by plugin; a minute is generous for that,
+                        // and it is spent once per bundle until the bundle changes.
+                        ProcessResult scan;
+                        try { scan = ProcessRunner.Run(NativePluginHost.Executable, [command, bundle], TimeSpan.FromSeconds(60)); }
+                        catch (Exception) { continue; }
+                        if (scan.ExitCode != 0 || scan.TimedOut || scan.Truncated) continue;
+                        description = scan.Stdout;
+                        cache.Store(bundle, description);
+                    }
+                    try { result.AddRange(Parse(description, kind)); }
+                    catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException) { /* one bad bundle */ }
+                }
+            }
+            cache.Save();
+        }
+        catch (Exception) { /* whatever was read stands */ }
         return result;
     }
 
-    /// <summary>The scanner's JSON for one bundle, as plugins the picker can offer.</summary>
-    internal static IReadOnlyList<PluginInfo> Parse(string json)
+    internal static IReadOnlyList<PluginInfo> Parse(string json, string kind)
+        => Parse(System.Text.Encoding.UTF8.GetBytes(json), kind);
+
+    /// <summary>
+    /// The scanner's JSON for one bundle, as plugins the picker can offer.
+    /// Read from bytes: a large module's description would double in size as
+    /// a string, and the daemon's heap is bounded.
+    /// </summary>
+    internal static IReadOnlyList<PluginInfo> Parse(ReadOnlySpan<byte> json, string kind)
     {
         var result = new List<PluginInfo>();
         if (JsonNode.Parse(json) is not JsonObject root) return result;
@@ -82,7 +164,7 @@ public static class ClapCatalog
                 if (parameters.Count == Lv2Catalog.MaxControls) break;
             }
             int ins = p["audioIns"]?.GetValue<int>() ?? 0, outs = p["audioOuts"]?.GetValue<int>() ?? 0;
-            result.Add(new PluginInfo("clap", id, p["name"]?.GetValue<string>() ?? id, Category(features),
+            result.Add(new PluginInfo(kind, id, p["name"]?.GetValue<string>() ?? id, Category(features),
                 ins, outs, "", "", parameters, [], [], [])
             {
                 HasNativeUi = p["gui"]?.GetValue<bool>() == true,
@@ -92,16 +174,23 @@ public static class ClapCatalog
         return result;
     }
 
-    /// <summary>The picker's grouping, from the plugin's own feature list.</summary>
+    /// <summary>
+    /// The picker's grouping, from the plugin's own feature list: CLAP
+    /// features such as "audio-effect", "reverb", "stereo", or VST3
+    /// sub-categories such as "Fx", "Reverb", "Stereo". The generic words
+    /// are skipped so the specific one is what shows.
+    /// </summary>
     internal static string Category(IReadOnlyList<string> features)
     {
         foreach (string feature in features)
         {
-            if (feature is "audio-effect" or "instrument" or "note-effect" or "note-detector" or "analyzer"
-                or "mono" or "stereo" or "surround" or "ambisonic") continue;
+            string lower = feature.ToLowerInvariant();
+            if (lower is "audio-effect" or "fx" or "instrument" or "note-effect" or "note-detector" or "analyzer"
+                or "mono" or "stereo" or "surround" or "ambisonic" or "only-rt" or "only-offline-process") continue;
             return string.Join(' ', feature.Split('-').Select(word =>
                 word.Length == 0 ? word : char.ToUpperInvariant(word[0]) + word[1..]));
         }
-        return features.Contains("audio-effect") ? "Effect" : "";
+        return features.Any(f => f.Equals("audio-effect", StringComparison.OrdinalIgnoreCase)
+            || f.Equals("fx", StringComparison.OrdinalIgnoreCase)) ? "Effect" : "";
     }
 }

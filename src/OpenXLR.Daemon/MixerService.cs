@@ -432,8 +432,8 @@ public sealed class MixerService : IHostedService, IDisposable
                 case "setInserts":
                     if (cmd.Channel is null || cmd.Inserts is null) return "setInserts: need 'channel' and 'inserts'";
                     foreach (InsertDefinition i in cmd.Inserts)
-                        if (string.IsNullOrWhiteSpace(i.Id) || i.Kind is not ("lv2" or "clap") || string.IsNullOrWhiteSpace(i.Plugin))
-                            return "setInserts: every insert needs an id, a kind of 'lv2' or 'clap', and a plugin identifier";
+                        if (string.IsNullOrWhiteSpace(i.Id) || i.Kind is not ("lv2" or "clap" or "vst3") || string.IsNullOrWhiteSpace(i.Plugin))
+                            return "setInserts: every insert needs an id, a kind of 'lv2', 'clap' or 'vst3', and a plugin identifier";
                     _mixer.SetInserts(cmd.Channel, cmd.Inserts);
                     break;
                 case "setInsertBypass":

@@ -701,12 +701,12 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     {
         lock (_gate)
         {
-            // A CLAP plugin only ever runs in the native host, so its record says so
-            // whatever a client sent; the window then shows it without a switch.
+            // A CLAP or VST3 plugin only ever runs in the native host, so its record
+            // says so whatever a client sent; the window then shows it without a switch.
             _inserts[channel] = [.. inserts.Select(i => i with
             {
                 Params = new Dictionary<string, double>(i.Params),
-                NativeHost = i.NativeHost || i.Kind == "clap",
+                NativeHost = i.RunsNatively,
             })];
             if (_built) RewireInsertKeyLocked(channel);
         }

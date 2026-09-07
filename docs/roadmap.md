@@ -122,11 +122,16 @@ host mechanism stable than two half-finished ones.
   the process model LV2 already had. Bundles are described for the
   catalogue by the helper, one process per bundle, so the daemon never
   loads plugin code. The CLAP headers are vendored, so no package changed.
-- [ ] VST3, and Windows VST3 through yabridge, as a sibling helper in C++
-  against Steinberg's interface headers, in the same process model, one
-  plugin per process, supervised and fail-open so a crashed plugin is
-  bypassed and audio continues. Carla was considered and dropped: no
+- [x] VST3, in the same host: a C++ backend against Steinberg's interface
+  headers (vendored, MIT), one plugin per process, with the component and
+  controller wired, parameters as controls, and the editor on a run loop of
+  ours. Windows VST3 plugins arrive through yabridge as ordinary bundles.
+  Scans are cached per bundle, since a module of two hundred plugins takes
+  a quarter of a minute to describe. Carla was considered and dropped: no
   commit in six months, no CLAP, and a second audio engine.
+- [ ] Windows plugins made easy: detect yabridge, run its sync when the
+  catalogue refreshes, and a card in Options that shows what was found with
+  the install steps behind a Manual link.
 - [ ] Presets: per-plugin and whole-chain, with export and import; copy a
   chain between channels; A/B comparison.
 - [ ] Plugin latency reported per insert and compensated across mixes.

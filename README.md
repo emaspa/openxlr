@@ -14,7 +14,7 @@
 Native Linux control suite for Elgato XLR interfaces: full hardware
 control over reverse-engineered USB protocols, a Wave Link style
 PipeWire submixer with per-application channels, virtual microphones,
-LV2 and CLAP plugin inserts, multi-output monitoring, a dedicated mix for a
+LV2, CLAP and VST3 plugin inserts, multi-output monitoring, a dedicated mix for a
 second computer on the USB Aux port, and an OpenDeck plugin for Stream
 Deck control.
 
@@ -66,7 +66,7 @@ Collect diagnostics).
   added, renamed, reordered and removed while audio plays, from the
   window or the API. Per-send levels and mutes, level meters, the
   monitor mixes on several outputs at once.
-- **Inserts**: LV2 and CLAP plugin chains on each XLR input and each mix, with a
+- **Inserts**: LV2, CLAP and VST3 plugin chains on each XLR input and each mix, with a
   plugin picker, generated control windows and bypass LEDs.
 - **Application routing**: audio clients are detected from their
   PipeWire registration and routed to a channel by name rules, with the

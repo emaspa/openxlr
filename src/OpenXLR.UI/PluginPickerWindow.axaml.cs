@@ -44,11 +44,12 @@ public partial class PluginPickerWindow : Window
     /// the list and never empty it by default.
     /// </summary>
     public static IEnumerable<PluginChoice> Matching(IEnumerable<PluginChoice> choices, string query,
-        bool lv2, bool clap)
+        bool lv2, bool clap, bool vst3 = false)
     {
         string q = query.Trim();
+        bool any = !lv2 && !clap && !vst3;
         return choices.Where(p =>
-            (!lv2 && !clap || lv2 && p.Kind == "lv2" || clap && p.Kind == "clap") &&
+            (any || lv2 && p.Kind == "lv2" || clap && p.Kind == "clap" || vst3 && p.Kind == "vst3") &&
             (q.Length == 0 ||
              p.Name.Contains(q, StringComparison.OrdinalIgnoreCase) ||
              p.Category.Contains(q, StringComparison.OrdinalIgnoreCase) ||
@@ -59,7 +60,7 @@ public partial class PluginPickerWindow : Window
     {
         if (DataContext is not InsertsViewModel vm) return;
         List.ItemsSource = Matching(vm.PluginChoices, Filter.Text ?? "",
-            OnlyLv2.IsChecked == true, OnlyClap.IsChecked == true).ToList();
+            OnlyLv2.IsChecked == true, OnlyClap.IsChecked == true, OnlyVst3.IsChecked == true).ToList();
     }
 
     private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e)

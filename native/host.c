@@ -135,6 +135,44 @@ void host_show_editor(Host *h, bool show) {
   x_escape_armed = 0;
 }
 
+// Any plugin callback that may touch X runs inside the escape, so a lost
+// display costs the editor and not the process. A caller already inside
+// the escape is simply called through.
+void host_run_guarded(Host *h, void (*call)(void *), void *argument) {
+  if (x_escape_armed) {
+    call(argument);
+    return;
+  }
+  if (sigsetjmp(x_escape, 0)) {
+    x_escape_armed = 0;
+    host_editor_lost(h);
+    return;
+  }
+  x_escape_armed = 1;
+  call(argument);
+  x_escape_armed = 0;
+}
+
+uint32_t host_rate(const Host *h) { return h->rate; }
+unsigned host_channels(const Host *h) { return h->channels; }
+unsigned long host_window(const Host *h) { return h->window; }
+void *host_impl(const Host *h) { return h->impl; }
+void host_set_impl(Host *h, void *impl) { h->impl = impl; }
+void host_set_has_editor(Host *h, bool has_editor) { h->has_editor = has_editor; }
+uint32_t host_control_count(const Host *h) { return h->control_count; }
+Control *host_control_at(Host *h, uint32_t index) {
+  return index < h->control_count ? &h->controls[index] : NULL;
+}
+float control_desired(const Control *c) { return atomic_load(&c->desired); }
+void control_set_desired(Control *c, float value) {
+  atomic_store(&c->desired, fminf(c->maximum, fmaxf(c->minimum, value)));
+}
+void control_set_observed(Control *c, float value) {
+  atomic_store(&c->observed, value);
+}
+bool control_is_output(const Control *c) { return c->output; }
+void *control_backend(const Control *c) { return c->backend; }
+
 void host_fail(Host *h, const char *why) {
   fprintf(stderr, "%s; restart the chain\n", why);
   atomic_store(&h->audio_error, true);
@@ -330,9 +368,12 @@ static void pump_editor(Host *h) {
                       (unsigned)c->height);
       else if (c->window == h->window &&
                XGetWindowAttributes(h->display, h->child, &attributes) &&
-               (attributes.width != c->width || attributes.height != c->height))
+               (attributes.width != c->width || attributes.height != c->height)) {
         XResizeWindow(h->display, h->child, (unsigned)c->width,
                       (unsigned)c->height);
+        if (h->backend->editor_resized && c->width > 0 && c->height > 0)
+          h->backend->editor_resized(h, (unsigned)c->width, (unsigned)c->height);
+      }
     }
   }
   bool finished = h->backend->editor_idle && h->backend->editor_idle(h);
@@ -459,12 +500,16 @@ static const Backend *backend_named(const char *name) {
     return &lv2_backend;
   if (!strcmp(name, "clap"))
     return &clap_backend;
+  if (!strcmp(name, "vst3"))
+    return &vst3_backend;
   return NULL;
 }
 
 int main(int argc, char **argv) {
   if (argc == 3 && !strcmp(argv[1], "scan-clap"))
     return clap_scan(argv[2]);
+  if (argc == 3 && !strcmp(argv[1], "scan-vst3"))
+    return vst3_scan(argv[2]);
   const Backend *backend = argc >= 2 ? backend_named(argv[1]) : NULL;
   int first = backend ? 2 + backend->argument_count : 0;  // NODE
   if (!backend || argc < first + 3) {
@@ -472,7 +517,10 @@ int main(int argc, char **argv) {
           "[SYMBOL=VALUE ...]\n"
           "       openxlr-lv2-host clap FILE ID NODE CHANNELS RATE "
           "[SYMBOL=VALUE ...]\n"
-          "       openxlr-lv2-host scan-clap FILE\n",
+          "       openxlr-lv2-host vst3 BUNDLE CLASS-ID NODE CHANNELS RATE "
+          "[SYMBOL=VALUE ...]\n"
+          "       openxlr-lv2-host scan-clap FILE\n"
+          "       openxlr-lv2-host scan-vst3 BUNDLE\n",
           stderr);
     return 2;
   }

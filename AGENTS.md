@@ -44,7 +44,7 @@ tools/check-version.sh
 tools/check-locked-restore.sh
 tools/check-openapi.py docs/openapi-v1.json
 tools/check-spec.py packaging/rpm/openxlr.spec
-make -C native  # optional LV2 host; needs the PipeWire, lilv, LV2 and X11 headers
+make -C native  # the plugin host; needs a C and C++ compiler and the PipeWire, lilv, LV2 and X11 headers
 ```
 
 CI runs exactly these; the build treats warnings as errors, so a build

@@ -208,23 +208,33 @@ channel, with its level and lock in the INPUTS card.
 
 The generated controls cover every parameter the plugin exposes. A
 plugin's own editor can be opened as well, with the native host described
-in 3.12. CLAP plugins appear in the same picker and always run in that
-host. VST plugins cannot be loaded.
+in 3.12. CLAP and VST3 plugins appear in the same picker and always run in
+that host. VST2 plugins cannot be loaded.
 
 To install plugins, use your distribution's packages or copy the bundles
 into your home directory: LV2 bundles go in `~/.lv2` or `/usr/lib/lv2`,
-CLAP bundles in `~/.clap` or `/usr/lib/clap` (`LV2_PATH` and `CLAP_PATH`
-override those). On Arch, `lsp-plugins-lv2` and `x42-plugins` cover the
-microphone path well, and `dragonfly-reverb-clap`, `dpf-plugins-clap` and
-`elephantdsp-roomreverb-clap` are CLAP effects for a mix. The daemon reads
-both catalogues once, when it starts, so restart it after installing:
+CLAP bundles in `~/.clap` or `/usr/lib/clap`, VST3 bundles in `~/.vst3` or
+`/usr/lib/vst3` (`LV2_PATH`, `CLAP_PATH` and `VST3_PATH` override those).
+On Arch, `lsp-plugins-lv2` and `x42-plugins` cover the microphone path
+well, `lsp-plugins-vst3` is the same set as VST3, and `dragonfly-reverb-clap`,
+`dpf-plugins-clap` and `elephantdsp-roomreverb-clap` are CLAP effects for a
+mix. Windows VST3 plugins work through [yabridge](https://github.com/robbert-vdh/yabridge):
+install it with Wine, add the Windows plugin directory with `yabridgectl add`
+and run `yabridgectl sync`, and the bridged plugins appear under `~/.vst3`
+like any other. The daemon reads the catalogues once, when it starts, and
+keeps what it learnt about each bundle until that bundle changes, so restart
+it after installing:
 
 ```sh
 systemctl --user restart openxlr-daemon.service
 ```
 
 The picker marks each plugin with its format, since the same plugin often
-ships as both, and its LV2 and CLAP buttons narrow the list to one of them.
+ships in more than one, and its LV2, CLAP and VST3 buttons narrow the list
+to one of them. When the catalogue grows past what the window can be sent,
+the LV2 list stays whole and the other formats fill the remaining room,
+with copies of a plugin already listed going last; a set installed in two
+formats shows once rather than pushing anything out.
 
 <a name="profiles"></a>
 ### 3.6 Save and recall a scene
@@ -385,9 +395,9 @@ To use it:
    is saved with the mixer and with profiles.
 4. Turn "Native host" off to put the insert back in the shared chain.
 
-A CLAP plugin has no shared chain to go back to, so it always runs this
-way: its row shows no switch, and the cog opens its editor whenever the
-plugin is running.
+A CLAP or VST3 plugin has no shared chain to go back to, so it always runs
+this way: its row shows no switch, and the cog opens its editor whenever
+the plugin is running.
 
 The editor draws on an X11 display, which means XWayland on a Wayland
 desktop, and the daemon has to know about it. A user service that started
