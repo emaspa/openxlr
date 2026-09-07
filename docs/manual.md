@@ -275,16 +275,28 @@ put it. With 5.1.1, the current release:
 tar -C ~/.local/share -xavf ~/Downloads/yabridge-5.1.1.tar.gz
 ```
 
-OpenXLR looks there, so nothing else is needed for it: close the Options
-window and open it again, and the card will say that yabridge is
-installed. To run `yabridgectl` yourself as well, add its directory to
-your PATH:
+That leaves `~/.local/share/yabridge/yabridgectl`, which is where OpenXLR
+looks, so nothing else is needed for it: close the Options window and open
+it again, and the card will say that yabridge is installed.
+
+Putting that directory on your PATH is worth it only to run `yabridgectl`
+yourself, and only after the tarball is unpacked: fish refuses a path that
+is not there, and a PATH entry pointing at nothing does no good either
+way. With fish:
+
+```sh
+fish_add_path ~/.local/share/yabridge
+```
+
+With bash, and a new terminal afterwards:
 
 ```sh
 echo 'export PATH="$PATH:$HOME/.local/share/yabridge"' >> ~/.bashrc
 ```
 
-With fish, `fish_add_path ~/.local/share/yabridge` does the same.
+Run neither on Arch or NixOS: their packages put `yabridgectl` where every
+shell already looks, and `fish_add_path` answers "Skipping non-existent
+path" because nothing was unpacked there.
 
 With both in place, run the plugin's Windows installer with Wine:
 
