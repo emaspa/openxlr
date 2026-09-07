@@ -94,7 +94,7 @@ public sealed class InsertsViewModel : ViewModelBase
     {
         if (_pluginsRequested) return;
         _pluginsRequested = true;
-        Note = "Scanning LV2 plugins…";
+        Note = "Scanning plugins…";
         JsonNode? plugins = await CatalogAsync(_client);
         Dispatcher.UIThread.Post(() =>
         {
@@ -120,7 +120,7 @@ public sealed class InsertsViewModel : ViewModelBase
             }
             string width = _channels == 1 ? "mono" : "stereo";
             Note = PluginChoices.Count == 0
-                ? $"No {width} plugins found (install e.g. lsp-plugins-lv2 or x42-plugins)"
+                ? $"No {width} plugins found. Install some, or add one with the buttons below"
                 : $"{PluginChoices.Count} {width} plugins available";
         });
     }

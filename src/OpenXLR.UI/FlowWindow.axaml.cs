@@ -78,7 +78,7 @@ public partial class FlowWindow : Window
 
         // Filter chains in the path. An input chain sits between the jack and
         // its channel: the built-in low cut and ClipGuard (XLR 1 only, when
-        // switched on) followed by the LV2 inserts. A mix chain sits between
+        // switched on) followed by the plugin inserts. A mix chain sits between
         // the mix and everything it feeds. Chains with nothing in them are
         // not drawn, and the columns appear only when a chain exists.
         var inputChains = new List<ChainNode>();

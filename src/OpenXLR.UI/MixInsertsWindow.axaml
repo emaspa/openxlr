@@ -19,7 +19,7 @@
     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
       <StackPanel>
         <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="Bold" Foreground="#e6e9f0"/>
-        <TextBlock Text="Stereo LV2 plugins, in order, before this mix reaches its outputs" Classes="h" FontSize="11"/>
+        <TextBlock Text="Stereo plugins, in order, before this mix reaches its outputs" Classes="h" FontSize="11"/>
       </StackPanel>
       <Button Grid.Column="1" Content="Add plugin…" Padding="12,4" VerticalAlignment="Top" Click="OnAddInsert"/>
     </Grid>

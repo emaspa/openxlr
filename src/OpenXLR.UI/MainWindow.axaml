@@ -282,13 +282,13 @@
                      VerticalAlignment="Center" HorizontalAlignment="Right"/>
         </Grid>
 
-        <!-- XLR 1 plugin inserts: LV2 plugins in the mic path, after the
+        <!-- XLR 1 plugin inserts: plugins in the mic path, after the
              software low cut and ClipGuard, heard by every mix. The picker
              and each plugin's controls open in their own windows. -->
         <StackPanel Spacing="4" Margin="0,4,0,0" IsVisible="{Binding HasMixer}">
           <Grid ColumnDefinitions="90,*,Auto">
             <TextBlock Text="Inserts" Classes="h" VerticalAlignment="Center"
-                       ToolTip.Tip="LV2 plugins processing XLR 1 before it reaches the mixes"/>
+                       ToolTip.Tip="Plugins processing XLR 1 before it reaches the mixes"/>
             <TextBlock Grid.Column="1" Text="{Binding Inserts.Summary}" Classes="h" FontSize="11" VerticalAlignment="Center"/>
             <Button Grid.Column="2" Content="Add plugin…" Padding="12,3" FontSize="12" MinHeight="0" Click="OnAddInsert"/>
           </Grid>
@@ -343,7 +343,7 @@
         <StackPanel Spacing="4" Margin="0,4,0,0" IsVisible="{Binding HasMixer}">
           <Grid ColumnDefinitions="90,*,Auto">
             <TextBlock Text="Inserts" Classes="h" VerticalAlignment="Center"
-                       ToolTip.Tip="LV2 plugins processing XLR 2 before it reaches the mixes"/>
+                       ToolTip.Tip="Plugins processing XLR 2 before it reaches the mixes"/>
             <TextBlock Grid.Column="1" Text="{Binding Inserts2.Summary}" Classes="h" FontSize="11" VerticalAlignment="Center"/>
             <Button Grid.Column="2" Content="Add plugin…" Padding="12,3" FontSize="12" MinHeight="0" Tag="xlr2" Click="OnAddInsert"/>
           </Grid>
@@ -563,7 +563,7 @@
                   <ToggleButton Content="Mute mix" Classes="mute" IsChecked="{Binding Muted, Mode=TwoWay}"/>
                   <Button Content="{Binding Inserts.ButtonText}" HorizontalAlignment="Stretch"
                           HorizontalContentAlignment="Center" Padding="8,4" FontSize="12" Click="OnMixInserts"
-                          ToolTip.Tip="Stereo LV2 plugins processing this mix before it reaches its outputs"/>
+                          ToolTip.Tip="Stereo plugins processing this mix before it reaches its outputs"/>
                   <!-- the chain at a glance: LED, name, bypass, controls; adding,
                        ordering and removing live in the chain window -->
                   <ItemsControl ItemsSource="{Binding Inserts.Items}" IsVisible="{Binding Inserts.HasItems}">
