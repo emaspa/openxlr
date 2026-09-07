@@ -46,7 +46,12 @@
           <TextBlock Text="{Binding Label}" FontSize="16" FontWeight="Bold" Foreground="#e6e9f0"/>
           <TextBlock Text="{Binding StateText}" Classes="h" VerticalAlignment="Center"/>
         </StackPanel>
-        <TextBlock Text="{Binding Plugin}" Classes="h" FontSize="11"/>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Text="{Binding Plugin}" Classes="h" FontSize="11" VerticalAlignment="Center"/>
+          <Border Background="#2a2e38" CornerRadius="4" Padding="6,1" VerticalAlignment="Center">
+            <TextBlock Text="{Binding Format}" Foreground="#8b93a7" FontSize="10" FontWeight="SemiBold"/>
+          </Border>
+        </StackPanel>
         <TextBlock Text="{Binding Error}" Foreground="#e0a05a" FontSize="11" IsVisible="{Binding HasError}"/>
       </StackPanel>
       <!-- Every button lives on the right, in two rows when this plugin can

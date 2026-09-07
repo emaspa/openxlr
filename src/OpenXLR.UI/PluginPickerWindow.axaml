@@ -30,6 +30,10 @@
           <StackPanel Orientation="Horizontal" Spacing="10">
             <TextBlock Text="{Binding Name}" Foreground="#e6e9f0"/>
             <TextBlock Text="{Binding Category}" Classes="h" FontSize="11" VerticalAlignment="Center"/>
+            <!-- the format: the same plugin often ships as both -->
+            <Border Background="#2a2e38" CornerRadius="4" Padding="6,1" VerticalAlignment="Center">
+              <TextBlock Text="{Binding Format}" Foreground="#8b93a7" FontSize="10" FontWeight="SemiBold"/>
+            </Border>
           </StackPanel>
         </DataTemplate>
       </ListBox.ItemTemplate>

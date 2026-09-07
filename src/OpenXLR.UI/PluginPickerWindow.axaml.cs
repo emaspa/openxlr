@@ -43,7 +43,8 @@ public partial class PluginPickerWindow : Window
             ? vm.PluginChoices.ToList()
             : vm.PluginChoices.Where(p =>
                 p.Name.Contains(q, StringComparison.OrdinalIgnoreCase) ||
-                p.Category.Contains(q, StringComparison.OrdinalIgnoreCase)).ToList();
+                p.Category.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                p.Format.Contains(q, StringComparison.OrdinalIgnoreCase)).ToList();
     }
 
     private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e)

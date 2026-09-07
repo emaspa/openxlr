@@ -12,7 +12,10 @@ namespace OpenXLR.UI;
 public sealed record PluginChoice(string Uri, string Name, string Category, JsonNode Params,
     bool NativeEditorAvailable = false, bool NativeEditorSupported = false, string Kind = "lv2")
 {
-    public override string ToString() => Category.Length > 0 ? $"{Name}  ({Category})" : Name;
+    /// <summary>The format, as the picker shows it: two plugins can share a name and differ in nothing else.</summary>
+    public string Format => Kind.ToUpperInvariant();
+
+    public override string ToString() => Category.Length > 0 ? $"{Name}  ({Category}, {Format})" : $"{Name}  ({Format})";
 }
 
 /// <summary>
@@ -46,8 +49,8 @@ public sealed class InsertsViewModel : ViewModelBase
 
     /// <summary>Picker header: which plugins fit this chain.</summary>
     public string PickerHint => _channels == 1
-        ? "LV2 plugins that fit the mono mic path (one input, one output)"
-        : "LV2 plugins that fit a stereo mix (two inputs, two outputs)";
+        ? "Plugins that fit the mono mic path (one input, one output)"
+        : "Plugins that fit a stereo mix (two inputs, two outputs)";
 
     public ObservableCollection<InsertViewModel> Items { get; } = [];
     public ObservableCollection<PluginChoice> PluginChoices { get; } = [];
@@ -117,8 +120,8 @@ public sealed class InsertsViewModel : ViewModelBase
             }
             string width = _channels == 1 ? "mono" : "stereo";
             Note = PluginChoices.Count == 0
-                ? $"No {width} LV2 plugins found (install e.g. lsp-plugins-lv2 or x42-plugins)"
-                : $"{PluginChoices.Count} {width} LV2 plugins available";
+                ? $"No {width} plugins found (install e.g. lsp-plugins-lv2 or x42-plugins)"
+                : $"{PluginChoices.Count} {width} plugins available";
         });
     }
 
@@ -239,6 +242,7 @@ public sealed class InsertViewModel : ViewModelBase
     public string Plugin { get; }
     public string Label { get; }
     public string Kind { get; }
+    public string Format => Kind.ToUpperInvariant();
 
     /// <summary>The channel chain this insert belongs to (row buttons route through it).</summary>
     public InsertsViewModel Owner => _owner;
