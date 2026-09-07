@@ -243,9 +243,11 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 bool cg = ch.InputPair == 0 && _softClipGuard && _clipGuardApplicable;
                 List<InsertDefinition> inserts = IsInsertChannel(ch.Id) ? InsertsFor(ch.Id) : [];
                 bool anyInsert = inserts.Any(i => !i.Bypass && Lv2Catalog.Find(i.Plugin) is not null);
+                bool givenUp = anyInsert && _restarts.Blocked(ch.Id);
+                if (givenUp) { inserts = []; anyInsert = false; _insertErrors[ch.Id] = RestartPolicy.GivenUp; }
                 if (lc || cg || anyInsert)
                 {
-                    _insertErrors.Remove(ch.Id);
+                    if (!givenUp) _insertErrors.Remove(ch.Id);
                     FilterHandle chain;
                     string chainId = $"{ch.Id}_{generation}";
                     try
@@ -401,10 +403,13 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 string key = MixKey(mix);
                 if (_chains.TryGetValue(key, out FilterHandle? c) && !c.IsAlive)
                 {
-                    WireMixChainLocked(mix);
+                    _restarts.Failed(key);
+                    WireMixChainLocked(mix);   // leaves the chain off once it has failed enough
                     changed = true;
                 }
             }
+            foreach ((string key, FilterHandle chain) in _chains)
+                if (!key.StartsWith("mix:", StringComparison.Ordinal) && !chain.IsAlive) _restarts.Failed(key);
             bool inputBroken = _chains.Where(e => !e.Key.StartsWith("mix:", StringComparison.Ordinal)).Any(e => !e.Value.IsAlive)
                 || _chainOuts.Values.Any(l => _pw.EnsureLinks(l) == LinkHealth.Broken);
             if (inputBroken) { WireInputFeedsLocked(); changed = true; }
@@ -505,6 +510,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     // running without its inserts.
     private readonly Dictionary<string, List<InsertDefinition>> _inserts = new();
     private readonly Dictionary<string, string> _insertErrors = new();
+    private readonly RestartPolicy _restarts = new(() => Environment.TickCount64);
 
     /// <summary>Insert keys: the mono XLR inputs (Aux In is stereo) and "mix:&lt;id&gt;" for every mix.</summary>
     private bool IsInsertChannel(string key) => key is "xlr1" or "xlr2" || MixForKey(key) is not null;
@@ -568,7 +574,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
 
         List<InsertDefinition> inserts = InsertsFor(key);
         bool anyInsert = inserts.Any(i => !i.Bypass && Lv2Catalog.Find(i.Plugin) is { } p && p.AudioIns >= 2 && p.AudioOuts >= 2);
-        if (anyInsert)
+        if (anyInsert && _restarts.Blocked(key)) _insertErrors[key] = RestartPolicy.GivenUp;
+        else if (anyInsert)
         {
             try
             {
@@ -714,6 +721,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
 
     private void RewireInsertKeyLocked(string key)
     {
+        _restarts.Forget(key);
         if (MixForKey(key) is MixDefinition mix) WireMixChainLocked(mix);
         else if (IsInsertChannel(key)) WireInputFeedsLocked();
     }
@@ -788,6 +796,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 return new InsertStatus(i,
                     Lv2Catalog.Find(i.Plugin) is null ? "plugin not installed"
                     : !i.Bypass && _insertErrors.TryGetValue(channel, out string? err) ? err
+                    : host?.EditorStalled == true ? "the plugin's editor stopped answering; its controls are frozen while audio keeps playing"
                     : null, host?.Meters, host?.IsRunning == true);
             })];
         }

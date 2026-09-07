@@ -222,15 +222,18 @@ public sealed class MixerService : IHostedService, IDisposable
                     if (restoredSinks.Count > 0)
                         _log.LogWarning("put {n} OpenXLR sink(s) back to full volume, unmuted ({names}); something outside OpenXLR had changed them",
                             restoredSinks.Count, string.Join(", ", restoredSinks));
-                    if (_mixer.SyncStreams() | _mixer.SyncDeviceVolumes() | _mixer.EnforceDefaults()
-                        | _mixer.EnsureInputFeeds() | _mixer.EnsureAuxRoute()
-                        | _mixer.EnsureFilterRoutes()
-                        | _mixer.EnsureMonitorRoutes()) Changed?.Invoke();
+                    // Collect what the plugins' own editors changed before the
+                    // healing pass below, so a chain that is about to be rebuilt
+                    // comes back with the values its editor last showed.
                     if (_mixer.SyncPluginControls())
                     {
                         ScheduleSave();
                         Changed?.Invoke();
                     }
+                    if (_mixer.SyncStreams() | _mixer.SyncDeviceVolumes() | _mixer.EnforceDefaults()
+                        | _mixer.EnsureInputFeeds() | _mixer.EnsureAuxRoute()
+                        | _mixer.EnsureFilterRoutes()
+                        | _mixer.EnsureMonitorRoutes()) Changed?.Invoke();
                     SyncOutputSelectors();
                     // Once a minute: is the PulseAudio server close to its
                     // open-file limit? Cheap (one /proc directory listing).
