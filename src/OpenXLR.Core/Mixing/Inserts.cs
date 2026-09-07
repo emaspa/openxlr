@@ -23,6 +23,9 @@ public sealed record InsertDefinition
 
     public bool Bypass { get; init; }
 
+    /// <summary>Explicit opt-in; omitted in old settings and profiles means filter-chain.</summary>
+    public bool NativeHost { get; init; }
+
     /// <summary>Control values by port symbol; ports not listed keep defaults.</summary>
     public Dictionary<string, double> Params { get; init; } = [];
 }

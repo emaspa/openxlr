@@ -572,7 +572,7 @@ public sealed class PipeWireAdapter
     private FilterHandle CreateFilterChain(string sinkName, string srcName, string description, int channels,
         int lowCutHz, bool clipGuard, IReadOnlyList<InsertDefinition>? inserts)
     {
-        if (inserts?.Any(i => !i.Bypass && Lv2Catalog.Find(i.Plugin)?.NativeEditorAvailable == true) == true)
+        if (inserts?.Any(i => !i.Bypass && i.NativeHost) == true)
             return CreateHostedChain(sinkName, srcName, description, channels, lowCutHz, clipGuard, inserts);
         if (clipGuard)
         {
@@ -677,8 +677,10 @@ public sealed class PipeWireAdapter
                     throw new InvalidOperationException("Plugin is unavailable or requires unsupported host features.");
                 string node = $"{sinkName}_stage_{insertStages.Count}";
                 FilterHandle stage;
-                if (info.NativeEditorAvailable)
+                if (insert.NativeHost)
                 {
+                    if (!info.NativeEditorAvailable)
+                        throw new InvalidOperationException($"Native hosting is unavailable for {insert.Plugin}; install the optional helper or select filter-chain.");
                     var host = new NativePluginHost(insert, node, channels, rate);
                     _nativeHosts.Add(host);
                     stage = new(node, node, node, host.Process) { NativeHost = host };

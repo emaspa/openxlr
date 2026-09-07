@@ -96,6 +96,11 @@ a bare `error` message, so an editor can wait for the acknowledgement:
 | `resetDevice` | none | write the firmware defaults back to a device without settings memory and forget its last settings (an error until the daemon has seen the device connect after a power cycle once); on the Wave XLR Pro, which keeps its own settings, write OpenXLR's baseline instead: gain 30 dB on both inputs, every processing stage and phantom off, headphones and aux level at half, the crossfade fully on PC, routing untouched, refused while the gain lock is on. The capabilities say `builtInDefaults` when a model has a baseline |
 | `getDiagnostics` | none | vendor block dump for bug reports |
 
+Insert definitions optionally carry `nativeHost: true` to select the native
+LV2 helper for that insert. Missing or false keeps PipeWire filter-chain, even
+when the helper is installed. Unsupported native selections are rejected.
+Changing this choice via `setInserts` rebuilds the chain and can interrupt audio.
+
 The OpenDeck plugin in `plugin/` is a client of this API; the command
 handler is `WebSocketHub.cs` and the message shapes are in
 `Protocol.cs`, both under `src/OpenXLR.Daemon/`.

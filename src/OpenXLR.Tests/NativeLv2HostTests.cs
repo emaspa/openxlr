@@ -76,6 +76,9 @@ public sealed class NativeLv2HostTests
         Assert.False(insert.NativeEditorAvailable);
 
         insert.ApplyFromDaemon(definition, error: null, nativeHostRunning: true);
+        Assert.False(insert.NativeEditorAvailable); // A live-process flag does not opt an old insert in.
+        definition["nativeHost"] = true;
+        insert.ApplyFromDaemon(definition, error: null, nativeHostRunning: true);
         Assert.True(insert.NativeEditorAvailable);
 
         insert.ApplyFromDaemon(definition, error: "chain build failed", nativeHostRunning: true);
@@ -84,5 +87,48 @@ public sealed class NativeLv2HostTests
         definition["bypass"] = true;
         insert.ApplyFromDaemon(definition, error: null, nativeHostRunning: true);
         Assert.False(insert.NativeEditorAvailable);
+    }
+
+    [Fact]
+    public void OldInsertJsonKeepsFilterChainAndExplicitChoiceRoundTrips()
+    {
+        var json = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        var old = JsonSerializer.Deserialize<InsertDefinition>("""{"id":"x","kind":"lv2","plugin":"urn:test"}""", json)!;
+        Assert.False(old.NativeHost);
+        var selected = old with { NativeHost = true };
+        Assert.True(JsonSerializer.Deserialize<InsertDefinition>(JsonSerializer.Serialize(selected, json), json)!.NativeHost);
+    }
+
+    [Fact]
+    public void SettingsPreservePerInsertHostChoice()
+    {
+        string dir = Directory.CreateTempSubdirectory("openxlr-host-choice-").FullName;
+        try
+        {
+            var legacy = new InsertDefinition { Id = "old", Kind = "lv2", Plugin = "urn:test" };
+            var settings = new MixerSettings { Inserts = new() { ["mix:stream"] = [legacy, legacy with { Id = "new", NativeHost = true }] } };
+            string path = Path.Combine(dir, "mixer.json");
+            Assert.Null(settings.Save(path));
+            var loaded = MixerSettings.Load(path)!.Inserts["mix:stream"];
+            Assert.False(loaded[0].NativeHost);
+            Assert.True(loaded[1].NativeHost);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public async Task UiPreservesExplicitChoiceAndCanDisableItWhenHelperIsUnavailable()
+    {
+        await using var client = new DaemonClient();
+        var owner = new InsertsViewModel(client, "xlr1");
+        owner.Apply(JsonNode.Parse("""[{"insert":{"id":"x","kind":"lv2","plugin":"urn:test","nativeHost":true},"error":"helper unavailable"}]"""));
+        var insert = Assert.Single(owner.Items);
+        Assert.True(insert.NativeHost);
+        Assert.True(insert.CanChooseNativeHost);
+        Assert.False(insert.NativeEditorAvailable);
+        Assert.Contains("\"nativeHost\":true", JsonSerializer.Serialize(insert.ToPayload()));
+        owner.Apply(JsonNode.Parse("""[{"insert":{"id":"x","kind":"lv2","plugin":"urn:test"}}]"""));
+        Assert.False(insert.NativeHost);
+        Assert.Contains("\"nativeHost\":false", JsonSerializer.Serialize(insert.ToPayload()));
     }
 }

@@ -1,7 +1,7 @@
 # Optional LV2 editor host
 
 The default .NET build does not invoke make or require a C compiler.
-Plugins continue to use PipeWire filter-chain when the helper is absent.
+Inserts use PipeWire filter-chain by default, even when the helper is installed.
 Build and copy the optional helper with:
 
 ```sh
@@ -13,8 +13,14 @@ development headers, lilv development headers and X11 development headers.
 The helper can also be built with `make -C native` and installed beside
 the daemon separately. Distribution packages are not changed by this PR.
 
-For a supported plugin exposing an X11 editor, the live instance runs in an
-isolated PipeWire filter process. Other plugins remain in filter-chain, also
+For a supported plugin exposing an X11 editor, enable **Native host** in its
+controls window to run that insert in an isolated PipeWire filter process.
+The choice is stored as `nativeHost: true` in the insert definition; old
+settings and profiles without the field keep filter-chain. An explicitly
+selected native host that is unavailable reports an error instead of silently
+changing hosts. Disable the choice to return to filter-chain. Switching hosts
+rebuilds the chain and can briefly interrupt audio.
+Other inserts remain in filter-chain, also
 inside mixed chains. The existing generated controls window gains a Plugin UI
 button when the daemon advertises an available native editor. On Wayland the
 editor requires XWayland. The catalog checks required features on both the DSP

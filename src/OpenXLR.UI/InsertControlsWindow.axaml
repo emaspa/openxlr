@@ -48,6 +48,9 @@
         </StackPanel>
         <TextBlock Text="{Binding Plugin}" Classes="h" FontSize="11"/>
         <TextBlock Text="{Binding Error}" Foreground="#e0a05a" FontSize="11" IsVisible="{Binding HasError}"/>
+        <ToggleButton Content="Native host" IsChecked="{Binding NativeHost, Mode=TwoWay}"
+                      IsVisible="{Binding CanChooseNativeHost}" Padding="12,4" HorizontalAlignment="Left"
+                      ToolTip.Tip="Use the optional native host for this insert. Switching rebuilds its chain and may briefly interrupt audio."/>
       </StackPanel>
       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
         <Button Content="Plugin UI" Padding="12,4" Click="OnNativeEditor"

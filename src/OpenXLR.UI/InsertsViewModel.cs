@@ -205,6 +205,11 @@ public sealed class InsertsViewModel : ViewModelBase
 
     internal bool Applying => _applying;
 
+    internal void SendHostChoice()
+    {
+        if (!_applying) _ = _client.SetInsertsAsync(_channel, Snapshot());
+    }
+
     /// <summary>The current chain as the daemon wants it, minus an optional id.</summary>
     private List<object> Snapshot(IEnumerable<InsertViewModel>? order = null, string? skip = null)
         => [.. (order ?? Items).Where(i => i.Id != skip).Select(i => (object)i.ToPayload())];
@@ -232,7 +237,23 @@ public sealed class InsertViewModel : ViewModelBase
     /// <summary>The channel chain this insert belongs to (row buttons route through it).</summary>
     public InsertsViewModel Owner => _owner;
     public bool NativeEditorSupported => _owner.PluginChoices.Any(p => p.Uri == Plugin && p.NativeEditorAvailable);
-    public bool NativeEditorAvailable => NativeEditorSupported && !Bypass && !HasError && NativeHostRunning;
+    public bool NativeEditorAvailable => NativeEditorSupported && NativeHost && !Bypass && !HasError && NativeHostRunning;
+
+    private bool _nativeHost;
+    public bool NativeHost
+    {
+        get => _nativeHost;
+        set
+        {
+            if (Set(ref _nativeHost, value))
+            {
+                Raise(nameof(NativeEditorAvailable));
+                Raise(nameof(CanChooseNativeHost));
+                _owner.SendHostChoice();
+            }
+        }
+    }
+    public bool CanChooseNativeHost => NativeEditorSupported || NativeHost;
 
     private readonly Dictionary<string, double> _params = [];
 
@@ -334,6 +355,9 @@ public sealed class InsertViewModel : ViewModelBase
     public void ApplyFromDaemon(JsonNode ins, string? error, bool nativeHostRunning)
     {
         _bypass = ins["bypass"]?.GetValue<bool>() ?? false;
+        _nativeHost = ins["nativeHost"]?.GetValue<bool>() ?? false;
+        Raise(nameof(NativeHost));
+        Raise(nameof(CanChooseNativeHost));
         Raise(nameof(Bypass));
         Raise(nameof(StateText));
         Raise(nameof(IsActive));
@@ -364,6 +388,7 @@ public sealed class InsertViewModel : ViewModelBase
     private void BuildParams()
     {
         Raise(nameof(NativeEditorSupported));
+        Raise(nameof(CanChooseNativeHost));
         Raise(nameof(NativeEditorAvailable));
         if (_owner.ParamsFor(Plugin) is not JsonArray arr) return;
         foreach (JsonNode? p in arr)
@@ -394,6 +419,7 @@ public sealed class InsertViewModel : ViewModelBase
         ["plugin"] = Plugin,
         ["label"] = Label,
         ["bypass"] = _bypass,
+        ["nativeHost"] = _nativeHost,
         ["params"] = new Dictionary<string, double>(_params),
     };
 }
