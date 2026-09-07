@@ -162,7 +162,8 @@ void *host_impl(const Host *h) { return h->impl; }
 void host_set_impl(Host *h, void *impl) { h->impl = impl; }
 void host_set_has_editor(Host *h, bool has_editor) { h->has_editor = has_editor; }
 void host_set_plugin_name(Host *h, const char *name) {
-  if (name && name[0])
+  // A scan has no host: it describes a bundle's plugins without running one.
+  if (h && name && name[0])
     snprintf(h->plugin_name, sizeof(h->plugin_name), "%s", name);
 }
 uint32_t host_control_count(const Host *h) { return h->control_count; }

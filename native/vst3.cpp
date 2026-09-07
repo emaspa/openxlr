@@ -737,7 +737,9 @@ bool instantiate(Vst3 *v, const TUID cid) {
     fputs("the plugin could not be created\n", stderr);
     return false;
   }
-  for (int32 i = 0; i < v->factory->countClasses(); ++i) {
+  // The name its window is titled after. A scan runs without a host, and
+  // asks the factory about every class itself, so it does not come here.
+  for (int32 i = 0; v->h && i < v->factory->countClasses(); ++i) {
     PClassInfo info;
     if (v->factory->getClassInfo(i, &info) == kResultOk &&
         memcmp(info.cid, cid, sizeof(TUID)) == 0) {
