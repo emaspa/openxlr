@@ -133,7 +133,8 @@ code itself: the host describes each bundle in a process of its own, so a
 plugin that misbehaves while being asked about its ports costs that
 bundle and nothing else, and what it learns is kept until the bundle
 changes. Windows VST3 plugins come through yabridge, which presents them
-as ordinary bundles under `~/.vst3`. VST2 plugins are not supported.
+as ordinary bundles under `~/.vst3`; the manual has the Wine and yabridge
+setup for each distribution. VST2 plugins are not supported.
 
 Installing a plugin is a pick in the picker or in Options: a file or a
 folder the user downloaded. The daemon works out what it is from its

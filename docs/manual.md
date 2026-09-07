@@ -228,14 +228,65 @@ other means, or copied into `/usr/lib/clap`, `/usr/lib/vst3` or
 restart (`LV2_PATH`, `CLAP_PATH` and `VST3_PATH` override the places
 searched).
 
-Windows VST3 and CLAP plugins run through
+<a name="windows-plugins"></a>
+**Windows VST3 and CLAP plugins.** They run through
 [yabridge](https://github.com/robbert-vdh/yabridge), which wraps each one
-in a bundle that OpenXLR loads like any other. Install `yabridge` and
-`wine` from your distribution (Arch has both; Fedora has yabridge in the
-`patrickl/yabridge` Copr; on Debian and Ubuntu, unpack the release
-archive from its GitHub page into `~/.local/share/yabridge` and put
-`yabridgectl` on your PATH). Then run the plugin's Windows installer with
-Wine:
+in a bundle that OpenXLR loads like any other. Two things have to be
+installed first: Wine, which runs the plugin, and yabridge, which bridges
+it. The Options window says which of the two it can see.
+
+Arch, and anything built on it such as Manjaro, EndeavourOS and CachyOS,
+has both in its own repositories:
+
+```sh
+sudo pacman -S wine yabridge yabridgectl
+```
+
+NixOS has both as well. Add `wine`, `yabridge` and `yabridgectl` to your
+packages, or try them first with:
+
+```sh
+nix shell nixpkgs#wine nixpkgs#yabridge nixpkgs#yabridgectl
+```
+
+Fedora has Wine but not yabridge; the community repositories that carried
+it have gone stale. Install Wine from Fedora and yabridge from its own
+release:
+
+```sh
+sudo dnf install wine
+```
+
+Debian, Ubuntu, Linux Mint and Pop!_OS also need yabridge from its own
+release. Their own `wine` package works; yabridge's author recommends
+Wine Staging from the [WineHQ repositories](https://wiki.winehq.org/Download)
+if a plugin misbehaves:
+
+```sh
+sudo apt install wine
+```
+
+On those, and on any distribution without a package, take the tarball
+from yabridge's [releases page](https://github.com/robbert-vdh/yabridge/releases)
+and unpack it into `~/.local/share`, which is where its own instructions
+put it. With 5.1.1, the current release:
+
+```sh
+tar -C ~/.local/share -xavf ~/Downloads/yabridge-5.1.1.tar.gz
+```
+
+OpenXLR looks there, so nothing else is needed for it: close the Options
+window and open it again, and the card will say that yabridge is
+installed. To run `yabridgectl` yourself as well, add its directory to
+your PATH:
+
+```sh
+echo 'export PATH="$PATH:$HOME/.local/share/yabridge"' >> ~/.bashrc
+```
+
+With fish, `fish_add_path ~/.local/share/yabridge` does the same.
+
+With both in place, run the plugin's Windows installer with Wine:
 
 ```sh
 wine ~/Downloads/PluginSetup.exe
@@ -248,6 +299,10 @@ Options window says how many folders are bridged; "Sync Windows plugins"
 bridges again after another installer has run. A plugin that comes as a
 bare Windows `.vst3` or `.clap` file works the same way when picked as a
 file. VST2 `.dll` files are left out, since OpenXLR cannot load VST2.
+
+Wine keeps its Windows drive in `~/.wine` unless `WINEPREFIX` says
+otherwise, and a plugin installed into another prefix works the same way:
+point "Install folder…" at wherever the installer put its VST3 folder.
 
 The picker marks each plugin with its format, since the same plugin often
 ships in more than one, and its LV2, CLAP and VST3 buttons narrow the list

@@ -20,7 +20,12 @@ public static class PluginInstall
     /// <summary>A bundle of two hundred plugins takes a quarter of a minute to describe; yabridge's sync is quick.</summary>
     private static readonly TimeSpan InstallTimeout = TimeSpan.FromMinutes(4);
 
-    public const string Manual = "https://github.com/emaspa/openxlr/blob/main/docs/manual.md#install-plugins";
+    /// <summary>
+    /// The manual on Windows plugins: the button sits beside the yabridge
+    /// row, and that is the part of installing a plugin that needs reading.
+    /// Installing plugins in general is the paragraph above it.
+    /// </summary>
+    public const string Manual = "https://github.com/emaspa/openxlr/blob/main/docs/manual.md#windows-plugins";
 
     /// <summary>Let the user pick plugin files: .clap, a single-file .vst3, or a Windows plugin.</summary>
     public static async Task<IReadOnlyList<string>> PickFilesAsync(Window owner)

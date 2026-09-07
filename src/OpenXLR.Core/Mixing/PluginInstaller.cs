@@ -73,13 +73,21 @@ public sealed class PluginInstaller
     private static string HomeDirectory(string name)
         => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), name);
 
-    /// <summary>A tool on PATH, or under ~/.local/bin where a tarball install puts it.</summary>
+    /// <summary>
+    /// A tool on PATH, or where a user installs one by hand. The daemon is a
+    /// user service and its PATH is systemd's, not the one a login shell
+    /// builds, so the places a tarball install puts a tool are looked in
+    /// whether or not the user added them to a shell profile: yabridge's own
+    /// instructions unpack it into ~/.local/share/yabridge.
+    /// </summary>
     internal static string? OnPath(string name)
     {
         var directories = new List<string>();
         string? path = Environment.GetEnvironmentVariable("PATH");
         if (!string.IsNullOrEmpty(path)) directories.AddRange(path.Split(':', StringSplitOptions.RemoveEmptyEntries));
         directories.Add(HomeDirectory(Path.Combine(".local", "bin")));
+        directories.Add(HomeDirectory(Path.Combine(".local", "share", "yabridge")));
+        directories.Add("/usr/local/bin");
         foreach (string directory in directories)
         {
             string candidate = Path.Combine(directory, name);

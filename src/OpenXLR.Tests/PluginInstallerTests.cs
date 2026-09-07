@@ -265,6 +265,25 @@ public sealed class PluginInstallerTests : IDisposable
     }
 
     [Fact]
+    public void AToolIsFoundWhereItIsInstalledByHand()
+    {
+        // The daemon is a user service: its PATH is systemd's, not a login
+        // shell's, so a tarball install has to be found without one.
+        string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        string tarball = Path.Combine(home, ".local", "share", "yabridge");
+        string name = "openxlr-test-tool-" + Guid.NewGuid().ToString("N");
+        Assert.Null(PluginInstaller.OnPath(name));
+        Directory.CreateDirectory(tarball);
+        string tool = Path.Combine(tarball, name);
+        try
+        {
+            File.WriteAllText(tool, "#!/bin/sh\n");
+            Assert.Equal(tool, PluginInstaller.OnPath(name));
+        }
+        finally { File.Delete(tool); }
+    }
+
+    [Fact]
     public void TheSetupNamesTheDirectoriesAndWhatIsMissing()
     {
         PluginSetup setup = Installer().Setup();
