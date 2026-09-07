@@ -20,6 +20,40 @@ public sealed class NativeLv2HostTests
         => Assert.Equal(supported, NativePluginHost.SupportsFeatures([feature]));
 
     [Fact]
+    public void AMissingHelperIsReportedAsSuchAndNotAsAPluginFault()
+    {
+        // What a user hit: with the helper gone, every plugin was reported as
+        // unable to host an editor, so the reason looked like the plugin's.
+        var hostable = new PluginInfo("lv2", "urn:test", "Test", "", 1, 1, "in", "out",
+            [], [], ["in"], ["out"]) { HasNativeUi = true };
+        Assert.True(hostable.NativeEditorSupported);
+        Assert.Equal(NativePluginHost.HostInstalled, hostable.NativeEditorAvailable);
+
+        var noEditor = hostable with { HasNativeUi = false };
+        Assert.False(noEditor.NativeEditorSupported);
+        Assert.False(noEditor.NativeEditorAvailable);
+
+        var command = new Command
+        {
+            Cmd = "setInserts",
+            Channel = "xlr1",
+            Inserts = [new InsertDefinition { Id = "a", Kind = "lv2", Plugin = "urn:test", NativeHost = true }],
+        };
+        string? refusal = CommandValidation.Check(command, new Layout(), _ => noEditor);
+        Assert.Contains("no editor the native host can open", refusal);
+    }
+
+    private sealed class Layout : OpenXLR.Core.Mixing.ILayoutInfo
+    {
+        public bool HasChannel(string id) => true;
+        public bool HasMix(string id) => true;
+        public bool IsMonitorFeed(string feed) => true;
+        public bool IsMonitorOutput(string device) => true;
+        public bool IsInsertKey(string key) => true;
+        public int OverrideCount => 0;
+    }
+
+    [Fact]
     public void TheHelperIsPlumbing()
     {
         // Its PipeWire client would otherwise be offered as an application to

@@ -9,9 +9,13 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="OpenXLR.Tests" />
+    <!-- The flag decides whether the helper is built; its presence decides
+         whether it is copied. Without the second half, one ordinary build
+         after a native one deletes the helper from the output again, and
+         every insert set to the native host reports it as unavailable. -->
     <None Include="../../native/openxlr-lv2-host" Link="openxlr-lv2-host"
           CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"
-          Condition="'$(EnableNativeLv2Host)' == 'true' And $([MSBuild]::IsOSPlatform('Linux'))" />
+          Condition="$([MSBuild]::IsOSPlatform('Linux')) And ('$(EnableNativeLv2Host)' == 'true' Or Exists('$(MSBuildThisFileDirectory)../../native/openxlr-lv2-host'))" />
   </ItemGroup>
 
   <Target Name="BuildNativeLv2Host" BeforeTargets="BeforeBuild"

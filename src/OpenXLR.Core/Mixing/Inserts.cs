@@ -67,8 +67,16 @@ public sealed record PluginInfo(
     public bool HasNativeUi { get; init; }
     /// <summary>Required features of the X11 UI selected by the native helper.</summary>
     public IReadOnlyList<string> NativeUiRequiredFeatures { get; init; } = [];
-    public bool NativeEditorAvailable => HasNativeUi
-        && System.IO.File.Exists(NativePluginHost.Executable)
+
+    /// <summary>
+    /// This plugin and its editor are ones the native host knows how to carry.
+    /// A property of the plugin, true whether or not the helper is installed,
+    /// so a machine without the helper can still say what is wrong.
+    /// </summary>
+    public bool NativeEditorSupported => HasNativeUi
         && NativePluginHost.SupportsFeatures(RequiredFeatures)
         && NativePluginHost.SupportsUiFeatures(NativeUiRequiredFeatures);
+
+    /// <summary>Supported, and the helper is here to do it.</summary>
+    public bool NativeEditorAvailable => NativeEditorSupported && NativePluginHost.HostInstalled;
 }

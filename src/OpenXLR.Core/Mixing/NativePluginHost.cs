@@ -49,6 +49,9 @@ internal sealed class NativePluginHost : IDisposable
     private readonly TimeSpan _patience = TimeSpan.FromSeconds(10);
     public IReadOnlyDictionary<string, double> Meters => new Dictionary<string, double>(_meters);
     public static string Executable => Path.Combine(AppContext.BaseDirectory, "openxlr-lv2-host");
+
+    /// <summary>Whether the optional helper was built and installed beside the daemon.</summary>
+    public static bool HostInstalled => File.Exists(Executable);
     /// <summary>
     /// What the helper implements for a plugin's DSP. The list is the same one
     /// native/lv2-host.c checks, and the two have to agree: this side decides

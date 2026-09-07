@@ -103,8 +103,10 @@ public static class CommandValidation
                         if (i.Plugin.Length > MaxUri) return "setInserts: plugin URI too long";
                         PluginInfo? plugin = findPlugin(i.Plugin);
                         if (plugin is null) return $"setInserts: plugin '{Short(i.Plugin)}' is not installed";
+                        if (i.NativeHost && !plugin.NativeEditorSupported)
+                            return $"setInserts: '{plugin.Name}' has no editor the native host can open";
                         if (i.NativeHost && !plugin.NativeEditorAvailable)
-                            return $"setInserts: native hosting is unavailable for '{plugin.Name}'";
+                            return "setInserts: the native LV2 host is not installed on this machine";
                         if (!plugin.Supported)
                             return $"setInserts: '{plugin.Name}' needs {string.Join(", ", plugin.UnsupportedFeatures.Select(Tail))}, which the PipeWire chain does not provide";
                         if (i.Params.Count > MaxParamsPerInsert) return "setInserts: too many parameters";

@@ -9,7 +9,8 @@ using Avalonia.Threading;
 namespace OpenXLR.UI;
 
 /// <summary>A plugin the picker offers (mono in / mono out only for the mic path).</summary>
-public sealed record PluginChoice(string Uri, string Name, string Category, JsonNode Params, bool NativeEditorAvailable = false)
+public sealed record PluginChoice(string Uri, string Name, string Category, JsonNode Params,
+    bool NativeEditorAvailable = false, bool NativeEditorSupported = false)
 {
     public override string ToString() => Category.Length > 0 ? $"{Name}  ({Category})" : Name;
 }
@@ -110,7 +111,8 @@ public sealed class InsertsViewModel : ViewModelBase
                     p["name"]?.GetValue<string>() ?? p["plugin"]!.GetValue<string>(),
                     p["category"]?.GetValue<string>() ?? "",
                     p["params"] ?? new JsonArray(),
-                    p["nativeEditorAvailable"]?.GetValue<bool>() == true));
+                    p["nativeEditorAvailable"]?.GetValue<bool>() == true,
+                    p["nativeEditorSupported"]?.GetValue<bool>() == true));
             }
             string width = _channels == 1 ? "mono" : "stereo";
             Note = PluginChoices.Count == 0
@@ -236,8 +238,18 @@ public sealed class InsertViewModel : ViewModelBase
 
     /// <summary>The channel chain this insert belongs to (row buttons route through it).</summary>
     public InsertsViewModel Owner => _owner;
-    public bool NativeEditorSupported => _owner.PluginChoices.Any(p => p.Uri == Plugin && p.NativeEditorAvailable);
-    public bool NativeEditorAvailable => NativeEditorSupported && NativeHost && !Bypass && !HasError && NativeHostRunning;
+    /// <summary>
+    /// The plugin could be hosted, whether or not the helper is here. A daemon
+    /// that only reports availability is older than this window, and anything
+    /// it calls available is by definition supported.
+    /// </summary>
+    public bool NativeEditorSupported => _owner.PluginChoices.Any(
+        p => p.Uri == Plugin && (p.NativeEditorSupported || p.NativeEditorAvailable));
+
+    /// <summary>The helper is here too, so turning the host on can work.</summary>
+    public bool NativeHostInstalled => _owner.PluginChoices.Any(p => p.Uri == Plugin && p.NativeEditorAvailable);
+
+    public bool NativeEditorAvailable => NativeHostInstalled && NativeHost && !Bypass && !HasError && NativeHostRunning;
 
     private bool _nativeHost;
     public bool NativeHost
@@ -388,6 +400,7 @@ public sealed class InsertViewModel : ViewModelBase
     private void BuildParams()
     {
         Raise(nameof(NativeEditorSupported));
+        Raise(nameof(NativeHostInstalled));
         Raise(nameof(CanChooseNativeHost));
         Raise(nameof(NativeEditorAvailable));
         if (_owner.ParamsFor(Plugin) is not JsonArray arr) return;
