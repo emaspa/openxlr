@@ -78,6 +78,7 @@ struct Host {
   Control controls[MAX_CONTROLS];
   uint32_t control_count;
   bool has_editor;  // the plugin ships one this backend can show
+  char plugin_name[128];  // what the plugin calls itself: the window title
   // PipeWire
   struct pw_main_loop *loop;
   struct pw_filter *filter;
@@ -136,6 +137,7 @@ unsigned long host_window(const Host *h);  // the X window, or 0
 void *host_impl(const Host *h);
 void host_set_impl(Host *h, void *impl);
 void host_set_has_editor(Host *h, bool has_editor);
+void host_set_plugin_name(Host *h, const char *name);
 uint32_t host_control_count(const Host *h);
 Control *host_control_at(Host *h, uint32_t index);
 float control_desired(const Control *c);

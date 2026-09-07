@@ -159,6 +159,10 @@ unsigned long host_window(const Host *h) { return h->window; }
 void *host_impl(const Host *h) { return h->impl; }
 void host_set_impl(Host *h, void *impl) { h->impl = impl; }
 void host_set_has_editor(Host *h, bool has_editor) { h->has_editor = has_editor; }
+void host_set_plugin_name(Host *h, const char *name) {
+  if (name && name[0])
+    snprintf(h->plugin_name, sizeof(h->plugin_name), "%s", name);
+}
 uint32_t host_control_count(const Host *h) { return h->control_count; }
 Control *host_control_at(Host *h, uint32_t index) {
   return index < h->control_count ? &h->controls[index] : NULL;
@@ -308,9 +312,9 @@ static bool open_ui(Host *h) {
   if (h->display) {
     h->window = XCreateSimpleWindow(h->display, DefaultRootWindow(h->display),
                                     0, 0, 900, 600, 0, 0, 0x16181d);
-    char title[64];
-    snprintf(title, sizeof(title), "OpenXLR - Native %s controls",
-             h->backend->name);
+    char title[160];
+    snprintf(title, sizeof(title), "OpenXLR - %s",
+             h->plugin_name[0] ? h->plugin_name : h->backend->name);
     XStoreName(h->display, h->window, title);
     XChangeProperty(h->display, h->window,
                     XInternAtom(h->display, "_OPENXLR_NODE", False), XA_STRING,

@@ -412,6 +412,8 @@ static bool clap_load(Host *h, char **arguments) {
     fprintf(stderr, "the bundle has no plugin %s\n", arguments[1]);
     return false;
   }
+  if (c->plugin->desc && c->plugin->desc->name)
+    host_set_plugin_name(h, c->plugin->desc->name);
   if (!c->plugin->init(c->plugin)) {
     fputs("the plugin refused to initialise\n", stderr);
     return false;

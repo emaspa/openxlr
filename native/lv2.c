@@ -240,6 +240,11 @@ static bool lv2_load(Host *h, char **arguments) {
     fputs("plugin is not installed\n", stderr);
     return false;
   }
+  LilvNode *name = lilv_plugin_get_name(l->plugin);
+  if (name) {
+    host_set_plugin_name(h, lilv_node_as_string(name));
+    lilv_node_free(name);
+  }
   LilvNodes *required = lilv_plugin_get_required_features(l->plugin);
   bool supported = required_features_supported(required, false);
   lilv_nodes_free(required);

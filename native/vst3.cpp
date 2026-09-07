@@ -737,6 +737,14 @@ bool instantiate(Vst3 *v, const TUID cid) {
     fputs("the plugin could not be created\n", stderr);
     return false;
   }
+  for (int32 i = 0; i < v->factory->countClasses(); ++i) {
+    PClassInfo info;
+    if (v->factory->getClassInfo(i, &info) == kResultOk &&
+        memcmp(info.cid, cid, sizeof(TUID)) == 0) {
+      host_set_plugin_name(v->h, info.name);
+      break;
+    }
+  }
   IHostApplication *context = &v->application;
   if (v->component->initialize(context) != kResultOk) {
     fputs("the plugin refused to initialise\n", stderr);
