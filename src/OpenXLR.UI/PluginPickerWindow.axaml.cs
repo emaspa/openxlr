@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
 using Avalonia.Controls;
@@ -35,16 +36,30 @@ public partial class PluginPickerWindow : Window
 
     private void OnCatalogChanged(object? sender, NotifyCollectionChangedEventArgs e) => Refresh();
 
+    private void OnFormatToggled(object? sender, RoutedEventArgs e) => Refresh();
+
+    /// <summary>
+    /// The list is what matches the search, of the formats whose buttons are
+    /// pressed. No button pressed means every format, so the buttons narrow
+    /// the list and never empty it by default.
+    /// </summary>
+    public static IEnumerable<PluginChoice> Matching(IEnumerable<PluginChoice> choices, string query,
+        bool lv2, bool clap)
+    {
+        string q = query.Trim();
+        return choices.Where(p =>
+            (!lv2 && !clap || lv2 && p.Kind == "lv2" || clap && p.Kind == "clap") &&
+            (q.Length == 0 ||
+             p.Name.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+             p.Category.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+             p.Format.Contains(q, StringComparison.OrdinalIgnoreCase)));
+    }
+
     private void Refresh()
     {
         if (DataContext is not InsertsViewModel vm) return;
-        string q = (Filter.Text ?? "").Trim();
-        List.ItemsSource = string.IsNullOrEmpty(q)
-            ? vm.PluginChoices.ToList()
-            : vm.PluginChoices.Where(p =>
-                p.Name.Contains(q, StringComparison.OrdinalIgnoreCase) ||
-                p.Category.Contains(q, StringComparison.OrdinalIgnoreCase) ||
-                p.Format.Contains(q, StringComparison.OrdinalIgnoreCase)).ToList();
+        List.ItemsSource = Matching(vm.PluginChoices, Filter.Text ?? "",
+            OnlyLv2.IsChecked == true, OnlyClap.IsChecked == true).ToList();
     }
 
     private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e)

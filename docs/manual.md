@@ -211,6 +211,21 @@ plugin's own editor can be opened as well, with the native host described
 in 3.12. CLAP plugins appear in the same picker and always run in that
 host. VST plugins cannot be loaded.
 
+To install plugins, use your distribution's packages or copy the bundles
+into your home directory: LV2 bundles go in `~/.lv2` or `/usr/lib/lv2`,
+CLAP bundles in `~/.clap` or `/usr/lib/clap` (`LV2_PATH` and `CLAP_PATH`
+override those). On Arch, `lsp-plugins-lv2` and `x42-plugins` cover the
+microphone path well, and `dragonfly-reverb-clap`, `dpf-plugins-clap` and
+`elephantdsp-roomreverb-clap` are CLAP effects for a mix. The daemon reads
+both catalogues once, when it starts, so restart it after installing:
+
+```sh
+systemctl --user restart openxlr-daemon.service
+```
+
+The picker marks each plugin with its format, since the same plugin often
+ships as both, and its LV2 and CLAP buttons narrow the list to one of them.
+
 <a name="profiles"></a>
 ### 3.6 Save and recall a scene
 

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using OpenXLR.Core.Mixing;
 using OpenXLR.Daemon;
+using OpenXLR.UI;
 
 namespace OpenXLR.Tests;
 
@@ -112,6 +113,25 @@ public sealed class ClapCatalogTests
         // LV2 insert, so the answer is the same on a machine without the host.
         command.Inserts[0] = command.Inserts[0] with { Kind = "lv2", Params = new() { ["99"] = 1 } };
         Assert.Contains("has no control", CommandValidation.Check(command, new Layout(), _ => reverb));
+    }
+
+    [Fact]
+    public void ThePickersFormatButtonsNarrowTheListAndNeverEmptyItByDefault()
+    {
+        var empty = new System.Text.Json.Nodes.JsonArray();
+        PluginChoice[] choices =
+        [
+            new("urn:a", "Dragonfly Hall Reverb", "Reverb", empty, Kind: "lv2"),
+            new("vendor.hall", "Dragonfly Hall Reverb", "Reverb", empty, Kind: "clap"),
+            new("urn:b", "LSP Compressor", "Compressor", empty, Kind: "lv2"),
+        ];
+        Assert.Equal(3, PluginPickerWindow.Matching(choices, "", lv2: false, clap: false).Count());
+        Assert.Equal(["vendor.hall"], PluginPickerWindow.Matching(choices, "", lv2: false, clap: true).Select(c => c.Uri));
+        Assert.Equal(2, PluginPickerWindow.Matching(choices, "", lv2: true, clap: false).Count());
+        Assert.Equal(3, PluginPickerWindow.Matching(choices, "", lv2: true, clap: true).Count());
+        // The search and the buttons combine, and the search matches the format too.
+        Assert.Equal(["urn:a"], PluginPickerWindow.Matching(choices, "hall", lv2: true, clap: false).Select(c => c.Uri));
+        Assert.Equal(["vendor.hall"], PluginPickerWindow.Matching(choices, "clap", lv2: false, clap: false).Select(c => c.Uri));
     }
 
     private sealed class Layout : ILayoutInfo
