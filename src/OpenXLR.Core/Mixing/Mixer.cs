@@ -783,11 +783,15 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         var result = new Dictionary<string, IReadOnlyList<InsertStatus>>();
         foreach ((string channel, List<InsertDefinition> list) in _inserts)
         {
-            result[channel] = [.. list.Select(i => new InsertStatus(i,
-                Lv2Catalog.Find(i.Plugin) is null ? "plugin not installed"
-                : !i.Bypass && _insertErrors.TryGetValue(channel, out string? err) ? err
-                : null, _chains.GetValueOrDefault(channel)?.InsertStages
-                    .FirstOrDefault(stage => stage.Id == i.Id).Stage?.NativeHost?.Meters))];
+            result[channel] = [.. list.Select(i =>
+            {
+                NativePluginHost? host = _chains.GetValueOrDefault(channel)?.InsertStages
+                    .FirstOrDefault(stage => stage.Id == i.Id).Stage?.NativeHost;
+                return new InsertStatus(i,
+                    Lv2Catalog.Find(i.Plugin) is null ? "plugin not installed"
+                    : !i.Bypass && _insertErrors.TryGetValue(channel, out string? err) ? err
+                    : null, host?.Meters, host?.IsRunning == true);
+            })];
         }
         return result;
     }

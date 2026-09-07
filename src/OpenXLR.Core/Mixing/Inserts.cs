@@ -29,7 +29,8 @@ public sealed record InsertDefinition
 
 /// <summary>An insert as pushed to clients: its definition plus live status.</summary>
 public sealed record InsertStatus(InsertDefinition Insert, string? Error,
-    IReadOnlyDictionary<string, double>? Meters = null);
+    IReadOnlyDictionary<string, double>? Meters = null,
+    bool NativeHostRunning = false);
 
 /// <summary>A control port of a plugin, enough to build a sensible slider.</summary>
 public sealed record PluginParam(
@@ -61,7 +62,10 @@ public sealed record PluginInfo(
 
     public bool Supported => UnsupportedFeatures.Count == 0;
     public bool HasNativeUi { get; init; }
+    /// <summary>Required features of the X11 UI selected by the native helper.</summary>
+    public IReadOnlyList<string> NativeUiRequiredFeatures { get; init; } = [];
     public bool NativeEditorAvailable => HasNativeUi
         && System.IO.File.Exists(NativePluginHost.Executable)
-        && NativePluginHost.SupportsFeatures(RequiredFeatures);
+        && NativePluginHost.SupportsFeatures(RequiredFeatures)
+        && NativePluginHost.SupportsUiFeatures(NativeUiRequiredFeatures);
 }

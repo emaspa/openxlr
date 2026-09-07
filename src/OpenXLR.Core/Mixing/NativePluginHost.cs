@@ -25,13 +25,29 @@ internal sealed class NativePluginHost : IDisposable
     private long _lastUiHeartbeat = Stopwatch.GetTimestamp();
 
     public Process Process { get; }
-    public bool IsHealthy => !Process.HasExited
+    public bool IsRunning
+    {
+        get
+        {
+            try { return !Process.HasExited; }
+            catch (InvalidOperationException) { return false; }
+        }
+    }
+    public bool IsHealthy => IsRunning
         && Stopwatch.GetElapsedTime(Interlocked.Read(ref _lastHeartbeat)) < TimeSpan.FromSeconds(10);
     public IReadOnlyDictionary<string, double> Meters => new Dictionary<string, double>(_meters);
     public static string Executable => Path.Combine(AppContext.BaseDirectory, "openxlr-lv2-host");
     internal static bool SupportsFeatures(IEnumerable<string> required)
         => required.All(feature => feature is
             "http://lv2plug.in/ns/ext/urid#map" or "http://lv2plug.in/ns/ext/urid#unmap");
+    internal static bool SupportsUiFeatures(IEnumerable<string> required)
+        => required.All(feature => feature is
+            "http://lv2plug.in/ns/ext/urid#map"
+            or "http://lv2plug.in/ns/ext/urid#unmap"
+            or "http://lv2plug.in/ns/ext/instance-access"
+            or "http://lv2plug.in/ns/extensions/ui#parent"
+            or "http://lv2plug.in/ns/extensions/ui#resize"
+            or "http://lv2plug.in/ns/extensions/ui#idleInterface");
 
     public NativePluginHost(InsertDefinition insert, string node, int channels, int sampleRate)
     {

@@ -17,8 +17,11 @@ For a supported plugin exposing an X11 editor, the live instance runs in an
 isolated PipeWire filter process. Other plugins remain in filter-chain, also
 inside mixed chains. The existing generated controls window gains a Plugin UI
 button when the daemon advertises an available native editor. On Wayland the
-editor requires XWayland. Unsupported required DSP features are never silently
-accepted; the existing upstream catalog and API feature gate remain in place.
+editor requires XWayland. The catalog checks required features on both the DSP
+and the selected X11 UI before advertising the editor. The live insert status
+also reports whether its native host is running, so a failed or bypassed chain
+cannot offer an editor action that will only fail. Unsupported requirements are
+never silently accepted; the existing upstream API feature gate remains in place.
 
 Control edits return through the helper pipe and are saved by the normal
 daemon settings path. Plugin output-control meters are included in insert status.

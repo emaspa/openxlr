@@ -51,7 +51,8 @@
       </StackPanel>
       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
         <Button Content="Plugin UI" Padding="12,4" Click="OnNativeEditor"
-                IsVisible="{Binding NativeEditorAvailable}"
+                IsVisible="{Binding NativeEditorSupported}"
+                IsEnabled="{Binding NativeEditorAvailable}"
                 ToolTip.Tip="Open this plugin's own editor on the live audio instance"/>
         <Button Content="Defaults" Padding="12,4" Click="OnDefaults"
                 ToolTip.Tip="Put every control back to the plugin's own defaults"/>
