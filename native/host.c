@@ -3,8 +3,10 @@
 // editor window and its threads. The audio callback never allocates, logs,
 // performs IPC or calls the editor.
 #include "host.h"
+#include "icon.h"
 
 #include <X11/Xatom.h>
+#include <X11/Xutil.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <math.h>
@@ -316,6 +318,15 @@ static bool open_ui(Host *h) {
     snprintf(title, sizeof(title), "OpenXLR - %s",
              h->plugin_name[0] ? h->plugin_name : h->backend->name);
     XStoreName(h->display, h->window, title);
+    // The same class as the main window, so the desktop files it with the
+    // application, and the application's icon, since no plugin format
+    // carries one of its own.
+    XClassHint class_hint = {(char *)"openxlr", (char *)"OpenXLR.UI"};
+    XSetClassHint(h->display, h->window, &class_hint);
+    XChangeProperty(h->display, h->window,
+                    XInternAtom(h->display, "_NET_WM_ICON", False), XA_CARDINAL,
+                    32, PropModeReplace, (const unsigned char *)openxlr_icon,
+                    (int)openxlr_icon_length);
     XChangeProperty(h->display, h->window,
                     XInternAtom(h->display, "_OPENXLR_NODE", False), XA_STRING,
                     8, PropModeReplace, (const unsigned char *)h->node_name,

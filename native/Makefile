@@ -10,7 +10,7 @@ CXXFLAGS += -std=c++17 $(WARN) -fno-exceptions -fno-rtti
 LDLIBS += $(shell pkg-config --libs $(PKGS)) -ldl -lm -pthread
 
 OBJECTS = host.o lv2.o clap.o vst3.o
-HEADERS = host.h $(wildcard clap/include/clap/*.h clap/include/clap/*/*.h) \
+HEADERS = host.h icon.h $(wildcard clap/include/clap/*.h clap/include/clap/*/*.h) \
           $(wildcard vst3/pluginterfaces/*/*.h)
 
 openxlr-lv2-host: $(OBJECTS)
