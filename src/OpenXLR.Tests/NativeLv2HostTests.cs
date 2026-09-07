@@ -99,7 +99,7 @@ public sealed class NativeLv2HostTests
         // a plugin whose required features it does not provide, so the two
         // lists have to name the same extensions.
         string source = File.ReadAllText(Path.Combine(
-            AppContext.BaseDirectory, "..", "..", "..", "..", "..", "native", "lv2-host.c"));
+            AppContext.BaseDirectory, "..", "..", "..", "..", "..", "native", "lv2.c"));
         foreach (string macro in new[] { "LV2_WORKER__schedule", "LV2_OPTIONS__options", "LV2_BUF_SIZE__boundedBlockLength" })
             Assert.Contains(macro, source);
         Assert.True(NativePluginHost.SupportsFeatures(

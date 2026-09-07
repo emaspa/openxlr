@@ -58,7 +58,7 @@ editor. A source build leaves it out unless you ask:
 dotnet build -c Release -p:EnableNativeLv2Host=true
 ```
 
-That step compiles `native/lv2-host.c` and copies the helper next to the
+That step compiles the sources under `native/` and copies the helper next to the
 daemon. It needs a C compiler, make, pkg-config and the development files
 for PipeWire, lilv, LV2 and X11 (`base-devel`, `pipewire`, `lilv`, `lv2`
 and `libx11` on Arch; the `-dev` packages of the same on Debian and

@@ -117,9 +117,16 @@ host mechanism stable than two half-finished ones.
   package builds and installs the helper; an ordinary .NET build still
   needs no compiler, and a source build opts in with
   `-p:EnableNativeLv2Host=true`.
-- [ ] VST3 and CLAP, and Windows VST3 through yabridge, in the same host
-  process model, one plugin per process, supervised and fail-open so a
-  crashed plugin is bypassed and audio continues.
+- [x] CLAP, in the same host: the helper loads a CLAP plugin, carries
+  its parameters, timers and file descriptors, and opens its editor, in
+  the process model LV2 already had. Bundles are described for the
+  catalogue by the helper, one process per bundle, so the daemon never
+  loads plugin code. The CLAP headers are vendored, so no package changed.
+- [ ] VST3, and Windows VST3 through yabridge, as a sibling helper in C++
+  against Steinberg's interface headers, in the same process model, one
+  plugin per process, supervised and fail-open so a crashed plugin is
+  bypassed and audio continues. Carla was considered and dropped: no
+  commit in six months, no CLAP, and a second audio engine.
 - [ ] Presets: per-plugin and whole-chain, with export and import; copy a
   chain between channels; A/B comparison.
 - [ ] Plugin latency reported per insert and compensated across mixes.

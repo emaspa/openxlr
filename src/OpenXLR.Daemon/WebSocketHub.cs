@@ -194,7 +194,7 @@ public sealed class WebSocketHub
                 break;
             case "listPlugins":
                 // The first call may block on lilv's scan; keep it off the socket loop's thread.
-                IReadOnlyList<OpenXLR.Core.Mixing.PluginInfo> plugins = await Task.Run(() => OpenXLR.Core.Mixing.Lv2Catalog.Plugins);
+                IReadOnlyList<OpenXLR.Core.Mixing.PluginInfo> plugins = await Task.Run(() => OpenXLR.Core.Mixing.PluginCatalog.Plugins);
                 await reply(new PluginsMessage(plugins));
                 break;
             case "set":

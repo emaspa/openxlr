@@ -163,7 +163,7 @@ public sealed class MixerService : IHostedService, IDisposable
             _log.LogInformation("submixer off (daemon.json, --mixer, or OPENXLR_BUILD_MIXER=1 turn it on); hardware control only");
             return Task.CompletedTask;
         }
-        OpenXLR.Core.Mixing.Lv2Catalog.Warm();   // plugin inserts: scan LV2 bundles off the startup path
+        OpenXLR.Core.Mixing.PluginCatalog.Warm();   // plugin inserts: scan the LV2 and CLAP bundles off the startup path
         _progress.Mark();
         _checkingProgress = true;
 
@@ -331,7 +331,7 @@ public sealed class MixerService : IHostedService, IDisposable
     public string? Apply(Command cmd)
     {
         if (!_mixer.Built) return "mixer not built (start the daemon with --mixer)";
-        string? invalid = CommandValidation.Check(cmd, _mixer, OpenXLR.Core.Mixing.Lv2Catalog.Find);
+        string? invalid = CommandValidation.Check(cmd, _mixer, OpenXLR.Core.Mixing.PluginCatalog.Find);
         if (invalid is not null) return invalid;
         try
         {
@@ -432,8 +432,8 @@ public sealed class MixerService : IHostedService, IDisposable
                 case "setInserts":
                     if (cmd.Channel is null || cmd.Inserts is null) return "setInserts: need 'channel' and 'inserts'";
                     foreach (InsertDefinition i in cmd.Inserts)
-                        if (string.IsNullOrWhiteSpace(i.Id) || i.Kind != "lv2" || string.IsNullOrWhiteSpace(i.Plugin))
-                            return "setInserts: every insert needs an id, kind 'lv2', and a plugin URI";
+                        if (string.IsNullOrWhiteSpace(i.Id) || i.Kind is not ("lv2" or "clap") || string.IsNullOrWhiteSpace(i.Plugin))
+                            return "setInserts: every insert needs an id, a kind of 'lv2' or 'clap', and a plugin identifier";
                     _mixer.SetInserts(cmd.Channel, cmd.Inserts);
                     break;
                 case "setInsertBypass":

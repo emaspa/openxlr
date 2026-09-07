@@ -572,7 +572,7 @@ public sealed class PipeWireAdapter
     private FilterHandle CreateFilterChain(string sinkName, string srcName, string description, int channels,
         int lowCutHz, bool clipGuard, IReadOnlyList<InsertDefinition>? inserts)
     {
-        if (inserts?.Any(i => !i.Bypass && i.NativeHost) == true)
+        if (inserts?.Any(i => !i.Bypass && i.RunsNatively) == true)
             return CreateHostedChain(sinkName, srcName, description, channels, lowCutHz, clipGuard, inserts);
         if (clipGuard)
         {
@@ -591,7 +591,7 @@ public sealed class PipeWireAdapter
         foreach (InsertDefinition ins in inserts ?? [])
         {
             if (ins.Bypass || ins.Kind != "lv2") continue;
-            PluginInfo? info = Lv2Catalog.Find(ins.Plugin);
+            PluginInfo? info = PluginCatalog.Find(ins);
             if (info is null || info.InputSymbols.Count < channels || info.OutputSymbols.Count < channels)
                 continue;   // unknown or wrong-width plugin: skipped, reported by the caller
             string name = $"i{k++}";
@@ -672,22 +672,24 @@ public sealed class PipeWireAdapter
             int rate = ParseGraphSampleRate(Run("pw-metadata", "-n", "settings"));
             foreach (InsertDefinition insert in inserts.Where(i => !i.Bypass))
             {
-                PluginInfo? info = Lv2Catalog.Find(insert.Plugin);
+                PluginInfo? info = PluginCatalog.Find(insert);
                 if (info is null || !info.Supported)
                     throw new InvalidOperationException("Plugin is unavailable or requires unsupported host features.");
                 string node = $"{sinkName}_stage_{insertStages.Count}";
                 FilterHandle stage;
-                if (insert.NativeHost)
+                if (insert.RunsNatively)
                 {
-                    if (!info.NativeEditorAvailable)
-                        throw new InvalidOperationException($"Native hosting is unavailable for {insert.Plugin}; install the optional helper or select filter-chain.");
-                    var host = new NativePluginHost(insert, node, channels, rate);
+                    if (!NativePluginHost.HostInstalled)
+                        throw new InvalidOperationException("The native plugin host is not installed.");
+                    if (insert.NativeHost && !info.NativeEditorSupported)
+                        throw new InvalidOperationException($"{info.Name} has no editor the native host can open; select the filter chain.");
+                    var host = new NativePluginHost(insert, node, channels, rate, info.Path);
                     _nativeHosts.Add(host);
                     stage = new(node, node, node, host.Process) { NativeHost = host };
                     stages.Add(stage);
                     if (!WaitForPorts(node, "playback", false, TimeSpan.FromSeconds(3), host.Process)
                         || !WaitForPorts(node, "capture", true, TimeSpan.FromSeconds(3), host.Process))
-                        throw new InvalidOperationException($"Native LV2 ports did not appear for {insert.Plugin}.");
+                        throw new InvalidOperationException($"The native host's ports did not appear for {insert.Plugin}.");
                 }
                 else
                 {

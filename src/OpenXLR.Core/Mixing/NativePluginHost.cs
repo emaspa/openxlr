@@ -73,17 +73,17 @@ internal sealed class NativePluginHost : IDisposable
             or "http://lv2plug.in/ns/extensions/ui#resize"
             or "http://lv2plug.in/ns/extensions/ui#idleInterface");
 
-    public NativePluginHost(InsertDefinition insert, string node, int channels, int sampleRate)
-        : this(insert, node, channels, sampleRate, Executable, []) { }
+    public NativePluginHost(InsertDefinition insert, string node, int channels, int sampleRate, string? bundle = null)
+        : this(insert, node, channels, sampleRate, Executable, [], bundle: bundle) { }
 
     internal NativePluginHost(InsertDefinition insert, string node, int channels, int sampleRate,
         string executable, IReadOnlyList<string> prefixArguments, TimeSpan? startupTimeout = null,
-        TimeSpan? patience = null)
+        TimeSpan? patience = null, string? bundle = null)
     {
         if (patience is { } chosen) _patience = chosen;
         if (!File.Exists(executable))
             throw new InvalidOperationException(
-                "The native LV2 host is not installed. Build it with -p:EnableNativeLv2Host=true, or switch this insert back to the filter chain.");
+                "The native plugin host is not installed. Build it with -p:EnableNativeLv2Host=true, or switch this insert back to the filter chain.");
         var start = new ProcessStartInfo(executable)
         {
             RedirectStandardInput = true,
@@ -91,7 +91,11 @@ internal sealed class NativePluginHost : IDisposable
             RedirectStandardError = true,
         };
         foreach (string argument in prefixArguments) start.ArgumentList.Add(argument);
-        foreach (string argument in new[] { insert.Plugin, node, channels.ToString(CultureInfo.InvariantCulture), sampleRate.ToString(CultureInfo.InvariantCulture) })
+        // The helper takes the format first, then what that format needs to
+        // find the plugin: an LV2 URI, or a CLAP bundle and the id inside it.
+        foreach (string argument in Arguments(insert, bundle))
+            start.ArgumentList.Add(argument);
+        foreach (string argument in new[] { node, channels.ToString(CultureInfo.InvariantCulture), sampleRate.ToString(CultureInfo.InvariantCulture) })
             start.ArgumentList.Add(argument);
         foreach ((string symbol, double value) in insert.Params)
             start.ArgumentList.Add($"{symbol}={value.ToString("R", CultureInfo.InvariantCulture)}");
@@ -105,6 +109,12 @@ internal sealed class NativePluginHost : IDisposable
             throw new InvalidOperationException($"Native LV2 startup failed: {_error}", ex);
         }
     }
+
+    internal static IReadOnlyList<string> Arguments(InsertDefinition insert, string? bundle) => insert.Kind switch
+    {
+        "clap" => ["clap", bundle ?? throw new InvalidOperationException("A CLAP insert needs the bundle it lives in."), insert.Plugin],
+        _ => ["lv2", insert.Plugin],
+    };
 
     private async Task ReadOutputAsync()
     {

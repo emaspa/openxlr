@@ -242,7 +242,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 bool lc = ch.InputPair == 0 && _lowCutHz > 0 && _lowCutApplicable;
                 bool cg = ch.InputPair == 0 && _softClipGuard && _clipGuardApplicable;
                 List<InsertDefinition> inserts = IsInsertChannel(ch.Id) ? InsertsFor(ch.Id) : [];
-                bool anyInsert = inserts.Any(i => !i.Bypass && Lv2Catalog.Find(i.Plugin) is not null);
+                bool anyInsert = inserts.Any(i => !i.Bypass && PluginCatalog.Find(i) is not null);
                 bool givenUp = anyInsert && _restarts.Blocked(ch.Id);
                 if (givenUp) { inserts = []; anyInsert = false; _insertErrors[ch.Id] = RestartPolicy.GivenUp; }
                 if (lc || cg || anyInsert)
@@ -573,7 +573,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         _insertErrors.Remove(key);
 
         List<InsertDefinition> inserts = InsertsFor(key);
-        bool anyInsert = inserts.Any(i => !i.Bypass && Lv2Catalog.Find(i.Plugin) is { } p && p.AudioIns >= 2 && p.AudioOuts >= 2);
+        bool anyInsert = inserts.Any(i => !i.Bypass && PluginCatalog.Find(i) is { } p && p.AudioIns >= 2 && p.AudioOuts >= 2);
         if (anyInsert && _restarts.Blocked(key)) _insertErrors[key] = RestartPolicy.GivenUp;
         else if (anyInsert)
         {
@@ -701,7 +701,13 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     {
         lock (_gate)
         {
-            _inserts[channel] = [.. inserts.Select(i => i with { Params = new Dictionary<string, double>(i.Params) })];
+            // A CLAP plugin only ever runs in the native host, so its record says so
+            // whatever a client sent; the window then shows it without a switch.
+            _inserts[channel] = [.. inserts.Select(i => i with
+            {
+                Params = new Dictionary<string, double>(i.Params),
+                NativeHost = i.NativeHost || i.Kind == "clap",
+            })];
             if (_built) RewireInsertKeyLocked(channel);
         }
     }
@@ -753,7 +759,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                     foreach ((string symbol, double value) in host.DrainChanges())
                     {
                         InsertDefinition? insert = InsertsFor(channel).FirstOrDefault(i => i.Id == id);
-                        PluginParam? parameter = insert is null ? null : Lv2Catalog.Find(insert.Plugin)?.Params.FirstOrDefault(p => p.Symbol == symbol);
+                        PluginParam? parameter = insert is null ? null : PluginCatalog.Find(insert)?.Params.FirstOrDefault(p => p.Symbol == symbol);
                         if (parameter is null || !double.IsFinite(value)) continue;
                         insert!.Params[symbol] = Math.Clamp(value, parameter.Min, parameter.Max);
                         changed = true;
@@ -777,7 +783,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             // non-bypassed, loadable inserts, so find this insert's stage index.
             int k = 0;
             for (int j = 0; j < idx; j++)
-                if (!list[j].Bypass && list[j].Kind == "lv2" && Lv2Catalog.Find(list[j].Plugin) is not null) k++;
+                if (!list[j].Bypass && PluginCatalog.Find(list[j]) is not null) k++;
             try { _pw.SetFilterControl(chain, $"i{k}:{symbol}", value); }
             catch (InvalidOperationException) { RewireInsertKeyLocked(channel); }
         }
@@ -794,7 +800,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 NativePluginHost? host = _chains.GetValueOrDefault(channel)?.InsertStages
                     .FirstOrDefault(stage => stage.Id == i.Id).Stage?.NativeHost;
                 return new InsertStatus(i,
-                    Lv2Catalog.Find(i.Plugin) is null ? "plugin not installed"
+                    PluginCatalog.Find(i) is null ? "plugin not installed"
                     : !i.Bypass && _insertErrors.TryGetValue(channel, out string? err) ? err
                     : host?.EditorStalled == true ? "the plugin's editor stopped answering; its controls are frozen while audio keeps playing"
                     : null, host?.Meters, host?.IsRunning == true);

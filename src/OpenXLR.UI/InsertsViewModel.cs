@@ -10,7 +10,7 @@ namespace OpenXLR.UI;
 
 /// <summary>A plugin the picker offers (mono in / mono out only for the mic path).</summary>
 public sealed record PluginChoice(string Uri, string Name, string Category, JsonNode Params,
-    bool NativeEditorAvailable = false, bool NativeEditorSupported = false)
+    bool NativeEditorAvailable = false, bool NativeEditorSupported = false, string Kind = "lv2")
 {
     public override string ToString() => Category.Length > 0 ? $"{Name}  ({Category})" : Name;
 }
@@ -112,7 +112,8 @@ public sealed class InsertsViewModel : ViewModelBase
                     p["category"]?.GetValue<string>() ?? "",
                     p["params"] ?? new JsonArray(),
                     p["nativeEditorAvailable"]?.GetValue<bool>() == true,
-                    p["nativeEditorSupported"]?.GetValue<bool>() == true));
+                    p["nativeEditorSupported"]?.GetValue<bool>() == true,
+                    p["kind"]?.GetValue<string>() ?? "lv2"));
             }
             string width = _channels == 1 ? "mono" : "stereo";
             Note = PluginChoices.Count == 0
@@ -143,7 +144,8 @@ public sealed class InsertsViewModel : ViewModelBase
                 if (ins is null) continue;
                 string id = ins["id"]!.GetValue<string>();
                 if (!byId.TryGetValue(id, out InsertViewModel? vm))
-                    vm = new InsertViewModel(this, id, ins["plugin"]!.GetValue<string>(), ins["label"]?.GetValue<string>() ?? id);
+                    vm = new InsertViewModel(this, id, ins["plugin"]!.GetValue<string>(), ins["label"]?.GetValue<string>() ?? id,
+                        ins["kind"]?.GetValue<string>() ?? "lv2");
                 vm.ApplyFromDaemon(ins, entry?["error"]?.GetValue<string>(),
                     entry?["nativeHostRunning"]?.GetValue<bool>() == true);
                 next.Add(vm);
@@ -170,7 +172,7 @@ public sealed class InsertsViewModel : ViewModelBase
         chain.Add(new Dictionary<string, object?>
         {
             ["id"] = Guid.NewGuid().ToString("N")[..8],
-            ["kind"] = "lv2",
+            ["kind"] = plugin.Kind,
             ["plugin"] = plugin.Uri,
             ["label"] = plugin.Name,
             ["bypass"] = false,
@@ -224,17 +226,19 @@ public sealed class InsertViewModel : ViewModelBase
 {
     private readonly InsertsViewModel _owner;
 
-    public InsertViewModel(InsertsViewModel owner, string id, string plugin, string label)
+    public InsertViewModel(InsertsViewModel owner, string id, string plugin, string label, string kind = "lv2")
     {
         _owner = owner;
         Id = id;
         Plugin = plugin;
         Label = label;
+        Kind = kind;
     }
 
     public string Id { get; }
     public string Plugin { get; }
     public string Label { get; }
+    public string Kind { get; }
 
     /// <summary>The channel chain this insert belongs to (row buttons route through it).</summary>
     public InsertsViewModel Owner => _owner;
@@ -286,7 +290,8 @@ public sealed class InsertViewModel : ViewModelBase
             }
         }
     }
-    public bool CanChooseNativeHost => NativeEditorSupported || NativeHost;
+    /// <summary>A CLAP plugin has nowhere else to run, so there is nothing to choose.</summary>
+    public bool CanChooseNativeHost => Kind != "clap" && (NativeEditorSupported || NativeHost);
 
     private readonly Dictionary<string, double> _params = [];
 
@@ -445,7 +450,7 @@ public sealed class InsertViewModel : ViewModelBase
     internal object ToPayload() => new Dictionary<string, object?>
     {
         ["id"] = Id,
-        ["kind"] = "lv2",
+        ["kind"] = Kind,
         ["plugin"] = Plugin,
         ["label"] = Label,
         ["bypass"] = _bypass,

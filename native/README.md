@@ -1,8 +1,10 @@
 # Optional LV2 editor host
 
-`lv2-host.c` builds `openxlr-lv2-host`, a small process that loads one LV2
-plugin, gives it PipeWire ports and, on request, opens the plugin's own X11
-editor on that live instance. It exists because a plugin's editor talks to its
+This directory builds `openxlr-lv2-host`, a small process that loads one
+plugin, LV2 or CLAP, gives it PipeWire ports and, on request, opens the
+plugin's own X11 editor on that live instance. `host.c` is the process:
+the audio node, the command pipe, the window and the threads. `lv2.c` and
+`clap.c` are the two formats behind one interface, so a third can follow. It exists because a plugin's editor talks to its
 DSP instance directly (LV2 instance access), which a PipeWire filter chain
 cannot offer.
 
@@ -82,6 +84,11 @@ hosted at all.
 
 For the editor: instance access, parent, resize and the idle interface.
 
-State and presets, and the VST and CLAP formats, are separate work. Changing
-an insert's host rebuilds its chain; nothing here swaps a plugin without a
-gap.
+For CLAP: parameters, the audio ports, the X11 editor, timers, file
+descriptors, thread checks and a log. The same binary describes a CLAP
+bundle for the daemon's catalogue (`openxlr-lv2-host scan-clap FILE`), in a
+process of its own so the daemon never loads plugin code. The headers are
+vendored under `clap/` (MIT, version 1.2.10).
+
+State and presets, and the VST formats, are separate work. Changing an
+insert's host rebuilds its chain; nothing here swaps a plugin without a gap.

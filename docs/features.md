@@ -122,8 +122,16 @@ plugin. Plugins are found in the standard LV2 directories
 reads them through lilv. `lsp-plugins-lv2` is the set used during
 development. A plugin that requires a host feature the chain does not
 provide is left out of the picker and refused by the daemon rather than
-failing when the chain is built. VST and CLAP plugins are not supported;
-loading them would need a plugin host.
+failing when the chain is built.
+
+CLAP plugins are offered in the same picker, found in the standard CLAP
+directories (`/usr/lib/clap`, `~/.clap`, or wherever `CLAP_PATH` points).
+A CLAP plugin has no filter chain to run in, so it always runs in the
+native host described below, and its row carries no host switch. The
+daemon never loads CLAP code itself: the host describes each bundle in a
+process of its own, so a plugin that misbehaves while being asked about
+its ports costs that bundle and nothing else. VST plugins are not
+supported.
 
 Plugins that ship their own editor still load, and the generated controls
 are shown for them. The editor itself can be opened through a small host

@@ -24,7 +24,7 @@ public sealed class CommandLimitsTests
         UnsupportedFeatures = ["http://lv2plug.in/ns/ext/instance-access"],
     };
 
-    private static PluginInfo? Find(string uri) => uri switch { "urn:test:comp" => Comp, "urn:test:ui" => NeedsUi, _ => null };
+    private static PluginInfo? Find(InsertDefinition insert) => insert.Plugin switch { "urn:test:comp" => Comp, "urn:test:ui" => NeedsUi, _ => null };
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private static Command Cmd(string json) => JsonSerializer.Deserialize<Command>(json, Json)!;

@@ -207,8 +207,9 @@ channel, with its level and lock in the INPUTS card.
 4. Chains are saved with the mixer and with profiles.
 
 The generated controls cover every parameter the plugin exposes. A
-plugin's own editor can be opened as well, with the optional native host
-described in 3.12. VST and CLAP plugins cannot be loaded.
+plugin's own editor can be opened as well, with the native host described
+in 3.12. CLAP plugins appear in the same picker and always run in that
+host. VST plugins cannot be loaded.
 
 <a name="profiles"></a>
 ### 3.6 Save and recall a scene
@@ -368,6 +369,10 @@ To use it:
    your audio. What you change there appears in the controls window and
    is saved with the mixer and with profiles.
 4. Turn "Native host" off to put the insert back in the shared chain.
+
+A CLAP plugin has no shared chain to go back to, so it always runs this
+way: its row shows no switch, and the cog opens its editor whenever the
+plugin is running.
 
 The editor draws on an X11 display, which means XWayland on a Wayland
 desktop, and the daemon has to know about it. A user service that started

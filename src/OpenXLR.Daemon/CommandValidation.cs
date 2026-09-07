@@ -20,7 +20,7 @@ public static class CommandValidation
     public const int MaxParamsPerInsert = 256;
     public const int MaxOverrides = 512;     // remembered app assignments
 
-    public static string? Check(Command cmd, ILayoutInfo layout, Func<string, PluginInfo?> findPlugin)
+    public static string? Check(Command cmd, ILayoutInfo layout, Func<InsertDefinition, PluginInfo?> findPlugin)
     {
         switch (cmd.Cmd)
         {
@@ -101,12 +101,12 @@ public static class CommandValidation
                         if (TooLong(i.Label, MaxText)) return "setInserts: label too long";
                         if (string.IsNullOrWhiteSpace(i.Plugin)) continue;
                         if (i.Plugin.Length > MaxUri) return "setInserts: plugin URI too long";
-                        PluginInfo? plugin = findPlugin(i.Plugin);
+                        PluginInfo? plugin = findPlugin(i);
                         if (plugin is null) return $"setInserts: plugin '{Short(i.Plugin)}' is not installed";
                         if (i.NativeHost && !plugin.NativeEditorSupported)
                             return $"setInserts: '{plugin.Name}' has no editor the native host can open";
-                        if (i.NativeHost && !plugin.NativeEditorAvailable)
-                            return "setInserts: the native LV2 host is not installed on this machine";
+                        if (i.RunsNatively && !PluginCatalog.HostInstalled)
+                            return "setInserts: the native plugin host is not installed on this machine";
                         if (!plugin.Supported)
                             return $"setInserts: '{plugin.Name}' needs {string.Join(", ", plugin.UnsupportedFeatures.Select(Tail))}, which the PipeWire chain does not provide";
                         if (i.Params.Count > MaxParamsPerInsert) return "setInserts: too many parameters";

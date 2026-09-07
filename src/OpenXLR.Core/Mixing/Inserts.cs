@@ -12,11 +12,15 @@ public sealed record InsertDefinition
     /// <summary>Stable id for this slot (survives reorders and restarts).</summary>
     public required string Id { get; init; }
 
-    /// <summary>"lv2" or "ladspa".</summary>
+    /// <summary>"lv2" or "clap".</summary>
     public required string Kind { get; init; }
 
-    /// <summary>LV2: the plugin URI. LADSPA: "library:label".</summary>
+    /// <summary>LV2: the plugin URI. CLAP: the plugin's id, such as "com.vendor.name".</summary>
     public required string Plugin { get; init; }
+
+    /// <summary>A CLAP plugin has no filter chain to run in: it always runs in the native host.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool RunsNatively => NativeHost || Kind == "clap";
 
     /// <summary>Display name, captured from the catalog when added.</summary>
     public string? Label { get; init; }
@@ -65,6 +69,9 @@ public sealed record PluginInfo(
 
     public bool Supported => UnsupportedFeatures.Count == 0;
     public bool HasNativeUi { get; init; }
+
+    /// <summary>CLAP: the bundle the plugin is loaded from. Null for LV2, which lilv locates.</summary>
+    public string? Path { get; init; }
     /// <summary>Required features of the X11 UI selected by the native helper.</summary>
     public IReadOnlyList<string> NativeUiRequiredFeatures { get; init; } = [];
 
