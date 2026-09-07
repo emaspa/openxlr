@@ -25,7 +25,8 @@ PKG = $(CURDIR)/debian/openxlr
 
 override_dh_auto_build:
 	dotnet publish src/OpenXLR.Daemon -c Release -r linux-x64 \
-		--self-contained false -p:RestoreLockedMode=true $(RESTORE_SOURCE) -o $(OUT)/daemon
+		--self-contained false -p:RestoreLockedMode=true -p:EnableNativeLv2Host=true \
+		$(RESTORE_SOURCE) -o $(OUT)/daemon
 	dotnet publish src/OpenXLR.UI -c Release -r linux-x64 \
 		--self-contained false -p:RestoreLockedMode=true $(RESTORE_SOURCE) -o $(OUT)/ui
 
@@ -36,6 +37,7 @@ override_dh_auto_install:
 	# dotnet publish marks assemblies executable; only the apphosts are.
 	find $(PKG)/usr/lib/openxlr -type f -exec chmod 644 {} +
 	chmod 755 $(PKG)/usr/lib/openxlr/daemon/OpenXLR.Daemon \
+		$(PKG)/usr/lib/openxlr/daemon/openxlr-lv2-host \
 		$(PKG)/usr/lib/openxlr/ui/OpenXLR.UI
 
 	install -dm755 $(PKG)/usr/bin

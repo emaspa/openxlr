@@ -126,11 +126,11 @@ failing when the chain is built. VST and CLAP plugins are not supported;
 loading them would need a plugin host.
 
 Plugins that ship their own editor still load, and the generated controls
-are shown for them. The editor itself can be opened through an optional
-native host, built from source and absent from the packages. Turning on
-"Native host" for one insert moves that insert out of the shared chain
-into a process of its own, which hosts the plugin and its editor
-together; the other inserts stay in the chain. The editor works on the
+are shown for them. The editor itself can be opened through a small host
+process, which every package installs. Turning on "Native host" for one
+insert moves that insert out of the shared chain into a process of its
+own, which hosts the plugin and its editor together; the other inserts
+stay in the chain and nothing moves unless you ask. The editor works on the
 audio that is playing and its changes are saved like any other control.
 The plugin keeps processing if the editor stops answering or the X
 display goes away, and a chain whose host keeps crashing is switched off

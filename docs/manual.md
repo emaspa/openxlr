@@ -352,18 +352,12 @@ and Stream Deck keys survive a rename. The layout file is described in
 
 The controls window is generated from the plugin's parameters and works
 for every plugin. Some plugins also ship an editor of their own, with the
-meters and curves their authors drew. Opening one needs the optional
-native host, which the packages do not carry. Build it from source:
+meters and curves their authors drew. Opening one goes through a small
+host process that the packages install for you. If you build from source,
+add one flag to get it, as
+[install-from-source.md](install-from-source.md) describes.
 
-```sh
-dotnet build src/OpenXLR.slnx -c Release -p:EnableNativeLv2Host=true
-```
-
-It needs a C compiler, make, pkg-config and the development files for
-PipeWire, lilv, the LV2 headers and X11. See
-[install-from-source.md](install-from-source.md).
-
-With the host in place:
+To use it:
 
 1. Open a plugin's Controls window. A plugin whose editor OpenXLR can
    host shows a "Native host" button.

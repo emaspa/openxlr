@@ -21,7 +21,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            build-essential debhelper dotnet-sdk-10.0 lintian
+            build-essential debhelper dotnet-sdk-10.0 lintian \
+            pkg-config libpipewire-0.3-dev liblilv-dev lv2-dev libx11-dev
 
       - name: Versions agree everywhere
         run: tools/check-version.sh
@@ -48,6 +49,7 @@ jobs:
           for f in usr/lib/systemd/user/openxlr-daemon.service \
                    usr/lib/systemd/user/pipewire-pulse.service.d/openxlr.conf \
                    usr/lib/udev/rules.d/70-openxlr.rules \
+                   usr/lib/openxlr/daemon/openxlr-lv2-host \
                    usr/bin/openxlr usr/bin/openxlr-daemon; do
             grep -q " ./$f\$" contents.txt || { echo "missing from the package: $f"; exit 1; }
           done

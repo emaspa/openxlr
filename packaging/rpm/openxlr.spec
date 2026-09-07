@@ -15,6 +15,15 @@ ExclusiveArch:  x86_64
 
 BuildRequires:  dotnet-sdk-10.0
 BuildRequires:  systemd-rpm-macros
+# The optional LV2 host is a small C program built beside the daemon. Its
+# libraries are already runtime dependencies below; only the headers are new.
+BuildRequires:  gcc
+BuildRequires:  make
+BuildRequires:  pkgconf-pkg-config
+BuildRequires:  pipewire-devel
+BuildRequires:  lilv-devel
+BuildRequires:  lv2-devel
+BuildRequires:  libX11-devel
 
 # Prebuilt .NET assemblies; dependencies are declared by hand, matching
 # the Debian and Arch packages.
@@ -58,7 +67,8 @@ interface once so the udev rule applies.
 export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 \
        DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
 dotnet publish src/OpenXLR.Daemon -c Release -r linux-x64 \
-    --self-contained false -p:RestoreLockedMode=true -o out/daemon
+    --self-contained false -p:RestoreLockedMode=true \
+    -p:EnableNativeLv2Host=true -o out/daemon
 dotnet publish src/OpenXLR.UI -c Release -r linux-x64 \
     --self-contained false -p:RestoreLockedMode=true -o out/ui
 
@@ -69,6 +79,7 @@ cp -r out/ui %{buildroot}%{_prefix}/lib/openxlr/ui
 # dotnet publish marks assemblies executable; only the apphosts are.
 find %{buildroot}%{_prefix}/lib/openxlr -type f -exec chmod 644 {} +
 chmod 755 %{buildroot}%{_prefix}/lib/openxlr/daemon/OpenXLR.Daemon \
+    %{buildroot}%{_prefix}/lib/openxlr/daemon/openxlr-lv2-host \
     %{buildroot}%{_prefix}/lib/openxlr/ui/OpenXLR.UI
 
 install -dm755 %{buildroot}%{_bindir}

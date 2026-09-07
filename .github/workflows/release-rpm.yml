@@ -20,7 +20,8 @@ jobs:
       - name: Install build dependencies
         run: |
           dnf install -y --setopt=install_weak_deps=False \
-            rpm-build rpmlint git-core dotnet-sdk-10.0 systemd-rpm-macros
+            rpm-build rpmlint git-core dotnet-sdk-10.0 systemd-rpm-macros \
+            gcc make pkgconf-pkg-config pipewire-devel lilv-devel lv2-devel libX11-devel
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -54,6 +55,7 @@ jobs:
           rpm -q openxlr
           test -x /usr/bin/openxlr && test -x /usr/bin/openxlr-daemon
           test -x /usr/lib/openxlr/daemon/OpenXLR.Daemon
+          test -x /usr/lib/openxlr/daemon/openxlr-lv2-host
           test -f /usr/lib/udev/rules.d/70-openxlr.rules
           test -f /usr/share/wireplumber/wireplumber.conf.d/50-xlr-dock-capture-hold.conf
           test -f /usr/lib/systemd/user/openxlr-daemon.service

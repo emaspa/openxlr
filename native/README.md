@@ -6,19 +6,23 @@ editor on that live instance. It exists because a plugin's editor talks to its
 DSP instance directly (LV2 instance access), which a PipeWire filter chain
 cannot offer.
 
-Nothing here is built by default, and installing it changes nothing on its
-own: inserts use the filter chain until an insert is explicitly switched to
-the native host in its controls window.
+The distribution packages build and install it, and its presence changes
+nothing on its own: inserts use the filter chain until one is explicitly
+switched to the native host in its controls window.
 
 ## Build
+
+An ordinary .NET build does not invoke a C compiler. Opt in with:
 
 ```sh
 dotnet build src/OpenXLR.slnx -c Release -p:EnableNativeLv2Host=true
 ```
 
-The flag compiles this directory and copies the helper next to the daemon.
-`make -C native` builds it alone. It needs a C11 compiler, make, pkg-config
-and the development files for PipeWire, lilv, LV2 and X11.
+The flag compiles this directory and copies the helper next to the daemon,
+which is what the packaging recipes do. `make -C native` builds it alone.
+It needs a C11 compiler, make, pkg-config and the development files for
+PipeWire, lilv, LV2 and X11; the libraries it links are already runtime
+dependencies of every package.
 
 ## What it does
 

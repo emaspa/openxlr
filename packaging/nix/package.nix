@@ -1,11 +1,14 @@
 { lib
 , buildDotnetModule
 , dotnetCorePackages
+, gcc
+, pkg-config
 , fontconfig
 , icu
 , libpulseaudio
 , libusb1
 , lilv
+, lv2
 , pipewire
 , libx11
 , libice
@@ -36,6 +39,12 @@ buildDotnetModule {
   '';
   dotnetRestoreFlags = [ "-p:RestorePackagesWithLockFile=false" ];
   dotnetBuildFlags = [ "-p:RestorePackagesWithLockFile=false" ];
+
+  # The optional LV2 host, a small C program the daemon build compiles beside
+  # itself. Its libraries are already runtime dependencies below.
+  dotnetFlags = [ "-p:EnableNativeLv2Host=true" ];
+  nativeBuildInputs = [ gcc pkg-config ];
+  buildInputs = [ pipewire lilv lv2 libx11 ];
 
   dotnet-sdk = dotnetCorePackages.sdk_10_0;
   dotnet-runtime = dotnetCorePackages.aspnetcore_10_0;

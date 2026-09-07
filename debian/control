@@ -2,7 +2,9 @@ Source: openxlr
 Section: sound
 Priority: optional
 Maintainer: Emanuele Sparvoli <sparvoli@gmail.com>
-Build-Depends: debhelper-compat (= 13), dotnet-sdk-10.0
+Build-Depends: debhelper-compat (= 13), dotnet-sdk-10.0,
+ gcc, make, pkg-config,
+ libpipewire-0.3-dev, liblilv-dev, lv2-dev, libx11-dev
 Standards-Version: 4.7.0
 Homepage: https://github.com/emaspa/openxlr
 Vcs-Git: https://github.com/emaspa/openxlr.git

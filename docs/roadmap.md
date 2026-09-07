@@ -113,10 +113,10 @@ host mechanism stable than two half-finished ones.
   existing chain never changes host on upgrade, and every insert without
   that choice stays in filter-chain. A failing editor costs the editor
   only: a lost X display, an editor that stops answering and a plugin that
-  crashes on start are each handled with the audio still playing. The .NET
-  build still needs no compiler; the helper is built with
-  `-p:EnableNativeLv2Host=true`. It is not in the packages yet, so it
-  remains a build-from-source feature.
+  crashes on start are each handled with the audio still playing. Every
+  package builds and installs the helper; an ordinary .NET build still
+  needs no compiler, and a source build opts in with
+  `-p:EnableNativeLv2Host=true`.
 - [ ] VST3 and CLAP, and Windows VST3 through yabridge, in the same host
   process model, one plugin per process, supervised and fail-open so a
   crashed plugin is bypassed and audio continues.

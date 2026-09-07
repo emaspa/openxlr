@@ -51,8 +51,8 @@ dotnet build -c Release
 Binaries land in `src/OpenXLR.Daemon/bin/Release/net10.0/` and
 `src/OpenXLR.UI/bin/Release/net10.0/`.
 
-To be able to open a plugin's own editor, build the optional native host
-as well:
+The packages install the small host process that opens a plugin's own
+editor. A source build leaves it out unless you ask:
 
 ```sh
 dotnet build -c Release -p:EnableNativeLv2Host=true
