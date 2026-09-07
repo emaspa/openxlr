@@ -468,6 +468,10 @@ struct Vst3 {
   std::vector<AudioBusBuffers> in_buses, out_buses;
   int32 main_in = 0, main_out = 0;
   float *in_ptrs[MAX_CHANNELS] = {}, *out_ptrs[MAX_CHANNELS] = {};
+  // The side buses are off, but a plugin may touch their buffers anyway, so
+  // each gets real ones: silence to read, scratch to write.
+  std::vector<std::vector<float>> side_buffers;
+  std::vector<std::vector<float *>> side_ptrs;
   ProcessData data;
   bool active = false, processing = false;
   IPlugView *view = nullptr;
@@ -957,13 +961,39 @@ bool vst3_activate(Host *h) {
   if (trace_enabled)
     fprintf(stderr, "trace: setProcessing -> %d\n", (int)processing);
   v->processing = true;
-  // Every bus gets an entry; the inactive ones carry no channels.
+  // Every bus gets an entry with buffers of its own width. The main ones
+  // carry the chain; the rest read silence and write into scratch, since a
+  // plugin does not always honour a bus being off before it indexes it.
   v->in_buses.assign((size_t)v->component->getBusCount(kAudio, kInput), AudioBusBuffers());
   v->out_buses.assign((size_t)v->component->getBusCount(kAudio, kOutput), AudioBusBuffers());
-  v->in_buses[(size_t)v->main_in].numChannels = (int32)host_channels(h);
-  v->in_buses[(size_t)v->main_in].channelBuffers32 = v->in_ptrs;
-  v->out_buses[(size_t)v->main_out].numChannels = (int32)host_channels(h);
-  v->out_buses[(size_t)v->main_out].channelBuffers32 = v->out_ptrs;
+  v->side_buffers.clear();
+  v->side_ptrs.clear();
+  v->side_ptrs.reserve(v->in_buses.size() + v->out_buses.size());
+  for (BusDirection direction : {kInput, kOutput}) {
+    std::vector<AudioBusBuffers> &buses = direction == kInput ? v->in_buses : v->out_buses;
+    int32 main = direction == kInput ? v->main_in : v->main_out;
+    for (size_t i = 0; i < buses.size(); ++i) {
+      if ((int32)i == main) {
+        buses[i].numChannels = (int32)host_channels(h);
+        buses[i].channelBuffers32 = direction == kInput ? v->in_ptrs : v->out_ptrs;
+        continue;
+      }
+      BusInfo info;
+      if (v->component->getBusInfo(kAudio, direction, (int32)i, info) != kResultOk ||
+          info.channelCount <= 0)
+        continue;
+      std::vector<float *> ptrs;
+      for (int32 c = 0; c < info.channelCount; ++c) {
+        v->side_buffers.emplace_back(MAX_FRAMES, 0.0f);
+        ptrs.push_back(v->side_buffers.back().data());
+      }
+      v->side_ptrs.push_back(std::move(ptrs));
+      buses[i].numChannels = info.channelCount;
+      buses[i].channelBuffers32 = v->side_ptrs.back().data();
+      if (direction == kInput)
+        buses[i].silenceFlags = ~0ULL;
+    }
+  }
   v->data.processMode = kRealtime;
   v->data.symbolicSampleSize = kSample32;
   v->data.numInputs = (int32)v->in_buses.size();
@@ -1038,8 +1068,7 @@ void vst3_process(Host *h, uint32_t frames, float *const *in,
     r->last_sent = wanted;
   }
   v->data.numSamples = (int32)frames;
-  for (AudioBusBuffers &bus : v->in_buses)
-    bus.silenceFlags = 0;
+  v->in_buses[(size_t)v->main_in].silenceFlags = 0;  // the side inputs stay silent
   for (AudioBusBuffers &bus : v->out_buses)
     bus.silenceFlags = 0;
   tresult result = v->processor->process(v->data);
