@@ -92,7 +92,7 @@ a bare `error` message, so an editor can wait for the acknowledgement:
 | `setActiveDevice` | `device` | switch to another attached interface (`vvvv:pppp`) |
 | `saveProfile` / `loadProfile` / `deleteProfile` | `name` | named scenes, scoped to the active device |
 | `setRecallOnConnect` | `name` | the profile recalled whenever the active device connects fresh (daemon start, replug, switch to it); empty clears it. With none chosen, a device whose capabilities say `retainsSettings: false` gets the last settings the daemon saw on it instead |
-| `resetDevice` | none | write the firmware defaults back to a device without settings memory and forget its last settings; an error until the daemon has seen the device connect after a power cycle once |
+| `resetDevice` | none | write the firmware defaults back to a device without settings memory and forget its last settings (an error until the daemon has seen the device connect after a power cycle once); on the Wave XLR Pro, which keeps its own settings, write OpenXLR's baseline instead: gain 30 dB on both inputs, every processing stage and phantom off, headphones, crossfade and aux level at half, routing untouched, refused while the gain lock is on. The capabilities say `builtInDefaults` when a model has a baseline |
 | `getDiagnostics` | none | vendor block dump for bug reports |
 
 The OpenDeck plugin in `plugin/` is a client of this API; the command

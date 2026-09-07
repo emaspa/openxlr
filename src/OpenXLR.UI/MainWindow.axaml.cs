@@ -180,10 +180,7 @@ public partial class MainWindow : Window
 
     private async void OnResetDevice(object? sender, RoutedEventArgs e)
     {
-        if (!await ConfirmAsync("Reset device to defaults?",
-                "The interface goes back to the settings its firmware starts with, and the " +
-                "settings OpenXLR restores when it connects are forgotten. Saved profiles stay.",
-                yesLabel: "Reset"))
+        if (!await ConfirmAsync("Reset device to defaults?", _vm.ResetDescription, yesLabel: "Reset"))
             return;
         _vm.ResetDevice();
     }

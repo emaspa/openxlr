@@ -28,6 +28,7 @@ the commit block every selector write needs.
 | Mic and PC crossfade | verified | direct monitor inside the device |
 | Physical output routing | verified | HP1, HP2, Line Out, USB Aux; verified by listening on both jacks |
 | USB Aux input level + lock, aux return | verified | return routing latches at stream open; the daemon bounces the stream |
+| Reset to OpenXLR's baseline | verified | the device keeps its settings, so the reset writes a known set (gain 30 dB, everything off, levels at half) instead of recorded firmware defaults |
 
 ## XLR Dock (0fd9:00a6)
 

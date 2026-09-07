@@ -148,6 +148,15 @@ public sealed class MainViewModel : ViewModelBase
     private bool _capRetainsSettings = true;
     public bool CapRetainsSettings { get => _capRetainsSettings; set => Set(ref _capRetainsSettings, value); }
 
+    private bool _capBuiltInDefaults;
+    /// <summary>OpenXLR ships a baseline for this model, so a device with its own memory can still be reset.</summary>
+    public bool CapBuiltInDefaults { get => _capBuiltInDefaults; set { if (Set(ref _capBuiltInDefaults, value)) Raise(nameof(ResetDescription)); } }
+
+    /// <summary>What the reset button does on this device, for its tooltip and confirmation.</summary>
+    public string ResetDescription => CapRetainsSettings
+        ? "Write OpenXLR's baseline to the interface: gain 30 dB on both inputs, every processing stage and phantom power off, headphones, crossfade and aux level at half. Output routing stays. Saved profiles stay."
+        : "The interface goes back to the settings its firmware starts with, and the settings OpenXLR restores when it connects are forgotten. Saved profiles stay.";
+
     private bool _showResetDefaults;
     public bool ShowResetDefaults { get => _showResetDefaults; private set => Set(ref _showResetDefaults, value); }
 
@@ -619,6 +628,7 @@ public sealed class MainViewModel : ViewModelBase
                 CapOutputRouting = Cap("outputRouting");
                 CapPhysicalControls = Cap("physicalControls");
                 CapRetainsSettings = caps["retainsSettings"]?.GetValue<bool>() ?? true;
+                CapBuiltInDefaults = caps["builtInDefaults"]?.GetValue<bool>() ?? false;
             }
 
             if (node["state"] is JsonNode s)
@@ -667,7 +677,8 @@ public sealed class MainViewModel : ViewModelBase
             ShowSoftLowCut = DeviceConnected && !CapLowCut && HasMixer;
             ShowSoftClipGuard = DeviceConnected && !CapClipGuard && HasMixer;
             ShowGainLock = DeviceConnected && !CapPhysicalControls;
-            ShowResetDefaults = DeviceConnected && !CapRetainsSettings;
+            ShowResetDefaults = DeviceConnected && (!CapRetainsSettings || CapBuiltInDefaults);
+            Raise(nameof(ResetDescription));
             Status = DeviceConnected ? "ready" : "no device";
         }
         finally { _applying = false; }

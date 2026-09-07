@@ -445,7 +445,18 @@ public sealed class DeviceManager : BackgroundService
         lock (_gate)
         {
             if (_device is null || !_device.Connected) return "no device connected";
-            if (_device.Capabilities.RetainsSettings) return "resetDevice: this interface keeps its own settings";
+            if (_device.Capabilities.RetainsSettings)
+            {
+                // Nothing to record on a device that keeps its settings:
+                // OpenXLR's own baseline is written instead, when the model has one.
+                DeviceState current;
+                try { current = _last ?? Stamp(_device.ReadState()); }
+                catch (Exception ex) { return ex.Message; }
+                DeviceState? baseline = DeviceDefaults.Baseline(_device.Info, current);
+                if (baseline is null) return "resetDevice: this interface keeps its own settings and OpenXLR has no baseline for it";
+                if (GainIsLocked) return "resetDevice: release the gain lock first";
+                return ApplyProfile(baseline);
+            }
             string id = DevId(_device);
             DeviceState? defaults;
             try { defaults = DeviceStateStore.LoadDefaults(id); }

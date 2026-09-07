@@ -118,4 +118,11 @@ public sealed record DeviceCapabilities
     /// one of them connects fresh, and offers a reset to those defaults.
     /// </summary>
     public bool RetainsSettings { get; init; } = true;
+
+    /// <summary>
+    /// Whether OpenXLR ships a baseline for this model (see
+    /// <see cref="DeviceDefaults"/>), so a device that keeps its settings can
+    /// still be reset to a known state.
+    /// </summary>
+    public bool BuiltInDefaults { get; init; }
 }

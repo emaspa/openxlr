@@ -25,6 +25,7 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
         Phantom = true, ClipGuard = true, Compressor = true,
         OutputRouting = true, AuxInput = true,
         XlrInputs = 2, HpOutputs = 2,
+        BuiltInDefaults = true,
     };
 
     private const ushort VIndex = 0x0103;

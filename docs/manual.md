@@ -243,6 +243,14 @@ stay). The defaults are recorded the first time the interface connects
 after a power cycle, so the button asks for one replug on a fresh
 install.
 
+The Wave XLR Pro keeps its settings in its own memory, so there is no
+clean state to record and whatever is set on Linux is what Wave Link
+finds on Windows, and the other way round. For it the same button
+writes OpenXLR's baseline instead: gain 30 dB on both inputs, every
+processing stage and phantom power off, headphones, crossfade and aux
+level at half. Output routing and saved profiles stay. The gain lock
+has to be off.
+
 <a name="default-devices"></a>
 ### 3.7 Hold the system default devices
 
@@ -535,7 +543,7 @@ it to a public issue. Nothing is uploaded automatically.
 | `$XDG_RUNTIME_DIR/openxlr/token` (or `~/.config/openxlr/token` without a runtime directory) | the control API token for this daemon run, readable by your user only; the window and the OpenDeck plugin read it, a daemon older than the window will not have it ([section 3.10](#upgrade)) |
 | `$XDG_RUNTIME_DIR/openxlr/daemon.lock` | held by the running daemon; a second daemon started for the same user stops at once instead of waiting for the port |
 | `~/.config/openxlr/devices/<vid-pid>/last-state.json` | the settings restored on connect to an interface without settings memory |
-| `~/.config/openxlr/devices/<vid-pid>/defaults.json` | the firmware defaults of such an interface, recorded after a power cycle, written back by "Reset device to defaults" |
+| `~/.config/openxlr/devices/<vid-pid>/defaults.json` | the firmware defaults of such an interface, recorded after a power cycle, written back by "Reset device to defaults" (the Pro has no such file: its reset writes OpenXLR's baseline) |
 | `~/.config/openxlr/daemon.json` | the submixer on/off preference |
 | `~/.config/openxlr/gainlock.json` | which devices have the gain lock set |
 | `~/.config/openxlr/ui.json` | window preferences |

@@ -162,7 +162,9 @@ marked to recall on connect: at daemon start, after a replug or power
 cycle, or when switching to that device. Interfaces without settings
 memory (Wave XLR, the first XLR Dock) get their last settings back
 on every fresh connect without a profile, and can be reset to the
-firmware defaults recorded after a power cycle. App routing and the
+firmware defaults recorded after a power cycle. The Wave XLR Pro, which
+keeps its own settings, can be reset to OpenXLR's baseline instead:
+gain 30 dB, everything off, levels at half. App routing and the
 enforced system defaults are global and not part of a profile, so
 recalling one does not rewire the desktop.
 
