@@ -31,7 +31,17 @@ public sealed record PluginSetup(
     string Lv2Directory, string ClapDirectory, string Vst3Directory,
     string? YabridgeVersion, bool Wine,
     IReadOnlyList<string> WindowsDirectories,
-    IReadOnlyList<string> WineFolders);
+    IReadOnlyList<string> WineFolders)
+{
+    /// <summary>Wine's version as it reports it, or null when Wine is not installed.</summary>
+    public string? WineVersion { get; init; }
+
+    /// <summary>
+    /// What a user should know before opening a bridged plugin's own editor
+    /// with this pair of versions, or null when there is nothing to say.
+    /// </summary>
+    public string? WindowsEditorNote { get; init; }
+}
 
 /// <summary>
 /// How an install went, in words the user can read. The destinations are
@@ -404,6 +414,39 @@ public sealed class PluginInstaller
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return []; }
     }
 
+    /// <summary>
+    /// Whether a bridged plugin's own editor will ignore the mouse. Since
+    /// Wine 9.22 the position a plugin's window believes it has and the one
+    /// it actually has are not the same, and every click arrives offset by
+    /// the distance between them, which for a window anywhere but the very
+    /// corner of the screen is far outside the plugin. yabridge has a fix in
+    /// progress; released yabridge, up to 5.1.1, does not carry it.
+    /// </summary>
+    internal static bool EditorsIgnoreTheMouse(string? yabridgeVersion, string? wineVersion)
+        => yabridgeVersion is not null   // nothing is bridged without it
+           && AtLeast(wineVersion, 9, 22) && !AtLeast(yabridgeVersion, 5, 2);
+
+    /// <summary>A version string such as "wine-11.17" or "5.1.1" against a floor.</summary>
+    internal static bool AtLeast(string? version, int major, int minor)
+    {
+        if (version is null) return false;
+        var digits = new List<int>();
+        int index = 0;
+        while (index < version.Length && digits.Count < 2)
+        {
+            if (!char.IsAsciiDigit(version[index])) { index++; continue; }
+            int start = index;
+            while (index < version.Length && char.IsAsciiDigit(version[index])) index++;
+            digits.Add(int.Parse(version.AsSpan(start, index - start)));
+            // Only a run of digits separated by a dot is the rest of a version.
+            if (index >= version.Length || version[index] != '.') break;
+            index++;
+        }
+        if (digits.Count == 0) return false;
+        if (digits[0] != major) return digits[0] > major;
+        return digits.Count > 1 && digits[1] >= minor;
+    }
+
     /// <summary>What is there: the directories, the host, yabridge and Wine.</summary>
     public PluginSetup Setup()
     {
@@ -419,6 +462,16 @@ public sealed class PluginInstaller
             }
             else version = "installed";
         }
+        string? wineVersion = null;
+        if (_wine is not null)
+        {
+            try
+            {
+                ProcessResult result = ProcessRunner.Run(_wine, ["--version"], TimeSpan.FromSeconds(10), cLocale: false);
+                if (result.ExitCode == 0) wineVersion = Encoding.UTF8.GetString(result.Stdout).Trim().Split('\n')[0].Trim();
+            }
+            catch (Exception) { /* Wine that will not say is Wine we know nothing about */ }
+        }
         IReadOnlyList<string> bridged = WindowsDirectories();
         var known = bridged.Select(d => Path.GetFullPath(d).TrimEnd('/')).ToHashSet(StringComparer.Ordinal);
         // Only the ones still to bridge: a folder already handed over needs
@@ -426,7 +479,13 @@ public sealed class PluginInstaller
         IReadOnlyList<string> wine = _wine is null || _yabridgectl is null
             ? []
             : [.. WinePluginFolders().Where(f => !known.Contains(Path.GetFullPath(f).TrimEnd('/')))];
-        return new(_hostInstalled, Shorten(_lv2), Shorten(_clap), Shorten(_vst3), version, _wine is not null, bridged, wine);
+        return new(_hostInstalled, Shorten(_lv2), Shorten(_clap), Shorten(_vst3), version, _wine is not null, bridged, wine)
+        {
+            WineVersion = wineVersion,
+            WindowsEditorNote = EditorsIgnoreTheMouse(version, wineVersion)
+                ? $"A Windows plugin's own editor ignores the mouse with yabridge {version} and {wineVersion}: since Wine 9.22 its clicks arrive somewhere else entirely. The plugin plays, and its controls window here works. The manual has the two ways to fix the editor."
+                : null,
+        };
     }
 
     private ProcessResult? Run(params string[] arguments)

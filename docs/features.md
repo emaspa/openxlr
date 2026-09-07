@@ -145,7 +145,10 @@ help: an archive to extract, a Windows installer to run with Wine first,
 a VST2 file. The catalogues are read again afterwards, and every open
 chain fetches the list, so the plugin is in the picker a moment later.
 The Options window says where plugins go, whether yabridge and Wine are
-installed and how many folders they bridge. It offers the plugin folders
+installed and how many folders they bridge, and it names the pair of
+versions, yabridge up to 5.1.1 with Wine 9.22 or newer, that leaves a
+bridged plugin's own editor deaf to the mouse, since the plugin is still
+worth using through the controls OpenXLR builds for it. It offers the plugin folders
 found in Wine's own drive, which file dialogs hide, so the first Windows
 plugin is one press rather than a hunt; the ones after it, installed into
 a folder already bridged, take the sync beside it.

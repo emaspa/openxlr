@@ -335,6 +335,31 @@ public sealed class PluginInstallerTests : IDisposable
     }
 
     [Fact]
+    public void TheVersionsThatLeaveABridgedEditorDeafAreRecognised()
+    {
+        // Wine 9.22 changed how a plugin window's position is tracked, and
+        // released yabridge does not carry the fix, so every click lands far
+        // from where it was aimed.
+        Assert.True(PluginInstaller.EditorsIgnoreTheMouse("5.1.1", "wine-11.17"));
+        Assert.True(PluginInstaller.EditorsIgnoreTheMouse("5.1.1", "wine-9.22 (Staging)"));
+        Assert.True(PluginInstaller.EditorsIgnoreTheMouse("5.0.4", "wine-10.0"));
+
+        Assert.False(PluginInstaller.EditorsIgnoreTheMouse("5.1.1", "wine-9.21"));
+        Assert.False(PluginInstaller.EditorsIgnoreTheMouse("5.1.1", "wine-8.21"));
+        Assert.False(PluginInstaller.EditorsIgnoreTheMouse("5.2.0", "wine-11.17"));   // the fix, once released
+        Assert.False(PluginInstaller.EditorsIgnoreTheMouse("6.0.0", "wine-11.17"));
+        Assert.False(PluginInstaller.EditorsIgnoreTheMouse(null, "wine-11.17"));      // no yabridge, no bridging
+        Assert.False(PluginInstaller.EditorsIgnoreTheMouse("5.1.1", null));
+
+        // Whatever a version looks like, only its first two numbers count.
+        Assert.True(PluginInstaller.AtLeast("wine-11.17", 9, 22));
+        Assert.True(PluginInstaller.AtLeast("yabridgectl 5.1.1", 5, 1));
+        Assert.False(PluginInstaller.AtLeast("yabridgectl 5.1.1", 5, 2));
+        Assert.False(PluginInstaller.AtLeast("installed", 5, 2));
+        Assert.False(PluginInstaller.AtLeast("", 1, 0));
+    }
+
+    [Fact]
     public void TheSetupNamesTheDirectoriesAndWhatIsMissing()
     {
         PluginSetup setup = Installer().Setup();

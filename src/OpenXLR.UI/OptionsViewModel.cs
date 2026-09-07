@@ -70,6 +70,12 @@ public sealed class OptionsViewModel : ViewModelBase
     /// <summary>What the button offers, named after what it will bridge.</summary>
     public string BridgeWineLabel { get => _bridgeWineLabel; private set => Set(ref _bridgeWineLabel, value); }
 
+    private string? _windowsEditorNote;
+    /// <summary>What to know before opening a bridged plugin's own editor, or null.</summary>
+    public string? WindowsEditorNote { get => _windowsEditorNote; private set { if (Set(ref _windowsEditorNote, value)) Raise(nameof(HasWindowsEditorNote)); } }
+
+    public bool HasWindowsEditorNote => !string.IsNullOrEmpty(_windowsEditorNote);
+
     private bool _canBridgeWine;
     /// <summary>
     /// Whether Wine holds plugins nobody has bridged yet. The button spares
@@ -99,6 +105,7 @@ public sealed class OptionsViewModel : ViewModelBase
         bool host = setup["hostInstalled"]?.GetValue<bool>() ?? true;
         PluginDirectories = $"Plugins are looked for in {lv2}, {clap} and {vst3} and the system plugin directories."
             + (host ? "" : " The native plugin host is not installed beside the daemon, so CLAP and VST3 plugins cannot run.");
+        WindowsEditorNote = setup["windowsEditorNote"]?.GetValue<string>();
         string? yabridge = setup["yabridge"]?.GetValue<string>();
         bool wine = setup["wine"]?.GetValue<bool>() ?? false;
         int folders = (setup["windowsDirectories"] as System.Text.Json.Nodes.JsonArray)?.Count ?? 0;

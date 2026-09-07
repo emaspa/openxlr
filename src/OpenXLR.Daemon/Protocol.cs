@@ -98,6 +98,9 @@ public sealed record PluginSetupMessage(PluginSetup Setup)
     [JsonPropertyName("windowsDirectories")] public IReadOnlyList<string> WindowsDirectories => Setup.WindowsDirectories;
     /// <summary>Wine's own plugin folders that hold a plugin and are not bridged yet.</summary>
     [JsonPropertyName("wineFolders")] public IReadOnlyList<string> WineFolders => Setup.WineFolders;
+    [JsonPropertyName("wineVersion")] public string? WineVersion => Setup.WineVersion;
+    /// <summary>What to know before opening a bridged plugin's own editor, or null.</summary>
+    [JsonPropertyName("windowsEditorNote")] public string? WindowsEditorNote => Setup.WindowsEditorNote;
     [JsonIgnore] public PluginSetup Setup { get; } = Setup;
 }
 

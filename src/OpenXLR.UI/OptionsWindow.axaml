@@ -107,6 +107,10 @@
                   ToolTip.Tip="Read the plugin directories again, for plugins installed by other means"/>
         </StackPanel>
         <TextBlock Text="{Binding WindowsPlugins}" FontSize="11" Foreground="#8b93a7" TextWrapping="Wrap" Margin="0,4,0,0"/>
+        <!-- A pair of versions that leaves a bridged plugin's own editor deaf
+             to the mouse. Worth saying before the user spends an evening on it. -->
+        <TextBlock Text="{Binding WindowsEditorNote}" IsVisible="{Binding HasWindowsEditorNote}"
+                   FontSize="11" Foreground="#e0b050" TextWrapping="Wrap"/>
         <!-- Wine keeps its plugins under a dot directory a file dialog hides,
              so what is found there is offered rather than browsed to. -->
         <Button Name="BridgeWine" Content="{Binding BridgeWineLabel}" Padding="14,5" HorizontalAlignment="Left"
