@@ -49,9 +49,18 @@ internal sealed class NativePluginHost : IDisposable
     private readonly TimeSpan _patience = TimeSpan.FromSeconds(10);
     public IReadOnlyDictionary<string, double> Meters => new Dictionary<string, double>(_meters);
     public static string Executable => Path.Combine(AppContext.BaseDirectory, "openxlr-lv2-host");
+    /// <summary>
+    /// What the helper implements for a plugin's DSP. The list is the same one
+    /// native/lv2-host.c checks, and the two have to agree: this side decides
+    /// whether an editor is offered, that side refuses to load without it.
+    /// </summary>
     internal static bool SupportsFeatures(IEnumerable<string> required)
         => required.All(feature => feature is
-            "http://lv2plug.in/ns/ext/urid#map" or "http://lv2plug.in/ns/ext/urid#unmap");
+            "http://lv2plug.in/ns/ext/urid#map"
+            or "http://lv2plug.in/ns/ext/urid#unmap"
+            or "http://lv2plug.in/ns/ext/worker#schedule"
+            or "http://lv2plug.in/ns/ext/options#options"
+            or "http://lv2plug.in/ns/ext/buf-size#boundedBlockLength");
     internal static bool SupportsUiFeatures(IEnumerable<string> required)
         => required.All(feature => feature is
             "http://lv2plug.in/ns/ext/urid#map"

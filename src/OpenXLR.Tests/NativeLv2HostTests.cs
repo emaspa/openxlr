@@ -11,11 +11,27 @@ public sealed class NativeLv2HostTests
     [Theory]
     [InlineData("http://lv2plug.in/ns/ext/urid#map", true)]
     [InlineData("http://lv2plug.in/ns/ext/urid#unmap", true)]
-    [InlineData("http://lv2plug.in/ns/ext/worker#schedule", false)]
-    [InlineData("http://lv2plug.in/ns/ext/options#options", false)]
+    [InlineData("http://lv2plug.in/ns/ext/worker#schedule", true)]
+    [InlineData("http://lv2plug.in/ns/ext/options#options", true)]
+    [InlineData("http://lv2plug.in/ns/ext/buf-size#boundedBlockLength", true)]
+    [InlineData("http://lv2plug.in/ns/ext/state#loadDefaultState", false)]
     [InlineData("urn:unknown", false)]
     public void NativeHostDoesNotClaimFeaturesItDoesNotImplement(string feature, bool supported)
         => Assert.Equal(supported, NativePluginHost.SupportsFeatures([feature]));
+
+    [Fact]
+    public void EveryFeatureTheHelperAcceptsIsOneItImplements()
+    {
+        // The C source is the other half of this contract: it refuses to load
+        // a plugin whose required features it does not provide, so the two
+        // lists have to name the same extensions.
+        string source = File.ReadAllText(Path.Combine(
+            AppContext.BaseDirectory, "..", "..", "..", "..", "..", "native", "lv2-host.c"));
+        foreach (string macro in new[] { "LV2_WORKER__schedule", "LV2_OPTIONS__options", "LV2_BUF_SIZE__boundedBlockLength" })
+            Assert.Contains(macro, source);
+        Assert.True(NativePluginHost.SupportsFeatures(
+            ["http://lv2plug.in/ns/ext/worker#schedule", "http://lv2plug.in/ns/ext/options#options"]));
+    }
 
     [Theory]
     [InlineData("http://lv2plug.in/ns/ext/urid#map", true)]

@@ -135,7 +135,8 @@ audio that is playing and its changes are saved like any other control.
 The plugin keeps processing if the editor stops answering or the X
 display goes away, and a chain whose host keeps crashing is switched off
 once it has failed three times in five minutes, with the reason on the
-insert. The manual covers the
+insert. Plugins that hand work to a background thread, which is how
+reverbs and convolvers build their impulse responses, are hosted too. The manual covers the
 setup in 3.12.
 
 The submixer can be switched off in Options. The daemon then controls

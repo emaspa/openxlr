@@ -73,8 +73,15 @@ Use the session's own value rather than a copy, and never `xhost +`.
 
 ## Scope
 
-URID map and unmap for the plugin, and the X11 editor features this host
-implements: instance access, parent, resize and the idle interface. Worker
-threads, state and presets, and the VST and CLAP formats are separate work.
-Changing an insert's host rebuilds its chain; nothing here swaps a plugin
-without a gap.
+For the plugin: URID map and unmap, the worker extension, options, and the
+promise that the block length is bounded. The worker runs on a thread of its
+own, fed by two lock-free rings, so a plugin that hands off heavy work never
+does it in the audio callback; its answers are delivered before the next run.
+That is what reverbs and convolvers ask for, and without it they could not be
+hosted at all.
+
+For the editor: instance access, parent, resize and the idle interface.
+
+State and presets, and the VST and CLAP formats, are separate work. Changing
+an insert's host rebuilds its chain; nothing here swaps a plugin without a
+gap.
