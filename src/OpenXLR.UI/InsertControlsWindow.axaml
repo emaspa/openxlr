@@ -48,22 +48,26 @@
         </StackPanel>
         <TextBlock Text="{Binding Plugin}" Classes="h" FontSize="11"/>
         <TextBlock Text="{Binding Error}" Foreground="#e0a05a" FontSize="11" IsVisible="{Binding HasError}"/>
-        <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Left"
+      </StackPanel>
+      <!-- Every button lives on the right, in two rows when this plugin can
+           be hosted natively. -->
+      <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Top" HorizontalAlignment="Right">
+        <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+          <Button Content="Plugin UI" Padding="12,4" Click="OnNativeEditor"
+                  IsVisible="{Binding NativeEditorSupported}"
+                  IsEnabled="{Binding NativeEditorAvailable}"
+                  ToolTip.Tip="Open this plugin's own editor on the live audio instance"/>
+          <Button Content="Defaults" Padding="12,4" Click="OnDefaults"
+                  ToolTip.Tip="Put every control back to the plugin's own defaults"/>
+          <ToggleButton Content="Bypass" IsChecked="{Binding Bypass, Mode=TwoWay}" Padding="12,4"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right"
                     IsVisible="{Binding CanChooseNativeHost}">
           <ToggleButton Content="Native host" IsChecked="{Binding NativeHost, Mode=TwoWay}" Padding="12,4"
                         ToolTip.Tip="Run this insert in its own process, which is what lets its own editor open. Switching rebuilds the chain and interrupts audio for a moment."/>
-          <Button Content="Manual" Padding="10,4" Click="OnEditorManual" VerticalAlignment="Center"
+          <Button Content="Manual" Padding="10,4" Click="OnEditorManual"
                   ToolTip.Tip="Open the manual section on plugin editors"/>
         </StackPanel>
-      </StackPanel>
-      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
-        <Button Content="Plugin UI" Padding="12,4" Click="OnNativeEditor"
-                IsVisible="{Binding NativeEditorSupported}"
-                IsEnabled="{Binding NativeEditorAvailable}"
-                ToolTip.Tip="Open this plugin's own editor on the live audio instance"/>
-        <Button Content="Defaults" Padding="12,4" Click="OnDefaults"
-                ToolTip.Tip="Put every control back to the plugin's own defaults"/>
-        <ToggleButton Content="Bypass" IsChecked="{Binding Bypass, Mode=TwoWay}" Padding="12,4"/>
       </StackPanel>
     </Grid>
     <Button DockPanel.Dock="Bottom" Content="Close" HorizontalAlignment="Right" Padding="18,6" Margin="0,10,0,0" Click="OnClose"/>
