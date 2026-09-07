@@ -39,6 +39,14 @@ jobs:
           python3 tools/check-openapi.py docs/openapi-v1.json
           node --test plugin/tests/*.test.mjs
 
+      - name: Optional native LV2 host compiles
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libpipewire-0.3-dev liblilv-dev lv2-dev libx11-dev
+          make -C native
+          test -x native/openxlr-lv2-host
+
       - name: Lint shell scripts
         run: shellcheck --severity=error tools/check-version.sh tools/check-locked-restore.sh packaging/ppa/make-source.sh
 

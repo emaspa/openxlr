@@ -22,5 +22,10 @@ public partial class InsertControlsWindow : Window
         if (DataContext is InsertViewModel insert) await insert.Owner.ShowNativeEditorAsync(insert);
     }
 
+    private const string EditorManual =
+        "https://github.com/emaspa/openxlr/blob/main/docs/manual.md#plugin-editors";
+
+    private void OnEditorManual(object? sender, RoutedEventArgs e) => ExternalLink.Open(EditorManual);
+
     private void OnClose(object? sender, RoutedEventArgs e) => Close();
 }

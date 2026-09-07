@@ -259,9 +259,10 @@ Code:
   graph changes, the bounded send queue, diagnostics redaction, systemd
   sandboxing, the test project and CI), the progress-gated watchdog, the
   update notice, the versioned HTTP API, the OpenDeck choices generated
-  from daemon state, and the first pieces of the editable layout: its
-  saved format, live channel creation and the saved order. Her native LV2
-  plugin editors are in review.
+  from daemon state, the first pieces of the editable layout (its saved
+  format, live channel creation and the saved order), and the optional
+  native LV2 host that opens a plugin's own editor on the instance
+  processing your audio.
 - [Michael Brooks](https://github.com/Michael-Brooks): the stream-sweep
   starvation fix ([#7](https://github.com/emaspa/openxlr/pull/7)) and the
   diagnosis that led to it.

@@ -80,6 +80,11 @@ modules or custom drivers:
   inserts on inputs and mixes) are `filter-chain` nodes, each held by a
   long-lived `pw-cli -m` process for the life of the chain; their
   controls are set with `pw-cli set-param`.
+- An insert switched to the native host is not a filter-chain node but
+  an `openxlr-lv2-host` process, one per insert, holding that plugin and
+  its editor behind a PipeWire filter node of its own. The rest of the
+  chain stays filter-chain nodes, linked stage to stage, and the daemon
+  speaks to the helper over a pipe that carries control values only.
 - Direct port links (`pw-link`) wire hardware inputs, chains, mixes and
   outputs, so the output device clocks the chain. Hardware inputs are
   wired by capture-channel pair (XLR 1 = pair 0, XLR 2 = pair 1, Line

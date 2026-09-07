@@ -106,17 +106,17 @@ plugin world, and it has to keep the audio path inside PipeWire. It waits
 for the mixer layout block above; the maintainer would rather have one
 host mechanism stable than two half-finished ones.
 
-- [ ] Native plugin editors: open an LV2 plugin's own window on the
-  instance that processes audio. This needs the instance out of
-  filter-chain and into a host process that exposes a PipeWire filter
-  node; the design has to keep filter-chain for inserts that have no
-  editor, and must not make the .NET build depend on a C toolchain. A
-  pull request (#19) meets those constraints with an optional C helper
-  and stays open until the layout work is done. Before it ships, native
-  hosting becomes a per-insert choice so an existing chain does not
-  change host on upgrade, and the helper is packaged on every channel
-  (its libraries already ship with the daemon; only build-time headers
-  and a compiler are new).
+- [x] Native plugin editors: an LV2 plugin's own window, open on the
+  instance that processes its audio. The instance moves out of
+  filter-chain into an optional C helper that carries one plugin and its
+  editor behind a PipeWire filter node. It is a per-insert choice, so an
+  existing chain never changes host on upgrade, and every insert without
+  that choice stays in filter-chain. A failing editor costs the editor
+  only: a lost X display, an editor that stops answering and a plugin that
+  crashes on start are each handled with the audio still playing. The .NET
+  build still needs no compiler; the helper is built with
+  `-p:EnableNativeLv2Host=true`. It is not in the packages yet, so it
+  remains a build-from-source feature.
 - [ ] VST3 and CLAP, and Windows VST3 through yabridge, in the same host
   process model, one plugin per process, supervised and fail-open so a
   crashed plugin is bypassed and audio continues.

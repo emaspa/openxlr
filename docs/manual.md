@@ -206,9 +206,9 @@ channel, with its level and lock in the INPUTS card.
    (red light); the arrows reorder the chain; the cross removes it.
 4. Chains are saved with the mixer and with profiles.
 
-The plugin's own graphical interface, if it has one, is not shown; the
-generated controls cover every parameter the plugin exposes. VST and
-CLAP plugins cannot be loaded.
+The generated controls cover every parameter the plugin exposes. A
+plugin's own editor can be opened as well, with the optional native host
+described in 3.12. VST and CLAP plugins cannot be loaded.
 
 <a name="profiles"></a>
 ### 3.6 Save and recall a scene
@@ -346,6 +346,55 @@ three seconds: nothing is kept that the daemon could not set.
 Ids are generated from names and never change afterwards, so profiles
 and Stream Deck keys survive a rename. The layout file is described in
 [mixer-layout.md](mixer-layout.md).
+
+<a name="plugin-editors"></a>
+### 3.12 Open a plugin's own editor
+
+The controls window is generated from the plugin's parameters and works
+for every plugin. Some plugins also ship an editor of their own, with the
+meters and curves their authors drew. Opening one needs the optional
+native host, which the packages do not carry. Build it from source:
+
+```sh
+dotnet build src/OpenXLR.slnx -c Release -p:EnableNativeLv2Host=true
+```
+
+It needs a C compiler, make, pkg-config and the development files for
+PipeWire, lilv, the LV2 headers and X11. See
+[install-from-source.md](install-from-source.md).
+
+With the host in place:
+
+1. Open a plugin's Controls window. A plugin whose editor OpenXLR can
+   host shows a "Native host" button.
+2. Turn it on. That one insert moves out of the shared filter chain into
+   its own process, which rebuilds the chain and interrupts audio for a
+   moment. Every other plugin stays where it is.
+3. Press "Plugin UI". The editor opens on the plugin that is processing
+   your audio. What you change there appears in the controls window and
+   is saved with the mixer and with profiles.
+4. Turn "Native host" off to put the insert back in the shared chain.
+
+The editor draws on an X11 display, which means XWayland on a Wayland
+desktop, and the daemon has to know about it. A user service that started
+before the desktop published its display does not, and the fix is one
+import and a restart, from a terminal inside the graphical session:
+
+```sh
+systemctl --user import-environment DISPLAY XAUTHORITY
+systemctl --user restart openxlr-daemon.service
+```
+
+The restart interrupts audio briefly. Repeat it after a graphical login
+that assigns a new display.
+
+Trouble with an editor never costs you the sound. If the X server goes
+away while an editor is open, the editor closes and the plugin keeps
+processing; pressing "Plugin UI" again opens a fresh one. If an editor
+stops answering, the insert says its controls are frozen and its audio
+carries on. A plugin that keeps crashing has its chain switched off after
+it has failed three times in five minutes, with the reason on the insert;
+changing or bypassing that chain starts it over.
 
 <a name="stream-deck"></a>
 ## 4. Stream Deck (OpenDeck)

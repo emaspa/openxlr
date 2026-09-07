@@ -1,77 +1,76 @@
 # Optional LV2 editor host
 
-The default .NET build does not invoke make or require a C compiler.
-Inserts use PipeWire filter-chain by default, even when the helper is installed.
-Build and copy the optional helper with:
+`lv2-host.c` builds `openxlr-lv2-host`, a small process that loads one LV2
+plugin, gives it PipeWire ports and, on request, opens the plugin's own X11
+editor on that live instance. It exists because a plugin's editor talks to its
+DSP instance directly (LV2 instance access), which a PipeWire filter chain
+cannot offer.
+
+Nothing here is built by default, and installing it changes nothing on its
+own: inserts use the filter chain until an insert is explicitly switched to
+the native host in its controls window.
+
+## Build
 
 ```sh
 dotnet build src/OpenXLR.slnx -c Release -p:EnableNativeLv2Host=true
 ```
 
-Native build dependencies are a C11 compiler, make, pkg-config, PipeWire
-development headers, lilv development headers and X11 development headers.
-The helper can also be built with `make -C native` and installed beside
-the daemon separately. Distribution packages are not changed by this PR.
+The flag compiles this directory and copies the helper next to the daemon.
+`make -C native` builds it alone. It needs a C11 compiler, make, pkg-config
+and the development files for PipeWire, lilv, LV2 and X11.
 
-For a supported plugin exposing an X11 editor, enable **Native host** in its
-controls window to run that insert in an isolated PipeWire filter process.
-The choice is stored as `nativeHost: true` in the insert definition; old
-settings and profiles without the field keep filter-chain. An explicitly
-selected native host that is unavailable reports an error instead of silently
-changing hosts. Disable the choice to return to filter-chain. Switching hosts
-rebuilds the chain and can briefly interrupt audio.
-Other inserts remain in filter-chain, also
-inside mixed chains. The existing generated controls window gains a Plugin UI
-button when the daemon advertises an available native editor. On Wayland the
-editor requires XWayland. The catalog checks required features on both the DSP
-and the selected X11 UI before advertising the editor. The live insert status
-also reports whether its native host is running, so a failed or bypassed chain
-cannot offer an editor action that will only fail. Unsupported requirements are
-never silently accepted; the existing upstream API feature gate remains in place.
+## What it does
 
-Control edits return through the helper pipe and are saved by the normal
-daemon settings path. Plugin output-control meters are included in insert status.
-Audio buffers never cross managed code or the command pipe.
+- One process per insert, holding one plugin instance and its editor.
+- Audio stays in PipeWire: the process is a `pw_filter` with the plugin's
+  ports. Samples never cross the command pipe or managed code.
+- The pipe carries control values only, in both directions. What the editor
+  changes comes back and is saved with the mixer, like any other control.
+- The daemon owns the process. Closing its stdin ends the helper, which is
+  why it watches that pipe rather than using PDEATHSIG, whose Linux semantics
+  follow the thread that spawned it.
 
-## Desktop session environment with the packaged user service
+## What it will not do to your audio
 
-The user service can start before the desktop publishes its X11 environment.
-The helper inherits the daemon's environment; it does not search other sessions
-or guess a display/cookie. From a terminal **inside the active graphical session**,
-import its values before restarting the daemon:
+The whole point is that an editor cannot cost you the microphone.
+
+- A protocol error from the editor is logged and the plugin keeps running.
+  Xlib's default handler would have exited the process.
+- A lost X connection drops the editor and leaves the plugin processing.
+  Verified by asking the X server to close the helper's connection while an
+  editor was open: the process kept its heartbeat, kept its ports, and opened
+  a fresh editor on request. The same test on a build without the handlers
+  killed the process immediately.
+- An editor that stops answering freezes that insert's controls and says so.
+  Its audio continues, and the daemon does not rebuild the chain for it.
+- A chain that dies on its own is rebuilt, until it has failed three times
+  within five minutes; then it is left off with the reason on the insert,
+  because every rebuild of an input chain interrupts the microphone. Changing
+  or bypassing the chain starts it over.
+
+## Session environment
+
+The editor needs an X11 display, so XWayland on a Wayland desktop. The helper
+inherits the daemon's environment and does not go looking for a session. A
+user service that started before the desktop published its display has none,
+which shows up as an editor that will not open. From a terminal inside the
+graphical session:
 
 ```sh
 systemctl --user import-environment DISPLAY XAUTHORITY
 systemctl --user restart openxlr-daemon.service
 ```
 
-The restart briefly interrupts audio. Repeat the import at graphical login (or
-use the desktop's session-start integration), especially when XWayland assigns
-a new display. Check that DISPLAY is set and that XAUTHORITY, when set, points
-to a readable cookie file. GDM/SDDM often use a file under `/run/user/...`, not
-`~/.Xauthority`; use the session's value, not a copied or guessed cookie. Never
-use `xhost +` to bypass authentication.
+The restart interrupts audio for a moment. Repeat it after a graphical login
+that assigns a new display. `XAUTHORITY`, when set, has to point at a cookie
+file the daemon can read; display managers commonly put it under `/run/user`.
+Use the session's own value rather than a copy, and never `xhost +`.
 
-The packaged unit also enables `PrivateTmp`. For a filesystem X11 socket that
-is hidden by that setting, create a **user override** with
-`systemctl --user edit openxlr-daemon.service`:
+## Scope
 
-```ini
-[Service]
-PrivateTmp=false
-```
-
-Then run `systemctl --user daemon-reload` and restart after the import above.
-This optional override reduces temporary-directory isolation; the shipped unit
-is unchanged. Do not disable other hardening. On Wayland, XWayland must be
-running. These steps describe setup, not acceptance on GDM/SDDM hardware.
-
-The helper observes the daemon-owned stdin pipe for EOF/HUP instead of using
-PDEATHSIG, whose Linux semantics tie it to the creating thread. A separate
-monitor thread reports audio progress; the UI loop reports UI progress.
-A stalled editor does not by itself make the DSP process unhealthy.
-
-The host currently implements URID map/unmap for DSP and the X11 editor
-features used by this implementation. Worker, state/preset, VST3 and CLAP
-support are separate work. Changing chains still uses the existing rebuild
-mechanism; seamless swapping is not claimed.
+URID map and unmap for the plugin, and the X11 editor features this host
+implements: instance access, parent, resize and the idle interface. Worker
+threads, state and presets, and the VST and CLAP formats are separate work.
+Changing an insert's host rebuilds its chain; nothing here swaps a plugin
+without a gap.
