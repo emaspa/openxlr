@@ -196,10 +196,6 @@
                               ItemsSource="{Binding RecallChoices}"
                               SelectedItem="{Binding RecallOnConnectChoice}"/>
                   </Grid>
-                  <Button Content="Reset device to defaults" FontSize="12" Margin="0,6,0,0"
-                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                          IsVisible="{Binding ShowResetDefaults}" Click="OnResetDevice"
-                          ToolTip.Tip="{Binding ResetDescription}"/>
                 </StackPanel>
               </Flyout>
             </DropDownButton.Flyout>

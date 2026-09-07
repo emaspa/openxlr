@@ -94,6 +94,15 @@
       </StackPanel>
     </Border>
 
+    <Border Classes="card" IsVisible="{Binding Main.ShowResetDefaults}">
+      <StackPanel Spacing="6">
+        <TextBlock Text="INTERFACE" Classes="h"/>
+        <TextBlock Text="{Binding Main.ResetDescription}"
+                   FontSize="11" Foreground="#6b7285" TextWrapping="Wrap"/>
+        <Button Content="Reset device to defaults" Padding="14,5" HorizontalAlignment="Left" Click="OnResetDevice"/>
+      </StackPanel>
+    </Border>
+
     <Border Classes="card">
       <StackPanel Spacing="6">
         <TextBlock Text="SUPPORT" Classes="h"/>

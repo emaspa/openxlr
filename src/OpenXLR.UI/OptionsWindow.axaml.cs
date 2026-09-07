@@ -37,6 +37,13 @@ public partial class OptionsWindow : Window
         }
     }
 
+    private async void OnResetDevice(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not OptionsViewModel vm) return;
+        if (await Dialogs.ConfirmAsync(this, "Reset device to defaults?", vm.Main.ResetDescription, "Reset"))
+            vm.Main.ResetDevice();
+    }
+
     private void OnClose(object? sender, RoutedEventArgs e) => Close();
 
     private async void OnCheckUpdates(object? sender, RoutedEventArgs e)

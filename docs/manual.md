@@ -237,7 +237,8 @@ daemon remembers every change and writes it back whenever the
 interface connects fresh, so a reboot or a replug leaves you where you
 were, with no profile needed. The picker shows "(last settings)" in
 place of "(none)" on these devices; a chosen profile takes precedence.
-"Reset device to defaults" under the picker writes the firmware
+"Reset device to defaults", in Options under INTERFACE (away from the
+profile picker, where a slip would be costly), writes the firmware
 defaults back and forgets the remembered settings (saved profiles
 stay). The defaults are recorded the first time the interface connects
 after a power cycle, so the button asks for one replug on a fresh

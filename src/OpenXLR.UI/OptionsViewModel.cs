@@ -22,6 +22,9 @@ public sealed class OptionsViewModel : ViewModelBase
     public DaemonClient Client => _client;
     public UpdatesViewModel Updates => _main.Updates;
 
+    /// <summary>The main view model, for the interface reset that lives in Options.</summary>
+    public MainViewModel Main => _main;
+
     public OptionsViewModel(DaemonClient client, MainViewModel main)
     {
         _client = client;
