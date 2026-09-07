@@ -50,6 +50,48 @@ internal sealed class NativePluginHost : IDisposable
     public IReadOnlyDictionary<string, double> Meters => new Dictionary<string, double>(_meters);
     public static string Executable => Path.Combine(AppContext.BaseDirectory, "openxlr-lv2-host");
 
+    /// <summary>
+    /// The desktop's display, for a daemon that has none of its own. A user
+    /// service that started before the session, or one left running across a
+    /// logout, has no DISPLAY, and a plugin's editor cannot open without one.
+    /// The session hands its display to systemd's user manager when it
+    /// starts, so that is where it is asked for.
+    /// </summary>
+    private static IReadOnlyDictionary<string, string> SessionDisplay()
+    {
+        if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("DISPLAY")))
+            return new Dictionary<string, string>(StringComparer.Ordinal);
+        string? environment = null;
+        try
+        {
+            ProcessResult result = ProcessRunner.Run("systemctl", ["--user", "show-environment"], TimeSpan.FromSeconds(3));
+            if (result.ExitCode == 0) environment = System.Text.Encoding.UTF8.GetString(result.Stdout);
+        }
+        catch (Exception) { /* no systemd, or none of it running: nothing to learn */ }
+        return DisplayIn(environment);
+    }
+
+    /// <summary>
+    /// DISPLAY and the cookie file beside it, out of what a manager reports.
+    /// A cookie without a display is no use, so neither is passed on.
+    /// </summary>
+    internal static Dictionary<string, string> DisplayIn(string? environment)
+    {
+        var found = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (string line in (environment ?? "").Split('\n'))
+        {
+            int equals = line.IndexOf('=');
+            if (equals <= 0) continue;
+            string name = line[..equals].Trim();
+            if (name is not ("DISPLAY" or "XAUTHORITY")) continue;
+            string value = line[(equals + 1)..].Trim();
+            if (value.Length > 1 && value[0] == '"' && value[^1] == '"') value = value[1..^1];
+            if (value.Length > 0) found[name] = value;
+        }
+        if (!found.ContainsKey("DISPLAY")) found.Clear();
+        return found;
+    }
+
     /// <summary>Whether the optional helper was built and installed beside the daemon.</summary>
     public static bool HostInstalled => File.Exists(Executable);
     /// <summary>
@@ -99,6 +141,8 @@ internal sealed class NativePluginHost : IDisposable
             start.ArgumentList.Add(argument);
         foreach ((string symbol, double value) in insert.Params)
             start.ArgumentList.Add($"{symbol}={value.ToString("R", CultureInfo.InvariantCulture)}");
+        foreach ((string name, string value) in SessionDisplay())
+            start.Environment[name] = value;
         Process = Process.Start(start) ?? throw new InvalidOperationException("Could not start the native LV2 host.");
         _outputReader = ReadOutputAsync();
         _errorReader = ReadErrorsAsync();

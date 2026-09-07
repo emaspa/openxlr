@@ -1166,6 +1166,12 @@ bool vst3_editor_open(Host *h) {
   return true;
 }
 
+void vst3_editor_focus(Host *h, bool focused) {
+  Vst3 *v = of(h);
+  if (v->view)
+    v->view->onFocus(focused);
+}
+
 void vst3_editor_close(Host *h) {
   Vst3 *v = of(h);
   if (!v->view)
@@ -1205,6 +1211,7 @@ extern "C" const Backend vst3_backend = {
     vst3_editor_close,
     vst3_editor_idle,
     vst3_editor_lost,
+    vst3_editor_focus,
     vst3_editor_resized,
     vst3_main_thread,
     vst3_unload,

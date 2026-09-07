@@ -48,6 +48,10 @@ typedef struct {
   void (*editor_close)(Host *h);
   bool (*editor_idle)(Host *h);  // true when the editor asked to close
   void (*editor_lost)(Host *h);  // the display is gone: forget, touch nothing
+  // The frame gained or lost the keyboard focus. A plugin that runs under
+  // Wine treats its window as inactive until it is told, and an inactive
+  // window ignores the mouse.
+  void (*editor_focus)(Host *h, bool focused);
   // The user resized the frame; the plugin may want to lay out again.
   void (*editor_resized)(Host *h, unsigned width, unsigned height);
   // Each tick, outside the guard: whatever the plugin asked for meanwhile.
@@ -95,6 +99,10 @@ struct Host {
   Window window, child;
   Atom close_message;
   bool editor_open;
+  // The size the plugin last asked the frame to be. A frame that reaches it
+  // is not news to the plugin, and telling it anyway starts the two of them
+  // resizing each other a few pixels at a time.
+  unsigned asked_width, asked_height;
   // The command pipe
   char input[16384];
   size_t input_size;

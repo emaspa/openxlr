@@ -98,8 +98,11 @@ void host_resize_editor(Host *h, unsigned width, unsigned height) {
   if (!h->display || !h->window || width < 1 || height < 1 ||
       width > 16384 || height > 16384)
     return;
+  h->asked_width = width;
+  h->asked_height = height;
   if (x_escape_armed) {
     XResizeWindow(h->display, h->window, width, height);
+    if (h->child) XResizeWindow(h->display, h->child, width, height);
     return;
   }
   if (sigsetjmp(x_escape, 0)) {
@@ -109,6 +112,7 @@ void host_resize_editor(Host *h, unsigned width, unsigned height) {
   }
   x_escape_armed = 1;
   XResizeWindow(h->display, h->window, width, height);
+  if (h->child) XResizeWindow(h->display, h->child, width, height);
   XFlush(h->display);
   x_escape_armed = 0;
 }
@@ -335,7 +339,7 @@ static bool open_ui(Host *h) {
     h->close_message = XInternAtom(h->display, "WM_DELETE_WINDOW", False);
     XSetWMProtocols(h->display, h->window, &h->close_message, 1);
     XSelectInput(h->display, h->window,
-                 StructureNotifyMask | SubstructureNotifyMask);
+                 StructureNotifyMask | SubstructureNotifyMask | FocusChangeMask);
     h->editor_open = h->backend->editor_open(h);
     if (h->editor_open) {
       fit_to_child(h);  // before mapping, so the frame never opens wrong
@@ -367,6 +371,11 @@ static void pump_editor(Host *h) {
       close_ui(h);
       return;
     }
+    // Whether the frame holds the keyboard focus. The plugin is told, since
+    // one running under Wine will not take the mouse until it knows.
+    if ((event.type == FocusIn || event.type == FocusOut) &&
+        event.xfocus.window == h->window && h->backend->editor_focus)
+      h->backend->editor_focus(h, event.type == FocusIn);
     // A plugin that builds its window after the editor opens is found when
     // that window appears.
     if (!h->child && (event.type == MapNotify || event.type == CreateNotify))
@@ -387,7 +396,13 @@ static void pump_editor(Host *h) {
                (attributes.width != c->width || attributes.height != c->height)) {
         XResizeWindow(h->display, h->child, (unsigned)c->width,
                       (unsigned)c->height);
-        if (h->backend->editor_resized && c->width > 0 && c->height > 0)
+        // Only a resize the user made is news. Answering the plugin's own
+        // request with the size it asked for sets the two of them chasing
+        // each other, a few pixels at a time, until the window fills the
+        // screen and its controls are nowhere near where they are drawn.
+        bool asked = (unsigned)c->width == h->asked_width &&
+                     (unsigned)c->height == h->asked_height;
+        if (!asked && h->backend->editor_resized && c->width > 0 && c->height > 0)
           h->backend->editor_resized(h, (unsigned)c->width, (unsigned)c->height);
       }
     }
@@ -416,10 +431,15 @@ static bool set_control(Host *h, const char *symbol, float value) {
 static void command(Host *h, char *line) {
   char symbol[MAX_SYMBOL + 1], extra;
   float value;
-  if (!strcmp(line, "show"))
-    puts(open_ui(h) ? "ui opened"
-                    : "ui unavailable: the plugin has no editor this host can "
-                      "show, or the display could not be opened");
+  if (!strcmp(line, "show")) {
+    // Two different disappointments, and the user can act on only one.
+    if (!h->has_editor)
+      puts("ui unavailable: this plugin has no editor the host can show");
+    else
+      puts(open_ui(h) ? "ui opened"
+                      : "ui unavailable: no X display; the daemon has none "
+                        "from your desktop session");
+  }
   else if (!strcmp(line, "hide"))
     close_ui(h);
   else if (!strcmp(line, "quit"))

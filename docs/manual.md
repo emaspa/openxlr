@@ -336,6 +336,29 @@ picked straight out of Downloads would hand yabridge your whole Downloads
 folder. VST2 `.dll` files are left out either way, since OpenXLR cannot
 load VST2.
 
+<a name="windows-editor-input"></a>
+**A Windows plugin's own editor ignores the mouse.** The plugin plays, its
+interface is drawn and it follows anything you change from OpenXLR, but
+clicking its knobs does nothing, wherever you click. This is a known fault
+in yabridge with Wine 9.22 and newer, not something OpenXLR can fix.
+
+Wine changed how it tracks where a window is in 9.22. A plugin editor is
+embedded in a window belonging to its host, and Wine never learns where
+that window really is, so it keeps believing the window sits in the very
+corner of the screen. Every click arrives offset by the distance between
+those two positions, which for a window anywhere else on a desktop lands
+far outside the plugin, and Wine drops it before the plugin sees it. The
+Options window says so when it sees a pair of versions with the fault:
+yabridge up to 5.1.1 with Wine 9.22 or newer. yabridge tracks the fix in
+[issue 409](https://github.com/robbert-vdh/yabridge/issues/409).
+
+Meanwhile the plugin is still usable: Controls in the insert row opens a
+window OpenXLR builds from the plugin's own parameters, and those work,
+bridged or not. To get the plugin's own editor back, either build yabridge
+from its `new-wine10-embedding` branch, which carries the fix and which
+people on Wine 11 report working, or install Wine 9.21, the last version
+yabridge 5.1.1 was built against.
+
 <a name="memlock"></a>
 **"Low memory locking limit".** yabridge prints this when it starts, in
 the daemon's log:
@@ -547,17 +570,22 @@ this way: its row shows no switch, and the cog opens its editor whenever
 the plugin is running.
 
 The editor draws on an X11 display, which means XWayland on a Wayland
-desktop, and the daemon has to know about it. A user service that started
-before the desktop published its display does not, and the fix is one
-import and a restart, from a terminal inside the graphical session:
+desktop, and the daemon has to know about it. A user service started
+before the desktop published its display has none of its own, so OpenXLR
+asks systemd's user manager, where the session puts it, whenever it starts
+a plugin. That covers a daemon that came up early and one left running
+across a logout.
+
+If an editor still answers "no X display", the session never handed its
+display over. Give it to the manager yourself, from a terminal inside the
+graphical session, and restart the daemon:
 
 ```sh
 systemctl --user import-environment DISPLAY XAUTHORITY
 systemctl --user restart openxlr-daemon.service
 ```
 
-The restart interrupts audio briefly. Repeat it after a graphical login
-that assigns a new display.
+The restart interrupts audio briefly.
 
 Trouble with an editor never costs you the sound. If the X server goes
 away while an editor is open, the editor closes and the plugin keeps

@@ -58,10 +58,13 @@ The whole point is that an editor cannot cost you the microphone.
 ## Session environment
 
 The editor needs an X11 display, so XWayland on a Wayland desktop. The helper
-inherits the daemon's environment and does not go looking for a session. A
-user service that started before the desktop published its display has none,
-which shows up as an editor that will not open. From a terminal inside the
-graphical session:
+inherits the environment the daemon starts it with. A daemon with no `DISPLAY`
+of its own, one started before the desktop published it or left running across
+a logout, asks systemd's user manager for the session's display and passes
+that on, so an editor usually opens without anyone doing anything.
+
+Where even the manager has no display, an editor answers "no X display" and
+the session has to hand it over. From a terminal inside the graphical session:
 
 ```sh
 systemctl --user import-environment DISPLAY XAUTHORITY

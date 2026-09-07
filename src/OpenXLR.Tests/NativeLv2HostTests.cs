@@ -220,4 +220,30 @@ public sealed class NativeLv2HostTests
         Assert.False(insert.NativeHost);
         Assert.Contains("\"nativeHost\":false", JsonSerializer.Serialize(insert.ToPayload()));
     }
+
+    [Fact]
+    public void TheDisplayIsTakenFromWhatTheManagerReports()
+    {
+        // What `systemctl --user show-environment` prints for a session.
+        const string environment = """
+            DISPLAY=:0
+            LANG=en_GB.UTF-8
+            QT_WAYLAND_RECONNECT=1
+            WAYLAND_DISPLAY=wayland-0
+            XAUTHORITY=/run/user/1000/xauth_vNMFGK
+            """;
+        Dictionary<string, string> found = NativePluginHost.DisplayIn(environment);
+        Assert.Equal(":0", found["DISPLAY"]);
+        Assert.Equal("/run/user/1000/xauth_vNMFGK", found["XAUTHORITY"]);
+        Assert.Equal(2, found.Count);   // nothing else travels
+
+        // A quoted value, as systemd writes one that needs escaping.
+        Assert.Equal(":1", NativePluginHost.DisplayIn("DISPLAY=\":1\"")["DISPLAY"]);
+
+        // A cookie on its own says nothing about where to draw.
+        Assert.Empty(NativePluginHost.DisplayIn("XAUTHORITY=/run/user/1000/xauth_a"));
+        Assert.Empty(NativePluginHost.DisplayIn("DISPLAY="));
+        Assert.Empty(NativePluginHost.DisplayIn(null));
+        Assert.Empty(NativePluginHost.DisplayIn("Failed to connect to bus"));
+    }
 }

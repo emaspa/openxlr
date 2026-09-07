@@ -642,6 +642,7 @@ const Backend clap_backend = {
     .editor_close = clap_editor_close,
     .editor_idle = clap_editor_idle,
     .editor_lost = clap_editor_lost,
+    .editor_focus = NULL,   // CLAP has no call for it
     .editor_resized = NULL,
     .main_thread = clap_main_thread,
     .unload = clap_unload,

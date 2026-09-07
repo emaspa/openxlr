@@ -593,6 +593,7 @@ const Backend lv2_backend = {
     .editor_close = lv2_editor_close,
     .editor_idle = lv2_editor_idle,
     .editor_lost = lv2_editor_lost,
+    .editor_focus = NULL,   // an LV2 UI is not told; X gives it the mouse itself
     .editor_resized = NULL,
     .main_thread = NULL,
     .unload = lv2_unload,
