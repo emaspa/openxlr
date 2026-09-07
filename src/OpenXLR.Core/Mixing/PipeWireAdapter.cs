@@ -45,6 +45,18 @@ public sealed class PipeWireAdapter
     /// applet hides. Verified on PipeWire 1.6 with all four properties.
     /// </summary>
     private static string PropList(string props) => '"' + props + '"';
+
+    /// <summary>
+    /// A string inside a filter-chain (SPA JSON) argument. PipeWire's
+    /// property parser treats '#' as the start of a comment even inside a
+    /// quoted string, so an LV2 URI such as darc#mono broke the whole graph
+    /// with "Mismatched bracket" and "Could not load module". The JSON
+    /// unicode escape survives that pass and decodes to '#' afterwards
+    /// (verified on PipeWire 1.6.8). Quotes and backslashes are escaped the
+    /// JSON way.
+    /// </summary>
+    internal static string SpaString(string value)
+        => value.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("#", "\\u0023");
     private static string PropValue(string value) => "'" + value.Replace("\\", "\\\\").Replace("'", "\\'") + "'";
 
     /// <summary>
@@ -536,8 +548,8 @@ public sealed class PipeWireAdapter
                 continue;   // unknown or wrong-width plugin: skipped, reported by the caller
             string name = $"i{k++}";
             string controls = ins.Params.Count == 0 ? "" :
-                " control = { " + string.Join(' ', ins.Params.Select(p => $"\"{p.Key}\" = {p.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}")) + " }";
-            stages.Add(($"{{ type = lv2 name = {name} plugin = \"{ins.Plugin}\"{controls} }}",
+                " control = { " + string.Join(' ', ins.Params.Select(p => $"\"{SpaString(p.Key)}\" = {p.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}")) + " }";
+            stages.Add(($"{{ type = lv2 name = {name} plugin = \"{SpaString(ins.Plugin)}\"{controls} }}",
                 [.. info.InputSymbols.Take(channels).Select(s => $"{name}:{s}")],
                 [.. info.OutputSymbols.Take(channels).Select(s => $"{name}:{s}")]));
         }
@@ -552,7 +564,7 @@ public sealed class PipeWireAdapter
         string outputs = string.Join(' ', stages[^1].Out.Select(p => $"\"{p}\""));
         string position = channels == 1 ? "[ MONO ]" : "[ FL FR ]";
         string spa =
-            $"{{ node.description = \"{description}\" " +
+            $"{{ node.description = \"{SpaString(description)}\" " +
             $"filter.graph = {{ nodes = [ {string.Join(' ', stages.Select(s => s.Node))} ] {links}" +
             $"inputs = [ {inputs} ] outputs = [ {outputs} ] }} " +
             $"capture.props = {{ node.name = {sinkName} media.class = Audio/Sink " +
@@ -607,7 +619,7 @@ public sealed class PipeWireAdapter
     {
         int id = FindNodeId(f.SinkName) ?? throw new InvalidOperationException($"filter node {f.SinkName} not found");
         string v = value.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        Run("pw-cli", "set-param", id.ToString(), "Props", $"{{ params = [ \"{control}\" {v} ] }}");
+        Run("pw-cli", "set-param", id.ToString(), "Props", $"{{ params = [ \"{SpaString(control)}\" {v} ] }}");
     }
 
     /// <summary>Unload a filter by killing its holder process.</summary>

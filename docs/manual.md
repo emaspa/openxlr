@@ -428,6 +428,12 @@ restart WirePlumber.
 - The insert picker lists what lilv finds in the standard LV2
   directories (`/usr/lib/lv2`, `~/.lv2`, or `LV2_PATH`). An empty
   picker means no LV2 plugins are installed, or lilv is missing.
+- Before 0.1.27 an insert whose plugin URI contains a `#` (the x42
+  plugins, for one: `darc#mono`) failed with "PipeWire filter chain did
+  not create the required ports ... Could not load module", because
+  PipeWire's argument parser reads the `#` as a comment. The daemon now
+  escapes it; on an older version pick a plugin without one, such as the
+  LSP set.
 
 <a name="wrong-device"></a>
 ### 5.5 Sound comes out of the wrong device
