@@ -50,14 +50,19 @@ internal sealed class NativePluginHost : IDisposable
             or "http://lv2plug.in/ns/extensions/ui#idleInterface");
 
     public NativePluginHost(InsertDefinition insert, string node, int channels, int sampleRate)
+        : this(insert, node, channels, sampleRate, Executable, []) { }
+
+    internal NativePluginHost(InsertDefinition insert, string node, int channels, int sampleRate,
+        string executable, IReadOnlyList<string> prefixArguments, TimeSpan? startupTimeout = null)
     {
-        if (!File.Exists(Executable)) throw new InvalidOperationException("Native LV2 host is missing; rebuild/install the complete OpenXLR package.");
-        var start = new ProcessStartInfo(Executable)
+        if (!File.Exists(executable)) throw new InvalidOperationException("Native LV2 host is missing; rebuild/install the complete OpenXLR package.");
+        var start = new ProcessStartInfo(executable)
         {
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
         };
+        foreach (string argument in prefixArguments) start.ArgumentList.Add(argument);
         foreach (string argument in new[] { insert.Plugin, node, channels.ToString(CultureInfo.InvariantCulture), sampleRate.ToString(CultureInfo.InvariantCulture) })
             start.ArgumentList.Add(argument);
         foreach ((string symbol, double value) in insert.Params)
@@ -65,7 +70,7 @@ internal sealed class NativePluginHost : IDisposable
         Process = Process.Start(start) ?? throw new InvalidOperationException("Could not start the native LV2 host.");
         _outputReader = ReadOutputAsync();
         _errorReader = ReadErrorsAsync();
-        try { _ready.Task.WaitAsync(TimeSpan.FromSeconds(8)).GetAwaiter().GetResult(); }
+        try { _ready.Task.WaitAsync(startupTimeout ?? TimeSpan.FromSeconds(8)).GetAwaiter().GetResult(); }
         catch (Exception ex)
         {
             Dispose();
@@ -113,21 +118,23 @@ internal sealed class NativePluginHost : IDisposable
         catch (Exception ex) when (ex is OperationCanceledException or IOException) { }
     }
 
-    private async Task SendAsync(string command)
+    private async Task SendAsync(string command, CancellationToken cancellation)
     {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
-        timeout.CancelAfter(TimeSpan.FromSeconds(2));
-        await _writes.WaitAsync(timeout.Token).ConfigureAwait(false);
+        await _writes.WaitAsync(cancellation).ConfigureAwait(false);
         try
         {
-            await Process.StandardInput.WriteLineAsync(command.AsMemory(), timeout.Token).ConfigureAwait(false);
-            await Process.StandardInput.FlushAsync(timeout.Token).ConfigureAwait(false);
+            await Process.StandardInput.WriteLineAsync(command.AsMemory(), cancellation).ConfigureAwait(false);
+            await Process.StandardInput.FlushAsync(cancellation).ConfigureAwait(false);
         }
         finally { _writes.Release(); }
     }
 
     public void SetControl(string symbol, double value)
-        => SendAsync($"set {symbol} {value.ToString("R", CultureInfo.InvariantCulture)}").GetAwaiter().GetResult();
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
+        timeout.CancelAfter(TimeSpan.FromSeconds(1));
+        SendAsync($"set {symbol} {value.ToString("R", CultureInfo.InvariantCulture)}", timeout.Token).GetAwaiter().GetResult();
+    }
 
     public void ShowUi()
     {
@@ -138,11 +145,22 @@ internal sealed class NativePluginHost : IDisposable
             throw new InvalidOperationException("The plugin editor is already opening.");
         try
         {
-            SendAsync("show").GetAwaiter().GetResult();
-            string? error = reply.Task.WaitAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
+            // One budget includes waiting for the writer, flushing and the reply.
+            // This path can be called under the mixer lock.
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
+            timeout.CancelAfter(TimeSpan.FromSeconds(1));
+            SendAsync("show", timeout.Token).GetAwaiter().GetResult();
+            string? error = reply.Task.WaitAsync(timeout.Token).GetAwaiter().GetResult();
             if (error is not null) throw new InvalidOperationException(error);
         }
-        finally { Interlocked.Exchange(ref _uiReply, null); }
+        finally
+        {
+            // The protocol has no request IDs. Keep a timed-out request occupied
+            // until its late reply arrives, so it cannot acknowledge a new show.
+            if (reply.Task.IsCompleted) Interlocked.CompareExchange(ref _uiReply, null, reply);
+            else _ = reply.Task.ContinueWith(_ => Interlocked.CompareExchange(ref _uiReply, null, reply),
+                CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        }
     }
 
     public IEnumerable<KeyValuePair<string, double>> DrainChanges()

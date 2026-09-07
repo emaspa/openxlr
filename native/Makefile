@@ -1,4 +1,4 @@
-PKGS = libpipewire-0.3 lilv-0 x11
+PKGS = libpipewire-0.3 lilv-0 lv2 x11
 CPPFLAGS += $(shell pkg-config --cflags $(PKGS))
 CFLAGS += -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-parameter
 LDLIBS += $(shell pkg-config --libs $(PKGS)) -ldl -lm -pthread

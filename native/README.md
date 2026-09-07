@@ -33,6 +33,39 @@ Control edits return through the helper pipe and are saved by the normal
 daemon settings path. Plugin output-control meters are included in insert status.
 Audio buffers never cross managed code or the command pipe.
 
+## Desktop session environment with the packaged user service
+
+The user service can start before the desktop publishes its X11 environment.
+The helper inherits the daemon's environment; it does not search other sessions
+or guess a display/cookie. From a terminal **inside the active graphical session**,
+import its values before restarting the daemon:
+
+```sh
+systemctl --user import-environment DISPLAY XAUTHORITY
+systemctl --user restart openxlr-daemon.service
+```
+
+The restart briefly interrupts audio. Repeat the import at graphical login (or
+use the desktop's session-start integration), especially when XWayland assigns
+a new display. Check that DISPLAY is set and that XAUTHORITY, when set, points
+to a readable cookie file. GDM/SDDM often use a file under `/run/user/...`, not
+`~/.Xauthority`; use the session's value, not a copied or guessed cookie. Never
+use `xhost +` to bypass authentication.
+
+The packaged unit also enables `PrivateTmp`. For a filesystem X11 socket that
+is hidden by that setting, create a **user override** with
+`systemctl --user edit openxlr-daemon.service`:
+
+```ini
+[Service]
+PrivateTmp=false
+```
+
+Then run `systemctl --user daemon-reload` and restart after the import above.
+This optional override reduces temporary-directory isolation; the shipped unit
+is unchanged. Do not disable other hardening. On Wayland, XWayland must be
+running. These steps describe setup, not acceptance on GDM/SDDM hardware.
+
 The helper observes the daemon-owned stdin pipe for EOF/HUP instead of using
 PDEATHSIG, whose Linux semantics tie it to the creating thread. A separate
 monitor thread reports audio progress; the UI loop reports UI progress.

@@ -28,7 +28,7 @@
 #include <unistd.h>
 
 enum {
-  MAX_PORTS = 2048,
+  MAX_PORTS = 4096,
   MAX_FRAMES = 8192,
   ATOM_CAPACITY = 65536,
   MAX_URIS = 4096

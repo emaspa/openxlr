@@ -718,20 +718,18 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         else if (IsInsertChannel(key)) WireInputFeedsLocked();
     }
 
-    /// <summary>
-    /// Set one control of an insert. Applied live to the running chain when
-    /// possible (no dropout); a chain that cannot take it is rebuilt.
-    /// </summary>
+    /// <summary>Capture the host under the mixer lock, then open its UI outside it.</summary>
     public void ShowInsertUi(string channel, string insertId)
     {
+        NativePluginHost? host;
         lock (_gate)
         {
-            NativePluginHost? host = _chains.GetValueOrDefault(channel)?.InsertStages
+            host = _chains.GetValueOrDefault(channel)?.InsertStages
                 .FirstOrDefault(stage => stage.Id == insertId).Stage?.NativeHost;
             if (host is null)
                 throw new InvalidOperationException("No native editor is running for this insert. Enable it and install the optional native host.");
-            host.ShowUi();
         }
+        host.ShowUi();
     }
 
     /// <summary>Collect editor changes on the same path used to persist ordinary controls.</summary>
