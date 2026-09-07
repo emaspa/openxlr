@@ -94,15 +94,17 @@ void host_editor_lost(Host *h) {
 
 // A backend's own callbacks (a plugin's timer, say) reach these outside any
 // guard, so each one arms its own unless a caller already has.
+static bool told_lately(Host *h, unsigned width, unsigned height);
+static bool dragging(Host *h);
+
 void host_resize_editor(Host *h, unsigned width, unsigned height) {
   if (!h->display || !h->window || width < 1 || height < 1 ||
-      width > 16384 || height > 16384)
+      width > 16384 || height > 16384 || dragging(h))
     return;
-  h->asked_width = width;
-  h->asked_height = height;
+  h->self_width = width;
+  h->self_height = height;
   if (x_escape_armed) {
     XResizeWindow(h->display, h->window, width, height);
-    if (h->child) XResizeWindow(h->display, h->child, width, height);
     return;
   }
   if (sigsetjmp(x_escape, 0)) {
@@ -112,7 +114,6 @@ void host_resize_editor(Host *h, unsigned width, unsigned height) {
   }
   x_escape_armed = 1;
   XResizeWindow(h->display, h->window, width, height);
-  if (h->child) XResizeWindow(h->display, h->child, width, height);
   XFlush(h->display);
   x_escape_armed = 0;
 }
@@ -345,12 +346,51 @@ static bool open_ui(Host *h) {
       fit_to_child(h);  // before mapping, so the frame never opens wrong
       XMapRaised(h->display, h->window);
       XFlush(h->display);
+      h->settle_ticks = 6;   // once it is on screen, teach it where that is
     }
   }
   x_escape_armed = 0;
   if (!h->editor_open)
     close_ui(h);
   return h->editor_open;
+}
+
+// Whether the user has the frame's corner right now: it changed size for a
+// reason that was not the plugin's, moments ago. A plugin's request is not
+// answered until they let go, so the window follows the hand holding it.
+static bool dragging(Host *h) {
+  if (h->dragged_at.tv_sec == 0 && h->dragged_at.tv_nsec == 0)
+    return false;
+  struct timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  long since = (now.tv_sec - h->dragged_at.tv_sec) * 1000 +
+               (now.tv_nsec - h->dragged_at.tv_nsec) / 1000000;
+  return since < 400;
+}
+
+// Whether the plugin has been told this size in the last second, which means
+// the two of them are going round rather than the user dragging: a drag
+// passes through a size once, a loop keeps coming back to it. Telling it
+// again is what keeps the loop alive, so this is where it ends.
+static bool told_lately(Host *h, unsigned width, unsigned height) {
+  struct timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  bool seen = false;
+  for (unsigned i = 0; i < 8; ++i) {
+    if (h->recent_sizes[i].width != width || h->recent_sizes[i].height != height)
+      continue;
+    long age = (now.tv_sec - h->recent_sizes[i].at.tv_sec) * 1000 +
+               (now.tv_nsec - h->recent_sizes[i].at.tv_nsec) / 1000000;
+    if (age < 1000)
+      seen = true;
+  }
+  if (!seen) {
+    h->recent_sizes[h->recent_next].width = width;
+    h->recent_sizes[h->recent_next].height = height;
+    h->recent_sizes[h->recent_next].at = now;
+    h->recent_next = (h->recent_next + 1) % 8;
+  }
+  return seen;
 }
 
 // One pass of the editor: its events and the backend's idle work. Losing
@@ -362,6 +402,8 @@ static void pump_editor(Host *h) {
     return;
   }
   x_escape_armed = 1;
+  unsigned frame_width = 0, frame_height = 0, plugin_width = 0, plugin_height = 0;
+  bool frame_resized = false, plugin_resized = false;
   while (XPending(h->display)) {
     XEvent event;
     XNextEvent(h->display, &event);
@@ -380,30 +422,78 @@ static void pump_editor(Host *h) {
     // that window appears.
     if (!h->child && (event.type == MapNotify || event.type == CreateNotify))
       fit_to_child(h);
-    // Keep the frame and the plugin's window the same size, whichever of
-    // the two changed. Each resize is skipped when the sizes already agree,
-    // so the two notifications cannot chase each other.
+    // The window moved. Where a plugin thinks it is decides where it thinks
+    // the pointer is, so it is taught the new place the only way it listens.
+    if (event.type == ConfigureNotify && event.xconfigure.window == h->window &&
+        (event.xconfigure.x != h->frame_x || event.xconfigure.y != h->frame_y)) {
+      h->frame_x = event.xconfigure.x;
+      h->frame_y = event.xconfigure.y;
+      h->settle_ticks = 9;
+    }
+    // Sizes are noted here and settled once the queue is empty. Dragging a
+    // corner fills the queue with them, and telling a plugin about every
+    // one, each a call across to its own process, leaves it a size behind
+    // the hand. It hears the last one instead, which is the one that counts.
     if (event.type == ConfigureNotify && h->child) {
       const XConfigureEvent *c = &event.xconfigure;
+      if (c->window == h->window && c->width > 0 && c->height > 0) {
+        frame_width = (unsigned)c->width;
+        frame_height = (unsigned)c->height;
+        frame_resized = true;
+      } else if (c->window == h->child && c->width > 0 && c->height > 0) {
+        plugin_width = (unsigned)c->width;
+        plugin_height = (unsigned)c->height;
+        plugin_resized = true;
+      }
+    }
+  }
+  if (h->child) {
+    XWindowAttributes attributes;
+    // The frame follows the plugin only when the plugin resized its own
+    // window: a size the frame gave it is an echo, and while the user has
+    // the corner the frame belongs to the user.
+    if (plugin_resized && !frame_resized && !dragging(h) &&
+        (plugin_width != h->child_width || plugin_height != h->child_height) &&
+        XGetWindowAttributes(h->display, h->window, &attributes) &&
+        ((unsigned)attributes.width != plugin_width ||
+         (unsigned)attributes.height != plugin_height))
+      XResizeWindow(h->display, h->window, plugin_width, plugin_height);
+    if (frame_resized) {
+      if (XGetWindowAttributes(h->display, h->child, &attributes) &&
+          ((unsigned)attributes.width != frame_width ||
+           (unsigned)attributes.height != frame_height)) {
+        XResizeWindow(h->display, h->child, frame_width, frame_height);
+        h->child_width = frame_width;
+        h->child_height = frame_height;
+      }
+      // A size the frame did not ask for is the user's doing.
+      if (frame_width != h->self_width || frame_height != h->self_height)
+        clock_gettime(CLOCK_MONOTONIC, &h->dragged_at);
+      if (h->backend->editor_resized &&
+          !told_lately(h, frame_width, frame_height))
+        h->backend->editor_resized(h, frame_width, frame_height);
+    }
+  }
+  // A window that has just opened or moved has to change size once for a
+  // plugin bridged from Windows to find out where it is; until it does, its
+  // clicks land as far from the pointer as the window is from the corner of
+  // the screen. A pixel smaller, then back a moment later, teaches it. The
+  // two halves are ticks apart so the plugin has laid itself out in between,
+  // and it costs a plugin that needed none of this one relayout.
+  if (h->settle_ticks > 0 && --h->settle_ticks == 0) {
+    if (h->settle_height > 0) {
+      XResizeWindow(h->display, h->window, h->settle_width, h->settle_height);
+      XFlush(h->display);
+      h->settle_height = 0;
+    } else if (h->child) {
       XWindowAttributes attributes;
-      if (c->window == h->child &&
-          XGetWindowAttributes(h->display, h->window, &attributes) &&
-          (attributes.width != c->width || attributes.height != c->height))
-        XResizeWindow(h->display, h->window, (unsigned)c->width,
-                      (unsigned)c->height);
-      else if (c->window == h->window &&
-               XGetWindowAttributes(h->display, h->child, &attributes) &&
-               (attributes.width != c->width || attributes.height != c->height)) {
-        XResizeWindow(h->display, h->child, (unsigned)c->width,
-                      (unsigned)c->height);
-        // Only a resize the user made is news. Answering the plugin's own
-        // request with the size it asked for sets the two of them chasing
-        // each other, a few pixels at a time, until the window fills the
-        // screen and its controls are nowhere near where they are drawn.
-        bool asked = (unsigned)c->width == h->asked_width &&
-                     (unsigned)c->height == h->asked_height;
-        if (!asked && h->backend->editor_resized && c->width > 0 && c->height > 0)
-          h->backend->editor_resized(h, (unsigned)c->width, (unsigned)c->height);
+      if (XGetWindowAttributes(h->display, h->window, &attributes) &&
+          attributes.width > 1 && attributes.height > 1) {
+        h->settle_width = (unsigned)attributes.width;
+        h->settle_height = (unsigned)attributes.height;
+        XResizeWindow(h->display, h->window, h->settle_width, h->settle_height - 1);
+        XFlush(h->display);
+        h->settle_ticks = 4;   // put it back once the plugin has caught up
       }
     }
   }

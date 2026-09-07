@@ -99,10 +99,27 @@ struct Host {
   Window window, child;
   Atom close_message;
   bool editor_open;
-  // The size the plugin last asked the frame to be. A frame that reaches it
-  // is not news to the plugin, and telling it anyway starts the two of them
-  // resizing each other a few pixels at a time.
-  unsigned asked_width, asked_height;
+  // A plugin bridged from Windows learns where its window is when the window
+  // changes size, and not when it opens or moves. Until it has learnt, its
+  // clicks land as far from the pointer as the window is from the corner of
+  // the screen. One pixel out and back teaches it, and this counts the ticks
+  // until that is worth doing again.
+  unsigned settle_ticks;
+  int frame_x, frame_y;  // where the frame was, to notice that it moved
+  unsigned settle_width, settle_height;  // the size to put back afterwards
+  // The last few sizes the plugin was told, with when. A plugin that answers
+  // a size by asking for another one, which the frame then reports back to
+  // it, would go round for ever; a size it was told a moment ago is that
+  // going round, not the user dragging, so it is not worth telling again.
+  struct { unsigned width, height; struct timespec at; } recent_sizes[8];
+  unsigned recent_next;
+  // When the frame last changed size for a reason of its own, meaning the
+  // user is dragging it. While that is going on the plugin's own requests
+  // are left unanswered: two things pulling one window in different
+  // directions is what a window that shakes is made of.
+  struct timespec dragged_at;
+  unsigned self_width, self_height;  // the last size the frame set itself
+  unsigned child_width, child_height;  // the last size the frame gave the plugin
   // The command pipe
   char input[16384];
   size_t input_size;
