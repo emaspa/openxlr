@@ -94,6 +94,30 @@
       </StackPanel>
     </Border>
 
+    <Border Classes="card">
+      <StackPanel Spacing="6">
+        <TextBlock Text="PLUGINS" Classes="h"/>
+        <TextBlock Text="{Binding PluginDirectories}" FontSize="11" Foreground="#6b7285" TextWrapping="Wrap"/>
+        <TextBlock Text="Pick a plugin you downloaded and OpenXLR puts it in place: a .clap or .vst3 file, a .vst3 or .lv2 folder, or a folder holding plugins."
+                   FontSize="11" Foreground="#6b7285" TextWrapping="Wrap"/>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button Name="InstallFile" Content="Install file…" Padding="14,5" Click="OnInstallPluginFile"/>
+          <Button Name="InstallFolder" Content="Install folder…" Padding="14,5" Click="OnInstallPluginFolder"/>
+          <Button Name="Rescan" Content="Rescan" Padding="14,5" Click="OnRescanPlugins"
+                  ToolTip.Tip="Read the plugin directories again, for plugins installed by other means"/>
+        </StackPanel>
+        <TextBlock Text="{Binding WindowsPlugins}" FontSize="11" Foreground="#8b93a7" TextWrapping="Wrap" Margin="0,4,0,0"/>
+        <Grid ColumnDefinitions="Auto,8,Auto,10,*">
+          <Button Name="SyncWindows" Content="Sync Windows plugins" Padding="14,5" Click="OnSyncWindowsPlugins"
+                  IsEnabled="{Binding CanSyncWindows}"
+                  ToolTip.Tip="Bridge again every folder yabridge knows, for Windows plugins installed since"/>
+          <Button Grid.Column="2" Content="Manual" Padding="10,5" Click="OnPluginsManual"
+                  ToolTip.Tip="Open the manual section on installing plugins"/>
+          <TextBlock Grid.Column="4" Name="PluginStatus" FontSize="11" Foreground="#8b93a7" VerticalAlignment="Center" TextWrapping="Wrap"/>
+        </Grid>
+      </StackPanel>
+    </Border>
+
     <Border Classes="card" IsVisible="{Binding Main.ShowResetDefaults}">
       <StackPanel Spacing="6">
         <TextBlock Text="INTERFACE" Classes="h"/>

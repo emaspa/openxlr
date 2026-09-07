@@ -14,7 +14,53 @@ public partial class OptionsWindow : Window
     public OptionsWindow(OptionsViewModel vm) : this()
     {
         DataContext = vm;
+        Opened += async (_, _) => await vm.LoadPluginSetupAsync();
     }
+
+    // Plugins: the same install flow as the picker, plus yabridge's sync and a rescan.
+    private async void OnInstallPluginFile(object? sender, RoutedEventArgs e)
+        => await InstallPluginsAsync(await PluginInstall.PickFilesAsync(this));
+
+    private async void OnInstallPluginFolder(object? sender, RoutedEventArgs e)
+        => await InstallPluginsAsync(await PluginInstall.PickFolderAsync(this));
+
+    private async System.Threading.Tasks.Task InstallPluginsAsync(System.Collections.Generic.IReadOnlyList<string> paths)
+    {
+        if (paths.Count == 0 || DataContext is not OptionsViewModel vm) return;
+        await PluginStepAsync(() => PluginInstall.InstallAsync(vm.Client, paths), "Installing…", vm);
+    }
+
+    private async void OnSyncWindowsPlugins(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not OptionsViewModel vm) return;
+        await PluginStepAsync(async () => PluginInstall.Describe(
+            await vm.Client.SyncWindowsPluginsAsync(TimeSpan.FromMinutes(4)), "the sync"), "Bridging Windows plugins…", vm);
+    }
+
+    private async void OnRescanPlugins(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not OptionsViewModel vm) return;
+        await PluginStepAsync(async () => PluginInstall.Describe(
+            await vm.Client.RescanPluginsAsync(TimeSpan.FromMinutes(4)), "the scan"), "Scanning…", vm);
+    }
+
+    private async System.Threading.Tasks.Task PluginStepAsync(Func<System.Threading.Tasks.Task<string>> step, string busy, OptionsViewModel vm)
+    {
+        InstallFile.IsEnabled = InstallFolder.IsEnabled = Rescan.IsEnabled = false;
+        bool sync = SyncWindows.IsEnabled;
+        SyncWindows.IsEnabled = false;
+        PluginStatus.Text = busy;
+        try { PluginStatus.Text = await step(); }
+        catch (Exception ex) { PluginStatus.Text = ex.Message; }
+        finally
+        {
+            InstallFile.IsEnabled = InstallFolder.IsEnabled = Rescan.IsEnabled = true;
+            SyncWindows.IsEnabled = sync;
+            await vm.LoadPluginSetupAsync();
+        }
+    }
+
+    private void OnPluginsManual(object? sender, RoutedEventArgs e) => ExternalLink.Open(PluginInstall.Manual);
 
     private async void OnCollectDiagnostics(object? sender, RoutedEventArgs e)
     {

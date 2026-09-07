@@ -50,6 +50,57 @@ public sealed class OptionsViewModel : ViewModelBase
         finally { _applying = false; }
     }
 
+    // --- plugins ---
+
+    private string _pluginDirectories = "Plugins are looked for in the home and system plugin directories.";
+    /// <summary>Where installs go, once the daemon has said.</summary>
+    public string PluginDirectories { get => _pluginDirectories; private set => Set(ref _pluginDirectories, value); }
+
+    private string _windowsPlugins = "Windows plugins: checking for yabridge…";
+    /// <summary>yabridge and Wine as found, and how many folders are bridged.</summary>
+    public string WindowsPlugins { get => _windowsPlugins; private set => Set(ref _windowsPlugins, value); }
+
+    private bool _canSyncWindows;
+    public bool CanSyncWindows { get => _canSyncWindows; private set => Set(ref _canSyncWindows, value); }
+
+    /// <summary>Ask the daemon where plugins go and what is there to bridge Windows ones.</summary>
+    public async System.Threading.Tasks.Task LoadPluginSetupAsync()
+    {
+        System.Text.Json.Nodes.JsonNode? setup = await _client.RequestPluginSetupAsync(TimeSpan.FromSeconds(10));
+        Avalonia.Threading.Dispatcher.UIThread.Post(() => ApplyPluginSetup(setup));
+    }
+
+    internal void ApplyPluginSetup(System.Text.Json.Nodes.JsonNode? setup)
+    {
+        if (setup is null)
+        {
+            WindowsPlugins = "Windows plugins: the daemon did not answer.";
+            CanSyncWindows = false;
+            return;
+        }
+        string lv2 = setup["lv2Directory"]?.GetValue<string>() ?? "~/.lv2";
+        string clap = setup["clapDirectory"]?.GetValue<string>() ?? "~/.clap";
+        string vst3 = setup["vst3Directory"]?.GetValue<string>() ?? "~/.vst3";
+        bool host = setup["hostInstalled"]?.GetValue<bool>() ?? true;
+        PluginDirectories = $"Plugins are looked for in {lv2}, {clap} and {vst3} and the system plugin directories."
+            + (host ? "" : " The native plugin host is not installed beside the daemon, so CLAP and VST3 plugins cannot run.");
+        string? yabridge = setup["yabridge"]?.GetValue<string>();
+        bool wine = setup["wine"]?.GetValue<bool>() ?? false;
+        int folders = (setup["windowsDirectories"] as System.Text.Json.Nodes.JsonArray)?.Count ?? 0;
+        WindowsPlugins = WindowsLine(yabridge, wine, folders);
+        CanSyncWindows = yabridge is not null && wine;
+    }
+
+    /// <summary>One line on Windows plugins, from what the daemon found.</summary>
+    internal static string WindowsLine(string? yabridge, bool wine, int folders)
+    {
+        if (yabridge is null && !wine) return "Windows plugins: yabridge and Wine are not installed. Install both from your distribution, then install a Windows VST3 or CLAP plugin here.";
+        if (yabridge is null) return "Windows plugins: Wine is installed, yabridge is not. Install yabridge from your distribution, then install a Windows VST3 or CLAP plugin here.";
+        if (!wine) return $"Windows plugins: yabridge {yabridge} is installed, Wine is not. Install Wine from your distribution.";
+        string bridged = folders switch { 0 => "no folder bridged yet", 1 => "1 folder bridged", _ => $"{folders} folders bridged" };
+        return $"Windows plugins: yabridge {yabridge} and Wine are installed, {bridged}. Run a plugin's installer with Wine, then install the folder it created.";
+    }
+
     // --- startup behaviour ---
 
     private bool _checkForUpdates;

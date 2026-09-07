@@ -211,23 +211,43 @@ plugin's own editor can be opened as well, with the native host described
 in 3.12. CLAP and VST3 plugins appear in the same picker and always run in
 that host. VST2 plugins cannot be loaded.
 
-To install plugins, use your distribution's packages or copy the bundles
-into your home directory: LV2 bundles go in `~/.lv2` or `/usr/lib/lv2`,
-CLAP bundles in `~/.clap` or `/usr/lib/clap`, VST3 bundles in `~/.vst3` or
-`/usr/lib/vst3` (`LV2_PATH`, `CLAP_PATH` and `VST3_PATH` override those).
-On Arch, `lsp-plugins-lv2` and `x42-plugins` cover the microphone path
+<a name="install-plugins"></a>
+**Installing plugins.** The quickest set comes from your distribution:
+on Arch, `lsp-plugins-lv2` and `x42-plugins` cover the microphone path
 well, `lsp-plugins-vst3` is the same set as VST3, and `dragonfly-reverb-clap`,
 `dpf-plugins-clap` and `elephantdsp-roomreverb-clap` are CLAP effects for a
-mix. Windows VST3 plugins work through [yabridge](https://github.com/robbert-vdh/yabridge):
-install it with Wine, add the Windows plugin directory with `yabridgectl add`
-and run `yabridgectl sync`, and the bridged plugins appear under `~/.vst3`
-like any other. The daemon reads the catalogues once, when it starts, and
-keeps what it learnt about each bundle until that bundle changes, so restart
-it after installing:
+mix. For a plugin you downloaded, press "Install file…" or "Install
+folder…" in the picker or in Options and pick it; OpenXLR puts it where
+it looks and the picker lists it a moment later. A file is a `.clap` or a
+single-file `.vst3`; a folder is a `.vst3` or `.lv2` bundle, or a folder
+holding several of them, such as an extracted download. Linux plugins are
+copied into `~/.clap`, `~/.vst3` or `~/.lv2`, so the download can go
+afterwards. An archive has to be extracted first. Plugins installed by
+other means, or copied into `/usr/lib/clap`, `/usr/lib/vst3` or
+`/usr/lib/lv2` by a package, appear after "Rescan" in Options or a daemon
+restart (`LV2_PATH`, `CLAP_PATH` and `VST3_PATH` override the places
+searched).
+
+Windows VST3 and CLAP plugins run through
+[yabridge](https://github.com/robbert-vdh/yabridge), which wraps each one
+in a bundle that OpenXLR loads like any other. Install `yabridge` and
+`wine` from your distribution (Arch has both; Fedora has yabridge in the
+`patrickl/yabridge` Copr; on Debian and Ubuntu, unpack the release
+archive from its GitHub page into `~/.local/share/yabridge` and put
+`yabridgectl` on your PATH). Then run the plugin's Windows installer with
+Wine:
 
 ```sh
-systemctl --user restart openxlr-daemon.service
+wine ~/Downloads/PluginSetup.exe
 ```
+
+and install the folder it created, usually
+`~/.wine/drive_c/Program Files/Common Files/VST3`, with "Install
+folder…". OpenXLR adds that folder to yabridge and runs its sync, and the
+Options window says how many folders are bridged; "Sync Windows plugins"
+bridges again after another installer has run. A plugin that comes as a
+bare Windows `.vst3` or `.clap` file works the same way when picked as a
+file. VST2 `.dll` files are left out, since OpenXLR cannot load VST2.
 
 The picker marks each plugin with its format, since the same plugin often
 ships in more than one, and its LV2, CLAP and VST3 buttons narrow the list

@@ -197,6 +197,19 @@ public sealed class WebSocketHub
                 IReadOnlyList<OpenXLR.Core.Mixing.PluginInfo> plugins = await Task.Run(() => OpenXLR.Core.Mixing.PluginCatalog.Plugins);
                 await reply(new PluginsMessage(plugins));
                 break;
+            case "getPluginSetup":
+                await reply(new PluginSetupMessage(await Task.Run(() => new OpenXLR.Core.Mixing.PluginInstaller().Setup())));
+                break;
+            case "installPlugin":
+                if (string.IsNullOrWhiteSpace(cmd.Path)) { error = "installPlugin: missing 'path'"; break; }
+                await reply(await Task.Run(() => InstallPlugin(installer => installer.Install(cmd.Path))));
+                break;
+            case "syncWindowsPlugins":
+                await reply(await Task.Run(() => InstallPlugin(installer => installer.SyncWindows())));
+                break;
+            case "rescanPlugins":
+                await reply(await Task.Run(() => InstallPlugin(_ => new OpenXLR.Core.Mixing.InstallOutcome(true, "", []))));
+                break;
             case "set":
                 error = cmd.Control is null ? "set: missing 'control'" : _devices.Apply(cmd.Control, cmd.Value);  // broadcasts on success
                 break;
@@ -339,6 +352,37 @@ public sealed class WebSocketHub
     /// <summary>The active device's usb id, or null while disconnected.</summary>
     private string? ActiveDeviceId() => _devices.Snapshot().Device?.UsbId;
 
+    /// <summary>
+    /// Run one install step, then read the catalogues again and say what
+    /// they gained. Installs are serialised: two at once would copy over
+    /// each other and race yabridge.
+    /// </summary>
+    private PluginInstallMessage InstallPlugin(Func<OpenXLR.Core.Mixing.PluginInstaller, OpenXLR.Core.Mixing.InstallOutcome> step)
+    {
+        lock (_installGate)
+        {
+            // Only the plugins' identities are kept across the rescan: the
+            // catalogue itself is large, and holding the old one while the
+            // new is built would not fit in the daemon's heap.
+            HashSet<(string Kind, string Plugin)> before = OpenXLR.Core.Mixing.PluginCatalog.Identities();
+            OpenXLR.Core.Mixing.InstallOutcome outcome;
+            try { outcome = step(new OpenXLR.Core.Mixing.PluginInstaller()); }
+            catch (Exception ex) { outcome = new(false, ex.Message, []); }
+            OpenXLR.Core.Mixing.PluginCatalog.Refresh();
+            // What this install brought: plugins not listed before, and when
+            // the install landed somewhere, only those found there, so a
+            // catalogue trimmed to its budget shifting underneath does not
+            // count as new plugins.
+            int added = OpenXLR.Core.Mixing.PluginCatalog.CountUnder(outcome.Destinations ?? [], before);
+            int total = OpenXLR.Core.Mixing.PluginCatalog.Plugins.Count;
+            if (outcome.Ok) _log.LogInformation("plugins: {message} {added} new in the catalogue", outcome.Message, added);
+            else _log.LogInformation("plugins: {message}", outcome.Message);
+            return new PluginInstallMessage(outcome.Ok, outcome.Message, outcome.Installed, added, total);
+        }
+    }
+
+    private readonly object _installGate = new();
+
     /// <summary>Save, load, or delete a named profile (per device). Null on success.</summary>
     private string? HandleProfile(Command cmd)
     {
@@ -375,7 +419,7 @@ public sealed class WebSocketHub
 
     private void Broadcast(object message)
     {
-        string text;
+        byte[] text;
         try { text = Serialize(message); }
         catch (Exception ex)
         {
@@ -395,7 +439,12 @@ public sealed class WebSocketHub
         }
     }
 
-    private static string Serialize(object o) => JsonSerializer.Serialize(o, Json);
+    /// <summary>
+    /// A message as the bytes that go on the wire. The plugin catalogue runs
+    /// to megabytes, and building it as a string first would hold it twice
+    /// over in a daemon whose heap is bounded, so nothing here becomes text.
+    /// </summary>
+    private static byte[] Serialize(object o) => JsonSerializer.SerializeToUtf8Bytes(o, Json);
 
     /// <summary>
     /// A connection with one bounded send pump. WebSocket forbids concurrent
@@ -427,15 +476,15 @@ public sealed class WebSocketHub
             _sendPump = Task.Run(SendPumpAsync);
         }
 
-        public bool TrySend(string text)
+        public bool TrySend(byte[] payload)
             => Socket.State == WebSocketState.Open &&
-               _outgoing.Writer.TryWrite(new PendingSend(text, null));
+               _outgoing.Writer.TryWrite(new PendingSend(payload, null));
 
-        public Task SendAsync(string text)
+        public Task SendAsync(byte[] payload)
         {
             if (Socket.State != WebSocketState.Open) return Task.CompletedTask;
             var sent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            if (_outgoing.Writer.TryWrite(new PendingSend(text, sent))) return sent.Task;
+            if (_outgoing.Writer.TryWrite(new PendingSend(payload, sent))) return sent.Task;
             // The queue holds about two seconds of meter frames. A client that
             // has not drained it is stuck; drop it rather than let the send
             // fault propagate through the command pipeline. The receive loop
@@ -455,7 +504,7 @@ public sealed class WebSocketHub
                     active = pending;
                     using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
                     timeout.CancelAfter(SendTimeout);
-                    await Socket.SendAsync(Encoding.UTF8.GetBytes(pending.Text),
+                    await Socket.SendAsync(pending.Payload,
                         WebSocketMessageType.Text, true, timeout.Token);
                     pending.Completion?.TrySetResult();
                     active = null;
@@ -487,6 +536,6 @@ public sealed class WebSocketHub
             _ = _sendPump.ContinueWith(_ => _lifetime.Dispose(), TaskScheduler.Default);
         }
 
-        private sealed record PendingSend(string Text, TaskCompletionSource? Completion);
+        private sealed record PendingSend(byte[] Payload, TaskCompletionSource? Completion);
     }
 }

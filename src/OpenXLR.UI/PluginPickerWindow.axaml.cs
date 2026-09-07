@@ -77,4 +77,20 @@ public partial class PluginPickerWindow : Window
     }
 
     private void OnCancel(object? sender, RoutedEventArgs e) => Close(null);
+
+    private async void OnInstallFile(object? sender, RoutedEventArgs e)
+        => await InstallAsync(await PluginInstall.PickFilesAsync(this));
+
+    private async void OnInstallFolder(object? sender, RoutedEventArgs e)
+        => await InstallAsync(await PluginInstall.PickFolderAsync(this));
+
+    private async System.Threading.Tasks.Task InstallAsync(IReadOnlyList<string> paths)
+    {
+        if (paths.Count == 0 || DataContext is not InsertsViewModel vm) return;
+        InstallFile.IsEnabled = InstallFolder.IsEnabled = false;
+        InstallStatus.Text = "Installing…";
+        try { InstallStatus.Text = await PluginInstall.InstallAsync(vm.Client, paths); }
+        catch (Exception ex) { InstallStatus.Text = ex.Message; }
+        finally { InstallFile.IsEnabled = InstallFolder.IsEnabled = true; }
+    }
 }

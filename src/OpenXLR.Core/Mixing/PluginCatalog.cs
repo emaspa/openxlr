@@ -7,7 +7,7 @@ namespace OpenXLR.Core.Mixing;
 /// </summary>
 public static class PluginCatalog
 {
-    private static readonly Lazy<IReadOnlyList<PluginInfo>> All = new(Build, LazyThreadSafetyMode.ExecutionAndPublication);
+    private static readonly Refreshable<IReadOnlyList<PluginInfo>> All = new(Build);
 
     private static IReadOnlyList<PluginInfo> Build()
     {
@@ -67,6 +67,44 @@ public static class PluginCatalog
 
     /// <summary>The whole catalogue, within the size a client is sent (blocks on the first call).</summary>
     public static IReadOnlyList<PluginInfo> Plugins => All.Value;
+
+    /// <summary>
+    /// Read every source again, for plugins installed since. What was
+    /// learnt about a bundle that did not change comes from the scan cache,
+    /// so only new bundles cost a scan. Blocks until the new list is ready.
+    ///
+    /// The old catalogue is dropped first and the heap swept before the new
+    /// one is built: the daemon runs under a firm heap limit, and holding
+    /// two catalogues and a large module's description at once does not fit
+    /// in it. Whatever a caller still holds keeps its own copy alive, so a
+    /// caller that only wants to compare should keep the plugins' names,
+    /// not the plugins.
+    /// </summary>
+    public static IReadOnlyList<PluginInfo> Refresh()
+    {
+        Lv2Catalog.Reset();
+        ClapCatalog.Reset();
+        Vst3Catalog.Reset();
+        All.Reset();
+        GC.Collect(2, GCCollectionMode.Aggressive, blocking: true);
+        NativeHeap.Trim();
+        IReadOnlyList<PluginInfo> plugins = All.Value;
+        // lilv builds and frees a large model to answer this; without the
+        // trim the C library keeps every megabyte of it for a use that never
+        // comes, and a few rescans cost more memory than the daemon ever needs.
+        GC.Collect(2, GCCollectionMode.Aggressive, blocking: true);
+        NativeHeap.Trim();
+        return plugins;
+    }
+
+    /// <summary>Every plugin listed now, by format and identifier: enough to tell what a rescan gained.</summary>
+    public static HashSet<(string Kind, string Plugin)> Identities()
+        => [.. Plugins.Select(p => (p.Kind, p.Plugin))];
+
+    /// <summary>The same, but only for plugins that came from one of these directories.</summary>
+    public static int CountUnder(IReadOnlyCollection<string> directories, HashSet<(string Kind, string Plugin)> known)
+        => Plugins.Count(p => !known.Contains((p.Kind, p.Plugin))
+            && (directories.Count == 0 || p.Path is null || directories.Any(d => p.Path.StartsWith(d, StringComparison.Ordinal))));
 
     /// <summary>Kick both scans off without waiting for them.</summary>
     public static void Warm() => ThreadPool.QueueUserWorkItem(_ => { try { _ = All.Value; } catch (Exception) { } });

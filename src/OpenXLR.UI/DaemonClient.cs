@@ -60,7 +60,28 @@ public sealed class DaemonClient : IAsyncDisposable
     public Task<JsonNode?> RequestPluginsAsync(TimeSpan timeout)
         => QueryAsync("plugins", "listPlugins", timeout);
 
-    private async Task<JsonNode?> QueryAsync(string type, string command, TimeSpan timeout)
+    /// <summary>Where plugins go and what bridges Windows ones (a "pluginSetup" message); null on timeout.</summary>
+    public Task<JsonNode?> RequestPluginSetupAsync(TimeSpan timeout)
+        => QueryAsync("pluginSetup", "getPluginSetup", timeout);
+
+    /// <summary>
+    /// Ask the daemon to install the plugin at a path the user picked. The
+    /// reply says what happened and how many plugins the catalogue gained;
+    /// null when the daemon did not answer in time. A scan of a large
+    /// bundle can take a while, so callers wait generously.
+    /// </summary>
+    public Task<JsonNode?> InstallPluginAsync(string path, TimeSpan timeout)
+        => QueryAsync("pluginInstall", "installPlugin", timeout, new Dictionary<string, object> { ["path"] = path });
+
+    /// <summary>Bridge again what yabridge knows; the reply is as for an install.</summary>
+    public Task<JsonNode?> SyncWindowsPluginsAsync(TimeSpan timeout)
+        => QueryAsync("pluginInstall", "syncWindowsPlugins", timeout);
+
+    /// <summary>Read the catalogues again, for plugins installed by other means.</summary>
+    public Task<JsonNode?> RescanPluginsAsync(TimeSpan timeout)
+        => QueryAsync("pluginInstall", "rescanPlugins", timeout);
+
+    private async Task<JsonNode?> QueryAsync(string type, string command, TimeSpan timeout, Dictionary<string, object>? fields = null)
     {
         PendingQuery query;
         bool send;
@@ -73,7 +94,8 @@ public sealed class DaemonClient : IAsyncDisposable
         }
         try
         {
-            if (send && !await SendAsync(new { cmd = command, requestId = query.Id }, reportErrors: false))
+            var payload = new Dictionary<string, object>(fields ?? []) { ["cmd"] = command, ["requestId"] = query.Id };
+            if (send && !await SendAsync(payload, reportErrors: false))
                 query.Reply.TrySetResult(null);
             return await query.Reply.Task.WaitAsync(timeout);
         }
@@ -211,6 +233,7 @@ public sealed class DaemonClient : IAsyncDisposable
             else if (type == "state") { LastStateJson = text; StateReceived?.Invoke(node); }
             else if (type == "diagnostics") StoreReply(type, node);
             else if (type == "plugins") StoreReply(type, node["plugins"]);
+            else if (type is "pluginSetup" or "pluginInstall") StoreReply(type, node);
             else if (type == "commandResult" && node["requestId"]?.GetValue<string>() is string requestId)
             {
                 CompleteQuery(requestId);

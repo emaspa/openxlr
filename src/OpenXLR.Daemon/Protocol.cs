@@ -79,6 +79,38 @@ public sealed record Command
 
     /// <summary>"setInsertParam": the control port symbol.</summary>
     [JsonPropertyName("symbol")] public string? Symbol { get; init; }
+
+    /// <summary>"installPlugin": the file or directory the user picked, absolute.</summary>
+    [JsonPropertyName("path")] public string? Path { get; init; }
+}
+
+/// <summary>Reply to "getPluginSetup": where plugins go and what bridges Windows ones.</summary>
+public sealed record PluginSetupMessage(PluginSetup Setup)
+{
+    [JsonPropertyName("type")] public string Type => "pluginSetup";
+    [JsonPropertyName("hostInstalled")] public bool HostInstalled => Setup.HostInstalled;
+    [JsonPropertyName("lv2Directory")] public string Lv2Directory => Setup.Lv2Directory;
+    [JsonPropertyName("clapDirectory")] public string ClapDirectory => Setup.ClapDirectory;
+    [JsonPropertyName("vst3Directory")] public string Vst3Directory => Setup.Vst3Directory;
+    /// <summary>yabridgectl's version when it is installed, else null.</summary>
+    [JsonPropertyName("yabridge")] public string? Yabridge => Setup.YabridgeVersion;
+    [JsonPropertyName("wine")] public bool Wine => Setup.Wine;
+    [JsonPropertyName("windowsDirectories")] public IReadOnlyList<string> WindowsDirectories => Setup.WindowsDirectories;
+    [JsonIgnore] public PluginSetup Setup { get; } = Setup;
+}
+
+/// <summary>Reply to "installPlugin", "syncWindowsPlugins" and "rescanPlugins": what happened, and what the catalogue gained.</summary>
+public sealed record PluginInstallMessage(bool Ok, string Message, IReadOnlyList<string> Installed, int Added, int Total)
+{
+    [JsonPropertyName("type")] public string Type => "pluginInstall";
+    [JsonPropertyName("ok")] public bool Ok { get; } = Ok;
+    /// <summary>A sentence or two for the user.</summary>
+    [JsonPropertyName("message")] public string Message { get; } = Message;
+    /// <summary>The bundles or directories installed, by name.</summary>
+    [JsonPropertyName("installed")] public IReadOnlyList<string> Installed { get; } = Installed;
+    /// <summary>Plugins in the catalogue now that were not before.</summary>
+    [JsonPropertyName("added")] public int Added { get; } = Added;
+    [JsonPropertyName("total")] public int Total { get; } = Total;
 }
 
 /// <summary>Reply to "listPlugins": everything the insert picker can offer.</summary>

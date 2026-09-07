@@ -59,6 +59,12 @@ public sealed class MainViewModel : ViewModelBase
         });
         _client.ErrorReceived += msg => Dispatcher.UIThread.Post(() => Status = msg);
         _client.MetersReceived += levels => Dispatcher.UIThread.Post(() => ApplyMeters(levels));
+        InsertsViewModel.ReloadAll = () =>
+        {
+            InsertsViewModel.ForgetCatalogue();
+            Inserts.Refetch(); Inserts2.Refetch();
+            foreach (MixViewModel mv in Mixes) mv.Inserts.Refetch();
+        };
     }
 
     // --- connection / device identity ---

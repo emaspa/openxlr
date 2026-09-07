@@ -127,6 +127,20 @@ public sealed class InsertsViewModel : ViewModelBase
 
     public void ResetForNewConnection() { _pluginsRequested = false; _catalogTask = null; }
 
+    /// <summary>
+    /// After a plugin was installed: every chain fetches the catalogue
+    /// again, sharing one request. The main view model wires this to all
+    /// of its chains; the picker and Options call it.
+    /// </summary>
+    public static Action? ReloadAll { get; set; }
+
+    internal static void ForgetCatalogue() => _catalogTask = null;
+
+    /// <summary>Fetch the catalogue again for this chain.</summary>
+    public void Refetch() { _pluginsRequested = false; EnsurePluginsLoaded(); }
+
+    internal DaemonClient Client => _client;
+
     /// <summary>Whether the catalog has arrived for this chain.</summary>
     public bool CatalogReady => PluginChoices.Count > 0;
 

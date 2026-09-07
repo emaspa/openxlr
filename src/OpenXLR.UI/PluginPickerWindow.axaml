@@ -28,10 +28,20 @@
                     IsCheckedChanged="OnFormatToggled" ToolTip.Tip="Show VST3 plugins"/>
     </Grid>
     <TextBlock DockPanel.Dock="Top" Text="{Binding Note}" Classes="h" FontSize="11" Margin="0,0,0,6"/>
-    <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto,Auto" Margin="0,10,0,0">
-      <Button Grid.Column="1" Name="AddButton" Content="Add" Padding="18,6" Margin="0,0,8,0" IsEnabled="False" Click="OnAdd"/>
-      <Button Grid.Column="2" Content="Cancel" Padding="18,6" Click="OnCancel"/>
-    </Grid>
+    <!-- installing: a file (.clap, .vst3, a Windows plugin) or a folder (a .vst3
+         or .lv2 bundle, or a folder of plugins); the daemon puts it in place -->
+    <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,10,0,0">
+      <TextBlock Name="InstallStatus" Classes="h" FontSize="11" TextWrapping="Wrap"
+                 IsVisible="{Binding #InstallStatus.Text, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+      <Grid ColumnDefinitions="Auto,6,Auto,*,Auto,8,Auto">
+        <Button Name="InstallFile" Content="Install file…" Padding="12,6" Click="OnInstallFile"
+                ToolTip.Tip="Install a .clap or .vst3 file, or a Windows plugin through yabridge"/>
+        <Button Grid.Column="2" Name="InstallFolder" Content="Install folder…" Padding="12,6" Click="OnInstallFolder"
+                ToolTip.Tip="Install a .vst3 or .lv2 bundle, or every plugin in a folder"/>
+        <Button Grid.Column="4" Name="AddButton" Content="Add" Padding="18,6" IsEnabled="False" Click="OnAdd"/>
+        <Button Grid.Column="6" Content="Cancel" Padding="18,6" Click="OnCancel"/>
+      </Grid>
+    </StackPanel>
     <ListBox Name="List" Background="#1d2027" CornerRadius="8" Padding="4"
              SelectionChanged="OnSelectionChanged" DoubleTapped="OnDoubleTapped">
       <ListBox.ItemTemplate>

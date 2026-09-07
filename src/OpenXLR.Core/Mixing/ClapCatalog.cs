@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 
 namespace OpenXLR.Core.Mixing;
 
@@ -13,9 +12,11 @@ namespace OpenXLR.Core.Mixing;
 /// </summary>
 public static class ClapCatalog
 {
-    private static readonly Lazy<IReadOnlyList<PluginInfo>> Scan = new(() => ScanNow(), LazyThreadSafetyMode.ExecutionAndPublication);
+    private static readonly Refreshable<IReadOnlyList<PluginInfo>> Scan = new(() => ScanNow());
 
     public static IReadOnlyList<PluginInfo> Plugins => Scan.Value;
+
+    public static void Reset() => Scan.Reset();
 
     /// <summary>Where bundles live, in the order the CLAP specification gives.</summary>
     public static IReadOnlyList<string> SearchPath()
@@ -42,9 +43,11 @@ public static class ClapCatalog
 /// </summary>
 public static class Vst3Catalog
 {
-    private static readonly Lazy<IReadOnlyList<PluginInfo>> Scan = new(() => ScanNow(), LazyThreadSafetyMode.ExecutionAndPublication);
+    private static readonly Refreshable<IReadOnlyList<PluginInfo>> Scan = new(() => ScanNow());
 
     public static IReadOnlyList<PluginInfo> Plugins => Scan.Value;
+
+    public static void Reset() => Scan.Reset();
 
     public static IReadOnlyList<string> SearchPath()
     {
@@ -130,49 +133,122 @@ internal static class HostScan
 
     /// <summary>
     /// The scanner's JSON for one bundle, as plugins the picker can offer.
-    /// Read from bytes: a large module's description would double in size as
-    /// a string, and the daemon's heap is bounded.
+    /// Read as a stream of tokens rather than into a tree: one module can
+    /// describe two hundred plugins in several megabytes, and a tree of that
+    /// runs to many times its size, which the daemon's bounded heap does not
+    /// have. Nothing is held but the plugins themselves.
     /// </summary>
     internal static IReadOnlyList<PluginInfo> Parse(ReadOnlySpan<byte> json, string kind)
     {
         var result = new List<PluginInfo>();
-        if (JsonNode.Parse(json) is not JsonObject root) return result;
-        string file = root["file"]?.GetValue<string>() ?? "";
-        foreach (JsonNode? node in root["plugins"] as JsonArray ?? [])
+        var reader = new Utf8JsonReader(json, new JsonReaderOptions { CommentHandling = JsonCommentHandling.Skip });
+        if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject) return result;
+        // The scanner writes "file" before "plugins", so a plugin's path is
+        // known by the time one is read; if it is not, the bundle is unnamed.
+        string file = "";
+        while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
         {
-            if (node is not JsonObject p) continue;
-            string? id = p["id"]?.GetValue<string>();
-            if (string.IsNullOrWhiteSpace(id)) continue;
-            var features = (p["features"] as JsonArray)?.Select(f => f?.GetValue<string>() ?? "").ToList() ?? [];
-            var parameters = new List<PluginParam>();
-            foreach (JsonNode? q in p["params"] as JsonArray ?? [])
+            if (reader.ValueTextEquals("file"u8))
             {
-                if (q is not JsonObject param) continue;
-                double min = param["min"]?.GetValue<double>() ?? 0, max = param["max"]?.GetValue<double>() ?? 1;
-                double def = param["default"]?.GetValue<double>() ?? min;
-                bool stepped = param["stepped"]?.GetValue<bool>() == true;
-                bool enumeration = param["enum"]?.GetValue<bool>() == true;
-                parameters.Add(new PluginParam(
-                    (param["id"]?.GetValue<long>() ?? 0).ToString(CultureInfo.InvariantCulture),
-                    param["name"]?.GetValue<string>() ?? "",
-                    min, max, def,
-                    Toggled: stepped && min == 0 && max == 1,
-                    Integer: stepped,
-                    Logarithmic: false,
-                    Enumeration: enumeration,
-                    []));
-                if (parameters.Count == Lv2Catalog.MaxControls) break;
+                reader.Read();
+                file = reader.TokenType == JsonTokenType.String ? reader.GetString() ?? "" : "";
             }
-            int ins = p["audioIns"]?.GetValue<int>() ?? 0, outs = p["audioOuts"]?.GetValue<int>() ?? 0;
-            result.Add(new PluginInfo(kind, id, p["name"]?.GetValue<string>() ?? id, Category(features),
-                ins, outs, "", "", parameters, [], [], [])
+            else if (reader.ValueTextEquals("plugins"u8))
             {
-                HasNativeUi = p["gui"]?.GetValue<bool>() == true,
-                Path = file,
-            });
+                reader.Read();
+                if (reader.TokenType != JsonTokenType.StartArray) { reader.Skip(); continue; }
+                while (reader.Read() && reader.TokenType == JsonTokenType.StartObject)
+                    if (ReadPlugin(ref reader, kind, file) is PluginInfo info)
+                        result.Add(info);
+            }
+            else { reader.Read(); reader.Skip(); }
         }
         return result;
     }
+
+    /// <summary>One plugin, from the object the reader stands on to its end.</summary>
+    private static PluginInfo? ReadPlugin(ref Utf8JsonReader reader, string kind, string file)
+    {
+        string? id = null, name = null;
+        var features = new List<string>();
+        var parameters = new List<PluginParam>();
+        int ins = 0, outs = 0;
+        bool gui = false;
+        while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
+        {
+            if (reader.ValueTextEquals("id"u8)) { reader.Read(); id = Text(ref reader); }
+            else if (reader.ValueTextEquals("name"u8)) { reader.Read(); name = Text(ref reader); }
+            else if (reader.ValueTextEquals("audioIns"u8)) { reader.Read(); ins = Whole(ref reader); }
+            else if (reader.ValueTextEquals("audioOuts"u8)) { reader.Read(); outs = Whole(ref reader); }
+            else if (reader.ValueTextEquals("gui"u8)) { reader.Read(); gui = reader.TokenType == JsonTokenType.True; }
+            else if (reader.ValueTextEquals("features"u8))
+            {
+                reader.Read();
+                if (reader.TokenType != JsonTokenType.StartArray) { reader.Skip(); continue; }
+                while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
+                {
+                    if (features.Count < Lv2Catalog.MaxFeatures && reader.TokenType == JsonTokenType.String)
+                        features.Add(reader.GetString() ?? "");
+                    else reader.Skip();
+                }
+            }
+            else if (reader.ValueTextEquals("params"u8))
+            {
+                reader.Read();
+                if (reader.TokenType != JsonTokenType.StartArray) { reader.Skip(); continue; }
+                while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
+                {
+                    if (reader.TokenType != JsonTokenType.StartObject || parameters.Count >= Lv2Catalog.MaxControls) { reader.Skip(); continue; }
+                    if (ReadParam(ref reader) is PluginParam param) parameters.Add(param);
+                }
+            }
+            else { reader.Read(); reader.Skip(); }
+        }
+        if (string.IsNullOrWhiteSpace(id)) return null;
+        return new PluginInfo(kind, id, string.IsNullOrWhiteSpace(name) ? id : name, Category(features),
+            ins, outs, "", "", parameters, [], [], [])
+        {
+            HasNativeUi = gui,
+            Path = file,
+        };
+    }
+
+    /// <summary>One parameter, addressed by its id, which is how the helper takes it.</summary>
+    private static PluginParam? ReadParam(ref Utf8JsonReader reader)
+    {
+        long id = 0;
+        string name = "";
+        double min = 0, max = 1;
+        double? initial = null;
+        bool stepped = false, enumeration = false;
+        while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
+        {
+            if (reader.ValueTextEquals("id"u8)) { reader.Read(); id = (long)Number(ref reader); }
+            else if (reader.ValueTextEquals("name"u8)) { reader.Read(); name = Text(ref reader) ?? ""; }
+            else if (reader.ValueTextEquals("min"u8)) { reader.Read(); min = Number(ref reader); }
+            else if (reader.ValueTextEquals("max"u8)) { reader.Read(); max = Number(ref reader, 1); }
+            else if (reader.ValueTextEquals("default"u8)) { reader.Read(); initial = Number(ref reader); }
+            else if (reader.ValueTextEquals("stepped"u8)) { reader.Read(); stepped = reader.TokenType == JsonTokenType.True; }
+            else if (reader.ValueTextEquals("enum"u8)) { reader.Read(); enumeration = reader.TokenType == JsonTokenType.True; }
+            else { reader.Read(); reader.Skip(); }
+        }
+        return new PluginParam(
+            id.ToString(CultureInfo.InvariantCulture), name, min, max, initial ?? min,
+            Toggled: stepped && min == 0 && max == 1,
+            Integer: stepped,
+            Logarithmic: false,
+            Enumeration: enumeration,
+            []);
+    }
+
+    private static string? Text(ref Utf8JsonReader reader)
+        => reader.TokenType == JsonTokenType.String ? reader.GetString() : null;
+
+    private static double Number(ref Utf8JsonReader reader, double fallback = 0)
+        => reader.TokenType == JsonTokenType.Number && reader.TryGetDouble(out double value) ? value : fallback;
+
+    private static int Whole(ref Utf8JsonReader reader)
+        => reader.TokenType == JsonTokenType.Number && reader.TryGetInt32(out int value) ? value : 0;
 
     /// <summary>
     /// The picker's grouping, from the plugin's own feature list: CLAP

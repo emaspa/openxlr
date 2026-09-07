@@ -129,9 +129,12 @@ host mechanism stable than two half-finished ones.
   Scans are cached per bundle, since a module of two hundred plugins takes
   a quarter of a minute to describe. Carla was considered and dropped: no
   commit in six months, no CLAP, and a second audio engine.
-- [ ] Windows plugins made easy: detect yabridge, run its sync when the
-  catalogue refreshes, and a card in Options that shows what was found with
-  the install steps behind a Manual link.
+- [x] Installing plugins from the window: pick a file or a folder and the
+  daemon puts it where it looks, copies Linux bundles into the home
+  directories, hands Windows plugins to yabridge and syncs, and reads the
+  catalogues again. A card in Options says where plugins go and whether
+  yabridge and Wine are there, with a rescan, a sync and the steps behind a
+  Manual link.
 - [ ] Presets: per-plugin and whole-chain, with export and import; copy a
   chain between channels; A/B comparison.
 - [ ] Plugin latency reported per insert and compensated across mixes.

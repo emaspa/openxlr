@@ -135,6 +135,17 @@ bundle and nothing else, and what it learns is kept until the bundle
 changes. Windows VST3 plugins come through yabridge, which presents them
 as ordinary bundles under `~/.vst3`. VST2 plugins are not supported.
 
+Installing a plugin is a pick in the picker or in Options: a file or a
+folder the user downloaded. The daemon works out what it is from its
+name and its first bytes, copies a Linux `.clap`, `.vst3` or `.lv2` into
+the matching directory under the home, hands a folder of Windows plugins
+to yabridge and runs its sync, and answers in a sentence when it cannot
+help: an archive to extract, a Windows installer to run with Wine first,
+a VST2 file. The catalogues are read again afterwards, and every open
+chain fetches the list, so the plugin is in the picker a moment later.
+The Options window says where plugins go, whether yabridge and Wine are
+installed and how many folders they bridge, with a rescan and a sync.
+
 The list a window is sent has a size limit. The same plugin often ships
 in more than one format, and while everything fits every copy is offered;
 past the limit, LV2 stays whole and the other formats fill what room is

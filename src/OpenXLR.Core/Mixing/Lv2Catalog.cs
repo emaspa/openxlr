@@ -16,7 +16,7 @@ namespace OpenXLR.Core.Mixing;
 /// </summary>
 public static class Lv2Catalog
 {
-    private static readonly Lazy<IReadOnlyList<PluginInfo>> Scan = new(() => ScanNow(), LazyThreadSafetyMode.ExecutionAndPublication);
+    private static readonly Refreshable<IReadOnlyList<PluginInfo>> Scan = new(() => ScanNow());
 
     /// <summary>
     /// The host features PipeWire's filter-chain LV2 loader provides (read
@@ -42,6 +42,9 @@ public static class Lv2Catalog
 
     /// <summary>Every LV2 plugin lilv can see (blocks on the first call).</summary>
     public static IReadOnlyList<PluginInfo> Plugins => Scan.Value;
+
+    /// <summary>Forget what was read; the next read scans again.</summary>
+    public static void Reset() => Scan.Reset();
 
     /// <summary>Kick the scan off without waiting for it.</summary>
     public static void Warm() => ThreadPool.QueueUserWorkItem(_ => { try { _ = Scan.Value; } catch (Exception) { } });
@@ -114,15 +117,26 @@ public static class Lv2Catalog
     internal const int MaxUri = 512;
     /// <summary>Required features beyond this count are not read; no real plugin declares more than a handful.</summary>
     internal const int MaxFeatures = 64;
-    /// <summary>Rough serialized size the whole catalog may reach; the window reads at most 8 MiB per message.</summary>
-    internal const int CatalogBudgetBytes = 6 * 1024 * 1024;
+    /// <summary>
+    /// Serialized size the whole catalog may reach. A client reads at most
+    /// 8 MiB in one message and drops anything longer, which would leave a
+    /// picker with nothing in it, so the catalog stops short of that with
+    /// room for the message around it.
+    /// </summary>
+    internal const int CatalogBudgetBytes = 7 * 1024 * 1024;
 
     private static string Clip(string s) => s.Length <= MaxText ? s : s[..MaxText];
 
-    /// <summary>A plugin's approximate footprint in the serialized catalog.</summary>
+    /// <summary>
+    /// A plugin's footprint in the serialized catalog. The fixed parts are
+    /// the field names and punctuation JSON puts around each value, measured
+    /// against what the daemon actually sends, and rounded up: an estimate
+    /// that ran under the truth would let the catalog past the size a client
+    /// will read.
+    /// </summary>
     internal static int Footprint(PluginInfo p)
-        => 160 + p.Plugin.Length + p.Name.Length + p.Category.Length
-           + p.Params.Sum(q => 120 + q.Symbol.Length + q.Name.Length + q.ScalePoints.Sum(sp => 24 + sp.Label.Length))
+        => 220 + p.Plugin.Length + p.Name.Length + p.Category.Length
+           + p.Params.Sum(q => 152 + q.Symbol.Length + q.Name.Length + q.ScalePoints.Sum(sp => 24 + sp.Label.Length))
            + p.RequiredFeatures.Sum(f => f.Length + 4) + (p.InputSymbols.Count + p.OutputSymbols.Count) * 16;
 
     /// <summary>

@@ -232,4 +232,76 @@ public sealed class ClapCatalogTests
         public bool IsInsertKey(string key) => true;
         public int OverrideCount => 0;
     }
+
+    [Fact]
+    public void ALargeDescriptionIsReadWithoutHoldingATreeOfIt()
+    {
+        // What a module of two hundred plugins looks like: too large to hold
+        // as a node tree in the daemon's heap, so the parser reads it as a
+        // stream. The test is that everything survives the reading, unknown
+        // fields with a structure of their own included.
+        var json = new System.Text.StringBuilder("{\"file\":\"/usr/lib/vst3/big.vst3\",\"plugins\":[");
+        for (int i = 0; i < 200; i++)
+        {
+            if (i > 0) json.Append(',');
+            json.Append("{\"id\":\"" + i.ToString("D32") + "\",\"name\":\"Plugin " + i + "\",\"vendor\":\"Test\",");
+            json.Append("\"features\":[\"Fx\",\"Reverb\"],\"unknown\":{\"nested\":[1,2,{\"deep\":true}]},");
+            json.Append("\"audioIns\":2,\"audioOuts\":2,\"gui\":true,\"params\":[");
+            for (int q = 0; q < 60; q++)
+            {
+                if (q > 0) json.Append(',');
+                json.Append("{\"id\":" + q + ",\"name\":\"Param " + q + "\",\"module\":\"Group\",");
+                json.Append("\"min\":-12.5,\"max\":12.5,\"default\":0,\"readonly\":false,\"stepped\":false,\"enum\":false}");
+            }
+            json.Append("]}");
+        }
+        json.Append("]}");
+
+        IReadOnlyList<PluginInfo> found = Vst3Catalog.Parse(json.ToString());
+        Assert.Equal(200, found.Count);
+        Assert.Equal("Plugin 7", found[7].Name);
+        Assert.Equal("/usr/lib/vst3/big.vst3", found[7].Path);
+        Assert.Equal("Reverb", found[7].Category);
+        Assert.Equal((2, 2), (found[7].AudioIns, found[7].AudioOuts));
+        Assert.True(found[7].HasNativeUi);
+        Assert.Equal(60, found[7].Params.Count);
+        Assert.Equal("3", found[7].Params[3].Symbol);
+        Assert.Equal(-12.5, found[7].Params[3].Min);
+        Assert.Equal(0, found[7].Params[3].Default);
+    }
+
+    [Fact]
+    public void WhatTheScannerLeavesOutTakesItsUsualValue()
+    {
+        const string sparse = """
+            {"plugins":[
+              {"name":"No id","audioIns":1,"audioOuts":1},
+              {"id":"only.id"},
+              {"id":"defaults","name":"Defaults","extra":{"a":[1,{"b":2}]},
+               "params":[{"id":4,"name":"Level","min":-60},{"id":5,"stepped":true,"min":0,"max":1}]}
+            ]}
+            """;
+        IReadOnlyList<PluginInfo> found = ClapCatalog.Parse(sparse);
+        Assert.Equal(2, found.Count);                  // the one without an id is not a plugin
+        Assert.Equal("only.id", found[0].Name);        // no name: its id stands in
+        Assert.Equal("", found[0].Path);               // no file: an unnamed bundle
+        Assert.Equal((0, 0), (found[0].AudioIns, found[0].AudioOuts));
+        Assert.False(found[0].HasNativeUi);
+
+        PluginInfo defaults = found[1];
+        Assert.Equal(2, defaults.Params.Count);
+        Assert.Equal(-60, defaults.Params[0].Min);
+        Assert.Equal(1, defaults.Params[0].Max);    // no max: one
+        Assert.Equal(-60, defaults.Params[0].Default);  // no default: the minimum
+        Assert.True(defaults.Params[1].Toggled);        // stepped from zero to one
+    }
+
+    [Fact]
+    public void WhatIsNotADescriptionDescribesNothing()
+    {
+        Assert.Empty(ClapCatalog.Parse("[1,2,3]"));
+        Assert.Empty(ClapCatalog.Parse("\"a string\""));
+        Assert.Empty(ClapCatalog.Parse("{\"plugins\":\"not an array\"}"));
+        Assert.Empty(ClapCatalog.Parse("{}"));
+    }
 }
