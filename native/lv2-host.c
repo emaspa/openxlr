@@ -139,7 +139,7 @@ typedef struct {
   float rate_hz;
   LV2_Options_Option options[5];
   Display *display;
-  Window window;
+  Window window, child;
   Atom close_message;
   void *ui_library;
   const LV2UI_Descriptor *ui_descriptor;
@@ -352,6 +352,28 @@ static void forget_ui(Host *h) {
   h->idle = NULL;
   h->display = NULL;
   h->window = 0;
+  h->child = 0;
+}
+
+// A plugin builds its interface in a window of its own inside ours, at
+// whatever size it wants, and many never call the host's resize. Take the
+// size from that window, and watch it so later changes follow.
+static void fit_to_child(Host *h) {
+  Window root, parent, *children = NULL;
+  unsigned count = 0;
+  if (!XQueryTree(h->display, h->window, &root, &parent, &children, &count))
+    return;
+  if (count > 0) {
+    h->child = children[count - 1];
+    XSelectInput(h->display, h->child, StructureNotifyMask);
+    XWindowAttributes attributes;
+    if (XGetWindowAttributes(h->display, h->child, &attributes) &&
+        attributes.width > 0 && attributes.height > 0)
+      XResizeWindow(h->display, h->window, (unsigned)attributes.width,
+                    (unsigned)attributes.height);
+  }
+  if (children)
+    XFree(children);
 }
 
 static void close_ui(Host *h) {
@@ -430,6 +452,8 @@ static bool open_editor_window(Host *h, const char *bundle) {
                     (int)strlen(h->node_name));
     h->close_message = XInternAtom(h->display, "WM_DELETE_WINDOW", False);
     XSetWMProtocols(h->display, h->window, &h->close_message, 1);
+    XSelectInput(h->display, h->window,
+                 StructureNotifyMask | SubstructureNotifyMask);
     h->resize = (LV2UI_Resize){h, ui_resize};
     LV2_Feature parent = {LV2_UI__parent, (void *)(uintptr_t)h->window};
     LV2_Feature map = {LV2_URID__map, &h->map},
@@ -448,6 +472,7 @@ static bool open_editor_window(Host *h, const char *bundle) {
       h->idle = h->ui_descriptor->extension_data
                     ? h->ui_descriptor->extension_data(LV2_UI__idleInterface)
                     : NULL;
+      fit_to_child(h);  // before mapping, so the frame never opens wrong
       XMapRaised(h->display, h->window);
       XFlush(h->display);
     }
@@ -588,6 +613,27 @@ static void pump_editor(Host *h) {
       x_escape_armed = 0;
       close_ui(h);
       return;
+    }
+    // A plugin that builds its window after instantiate returns is found
+    // when that window appears.
+    if (!h->child && (event.type == MapNotify || event.type == CreateNotify))
+      fit_to_child(h);
+    // Keep the frame and the plugin's window the same size, whichever of
+    // the two changed. Each resize is skipped when the sizes already agree,
+    // so the two notifications cannot chase each other.
+    if (event.type == ConfigureNotify && h->child) {
+      const XConfigureEvent *c = &event.xconfigure;
+      XWindowAttributes attributes;
+      if (c->window == h->child &&
+          XGetWindowAttributes(h->display, h->window, &attributes) &&
+          (attributes.width != c->width || attributes.height != c->height))
+        XResizeWindow(h->display, h->window, (unsigned)c->width,
+                      (unsigned)c->height);
+      else if (c->window == h->window &&
+               XGetWindowAttributes(h->display, h->child, &attributes) &&
+               (attributes.width != c->width || attributes.height != c->height))
+        XResizeWindow(h->display, h->child, (unsigned)c->width,
+                      (unsigned)c->height);
     }
   }
   if (h->ui_descriptor->port_event)
