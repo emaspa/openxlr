@@ -96,6 +96,8 @@ public sealed record PluginSetupMessage(PluginSetup Setup)
     [JsonPropertyName("yabridge")] public string? Yabridge => Setup.YabridgeVersion;
     [JsonPropertyName("wine")] public bool Wine => Setup.Wine;
     [JsonPropertyName("windowsDirectories")] public IReadOnlyList<string> WindowsDirectories => Setup.WindowsDirectories;
+    /// <summary>Wine's own plugin folders that hold a plugin and are not bridged yet.</summary>
+    [JsonPropertyName("wineFolders")] public IReadOnlyList<string> WineFolders => Setup.WineFolders;
     [JsonIgnore] public PluginSetup Setup { get; } = Setup;
 }
 

@@ -30,7 +30,8 @@ public sealed record PluginSetup(
     bool HostInstalled,
     string Lv2Directory, string ClapDirectory, string Vst3Directory,
     string? YabridgeVersion, bool Wine,
-    IReadOnlyList<string> WindowsDirectories);
+    IReadOnlyList<string> WindowsDirectories,
+    IReadOnlyList<string> WineFolders);
 
 /// <summary>
 /// How an install went, in words the user can read. The destinations are
@@ -50,7 +51,7 @@ public sealed class PluginInstaller
     /// <summary>How long yabridge gets to bridge a directory: it copies files, it does not run them.</summary>
     private static readonly TimeSpan YabridgeTimeout = TimeSpan.FromMinutes(3);
 
-    private readonly string _lv2, _clap, _vst3;
+    private readonly string _lv2, _clap, _vst3, _winePrefix;
     private readonly string? _yabridgectl, _wine;
     private readonly bool _hostInstalled;
 
@@ -60,7 +61,7 @@ public sealed class PluginInstaller
                OnPath("yabridgectl"), OnPath("wine"), NativePluginHost.HostInstalled) { }
 
     public PluginInstaller(string lv2Directory, string clapDirectory, string vst3Directory,
-        string? yabridgectl, string? wine, bool hostInstalled = true)
+        string? yabridgectl, string? wine, bool hostInstalled = true, string? winePrefix = null)
     {
         _lv2 = lv2Directory;
         _clap = clapDirectory;
@@ -68,6 +69,7 @@ public sealed class PluginInstaller
         _yabridgectl = yabridgectl;
         _wine = wine;
         _hostInstalled = hostInstalled;
+        _winePrefix = winePrefix ?? DefaultWinePrefix();
     }
 
     private static string HomeDirectory(string name)
@@ -349,6 +351,59 @@ public sealed class PluginInstaller
             .Where(line => line.StartsWith('/')).Select(line => line.TrimEnd('/')).ToList();
     }
 
+    /// <summary>Where Wine keeps its own drive: WINEPREFIX, or ~/.wine as Wine itself does.</summary>
+    internal static string DefaultWinePrefix()
+    {
+        string? configured = Environment.GetEnvironmentVariable("WINEPREFIX");
+        return string.IsNullOrWhiteSpace(configured) ? HomeDirectory(".wine") : configured;
+    }
+
+    /// <summary>
+    /// The folders a Windows installer puts a plugin in, when they hold one.
+    /// They live under a dot directory Wine owns, which a file dialog hides,
+    /// so the window offers them rather than asking the user to find them.
+    /// Only VST3 and CLAP, the two formats OpenXLR can load.
+    /// </summary>
+    public IReadOnlyList<string> WinePluginFolders()
+    {
+        string drive = Path.Combine(_winePrefix, "drive_c");
+        var found = new List<string>();
+        var sixtyFourBit = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string format in new[] { "VST3", "CLAP" })
+        {
+            string folder = Path.Combine(drive, "Program Files", "Common Files", format);
+            IReadOnlyList<string> names = PluginNames(folder);
+            if (names.Count == 0) continue;
+            found.Add(folder);
+            sixtyFourBit.UnionWith(names);
+        }
+        foreach (string format in new[] { "VST3", "CLAP" })
+        {
+            // An installer usually writes both builds of a plugin. The 32-bit
+            // copy of one already there as 64-bit is not worth bridging: it is
+            // the same plugin twice in the picker, under one name that two
+            // bridged bundles would fight over. A folder is offered only for
+            // what it holds and the other does not.
+            string folder = Path.Combine(drive, "Program Files (x86)", "Common Files", format);
+            if (PluginNames(folder).Any(name => !sixtyFourBit.Contains(name))) found.Add(folder);
+        }
+        return found;
+    }
+
+    /// <summary>The plugins in a folder, by file name; empty when there are none.</summary>
+    private static IReadOnlyList<string> PluginNames(string folder)
+    {
+        try
+        {
+            if (!Directory.Exists(folder)) return [];
+            return [.. Directory.EnumerateFileSystemEntries(folder)
+                .Where(e => e.EndsWith(".vst3", StringComparison.OrdinalIgnoreCase)
+                         || e.EndsWith(".clap", StringComparison.OrdinalIgnoreCase))
+                .Select(e => Path.GetFileName(e.TrimEnd('/')))];
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return []; }
+    }
+
     /// <summary>What is there: the directories, the host, yabridge and Wine.</summary>
     public PluginSetup Setup()
     {
@@ -364,7 +419,14 @@ public sealed class PluginInstaller
             }
             else version = "installed";
         }
-        return new(_hostInstalled, Shorten(_lv2), Shorten(_clap), Shorten(_vst3), version, _wine is not null, WindowsDirectories());
+        IReadOnlyList<string> bridged = WindowsDirectories();
+        var known = bridged.Select(d => Path.GetFullPath(d).TrimEnd('/')).ToHashSet(StringComparer.Ordinal);
+        // Only the ones still to bridge: a folder already handed over needs
+        // no offer, and after bridging one the offer goes away by itself.
+        IReadOnlyList<string> wine = _wine is null || _yabridgectl is null
+            ? []
+            : [.. WinePluginFolders().Where(f => !known.Contains(Path.GetFullPath(f).TrimEnd('/')))];
+        return new(_hostInstalled, Shorten(_lv2), Shorten(_clap), Shorten(_vst3), version, _wine is not null, bridged, wine);
     }
 
     private ProcessResult? Run(params string[] arguments)

@@ -63,6 +63,21 @@ public sealed class OptionsViewModel : ViewModelBase
     private bool _canSyncWindows;
     public bool CanSyncWindows { get => _canSyncWindows; private set => Set(ref _canSyncWindows, value); }
 
+    /// <summary>Wine's own plugin folders waiting to be bridged, absolute.</summary>
+    public System.Collections.Generic.IReadOnlyList<string> WineFolders { get; private set; } = [];
+
+    private string _bridgeWineLabel = "Bridge Wine's plugins";
+    /// <summary>What the button offers, named after what it will bridge.</summary>
+    public string BridgeWineLabel { get => _bridgeWineLabel; private set => Set(ref _bridgeWineLabel, value); }
+
+    private bool _canBridgeWine;
+    /// <summary>
+    /// Whether Wine holds plugins nobody has bridged yet. The button spares
+    /// the user a file dialog: Wine keeps them under a dot directory, which
+    /// a file dialog hides until the user knows to ask for hidden folders.
+    /// </summary>
+    public bool CanBridgeWine { get => _canBridgeWine; private set => Set(ref _canBridgeWine, value); }
+
     /// <summary>Ask the daemon where plugins go and what is there to bridge Windows ones.</summary>
     public async System.Threading.Tasks.Task LoadPluginSetupAsync()
     {
@@ -89,6 +104,12 @@ public sealed class OptionsViewModel : ViewModelBase
         int folders = (setup["windowsDirectories"] as System.Text.Json.Nodes.JsonArray)?.Count ?? 0;
         WindowsPlugins = WindowsLine(yabridge, wine, folders);
         CanSyncWindows = yabridge is not null && wine;
+        WineFolders = [.. (setup["wineFolders"] as System.Text.Json.Nodes.JsonArray ?? [])
+            .Select(f => f?.GetValue<string>()).OfType<string>()];
+        CanBridgeWine = WineFolders.Count > 0;
+        BridgeWineLabel = WineFolders.Count > 1
+            ? $"Bridge Wine's {WineFolders.Count} plugin folders"
+            : "Bridge Wine's plugins";
     }
 
     /// <summary>One line on Windows plugins, from what the daemon found.</summary>

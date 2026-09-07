@@ -313,8 +313,52 @@ bare Windows `.vst3` or `.clap` file works the same way when picked as a
 file. VST2 `.dll` files are left out, since OpenXLR cannot load VST2.
 
 Wine keeps its Windows drive in `~/.wine` unless `WINEPREFIX` says
-otherwise, and a plugin installed into another prefix works the same way:
-point "Install folder…" at wherever the installer put its VST3 folder.
+otherwise. OpenXLR looks there for the folders a Windows installer writes
+to, `Program Files/Common Files/VST3` and the same for CLAP, and offers
+them in Options as "Bridge Wine's plugins", so there is no need to find
+them in a file dialog, which hides `~/.wine` as a dotted folder. An
+installer that wrote somewhere else is picked with "Install folder…"; use
+Ctrl+H there to show hidden folders.
+
+<a name="memlock"></a>
+**"Low memory locking limit".** yabridge prints this when it starts, in
+the daemon's log:
+
+```
+With a low memory locking limit, yabridge may not be able to lock its
+shared memory audio buffers into main memory.
+```
+
+It is a warning, not a failure: the plugin runs, but the buffers it shares
+with its Windows half can be paged out under memory pressure, and reading
+them back takes far longer than an audio cycle allows. Every distribution
+ships 8 MiB as the limit, which is what systemd uses when nothing else
+says otherwise.
+
+Being in the `audio` group is not enough for this. That group is usually
+granted realtime priority and nothing else; the memory lock comes with the
+`realtime` group. On Arch, and anything built on it:
+
+```sh
+sudo pacman -S realtime-privileges
+sudo usermod -aG realtime $USER
+```
+
+On any distribution, granting it by hand does the same:
+
+```sh
+printf '@audio - memlock unlimited\n' | sudo tee /etc/security/limits.d/99-openxlr.conf
+sudo usermod -aG audio $USER
+```
+
+Either way, log out and back in, since the limit is set when the session
+starts. To see that it took, ask the daemon itself:
+
+```sh
+grep 'Max locked memory' /proc/$(systemctl --user show openxlr-daemon -p MainPID --value)/limits
+```
+
+"unlimited" there means the plugins the daemon starts inherit it too.
 
 The picker marks each plugin with its format, since the same plugin often
 ships in more than one, and its LV2, CLAP and VST3 buttons narrow the list

@@ -30,6 +30,12 @@ public partial class OptionsWindow : Window
         await PluginStepAsync(() => PluginInstall.InstallAsync(vm.Client, paths), "Installing…", vm);
     }
 
+    private async void OnBridgeWinePlugins(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not OptionsViewModel vm || vm.WineFolders.Count == 0) return;
+        await PluginStepAsync(() => PluginInstall.InstallAsync(vm.Client, vm.WineFolders), "Bridging Wine's plugins…", vm);
+    }
+
     private async void OnSyncWindowsPlugins(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not OptionsViewModel vm) return;
@@ -48,7 +54,7 @@ public partial class OptionsWindow : Window
     {
         InstallFile.IsEnabled = InstallFolder.IsEnabled = Rescan.IsEnabled = false;
         bool sync = SyncWindows.IsEnabled;
-        SyncWindows.IsEnabled = false;
+        SyncWindows.IsEnabled = BridgeWine.IsEnabled = false;
         PluginStatus.Text = busy;
         try { PluginStatus.Text = await step(); }
         catch (Exception ex) { PluginStatus.Text = ex.Message; }
@@ -56,6 +62,7 @@ public partial class OptionsWindow : Window
         {
             InstallFile.IsEnabled = InstallFolder.IsEnabled = Rescan.IsEnabled = true;
             SyncWindows.IsEnabled = sync;
+            BridgeWine.IsEnabled = true;
             await vm.LoadPluginSetupAsync();
         }
     }

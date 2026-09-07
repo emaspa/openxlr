@@ -284,6 +284,57 @@ public sealed class PluginInstallerTests : IDisposable
     }
 
     [Fact]
+    public void WhatAWindowsInstallerLeftInWineIsOffered()
+    {
+        string prefix = Path.Combine(_root, "wine");
+        string vst3 = Path.Combine(prefix, "drive_c", "Program Files", "Common Files", "VST3");
+        string clap = Path.Combine(prefix, "drive_c", "Program Files", "Common Files", "CLAP");
+        string thirtyTwo = Path.Combine(prefix, "drive_c", "Program Files (x86)", "Common Files", "VST3");
+        Directory.CreateDirectory(clap);
+        File.WriteAllBytes(Path.Combine(clap, "Thing.clap"), Windows);
+        Directory.CreateDirectory(Path.Combine(vst3, "Nova.vst3"));
+        // What an installer writes: the same plugin in both builds. Only the
+        // 64-bit folder is worth bridging.
+        Directory.CreateDirectory(thirtyTwo);
+        File.WriteAllBytes(Path.Combine(thirtyTwo, "Nova.vst3"), Windows);
+
+        PluginInstaller withYabridge = new(_lv2, _clap, _vst3, FakeYabridgectl(), wine: "/bin/true", hostInstalled: true, winePrefix: prefix);
+        Assert.Equal([vst3, clap], withYabridge.WinePluginFolders());   // the 32-bit copy is not offered
+        Assert.Equal([vst3, clap], withYabridge.Setup().WineFolders);
+
+        // Nothing to offer when the tools that would use it are missing.
+        Assert.Empty(new PluginInstaller(_lv2, _clap, _vst3, null, null, true, prefix).Setup().WineFolders);
+
+        // A folder already bridged is not offered again.
+        PluginInstaller bridged = new(_lv2, _clap, _vst3, FakeYabridgectl(vst3), wine: "/bin/true", hostInstalled: true, winePrefix: prefix);
+        Assert.Equal([clap], bridged.Setup().WineFolders);
+    }
+
+    [Fact]
+    public void A32BitPluginWithNo64BitCopyIsStillOffered()
+    {
+        string prefix = Path.Combine(_root, "wine32");
+        string sixtyFour = Path.Combine(prefix, "drive_c", "Program Files", "Common Files", "VST3");
+        string thirtyTwo = Path.Combine(prefix, "drive_c", "Program Files (x86)", "Common Files", "VST3");
+        Directory.CreateDirectory(sixtyFour);
+        File.WriteAllBytes(Path.Combine(sixtyFour, "Nova.vst3"), Windows);
+        Directory.CreateDirectory(thirtyTwo);
+        File.WriteAllBytes(Path.Combine(thirtyTwo, "Nova.vst3"), Windows);
+        File.WriteAllBytes(Path.Combine(thirtyTwo, "OldThing.vst3"), Windows);
+
+        PluginInstaller installer = new(_lv2, _clap, _vst3, FakeYabridgectl(), wine: "/bin/true", hostInstalled: true, winePrefix: prefix);
+        Assert.Equal([sixtyFour, thirtyTwo], installer.WinePluginFolders());
+    }
+
+    [Fact]
+    public void WithoutAWinePrefixThereIsNothingToOffer()
+    {
+        PluginInstaller none = new(_lv2, _clap, _vst3, FakeYabridgectl(), wine: "/bin/true", hostInstalled: true,
+            winePrefix: Path.Combine(_root, "no-such-prefix"));
+        Assert.Empty(none.WinePluginFolders());
+    }
+
+    [Fact]
     public void TheSetupNamesTheDirectoriesAndWhatIsMissing()
     {
         PluginSetup setup = Installer().Setup();
@@ -316,9 +367,10 @@ public sealed class PluginInstallerTests : IDisposable
         string json = JsonSerializer.Serialize(message);
         Assert.Contains("\"type\":\"pluginInstall\"", json);
         Assert.Contains("\"added\":1", json);
-        var setup = new PluginSetupMessage(new PluginSetup(true, "~/.lv2", "~/.clap", "~/.vst3", "5.1.1", true, ["/home/me/.wine/drive_c/VST3"]));
+        var setup = new PluginSetupMessage(new PluginSetup(true, "~/.lv2", "~/.clap", "~/.vst3", "5.1.1", true, ["/home/me/.wine/drive_c/VST3"], ["/home/me/.wine/drive_c/Program Files/Common Files/CLAP"]));
         string setupJson = JsonSerializer.Serialize(setup);
         Assert.Contains("\"yabridge\":\"5.1.1\"", setupJson);
+        Assert.Contains("\"wineFolders\":[\"/home/me/.wine/drive_c/Program Files/Common Files/CLAP\"]", setupJson);
         Assert.DoesNotContain("\"Setup\"", setupJson);
     }
 

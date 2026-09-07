@@ -107,6 +107,11 @@
                   ToolTip.Tip="Read the plugin directories again, for plugins installed by other means"/>
         </StackPanel>
         <TextBlock Text="{Binding WindowsPlugins}" FontSize="11" Foreground="#8b93a7" TextWrapping="Wrap" Margin="0,4,0,0"/>
+        <!-- Wine keeps its plugins under a dot directory a file dialog hides,
+             so what is found there is offered rather than browsed to. -->
+        <Button Name="BridgeWine" Content="{Binding BridgeWineLabel}" Padding="14,5" HorizontalAlignment="Left"
+                IsVisible="{Binding CanBridgeWine}" Click="OnBridgeWinePlugins"
+                ToolTip.Tip="Hand the plugins a Windows installer left in Wine to yabridge"/>
         <Grid ColumnDefinitions="Auto,8,Auto,10,*">
           <Button Name="SyncWindows" Content="Sync Windows plugins" Padding="14,5" Click="OnSyncWindowsPlugins"
                   IsEnabled="{Binding CanSyncWindows}"
