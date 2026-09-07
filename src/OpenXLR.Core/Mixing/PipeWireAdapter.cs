@@ -219,6 +219,51 @@ public sealed class PipeWireAdapter
         return marker >= 0 ? sinkName[..marker] : sinkName;
     }
 
+    /// <summary>
+    /// Volume and mute of every sink this daemon created, read from the
+    /// graph dump. The session manager or a desktop applet can turn one of
+    /// them down, and a channel sink at half volume quietly cuts every mix
+    /// it feeds by 15 dB (seen on a user's machine: all nine channel sinks
+    /// restored to 55% by something outside OpenXLR).
+    /// </summary>
+    public IReadOnlyList<OwnSinkLevel> OwnSinkLevels() => OwnSinkLevels(DumpJson());
+
+    internal static IReadOnlyList<OwnSinkLevel> OwnSinkLevels(byte[] json)
+    {
+        var found = new List<OwnSinkLevel>();
+        JsonDocument doc;
+        try { doc = PipeWireSnapshot.Parse(json); }
+        catch (JsonException) { return found; }
+        using (doc)
+        {
+            foreach (JsonElement o in doc.RootElement.EnumerateArray())
+            {
+                if (!o.TryGetProperty("type", out JsonElement t) ||
+                    !(t.GetString()?.EndsWith("Node", StringComparison.Ordinal) ?? false)) continue;
+                if (!o.TryGetProperty("info", out JsonElement info) ||
+                    !info.TryGetProperty("props", out JsonElement props)) continue;
+                string? name = props.TryGetProperty("node.name", out JsonElement n) ? n.GetString() : null;
+                if (name is null || !name.StartsWith("OpenXLR_", StringComparison.Ordinal)) continue;
+                if (!props.TryGetProperty("media.class", out JsonElement m) || m.GetString() != "Audio/Sink") continue;
+                if (!info.TryGetProperty("params", out JsonElement pars) ||
+                    !pars.TryGetProperty("Props", out JsonElement list) || list.ValueKind != JsonValueKind.Array) continue;
+                foreach (JsonElement p in list.EnumerateArray())
+                {
+                    if (!p.TryGetProperty("channelVolumes", out JsonElement cv) || cv.ValueKind != JsonValueKind.Array) continue;
+                    double volume = 1.0;
+                    bool any = false;
+                    foreach (JsonElement v in cv.EnumerateArray())
+                        if (v.TryGetDouble(out double d)) { volume = any ? Math.Min(volume, d) : d; any = true; }
+                    if (!any) continue;
+                    bool muted = p.TryGetProperty("mute", out JsonElement mu) && mu.ValueKind == JsonValueKind.True;
+                    found.Add(new OwnSinkLevel(name, volume, muted));
+                    break;
+                }
+            }
+        }
+        return found;
+    }
+
     /// <summary>Set a sink's volume.</summary>
     public void SetSinkVolume(string sinkName, double volume)
         => Run("pactl", "set-sink-volume", BareSink(sinkName),
@@ -1301,3 +1346,6 @@ public enum AudioNodeKind { Sink, Source }
 /// </summary>
 public sealed record AudioNode(string Name, string Description, AudioNodeKind Kind, bool IsOwn,
     bool IsPhysical = false);
+
+/// <summary>One of the daemon's own sinks: its linear volume (1.0 = unity) and mute.</summary>
+public sealed record OwnSinkLevel(string Name, double Volume, bool Muted);

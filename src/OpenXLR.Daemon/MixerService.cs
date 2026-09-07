@@ -218,6 +218,10 @@ public sealed class MixerService : IHostedService, IDisposable
                     // Software DSP only for devices without the hardware version.
                     _mixer.SetLowCutApplicable(!(_devices.ActiveCapabilities?.LowCut ?? false));
                     _mixer.SetClipGuardApplicable(!(_devices.ActiveCapabilities?.ClipGuard ?? false));
+                    IReadOnlyList<string> restoredSinks = _mixer.EnsureOwnSinkLevels();
+                    if (restoredSinks.Count > 0)
+                        _log.LogWarning("put {n} OpenXLR sink(s) back to full volume, unmuted ({names}); something outside OpenXLR had changed them",
+                            restoredSinks.Count, string.Join(", ", restoredSinks));
                     if (_mixer.SyncStreams() | _mixer.SyncDeviceVolumes() | _mixer.EnforceDefaults()
                         | _mixer.EnsureInputFeeds() | _mixer.EnsureAuxRoute()
                         | _mixer.EnsureFilterRoutes()

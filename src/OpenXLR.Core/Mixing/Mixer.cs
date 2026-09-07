@@ -1095,6 +1095,35 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             => a.HasValue != b.HasValue || (a.HasValue && Math.Abs(a.Value - b!.Value) > 0.005);
     }
 
+    /// <summary>
+    /// Hold every OpenXLR sink at unity and unmuted. The faders are the
+    /// combine legs and the mix masters; a sink's own volume is never a
+    /// control here, so anything that turned one down (the session manager
+    /// restoring a stored level, a desktop applet) only cuts audio. Returns
+    /// the sinks put back.
+    /// </summary>
+    public IReadOnlyList<string> EnsureOwnSinkLevels()
+    {
+        lock (_gate)
+        {
+            if (!_built) return [];
+            var restored = new List<string>();
+            foreach (OwnSinkLevel sink in _pw.OwnSinkLevels())
+            {
+                bool off = Math.Abs(sink.Volume - 1.0) > 0.01;
+                if (!off && !sink.Muted) continue;
+                try
+                {
+                    if (off) _pw.SetSinkVolume(sink.Name, 1.0);
+                    if (sink.Muted) _pw.SetSinkMuted(sink.Name, false);
+                    restored.Add(sink.Name);
+                }
+                catch (InvalidOperationException) { /* the sink went away; the next sweep sees the rest */ }
+            }
+            return restored;
+        }
+    }
+
     /// <summary>First selected monitor output, or null (legacy single view).</summary>
     public string? MonitorOutput { get { lock (_gate) return _monitorOutputs.FirstOrDefault(); } }
 

@@ -445,7 +445,7 @@ device ignores the write, the control snaps back. On the Wave XLR Pro
 the mute button shows a countdown after every 48V change: the firmware
 holds that input muted for about 13 seconds and unmutes it itself. On
 other devices this would be new information: collect diagnostics
-([section 5.9](#reporting)) and open an issue.
+([section 5.10](#reporting)) and open an issue.
 
 <a name="daemon-hang"></a>
 ### 5.7 The daemon froze, or a control hung the window
@@ -468,7 +468,7 @@ working. Unplug the interface and plug it back in, or restart the
 daemon, to try again. A helper whose device could not be opened at all
 (the udev rule not applied yet, see [section 5.1](#no-device)) is
 killed straight away and the daemon tries again two seconds later.
-Collect diagnostics afterwards ([section 5.9](#reporting)): the archive contains the
+Collect diagnostics afterwards ([section 5.10](#reporting)): the archive contains the
 exact transfer, and that is what makes the report actionable.
 
 <a name="open-files"></a>
@@ -515,8 +515,25 @@ limit to 65536:
    It should say 65536. If it still says 1024 the file is not where systemd
    looks; `systemctl --user cat pipewire-pulse` lists every file it read.
 
+<a name="quiet-mixes"></a>
+### 5.9 The mixes are quieter than the microphone
+
+If OBS or a recorder shows the raw Wave XLR device peaking near -6 dB
+while the OpenXLR Stream and Chat microphones sit some 15 dB lower, with
+every send and master at 100, one of OpenXLR's own sinks has been turned
+down. The channel sinks are playback devices, and a desktop applet or
+the session manager restoring a remembered level can set one to half
+volume; nothing in OpenXLR uses a sink's own volume as a control, so
+that only cuts audio. Since 0.1.27 the daemon puts every OpenXLR sink
+back to full volume on its sweep and logs when it had to. On an older
+version, set them by hand:
+
+```sh
+for s in $(pactl list sinks short | awk '/OpenXLR_/ {print $2}'); do pactl set-sink-volume "$s" 100%; done
+```
+
 <a name="reporting"></a>
-### 5.9 Reporting a problem
+### 5.10 Reporting a problem
 
 Ask on the OpenXLR Discord server (<https://discord.gg/4bswtnGPW4>,
 one post per problem in its support forum), on Reddit at

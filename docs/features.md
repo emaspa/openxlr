@@ -230,7 +230,10 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   with an OpenAPI document ([http-api.md](http-api.md))
 - The daemon rebuilds its graph after a pipewire-pulse restart, and
   refuses to grow the layout when pipewire-pulse has no open-file
-  headroom left; the packages raise that limit with a systemd drop-in
+  headroom left; the packages raise that limit with a systemd drop-in.
+  It also holds every sink it created at full volume and unmuted, since
+  a desktop applet or the session manager can turn one down and quietly
+  cut the mixes it feeds
 - Tray icon, start-minimized option, daemon and window autostart from
   Options
 - Diagnostics archive: one action collects app and device state, a
