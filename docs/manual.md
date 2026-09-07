@@ -282,6 +282,9 @@ Options, STARTUP:
   quitting; the tray icon's menu shows it again or quits. "Start
   minimized to tray" starts with no window at all; the tray icon shows
   it the first time you click it.
+- Only one window runs per user. Starting OpenXLR again, from the menu
+  or a shell, brings the running window to the front (out of the tray
+  if it is hidden there) instead of opening a second one.
 
 To land on a known scene at every login, mark a profile to recall on
 connect ([section 3.6](#profiles)). An interface without settings memory comes back

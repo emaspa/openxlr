@@ -234,6 +234,8 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   It also holds every sink it created at full volume and unmuted, since
   a desktop applet or the session manager can turn one down and quietly
   cut the mixes it feeds
+- One window per user: a second launch brings the running window to the
+  front, out of the tray if it is hidden there, and exits
 - Tray icon, start-minimized option, daemon and window autostart from
   Options
 - Diagnostics archive: one action collects app and device state, a
