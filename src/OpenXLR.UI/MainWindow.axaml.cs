@@ -163,9 +163,14 @@ public partial class MainWindow : Window
         if (choice is not null) chain.Add(choice);
     }
 
-    private void OnInsertControls(object? sender, RoutedEventArgs e)
+    private async void OnInsertControls(object? sender, RoutedEventArgs e)
     {
-        if ((sender as Control)?.DataContext is InsertViewModel ins) InsertWindows.OpenControls(this, ins);
+        if ((sender as Control)?.DataContext is not InsertViewModel insert) return;
+        // A plugin running in its own process has an editor of its own, which
+        // is the better one to open. Anything else, including a native host
+        // that is bypassed or not running, opens the generated controls.
+        if (insert.NativeEditorAvailable) await insert.Owner.ShowNativeEditorAsync(insert);
+        else InsertWindows.OpenControls(this, insert);
     }
 
     private void OnMixInserts(object? sender, RoutedEventArgs e)

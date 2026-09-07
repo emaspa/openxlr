@@ -54,6 +54,35 @@ public sealed class NativeLv2HostTests
     }
 
     [Fact]
+    public async Task TheRowCarriesTheHostSwitchAndSaysWhatTheCogWillOpen()
+    {
+        await using var client = new DaemonClient();
+        var owner = new InsertsViewModel(client, "xlr1");
+        owner.PluginChoices.Add(new PluginChoice("urn:test", "Test", "", new JsonArray(),
+            NativeEditorAvailable: true, NativeEditorSupported: true));
+        var insert = new InsertViewModel(owner, "comp", "urn:test", "Test");
+        JsonNode definition = JsonNode.Parse(
+            "{\"id\":\"comp\",\"kind\":\"lv2\",\"plugin\":\"urn:test\",\"bypass\":false,\"params\":{}}")!;
+
+        insert.ApplyFromDaemon(definition, error: null, nativeHostRunning: false);
+        Assert.True(insert.CanChooseNativeHost);      // the switch belongs on the row
+        Assert.True(insert.CanTurnNativeHostOn);      // and is usable: the helper is here
+        Assert.Contains("controls", insert.ControlsHint);
+
+        definition["nativeHost"] = true;
+        insert.ApplyFromDaemon(definition, error: null, nativeHostRunning: true);
+        Assert.True(insert.NativeEditorAvailable);
+        Assert.Contains("own editor", insert.ControlsHint);   // the cog opens that instead
+
+        // Bypassed, there is no process to show, so the cog goes back to ours.
+        definition["bypass"] = true;
+        insert.ApplyFromDaemon(definition, error: null, nativeHostRunning: true);
+        Assert.False(insert.NativeEditorAvailable);
+        Assert.Contains("controls", insert.ControlsHint);
+        Assert.True(insert.CanTurnNativeHostOn);      // and it can still be switched back
+    }
+
+    [Fact]
     public void TheHelperIsPlumbing()
     {
         // Its PipeWire client would otherwise be offered as an application to

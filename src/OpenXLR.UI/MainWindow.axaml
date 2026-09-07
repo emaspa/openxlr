@@ -569,16 +569,22 @@
                   <ItemsControl ItemsSource="{Binding Inserts.Items}" IsVisible="{Binding Inserts.HasItems}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="vm:InsertViewModel">
-                        <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,2,0,0">
+                        <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="0,2,0,0">
                           <Ellipse Width="8" Height="8" VerticalAlignment="Center" Margin="0,0,6,0"
                                    Fill="{Binding IsActive, Converter={x:Static vm:Converters.ActiveLed}}"/>
                           <TextBlock Grid.Column="1" Text="{Binding Label}" Foreground="#e6e9f0" FontSize="11"
                                      VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
-                          <ToggleButton Grid.Column="2" Content="B" IsChecked="{Binding Bypass, Mode=TwoWay}"
+                          <ToggleButton Grid.Column="2" Content="N" IsChecked="{Binding NativeHost, Mode=TwoWay}"
+                                        IsVisible="{Binding CanChooseNativeHost}"
+                                        IsEnabled="{Binding CanTurnNativeHostOn}"
+                                        Padding="6,0" MinHeight="0" MinWidth="0" FontSize="10" Margin="4,0,0,0"
+                                        HorizontalAlignment="Right"
+                                        ToolTip.Tip="Run this plugin in its own process, which is what lets its own editor open. Switching rebuilds the chain and interrupts audio for a moment."/>
+                          <ToggleButton Grid.Column="3" Content="B" IsChecked="{Binding Bypass, Mode=TwoWay}"
                                         Padding="6,0" MinHeight="0" MinWidth="0" FontSize="10" Margin="4,0,2,0"
                                         HorizontalAlignment="Right" ToolTip.Tip="Bypass"/>
-                          <Button Grid.Column="3" Content="⚙" Padding="6,0" MinHeight="0" MinWidth="0" FontSize="10"
-                                  Click="OnInsertControls" ToolTip.Tip="Open this plugin's controls"/>
+                          <Button Grid.Column="4" Content="⚙" Padding="6,0" MinHeight="0" MinWidth="0" FontSize="10"
+                                  Click="OnInsertControls" ToolTip.Tip="{Binding ControlsHint}"/>
                         </Grid>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
