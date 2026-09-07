@@ -17,6 +17,7 @@
 #include <pipewire/filter.h>
 #include <pipewire/pipewire.h>
 #include <pthread.h>
+#include <setjmp.h>
 #include <signal.h>
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -55,9 +56,8 @@ typedef struct {
   struct pw_filter *filter;
   struct spa_source *timer;
   _Atomic bool audio_error;
-  _Atomic uint64_t completed_cycles;
   unsigned heartbeat_ticks;
-  _Atomic bool streaming, monitor_stop;
+  _Atomic bool monitor_stop;
   char *uris[MAX_URIS];
   _Atomic uint32_t uri_count;
   pthread_t main_thread;
@@ -166,13 +166,11 @@ static void process_audio(void *data, struct spa_io_position *position) {
     } else if (p->control)
       atomic_store(&p->observed, p->value);
   }
-  atomic_fetch_add(&h->completed_cycles, 1);
 }
 
 static void state_changed(void *data, enum pw_filter_state old,
                           enum pw_filter_state state, const char *error) {
   Host *h = data;
-  h->streaming = state == PW_FILTER_STATE_STREAMING;
   if (state == PW_FILTER_STATE_ERROR) {
     fprintf(stderr, "PipeWire: %s\n", error ? error : "disconnected");
     h->exit_code = 1;
@@ -185,20 +183,60 @@ static const struct pw_filter_events filter_events = {
     PW_VERSION_FILTER_EVENTS, .state_changed = state_changed,
     .process = process_audio};
 
-static void close_ui(Host *h) {
-  if (h->ui)
-    h->ui_descriptor->cleanup(h->ui);
+// Xlib exits the process on both of its error paths: the default protocol
+// error handler calls exit, and so does a lost connection to the display.
+// Either would take an insert's audio down with its editor, which is the one
+// thing this host exists to prevent. A protocol error is logged and the
+// editor carries on. A lost connection cannot be resumed, so it jumps back to
+// whichever call armed the escape; that call drops the editor and returns,
+// leaving the plugin instance processing audio.
+static sigjmp_buf x_escape;
+static volatile sig_atomic_t x_escape_armed;
+
+static int report_x_error(Display *display, XErrorEvent *event) {
+  char text[256];
+  XGetErrorText(display, event->error_code, text, sizeof(text));
+  fprintf(stderr, "editor X11 error: %s (request %u)\n", text,
+          event->request_code);
+  return 0;
+}
+
+static int lost_x_connection(Display *display) {
+  if (x_escape_armed) {
+    x_escape_armed = 0;
+    siglongjmp(x_escape, 1);
+  }
+  // Xlib only calls this from inside one of its own functions, and every one
+  // this host calls is armed. Leave rather than return: Xlib exits either way.
+  _exit(1);
+}
+
+// Drop the editor without talking to X, for a connection that is already
+// gone. The plugin's UI instance cannot be cleaned up through a dead
+// connection, so it and its library stay until this process exits, which LV2
+// permits (ui:makeSONameResident).
+static void forget_ui(Host *h) {
   h->ui = NULL;
   h->idle = NULL;
-  if (h->display) {
+  h->display = NULL;
+  h->window = 0;
+}
+
+static void close_ui(Host *h) {
+  if (!h->display) {
+    forget_ui(h);
+    return;
+  }
+  if (sigsetjmp(x_escape, 0) == 0) {
+    x_escape_armed = 1;
+    if (h->ui)
+      h->ui_descriptor->cleanup(h->ui);
     if (h->window)
       XDestroyWindow(h->display, h->window);
     XCloseDisplay(h->display);
   }
-  h->display = NULL;
-  h->window = 0;
-  // Some plugin toolkits retain process-global resources: keep their library
-  // resident until process exit, as permitted by LV2 ui:makeSONameResident.
+  x_escape_armed = 0;
+  forget_ui(h);
 }
 
 static void ui_write(LV2UI_Controller controller, uint32_t index, uint32_t size,
@@ -224,11 +262,71 @@ static int ui_resize(LV2UI_Feature_Handle handle, int width, int height) {
   return 0;
 }
 
-static bool open_ui(Host *h) {
-  if (h->ui) {
-    XMapRaised(h->display, h->window);
-    return true;
+// Raise a window that is already up. A failure here is a lost connection.
+static bool raise_ui(Host *h) {
+  if (sigsetjmp(x_escape, 0)) {
+    x_escape_armed = 0;
+    forget_ui(h);
+    return false;
   }
+  x_escape_armed = 1;
+  XMapRaised(h->display, h->window);
+  XFlush(h->display);
+  x_escape_armed = 0;
+  return true;
+}
+
+/// Open the window and hand it to the plugin. Every X call of the editor's
+/// lifetime starts here or in the tick below, both of them guarded.
+/// Open the window and hand it to the plugin. Every X call of the editor's
+/// life happens here, in raise_ui or in the tick, and all three are guarded.
+static bool open_editor_window(Host *h, const char *bundle) {
+  if (sigsetjmp(x_escape, 0)) {
+    x_escape_armed = 0;
+    forget_ui(h);
+    return false;
+  }
+  x_escape_armed = 1;
+  h->display = XOpenDisplay(NULL);
+  if (h->display) {
+    h->window = XCreateSimpleWindow(h->display, DefaultRootWindow(h->display),
+                                    0, 0, 900, 600, 0, 0, 0x16181d);
+    XStoreName(h->display, h->window, "OpenXLR - Native LV2 controls");
+    XChangeProperty(h->display, h->window,
+                    XInternAtom(h->display, "_OPENXLR_NODE", False), XA_STRING,
+                    8, PropModeReplace, (const unsigned char *)h->node_name,
+                    (int)strlen(h->node_name));
+    h->close_message = XInternAtom(h->display, "WM_DELETE_WINDOW", False);
+    XSetWMProtocols(h->display, h->window, &h->close_message, 1);
+    h->resize = (LV2UI_Resize){h, ui_resize};
+    LV2_Feature parent = {LV2_UI__parent, (void *)(uintptr_t)h->window};
+    LV2_Feature map = {LV2_URID__map, &h->map},
+                unmap = {LV2_URID__unmap, &h->unmap};
+    LV2_Feature access = {LV2_INSTANCE_ACCESS_URI,
+                          lilv_instance_get_handle(h->instance)};
+    LV2_Feature size = {LV2_UI__resize, &h->resize};
+    LV2_Feature idle = {LV2_UI__idleInterface, NULL};
+    const LV2_Feature *features[] = {&parent, &map,  &unmap, &access,
+                                     &size,   &idle, NULL};
+    LV2UI_Widget widget = NULL;
+    h->ui = h->ui_descriptor->instantiate(
+        h->ui_descriptor, lilv_node_as_uri(lilv_plugin_get_uri(h->plugin)),
+        bundle, ui_write, h, &widget, features);
+    if (h->ui) {
+      h->idle = h->ui_descriptor->extension_data
+                    ? h->ui_descriptor->extension_data(LV2_UI__idleInterface)
+                    : NULL;
+      XMapRaised(h->display, h->window);
+      XFlush(h->display);
+    }
+  }
+  x_escape_armed = 0;
+  return h->ui != NULL;
+}
+
+static bool open_ui(Host *h) {
+  if (h->ui)
+    return raise_ui(h);
   LilvUIs *uis = lilv_plugin_get_uis(h->plugin);
   LilvNode *x11 = lilv_new_uri(h->world, LV2_UI__X11UI);
   const LilvUI *selected = NULL;
@@ -274,39 +372,8 @@ static bool open_ui(Host *h) {
         break;
       }
     }
-  h->display = h->ui_descriptor ? XOpenDisplay(NULL) : NULL;
-  if (h->display) {
-    h->window = XCreateSimpleWindow(h->display, DefaultRootWindow(h->display),
-                                    0, 0, 900, 600, 0, 0, 0x16181d);
-    XStoreName(h->display, h->window, "OpenXLR - Native LV2 controls");
-    XChangeProperty(h->display, h->window,
-                    XInternAtom(h->display, "_OPENXLR_NODE", False), XA_STRING,
-                    8, PropModeReplace, (const unsigned char *)h->node_name,
-                    (int)strlen(h->node_name));
-    h->close_message = XInternAtom(h->display, "WM_DELETE_WINDOW", False);
-    XSetWMProtocols(h->display, h->window, &h->close_message, 1);
-    h->resize = (LV2UI_Resize){h, ui_resize};
-    LV2_Feature parent = {LV2_UI__parent, (void *)(uintptr_t)h->window};
-    LV2_Feature map = {LV2_URID__map, &h->map},
-                unmap = {LV2_URID__unmap, &h->unmap};
-    LV2_Feature access = {LV2_INSTANCE_ACCESS_URI,
-                          lilv_instance_get_handle(h->instance)};
-    LV2_Feature size = {LV2_UI__resize, &h->resize};
-    LV2_Feature idle = {LV2_UI__idleInterface, NULL};
-    const LV2_Feature *features[] = {&parent, &map,  &unmap, &access,
-                                     &size,   &idle, NULL};
-    LV2UI_Widget widget = NULL;
-    h->ui = h->ui_descriptor->instantiate(
-        h->ui_descriptor, lilv_node_as_uri(lilv_plugin_get_uri(h->plugin)),
-        bundle, ui_write, h, &widget, features);
-    if (h->ui) {
-      h->idle = h->ui_descriptor->extension_data
-                    ? h->ui_descriptor->extension_data(LV2_UI__idleInterface)
-                    : NULL;
-      XMapRaised(h->display, h->window);
-      XFlush(h->display);
-    }
-  }
+  if (h->ui_descriptor)
+    open_editor_window(h, bundle);
   lilv_free(binary);
   lilv_free(bundle);
   lilv_uis_free(uis);
@@ -314,7 +381,6 @@ static bool open_ui(Host *h) {
     close_ui(h);
   return h->ui != NULL;
 }
-
 static bool set_control(Host *h, const char *symbol, float value) {
   if (!isfinite(value))
     return false;
@@ -371,6 +437,42 @@ static void read_commands(void *data, int fd, uint32_t mask) {
   }
 }
 
+// One pass of the editor: its events, the current control values, and the
+// toolkit's own idle work. Losing the display here costs the editor and
+// nothing else; the plugin keeps processing audio on the real-time thread.
+static void pump_editor(Host *h) {
+  if (sigsetjmp(x_escape, 0)) {
+    x_escape_armed = 0;
+    forget_ui(h);
+    fputs("editor X11 connection lost; audio continues without it\n", stderr);
+    return;
+  }
+  x_escape_armed = 1;
+  while (XPending(h->display)) {
+    XEvent event;
+    XNextEvent(h->display, &event);
+    if (event.type == ClientMessage &&
+        (Atom)event.xclient.data.l[0] == h->close_message) {
+      x_escape_armed = 0;
+      close_ui(h);
+      return;
+    }
+  }
+  if (h->ui_descriptor->port_event)
+    for (uint32_t i = 0; i < h->count; ++i) {
+      Port *p = &h->ports[i];
+      if (!p->control)
+        continue;
+      float value =
+          p->input ? atomic_load(&p->desired) : atomic_load(&p->observed);
+      h->ui_descriptor->port_event(h->ui, i, sizeof(float), 0, &value);
+    }
+  bool finished = h->idle && h->idle->idle(h->ui);
+  x_escape_armed = 0;
+  if (finished)
+    close_ui(h);
+}
+
 static void tick(void *data, uint64_t expirations) {
   Host *h = data;
   // Editor progress is separate from audio progress. A blocked editor must
@@ -387,32 +489,18 @@ static void tick(void *data, uint64_t expirations) {
     pw_main_loop_quit(h->loop);
     return;
   }
-  if (h->ui) {
-    while (XPending(h->display)) {
-      XEvent event;
-      XNextEvent(h->display, &event);
-      if (event.type == ClientMessage &&
-          (Atom)event.xclient.data.l[0] == h->close_message) {
-        close_ui(h);
-        break;
-      }
-    }
-  }
   for (uint32_t i = 0; i < h->count; ++i) {
     Port *p = &h->ports[i];
-    if (!p->control)
+    if (!p->control || p->input)
       continue;
-    float value =
-        p->input ? atomic_load(&p->desired) : atomic_load(&p->observed);
-    if (h->ui && h->ui_descriptor->port_event)
-      h->ui_descriptor->port_event(h->ui, i, sizeof(float), 0, &value);
-    if (!p->input && isfinite(value) && value != p->reported) {
+    float value = atomic_load(&p->observed);
+    if (isfinite(value) && value != p->reported) {
       printf("meter %s %.9g\n", p->symbol, value);
       p->reported = value;
     }
   }
-  if (h->ui && h->idle && h->idle->idle(h->ui))
-    close_ui(h);
+  if (h->ui)
+    pump_editor(h);
 }
 
 static void stop(void *data, int signal) {
@@ -421,7 +509,6 @@ static void stop(void *data, int signal) {
 
 static void *monitor_audio(void *data) {
   Host *h = data;
-  uint64_t last_cycles = 0;
   while (!atomic_load(&h->monitor_stop)) {
     // The redirected input pipe belongs to the daemon process, unlike
     // PDEATHSIG, which follows the short-lived .NET thread that spawned us.
@@ -429,10 +516,7 @@ static void *monitor_audio(void *data) {
     struct pollfd input = {STDIN_FILENO, POLLHUP | POLLERR, 0};
     if (poll(&input, 1, 1000) > 0 && (input.revents & (POLLHUP | POLLERR)))
       _exit(0);
-    uint64_t cycles = atomic_load(&h->completed_cycles);
-    if (!atomic_load(&h->streaming) || cycles != last_cycles)
-      puts("heartbeat");
-    last_cycles = cycles;
+    puts("heartbeat");
   }
   return NULL;
 }
@@ -450,6 +534,8 @@ int main(int argc, char **argv) {
   if (channels < 1 || channels > 2 || h.rate < 8000 || h.rate > 384000)
     return 2;
   setvbuf(stdout, NULL, _IOLBF, 0);
+  XSetErrorHandler(report_x_error);
+  XSetIOErrorHandler(lost_x_connection);
   h.world = lilv_world_new();
   if (!h.world)
     return 1;

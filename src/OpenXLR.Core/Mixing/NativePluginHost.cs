@@ -34,7 +34,19 @@ internal sealed class NativePluginHost : IDisposable
         }
     }
     public bool IsHealthy => IsRunning
-        && Stopwatch.GetElapsedTime(Interlocked.Read(ref _lastHeartbeat)) < TimeSpan.FromSeconds(10);
+        && Stopwatch.GetElapsedTime(Interlocked.Read(ref _lastHeartbeat)) < _patience;
+
+    /// <summary>
+    /// The editor loop has stopped answering while the DSP keeps running: a
+    /// plugin's own interface can block its thread, which freezes control
+    /// changes for that insert. Audio is unaffected, so this is reported
+    /// rather than treated as a death.
+    /// </summary>
+    public bool EditorStalled => IsRunning
+        && Stopwatch.GetElapsedTime(Interlocked.Read(ref _lastUiHeartbeat)) > _patience;
+
+    /// <summary>How long either beat may go quiet before it means something.</summary>
+    private readonly TimeSpan _patience = TimeSpan.FromSeconds(10);
     public IReadOnlyDictionary<string, double> Meters => new Dictionary<string, double>(_meters);
     public static string Executable => Path.Combine(AppContext.BaseDirectory, "openxlr-lv2-host");
     internal static bool SupportsFeatures(IEnumerable<string> required)
@@ -53,8 +65,10 @@ internal sealed class NativePluginHost : IDisposable
         : this(insert, node, channels, sampleRate, Executable, []) { }
 
     internal NativePluginHost(InsertDefinition insert, string node, int channels, int sampleRate,
-        string executable, IReadOnlyList<string> prefixArguments, TimeSpan? startupTimeout = null)
+        string executable, IReadOnlyList<string> prefixArguments, TimeSpan? startupTimeout = null,
+        TimeSpan? patience = null)
     {
+        if (patience is { } chosen) _patience = chosen;
         if (!File.Exists(executable)) throw new InvalidOperationException("Native LV2 host is missing; rebuild/install the complete OpenXLR package.");
         var start = new ProcessStartInfo(executable)
         {
@@ -133,12 +147,19 @@ internal sealed class NativePluginHost : IDisposable
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
         timeout.CancelAfter(TimeSpan.FromSeconds(1));
-        SendAsync($"set {symbol} {value.ToString("R", CultureInfo.InvariantCulture)}", timeout.Token).GetAwaiter().GetResult();
+        try
+        {
+            SendAsync($"set {symbol} {value.ToString("R", CultureInfo.InvariantCulture)}", timeout.Token).GetAwaiter().GetResult();
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or IOException)
+        {
+            throw new InvalidOperationException("The plugin host did not take the change; audio is unaffected.", ex);
+        }
     }
 
     public void ShowUi()
     {
-        if (Stopwatch.GetElapsedTime(Interlocked.Read(ref _lastUiHeartbeat)) > TimeSpan.FromSeconds(10))
+        if (EditorStalled)
             throw new InvalidOperationException("Plugin editor is unresponsive; audio is still running.");
         var reply = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
         if (Interlocked.CompareExchange(ref _uiReply, reply, null) is not null)
@@ -152,6 +173,12 @@ internal sealed class NativePluginHost : IDisposable
             SendAsync("show", timeout.Token).GetAwaiter().GetResult();
             string? error = reply.Task.WaitAsync(timeout.Token).GetAwaiter().GetResult();
             if (error is not null) throw new InvalidOperationException(error);
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or IOException)
+        {
+            // Callers turn this into a client error message, so say what it
+            // means for the audio rather than reporting a cancelled task.
+            throw new InvalidOperationException("The plugin editor did not answer in time; audio is unaffected.", ex);
         }
         finally
         {
