@@ -292,7 +292,8 @@ the `.rpm` or the `.pkg.tar.zst` from the
 [latest release](https://github.com/emaspa/openxlr/releases/latest), check
 it against `SHA256SUMS-yabridge.txt`, and install it by hand. The
 [package guide](../packaging/yabridge/README.md) covers building it
-yourself.
+yourself, with the build dependencies for each distribution and where to
+install the result so OpenXLR finds it.
 
 Restart the daemon with `systemctl --user restart openxlr-daemon` so it
 finds the companion; this briefly interrupts audio. Options then

@@ -65,15 +65,67 @@ not selected. Options shows the effective provider, version and path.
 The system bridge needs its own synced
 wrappers when opting out; OpenXLR's private files remain for switching back.
 
-## Build and prepare publication
+## Build it yourself
 
-Tools: Python 3, Git, Meson, Ninja, CMake, pkg-config, a C++ compiler,
-winegcc/wineg++, Wine development files, XCB and D-Bus headers, Cargo and
-Rust. Package creation also uses dpkg-dev, rpm, tar, xz and zstd.
+The packages above are the easy route. Building takes a few minutes and
+needs a compiler for Windows binaries, which is what Wine's development
+files provide.
+
+Install the build tools first:
+
+```sh
+# Arch
+sudo pacman -S --needed python meson ninja cmake pkgconf rust wine
+
+# Debian or Ubuntu
+sudo apt install python3 g++ meson ninja-build cmake pkg-config \
+    wine wine64-tools libwine-dev libxcb1-dev libdbus-1-dev cargo rustc
+
+# Fedora
+sudo dnf install python3 gcc-c++ meson ninja-build cmake pkgconf-pkg-config \
+    wine wine-devel libxcb-devel dbus-devel cargo rust
+```
+
+Then fetch the pinned source and build it. `prepare` is the only step that
+downloads anything; it clones yabridge at the commit in `source.json`,
+checks out the VST3 SDK it needs and vendors the Rust crates, so `build`
+works offline afterwards:
 
 ```sh
 python3 packaging/yabridge/build.py prepare --source /tmp/yabridge-source --output /tmp/yabridge-build
-python3 packaging/yabridge/build.py build --source /tmp/yabridge-source --output /tmp/yabridge-build
+python3 packaging/yabridge/build.py build   --source /tmp/yabridge-source --output /tmp/yabridge-build --jobs "$(nproc)"
+```
+
+To use the result without making a package, install it under
+`/usr/local`, which OpenXLR looks in without being told:
+
+```sh
+sudo python3 packaging/yabridge/build.py stage --source /tmp/yabridge-source \
+    --output /tmp/yabridge-build --destdir / --prefix /usr/local
+systemctl --user restart openxlr-daemon
+```
+
+That writes `/usr/local/lib/openxlr/yabridge` and the
+`openxlr-yabridgectl` command beside it. Options then shows it as the
+selected bridge, with its version and path. For any other location, stage it with
+`--prefix` set to that root and set `OPENXLR_YABRIDGE` to the bridge
+directory: both the daemon and the `openxlr-yabridgectl` wrapper read it,
+and the wrapper falls back to the prefix it was staged with.
+
+Three things bite when building inside a package builder rather than by
+hand, and the recipes in this directory already handle them. Ubuntu names
+the winelib compilers `winegcc-stable` and `wineg++-stable`, so the plain
+names have to be on PATH. Wine reports no version at all without a home
+directory it can write, and an empty version makes the build refuse to
+compile VST3 support. And the distributions' hardened link flags reject
+winelib output, which fails at the link with relocations in a read-only
+segment.
+
+## Prepare publication
+
+Package creation also uses dpkg-dev, rpm, tar, xz and zstd.
+
+```sh
 python3 packaging/yabridge/build.py package --source /tmp/yabridge-source --output /tmp/yabridge-build --format deb
 python3 packaging/yabridge/test-package.py /tmp/yabridge-build/stage-deb
 ```
