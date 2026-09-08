@@ -23,10 +23,14 @@ public static class ClapCatalog
     {
         string? configured = Environment.GetEnvironmentVariable("CLAP_PATH");
         if (!string.IsNullOrWhiteSpace(configured))
-            return [.. configured.Split(':', StringSplitOptions.RemoveEmptyEntries)];
+            return WithManagedPath(configured.Split(':', StringSplitOptions.RemoveEmptyEntries));
         string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        return [Path.Combine(home, ".clap"), "/usr/lib/clap", "/usr/local/lib/clap"];
+        return WithManagedPath([Path.Combine(home, ".clap"), "/usr/lib/clap", "/usr/local/lib/clap"]);
     }
+
+    private static IReadOnlyList<string> WithManagedPath(IEnumerable<string> paths)
+        => ManagedYabridge.Discover() is null ? [.. paths]
+            : [Path.Combine(ManagedYabridge.PluginHome, "clap"), .. paths];
 
     internal static IReadOnlyList<PluginInfo> ScanNow(IEnumerable<string>? directories = null)
         => HostScan.Run("clap", "scan-clap", directories ?? SearchPath(),
@@ -53,10 +57,14 @@ public static class Vst3Catalog
     {
         string? configured = Environment.GetEnvironmentVariable("VST3_PATH");
         if (!string.IsNullOrWhiteSpace(configured))
-            return [.. configured.Split(':', StringSplitOptions.RemoveEmptyEntries)];
+            return WithManagedPath(configured.Split(':', StringSplitOptions.RemoveEmptyEntries));
         string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        return [Path.Combine(home, ".vst3"), "/usr/lib/vst3", "/usr/local/lib/vst3"];
+        return WithManagedPath([Path.Combine(home, ".vst3"), "/usr/lib/vst3", "/usr/local/lib/vst3"]);
     }
+
+    private static IReadOnlyList<string> WithManagedPath(IEnumerable<string> paths)
+        => ManagedYabridge.Discover() is null ? [.. paths]
+            : [Path.Combine(ManagedYabridge.PluginHome, "vst3"), .. paths];
 
     /// <summary>Bundles at any depth, since yabridge keeps its own directory under ~/.vst3, never descending into one.</summary>
     internal static IEnumerable<string> Bundles(string directory)
@@ -96,7 +104,10 @@ internal static class HostScan
         try
         {
             if (!NativePluginHost.HostInstalled) return result;
-            var cache = new ScanCache(ScanCache.DefaultDirectory);
+            ManagedYabridge? bridge = ManagedYabridge.Discover();
+            var cache = new ScanCache(bridge is null ? ScanCache.DefaultDirectory
+                : Path.Combine(ScanCache.DefaultDirectory, "bridge-" + bridge.CacheKey));
+            var known = new HashSet<string>(StringComparer.Ordinal);
             foreach (string directory in directories)
             {
                 if (!Directory.Exists(directory)) continue;
@@ -112,13 +123,14 @@ internal static class HostScan
                         // released plugin by plugin; a minute is generous for that,
                         // and it is spent once per bundle until the bundle changes.
                         ProcessResult scan;
-                        try { scan = ProcessRunner.Run(NativePluginHost.Executable, [command, bundle], TimeSpan.FromSeconds(60)); }
+                        try { scan = ProcessRunner.Run(NativePluginHost.Executable, [command, bundle], TimeSpan.FromSeconds(60),
+                            environment: bridge?.HostEnvironment()); }
                         catch (Exception) { continue; }
                         if (scan.ExitCode != 0 || scan.TimedOut || scan.Truncated) continue;
                         description = scan.Stdout;
                         cache.Store(bundle, description);
                     }
-                    try { result.AddRange(Parse(description, kind)); }
+                    try { result.AddRange(Parse(description, kind).Where(plugin => known.Add(plugin.Plugin))); }
                     catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException) { /* one bad bundle */ }
                 }
             }

@@ -237,10 +237,50 @@ searched).
 
 <a name="windows-plugins"></a>
 **Windows VST3 and CLAP plugins.** They run through
-[yabridge](https://github.com/robbert-vdh/yabridge), which wraps each one
-in a bundle that OpenXLR loads like any other. Two things have to be
-installed first: Wine, which runs the plugin, and yabridge, which bridges
-it. The Options window says which of the two it can see.
+[yabridge](https://github.com/robbert-vdh/yabridge), which wraps them as
+Linux bundles.
+
+The optional **openxlr-yabridge** package supplies a tested bridge for
+64-bit Windows VST3 and CLAP plugins, including the Wine editor input fix.
+Wine remains a system dependency. Install the companion artifact with
+your distribution's package manager, then restart the daemon:
+
+```sh
+# Debian or Ubuntu
+sudo apt install ./openxlr-yabridge_*_amd64.deb wine
+# Fedora
+sudo dnf install ./openxlr-yabridge-*.x86_64.rpm wine
+# Arch
+sudo pacman -U ./openxlr-yabridge-*-x86_64.pkg.tar.zst
+```
+
+Use the command for your distribution. Run
+`systemctl --user restart openxlr-daemon` to load the companion; this briefly interrupts audio. Options
+then identifies the selected bridge as "OpenXLR bridge". Use "Bridge
+Wine's plugins" or pick a Windows plugin folder to create private wrappers.
+
+The companion keeps those wrappers in
+`~/.local/share/openxlr/yabridge/{vst3,clap}` and its directory registry in
+`~/.config/openxlr/bridge/yabridgectl`, honoring XDG overrides. It leaves
+other DAWs' existing wrappers and yabridgectl configuration alone. OpenXLR
+can also read existing wrappers using the companion's matching libraries
+and host. Private copies take priority when the same plugin is found twice.
+
+On NixOS, set `services.openxlr.yabridgePackage` to the flake's
+`packages.x86_64-linux.openxlr-yabridge` package. Installation, source-package
+builds and rollback are covered in the
+[companion package guide](../packaging/yabridge/README.md).
+
+An existing system or user yabridge installation remains supported. It is
+used when the companion is absent, or when the daemon environment sets
+`OPENXLR_YABRIDGE=system`. An absolute path in that variable selects a
+companion installed elsewhere. Restart the daemon after changing it.
+
+**Using a separate yabridge installation.** The instructions below apply
+when choosing the system bridge instead of the companion.
+
+Wine and yabridge must both be installed for the system bridge.
+The Options window says which of the two it can see.
 
 Arch, and anything built on it such as Manjaro, EndeavourOS and CachyOS,
 has both in its own repositories:
@@ -347,7 +387,8 @@ load VST2.
 **A Windows plugin's own editor ignores the mouse.** The plugin plays, its
 interface is drawn and it follows anything you change from OpenXLR, but
 clicking its knobs does nothing, wherever you click. This is a known fault
-in yabridge with Wine 9.22 and newer, not something OpenXLR can fix.
+in the unpatched yabridge release with Wine 9.22 and newer. The OpenXLR
+companion includes the input fix.
 
 Wine changed how it tracks where a window is in 9.22. A plugin editor is
 embedded in a window belonging to its host, and Wine never learns where
@@ -361,10 +402,9 @@ yabridge up to 5.1.1 with Wine 9.22 or newer. yabridge tracks the fix in
 
 Meanwhile the plugin is still usable: Controls in the insert row opens a
 window OpenXLR builds from the plugin's own parameters, and those work,
-bridged or not. To get the plugin's own editor back, either build yabridge
-from its `new-wine10-embedding` branch, which carries the fix and which
-people on Wine 11 report working, or install Wine 9.21, the last version
-yabridge 5.1.1 was built against.
+bridged or not. The optional `openxlr-yabridge` companion carries a pinned build with the
+input fix. Select it and restart the daemon. Users managing their own
+bridge can follow the upstream development builds linked from issue 409.
 
 <a name="memlock"></a>
 **"Low memory locking limit".** yabridge prints this when it starts, in

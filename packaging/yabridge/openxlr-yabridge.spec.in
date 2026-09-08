@@ -1,0 +1,29 @@
+%global debug_package %{nil}
+%global _build_id_links none
+Name: openxlr-yabridge
+Version: @VERSION@
+Release: @REVISION@%{?dist}
+Summary: Tested Windows plugin bridge for OpenXLR
+License: GPL-3.0-only AND GPL-3.0-or-later
+URL: https://github.com/emaspa/openxlr
+Source0: payload.tar.gz
+ExclusiveArch: x86_64
+AutoProv: no
+Requires: wine dbus-libs
+
+%description
+Pinned yabridge build with the Wine editor input fix, matching bridge
+libraries and private wrapper support. Supports 64-bit Windows VST3 and
+CLAP plugins. Wine is supplied by the system.
+
+%prep
+%setup -q -c
+
+%install
+mkdir -p %{buildroot}
+cp -a usr %{buildroot}/
+
+%files
+/usr/bin/openxlr-yabridgectl
+/usr/lib/openxlr/yabridge
+%license /usr/share/licenses/openxlr-yabridge

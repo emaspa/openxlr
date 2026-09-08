@@ -109,7 +109,9 @@ public sealed class OptionsViewModel : ViewModelBase
         string? yabridge = setup["yabridge"]?.GetValue<string>();
         bool wine = setup["wine"]?.GetValue<bool>() ?? false;
         int folders = (setup["windowsDirectories"] as System.Text.Json.Nodes.JsonArray)?.Count ?? 0;
-        WindowsPlugins = WindowsLine(yabridge, wine, folders);
+        WindowsPlugins = WindowsLine(yabridge, wine, folders, setup["bridgeProvider"]?.GetValue<string>() == "openxlr");
+        if (setup["windowsPluginDirectory"]?.GetValue<string>() is { } managedDirectory)
+            PluginDirectories += $" OpenXLR's Windows plugin wrappers are in {managedDirectory}.";
         CanSyncWindows = yabridge is not null && wine;
         WineFolders = [.. (setup["wineFolders"] as System.Text.Json.Nodes.JsonArray ?? [])
             .Select(f => f?.GetValue<string>()).OfType<string>()];
@@ -120,13 +122,14 @@ public sealed class OptionsViewModel : ViewModelBase
     }
 
     /// <summary>One line on Windows plugins, from what the daemon found.</summary>
-    internal static string WindowsLine(string? yabridge, bool wine, int folders)
+    internal static string WindowsLine(string? yabridge, bool wine, int folders, bool managed = false)
     {
-        if (yabridge is null && !wine) return "Windows plugins: yabridge and Wine are not installed. Install both from your distribution, then install a Windows VST3 or CLAP plugin here.";
-        if (yabridge is null) return "Windows plugins: Wine is installed, yabridge is not. Install yabridge from your distribution, then install a Windows VST3 or CLAP plugin here.";
-        if (!wine) return $"Windows plugins: yabridge {yabridge} is installed, Wine is not. Install Wine from your distribution.";
+        if (yabridge is null && !wine) return "Windows plugins: yabridge and Wine are not installed. Install the optional openxlr-yabridge package and Wine, then install a Windows VST3 or CLAP plugin here.";
+        if (yabridge is null) return "Windows plugins: Wine is installed, yabridge is not. Install the optional openxlr-yabridge package, then install a Windows VST3 or CLAP plugin here.";
+        string bridge = managed ? $"OpenXLR bridge {yabridge} (64-bit)" : $"yabridge {yabridge}";
+        if (!wine) return $"Windows plugins: {bridge} is installed, Wine is not. Install Wine from your distribution.";
         string bridged = folders switch { 0 => "no folder bridged yet", 1 => "1 folder bridged", _ => $"{folders} folders bridged" };
-        return $"Windows plugins: yabridge {yabridge} and Wine are installed, {bridged}. Run a plugin's installer with Wine, then install the folder it created.";
+        return $"Windows plugins: {bridge} and Wine are installed, {bridged}. Run a plugin's installer with Wine, then install the folder it created.";
     }
 
     // --- startup behaviour ---

@@ -109,6 +109,12 @@ client, for example `Balatro.exe` becomes `balatro`. `assignApp` and
 `forgetApp` also accept those legacy executable-name identities. When
 loading conflicting old and normalized overrides, the normalized key wins.
 
+`pluginSetup` also reports `bridgeProvider` (`openxlr` or `system`),
+`bridgeDirectory` (the selected companion directory, or null), and
+`windowsPluginDirectory` (OpenXLR's private wrapper root, or null).
+The `openxlr` provider includes the pinned Wine input fix. Its directory
+registry and generated wrappers are separate from the system controller.
+
 Insert definitions optionally carry `nativeHost: true` to select the native
 LV2 helper for that insert. Missing or false keeps PipeWire filter-chain, even
 when the helper is installed. Unsupported native selections are rejected.

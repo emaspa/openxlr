@@ -1,0 +1,14 @@
+#!/bin/sh
+# The companion's controller has its own registry and generated wrappers.
+set -eu
+umask 077
+bridge_dir=${OPENXLR_YABRIDGE:-@BRIDGE_DIR@}
+case "$bridge_dir" in
+  /*) ;;
+  *) echo 'Set OPENXLR_YABRIDGE to an absolute companion-package directory.' >&2; exit 2 ;;
+esac
+export PATH="$bridge_dir:${PATH:-/usr/bin:/bin}"
+export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}/openxlr/bridge"
+export OPENXLR_YABRIDGE_PLUGIN_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/openxlr/yabridge"
+"$bridge_dir/yabridgectl" set --path "$bridge_dir" >/dev/null
+exec "$bridge_dir/yabridgectl" "$@"

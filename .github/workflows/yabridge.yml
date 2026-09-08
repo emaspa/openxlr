@@ -1,0 +1,51 @@
+name: Optional Windows bridge
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'packaging/yabridge/**'
+      - 'packaging/nix/yabridge.nix'
+      - '.github/workflows/yabridge.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  bridge-packages:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install bridge build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            g++ git meson ninja-build cmake pkg-config wine wine64-tools libwine-dev \
+            libxcb1-dev libdbus-1-dev cargo rustc python3 dpkg-dev rpm zstd xz-utils
+          mkdir -p "$RUNNER_TEMP/bin"
+          for tool in winegcc wineg++; do
+            if ! command -v "$tool" >/dev/null; then
+              ln -s "$(command -v "$tool-stable")" "$RUNNER_TEMP/bin/$tool"
+            fi
+          done
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Prepare pinned source and dependencies
+        run: python3 packaging/yabridge/build.py prepare --source "$RUNNER_TEMP/yabridge-source" --output "$RUNNER_TEMP/yabridge-build"
+      - name: Build with downloads disabled
+        run: python3 packaging/yabridge/build.py build --source "$RUNNER_TEMP/yabridge-source" --output "$RUNNER_TEMP/yabridge-build" --jobs 2
+      - name: Build companion packages and corresponding sources
+        run: |
+          for format in deb rpm arch srpm debian-source; do
+            python3 packaging/yabridge/build.py package --source "$RUNNER_TEMP/yabridge-source" --output "$RUNNER_TEMP/yabridge-build" --format "$format"
+          done
+      - name: Verify private sync and package payloads
+        run: |
+          python3 packaging/yabridge/test-package.py "$RUNNER_TEMP/yabridge-build/stage-deb"
+          dpkg-deb -c "$RUNNER_TEMP"/yabridge-build/dist/*.deb
+          rpm -qpl "$RUNNER_TEMP"/yabridge-build/dist/*.x86_64.rpm
+          cd "$RUNNER_TEMP/yabridge-build/dist"
+          sha256sum -c SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: openxlr-yabridge
+          path: ${{ runner.temp }}/yabridge-build/dist/*

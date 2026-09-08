@@ -143,6 +143,8 @@ internal sealed class NativePluginHost : IDisposable
             start.ArgumentList.Add($"{symbol}={value.ToString("R", CultureInfo.InvariantCulture)}");
         foreach ((string name, string value) in SessionDisplay())
             start.Environment[name] = value;
+        if (ManagedYabridge.Discover() is { } bridge)
+            foreach ((string name, string value) in bridge.HostEnvironment()) start.Environment[name] = value;
         Process = Process.Start(start) ?? throw new InvalidOperationException("Could not start the native LV2 host.");
         _outputReader = ReadOutputAsync();
         _errorReader = ReadErrorsAsync();

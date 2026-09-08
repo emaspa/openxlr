@@ -41,6 +41,9 @@ public sealed record PluginSetup(
     /// with this pair of versions, or null when there is nothing to say.
     /// </summary>
     public string? WindowsEditorNote { get; init; }
+    public string BridgeProvider { get; init; } = "system";
+    public string? BridgeDirectory { get; init; }
+    public string? WindowsPluginDirectory { get; init; }
 }
 
 /// <summary>
@@ -64,11 +67,16 @@ public sealed class PluginInstaller
     private readonly string _lv2, _clap, _vst3, _winePrefix;
     private readonly string? _yabridgectl, _wine;
     private readonly bool _hostInstalled;
+    private readonly ManagedYabridge? _managed;
 
     /// <summary>The daemon's own: the home directories, the tools on PATH.</summary>
     public PluginInstaller()
         : this(HomeDirectory(".lv2"), HomeDirectory(".clap"), HomeDirectory(".vst3"),
-               OnPath("yabridgectl"), OnPath("wine"), NativePluginHost.HostInstalled) { }
+               OnPath("yabridgectl"), OnPath("wine"), NativePluginHost.HostInstalled)
+    {
+        _managed = ManagedYabridge.Discover();
+        if (_managed is not null) _yabridgectl = _managed.Controller;
+    }
 
     public PluginInstaller(string lv2Directory, string clapDirectory, string vst3Directory,
         string? yabridgectl, string? wine, bool hostInstalled = true, string? winePrefix = null)
@@ -318,6 +326,7 @@ public sealed class PluginInstaller
                 : directories.Count == 1 ? $"{Path.GetFileName(directories[0])} holds Windows plugins" : "These are Windows plugins";
             return $"{what}, and {missing} not installed. Install {(missing.StartsWith("yabridge and", StringComparison.Ordinal) ? "them" : "it")}, then add {(picked is not null || directories.Count == 1 ? "it" : "them")} again.";
         }
+        if (!PrepareManagedBridge()) return "The OpenXLR bridge could not select its packaged libraries.";
         HashSet<string> known = WindowsDirectories().ToHashSet(StringComparer.Ordinal);
         foreach (string directory in directories)
         {
@@ -329,8 +338,8 @@ public sealed class PluginInstaller
         ProcessResult? sync = Run("sync");
         if (sync is null || sync.ExitCode != 0) return $"yabridge could not bridge the plugins: {Tail(sync)}";
         installed.AddRange(directories.Select(Shorten));
-        destinations.Add(Path.Combine(_vst3, "yabridge"));   // where yabridge writes its bundles
-        destinations.Add(Path.Combine(_clap, "yabridge"));
+        destinations.Add(BridgedVst3Directory);
+        destinations.Add(BridgedClapDirectory);
         return directories.Count == 1
             ? $"Bridged the Windows plugins in {Shorten(directories[0])} with yabridge."
             : $"Bridged the Windows plugins in {directories.Count} folders with yabridge.";
@@ -341,6 +350,7 @@ public sealed class PluginInstaller
     {
         if (_yabridgectl is null) return new(false, "yabridge is not installed.", []);
         if (_wine is null) return new(false, "Wine is not installed, and yabridge needs it.", []);
+        if (!PrepareManagedBridge()) return new(false, "The OpenXLR bridge could not select its packaged libraries.", []);
         IReadOnlyList<string> directories = WindowsDirectories();
         if (directories.Count == 0) return new(false, "yabridge has no plugin folders yet. Add a Windows plugin to give it one.", []);
         ProcessResult? sync = Run("sync");
@@ -348,8 +358,16 @@ public sealed class PluginInstaller
         return new(true, directories.Count == 1
             ? $"Bridged the Windows plugins in {Shorten(directories[0])}."
             : $"Bridged the Windows plugins in {directories.Count} folders.", directories.Select(Shorten).ToList(),
-            [Path.Combine(_vst3, "yabridge"), Path.Combine(_clap, "yabridge")]);
+            [BridgedVst3Directory, BridgedClapDirectory]);
     }
+
+    private string BridgedVst3Directory => _managed is null ? Path.Combine(_vst3, "yabridge")
+        : Path.Combine(ManagedYabridge.PluginHome, "vst3");
+    private string BridgedClapDirectory => _managed is null ? Path.Combine(_clap, "yabridge")
+        : Path.Combine(ManagedYabridge.PluginHome, "clap");
+
+    private bool PrepareManagedBridge()
+        => _managed is null || Run("set", "--path", _managed.Directory)?.Ok == true;
 
     /// <summary>The directories yabridge watches, from `yabridgectl list`.</summary>
     public IReadOnlyList<string> WindowsDirectories()
@@ -479,11 +497,14 @@ public sealed class PluginInstaller
         IReadOnlyList<string> wine = _wine is null || _yabridgectl is null
             ? []
             : [.. WinePluginFolders().Where(f => !known.Contains(Path.GetFullPath(f).TrimEnd('/')))];
-        return new(_hostInstalled, Shorten(_lv2), Shorten(_clap), Shorten(_vst3), version, _wine is not null, bridged, wine)
+        return new(_hostInstalled, Shorten(_lv2), Shorten(_clap), Shorten(_vst3), _managed?.Version ?? version, _wine is not null, bridged, wine)
         {
             WineVersion = wineVersion,
-            WindowsEditorNote = EditorsIgnoreTheMouse(version, wineVersion)
-                ? $"A Windows plugin's own editor ignores the mouse with yabridge {version} and {wineVersion}: since Wine 9.22 its clicks arrive somewhere else entirely. The plugin plays, and its controls window here works. The manual has the two ways to fix the editor."
+            BridgeProvider = _managed is null ? "system" : "openxlr",
+            BridgeDirectory = _managed is null ? null : Shorten(_managed.Directory),
+            WindowsPluginDirectory = _managed is null ? null : Shorten(ManagedYabridge.PluginHome),
+            WindowsEditorNote = _managed is null && EditorsIgnoreTheMouse(version, wineVersion)
+                ? $"A Windows plugin's own editor can ignore the mouse with yabridge {version} and {wineVersion}: since Wine 9.22 its clicks can arrive somewhere else entirely. The optional openxlr-yabridge package includes the input fix. The manual covers bridge selection."
                 : null,
         };
     }
@@ -491,7 +512,8 @@ public sealed class PluginInstaller
     private ProcessResult? Run(params string[] arguments)
     {
         if (_yabridgectl is null) return null;
-        try { return ProcessRunner.Run(_yabridgectl, arguments, YabridgeTimeout, cLocale: false); }
+        try { return ProcessRunner.Run(_yabridgectl, arguments, YabridgeTimeout, cLocale: false,
+            environment: _managed?.ControllerEnvironment()); }
         catch (Exception) { return null; }
     }
 

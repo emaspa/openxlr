@@ -12,6 +12,8 @@
       packages = forAllSystems (pkgs: rec {
         openxlr = pkgs.callPackage ./packaging/nix/package.nix { };
         default = openxlr;
+      } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isx86_64 {
+        openxlr-yabridge = pkgs.callPackage ./packaging/nix/yabridge.nix { };
       });
 
       nixosModules.openxlr = { pkgs, lib, ... }: {

@@ -45,6 +45,7 @@ Recommends:     pulseaudio-utils
 Recommends:     xdg-utils
 Suggests:       ladspa-swh-plugins
 Suggests:       lsp-plugins-lv2
+Suggests:       openxlr-yabridge
 
 %description
 Native Linux control for Elgato XLR interfaces over reverse-engineered

@@ -49,8 +49,8 @@ public static class ProcessRunner
     /// <summary>Run to completion on the calling thread. See <see cref="RunAsync"/>.</summary>
     public static ProcessResult Run(string exe, IReadOnlyList<string> args, TimeSpan? timeout = null,
         int stdoutCap = DefaultStdoutCap, int stderrCap = DefaultStderrCap, bool cLocale = true,
-        CancellationToken cancel = default)
-        => RunAsync(exe, args, timeout, stdoutCap, stderrCap, cLocale, cancel).GetAwaiter().GetResult();
+        CancellationToken cancel = default, IReadOnlyDictionary<string, string>? environment = null)
+        => RunAsync(exe, args, timeout, stdoutCap, stderrCap, cLocale, cancel, environment).GetAwaiter().GetResult();
 
     /// <summary>
     /// Run a helper with a deadline and output caps. Throws only when the
@@ -59,7 +59,7 @@ public static class ProcessRunner
     /// </summary>
     public static async Task<ProcessResult> RunAsync(string exe, IReadOnlyList<string> args, TimeSpan? timeout = null,
         int stdoutCap = DefaultStdoutCap, int stderrCap = DefaultStderrCap, bool cLocale = true,
-        CancellationToken cancel = default)
+        CancellationToken cancel = default, IReadOnlyDictionary<string, string>? environment = null)
     {
         var psi = new ProcessStartInfo(exe)
         {
@@ -68,6 +68,8 @@ public static class ProcessRunner
             RedirectStandardInput = false,
             UseShellExecute = false,
         };
+        if (environment is not null)
+            foreach ((string name, string value) in environment) psi.Environment[name] = value;
         if (cLocale)
         {
             psi.Environment["LC_ALL"] = "C";

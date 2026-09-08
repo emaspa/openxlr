@@ -1,0 +1,22 @@
+#!/usr/bin/make -f
+%:
+	dh $@
+
+override_dh_auto_configure:
+	:
+
+override_dh_auto_build:
+	python3 openxlr-packaging/build.py build --source . --output out
+
+override_dh_auto_test:
+	:
+
+override_dh_auto_install:
+	python3 openxlr-packaging/build.py stage --source . --output out --destdir debian/openxlr-yabridge
+	python3 openxlr-packaging/test-package.py debian/openxlr-yabridge
+
+override_dh_auto_clean:
+	rm -rf out
+
+override_dh_dwz:
+	:

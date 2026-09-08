@@ -101,6 +101,9 @@ public sealed record PluginSetupMessage(PluginSetup Setup)
     [JsonPropertyName("wineVersion")] public string? WineVersion => Setup.WineVersion;
     /// <summary>What to know before opening a bridged plugin's own editor, or null.</summary>
     [JsonPropertyName("windowsEditorNote")] public string? WindowsEditorNote => Setup.WindowsEditorNote;
+    [JsonPropertyName("bridgeProvider")] public string BridgeProvider => Setup.BridgeProvider;
+    [JsonPropertyName("bridgeDirectory")] public string? BridgeDirectory => Setup.BridgeDirectory;
+    [JsonPropertyName("windowsPluginDirectory")] public string? WindowsPluginDirectory => Setup.WindowsPluginDirectory;
     [JsonIgnore] public PluginSetup Setup { get; } = Setup;
 }
 

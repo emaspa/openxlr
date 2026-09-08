@@ -26,7 +26,7 @@ Depends: ${misc:Depends},
  libice6,
  libsm6
 Recommends: alsa-utils, pulseaudio-utils, xdg-utils
-Suggests: swh-plugins, lsp-plugins-lv2
+Suggests: swh-plugins, lsp-plugins-lv2, openxlr-yabridge
 Description: Control suite and PipeWire submixer for Elgato XLR interfaces
  Native Linux control for Elgato XLR interfaces over reverse-engineered
  USB protocols: gain, DSP, phantom power, output routing and the

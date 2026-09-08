@@ -1,0 +1,34 @@
+diff --git a/tools/yabridgectl/src/config.rs b/tools/yabridgectl/src/config.rs
+index d948beff..46bf7118 100644
+--- a/tools/yabridgectl/src/config.rs
++++ b/tools/yabridgectl/src/config.rs
+@@ -366,6 +366,9 @@ pub fn yabridgectl_directories() -> Result<BaseDirectories> {
+ /// installation location setting. This is a subdirectory of `~/.vst` so we can easily clean up
+ /// leftover files without interfering with other native plugins.
+ pub fn yabridge_vst2_home() -> PathBuf {
++    if let Some(root) = env::var_os("OPENXLR_YABRIDGE_PLUGIN_HOME") {
++        return PathBuf::from(root).join("vst2");
++    }
+     Path::new(&env::var("HOME").expect("$HOME is not set")).join(YABRIDGE_VST2_HOME)
+ }
+ 
+@@ -373,6 +376,9 @@ pub fn yabridge_vst2_home() -> PathBuf {
+ /// subdirectory of `~/.vst3` so we can easily clean up leftover files without interfering with
+ /// other native plugins.
+ pub fn yabridge_vst3_home() -> PathBuf {
++    if let Some(root) = env::var_os("OPENXLR_YABRIDGE_PLUGIN_HOME") {
++        return PathBuf::from(root).join("vst3");
++    }
+     Path::new(&env::var("HOME").expect("$HOME is not set")).join(YABRIDGE_VST3_HOME)
+ }
+ 
+@@ -381,6 +387,9 @@ pub fn yabridge_vst3_home() -> PathBuf {
+ /// other native plugins. Unless `$CLAP_PATH` is set, in which case this is a subdirectory if the
+ /// first direcotry in `$CLAP_PATH`.
+ pub fn yabridge_clap_home() -> PathBuf {
++    if let Some(root) = env::var_os("OPENXLR_YABRIDGE_PLUGIN_HOME") {
++        return PathBuf::from(root).join("clap");
++    }
+     // Noone's going to be running yabridgectl on Windows, but this would need to be a semicolon
+     // there
+     #[cfg(unix)]

@@ -1,0 +1,25 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: yabridge
+Source: https://github.com/robbert-vdh/yabridge
+
+Files: *
+Copyright: 2020-2026 Robbert van der Helm and contributors
+License: GPL-3+
+ The upstream COPYING file contains the GNU General Public License version 3.
+ The program is distributed under version 3 or, at your option, a later version.
+ On Debian systems the full GPL version 3 is in /usr/share/common-licenses/GPL-3.
+Comment: Bundled build dependencies retain their respective licenses. Their
+ complete source and license files are included in the corresponding source
+ archive. The installed THIRD-PARTY-NOTICES file collects their license texts.
+
+Files: openxlr-packaging/* debian/*
+Copyright: 2026 Emanuele Sparvoli
+License: GPL-3
+ On Debian systems the full GPL version 3 is in /usr/share/common-licenses/GPL-3.
+
+Files: subprojects/* tools/yabridgectl/vendor/*
+Copyright: See the included copyright notices in each dependency.
+License: various
+ These dependencies retain the licenses in their respective source directories.
+ Their complete source and license texts are included in the source archive
+ and collected in the installed THIRD-PARTY-NOTICES file.

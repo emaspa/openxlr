@@ -1,0 +1,2 @@
+# Unified-diff context lines can contain a single structural space.
+packaging/yabridge/*.patch -whitespace

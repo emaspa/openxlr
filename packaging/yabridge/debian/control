@@ -1,0 +1,16 @@
+Source: openxlr-yabridge
+Section: sound
+Priority: optional
+Maintainer: Emanuele Sparvoli <sparvoli@gmail.com>
+Build-Depends: debhelper-compat (= 13), python3, g++, meson, ninja-build,
+ cmake, pkg-config, wine64-tools, libwine-dev, libxcb1-dev, libdbus-1-dev,
+ cargo, rustc
+Standards-Version: 4.7.0
+Homepage: https://github.com/emaspa/openxlr
+
+Package: openxlr-yabridge
+Architecture: amd64
+Depends: ${misc:Depends}, ${shlibs:Depends}, wine, libdbus-1-3
+Description: Tested Windows plugin bridge for OpenXLR
+ Pinned yabridge build with the Wine editor input fix, matching libraries
+ and private wrapper support. Supports 64-bit Windows VST3 and CLAP plugins.

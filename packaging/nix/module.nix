@@ -22,6 +22,15 @@ in
       '';
     };
 
+    yabridgePackage = lib.mkOption {
+      type = lib.types.nullOr lib.types.package;
+      default = null;
+      description = ''
+        Optional openxlr-yabridge companion package. Its matched bridge and
+        controller are selected only for OpenXLR. Wine is its package dependency.
+      '';
+    };
+
     lv2Plugins = lib.mkOption {
       type = lib.types.listOf lib.types.package;
       default = [ pkgs.lsp-plugins ];
@@ -36,7 +45,7 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    environment.systemPackages = [ cfg.package ];
+    environment.systemPackages = [ cfg.package ] ++ lib.optional (cfg.yabridgePackage != null) cfg.yabridgePackage;
 
     # Device access for regular users (uaccess tag).
     services.udev.packages = [ cfg.package ];
@@ -66,6 +75,8 @@ in
         LV2_PATH = lib.concatStringsSep ":" (
           [ "%h/.lv2" "/run/current-system/sw/lib/lv2" ]
           ++ map (p: "${p}/lib/lv2") cfg.lv2Plugins);
+      } // lib.optionalAttrs (cfg.yabridgePackage != null) {
+        OPENXLR_YABRIDGE = "${cfg.yabridgePackage}/lib/openxlr/yabridge";
       } // lib.optionalAttrs cfg.clipGuard {
         LADSPA_PATH = "${pkgs.ladspaPlugins}/lib/ladspa";
       };
