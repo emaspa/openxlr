@@ -15,14 +15,24 @@ folder sync from writing into another DAW's bridge tree.
 
 ## Install
 
-The [Optional Windows bridge workflow](https://github.com/emaspa/openxlr/actions/workflows/yabridge.yml)
-produces binary and corresponding source artifacts for review. It does
-not publish to GitHub Releases, AUR, COPR or the PPA. Download an artifact
-from a successful run or build it below; extract it and verify the included
-`SHA256SUMS` with `sha256sum -c SHA256SUMS` in its directory.
+Most people install it from the same place they installed OpenXLR:
 
-Choose the package for your distribution and architecture, then run only
-the matching command. The companion supports x86-64 Linux and 64-bit
+```sh
+yay -S openxlr-yabridge          # Arch, from the AUR
+sudo apt install openxlr-yabridge   # Ubuntu, from the PPA
+sudo dnf install openxlr-yabridge   # Fedora 44, from the COPR repository
+```
+
+On NixOS, set `services.openxlr.yabridgePackage` to the flake's
+`openxlr-yabridge` package.
+
+Every release also carries the packages themselves, next to a
+`SHA256SUMS-yabridge.txt` to check them against. The
+[Optional Windows bridge workflow](https://github.com/emaspa/openxlr/actions/workflows/yabridge.yml)
+builds the same set from any branch, for review.
+
+To install a package by hand, choose the one for your distribution and run
+only the matching command. The companion supports x86-64 Linux and 64-bit
 Windows plugins; it does not bundle Wine or 32-bit plugin support:
 
 ```sh

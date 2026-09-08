@@ -75,8 +75,9 @@ Collect diagnostics).
   monitor mixes on several outputs at once.
 - **Inserts**: LV2, CLAP and VST3 plugin chains on each XLR input and each mix, with a
   plugin picker, generated controls, bypass and native plugin editors.
-  Windows VST3 and CLAP plugins use Wine and yabridge; an optional
-  OpenXLR companion supplies the Wine editor input fix and private wrappers.
+  Windows VST3 and CLAP plugins use Wine and yabridge; the
+  `openxlr-yabridge` package supplies a tested bridge with the Wine editor
+  input fix and private wrappers.
 - **Application routing**: audio clients are detected from their
   PipeWire registration and routed to a channel by name rules, with the
   assignment remembered per app; an app can also be left to the
@@ -220,10 +221,13 @@ also covers WirePlumber rules, the open-file limit, the user service,
 updating and uninstalling. Keep the native build flag on subsequent builds
 to retain CLAP, VST3 and plugin editors.
 
-For Windows plugins, see [the manual](docs/manual.md#windows-plugins) and
-[the companion package guide](packaging/yabridge/README.md). The companion
-has a separate build workflow; its CI artifacts are not automatically
-published to the OpenXLR release or distribution repositories.
+For Windows plugins, install `openxlr-yabridge` from the same place you
+installed OpenXLR: the AUR, the PPA, the COPR repository, or the packages
+on the release page. It carries a tested bridge with the Wine editor input
+fix, without which a plugin editor ignores the mouse on Wine 9.22 and
+newer. [The manual](docs/manual.md#windows-plugins) walks through it and
+[the package guide](packaging/yabridge/README.md) covers building it
+yourself.
 
 ## Documentation
 

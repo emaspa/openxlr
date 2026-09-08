@@ -151,10 +151,10 @@ or `~/.vst3`. Windows installers must run in Wine first; OpenXLR bridges
 the installed plugins and rescans automatically. Options offers a rescan,
 a Windows sync, detected Wine folders and the selected bridge's status.
 
-The optional `openxlr-yabridge` companion includes the Wine 9.22+ editor
-input fix. It creates wrappers under `~/.local/share/openxlr/yabridge` and
-keeps its controller registry under `~/.config/openxlr/bridge`, honoring
-XDG overrides. Other DAWs' wrappers and controller settings remain separate.
+The `openxlr-yabridge` companion is packaged on every channel OpenXLR is,
+and includes the Wine 9.22+ editor input fix. It creates wrappers under
+`~/.local/share/openxlr/yabridge` and keeps its controller registry under
+`~/.config/openxlr/bridge`, honoring XDG overrides. Other DAWs' wrappers and controller settings remain separate.
 Private wrappers take priority over duplicate global copies. A system/user
 bridge remains supported; Options warns about known incompatible versions.
 See [Windows plugins](manual.md#windows-plugins) for availability and setup.

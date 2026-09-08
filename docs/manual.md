@@ -270,30 +270,40 @@ searched).
 [yabridge](https://github.com/robbert-vdh/yabridge), which wraps them as
 Linux bundles.
 
-The optional **openxlr-yabridge** package supplies a tested bridge for
-64-bit Windows VST3 and CLAP plugins, including the Wine editor input fix.
-Wine remains a system dependency. The companion currently comes from the
-separate [Optional Windows bridge workflow](https://github.com/emaspa/openxlr/actions/workflows/yabridge.yml)
-or a source build. That workflow creates binary and source artifacts; it
-does not attach them to OpenXLR releases or publish distribution packages.
-Download and extract the artifact for your distribution, check its
-`SHA256SUMS`, and follow the [package guide](../packaging/yabridge/README.md).
-Install the companion artifact with
-your distribution's package manager, then restart the daemon:
+The **openxlr-yabridge** package supplies a tested bridge for 64-bit
+Windows VST3 and CLAP plugins, built from a pinned source with the Wine
+editor input fix. Install it from the same place you installed OpenXLR.
+Wine comes with it as a dependency.
 
 ```sh
-# Debian or Ubuntu
-sudo apt install ./openxlr-yabridge_*_amd64.deb wine
-# Fedora
-sudo dnf install ./openxlr-yabridge-*.x86_64.rpm wine
-# Arch
-sudo pacman -U ./openxlr-yabridge-*-x86_64.pkg.tar.zst
+# Arch, from the AUR
+yay -S openxlr-yabridge
+
+# Ubuntu, from the PPA you already added for OpenXLR
+sudo apt install openxlr-yabridge
+
+# Fedora 44, from the COPR repository you already enabled
+sudo dnf install openxlr-yabridge
 ```
 
-Use the command for your distribution. Run
-`systemctl --user restart openxlr-daemon` to load the companion; this briefly interrupts audio. Options
-then identifies the selected bridge as "OpenXLR bridge". Use "Bridge
-Wine's plugins" or pick a Windows plugin folder to create private wrappers.
+On NixOS, set `services.openxlr.yabridgePackage` to the flake's
+`openxlr-yabridge` package. On any other distribution, take the `.deb`,
+the `.rpm` or the `.pkg.tar.zst` from the
+[latest release](https://github.com/emaspa/openxlr/releases/latest), check
+it against `SHA256SUMS-yabridge.txt`, and install it by hand. The
+[package guide](../packaging/yabridge/README.md) covers building it
+yourself.
+
+Restart the daemon with `systemctl --user restart openxlr-daemon` so it
+finds the companion; this briefly interrupts audio. Options then
+identifies the selected bridge as "OpenXLR bridge". Use "Bridge Wine's
+plugins" or pick a Windows plugin folder to create private wrappers.
+
+Without the companion, a distribution yabridge works only with Wine older
+than 9.22. From 9.22 an embedded plugin window never learns where it is,
+so every click lands as far from the pointer as the window is from the
+corner of the screen, and the plugin ignores the mouse entirely. Options
+says so when it sees that pair of versions.
 
 The companion keeps those wrappers in
 `~/.local/share/openxlr/yabridge/{vst3,clap}` and its directory registry in
