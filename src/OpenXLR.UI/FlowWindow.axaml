@@ -1,29 +1,67 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="OpenXLR.UI.FlowWindow"
-        Title="OpenXLR Audio Flow" Width="1180" Height="760" MinWidth="900" MinHeight="500"
-        WindowStartupLocation="CenterOwner"
-        Background="#16181d">
-
-  <DockPanel Margin="14">
-    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
-      <StackPanel>
-        <TextBlock Text="Audio flow" FontSize="18" FontWeight="Bold" Foreground="#e6e9f0"/>
-        <TextBlock Text="Live view of the routing: sources into channels, channels into mixes, mixes to outputs, with insert chains where they sit in the path."
-                   FontSize="11" Foreground="#8b93a7"/>
+        Title="OpenXLR · Audio flow" SizeToContent="WidthAndHeight" MinWidth="900" MinHeight="500"
+        WindowStartupLocation="CenterOwner" RequestedThemeVariant="Dark"
+        Background="#242624">
+  <Window.Resources>
+    <SolidColorBrush x:Key="FlowCard" Color="#333633"/>
+    <SolidColorBrush x:Key="FlowCardSelected" Color="#414541"/>
+    <SolidColorBrush x:Key="FlowText" Color="#f0f2ef"/>
+    <SolidColorBrush x:Key="FlowTextDim" Color="#a3aaa3"/>
+    <SolidColorBrush x:Key="FlowInput" Color="#20c4d1"/>
+    <SolidColorBrush x:Key="FlowChannel" Color="#c958e5"/>
+    <SolidColorBrush x:Key="FlowOutput" Color="#20d49a"/>
+    <SolidColorBrush x:Key="FlowMuted" Color="#757d75"/>
+  </Window.Resources>
+  <Window.Styles>
+    <Style Selector="Button.flowNode">
+      <Setter Property="Padding" Value="12,9"/>
+      <Setter Property="CornerRadius" Value="6"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Button.flowNode:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#414541"/>
+      <Setter Property="BorderBrush" Value="#717971"/>
+    </Style>
+  </Window.Styles>
+  <Grid RowDefinitions="Auto,*,Auto" Margin="28,24,28,18">
+    <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,20">
+      <StackPanel Spacing="5">
+        <TextBlock Text="Audio flow" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource FlowText}"/>
+        <TextBlock Name="FlowHint" Text="Click any element to trace its signal path" FontSize="12" Foreground="{StaticResource FlowTextDim}"/>
       </StackPanel>
-      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
-        <TextBlock Text="lines share the color of their channel (mixes color their output lines)"
-                   FontSize="11" Foreground="#8b93a7" VerticalAlignment="Center"/>
-        <StackPanel Orientation="Horizontal" Spacing="5">
-          <Rectangle Width="14" Height="3" Fill="#555b68" VerticalAlignment="Center"/>
-          <TextBlock Text="muted / silent" FontSize="11" Foreground="#8b93a7"/>
-        </StackPanel>
-      </StackPanel>
+      <Button Name="ClearSelection" Grid.Column="1" Content="×  Clear selection" Click="OnClearSelection"
+              VerticalAlignment="Center" FontSize="12" Background="#333633" Foreground="{StaticResource FlowText}"
+              CornerRadius="4" Padding="12,7" IsEnabled="False"/>
     </Grid>
-
-    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-      <Canvas Name="GraphCanvas" Background="#16181d"/>
+    <ScrollViewer Name="GraphScroll" Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+      <Canvas Name="GraphCanvas" Background="Transparent"/>
     </ScrollViewer>
-  </DockPanel>
+    <WrapPanel Grid.Row="2" Margin="0,18,0,0">
+      <StackPanel Orientation="Horizontal" Spacing="7" Margin="0,0,22,8">
+        <Path Width="20" Height="3" Data="M0,1 L20,1" Stroke="{StaticResource FlowInput}" StrokeThickness="2"/>
+        <TextBlock Text="Input to channel" FontSize="11" Foreground="{StaticResource FlowTextDim}"/>
+      </StackPanel>
+      <StackPanel Orientation="Horizontal" Spacing="7" Margin="0,0,22,8">
+        <Path Width="20" Height="3" Data="M0,1 L20,1" Stroke="{StaticResource FlowChannel}" StrokeThickness="2"/>
+        <TextBlock Text="Channel to mix" FontSize="11" Foreground="{StaticResource FlowTextDim}"/>
+      </StackPanel>
+      <StackPanel Orientation="Horizontal" Spacing="7" Margin="0,0,22,8">
+        <Path Width="20" Height="3" Data="M0,1 L20,1" Stroke="{StaticResource FlowOutput}" StrokeThickness="2"/>
+        <TextBlock Text="Mix to output" FontSize="11" Foreground="{StaticResource FlowTextDim}"/>
+      </StackPanel>
+      <StackPanel Orientation="Horizontal" Spacing="7" Margin="0,0,22,8">
+        <Path Width="20" Height="3" Data="M0,1 L20,1" Stroke="{StaticResource FlowMuted}" StrokeThickness="2" StrokeDashArray="3,3"/>
+        <TextBlock Text="Muted / inactive" FontSize="11" Foreground="{StaticResource FlowTextDim}"/>
+      </StackPanel>
+      <StackPanel Orientation="Horizontal" Spacing="7" Margin="0,0,22,8">
+        <Path Width="20" Height="3" Data="M0,1 L20,1" Stroke="{StaticResource FlowMuted}" StrokeThickness="2" Opacity="0.3"/>
+        <TextBlock Text="Not in path" FontSize="11" Foreground="{StaticResource FlowTextDim}"/>
+      </StackPanel>
+    </WrapPanel>
+  </Grid>
 </Window>

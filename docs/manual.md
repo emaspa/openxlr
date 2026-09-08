@@ -148,6 +148,28 @@ zero latency; muted, you do not. If another device (speakers, a headset)
 is ticked as well, the microphone reaches everything through the
 software mix instead, with a few milliseconds of delay.
 
+<a name="audio-flow"></a>
+### Audio flow
+
+Open **Flow** from the main window to see inputs, channels, mixes and outputs
+from left to right. Cyan lines connect inputs to channels, purple lines connect
+channels to mixes, and green lines connect mixes to outputs. Muted or inactive
+routes are dashed. Sends at zero have no line.
+
+Click a card to trace its upstream and downstream routes. Unrelated cards and
+lines dim, and dots travel along the highlighted active routes to show direction.
+The dots indicate routing, not measured audio levels. Click the card again,
+click empty space, press Escape or use **Clear selection** to show every route.
+Cards also work with Tab and Enter or Space. Selection does not change routing.
+
+Input and mix processing appears in an FX row inside its card. Hover over the
+card for the full chain in signal order, including bypass and error states.
+Outputs follow the selected monitor feeds, including Monitor A+B, and the
+current virtual microphones. Apps left to desktop routing appear without an
+OpenXLR connection. The window sizes itself to the graph when it opens, or when
+the first routing state arrives, up to the screen's usable area. Larger layouts
+scroll horizontally and vertically. Resizing the window manually turns off automatic sizing.
+
 <a name="apps"></a>
 ### 3.3 Put an application on a different channel
 

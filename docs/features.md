@@ -66,6 +66,11 @@ does not reach the speakers until unmuted.
 
 ## Submixer
 
+The **Flow** window shows inputs, channels, mixes and outputs in four columns.
+Click a card to trace its signal path, with colours for each routing stage and
+unrelated routes dimmed. Processing stays inside the channel and mix cards;
+the tooltip lists each insert in signal order. See [Audio flow](manual.md#audio-flow).
+
 Built from PipeWire nodes, no kernel modules or custom drivers:
 - Channels for the hardware inputs (XLR 1, XLR 2, Aux In) and for
   application groups (Game, Music, Browser, System, Voice Chat, SFX)

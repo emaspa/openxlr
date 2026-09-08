@@ -1,305 +1,264 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Linq;
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
+using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Threading;
 
 namespace OpenXLR.UI;
 
-/// <summary>
-/// A flow graph of the live routing, rebuilt from the view model on every
-/// state push: sources (apps and hardware inputs) into channels, channels
-/// into mixes, mixes to physical and virtual outputs, with the filter chains
-/// (built-in DSP and LV2 inserts) drawn where they sit in the path.
-/// Read-only by design; the mixer cards are where things are changed.
-/// </summary>
+/// <summary>Live routing with selectable paths. Selection never changes the mixer.</summary>
 public partial class FlowWindow : Window
 {
-    private const double NodeW = 190, NodeH = 40, ColGap = 130, RowGap = 10, Pad = 8;
-
-    private static readonly IBrush NodeBg = new SolidColorBrush(Color.Parse("#23262f"));
-    private static readonly IBrush NodeBgDim = new SolidColorBrush(Color.Parse("#1c1f26"));
-    private static readonly IBrush TextFg = new SolidColorBrush(Color.Parse("#e6e9f0"));
-    private static readonly IBrush TextDim = new SolidColorBrush(Color.Parse("#7d8496"));
-    private static readonly IBrush EdgeMuted = new SolidColorBrush(Color.Parse("#555b68"));
-
-    // One stable hue per channel: every edge touching a channel wears its
-    // color, which is what keeps the crossing curves readable.
-    private static readonly IBrush[] Palette =
-        new[] { "#4fb3d9", "#e0a84a", "#b06ab3", "#3ecf7a", "#e06767",
-                "#6a8de0", "#d9cf4f", "#e08bc7", "#7fd9c6", "#c78b5a" }
-        .Select(IBrush (h) => new SolidColorBrush(Color.Parse(h))).ToArray();
-
     private readonly MainViewModel? _vm;
+    private FlowGraph _graph = new([], []);
+    private string? _selected;
+    private readonly Dictionary<string, Button> _cards = [];
+    private readonly List<RouteVisual> _routes = [];
+    private readonly DispatcherTimer _animation = new() { Interval = TimeSpan.FromMilliseconds(33) };
+    private readonly Stopwatch _clock = Stopwatch.StartNew();
 
-    public FlowWindow() => InitializeComponent();
+    private sealed record RouteVisual(FlowRoute Route, Path Line, Path Glow, Ellipse Dot, Point Start, Point End);
+
+    public FlowWindow()
+    {
+        InitializeComponent();
+        GraphScroll.SizeChanged += (_, _) => RenderGraph();
+        GraphCanvas.PointerPressed += (_, e) =>
+        {
+            if (e.Source == GraphCanvas) Select(null);
+        };
+        KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Escape) { Select(null); e.Handled = true; }
+        };
+        _animation.Tick += (_, _) => Animate();
+        Opened += (_, _) => { ConstrainToScreen(); Rebuild(); };
+        Closed += (_, _) => _animation.Stop();
+    }
 
     public FlowWindow(MainViewModel vm) : this()
     {
         _vm = vm;
         vm.StateApplied += Rebuild;
-        Opened += (_, _) => Rebuild();
-        Closed += (_, _) => vm.StateApplied -= Rebuild;
+        vm.PropertyChanged += OnStatePropertyChanged;
+        ConstrainToScreen();
+        Rebuild();
+        Closed += (_, _) =>
+        {
+            vm.StateApplied -= Rebuild;
+            vm.PropertyChanged -= OnStatePropertyChanged;
+        };
     }
 
-    /// <summary>One filter chain: the inserts (and built-in DSP) between a
-    /// source and its channel, or between a mix and its outputs.</summary>
-    private sealed record ChainNode(string Key, string Owner, IReadOnlyList<(string Label, bool Active, string? Note)> Items);
+    private void OnStatePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(MainViewModel.DaemonConnected) or nameof(MainViewModel.HasMixer))
+            UpdateHint();
+    }
+
+    private IBrush Brush(string name) => (IBrush)Resources[name]!;
+    private IBrush RouteBrush(FlowStage stage) => Brush(stage switch
+    {
+        FlowStage.Input => "FlowInput", FlowStage.Channel => "FlowChannel", _ => "FlowOutput",
+    });
 
     private void Rebuild()
     {
         if (_vm is null) return;
-        Canvas c = GraphCanvas;
-        c.Children.Clear();
-
-        // ---- collect the nodes per column ----
-        var sources = new List<(string Key, string Label, string Channel, bool Playing)>();
-        foreach (string chId in new[] { "xlr1", "xlr2", "aux" })
-            if (_vm.Channels.Any(x => x.Id == chId))
-                sources.Add(($"hw:{chId}",
-                    chId switch { "xlr1" => "XLR 1 jack", "xlr2" => "XLR 2 jack", _ => "Line In / USB Aux" },
-                    chId, true));
-        foreach (AppStreamViewModel a in _vm.ActiveApps)
-            sources.Add(($"app:{a.Identity}", a.Label, a.ChannelId, a.Active));
-
-        var channels = _vm.Channels.ToList();
-        var mixes = _vm.Mixes.ToList();
-
-        var outputs = new List<(string Key, string Label, string MixId, bool Active)>();
-        foreach (MonitorOutputItem o in _vm.MonitorOutputs.Where(o => o.IsSelected))
-            outputs.Add(($"out:{o.Name}", o.Label, "monitor", true));
-        outputs.Add(("vm:stream", "OpenXLR Stream (virtual mic)", "stream", true));
-        outputs.Add(("vm:chat", "OpenXLR Chat (virtual mic)", "chat", true));
-        MixViewModel? auxMix = mixes.FirstOrDefault(m => m.IsAuxPort);
-        if (auxMix is not null)
-            outputs.Add(("aux:port", "USB Aux port (second PC)", auxMix.Id, auxMix.AuxPortEnabled));
-
-        // Filter chains in the path. An input chain sits between the jack and
-        // its channel: the built-in low cut and ClipGuard (XLR 1 only, when
-        // switched on) followed by the plugin inserts. A mix chain sits between
-        // the mix and everything it feeds. Chains with nothing in them are
-        // not drawn, and the columns appear only when a chain exists.
-        var inputChains = new List<ChainNode>();
-        static IEnumerable<(string, bool, string?)> InsertItems(InsertsViewModel vm)
-            => vm.Items.Select(i => (i.Label, i.IsActive, i.HasError ? "problem" : i.Bypass ? "bypassed" : null));
-        if (channels.Any(x => x.Id == "xlr1"))
-        {
-            var items = new List<(string, bool, string?)>();
-            if (_vm.ShowSoftLowCut && _vm.SoftLowCutOn) items.Add(($"Low cut {_vm.SoftLowCutHz} Hz", true, null));
-            if (_vm.ShowSoftClipGuard && _vm.SoftClipGuard) items.Add(("ClipGuard", _vm.SoftClipGuardAvailable, _vm.SoftClipGuardAvailable ? null : "unavailable"));
-            items.AddRange(InsertItems(_vm.Inserts));
-            if (items.Count > 0) inputChains.Add(new ChainNode("chain:xlr1", "xlr1", items));
-        }
-        if (channels.Any(x => x.Id == "xlr2"))
-        {
-            var items = InsertItems(_vm.Inserts2).ToList();
-            if (items.Count > 0) inputChains.Add(new ChainNode("chain:xlr2", "xlr2", items));
-        }
-        var mixChains = mixes
-            .Where(m => m.Inserts.Items.Count > 0)
-            .Select(m => new ChainNode($"chain:mix:{m.Id}", m.Id, InsertItems(m.Inserts).ToList()))
-            .ToList();
-
-        // ---- layout ----
-        // Columns: sources, [input DSP], channels, mixes, [mix DSP], outputs.
-        var headers = new List<string> { "SOURCES" };
-        int colInputDsp = -1, colMixDsp = -1;
-        if (inputChains.Count > 0) { colInputDsp = headers.Count; headers.Add("INPUT DSP"); }
-        int colChannels = headers.Count; headers.Add("CHANNELS");
-        int colMixes = headers.Count; headers.Add("MIXES");
-        if (mixChains.Count > 0) { colMixDsp = headers.Count; headers.Add("MIX DSP"); }
-        int colOutputs = headers.Count; headers.Add("OUTPUTS");
-
-        double colX(int col) => Pad + col * (NodeW + ColGap);
-        var pos = new Dictionary<string, Rect>();
-        void Place(int col, int row, string key)
-            => pos[key] = new Rect(colX(col), Pad + row * (NodeH + RowGap), NodeW, NodeH);
-        // A chain node is as tall as its list, centred on its owner's row.
-        void PlaceChain(int col, Rect owner, ChainNode chain)
-        {
-            double h = Math.Max(NodeH, 10 + chain.Items.Count * 16);
-            pos[chain.Key] = new Rect(colX(col), owner.Center.Y - h / 2, NodeW, h);
-        }
-
-        for (int i = 0; i < sources.Count; i++) Place(0, i, sources[i].Key);
-        for (int i = 0; i < channels.Count; i++) Place(colChannels, i, $"ch:{channels[i].Id}");
-        for (int i = 0; i < mixes.Count; i++) Place(colMixes, i * 2 + 1, $"mix:{mixes[i].Id}");
-        for (int i = 0; i < outputs.Count; i++) Place(colOutputs, i * 2 + 1, outputs[i].Key);
-        foreach (ChainNode chain in inputChains) PlaceChain(colInputDsp, pos[$"ch:{chain.Owner}"], chain);
-        foreach (ChainNode chain in mixChains) PlaceChain(colMixDsp, pos[$"mix:{chain.Owner}"], chain);
-
-        // A tall chain centred on the first row would start above the canvas;
-        // push everything down by the overshoot.
-        double overshoot = Pad - pos.Values.Min(r => r.Y);
-        if (overshoot > 0)
-            foreach (string key in pos.Keys.ToList())
-                pos[key] = pos[key].Translate(new Vector(0, overshoot));
-
-        c.Width = colX(colOutputs) + NodeW + Pad;
-        c.Height = pos.Values.Max(r => r.Bottom) + Pad;
-
-        // ---- edges first (under the nodes) ----
-        IBrush ChannelBrush(string chId)
-        {
-            int idx = channels.FindIndex(x => x.Id == chId);
-            return idx < 0 ? EdgeMuted : Palette[idx % Palette.Length];
-        }
-        IBrush MixBrush(string mixId)
-        {
-            int idx = mixes.FindIndex(x => x.Id == mixId);
-            return idx < 0 ? EdgeMuted : Palette[idx % Palette.Length];
-        }
-        string? InputChainKey(string chId) => inputChains.FirstOrDefault(x => x.Owner == chId)?.Key;
-        string? MixChainKey(string mixId) => mixChains.FirstOrDefault(x => x.Owner == mixId)?.Key;
-
-        foreach (var s in sources)
-        {
-            if (!pos.ContainsKey($"ch:{s.Channel}")) continue;
-            IBrush brush = s.Playing ? ChannelBrush(s.Channel) : EdgeMuted;
-            double w = s.Playing ? 2 : 1.2;
-            // The jack's own chain is in its path; app streams join the
-            // channel directly.
-            string? via = s.Key.StartsWith("hw:", StringComparison.Ordinal) ? InputChainKey(s.Channel) : null;
-            if (via is not null)
-            {
-                Edge(c, pos[s.Key], pos[via], brush, w, dashed: !s.Playing);
-                Edge(c, pos[via], pos[$"ch:{s.Channel}"], brush, w, dashed: !s.Playing);
-            }
-            else Edge(c, pos[s.Key], pos[$"ch:{s.Channel}"], brush, w, dashed: !s.Playing);
-        }
-
-        foreach (ChannelViewModel ch in channels)
-            foreach (SendViewModel send in ch.Sends)
-            {
-                if (!pos.ContainsKey($"mix:{send.MixId}")) continue;
-                bool flows = send.Level > 0.001 && !send.Muted;
-                if (!flows && send.Level <= 0.001) continue;      // no send at all: no line
-                Edge(c, pos[$"ch:{ch.Id}"], pos[$"mix:{send.MixId}"],
-                    flows ? ChannelBrush(ch.Id) : EdgeMuted,
-                    flows ? Math.Max(1.2, send.Level * 3.0) : 1.2, dashed: !flows);
-            }
-
-        // A mix with a chain feeds it once; the chain then fans out to the
-        // mix's outputs.
-        foreach (ChainNode chain in mixChains)
-        {
-            bool live = outputs.Any(o => o.MixId == chain.Owner && o.Active);
-            Edge(c, pos[$"mix:{chain.Owner}"], pos[chain.Key], live ? MixBrush(chain.Owner) : EdgeMuted, live ? 2 : 1.2, dashed: !live);
-        }
-        foreach (var o in outputs)
-        {
-            if (!pos.ContainsKey($"mix:{o.MixId}")) continue;
-            string from = MixChainKey(o.MixId) ?? $"mix:{o.MixId}";
-            Edge(c, pos[from], pos[o.Key], o.Active ? MixBrush(o.MixId) : EdgeMuted,
-                o.Active ? 2 : 1.2, dashed: !o.Active);
-        }
-
-        // ---- nodes ----
-        foreach (var s in sources) Node(c, pos[s.Key], s.Label, s.Playing ? null : "silent", s.Playing);
-        foreach (ChannelViewModel ch in channels)
-            Node(c, pos[$"ch:{ch.Id}"], ch.Name, null, true, ChannelBrush(ch.Id));
-        foreach (MixViewModel m in mixes)
-            Node(c, pos[$"mix:{m.Id}"], m.Name, m.Muted ? "muted" : $"{m.Volume * 100:0}%", !m.Muted, MixBrush(m.Id));
-        foreach (var o in outputs) Node(c, pos[o.Key], o.Label, o.Active ? null : "off", o.Active);
-        foreach (ChainNode chain in inputChains) ChainBox(c, pos[chain.Key], chain, ChannelBrush(chain.Owner));
-        foreach (ChainNode chain in mixChains) ChainBox(c, pos[chain.Key], chain, MixBrush(chain.Owner));
-
-        // ---- column headers ----
-        for (int i = 0; i < headers.Count; i++)
-        {
-            var t = new TextBlock
-            {
-                Text = headers[i], FontSize = 11, FontWeight = FontWeight.SemiBold,
-                Foreground = TextDim,
-            };
-            Canvas.SetLeft(t, colX(i));
-            Canvas.SetTop(t, c.Height);
-            c.Children.Add(t);
-        }
-        c.Height += 22;
+        FlowGraph next = FlowGraph.From(_vm);
+        UpdateHint();
+        if (_graph.Nodes.SequenceEqual(next.Nodes) && _graph.Routes.SequenceEqual(next.Routes)) return;
+        _graph = next;
+        if (_selected is not null && !_graph.Nodes.Any(n => n.Key == _selected)) _selected = null;
+        RenderGraph();
     }
 
-    /// <summary>A chain node: one line per stage, in signal order, dimmed
-    /// when bypassed or broken, with the owner's accent on the left edge.</summary>
-    private static void ChainBox(Canvas c, Rect r, ChainNode chain, IBrush accent)
+    private void UpdateHint()
     {
-        var list = new StackPanel { VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center, Spacing = 2 };
-        foreach ((string label, bool active, string? note) in chain.Items)
+        FlowHint.Text = _vm is { DaemonConnected: false } ? "Daemon disconnected. Waiting for live routing."
+            : _vm is { HasMixer: false } ? "Turn on the submixer in Options to see audio flow."
+            : "Click any element to trace its signal path";
+    }
+
+    private void ConstrainToScreen()
+    {
+        var screen = Screens.ScreenFromWindow(Owner ?? this) ?? Screens.Primary ?? Screens.All.FirstOrDefault();
+        if (screen is null) return;
+        Size frame = FrameSize ?? ClientSize;
+        var decoration = new Size(Math.Max(0, frame.Width - ClientSize.Width),
+            Math.Max(0, frame.Height - ClientSize.Height));
+        Size limit = FitClientSize(Size.Infinity, screen.WorkingArea.Size, screen.Scaling, decoration);
+        MinWidth = Math.Min(900, limit.Width);
+        MinHeight = Math.Min(500, limit.Height);
+        MaxWidth = limit.Width;
+        MaxHeight = limit.Height;
+    }
+
+    internal static Size FitClientSize(Size desired, PixelSize workingArea, double scaling, Size decoration)
+        => new(Math.Min(desired.Width, Math.Max(1, workingArea.Width / scaling - decoration.Width)),
+            Math.Min(desired.Height, Math.Max(1, workingArea.Height / scaling - decoration.Height)));
+
+    private void RenderGraph()
+    {
+        Canvas canvas = GraphCanvas;
+        canvas.Children.Clear();
+        _cards.Clear();
+        _routes.Clear();
+        // Auto-size against a fixed natural width. Once the user resizes the
+        // window, Avalonia switches SizeToContent to Manual and the graph adapts.
+        double width = SizeToContent == SizeToContent.Manual
+            ? Math.Max(1040, GraphScroll.Bounds.Width - 16) : 1208;
+        double gap = Math.Clamp(width * 0.075, 72, 140);
+        double cardWidth = (width - 3 * gap) / 4;
+        double X(FlowStage stage) => (int)stage * (cardWidth + gap);
+        canvas.Width = width;
+        canvas.Height = Math.Max(320, _graph.Nodes.Select(n => n.Y + n.Height + 16).DefaultIfEmpty(320).Max());
+
+        foreach ((FlowStage stage, string title, FlowIcon icon) in new[]
         {
-            var row = new DockPanel();
-            if (note is not null)
-            {
-                var n = new TextBlock { Text = note, FontSize = 10, Foreground = TextDim, Margin = new Thickness(6, 0, 0, 0) };
-                DockPanel.SetDock(n, Dock.Right);
-                row.Children.Add(n);
-            }
-            row.Children.Add(new TextBlock
-            {
-                Text = label, FontSize = 11, Foreground = active ? TextFg : TextDim,
-                TextTrimming = TextTrimming.CharacterEllipsis,
-            });
-            list.Children.Add(row);
+            (FlowStage.Input, "INPUTS", FlowIcon.Microphone),
+            (FlowStage.Channel, "CHANNELS", FlowIcon.Channel),
+            (FlowStage.Mix, "MIXES", FlowIcon.Mix),
+            (FlowStage.Output, "OUTPUTS", FlowIcon.Speaker),
+        })
+        {
+            var label = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            label.Children.Add(CreateIcon(icon, 15));
+            label.Children.Add(new TextBlock { Text = title, FontSize = 11, FontWeight = FontWeight.SemiBold,
+                Foreground = Brush("FlowText"), VerticalAlignment = VerticalAlignment.Center });
+            var header = new Border { Background = Brush("FlowCard"), CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(12, 8), Child = label };
+            header.Measure(Size.Infinity);
+            Place(header, X(stage) + (cardWidth - header.DesiredSize.Width) / 2, 8);
         }
-        bool anyActive = chain.Items.Any(i => i.Active);
-        var node = new Border
+
+        var positions = _graph.Nodes.ToDictionary(n => n.Key,
+            n => new Rect(X(n.Stage), n.Y, cardWidth, n.Height));
+        foreach (FlowRoute route in _graph.Routes)
         {
-            Width = r.Width, Height = r.Height,
-            Background = anyActive ? NodeBg : NodeBgDim,
-            CornerRadius = new CornerRadius(6),
-            Padding = new Thickness(10, 4),
-            BorderThickness = new Thickness(3, 0, 0, 0),
-            BorderBrush = accent,
-            Child = list,
+            Rect from = positions[route.From], to = positions[route.To];
+            var start = new Point(from.Right, from.Y + 29);
+            var end = new Point(to.X, to.Y + 29);
+            double bend = (end.X - start.X) / 2;
+            var geometry = new StreamGeometry();
+            using (StreamGeometryContext context = geometry.Open())
+            {
+                context.BeginFigure(start, false);
+                context.CubicBezierTo(new Point(start.X + bend, start.Y), new Point(end.X - bend, end.Y), end);
+            }
+            var glow = new Path { Data = geometry, StrokeThickness = 8, IsHitTestVisible = false };
+            var line = new Path { Data = geometry, StrokeThickness = 2, IsHitTestVisible = false };
+            var dot = new Ellipse { Width = 6, Height = 6, IsHitTestVisible = false };
+            canvas.Children.Add(glow);
+            canvas.Children.Add(line);
+            canvas.Children.Add(dot);
+            _routes.Add(new RouteVisual(route, line, glow, dot, start, end));
+        }
+
+        foreach (FlowNode node in _graph.Nodes)
+        {
+            var content = new Grid { ColumnDefinitions = new ColumnDefinitions("28,*") };
+            content.Children.Add(CreateIcon(node.Icon, 20));
+            var text = new StackPanel { Spacing = 3, Margin = new Thickness(9, 0, 0, 0) };
+            Grid.SetColumn(text, 1);
+            text.Children.Add(new TextBlock { Text = node.Label, FontSize = 13, FontWeight = FontWeight.Medium,
+                Foreground = Brush("FlowText"), TextTrimming = TextTrimming.CharacterEllipsis });
+            text.Children.Add(new TextBlock { Text = node.Detail, FontSize = 11, Foreground = Brush("FlowTextDim"),
+                TextTrimming = TextTrimming.CharacterEllipsis });
+            if (node.Processing.Length > 0)
+                text.Children.Add(new TextBlock { Text = "FX  " + node.Processing.Replace("\n", " · "),
+                    FontSize = 10, Foreground = Brush("FlowInput"), Margin = new Thickness(0, 4, 0, 0),
+                    TextTrimming = TextTrimming.CharacterEllipsis });
+            content.Children.Add(text);
+            var card = new Button { Width = cardWidth, Height = node.Height, Content = content };
+            card.Classes.Add("flowNode");
+            AutomationProperties.SetName(card, $"{node.Label}, {node.Detail}");
+            ToolTip.SetTip(card, node.Label + "\n" + node.Detail + (node.Processing.Length == 0 ? ""
+                : (node.Stage == FlowStage.Channel ? "\nInput processing:\n" : "\nMix processing:\n") + node.Processing));
+            card.Click += (_, _) => Select(_selected == node.Key ? null : node.Key);
+            _cards.Add(node.Key, card);
+            Place(card, positions[node.Key].X, node.Y);
+        }
+        Select(_selected);
+    }
+
+    private void Place(Control control, double x, double y)
+    {
+        Canvas.SetLeft(control, x);
+        Canvas.SetTop(control, y);
+        GraphCanvas.Children.Add(control);
+    }
+
+    private void OnClearSelection(object? sender, RoutedEventArgs e) => Select(null);
+
+    private void Select(string? key)
+    {
+        _selected = key;
+        ClearSelection.IsEnabled = key is not null;
+        HashSet<FlowRoute>? path = key is null ? null : _graph.Trace(key);
+        var related = path?.SelectMany(r => new[] { r.From, r.To }).ToHashSet() ?? [];
+        if (key is not null) related.Add(key);
+        foreach (FlowNode node in _graph.Nodes)
+        {
+            Button card = _cards[node.Key];
+            card.Opacity = key is not null && !related.Contains(node.Key) ? 0.28 : node.Active ? 1 : 0.65;
+            card.Background = Brush(node.Key == key ? "FlowCardSelected" : "FlowCard");
+            card.BorderBrush = node.Key == key ? Brush("FlowTextDim") : Brushes.Transparent;
+        }
+        foreach (RouteVisual visual in _routes)
+        {
+            bool inPath = path is null || path.Contains(visual.Route);
+            IBrush color = inPath && visual.Route.Active ? RouteBrush(visual.Route.Stage) : Brush("FlowMuted");
+            visual.Line.Stroke = color;
+            visual.Line.Opacity = inPath ? 0.9 : 0.16;
+            visual.Line.StrokeDashArray = visual.Route.Active ? null : [3, 4];
+            visual.Glow.Stroke = color;
+            visual.Glow.Opacity = key is not null && inPath && visual.Route.Active ? 0.13 : 0;
+            visual.Dot.Fill = color;
+            visual.Dot.IsVisible = key is not null && inPath && visual.Route.Active;
+        }
+        if (_routes.Any(r => r.Dot.IsVisible)) _animation.Start();
+        else _animation.Stop();
+        Animate();
+    }
+
+    private void Animate()
+    {
+        double t = _clock.Elapsed.TotalSeconds / 2 % 1, u = 1 - t;
+        foreach (RouteVisual route in _routes.Where(r => r.Dot.IsVisible))
+        {
+            double bend = (route.End.X - route.Start.X) / 2;
+            double x = u * u * u * route.Start.X + 3 * u * u * t * (route.Start.X + bend)
+                + 3 * u * t * t * (route.End.X - bend) + t * t * t * route.End.X;
+            double y = (u * u * u + 3 * u * u * t) * route.Start.Y
+                + (3 * u * t * t + t * t * t) * route.End.Y;
+            Canvas.SetLeft(route.Dot, x - 3);
+            Canvas.SetTop(route.Dot, y - 3);
+        }
+    }
+
+    private Control CreateIcon(FlowIcon icon, double size)
+    {
+        string data = icon switch
+        {
+            FlowIcon.Microphone => "M9,4 C9,0 15,0 15,4 L15,11 C15,15 9,15 9,11 Z M5,10 L5,11 C5,20 19,20 19,11 L19,10 M12,18 L12,23 M8,23 L16,23",
+            FlowIcon.Headphones => "M3,14 L3,11 C3,0 21,0 21,11 L21,14 M3,12 L7,12 L7,21 L3,21 Z M17,12 L21,12 L21,21 L17,21 Z",
+            FlowIcon.Speaker => "M3,9 L7,9 L12,4 L12,20 L7,15 L3,15 Z M16,8 C20,10 20,14 16,16 M19,4 C25,8 25,16 19,20",
+            FlowIcon.Channel => "M5,2 L5,8 M5,13 L5,22 M2,8 L8,8 L8,13 L2,13 Z M17,2 L17,13 M17,18 L17,22 M14,13 L20,13 L20,18 L14,18 Z",
+            FlowIcon.Mix => "M3,5 L8,5 L8,10 L3,10 Z M16,5 L21,5 L21,10 L16,10 Z M12,15 L12,10 M6,10 L6,15 L18,15 L18,10 M9,18 L15,18 L15,23 L9,23 Z",
+            _ => "M2,3 L22,3 L22,18 L2,18 Z M2,7 L22,7 M8,22 L16,22 M12,18 L12,22",
         };
-        Canvas.SetLeft(node, r.X);
-        Canvas.SetTop(node, r.Y);
-        c.Children.Add(node);
-    }
-
-    private static void Node(Canvas c, Rect r, string label, string? sub, bool lit, IBrush? accent = null)
-    {
-        var text = new StackPanel { VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center };
-        text.Children.Add(new TextBlock
-        {
-            Text = label, FontSize = 12, Foreground = lit ? TextFg : TextDim,
-            TextTrimming = TextTrimming.CharacterEllipsis,
-        });
-        if (sub is not null)
-            text.Children.Add(new TextBlock { Text = sub, FontSize = 10, Foreground = TextDim });
-
-        var node = new Border
-        {
-            Width = r.Width, Height = r.Height,
-            Background = lit ? NodeBg : NodeBgDim,
-            CornerRadius = new CornerRadius(6),
-            Padding = new Thickness(10, 0),
-            BorderThickness = new Thickness(3, 0, 0, 0),
-            BorderBrush = accent ?? Brushes.Transparent,
-            Child = text,
-        };
-        Canvas.SetLeft(node, r.X);
-        Canvas.SetTop(node, r.Y);
-        c.Children.Add(node);
-    }
-
-    private static void Edge(Canvas c, Rect from, Rect to, IBrush stroke, double thickness, bool dashed)
-    {
-        var p0 = new Point(from.Right, from.Center.Y);
-        var p3 = new Point(to.X, to.Center.Y);
-        double bend = (p3.X - p0.X) * 0.5;
-        var geo = new StreamGeometry();
-        using (StreamGeometryContext ctx = geo.Open())
-        {
-            ctx.BeginFigure(p0, isFilled: false);
-            ctx.CubicBezierTo(new Point(p0.X + bend, p0.Y), new Point(p3.X - bend, p3.Y), p3);
-        }
-        c.Children.Add(new Path
-        {
-            Data = geo, Stroke = stroke, StrokeThickness = thickness,
-            StrokeDashArray = dashed ? [3, 3] : null,
-            Opacity = dashed ? 0.7 : 0.9,
-        });
+        return new Viewbox { Width = size, Height = size, VerticalAlignment = VerticalAlignment.Center,
+            Child = new Path { Width = 24, Height = 24, Data = Geometry.Parse(data),
+                Stroke = Brush("FlowTextDim"), StrokeThickness = 1.6, StrokeLineCap = PenLineCap.Round } };
     }
 }
