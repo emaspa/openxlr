@@ -211,6 +211,19 @@ while fixes to existing hosts remain part of normal maintenance.
   (see the protocol notes, block 0x0001 bytes 12 and 13). Direct control
   of that matrix from the window is the long-term answer to the
   crossfade and mic-monitoring questions.
+- [ ] The four-band equalizer the Wave FX processor runs on the Pro, the
+  Wave XLR MK.2 and the XLR Dock MK.2. It is onboard DSP on all three,
+  and OpenXLR maps none of it, so a user who shapes their voice in Wave
+  Link on Windows loses that shape on Linux. Four bands means the
+  registers are wider than anything mapped so far, and the capture has to
+  separate the per-band frequency, gain and width bytes.
+- [ ] Ducking on the Pro, which lowers the other mixes while you speak
+  and is applied per mix. It is the one onboard effect that touches the
+  mix matrix rather than the microphone path, so it is worth capturing
+  together with the matrix above.
+- [ ] The Pro's mix maximizer and channel booster, the other two onboard
+  effects with no mapped control. The booster adds up to 12 dB above the
+  normal ceiling on any input; the maximizer is per mix.
 - [ ] LED controls where captures show the registers; nothing is guessed.
 - [ ] UCM profile for the Pro upstreamed to alsa-ucm-conf once a second
   owner confirms the split.

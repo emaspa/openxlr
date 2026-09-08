@@ -32,7 +32,12 @@ the commit block every selector write needs.
 | Reset to OpenXLR's baseline | verified | the device keeps its settings, so the reset writes a known set (gain 30 dB, everything off, levels at half, crossfade on PC) instead of recorded firmware defaults |
 
 The Pro's onboard EQ, ducking, mix maximizer and channel booster have no
-mapped OpenXLR controls. The full hardware mix matrix is also unfinished.
+mapped OpenXLR controls. Elgato describes all four as running on the
+device: a four-band equalizer, ducking that lowers the other mixes while
+you speak and is applied per mix, a maximizer per mix, and a booster
+worth up to 12 dB above the normal ceiling on any input. The same
+four-band equalizer runs on the Wave XLR MK.2 and the XLR Dock MK.2,
+which have no ducking. The full hardware mix matrix is also unfinished.
 Elgato's [Pro feature guide](https://www.elgato.com/us/en/explorer/products/wave/wave-xlr-pro-give-your-setup-superpowers/)
 distinguishes those onboard effects from VST processing on the computer.
 OpenXLR exposes Voice Tune and the other DSP controls listed above; its
