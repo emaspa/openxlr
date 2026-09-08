@@ -1163,6 +1163,7 @@ bool vst3_editor_open(Host *h) {
     v->view = nullptr;
     return false;
   }
+  host_set_editor_resizable(h, v->view->canResize() == kResultTrue);
   return true;
 }
 
@@ -1228,6 +1229,7 @@ extern "C" const Backend vst3_backend = {
     vst3_editor_constrain,
     vst3_main_thread,
     vst3_unload,
+    true,
 };
 
 // --- the scanner ------------------------------------------------------------

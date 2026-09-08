@@ -59,6 +59,8 @@ typedef struct {
   // Each tick, outside the guard: whatever the plugin asked for meanwhile.
   void (*main_thread)(Host *h);
   void (*unload)(Host *h);
+  // These formats can arrive through Wine and need the coordinate nudge.
+  bool editor_coordinate_nudge;
 } Backend;
 
 #ifndef __cplusplus
@@ -102,6 +104,9 @@ struct Host {
   Window window, child;
   Atom close_message;
   bool editor_open;
+  bool editor_resizable;
+  unsigned editor_min_width, editor_min_height;
+  unsigned editor_max_width, editor_max_height;
   // A plugin bridged from Windows learns where its window is when the window
   // changes size, and not when it opens or moves. Until it has learnt, its
   // clicks land as far from the pointer as the window is from the corner of
@@ -142,6 +147,7 @@ void host_control_moved(Host *h, Control *c, float value);
 // The editor moved a control on the audio thread: apply it; the tick tells.
 void host_control_moved_rt(Host *h, Control *c, float value);
 void host_resize_editor(Host *h, unsigned width, unsigned height);
+void host_set_editor_resizable(Host *h, bool resizable);
 void host_show_editor(Host *h, bool show);
 // The display went away under a backend's own callback: drop the editor.
 void host_editor_lost(Host *h);

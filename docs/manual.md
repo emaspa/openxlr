@@ -569,10 +569,14 @@ A CLAP or VST3 plugin has no shared chain to go back to, so it always runs
 this way: its row shows no switch, and the cog opens its editor whenever
 the plugin is running.
 
-Dragging a VST3 editor's border follows the sizes the plugin supports, so
-an editor with size increments may move in steps. The plugin draws its own
-contents; a Windows editor running through Wine can still briefly expose
-an unpainted edge while it redraws during a drag.
+Dragging an editor's border respects the plugin's minimum and maximum
+dimensions, so shrinking an LSP editor stops before its controls are cut
+off. A VST3 editor also decides whether its border can be resized. TDR Nova
+disables border resizing; use its own "User Interface Scale" menu to make
+it larger. Editors that allow resizing may move in steps if the plugin
+requires size increments. The plugin draws its own contents; a Windows
+editor running through Wine can still briefly expose an unpainted edge
+while it redraws during a drag.
 
 The editor draws on an X11 display, which means XWayland on a Wayland
 desktop, and the daemon has to know about it. A user service started

@@ -31,8 +31,10 @@ dependencies of every package.
 machine without a desktop, run `xvfb-run -a make -C native test-editor`.
 These tests need neither a plugin installation nor a running PipeWire
 server. They cover event delivery without idle polling, coalesced sizes,
-drag reversal, size constraints, the Wine coordinate nudge and display
-cleanup. Real plugin repainting and mouse input still need desktop testing.
+drag reversal, size constraints, changes to child-window size bounds,
+fixed-size editors and plugin-driven scaling, the Wine coordinate nudge
+and display cleanup. Real plugin repainting and mouse input still need
+desktop testing.
 
 ## What it does
 
@@ -105,6 +107,10 @@ That is what reverbs and convolvers ask for, and without it they could not be
 hosted at all.
 
 For the editor: instance access, parent, resize and the idle interface.
+The host calls a UI's LV2 resize interface when present and forwards the
+child window's minimum and maximum dimensions to the outer window. Changed
+size hints are read again, so a plugin's scaling controls can update them.
+LV2 editors do not receive the Wine coordinate nudge.
 
 For CLAP: parameters, the audio ports, the X11 editor, timers, file
 descriptors, thread checks and a log. The same binary describes a CLAP
@@ -129,7 +135,10 @@ plugins arrive through yabridge as ordinary bundles.
 Editor X events wake the main loop directly; the 30 Hz tick remains for
 idle work and the Wine coordinate workaround. During a frame resize, the
 VST3 backend checks the plugin's size constraints before notifying its
-view, and the embedding window follows after that callback. Consecutive
+view, and the embedding window follows after that callback. A VST3 view
+that refuses border resizing gets equal minimum and maximum dimensions;
+its own resize requests update those bounds, so plugin-driven UI scaling
+still works. Consecutive
 duplicate sizes are skipped, but reversing a drag delivers the old size
 again. Plugin resize requests and child-window echoes remain suppressed
 while the user is resizing the frame.

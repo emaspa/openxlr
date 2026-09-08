@@ -9,6 +9,7 @@ static Display *plugin_display;
 static Window plugin_window;
 static unsigned resize_calls, idle_calls, constrain_calls, width_seen, height_seen;
 static bool constrain_sizes, answer_resize;
+static bool fixed_editor;
 
 static bool test_open(Host *h) {
   plugin_display = XOpenDisplay(NULL);
@@ -20,6 +21,7 @@ static bool test_open(Host *h) {
                                       0, 0, 64, 48, 0, 0, 0);
   XMapWindow(plugin_display, plugin_window);
   XSync(plugin_display, False);
+  host_set_editor_resizable(h, !fixed_editor);
   return true;
 }
 
@@ -56,7 +58,7 @@ static bool test_idle(Host *h) {
 static const Backend test_backend = {
     .name = "resize test", .editor_open = test_open, .editor_close = test_close,
     .editor_idle = test_idle, .editor_resized = test_resize,
-    .editor_constrain = test_constrain};
+    .editor_constrain = test_constrain, .editor_coordinate_nudge = true};
 
 static void drain(Host *h) {
   // No host timer is installed. Only readiness of the real X connection can
@@ -78,6 +80,16 @@ static void assert_size(Host *h, unsigned width, unsigned height) {
   assert((unsigned)frame.width == width && (unsigned)frame.height == height);
   assert((unsigned)child.width == width && (unsigned)child.height == height);
   assert(width_seen == width && height_seen == height);
+}
+
+static void assert_bounds(Host *h, int min_width, int min_height,
+                          int max_width, int max_height) {
+  XSizeHints hints;
+  long supplied;
+  assert(XGetWMNormalHints(plugin_display, h->window, &hints, &supplied));
+  assert((hints.flags & (PMinSize | PMaxSize)) == (PMinSize | PMaxSize));
+  assert(hints.min_width == min_width && hints.min_height == min_height);
+  assert(hints.max_width == max_width && hints.max_height == max_height);
 }
 
 int main(void) {
@@ -141,6 +153,73 @@ int main(void) {
 
   close_ui(&h);
   assert(!h.editor_source && !h.display && !h.editor_open);
+
+  // A native LV2 editor publishes its bounds on its child window. The WM
+  // only sees our frame, and direct X resize requests bypass the WM entirely.
+  Backend native_backend = test_backend;
+  native_backend.editor_coordinate_nudge = false;
+  h.backend = &native_backend;
+  constrain_sizes = false;
+  assert(open_ui(&h));
+  drain(&h);
+  assert(h.settle_ticks == 0);
+  XSizeHints hints = {.flags = PMinSize | PMaxSize,
+                      .min_width = 64, .min_height = 48,
+                      .max_width = 160, .max_height = 120};
+  XSetWMNormalHints(plugin_display, plugin_window, &hints);
+  XSync(plugin_display, False);
+  drain(&h);
+  assert_bounds(&h, 64, 48, 160, 120);
+  resize_to(&h, 32, 24);
+  assert_size(&h, 64, 48);
+  resize_to(&h, 200, 180);
+  assert_size(&h, 160, 120);
+  puts("PASS: child size bounds reach the frame and prevent clipped controls");
+
+  hints.min_width = 80;
+  hints.min_height = 60;
+  hints.max_width = 240;
+  hints.max_height = 180;
+  XSetWMNormalHints(plugin_display, plugin_window, &hints);
+  XSync(plugin_display, False);
+  drain(&h);
+  assert_bounds(&h, 80, 60, 240, 180);
+  resize_to(&h, 64, 48);
+  assert_size(&h, 80, 60);
+  XMoveWindow(plugin_display, h.window, 10, 10);
+  XSync(plugin_display, False);
+  drain(&h);
+  for (unsigned i = 0; i < 15; ++i)
+    pump_editor(&h, true);
+  assert(h.settle_ticks == 0 && h.settle_height == 0);
+  assert_size(&h, 80, 60);
+  puts("PASS: bounds refresh after scaling and native editors get no Wine nudge");
+  close_ui(&h);
+
+  // Fixed-size VST3 editors still resize through their own scaling controls.
+  h.backend = &test_backend;
+  fixed_editor = true;
+  assert(open_ui(&h));
+  drain(&h);
+  assert_bounds(&h, 64, 48, 64, 48);
+  resize_to(&h, 100, 80);
+  assert_size(&h, 64, 48);
+  host_resize_editor(&h, 128, 96);
+  drain(&h);
+  assert_bounds(&h, 128, 96, 128, 96);
+  assert_size(&h, 128, 96);
+  h.settle_ticks = 1;
+  pump_editor(&h, true);
+  drain(&h);
+  assert_size(&h, 128, 95);
+  h.settle_ticks = 1;
+  pump_editor(&h, true);
+  drain(&h);
+  assert_size(&h, 128, 96);
+  assert_bounds(&h, 128, 96, 128, 96);
+  puts("PASS: fixed editors reject border resizing but accept plugin scaling");
+  close_ui(&h);
+  fixed_editor = false;
   assert(open_ui(&h));
   drain(&h);
   assert_size(&h, 64, 48);

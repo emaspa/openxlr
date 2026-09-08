@@ -123,6 +123,7 @@ typedef struct {
   void *ui_library;
   const LV2UI_Descriptor *ui_descriptor;
   const LV2UI_Idle_Interface *idle;
+  const LV2UI_Resize *ui_resize;
   LV2UI_Handle ui;
   LV2UI_Resize resize;
 } Lv2;
@@ -541,10 +542,14 @@ static bool lv2_editor_open(Host *h) {
     l->ui = l->ui_descriptor->instantiate(
         l->ui_descriptor, lilv_node_as_uri(lilv_plugin_get_uri(l->plugin)),
         bundle, ui_write, l, &widget, features);
-    if (l->ui)
+    if (l->ui) {
       l->idle = l->ui_descriptor->extension_data
                     ? l->ui_descriptor->extension_data(LV2_UI__idleInterface)
                     : NULL;
+      l->ui_resize = l->ui_descriptor->extension_data
+                         ? l->ui_descriptor->extension_data(LV2_UI__resize)
+                         : NULL;
+    }
   }
   lilv_free(binary);
   lilv_free(bundle);
@@ -558,12 +563,20 @@ static void lv2_editor_close(Host *h) {
     l->ui_descriptor->cleanup(l->ui);
   l->ui = NULL;
   l->idle = NULL;
+  l->ui_resize = NULL;
 }
 
 static void lv2_editor_lost(Host *h) {
   Lv2 *l = h->impl;
   l->ui = NULL;
   l->idle = NULL;
+  l->ui_resize = NULL;
+}
+
+static void lv2_editor_resized(Host *h, unsigned width, unsigned height) {
+  Lv2 *l = h->impl;
+  if (l->ui && l->ui_resize && l->ui_resize->ui_resize)
+    l->ui_resize->ui_resize(l->ui, (int)width, (int)height);
 }
 
 static bool lv2_editor_idle(Host *h) {
@@ -594,7 +607,7 @@ const Backend lv2_backend = {
     .editor_idle = lv2_editor_idle,
     .editor_lost = lv2_editor_lost,
     .editor_focus = NULL,   // an LV2 UI is not told; X gives it the mouse itself
-    .editor_resized = NULL,
+    .editor_resized = lv2_editor_resized,
     .main_thread = NULL,
     .unload = lv2_unload,
 };

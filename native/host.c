@@ -106,6 +106,11 @@ void host_editor_lost(Host *h) {
 // guard, so each one arms its own unless a caller already has.
 static bool same_editor_size(Host *h, unsigned width, unsigned height);
 static bool dragging(Host *h);
+static void update_editor_hints(Host *h);
+
+void host_set_editor_resizable(Host *h, bool resizable) {
+  h->editor_resizable = resizable;
+}
 
 void host_resize_editor(Host *h, unsigned width, unsigned height) {
   if (!h->display || !h->window || width < 1 || height < 1 ||
@@ -114,6 +119,8 @@ void host_resize_editor(Host *h, unsigned width, unsigned height) {
   h->self_width = width;
   h->self_height = height;
   if (x_escape_armed) {
+    if (!h->editor_resizable)
+      update_editor_hints(h);
     XResizeWindow(h->display, h->window, width, height);
     return;
   }
@@ -123,6 +130,8 @@ void host_resize_editor(Host *h, unsigned width, unsigned height) {
     return;
   }
   x_escape_armed = 1;
+  if (!h->editor_resizable)
+    update_editor_hints(h);
   XResizeWindow(h->display, h->window, width, height);
   XFlush(h->display);
   x_escape_armed = 0;
@@ -259,6 +268,40 @@ static const struct pw_filter_events filter_events = {
 
 // --- the editor's window ----------------------------------------------------
 
+// A window manager only reads the outer window's hints. Embedded editors
+// such as LSP put their limits on the child, so copy the size bounds and
+// also enforce them for resize requests that bypass the window manager.
+static void update_editor_hints(Host *h) {
+  XSizeHints child = {0}, hints = {0};
+  long supplied;
+  h->editor_min_width = h->editor_min_height = 1;
+  h->editor_max_width = h->editor_max_height = 16384;
+  if (h->child && XGetWMNormalHints(h->display, h->child, &child, &supplied)) {
+    if ((child.flags & PMinSize) && child.min_width > 0 && child.min_height > 0 &&
+        child.min_width <= 16384 && child.min_height <= 16384) {
+      h->editor_min_width = (unsigned)child.min_width;
+      h->editor_min_height = (unsigned)child.min_height;
+    }
+    if ((child.flags & PMaxSize) && child.max_width >= (int)h->editor_min_width &&
+        child.max_height >= (int)h->editor_min_height) {
+      if (child.max_width < 16384)
+        h->editor_max_width = (unsigned)child.max_width;
+      if (child.max_height < 16384)
+        h->editor_max_height = (unsigned)child.max_height;
+    }
+  }
+  if (!h->editor_resizable && h->self_width && h->self_height) {
+    h->editor_min_width = h->editor_max_width = h->self_width;
+    h->editor_min_height = h->editor_max_height = h->self_height;
+  }
+  hints.flags = PMinSize | PMaxSize;
+  hints.min_width = (int)h->editor_min_width;
+  hints.min_height = (int)h->editor_min_height;
+  hints.max_width = (int)h->editor_max_width;
+  hints.max_height = (int)h->editor_max_height;
+  XSetWMNormalHints(h->display, h->window, &hints);
+}
+
 // A plugin builds its interface in a window of its own inside ours, at
 // whatever size it wants, and many never call the host's resize. Take the
 // size from that window, and watch it so later changes follow.
@@ -269,12 +312,13 @@ static void fit_to_child(Host *h) {
     return;
   if (count > 0) {
     h->child = children[count - 1];
-    XSelectInput(h->display, h->child, StructureNotifyMask);
+    XSelectInput(h->display, h->child, StructureNotifyMask | PropertyChangeMask);
     XWindowAttributes attributes;
     if (XGetWindowAttributes(h->display, h->child, &attributes) &&
         attributes.width > 0 && attributes.height > 0) {
       h->self_width = (unsigned)attributes.width;
       h->self_height = (unsigned)attributes.height;
+      update_editor_hints(h);
       XResizeWindow(h->display, h->window, h->self_width, h->self_height);
     }
   }
@@ -334,6 +378,7 @@ static bool open_ui(Host *h) {
     return false;
   }
   x_escape_armed = 1;
+  h->editor_resizable = true;
   h->display = XOpenDisplay(NULL);
   if (h->display) {
     h->window = XCreateSimpleWindow(h->display, DefaultRootWindow(h->display),
@@ -367,7 +412,8 @@ static bool open_ui(Host *h) {
       h->editor_source = pw_loop_add_io(host_loop(h), ConnectionNumber(h->display),
                                         SPA_IO_IN | SPA_IO_HUP | SPA_IO_ERR,
                                         false, editor_events, h);
-      h->settle_ticks = 6;   // once it is on screen, teach it where that is
+      if (h->backend->editor_coordinate_nudge)
+        h->settle_ticks = 6;   // once it is on screen, teach it where that is
     }
   }
   x_escape_armed = 0;
@@ -427,13 +473,17 @@ static void pump_editor(Host *h, bool idle) {
     // that window appears.
     if (!h->child && (event.type == MapNotify || event.type == CreateNotify))
       fit_to_child(h);
+    if (event.type == PropertyNotify && event.xproperty.window == h->child &&
+        event.xproperty.atom == XA_WM_NORMAL_HINTS)
+      update_editor_hints(h);
     // The window moved. Where a plugin thinks it is decides where it thinks
     // the pointer is, so it is taught the new place the only way it listens.
     if (event.type == ConfigureNotify && event.xconfigure.window == h->window &&
         (event.xconfigure.x != h->frame_x || event.xconfigure.y != h->frame_y)) {
       h->frame_x = event.xconfigure.x;
       h->frame_y = event.xconfigure.y;
-      h->settle_ticks = 9;
+      if (h->backend->editor_coordinate_nudge)
+        h->settle_ticks = 9;
     }
     // Sizes are noted here and settled once the queue is empty. Dragging a
     // corner fills the queue with them, and telling a plugin about every
@@ -464,15 +514,21 @@ static void pump_editor(Host *h, bool idle) {
          (unsigned)attributes.height != plugin_height)) {
       h->self_width = plugin_width;
       h->self_height = plugin_height;
+      update_editor_hints(h);
       XResizeWindow(h->display, h->window, plugin_width, plugin_height);
     }
     if (frame_resized) {
       bool user_size = frame_width != h->self_width || frame_height != h->self_height;
-      if (user_size)
+      if (user_size && h->editor_resizable)
         clock_gettime(CLOCK_MONOTONIC, &h->dragged_at);
-      if (user_size && h->backend->editor_constrain) {
+      if (user_size) {
         unsigned width = frame_width, height = frame_height;
-        h->backend->editor_constrain(h, &width, &height);
+        if (width < h->editor_min_width) width = h->editor_min_width;
+        if (height < h->editor_min_height) height = h->editor_min_height;
+        if (width > h->editor_max_width) width = h->editor_max_width;
+        if (height > h->editor_max_height) height = h->editor_max_height;
+        if (h->editor_resizable && h->backend->editor_constrain)
+          h->backend->editor_constrain(h, &width, &height);
         if (width > 0 && height > 0 && width <= 16384 && height <= 16384 &&
             (width != frame_width || height != frame_height)) {
           frame_width = h->self_width = width;
@@ -504,6 +560,8 @@ static void pump_editor(Host *h, bool idle) {
     if (h->settle_height > 0) {
       h->self_width = h->settle_width;
       h->self_height = h->settle_height;
+      if (!h->editor_resizable)
+        update_editor_hints(h);
       XResizeWindow(h->display, h->window, h->settle_width, h->settle_height);
       XFlush(h->display);
       h->settle_height = 0;
@@ -515,6 +573,8 @@ static void pump_editor(Host *h, bool idle) {
         h->settle_height = (unsigned)attributes.height;
         h->self_width = h->settle_width;
         h->self_height = h->settle_height - 1;
+        if (!h->editor_resizable)
+          update_editor_hints(h);
         XResizeWindow(h->display, h->window, h->settle_width, h->settle_height - 1);
         XFlush(h->display);
         h->settle_ticks = 4;   // put it back once the plugin has caught up

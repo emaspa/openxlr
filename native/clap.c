@@ -646,6 +646,7 @@ const Backend clap_backend = {
     .editor_resized = NULL,
     .main_thread = clap_main_thread,
     .unload = clap_unload,
+    .editor_coordinate_nudge = true,
 };
 
 // --- the scanner ------------------------------------------------------------
