@@ -35,7 +35,9 @@ Existing monitor-feed settings and profile semantics are unchanged.
 ## Editing while running
 
 The window's Edit layout button, and the commands below over the API,
-change the layout without stopping audio. Each one is saved before it is
+edit the running graph. Adding or reordering preserves existing routes;
+renaming an application channel can cause a short gap on that channel,
+and deleting a virtual microphone disconnects its recorders. Each one is saved before it is
 acknowledged; a failed save restores the previous layout and reports an
 error. Ordinary fader saves keep their debounced, retried behaviour.
 
@@ -69,7 +71,7 @@ error. Ordinary fader saves keep their debounced, retried behaviour.
 
 Every added channel or mix costs pipewire-pulse a few dozen open files;
 the daemon refuses an addition the server has no room for, and the packages
-raise the server's limit ([manual, section 5.8](manual.md#open-files)).
+raise the server's limit ([manual: open-file limit](manual.md#open-files)).
 
 Ids are generated from names (lowercase letters, digits and hyphens,
 starting with a letter, unique with a numeric suffix) and never change

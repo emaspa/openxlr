@@ -1,4 +1,4 @@
-# Optional LV2 editor host
+# Native plugin host
 
 This directory builds `openxlr-lv2-host`, a small process that loads one
 plugin, LV2, CLAP or VST3, gives it PipeWire ports and, on request, opens
@@ -9,8 +9,8 @@ DSP instance directly (LV2 instance access), which a PipeWire filter chain
 cannot offer.
 
 The distribution packages build and install it, and its presence changes
-nothing on its own: inserts use the filter chain until one is explicitly
-switched to the native host in its controls window.
+existing LV2 inserts: they use filter-chain until explicitly switched in
+the controls window. CLAP and VST3 always use this helper.
 
 ## Build
 
@@ -22,7 +22,7 @@ dotnet build src/OpenXLR.slnx -c Release -p:EnableNativeLv2Host=true
 
 The flag compiles this directory and copies the helper next to the daemon,
 which is what the packaging recipes do. `make -C native` builds it alone.
-It needs a C11 compiler, make, pkg-config and the development files for
+It needs a C11 and a C++ compiler, make, pkg-config and the development files for
 PipeWire, lilv, LV2 and X11; the libraries it links are already runtime
 dependencies of every package.
 
@@ -48,15 +48,18 @@ tests the explicit OpenGL override. It creates no audio links.
 - One process per insert, holding one plugin instance and its editor.
 - Audio stays in PipeWire: the process is a `pw_filter` with the plugin's
   ports. Samples never cross the command pipe or managed code.
-- The pipe carries control values only, in both directions. What the editor
-  changes comes back and is saved with the mixer, like any other control.
+- The pipe carries parameter values, status and editor requests in both
+  directions, never audio. Exposed parameter changes are saved with the mixer;
+  opaque plugin state and plugin presets are not persisted.
 - The daemon owns the process. Closing its stdin ends the helper, which is
   why it watches that pipe rather than using PDEATHSIG, whose Linux semantics
   follow the thread that spawned it.
 
-## What it will not do to your audio
+## Editor failures and audio recovery
 
-The whole point is that an editor cannot cost you the microphone.
+Display loss or stalled editor controls do not rebuild a healthy audio
+instance. Plugin code and its editor share a process, so a process crash
+can still interrupt that insert's chain.
 
 - A protocol error from the editor is logged and the plugin keeps running.
   Xlib's default handler would have exited the process.
@@ -143,7 +146,10 @@ since that is most of the cost of describing a large module; every VST3
 plugin is assumed to have one and the host finds out when asked. The
 interface headers are vendored under `vst3/` (MIT, VST 3.8.1); only their
 inline parts are used, so nothing of the SDK is compiled. Windows VST3
-plugins arrive through yabridge as ordinary bundles.
+plugins arrive through yabridge as ordinary bundles. The optional
+[OpenXLR companion](../packaging/yabridge/README.md) supplies matching
+64-bit libraries and host with the Wine input fix, selected through the
+helper's PATH. Wine and plugin settings remain in the user's environment.
 
 Editor X events wake the main loop directly; the 30 Hz tick remains for
 idle work and the Wine coordinate workaround. During a frame resize, the

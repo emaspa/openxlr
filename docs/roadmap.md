@@ -3,8 +3,8 @@
 What OpenXLR is heading towards, in the order the maintainer intends to
 take it, and the rules a change has to meet to land. Items move here
 from issues and pull requests once they are agreed; a checked item is
-merged on main and verified on hardware, and the release notes say when
-it shipped.
+implemented on `main`. Device-specific verification is recorded in
+[hardware-support.md](hardware-support.md); release notes say when it shipped.
 
 The goal has not changed since the first release: native Linux control
 of the Elgato XLR interfaces, a Wave Link style submixer on plain
@@ -13,7 +13,10 @@ behaviour verified on hardware before it ships. The project is small on
 purpose. It prefers one small, idiomatic change over a framework, and a
 feature that is measured over one that is described.
 
-## Where it stands (0.1.29)
+## Where it stands on main
+
+This includes changes merged after 0.1.29. A checked item does not imply
+that a published package already includes it.
 
 - [x] Wave XLR Pro, XLR Dock (MK.1 and MK.2 modules), Wave XLR, Wave XLR
   MK.2: hardware controls, verified by owners of each device.
@@ -24,15 +27,20 @@ feature that is measured over one that is described.
   or the API, every change saved before it is acknowledged); monitoring
   on several outputs with each output choosing which monitor mix feeds it,
   the USB Aux port as a second computer's feed, live meters, profiles,
-  one profile per device recalled on connect, interfaces without
-  settings memory restored to their last settings on connect with a
+  one profile per device recalled on connect, Wave XLR and the first XLR Dock
+  restored to their last settings on connect with a
   reset to firmware defaults, and an app can be left to the desktop's
   own routing.
-- [x] Software low cut and ClipGuard for devices without the hardware
-  versions.
-- [x] Plugin inserts: LV2 chains on each XLR input and on every mix, hosted
-  by PipeWire's filter-chain, with generated controls; bypass and
-  controls on the Stream Deck.
+- [x] Software low cut and limiting where the backend does not expose
+  the corresponding hardware controls; gain lock respects connect-time
+  restoration while preventing requested gain changes.
+- [x] Plugin inserts: LV2, CLAP and VST3 chains on each XLR input and
+  every mix, generated controls and native editors, bypass and parameter
+  controls on the Stream Deck. See the completed plugin work below.
+- [x] Application identity fallback from streams to clients, normalized
+  Wine/Proton names and migration of stale saved aliases.
+- [x] Flow window: four routing columns, selectable signal paths,
+  processing inside cards and automatic initial sizing.
 - [x] OpenDeck plugin: dials and keys drawn like the hardware, profile
   keys, insert keys and dials, monitor feed keys.
 - [x] Packages: AUR, Debian/Ubuntu, Fedora, NixOS flake and module.
@@ -49,8 +57,8 @@ feature that is measured over one that is described.
 ## Next: mixer layout and customization
 
 The submixer's shape is the user's own since the editable layout landed;
-what remains in this block is how the mixer presents itself. It still
-comes before anything in the plugins section: the routing model, the
+what remains in this block is how the mixer presents itself. The remaining
+layout work comes before further plugin expansion: the routing model, the
 layout editing and the daemon's service behaviour all changed within a
 few releases, and they get to settle in users' hands first.
 
@@ -101,20 +109,21 @@ every view binds to.
 
 ## Later: plugins
 
-Stage 1 (LV2 through filter-chain) is shipped. Stage 2 is the rest of the
-plugin world, and it has to keep the audio path inside PipeWire. It waits
-for the mixer layout block above; the maintainer would rather have one
-host mechanism stable than two half-finished ones.
+LV2 filter-chain, native LV2/CLAP/VST3 hosting and plugin installation are
+implemented. Remaining plugin work follows the mixer priorities above,
+while fixes to existing hosts remain part of normal maintenance.
 
 - [x] Native plugin editors: an LV2 plugin's own window, open on the
   instance that processes its audio. The instance moves out of
-  filter-chain into an optional C helper that carries one plugin and its
+  filter-chain into an optional C/C++ helper that carries one plugin and its
   editor behind a PipeWire filter node. It is a per-insert choice, so an
   existing chain never changes host on upgrade, and every insert without
-  that choice stays in filter-chain. A failing editor costs the editor
-  only: a lost X display, an editor that stops answering and a plugin that
-  crashes on start are each handled with the audio still playing. Every
-  package builds and installs the helper; an ordinary .NET build still
+  that choice stays in filter-chain. Display loss and stalled editor
+  controls leave healthy processing running; plugin-process crashes can
+  interrupt the chain and repeated failures stop automatic retries.
+  Resizing follows plugin constraints, fixed-size VST3 editors retain
+  plugin-driven scaling, and LSP editors default to software rendering.
+  Every package builds and installs the helper; an ordinary .NET build still
   needs no compiler, and a source build opts in with
   `-p:EnableNativeLv2Host=true`.
 - [x] CLAP, in the same host: the helper loads a CLAP plugin, carries
@@ -126,15 +135,18 @@ host mechanism stable than two half-finished ones.
   headers (vendored, MIT), one plugin per process, with the component and
   controller wired, parameters as controls, and the editor on a run loop of
   ours. Windows VST3 plugins arrive through yabridge as ordinary bundles.
-  Scans are cached per bundle, since a module of two hundred plugins takes
-  a quarter of a minute to describe. Carla was considered and dropped: no
-  commit in six months, no CLAP, and a second audio engine.
+  Scans are cached per bundle to avoid repeating expensive discovery.
+  Audio remains on PipeWire ports in the same per-insert process model.
 - [x] Installing plugins from the window: pick a file or a folder and the
   daemon puts it where it looks, copies Linux bundles into the home
   directories, hands Windows plugins to yabridge and syncs, and reads the
   catalogues again. A card in Options says where plugins go and whether
   yabridge and Wine are there, with a rescan, a sync and the steps behind a
   Manual link.
+- [x] Optional OpenXLR yabridge companion: pinned 64-bit bridge with the
+  Wine editor input fix, private wrappers and controller settings, system
+  bridge fallback, and binary/source package artifacts. The separate CI
+  workflow does not publish them to release or distribution repositories.
 - [ ] Presets: per-plugin and whole-chain, with export and import; copy a
   chain between channels; A/B comparison.
 - [ ] Plugin latency reported per insert and compensated across mixes.
@@ -218,8 +230,9 @@ host mechanism stable than two half-finished ones.
 - Contributors are credited in the README once their work is merged, in
   a Credits section the maintainer writes, and in the release notes. A
   pull request does not add its own credit paragraph.
-- The .NET build stays a .NET build. Native helpers, when they come, are
-  optional at build time and packaged separately.
+- The .NET build stays usable without a native compiler. The plugin host
+  is optional at source-build time and included in distribution packages.
+  The Windows bridge is a separate optional companion.
 - The audio graph is not rebuilt for a change that does not need it;
   every node the daemon creates has a name that survives restarts, and
   existing users' assignments and profiles keep working across upgrades.

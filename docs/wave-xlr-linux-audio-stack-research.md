@@ -2,7 +2,9 @@
 
 The survey and decisions that preceded OpenXLR, condensed from the
 research log. Repository statistics are from the dates given and have
-drifted since. The protocol findings that came out of this work are in
+drifted since. For installation and current behaviour, use the
+[manual](manual.md), [architecture](architecture.md) and
+[hardware support](hardware-support.md). The protocol findings that came out of this work are in
 [wave-xlr-pro-protocol.md](wave-xlr-pro-protocol.md).
 
 ## 1. The replacement target
@@ -45,8 +47,9 @@ driver work.
 - Stream Deck hosts: [OpenDeck](https://github.com/nekename/OpenDeck)
   (Tauri, runs Elgato SDK plugins, OpenAction plugin API) was chosen.
   Its 2.14.0 release (2026-07-29) supports the Stream Deck + XL
-  natively, including encoder events, touch taps and per-encoder LCD
-  rendering. StreamController's + XL support was in beta with open
+  natively, including encoder events and per-encoder LCD rendering. Touch-tap
+  support for the + XL needed a later upstream fix; see the
+  [current plugin instructions](features.md#opendeck-plugin). StreamController's + XL support was in beta with open
   dial and touchscreen issues. Neither host imports Elgato profiles;
   profiles are rebuilt by hand.
 - Adjacent projects used as references: goxlr-utility (headless daemon

@@ -22,6 +22,11 @@ volume, low impedance, crossfade.
 
 Wave XLR: gain, mute, headphone volume, low impedance, phantom power.
 
+Hardware EQ is not mapped on the Wave FX devices. The Pro's ducking, mix
+maximizer, channel booster and remaining hardware mix matrix are also
+unmapped. Wave Link configures those onboard effects on supported systems;
+OpenXLR's LV2, CLAP and VST3 inserts process audio on the Linux host.
+
 XLR Dock: gain, mute and headphone volume through the kernel's standard
 ALSA controls, plus phantom power and headphone low impedance over the
 original Wave XLR's protocol dialect, which the dock also answers. The
@@ -35,7 +40,8 @@ provides them (below).
 
 ## Software controls
 
-For devices without the hardware version, the PipeWire layer provides:
+When the backend has no mapped hardware control, OpenXLR provides:
+
 - Low cut: a high-pass at 80 or 120 Hz (the two values Wave Link
   offers), a filter-chain node inserted between the mic and its channel,
   cycled from a button on the XLR 1 strip. Its response was measured
@@ -56,8 +62,10 @@ For devices without the hardware version, the PipeWire layer provides:
   otherwise come up at whatever gain its firmware chooses, which is the
   one thing the lock is there to prevent.
 
-These controls appear only when the active device lacks the hardware
-version, so a signal is never filtered twice.
+The software low cut and limiter appear when the backend does not expose
+the corresponding hardware control. On the original Wave XLR, hardware
+processing configured in Wave Link can still be active; OpenXLR cannot
+read or disable those unmapped settings.
 
 Two behaviours apply on multi-device switching: the mixer's hardware
 input channels follow the active device, and after a switch the
@@ -112,74 +120,56 @@ devices; the hardware input channels are hidden from it.
 
 ## Inserts
 
-LV2 plugins in the signal path. Each XLR input carries a mono chain and
-every mix a stereo one, the ones you add included. An Inserts row
-under the channel or mix lists what is loaded: a green or red LED for
-active or bypassed, a bypass button, and a gear that opens the plugin's
-controls in their own window. The picker shows every installed LV2
-plugin that fits the slot (mono for inputs, stereo for mixes), grouped
-by category. The controls window is generated from the plugin's port
-descriptions, grouped by parameter family, with a Defaults button.
-Chains are saved with the mixer and recalled by profiles.
+LV2, CLAP and VST3 effects can form a mono chain on each XLR input and a
+stereo chain on every mix, including virtual microphones you add. The
+picker filters by format, name, category and compatible channel width.
+Unsupported host requirements are reported instead of loading a plugin
+that the chosen backend cannot run. VST2 is not supported.
 
-Every chain is a PipeWire filter-chain node, the same mechanism as the
-software low cut and ClipGuard, so plugins run inside PipeWire's graph
-with no extra process, and a chain adds latency only while it holds a
-plugin. Plugins are found in the standard LV2 directories
-(`/usr/lib/lv2`, `~/.lv2`, or wherever `LV2_PATH` points); the daemon
-reads them through lilv. `lsp-plugins-lv2` is the set used during
-development. A plugin that requires a host feature the chain does not
-provide is left out of the picker and refused by the daemon rather than
-failing when the chain is built.
+| Format | Processing host | Discovery |
+|---|---|---|
+| LV2 | PipeWire filter-chain by default; optional native host per insert | lilv, standard LV2 directories or `LV2_PATH` |
+| CLAP | native host, one process per insert | standard CLAP directories or `CLAP_PATH` |
+| VST3 | native host, one process per insert | standard VST3 directories or `VST3_PATH` |
+| Windows VST3 / CLAP | yabridge and Wine behind the native host | bridge-generated Linux wrappers |
 
-CLAP and VST3 plugins are offered in the same picker, found in the
-standard directories (`/usr/lib/clap` and `~/.clap`, `/usr/lib/vst3` and
-`~/.vst3`, or wherever `CLAP_PATH` and `VST3_PATH` point). Neither has a
-filter chain to run in, so both always run in the native host described
-below, and their rows carry no host switch. The daemon never loads their
-code itself: the host describes each bundle in a process of its own, so a
-plugin that misbehaves while being asked about its ports costs that
-bundle and nothing else, and what it learns is kept until the bundle
-changes. Windows VST3 plugins come through yabridge, which presents them
-as ordinary bundles under `~/.vst3`; the manual has the Wine and yabridge
-setup for each distribution. VST2 plugins are not supported.
+The Inserts row provides bypass, ordering, removal and generated parameter
+controls. Native plugin editors open on the instance processing the audio.
+For LV2, enabling "Native host" moves only that insert out of filter-chain
+and briefly interrupts its chain. CLAP and VST3 always use that host.
+Packages include the helper; source builds need
+`-p:EnableNativeLv2Host=true`. The helper scans CLAP/VST3 bundles in separate
+processes and caches their descriptions until they change.
 
-Installing a plugin is a pick in the picker or in Options: a file or a
-folder the user downloaded. The daemon works out what it is from its
-name and its first bytes, copies a Linux `.clap`, `.vst3` or `.lv2` into
-the matching directory under the home, hands a folder of Windows plugins
-to yabridge and runs its sync, and answers in a sentence when it cannot
-help: an archive to extract, a Windows installer to run with Wine first,
-a VST2 file. The catalogues are read again afterwards, and every open
-chain fetches the list, so the plugin is in the picker a moment later.
-The Options window says where plugins go, whether yabridge and Wine are
-installed and how many folders they bridge, and it names the pair of
-versions, yabridge up to 5.1.1 with Wine 9.22 or newer, that leaves a
-bridged plugin's own editor deaf to the mouse, since the plugin is still
-worth using through the controls OpenXLR builds for it. It offers the plugin folders
-found in Wine's own drive, which file dialogs hide, so the first Windows
-plugin is one press rather than a hunt; the ones after it, installed into
-a folder already bridged, take the sync beside it.
+Chains and exposed parameter values are saved with the mixer and profiles.
+Opaque plugin state, loaded sample files and plugin preset data are not
+persisted by OpenXLR. A plugin may save its own preferences separately.
 
-The list a window is sent has a size limit. The same plugin often ships
-in more than one format, and while everything fits every copy is offered;
-past the limit, LV2 stays whole and the other formats fill what room is
-left, copies of a plugin already listed going last. A set installed twice,
-as LV2 and as VST3, therefore shows once rather than pushing anything out.
+"Install file…" and "Install folder…" accept extracted Linux plugins or
+Windows plugin folders. Linux bundles are copied into `~/.lv2`, `~/.clap`
+or `~/.vst3`. Windows installers must run in Wine first; OpenXLR bridges
+the installed plugins and rescans automatically. Options offers a rescan,
+a Windows sync, detected Wine folders and the selected bridge's status.
 
-Plugins that ship their own editor still load, and the generated controls
-are shown for them. The editor itself can be opened through a small host
-process, which every package installs. Turning on "Native host" for one
-insert moves that insert out of the shared chain into a process of its
-own, which hosts the plugin and its editor together; the other inserts
-stay in the chain and nothing moves unless you ask. The editor works on the
-audio that is playing and its changes are saved like any other control.
-The plugin keeps processing if the editor stops answering or the X
-display goes away, and a chain whose host keeps crashing is switched off
-once it has failed three times in five minutes, with the reason on the
-insert. Plugins that hand work to a background thread, which is how
-reverbs and convolvers build their impulse responses, are hosted too. The manual covers the
-setup in 3.12.
+The optional `openxlr-yabridge` companion includes the Wine 9.22+ editor
+input fix. It creates wrappers under `~/.local/share/openxlr/yabridge` and
+keeps its controller registry under `~/.config/openxlr/bridge`, honoring
+XDG overrides. Other DAWs' wrappers and controller settings remain separate.
+Private wrappers take priority over duplicate global copies. A system/user
+bridge remains supported; Options warns about known incompatible versions.
+See [Windows plugins](manual.md#windows-plugins) for availability and setup.
+
+The catalogue sent to clients is bounded. While it fits, all formats are
+offered. Beyond the limit, LV2 entries retain priority and other formats
+fill the remaining space, with duplicate names last.
+
+Editor borders follow each plugin's size limits. TDR Nova uses its own UI
+scale menu instead of border resizing. LSP editors default to software
+rendering to avoid freezes during large drags. Display loss and stalled
+editor controls are handled without rebuilding a healthy audio instance;
+a crash of the plugin process interrupts its chain. Repeated chain failures
+stop automatic retries after three failures in five minutes. See
+[plugin editors](manual.md#plugin-editors) for recovery and renderer settings.
 
 The submixer can be switched off in Options. The daemon then controls
 the hardware only, restarts itself, and leaves the sound card in its
@@ -195,7 +185,10 @@ restores the split profile when it stops.
 ## Application routing
 
 - Audio clients are detected from their PipeWire client registration
-  and assigned to a channel by name rules; each assignment is stored in
+  and playback metadata, falling back to the owning client when fields
+  are missing. Windows `.exe` identities normalize to their Wine/Proton
+  key; an existing normalized assignment wins over an old alias. Apps are
+  assigned to a channel by name rules; each assignment is stored in
   the app registry and can be edited while the app is silent
 - Electron apps report "Chromium" as their application name; they are
   identified by their process binary instead, so Discord appears as
@@ -213,8 +206,8 @@ levels, mutes, masters, monitor outputs, aux state, insert chains with
 their parameters). Saved per device and recalled from the header, over
 the API, or from a Stream Deck key. One profile per device can be
 marked to recall on connect: at daemon start, after a replug or power
-cycle, or when switching to that device. Interfaces without settings
-memory (Wave XLR, the first XLR Dock) get their last settings back
+cycle, or when switching to that device. Interfaces using OpenXLR's connect-time
+restoration (Wave XLR, the first XLR Dock) get their last settings back
 on every fresh connect without a profile, and can be reset to the
 firmware defaults recorded after a power cycle. The Wave XLR Pro, which
 keeps its own settings, can be reset to OpenXLR's baseline instead:
@@ -270,15 +263,12 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
 
 ## Other
 
-- Audio Flow window: a graph of the current routing, sources through
-  outputs, with the filter chains (built-in low cut and ClipGuard, LV2
-  inserts) drawn where they sit in the path and each stage marked active,
-  bypassed or broken
 - Enforced defaults: the daemon re-asserts the chosen system default
   sink and source on its one-second sweep, undoing WirePlumber's
   auto-switch to newly created nodes
 - The control API validates every command before the mixer sees it and
-  answers with an error instead of ignoring it; clients are rate-limited
+  answers with an error instead of ignoring it. A private token is required
+  before any state is sent or command executed; clients are rate-limited
   and browser pages from other origins are refused; see
   [api.md](api.md). The same commands are served over HTTP at `/api/v1`
   with an OpenAPI document ([http-api.md](http-api.md))

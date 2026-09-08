@@ -43,6 +43,19 @@ Content-Type; 429 budget exhausted or another HTTP mutation in flight. Chunked b
 five-second deadline. One HTTP command runs at a time, with no waiting queue.
 All authenticated HTTP responses use `Cache-Control: no-store`.
 
+For a read-only check from a shell in the daemon's user session:
+
+```sh
+TOKEN=$(cat "${XDG_RUNTIME_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}}/openxlr/token")
+curl --fail --silent --show-error -H "Authorization: Bearer $TOKEN" \
+  http://127.0.0.1:37890/api/v1/state
+unset TOKEN
+```
+
+`getPluginSetup` is available through `POST /api/v1/commands` and reports
+the effective plugin host, Wine and bridge provider. Its reply fields are
+documented in [api.md](api.md); the transport does not select a bridge itself.
+
 The [OpenAPI document](openapi-v1.json) describes the HTTP endpoints. Restarting
 the daemon rotates its per-session token once the new instance listens;
 clients must reread it.

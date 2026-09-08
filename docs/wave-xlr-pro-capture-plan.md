@@ -1,10 +1,12 @@
 # Wave XLR Pro USB protocol capture plan
 
 Status: completed historical procedure. The ordered follow-up capture
-resolved the control map; use
+resolved the input and output-selector controls described here; use
 [wave-xlr-pro-protocol.md, section 6](wave-xlr-pro-protocol.md#6-capture-2-xlrpro2pcapng-2026-08-25-with-ordered-action-log-outputs-mic-dsp-usb-aux)
 for current offsets. The steps below are retained as the methodology for
 capturing another device, not as the current protocol specification.
+Hardware EQ and the remaining mix matrix still need separate captures;
+see [hardware support](hardware-support.md) and the [roadmap](roadmap.md#devices).
 
 Goal: capture every USB control transfer Wave Link sends to the Wave XLR Pro so its vendor
 protocol can be reimplemented in a Linux backend. The device has
@@ -68,7 +70,8 @@ USBPcap captures the whole root hub, so filter in Wireshark. Two ways:
 - Useful display filters while reviewing:
   - Control transfers only: `usb.transfer_type == 0x02`
   - Vendor/class SETUP packets (the interesting writes): `usb.bmRequestType.type == 2` (vendor)
-    or `== 1` (class). The MK.2 used **standard class requests**, so also watch class ones.
+    or `== 1` (class). The MK.1 uses class requests; the MK.2/Pro family uses vendor requests.
+    Watch both when identifying an unknown device.
   - Interrupt IN traffic (the 6-byte endpoint): `usb.transfer_type == 0x01`
   - Just the setup stage with data: `usb.setup.wLength > 0`
 

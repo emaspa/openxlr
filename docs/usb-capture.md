@@ -4,8 +4,11 @@ This guide is for owners of the original Wave XLR (`0fd9:007d`) who want
 to help map the rest of its protocol. No programming needed, just
 Wireshark and about 15 minutes.
 
-The goal is the mic DSP: low cut, ClipGuard, and the mic/PC crossfade
-exist in the hardware but their registers have not been captured.
+The remaining targets are low cut, ClipGuard, mic/PC crossfade and the
+hardware-save action exposed by Wave Link. Their OpenXLR commands are not
+yet mapped; the [support table](hardware-support.md#wave-xlr-0fd9007d)
+tracks current status. Capture these device controls separately from
+software plugin effects.
 Phantom power is already coded (the
 [openwave](https://github.com/rikkichy/openwave) project found its
 byte); the phantom toggles in your capture serve as confirmation, and
@@ -66,6 +69,8 @@ time with 5 second pauses between them, in this order:
 4. ClipGuard on, pause, off.
 5. Headphone volume: minimum, pause, maximum, pause, middle.
 6. Mic/PC balance: sweep it fully one way, pause, fully back.
+7. Save settings to hardware, if your Wave Link version offers it. Note
+   the gain before saving, then replug and record what was retained.
 
 Jot down the order you actually did things in and roughly when. The
 notes matter as much as the capture.
@@ -86,7 +91,9 @@ XLR MK.1 USB capture" and attach:
 In Wireshark, type
 `usb.idProduct == 0x007d` into the filter bar and press enter. You
 should see a packet from the replug; its "Device address" field, say 5,
-identifies your Wave XLR. Now filter `usb.device_address == 5` and you
-are looking at only the Wave XLR's traffic. Toggling phantom in Wave
-Link should have produced a small burst of packets at each moment you
-clicked.
+identifies your Wave XLR on that USB bus. Filter by both `usb.bus_id`
+and `usb.device_address` if the file contains several buses. Recheck the
+address after a replug; it may change. Use File, Export Specified Packets
+and select displayed packets to create a device-only file to share. A
+display filter alone does not remove other devices from the saved capture.
+Toggling phantom should produce a small burst at each recorded action.

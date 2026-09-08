@@ -44,15 +44,24 @@ tools/check-version.sh
 tools/check-locked-restore.sh
 tools/check-openapi.py docs/openapi-v1.json
 tools/check-spec.py packaging/rpm/openxlr.spec
-make -C native  # the plugin host; needs a C and C++ compiler and the PipeWire, lilv, LV2 and X11 headers
+make -C native  # C/C++, PipeWire, lilv, LV2 and X11 development headers
+xvfb-run -a make -C native test-editor  # also needs Xvfb and xauth
 ```
 
-CI runs exactly these; the build treats warnings as errors, so a build
+These cover the main CI build and tests; the workflow also checks packaged
+service inputs. The build treats warnings as errors, so a build
 counts as clean only with `0 Error(s)` and `0 Warning(s)`.
 After a package change, regenerate the lock files with a plain
 `dotnet restore src/OpenXLR.slnx` and the Nix dependency list with
 `nix build .#openxlr.passthru.fetch-deps -o /tmp/fd && /tmp/fd packaging/nix/deps.json`,
 and commit both.
+
+The native-enabled application build uses `-p:EnableNativeLv2Host=true`.
+Keep that flag when rebuilding a local installation that uses CLAP, VST3
+or native LV2 editors. Desktop acceptance checks must include plugin
+controls, resizing, moving and reopening editors; Xvfb tests do not replace
+those checks. The optional Windows bridge has a separate artifact workflow
+and [package checks](packaging/yabridge/README.md).
 
 ## Where things are
 
@@ -64,7 +73,8 @@ and commit both.
   the two files both need are compiled in as linked sources.
 - `plugin/com.emaspa.openxlr.sdPlugin`: the OpenDeck plugin
   (`plugin.mjs`) and its property inspectors; tests in `plugin/tests`.
-- `packaging/`: unit, udev rule, WirePlumber rules, RPM spec, Nix,
+- `native/`: C/C++ LV2, CLAP and VST3 host, editor regression tests.
+- `packaging/`: optional yabridge companion, unit, udev rule, WirePlumber rules, RPM spec, Nix,
   PPA script; `debian/` for the .deb.
 
 ## Rules the code already follows

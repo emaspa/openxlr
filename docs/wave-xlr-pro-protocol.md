@@ -1,7 +1,9 @@
 # Wave XLR Pro vendor control protocol
 
 How the Wave XLR Pro's vendor protocol was captured and decoded, in the order it happened;
-later sections correct earlier ones where noted.
+later sections correct earlier ones where noted. This is a chronological
+notebook: provisional labels are retained as evidence, not API promises.
+For supported controls, start with [hardware-support.md](hardware-support.md).
 
 Source: `wavexlrpro.pcapng` (7.4 GB, 4.6M packets, 649 s, Wave Link on Windows, 2026-08-25).
 Decoded on Linux with tshark. No companion action-log was captured, so **block/offset → named
@@ -10,7 +12,7 @@ below are directly observed and solid.
 
 ## Implementation
 
-The shipping implementation of this protocol is
+The current implementation of this protocol is
 `src/OpenXLR.Core/Devices/WaveXlrProDevice.cs` (libusb control transfers,
 read-modify-write of the blocks below, commit block after selector
 writes): both XLR structures, both headphone volumes, the USB Aux input
@@ -60,7 +62,8 @@ interface, class 0xFF, that has no kernel driver, so no audio-driver detach need
 | wLength        | fixed per block  | fixed per block  |
 
 So it is NOT the MK.1 `wIndex=0x3303` trick and NOT the MK.2 `wIndex=0x0203` standard-class
-scheme. It is a **paged property bank**: `wValue` selects a fixed-size block; the whole block is
+address. The MK.2 also uses vendor requests; "standard-class" above was
+an early classification error. It is a **paged property bank**: `wValue` selects a fixed-size block; the whole block is
 read or written as one unit; individual controls are byte fields at fixed offsets inside a block.
 
 ## 2. The blocks (wValue) observed

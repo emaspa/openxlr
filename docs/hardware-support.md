@@ -1,16 +1,17 @@
 # Hardware support
 
-The state of every device OpenXLR supports, control by control. The
-Wave XLR row still needs an owner; the section at the bottom explains
-how to help.
+The controls OpenXLR exposes, with recorded hardware verification kept
+separate from implementation status. An unavailable control may exist in
+the device but have no mapped OpenXLR command. See the final section for
+the checks that still need an owner.
 
 | Device | USB id | Status |
 |---|---|---|
-| Wave XLR Pro | `0fd9:00b4` | every control verified on hardware |
-| XLR Dock | `0fd9:00a6` | every control the hardware has, verified on hardware |
+| Wave XLR Pro | `0fd9:00b4` | exposed controls verified on hardware |
+| XLR Dock | `0fd9:00a6` | exposed controls verified on hardware |
 | Wave XLR | `0fd9:007d` | core controls verified on hardware by community testers on two units (0.1.13) |
-| Wave XLR MK.2 | `0fd9:00b6` | every control verified on hardware by a community tester |
-| XLR Dock MK.2 | `0fd9:00c7` | MK.2 backend at the Pro's block bank; every control verified on hardware |
+| Wave XLR MK.2 | `0fd9:00b6` | exposed controls verified on hardware by a community tester |
+| XLR Dock MK.2 | `0fd9:00c7` | MK.2 backend at the Pro's block bank; exposed controls verified on hardware |
 
 ## Wave XLR Pro (0fd9:00b4)
 
@@ -29,6 +30,13 @@ the commit block every selector write needs.
 | Physical output routing | verified | HP1, HP2, Line Out, USB Aux; verified by listening on both jacks |
 | USB Aux input level + lock, aux return | verified | return routing latches at stream open; the daemon bounces the stream |
 | Reset to OpenXLR's baseline | verified | the device keeps its settings, so the reset writes a known set (gain 30 dB, everything off, levels at half, crossfade on PC) instead of recorded firmware defaults |
+
+The Pro's onboard EQ, ducking, mix maximizer and channel booster have no
+mapped OpenXLR controls. The full hardware mix matrix is also unfinished.
+Elgato's [Pro feature guide](https://www.elgato.com/us/en/explorer/products/wave/wave-xlr-pro-give-your-setup-superpowers/)
+distinguishes those onboard effects from VST processing on the computer.
+OpenXLR exposes Voice Tune and the other DSP controls listed above; its
+plugin inserts run in the Linux audio graph.
 
 ## XLR Dock (0fd9:00a6)
 
@@ -49,7 +57,7 @@ expose, reached over the original Wave XLR's protocol dialect.
 | Phantom power | verified | byte 6 of the dock's config block over the original Wave XLR's protocol dialect. Identified by [openwave PR #8](https://github.com/rikkichy/openwave/pull/8) on the MK.1 against its 48V LED; confirmed here with a condenser microphone on the dock's XLR. Wave Link does not write it for the dock |
 | Low impedance | verified | byte 33 of the same config block, verified by listening on the dock's headphone jack |
 | Device info block (0x000A) | read | 51 bytes; carries the unit's USB serial in ASCII from offset 35, so the diagnostics exporter masks it in the hex dump |
-| Hardware sidetone | not present | no control path found; a byte sweep came back negative |
+| Hardware sidetone | unmapped | no control path found in the byte sweep; this does not establish whether the hardware supports it |
 
 Kernel behaviour: the kernel starves the dock's capture endpoint when
 playback to it starts first, and the mic records silence. OpenXLR
@@ -73,7 +81,14 @@ but the daemon's stream sweep starving its own clients; fixed in
 | Gain, mute | verified | community tester; scale is 256 raw units per dB ([openwave PR #8](https://github.com/rikkichy/openwave/pull/8) measured it on the shared protocol) |
 | Headphone volume, low impedance | verified | community tester |
 | Phantom 48V | coded | config byte 6, found by [openwave PR #8](https://github.com/rikkichy/openwave/pull/8) against the MK.1's own 48V LED; the same byte is verified on the XLR Dock. Added after the tester's run, so an LED check on a MK.1 is still open |
-| Low cut, voice DSP, crossfade | unmapped | the hardware has them; their offsets are unknown. A [USB capture](usb-capture.md) from an owner would map them |
+| Hardware low cut, ClipGuard, mic/PC crossfade | unmapped | Wave Link exposes these controls; their OpenXLR offsets are unknown. Software low cut and limiting are available in the submixer |
+| Save settings to hardware, LED colours | unmapped | OpenXLR restores its last observed settings on connect instead of issuing Wave Link's hardware-save operation |
+
+Elgato's [Wave XLR settings guide](https://help.elgato.com/hc/en-us/articles/4404228579853-Elgato-Wave-XLR-Wave-Link-Settings-Overview)
+documents a separate hardware-save action. OpenXLR's `retainsSettings: false`
+capability describes its restoration policy, not an absence of device memory.
+Hardware low cut or ClipGuard configured in Wave Link may remain active;
+OpenXLR cannot currently read or disable those settings.
 
 ## Wave XLR MK.2 (0fd9:00b6) and XLR Dock MK.2 (0fd9:00c7), verified
 
@@ -111,9 +126,9 @@ every write showed up there and read back from the block. Blocks
 | Headphone volume, low impedance, crossfade | verified | Wave XLR MK.2: community tester. Dock: all three on the author's unit (the mic leaves the direct monitor at the PC end of the crossfade) |
 | Phantom 48V, ClipGuard, compressor | verified | at the Pro's bit positions; community tester, 0.1.12. Dock: phantom confirmed with a condenser mic going silent when switched off, ClipGuard and compressor by ear |
 
-Every control was confirmed on the dock on 2026-09-05, the DSP ones by
-ear through the monitor mix and phantom with a condenser microphone.
-Blocks 0x0002 and 0x0006 exist and are not decoded.
+Every exposed control listed above was confirmed on the dock on
+2026-09-05, the DSP ones by ear through the monitor mix and phantom with a condenser microphone.
+Hardware EQ is not mapped. Blocks 0x0002 and 0x0006 exist and are not decoded.
 
 ## Every device gets
 
@@ -122,9 +137,8 @@ Blocks 0x0002 and 0x0006 exist and are not decoded.
 - Per-device profiles: named scenes of hardware state plus the whole
   submix, recalled from the UI, the API or a Stream Deck key, and one
   of them on connect if chosen
-- Last settings restored on connect for the devices without settings
-  memory (Wave XLR, XLR Dock), plus a reset to the firmware defaults
-  recorded after a power cycle. The Pro and the MK.2 family, the XLR
+- Last settings restored on connect for Wave XLR and the first XLR Dock,
+  plus a reset to the defaults recorded after a power cycle. The Pro and the MK.2 family, the XLR
   Dock MK.2 included, keep their settings on board (verified by
   replugging the dock)
 - Multi-device switching: a header picker chooses which interface
@@ -136,7 +150,7 @@ Blocks 0x0002 and 0x0006 exist and are not decoded.
 
 ## Help confirm a control
 
-Anything marked "coded" above, or the dock's DSP flags, can be
+Anything marked "coded" above can be
 confirmed in a few minutes:
 
 1. Install OpenXLR per the [README](../README.md), including the udev
@@ -147,9 +161,7 @@ confirmed in a few minutes:
 4. Open an [issue](https://github.com/emaspa/openxlr/issues) with the
    archive and what you observed.
 
-MK.1 owners who can record a Wave Link USB capture on Windows can map
-the rest of their device: low cut, the voice DSP, and the crossfade
-exist in the hardware and need their registers found (phantom is
-already coded, from the openwave project). The
-[USB capture guide](usb-capture.md) walks through it in about 15
+MK.1 owners can help map low cut, ClipGuard, mic/PC crossfade and the
+hardware-save action with an ordered Wave Link capture. The
+[USB capture guide](usb-capture.md) explains the process in about 15
 minutes, no programming needed.

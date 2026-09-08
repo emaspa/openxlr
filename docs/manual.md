@@ -1,5 +1,9 @@
 # OpenXLR manual
 
+This manual follows `main`. A released package can lag behind it; read the
+manual at that release's tag for matching behaviour. The app's Manual links
+open this page on GitHub `main`.
+
 How to use OpenXLR day to day: what it changes on your system, the
 concepts behind the mixer window, step-by-step tasks, and what to do
 when something does not work. For installing, see the README; for the
@@ -95,10 +99,12 @@ chains). They are saved per interface. Application routing and the
 system default devices are not part of a profile, so recalling one
 does not rewire the desktop.
 
-**Inserts** are LV2 plugins placed in the signal path: a mono chain on
-each XLR input, a stereo chain on each mix. The XLR Dock and the
-original Wave XLR have no onboard DSP, so on those OpenXLR also offers
-a software low cut and ClipGuard on XLR 1.
+**Inserts** are LV2, CLAP or VST3 effects placed in the signal path: a mono
+chain on each XLR input, a stereo chain on each mix. On the first XLR Dock
+and original Wave XLR, OpenXLR also offers software low cut and limiting
+on XLR 1 because their backends do not expose those hardware controls.
+Unmapped processing previously enabled in Wave Link may still be active
+on the original Wave XLR. See [hardware support](hardware-support.md).
 
 <a name="tasks"></a>
 ## 3. Tasks
@@ -225,17 +231,20 @@ channel, with its level and lock in the INPUTS card.
 ### 3.5 Add a plugin to the signal path
 
 1. Under XLR 1, XLR 2 or a mix, press "Add plugin…". The picker lists
-   the installed LV2 plugins that fit the slot (mono for an input,
-   stereo for a mix), searchable by name or category. `lsp-plugins-lv2`
-   is the set used during development; any LV2 plugin set works.
+   compatible installed LV2, CLAP and VST3 effects (mono for an input,
+   stereo for a mix), searchable by name, category or format. Host
+   feature requirements can exclude a plugin; install a compatible set
+   such as `lsp-plugins-lv2` if the list is empty.
 2. Add. The plugin appears in the Inserts row with a green light while
    active.
 3. Controls opens a window generated from the plugin's parameters,
    grouped, with a Defaults button. Bypass takes it out of the path
    (red light); the arrows reorder the chain; the cross removes it.
-4. Chains are saved with the mixer and with profiles.
+4. Chains and exposed parameter values are saved with the mixer and
+   profiles. OpenXLR does not yet save opaque plugin state, sample-file
+   selections or plugin presets.
 
-The generated controls cover every parameter the plugin exposes. A
+The generated controls cover the parameters in the bounded catalogue. A
 plugin's own editor can be opened as well, with the native host described
 in 3.12. CLAP and VST3 plugins appear in the same picker and always run in
 that host. VST2 plugins cannot be loaded.
@@ -243,10 +252,9 @@ that host. VST2 plugins cannot be loaded.
 <a name="install-plugins"></a>
 **Installing plugins.** The quickest set comes from your distribution:
 on Arch, `lsp-plugins-lv2` and `x42-plugins` cover the microphone path
-well, `lsp-plugins-vst3` is the same set as VST3, and `dragonfly-reverb-clap`,
-`dpf-plugins-clap` and `elephantdsp-roomreverb-clap` are CLAP effects for a
-mix. For a plugin you downloaded, press "Install file…" or "Install
-folder…" in the picker or in Options and pick it; OpenXLR puts it where
+well. Choose LV2, CLAP or VST3 packages available for your distribution;
+the picker offers only plugins compatible with the selected slot.
+For a plugin you downloaded, press "Install file…" or "Install folder…" in the picker or in Options and pick it; OpenXLR puts it where
 it looks and the picker lists it a moment later. A file is a `.clap` or a
 single-file `.vst3`; a folder is a `.vst3` or `.lv2` bundle, or a folder
 holding several of them, such as an extracted download. Linux plugins are
@@ -264,7 +272,13 @@ Linux bundles.
 
 The optional **openxlr-yabridge** package supplies a tested bridge for
 64-bit Windows VST3 and CLAP plugins, including the Wine editor input fix.
-Wine remains a system dependency. Install the companion artifact with
+Wine remains a system dependency. The companion currently comes from the
+separate [Optional Windows bridge workflow](https://github.com/emaspa/openxlr/actions/workflows/yabridge.yml)
+or a source build. That workflow creates binary and source artifacts; it
+does not attach them to OpenXLR releases or publish distribution packages.
+Download and extract the artifact for your distribution, check its
+`SHA256SUMS`, and follow the [package guide](../packaging/yabridge/README.md).
+Install the companion artifact with
 your distribution's package manager, then restart the daemon:
 
 ```sh
@@ -298,74 +312,18 @@ used when the companion is absent, or when the daemon environment sets
 `OPENXLR_YABRIDGE=system`. An absolute path in that variable selects a
 companion installed elsewhere. Restart the daemon after changing it.
 
-**Using a separate yabridge installation.** The instructions below apply
-when choosing the system bridge instead of the companion.
+**Using a separate yabridge installation.** Install Wine through your
+distribution. For yabridge, use its distribution package where available
+or follow the [upstream installation instructions](https://github.com/robbert-vdh/yabridge#installation).
+For example, Arch provides `wine`, `yabridge` and `yabridgectl`.
 
-Wine and yabridge must both be installed for the system bridge.
-The Options window says which of the two it can see.
+For an upstream tarball install, extract it into `~/.local/share` so that
+`~/.local/share/yabridge/yabridgectl` exists. OpenXLR checks this location
+and PATH. Adding it to your interactive shell's PATH alone does not change
+the environment of a running systemd daemon. The
+[editor input note](#windows-editor-input) applies to unpatched bridges.
 
-Arch, and anything built on it such as Manjaro, EndeavourOS and CachyOS,
-has both in its own repositories:
-
-```sh
-sudo pacman -S wine yabridge yabridgectl
-```
-
-NixOS has both as well. Add `wine`, `yabridge` and `yabridgectl` to your
-packages, or try them first with:
-
-```sh
-nix shell nixpkgs#wine nixpkgs#yabridge nixpkgs#yabridgectl
-```
-
-Fedora has Wine but not yabridge; the community repositories that carried
-it have gone stale. Install Wine from Fedora and yabridge from its own
-release:
-
-```sh
-sudo dnf install wine
-```
-
-Debian, Ubuntu, Linux Mint and Pop!_OS also need yabridge from its own
-release. Their own `wine` package works; yabridge's author recommends
-Wine Staging from the [WineHQ repositories](https://wiki.winehq.org/Download)
-if a plugin misbehaves:
-
-```sh
-sudo apt install wine
-```
-
-On those, and on any distribution without a package, take the tarball
-from yabridge's [releases page](https://github.com/robbert-vdh/yabridge/releases)
-and unpack it into `~/.local/share`, which is where its own instructions
-put it. With 5.1.1, the current release:
-
-```sh
-tar -C ~/.local/share -xavf ~/Downloads/yabridge-5.1.1.tar.gz
-```
-
-That leaves `~/.local/share/yabridge/yabridgectl`, which is where OpenXLR
-looks, so nothing else is needed for it: close the Options window and open
-it again, and the card will say that yabridge is installed.
-
-Putting that directory on your PATH is worth it only to run `yabridgectl`
-yourself, and only after the tarball is unpacked: fish refuses a path that
-is not there, and a PATH entry pointing at nothing does no good either
-way. With fish:
-
-```sh
-fish_add_path ~/.local/share/yabridge
-```
-
-With bash, and a new terminal afterwards:
-
-```sh
-echo 'export PATH="$PATH:$HOME/.local/share/yabridge"' >> ~/.bashrc
-```
-
-Run neither on Arch or NixOS: their packages put `yabridgectl` where every
-shell already looks, and `fish_add_path` answers "Skipping non-existent
-path" because nothing was unpacked there.
+**Installing and syncing Windows plugins with either bridge.**
 
 With both in place, run the plugin's Windows installer with Wine and let
 it install where it offers to:
@@ -385,7 +343,9 @@ yabridge has seen that folder before:
 | Rescan | Plugins that arrived by other means, such as a package from your distribution. Nothing to press after a bridge or a sync, since both read the catalogues again |
 
 Bridging and syncing end the same way: yabridge wraps each Windows plugin
-in a bundle under `~/.vst3/yabridge`, OpenXLR reads its catalogues again,
+in the selected bridge's directories: private `vst3`/`clap` directories
+for the companion, normally `~/.vst3/yabridge` or `~/.clap/yabridge` for
+a system bridge. OpenXLR reads its catalogues again,
 and the plugin is in the picker with a VST3 or CLAP badge. Nothing else
 has to be restarted.
 
@@ -439,20 +399,20 @@ shared memory audio buffers into main memory.
 
 It is a warning, not a failure: the plugin runs, but the buffers it shares
 with its Windows half can be paged out under memory pressure, and reading
-them back takes far longer than an audio cycle allows. Every distribution
-ships 8 MiB as the limit, which is what systemd uses when nothing else
-says otherwise.
+them back can exceed an audio cycle. The effective limit depends on the
+distribution and user session; check the running daemon before changing it.
 
-Being in the `audio` group is not enough for this. That group is usually
-granted realtime priority and nothing else; the memory lock comes with the
-`realtime` group. On Arch, and anything built on it:
+Group names alone do not grant a memory-lock limit; the distribution's
+PAM and systemd policy determines it. On Arch, the realtime privileges
+package provides the relevant group policy:
 
 ```sh
 sudo pacman -S realtime-privileges
 sudo usermod -aG realtime $USER
 ```
 
-On any distribution, granting it by hand does the same:
+On systems using PAM limits, an administrator can instead grant the
+`audio` group a memory-lock allowance:
 
 ```sh
 printf '@audio - memlock unlimited\n' | sudo tee /etc/security/limits.d/99-openxlr.conf
@@ -495,10 +455,11 @@ known scene at every login. The reconnect after a passing USB error
 does not count, so the recall never undoes changes you made since.
 Pick "(none)" to stop.
 
-**Interfaces without settings memory.** The Wave XLR and the first XLR
-Dock keep nothing on board; unplugged, they come back with the
-firmware's own values (full gain, headphones at 100%). For them the
-daemon remembers every change and writes it back whenever the
+**Restoring settings on connect.** For the original Wave XLR and first
+XLR Dock, OpenXLR restores the last settings it observed. This policy
+does not describe the device's storage: Wave Link offers a separate
+hardware-save action for the Wave XLR that OpenXLR has not mapped. The
+daemon remembers changes and writes them back whenever the
 interface connects fresh, so a reboot or a replug leaves you where you
 were, with no profile needed. The picker shows "(last settings)" in
 place of "(none)" on these devices; a chosen profile takes precedence.
@@ -552,7 +513,7 @@ Options, STARTUP:
   if it is hidden there) instead of opening a second one.
 
 To land on a known scene at every login, mark a profile to recall on
-connect ([section 3.6](#profiles)). An interface without settings memory comes back
+connect ([section 3.6](#profiles)). An interface using connect-time restoration comes back
 as you left it without one.
 
 The window also remembers which of its sections (INPUTS, HEADPHONES,
@@ -622,16 +583,16 @@ host process that the packages install for you. If you build from source,
 add one flag to get it, as
 [install-from-source.md](install-from-source.md) describes.
 
-To use it:
+For an LV2 insert:
 
 1. Open a plugin's Controls window. A plugin whose editor OpenXLR can
    host shows a "Native host" button.
 2. Turn it on. That one insert moves out of the shared filter chain into
    its own process, which rebuilds the chain and interrupts audio for a
    moment. Every other plugin stays where it is.
-3. Press "Plugin UI". The editor opens on the plugin that is processing
-   your audio. What you change there appears in the controls window and
-   is saved with the mixer and with profiles.
+3. Press "Plugin UI". The editor opens on the plugin processing your audio.
+   Changes to exposed parameters appear in the controls window and are
+   saved with the mixer and profiles. Other internal plugin state is not saved.
 4. Turn "Native host" off to put the insert back in the shared chain.
 
 A CLAP or VST3 plugin has no shared chain to go back to, so it always runs
@@ -672,11 +633,12 @@ systemctl --user restart openxlr-daemon.service
 
 The restart interrupts audio briefly.
 
-Trouble with an editor never costs you the sound. If the X server goes
+Editor display failures are handled separately from audio. If the X server goes
 away while an editor is open, the editor closes and the plugin keeps
 processing; pressing "Plugin UI" again opens a fresh one. If an editor
 stops answering, the insert says its controls are frozen and its audio
-carries on. A plugin that keeps crashing has its chain switched off after
+carries on. A crash of the plugin process interrupts the chain while it
+recovers. A plugin that keeps crashing has its chain switched off after
 it has failed three times in five minutes, with the reason on the insert;
 changing or bypassing that chain starts it over.
 
@@ -724,7 +686,8 @@ Restart OpenDeck after installing or updating the plugin.
 - `lsusb` should list an `0fd9:` device. If it does but the header
   still says no device, look at the daemon's log:
   `journalctl --user -u openxlr-daemon -n 50`. "present but could not
-  be opened" is the udev rule not applied yet.
+  be opened" can mean missing USB permission or a busy interface; check
+  the udev rule and whether another hardware-control program is running.
 - With more than one supported interface attached, the header shows a
   picker; the mixer's input channels follow the chosen one.
 
@@ -740,11 +703,11 @@ restart WirePlumber.
 
 A second cause, when the microphone is silent only after a reboot: the
 dock forgets its gain at every power cycle and comes back at the gain its
-firmware chooses, which is lower than most people set. OpenXLR gives the
-gain back when the dock connects, even when the gain lock is on, from
-0.1.30 onwards. On an older version, take the lock off and set the gain
-again. A gate or an expander in the insert chain, tuned at the gain you
-meant to have, stays shut at a lower one and passes nothing at all, which
+firmware restores, which can differ from the gain used by your insert chain.
+OpenXLR gives the
+gain back when the dock connects, even when the gain lock is on. This
+fix is on `main` after 0.1.29; on a build without it, take the lock off
+and set the gain again. A gate or expander tuned at the gain you meant to have stays shut at a lower one and passes nothing at all, which
 is what makes the microphone sound dead rather than quiet.
 
 <a name="daemon-not-starting"></a>
@@ -770,9 +733,12 @@ is what makes the microphone sound dead rather than quiet.
 - The software ClipGuard needs the SWH LADSPA plugins (`swh-plugins`).
   Without them the control is disabled and its tooltip says so; the
   rest keeps working.
-- The insert picker lists what lilv finds in the standard LV2
-  directories (`/usr/lib/lv2`, `~/.lv2`, or `LV2_PATH`). An empty
-  picker means no LV2 plugins are installed, or lilv is missing.
+- For LV2, check lilv and the installed plugins in `/usr/lib/lv2`, `~/.lv2`
+  or `LV2_PATH`. CLAP and VST3 also require the native helper; Options
+  reports whether it is installed. A source build without the native
+  flag removes it. Check the format filter and press Rescan after an
+  external installation. A Windows bundle also needs Wine and a working
+  bridge; see [Windows plugins](#windows-plugins).
 - Before 0.1.27 an insert whose plugin URI contains a `#` (the x42
   plugins, for one: `darc#mono`) failed with "PipeWire filter chain did
   not create the required ports ... Could not load module", because
@@ -837,8 +803,9 @@ and says so in the editor, which also shows a note once the server is at
 three quarters of its limit. The fix is a systemd drop-in that raises the
 limit to 65536:
 
-1. The deb, rpm and Nix packages install it as
-   `/usr/lib/systemd/user/pipewire-pulse.service.d/openxlr.conf`. On a
+1. The deb and rpm packages install it as
+   `/usr/lib/systemd/user/pipewire-pulse.service.d/openxlr.conf`; the NixOS
+   module sets the same service limit declaratively. On a
    source checkout, or any install without it, create the file yourself:
 
    ```sh
@@ -911,14 +878,20 @@ it to a public issue. Nothing is uploaded automatically.
 | `~/.config/openxlr/profiles/<vid-pid>/recall-on-connect` | the profile recalled when that interface connects, when one is chosen |
 | `$XDG_RUNTIME_DIR/openxlr/token` (or `~/.config/openxlr/token` without a runtime directory) | the control API token for this daemon run, readable by your user only; the window and the OpenDeck plugin read it, a daemon older than the window will not have it ([section 3.10](#upgrade)) |
 | `$XDG_RUNTIME_DIR/openxlr/daemon.lock` | held by the running daemon; a second daemon started for the same user stops at once instead of waiting for the port |
-| `~/.config/openxlr/devices/<vid-pid>/last-state.json` | the settings restored on connect to an interface without settings memory |
+| `~/.config/openxlr/devices/<vid-pid>/last-state.json` | the settings restored on connect when `retainsSettings` is false |
 | `~/.config/openxlr/devices/<vid-pid>/defaults.json` | the firmware defaults of such an interface, recorded after a power cycle, written back by "Reset device to defaults" (the Pro has no such file: its reset writes OpenXLR's baseline) |
 | `~/.config/openxlr/daemon.json` | the submixer on/off preference |
 | `~/.config/openxlr/gainlock.json` | which devices have the gain lock set |
+| `~/.config/openxlr/bridge/yabridgectl/config.toml` | companion bridge folder registry, separate from the system bridge |
+| `~/.local/share/openxlr/yabridge/{vst3,clap,vst2}` | companion-generated wrappers; OpenXLR loads VST3 and CLAP only |
 | `~/.config/openxlr/ui.json` | window preferences |
 | `openxlr-daemon.service` (systemd user unit) | the daemon; `journalctl --user -u openxlr-daemon` for its log |
 | `/usr/lib/systemd/user/pipewire-pulse.service.d/openxlr.conf` | installed by the packages: raises pipewire-pulse's open-file limit ([section 5.8](#open-files)) |
 | `ws://127.0.0.1:37890/ws` | the daemon's API, documented in [api.md](api.md); the same commands over HTTP at `/api/v1` ([http-api.md](http-api.md)) |
+
+Configuration paths honor `XDG_CONFIG_HOME`; the private wrapper root honors
+`XDG_DATA_HOME`. Without `XDG_RUNTIME_DIR`, runtime files use the private
+OpenXLR configuration directory.
 
 Uninstalling a package leaves `~/.config/openxlr` in place; remove it
 by hand if you want a clean slate.

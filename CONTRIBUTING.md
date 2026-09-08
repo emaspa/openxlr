@@ -39,7 +39,8 @@ tools/check-version.sh                          # the five version locations agr
 tools/check-locked-restore.sh                   # every packaging path restores locked
 tools/check-openapi.py docs/openapi-v1.json     # the HTTP API document keeps its shape
 tools/check-spec.py packaging/rpm/openxlr.spec  # every installed file is in %files
-make -C native  # the plugin host; needs a C and C++ compiler and the PipeWire, lilv, LV2 and X11 headers
+make -C native  # C/C++, PipeWire, lilv, LV2 and X11 development headers
+xvfb-run -a make -C native test-editor  # also needs Xvfb and xauth
 ```
 
 If you add or change a NuGet package, regenerate the lock files with a
@@ -53,6 +54,13 @@ commit across all five files.
 Real hardware is the final test. Say in the pull request what you ran
 it on, or that you could not; the maintainer tests on a Wave XLR Pro
 and both XLR Dock modules before merging.
+
+The native-enabled application build uses `-p:EnableNativeLv2Host=true`.
+Keep that flag when rebuilding a local installation that uses CLAP, VST3
+or native LV2 editors. Desktop acceptance checks must include plugin
+controls, resizing, moving and reopening editors; Xvfb tests do not replace
+those checks. The optional Windows bridge has a separate artifact workflow
+and [package checks](packaging/yabridge/README.md).
 
 ## Pull requests
 

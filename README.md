@@ -11,7 +11,7 @@
 [![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-emaspa-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/emaspa)
 [![Sponsor](https://img.shields.io/badge/Sponsor-GitHub-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/emaspa)
 
-Native Linux control suite for Elgato XLR interfaces: full hardware
+Native Linux control suite for Elgato XLR interfaces: hardware
 control over reverse-engineered USB protocols, a Wave Link style
 PipeWire submixer with per-application channels, virtual microphones,
 LV2, CLAP and VST3 plugin inserts, multi-output monitoring, a dedicated mix for a
@@ -20,11 +20,15 @@ Deck control.
 
 ![OpenXLR mixer](docs/screenshot-mixer-0125.png)
 
+Mixer screenshot from 0.1.25. This README and the linked guides describe
+current `main`; for a released build, read the docs at its release tag.
+Changes merged after a release are available from source until the next release.
+
 Elgato ships no Linux software. These devices enumerate as
 class-compliant USB audio interfaces, so audio flows out of the box.
-Gain, DSP, phantom power, output routing and the hardware mixer only
-answer to vendor protocols, which this project reverse engineered from
-USB captures of Wave Link and reimplemented from scratch.
+Controls beyond standard USB audio use device-specific protocols, decoded
+from Wave Link USB captures and prior open-source protocol work. OpenXLR
+uses those mappings alongside ALSA controls where available.
 
 Not affiliated with or endorsed by Elgato. Built by protocol analysis on
 the author's own hardware.
@@ -33,13 +37,13 @@ the author's own hardware.
 
 | Device | USB id | Status |
 |---|---|---|
-| Wave XLR Pro | 0fd9:00b4 | full support, verified on hardware |
+| Wave XLR Pro | 0fd9:00b4 | mapped controls verified on hardware; hardware EQ and the full mix matrix remain unmapped |
 | XLR Dock (Stream Deck+ module) | 0fd9:00a6 | gain, mute, headphone volume, 48V phantom power, low impedance; verified on hardware |
-| Wave XLR | 0fd9:007d | gain, mute, headphone volume, low impedance, 48V phantom power; verified on hardware by community testers |
+| Wave XLR | 0fd9:007d | gain, mute, headphone volume and low impedance verified by community testers; phantom power implemented, awaiting an OpenXLR hardware check |
 | Wave XLR MK.2 | 0fd9:00b6 | gain, mute, phantom power, DSP, ClipGuard, compressor, headphone volume, crossfade; verified on hardware by a community tester |
-| XLR Dock MK.2 (Stream Deck+ module) | 0fd9:00c7 | same controls as the Wave XLR MK.2; every control verified on hardware |
+| XLR Dock MK.2 (Stream Deck+ module) | 0fd9:00c7 | same exposed controls as the Wave XLR MK.2, verified on hardware |
 
-The UI shows only the controls the connected device has, and a picker
+The UI shows the controls OpenXLR exposes for the connected device, and a picker
 in the header switches between several attached interfaces. The
 per-control state of every device is in
 [docs/hardware-support.md](docs/hardware-support.md). Own an untested
@@ -54,8 +58,11 @@ Collect diagnostics).
   volumes with low-impedance mode, the mic/PC crossfade, and the
   physical output routing (HP1, HP2, Line Out, USB Aux). The other
   devices expose the subset their protocol has; see the table above.
-  Devices without onboard DSP get a software low cut, ClipGuard and
-  gain lock in the PipeWire layer instead.
+  Where a hardware low cut or ClipGuard control is unavailable, OpenXLR
+  offers software processing in PipeWire. Gain lock is a daemon policy
+  for devices without physical gain controls. Hardware EQ, ducking, mix
+  maximizer and channel booster are not exposed; plugin effects run on
+  the computer, separate from the device's onboard processing.
 - **Submixer** built from PipeWire nodes (null sinks, remap sources,
   filter chains), no kernel modules. Channels for the hardware inputs
   and for application groups; mixes for what you hear (Monitor A and
@@ -67,19 +74,23 @@ Collect diagnostics).
   window or the API. Per-send levels and mutes, level meters, the
   monitor mixes on several outputs at once.
 - **Inserts**: LV2, CLAP and VST3 plugin chains on each XLR input and each mix, with a
-  plugin picker, generated control windows and bypass LEDs.
+  plugin picker, generated controls, bypass and native plugin editors.
+  Windows VST3 and CLAP plugins use Wine and yabridge; an optional
+  OpenXLR companion supplies the Wine editor input fix and private wrappers.
 - **Application routing**: audio clients are detected from their
   PipeWire registration and routed to a channel by name rules, with the
   assignment remembered per app; an app can also be left to the
   desktop's own routing. Electron apps are identified by their process
-  binary rather than the "Chromium" name they report.
+  binary rather than the "Chromium" name they report. Missing stream
+  metadata falls back to the owning client, and Windows executable names
+  share an identity with their Wine/Proton client so saved routing persists.
 - **Profiles**: named scenes holding the hardware settings and the
   whole submix (levels, mutes, outputs, insert chains), saved per device
   and recalled from the UI, the API or a Stream Deck key. One profile
   per device can be recalled on connect, so an interface comes up in a
-  known scene at login or after a power cycle. Interfaces without
-  settings memory (Wave XLR, the first XLR Dock) come back as they
-  were left even without a profile, with a reset to firmware defaults.
+  known scene at login or after a power cycle. OpenXLR also restores the
+  last settings on the original Wave XLR and first XLR Dock without a
+  profile, with a reset to the defaults recorded after a power cycle.
 - **OpenDeck plugin**: key and dial actions for every switch, mute,
   level and insert, rendered with level meters and status LEDs. It is a
   client of the daemon's API, so it reflects changes made in the UI or
@@ -87,8 +98,9 @@ Collect diagnostics).
 - **Daemon and UI**: the daemon owns the device and the graph, keeps
   running with the window closed, re-asserts the chosen default sink
   and source once a second, and serves a WebSocket API and a versioned
-  HTTP API (`/api/v1`) on 127.0.0.1:37890. The UI has a routing graph
-  view, a tray icon and a diagnostics archive exporter.
+  HTTP API (`/api/v1`) on 127.0.0.1:37890. The UI has a Flow window with
+  selectable signal paths through inputs, channels, mixes and outputs,
+  a tray icon and a diagnostics archive exporter.
 - **Optional update notice**: the UI can check the upstream GitHub release
   feed for a newer stable release. Startup checks are off by default and,
   when enabled, run at most once per day. Nothing is installed automatically.
@@ -158,49 +170,65 @@ run `sudo dnf install ./openxlr-*.x86_64.rpm`.
 enables the daemon itself; after a rebuild, `openxlr` is in the
 application menu.
 
+Add `inputs.openxlr.url = "github:emaspa/openxlr";` to your system flake,
+then include these entries in its `nixosSystem.modules` list:
+
 ```nix
-{
-  inputs.openxlr.url = "github:emaspa/openxlr";
-  # in your NixOS configuration:
-  imports = [ openxlr.nixosModules.default ];
-  services.openxlr.enable = true;
-}
+openxlr.nixosModules.default
+{ services.openxlr.enable = true; }
 ```
+
+Here `openxlr` is the input passed to the flake's `outputs` function. The
+[module options](packaging/nix/module.nix) configure LV2 plugins, software
+ClipGuard and the optional Windows bridge.
 
 On every distribution, replug the interface once after installing so
 the udev rule applies. For the Stream Deck, install
 `com.emaspa.openxlr.sdPlugin.zip` from the release with OpenDeck's
 install-from-file, or copy the folder the package puts in
 `/usr/share/openxlr/` into `~/.config/opendeck/plugins/`. Inserts show
-whatever LV2 plugins are installed (`lsp-plugins-lv2` is the set used
+compatible LV2, CLAP and VST3 plugins (`lsp-plugins-lv2` is the set used
 during development); the software ClipGuard for the XLR Dock needs
 `swh-plugins`. The NixOS module wires both up itself. The packages also
 raise pipewire-pulse's open-file limit with a systemd drop-in, which
 applies at the next login or after `systemctl --user restart
 pipewire-pulse`; a source install needs the same file before growing the
-layout ([manual, section 5.8](docs/manual.md#open-files)).
+layout ([manual: open-file limit](docs/manual.md#open-files)).
 
 ### Build from source
 
-Needs the .NET 10 SDK, PipeWire with its CLI tools, libusb, and lilv
-(package names per distribution in
-[docs/install-from-source.md](docs/install-from-source.md)).
+Needs the .NET 10 SDK, PipeWire tools, libusb, lilv, a C/C++ compiler
+and the native host's development headers. Install the prerequisites in
+[the source guide](docs/install-from-source.md) first. From the repository root:
 
 ```sh
 git clone https://github.com/emaspa/openxlr.git
-cd openxlr/src
-dotnet build -c Release
-OPENXLR_BUILD_MIXER=1 ./OpenXLR.Daemon/bin/Release/net10.0/OpenXLR.Daemon   # terminal 1
-./OpenXLR.UI/bin/Release/net10.0/OpenXLR.UI                                 # terminal 2
+cd openxlr
+dotnet restore src/OpenXLR.slnx --locked-mode
+dotnet build src/OpenXLR.slnx -c Release --no-restore -warnaserror -p:EnableNativeLv2Host=true
+OPENXLR_BUILD_MIXER=1 ./src/OpenXLR.Daemon/bin/Release/net10.0/OpenXLR.Daemon
 ```
 
-Device access needs the udev rule from `packaging/70-openxlr.rules`
-installed under `/etc/udev/rules.d/` and a replug. The XLR Dock also
-needs the WirePlumber rule from `packaging/`. Running the daemon as a
-user service, updating and uninstalling:
-[docs/install-from-source.md](docs/install-from-source.md).
+In a second terminal, from the same repository root:
+
+```sh
+./src/OpenXLR.UI/bin/Release/net10.0/OpenXLR.UI
+```
+
+Device access needs the tracked udev rule and a replug. The source guide
+also covers WirePlumber rules, the open-file limit, the user service,
+updating and uninstalling. Keep the native build flag on subsequent builds
+to retain CLAP, VST3 and plugin editors.
+
+For Windows plugins, see [the manual](docs/manual.md#windows-plugins) and
+[the companion package guide](packaging/yabridge/README.md). The companion
+has a separate build workflow; its CI artifacts are not automatically
+published to the OpenXLR release or distribution repositories.
 
 ## Documentation
+
+[Documentation index](docs/README.md): user guides, developer references and
+historical protocol research.
 
 - [Manual](docs/manual.md): first run, the concepts behind the mixer,
   step-by-step tasks, the Stream Deck plugin, troubleshooting

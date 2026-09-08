@@ -15,8 +15,15 @@ folder sync from writing into another DAW's bridge tree.
 
 ## Install
 
-Choose the companion artifact for the distribution, then use its package
-manager:
+The [Optional Windows bridge workflow](https://github.com/emaspa/openxlr/actions/workflows/yabridge.yml)
+produces binary and corresponding source artifacts for review. It does
+not publish to GitHub Releases, AUR, COPR or the PPA. Download an artifact
+from a successful run or build it below; extract it and verify the included
+`SHA256SUMS` with `sha256sum -c SHA256SUMS` in its directory.
+
+Choose the package for your distribution and architecture, then run only
+the matching command. The companion supports x86-64 Linux and 64-bit
+Windows plugins; it does not bundle Wine or 32-bit plugin support:
 
 ```sh
 sudo apt install ./openxlr-yabridge_*_amd64.deb wine
@@ -30,16 +37,25 @@ OpenXLR selects the companion's matching libraries and host through its
 isolated helper's PATH. It can still read existing system wrappers; new
 wrappers are private. Other DAWs keep their existing environment and files.
 
-For NixOS, set `services.openxlr.yabridgePackage` to this flake's
-`packages.x86_64-linux.openxlr-yabridge`. The module passes the store path
-to the daemon. Build it separately with `nix build .#openxlr-yabridge`.
+For NixOS, import the OpenXLR module as shown in the [README](../../README.md#install),
+then add this to the service configuration (`openxlr` is the flake input):
+
+```nix
+services.openxlr.yabridgePackage = openxlr.packages.x86_64-linux.openxlr-yabridge;
+```
+
+The module passes the store path to the daemon. Build it separately with
+`nix build .#openxlr-yabridge` from the repository root.
 
 `OPENXLR_YABRIDGE=system` opts out and uses the system/user bridge. An
 absolute path selects a companion installed elsewhere. Restart the daemon
-after changing this setting. The system bridge needs its own synced
+after changing this setting. The selected directory must contain the complete
+payload and its `openxlr-yabridge.json` receipt; an incomplete directory is
+not selected. Options shows the effective provider, version and path.
+The system bridge needs its own synced
 wrappers when opting out; OpenXLR's private files remain for switching back.
 
-## Build and publish
+## Build and prepare publication
 
 Tools: Python 3, Git, Meson, Ninja, CMake, pkg-config, a C++ compiler,
 winegcc/wineg++, Wine development files, XCB and D-Bus headers, Cargo and

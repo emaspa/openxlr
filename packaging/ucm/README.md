@@ -1,16 +1,17 @@
 # UCM profile for the Wave XLR Pro (experimental)
 
 An ALSA UCM2 profile that splits the Pro's 17-in/18-out multichannel
-card into named, useful devices for people running WITHOUT the OpenXLR
-daemon: a "Monitor (headphones / line out)" sink on playback pair 2/3,
+card into named devices when the OpenXLR submixer is off, or when
+OpenXLR is not running: a "Monitor (headphones / line out)" sink on playback pair 2/3,
 the three other hardware-monitor-bus feeds as Line1..3 (pairs 10/11,
 12/13, 14/15), and mono "XLR 1" / "XLR 2" sources (capture pairs 0 and
 1). Suggested by the goxlr-utility / PipeWeaver author; the GoXLR's own
 in-tree UCM profile is the precedent.
 
-Install: `install.sh` as root (purely additive under
+From this directory, install: `./install.sh` as root (purely additive under
 `/usr/share/alsa/ucm2/USB-Audio/`, edits nothing shipped), then restart
-pipewire + wireplumber. Revert: `revert.sh` + the same restart.
+pipewire + wireplumber. Revert: `./revert.sh` as root, then the same restart. Restarting the audio
+services interrupts playback and recording.
 
 ## Verified 2026-08-30 on real hardware
 
@@ -28,9 +29,9 @@ pipewire + wireplumber. Revert: `revert.sh` + the same restart.
 
 Under the HiFi split the raw multichannel nodes the daemon links
 against do not exist. The daemon therefore switches the card to the
-pro-audio profile while it drives the device and restores the previous
-profile on graceful shutdown, so the split serves exactly when OpenXLR
-is not running.
+pro-audio profile while its submixer runs and restores the previous
+profile on graceful shutdown. In hardware-control-only mode the split
+can remain active; see [the manual](../../docs/manual.md#hardware-only).
 
 ## Status
 

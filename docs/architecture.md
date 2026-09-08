@@ -1,46 +1,40 @@
 # Architecture
 
-```
-  OpenXLR.UI (Avalonia)   ──┐
-  OpenDeck plugin (Node)  ──┼── WebSocket, JSON, 127.0.0.1:37890 ──►  OpenXLR.Daemon (ASP.NET Core)
-  scripts, tools          ──┘                                          hosts OpenXLR.Core
-                                                                          │
-              ┌───────────────────────────────────────────────────────────┼──────────────────┐
-              │                                                           │                  │
-   libusb control transfers (USB helper process)              amixer (ALSA controls)     lilv (in-process)
-   Wave XLR Pro, Wave XLR MK.2,                               XLR Dock: gain, mute,     LV2 plugin catalog
-   XLR Dock MK.2, Wave XLR (MK.1),                            headphone volume
-   XLR Dock: phantom, low impedance
-                                                                          │
-                                       pactl (modules), pw-link, pw-dump, pw-cli, wpctl, parec
-                                                                          ▼
-                                                                   PipeWire graph
-
-  ~/.config/openxlr: mixer.json, profiles/, devices/, gainlock.json (daemon); daemon.json, ui.json (UI)
-  $XDG_RUNTIME_DIR/openxlr/token: the control API token, one per daemon run
-  $XDG_RUNTIME_DIR/openxlr/daemon.lock: held by the running daemon, one instance per user
+```mermaid
+flowchart TD
+    UI["Avalonia UI / OpenDeck"] -->|"authenticated WebSocket"| Daemon["OpenXLR daemon"]
+    Scripts["Scripts / tools"] -->|"authenticated HTTP or WebSocket"| Daemon
+    Daemon --> Core["Core: device control, mixer, profiles"]
+    Core --> USB["USB helper: libusb vendor transfers"]
+    Core --> ALSA["amixer: first XLR Dock controls"]
+    Core --> Graph["PipeWire modules and port links"]
+    Core --> Catalog["lilv: LV2 catalogue"]
+    Core --> Host["Native helper: LV2, CLAP, VST3"]
+    Host <-->|"audio ports"| Graph
+    Host --> Bridge["Optional yabridge / Wine: Windows plugins"]
 ```
 
-- `OpenXLR.Daemon` owns the device and the graph: it opens the
-  interface, polls its state every 100 ms, builds and maintains the
-  PipeWire graph, routes application streams, and serves the WebSocket
-  API. Every state change is broadcast to all clients, whichever client
-  (or the hardware) caused it. Commands are validated before the mixer
-  sees them (known channel and mix ids, catalogued and supported
-  plugins, declared parameter symbols, bounded strings and lists), each
-  client has a command budget, and a WebSocket handshake with a browser
-  Origin from anywhere but localhost is refused. It is a systemd user
-  service, running workstation GC under a 256 MB hard limit.
-- `OpenXLR.UI` is a view over that API with no dependency on
-  `OpenXLR.Core`: it parses the state JSON and sends commands. Outside
-  the API it only runs `systemctl --user` for the daemon's unit and
-  writes `daemon.json` (the submixer on/off preference the daemon reads
-  at start). It can be closed at any time; the daemon keeps mixing.
-- The OpenDeck plugin is an OpenAction plugin running in OpenDeck's
-  Node runtime, another client of the same API.
-- `OpenXLR.Core` holds the device backends, the mixer engine, the
-  PipeWire adapter and the profile store, shared by the daemon and the
-  probe tool.
+- `OpenXLR.Daemon` owns the device and graph. It polls hardware, maintains
+  the mixer, routes application streams and broadcasts state to clients.
+  The WebSocket endpoints and HTTP API share one dispatcher on
+  `127.0.0.1:37890`. Clients authenticate with a private per-run token;
+  browser Origins, command sizes and rates are checked as well.
+- `OpenXLR.UI` is an Avalonia client with no Core assembly dependency. It
+  parses state and sends commands. It also manages local window preferences,
+  autostart and the daemon service, collects diagnostics, and optionally
+  checks GitHub releases. Closing it leaves audio running. Its Flow window
+  builds a four-column view from state; selecting a path changes only
+  the visualization.
+- The OpenDeck plugin is an OpenAction plugin in OpenDeck's Node runtime,
+  using the same authenticated API and live choices as the window.
+- `OpenXLR.Core` contains device backends, the PipeWire adapter, mixer,
+  application matching, plugin catalogues and profile storage. The native
+  host processes plugin audio without passing samples through managed code.
+
+Configuration lives in `$XDG_CONFIG_HOME/openxlr` (default `~/.config/openxlr`).
+The token and instance lock live in `$XDG_RUNTIME_DIR/openxlr`, falling back
+to the configuration directory when unavailable. See [api.md](api.md) for
+file names and [http-api.md](http-api.md) for transport limits.
 
 ## The PipeWire graph
 
@@ -76,15 +70,17 @@ modules or custom drivers:
   restarts it takes every module with it and reuses their ids, so the
   daemon forgets the graph without unloading anything and exits with
   code 75 for systemd to start it afresh.
-- Filter chains (the software low cut and ClipGuard, and the LV2
-  inserts on inputs and mixes) are `filter-chain` nodes, each held by a
+- Filter chains (the software low cut and ClipGuard, and LV2
+  inserts left on the default backend) are `filter-chain` nodes, each held by a
   long-lived `pw-cli -m` process for the life of the chain; their
   controls are set with `pw-cli set-param`.
-- An insert switched to the native host is not a filter-chain node but
-  an `openxlr-lv2-host` process, one per insert, holding that plugin and
-  its editor behind a PipeWire filter node of its own. The rest of the
-  chain stays filter-chain nodes, linked stage to stage, and the daemon
-  speaks to the helper over a pipe that carries control values only.
+- A native insert runs in an `openxlr-lv2-host` process with a PipeWire
+  filter node. LV2 chooses this per insert; CLAP and VST3 always use it.
+  Stages can mix native and filter-chain backends, linked in signal order.
+  The command pipe carries parameter values, status and editor requests,
+  never audio. Exposed parameters are persisted; opaque plugin state and
+  presets are not. See [native/README.md](../native/README.md) for editor
+  recovery, size constraints and LSP renderer defaults.
 - Direct port links (`pw-link`) wire hardware inputs, chains, mixes and
   outputs, so the output device clocks the chain. Hardware inputs are
   wired by capture-channel pair (XLR 1 = pair 0, XLR 2 = pair 1, Line
@@ -102,10 +98,38 @@ modules or custom drivers:
   desktop applets list them; hardware input channels keep the flag and
   stay hidden.
 
+## Plugin discovery and Windows bridging
+
+LV2 metadata is read through lilv. CLAP and VST3 bundles are described in
+isolated helper processes, with bounded output and a cache invalidated by
+bundle changes. An optional managed bridge also keys that cache by its
+package version, source commit and installation directory.
+
+`ManagedYabridge` selects a complete companion installation, or falls back
+to the system/user bridge. It prepends the companion to PATH only for the
+scanner, host and controller it starts. Plugin processes retain HOME,
+WINEPREFIX and their settings environment. The controller alone receives
+a private configuration root and wrapper destination. Private wrappers
+are searched first and deduplicated by plugin id.
+
+The companion supplies 64-bit yabridge; Wine remains external. Its pinned
+source, package formats and separate artifact workflow are documented in
+[packaging/yabridge](../packaging/yabridge/README.md).
+
+## Application identity
+
+Playback-node metadata takes precedence, with missing application and
+process fields filled from the owning PipeWire client. Electron process
+names and Wine/Proton executable names are normalized before looking up
+routing rules and saved overrides. On loading legacy aliases, an existing
+canonical override wins. Assigning or forgetting an app uses the same key.
+Pre-assignments from desktop launchers remain best-effort when the running
+application reports a different identity.
+
 ## The device protocols
 
-The five devices speak three dialects, all reached without detaching
-the kernel's audio driver:
+The five devices use vendor-block and class-request protocols plus ALSA
+controls, all reached without detaching the kernel's audio driver:
 
 - Wave XLR Pro, Wave XLR MK.2 and XLR Dock MK.2: a vendor block bank
   on the unclaimed interface (`bmRequestType 0x41/0xC1`, `bRequest 1`,
@@ -141,12 +165,14 @@ processes.
 
 ```
 src/            .NET solution: Core (device + mixer), Daemon, UI, Probe, Tests
+native/         optional C/C++ plugin host, vendored interface headers, editor tests
 plugin/         the OpenDeck (Stream Deck) plugin
 docs/           this documentation, protocol write-up, capture guides
 tools/          proprobe.py, a standalone Python probe for the vendor protocol,
                 and the CI checks (versions, locked restores, the OpenAPI
                 document's shape, the rpm recipe's %files)
 packaging/      systemd unit, the pipewire-pulse open-file drop-in, udev rule,
-                WirePlumber rules, UCM profile, rpm and nix packaging, OpenDeck patches
+                WirePlumber rules, UCM profile, rpm and nix packaging, OpenDeck patches,
+                optional yabridge companion source and package recipes
 debian/         Debian/Ubuntu packaging
 ```

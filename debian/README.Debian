@@ -9,6 +9,7 @@ After installing:
 
 Stream Deck control via OpenDeck:
 
+    mkdir -p ~/.config/opendeck/plugins
     cp -r /usr/share/openxlr/com.emaspa.openxlr.sdPlugin \
         ~/.config/opendeck/plugins/
 
@@ -18,6 +19,13 @@ standard LADSPA path. Without that optional package the ClipGuard control
 is disabled; all other controls and the existing microphone route continue
 to work.
 
-Inserts (per-channel and per-mix plugin chains) offer whatever LV2
-plugins are installed in /usr/lib/lv2 or ~/.lv2; lsp-plugins-lv2 is a
-good first set.
+Inserts on XLR inputs and mixes support LV2, CLAP and VST3. The package
+includes the native helper for CLAP/VST3 and plugin editors. Install
+compatible plugins separately; lsp-plugins-lv2 supplies LV2 effects.
+Windows VST3/CLAP additionally need Wine and yabridge. The optional
+openxlr-yabridge companion has a separate build/artifact workflow and
+private wrappers; it is not automatically installed with openxlr.
+
+Manual and bridge setup:
+https://github.com/emaspa/openxlr/blob/main/docs/manual.md#windows-plugins
+For matching release documentation, select the installed version's tag.
