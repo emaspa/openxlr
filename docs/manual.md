@@ -578,6 +578,13 @@ requires size increments. The plugin draws its own contents; a Windows
 editor running through Wine can still briefly expose an unpainted edge
 while it redraws during a drag.
 
+LSP editors use software rendering by default. Their OpenGL renderer can
+stop repainting after a continuous drag to a large size, requiring the
+editor to be closed and reopened. To test OpenGL again, start the daemon
+with `LSP_WS_LIB_GLXSURFACE=1` in its environment. An explicit renderer
+setting takes precedence over the default. This setting controls LSP's
+editor rendering; it does not change audio processing.
+
 The editor draws on an X11 display, which means XWayland on a Wayland
 desktop, and the daemon has to know about it. A user service started
 before the desktop published its display has none of its own, so OpenXLR

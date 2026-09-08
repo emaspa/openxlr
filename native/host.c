@@ -726,6 +726,13 @@ static const Backend *backend_named(const char *name) {
   return NULL;
 }
 
+static bool configure_editor_environment(void) {
+  // LSP's OpenGL editor can stop repainting after continuous large resizes.
+  // Its software renderer stays responsive. Only LSP reads this setting;
+  // keep an explicit choice supplied by the user.
+  return setenv("LSP_WS_LIB_GLXSURFACE", "0", 0) == 0;
+}
+
 int main(int argc, char **argv) {
   if (argc == 3 && !strcmp(argv[1], "scan-clap"))
     return clap_scan(argv[2]);
@@ -755,6 +762,11 @@ int main(int argc, char **argv) {
   if (channels < 1 || channels > MAX_CHANNELS || h.rate < 8000 ||
       h.rate > 384000)
     return 2;
+  // Set the renderer before loading plugin code or starting audio threads.
+  if (!configure_editor_environment()) {
+    perror("editor renderer environment");
+    return 1;
+  }
   setvbuf(stdout, NULL, _IOLBF, 0);
   XSetErrorHandler(report_x_error);
   XSetIOErrorHandler(lost_x_connection);

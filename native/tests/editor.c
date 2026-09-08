@@ -93,6 +93,21 @@ static void assert_bounds(Host *h, int min_width, int min_height,
 }
 
 int main(void) {
+  const char *renderer = getenv("LSP_WS_LIB_GLXSURFACE");
+  char *saved_renderer = renderer ? strdup(renderer) : NULL;
+  assert(!renderer || saved_renderer);
+  assert(unsetenv("LSP_WS_LIB_GLXSURFACE") == 0);
+  assert(configure_editor_environment());
+  assert(!strcmp(getenv("LSP_WS_LIB_GLXSURFACE"), "0"));
+  assert(setenv("LSP_WS_LIB_GLXSURFACE", "1", 1) == 0);
+  assert(configure_editor_environment());
+  assert(!strcmp(getenv("LSP_WS_LIB_GLXSURFACE"), "1"));
+  if (saved_renderer) {
+    assert(setenv("LSP_WS_LIB_GLXSURFACE", saved_renderer, 1) == 0);
+    free(saved_renderer);
+  } else
+    assert(unsetenv("LSP_WS_LIB_GLXSURFACE") == 0);
+  puts("PASS: LSP rendering defaults to software and preserves an explicit override");
   pw_init(NULL, NULL);
   Host h = {.backend = &test_backend, .has_editor = true,
             .node_name = "openxlr-editor-test"};

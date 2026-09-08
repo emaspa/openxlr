@@ -36,6 +36,13 @@ fixed-size editors and plugin-driven scaling, the Wine coordinate nudge
 and display cleanup. Real plugin repainting and mouse input still need
 desktop testing.
 
+`python3 native/tests/lsp-editor.py` is an opt-in desktop regression using
+an isolated LSP Gate Mono LV2 instance. It needs python-xlib, the installed
+plugin, a running PipeWire server and a display large enough for the tested
+sizes. It drags the editor to large sizes and back, checking that changed
+parameters still repaint. `--host PATH` selects another build; `--opengl`
+tests the explicit OpenGL override. It creates no audio links.
+
 ## What it does
 
 - One process per insert, holding one plugin instance and its editor.
@@ -111,6 +118,12 @@ The host calls a UI's LV2 resize interface when present and forwards the
 child window's minimum and maximum dimensions to the outer window. Changed
 size hints are read again, so a plugin's scaling controls can update them.
 LV2 editors do not receive the Wine coordinate nudge.
+
+Before loading a plugin, the helper defaults `LSP_WS_LIB_GLXSURFACE` to `0`
+unless the user already set it. LSP's software renderer avoids the repaint
+freeze reproduced with its OpenGL renderer during large continuous resizes.
+The setting is specific to LSP and applies to its editors in every hosted
+format. Set it to `1` in the daemon environment to test OpenGL again.
 
 For CLAP: parameters, the audio ports, the X11 editor, timers, file
 descriptors, thread checks and a log. The same binary describes a CLAP
