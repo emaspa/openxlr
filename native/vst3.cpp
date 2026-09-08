@@ -1190,6 +1190,18 @@ void vst3_editor_lost(Host *h) {
 
 bool vst3_editor_idle(Host *) { return false; }
 
+void vst3_editor_constrain(Host *h, unsigned *width, unsigned *height) {
+  Vst3 *v = of(h);
+  if (!v->view)
+    return;
+  ViewRect rect(0, 0, (int32)*width, (int32)*height);
+  if (v->view->checkSizeConstraint(&rect) == kResultOk &&
+      rect.getWidth() > 0 && rect.getHeight() > 0) {
+    *width = (unsigned)rect.getWidth();
+    *height = (unsigned)rect.getHeight();
+  }
+}
+
 void vst3_editor_resized(Host *h, unsigned width, unsigned height) {
   Vst3 *v = of(h);
   if (!v->view)
@@ -1213,6 +1225,7 @@ extern "C" const Backend vst3_backend = {
     vst3_editor_lost,
     vst3_editor_focus,
     vst3_editor_resized,
+    vst3_editor_constrain,
     vst3_main_thread,
     vst3_unload,
 };

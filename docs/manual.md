@@ -569,6 +569,11 @@ A CLAP or VST3 plugin has no shared chain to go back to, so it always runs
 this way: its row shows no switch, and the cog opens its editor whenever
 the plugin is running.
 
+Dragging a VST3 editor's border follows the sizes the plugin supports, so
+an editor with size increments may move in steps. The plugin draws its own
+contents; a Windows editor running through Wine can still briefly expose
+an unpainted edge while it redraws during a drag.
+
 The editor draws on an X11 display, which means XWayland on a Wayland
 desktop, and the daemon has to know about it. A user service started
 before the desktop published its display has none of its own, so OpenXLR

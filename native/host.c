@@ -79,12 +79,22 @@ void host_control_moved_rt(Host *h, Control *c, float value) {
 // gone. What the plugin built inside the window cannot be cleaned up through
 // a dead connection, so it stays until this process exits.
 static void forget_ui(Host *h) {
+  if (h->editor_source) {
+    pw_loop_destroy_source(host_loop(h), h->editor_source);
+    h->editor_source = NULL;
+  }
   if (h->editor_open && h->backend->editor_lost)
     h->backend->editor_lost(h);
   h->editor_open = false;
   h->display = NULL;
   h->window = 0;
   h->child = 0;
+  h->notified_width = h->notified_height = 0;
+  h->self_width = h->self_height = 0;
+  h->child_width = h->child_height = 0;
+  h->settle_ticks = h->settle_width = h->settle_height = 0;
+  h->frame_x = h->frame_y = 0;
+  h->dragged_at = (struct timespec){0};
 }
 
 void host_editor_lost(Host *h) {
@@ -94,7 +104,7 @@ void host_editor_lost(Host *h) {
 
 // A backend's own callbacks (a plugin's timer, say) reach these outside any
 // guard, so each one arms its own unless a caller already has.
-static bool told_lately(Host *h, unsigned width, unsigned height);
+static bool same_editor_size(Host *h, unsigned width, unsigned height);
 static bool dragging(Host *h);
 
 void host_resize_editor(Host *h, unsigned width, unsigned height) {
@@ -262,15 +272,21 @@ static void fit_to_child(Host *h) {
     XSelectInput(h->display, h->child, StructureNotifyMask);
     XWindowAttributes attributes;
     if (XGetWindowAttributes(h->display, h->child, &attributes) &&
-        attributes.width > 0 && attributes.height > 0)
-      XResizeWindow(h->display, h->window, (unsigned)attributes.width,
-                    (unsigned)attributes.height);
+        attributes.width > 0 && attributes.height > 0) {
+      h->self_width = (unsigned)attributes.width;
+      h->self_height = (unsigned)attributes.height;
+      XResizeWindow(h->display, h->window, h->self_width, h->self_height);
+    }
   }
   if (children)
     XFree(children);
 }
 
 static void close_ui(Host *h) {
+  if (h->editor_source) {
+    pw_loop_destroy_source(host_loop(h), h->editor_source);
+    h->editor_source = NULL;
+  }
   if (!h->display) {
     forget_ui(h);
     return;
@@ -303,8 +319,10 @@ static bool raise_ui(Host *h) {
 }
 
 // Open the window and hand it to the backend. Every X call of the editor's
-// life happens here, in raise_ui, in the tick or in a backend's guarded
-// callback.
+// life happens here, in raise_ui, in the event pump or in a backend's guarded
+// callback. Watch the X connection so a drag need not wait for the idle tick.
+static void editor_events(void *data, int fd, uint32_t mask);
+
 static bool open_ui(Host *h) {
   if (h->editor_open)
     return raise_ui(h);
@@ -346,6 +364,9 @@ static bool open_ui(Host *h) {
       fit_to_child(h);  // before mapping, so the frame never opens wrong
       XMapRaised(h->display, h->window);
       XFlush(h->display);
+      h->editor_source = pw_loop_add_io(host_loop(h), ConnectionNumber(h->display),
+                                        SPA_IO_IN | SPA_IO_HUP | SPA_IO_ERR,
+                                        false, editor_events, h);
       h->settle_ticks = 6;   // once it is on screen, teach it where that is
     }
   }
@@ -368,34 +389,18 @@ static bool dragging(Host *h) {
   return since < 400;
 }
 
-// Whether the plugin has been told this size in the last second, which means
-// the two of them are going round rather than the user dragging: a drag
-// passes through a size once, a loop keeps coming back to it. Telling it
-// again is what keeps the loop alive, so this is where it ends.
-static bool told_lately(Host *h, unsigned width, unsigned height) {
-  struct timespec now;
-  clock_gettime(CLOCK_MONOTONIC, &now);
-  bool seen = false;
-  for (unsigned i = 0; i < 8; ++i) {
-    if (h->recent_sizes[i].width != width || h->recent_sizes[i].height != height)
-      continue;
-    long age = (now.tv_sec - h->recent_sizes[i].at.tv_sec) * 1000 +
-               (now.tv_nsec - h->recent_sizes[i].at.tv_nsec) / 1000000;
-    if (age < 1000)
-      seen = true;
-  }
-  if (!seen) {
-    h->recent_sizes[h->recent_next].width = width;
-    h->recent_sizes[h->recent_next].height = height;
-    h->recent_sizes[h->recent_next].at = now;
-    h->recent_next = (h->recent_next + 1) % 8;
-  }
+// X reports moves and echoes as well as new sizes. Only skip the last size:
+// returning to an earlier size is normal when the user reverses a drag.
+static bool same_editor_size(Host *h, unsigned width, unsigned height) {
+  bool seen = h->notified_width == width && h->notified_height == height;
+  h->notified_width = width;
+  h->notified_height = height;
   return seen;
 }
 
 // One pass of the editor: its events and the backend's idle work. Losing
 // the display here costs the editor and nothing else.
-static void pump_editor(Host *h) {
+static void pump_editor(Host *h, bool idle) {
   if (sigsetjmp(x_escape, 0)) {
     x_escape_armed = 0;
     host_editor_lost(h);
@@ -456,22 +461,37 @@ static void pump_editor(Host *h) {
         (plugin_width != h->child_width || plugin_height != h->child_height) &&
         XGetWindowAttributes(h->display, h->window, &attributes) &&
         ((unsigned)attributes.width != plugin_width ||
-         (unsigned)attributes.height != plugin_height))
+         (unsigned)attributes.height != plugin_height)) {
+      h->self_width = plugin_width;
+      h->self_height = plugin_height;
       XResizeWindow(h->display, h->window, plugin_width, plugin_height);
+    }
     if (frame_resized) {
+      bool user_size = frame_width != h->self_width || frame_height != h->self_height;
+      if (user_size)
+        clock_gettime(CLOCK_MONOTONIC, &h->dragged_at);
+      if (user_size && h->backend->editor_constrain) {
+        unsigned width = frame_width, height = frame_height;
+        h->backend->editor_constrain(h, &width, &height);
+        if (width > 0 && height > 0 && width <= 16384 && height <= 16384 &&
+            (width != frame_width || height != frame_height)) {
+          frame_width = h->self_width = width;
+          frame_height = h->self_height = height;
+          XResizeWindow(h->display, h->window, width, height);
+        }
+      }
+      // Let the plugin lay out before enlarging its embedding window, which
+      // otherwise exposes pixels the plugin has not drawn yet.
+      if (h->backend->editor_resized &&
+          !same_editor_size(h, frame_width, frame_height))
+        h->backend->editor_resized(h, frame_width, frame_height);
       if (XGetWindowAttributes(h->display, h->child, &attributes) &&
           ((unsigned)attributes.width != frame_width ||
            (unsigned)attributes.height != frame_height)) {
         XResizeWindow(h->display, h->child, frame_width, frame_height);
-        h->child_width = frame_width;
-        h->child_height = frame_height;
       }
-      // A size the frame did not ask for is the user's doing.
-      if (frame_width != h->self_width || frame_height != h->self_height)
-        clock_gettime(CLOCK_MONOTONIC, &h->dragged_at);
-      if (h->backend->editor_resized &&
-          !told_lately(h, frame_width, frame_height))
-        h->backend->editor_resized(h, frame_width, frame_height);
+      h->child_width = frame_width;
+      h->child_height = frame_height;
     }
   }
   // A window that has just opened or moved has to change size once for a
@@ -480,8 +500,10 @@ static void pump_editor(Host *h) {
   // the screen. A pixel smaller, then back a moment later, teaches it. The
   // two halves are ticks apart so the plugin has laid itself out in between,
   // and it costs a plugin that needed none of this one relayout.
-  if (h->settle_ticks > 0 && --h->settle_ticks == 0) {
+  if (idle && h->settle_ticks > 0 && --h->settle_ticks == 0) {
     if (h->settle_height > 0) {
+      h->self_width = h->settle_width;
+      h->self_height = h->settle_height;
       XResizeWindow(h->display, h->window, h->settle_width, h->settle_height);
       XFlush(h->display);
       h->settle_height = 0;
@@ -491,16 +513,29 @@ static void pump_editor(Host *h) {
           attributes.width > 1 && attributes.height > 1) {
         h->settle_width = (unsigned)attributes.width;
         h->settle_height = (unsigned)attributes.height;
+        h->self_width = h->settle_width;
+        h->self_height = h->settle_height - 1;
         XResizeWindow(h->display, h->window, h->settle_width, h->settle_height - 1);
         XFlush(h->display);
         h->settle_ticks = 4;   // put it back once the plugin has caught up
       }
     }
   }
-  bool finished = h->backend->editor_idle && h->backend->editor_idle(h);
+  bool finished = idle && h->backend->editor_idle && h->backend->editor_idle(h);
+  XFlush(h->display);
   x_escape_armed = 0;
   if (finished)
     close_ui(h);
+}
+
+static void editor_events(void *data, int fd, uint32_t mask) {
+  Host *h = data;
+  if (mask & (SPA_IO_HUP | SPA_IO_ERR)) {
+    host_editor_lost(h);
+    return;
+  }
+  if (h->editor_open)
+    pump_editor(h, false);
 }
 
 // --- the command pipe -------------------------------------------------------
@@ -598,7 +633,7 @@ static void tick(void *data, uint64_t expirations) {
   if (h->backend->main_thread)
     h->backend->main_thread(h);
   if (h->editor_open)
-    pump_editor(h);
+    pump_editor(h, true);
 }
 
 static void stop(void *data, int signal) {

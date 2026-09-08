@@ -26,6 +26,14 @@ It needs a C11 compiler, make, pkg-config and the development files for
 PipeWire, lilv, LV2 and X11; the libraries it links are already runtime
 dependencies of every package.
 
+`make -C native test-editor` runs the host's resize regression tests on
+`DISPLAY`, using a small test editor and a separate X connection. On a
+machine without a desktop, run `xvfb-run -a make -C native test-editor`.
+These tests need neither a plugin installation nor a running PipeWire
+server. They cover event delivery without idle polling, coalesced sizes,
+drag reversal, size constraints, the Wine coordinate nudge and display
+cleanup. Real plugin repainting and mouse input still need desktop testing.
+
 ## What it does
 
 - One process per insert, holding one plugin instance and its editor.
@@ -117,6 +125,14 @@ plugin is assumed to have one and the host finds out when asked. The
 interface headers are vendored under `vst3/` (MIT, VST 3.8.1); only their
 inline parts are used, so nothing of the SDK is compiled. Windows VST3
 plugins arrive through yabridge as ordinary bundles.
+
+Editor X events wake the main loop directly; the 30 Hz tick remains for
+idle work and the Wine coordinate workaround. During a frame resize, the
+VST3 backend checks the plugin's size constraints before notifying its
+view, and the embedding window follows after that callback. Consecutive
+duplicate sizes are skipped, but reversing a drag delivers the old size
+again. Plugin resize requests and child-window echoes remain suppressed
+while the user is resizing the frame.
 
 State and presets, and VST2, are separate work. Changing an insert's host
 rebuilds its chain; nothing here swaps a plugin without a gap.

@@ -54,6 +54,8 @@ typedef struct {
   void (*editor_focus)(Host *h, bool focused);
   // The user resized the frame; the plugin may want to lay out again.
   void (*editor_resized)(Host *h, unsigned width, unsigned height);
+  // Adjust a user-requested size before resizing the frame or the editor.
+  void (*editor_constrain)(Host *h, unsigned *width, unsigned *height);
   // Each tick, outside the guard: whatever the plugin asked for meanwhile.
   void (*main_thread)(Host *h);
   void (*unload)(Host *h);
@@ -96,6 +98,7 @@ struct Host {
   _Atomic bool audio_thread_known;
   // The editor's window
   Display *display;
+  struct spa_source *editor_source;
   Window window, child;
   Atom close_message;
   bool editor_open;
@@ -107,12 +110,8 @@ struct Host {
   unsigned settle_ticks;
   int frame_x, frame_y;  // where the frame was, to notice that it moved
   unsigned settle_width, settle_height;  // the size to put back afterwards
-  // The last few sizes the plugin was told, with when. A plugin that answers
-  // a size by asking for another one, which the frame then reports back to
-  // it, would go round for ever; a size it was told a moment ago is that
-  // going round, not the user dragging, so it is not worth telling again.
-  struct { unsigned width, height; struct timespec at; } recent_sizes[8];
-  unsigned recent_next;
+  // Ignore consecutive duplicates, but deliver A -> B -> A during a drag.
+  unsigned notified_width, notified_height;
   // When the frame last changed size for a reason of its own, meaning the
   // user is dragging it. While that is going on the plugin's own requests
   // are left unanswered: two things pulling one window in different

@@ -43,9 +43,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            g++ libpipewire-0.3-dev liblilv-dev lv2-dev libx11-dev
+            g++ libpipewire-0.3-dev liblilv-dev lv2-dev libx11-dev xvfb xauth
           make -C native
           test -x native/openxlr-lv2-host
+          xvfb-run -a make -C native test-editor
 
       - name: Lint shell scripts
         run: shellcheck --severity=error tools/check-version.sh tools/check-locked-restore.sh packaging/ppa/make-source.sh

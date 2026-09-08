@@ -22,6 +22,15 @@ openxlr-lv2-host: $(OBJECTS)
 %.o: %.cpp $(HEADERS)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
-.PHONY: clean
+tests/editor.o: tests/editor.c host.c $(HEADERS)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
+tests/editor: tests/editor.o lv2.o clap.o vst3.o
+	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+.PHONY: test-editor clean
+test-editor: tests/editor
+	./tests/editor
+
 clean:
-	rm -f openxlr-lv2-host $(OBJECTS)
+	rm -f openxlr-lv2-host $(OBJECTS) tests/editor tests/editor.o

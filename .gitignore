@@ -6,6 +6,8 @@ src/*/bin/
 src/*/obj/
 native/openxlr-lv2-host
 native/*.o
+native/tests/*.o
+native/tests/editor
 # nix build output symlink
 result
 
