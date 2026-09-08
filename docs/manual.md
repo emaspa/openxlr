@@ -669,6 +669,15 @@ WirePlumber rule that keeps the dock's capture source always active
 `packaging/` into `~/.config/wireplumber/wireplumber.conf.d/` and
 restart WirePlumber.
 
+A second cause, when the microphone is silent only after a reboot: the
+dock forgets its gain at every power cycle and comes back at the gain its
+firmware chooses, which is lower than most people set. OpenXLR gives the
+gain back when the dock connects, even when the gain lock is on, from
+0.1.30 onwards. On an older version, take the lock off and set the gain
+again. A gate or an expander in the insert chain, tuned at the gain you
+meant to have, stays shut at a lower one and passes nothing at all, which
+is what makes the microphone sound dead rather than quiet.
+
 <a name="daemon-not-starting"></a>
 ### 5.3 Daemon does not start after an upgrade, or after a reboot
 

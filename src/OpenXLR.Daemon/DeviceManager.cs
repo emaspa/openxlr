@@ -415,7 +415,7 @@ public sealed class DeviceManager : BackgroundService
             catch (Exception ex) { last = null; _log.LogWarning("loading last settings of {dev}: {msg}", id, ex.Message); }
             _restorePending = false;
             if (last is null) return null;
-            string? err = ApplyProfile(last);
+            string? err = ApplyProfile(last, restoring: true);
             NoteChangedLocked();
             return err is null ? $"restored the last settings of {id}" : $"restoring the last settings of {id}: {err}";
         }
@@ -687,19 +687,30 @@ public sealed class DeviceManager : BackgroundService
     /// on purpose: they follow the mixer's monitor-output selection (synced
     /// every sweep), which the profile's mixer half restores instead.
     /// </summary>
-    public string? ApplyProfile(DeviceState p)
+    /// <summary>
+    /// Write a saved state to the device. <paramref name="restoring"/> marks
+    /// the settings a device that forgets its own is being given back on
+    /// connect, which includes its gain even when the gain lock is set: the
+    /// lock is there to keep the gain where the user put it, and refusing to
+    /// restore it leaves the hardware at whatever its firmware powers up
+    /// with, which is the one outcome the lock exists to prevent. A profile
+    /// loaded by hand is a change like any other and the lock still refuses.
+    /// </summary>
+    public string? ApplyProfile(DeviceState p, bool restoring = false)
     {
         lock (_gate)
         {
             if (_device is null || !_device.Connected) return "no device connected";
             DeviceState s = _last ?? Stamp(_device.ReadState());
             DeviceCapabilities c = _device.Capabilities;
-            bool gainBlocked = GainIsLocked &&
+            bool lockApplies = GainIsLocked && !restoring;
+            bool gainBlocked = lockApplies &&
                 (c.Gain && s.GainDb != p.GainDb ||
                  c.Gain && c.XlrInputs > 1 && s.Gain2Db != p.Gain2Db);
+            bool gainRestored = GainIsLocked && restoring && c.Gain && s.GainDb != p.GainDb;
             try
             {
-                if (c.Gain && !GainIsLocked && s.GainDb != p.GainDb) _device.SetGainDb(p.GainDb);
+                if (c.Gain && !lockApplies && s.GainDb != p.GainDb) _device.SetGainDb(p.GainDb);
                 if (c.Mute && s.Mute != p.Mute) _device.SetMute(p.Mute);
                 if (c.LowCut && s.LowCut != p.LowCut) _device.SetLowCut(p.LowCut);
                 if (c.Expander && s.Expander != p.Expander) _device.SetExpander(p.Expander);
@@ -708,7 +719,7 @@ public sealed class DeviceManager : BackgroundService
                 if (c.Phantom && s.Phantom != p.Phantom) { _device.SetPhantom(p.Phantom); _phantomWroteAt = DateTime.UtcNow; }
                 if (c.ClipGuard && s.ClipGuard != p.ClipGuard) _device.SetClipGuard(p.ClipGuard);
                 if (c.Compressor && s.Compressor != p.Compressor) _device.SetCompressor(p.Compressor);
-                if (c.Gain && c.XlrInputs > 1 && !GainIsLocked && s.Gain2Db != p.Gain2Db) _device.SetGain2Db(p.Gain2Db);
+                if (c.Gain && c.XlrInputs > 1 && !lockApplies && s.Gain2Db != p.Gain2Db) _device.SetGain2Db(p.Gain2Db);
                 if (c.Mute && c.XlrInputs > 1 && s.Mute2 != p.Mute2) _device.SetMute2(p.Mute2);
                 if (c.LowCut && c.XlrInputs > 1 && s.LowCut2 != p.LowCut2) _device.SetLowCut2(p.LowCut2);
                 if (c.Expander && c.XlrInputs > 1 && s.Expander2 != p.Expander2) _device.SetExpander2(p.Expander2);
@@ -734,6 +745,7 @@ public sealed class DeviceManager : BackgroundService
             // Not an error: the profile loaded and the state was broadcast.
             // The lock is visible to every client in the state itself.
             if (gainBlocked) _log.LogInformation("profile loaded; gain left unchanged because the gain lock is active");
+            if (gainRestored) _log.LogInformation("gain restored to {db} dB; the lock keeps it there rather than at the firmware's own", p.GainDb);
             return null;
         }
     }

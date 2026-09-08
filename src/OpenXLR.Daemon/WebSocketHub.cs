@@ -281,11 +281,11 @@ public sealed class WebSocketHub
     /// block the mixer scene (and the other way round). The mixer half is
     /// skipped when this run has no submixer. Null on success.
     /// </summary>
-    private string? ApplyNamedProfile(string devId, string name)
+    private string? ApplyNamedProfile(string devId, string name, bool restoring = false)
     {
         OpenXLR.Core.Profile? p = OpenXLR.Core.ProfileStore.Load(devId, name);
         if (p is null) return $"no profile named '{name}'";
-        string? devErr = p.Device is null ? null : _devices.ApplyProfile(p.Device);
+        string? devErr = p.Device is null ? null : _devices.ApplyProfile(p.Device, restoring);
         string? mixErr = p.Mixer is null || !_mixer.SubmixerEnabled ? null : _mixer.ApplyScene(p.Mixer);
         if (devErr is null && mixErr is null) _activeProfile[devId] = name;
         return devErr ?? mixErr;
@@ -342,7 +342,9 @@ public sealed class WebSocketHub
         while (_mixer.SubmixerEnabled && !_mixer.Built && Environment.TickCount64 < deadline && !_stopping.IsCancellationRequested)
             await Task.Delay(250, _stopping).ContinueWith(_ => { }, TaskScheduler.Default);
         if (_stopping.IsCancellationRequested || ActiveDeviceId() != devId) { _devices.MarkRestored(); return; }
-        string? err = ApplyNamedProfile(devId, name);
+        // The device just connected and is being given its settings back,
+        // gain included: see ApplyProfile.
+        string? err = ApplyNamedProfile(devId, name, restoring: true);
         _devices.MarkRestored();
         if (err is null) _log.LogInformation("recalled profile '{name}' on connect of {dev}", name, devId);
         else _log.LogWarning("recall of profile '{name}' on connect of {dev}: {err}", name, devId, err);

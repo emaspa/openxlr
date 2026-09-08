@@ -51,7 +51,10 @@ For devices without the hardware version, the PipeWire layer provides:
 - Gain lock: the daemon rejects every gain change while the lock is set,
   from any client, and stores the lock per device in `gainlock.json`.
   Shown only for devices without a physical gain dial, which would
-  bypass it.
+  bypass it. Giving a device its own settings back when it connects is
+  not a change and goes through: a dock that forgets its settings would
+  otherwise come up at whatever gain its firmware chooses, which is the
+  one thing the lock is there to prevent.
 
 These controls appear only when the active device lacks the hardware
 version, so a signal is never filtered twice.
