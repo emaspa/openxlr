@@ -154,6 +154,13 @@ software mix instead, with a few milliseconds of delay.
 The APPLICATIONS card lists every app that is currently registered with
 PipeWire as an audio client; a green light means it is playing.
 
+An app's playback streams and audio client share the same identity even
+when PipeWire puts the process name only on the client. Windows executable
+names such as `Balatro.exe` use the same normalized key as their Wine or
+Proton client, so the app keeps one entry and one channel assignment.
+When older settings contain both that key and a stale executable-name
+alias, the existing normalized assignment takes precedence.
+
 1. Change the channel in the dropdown next to the app. The move happens
    immediately and is remembered for that app. The channels also appear
    as playback devices in your desktop's audio applet (KDE's, for one),

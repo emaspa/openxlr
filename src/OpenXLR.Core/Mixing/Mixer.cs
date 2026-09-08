@@ -904,8 +904,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             foreach (string cell in s.ChannelMuted)
                 if (_cells.Contains(cell)) _muted.Add(cell);
 
-            foreach ((string identity, string channelId) in s.AppOverrides)
-                Matcher.SetOverride(StreamMatcher.MigrateIdentity(Sanitize(identity)), _config.ResolveApplicationChannel(channelId));
+            foreach ((string identity, string channelId) in StreamMatcher.MigrateOverrides(s.AppOverrides))
+                Matcher.SetOverride(identity, _config.ResolveApplicationChannel(channelId));
 
             // Remembered apps come back inactive until a stream appears.
             // Identities saved before the "(deleted)" fix are migrated here so
@@ -915,7 +915,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 string identity = StreamMatcher.MigrateIdentity(Sanitize(app.Identity));
                 if (PipeWireAdapter.IsPlumbingIdentity(identity)) continue;   // pre-filter leftovers
                 if (!_apps.ContainsKey(identity))
-                    _apps[identity] = new StreamAssignment(0, 0, Sanitize(app.Label), identity, _config.ResolveApplicationChannel(app.ChannelId)) { Active = false, Running = false };
+                    _apps[identity] = new StreamAssignment(0, 0, Sanitize(app.Label), identity,
+                        Matcher.Overrides.TryGetValue(identity, out string? pinned)
+                            ? pinned : _config.ResolveApplicationChannel(app.ChannelId)) { Active = false, Running = false };
             }
 
             static string Sanitize(string v) => v.EndsWith(" (deleted)", StringComparison.Ordinal) ? v[..^10] : v;
@@ -1596,6 +1598,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     {
         lock (_gate)
         {
+            identity = StreamMatcher.MigrateIdentity(identity);
             _apps.Remove(identity);
             Matcher.RemoveOverride(identity);
         }
@@ -1610,6 +1613,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         lock (_gate)
         {
             if (string.IsNullOrWhiteSpace(identity)) return;
+            identity = StreamMatcher.MigrateIdentity(identity);
             if (channelId == StreamMatcher.Ignore)
             {
                 // Stop managing the app: remember the choice, hand its live

@@ -1209,10 +1209,11 @@ public sealed class PipeWireAdapter
     /// not. Browsers, chat apps and players connect as clients the moment they
     /// initialise audio, so this is "audio-capable and running".
     /// </summary>
-    public IReadOnlyList<AudioStream> ListClients()
+    public IReadOnlyList<AudioStream> ListClients() => ListClients(DumpJson());
+
+    internal static IReadOnlyList<AudioStream> ListClients(byte[] json)
     {
         var found = new List<AudioStream>();
-        byte[] json = DumpJson();
         JsonDocument doc;
         try { doc = PipeWireSnapshot.Parse(json); }
         catch (JsonException) { return found; }
@@ -1251,15 +1252,29 @@ public sealed class PipeWireAdapter
     /// with the identity fields the matcher needs. OpenXLR's own loopbacks are
     /// excluded: they are plumbing, not applications.
     /// </summary>
-    public IReadOnlyList<AudioStream> ListStreams()
+    public IReadOnlyList<AudioStream> ListStreams() => ListStreams(DumpJson());
+
+    internal static IReadOnlyList<AudioStream> ListStreams(byte[] json)
     {
         var found = new List<AudioStream>();
-        byte[] json = DumpJson();
         JsonDocument doc;
         try { doc = PipeWireSnapshot.Parse(json); }
         catch (JsonException) { return found; }
         using (doc)
         {
+            // Native PipeWire streams can leave process metadata on their
+            // owning client. Read it from this same snapshot, regardless of
+            // whether the client appears before or after its playback node.
+            var clients = new Dictionary<int, JsonElement>();
+            foreach (JsonElement o in doc.RootElement.EnumerateArray())
+                if (o.TryGetProperty("type", out JsonElement type) &&
+                    type.GetString() == "PipeWire:Interface:Client" &&
+                    o.TryGetProperty("id", out JsonElement id) && id.ValueKind == JsonValueKind.Number &&
+                    id.TryGetInt32(out int clientId) &&
+                    o.TryGetProperty("info", out JsonElement info) && info.ValueKind == JsonValueKind.Object &&
+                    info.TryGetProperty("props", out JsonElement props))
+                    clients[clientId] = props;
+
             foreach (JsonElement o in doc.RootElement.EnumerateArray())
             {
                 if (!o.TryGetProperty("type", out JsonElement t) ||
@@ -1289,12 +1304,17 @@ public sealed class PipeWireAdapter
                              os.TryGetInt32(out int sv) ? sv : o.GetProperty("id").GetInt32();
                 // A binary replaced on disk while running (updates) reports
                 // as "name (deleted)"; strip it or the app splits identities.
-                string? binary = Str(props, "application.process.binary");
+                JsonElement client = default;
+                if (props.TryGetProperty("client.id", out JsonElement owner) && owner.ValueKind == JsonValueKind.Number &&
+                    owner.TryGetInt32(out int ownerId))
+                    clients.TryGetValue(ownerId, out client);
+                string? AppProperty(string key) => Str(props, key) ?? Str(client, key);
+                string? binary = AppProperty("application.process.binary");
                 if (binary is not null && binary.EndsWith(" (deleted)", StringComparison.Ordinal))
                     binary = binary[..^10];
                 found.Add(new AudioStream(
                     o.GetProperty("id").GetInt32(),
-                    Str(props, "application.name"),
+                    AppProperty("application.name"),
                     binary,
                     Str(props, "media.name")) { Serial = serial });
             }
@@ -1302,7 +1322,9 @@ public sealed class PipeWireAdapter
         return found;
 
         static string? Str(JsonElement props, string key)
-            => props.TryGetProperty(key, out JsonElement v) ? v.GetString() : null;
+            => props.ValueKind == JsonValueKind.Object && props.TryGetProperty(key, out JsonElement v) &&
+               v.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(v.GetString())
+                ? v.GetString() : null;
     }
 
     /// <summary>All audio nodes as (id, node.name, media.class).</summary>

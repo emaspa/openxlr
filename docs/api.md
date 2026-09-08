@@ -102,6 +102,13 @@ a bare `error` message, so an editor can wait for the acknowledgement:
 | `resetDevice` | none | write the firmware defaults back to a device without settings memory and forget its last settings (an error until the daemon has seen the device connect after a power cycle once); on the Wave XLR Pro, which keeps its own settings, write OpenXLR's baseline instead: gain 30 dB on both inputs, every processing stage and phantom off, headphones and aux level at half, the crossfade fully on PC, routing untouched, refused while the gain lock is on. The capabilities say `builtInDefaults` when a model has a baseline |
 | `getDiagnostics` | none | vendor block dump for bug reports |
 
+Application identities use playback-node metadata, falling back to the
+owning PipeWire client's application name and process binary when absent.
+Windows executable names normalize to the same key as their Wine/Proton
+client, for example `Balatro.exe` becomes `balatro`. `assignApp` and
+`forgetApp` also accept those legacy executable-name identities. When
+loading conflicting old and normalized overrides, the normalized key wins.
+
 Insert definitions optionally carry `nativeHost: true` to select the native
 LV2 helper for that insert. Missing or false keeps PipeWire filter-chain, even
 when the helper is installed. Unsupported native selections are rejected.

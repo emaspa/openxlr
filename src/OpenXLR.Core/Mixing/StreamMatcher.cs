@@ -90,13 +90,17 @@ public sealed class StreamMatcher
 
         // Wine and Proton report a shared binary, so treat them as games rather
         // than letting them fall through to System with every other unknown app.
-        if (IsWineLike(stream.Binary) || IsWineLike(stream.AppName)) return "game";
+        if (IsWineLike(stream.Binary) || IsWineLike(stream.AppName) ||
+            IsWindowsExecutable(stream.Binary) || IsWindowsExecutable(stream.AppName)) return "game";
 
         return _fallbackChannel;
     }
 
     private static bool IsWineLike(string? s) =>
         s is not null && WineLike.Any(w => s.Contains(w, StringComparison.OrdinalIgnoreCase));
+
+    internal static bool IsWindowsExecutable(string? name)
+        => name?.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) == true;
 
     /// <summary>
     /// A Windows game's stable key. The same game surfaces under several
@@ -119,9 +123,20 @@ public sealed class StreamMatcher
     /// through unchanged.
     /// </summary>
     public static string MigrateIdentity(string identity)
-        => identity.Contains(' ') || identity.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
-            ? GameIdentity(identity)
-            : identity;
+    {
+        if (identity.EndsWith(" (deleted)", StringComparison.Ordinal)) identity = identity[..^10];
+        return identity.Contains(' ') || IsWindowsExecutable(identity) ? GameIdentity(identity) : identity;
+    }
+
+    /// <summary>Prefer an existing canonical choice over a stale alias.</summary>
+    internal static IReadOnlyDictionary<string, string> MigrateOverrides(IReadOnlyDictionary<string, string> overrides)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach ((string identity, string channel) in overrides.OrderBy(pair =>
+                     string.Equals(pair.Key, MigrateIdentity(pair.Key), StringComparison.OrdinalIgnoreCase) ? 0 : 1))
+            result.TryAdd(MigrateIdentity(identity), channel);
+        return result;
+    }
 }
 
 /// <summary>One application playback stream in the graph.</summary>
@@ -148,6 +163,9 @@ public sealed record AudioStream(int Id, string? AppName, string? Binary, string
             // person both are "Steam", so they share one identity and one
             // channel assignment.
             if (bin.Equals("steamwebhelper", StringComparison.OrdinalIgnoreCase)) return "steam";
+            // The executable can be reported directly, or as the app name
+            // while the playback node omits its runtime binary entirely.
+            if (StreamMatcher.IsWindowsExecutable(bin)) return StreamMatcher.GameIdentity(bin);
             bool shared = bin.Contains("wine", StringComparison.OrdinalIgnoreCase) ||
                           bin.Contains("proton", StringComparison.OrdinalIgnoreCase);
             if (!shared) return bin;
