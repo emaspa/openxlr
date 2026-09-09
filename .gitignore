@@ -31,3 +31,6 @@ debian/*.substvars
 # PPA source packages and the vendored NuGet feed (packaging/ppa/make-source.sh)
 dist/
 vendor/
+
+# Claude Code per-machine local settings (model gateway wiring)
+.claude/settings.local.json
