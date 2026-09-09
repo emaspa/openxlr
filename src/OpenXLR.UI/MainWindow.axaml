@@ -204,16 +204,20 @@
                   Click="OnFlow" ToolTip.Tip="Show the live audio routing graph"/>
           <Button Content="Restart daemon" Padding="10,3" FontSize="12" Background="Transparent"
                   IsEnabled="{Binding DaemonRestart.CanRestart}" Click="OnRestartDaemon"
-                  ToolTip.Tip="Restart the OpenXLR user service. Audio will be interrupted briefly."/>
+                  ToolTip.Tip="Restart the OpenXLR daemon. Audio will be interrupted briefly."/>
           <TextBlock Name="HeaderVersion" Text="v0.0.0" Classes="h" VerticalAlignment="Center"/>
           <Button Content="About" Padding="10,3" FontSize="12" Background="Transparent"
                   Click="OnAbout"/>
+          <Button Content="Quit" Click="OnQuit" IsVisible="{Binding IsFlatpak}"
+                  ToolTip.Tip="Quit OpenXLR and stop its bundled daemon"/>
         </StackPanel>
       </Grid>
     </Border>
 
     <TextBlock Text="{Binding DaemonRestart.Status}" Classes="h" TextWrapping="Wrap"
                Margin="0,0,0,8" IsVisible="{Binding DaemonRestart.Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+    <TextBlock Text="{Binding SessionNotice}" Foreground="#e0a030" TextWrapping="Wrap" FontSize="12"
+               Margin="0,0,0,8" IsVisible="{Binding SessionNotice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
     <TextBlock Text="{Binding DaemonWarning}" Foreground="#e0a030" TextWrapping="Wrap" FontSize="12"
                Margin="0,0,0,8" IsVisible="{Binding DaemonWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 
@@ -232,7 +236,7 @@
         <Button DockPanel.Dock="Right" Content="Restart daemon" Padding="10,3" FontSize="12"
                 IsEnabled="{Binding DaemonRestart.CanRestart}"
                 VerticalAlignment="Center" Click="OnRestartDaemon"
-                ToolTip.Tip="systemctl --user restart openxlr-daemon"/>
+                ToolTip.Tip="Restart the OpenXLR daemon"/>
         <TextBlock Text="{Binding DaemonVersionNote}" Classes="h" TextWrapping="Wrap"
                    VerticalAlignment="Center" Margin="0,0,12,0"/>
       </DockPanel>

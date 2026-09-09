@@ -18,7 +18,7 @@ public partial class App : Application
         {
             // An earlier version wrote a user unit with a build-tree path on
             // packaged installs; fix it before the user has to notice.
-            if (UiSettings.Load().StartDaemonAtLogin)
+            if (!Deployment.IsFlatpak && UiSettings.Load().StartDaemonAtLogin)
                 StartupIntegration.RepairDaemonUnit();
 
             var window = new MainWindow();

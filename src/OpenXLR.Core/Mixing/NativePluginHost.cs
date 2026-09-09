@@ -93,7 +93,7 @@ internal sealed class NativePluginHost : IDisposable
     }
 
     /// <summary>Whether the optional helper was built and installed beside the daemon.</summary>
-    public static bool HostInstalled => File.Exists(Executable);
+    public static bool HostInstalled => !Deployment.IsFlatpak && File.Exists(Executable);
     /// <summary>
     /// What the helper implements for a plugin's DSP. The list is the same one
     /// native/lv2-host.c checks, and the two have to agree: this side decides

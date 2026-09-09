@@ -33,6 +33,7 @@ public abstract class ViewModelBase : INotifyPropertyChanged
 /// </summary>
 public sealed class MainViewModel : ViewModelBase
 {
+    public bool IsFlatpak => Deployment.IsFlatpak;
     public DaemonRestartViewModel DaemonRestart { get; } = new();
     public UpdatesViewModel Updates { get; } = new();
 
@@ -85,6 +86,8 @@ public sealed class MainViewModel : ViewModelBase
 
     private string _status = "connecting…";
     public string Status { get => _status; private set { if (Set(ref _status, value)) Raise(nameof(StatusLine)); } }
+    private string? _sessionNotice;
+    public string? SessionNotice { get => _sessionNotice; set => Set(ref _sessionNotice, value); }
 
     public string StatusLine => !DaemonConnected ? "Daemon not running"
         : DeviceConnected ? DeviceName

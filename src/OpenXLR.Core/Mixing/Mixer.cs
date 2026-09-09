@@ -111,6 +111,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// </summary>
     public void Build(MixerConfig config, string? monitorOutputSink = null, string? defaultSource = null)
     {
+        if (Deployment.IsFlatpak && config.Channels.Count * config.Mixes.Count > 45)
+            throw new InvalidOperationException("This Flatpak test build supports at most 45 channel-to-mix sends because it cannot inspect the host audio server's file limit.");
         lock (_gate)
         {
             if (_built) TearDownLocked();

@@ -1,0 +1,17 @@
+#!/bin/sh
+# Read-only preflight. Does not create routes or change hardware controls.
+set -eu
+printf 'Flatpak: %s\n' "${FLATPAK_ID:-not running in Flatpak}"
+printf 'Private configuration: %s/openxlr\n' "$XDG_CONFIG_HOME"
+for tool in dotnet pw-cli pw-dump pw-link pw-metadata pactl parec amixer; do command -v "$tool"; done
+test -f /app/lib/pipewire-0.3/libpipewire-module-filter-chain.so
+test -f /app/lib/ladspa/hard_limiter_1413.so
+test ! -e /app/lib/openxlr/daemon/openxlr-lv2-host
+printf '\nHost audio server:\n'
+pactl info
+printf '\nPipeWire connection:\n'
+pw-cli info 0
+printf '\nALSA controls:\n'
+ls /dev/snd/controlC* 2>/dev/null || true
+printf '\nUSB device nodes, host permissions still apply:\n'
+ls -l /dev/bus/usb/*/* 2>/dev/null || true

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=OpenXLR
+Comment=Control Elgato XLR interfaces and mix application audio
+Exec=openxlr
+Icon=io.github.emaspa.OpenXLR
+Terminal=false
+Categories=AudioVideo;Audio;Mixer;

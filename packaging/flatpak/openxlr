@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+export LV2_PATH="$XDG_DATA_HOME/openxlr/lv2:/app/lib/lv2:/app/extensions/Plugins/lv2"
+exec /app/lib/openxlr/ui/OpenXLR.UI "$@"

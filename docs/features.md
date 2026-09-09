@@ -285,3 +285,11 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
 - Diagnostics archive: one action collects app and device state, a
   vendor block dump, the PipeWire graph, daemon logs and configs into a
   tarball for bug reports
+
+## Flatpak test variant
+
+A manually installed GitHub bundle packages the UI, supervised daemon and
+LV2 filter-chain support. It excludes the native plugin host and Windows
+bridge. Background startup uses the desktop portal; updates are notifications
+with a manual GitHub download. Host permissions and SteamOS acceptance remain
+separate from a successful build. See [the Flatpak guide](../packaging/flatpak/README.md).

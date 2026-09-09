@@ -32,6 +32,25 @@ public partial class MainWindow : Window
         {
             if (_automaticUpdateCheckStarted) return;
             _automaticUpdateCheckStarted = true;
+            if (Deployment.IsFlatpak)
+            {
+                try
+                {
+                    if (!await FlatpakBackground.RequestAsync(UiSettings.Load().StartDaemonAtLogin, _lifetime.Token))
+                    {
+                        _vm.MinimizeToTray = false;
+                        (UiSettings.Load() with { MinimizeToTray = false }).Save();
+                        _vm.SessionNotice = "Background permission was denied. Closing this window will stop audio routing.";
+                    }
+                }
+                catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { return; }
+                catch (Exception)
+                {
+                    _vm.MinimizeToTray = false;
+                    (UiSettings.Load() with { MinimizeToTray = false }).Save();
+                    _vm.SessionNotice = "The background portal is unavailable. Keep this window open while using OpenXLR.";
+                }
+            }
             await _vm.Updates.CheckAsync(manual: false, cancellation: _lifetime.Token);
         };
 
@@ -39,7 +58,8 @@ public partial class MainWindow : Window
         // exists; otherwise the window must show or nothing is reachable).
         // App reads this and leaves the window unshown; it is never mapped
         // and unmapped, which is what produced a hollow frame at login.
-        StartsHidden = UiSettings.Load().StartMinimized && _tray is not null;
+        StartsHidden = Deployment.IsFlatpak && Environment.GetCommandLineArgs().Contains("--background")
+            || UiSettings.Load().StartMinimized && _tray is not null;
 
         Closing += (_, e) =>
         {
@@ -111,6 +131,12 @@ public partial class MainWindow : Window
 
     private void OnAbout(object? sender, RoutedEventArgs e)
         => new AboutWindow().ShowDialog(this);
+
+    private void OnQuit(object? sender, RoutedEventArgs e)
+    {
+        _reallyExit = true;
+        Close();
+    }
 
     private void OnUpdates(object? sender, RoutedEventArgs e)
         => new UpdatesWindow { DataContext = _vm.Updates }.ShowDialog(this);

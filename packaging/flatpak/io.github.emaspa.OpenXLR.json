@@ -1,0 +1,264 @@
+{
+  "app-id": "io.github.emaspa.OpenXLR",
+  "runtime": "org.freedesktop.Platform",
+  "runtime-version": "25.08",
+  "sdk": "org.freedesktop.Sdk",
+  "sdk-extensions": [
+    "org.freedesktop.Sdk.Extension.dotnet10"
+  ],
+  "command": "openxlr",
+  "build-options": {
+    "prepend-path": "/usr/lib/sdk/dotnet10/bin",
+    "env": {
+      "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+      "DOTNET_SKIP_FIRST_TIME_EXPERIENCE": "1",
+      "DOTNET_GENERATE_ASPNET_CERTIFICATE": "false"
+    },
+    "libdir": "/app/lib"
+  },
+  "finish-args": [
+    "--share=ipc",
+    "--share=network",
+    "--socket=x11",
+    "--socket=pulseaudio",
+    "--device=all",
+    "--talk-name=org.kde.StatusNotifierWatcher",
+    "--filesystem=xdg-run/pipewire-0:ro",
+    "--filesystem=xdg-run/openxlr:create",
+    "--env=DOTNET_ROOT=/app/lib/dotnet",
+    "--env=PIPEWIRE_MODULE_DIR=/app/lib/pipewire-0.3",
+    "--env=SPA_PLUGIN_DIR=/app/lib/spa-0.2",
+    "--env=LADSPA_PATH=/app/lib/ladspa",
+    "--env=OPENXLR_BUILD_MIXER=1"
+  ],
+  "add-extensions": {
+    "org.freedesktop.LinuxAudio.Plugins": {
+      "directory": "extensions/Plugins",
+      "version": "25.08",
+      "subdirectories": true,
+      "no-autodownload": true,
+      "add-ld-path": "lib",
+      "merge-dirs": "lv2"
+    }
+  },
+  "cleanup": [
+    "/include",
+    "/lib/pkgconfig",
+    "/share/man",
+    "/share/doc",
+    "*.a",
+    "*.la"
+  ],
+  "modules": [
+    {
+      "name": "serd",
+      "buildsystem": "meson",
+      "sources": [
+        {
+          "type": "archive",
+          "url": "https://download.drobilla.net/serd-0.32.10.tar.xz",
+          "sha256": "b0e93b49e52f01a049475b7886ef140407115a32d3b1e5dc5f95141c88275d1c"
+        }
+      ],
+      "config-opts": [
+        "-Ddocs=disabled",
+        "-Dtests=disabled"
+      ],
+      "post-install": [
+        "mkdir -p /app/share/licenses/serd; for file in COPYING* LICENSE* ../COPYING* ../LICENSE*; do if test -e \"$file\"; then cp -r \"$file\" /app/share/licenses/serd/; fi; done"
+      ]
+    },
+    {
+      "name": "zix",
+      "buildsystem": "meson",
+      "sources": [
+        {
+          "type": "archive",
+          "url": "https://download.drobilla.net/zix-0.8.2.tar.xz",
+          "sha256": "4c73aab0f8cbbfe56b00c8c6d648316021e699c5ae6cbf254391ef309047e67b"
+        }
+      ],
+      "config-opts": [
+        "-Ddocs=disabled",
+        "-Dtests=disabled"
+      ],
+      "post-install": [
+        "mkdir -p /app/share/licenses/zix; for file in COPYING* LICENSE* ../COPYING* ../LICENSE*; do if test -e \"$file\"; then cp -r \"$file\" /app/share/licenses/zix/; fi; done"
+      ]
+    },
+    {
+      "name": "sord",
+      "buildsystem": "meson",
+      "sources": [
+        {
+          "type": "archive",
+          "url": "https://download.drobilla.net/sord-0.16.22.tar.xz",
+          "sha256": "bb23b34b216579136795d518cffa73d91cf205594ce9accebfd408afb839173f"
+        }
+      ],
+      "config-opts": [
+        "-Ddocs=disabled",
+        "-Dtests=disabled"
+      ],
+      "post-install": [
+        "mkdir -p /app/share/licenses/sord; for file in COPYING* LICENSE* ../COPYING* ../LICENSE*; do if test -e \"$file\"; then cp -r \"$file\" /app/share/licenses/sord/; fi; done"
+      ]
+    },
+    {
+      "name": "lv2",
+      "buildsystem": "meson",
+      "sources": [
+        {
+          "type": "archive",
+          "url": "https://lv2plug.in/spec/lv2-1.18.10.tar.xz",
+          "sha256": "78c51bcf21b54e58bb6329accbb4dae03b2ed79b520f9a01e734bd9de530953f"
+        }
+      ],
+      "config-opts": [
+        "-Ddocs=disabled",
+        "-Dtests=disabled",
+        "-Dplugins=auto"
+      ],
+      "post-install": [
+        "mkdir -p /app/share/licenses/lv2; for file in COPYING* LICENSE* ../COPYING* ../LICENSE*; do if test -e \"$file\"; then cp -r \"$file\" /app/share/licenses/lv2/; fi; done"
+      ]
+    },
+    {
+      "name": "sratom",
+      "buildsystem": "meson",
+      "sources": [
+        {
+          "type": "archive",
+          "url": "https://download.drobilla.net/sratom-0.6.22.tar.xz",
+          "sha256": "0209b7d0f22c96abb416722ed735b0933be47931ecff4aa4b26ded7760b4f252"
+        }
+      ],
+      "config-opts": [
+        "-Ddocs=disabled",
+        "-Dtests=disabled"
+      ],
+      "post-install": [
+        "mkdir -p /app/share/licenses/sratom; for file in COPYING* LICENSE* ../COPYING* ../LICENSE*; do if test -e \"$file\"; then cp -r \"$file\" /app/share/licenses/sratom/; fi; done"
+      ]
+    },
+    {
+      "name": "lilv",
+      "buildsystem": "meson",
+      "sources": [
+        {
+          "type": "archive",
+          "url": "https://download.drobilla.net/lilv-0.28.0.tar.xz",
+          "sha256": "8dcb70adb5cf072335115a6b091f4113710bdc73abaadaa3f9e9c1e55957b149"
+        }
+      ],
+      "config-opts": [
+        "-Ddocs=disabled",
+        "-Dtests=disabled"
+      ],
+      "post-install": [
+        "mkdir -p /app/share/licenses/lilv; for file in COPYING* LICENSE* ../COPYING* ../LICENSE*; do if test -e \"$file\"; then cp -r \"$file\" /app/share/licenses/lilv/; fi; done"
+      ]
+    },
+    {
+      "name": "pipewire-client",
+      "buildsystem": "meson",
+      "config-opts": [
+        "-Dauto_features=disabled",
+        "-Dlv2=enabled",
+        "-Dexamples=disabled",
+        "-Dtests=disabled",
+        "-Dpipewire-jack=disabled",
+        "-Dpipewire-v4l2=disabled",
+        "-Dsession-managers=[]",
+        "-Dsystemd-user-service=disabled",
+        "-Drlimits-install=false"
+      ],
+      "sources": [
+        {
+          "type": "archive",
+          "url": "https://github.com/PipeWire/pipewire/archive/refs/tags/1.4.9.tar.gz",
+          "sha256": "8066a7b220069e4c6e3b02bd2b6ea303bba66df255023c07c99323449ba8fe3c"
+        }
+      ],
+      "post-install": [
+        "mkdir -p /app/share/licenses/pipewire-client; for file in COPYING* LICENSE* ../COPYING* ../LICENSE*; do if test -e \"$file\"; then cp -r \"$file\" /app/share/licenses/pipewire-client/; fi; done"
+      ]
+    },
+    {
+      "name": "amixer",
+      "buildsystem": "simple",
+      "build-commands": [
+        "./configure --prefix=/app --disable-nls --disable-alsaconf --disable-alsaloop --disable-alsaucm --disable-bat --disable-xmlto",
+        "make -C amixer",
+        "make -C amixer install"
+      ],
+      "sources": [
+        {
+          "type": "archive",
+          "url": "https://www.alsa-project.org/files/pub/utils/alsa-utils-1.2.14.tar.bz2",
+          "sha256": "0794c74d33fed943e7c50609c13089e409312b6c403d6ae8984fc429c0960741"
+        }
+      ],
+      "post-install": [
+        "mkdir -p /app/share/licenses/amixer; for file in COPYING* LICENSE* ../COPYING* ../LICENSE*; do if test -e \"$file\"; then cp -r \"$file\" /app/share/licenses/amixer/; fi; done"
+      ]
+    },
+    {
+      "name": "hard-limiter",
+      "buildsystem": "simple",
+      "build-commands": [
+        "touch config.h",
+        "perl makestub.pl hard_limiter_1413.xml > hard_limiter_1413.c",
+        "cc -shared -fPIC -O2 -I. hard_limiter_1413.c -o hard_limiter_1413.so -lm",
+        "install -Dm755 hard_limiter_1413.so /app/lib/ladspa/hard_limiter_1413.so",
+        "install -Dm644 COPYING /app/share/licenses/swh-plugins/COPYING"
+      ],
+      "sources": [
+        {
+          "type": "archive",
+          "url": "https://github.com/swh/ladspa/archive/refs/tags/v0.4.17.tar.gz",
+          "sha256": "d1b090feec4c5e8f9605334b47faaad72db7cc18fe91d792b9161a9e3b821ce7"
+        }
+      ],
+      "post-install": [
+        "mkdir -p /app/share/licenses/hard-limiter; for file in COPYING* LICENSE* ../COPYING* ../LICENSE*; do if test -e \"$file\"; then cp -r \"$file\" /app/share/licenses/hard-limiter/; fi; done"
+      ]
+    },
+    {
+      "name": "dotnet",
+      "buildsystem": "simple",
+      "build-commands": [
+        "/usr/lib/sdk/dotnet10/bin/install.sh",
+        "mkdir -p /app/share/licenses/dotnet; cp /usr/lib/sdk/dotnet10/lib/LICENSE.txt /usr/lib/sdk/dotnet10/lib/ThirdPartyNotices.txt /app/share/licenses/dotnet/"
+      ]
+    },
+    {
+      "name": "openxlr",
+      "buildsystem": "simple",
+      "build-commands": [
+        "dotnet restore src/OpenXLR.slnx --locked-mode -p:EnableRuntimePackDownload=false --source nuget-sources",
+        "dotnet publish src/OpenXLR.Daemon -c Release -warnaserror -r linux-x64 --no-restore --no-self-contained -p:EnableRuntimePackDownload=false -p:OpenXlrFlatpak=true -p:EnableNativeLv2Host=false -o /app/lib/openxlr/daemon",
+        "dotnet publish src/OpenXLR.UI -c Release -warnaserror -r linux-x64 --no-restore --no-self-contained -p:EnableRuntimePackDownload=false -p:OpenXlrFlatpak=true -p:EnableNativeLv2Host=false -o /app/lib/openxlr/ui",
+        "install -Dm755 packaging/flatpak/openxlr /app/bin/openxlr",
+        "install -Dm755 packaging/flatpak/openxlr-check /app/bin/openxlr-check",
+        "install -Dm644 packaging/flatpak/io.github.emaspa.OpenXLR.desktop /app/share/applications/io.github.emaspa.OpenXLR.desktop",
+        "install -Dm644 packaging/flatpak/io.github.emaspa.OpenXLR.metainfo.xml /app/share/metainfo/io.github.emaspa.OpenXLR.metainfo.xml",
+        "install -Dm644 src/OpenXLR.UI/Assets/icon.png /app/share/icons/hicolor/256x256/apps/io.github.emaspa.OpenXLR.png",
+        "install -Dm644 LICENSE /app/share/licenses/openxlr/LICENSE",
+        "test ! -e /app/lib/openxlr/daemon/openxlr-lv2-host"
+      ],
+      "sources": [
+        {
+          "type": "archive",
+          "path": "openxlr-source.tar.gz"
+        }
+      ],
+      "build-options": {
+        "env": {
+          "NUGET_PACKAGES": "/run/build/openxlr/nuget-cache",
+          "DOTNET_CLI_HOME": "/run/build/openxlr/dotnet-home"
+        }
+      }
+    }
+  ]
+}

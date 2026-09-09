@@ -16,7 +16,7 @@ public sealed record UiSettings
 {
     public bool StartDaemonAtLogin { get; init; }
     public bool OpenWindowAtLogin { get; init; }
-    public bool MinimizeToTray { get; init; }
+    public bool MinimizeToTray { get; init; } = Deployment.IsFlatpak;
     public bool StartMinimized { get; init; }
     /// <summary>Opt-in only. False means the UI performs no startup network request.</summary>
     public bool CheckForUpdates { get; init; }
@@ -251,6 +251,7 @@ public static class StartupIntegration
 
     public static void SetDaemonAtLogin(bool enabled)
     {
+        if (Deployment.IsFlatpak) throw new InvalidOperationException("Flatpak startup is managed by the desktop background portal.");
         if (enabled)
         {
             if (PackagedUnit is not null)
@@ -315,6 +316,7 @@ public static class StartupIntegration
 
     public static void SetWindowAtLogin(bool enabled)
     {
+        if (Deployment.IsFlatpak) throw new InvalidOperationException("Flatpak startup is managed by the desktop background portal.");
         if (enabled)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(AutostartPath)!);
@@ -340,7 +342,9 @@ public static class StartupIntegration
     /// effect. False when systemd does not manage it (source builds run by
     /// hand), so the caller can tell the user to restart it themselves.
     /// </summary>
-    public static bool RestartDaemon() => Systemctl("restart", "openxlr-daemon.service");
+    public static bool RestartDaemon() => Deployment.IsFlatpak
+        ? FlatpakSession.Current?.RestartAsync().GetAwaiter().GetResult() == true
+        : Systemctl("restart", "openxlr-daemon.service");
 
     private static bool Systemctl(params string[] args)
     {

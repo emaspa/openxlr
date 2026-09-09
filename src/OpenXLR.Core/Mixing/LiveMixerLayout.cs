@@ -25,7 +25,9 @@ public sealed partial class Mixer
     /// <summary>The state warning when pipewire-pulse runs close to its limit, or null.</summary>
     public string? PulseFileWarning()
     {
-        if (_pw.PulseFileUsage() is not (int used, int limit)) return null;
+        if (_pw.PulseFileUsage() is not (int used, int limit)) return Deployment.IsFlatpak
+            ? "Flatpak cannot inspect the host audio server's file limit. Adding channels and mixes is disabled in this build; existing routing remains editable."
+            : null;
         return used * 4 >= limit * 3
             ? $"pipewire-pulse has {used} of its {limit} open files in use; past the limit it drops audio nodes. Raise the limit with the pipewire-pulse drop-in OpenXLR installs and restart pipewire-pulse."
             : null;
@@ -34,7 +36,12 @@ public sealed partial class Mixer
     /// <summary>Refuse a change that would push pipewire-pulse over its open-file limit.</summary>
     private void EnsurePulseHeadroomLocked(int newStreams, int newNodes)
     {
-        if (_pw.PulseFileUsage() is not (int used, int limit)) return;
+        if (_pw.PulseFileUsage() is not (int used, int limit))
+        {
+            if (Deployment.IsFlatpak)
+                throw new InvalidOperationException("Flatpak cannot verify the host audio server's file limit. Adding channels or mixes requires a native OpenXLR installation.");
+            return;
+        }
         int needed = newStreams * FilesPerStream + newNodes * FilesPerNode + FileReserve;
         if (used + needed <= limit) return;
         throw new InvalidOperationException(

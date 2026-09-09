@@ -40,7 +40,8 @@ public sealed class DaemonRestartViewModel : ViewModelBase
         try
         {
             Status = await _restart()
-                ? "Service restarted. Waiting for the daemon connection."
+                ? (Deployment.IsFlatpak ? "Daemon restarted. Waiting for the daemon connection." : "Service restarted. Waiting for the daemon connection.")
+                : Deployment.IsFlatpak ? "Restart failed. Check the Flatpak daemon log or quit and reopen OpenXLR."
                 : "Restart failed. Check the user service logs; a manually started daemon must be restarted by hand.";
         }
         catch (Exception)

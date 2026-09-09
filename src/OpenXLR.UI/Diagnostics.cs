@@ -61,8 +61,12 @@ public static class Diagnostics
             await WriteCmd(work, "sources.txt", "pactl", "list", "short", "sources");
             await WriteCmd(work, "modules.txt", "pactl", "list", "short", "modules");
             await WriteCmd(work, "lsusb.txt", "lsusb");
-            await WriteCmd(work, "journal.txt", "journalctl", "--user", "-u", "openxlr-daemon",
-                "--since", "2 hours ago", "--no-pager");
+            if (Deployment.IsFlatpak)
+                await File.WriteAllTextAsync(Path.Combine(work, "daemon.log"),
+                    Redact(File.Exists(FlatpakSession.LogPath) ? File.ReadAllText(FlatpakSession.LogPath) : "No daemon log yet."));
+            else
+                await WriteCmd(work, "journal.txt", "journalctl", "--user", "-u", "openxlr-daemon",
+                    "--since", "2 hours ago", "--no-pager");
 
             // Configs may include remembered application identities and device
             // names; redact common personal fields and disclose them above.
@@ -70,7 +74,7 @@ public static class Diagnostics
             CopyRedactedIfExists(UiSettings.ConfigDir, "ui.json", work);
 
             string outPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                Deployment.IsFlatpak ? Deployment.DataDirectory : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                 $"openxlr-diagnostics-{stamp}.tar.gz");
             await using (var fs = OpenXlrPaths.CreatePrivate(outPath))
             await using (var gz = new GZipStream(fs, CompressionLevel.SmallestSize))

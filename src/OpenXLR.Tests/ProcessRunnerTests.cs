@@ -6,6 +6,33 @@ namespace OpenXLR.Tests;
 public sealed class ProcessRunnerTests
 {
     [Fact]
+    public async Task ServiceLogsAreBoundedWithoutStoppingTheServiceAndShutdownIsGraceful()
+    {
+        string dir = Directory.CreateTempSubdirectory("openxlr-service-test-").FullName;
+        try
+        {
+            using var cancellation = new CancellationTokenSource();
+            string ready = Path.Combine(dir, "ready"), stopped = Path.Combine(dir, "stopped"), log = Path.Combine(dir, "daemon.log");
+            Task<int> service = ProcessRunner.RunServiceAsync("sh", ["-c",
+                "trap 'printf stopped > \"$2\"; exit 0' TERM; head -c 2200000 /dev/zero; printf ready > \"$1\"; while :; do sleep 0.1; done",
+                "service-test", ready, stopped], log, cancellation.Token);
+            try
+            {
+                using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                while (!File.Exists(ready)) await Task.Delay(20, deadline.Token);
+                Assert.False(service.IsCompleted);
+                Assert.InRange(new FileInfo(log).Length, 1, 1024 * 1024);
+                Assert.NotEmpty(File.ReadAllBytes(log));
+            }
+            finally { cancellation.Cancel(); }
+            Assert.Equal(0, await service.WaitAsync(TimeSpan.FromSeconds(10)));
+            Assert.Equal("stopped", File.ReadAllText(stopped));
+            if (!OperatingSystem.IsWindows()) Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(log));
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
     public async Task OutputComesBackWholeWithTheExitCodeAndStderr()
     {
         ProcessResult r = await ProcessRunner.RunAsync("sh", ["-c", "printf 'out'; printf 'err' >&2; exit 3"]);

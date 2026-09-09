@@ -11,6 +11,7 @@
     <!-- Shared with the daemon (see the file): XDG paths and private atomic writes. -->
     <Compile Include="../OpenXLR.Core/OpenXlrPaths.cs" Link="OpenXlrPaths.cs" />
     <Compile Include="../OpenXLR.Core/ProcessRunner.cs" Link="ProcessRunner.cs" />
+    <Compile Include="../OpenXLR.Core/Deployment.cs" Link="Deployment.cs" />
   </ItemGroup>
 
   <ItemGroup>

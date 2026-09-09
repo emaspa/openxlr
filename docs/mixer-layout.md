@@ -79,3 +79,12 @@ afterwards, so node names, profiles and Stream Deck keys survive a rename.
 
 Other manual changes, including external PipeWire descriptions, take effect
 at startup.
+
+## Flatpak test-build limits
+
+When Flatpak cannot inspect the host pipewire-pulse process's file limit,
+commands adding a channel or mix are rejected before changing routing. Saved
+layouts above 45 channel-to-mix sends are rejected before graph construction.
+Existing sends, assignments, names, order and removals remain editable. Raising
+the host limit alone does not remove this restriction because the sandbox cannot
+verify the new value. See [the Flatpak guide](../packaging/flatpak/README.md).

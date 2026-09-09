@@ -1,0 +1,38 @@
+name: Flatpak test bundle
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'packaging/flatpak/**'
+      - '.github/workflows/flatpak.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  flatpak:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Flatpak builder
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+      - name: Prepare sources and build without network access
+        run: python3 packaging/flatpak/build.py all --output "$HOME/openxlr-flatpak-build"
+      - name: Check the packaged variant
+        run: |
+          python3 packaging/flatpak/check-package.py "$HOME/openxlr-flatpak-build/build/files"
+          cd "$HOME/openxlr-flatpak-build/dist"
+          sha256sum -c SHA256SUMS
+      - name: Exercise the bundled daemon and LV2 chain on an isolated audio server
+        run: |
+          flatpak install --user --noninteractive --reinstall "$HOME/openxlr-flatpak-build/dist/OpenXLR-x86_64.flatpak"
+          dbus-run-session -- timeout -k 5 90 flatpak run --unshare=network --nodevice=all \
+            --command=sh io.github.emaspa.OpenXLR -s < packaging/flatpak/smoke-test.sh
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: openxlr-flatpak-test
+          path: ~/openxlr-flatpak-build/dist/*

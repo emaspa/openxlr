@@ -9,6 +9,7 @@ check() { grep -q -- "$2" "$1" || { echo "$1: missing $2" >&2; status=1; }; }
 check .github/workflows/ci.yml "dotnet restore src/OpenXLR.slnx --locked-mode"
 check .github/workflows/release-deb.yml "dotnet restore src/OpenXLR.slnx --locked-mode"
 check .github/workflows/release-rpm.yml "dotnet restore src/OpenXLR.slnx --locked-mode"
+check packaging/flatpak/io.github.emaspa.OpenXLR.json "--locked-mode"
 check debian/rules "-p:RestoreLockedMode=true"
 check packaging/rpm/openxlr.spec "-p:RestoreLockedMode=true"
 check packaging/ppa/make-source.sh "--locked-mode"

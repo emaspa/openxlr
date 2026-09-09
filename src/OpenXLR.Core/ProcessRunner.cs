@@ -46,6 +46,62 @@ public static class ProcessRunner
     public const int DefaultStderrCap = 64 * 1024;
     public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(5);
 
+    /// <summary>A session-owned service with bounded rolling output and graceful cancellation.
+    /// Unlike a command, reaching the log limit does not interrupt its audio.</summary>
+    public static async Task<int> RunServiceAsync(string exe, IReadOnlyList<string> args, string logPath,
+        CancellationToken cancellation, Action? started = null)
+    {
+        OpenXlrPaths.EnsurePrivateDir(Path.GetDirectoryName(logPath)!);
+        OpenXlrPaths.WriteAtomic(logPath, "");
+        using var log = new FileStream(logPath, FileMode.Open, FileAccess.Write, FileShare.Read);
+        var logGate = new object();
+        var psi = new ProcessStartInfo(exe)
+        {
+            UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true,
+        };
+        foreach (string arg in args) psi.ArgumentList.Add(arg);
+        using Process process = Process.Start(psi) ?? throw new IOException($"Could not start {exe}");
+        async Task Drain(Stream input)
+        {
+            var buffer = new byte[4096];
+            try
+            {
+                int count;
+                while ((count = await input.ReadAsync(buffer).ConfigureAwait(false)) > 0)
+                    lock (logGate)
+                    {
+                        try
+                        {
+                            if (log.Length + count > 1024 * 1024) { log.SetLength(0); log.Position = 0; }
+                            log.Write(buffer, 0, count);
+                            log.Flush();
+                        }
+                        catch (IOException) { /* Keep draining even when the disk is full. */ }
+                    }
+            }
+            catch (Exception ex) when (ex is IOException or ObjectDisposedException) { }
+        }
+        Task stdout = Drain(process.StandardOutput.BaseStream), stderr = Drain(process.StandardError.BaseStream);
+        started?.Invoke();
+        try { await process.WaitForExitAsync(cancellation).ConfigureAwait(false); }
+        catch (OperationCanceledException)
+        {
+            try { await RunAsync("kill", ["-TERM", process.Id.ToString()], TimeSpan.FromSeconds(2)).ConfigureAwait(false); }
+            catch (Exception) { /* The bounded wait below still reaps it. */ }
+            try { await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(45)).ConfigureAwait(false); }
+            catch (TimeoutException) { KillTree(process); await process.WaitForExitAsync().ConfigureAwait(false); }
+        }
+        // A grandchild may inherit a pipe. Closing our readers must not keep
+        // application shutdown waiting for that unrelated process.
+        try { await Task.WhenAll(stdout, stderr).WaitAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false); }
+        catch (TimeoutException)
+        {
+            process.StandardOutput.Close(); process.StandardError.Close();
+            await Task.WhenAll(stdout, stderr).ConfigureAwait(false);
+        }
+        return process.ExitCode;
+    }
+
     /// <summary>Run to completion on the calling thread. See <see cref="RunAsync"/>.</summary>
     public static ProcessResult Run(string exe, IReadOnlyList<string> args, TimeSpan? timeout = null,
         int stdoutCap = DefaultStdoutCap, int stderrCap = DefaultStderrCap, bool cLocale = true,

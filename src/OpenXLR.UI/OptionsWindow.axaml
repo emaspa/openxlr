@@ -28,9 +28,10 @@
     <Border Classes="card">
       <StackPanel Spacing="6">
         <TextBlock Text="STARTUP" Classes="h"/>
-        <CheckBox Content="Start the daemon at login (systemd user service)"
+        <CheckBox Content="{Binding StartupLabel}" IsEnabled="{Binding StartupAvailable}"
                   IsChecked="{Binding StartDaemonAtLogin, Mode=TwoWay}"/>
-        <CheckBox Content="Start the mixer UI at login"
+        <TextBlock Text="{Binding StartupNote}" TextWrapping="Wrap" Foreground="#8b93a7" FontSize="11"/>
+        <CheckBox Content="Start the mixer UI at login" IsVisible="{Binding IsNative}"
                   IsChecked="{Binding OpenWindowAtLogin, Mode=TwoWay}"/>
         <CheckBox Content="Close button minimizes to tray instead of quitting"
                   IsChecked="{Binding MinimizeToTray, Mode=TwoWay}"/>
@@ -98,10 +99,10 @@
       <StackPanel Spacing="6">
         <TextBlock Text="PLUGINS" Classes="h"/>
         <TextBlock Text="{Binding PluginDirectories}" FontSize="11" Foreground="#6b7285" TextWrapping="Wrap"/>
-        <TextBlock Text="Pick a plugin you downloaded and OpenXLR puts it in place: a .clap or .vst3 file, a .vst3 or .lv2 folder, or a folder holding plugins."
+        <TextBlock Text="{Binding PluginInstallHint}"
                    FontSize="11" Foreground="#6b7285" TextWrapping="Wrap"/>
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <Button Name="InstallFile" Content="Install file…" Padding="14,5" Click="OnInstallPluginFile"/>
+          <Button Name="InstallFile" Content="Install file…" Padding="14,5" Click="OnInstallPluginFile" IsVisible="{Binding IsNative}"/>
           <Button Name="InstallFolder" Content="Install folder…" Padding="14,5" Click="OnInstallPluginFolder"/>
           <Button Name="Rescan" Content="Rescan" Padding="14,5" Click="OnRescanPlugins"
                   ToolTip.Tip="Read the plugin directories again, for plugins installed by other means"/>
@@ -118,6 +119,7 @@
                 ToolTip.Tip="Hand the plugins a Windows installer left in Wine to yabridge"/>
         <Grid ColumnDefinitions="Auto,8,Auto,10,*">
           <Button Name="SyncWindows" Content="Sync Windows plugins" Padding="14,5" Click="OnSyncWindowsPlugins"
+                  IsVisible="{Binding IsNative}"
                   IsEnabled="{Binding CanSyncWindows}"
                   ToolTip.Tip="Bridge again every folder yabridge knows, for Windows plugins installed since"/>
           <Button Grid.Column="2" Content="Manual" Padding="10,5" Click="OnPluginsManual"

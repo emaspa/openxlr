@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.emaspa.OpenXLR</id>
+  <name>OpenXLR</name>
+  <summary>Control Elgato XLR interfaces and mix application audio</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-only</project_license>
+  <description><p>OpenXLR provides hardware controls, application channels, monitor mixes and virtual microphones using PipeWire. This Flatpak variant supports compatible LV2 effects with generated parameter controls.</p></description>
+  <launchable type="desktop-id">io.github.emaspa.OpenXLR.desktop</launchable>
+  <url type="homepage">https://github.com/emaspa/openxlr</url>
+  <url type="bugtracker">https://github.com/emaspa/openxlr/issues</url>
+  <content_rating type="oars-1.1"/>
+</component>

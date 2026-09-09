@@ -161,3 +161,12 @@ All under `~/.config/openxlr/` (or `$XDG_CONFIG_HOME/openxlr/`):
   under `$XDG_DATA_HOME/openxlr/yabridge` (default `~/.local/share/openxlr/yabridge`).
 - `ui.json`: window preferences (tray, start minimized, autostart
   toggles)
+
+## Flatpak test variant
+
+The Flatpak test build uses the same API and token authentication. Its plugin
+catalogue contains LV2 only, plugin installation rejects non-LV2 inputs before
+copying any files, and native plugin hosting is unavailable. Layout creation
+commands fail if the host audio server's file-limit headroom cannot be checked.
+See [Flatpak limits](mixer-layout.md#flatpak-test-build-limits) and the
+[installation guide](../packaging/flatpak/README.md). No new commands are required.

@@ -44,7 +44,7 @@
       <DockPanel IsVisible="{Binding RenamedSinceStart}">
         <Button DockPanel.Dock="Right" Content="Restart daemon" Padding="10,3" FontSize="12"
                 IsEnabled="{Binding DaemonRestart.CanRestart}" VerticalAlignment="Center"
-                Click="OnRestartDaemon" ToolTip.Tip="systemctl --user restart openxlr-daemon"/>
+                Click="OnRestartDaemon" ToolTip.Tip="Restart the OpenXLR daemon"/>
         <TextBlock Text="A renamed virtual microphone keeps its old name in other applications until the daemon restarts. Restart when nothing is recording from it."
                    FontSize="11" Foreground="#e0a84a" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0"/>
       </DockPanel>

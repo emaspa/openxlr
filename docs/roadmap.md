@@ -188,19 +188,16 @@ while fixes to existing hosts remain part of normal maintenance.
   directory already used by the release workflows; the PPA source package
   carries the NuGet packages (packaging/ppa/make-source.sh) because
   Launchpad builders have no network.
-- [ ] Flatpak, after the repositories above, first as a manifest in this
-  repo and then on Flathub. The sandbox cannot install the udev rules,
-  the WirePlumber rules, the UCM profile or the systemd unit, so the
-  work is a Flatpak mode before the manifest: the window starts the
-  daemon as a child process and uses the background portal for login
-  start, the daemon logs to a file instead of the journal, the
-  WirePlumber rules are written to the user's config directory, the
-  udev rules ship inside the app with a first-run notice giving the copy
-  command, and the UCM profile stays a documented manual step. LV2
-  inserts follow the Flathub audio plugin extension instead of host
-  plugins. The watchdog does not work in the sandbox, so the packaged
-  units stay the recommended install and the Flatpak covers the
-  distributions without a package.
+- [ ] Flatpak for manual installation from GitHub Releases. The test build
+  in `packaging/flatpak` bundles its daemon, uses the desktop background
+  portal for login startup, keeps a bounded local log and supports LV2
+  filter-chain inserts with generated controls. CLAP, VST3, Wine/yabridge
+  and native plugin editors remain in native packages. Runtime and audio
+  plugin extensions may come from existing Flatpak repositories; OpenXLR
+  itself is not submitted to Flathub. Host USB permissions, the XLR Dock
+  capture workaround and PipeWire PulseAudio file limits still need host
+  setup where missing. SteamOS hardware, Gaming Mode and update persistence
+  must be verified before treating the test bundle as a supported release.
 
 ## Devices
 

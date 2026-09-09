@@ -18,6 +18,7 @@ public static class PluginCatalog
             try { return source(); }
             catch (Exception) { return []; }
         }
+        if (Deployment.IsFlatpak) return read(() => Lv2Catalog.Plugins);
         return Merge(read(() => Lv2Catalog.Plugins), read(() => ClapCatalog.Plugins), read(() => Vst3Catalog.Plugins));
     }
 

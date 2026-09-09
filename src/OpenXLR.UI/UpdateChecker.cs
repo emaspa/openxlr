@@ -19,14 +19,16 @@ public sealed class UpdateChecker
     private const string ReleasesEndpoint = "https://api.github.com/repos/emaspa/openxlr/releases/latest";
     private readonly HttpClient _http;
     private readonly TimeSpan _timeout;
+    private readonly bool _flatpak;
     private static readonly HttpClient SharedHttp = new(new HttpClientHandler { AllowAutoRedirect = false })
     { Timeout = TimeSpan.FromSeconds(8) };
 
     public UpdateChecker() : this(SharedHttp) { }
-    internal UpdateChecker(HttpClient http, TimeSpan? timeout = null)
+    internal UpdateChecker(HttpClient http, TimeSpan? timeout = null, bool? flatpak = null)
     {
         _http = http;
         _timeout = timeout ?? TimeSpan.FromSeconds(8);
+        _flatpak = flatpak ?? Deployment.IsFlatpak;
     }
 
     public async Task<UpdateResult> CheckAsync(string installedVersion, CancellationToken cancellation = default)
@@ -67,8 +69,17 @@ public sealed class UpdateChecker
 
         string details = String(root, "body");
         if (details.Length > 12000) details = details[..12000] + "\n… Open GitHub for the complete notes.";
+        string url = $"https://github.com/emaspa/openxlr/releases/tag/{Uri.EscapeDataString(tag)}";
+        if (_flatpak)
+        {
+            bool hasBundle = root.TryGetProperty("assets", out var assets) && assets.ValueKind == JsonValueKind.Array
+                && System.Linq.Enumerable.Any(assets.EnumerateArray(), a => String(a, "name") == "OpenXLR-x86_64.flatpak");
+            details = (hasBundle ? "Download the Flatpak from GitHub and install it manually to update."
+                : "This release does not have a Flatpak bundle yet. Wait for that asset before updating this installation.") + "\n\n" + details;
+            if (hasBundle) url = $"https://github.com/emaspa/openxlr/releases/download/{Uri.EscapeDataString(tag)}/OpenXLR-x86_64.flatpak";
+        }
         return new(true, tag, $"New OpenXLR release {tag}", details,
-            $"https://github.com/emaspa/openxlr/releases/tag/{Uri.EscapeDataString(tag)}");
+            url);
     }
 
     internal static bool Newer(string tag, string installed)

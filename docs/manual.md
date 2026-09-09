@@ -906,3 +906,18 @@ OpenXLR configuration directory.
 
 Uninstalling a package leaves `~/.config/openxlr` in place; remove it
 by hand if you want a clean slate.
+
+### Flatpak test builds
+
+The Flatpak variant is installed and updated manually from GitHub bundles.
+It owns its daemon, uses the background portal for login startup and keeps
+configuration separate from native packages. Compatible LV2 effects use the
+window's parameter controls; CLAP, VST3, Windows plugins and native plugin
+editors are unavailable. The GitHub update check links to the Flatpak asset
+when available and reports when a newer release has no Flatpak yet.
+
+Host device permissions still apply. The sandbox does not install udev,
+WirePlumber or systemd configuration on the host. Layout expansion is disabled
+when the host audio server's file limit cannot be inspected, and saved layouts
+above 45 channel-to-mix sends are rejected. See the [Flatpak installation and
+SteamOS test guide](../packaging/flatpak/README.md) for setup, logs and limitations.

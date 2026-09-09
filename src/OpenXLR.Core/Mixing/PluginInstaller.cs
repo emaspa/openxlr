@@ -71,10 +71,10 @@ public sealed class PluginInstaller
 
     /// <summary>The daemon's own: the home directories, the tools on PATH.</summary>
     public PluginInstaller()
-        : this(HomeDirectory(".lv2"), HomeDirectory(".clap"), HomeDirectory(".vst3"),
+        : this(Deployment.IsFlatpak ? Deployment.Lv2Directory : HomeDirectory(".lv2"), HomeDirectory(".clap"), HomeDirectory(".vst3"),
                OnPath("yabridgectl"), OnPath("wine"), NativePluginHost.HostInstalled)
     {
-        _managed = ManagedYabridge.Discover();
+        _managed = Deployment.IsFlatpak ? null : ManagedYabridge.Discover();
         if (_managed is not null) _yabridgectl = _managed.Controller;
     }
 
@@ -214,6 +214,8 @@ public sealed class PluginInstaller
         if (!Path.IsPathRooted(path)) return new(false, "The path has to be absolute.", []);
         if (!File.Exists(path) && !Directory.Exists(path)) return new(false, $"There is nothing at {path}.", []);
         IReadOnlyList<PluginItem> items = Items(path);
+        if (Deployment.IsFlatpak && items.Any(i => i.Kind != PluginItemKind.Lv2Bundle))
+            return new(false, "This Flatpak supports LV2 bundles only. CLAP, VST3 and Windows plugins need a native OpenXLR installation.", []);
         string name = Path.GetFileName(path.TrimEnd('/'));
         if (items.Count == 1 && items[0].Kind is PluginItemKind.Unknown or PluginItemKind.Archive or PluginItemKind.Installer or PluginItemKind.WindowsVst2)
             return new(false, Refusal(items[0], name), []);

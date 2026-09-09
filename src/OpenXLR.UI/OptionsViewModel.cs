@@ -21,6 +21,16 @@ public sealed class OptionsViewModel : ViewModelBase
     /// <summary>Exposed for the diagnostics collector in the Options window.</summary>
     public DaemonClient Client => _client;
     public UpdatesViewModel Updates => _main.Updates;
+    public bool IsFlatpak => Deployment.IsFlatpak;
+    public bool IsNative => !IsFlatpak;
+    public string StartupLabel => IsFlatpak ? "Start OpenXLR at login" : "Start the daemon at login (systemd user service)";
+    public string PluginInstallHint => IsFlatpak
+        ? "Install a compatible Linux .lv2 folder. This build does not support CLAP, VST3, Windows plugins or native plugin editor windows."
+        : "Pick a plugin you downloaded: a .clap or .vst3 file, a .vst3 or .lv2 folder, or a folder holding plugins.";
+    private string? _startupNote;
+    public string? StartupNote { get => _startupNote; private set => Set(ref _startupNote, value); }
+    private bool _startupBusy;
+    public bool StartupAvailable => !_startupBusy;
 
     /// <summary>The main view model, for the interface reset that lives in Options.</summary>
     public MainViewModel Main => _main;
@@ -93,6 +103,13 @@ public sealed class OptionsViewModel : ViewModelBase
 
     internal void ApplyPluginSetup(System.Text.Json.Nodes.JsonNode? setup)
     {
+        if (IsFlatpak)
+        {
+            PluginDirectories = $"LV2 installs go in {Deployment.Lv2Directory}. Compatible Flatpak audio plugin extensions are also available.";
+            WindowsPlugins = "";
+            CanSyncWindows = CanBridgeWine = false;
+            return;
+        }
         if (setup is null)
         {
             WindowsPlugins = "Windows plugins: the daemon did not answer.";
@@ -147,9 +164,37 @@ public sealed class OptionsViewModel : ViewModelBase
         get => _startDaemonAtLogin;
         set
         {
+            if (IsFlatpak)
+            {
+                if (_startupBusy || value == _startDaemonAtLogin) return;
+                _ = SetFlatpakStartupAsync(value);
+                return;
+            }
             if (!Set(ref _startDaemonAtLogin, value)) return;
             StartupIntegration.SetDaemonAtLogin(value);
             Persist();
+        }
+    }
+
+    private async System.Threading.Tasks.Task SetFlatpakStartupAsync(bool enabled)
+    {
+        _startupBusy = true; Raise(nameof(StartupAvailable));
+        try
+        {
+            bool accepted = await FlatpakBackground.RequestAsync(enabled);
+            if (accepted)
+            {
+                _main.SessionNotice = null;
+                _startDaemonAtLogin = enabled;
+                Persist();
+                StartupNote = enabled ? "The desktop will start OpenXLR at login." : "Login startup is off.";
+            }
+            else StartupNote = "The desktop did not grant the requested background permission.";
+        }
+        catch (Exception ex) { StartupNote = $"Could not change startup: {ex.Message}"; }
+        finally
+        {
+            _startupBusy = false; Raise(nameof(StartupAvailable)); Raise(nameof(StartDaemonAtLogin));
         }
     }
 
@@ -206,6 +251,11 @@ public sealed class OptionsViewModel : ViewModelBase
                 SubmixerNote = $"Could not save the setting: {ex.Message}";
                 return;
             }
+            if (IsFlatpak)
+            {
+                _ = RestartFlatpakForSubmixerAsync();
+                return;
+            }
             SubmixerNote = StartupIntegration.RestartDaemon()
                 ? (value ? "Daemon restarted with the submixer on."
                          : "Daemon restarted in hardware-control mode; the sound card keeps its stock layout and inserts are not loaded.")
@@ -214,6 +264,13 @@ public sealed class OptionsViewModel : ViewModelBase
     }
 
     private string? _submixerNote;
+    private async System.Threading.Tasks.Task RestartFlatpakForSubmixerAsync()
+    {
+        SubmixerNote = "Restarting the bundled daemon...";
+        SubmixerNote = FlatpakSession.Current is { } session && await session.RestartAsync()
+            ? "Daemon restarted. Waiting for the mixer state."
+            : "Saved. Quit and reopen OpenXLR to apply the setting.";
+    }
     public string? SubmixerNote
     {
         get => _submixerNote;
