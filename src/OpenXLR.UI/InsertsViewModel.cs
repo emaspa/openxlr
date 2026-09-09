@@ -47,6 +47,11 @@ public sealed class InsertsViewModel : ViewModelBase
     public Task ShowNativeEditorAsync(InsertViewModel insert)
         => _client.ShowInsertUiAsync(_channel, insert.Id);
 
+    /// <summary>Chain window subtitle: where these plugins sit in the path.</summary>
+    public string ChainHint => _channels == 1
+        ? "Plugins, in order, before this input reaches the mixes"
+        : "Stereo plugins, in order, before this mix reaches its outputs";
+
     /// <summary>Picker header: which plugins fit this chain.</summary>
     public string PickerHint => _channels == 1
         ? "Plugins that fit the mono mic path (one input, one output)"

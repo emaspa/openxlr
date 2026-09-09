@@ -152,15 +152,13 @@ public partial class MainWindow : Window
 
     private void OnCycleSoftLowCut(object? sender, RoutedEventArgs e) => _vm.CycleSoftLowCut();
 
-    // Plugin inserts: the picker is a modal dialog; each insert's controls
-    // and each mix's chain live in their own windows (see InsertWindows).
-    private async void OnAddInsert(object? sender, RoutedEventArgs e)
+    // Plugin inserts: every chain, input or mix, opens the same window,
+    // and each insert's controls open in their own (see InsertWindows).
+    private void OnXlrInserts(object? sender, RoutedEventArgs e)
     {
         // The button's Tag names the channel: "xlr2" for the second input.
-        InsertsViewModel chain = (sender as Control)?.Tag as string == "xlr2" ? _vm.Inserts2 : _vm.Inserts;
-        var picker = new PluginPickerWindow { DataContext = chain };
-        PluginChoice? choice = await picker.ShowDialog<PluginChoice?>(this);
-        if (choice is not null) chain.Add(choice);
+        bool second = (sender as Control)?.Tag as string == "xlr2";
+        InsertWindows.OpenChain(this, second ? _vm.Inserts2 : _vm.Inserts, second ? "xlr2" : "xlr1");
     }
 
     private async void OnInsertControls(object? sender, RoutedEventArgs e)

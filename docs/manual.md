@@ -230,16 +230,18 @@ channel, with its level and lock in the INPUTS card.
 <a name="plugins"></a>
 ### 3.5 Add a plugin to the signal path
 
-1. Under XLR 1, XLR 2 or a mix, press "Add plugin…". The picker lists
+1. Under XLR 1, XLR 2 or a mix, press "Inserts…". The chain window opens
+   with that chain's plugins and an "Add plugin…" button. The picker lists
    compatible installed LV2, CLAP and VST3 effects (mono for an input,
    stereo for a mix), searchable by name, category or format. Host
    feature requirements can exclude a plugin; install a compatible set
    such as `lsp-plugins-lv2` if the list is empty.
-2. Add. The plugin appears in the Inserts row with a green light while
-   active.
+2. Add. The plugin appears in the chain window and in the Inserts row on
+   the strip, with a green light while active.
 3. Controls opens a window generated from the plugin's parameters,
    grouped, with a Defaults button. Bypass takes it out of the path
-   (red light); the arrows reorder the chain; the cross removes it.
+   (red light); the arrows reorder the chain; the cross removes it. The
+   strip keeps the short form: bypass and the cog that opens the controls.
 4. Chains and exposed parameter values are saved with the mixer and
    profiles. OpenXLR does not yet save opaque plugin state, sample-file
    selections or plugin presets.

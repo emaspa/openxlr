@@ -283,36 +283,39 @@
         </Grid>
 
         <!-- XLR 1 plugin inserts: plugins in the mic path, after the
-             software low cut and ClipGuard, heard by every mix. The picker
-             and each plugin's controls open in their own windows. -->
+             software low cut and ClipGuard, heard by every mix. The chain
+             window adds, reorders and removes; each plugin's controls open
+             in their own window. -->
         <StackPanel Spacing="4" Margin="0,4,0,0" IsVisible="{Binding HasMixer}">
           <Grid ColumnDefinitions="90,*,Auto">
             <TextBlock Text="Inserts" Classes="h" VerticalAlignment="Center"
                        ToolTip.Tip="Plugins processing XLR 1 before it reaches the mixes"/>
-            <TextBlock Grid.Column="1" Text="{Binding Inserts.Summary}" Classes="h" FontSize="11" VerticalAlignment="Center"/>
-            <Button Grid.Column="2" Content="Add plugin…" Padding="12,3" FontSize="12" MinHeight="0" Click="OnAddInsert"/>
+            <Button Grid.Column="2" Content="{Binding Inserts.ButtonText}" Padding="12,3" FontSize="12" MinHeight="0"
+                    Click="OnXlrInserts" ToolTip.Tip="Plugins processing XLR 1 before it reaches the mixes"/>
           </Grid>
+          <!-- the chain at a glance: LED, name, bypass, controls; adding,
+               ordering and removing live in the chain window -->
           <ItemsControl ItemsSource="{Binding Inserts.Items}" IsVisible="{Binding Inserts.HasItems}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:InsertViewModel">
-                <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto" Margin="0,0,0,3">
-                  <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <Ellipse Width="9" Height="9" VerticalAlignment="Center"
-                             Fill="{Binding IsActive, Converter={x:Static vm:Converters.ActiveLed}}"/>
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="0,0,0,3">
+                  <Ellipse Width="9" Height="9" VerticalAlignment="Center" Margin="0,0,8,0"
+                           Fill="{Binding IsActive, Converter={x:Static vm:Converters.ActiveLed}}"/>
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <TextBlock Text="{Binding Label}" Foreground="#e6e9f0" FontSize="12"/>
                     <TextBlock Text="{Binding StateText}" Classes="h" FontSize="11"/>
                     <TextBlock Text="{Binding Error}" Foreground="#e0a05a" FontSize="11" IsVisible="{Binding HasError}"/>
                   </StackPanel>
-                  <Button Grid.Column="1" Content="Controls" Padding="8,1" MinHeight="0" FontSize="11" Margin="0,0,4,0"
-                          Click="OnInsertControls" ToolTip.Tip="Open this plugin's controls in a window"/>
-                  <ToggleButton Grid.Column="2" Content="Bypass" IsChecked="{Binding Bypass, Mode=TwoWay}"
-                                Padding="8,1" MinHeight="0" FontSize="11" Margin="0,0,4,0"/>
-                  <Button Grid.Column="3" Content="▲" Padding="6,1" MinHeight="0" FontSize="10" Margin="0,0,2,0"
-                          Click="OnInsertUp" ToolTip.Tip="Move earlier in the chain"/>
-                  <Button Grid.Column="4" Content="▼" Padding="6,1" MinHeight="0" FontSize="10" Margin="0,0,4,0"
-                          Click="OnInsertDown" ToolTip.Tip="Move later in the chain"/>
-                  <Button Grid.Column="5" Content="✕" Padding="6,1" MinHeight="0" FontSize="10"
-                          Click="OnInsertRemove" ToolTip.Tip="Remove this insert"/>
+                  <ToggleButton Grid.Column="2" Content="N" IsChecked="{Binding NativeHost, Mode=TwoWay}"
+                                IsVisible="{Binding CanChooseNativeHost}"
+                                IsEnabled="{Binding CanTurnNativeHostOn}"
+                                Padding="6,0" MinHeight="0" MinWidth="0" FontSize="10" Margin="4,0,0,0"
+                                ToolTip.Tip="Run this plugin in its own process, which is what lets its own editor open. Switching rebuilds the chain and interrupts audio for a moment."/>
+                  <ToggleButton Grid.Column="3" Content="B" IsChecked="{Binding Bypass, Mode=TwoWay}"
+                                Padding="6,0" MinHeight="0" MinWidth="0" FontSize="10" Margin="4,0,2,0"
+                                ToolTip.Tip="Bypass"/>
+                  <Button Grid.Column="4" Content="⚙" Padding="6,0" MinHeight="0" MinWidth="0" FontSize="10"
+                          Click="OnInsertControls" ToolTip.Tip="{Binding ControlsHint}"/>
                 </Grid>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
@@ -344,30 +347,32 @@
           <Grid ColumnDefinitions="90,*,Auto">
             <TextBlock Text="Inserts" Classes="h" VerticalAlignment="Center"
                        ToolTip.Tip="Plugins processing XLR 2 before it reaches the mixes"/>
-            <TextBlock Grid.Column="1" Text="{Binding Inserts2.Summary}" Classes="h" FontSize="11" VerticalAlignment="Center"/>
-            <Button Grid.Column="2" Content="Add plugin…" Padding="12,3" FontSize="12" MinHeight="0" Tag="xlr2" Click="OnAddInsert"/>
+            <Button Grid.Column="2" Content="{Binding Inserts2.ButtonText}" Padding="12,3" FontSize="12" MinHeight="0"
+                    Tag="xlr2" Click="OnXlrInserts" ToolTip.Tip="Plugins processing XLR 2 before it reaches the mixes"/>
           </Grid>
+          <!-- the chain at a glance: LED, name, bypass, controls; adding,
+               ordering and removing live in the chain window -->
           <ItemsControl ItemsSource="{Binding Inserts2.Items}" IsVisible="{Binding Inserts2.HasItems}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:InsertViewModel">
-                <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto" Margin="0,0,0,3">
-                  <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <Ellipse Width="9" Height="9" VerticalAlignment="Center"
-                             Fill="{Binding IsActive, Converter={x:Static vm:Converters.ActiveLed}}"/>
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="0,0,0,3">
+                  <Ellipse Width="9" Height="9" VerticalAlignment="Center" Margin="0,0,8,0"
+                           Fill="{Binding IsActive, Converter={x:Static vm:Converters.ActiveLed}}"/>
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <TextBlock Text="{Binding Label}" Foreground="#e6e9f0" FontSize="12"/>
                     <TextBlock Text="{Binding StateText}" Classes="h" FontSize="11"/>
                     <TextBlock Text="{Binding Error}" Foreground="#e0a05a" FontSize="11" IsVisible="{Binding HasError}"/>
                   </StackPanel>
-                  <Button Grid.Column="1" Content="Controls" Padding="8,1" MinHeight="0" FontSize="11" Margin="0,0,4,0"
-                          Click="OnInsertControls" ToolTip.Tip="Open this plugin's controls in a window"/>
-                  <ToggleButton Grid.Column="2" Content="Bypass" IsChecked="{Binding Bypass, Mode=TwoWay}"
-                                Padding="8,1" MinHeight="0" FontSize="11" Margin="0,0,4,0"/>
-                  <Button Grid.Column="3" Content="▲" Padding="6,1" MinHeight="0" FontSize="10" Margin="0,0,2,0"
-                          Click="OnInsertUp" ToolTip.Tip="Move earlier in the chain"/>
-                  <Button Grid.Column="4" Content="▼" Padding="6,1" MinHeight="0" FontSize="10" Margin="0,0,4,0"
-                          Click="OnInsertDown" ToolTip.Tip="Move later in the chain"/>
-                  <Button Grid.Column="5" Content="✕" Padding="6,1" MinHeight="0" FontSize="10"
-                          Click="OnInsertRemove" ToolTip.Tip="Remove this insert"/>
+                  <ToggleButton Grid.Column="2" Content="N" IsChecked="{Binding NativeHost, Mode=TwoWay}"
+                                IsVisible="{Binding CanChooseNativeHost}"
+                                IsEnabled="{Binding CanTurnNativeHostOn}"
+                                Padding="6,0" MinHeight="0" MinWidth="0" FontSize="10" Margin="4,0,0,0"
+                                ToolTip.Tip="Run this plugin in its own process, which is what lets its own editor open. Switching rebuilds the chain and interrupts audio for a moment."/>
+                  <ToggleButton Grid.Column="3" Content="B" IsChecked="{Binding Bypass, Mode=TwoWay}"
+                                Padding="6,0" MinHeight="0" MinWidth="0" FontSize="10" Margin="4,0,2,0"
+                                ToolTip.Tip="Bypass"/>
+                  <Button Grid.Column="4" Content="⚙" Padding="6,0" MinHeight="0" MinWidth="0" FontSize="10"
+                          Click="OnInsertControls" ToolTip.Tip="{Binding ControlsHint}"/>
                 </Grid>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
