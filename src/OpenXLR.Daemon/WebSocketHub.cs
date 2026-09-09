@@ -197,6 +197,9 @@ public sealed class WebSocketHub
                 IReadOnlyList<OpenXLR.Core.Mixing.PluginInfo> plugins = await Task.Run(() => OpenXLR.Core.Mixing.PluginCatalog.Plugins);
                 await reply(new PluginsMessage(plugins));
                 break;
+            case "getPluginDiagnostics":
+                await reply(new PluginDiagnosticsMessage(await Task.Run(() => new OpenXLR.Core.Mixing.PluginInstaller().Diagnostics())));
+                break;
             case "getPluginSetup":
                 await reply(new PluginSetupMessage(await Task.Run(() => new OpenXLR.Core.Mixing.PluginInstaller().Setup())));
                 break;

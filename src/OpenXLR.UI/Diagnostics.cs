@@ -6,6 +6,9 @@ using System.IO.Compression;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.Encodings.Web;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
@@ -39,7 +42,10 @@ public static class Diagnostics
                 This archive is created locally and is never uploaded automatically.
                 It contains OpenXLR state, USB control blocks, PipeWire topology,
                 recent openxlr-daemon journal entries, application audio metadata,
-                configuration files, and system version information. The home
+                configuration files, plugin names and paths, the plugin catalogue,
+                Wine/yabridge versions and status, latest scan results, and system
+                version information. No plugin binaries, presets, Wine registry
+                files or API token are collected. The home
                 path, the host name, the serial numbers of attached USB devices
                 (including inside PipeWire node names) and process-id fields are
                 redacted, but review the archive before attaching it to a public
@@ -52,6 +58,8 @@ public static class Diagnostics
             var blocks = await client.RequestDiagnosticsAsync(TimeSpan.FromSeconds(5));
             await File.WriteAllTextAsync(Path.Combine(work, "device-blocks.json"),
                 RedactHex(blocks?.ToJsonString() ?? "unavailable (daemon not running or no device)", DefaultSecrets()));
+
+            await WritePluginDataAsync(client, work, TimeSpan.FromSeconds(15));
 
             // Audio stack.
             await WriteCmd(work, "pw-dump.json", "pw-dump");
@@ -81,6 +89,43 @@ public static class Diagnostics
         {
             try { Directory.Delete(work, recursive: true); } catch (IOException) { }
         }
+    }
+
+    internal static async Task WritePluginDataAsync(DaemonClient client, string directory, TimeSpan timeout)
+    {
+        // Independent reply types; all requests use the daemon's environment.
+        var requests = new[]
+        {
+            ("plugins.json", client.RequestPluginsAsync(timeout)),
+            ("plugin-setup.json", client.RequestPluginSetupAsync(timeout)),
+            ("plugin-discovery.json", client.RequestPluginDiagnosticsAsync(timeout))
+        };
+        string[] secrets = DefaultSecrets().ToArray();
+        foreach (var (file, request) in requests)
+        {
+            JsonNode? reply = await request;
+            var data = reply?.DeepClone() ?? new JsonObject
+            {
+                ["unavailable"] = "No reply: daemon disconnected, query timed out, or command unsupported."
+            };
+            RedactJson(data, secrets);
+            await File.WriteAllTextAsync(Path.Combine(directory, file), data.ToJsonString(
+                new JsonSerializerOptions { WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping }));
+        }
+    }
+
+    private static void RedactJson(JsonNode node, string[] secrets)
+    {
+        if (node is JsonObject obj)
+        {
+            foreach (string key in obj.Select(p => p.Key).ToArray())
+                if (obj[key] is JsonValue value && value.TryGetValue<string>(out string? text)) obj[key] = Redact(text, secrets);
+                else if (obj[key] is { } child) RedactJson(child, secrets);
+        }
+        else if (node is JsonArray array)
+            for (int i = 0; i < array.Count; i++)
+                if (array[i] is JsonValue value && value.TryGetValue<string>(out string? text)) array[i] = Redact(text, secrets);
+                else if (array[i] is { } child) RedactJson(child, secrets);
     }
 
     private static async Task WriteCmd(string dir, string file, string exe, params string[] args)

@@ -249,3 +249,10 @@ public static class DaemonVersion
             .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?
             .InformationalVersion.Split('+')[0] ?? "0.0.0";
 }
+
+/// <summary>Read-only plugin discovery evidence, separate from the bounded plugin catalogue.</summary>
+public sealed record PluginDiagnosticsMessage(object Discovery)
+{
+    [JsonPropertyName("type")] public string Type => "pluginDiagnostics";
+    [JsonPropertyName("discovery")] public object Discovery { get; } = Discovery;
+}

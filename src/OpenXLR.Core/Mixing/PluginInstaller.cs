@@ -465,6 +465,31 @@ public sealed class PluginInstaller
         return digits.Count > 1 && digits[1] >= minor;
     }
 
+    /// <summary>Read bridge status without syncing or executing a plugin.</summary>
+    public object Diagnostics()
+    {
+        object? status = null;
+        if (_yabridgectl is not null)
+        {
+            try
+            {
+                ProcessResult result = ProcessRunner.Run(_yabridgectl, ["status"], TimeSpan.FromSeconds(5),
+                    stdoutCap: 64 * 1024, stderrCap: 16 * 1024, environment: _managed?.ControllerEnvironment());
+                status = new { result.ExitCode, result.TimedOut, result.Truncated, output = result.StdoutText, error = result.Stderr };
+            }
+            catch (Exception ex) { status = new { error = PluginScanDiagnostics.Clip(ex.Message, 2048) }; }
+        }
+        return new
+        {
+            controller = _yabridgectl, wineExecutable = _wine, winePrefix = _winePrefix,
+            sourceCommit = _managed?.SourceCommit, status,
+            hostExecutable = NativePluginHost.Executable, hostInstalled = _hostInstalled,
+            processArchitecture = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),
+            searchPaths = new { lv2Override = Environment.GetEnvironmentVariable("LV2_PATH"), clap = ClapCatalog.SearchPath().Take(64), vst3 = Vst3Catalog.SearchPath().Take(64) },
+            scans = PluginScanDiagnostics.Snapshot()
+        };
+    }
+
     /// <summary>What is there: the directories, the host, yabridge and Wine.</summary>
     public PluginSetup Setup()
     {

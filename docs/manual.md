@@ -873,11 +873,32 @@ Options, SUPPORT, Collect diagnostics. It writes
 `~/openxlr-diagnostics-<timestamp>.tar.gz` with the daemon's state and
 capabilities, a dump of the interface's vendor blocks, the PipeWire
 graph and device listings, the recent daemon journal, the
-configuration files and version information. The home path, host name
+configuration files and version information. Plugin evidence includes the
+catalogue, effective bridge setup and latest native scan results. The home path, host name
 and the serial numbers of attached USB devices are redacted, in the
 text files and inside the hex dump of the vendor blocks (the XLR Dock
 stores its serial in one); review the archive anyway before attaching
 it to a public issue. Nothing is uploaded automatically.
+
+For a Windows plugin missing from the picker, collect diagnostics after the
+scan finishes and name the plugin and intended insert slot in the report.
+The archive adds:
+
+- `plugins.json`: the catalogue, including format, identifier, channel width,
+  parameters, host support and bundle paths.
+- `plugin-setup.json`: Wine/yabridge versions, selected bridge provider,
+  registered Windows folders and install destinations.
+- `plugin-discovery.json`: the daemon's search paths and Wine prefix,
+  `yabridgectl status`, and the latest completed VST3/CLAP scan results,
+  including cache hits, duplicate ids, missing loaders, failures and timeouts.
+
+Collection does not sync folders, force a rescan or change live inserts.
+Scan evidence is bounded and marks omitted entries. It is collected from
+scans performed by the updated daemon; restart an older daemon after updating
+when convenient, then let discovery finish. An older, disconnected or busy
+daemon produces an explicit unavailable entry instead of stopping the archive.
+Plugin binaries, presets, Wine registry files and the API token are not copied.
+Review plugin names, paths and scanner output before sharing the archive.
 
 <a name="files"></a>
 ## 6. Files and services

@@ -60,6 +60,10 @@ public sealed class DaemonClient : IAsyncDisposable
     public Task<JsonNode?> RequestPluginsAsync(TimeSpan timeout)
         => QueryAsync("plugins", "listPlugins", timeout);
 
+    /// <summary>Latest scan evidence and effective bridge status; null on timeout or an older daemon.</summary>
+    public Task<JsonNode?> RequestPluginDiagnosticsAsync(TimeSpan timeout)
+        => QueryAsync("pluginDiagnostics", "getPluginDiagnostics", timeout);
+
     /// <summary>Where plugins go and what bridges Windows ones (a "pluginSetup" message); null on timeout.</summary>
     public Task<JsonNode?> RequestPluginSetupAsync(TimeSpan timeout)
         => QueryAsync("pluginSetup", "getPluginSetup", timeout);
@@ -233,7 +237,7 @@ public sealed class DaemonClient : IAsyncDisposable
             else if (type == "state") { LastStateJson = text; StateReceived?.Invoke(node); }
             else if (type == "diagnostics") StoreReply(type, node);
             else if (type == "plugins") StoreReply(type, node["plugins"]);
-            else if (type is "pluginSetup" or "pluginInstall") StoreReply(type, node);
+            else if (type is "pluginSetup" or "pluginInstall" or "pluginDiagnostics") StoreReply(type, node);
             else if (type == "commandResult" && node["requestId"]?.GetValue<string>() is string requestId)
             {
                 CompleteQuery(requestId);

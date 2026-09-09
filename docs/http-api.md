@@ -53,7 +53,8 @@ unset TOKEN
 ```
 
 `getPluginSetup` is available through `POST /api/v1/commands` and reports
-the effective plugin host, Wine and bridge provider. Its reply fields are
+the effective plugin host, Wine and bridge provider. `getPluginDiagnostics` reads bridge status and the latest completed native
+scan evidence without syncing or changing inserts. Both reply shapes are
 documented in [api.md](api.md); the transport does not select a bridge itself.
 
 The [OpenAPI document](openapi-v1.json) describes the HTTP endpoints. Restarting

@@ -51,6 +51,7 @@ Messages from the daemon, each a JSON object with a `type` field:
 | `meters` | 15 Hz while the mixer is built | live stereo levels per channel and mix |
 | `plugins` | in answer to `listPlugins` | the installed LV2, CLAP and VST3 plugins with their controls; `supported` is false, with `unsupportedFeatures` listed, for a plugin that needs a host feature the PipeWire chain lacks |
 | `pluginSetup` | in answer to `getPluginSetup` | where installs go (`lv2Directory`, `clapDirectory`, `vst3Directory`), `hostInstalled`, `yabridge` (its version, or null when not installed), `wine`, `windowsDirectories` (the folders yabridge bridges) and `wineFolders` (Wine's own plugin folders that hold a plugin and are not bridged yet, offered as one press since a file dialog hides them) |
+| `pluginDiagnostics` | in answer to `getPluginDiagnostics` | `discovery`: daemon host/controller paths, Wine prefix, architecture, effective search paths, bounded `yabridgectl status` output and latest completed CLAP/VST3 scan reports |
 | `pluginInstall` | in answer to `installPlugin`, `syncWindowsPlugins` and `rescanPlugins` | `ok`, `message` (a sentence or two for the user), `installed` (the bundles or folders put in place), `added` (plugins in the catalogue that were not before) and `total` |
 | `error` | when a command without a `requestId` is rejected | `message` |
 | `commandResult` | in answer to a command that carried a `requestId` | `requestId`, `error` (null on success); preceded by the state the result refers to |
@@ -85,6 +86,7 @@ a bare `error` message, so an editor can wait for the acknowledgement:
 | `setAuxPortEnabled` | `value` | send the Aux mix to the USB Aux port |
 | `setOutputVolume` | `value` | volume of the selected monitor devices |
 | `listPlugins` | none | the installed LV2, CLAP and VST3 plugins, answered with a `plugins` message |
+| `getPluginDiagnostics` | none | read bridge status and existing native scan evidence without syncing, rescanning or changing inserts; answered with `pluginDiagnostics` |
 | `getPluginSetup` | none | where plugins are installed and what bridges Windows ones, answered with a `pluginSetup` message |
 | `installPlugin` | `path` | install what is at an absolute path the user picked: a `.clap` or single-file `.vst3` is copied into `~/.clap` or `~/.vst3`, a `.vst3` or `.lv2` directory into `~/.vst3` or `~/.lv2`, a plain directory installs every plugin inside it, and a Windows VST3 or CLAP plugin has its directory added to yabridge and synced. Archives, installers and VST2 files are refused with a message that says what to do. The catalogues are read again before the `pluginInstall` answer |
 | `syncWindowsPlugins` | none | run yabridge's sync over the folders it knows, then read the catalogues again; answered with `pluginInstall` |
@@ -161,3 +163,34 @@ All under `~/.config/openxlr/` (or `$XDG_CONFIG_HOME/openxlr/`):
   under `$XDG_DATA_HOME/openxlr/yabridge` (default `~/.local/share/openxlr/yabridge`).
 - `ui.json`: window preferences (tray, start minimized, autostart
   toggles)
+
+## Plugin discovery diagnostics
+
+`getPluginDiagnostics` reads the daemon's environment, not the UI's shell.
+`discovery` includes `controller`, `wineExecutable`, `winePrefix`,
+`sourceCommit` for a managed bridge, `hostExecutable`, `hostInstalled`,
+`processArchitecture`, `searchPaths` and `scans`. `searchPaths.lv2Override`
+is the explicit `LV2_PATH` or null for lilv defaults; `clap` and `vst3`
+contain up to 64 effective search directories, including private wrappers.
+
+`status` is null without a controller. Otherwise it contains `exitCode`,
+`timedOut`, `truncated`, `output` and `error`, or just `error` when the
+controller cannot start. The status command has a five-second deadline,
+64 KiB stdout and 16 KiB stderr limits. It does not run a sync.
+
+`scans` contains the last completed report for each native format since
+startup, with `kind`, `completedAt`, `entries` and `omitted`. An empty list
+means no native scan has completed yet. Entries carry `path`, `outcome`,
+`cached`, `plugins`, `duplicates`, `exitCode` and `detail`. Outcomes include
+`host-missing`, `directory`, `directory-missing`, `directory-error`,
+`start-error`, `scan-failed`, `timeout`, `output-limit`, `invalid-description`,
+`no-plugins`, `ok` and `scan-error`. Reports retain at most 128 entries per
+format, preferring failures over successful entries when full. Paths are
+limited to 4096 characters and details to 2048, with truncation marked.
+
+These reports describe scanner output before the combined catalogue's size
+budget and the picker's channel-width/format filters. Compare them with
+`listPlugins` to distinguish scanning from filtering. Reading diagnostics
+does not invalidate scan caches or retry plugins. The API returns paths and
+scanner messages to authenticated clients; the UI redacts personal paths
+when writing the diagnostics archive.
