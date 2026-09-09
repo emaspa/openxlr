@@ -230,16 +230,18 @@ channel, with its level and lock in the INPUTS card.
 <a name="plugins"></a>
 ### 3.5 Add a plugin to the signal path
 
-1. Under XLR 1, XLR 2 or a mix, press "Add plugin…". The picker lists
+1. Under XLR 1, XLR 2 or a mix, press "Inserts…". The chain window opens
+   with that chain's plugins and an "Add plugin…" button. The picker lists
    compatible installed LV2, CLAP and VST3 effects (mono for an input,
    stereo for a mix), searchable by name, category or format. Host
    feature requirements can exclude a plugin; install a compatible set
    such as `lsp-plugins-lv2` if the list is empty.
-2. Add. The plugin appears in the Inserts row with a green light while
-   active.
+2. Add. The plugin appears in the chain window and in the Inserts row on
+   the strip, with a green light while active.
 3. Controls opens a window generated from the plugin's parameters,
    grouped, with a Defaults button. Bypass takes it out of the path
-   (red light); the arrows reorder the chain; the cross removes it.
+   (red light); the arrows reorder the chain; the cross removes it. The
+   strip keeps the short form: bypass and the cog that opens the controls.
 4. Chains and exposed parameter values are saved with the mixer and
    profiles. OpenXLR does not yet save opaque plugin state, sample-file
    selections or plugin presets.
@@ -873,11 +875,32 @@ Options, SUPPORT, Collect diagnostics. It writes
 `~/openxlr-diagnostics-<timestamp>.tar.gz` with the daemon's state and
 capabilities, a dump of the interface's vendor blocks, the PipeWire
 graph and device listings, the recent daemon journal, the
-configuration files and version information. The home path, host name
+configuration files and version information. Plugin evidence includes the
+catalogue, effective bridge setup and latest native scan results. The home path, host name
 and the serial numbers of attached USB devices are redacted, in the
 text files and inside the hex dump of the vendor blocks (the XLR Dock
 stores its serial in one); review the archive anyway before attaching
 it to a public issue. Nothing is uploaded automatically.
+
+For a Windows plugin missing from the picker, collect diagnostics after the
+scan finishes and name the plugin and intended insert slot in the report.
+The archive adds:
+
+- `plugins.json`: the catalogue, including format, identifier, channel width,
+  parameters, host support and bundle paths.
+- `plugin-setup.json`: Wine/yabridge versions, selected bridge provider,
+  registered Windows folders and install destinations.
+- `plugin-discovery.json`: the daemon's search paths and Wine prefix,
+  `yabridgectl status`, and the latest completed VST3/CLAP scan results,
+  including cache hits, duplicate ids, missing loaders, failures and timeouts.
+
+Collection does not sync folders, force a rescan or change live inserts.
+Scan evidence is bounded and marks omitted entries. It is collected from
+scans performed by the updated daemon; restart an older daemon after updating
+when convenient, then let discovery finish. An older, disconnected or busy
+daemon produces an explicit unavailable entry instead of stopping the archive.
+Plugin binaries, presets, Wine registry files and the API token are not copied.
+Review plugin names, paths and scanner output before sharing the archive.
 
 <a name="files"></a>
 ## 6. Files and services

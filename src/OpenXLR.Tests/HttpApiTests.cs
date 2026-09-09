@@ -97,6 +97,14 @@ public sealed class HttpApiTests
                 new StringContent("{\"cmd\":\"getDiagnostics\"}", Encoding.UTF8, "application/json"));
             Assert.Equal(HttpStatusCode.OK, valid.StatusCode);
             Assert.Contains("\"ok\":true", await valid.Content.ReadAsStringAsync());
+            using var pluginDiagnostics = await http.PostAsync("/api/v1/commands",
+                new StringContent("{\"cmd\":\"getPluginDiagnostics\"}", Encoding.UTF8, "application/json"));
+            Assert.Equal(HttpStatusCode.OK, pluginDiagnostics.StatusCode);
+            using var evidence = System.Text.Json.JsonDocument.Parse(await pluginDiagnostics.Content.ReadAsStringAsync());
+            var discovery = evidence.RootElement.GetProperty("messages")[0];
+            Assert.Equal("pluginDiagnostics", discovery.GetProperty("type").GetString());
+            Assert.True(discovery.GetProperty("discovery").TryGetProperty("searchPaths", out _));
+            Assert.True(discovery.GetProperty("discovery").TryGetProperty("scans", out _));
         }
         finally { await app.StopAsync(); }
     }

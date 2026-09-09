@@ -5,7 +5,7 @@
 %global _build_id_links none
 
 Name:           openxlr
-Version:        0.1.30
+Version:        0.1.31
 Release:        1%{?dist}
 Summary:        Control suite and PipeWire submixer for Elgato XLR interfaces
 License:        GPL-3.0-only
@@ -149,6 +149,12 @@ MSG
 %{_datadir}/openxlr/
 
 %changelog
+* Wed Sep 09 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.31-1
+- The Options window fits a 1080p screen: two columns that scroll, never taller than the screen it opens on.
+- XLR 1 and XLR 2 open their inserts in the same window a mix uses, and their strips keep the short row with bypass and the plugin's own controls.
+- A diagnostics archive carries the plugin catalogue the daemon sees, the Wine and bridge setup in effect, and the latest scan results.
+- The manual explains where the Windows bridge comes from and how to build it yourself.
+
 * Tue Sep 08 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.30-1
 - CLAP and VST3 plugins run as inserts in the native host, beside LV2, and the picker marks each plugin with its format and filters by it.
 - Plugins can be installed from the app instead of manually: pick a file or a folder and OpenXLR puts it where it looks.

@@ -9,6 +9,16 @@ public partial class OptionsWindow : Window
     public OptionsWindow()
     {
         InitializeComponent();
+        // The window sizes itself to its cards, so on a short screen it can be
+        // taller than the desktop, with its bottom off the edge and no way to
+        // resize it. Cap it to the screen it opens on; the cards scroll.
+        Opened += (_, _) =>
+        {
+            var screen = Screens.ScreenFromWindow(this);
+            if (screen is null) return;
+            double usable = screen.WorkingArea.Height / screen.Scaling;
+            if (usable > 200) MaxHeight = usable - 60;
+        };
     }
 
     public OptionsWindow(OptionsViewModel vm) : this()

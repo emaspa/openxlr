@@ -96,47 +96,86 @@ public static class Vst3Catalog
 internal static class HostScan
 {
     internal static IReadOnlyList<PluginInfo> Run(string kind, string command, IEnumerable<string> directories,
-        Func<string, IEnumerable<string>> bundlesIn)
+        Func<string, IEnumerable<string>> bundlesIn,
+        Func<string, ProcessResult>? describe = null, ScanCache? scanCache = null)
     {
         // Nothing here may throw: the catalogue is read once and kept, so an
         // exception would be kept with it, and every lookup after would fail.
         var result = new List<PluginInfo>();
+        var evidence = new PluginScanDiagnostics.Capture(kind);
         try
         {
-            if (!NativePluginHost.HostInstalled) return result;
+            if (describe is null && !NativePluginHost.HostInstalled)
+            {
+                evidence.Add(NativePluginHost.Executable, "host-missing");
+                return result;
+            }
             ManagedYabridge? bridge = ManagedYabridge.Discover();
-            var cache = new ScanCache(bridge is null ? ScanCache.DefaultDirectory
+            var cache = scanCache ?? new ScanCache(bridge is null ? ScanCache.DefaultDirectory
                 : Path.Combine(ScanCache.DefaultDirectory, "bridge-" + bridge.CacheKey));
             var known = new HashSet<string>(StringComparer.Ordinal);
             foreach (string directory in directories)
             {
-                if (!Directory.Exists(directory)) continue;
+                if (!Directory.Exists(directory))
+                {
+                    evidence.Add(directory, "directory-missing");
+                    continue;
+                }
                 IEnumerable<string> bundles;
                 try { bundles = bundlesIn(directory).OrderBy(f => f, StringComparer.Ordinal).ToList(); }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { continue; }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    evidence.Add(directory, "directory-error", detail: ex.Message);
+                    continue;
+                }
+                evidence.Add(directory, "directory", detail: $"{bundles.Count()} candidate bundles");
                 foreach (string bundle in bundles)
                 {
                     byte[]? description = cache.Lookup(bundle);
+                    bool cached = description is not null;
+                    string? stderr = null;
                     if (description is null)
                     {
                         // A module that carries hundreds of plugins is created and
                         // released plugin by plugin; a minute is generous for that,
                         // and it is spent once per bundle until the bundle changes.
                         ProcessResult scan;
-                        try { scan = ProcessRunner.Run(NativePluginHost.Executable, [command, bundle], TimeSpan.FromSeconds(60),
-                            environment: bridge?.HostEnvironment()); }
-                        catch (Exception) { continue; }
-                        if (scan.ExitCode != 0 || scan.TimedOut || scan.Truncated) continue;
+                        try { scan = describe is not null ? describe(bundle)
+                            : ProcessRunner.Run(NativePluginHost.Executable, [command, bundle], TimeSpan.FromSeconds(60),
+                                environment: bridge?.HostEnvironment()); }
+                        catch (Exception ex)
+                        {
+                            evidence.Add(bundle, "start-error", detail: ex.Message);
+                            continue;
+                        }
+                        stderr = scan.Stderr;
+                        if (scan.ExitCode != 0 || scan.TimedOut || scan.Truncated)
+                        {
+                            evidence.Add(bundle, scan.TimedOut ? "timeout" : scan.Truncated ? "output-limit" : "scan-failed",
+                                exitCode: scan.ExitCode, detail: stderr);
+                            continue;
+                        }
                         description = scan.Stdout;
                         cache.Store(bundle, description);
                     }
-                    try { result.AddRange(Parse(description, kind).Where(plugin => known.Add(plugin.Plugin))); }
-                    catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException) { /* one bad bundle */ }
+                    try
+                    {
+                        IReadOnlyList<PluginInfo> parsed = Parse(description, kind);
+                        int before = result.Count;
+                        result.AddRange(parsed.Where(plugin => known.Add(plugin.Plugin)));
+                        evidence.Add(bundle, parsed.Count == 0 ? "no-plugins" : "ok", cached,
+                            parsed.Count, parsed.Count - (result.Count - before), detail: stderr);
+                    }
+                    catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException)
+                    {
+                        evidence.Add(bundle, "invalid-description", cached, detail: ex.Message);
+                    }
                 }
             }
             cache.Save();
         }
-        catch (Exception) { /* whatever was read stands */ }
+        catch (Exception ex) { evidence.Add("", "scan-error", detail: ex.Message); }
+        finally { evidence.Complete(); }
         return result;
     }
 

@@ -13,7 +13,7 @@ behaviour verified on hardware before it ships. The project is small on
 purpose. It prefers one small, idiomatic change over a framework, and a
 feature that is measured over one that is described.
 
-## Where it stands (0.1.30)
+## Where it stands (0.1.31)
 
 This is what 0.1.30 ships. A checked item is in the released packages.
 

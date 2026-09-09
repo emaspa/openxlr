@@ -1,3 +1,12 @@
+openxlr (0.1.31) resolute; urgency=medium
+
+  * The Options window fits a 1080p screen: two columns that scroll, never taller than the screen it opens on.
+  * XLR 1 and XLR 2 open their inserts in the same window a mix uses, and their strips keep the short row with bypass and the plugin's own controls.
+  * A diagnostics archive carries the plugin catalogue the daemon sees, the Wine and bridge setup in effect, and the latest scan results.
+  * The manual explains where the Windows bridge comes from and how to build it yourself.
+
+ -- Emanuele Sparvoli <sparvoli@gmail.com>  Wed, 09 Sep 2026 07:20:00 +0100
+
 openxlr (0.1.30) resolute; urgency=medium
 
   * CLAP and VST3 plugins run as inserts in the native host, beside LV2, and the picker marks each plugin with its format and filters by it.

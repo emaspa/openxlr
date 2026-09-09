@@ -284,7 +284,9 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   Options
 - Diagnostics archive: one action collects app and device state, a
   vendor block dump, the PipeWire graph, daemon logs and configs into a
-  tarball for bug reports
+  tarball for bug reports. It also includes plugin catalogue and bridge
+  setup, effective search paths and bounded native scan outcomes, with
+  personal paths redacted and no forced sync or insert changes
 
 ## Flatpak test variant
 
