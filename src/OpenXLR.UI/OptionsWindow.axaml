@@ -39,7 +39,8 @@
         <TextBlock Text="STARTUP" Classes="h"/>
         <CheckBox Content="{Binding StartupLabel}" IsEnabled="{Binding StartupAvailable}"
                   IsChecked="{Binding StartDaemonAtLogin, Mode=TwoWay}"/>
-        <TextBlock Text="{Binding StartupNote}" TextWrapping="Wrap" Foreground="#8b93a7" FontSize="11"/>
+        <TextBlock Text="{Binding StartupNote}" TextWrapping="Wrap" Foreground="#8b93a7" FontSize="11"
+                   Margin="26,0,0,0" IsVisible="{Binding StartupNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
         <CheckBox Content="Start the mixer UI at login" IsVisible="{Binding IsNative}"
                   IsChecked="{Binding OpenWindowAtLogin, Mode=TwoWay}"/>
         <CheckBox Content="Close button minimizes to tray instead of quitting"
@@ -138,7 +139,9 @@
     <Border Classes="card">
       <StackPanel Spacing="6">
         <TextBlock Text="UPDATES" Classes="h"/>
-        <CheckBox Content="Check GitHub for stable releases at startup (at most once per day)"
+        <!-- Two rows on purpose: left to wrap on its own the label breaks after
+             "per" and leaves "day)" alone on the second line. -->
+        <CheckBox Content="Check GitHub for stable releases at startup&#x0a;(at most once per day)"
                   IsChecked="{Binding CheckForUpdates, Mode=TwoWay}"/>
         <TextBlock Text="Off by default. Check now makes one explicit request. Nothing is downloaded or installed."
                    FontSize="11" Foreground="#6b7285" TextWrapping="Wrap"/>
