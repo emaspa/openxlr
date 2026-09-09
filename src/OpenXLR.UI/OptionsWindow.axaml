@@ -3,7 +3,7 @@
         xmlns:vm="using:OpenXLR.UI"
         x:Class="OpenXLR.UI.OptionsWindow"
         x:DataType="vm:OptionsViewModel"
-        Title="OpenXLR Options" Width="560" SizeToContent="Height"
+        Title="OpenXLR Options" Width="980" SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         Background="#16181d" CanResize="False">
 
@@ -23,7 +23,16 @@
     </Style>
   </Window.Styles>
 
-  <StackPanel Margin="14" Spacing="8">
+  <!-- Two columns of cards. One column of them is taller than a 1080p screen,
+       and a window that cannot be resized has no way to show what falls off
+       the bottom. The scroll view is the floor under that, and the code
+       behind caps the height to the screen the window opens on. -->
+  <DockPanel Margin="14">
+    <Button DockPanel.Dock="Bottom" Content="Close" HorizontalAlignment="Right"
+            Padding="18,6" Margin="0,10,0,0" Click="OnClose"/>
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+      <Grid ColumnDefinitions="*,10,*">
+        <StackPanel Spacing="8">
 
     <Border Classes="card">
       <StackPanel Spacing="6">
@@ -41,21 +50,6 @@
                   ToolTip.Tip="Off: OpenXLR controls the hardware only and leaves the sound card in its stock PipeWire layout (the UCM profile where one exists). Plugin inserts go with the submixer. Toggling restarts the daemon."/>
         <TextBlock Text="{Binding SubmixerNote}" Foreground="#8b93a7" FontSize="11" TextWrapping="Wrap"
                    Margin="26,0,0,0" IsVisible="{Binding SubmixerNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-      </StackPanel>
-    </Border>
-
-    <Border Classes="card">
-      <StackPanel Spacing="6">
-        <TextBlock Text="UPDATES" Classes="h"/>
-        <CheckBox Content="Check GitHub for stable releases at startup (at most once per day)"
-                  IsChecked="{Binding CheckForUpdates, Mode=TwoWay}"/>
-        <TextBlock Text="Off by default. Check now makes one explicit request. Nothing is downloaded or installed."
-                   FontSize="11" Foreground="#6b7285" TextWrapping="Wrap"/>
-        <TextBlock Text="{Binding Updates.Title}" Foreground="#5ba8f5" TextWrapping="Wrap"/>
-        <StackPanel Orientation="Horizontal" Spacing="8">
-          <Button Content="Check now" Click="OnCheckUpdates" IsEnabled="{Binding !Updates.Busy}"/>
-          <Button Content="View result" Click="OnUpdates"/>
-        </StackPanel>
       </StackPanel>
     </Border>
 
@@ -94,6 +88,18 @@
       </StackPanel>
     </Border>
 
+    <Border Classes="card" IsVisible="{Binding Main.ShowResetDefaults}">
+      <StackPanel Spacing="6">
+        <TextBlock Text="INTERFACE" Classes="h"/>
+        <TextBlock Text="{Binding Main.ResetDescription}"
+                   FontSize="11" Foreground="#6b7285" TextWrapping="Wrap"/>
+        <Button Content="Reset device to defaults" Padding="14,5" HorizontalAlignment="Left" Click="OnResetDevice"/>
+      </StackPanel>
+    </Border>
+
+        </StackPanel>
+        <StackPanel Grid.Column="2" Spacing="8">
+
     <Border Classes="card">
       <StackPanel Spacing="6">
         <TextBlock Text="PLUGINS" Classes="h"/>
@@ -127,12 +133,18 @@
       </StackPanel>
     </Border>
 
-    <Border Classes="card" IsVisible="{Binding Main.ShowResetDefaults}">
+    <Border Classes="card">
       <StackPanel Spacing="6">
-        <TextBlock Text="INTERFACE" Classes="h"/>
-        <TextBlock Text="{Binding Main.ResetDescription}"
+        <TextBlock Text="UPDATES" Classes="h"/>
+        <CheckBox Content="Check GitHub for stable releases at startup (at most once per day)"
+                  IsChecked="{Binding CheckForUpdates, Mode=TwoWay}"/>
+        <TextBlock Text="Off by default. Check now makes one explicit request. Nothing is downloaded or installed."
                    FontSize="11" Foreground="#6b7285" TextWrapping="Wrap"/>
-        <Button Content="Reset device to defaults" Padding="14,5" HorizontalAlignment="Left" Click="OnResetDevice"/>
+        <TextBlock Text="{Binding Updates.Title}" Foreground="#5ba8f5" TextWrapping="Wrap"/>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button Content="Check now" Click="OnCheckUpdates" IsEnabled="{Binding !Updates.Busy}"/>
+          <Button Content="View result" Click="OnUpdates"/>
+        </StackPanel>
       </StackPanel>
     </Border>
 
@@ -149,6 +161,8 @@
       </StackPanel>
     </Border>
 
-    <Button Content="Close" HorizontalAlignment="Right" Padding="18,6" Margin="0,2,0,6" Click="OnClose"/>
-  </StackPanel>
+        </StackPanel>
+      </Grid>
+    </ScrollViewer>
+  </DockPanel>
 </Window>
