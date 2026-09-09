@@ -28,9 +28,32 @@ tests/editor.o: tests/editor.c host.c $(HEADERS)
 tests/editor: tests/editor.o lv2.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
-.PHONY: test-editor clean
+tests/audio.o: tests/audio.c host.c $(HEADERS)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
+tests/audio: tests/audio.o lv2.o clap.o vst3.o
+	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+# This one compiles clap.c into itself to reach the layout reading, so it
+# links without clap.o.
+tests/clap.o: tests/clap.c host.c clap.c $(HEADERS)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
+tests/clap: tests/clap.o lv2.o vst3.o
+	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+.PHONY: test test-editor test-audio test-clap clean
+# The editor tests need a display; the others need nothing.
+test: test-audio test-clap test-editor
+
 test-editor: tests/editor
 	./tests/editor
 
+test-audio: tests/audio
+	./tests/audio
+
+test-clap: tests/clap
+	./tests/clap
+
 clean:
-	rm -f openxlr-lv2-host $(OBJECTS) tests/editor tests/editor.o
+	rm -f openxlr-lv2-host $(OBJECTS) tests/editor tests/editor.o tests/audio tests/audio.o tests/clap tests/clap.o

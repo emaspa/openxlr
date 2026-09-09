@@ -46,6 +46,7 @@ jobs:
             g++ libpipewire-0.3-dev liblilv-dev lv2-dev libx11-dev xvfb xauth
           make -C native
           test -x native/openxlr-lv2-host
+          make -C native test-audio test-clap
           xvfb-run -a make -C native test-editor
 
       - name: Tray window lifecycle

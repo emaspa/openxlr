@@ -12,7 +12,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-enum { MAX_TIMERS = 32, MAX_FDS = 32, MAX_EVENTS = 1024 };
+enum {
+  MAX_TIMERS = 32,
+  MAX_FDS = 32,
+  MAX_EVENTS = 1024,
+  // A plugin may declare more audio ports than the one pair a chain insert
+  // uses: a sidechain input, a second output. Every declared port still has
+  // to be handed a buffer, so these bound what can be carried.
+  MAX_PORTS = 8,
+  MAX_PORT_CHANNELS = 8
+};
 
 typedef struct Clap Clap;
 
@@ -54,6 +63,17 @@ struct Clap {
   Timer timers[MAX_TIMERS];
   Fd fds[MAX_FDS];
   int64_t steady;
+  // Every audio port the plugin declares, not only the pair the chain uses.
+  // CLAP says the buffer arrays a process call carries have to be as long as
+  // the counts the plugin declared, so a plugin with a sidechain input may
+  // read the second entry; passing one entry with a count of one would send
+  // it past the end. The main ports carry the chain's own buffers, the rest
+  // read silence and write into a buffer nothing listens to.
+  clap_audio_buffer_t in_buses[MAX_PORTS], out_buses[MAX_PORTS];
+  float *in_channels[MAX_PORTS][MAX_PORT_CHANNELS];
+  float *out_channels[MAX_PORTS][MAX_PORT_CHANNELS];
+  uint32_t in_bus_count, out_bus_count, main_in, main_out;
+  float *quiet, *discard;  // silence for the spare inputs, a sink for the spare outputs
   // The events of one process call. The plugin reads the inputs through
   // in_list and answers through out_list; neither allocates.
   clap_event_param_value_t in_events[MAX_EVENTS];
@@ -363,23 +383,100 @@ static const clap_plugin_factory_t *factory_of(Clap *c) {
   return c->entry->get_factory(CLAP_PLUGIN_FACTORY_ID);
 }
 
-// The main audio port in one direction, or the first one: its channel count.
-static uint32_t main_port_channels(const clap_plugin_t *plugin,
-                                   const clap_plugin_audio_ports_t *ports,
-                                   bool input) {
-  if (!ports)
-    return 0;
-  uint32_t count = ports->count(plugin, input), fallback = 0;
+// What one direction's audio ports amount to, as far as this host cares.
+// The scanner and the loader both read a layout through clap_layout, so the
+// catalogue can never offer a plugin the loader would then refuse.
+typedef struct {
+  uint32_t count;          // ports the plugin declares in this direction
+  uint32_t main;           // index of the main one
+  uint32_t main_channels;  // its channel count, which is what the catalogue shows
+} PortLayout;
+
+// Read one direction's layout and say whether this host can carry it. The
+// main port is the first one flagged as such, or port 0 when none is.
+// `chain_channels` is the width of the insert the plugin would run in, or 0
+// when the caller is only describing the plugin: a scan does not know what
+// it would be inserted into, and the catalogue matches widths itself.
+// On refusal `why` is filled with the reason, in the same words whichever
+// caller reports it.
+static bool clap_layout(const clap_plugin_t *plugin,
+                        const clap_plugin_audio_ports_t *ports, bool input,
+                        unsigned chain_channels, PortLayout *out, char *why,
+                        size_t why_size) {
+  const char *side = input ? "input" : "output";
+  *out = (PortLayout){0};
+  uint32_t count = ports ? ports->count(plugin, input) : 0;
+  if (count == 0 || count > MAX_PORTS) {
+    snprintf(why, why_size,
+             "the plugin declares %u audio %s ports; this host carries 1 to %d",
+             count, side, MAX_PORTS);
+    return false;
+  }
+  out->count = count;
+  bool flagged = false;
   for (uint32_t i = 0; i < count; ++i) {
     clap_audio_port_info_t info;
-    if (!ports->get(plugin, i, input, &info))
-      continue;
-    if (info.flags & CLAP_AUDIO_PORT_IS_MAIN)
-      return info.channel_count;
-    if (i == 0)
-      fallback = info.channel_count;
+    if (!ports->get(plugin, i, input, &info)) {
+      snprintf(why, why_size, "the plugin would not describe its audio %s port %u",
+               side, i);
+      return false;
+    }
+    if (info.channel_count > MAX_PORT_CHANNELS) {
+      snprintf(why, why_size,
+               "the plugin's audio %s port %u has %u channels; this host carries %d",
+               side, i, info.channel_count, MAX_PORT_CHANNELS);
+      return false;
+    }
+    if (!flagged && ((info.flags & CLAP_AUDIO_PORT_IS_MAIN) || i == 0)) {
+      flagged = (info.flags & CLAP_AUDIO_PORT_IS_MAIN) != 0;
+      out->main = i;
+      out->main_channels = info.channel_count;
+    }
   }
-  return fallback;
+  if (chain_channels && out->main_channels != chain_channels) {
+    snprintf(why, why_size,
+             "the plugin's main audio %s port has %u channels, not the chain's %u",
+             side, out->main_channels, chain_channels);
+    return false;
+  }
+  return true;
+}
+
+// Lay out the buffer arrays one direction's process call needs. CLAP asks
+// for as many buffers as the plugin declared ports, so a plugin with a
+// sidechain input reads the second entry of an array a one-port host would
+// have made one entry long. The main port carries the chain's own buffers;
+// every other port is given one of the two spare buffers, silence in and a
+// sink out, so it is real memory of the right length whatever the plugin
+// does with it.
+static bool clap_map_ports(Clap *c, Host *h,
+                           const clap_plugin_audio_ports_t *ports, bool input) {
+  PortLayout layout;
+  char why[256];
+  if (!clap_layout(c->plugin, ports, input, h->channels, &layout, why, sizeof(why))) {
+    fprintf(stderr, "%s\n", why);
+    return false;
+  }
+  clap_audio_buffer_t *buses = input ? c->in_buses : c->out_buses;
+  float *(*channels)[MAX_PORT_CHANNELS] = input ? c->in_channels : c->out_channels;
+  float *spare = input ? c->quiet : c->discard;
+  for (uint32_t i = 0; i < layout.count; ++i) {
+    clap_audio_port_info_t info;
+    if (!ports->get(c->plugin, i, input, &info))
+      return false;   // clap_layout already read every port; a change now is a refusal
+    for (uint32_t k = 0; k < info.channel_count; ++k)
+      channels[i][k] = spare;
+    buses[i].data32 = channels[i];
+    buses[i].channel_count = info.channel_count;
+  }
+  if (input) {
+    c->in_bus_count = layout.count;
+    c->main_in = layout.main;
+  } else {
+    c->out_bus_count = layout.count;
+    c->main_out = layout.main;
+  }
+  return true;
 }
 
 static bool clap_load(Host *h, char **arguments) {
@@ -418,14 +515,14 @@ static bool clap_load(Host *h, char **arguments) {
     fputs("the plugin refused to initialise\n", stderr);
     return false;
   }
+  c->quiet = calloc(MAX_FRAMES, sizeof(float));
+  c->discard = calloc(MAX_FRAMES, sizeof(float));
+  if (!c->quiet || !c->discard)
+    return false;
   const clap_plugin_audio_ports_t *ports =
       c->plugin->get_extension(c->plugin, CLAP_EXT_AUDIO_PORTS);
-  if (main_port_channels(c->plugin, ports, true) != h->channels ||
-      main_port_channels(c->plugin, ports, false) != h->channels) {
-    fputs("the plugin's main ports do not match the chain's channels\n",
-          stderr);
+  if (!clap_map_ports(c, h, ports, true) || !clap_map_ports(c, h, ports, false))
     return false;
-  }
   c->params = c->plugin->get_extension(c->plugin, CLAP_EXT_PARAMS);
   c->gui = c->plugin->get_extension(c->plugin, CLAP_EXT_GUI);
   c->timer_support =
@@ -500,6 +597,8 @@ static void clap_unload(Host *h) {
   if (c->library)
     dlclose(c->library);
   free(c->records);
+  free(c->quiet);
+  free(c->discard);
   free(c);
   h->impl = NULL;
 }
@@ -509,15 +608,16 @@ static void clap_unload(Host *h) {
 static void clap_process_audio(Host *h, uint32_t frames, float *const *in,
                                float *const *out) {
   Clap *c = h->impl;
-  float *inputs[MAX_CHANNELS], *outputs[MAX_CHANNELS];
+  // Only the main ports change from cycle to cycle; the spare ones were
+  // pointed at their buffers when the layout was mapped at load.
   for (unsigned i = 0; i < h->channels; ++i) {
-    inputs[i] = in[i];
-    outputs[i] = out[i];
+    c->in_channels[c->main_in][i] = in[i];
+    c->out_channels[c->main_out][i] = out[i];
   }
   if (!atomic_load(&c->processing)) {
     if (!c->plugin->start_processing(c->plugin)) {
       for (unsigned i = 0; i < h->channels; ++i)
-        memset(outputs[i], 0, frames * sizeof(float));
+        memset(out[i], 0, frames * sizeof(float));
       return;
     }
     atomic_store(&c->processing, true);
@@ -544,16 +644,14 @@ static void clap_process_audio(Host *h, uint32_t frames, float *const *in,
     };
     p->last_sent = desired;
   }
-  clap_audio_buffer_t input = {.data32 = inputs, .channel_count = h->channels};
-  clap_audio_buffer_t output = {.data32 = outputs, .channel_count = h->channels};
   clap_process_t process = {
       .steady_time = c->steady,
       .frames_count = frames,
       .transport = NULL,
-      .audio_inputs = &input,
-      .audio_outputs = &output,
-      .audio_inputs_count = 1,
-      .audio_outputs_count = 1,
+      .audio_inputs = c->in_buses,
+      .audio_outputs = c->out_buses,
+      .audio_inputs_count = c->in_bus_count,
+      .audio_outputs_count = c->out_bus_count,
       .in_events = &c->in_list,
       .out_events = &c->out_list,
   };
@@ -561,7 +659,7 @@ static void clap_process_audio(Host *h, uint32_t frames, float *const *in,
   c->steady += frames;
   if (status == CLAP_PROCESS_ERROR)
     for (unsigned i = 0; i < h->channels; ++i)
-      memset(outputs[i], 0, frames * sizeof(float));
+      memset(out[i], 0, frames * sizeof(float));
   for (uint32_t i = 0; i < c->record_count; ++i)
     if (c->records[i].ctl->output) {
       double value;
@@ -737,9 +835,20 @@ int clap_scan(const char *file) {
     }
     const clap_plugin_audio_ports_t *ports =
         plugin->get_extension(plugin, CLAP_EXT_AUDIO_PORTS);
-    printf("],\"audioIns\":%u,\"audioOuts\":%u",
-           main_port_channels(plugin, ports, true),
-           main_port_channels(plugin, ports, false));
+    // The catalogue shows the main ports' widths, and says so when the whole
+    // layout is one this host would refuse to load. Both come from the same
+    // reading the loader does, so the picker never offers a plugin that
+    // would then be turned away, and the reason is worded the same either way.
+    PortLayout in_layout, out_layout;
+    char refusal[256] = "";
+    bool carried = clap_layout(plugin, ports, true, 0, &in_layout, refusal, sizeof(refusal)) &&
+                   clap_layout(plugin, ports, false, 0, &out_layout, refusal, sizeof(refusal));
+    printf("],\"audioIns\":%u,\"audioOuts\":%u", in_layout.main_channels,
+           out_layout.main_channels);
+    if (!carried) {
+      printf(",\"layoutRefused\":");
+      json_string(refusal);
+    }
     const clap_plugin_gui_t *gui = plugin->get_extension(plugin, CLAP_EXT_GUI);
     printf(",\"gui\":%s",
            gui && gui->is_api_supported(plugin, CLAP_WINDOW_API_X11, false)

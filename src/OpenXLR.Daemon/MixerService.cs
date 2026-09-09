@@ -22,7 +22,6 @@ public sealed class MixerService : IHostedService, IDisposable
     private volatile bool _checkingProgress;
     internal bool IsResponsive(TimeSpan limit) => !_checkingProgress || _progress.IsRecent(limit);
     private Timer? _streamSweep;
-    private Timer? _saveDebounce;
     private Timer? _meterPush;
     // The default-device defense after a build: stored and cancellable, so a
     // stop never leaves a pass behind that would override a default the
@@ -43,6 +42,13 @@ public sealed class MixerService : IHostedService, IDisposable
     private readonly IHostApplicationLifetime? _lifetime;
     private int _graphMissing;
 
+    /// <summary>
+    /// The debounced writer for the mixer settings. It stops writing as soon
+    /// as the graph is on its way out, so nothing can export a torn-down
+    /// mixer over the user's file.
+    /// </summary>
+    private readonly SettingsSaver _saves;
+
     public MixerService(ILogger<MixerService> log, IConfiguration config, DeviceManager devices,
         IHostApplicationLifetime? lifetime = null)
     {
@@ -51,6 +57,14 @@ public sealed class MixerService : IHostedService, IDisposable
         _devices = devices;
         _lifetime = lifetime;
         _mixer = new(new PipeWireAdapter(_progress.Mark));
+        _saves = new SettingsSaver(
+            () => _mixer.ExportSettings().Save(),
+            error =>
+            {
+                if (error is null) _log.LogInformation("mixer settings saved again");
+                else _log.LogWarning("mixer settings not saved: {err}; retrying", error);
+            },
+            () => Changed?.Invoke());
     }
 
     /// <summary>
@@ -66,11 +80,9 @@ public sealed class MixerService : IHostedService, IDisposable
         if (_mixer.GraphPresent() is not false) { _graphMissing = 0; return false; }
         if (++_graphMissing < 2) return false;
         _log.LogWarning("the submixer graph is gone (pipewire-pulse restarted?); restarting the daemon to rebuild it");
-        lock (_saveGate)
-        {
-            if (_saveDirty && _mixer.ExportSettings().Save() is string err) _log.LogWarning("settings not saved before the restart: {err}", err);
-            _saveDirty = false;
-        }
+        // ForgetGraph empties the mixer, so this is the last chance to write
+        // and the end of writing, exactly as at a clean stop.
+        if (_saves.Close(write: _saves.Pending) is string err) _log.LogWarning("settings not saved before the restart: {err}", err);
         _mixer.ForgetGraph();
         RestartRequest.Ask(RestartRequest.TemporaryFailure);
         _lifetime?.StopApplication();
@@ -243,6 +255,10 @@ public sealed class MixerService : IHostedService, IDisposable
                         ScheduleSave();
                         Changed?.Invoke();
                     }
+                    // A combine leg that appeared after its cell was applied
+                    // sits at PipeWire's defaults, full level and unmuted,
+                    // until the stored fader is pushed onto it.
+                    _mixer.EnsureCellLevels();
                     if (_mixer.SyncStreams() | _mixer.SyncDeviceVolumes() | _mixer.EnforceDefaults()
                         | _mixer.EnsureInputFeeds() | _mixer.EnsureAuxRoute()
                         | _mixer.EnsureFilterRoutes()
@@ -334,10 +350,15 @@ public sealed class MixerService : IHostedService, IDisposable
         catch (Exception ex) when (ex is TimeoutException or OperationCanceledException) { _log.LogWarning("default defense did not stop in time"); }
         if (_mixer.Built)
         {
-            if (_mixer.ExportSettings().Save() is string stopErr) _log.LogWarning("settings not saved at stop: {err}", stopErr);
+            // The final save and the end of saving are one step. Tearing the
+            // graph down empties the levels, mutes and monitor routing, so a
+            // debounced save still pending here, or the flush in Dispose,
+            // would write that empty state over the user's settings.
+            if (_saves.Close(write: true) is string stopErr) _log.LogWarning("settings not saved at stop: {err}", stopErr);
             _mixer.TearDown();
             _log.LogInformation("submix graph torn down");
         }
+        else _saves.Close(write: false);
     }
 
     /// <summary>Apply a mixer command. Returns null on success, else an error.</summary>
@@ -360,7 +381,7 @@ public sealed class MixerService : IHostedService, IDisposable
                     // Layout commands save synchronously, under the same gate
                     // as the debounced fader saves, and succeed only once the
                     // new layout is on disk.
-                    lock (_saveGate)
+                    _saves.RunSaved(() =>
                     {
                         Func<MixerSettings, string?> save = settings => settings.Save();
                         switch (cmd.Cmd)
@@ -373,11 +394,7 @@ public sealed class MixerService : IHostedService, IDisposable
                             case "deleteMix": _mixer.DeleteVirtualMix(cmd.Mix!, save); break;
                             default: _mixer.SetLayoutOrder(cmd.Channels!, cmd.Mixes!, save); break;
                         }
-                        _saveDirty = false;
-                        _lastSaveError = null;
-                        _retryDelay = SaveDelay;
-                        _saveDebounce?.Change(Timeout.Infinite, Timeout.Infinite);
-                    }
+                    });
                     Changed?.Invoke();
                     return null;
                 case "setLevel":
@@ -490,16 +507,11 @@ public sealed class MixerService : IHostedService, IDisposable
         return null;
     }
 
-    /// <summary>
-    /// Persist a moment after the last change, so dragging a fader writes once
-    /// instead of on every pixel of travel.
-    /// </summary>
-    private readonly object _saveGate = new();
-    private bool _saveDirty;
-    private static readonly TimeSpan SaveDelay = TimeSpan.FromSeconds(2);
-    private static readonly TimeSpan MaxRetryDelay = TimeSpan.FromSeconds(60);
-    private TimeSpan _retryDelay = SaveDelay;
-    private string? _lastSaveError;
+    private int _sweepCount;
+    private string? _resourceWarning;
+
+    /// <summary>pipewire-pulse close to its open-file limit, or null.</summary>
+    public string? ResourceWarning => Volatile.Read(ref _resourceWarning);
 
     /// <summary>
     /// Why the mixer settings are not on disk, or null while they are. A
@@ -508,70 +520,15 @@ public sealed class MixerService : IHostedService, IDisposable
     /// state so the user knows the window's changes would not survive a
     /// restart yet.
     /// </summary>
-    private int _sweepCount;
-    private string? _resourceWarning;
-
-    /// <summary>pipewire-pulse close to its open-file limit, or null.</summary>
-    public string? ResourceWarning => Volatile.Read(ref _resourceWarning);
-
     public string? PersistenceWarning
-    {
-        get { lock (_saveGate) return _lastSaveError is null ? null : $"Mixer settings are not being saved ({_lastSaveError}); retrying."; }
-    }
+        => _saves.Error is string err ? $"Mixer settings are not being saved ({err}); retrying." : null;
 
-    private void ScheduleSave()
-    {
-        lock (_saveGate)
-        {
-            _saveDirty = true;
-            _saveDebounce ??= new Timer(_ => SaveNow(), null, Timeout.Infinite, Timeout.Infinite);
-            _saveDebounce.Change(SaveDelay, Timeout.InfiniteTimeSpan);
-        }
-    }
-
-    // One writer at a time, and only when something changed since the last
-    // write; Dispose flushes a pending save so a change made just before
-    // shutdown is not lost. A failed write stays dirty and is retried with
-    // backoff; the failure is logged once per distinct reason and shown to
-    // clients until a write succeeds.
-    private void SaveNow()
-    {
-        bool changed = false;
-        lock (_saveGate)
-        {
-            if (!_saveDirty) return;
-            string? err = _mixer.ExportSettings().Save();
-            if (err is null)
-            {
-                _saveDirty = false;
-                _retryDelay = SaveDelay;
-                if (_lastSaveError is not null)
-                {
-                    _log.LogInformation("mixer settings saved again");
-                    _lastSaveError = null;
-                    changed = true;
-                }
-            }
-            else
-            {
-                if (err != _lastSaveError)
-                {
-                    _log.LogWarning("mixer settings not saved: {err}; retrying", err);
-                    _lastSaveError = err;
-                    changed = true;
-                }
-                _retryDelay = TimeSpan.FromTicks(Math.Min(_retryDelay.Ticks * 2, MaxRetryDelay.Ticks));
-                _saveDebounce?.Change(_retryDelay, Timeout.InfiniteTimeSpan);
-            }
-        }
-        if (changed) Changed?.Invoke();
-    }
+    private void ScheduleSave() => _saves.Schedule();
 
     public void Dispose()
     {
         _streamSweep?.Dispose();
-        _saveDebounce?.Dispose();
         _meterPush?.Dispose();
-        SaveNow();
+        _saves.Dispose();
     }
 }

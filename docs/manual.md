@@ -271,7 +271,11 @@ it looks and the picker lists it a moment later. A file is a `.clap` or a
 single-file `.vst3`; a folder is a `.vst3` or `.lv2` bundle, or a folder
 holding several of them, such as an extracted download. Linux plugins are
 copied into `~/.clap`, `~/.vst3` or `~/.lv2`, so the download can go
-afterwards. An archive has to be extracted first. Plugins installed by
+afterwards. Installing over a plugin that is already there builds the new
+copy beside it and swaps the two only once the copy is complete, so a
+download that turns out to be unreadable, or a disk that fills up, costs
+the update and not the plugin you had. An archive has to be extracted
+first. Plugins installed by
 other means, or copied into `/usr/lib/clap`, `/usr/lib/vst3` or
 `/usr/lib/lv2` by a package, appear after "Rescan" in Options or a daemon
 restart (`LV2_PATH`, `CLAP_PATH` and `VST3_PATH` override the places
@@ -479,6 +483,13 @@ and when you switch to it in the device picker. Use it to land on a
 known scene at every login. The reconnect after a passing USB error
 does not count, so the recall never undoes changes you made since.
 Pick "(none)" to stop.
+
+A profile only sets the sends and mixes it names. Add a channel or a
+virtual microphone after saving a profile, and recalling that profile
+leaves the new one as it is: its sends stay closed, the way a new
+channel or mix starts, instead of opening at full level because an
+older profile had nothing to say about them. Save the profile again to
+take the new sends into it.
 
 **Restoring settings on connect.** For the original Wave XLR and first
 XLR Dock, OpenXLR restores the last settings it observed. This policy
@@ -691,8 +702,12 @@ away while an editor is open, the editor closes and the plugin keeps
 processing; pressing "Plugin UI" again opens a fresh one. If an editor
 stops answering, the insert says its controls are frozen and its audio
 carries on. A crash of the plugin process interrupts the chain while it
-recovers. A plugin that keeps crashing has its chain switched off after
-it has failed three times in five minutes, with the reason on the insert;
+recovers, and so does a plugin that stops passing audio: one that blocks
+inside its own processing is noticed after a few seconds and replaced the
+same way a crashed one is, since an instance that is neither dead nor
+processing would otherwise sit there silent. A plugin that keeps crashing
+has its chain switched off after it has failed three times in five
+minutes, with the reason on the insert;
 changing or bypassing that chain starts it over.
 
 <a name="stream-deck"></a>

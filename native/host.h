@@ -96,6 +96,12 @@ struct Host {
   _Atomic bool audio_error;
   _Atomic bool monitor_stop;
   unsigned heartbeat_ticks;
+  // Audio-callback progress. The audio thread bumps entered before the
+  // plugin's process call and left after it returns, so the two differ
+  // exactly while a call is outstanding and entered stops moving when one
+  // never returns. An idle or suspended node makes no calls at all, which
+  // reads as no call outstanding rather than as a stall.
+  _Atomic uint64_t audio_entered, audio_left;
   pthread_t main_thread, audio_thread;
   _Atomic bool audio_thread_known;
   // The editor's window
@@ -156,6 +162,22 @@ void host_editor_lost(Host *h);
 void host_run_guarded(Host *h, void (*call)(void *), void *argument);
 // Ask the supervisor for a fresh process; audio ends with this one.
 void host_fail(Host *h, const char *why);
+// Whether one cycle can be carried at all: the fixed fallback buffers hold
+// MAX_FRAMES frames, and the plugin was activated for one sample rate. A
+// cycle that fails this is refused before anything is written.
+bool host_quantum_supported(const Host *h, uint32_t frames, uint32_t rate_denom);
+// A channel PipeWire gave no buffer for this cycle borrows one of the two
+// fixed fallback buffers. The clear is bounded by their length, so it can
+// never run past the allocation.
+float *host_fallback(float *buffer, uint32_t frames, bool clear);
+// Whether the plugin's audio callback is stuck: the same call has been
+// outstanding across every poll of a window. `entered` and `left` come from
+// the host, `last` and `outstanding` are the caller's running state, and
+// `window` is how many consecutive polls a single call may span before it
+// counts as stuck. A node with no call outstanding, idle or suspended, is
+// never stuck.
+bool host_audio_stuck(uint64_t entered, uint64_t left, uint64_t *last,
+                      unsigned *outstanding, unsigned window);
 struct pw_loop *host_loop(Host *h);
 bool host_on_main_thread(Host *h);
 bool host_on_audio_thread(Host *h);

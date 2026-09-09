@@ -445,6 +445,7 @@ public sealed partial class Mixer
             _levels.Remove(cell);
             if (_muted.Remove(cell)) snapshot.Muted.Add(cell);
             if (_legIndex.Remove(cell, out int index)) snapshot.Legs[cell] = index;
+            _pendingCells.Remove(cell);
         }
         if (mixId is not null) { _mixVolume.Remove(mixId); _mixMuted.Remove(mixId); }
         return snapshot;
@@ -459,6 +460,7 @@ public sealed partial class Mixer
             _levels.Remove(cell);
             _muted.Remove(cell);
             _legIndex.Remove(cell);
+            _pendingCells.Remove(cell);
         }
     }
 
@@ -470,6 +472,7 @@ public sealed partial class Mixer
             _levels.Remove(cell);
             _muted.Remove(cell);
             _legIndex.Remove(cell);
+            _pendingCells.Remove(cell);
         }
         _mixVolume.Remove(mixId);
         _mixMuted.Remove(mixId);

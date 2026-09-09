@@ -33,24 +33,29 @@ public sealed class MeterReader : IDisposable
     /// <summary>Begin metering a sink by monitoring its output.</summary>
     public void Add(string id, string sinkName)
     {
+        var psi = new ProcessStartInfo("parec")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        psi.ArgumentList.Add("-d"); psi.ArgumentList.Add($"{sinkName}.monitor");
+        psi.ArgumentList.Add("--format=float32le");
+        psi.ArgumentList.Add($"--rate={SampleRate}");
+        psi.ArgumentList.Add("--channels=2");
+        // Without an explicit latency parec batches its output in ~1 s
+        // chunks, which turns a steady signal into a once-a-second spike
+        // followed by decay. 50 ms delivers fragments faster than the
+        // 15 Hz poll, so bars track the signal.
+        psi.ArgumentList.Add("--latency-msec=50");
+        Add(id, psi);
+    }
+
+    /// <summary>Begin metering with a capture process of the caller's choosing.</summary>
+    internal void Add(string id, ProcessStartInfo psi)
+    {
         lock (_gate)
         {
             if (_disposed || _meters.ContainsKey(id)) return;
-
-            var psi = new ProcessStartInfo("parec")
-            {
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-            };
-            psi.ArgumentList.Add("-d"); psi.ArgumentList.Add($"{sinkName}.monitor");
-            psi.ArgumentList.Add("--format=float32le");
-            psi.ArgumentList.Add($"--rate={SampleRate}");
-            psi.ArgumentList.Add("--channels=2");
-            // Without an explicit latency parec batches its output in ~1 s
-            // chunks, which turns a steady signal into a once-a-second spike
-            // followed by decay. 50 ms delivers fragments faster than the
-            // 15 Hz poll, so bars track the signal.
-            psi.ArgumentList.Add("--latency-msec=50");
 
             Process? p;
             try { p = Process.Start(psi); }
@@ -59,10 +64,18 @@ public sealed class MeterReader : IDisposable
 
             var meter = new Meter { Process = p };
             _meters[id] = meter;
-            new Thread(() => Pump(meter)) { IsBackground = true, Name = $"meter-{id}" }.Start();
+            // Take both streams here, while the gate still holds the process:
+            // Remove and Dispose can retire the meter before either thread is
+            // scheduled, and Process.StandardOutput on a disposed process
+            // throws, on a raw thread with no handler above it. Reading a
+            // stream that was closed underneath fails inside the loops, where
+            // it is caught.
+            Stream output = p.StandardOutput.BaseStream;
+            Stream errors = p.StandardError.BaseStream;
+            new Thread(() => Pump(meter, output)) { IsBackground = true, Name = $"meter-{id}" }.Start();
             // stderr must be drained: parec blocks once the pipe fills with
             // warnings, which silently freezes its audio output mid-stream.
-            new Thread(() => Drain(p)) { IsBackground = true, Name = $"meter-err-{id}" }.Start();
+            new Thread(() => Drain(errors)) { IsBackground = true, Name = $"meter-err-{id}" }.Start();
         }
     }
 
@@ -102,21 +115,20 @@ public sealed class MeterReader : IDisposable
         return (sumL, sumR, frames, rest);
     }
 
-    private static void Drain(Process p)
+    private static void Drain(Stream errors)
     {
         var buf = new byte[4096];
-        try { while (p.StandardError.BaseStream.Read(buf, 0, buf.Length) > 0) { } }
+        try { while (errors.Read(buf, 0, buf.Length) > 0) { } }
         catch (Exception) { /* process ended */ }
     }
 
-    private void Pump(Meter meter)
+    private void Pump(Meter meter, Stream stdout)
     {
         // A pipe read can end anywhere inside an 8-byte stereo frame; the
         // remainder is carried into the next read so the stream never goes
         // out of alignment (which would turn the meters into noise).
         var buf = new byte[8192];
         int carry = 0;
-        Stream stdout = meter.Process.StandardOutput.BaseStream;
         while (!_disposed)
         {
             int read;

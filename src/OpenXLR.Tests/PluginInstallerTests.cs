@@ -129,6 +129,46 @@ public sealed class PluginInstallerTests : IDisposable
     }
 
     [Fact]
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]   // file modes are a Unix matter; the daemon only runs there
+    public void AFailedReplacementLeavesTheInstalledPluginWhereItWas()
+    {
+        // The installed bundle used to be deleted before the new copy was
+        // made, so an unreadable download or a full disk cost the working
+        // plugin. The copy is built beside it now and the two are swapped
+        // only once it is complete.
+        if (Environment.IsPrivilegedProcess) return;   // root reads an unreadable directory anyway
+        PluginInstaller installer = Installer();
+        Assert.True(installer.Install(Lv2("gate.lv2")).Ok);
+        string installed = Path.Combine(_lv2, "gate.lv2");
+        Assert.True(File.Exists(Path.Combine(installed, "manifest.ttl")));
+
+        // A second copy of the same bundle, with a directory inside it that
+        // cannot be read: the copy fails part way through.
+        string broken = Path.Combine(_picked, "broken", "gate.lv2");
+        Directory.CreateDirectory(Path.Combine(broken, "presets"));
+        File.WriteAllText(Path.Combine(broken, "manifest.ttl"), "replacement");
+        File.SetUnixFileMode(Path.Combine(broken, "presets"), UnixFileMode.None);
+        try
+        {
+            InstallOutcome failed = installer.Install(broken);
+            Assert.False(failed.Ok);
+            Assert.Contains("Could not copy gate.lv2", failed.Message);
+        }
+        finally
+        {
+            File.SetUnixFileMode(Path.Combine(broken, "presets"),
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+
+        // The plugin that was working is still there, still itself, and
+        // nothing half-copied was left beside it.
+        Assert.True(Directory.Exists(installed));
+        Assert.StartsWith("@prefix", File.ReadAllText(Path.Combine(installed, "manifest.ttl")));
+        Assert.True(File.Exists(Path.Combine(installed, "plugin.so")));
+        Assert.Equal(["gate.lv2"], Directory.GetDirectories(_lv2).Select(Path.GetFileName));
+    }
+
+    [Fact]
     public void ABundleAlreadyInPlaceIsOnlyRescanned()
     {
         Directory.CreateDirectory(_clap);

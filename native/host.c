@@ -222,6 +222,34 @@ bool host_on_audio_thread(Host *h) {
 
 // --- audio ------------------------------------------------------------------
 
+bool host_quantum_supported(const Host *h, uint32_t frames, uint32_t rate_denom) {
+  return frames <= MAX_FRAMES && rate_denom == h->rate;
+}
+
+float *host_fallback(float *buffer, uint32_t frames, bool clear) {
+  if (clear)
+    memset(buffer, 0,
+           sizeof(float) * (frames > MAX_FRAMES ? MAX_FRAMES : frames));
+  return buffer;
+}
+
+bool host_audio_stuck(uint64_t entered, uint64_t left, uint64_t *last,
+                      unsigned *outstanding, unsigned window) {
+  if (entered == left) {  // nothing in the plugin right now
+    *last = entered;
+    *outstanding = 0;
+    return false;
+  }
+  if (entered != *last) {  // a different call, so the previous one returned
+    *last = entered;
+    *outstanding = 1;
+    return false;
+  }
+  if (*outstanding < window)
+    ++*outstanding;
+  return *outstanding >= window;
+}
+
 static void process_audio(void *data, struct spa_io_position *position) {
   Host *h = data;
   if (!atomic_load(&h->audio_thread_known)) {
@@ -229,26 +257,37 @@ static void process_audio(void *data, struct spa_io_position *position) {
     atomic_store(&h->audio_thread_known, true);
   }
   uint32_t frames = position->clock.duration;
-  bool broken = frames > MAX_FRAMES || position->clock.rate.denom != h->rate;
+  // Refuse the cycle before anything is written. The fallback buffers hold
+  // MAX_FRAMES frames, so a larger quantum has to be turned away here: the
+  // silence and scratch writes below would run past their end, and the
+  // check that used to sit after them came too late to prevent that.
+  // The output ports' own buffers are sized for this quantum, so those are
+  // the only ones it is safe to clear on the way out.
+  if (!host_quantum_supported(h, frames, position->clock.rate.denom)) {
+    atomic_store(&h->audio_error, true);
+    for (unsigned i = 0; i < h->channels; ++i) {
+      float *buffer = pw_filter_get_dsp_buffer(h->out_ports[i], frames);
+      if (buffer)
+        memset(buffer, 0, sizeof(float) * frames);
+    }
+    return;
+  }
   float *in[MAX_CHANNELS], *out[MAX_CHANNELS];
   for (unsigned i = 0; i < h->channels; ++i) {
     float *buffer = pw_filter_get_dsp_buffer(h->in_ports[i], frames);
-    if (!buffer) {
-      memset(h->silence, 0, sizeof(float) * frames);
-      buffer = h->silence;
-    }
+    if (!buffer)
+      buffer = host_fallback(h->silence, frames, true);
     in[i] = buffer;
     out[i] = pw_filter_get_dsp_buffer(h->out_ports[i], frames);
     if (!out[i])
-      out[i] = h->scratch;
+      out[i] = host_fallback(h->scratch, frames, false);
   }
-  if (broken) {
-    atomic_store(&h->audio_error, true);
-    for (unsigned i = 0; i < h->channels; ++i)
-      memset(out[i], 0, sizeof(float) * frames);
-    return;
-  }
+  // Bracket the plugin's callback so the process monitor can tell a stuck
+  // one from an idle node: entered and left differ only while a call is
+  // outstanding, and a stuck call keeps the same entered value.
+  atomic_fetch_add(&h->audio_entered, 1);
   h->backend->process(h, frames, in, out);
+  atomic_fetch_add(&h->audio_left, 1);
 }
 
 static void state_changed(void *data, enum pw_filter_state old,
@@ -700,8 +739,17 @@ static void stop(void *data, int signal) {
   pw_main_loop_quit(((Host *)data)->loop);
 }
 
+// How many consecutive polls one plugin callback may span before it counts
+// as stuck. At a poll a second that is several seconds inside the plugin,
+// on top of which the daemon waits out its own patience before it replaces
+// the process: long enough that no working plugin is ever mistaken for one.
+enum { AUDIO_STALL_POLLS = 6 };
+
 static void *monitor_audio(void *data) {
   Host *h = data;
+  uint64_t last_entered = 0;
+  unsigned outstanding = 0;
+  bool said = false;
   while (!atomic_load(&h->monitor_stop)) {
     // The redirected input pipe belongs to the daemon process, unlike
     // PDEATHSIG, which follows the short-lived .NET thread that spawned us.
@@ -709,6 +757,25 @@ static void *monitor_audio(void *data) {
     struct pollfd input = {STDIN_FILENO, POLLHUP | POLLERR, 0};
     if (poll(&input, 1, 1000) > 0 && (input.revents & (POLLHUP | POLLERR)))
       _exit(0);
+    // The beat says the audio is moving, not merely that the process is
+    // alive. A plugin that blocks inside its own process callback leaves
+    // this thread and the editor loop untouched, so beating regardless
+    // would leave the daemon carrying an instance that passes no audio and
+    // never gets replaced. A node with no call outstanding is idle or
+    // suspended on purpose and keeps beating.
+    if (host_audio_stuck(atomic_load(&h->audio_entered),
+                         atomic_load(&h->audio_left), &last_entered,
+                         &outstanding, AUDIO_STALL_POLLS)) {
+      if (!said) {
+        fprintf(stderr,
+                "the plugin has been inside one audio callback for %d s; "
+                "restart the chain\n",
+                AUDIO_STALL_POLLS);
+        said = true;
+      }
+      continue;
+    }
+    said = false;
     puts("heartbeat");
   }
   return NULL;

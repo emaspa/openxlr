@@ -220,7 +220,7 @@ internal static class HostScan
     /// <summary>One plugin, from the object the reader stands on to its end.</summary>
     private static PluginInfo? ReadPlugin(ref Utf8JsonReader reader, string kind, string file)
     {
-        string? id = null, name = null;
+        string? id = null, name = null, layoutRefused = null;
         var features = new List<string>();
         var parameters = new List<PluginParam>();
         int ins = 0, outs = 0;
@@ -232,6 +232,11 @@ internal static class HostScan
             else if (reader.ValueTextEquals("audioIns"u8)) { reader.Read(); ins = Whole(ref reader); }
             else if (reader.ValueTextEquals("audioOuts"u8)) { reader.Read(); outs = Whole(ref reader); }
             else if (reader.ValueTextEquals("gui"u8)) { reader.Read(); gui = reader.TokenType == JsonTokenType.True; }
+            // The helper says so when the plugin's port layout is one it
+            // would refuse to load, in the words it would print. Carrying
+            // that here keeps the picker from offering a plugin that cannot
+            // be inserted, on the same footing as a missing host feature.
+            else if (reader.ValueTextEquals("layoutRefused"u8)) { reader.Read(); layoutRefused = Text(ref reader); }
             else if (reader.ValueTextEquals("features"u8))
             {
                 reader.Read();
@@ -261,6 +266,7 @@ internal static class HostScan
         {
             HasNativeUi = gui,
             Path = file,
+            UnsupportedFeatures = string.IsNullOrWhiteSpace(layoutRefused) ? [] : [layoutRefused],
         };
     }
 
