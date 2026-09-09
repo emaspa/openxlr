@@ -67,6 +67,15 @@ public sealed class PluginScanDiagnosticsTests
             report = PluginScanDiagnostics.Snapshot().Single(r => r.Kind == kind);
             Assert.Equal(2, report.Entries.Count(e => e.Outcome == "ok" && e.Cached));
             Assert.Contains(report.Entries, e => e.Outcome == "invalid-description" && e.Cached);
+
+            // A cache filled by an older helper answers nothing: whatever the
+            // scanner has learnt since reaches bundles that never changed.
+            result = HostScan.Run(kind, "unused", [dir], _ => bundles, Describe,
+                new ScanCache(Path.Combine(dir, "cache"), "another-helper"));
+            Assert.Single(result);
+            Assert.Equal(4, goodCalls);
+            report = PluginScanDiagnostics.Snapshot().Single(r => r.Kind == kind);
+            Assert.DoesNotContain(report.Entries, e => e.Cached);
         }
         finally { Directory.Delete(dir, recursive: true); }
     }

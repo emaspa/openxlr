@@ -39,7 +39,8 @@ public static class PluginCatalog
     /// <summary>
     /// Read every source again, for plugins installed since. What was
     /// learnt about a bundle that did not change comes from the scan cache,
-    /// so only new bundles cost a scan. Blocks until the new list is ready.
+    /// so only new bundles cost a scan, and every bundle once after the
+    /// native helper itself changes. Blocks until the new list is ready.
     ///
     /// The old catalogue is dropped first and the heap swept before the new
     /// one is built: the daemon runs under a firm heap limit, and holding

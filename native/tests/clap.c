@@ -269,5 +269,25 @@ int main(void) {
   assert(clap_layout(&fake, &ap_ext, true, 0, &scanned, scan_why, sizeof(scan_why)));
   assert(!clap_layout(&fake, &ap_ext, true, 1, &loaded, load_why, sizeof(load_why)));
   puts("PASS: the scanner and the loader refuse the same layouts, in the same words");
+
+  // 8. A refusal in one direction leaves the other one described. The scan
+  // prints both widths, so a reading it skips is a reading of whatever the
+  // stack held: skipping the output reading once a refused input had
+  // short-circuited it put 0xFEFEFEFE into the catalogue's JSON as an
+  // audioOuts of 4278124286, for four real LSP mixers. Both layouts are
+  // poisoned first, so anything left unwritten is caught here.
+  in_side = (Side){.count = MAX_PORTS + 1, .channels = {2, 2, 2, 2, 2, 2, 2, 2}};
+  out_side = (Side){.count = 1, .channels = {2}, .main = 0, .flag_main = true};
+  PortLayout poisoned_in, poisoned_out;
+  memset(&poisoned_in, 0xFE, sizeof(poisoned_in));
+  memset(&poisoned_out, 0xFE, sizeof(poisoned_out));
+  char why_in[256] = "", why_out[256] = "";
+  bool read_in = clap_layout(&fake, &ap_ext, true, 0, &poisoned_in, why_in, sizeof(why_in));
+  bool read_out = clap_layout(&fake, &ap_ext, false, 0, &poisoned_out, why_out, sizeof(why_out));
+  assert(!read_in && read_out);
+  assert(poisoned_in.count == 0 && poisoned_in.main == 0 && poisoned_in.main_channels == 0);
+  assert(poisoned_out.count == 1 && poisoned_out.main_channels == 2);
+  assert(why_in[0] && !why_out[0]);
+  puts("PASS: a refused direction writes its own layout and leaves the other described");
   return 0;
 }

@@ -279,7 +279,11 @@ first. Plugins installed by
 other means, or copied into `/usr/lib/clap`, `/usr/lib/vst3` or
 `/usr/lib/lv2` by a package, appear after "Rescan" in Options or a daemon
 restart (`LV2_PATH`, `CLAP_PATH` and `VST3_PATH` override the places
-searched).
+searched). What a CLAP or VST3 bundle said about itself is remembered
+until the bundle changes, so a rescan costs nothing for plugins already
+known. Updating OpenXLR reads every one of them again once, because the
+new version may see them differently, which makes the first scan after
+an update as slow as the first ever.
 
 <a name="windows-plugins"></a>
 **Windows VST3 and CLAP plugins.** They run through

@@ -839,15 +839,20 @@ int clap_scan(const char *file) {
     // layout is one this host would refuse to load. Both come from the same
     // reading the loader does, so the picker never offers a plugin that
     // would then be turned away, and the reason is worded the same either way.
+    // Both directions are read, and neither reading is skipped: the widths
+    // of both are printed, so a short circuit on the first refusal would
+    // leave the second layout unwritten and print whatever the stack held.
+    // A refused reading zeroes its own layout, so a plugin refused in one
+    // direction is still described in the other.
     PortLayout in_layout, out_layout;
-    char refusal[256] = "";
-    bool carried = clap_layout(plugin, ports, true, 0, &in_layout, refusal, sizeof(refusal)) &&
-                   clap_layout(plugin, ports, false, 0, &out_layout, refusal, sizeof(refusal));
+    char in_why[256] = "", out_why[256] = "";
+    bool ins = clap_layout(plugin, ports, true, 0, &in_layout, in_why, sizeof(in_why));
+    bool outs = clap_layout(plugin, ports, false, 0, &out_layout, out_why, sizeof(out_why));
     printf("],\"audioIns\":%u,\"audioOuts\":%u", in_layout.main_channels,
            out_layout.main_channels);
-    if (!carried) {
+    if (!ins || !outs) {
       printf(",\"layoutRefused\":");
-      json_string(refusal);
+      json_string(!ins ? in_why : out_why);   // the input's reason first, as the loader reports it
     }
     const clap_plugin_gui_t *gui = plugin->get_extension(plugin, CLAP_EXT_GUI);
     printf(",\"gui\":%s",
