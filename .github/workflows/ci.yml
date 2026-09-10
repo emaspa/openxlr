@@ -48,6 +48,9 @@ jobs:
           test -x native/openxlr-lv2-host
           xvfb-run -a make -C native test-editor
 
+      - name: Tray window lifecycle
+        run: OPENXLR_TEST_DESKTOP=1 xvfb-run -a dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~TrayWindowTests
+
       - name: Lint shell scripts
         run: shellcheck --severity=error tools/check-version.sh tools/check-locked-restore.sh packaging/ppa/make-source.sh
 
