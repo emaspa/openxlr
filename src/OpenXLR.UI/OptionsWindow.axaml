@@ -37,10 +37,13 @@
     <Border Classes="card">
       <StackPanel Spacing="6">
         <TextBlock Text="STARTUP" Classes="h"/>
-        <CheckBox Content="Start the daemon at login (systemd user service)"
+        <CheckBox Content="Start audio service at login (background only)"
                   IsChecked="{Binding StartDaemonAtLogin, Mode=TwoWay}"/>
-        <CheckBox Content="Start the mixer UI at login"
+        <CheckBox Content="Start mixer window and tray icon at login"
                   IsChecked="{Binding OpenWindowAtLogin, Mode=TwoWay}"/>
+        <TextBlock Text="{Binding StartupHint}" FontSize="11" Foreground="#8b93a7" TextWrapping="Wrap" Margin="26,0,0,4"/>
+        <TextBlock Text="{Binding StartupError}" FontSize="11" Foreground="#e0a05a" TextWrapping="Wrap"
+                   IsVisible="{Binding StartupError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
         <CheckBox Content="Close button minimizes to tray instead of quitting"
                   IsChecked="{Binding MinimizeToTray, Mode=TwoWay}"/>
         <CheckBox Content="Start minimized to tray"

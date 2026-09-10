@@ -159,11 +159,26 @@ public sealed class OptionsViewModel : ViewModelBase
         get => _openWindowAtLogin;
         set
         {
-            if (!Set(ref _openWindowAtLogin, value)) return;
-            StartupIntegration.SetWindowAtLogin(value);
+            if (_openWindowAtLogin == value) return;
+            if (!StartupIntegration.SetWindowAtLogin(value))
+            {
+                StartupError = "Could not update mixer autostart. Check that OpenXLR is installed and the autostart folder is writable.";
+                Raise(nameof(OpenWindowAtLogin));
+                return;
+            }
+            StartupError = null;
+            Set(ref _openWindowAtLogin, value);
+            Raise(nameof(StartupHint));
             Persist();
         }
     }
+
+    private string? _startupError;
+    public string? StartupError { get => _startupError; private set => Set(ref _startupError, value); }
+
+    public string StartupHint => OpenWindowAtLogin
+        ? "The mixer and tray icon will start when you sign in."
+        : "The mixer and tray icon will not start at login. Starting minimized does not enable autostart.";
 
     private bool _minimizeToTray;
     public bool MinimizeToTray

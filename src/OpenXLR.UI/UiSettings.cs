@@ -131,10 +131,22 @@ public static class StartupIntegration
         Path.Combine("..", "..", "..", "..", "OpenXLR.Daemon", "bin", "Release", "net10.0", "OpenXLR.Daemon"));
 
     /// <summary>The window for the autostart entry: the installed wrapper, else this binary.</summary>
-    private static string UiBinary => FirstExisting(
-        Path.Combine("..", "..", "bin", "openxlr"),
-        Path.Combine("..", "..", "..", "bin", "openxlr"))
-        ?? Path.Combine(AppContext.BaseDirectory, "OpenXLR.UI");
+    private static string UiBinary => ResolveUiBinary(AppContext.BaseDirectory);
+
+    internal static string ResolveUiBinary(string baseDirectory)
+    {
+        var directory = new DirectoryInfo(baseDirectory);
+        var package = directory.Name == "ui" ? directory.Parent : directory;
+        // Only packaged lib/openxlr[/ui] layouts have a sibling bin wrapper.
+        // Walking upward from an arbitrary build can select another install.
+        if (package?.Name == "openxlr" && package.Parent?.Name == "lib"
+            && package.Parent.Parent is { } prefix)
+        {
+            string wrapper = Path.Combine(prefix.FullName, "bin", "openxlr");
+            if (File.Exists(wrapper)) return wrapper;
+        }
+        return Path.Combine(baseDirectory, "OpenXLR.UI");
+    }
 
     private static string? FirstExisting(params string[] relativeToBaseDir) =>
         relativeToBaseDir
@@ -313,26 +325,66 @@ public static class StartupIntegration
         }
     }
 
-    public static void SetWindowAtLogin(bool enabled)
+    public static bool SetWindowAtLogin(bool enabled) => SetWindowAtLogin(enabled, UiBinary);
+
+    internal static bool SetWindowAtLogin(bool enabled, string executable)
     {
-        if (enabled)
+        try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(AutostartPath)!);
-            File.WriteAllText(AutostartPath, $"""
-                [Desktop Entry]
-                Type=Application
-                Name=OpenXLR
-                Comment=OpenXLR mixer window
-                Exec={DesktopExec(UiBinary)}
-                Icon=openxlr
-                Terminal=false
-                X-GNOME-Autostart-enabled=true
-                """);
+            if (!enabled) File.Delete(AutostartPath);
+            else
+            {
+                if (!File.Exists(executable)) return false;
+                OpenXlrPaths.WriteAtomic(AutostartPath, $"""
+                    [Desktop Entry]
+                    Type=Application
+                    Name=OpenXLR
+                    Comment=OpenXLR mixer window
+                    Exec={DesktopExec(executable)}
+                    Icon=openxlr
+                    Terminal=false
+                    X-GNOME-Autostart-enabled=true
+
+                    """);
+            }
+            return true;
         }
-        else
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return false; }
+    }
+
+    /// <summary>
+    /// Recreate a missing entry or update its launch path after an installation
+    /// moves. Keep desktop-specific settings, including an external disable.
+    /// A saved choice to start only the daemon never enables the window.
+    /// </summary>
+    public static bool RepairWindowAutostart()
+        => RepairWindowAutostart(UiSettings.Load(), UiBinary);
+
+    internal static bool RepairWindowAutostart(UiSettings settings, string executable)
+    {
+        if (!settings.OpenWindowAtLogin) return true;
+        try
         {
-            try { File.Delete(AutostartPath); } catch (IOException) { }
+            if (!File.Exists(executable)) return false;
+            if (!File.Exists(AutostartPath)) return SetWindowAtLogin(true, executable);
+            var lines = File.ReadAllLines(AutostartPath).ToList();
+            int start = lines.FindIndex(l => l.Trim() == "[Desktop Entry]");
+            if (start < 0) return SetWindowAtLogin(true, executable);
+            int end = lines.FindIndex(start + 1, l => l.TrimStart().StartsWith("[", StringComparison.Ordinal));
+            if (end < 0) end = lines.Count;
+            string expected = "Exec=" + DesktopExec(executable);
+            int exec = lines.FindIndex(start + 1, end - start - 1,
+                l => l.TrimStart().StartsWith("Exec=", StringComparison.Ordinal));
+            if (exec >= 0)
+            {
+                if (lines[exec] == expected) return true;
+                lines[exec] = expected;
+            }
+            else lines.Insert(end, expected);
+            OpenXlrPaths.WriteAtomic(AutostartPath, string.Join("\n", lines) + "\n");
+            return true;
         }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return false; }
     }
 
     /// <summary>
