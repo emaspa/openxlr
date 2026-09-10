@@ -41,7 +41,14 @@ tools/check-openapi.py docs/openapi-v1.json     # the HTTP API document keeps it
 tools/check-spec.py packaging/rpm/openxlr.spec  # every installed file is in %files
 make -C native  # C/C++, PipeWire, lilv, LV2 and X11 development headers
 xvfb-run -a make -C native test-editor  # also needs Xvfb and xauth
+OPENXLR_TEST_DESKTOP=1 xvfb-run -a dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~TrayWindowTests
 ```
+
+The tray window test runs in a separate process because Avalonia owns one
+UI thread. It uses X11 with isolated configuration and runtime directories and disconnects from the
+session bus, so it does not add icons to the developer's desktop tray.
+It checks window visibility, restoration and shutdown; checking the real
+tray menu and compositor still requires a desktop session.
 
 If you add or change a NuGet package, regenerate the lock files with a
 plain `dotnet restore src/OpenXLR.slnx` (the linux-x64 graph is part of

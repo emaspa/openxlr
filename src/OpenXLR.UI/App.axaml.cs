@@ -25,12 +25,7 @@ public partial class App : Application
             // A later launch asks for the window through the single-instance
             // socket: bring it up, from the tray or from behind other windows.
             if (Program.Instance is { } instance)
-                instance.ShowRequested = () => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                {
-                    window.Show();
-                    if (window.WindowState == WindowState.Minimized) window.WindowState = WindowState.Normal;
-                    window.Activate();
-                });
+                instance.ShowRequested = () => Avalonia.Threading.Dispatcher.UIThread.Post(window.ShowMixer);
             if (window.StartsHidden)
             {
                 // Starting in the tray means the window must never be

@@ -518,7 +518,10 @@ Options, STARTUP:
   service. On a packaged install this is the package's own unit.
 - "Start the mixer UI at login" adds an autostart entry for the window.
 - With "Close button minimizes to tray", the window hides instead of
-  quitting; the tray icon's menu shows it again or quits. "Start
+  quitting; the tray icon's "Show mixer" menu item restores it, including
+  when the window was minimized. "Quit OpenXLR" exits even with
+  close-to-tray enabled. Closing only hides the window when its tray
+  icon was created successfully. "Start
   minimized to tray" starts with no window at all; the tray icon shows
   it the first time you click it.
 - Only one window runs per user. Starting OpenXLR again, from the menu

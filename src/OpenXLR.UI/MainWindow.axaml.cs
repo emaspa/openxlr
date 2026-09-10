@@ -7,6 +7,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Interactivity;
 using Avalonia.Platform;
+using Avalonia.Threading;
 
 namespace OpenXLR.UI;
 
@@ -16,6 +17,7 @@ public partial class MainWindow : Window
     private readonly MainViewModel _vm;
     private TrayIcon? _tray;
     private bool _reallyExit;
+    private bool _hideToTrayPending;
     private readonly CancellationTokenSource _lifetime = new();
     private bool _automaticUpdateCheckStarted;
 
@@ -48,15 +50,26 @@ public partial class MainWindow : Window
             // user-initiated window close is intercepted: cancelling an
             // OS/application shutdown request here blocks the whole system
             // from logging out or rebooting.
-            if (_vm.MinimizeToTray && !_reallyExit &&
+            if (_vm.MinimizeToTray && _tray is not null && !_reallyExit &&
                 e.CloseReason == WindowCloseReason.WindowClosing)
             {
                 e.Cancel = true;
-                Hide();
+                if (_hideToTrayPending) return;
+                _hideToTrayPending = true;
+                // Finish the native close callback before unmapping the
+                // window and stopping its renderer.
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (!_hideToTrayPending) return;
+                    _hideToTrayPending = false;
+                    Hide();
+                });
             }
         };
         Closed += async (_, _) =>
         {
+            _reallyExit = true;
+            _hideToTrayPending = false;
             _lifetime.Cancel();
             _tray?.Dispose();
             await _client.DisposeAsync();
@@ -72,15 +85,31 @@ public partial class MainWindow : Window
     /// <summary>True when the window should stay unshown until the tray asks for it.</summary>
     public bool StartsHidden { get; }
 
+    internal void ShowMixer()
+    {
+        _hideToTrayPending = false;
+        if (_reallyExit) return;
+        Show();
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        Activate();
+    }
+
+    internal void Quit()
+    {
+        _hideToTrayPending = false;
+        _reallyExit = true;
+        Close();
+    }
+
     private void SetupTray()
     {
         try
         {
             var menu = new NativeMenu();
             var show = new NativeMenuItem("Show mixer");
-            show.Click += (_, _) => { Show(); Activate(); };
+            show.Click += (_, _) => Dispatcher.UIThread.Post(ShowMixer);
             var quit = new NativeMenuItem("Quit OpenXLR");
-            quit.Click += (_, _) => { _reallyExit = true; Close(); };
+            quit.Click += (_, _) => Dispatcher.UIThread.Post(Quit);
             menu.Items.Add(show);
             menu.Items.Add(new NativeMenuItemSeparator());
             menu.Items.Add(quit);
@@ -91,7 +120,7 @@ public partial class MainWindow : Window
                 ToolTipText = "OpenXLR",
                 Menu = menu,
             };
-            _tray.Clicked += (_, _) => { Show(); Activate(); };
+            _tray.Clicked += (_, _) => Dispatcher.UIThread.Post(ShowMixer);
         }
         catch (Exception)
         {
