@@ -19,6 +19,7 @@ public sealed class TrayWindowTests
     {
         string config = Path.Combine(Path.GetTempPath(), "openxlr-tray-" + Guid.NewGuid());
         string? previous = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
+        string? previousRuntime = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
         string? previousBus = Environment.GetEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS");
         Exception? failure = null;
         var thread = new Thread(() =>
@@ -30,8 +31,9 @@ public sealed class TrayWindowTests
                 // Exercise the window lifecycle without registering icons in
                 // the developer's real desktop tray.
                 Environment.SetEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS", "unix:path=/nonexistent");
+                Environment.SetEnvironmentVariable("XDG_RUNTIME_DIR", config);
                 new UiSettings { MinimizeToTray = true }.Save();
-                AppBuilder.Configure<App>().UsePlatformDetect().SetupWithoutStarting();
+                AppBuilder.Configure<App>().UseSkia().UseHarfBuzz().UseX11().SetupWithoutStarting();
                 window = new MainWindow();
                 window.ShowMixer();
                 bool closed = false;
@@ -85,6 +87,7 @@ public sealed class TrayWindowTests
                 window?.Quit();
                 Dispatcher.UIThread.RunJobs();
                 Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", previous);
+                Environment.SetEnvironmentVariable("XDG_RUNTIME_DIR", previousRuntime);
                 Environment.SetEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS", previousBus);
                 if (Directory.Exists(config)) Directory.Delete(config, recursive: true);
             }

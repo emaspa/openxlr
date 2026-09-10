@@ -45,7 +45,7 @@ OPENXLR_TEST_DESKTOP=1 xvfb-run -a dotnet test src/OpenXLR.Tests/OpenXLR.Tests.c
 ```
 
 The tray window test runs in a separate process because Avalonia owns one
-UI thread. It uses an isolated configuration and disconnects from the
+UI thread. It uses X11 with isolated configuration and runtime directories and disconnects from the
 session bus, so it does not add icons to the developer's desktop tray.
 It checks window visibility, restoration and shutdown; checking the real
 tray menu and compositor still requires a desktop session.
