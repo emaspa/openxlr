@@ -514,16 +514,24 @@ cards keep working. Turn it on again the same way.
 
 Options, STARTUP:
 
-- "Start the daemon at login" enables the daemon's systemd user
-  service. On a packaged install this is the package's own unit.
-- "Start the mixer UI at login" adds an autostart entry for the window.
+- "Start audio service at login (background only)" enables the daemon's
+  systemd user service. On a packaged install this is the package's own
+  unit. This does not start the mixer window or create a tray icon.
+- "Start mixer window and tray icon at login" adds a desktop autostart
+  entry for the window, including on KDE Plasma and CachyOS. When this
+  preference is on, a manual launch repairs a missing entry or updates
+  its executable path after an installation moves. Desktop-specific
+  settings, including an external `Hidden=true` disable, are preserved.
+  Failed changes show an error in Options and keep the previous preference.
 - With "Close button minimizes to tray", the window hides instead of
   quitting; the tray icon's "Show mixer" menu item restores it, including
   when the window was minimized. "Quit OpenXLR" exits even with
   close-to-tray enabled. Closing only hides the window when its tray
   icon was created successfully. "Start
   minimized to tray" starts with no window at all; the tray icon shows
-  it the first time you click it.
+  it the first time you click it. This changes how the window opens; it
+  does not enable autostart. For a tray icon at login, enable both the
+  mixer-at-login option and "Start minimized to tray".
 - Only one window runs per user. Starting OpenXLR again, from the menu
   or a shell, brings the running window to the front (out of the tray
   if it is hidden there) instead of opening a second one.

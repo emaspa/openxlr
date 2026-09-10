@@ -21,6 +21,10 @@ public partial class App : Application
             if (UiSettings.Load().StartDaemonAtLogin)
                 StartupIntegration.RepairDaemonUnit();
 
+            // A moved installation or deleted desktop entry must not leave
+            // an enabled mixer-at-login preference pointing nowhere.
+            StartupIntegration.RepairWindowAutostart();
+
             var window = new MainWindow();
             // A later launch asks for the window through the single-instance
             // socket: bring it up, from the tray or from behind other windows.
