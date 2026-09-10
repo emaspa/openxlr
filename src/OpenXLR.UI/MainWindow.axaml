@@ -3,7 +3,7 @@
         xmlns:vm="using:OpenXLR.UI"
         x:Class="OpenXLR.UI.MainWindow"
         x:DataType="vm:MainViewModel"
-        Title="OpenXLR" Width="1040" Height="900" MinHeight="640"
+        Title="OpenXLR" Width="1040" Height="900" MinWidth="760" MinHeight="480"
         Icon="avares://OpenXLR.UI/Assets/icon.png"
         Background="#16181d">
 
@@ -143,11 +143,9 @@
     </Style>
   </Window.Styles>
 
-  <!-- MaxWidth keeps sliders and dropdowns a sane length on an ultrawide or when
-       maximized; without it a fader stretches across the whole screen. Every
-       card sizes to its content; the page scrolls when the window is shorter. -->
+  <!-- Cards follow the available width. The page scrolls when it is shorter. -->
   <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-  <StackPanel Margin="16" MaxWidth="1300" HorizontalAlignment="Center">
+  <StackPanel Name="MixerContent" Margin="16" HorizontalAlignment="Stretch">
 
     <!-- header -->
     <Border Classes="card" Margin="0,0,0,8">
@@ -322,11 +320,14 @@
                 <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="0,0,0,3">
                   <Ellipse Width="9" Height="9" VerticalAlignment="Center" Margin="0,0,8,0"
                            Fill="{Binding IsActive, Converter={x:Static vm:Converters.ActiveLed}}"/>
-                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding Label}" Foreground="#e6e9f0" FontSize="12"/>
-                    <TextBlock Text="{Binding StateText}" Classes="h" FontSize="11"/>
-                    <TextBlock Text="{Binding Error}" Foreground="#e0a05a" FontSize="11" IsVisible="{Binding HasError}"/>
-                  </StackPanel>
+                  <Grid Grid.Column="1" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"
+                        ColumnSpacing="8" VerticalAlignment="Center" ClipToBounds="True">
+                    <TextBlock Text="{Binding Label}" Classes="insertName" Foreground="#e6e9f0" FontSize="12"
+                               TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
+                    <TextBlock Grid.Column="1" Text="{Binding StateText}" Classes="h" FontSize="11"/>
+                    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Error}" Foreground="#e0a05a"
+                               FontSize="11" TextWrapping="Wrap" IsVisible="{Binding HasError}"/>
+                  </Grid>
                   <ToggleButton Grid.Column="2" Content="N" Classes="insertmini"
                                 IsChecked="{Binding NativeHost, Mode=TwoWay}"
                                 IsVisible="{Binding CanChooseNativeHost}"
@@ -384,11 +385,14 @@
                 <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="0,0,0,3">
                   <Ellipse Width="9" Height="9" VerticalAlignment="Center" Margin="0,0,8,0"
                            Fill="{Binding IsActive, Converter={x:Static vm:Converters.ActiveLed}}"/>
-                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding Label}" Foreground="#e6e9f0" FontSize="12"/>
-                    <TextBlock Text="{Binding StateText}" Classes="h" FontSize="11"/>
-                    <TextBlock Text="{Binding Error}" Foreground="#e0a05a" FontSize="11" IsVisible="{Binding HasError}"/>
-                  </StackPanel>
+                  <Grid Grid.Column="1" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"
+                        ColumnSpacing="8" VerticalAlignment="Center" ClipToBounds="True">
+                    <TextBlock Text="{Binding Label}" Classes="insertName" Foreground="#e6e9f0" FontSize="12"
+                               TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
+                    <TextBlock Grid.Column="1" Text="{Binding StateText}" Classes="h" FontSize="11"/>
+                    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Error}" Foreground="#e0a05a"
+                               FontSize="11" TextWrapping="Wrap" IsVisible="{Binding HasError}"/>
+                  </Grid>
                   <ToggleButton Grid.Column="2" Content="N" Classes="insertmini"
                                 IsChecked="{Binding NativeHost, Mode=TwoWay}"
                                 IsVisible="{Binding CanChooseNativeHost}"
@@ -572,15 +576,16 @@
         <ItemsControl DockPanel.Dock="Bottom" ItemsSource="{Binding Mixes}" IsVisible="{Binding HasMixer}"
                       Margin="0,10,0,0">
           <ItemsControl.ItemsPanel>
-            <ItemsPanelTemplate><UniformGrid Rows="1"/></ItemsPanelTemplate>
+            <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:MixViewModel">
-              <Border Background="#23262f" CornerRadius="6" Padding="10" Margin="0,0,8,0"
+              <Border Background="#23262f" CornerRadius="6" Padding="10" Margin="0,0,8,8" Width="232"
                       IsVisible="{Binding Visible}">
                 <StackPanel Spacing="6">
                   <Grid ColumnDefinitions="*,Auto">
-                    <TextBlock Text="{Binding Name}" Foreground="#e6e9f0" FontWeight="SemiBold"/>
+                    <TextBlock Text="{Binding Name}" Foreground="#e6e9f0" FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" Margin="0,0,8,0"/>
                     <TextBlock Grid.Column="1" Text="{Binding VolumeText}" Classes="val"/>
                   </Grid>
                   <StackPanel Spacing="1">

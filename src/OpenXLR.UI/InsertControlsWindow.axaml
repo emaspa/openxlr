@@ -3,7 +3,7 @@
         xmlns:vm="using:OpenXLR.UI"
         x:Class="OpenXLR.UI.InsertControlsWindow"
         x:DataType="vm:InsertViewModel"
-        Title="{Binding Label}" Width="620" Height="560" MinWidth="420" MinHeight="240"
+        Title="{Binding Label}" Width="620" Height="560" MinWidth="420" MinHeight="320"
         WindowStartupLocation="CenterOwner"
         Background="#16181d">
 
@@ -38,47 +38,43 @@
   </Window.Styles>
 
   <DockPanel Margin="16">
-    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
-      <StackPanel>
-        <StackPanel Orientation="Horizontal" Spacing="8">
-          <Ellipse Width="10" Height="10" VerticalAlignment="Center"
-                   Fill="{Binding IsActive, Converter={x:Static vm:Converters.ActiveLed}}"/>
-          <TextBlock Text="{Binding Label}" FontSize="16" FontWeight="Bold" Foreground="#e6e9f0"/>
-          <TextBlock Text="{Binding StateText}" Classes="h" VerticalAlignment="Center"/>
-        </StackPanel>
-        <StackPanel Orientation="Horizontal" Spacing="8">
-          <TextBlock Text="{Binding Plugin}" Classes="h" FontSize="11" VerticalAlignment="Center"/>
-          <Border Background="#2a2e38" CornerRadius="4" Padding="6,1" VerticalAlignment="Center">
-            <TextBlock Text="{Binding Format}" Foreground="#8b93a7" FontSize="10" FontWeight="SemiBold"/>
-          </Border>
-        </StackPanel>
-        <TextBlock Text="{Binding Error}" Foreground="#e0a05a" FontSize="11" IsVisible="{Binding HasError}"/>
-      </StackPanel>
-      <!-- Every button lives on the right, in two rows when this plugin can
-           be hosted natively. -->
-      <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Top" HorizontalAlignment="Right">
-        <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
-          <Button Content="Plugin UI" Padding="12,4" Click="OnNativeEditor"
-                  IsVisible="{Binding NativeEditorSupported}"
-                  IsEnabled="{Binding NativeEditorAvailable}"
-                  ToolTip.Tip="Open this plugin's own editor on the live audio instance"/>
-          <Button Content="Defaults" Padding="12,4" Click="OnDefaults"
-                  ToolTip.Tip="Put every control back to the plugin's own defaults"/>
-          <ToggleButton Content="Bypass" IsChecked="{Binding Bypass, Mode=TwoWay}" Padding="12,4"/>
-        </StackPanel>
-        <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right"
-                    IsVisible="{Binding CanChooseNativeHost}">
-          <ToggleButton Content="Native host" IsChecked="{Binding NativeHost, Mode=TwoWay}" Padding="12,4"
-                        ToolTip.Tip="Run this insert in its own process, which is what lets its own editor open. Switching rebuilds the chain and interrupts audio for a moment."/>
-          <Button Content="Manual" Padding="10,4" Click="OnEditorManual"
-                  ToolTip.Tip="Open the manual section on plugin editors"/>
-        </StackPanel>
-      </StackPanel>
-    </Grid>
+    <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,12">
+      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+        <Ellipse Width="10" Height="10" VerticalAlignment="Center"
+                 Fill="{Binding IsActive, Converter={x:Static vm:Converters.ActiveLed}}"/>
+        <TextBlock Grid.Column="1" Name="PluginTitle" Text="{Binding Label}" FontSize="16" FontWeight="Bold"
+                   Foreground="#e6e9f0" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
+        <TextBlock Grid.Column="2" Text="{Binding StateText}" Classes="h" VerticalAlignment="Center"/>
+      </Grid>
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+        <TextBlock Text="{Binding Plugin}" Classes="h" FontSize="11" VerticalAlignment="Center"
+                   TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Plugin}"/>
+        <Border Grid.Column="1" Background="#2a2e38" CornerRadius="4" Padding="6,1" VerticalAlignment="Center">
+          <TextBlock Text="{Binding Format}" Foreground="#8b93a7" FontSize="10" FontWeight="SemiBold"/>
+        </Border>
+      </Grid>
+      <!-- Actions get their own row and wrap instead of competing with the title. -->
+      <WrapPanel Name="PluginActions">
+        <Button Content="Plugin UI" Padding="12,4" Margin="0,0,6,6" Click="OnNativeEditor"
+                IsVisible="{Binding NativeEditorSupported}" IsEnabled="{Binding NativeEditorAvailable}"
+                ToolTip.Tip="Open this plugin's own editor on the live audio instance"/>
+        <Button Content="Defaults" Padding="12,4" Margin="0,0,6,6" Click="OnDefaults"
+                ToolTip.Tip="Put every control back to the plugin's own defaults"/>
+        <ToggleButton Content="Bypass" IsChecked="{Binding Bypass, Mode=TwoWay}" Padding="12,4" Margin="0,0,6,6"/>
+        <ToggleButton Content="Native host" IsChecked="{Binding NativeHost, Mode=TwoWay}" Padding="12,4" Margin="0,0,6,6"
+                      IsVisible="{Binding CanChooseNativeHost}"
+                      ToolTip.Tip="Run this insert in its own process, which is what lets its own editor open. Switching rebuilds the chain and interrupts audio for a moment."/>
+        <Button Content="Manual" Padding="10,4" Margin="0,0,6,6" Click="OnEditorManual"
+                IsVisible="{Binding CanChooseNativeHost}" ToolTip.Tip="Open the manual section on plugin editors"/>
+      </WrapPanel>
+    </StackPanel>
     <Button DockPanel.Dock="Bottom" Content="Close" HorizontalAlignment="Right" Padding="18,6" Margin="0,10,0,0" Click="OnClose"/>
     <!-- AllowAutoHide off: the scrollbar reserves its own column instead
          of floating over the value readouts -->
     <ScrollViewer VerticalScrollBarVisibility="Auto" AllowAutoHide="False">
+      <StackPanel>
+      <TextBlock Text="{Binding Error}" Foreground="#e0a05a" FontSize="11" TextWrapping="Wrap"
+                 Margin="0,0,0,8" IsVisible="{Binding HasError}"/>
       <ItemsControl ItemsSource="{Binding Groups}" Margin="0,0,10,0">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:InsertParamGroup">
@@ -90,7 +86,7 @@
               <ItemsControl ItemsSource="{Binding Params}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:InsertParamViewModel">
-                    <Grid ColumnDefinitions="200,*,72" Margin="0,0,0,4">
+                    <Grid ColumnDefinitions="*,2*,72" ColumnSpacing="8" Margin="0,0,0,4">
                       <TextBlock Text="{Binding Name}" Classes="h" VerticalAlignment="Center"
                                  TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Symbol}"/>
                       <Slider Grid.Column="1" Minimum="{Binding Min}" Maximum="{Binding Max}"
@@ -99,7 +95,8 @@
                       <CheckBox Grid.Column="1" IsChecked="{Binding On, Mode=TwoWay}" IsVisible="{Binding Toggled}"
                                 MinHeight="0" VerticalAlignment="Center"/>
                       <TextBlock Grid.Column="2" Text="{Binding ValueText}" Classes="val" FontSize="12"
-                                 VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                                 VerticalAlignment="Center" HorizontalAlignment="Right"
+                                 TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ValueText}"/>
                     </Grid>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
@@ -108,6 +105,7 @@
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
+      </StackPanel>
     </ScrollViewer>
   </DockPanel>
 </Window>

@@ -54,6 +54,9 @@ jobs:
       - name: Lint shell scripts
         run: shellcheck --severity=error tools/check-version.sh tools/check-locked-restore.sh packaging/ppa/make-source.sh
 
+      - name: Window layout at narrow and wide sizes
+        run: OPENXLR_TEST_LAYOUT=1 xvfb-run -a -s '-screen 0 2560x1440x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~WindowLayoutTests
+
       - name: Locked restore enforced on every packaging path
         run: tools/check-locked-restore.sh
 
