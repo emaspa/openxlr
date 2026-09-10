@@ -41,7 +41,13 @@ tools/check-openapi.py docs/openapi-v1.json     # the HTTP API document keeps it
 tools/check-spec.py packaging/rpm/openxlr.spec  # every installed file is in %files
 make -C native  # C/C++, PipeWire, lilv, LV2 and X11 development headers
 xvfb-run -a make -C native test-editor  # also needs Xvfb and xauth
+OPENXLR_TEST_LAYOUT=1 xvfb-run -a -s '-screen 0 2560x1440x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~WindowLayoutTests
 ```
+
+The window layout test runs in its own process using X11 and isolated
+configuration, runtime and session-bus settings. It checks narrow plugin
+windows and mixer widths from 760 to 2400 logical pixels. Set
+`OPENXLR_LAYOUT_ARTIFACTS` to a directory to save rendered previews.
 
 If you add or change a NuGet package, regenerate the lock files with a
 plain `dotnet restore src/OpenXLR.slnx` (the linux-x64 graph is part of

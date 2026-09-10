@@ -109,6 +109,13 @@ on the original Wave XLR. See [hardware support](hardware-support.md).
 <a name="tasks"></a>
 ## 3. Tasks
 
+The mixer cards fill the window width when it is enlarged. The main
+window has a minimum width of 760 logical pixels; shorter windows scroll
+vertically. Mix master cards wrap onto additional rows when needed.
+Long plugin names are shortened with an ellipsis, with the full name in
+the tooltip. Plugin control and chain windows keep actions below their
+headings, and actions wrap when space is limited.
+
 <a name="mic-to-call"></a>
 ### 3.1 Send your microphone to a call or a recording
 

@@ -16,10 +16,11 @@
   </Window.Styles>
 
   <DockPanel Margin="16">
-    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,0,0,10">
       <StackPanel>
-        <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="Bold" Foreground="#e6e9f0"/>
-        <TextBlock Text="{Binding ChainHint}" Classes="h" FontSize="11"/>
+        <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="Bold" Foreground="#e6e9f0"
+                   TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Title}"/>
+        <TextBlock Text="{Binding ChainHint}" Classes="h" FontSize="11" TextWrapping="Wrap"/>
       </StackPanel>
       <Button Grid.Column="1" Content="Add plugin…" Padding="12,4" VerticalAlignment="Top" Click="OnAddInsert"/>
     </Grid>
@@ -29,21 +30,30 @@
       <ItemsControl ItemsSource="{Binding Items}" Margin="0,0,10,0">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:InsertViewModel">
-            <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto" Margin="0,0,0,4">
-              <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                <Ellipse Width="9" Height="9" VerticalAlignment="Center"
-                         Fill="{Binding IsActive, Converter={x:Static vm:Converters.ActiveLed}}"/>
-                <TextBlock Text="{Binding Label}" Foreground="#e6e9f0" FontSize="12"/>
-                <TextBlock Text="{Binding StateText}" Classes="h" FontSize="11"/>
-                <TextBlock Text="{Binding Error}" Foreground="#e0a05a" FontSize="11" IsVisible="{Binding HasError}"/>
+            <Border Background="#23262f" CornerRadius="6" Padding="10" Margin="0,0,0,8">
+              <StackPanel Spacing="8">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                  <Ellipse Width="9" Height="9" VerticalAlignment="Center"
+                           Fill="{Binding IsActive, Converter={x:Static vm:Converters.ActiveLed}}"/>
+                  <TextBlock Grid.Column="1" Text="{Binding Label}" Classes="insertName" Foreground="#e6e9f0" FontSize="12"
+                             TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
+                  <TextBlock Grid.Column="2" Text="{Binding StateText}" Classes="h" FontSize="11"/>
+                </Grid>
+                <TextBlock Text="{Binding Error}" Foreground="#e0a05a" FontSize="11"
+                           TextWrapping="Wrap" IsVisible="{Binding HasError}"/>
+                <WrapPanel>
+                  <Button Content="Controls" Padding="8,3" MinHeight="0" FontSize="11" Margin="0,0,6,0" Click="OnInsertControls"/>
+                  <ToggleButton Content="Bypass" IsChecked="{Binding Bypass, Mode=TwoWay}"
+                                Padding="8,3" MinHeight="0" FontSize="11" Margin="0,0,6,0"/>
+                  <Button Content="▲" Padding="6,3" MinHeight="0" FontSize="10" Margin="0,0,4,0" Click="OnInsertUp"
+                          AutomationProperties.Name="Move plugin up" ToolTip.Tip="Move up"/>
+                  <Button Content="▼" Padding="6,3" MinHeight="0" FontSize="10" Margin="0,0,6,0" Click="OnInsertDown"
+                          AutomationProperties.Name="Move plugin down" ToolTip.Tip="Move down"/>
+                  <Button Content="✕" Padding="6,3" MinHeight="0" FontSize="10" Click="OnInsertRemove"
+                          AutomationProperties.Name="Remove plugin" ToolTip.Tip="Remove plugin"/>
+                </WrapPanel>
               </StackPanel>
-              <Button Grid.Column="1" Content="Controls" Padding="8,1" MinHeight="0" FontSize="11" Margin="0,0,4,0" Click="OnInsertControls"/>
-              <ToggleButton Grid.Column="2" Content="Bypass" IsChecked="{Binding Bypass, Mode=TwoWay}"
-                            Padding="8,1" MinHeight="0" FontSize="11" Margin="0,0,4,0"/>
-              <Button Grid.Column="3" Content="▲" Padding="6,1" MinHeight="0" FontSize="10" Margin="0,0,2,0" Click="OnInsertUp"/>
-              <Button Grid.Column="4" Content="▼" Padding="6,1" MinHeight="0" FontSize="10" Margin="0,0,4,0" Click="OnInsertDown"/>
-              <Button Grid.Column="5" Content="✕" Padding="6,1" MinHeight="0" FontSize="10" Click="OnInsertRemove"/>
-            </Grid>
+            </Border>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
