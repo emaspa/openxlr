@@ -75,8 +75,17 @@ public static class PluginCatalog
         => Plugins.Count(p => !known.Contains((p.Kind, p.Plugin))
             && (directories.Count == 0 || p.Path is null || directories.Any(d => p.Path.StartsWith(d, StringComparison.Ordinal))));
 
-    /// <summary>Kick both scans off without waiting for them.</summary>
-    public static void Warm() => ThreadPool.QueueUserWorkItem(_ => { try { _ = All.Value; } catch (Exception) { } });
+    /// <summary>
+    /// Kick both scans off without waiting for them. <paramref name="then"/>
+    /// runs once they are done, on the same thread: the startup scan is the
+    /// one that has no user watching it, so whatever it could not read is
+    /// reported from there.
+    /// </summary>
+    public static void Warm(Action? then = null) => ThreadPool.QueueUserWorkItem(_ =>
+    {
+        try { _ = All.Value; } catch (Exception) { }
+        try { then?.Invoke(); } catch (Exception) { }
+    });
 
     /// <summary>The plugin an insert names, by its kind and its identifier.</summary>
     public static PluginInfo? Find(string kind, string plugin) => Find(Plugins, kind, plugin);
