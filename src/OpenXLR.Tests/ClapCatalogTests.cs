@@ -207,20 +207,20 @@ public sealed class ClapCatalogTests
         // Under the budget, every copy is offered.
         var lv2 = new[] { plugin("lv2", "LSP Compressor Mono", 1, 30), plugin("lv2", "Dragonfly Hall Reverb", 2, 18) };
         var vst3 = new[] { plugin("vst3", "Compressor Mono", 1, 30), plugin("vst3", "Dragonfly Hall Reverb", 2, 18) };
-        Assert.Equal(4, PluginCatalog.Merge(lv2, vst3).Count);
+        Assert.Equal(4, ClientCatalog.Merge(lv2, vst3).Count);
 
         // Over it, a copy goes before anything distinct, and LV2 stays whole.
         var heavy = Enumerable.Range(0, 400).Select(i => plugin("lv2", $"Plugin {i}", 1, Lv2Catalog.MaxControls)).ToList();
         var heavyVst3 = heavy.Select(p => plugin("vst3", p.Name, 1, Lv2Catalog.MaxControls)).ToList();
-        List<PluginInfo> merged = PluginCatalog.Merge(heavy, [.. heavyVst3, plugin("vst3", "Something Else", 2, 3)]);
+        List<PluginInfo> merged = ClientCatalog.Merge(heavy, [.. heavyVst3, plugin("vst3", "Something Else", 2, 3)]);
         List<PluginInfo> keptLv2 = Lv2Catalog.WithinBudget([.. heavy]);
         Assert.Equal(keptLv2.Count, merged.Count(p => p.Kind == "lv2"));
         Assert.Contains(merged, p => p.Name == "Something Else");      // the distinct one got in
         Assert.DoesNotContain(merged, p => p.Kind == "vst3" && p.Name == "Plugin 0");
 
-        Assert.True(PluginCatalog.SamePlugin(plugin("lv2", "LSP Compressor Mono", 1, 1), plugin("vst3", "Compressor Mono", 1, 1)));
-        Assert.True(PluginCatalog.SamePlugin(plugin("lv2", "x42 - IR Convolver", 2, 1), plugin("vst3", "IR Convolver", 2, 1)));
-        Assert.False(PluginCatalog.SamePlugin(plugin("lv2", "Compressor Mono", 1, 1), plugin("vst3", "Compressor Stereo", 2, 1)));
+        Assert.True(ClientCatalog.SamePlugin(plugin("lv2", "LSP Compressor Mono", 1, 1), plugin("vst3", "Compressor Mono", 1, 1)));
+        Assert.True(ClientCatalog.SamePlugin(plugin("lv2", "x42 - IR Convolver", 2, 1), plugin("vst3", "IR Convolver", 2, 1)));
+        Assert.False(ClientCatalog.SamePlugin(plugin("lv2", "Compressor Mono", 1, 1), plugin("vst3", "Compressor Stereo", 2, 1)));
     }
 
     private sealed class Layout : ILayoutInfo

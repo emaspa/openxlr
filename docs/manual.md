@@ -256,10 +256,10 @@ channel, with its level and lock in the INPUTS card.
    profiles. OpenXLR does not yet save opaque plugin state, sample-file
    selections or plugin presets.
 
-The generated controls cover the parameters in the bounded catalogue. A
-plugin's own editor can be opened as well, with the native host described
-in 3.12. CLAP and VST3 plugins appear in the same picker and always run in
-that host. VST2 plugins cannot be loaded.
+The generated controls cover the parameters the daemon read from the
+plugin. A plugin's own editor can be opened as well, with the native
+host described in 3.12. CLAP and VST3 plugins appear in the same picker
+and always run in that host. VST2 plugins cannot be loaded.
 
 <a name="install-plugins"></a>
 **Installing plugins.** The quickest set comes from your distribution:
@@ -454,9 +454,11 @@ grep 'Max locked memory' /proc/$(systemctl --user show openxlr-daemon -p MainPID
 The picker marks each plugin with its format, since the same plugin often
 ships in more than one, and its LV2, CLAP and VST3 buttons narrow the list
 to one of them. When the catalogue grows past what the window can be sent,
-the LV2 list stays whole and the other formats fill the remaining room,
-with copies of a plugin already listed going last; a set installed in two
-formats shows once rather than pushing anything out.
+the plugins your chains already use come first, then the LV2 list, then
+the other formats in the room that is left, with copies of a plugin
+already listed going last; a set installed in two formats shows once
+rather than pushing anything out. Only the list is cut. A chain keeps
+loading, and keeps its controls, whether or not its plugin fits in it.
 
 <a name="profiles"></a>
 ### 3.6 Save and recall a scene

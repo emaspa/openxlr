@@ -194,7 +194,11 @@ public sealed class WebSocketHub
                 break;
             case "listPlugins":
                 // The first call may block on lilv's scan; keep it off the socket loop's thread.
-                IReadOnlyList<OpenXLR.Core.Mixing.PluginInfo> plugins = await Task.Run(() => OpenXLR.Core.Mixing.PluginCatalog.Plugins);
+                // The chains' own plugins go with it, so the list a client
+                // gets can name every insert the daemon loaded.
+                IReadOnlyList<OpenXLR.Core.Mixing.PluginInfo> plugins =
+                    await Task.Run(() => OpenXLR.Core.Mixing.ClientCatalog.ForClient(
+                        OpenXLR.Core.Mixing.PluginCatalog.Plugins, _mixer.InsertPlugins()));
                 await reply(new PluginsMessage(plugins));
                 break;
             case "getPluginDiagnostics":
@@ -375,9 +379,8 @@ public sealed class WebSocketHub
             catch (Exception ex) { outcome = new(false, ex.Message, []); }
             OpenXLR.Core.Mixing.PluginCatalog.Refresh();
             // What this install brought: plugins not listed before, and when
-            // the install landed somewhere, only those found there, so a
-            // catalogue trimmed to its budget shifting underneath does not
-            // count as new plugins.
+            // the install landed somewhere, only those found there, so
+            // plugins that arrived by other means are not credited to it.
             int added = OpenXLR.Core.Mixing.PluginCatalog.CountUnder(outcome.Destinations ?? [], before);
             int total = OpenXLR.Core.Mixing.PluginCatalog.Plugins.Count;
             if (outcome.Ok) _log.LogInformation("plugins: {message} {added} new in the catalogue", outcome.Message, added);

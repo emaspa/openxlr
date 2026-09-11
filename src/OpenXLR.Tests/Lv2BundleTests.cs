@@ -51,4 +51,45 @@ public sealed class Lv2BundleTests
             try { Directory.Delete(dir, recursive: true); } catch (IOException) { }
         }
     }
+
+    [Fact]
+    public void AnLv2ScanBiggerThanOneMessageIsKeptWholeAndOnlyTheClientListIsCut()
+    {
+        if (!NativeLibrary.TryLoad("liblilv-0.so.0", out IntPtr lib)) return;   // no lilv here (CI): nothing to scan with
+        NativeLibrary.Free(lib);
+        string dir = Path.Combine(Path.GetTempPath(), "openxlr-lv2-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            // Ninety plugins at the control limit: more than a client reads
+            // in one message, which used to end the scan short.
+            const int count = 90;
+            for (int i = 0; i < count; i++)
+            {
+                string bundle = Path.Combine(dir, $"big{i}.lv2");
+                Directory.CreateDirectory(bundle);
+                File.WriteAllText(Path.Combine(bundle, "manifest.ttl"),
+                    "@prefix lv2: <http://lv2plug.in/ns/lv2core#> .\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+                    + $"<urn:openxlr:test:big{i}> a lv2:Plugin ; lv2:binary <big{i}.so> ; rdfs:seeAlso <big{i}.ttl> .\n");
+                File.WriteAllText(Path.Combine(bundle, $"big{i}.ttl"),
+                    Bundle($"big{i}", $"urn:openxlr:test:big{i}", Lv2Catalog.MaxControls));
+            }
+            IReadOnlyList<PluginInfo> found = Lv2Catalog.ScanNow(dir);
+            Assert.Equal(count, found.Count);
+            Assert.True(found.Sum(p => (long)Lv2Catalog.Footprint(p)) > Lv2Catalog.CatalogBudgetBytes);
+
+            // The message is what gets cut, and a plugin it cut is listed
+            // again as soon as a chain uses it.
+            IReadOnlyList<PluginInfo> idle = ClientCatalog.ForClient(found, []);
+            Assert.True(idle.Count < found.Count);
+            Assert.True(idle.Sum(p => (long)Lv2Catalog.Footprint(p)) <= Lv2Catalog.CatalogBudgetBytes);
+            PluginInfo dropped = found.First(p => !idle.Contains(p));
+            IReadOnlyList<PluginInfo> sent = ClientCatalog.ForClient(found, [("lv2", dropped.Plugin)]);
+            Assert.Contains(sent, p => p.Plugin == dropped.Plugin);
+            Assert.True(sent.Sum(p => (long)Lv2Catalog.Footprint(p)) <= Lv2Catalog.CatalogBudgetBytes);
+        }
+        finally
+        {
+            try { Directory.Delete(dir, recursive: true); } catch (IOException) { }
+        }
+    }
 }

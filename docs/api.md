@@ -35,12 +35,17 @@ non-finite numbers, and over-long strings or lists all come back as an
 `error` message instead of being silently ignored. A client may send
 bursts of up to 300 commands and a sustained 100 per second; beyond
 that it is disconnected with close code 1008. At most 32 clients can be
-connected at once. The plugin catalog is bounded too: a plugin with a
+connected at once. The `plugins` message is bounded too: a plugin with a
 URI over 512 characters, more than 4096 ports, or one that would push
-the catalog past 7 MiB is left out of `plugins` altogether, and at most
+the message past 7 MiB is left out of `plugins` altogether, and at most
 512 controls, 256 scale points and 64 required features are read per
 plugin; a plugin that is listed with `supported: false` is a different
-case, one the chain host cannot run.
+case, one the chain host cannot run. The limit is on the message, not on
+what the daemon knows: every plugin a saved insert names is listed
+whatever the size, and `setInserts`, chain building and insert status all
+resolve a plugin against everything installed. A plugin missing from
+`plugins` can still be named by an insert that already holds it; it
+cannot be picked from the list, which is the only place its absence shows.
 
 Messages from the daemon, each a JSON object with a `type` field:
 
@@ -49,7 +54,7 @@ Messages from the daemon, each a JSON object with a `type` field:
 | `state` | on connect and on every change | `daemonVersion`, device state, capabilities, mixer state, the device list, the app registry, profile names, `activeProfile` (the profile last recalled or saved for the active device; not cleared by later manual changes), `recallOnConnect` (the profile recalled when the device connects, or null), `warning` (one sentence the user should see, or null: mixer settings that cannot be written to disk, which the daemon keeps retrying with backoff, or a device set aside after three hung USB transfers in one run). In the mixer state, each channel carries `hardware` (true for the fixed input channels), `renamedSinceStart` says a virtual microphone was renamed since the daemon started (its PipeWire device keeps the old name until a restart), and `layoutWarning` is a sentence for the layout editor when pipewire-pulse nears its open-file limit, or null |
 | `diagnostics` | in answer to `getDiagnostics` | `blocks`, mapping vendor block names to hex strings or read errors |
 | `meters` | 15 Hz while the mixer is built | live stereo levels per channel and mix |
-| `plugins` | in answer to `listPlugins` | the installed LV2, CLAP and VST3 plugins with their controls; `supported` is false, with `unsupportedFeatures` listed, for a plugin that needs a host feature the PipeWire chain lacks |
+| `plugins` | in answer to `listPlugins` | the installed LV2, CLAP and VST3 plugins with their controls, within the message size limit above and always including the plugins the saved chains use; `supported` is false, with `unsupportedFeatures` listed, for a plugin that needs a host feature the PipeWire chain lacks |
 | `pluginSetup` | in answer to `getPluginSetup` | where installs go (`lv2Directory`, `clapDirectory`, `vst3Directory`), `hostInstalled`, `yabridge` (its version, or null when not installed), `wine`, `windowsDirectories` (the folders yabridge bridges) and `wineFolders` (Wine's own plugin folders that hold a plugin and are not bridged yet, offered as one press since a file dialog hides them) |
 | `pluginDiagnostics` | in answer to `getPluginDiagnostics` | `discovery`: daemon host/controller paths, Wine prefix, architecture, effective search paths, bounded `yabridgectl status` output and latest completed CLAP/VST3 scan reports |
 | `pluginInstall` | in answer to `installPlugin`, `syncWindowsPlugins` and `rescanPlugins` | `ok`, `message` (a sentence or two for the user), `installed` (the bundles or folders put in place), `added` (plugins in the catalogue that were not before) and `total` |
@@ -188,7 +193,7 @@ means no native scan has completed yet. Entries carry `path`, `outcome`,
 format, preferring failures over successful entries when full. Paths are
 limited to 4096 characters and details to 2048, with truncation marked.
 
-These reports describe scanner output before the combined catalogue's size
+These reports describe scanner output before the `plugins` message's size
 budget and the picker's channel-width/format filters. Compare them with
 `listPlugins` to distinguish scanning from filtering. Reading diagnostics
 does not invalidate scan caches or retry plugins. The API returns paths and

@@ -673,8 +673,12 @@ public sealed class PipeWireAdapter
             foreach (InsertDefinition insert in inserts.Where(i => !i.Bypass))
             {
                 PluginInfo? info = PluginCatalog.Find(insert);
+                // The plugin is named because this error is reported on every
+                // insert in the chain: without the name, the one that failed
+                // cannot be told from the ones that were behind it.
                 if (info is null || !info.Supported)
-                    throw new InvalidOperationException("Plugin is unavailable or requires unsupported host features.");
+                    throw new InvalidOperationException(
+                        $"{(string.IsNullOrWhiteSpace(insert.Label) ? insert.Plugin : insert.Label)} is unavailable or requires unsupported host features.");
                 string node = $"{sinkName}_stage_{insertStages.Count}";
                 FilterHandle stage;
                 if (insert.RunsNatively)

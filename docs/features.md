@@ -160,8 +160,11 @@ bridge remains supported; Options warns about known incompatible versions.
 See [Windows plugins](manual.md#windows-plugins) for availability and setup.
 
 The catalogue sent to clients is bounded. While it fits, all formats are
-offered. Beyond the limit, LV2 entries retain priority and other formats
-fill the remaining space, with duplicate names last.
+offered. Beyond the limit, the plugins the saved chains use are kept
+first, LV2 entries retain priority over the formats that follow, and
+other formats fill the remaining space, with duplicate names last. The
+daemon itself keeps every scan whole, so an insert loads and reports on a
+plugin the list had no room for.
 
 Editor borders follow each plugin's size limits. TDR Nova uses its own UI
 scale menu instead of border resizing. LSP editors default to software
