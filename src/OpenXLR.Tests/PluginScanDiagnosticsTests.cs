@@ -1,6 +1,8 @@
 using System.Text;
+using Microsoft.Extensions.Logging;
 using OpenXLR.Core;
 using OpenXLR.Core.Mixing;
+using OpenXLR.Daemon;
 
 namespace OpenXLR.Tests;
 
@@ -85,14 +87,125 @@ public sealed class PluginScanDiagnosticsTests
     {
         var capture = new PluginScanDiagnostics.Capture("bounded-test");
         for (int i = 0; i < 200; i++) capture.Add("/plugin/" + i, "ok");
-        capture.Add(new string('p', 9000), "scan-failed", detail: new string('e', 9000));
+        capture.Add(new string('p', 9000), "scan-failed", detail: "first" + new string('e', 9000) + "last");
         var report = capture.Complete();
         Assert.Equal(128, report.Entries.Count);
         Assert.Equal(73, report.Omitted);
         var failure = Assert.Single(report.Entries, e => e.Outcome == "scan-failed");
         Assert.True(failure.Path.Length < 4200);
+        Assert.EndsWith("[truncated]", failure.Path);
         Assert.True(failure.Detail!.Length < 2100);
-        Assert.EndsWith("[truncated]", failure.Detail);
+        Assert.StartsWith("first", failure.Detail);
+        Assert.EndsWith("last", failure.Detail);
+    }
+
+    // Replay the recorded timeout and exit code with synthetic long stderr.
+    // The reporter's tail was lost, so this does not identify why Wine hung.
+    [Fact]
+    public void ATimedOutBundleKeepsBothEndsOfTheScannerOutputAndIsNamedAsAFailure()
+    {
+        string dir = Directory.CreateTempSubdirectory("plugin-scan-tail-").FullName;
+        string kind = Guid.NewGuid().ToString("N");
+        try
+        {
+            string bundle = Path.Combine(dir, "TDR Kotelnikov.vst3");
+            File.WriteAllText(bundle, "fixture");
+            string banner = string.Join("\n", Enumerable.Range(0, 60)
+                .Select(i => $"11:44:07 [bridge] Initializing yabridge, start-up line {i}"));
+            string output = banner + "\nSYNTHETIC-TAIL scanner diagnostic after the startup banner";
+            Assert.True(output.Length > 2048);
+            var cache = new ScanCache(Path.Combine(dir, "cache"));
+
+            int calls = 0;
+            ProcessResult Describe(string _) { calls++; return new(137, [], output, true, false); }
+            var result = HostScan.Run(kind, "unused", [dir], Vst3Catalog.Bundles, Describe, cache);
+
+            Assert.Empty(result);
+            var report = PluginScanDiagnostics.Snapshot().Single(r => r.Kind == kind);
+            var entry = Assert.Single(report.Entries, e => e.Outcome == "timeout");
+            Assert.Equal(137, entry.ExitCode);
+            Assert.False(entry.Cached);
+            Assert.Contains("start-up line 0", entry.Detail);
+            Assert.Contains("SYNTHETIC-TAIL", entry.Detail);
+            Assert.Contains("[truncated]", entry.Detail);
+            Assert.Equal(2048, entry.Detail!.Length);
+
+            var failure = Assert.Single(PluginScanDiagnostics.Failures([report]));
+            Assert.Equal(kind, failure.Kind);
+            Assert.Equal(bundle, failure.Path);
+            Assert.Equal("timeout", failure.Outcome);
+            Assert.Equal(137, failure.ExitCode);
+            Assert.Equal("1 bundle could not be read: TDR Kotelnikov.vst3 (timed out); the daemon's log says more.",
+                PluginScanDiagnostics.Sentence([failure]));
+
+            var log = new ScanLogger();
+            PluginScanLog.Write(log);
+            var warning = Assert.Single(log.Lines, line => line.Text.Contains(kind));
+            Assert.Equal(LogLevel.Warning, warning.Level);
+            Assert.Contains(bundle, warning.Text);
+            Assert.Contains("timeout (exit 137)", warning.Text);
+
+            // Rescan retries a timeout, including through a reloaded disk cache.
+            Assert.Empty(HostScan.Run(kind, "unused", [dir], Vst3Catalog.Bundles, Describe,
+                new ScanCache(Path.Combine(dir, "cache"))));
+            Assert.Equal(2, calls);
+
+            // When the same bundle answers, the old warning disappears and
+            // the successful description can be cached without another launch.
+            ProcessResult Recovered(string _) => new(0, Encoding.UTF8.GetBytes(
+                "{\"plugins\":[{\"id\":\"recovered\",\"name\":\"Recovered\",\"audioIns\":2,\"audioOuts\":2}]}"), "", false, false);
+            Assert.Single(HostScan.Run(kind, "unused", [dir], Vst3Catalog.Bundles, Recovered, cache));
+            Assert.Single(HostScan.Run(kind, "unused", [dir], Vst3Catalog.Bundles, Describe, cache));
+            Assert.Equal(2, calls);
+            report = PluginScanDiagnostics.Snapshot().Single(r => r.Kind == kind);
+            Assert.Contains(report.Entries, e => e.Outcome == "ok" && e.Cached);
+            Assert.Empty(PluginScanDiagnostics.Failures([report]));
+            log.Lines.Clear();
+            PluginScanLog.Write(log);
+            Assert.DoesNotContain(log.Lines, line => line.Text.Contains(kind));
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("short error")]
+    public void ShortDetailsAreUnchanged(string? text)
+        => Assert.Equal(text, PluginScanDiagnostics.ClipEnds(text, 2048));
+
+    private sealed class ScanLogger : ILogger
+    {
+        internal readonly List<(LogLevel Level, string Text)> Lines = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel level) => true;
+        public void Log<TState>(LogLevel level, EventId id, TState state, Exception? error,
+            Func<TState, Exception?, string> format) => Lines.Add((level, format(state, error)));
+    }
+
+    [Fact]
+    public void TheFailureSentenceNamesThreeBundlesAndCountsTheRest()
+    {
+        var capture = new PluginScanDiagnostics.Capture("failure-sentence-test");
+        capture.Add("/plugins/Ok.vst3", "ok", plugins: 1);
+        capture.Add("/plugins/absent", "directory-missing");
+        capture.Add("/plugins/Empty.vst3", "no-plugins");
+        capture.Add("/usr/lib/openxlr/daemon/openxlr-lv2-host", "host-missing");
+        capture.Add("/plugins/A.vst3", "timeout", exitCode: 137);
+        capture.Add("/plugins/B.vst3", "scan-failed", exitCode: 9);
+        capture.Add("/plugins/C.vst3", "invalid-description");
+        capture.Add("/plugins/D.vst3", "output-limit");
+        capture.Add("/plugins/E.clap", "start-error");
+
+        var failures = PluginScanDiagnostics.Failures([capture.Complete()]);
+
+        // A folder that is not there, a bundle with nothing in it and a host
+        // that was never installed are states, not failures to report.
+        Assert.Equal(5, failures.Count);
+        Assert.Equal("5 bundles could not be read: A.vst3 (timed out), B.vst3 (the scanner failed), "
+            + "C.vst3 (its description could not be read) and 2 more; the daemon's log says more.",
+            PluginScanDiagnostics.Sentence(failures));
+        Assert.Equal("", PluginScanDiagnostics.Sentence([]));
     }
 
     [Fact]

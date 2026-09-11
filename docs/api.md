@@ -57,7 +57,7 @@ Messages from the daemon, each a JSON object with a `type` field:
 | `plugins` | in answer to `listPlugins` | the installed LV2, CLAP and VST3 plugins with their controls, within the message size limit above and always including the plugins the saved chains use; `supported` is false, with `unsupportedFeatures` listed, for a plugin that needs a host feature the PipeWire chain lacks |
 | `pluginSetup` | in answer to `getPluginSetup` | where installs go (`lv2Directory`, `clapDirectory`, `vst3Directory`), `hostInstalled`, `yabridge` (its version, or null when not installed), `wine`, `windowsDirectories` (the folders yabridge bridges) and `wineFolders` (Wine's own plugin folders that hold a plugin and are not bridged yet, offered as one press since a file dialog hides them) |
 | `pluginDiagnostics` | in answer to `getPluginDiagnostics` | `discovery`: daemon host/controller paths, Wine prefix, architecture, effective search paths, bounded `yabridgectl status` output and latest completed CLAP/VST3 scan reports |
-| `pluginInstall` | in answer to `installPlugin`, `syncWindowsPlugins` and `rescanPlugins` | `ok`, `message` (a sentence or two for the user), `installed` (the bundles or folders put in place), `added` (plugins in the catalogue that were not before) and `total` |
+| `pluginInstall` | in answer to `installPlugin`, `syncWindowsPlugins` and `rescanPlugins` | `ok`, `message` (a sentence or two for the user, ending with the bundles the scan that followed could not read, up to three by name and the rest as a count), `installed` (the bundles or folders put in place), `added` (plugins in the catalogue that were not before) and `total` |
 | `error` | when a command without a `requestId` is rejected | `message` |
 | `commandResult` | in answer to a command that carried a `requestId` | `requestId`, `error` (null on success); preceded by the state the result refers to |
 
@@ -193,8 +193,20 @@ means no native scan has completed yet. Entries carry `path`, `outcome`,
 while the native helper that wrote it is the one asking, so `cached` is
 false everywhere in the first scan after the helper changes. Reports retain
 at most 128 entries per format, preferring failures over successful entries
-when full. Paths are limited to 4096 characters and details to 2048, with
-truncation marked.
+when full. Paths keep the first 4096 characters plus a truncation marker.
+Details use at most 2048 characters including the marker, with a quarter of
+the remaining space for the start and three quarters for the end. This
+keeps later errors from being hidden by a bridge's startup banner.
+
+After startup discovery and each install, sync or rescan, the daemon logs
+retained scan failures with their format, path, outcome and exit code when
+known. `pluginInstall.message` appends a summary of these failures without
+changing `ok`, `installed`, `added` or `total`. `ok` still describes the
+install or sync step, not whether every bundle could be scanned. Missing
+optional directories, an absent native helper and bundles reporting no
+plugins are not counted as scan failures. The summary uses the retained
+entries, so check `omitted` for larger scans. A timed-out scan is not cached
+and will be retried on the next rescan.
 
 These reports describe scanner output before the `plugins` message's size
 budget and the picker's channel-width/format filters. Compare them with

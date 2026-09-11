@@ -385,7 +385,15 @@ public sealed class WebSocketHub
             int total = OpenXLR.Core.Mixing.PluginCatalog.Plugins.Count;
             if (outcome.Ok) _log.LogInformation("plugins: {message} {added} new in the catalogue", outcome.Message, added);
             else _log.LogInformation("plugins: {message}", outcome.Message);
-            return new PluginInstallMessage(outcome.Ok, outcome.Message, outcome.Installed, added, total);
+            // A bundle the scan could not read costs the catalogue a plugin,
+            // and used to cost it silently: the answer said how many plugins
+            // there are, which reads as "nothing to find" to someone who has
+            // just installed one. Say it in the reply and in the log.
+            IReadOnlyList<OpenXLR.Core.Mixing.PluginScanFailure> failures = PluginScanLog.Write(_log);
+            string note = OpenXLR.Core.Mixing.PluginScanDiagnostics.Sentence(failures);
+            string message = note.Length == 0 ? outcome.Message
+                : outcome.Message.Length == 0 ? note : outcome.Message + " " + note;
+            return new PluginInstallMessage(outcome.Ok, message, outcome.Installed, added, total);
         }
     }
 

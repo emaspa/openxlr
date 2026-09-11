@@ -396,6 +396,54 @@ picked straight out of Downloads would hand yabridge your whole Downloads
 folder. VST2 `.dll` files are left out either way, since OpenXLR cannot
 load VST2.
 
+<a name="bundle-not-read"></a>
+**A bridged plugin is not in the picker.** A successful yabridge sync means
+the wrapper exists, not that OpenXLR could read the plugin. Each CLAP or
+VST3 bundle is scanned in a separate process. If that process fails or
+takes longer than a minute, the bundle contributes no plugins to the
+catalogue. Install, bridge, sync and Rescan replies name up to three scan
+failures and count the rest, for example:
+
+```
+1 bundle could not be read: TDR Kotelnikov.vst3 (timed out); the daemon's log says more.
+```
+
+The daemon also logs scan failures after startup discovery and after these
+commands, with the format, bundle path, outcome and exit code when known:
+
+```sh
+journalctl --user -u openxlr-daemon -n 200 --no-pager | grep 'plugin scan'
+```
+
+A timeout is not cached, so the next Rescan tries that bundle again. The
+warning makes a failed scan visible; it does not fix the underlying Wine
+or plugin failure. Collect [diagnostics](#reporting) after the scan ends.
+`plugin-discovery.json` keeps both the beginning and the end of long scanner
+output, since a bridge's startup banner can otherwise hide later errors.
+Review paths and output before sharing.
+
+After a Wine upgrade, a bridged scan can be the first program to use an
+older Wine prefix. Wine then updates it and may show an optional Mono or
+Gecko installer dialog; the scan can wait behind that dialog until its
+deadline. Check for an open Wine dialog and finish or cancel it, declining
+optional components you do not need, then Rescan. If there is no visible
+dialog, close other Wine applications using the same prefix and start Wine
+interactively so any pending update can finish where its dialogs are
+visible. For the default prefix:
+
+```sh
+WINEPREFIX="$HOME/.wine" wineboot
+```
+
+Use the plugin's actual prefix if it is not the default. Wait for Wine to
+finish, then Rescan. This is a possible explanation for a timeout, not
+proof that every missing plugin is waiting on a dialog.
+
+A timeout alone does not tell us why Wine or the plugin stopped answering.
+Do not run `wineboot -u` or a prefix-wide `wineserver -k` as a routine fix:
+they change or stop other Wine applications using that prefix. Start with
+the scan evidence instead.
+
 <a name="windows-editor-input"></a>
 **A Windows plugin's own editor ignores the mouse.** The plugin plays, its
 interface is drawn and it follows anything you change from OpenXLR, but

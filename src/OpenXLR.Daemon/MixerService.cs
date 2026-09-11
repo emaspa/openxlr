@@ -188,7 +188,9 @@ public sealed class MixerService : IHostedService, IDisposable
             _log.LogInformation("submixer off (daemon.json, --mixer, or OPENXLR_BUILD_MIXER=1 turn it on); hardware control only");
             return Task.CompletedTask;
         }
-        OpenXLR.Core.Mixing.PluginCatalog.Warm();   // plugin inserts: scan the LV2 and CLAP bundles off the startup path
+        // plugin inserts: scan the LV2, CLAP and VST3 bundles off the startup
+        // path, and say in the log what the scan could not read.
+        OpenXLR.Core.Mixing.PluginCatalog.Warm(() => PluginScanLog.Write(_log));
         _progress.Mark();
         _checkingProgress = true;
 
