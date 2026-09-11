@@ -30,8 +30,24 @@ internal static class SocketGuard
     public static async Task<(Outcome Outcome, byte[]? Message)> ReceiveMessageAsync(
         WebSocket socket, byte[] buf, int maxBytes, TimeSpan messageDeadline, CancellationToken stopping)
     {
+        // One clock for the whole message, not one per fragment. A timer and a
+        // cancellation registration per fragment would let a peer that sends
+        // many small (or empty, which the byte count cannot see) continuation
+        // frames pile both up until the deadline passed, on every connection
+        // at once. Cancelling it on the way out releases the timer at once,
+        // rather than leaving it armed until the deadline it never needed.
+        using var clock = CancellationTokenSource.CreateLinkedTokenSource(stopping);
+        try { return await ReceiveMessageAsync(socket, buf, maxBytes, messageDeadline, stopping, clock.Token); }
+        finally { clock.Cancel(); }
+    }
+
+    private static async Task<(Outcome Outcome, byte[]? Message)> ReceiveMessageAsync(
+        WebSocket socket, byte[] buf, int maxBytes, TimeSpan messageDeadline, CancellationToken stopping,
+        CancellationToken clock)
+    {
         using var ms = new MemoryStream();
-        long? due = null;   // monotonic ms, set by the first fragment of a multi-frame message
+        Task? expired = null;   // started by the first fragment of a multi-frame message
+        int fragments = 0;
         WebSocketReceiveResult res;
         do
         {
@@ -39,13 +55,12 @@ internal static class SocketGuard
             try
             {
                 recv = socket.ReceiveAsync(buf, stopping);
-                if (due is long d)
+                if (expired is not null)
                 {
                     // Cancelling a pending receive would abort the socket
                     // without a word to the peer, so race it with the clock
                     // and close properly when the clock wins.
-                    TimeSpan left = TimeSpan.FromMilliseconds(d - Environment.TickCount64);
-                    if (left <= TimeSpan.Zero || await Task.WhenAny(recv, Task.Delay(left, stopping)) != recv)
+                    if (expired.IsCompleted || await Task.WhenAny(recv, expired) != recv)
                     {
                         if (stopping.IsCancellationRequested)
                         {
@@ -74,15 +89,21 @@ internal static class SocketGuard
                 await CloseAsync(socket, WebSocketCloseStatus.InvalidMessageType, "text messages only");
                 return (Outcome.NotText, null);
             }
-            if (ms.Length + res.Count > maxBytes)
+            // An empty continuation frame carries no bytes, so the size limit
+            // cannot see it. Count the frames as well, or a peer could hold a
+            // handler and a connection slot busy with nothing at all until the
+            // deadline. One frame per byte of the limit is far more than any
+            // real client sends and still bounds the loop.
+            if (ms.Length + res.Count > maxBytes || ++fragments > maxBytes)
             {
                 await CloseAsync(socket, WebSocketCloseStatus.MessageTooBig, $"command exceeds {maxBytes} bytes");
                 return (Outcome.TooBig, null);
             }
             ms.Write(buf, 0, res.Count);
             // The clock starts with the first fragment, so a quiet client
-            // between commands is never on it.
-            if (due is null && !res.EndOfMessage) due = Environment.TickCount64 + (long)messageDeadline.TotalMilliseconds;
+            // between commands is never on it, and it runs once for the whole
+            // message rather than once per fragment.
+            if (expired is null && !res.EndOfMessage) expired = Task.Delay(messageDeadline, clock);
         } while (!res.EndOfMessage);
         return (Outcome.Message, ms.ToArray());
     }

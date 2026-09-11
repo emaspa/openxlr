@@ -189,9 +189,12 @@ means no native scan has completed yet. Entries carry `path`, `outcome`,
 `cached`, `plugins`, `duplicates`, `exitCode` and `detail`. Outcomes include
 `host-missing`, `directory`, `directory-missing`, `directory-error`,
 `start-error`, `scan-failed`, `timeout`, `output-limit`, `invalid-description`,
-`no-plugins`, `ok` and `scan-error`. Reports retain at most 128 entries per
-format, preferring failures over successful entries when full. Paths are
-limited to 4096 characters and details to 2048, with truncation marked.
+`no-plugins`, `ok` and `scan-error`. A cached description is reused only
+while the native helper that wrote it is the one asking, so `cached` is
+false everywhere in the first scan after the helper changes. Reports retain
+at most 128 entries per format, preferring failures over successful entries
+when full. Paths are limited to 4096 characters and details to 2048, with
+truncation marked.
 
 These reports describe scanner output before the `plugins` message's size
 budget and the picker's channel-width/format filters. Compare them with

@@ -139,7 +139,8 @@ For LV2, enabling "Native host" moves only that insert out of filter-chain
 and briefly interrupts its chain. CLAP and VST3 always use that host.
 Packages include the helper; source builds need
 `-p:EnableNativeLv2Host=true`. The helper scans CLAP/VST3 bundles in separate
-processes and caches their descriptions until they change.
+processes and caches their descriptions until the bundle or the helper itself
+changes, so an updated helper reads every installed bundle once.
 
 Chains and exposed parameter values are saved with the mixer and profiles.
 Opaque plugin state, loaded sample files and plugin preset data are not

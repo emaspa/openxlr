@@ -89,6 +89,16 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// <summary>Every channel combine feeds every mix sink, present or future.</summary>
     private const string MixSinkPattern = "~" + MixDefinition.SinkPrefix;
     private readonly Dictionary<string, int> _legIndex = [];
+    // Cells whose combine leg was not there when their fader was last pushed.
+    // A leg that turns up afterwards carries PipeWire's defaults, full level
+    // and unmuted, so the sweep pushes the stored fader onto it as soon as it
+    // appears. See EnsureCellLevels.
+    private readonly HashSet<string> _pendingCells = [];
+    /// <summary>Rounds run on consecutive sweeps before backing off; a late leg is up in one or two.</summary>
+    private const int CellPromptRounds = 3;
+    /// <summary>The longest the sweep waits between rounds, so a send still waiting is tried at least once a minute.</summary>
+    private const int CellMaxGapSweeps = 60;
+    private int _cellRounds, _cellWait;
 
     /// <summary>Map every combine's internal streams to their (channel, mix) cells.</summary>
     private void DiscoverLegsLocked()
@@ -892,8 +902,46 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 AuxPortEnabled = _auxPortEnabled,
                 LowCutHz = _lowCutHz,
                 SoftClipGuard = _softClipGuard,
-                Inserts = _inserts.ToDictionary(e => e.Key, e => e.Value.ToList()),
+                Inserts = CopyInsertsLocked(),
             };
+        }
+    }
+
+    /// <summary>
+    /// The insert chains as a snapshot nothing else can change. An insert's
+    /// Params dictionary is written in place (a control move, an editor edit)
+    /// under this lock, while an export is serialized outside it, so handing
+    /// the live dictionary out would let a save enumerate a dictionary that
+    /// gains a key mid-write. That throws inside a timer callback, which ends
+    /// the daemon.
+    /// </summary>
+    private Dictionary<string, List<InsertDefinition>> CopyInsertsLocked() => CopyInserts(_inserts);
+
+    /// <inheritdoc cref="CopyInsertsLocked"/>
+    internal static Dictionary<string, List<InsertDefinition>> CopyInserts(
+        IReadOnlyDictionary<string, List<InsertDefinition>> inserts)
+        => inserts.ToDictionary(e => e.Key,
+            e => e.Value.Select(i => i with { Params = new Dictionary<string, double>(i.Params) }).ToList());
+
+    /// <summary>
+    /// Apply the mutes a saved scene or settings file carries, leaving alone
+    /// every entry it does not mention. A channel or a mix added after the
+    /// file was written is not in it, and those start muted with their sends
+    /// at unity, so clearing the whole set and re-adding would open a send
+    /// the file never described: the microphone into a mix a profile predates.
+    /// An entry the file describes (it carries a level for it, or lists it as
+    /// muted) is set exactly as the file says.
+    /// </summary>
+    internal static void RecallMutes(HashSet<string> muted, IEnumerable<string> entries,
+        IEnumerable<string> described, IEnumerable<string> savedMuted)
+    {
+        var wanted = new HashSet<string>(savedMuted, StringComparer.Ordinal);
+        var known = new HashSet<string>(wanted, StringComparer.Ordinal);
+        known.UnionWith(described);
+        foreach (string entry in entries)
+        {
+            if (wanted.Contains(entry)) muted.Add(entry);
+            else if (known.Contains(entry)) muted.Remove(entry);
         }
     }
 
@@ -906,14 +954,11 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
 
             foreach ((string mixId, double vol) in s.MixVolumes)
                 if (_mixVolume.ContainsKey(mixId)) _mixVolume[mixId] = Math.Clamp(vol, 0, 1);
-            _mixMuted.Clear();
-            foreach (string mixId in s.MixMuted) _mixMuted.Add(mixId);
+            RecallMutes(_mixMuted, _config.Mixes.Select(m => m.Id), s.MixVolumes.Keys, s.MixMuted);
 
             foreach ((string cell, double lvl) in s.Levels)
                 if (_cells.Contains(cell)) _levels[cell] = Math.Clamp(lvl, 0, 1);
-            _muted.Clear();
-            foreach (string cell in s.ChannelMuted)
-                if (_cells.Contains(cell)) _muted.Add(cell);
+            RecallMutes(_muted, _cells, s.Levels.Keys, s.ChannelMuted);
 
             foreach ((string identity, string channelId) in StreamMatcher.MigrateOverrides(s.AppOverrides))
                 Matcher.SetOverride(identity, _config.ResolveApplicationChannel(channelId));
@@ -1000,7 +1045,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 OutputVolume = _outputVolume,
                 LowCutHz = _lowCutHz,
                 SoftClipGuard = _softClipGuard,
-                Inserts = _inserts.ToDictionary(e => e.Key, e => e.Value.ToList()),
+                Inserts = CopyInsertsLocked(),
             };
         }
     }
@@ -1018,14 +1063,14 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
 
             foreach ((string mixId, double vol) in s.MixVolumes)
                 if (_mixVolume.ContainsKey(mixId)) _mixVolume[mixId] = Math.Clamp(vol, 0, 1);
-            _mixMuted.Clear();
-            foreach (string mixId in s.MixMuted) _mixMuted.Add(mixId);
+            // A profile saved before a channel or a mix existed says nothing
+            // about its sends, and those sends sit at unity behind a mute.
+            // Recalling it must not open them.
+            RecallMutes(_mixMuted, _config.Mixes.Select(m => m.Id), s.MixVolumes.Keys, s.MixMuted);
 
             foreach ((string cell, double lvl) in s.Levels)
                 if (_cells.Contains(cell)) _levels[cell] = Math.Clamp(lvl, 0, 1);
-            _muted.Clear();
-            foreach (string cell in s.ChannelMuted)
-                if (_cells.Contains(cell)) _muted.Add(cell);
+            RecallMutes(_muted, _cells, s.Levels.Keys, s.ChannelMuted);
 
             foreach (MixDefinition mix in _config.Mixes) ReapplyMixLocked(mix.Id);
 
@@ -1745,11 +1790,20 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         if (_hardwareMicMonitor && channelId == "xlr1" && MonitorFeed.Includes(JackFeedLocked(), mixId))
             muted = true;   // the hardware direct path carries it to the jacks
 
-        if (!_legIndex.TryGetValue(cell, out int idx)) { DiscoverLegsLocked(); if (!_legIndex.TryGetValue(cell, out idx)) return; }
+        if (!_legIndex.TryGetValue(cell, out int idx))
+        {
+            DiscoverLegsLocked();
+            // A leg that has not grown yet sits at PipeWire's defaults, which
+            // are full level and unmuted. Remember the cell so the sweep can
+            // push the stored fader the moment the leg appears; leaving it
+            // would open a send the user had closed.
+            if (!_legIndex.TryGetValue(cell, out idx)) { MarkCellPendingLocked(cell); return; }
+        }
         try
         {
             _pw.SetSinkInputVolume(idx, level);
             _pw.SetSinkInputMuted(idx, muted);
+            _pendingCells.Remove(cell);
         }
         catch (InvalidOperationException)
         {
@@ -1757,9 +1811,78 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             DiscoverLegsLocked();
             if (_legIndex.TryGetValue(cell, out idx))
             {
-                try { _pw.SetSinkInputVolume(idx, level); _pw.SetSinkInputMuted(idx, muted); }
-                catch (InvalidOperationException) { /* give up until next change */ }
+                try { _pw.SetSinkInputVolume(idx, level); _pw.SetSinkInputMuted(idx, muted); _pendingCells.Remove(cell); }
+                catch (InvalidOperationException) { MarkCellPendingLocked(cell); }
             }
+            else MarkCellPendingLocked(cell);
+        }
+    }
+
+    /// <summary>A cell that could not be pushed, and a fresh round of tries for it.</summary>
+    private void MarkCellPendingLocked(string cell)
+    {
+        if (_pendingCells.Add(cell)) _cellRounds = _cellWait = 0;
+    }
+
+    /// <summary>
+    /// Drop from the pending set every cell that no longer exists. A deleted
+    /// channel or mix is not waiting for a leg, and its cells must not keep
+    /// the reconciliation running on its own account.
+    /// </summary>
+    internal static void ForgetRemovedCells(HashSet<string> pending, IReadOnlySet<string> cells)
+    {
+        if (pending.Count > 0) pending.RemoveWhere(cell => !cells.Contains(cell));
+    }
+
+    /// <summary>
+    /// Sweeps to wait before reconciliation round <paramref name="rounds"/>.
+    /// The first rounds go on consecutive sweeps, because a leg that is
+    /// merely late is up within a second or two. After that the gap doubles
+    /// and settles at <see cref="CellMaxGapSweeps"/>, and there it stays: a
+    /// send whose leg has still not appeared is a send sitting at full level
+    /// and unmuted, so it is tried again for as long as the cell exists.
+    /// The cost in the steady state is one leg discovery a minute, and only
+    /// while something is actually waiting.
+    /// </summary>
+    internal static int CellRoundGap(int rounds)
+    {
+        if (rounds <= 0) return 0;                     // the first round runs at once
+        if (rounds < CellPromptRounds) return 1;       // then the next sweep, twice
+        return Math.Min(2 << Math.Min(rounds - CellPromptRounds, 16), CellMaxGapSweeps);
+    }
+
+    /// <summary>
+    /// Push the stored fader onto every send whose combine leg was missing
+    /// when it was last set. A combine grows its legs a moment after its
+    /// module loads, and the build does not wait for them, so a leg can turn
+    /// up after its cell was applied; until this runs it carries PipeWire's
+    /// defaults, full level and unmuted. A cell stays on this list until its
+    /// fader is on the leg or the cell itself is gone, on the backoff
+    /// <see cref="CellRoundGap"/> sets. Called from the sweep, and free
+    /// while nothing is waiting.
+    /// </summary>
+    public bool EnsureCellLevels()
+    {
+        lock (_gate)
+        {
+            ForgetRemovedCells(_pendingCells, _cells);
+            if (!_built || _pendingCells.Count == 0) { _cellRounds = _cellWait = 0; return false; }
+            if (_cellWait > 0) { _cellWait--; return false; }
+            DiscoverLegsLocked();
+            bool applied = false;
+            foreach (string cell in _pendingCells.ToList())
+            {
+                int bar = cell.IndexOf('|', StringComparison.Ordinal);
+                if (bar <= 0) { _pendingCells.Remove(cell); continue; }
+                if (!_legIndex.ContainsKey(cell)) continue;   // still not there; try again next round
+                ApplyCellLocked(cell[..bar], cell[(bar + 1)..]);
+                applied = true;
+            }
+            _cellRounds++;
+            // The gap is a distance between rounds; the wait counts the
+            // sweeps skipped in between, which is one fewer.
+            _cellWait = Math.Max(0, CellRoundGap(_cellRounds) - 1);
+            return applied;
         }
     }
 
@@ -1790,6 +1913,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         _virtualMicModules.Clear();
         _renamedSinceBuild = false;
         _legIndex.Clear();
+        _pendingCells.Clear();
+        _cellRounds = _cellWait = 0;
         _streams.Clear();
         _cells.Clear();
         _levels.Clear();

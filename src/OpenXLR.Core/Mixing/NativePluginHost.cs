@@ -33,6 +33,16 @@ internal sealed class NativePluginHost : IDisposable
             catch (InvalidOperationException) { return false; }
         }
     }
+    /// <summary>
+    /// The instance is worth keeping. The helper's beat says its audio is
+    /// moving, not merely that its process is alive: it stops beating when
+    /// the plugin has been inside one process callback for several seconds,
+    /// because an instance that is neither dead nor processing would
+    /// otherwise sit in the chain passing nothing. A node with no callback
+    /// outstanding, idle or suspended, keeps beating. The chain healing in
+    /// the sweep reads this and replaces the process, with the restart
+    /// policy's backoff behind it.
+    /// </summary>
     public bool IsHealthy => IsRunning
         && Stopwatch.GetElapsedTime(Interlocked.Read(ref _lastHeartbeat)) < _patience;
 
@@ -193,12 +203,53 @@ internal sealed class NativePluginHost : IDisposable
         }
     }
 
+    /// <summary>How much of a line the helper writes to stderr is kept, and all that is ever held.</summary>
+    private const int ErrorLineCap = 2048;
+
+    /// <summary>
+    /// Fold one block of helper output into the line being assembled and
+    /// return the last complete line in it, or null when the block held no
+    /// newline. <paramref name="line"/> never grows past
+    /// <see cref="ErrorLineCap"/> characters, whatever the block contains:
+    /// everything past that is dropped where it arrives, so a plugin writing
+    /// without newlines cannot make the daemon hold its output.
+    /// </summary>
+    internal static string? FoldErrorBlock(System.Text.StringBuilder line, ReadOnlySpan<char> block)
+    {
+        string? complete = null;
+        foreach (char c in block)
+        {
+            if (c != '\n')
+            {
+                if (line.Length < ErrorLineCap) line.Append(c);
+                continue;
+            }
+            complete = line.ToString().TrimEnd('\r');
+            line.Clear();
+        }
+        return complete;
+    }
+
+    /// <summary>
+    /// Drain the helper's stderr without letting a plugin decide how much
+    /// memory the daemon uses. ReadLineAsync buffers a whole line before it
+    /// hands one over, so a plugin that logs through the helper and never
+    /// writes a newline would grow that buffer without a limit, while its
+    /// heartbeats keep the process looking healthy. Reading in blocks keeps
+    /// the drain going, so the helper never blocks on a full pipe, and holds
+    /// only the bounded head of the line in hand.
+    /// </summary>
     private async Task ReadErrorsAsync()
     {
+        var block = new char[1024];
+        var line = new System.Text.StringBuilder(ErrorLineCap);
         try
         {
-            while (await Process.StandardError.ReadLineAsync(_stop.Token).ConfigureAwait(false) is string line)
-                _error = line.Length > 2048 ? line[..2048] : line;
+            int read;
+            while ((read = await Process.StandardError.ReadAsync(block.AsMemory(), _stop.Token).ConfigureAwait(false)) > 0)
+                if (FoldErrorBlock(line, block.AsSpan(0, read)) is string complete) _error = complete;
+            // A helper that dies mid-sentence still gets to explain itself.
+            if (line.Length > 0) _error = line.ToString();
         }
         catch (Exception ex) when (ex is OperationCanceledException or IOException) { }
     }

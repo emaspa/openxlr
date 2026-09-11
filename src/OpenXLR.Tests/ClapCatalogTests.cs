@@ -20,6 +20,52 @@ public sealed class ClapCatalogTests
         ]}
         """;
 
+    // A bundle whose plugins the helper would refuse to load. Both are real
+    // LSP layouts: a mixer declares more input buses than the host carries,
+    // a crossover more output buses.
+    private const string RefusedScan = """
+        {"file":"/usr/lib/clap/lsp-plugins.clap","plugins":[
+          {"id":"in.lsp-plug.mixer_x8_mono","name":"Mixer x8 Mono","vendor":"LSP",
+           "features":["audio-effect","mono"],"audioIns":0,"audioOuts":1,"gui":true,
+           "layoutRefused":"the plugin declares 9 audio input ports; this host carries 1 to 8","params":[]},
+          {"id":"in.lsp-plug.crossover_stereo","name":"Crossover Stereo","vendor":"LSP",
+           "features":["audio-effect","stereo"],"audioIns":2,"audioOuts":0,"gui":true,
+           "layoutRefused":"the plugin declares 9 audio output ports; this host carries 1 to 8","params":[]},
+          {"id":"in.lsp-plug.comp_stereo","name":"Compressor Stereo","vendor":"LSP",
+           "features":["audio-effect","stereo"],"audioIns":2,"audioOuts":2,"gui":true,"params":[]}
+        ]}
+        """;
+
+    [Fact]
+    public void APortLayoutTheHostWouldRefuseKeepsThePluginOutOfThePicker()
+    {
+        // The helper refuses a layout it cannot hand a buffer for, and says
+        // so in the scan. The catalogue carries that through as an
+        // unsupported feature, so the picker never offers a plugin that would
+        // then be turned away, and the reason is the loader's own words.
+        IReadOnlyList<PluginInfo> found = ClapCatalog.Parse(RefusedScan);
+        Assert.Equal(3, found.Count);
+
+        Assert.False(found[0].Supported);
+        Assert.Equal(["the plugin declares 9 audio input ports; this host carries 1 to 8"],
+            found[0].UnsupportedFeatures);
+        Assert.False(found[1].Supported);
+        Assert.Equal(["the plugin declares 9 audio output ports; this host carries 1 to 8"],
+            found[1].UnsupportedFeatures);
+
+        // Both directions are still described. A refusal in one used to leave
+        // the other reading uninitialised stack in the helper, which reached
+        // the catalogue as a nonsense width.
+        Assert.Equal((0, 1), (found[0].AudioIns, found[0].AudioOuts));
+        Assert.Equal((2, 0), (found[1].AudioIns, found[1].AudioOuts));
+
+        // A plugin from the same bundle with a layout the host carries is
+        // offered as usual.
+        Assert.True(found[2].Supported);
+        Assert.Empty(found[2].UnsupportedFeatures);
+        Assert.Equal((2, 2), (found[2].AudioIns, found[2].AudioOuts));
+    }
+
     [Fact]
     public void TheScannersJsonBecomesPluginsThePickerCanOffer()
     {
@@ -193,6 +239,70 @@ public sealed class ClapCatalogTests
             later.Save();
             Assert.DoesNotContain("Thing.vst3", File.ReadAllText(Path.Combine(cacheDir, "index.json")));
             Assert.Single(Directory.GetFiles(cacheDir));   // only the index is left
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public void AScanIsReadAgainWhenTheHelperThatWroteItChanged()
+    {
+        string dir = Directory.CreateTempSubdirectory("openxlr-scan-scanner-").FullName;
+        try
+        {
+            string bundle = Path.Combine(dir, "Thing.clap");
+            File.WriteAllText(bundle, "not really");
+            string cacheDir = Path.Combine(dir, "cache", "plugin-scans");
+            string index = Path.Combine(cacheDir, "index.json");
+            byte[] description = System.Text.Encoding.UTF8.GetBytes("{\"file\":\"x\",\"plugins\":[]}");
+
+            var first = new ScanCache(cacheDir, "helper-one");
+            first.Store(bundle, description);
+            first.Save();
+
+            // The same helper answers from the cache; another one does not,
+            // however untouched the bundle is.
+            Assert.Equal(description, new ScanCache(cacheDir, "helper-one").Lookup(bundle));
+            Assert.Null(new ScanCache(cacheDir, "helper-two").Lookup(bundle));
+
+            // What the daemon uses when it is not told: the helper's own file,
+            // which says something else as soon as another one is installed.
+            Assert.Equal(ScanCache.StampText(NativePluginHost.Executable), ScanCache.ScannerStamp);
+            string helper = Path.Combine(dir, "openxlr-lv2-host");
+            Assert.Equal("none", ScanCache.StampText(helper));
+            File.WriteAllText(helper, "one helper");
+            string oneHelper = ScanCache.StampText(helper);
+            File.WriteAllText(helper, "a helper that is longer");
+            Assert.NotEqual(oneHelper, ScanCache.StampText(helper));
+
+            Assert.Null(new ScanCache(cacheDir).Lookup(bundle));
+            var stamped = new ScanCache(cacheDir);
+            stamped.Store(bundle, description);
+            stamped.Save();
+            Assert.Equal(description, new ScanCache(cacheDir).Lookup(bundle));
+            Assert.Equal(description, new ScanCache(cacheDir, ScanCache.ScannerStamp).Lookup(bundle));
+
+            // An index written before any of this was recorded: one scan each,
+            // and then it is kept like any other.
+            string written = File.ReadAllText(index);
+            Assert.Contains("\"scanner\":", written);
+            File.WriteAllText(index, System.Text.RegularExpressions.Regex.Replace(written, ",\"scanner\":\"[^\"]*\"", ""));
+            Assert.Null(new ScanCache(cacheDir, "helper-one").Lookup(bundle));
+            var rescanned = new ScanCache(cacheDir, "helper-one");
+            rescanned.Store(bundle, description);
+            rescanned.Save();
+            Assert.Equal(description, new ScanCache(cacheDir, "helper-one").Lookup(bundle));
+
+            // The bridge keeps its own index beside it, and neither reaches
+            // into the other, with or without a helper of the same name.
+            string bridgeDir = Path.Combine(cacheDir, "bridge-ABC");
+            byte[] bridged = System.Text.Encoding.UTF8.GetBytes("{\"file\":\"y\",\"plugins\":[]}");
+            Assert.Null(new ScanCache(bridgeDir, "helper-one").Lookup(bundle));
+            var bridge = new ScanCache(bridgeDir, "helper-one");
+            bridge.Store(bundle, bridged);
+            bridge.Save();
+            Assert.Equal(bridged, new ScanCache(bridgeDir, "helper-one").Lookup(bundle));
+            Assert.Null(new ScanCache(bridgeDir, "helper-two").Lookup(bundle));
+            Assert.Equal(description, new ScanCache(cacheDir, "helper-one").Lookup(bundle));
         }
         finally { Directory.Delete(dir, true); }
     }

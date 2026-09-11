@@ -270,21 +270,50 @@ public sealed class PluginInstaller
             destinations.Add(destination);
             return;
         }
+        // Replacing a plugin must not be able to lose the working one. The new
+        // copy is built beside the destination under a name nothing looks at,
+        // the installed bundle is moved aside only once that copy is complete,
+        // and the swap is two renames inside one directory. A failure anywhere
+        // puts the old bundle back and leaves nothing half-written behind: an
+        // unreadable file or a full disk costs the update, not the plugin.
+        string staged = destination + ".openxlr-new";
+        string retired = destination + ".openxlr-old";
         try
         {
             Directory.CreateDirectory(directory);
-            if (Directory.Exists(destination)) Directory.Delete(destination, recursive: true);
-            else if (File.Exists(destination)) File.Delete(destination);
-            if (Directory.Exists(source)) CopyTree(source, destination);
-            else File.Copy(source, destination);
+            Remove(staged);
+            Remove(retired);
+            if (Directory.Exists(source)) CopyTree(source, staged);
+            else File.Copy(source, staged);
+            bool replacing = Directory.Exists(destination) || File.Exists(destination);
+            if (replacing) Move(destination, retired);
+            try { Move(staged, destination); }
+            catch { if (replacing) Move(retired, destination); throw; }
+            // The new bundle is in place; the old one is only litter now.
+            try { Remove(retired); } catch (Exception) { /* removed on the next install */ }
             installed.Add(name);
             destinations.Add(destination);
             notes.Add($"Installed {name} in {Shorten(directory)}.");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            try { Remove(staged); } catch (Exception) { /* the note already says the install failed */ }
             notes.Add($"Could not copy {name} to {Shorten(directory)}: {ex.Message}");
         }
+    }
+
+    /// <summary>Delete a path whether it is a bundle directory or a single file.</summary>
+    private static void Remove(string path)
+    {
+        if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
+        else if (File.Exists(path)) File.Delete(path);
+    }
+
+    /// <summary>Rename within one directory, for either kind of bundle.</summary>
+    private static void Move(string from, string to)
+    {
+        if (Directory.Exists(from)) Directory.Move(from, to);
+        else File.Move(from, to, overwrite: true);
     }
 
     private static void CopyTree(string source, string destination)

@@ -61,6 +61,76 @@ public sealed class NativeHostProtocolTests
     }
 
     [Fact]
+    public async Task AHelperThatStopsBeatingIsUnhealthyWhileItIsStillAlive()
+    {
+        // The helper stops beating once the plugin has been inside one audio
+        // callback for several seconds. It is still a live process with a
+        // turning editor loop, so nothing else would notice; this is what
+        // tells the chain healing in the sweep to replace it.
+        using var host = Start("""
+            import sys
+            print('ready')
+            print('heartbeat')
+            print('ui-heartbeat')
+            for line in sys.stdin:
+                pass
+            """, patience: TimeSpan.FromMilliseconds(500));
+
+        bool noticed = false;
+        for (int attempt = 0; attempt < 40 && !noticed; attempt++)
+        {
+            noticed = host.IsRunning && !host.IsHealthy;
+            if (!noticed) await Task.Delay(100);
+        }
+        Assert.True(noticed, "a live helper that stopped beating should read as unhealthy");
+    }
+
+    [Fact]
+    public async Task AStalledHostMakesItsChainStageReadAsDead()
+    {
+        // The step that turns a silent helper into a replaced one: the chain
+        // stage carrying it stops reading as alive, which is what the sweep's
+        // healing pass looks at. A stage whose helper is beating stays alive,
+        // so a working plugin is never rebuilt underneath the user.
+        using var beating = Start("""
+            import sys, threading, time
+            lock = threading.Lock()
+            def say(line):
+                with lock:
+                    sys.stdout.write(line + '\n')
+                    sys.stdout.flush()
+            say('ready')
+            def beat():
+                while True:
+                    say('heartbeat')
+                    time.sleep(0.05)
+            threading.Thread(target=beat, daemon=True).start()
+            for line in sys.stdin:
+                pass
+            """, patience: TimeSpan.FromMilliseconds(500));
+        using var stalled = Start("""
+            import sys
+            print('ready')
+            print('heartbeat')
+            for line in sys.stdin:
+                pass
+            """, patience: TimeSpan.FromMilliseconds(500));
+
+        var live = new FilterHandle("live", "sink", "source", beating.Process) { NativeHost = beating };
+        var stuck = new FilterHandle("stuck", "sink", "source", stalled.Process) { NativeHost = stalled };
+
+        bool noticed = false;
+        for (int attempt = 0; attempt < 40 && !noticed; attempt++)
+        {
+            noticed = !stuck.IsAlive;
+            if (!noticed) await Task.Delay(100);
+        }
+        Assert.True(noticed, "a stage whose helper stopped beating should read as dead");
+        Assert.True(stalled.IsRunning, "and it is a live process, which is what made this invisible before");
+        Assert.True(live.IsAlive, "a stage whose helper is still beating must not be rebuilt");
+    }
+
+    [Fact]
     public async Task AFrozenEditorLoopIsReportedWithoutCondemningTheAudio()
     {
         // The helper's two beats mean different things: one says the process

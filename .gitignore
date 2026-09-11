@@ -8,6 +8,8 @@ native/openxlr-lv2-host
 native/*.o
 native/tests/*.o
 native/tests/editor
+native/tests/audio
+native/tests/clap
 # nix build output symlink
 result
 
