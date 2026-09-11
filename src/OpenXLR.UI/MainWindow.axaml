@@ -3,7 +3,7 @@
         xmlns:vm="using:OpenXLR.UI"
         x:Class="OpenXLR.UI.MainWindow"
         x:DataType="vm:MainViewModel"
-        Title="OpenXLR" Width="1040" Height="900" MinWidth="760" MinHeight="480"
+        Title="OpenXLR" Width="1040" Height="900" MinHeight="480"
         Icon="avares://OpenXLR.UI/Assets/icon.png"
         Background="#16181d">
 
@@ -143,9 +143,12 @@
     </Style>
   </Window.Styles>
 
-  <!-- Cards follow the available width. The page scrolls when it is shorter. -->
+  <!-- MaxWidth keeps sliders and dropdowns a sane length on an ultrawide or when
+       maximized; without it a fader stretches across the whole screen. Below it
+       the cards follow the available width. Every card sizes to its content;
+       the page scrolls when the window is shorter. -->
   <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-  <StackPanel Name="MixerContent" Margin="16" HorizontalAlignment="Stretch">
+  <StackPanel Name="MixerContent" Margin="16" MaxWidth="1300" HorizontalAlignment="Center">
 
     <!-- header -->
     <Border Classes="card" Margin="0,0,0,8">
@@ -613,8 +616,9 @@
                         <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="0,2,0,0">
                           <Ellipse Width="8" Height="8" VerticalAlignment="Center" Margin="0,0,6,0"
                                    Fill="{Binding IsActive, Converter={x:Static vm:Converters.ActiveLed}}"/>
-                          <TextBlock Grid.Column="1" Text="{Binding Label}" Foreground="#e6e9f0" FontSize="11"
-                                     VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
+                          <TextBlock Grid.Column="1" Text="{Binding Label}" Classes="insertName"
+                                     Foreground="#e6e9f0" FontSize="11" VerticalAlignment="Center"
+                                     TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
                           <ToggleButton Grid.Column="2" Content="N" Classes="insertmini"
                                         IsChecked="{Binding NativeHost, Mode=TwoWay}"
                                         IsVisible="{Binding CanChooseNativeHost}"

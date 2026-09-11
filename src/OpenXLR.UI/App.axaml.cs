@@ -21,8 +21,10 @@ public partial class App : Application
             if (UiSettings.Load().StartDaemonAtLogin)
                 StartupIntegration.RepairDaemonUnit();
 
-            // A moved installation or deleted desktop entry must not leave
-            // an enabled mixer-at-login preference pointing nowhere.
+            // A moved installation must not leave an enabled mixer-at-login
+            // preference pointing at a binary that is gone. An entry removed
+            // with a desktop tool stays removed. Either way the outcome is
+            // kept, and Options reports anything the user should know.
             StartupIntegration.RepairWindowAutostart();
 
             var window = new MainWindow();

@@ -36,6 +36,7 @@ public sealed class OptionsViewModel : ViewModelBase
         _minimizeToTray = s.MinimizeToTray;
         _startMinimized = s.StartMinimized;
         _checkForUpdates = s.CheckForUpdates;
+        _startupError = RepairNote(StartupIntegration.LastRepair);
         // No saved choice means the daemon runs whatever its unit asked for,
         // which for every shipped unit is the submixer on.
         _submixer = DaemonPrefs.Load().Submixer ?? true;
@@ -147,8 +148,18 @@ public sealed class OptionsViewModel : ViewModelBase
         get => _startDaemonAtLogin;
         set
         {
-            if (!Set(ref _startDaemonAtLogin, value)) return;
-            StartupIntegration.SetDaemonAtLogin(value);
+            if (_startDaemonAtLogin == value) return;
+            if (!StartupIntegration.SetDaemonAtLogin(value))
+            {
+                StartupError = value
+                    ? "Could not start the audio service at login. Check that OpenXLR is installed and that systemd user services work here (systemctl --user status)."
+                    : "Could not stop the audio service from starting at login. Check that systemd user services work here (systemctl --user status).";
+                Reject(ref _startDaemonAtLogin, value, nameof(StartDaemonAtLogin));
+                return;
+            }
+            StartupError = null;
+            _startDaemonAtLogin = value;
+            Raise();
             Persist();
         }
     }
@@ -162,19 +173,45 @@ public sealed class OptionsViewModel : ViewModelBase
             if (_openWindowAtLogin == value) return;
             if (!StartupIntegration.SetWindowAtLogin(value))
             {
-                StartupError = "Could not update mixer autostart. Check that OpenXLR is installed and the autostart folder is writable.";
-                Raise(nameof(OpenWindowAtLogin));
+                StartupError = "Could not update mixer autostart. Check that OpenXLR is installed, the autostart folder is writable, and the entry there is not a symbolic link.";
+                Reject(ref _openWindowAtLogin, value, nameof(OpenWindowAtLogin));
                 return;
             }
             StartupError = null;
-            Set(ref _openWindowAtLogin, value);
+            _openWindowAtLogin = value;
+            Raise();
             Raise(nameof(StartupHint));
             Persist();
         }
     }
 
+    /// <summary>
+    /// Put a rejected toggle back where it was. The check box has already
+    /// drawn itself in the new state, and a notification carrying the value
+    /// the property already had does not move it: the binding compares
+    /// against what it last wrote and pushes nothing. Publishing the rejected
+    /// value and then the real one does move it.
+    /// </summary>
+    private void Reject(ref bool field, bool rejected, string name)
+    {
+        field = rejected;
+        Raise(name);
+        field = !rejected;
+        Raise(name);
+    }
+
     private string? _startupError;
     public string? StartupError { get => _startupError; private set => Set(ref _startupError, value); }
+
+    /// <summary>What the startup repair did, in words, or null when it did nothing worth saying.</summary>
+    internal static string? RepairNote(StartupIntegration.AutostartRepair repair) => repair switch
+    {
+        StartupIntegration.AutostartRepair.RemovedOutside =>
+            "The mixer autostart entry was removed outside OpenXLR, so it was left removed. Turn this option off and on again to create it.",
+        StartupIntegration.AutostartRepair.Failed =>
+            "Could not repair the mixer autostart entry. Check that OpenXLR is installed, the autostart folder is writable, and the entry there is not a symbolic link.",
+        _ => null,
+    };
 
     public string StartupHint => OpenWindowAtLogin
         ? "The mixer and tray icon will start when you sign in."

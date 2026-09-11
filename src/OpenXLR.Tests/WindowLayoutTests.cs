@@ -12,6 +12,15 @@ namespace OpenXLR.Tests;
 [Collection("xdg-config")]
 public sealed class WindowLayoutTests
 {
+    /// <summary>
+    /// The widest fixed row in the mixer, the seven input toggles, needs about
+    /// 660 logical pixels. The window must not refuse to go narrower than that.
+    /// </summary>
+    private const double WidestFixedRow = 660;
+
+    /// <summary>Faders and dropdowns stop growing here, however wide the screen is.</summary>
+    private const double ContentCap = 1300;
+
     [LayoutFact]
     public void NarrowPluginWindowsKeepActionsSeparateAndMixerFillsWideWindows()
     {
@@ -49,23 +58,60 @@ public sealed class WindowLayoutTests
                     vm.Mixes.Add(mix);
                 }
                 main.Show();
-                foreach (double width in new[] { 760d, 1040, 1800, 2400 })
+
+                // No floor above the widest row: the window squeezes to 640.
+                Assert.InRange(main.MinWidth, 0, WidestFixedRow);
+
+                foreach (double width in new[] { 640d, 760, 1040, 1800, 2400 })
                 {
                     Layout(main, width, 900);
+                    Assert.Equal(width, main.ClientSize.Width);
                     var content = main.FindControl<StackPanel>("MixerContent")!;
-                    Assert.True(Math.Abs(content.Bounds.Width - (width - 32)) < 28,
-                        $"Requested {width}, window {main.Width}/{main.Bounds.Width}, client {main.ClientSize.Width}, content {content.Bounds.Width}");
-                    foreach (var name in main.GetVisualDescendants().OfType<TextBlock>()
-                                 .Where(t => t.Classes.Contains("insertName")))
+                    string where = $"Requested {width}, window {main.Width}/{main.Bounds.Width}, "
+                        + $"client {main.ClientSize.Width}, content {content.Bounds.Width}";
+                    // Below the cap the cards follow the window; above it they
+                    // stop, so a fader does not stretch across an ultrawide.
+                    Assert.True(content.Bounds.Width <= ContentCap, where);
+                    if (width <= ContentCap) Assert.InRange(content.Bounds.Width, width - 72, width - 16);
+                    else Assert.InRange(content.Bounds.Width, ContentCap / 2, ContentCap);
+
+                    // Every input toggle keeps a usable width and stays in the window.
+                    foreach (var row in main.GetVisualDescendants().OfType<Avalonia.Controls.Primitives.UniformGrid>())
+                        foreach (var toggle in row.Children.Where(c => c.IsVisible))
+                        {
+                            Assert.True(toggle.Bounds.Width > 40, $"A toggle shrank to {toggle.Bounds.Width}. {where}");
+                            AssertInside(toggle, main);
+                        }
+
+                    // XLR 1, XLR 2, and the chain line inside each of the eight
+                    // mix cards. A template that loses the class loses a row here.
+                    var names = main.GetVisualDescendants().OfType<TextBlock>()
+                        .Where(t => t.Classes.Contains("insertName")).ToArray();
+                    Assert.Equal(10, names.Length);
+                    foreach (var name in names)
                     {
                         AssertInside(name, (Control)name.Parent!);
+                        AssertInside(name, main);
                         AssertNoOverlap(((Grid)name.Parent!).Children.Where(c => c.IsVisible).ToArray());
                     }
+
                     var masters = main.GetVisualDescendants().OfType<Border>()
                         .Where(b => b.DataContext is MixViewModel && b.Width == 232).ToArray();
                     Assert.Equal(8, masters.Length);
                     AssertNoOverlap(masters);
-                    foreach (var master in masters) AssertInside(master, (Control)master.Parent!);
+                    foreach (var master in masters)
+                    {
+                        AssertInside(master, content);
+                        // The card's own contents: the mix name, its fader and
+                        // its chain line all have to fit inside the card.
+                        var inside = master.GetVisualDescendants().OfType<Control>()
+                            .Where(c => c is TextBlock or Slider or Button && c.IsVisible && c.Bounds.Width > 0).ToArray();
+                        Assert.NotEmpty(inside);
+                        foreach (var child in inside) AssertInside(child, master);
+                        Assert.Single(master.GetVisualDescendants().OfType<TextBlock>(),
+                            t => t.Classes.Contains("insertName"));
+                        Assert.Single(master.GetVisualDescendants().OfType<Slider>());
+                    }
                     Capture(main, "mixer-" + width);
                     var page = main.GetVisualDescendants().OfType<ScrollViewer>().First();
                     page.Offset = new Vector(0, page.Extent.Height);
@@ -73,7 +119,6 @@ public sealed class WindowLayoutTests
                     Capture(main, "mixes-" + width);
                     page.Offset = default;
                 }
-                Assert.True(main.MinWidth >= 700);
 
                 var insert = vm.Inserts.Items[0];
                 var controls = new InsertControlsWindow { DataContext = insert };
@@ -86,12 +131,16 @@ public sealed class WindowLayoutTests
                     var actions = controls.FindControl<WrapPanel>("PluginActions")!;
                     Assert.True(title.TranslatePoint(default, controls)!.Value.Y + title.Bounds.Height <=
                                 actions.TranslatePoint(default, controls)!.Value.Y);
-                    Assert.Equal(5, actions.Children.Count(c => c.IsVisible));
+                    var buttons = actions.Children.Where(c => c.IsVisible).ToArray();
+                    Assert.Equal(5, buttons.Length);
                     Assert.Single(controls.GetVisualDescendants().OfType<Slider>());
-                    foreach (var button in actions.Children.Where(c => c.IsVisible))
-                        AssertInside(button, actions);
-                    Assert.True(actions.Children.Where(c => c.IsVisible).All(c => c.Bounds.Width > 20));
-                    AssertNoOverlap(actions.Children.Where(c => c.IsVisible).ToArray());
+                    // In one row the five actions need about 454 px, so at 420
+                    // they have to wrap rather than run off the window.
+                    foreach (var button in buttons)
+                    {
+                        Assert.True(button.Bounds.Width > 20);
+                        AssertInside(button, controls);
+                    }
                     var slider = controls.GetVisualDescendants().OfType<Slider>().Single();
                     AssertNoOverlap(((Grid)slider.Parent!).Children.Where(c => c.IsVisible).ToArray());
                     Capture(controls, "plugin-" + width);
@@ -109,9 +158,16 @@ public sealed class WindowLayoutTests
                 var label = chain.GetVisualDescendants().OfType<TextBlock>()
                     .Single(t => t.Classes.Contains("insertName"));
                 AssertInside(label, (Control)label.Parent!);
+                AssertInside(label, chain);
                 foreach (var actions in chain.GetVisualDescendants().OfType<WrapPanel>())
+                {
+                    Assert.NotEmpty(actions.Children);
                     foreach (var button in actions.Children)
+                    {
                         AssertInside(button, actions);
+                        AssertInside(button, chain);
+                    }
+                }
                 Capture(chain, "chain-440");
             }
             catch (Exception ex) { failure = ex; }
@@ -152,12 +208,21 @@ public sealed class WindowLayoutTests
         window.UpdateLayout();
     }
 
-    private static void AssertInside(Control child, Control parent)
+    /// <summary>
+    /// The control sits inside the box of one of its ancestors, measured in
+    /// that ancestor's own coordinates, so it works for a card, a panel or the
+    /// window itself. Height is only checked against an immediate parent: a
+    /// scrolled page is taller than its window on purpose.
+    /// </summary>
+    private static void AssertInside(Control child, Visual ancestor)
     {
-        Assert.True(child.Bounds.Width > 0);
-        Assert.InRange(child.Bounds.Left, -0.1, parent.Bounds.Width);
-        Assert.InRange(child.Bounds.Right, 0, parent.Bounds.Width + 0.1);
-        Assert.InRange(child.Bounds.Bottom, 0, parent.Bounds.Height + 0.1);
+        Assert.True(child.Bounds.Width > 0, $"{child.GetType().Name} has no width.");
+        var origin = child.TranslatePoint(default, ancestor)!.Value;
+        Size box = ancestor is TopLevel top ? top.ClientSize : ancestor.Bounds.Size;
+        Assert.InRange(origin.X, -0.1, box.Width);
+        Assert.InRange(origin.X + child.Bounds.Width, 0, box.Width + 0.1);
+        if (ReferenceEquals(child.Parent, ancestor))
+            Assert.InRange(origin.Y + child.Bounds.Height, 0, box.Height + 0.1);
     }
 
     private static void AssertNoOverlap(IReadOnlyList<Control> controls)

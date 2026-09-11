@@ -46,7 +46,7 @@ OPENXLR_TEST_LAYOUT=1 xvfb-run -a -s '-screen 0 2560x1440x24' dotnet test src/Op
 
 The window layout test runs in its own process using X11 and isolated
 configuration, runtime and session-bus settings. It checks narrow plugin
-windows and mixer widths from 760 to 2400 logical pixels. Set
+windows and mixer widths from 640 to 2400 logical pixels. Set
 `OPENXLR_LAYOUT_ARTIFACTS` to a directory to save rendered previews.
 
 If you add or change a NuGet package, regenerate the lock files with a
