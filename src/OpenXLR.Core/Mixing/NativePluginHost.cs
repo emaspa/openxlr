@@ -25,6 +25,15 @@ internal sealed class NativePluginHost : IDisposable
     private long _lastUiHeartbeat = Stopwatch.GetTimestamp();
 
     public Process Process { get; }
+
+    /// <summary>
+    /// Whether this helper loads a Windows plugin through yabridge, so Wine
+    /// is running behind it. What Wine leaves in the daemon's control group
+    /// outlives the helper, so the mixer has to know which helpers put it
+    /// there. See <see cref="WineSession"/>.
+    /// </summary>
+    public bool Bridged { get; }
+
     public bool IsRunning
     {
         get
@@ -133,6 +142,7 @@ internal sealed class NativePluginHost : IDisposable
         TimeSpan? patience = null, string? bundle = null)
     {
         if (patience is { } chosen) _patience = chosen;
+        Bridged = WineSession.Bridged(bundle);
         if (!File.Exists(executable))
             throw new InvalidOperationException(
                 "The native plugin host is not installed. Build it with -p:EnableNativeLv2Host=true, or switch this insert back to the filter chain.");

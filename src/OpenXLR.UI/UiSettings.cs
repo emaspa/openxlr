@@ -421,6 +421,7 @@ public static class StartupIntegration
                     ExecStart={SystemdQuote(daemon)}
                     Environment=OPENXLR_BUILD_MIXER=1
                     TimeoutStopSec=45
+                    KillMode=mixed
                     Restart=on-failure
                     RestartSec=3
                     NoNewPrivileges=true
