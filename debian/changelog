@@ -1,3 +1,17 @@
+openxlr (0.1.33) resolute; urgency=medium
+
+  * Closing the window to the tray waits for the close to complete, "Show mixer" restores a minimized window, and "Quit OpenXLR" exits while close to tray is on.
+  * The mixer follows the window width up to 1300 logical pixels and squeezes down to about 640, content scrolls when the window is short, mix cards wrap, and long plugin names are shortened with the full name in the tooltip.
+  * Tooltips sit against the control they describe and flip to the side of it that has room, so one near a screen edge no longer covers the button or takes the click meant for it.
+  * The window repairs its autostart entry only where a repair is needed and only once per installation path, leaving an edited command, a Hidden disable or a symbolic link alone, and Options keeps the previous preference when a change fails.
+  * Sends, mutes and saved settings survive failures: a send whose combine leg arrives late is applied when it does, a missing one is retried without being given up, settings are written at shutdown, a failed write is reported once, and a recalled profile sets only the sends it names.
+  * A plugin that stops passing audio is replaced the way a crashed one is, the plugin output the daemon reads is bounded, CLAP plugins are described from both bus layouts, and installing over a plugin already in place swaps in the new copy only once it is complete.
+  * Inserts resolve their plugin against everything installed, so a chain whose plugin did not fit in the bounded list still loads and reports, and that list now puts the plugins the saved chains use first.
+  * Bundles a scan could not read are named in install, sync and rescan replies and logged with their outcome and exit code, retained scanner output keeps its beginning and its end, and a cached CLAP or VST3 description is reused only while the helper that wrote it is the one asking.
+  * The daemon ends the Wine session a bridged plugin leaves behind once the last bridged insert stops and when the daemon stops, and the user service sends SIGTERM to the daemon alone, so a stop takes seconds instead of the service stop timeout.
+
+ -- Emanuele Sparvoli <sparvoli@gmail.com>  Fri, 11 Sep 2026 19:15:00 +0100
+
 openxlr (0.1.32) resolute; urgency=medium
 
   * The inline N, B and cog buttons on the microphone strips and the mix cards are larger, with a minimum 24 by 24 target and accessibility names.
