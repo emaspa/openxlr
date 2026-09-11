@@ -24,14 +24,26 @@ public sealed class PipeWireAdapter
     private readonly List<Process> _loopbacks = [];
     private readonly List<Process> _filters = [];
     private readonly HashSet<NativePluginHost> _nativeHosts = [];
+    private readonly WineSession _wine;
 
-    public PipeWireAdapter() { }
+    public PipeWireAdapter() => _wine = new WineSession();
 
-    /// <summary>Report completed helper operations, including failures, to the daemon's progress gate.</summary>
-    public PipeWireAdapter(Action progress) => _progress = progress;
+    /// <summary>
+    /// Report completed helper operations, including failures, to the daemon's
+    /// progress gate. <paramref name="note"/> carries the few lines the mixer
+    /// has for the journal; the core has no logger of its own.
+    /// </summary>
+    public PipeWireAdapter(Action progress, Action<string>? note = null)
+    {
+        _progress = progress;
+        _wine = new WineSession(note);
+    }
 
     internal PipeWireAdapter(Func<DspFeatureAvailability> clipGuardAvailabilityOverride)
-        => _clipGuardAvailabilityOverride = clipGuardAvailabilityOverride;
+    {
+        _clipGuardAvailabilityOverride = clipGuardAvailabilityOverride;
+        _wine = new WineSession();
+    }
 
     /// <summary>
     /// pactl joins its arguments into one module-argument string, and PipeWire's
@@ -689,6 +701,9 @@ public sealed class PipeWireAdapter
                         throw new InvalidOperationException($"{info.Name} has no editor the native host can open; select the filter chain.");
                     var host = new NativePluginHost(insert, node, channels, rate, info.Path);
                     _nativeHosts.Add(host);
+                    // Wine starts behind a bridged plugin and outlives this
+                    // helper, so from here on it is this daemon's to end.
+                    if (host.Bridged) _wine.HelperStarted();
                     stage = new(node, node, node, host.Process) { NativeHost = host };
                     stages.Add(stage);
                     if (!WaitForPorts(node, "playback", false, TimeSpan.FromSeconds(3), host.Process)
@@ -1365,11 +1380,31 @@ public sealed class PipeWireAdapter
         return false;
     }
 
+    /// <summary>
+    /// Whether Wine can be ended now, and in which prefixes. Empty unless a
+    /// bridged plugin ran here, every bridged helper has gone, and a Wine
+    /// session this daemon started is up. Deciding is separate from doing, so
+    /// a caller can decide under its lock and make the call outside it.
+    /// </summary>
+    internal IReadOnlyList<WineSession.Ending> WineEndings() => _wine.Decide(_nativeHosts.Any(host => host.Bridged));
+
+    /// <summary>Carry out decided endings. Never throws, never waits long.</summary>
+    internal void EndWine(IReadOnlyList<WineSession.Ending> endings) => _wine.Run(endings);
+
     /// <summary>Remove everything this adapter created, in reverse order.</summary>
     public void TearDown()
     {
         foreach (NativePluginHost host in _nativeHosts) host.Dispose();
         _nativeHosts.Clear();
+        // Here the call is made rather than handed out: at a daemon stop this
+        // is the last chance to end Wine, and what it leaves has to be gone
+        // before the unit's control group is counted. It takes Wine a couple
+        // of seconds and nothing below depends on it, so it goes out now and
+        // is joined at the end: the stop pays the longer of the two, not the
+        // sum. It is bounded by the runner's deadline and cannot fail the
+        // teardown.
+        IReadOnlyList<WineSession.Ending> endings = WineEndings();
+        Task wine = endings.Count == 0 ? Task.CompletedTask : Task.Run(() => EndWine(endings));
         foreach (Process p in _loopbacks.Concat(_filters))
         {
             try { if (!p.HasExited) { p.Kill(entireProcessTree: true); p.WaitForExit(2000); } }
@@ -1385,6 +1420,8 @@ public sealed class PipeWireAdapter
             catch (Exception) { /* already unloaded */ }
         }
         _modules.Clear();
+        try { wine.Wait(WineSession.Deadline + TimeSpan.FromSeconds(1)); }
+        catch (Exception) { /* EndWine swallows its own failures; this is the join */ }
     }
 
     // The sweep asks for the graph several times a second (streams, devices,

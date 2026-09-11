@@ -423,6 +423,16 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             bool inputBroken = _chains.Where(e => !e.Key.StartsWith("mix:", StringComparison.Ordinal)).Any(e => !e.Value.IsAlive)
                 || _chainOuts.Values.Any(l => _pw.EnsureLinks(l) == LinkHealth.Broken);
             if (inputBroken) { WireInputFeedsLocked(); changed = true; }
+            // A heal can retire the last bridged plugin without any command
+            // being given: a chain the restart policy has given up on is left
+            // off, and the helper that held Wine up goes with it. No rewire
+            // follows to notice, so the same decision is taken here, against
+            // the chains that now run, and carried out off this thread.
+            if (changed)
+            {
+                IReadOnlyList<WineSession.Ending> endings = _pw.WineEndings();
+                if (endings.Count > 0) Task.Run(() => _pw.EndWine(endings));
+            }
             return changed;
         }
     }
@@ -751,6 +761,13 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         _restarts.Forget(key);
         if (MixForKey(key) is MixDefinition mix) WireMixChainLocked(mix);
         else if (IsInsertChannel(key)) WireInputFeedsLocked();
+        // The new chain is up: if it holds no bridged plugin any more, Wine is
+        // resident for nothing, and it would still be resident hours later
+        // when the daemon stops. The decision is taken here, under the lock,
+        // against the chain that now runs; the helper runs off this thread so
+        // the command that caused the rewire answers straight away.
+        IReadOnlyList<WineSession.Ending> endings = _pw.WineEndings();
+        if (endings.Count > 0) Task.Run(() => _pw.EndWine(endings));
     }
 
     /// <summary>Capture the host under the mixer lock, then open its UI outside it.</summary>

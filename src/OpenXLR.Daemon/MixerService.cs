@@ -56,7 +56,7 @@ public sealed class MixerService : IHostedService, IDisposable
         _config = config;
         _devices = devices;
         _lifetime = lifetime;
-        _mixer = new(new PipeWireAdapter(_progress.Mark));
+        _mixer = new(new PipeWireAdapter(_progress.Mark, note => _log.LogInformation("{msg}", note)));
         _saves = new SettingsSaver(
             () => _mixer.ExportSettings().Save(),
             error =>

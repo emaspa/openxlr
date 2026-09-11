@@ -459,6 +459,22 @@ grep 'Max locked memory' /proc/$(systemctl --user show openxlr-daemon -p MainPID
 
 "unlimited" there means the plugins the daemon starts inherit it too.
 
+<a name="wine-ends"></a>
+**Wine ends with the last bridged plugin.** A Windows plugin runs in Wine,
+and Wine keeps service processes of its own behind it that stay after the
+plugin is gone. OpenXLR ends that Wine session with `wineserver -k` once
+the last bridged insert has stopped, and again when the daemon stops, so
+`systemctl --user stop openxlr-daemon` and the window's Restart finish in
+a few seconds instead of waiting out the unit's stop timeout. Only the
+session OpenXLR started is ended: a plugin installer you are running, or
+another DAW with its own bridged plugins, keeps its Wine whatever OpenXLR
+does. Without `wineserver` on PATH nothing is ended, and the daemon says
+so once in its log. The unit sends SIGTERM to the daemon alone
+(`KillMode=mixed`, in the packaged unit and in the one the window writes
+for a source build), which is what gives it the chance: sent to the whole
+group, the signal would take `wineserver` down first and leave the rest of
+Wine to the timeout.
+
 The picker marks each plugin with its format, since the same plugin often
 ships in more than one, and its LV2, CLAP and VST3 buttons narrow the list
 to one of them. When the catalogue grows past what the window can be sent,
