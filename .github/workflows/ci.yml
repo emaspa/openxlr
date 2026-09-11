@@ -43,7 +43,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            g++ libpipewire-0.3-dev liblilv-dev lv2-dev libx11-dev xvfb xauth
+            g++ libpipewire-0.3-dev liblilv-dev lv2-dev libx11-dev libxtst6 xvfb xauth
           make -C native
           test -x native/openxlr-lv2-host
           make -C native test-audio test-clap
@@ -57,6 +57,9 @@ jobs:
 
       - name: Window layout at narrow and wide sizes
         run: OPENXLR_TEST_LAYOUT=1 xvfb-run -a -s '-screen 0 2560x1440x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~WindowLayoutTests
+
+      - name: A tooltip at a screen edge does not take the click
+        run: OPENXLR_TEST_TOOLTIP=1 xvfb-run -a -s '-screen 0 1600x1000x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~ToolTipInputTests
 
       - name: Locked restore enforced on every packaging path
         run: tools/check-locked-restore.sh

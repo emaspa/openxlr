@@ -118,6 +118,10 @@ than its content scrolls vertically. Mix master cards wrap onto further
 rows when needed. Long plugin names are shortened with an ellipsis, with
 the full name in the tooltip. Plugin control and chain windows keep
 actions below their headings, and actions wrap when space is limited.
+A tooltip sits against the control it describes rather than against the
+pointer, and flips to whichever side of that control the screen has room
+for, so a tooltip near an edge of the screen never ends up over the
+button and never takes the click meant for it.
 
 <a name="mic-to-call"></a>
 ### 3.1 Send your microphone to a call or a recording
