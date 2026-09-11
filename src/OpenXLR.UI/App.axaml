@@ -6,5 +6,18 @@
 
     <Application.Styles>
         <FluentTheme />
+        <!-- A tooltip follows the pointer by default and sits 20 pixels below
+             it. Close to the bottom of a screen there is no room for that, so
+             the popup is pushed back up over the cursor and swallows the next
+             button press: the control under it never sees a click. Anchoring
+             every tooltip to its owner with no offset keeps the popup clear of
+             the pointer wherever the window sits. It is set for the whole
+             application because the tooltip properties do not inherit and every
+             control with a tooltip has the same problem; a control that needs
+             other values can still set them itself. -->
+        <Style Selector=":is(Control)">
+            <Setter Property="ToolTip.Placement" Value="Bottom"/>
+            <Setter Property="ToolTip.VerticalOffset" Value="0"/>
+        </Style>
     </Application.Styles>
 </Application>

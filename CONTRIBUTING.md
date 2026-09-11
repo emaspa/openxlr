@@ -44,12 +44,19 @@ make -C native test-audio test-clap  # audio bounds, stall detection and CLAP bu
 xvfb-run -a make -C native test-editor  # also needs Xvfb and xauth
 OPENXLR_TEST_DESKTOP=1 xvfb-run -a dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~TrayWindowTests
 OPENXLR_TEST_LAYOUT=1 xvfb-run -a -s '-screen 0 2560x1440x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~WindowLayoutTests
+OPENXLR_TEST_TOOLTIP=1 xvfb-run -a -s '-screen 0 1600x1000x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~ToolTipInputTests
 ```
 
 The window layout test runs in its own process using X11 and isolated
 configuration, runtime and session-bus settings. It checks narrow plugin
 windows and mixer widths from 640 to 2400 logical pixels. Set
 `OPENXLR_LAYOUT_ARTIFACTS` to a directory to save rendered previews.
+
+The tooltip test runs in its own process too. It drives a real pointer
+through the X server's XTEST extension, so it needs `libXtst`, and it
+checks that a tooltip shown at the bottom of the screen still lets the
+control underneath it be clicked. Set `AVALONIA_GLOBAL_SCALE_FACTOR` to
+run the same cases at another desktop scale.
 
 If you add or change a NuGet package, regenerate the lock files with a
 plain `dotnet restore src/OpenXLR.slnx` (the linux-x64 graph is part of
