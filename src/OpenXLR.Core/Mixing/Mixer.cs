@@ -608,6 +608,17 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     private List<InsertDefinition> InsertsFor(string channelId)
         => _inserts.TryGetValue(channelId, out List<InsertDefinition>? l) ? l : [];
 
+    /// <summary>
+    /// Every plugin the saved chains name, bypassed ones included: the
+    /// catalogue a client is sent has to hold these whatever its size limit,
+    /// or a chain the daemon loads looks like an unknown plugin in the window
+    /// and on the Stream Deck.
+    /// </summary>
+    public IReadOnlyCollection<(string Kind, string Plugin)> InsertPlugins()
+    {
+        lock (_gate) return [.. _inserts.Values.SelectMany(list => list).Select(i => (i.Kind, i.Plugin))];
+    }
+
     /// <summary>Software low cut frequency (0, 80, or 120 Hz; 0 = off).</summary>
     public int LowCutHz { get { lock (_gate) return _lowCutHz; } }
 

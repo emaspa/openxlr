@@ -143,6 +143,19 @@ public sealed class MixerService : IHostedService, IDisposable
     /// <summary>Live stereo levels, or null when the mixer is off.</summary>
     public IReadOnlyDictionary<string, double[]>? Meters() => _mixer.Built ? _mixer.ReadMeters() : null;
 
+    /// <summary>
+    /// Every plugin the saved chains name, for the catalogue a client is sent.
+    /// The socket accepts clients before this service has restored the chains,
+    /// and a client that reconnects in that window asks straight away, so the
+    /// saved file answers until the mixer holds them.
+    /// </summary>
+    public IReadOnlyCollection<(string Kind, string Plugin)> InsertPlugins()
+    {
+        var used = new HashSet<(string Kind, string Plugin)>(_mixer.InsertPlugins());
+        if (used.Count == 0) used.UnionWith(OpenXLR.Core.Mixing.MixerSettings.Load()?.InsertPlugins() ?? []);
+        return used;
+    }
+
     /// <summary>Raised at the meter refresh rate so the hub can push levels.</summary>
     public event Action? MetersUpdated;
 

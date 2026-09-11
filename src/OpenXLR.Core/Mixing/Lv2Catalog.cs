@@ -102,7 +102,10 @@ public static class Lv2Catalog
             Lilv.lilv_world_free(world);
         }
         result.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
-        return WithinBudget(result);
+        // Whole: the budget belongs to the message a client is sent, not to
+        // what an insert can name. A chain saved around a large plugin has to
+        // keep loading after another format's plugins arrive beside it.
+        return result;
     }
 
     // Limits on what a bundle can make the daemon hold. lilv reports whatever
@@ -118,10 +121,11 @@ public static class Lv2Catalog
     /// <summary>Required features beyond this count are not read; no real plugin declares more than a handful.</summary>
     internal const int MaxFeatures = 64;
     /// <summary>
-    /// Serialized size the whole catalog may reach. A client reads at most
-    /// 8 MiB in one message and drops anything longer, which would leave a
-    /// picker with nothing in it, so the catalog stops short of that with
-    /// room for the message around it.
+    /// Serialized size the catalog sent to a client may reach. A client reads
+    /// at most 8 MiB in one message and drops anything longer, which would
+    /// leave a picker with nothing in it, so the message stops short of that
+    /// with room for what is around the list. What the daemon holds and
+    /// resolves inserts against is not bounded by this.
     /// </summary>
     internal const int CatalogBudgetBytes = 7 * 1024 * 1024;
 
@@ -140,18 +144,19 @@ public static class Lv2Catalog
            + p.RequiredFeatures.Sum(f => f.Length + 4) + (p.InputSymbols.Count + p.OutputSymbols.Count) * 16;
 
     /// <summary>
-    /// Keep the catalog under the budget by dropping the largest plugins
-    /// first: a handful of monsters must not push every ordinary plugin
-    /// out of the window's picker.
+    /// Keep a list under the budget by dropping the largest plugins first: a
+    /// handful of monsters must not push every ordinary plugin out of the
+    /// window's picker. The room already spent on the chains' own plugins is
+    /// taken off the budget by the caller.
     /// </summary>
-    internal static List<PluginInfo> WithinBudget(List<PluginInfo> all)
+    internal static List<PluginInfo> WithinBudget(List<PluginInfo> all, long budget = CatalogBudgetBytes)
     {
         long total = all.Sum(p => (long)Footprint(p));
-        if (total <= CatalogBudgetBytes) return all;
+        if (total <= budget) return all;
         var keep = new HashSet<PluginInfo>(all);
         foreach (PluginInfo p in all.OrderByDescending(Footprint))
         {
-            if (total <= CatalogBudgetBytes) break;
+            if (total <= budget) break;
             keep.Remove(p);
             total -= Footprint(p);
         }

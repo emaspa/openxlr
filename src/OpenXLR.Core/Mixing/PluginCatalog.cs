@@ -2,70 +2,38 @@ namespace OpenXLR.Core.Mixing;
 
 /// <summary>
 /// Every plugin an insert can hold, whichever format it comes in. The LV2
-/// list is read through lilv in this process; the CLAP list comes from the
-/// native host, one scan per bundle. Both are read once and kept.
+/// list is read through lilv in this process; the CLAP and VST3 lists come
+/// from the native host, one scan per bundle. All of them are read once and
+/// kept, whole: an insert is resolved against everything installed, so a
+/// chain that loaded yesterday loads today.
+///
+/// Nothing here is bounded. The size a client will read bounds the message
+/// it is sent, and that lives in <see cref="ClientCatalog"/>.
 /// </summary>
 public static class PluginCatalog
 {
     private static readonly Refreshable<IReadOnlyList<PluginInfo>> All = new(Build);
 
     private static IReadOnlyList<PluginInfo> Build()
-    {
-        // Each source on its own: one that fails costs its plugins, not the
-        // catalogue. The list is read once and kept, exceptions included.
-        static IReadOnlyList<PluginInfo> read(Func<IReadOnlyList<PluginInfo>> source)
-        {
-            try { return source(); }
-            catch (Exception) { return []; }
-        }
-        return Merge(read(() => Lv2Catalog.Plugins), read(() => ClapCatalog.Plugins), read(() => Vst3Catalog.Plugins));
-    }
+        => Combine(() => Lv2Catalog.Plugins, () => ClapCatalog.Plugins, () => Vst3Catalog.Plugins);
 
     /// <summary>
-    /// One list within the size a client is sent. LV2 comes first and whole,
-    /// as it always did; the other formats take the room that is left. When
-    /// everything fits, every copy of a plugin is offered. When it does not,
-    /// a format's copies of plugins already listed go before anything
-    /// distinct, and then its largest entries, so LV2 never loses a plugin
-    /// to a duplicate of itself.
+    /// Every source's plugins as one list. Each source on its own: one that
+    /// fails costs its plugins, not the catalogue. The list is read once and
+    /// kept, exceptions included.
     /// </summary>
-    internal static List<PluginInfo> Merge(IReadOnlyList<PluginInfo> lv2, params IReadOnlyList<PluginInfo>[] others)
+    internal static IReadOnlyList<PluginInfo> Combine(params Func<IReadOnlyList<PluginInfo>>[] sources)
     {
-        List<PluginInfo> kept = Lv2Catalog.WithinBudget([.. lv2]);
-        long used = kept.Sum(p => (long)Lv2Catalog.Footprint(p));
-        foreach (IReadOnlyList<PluginInfo> format in others)
+        var all = new List<PluginInfo>();
+        foreach (Func<IReadOnlyList<PluginInfo>> source in sources)
         {
-            // Distinct plugins first, smallest first, then the copies with
-            // whatever room is left; the first that does not fit ends it.
-            var listed = kept.ToList();
-            foreach (PluginInfo p in format.OrderBy(p => listed.Any(k => SamePlugin(k, p))).ThenBy(Lv2Catalog.Footprint))
-            {
-                long size = Lv2Catalog.Footprint(p);
-                if (used + size > Lv2Catalog.CatalogBudgetBytes) break;
-                kept.Add(p);
-                used += size;
-            }
+            try { all.AddRange(source()); }
+            catch (Exception) { }
         }
-        return kept;
+        return all;
     }
 
-    /// <summary>
-    /// The same plugin in another format: the same width, and a name that is
-    /// the same or the same behind a vendor prefix, as "LSP Compressor Mono"
-    /// and "Compressor Mono" are.
-    /// </summary>
-    internal static bool SamePlugin(PluginInfo a, PluginInfo b)
-    {
-        if (a.AudioIns != b.AudioIns || a.AudioOuts != b.AudioOuts) return false;
-        string x = Simplified(a.Name), y = Simplified(b.Name);
-        if (x.Length == 0 || y.Length == 0) return false;
-        return x == y || x.EndsWith(" " + y, StringComparison.Ordinal) || y.EndsWith(" " + x, StringComparison.Ordinal);
-    }
-
-    private static string Simplified(string name)
-        => string.Join(' ', name.ToLowerInvariant().Split([' ', '-', '_', ':'], StringSplitOptions.RemoveEmptyEntries));
-
-    /// <summary>The whole catalogue, within the size a client is sent (blocks on the first call).</summary>
+    /// <summary>Every plugin installed, in every format (blocks on the first call).</summary>
     public static IReadOnlyList<PluginInfo> Plugins => All.Value;
 
     /// <summary>
@@ -110,8 +78,10 @@ public static class PluginCatalog
     public static void Warm() => ThreadPool.QueueUserWorkItem(_ => { try { _ = All.Value; } catch (Exception) { } });
 
     /// <summary>The plugin an insert names, by its kind and its identifier.</summary>
-    public static PluginInfo? Find(string kind, string plugin)
-        => Plugins.FirstOrDefault(p => p.Kind == kind && p.Plugin == plugin);
+    public static PluginInfo? Find(string kind, string plugin) => Find(Plugins, kind, plugin);
+
+    internal static PluginInfo? Find(IReadOnlyList<PluginInfo> catalogue, string kind, string plugin)
+        => catalogue.FirstOrDefault(p => p.Kind == kind && p.Plugin == plugin);
 
     public static PluginInfo? Find(InsertDefinition insert) => Find(insert.Kind, insert.Plugin);
 

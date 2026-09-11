@@ -66,6 +66,14 @@ public sealed record MixerSettings
     public Dictionary<string, List<InsertDefinition>> Inserts { get; init; } = [];
 
     /// <summary>
+    /// Every plugin the saved chains name. A client that reconnects while the
+    /// daemon is still starting asks for the catalogue before the chains are
+    /// restored, and this is what they will hold.
+    /// </summary>
+    public IReadOnlyCollection<(string Kind, string Plugin)> InsertPlugins()
+        => [.. Inserts.Values.SelectMany(list => list).Select(i => (i.Kind, i.Plugin))];
+
+    /// <summary>
     /// Whether the Aux mix feeds the USB Aux port. Null in files written before
     /// the Aux mix existed; migrated from the old monitor-destination choice.
     /// </summary>
