@@ -109,12 +109,15 @@ on the original Wave XLR. See [hardware support](hardware-support.md).
 <a name="tasks"></a>
 ## 3. Tasks
 
-The mixer cards fill the window width when it is enlarged. The main
-window has a minimum width of 760 logical pixels; shorter windows scroll
-vertically. Mix master cards wrap onto additional rows when needed.
-Long plugin names are shortened with an ellipsis, with the full name in
-the tooltip. Plugin control and chain windows keep actions below their
-headings, and actions wrap when space is limited.
+The mixer cards follow the window width, up to a limit of 1300 logical
+pixels, so faders and dropdowns keep a usable length on a maximized
+ultrawide instead of stretching across the screen. The window has no
+minimum width of its own: it squeezes down to about 640 pixels, where
+the widest row, the seven input toggles, still fits. A window shorter
+than its content scrolls vertically. Mix master cards wrap onto further
+rows when needed. Long plugin names are shortened with an ellipsis, with
+the full name in the tooltip. Plugin control and chain windows keep
+actions below their headings, and actions wrap when space is limited.
 
 <a name="mic-to-call"></a>
 ### 3.1 Send your microphone to a call or a recording
@@ -523,22 +526,39 @@ Options, STARTUP:
 
 - "Start audio service at login (background only)" enables the daemon's
   systemd user service. On a packaged install this is the package's own
-  unit. This does not start the mixer window or create a tray icon.
-- "Start mixer window and tray icon at login" adds a desktop autostart
-  entry for the window, including on KDE Plasma and CachyOS. When this
-  preference is on, a manual launch repairs a missing entry or updates
-  its executable path after an installation moves. Desktop-specific
-  settings, including an external `Hidden=true` disable, are preserved.
-  Failed changes show an error in Options and keep the previous preference.
+  unit. This does not start the mixer window or create a tray icon. If
+  the service cannot be enabled or disabled, Options says so and keeps
+  the previous preference rather than saving one the system does not have.
+- "Start mixer window and tray icon at login" writes a desktop autostart
+  entry for the window in `~/.config/autostart/openxlr.desktop`,
+  including on KDE Plasma and CachyOS. The file is written the way any
+  desktop application writes there: the folder keeps its own permissions,
+  the entry gets the ordinary permissions your system gives new files,
+  and an entry you turned into a symbolic link is never replaced. Failed
+  changes show an error in Options and keep the previous preference.
+- While that preference is on, a launch repairs the entry only where a
+  repair is needed, and only once per installation path:
+  - an entry whose command still exists is left exactly as it is, so a
+    command you edited yourself keeps working;
+  - an entry whose command points at a program that is gone gets this
+    installation's path, keeping every other line, including a
+    `Hidden=true` disable written by a desktop autostart editor;
+  - an entry that has disappeared is created again only when OpenXLR
+    moved since it last wrote one. If you removed the entry yourself
+    with a desktop tool, it stays removed and Options says so; turn the
+    option off and on again to get it back.
 - With "Close button minimizes to tray", the window hides instead of
   quitting; the tray icon's "Show mixer" menu item restores it, including
   when the window was minimized. "Quit OpenXLR" exits even with
-  close-to-tray enabled. Closing only hides the window when its tray
-  icon was created successfully. "Start
-  minimized to tray" starts with no window at all; the tray icon shows
-  it the first time you click it. This changes how the window opens; it
-  does not enable autostart. For a tray icon at login, enable both the
-  mixer-at-login option and "Start minimized to tray".
+  close-to-tray enabled. The close button always hides the window when
+  this option is on: a Linux desktop gives an application no way to find
+  out whether a system tray is there, so OpenXLR cannot fall back to
+  quitting when there is none. On a desktop with no tray, leave this
+  option off. "Start minimized to tray" starts with no window at all; the
+  tray icon shows it the first time you click it, and with no tray there
+  is nothing to click, so leave that off too. It changes how the window
+  opens; it does not enable autostart. For a tray icon at login, enable
+  both the mixer-at-login option and "Start minimized to tray".
 - Only one window runs per user. Starting OpenXLR again, from the menu
   or a shell, brings the running window to the front (out of the tray
   if it is hidden there) instead of opening a second one.

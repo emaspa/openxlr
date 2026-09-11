@@ -24,6 +24,13 @@ public sealed record UiSettings
     public DateTimeOffset? LastUpdateCheckUtc { get; init; }
     /// <summary>Release tag whose banner the user dismissed.</summary>
     public string? DismissedUpdate { get; init; }
+    /// <summary>
+    /// The launch path the autostart entry was last written for. The startup
+    /// repair recreates a missing entry only when this differs from the path
+    /// the running copy resolves to, so an entry removed with a desktop tool
+    /// stays removed while a moved installation is still fixed.
+    /// </summary>
+    public string? AutostartExecutable { get; init; }
     /// <summary>Names of the main window's tiles the user collapsed (INPUTS, HEADPHONES, ...).</summary>
     public IReadOnlyList<string> CollapsedSections { get; init; } = [];
 
@@ -261,21 +268,143 @@ public static class StartupIntegration
         return "\"" + inner.Replace("\\", "\\\\") + "\"";   // and once more for the string layer
     }
 
-    public static void SetDaemonAtLogin(bool enabled)
+    /// <summary>
+    /// The program an Exec value runs, as a path: the inverse of
+    /// <see cref="DesktopExec"/> for entries this window wrote, and a best
+    /// effort for entries a desktop or a user wrote by hand. Null when the
+    /// value carries no program at all.
+    /// </summary>
+    internal static string? DesktopExecBinary(string value)
+    {
+        // The desktop entry file itself escapes the value (\\ for a
+        // backslash, \s \n \t \r for whitespace); undo that first, then read
+        // the first argument under the Exec quoting rules.
+        var unescaped = new System.Text.StringBuilder();
+        for (int i = 0; i < value.Length; i++)
+        {
+            if (value[i] != '\\' || i + 1 >= value.Length) { unescaped.Append(value[i]); continue; }
+            char next = value[++i];
+            unescaped.Append(next switch { '\\' => '\\', 's' => ' ', 'n' => '\n', 't' => '\t', 'r' => '\r', _ => next });
+            // An unknown sequence keeps the escaped character, not the backslash.
+        }
+
+        string argument = unescaped.ToString().TrimStart();
+        if (argument.Length == 0) return null;
+        var program = new System.Text.StringBuilder();
+        if (argument[0] == '"')
+        {
+            for (int i = 1; i < argument.Length; i++)
+            {
+                char c = argument[i];
+                if (c == '"') break;
+                // Inside quotes the spec reserves " ` $ \, each escaped with a backslash.
+                if (c == '\\' && i + 1 < argument.Length) { program.Append(argument[++i]); continue; }
+                program.Append(c);
+            }
+        }
+        else
+        {
+            foreach (char c in argument)
+            {
+                if (char.IsWhiteSpace(c)) break;
+                program.Append(c);
+            }
+        }
+        string result = program.ToString().Replace("%%", "%");
+        return result.Length == 0 ? null : result;
+    }
+
+    /// <summary>
+    /// True when the program an Exec value names can still be launched: an
+    /// absolute or relative path that exists, or a bare command found on PATH.
+    /// </summary>
+    internal static bool DesktopExecTargetExists(string? program)
+    {
+        if (program is not { Length: > 0 }) return false;
+        if (program.Contains(Path.DirectorySeparatorChar)) return File.Exists(program);
+        string path = Environment.GetEnvironmentVariable("PATH") ?? "";
+        return path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+            .Any(d => File.Exists(Path.Combine(d, program)));
+    }
+
+    /// <summary>
+    /// Write one of the two startup files, both of which live in directories
+    /// the desktop and systemd own rather than in OpenXLR's own tree:
+    /// ~/.config/autostart and ~/.config/systemd/user.
+    ///
+    /// AGENTS.md requires <c>OpenXlrPaths.WriteAtomic</c> for files under
+    /// ~/.config/openxlr. These two are outside that tree and that helper is
+    /// wrong for them: it forces the directory to 0700 and the file to 0600,
+    /// which is not OpenXLR's call to make for a shared directory, and its
+    /// rename would turn an entry the user symlinked into a regular file.
+    /// So the write is still a temporary file and a rename in the same
+    /// directory, but the directory keeps its mode and the process umask
+    /// decides the file's (0644 on a default umask).
+    ///
+    /// False when the target is a symbolic link: whatever it points at
+    /// belongs to whoever made the link, so it is left untouched and the
+    /// caller reports the refusal.
+    /// </summary>
+    private static bool WriteStartupFile(string path, string text)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        if (IsSymbolicLink(path)) return false;
+        string tmp = path + ".openxlr-tmp";
+        File.WriteAllText(tmp, text);
+        File.Move(tmp, path, overwrite: true);
+        return true;
+    }
+
+    /// <summary>Remove a startup file, treating one that is already gone as done.</summary>
+    private static void RemoveStartupFile(string path)
+    {
+        // File.Delete is silent about a missing file but throws
+        // DirectoryNotFoundException when the directory itself is absent,
+        // which is the same "nothing to remove" state.
+        try { File.Delete(path); }
+        catch (DirectoryNotFoundException) { }
+    }
+
+    private static bool IsSymbolicLink(string path) => new FileInfo(path).LinkTarget is not null;
+
+    /// <summary>The autostart entry this window writes for a given executable.</summary>
+    private static string AutostartEntry(string executable) => $"""
+        [Desktop Entry]
+        Type=Application
+        Name=OpenXLR
+        Comment=OpenXLR mixer window
+        Exec={DesktopExec(executable)}
+        Icon=openxlr
+        Terminal=false
+        X-GNOME-Autostart-enabled=true
+
+        """;
+
+    /// <summary>
+    /// Apply the daemon-at-login preference. False when nothing could be
+    /// applied, so Options reports it instead of saving a preference the
+    /// system does not have.
+    /// </summary>
+    public static bool SetDaemonAtLogin(bool enabled)
+    {
+        try { return ApplyDaemonAtLogin(enabled); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return false; }
+    }
+
+    private static bool ApplyDaemonAtLogin(bool enabled)
     {
         if (enabled)
         {
             if (PackagedUnit is not null)
             {
                 // Any copy in ~/.config would shadow the packaged unit.
-                try { File.Delete(UnitPath); } catch (IOException) { }
+                try { RemoveStartupFile(UnitPath); } catch (IOException) { }
             }
             else
             {
                 // No binary anywhere we know of: a unit would only loop on 203/EXEC.
-                if (DaemonBinary is not { } daemon) return;
-                Directory.CreateDirectory(Path.GetDirectoryName(UnitPath)!);
-                File.WriteAllText(UnitPath, $"""
+                if (DaemonBinary is not { } daemon) return false;
+                if (!WriteStartupFile(UnitPath, $"""
                     # Written by the OpenXLR window for a source build (Options, Start at login).
                     [Unit]
                     Description=OpenXLR audio daemon
@@ -312,79 +441,156 @@ public static class StartupIntegration
 
                     [Install]
                     WantedBy=default.target
-                    """);
+                    """)) return false;
             }
             Systemctl("daemon-reload");
-            Systemctl("enable", UnitName);
+            return Systemctl("enable", UnitName);
         }
-        else
-        {
-            Systemctl("disable", UnitName);
-            try { File.Delete(UnitPath); } catch (IOException) { }
-            Systemctl("daemon-reload");
-        }
+        bool disabled = Systemctl("disable", UnitName);
+        try { RemoveStartupFile(UnitPath); } catch (IOException) { }
+        Systemctl("daemon-reload");
+        // systemctl refuses to disable a unit that does not exist, but an
+        // install with no unit at all already starts no daemon at login, so
+        // turning the option off there has nothing to report.
+        return disabled || (PackagedUnit is null && !File.Exists(UnitPath));
     }
 
-    public static bool SetWindowAtLogin(bool enabled) => SetWindowAtLogin(enabled, UiBinary);
+    /// <summary>
+    /// Apply the window-at-login preference and record which executable the
+    /// entry now names, so a later repair can tell a moved installation from
+    /// an entry the user removed. False when nothing was applied.
+    /// </summary>
+    public static bool SetWindowAtLogin(bool enabled)
+    {
+        if (!SetWindowAtLogin(enabled, UiBinary)) return false;
+        RememberAutostartExecutable(enabled ? UiBinary : null);
+        return true;
+    }
 
     internal static bool SetWindowAtLogin(bool enabled, string executable)
     {
         try
         {
-            if (!enabled) File.Delete(AutostartPath);
-            else
-            {
-                if (!File.Exists(executable)) return false;
-                OpenXlrPaths.WriteAtomic(AutostartPath, $"""
-                    [Desktop Entry]
-                    Type=Application
-                    Name=OpenXLR
-                    Comment=OpenXLR mixer window
-                    Exec={DesktopExec(executable)}
-                    Icon=openxlr
-                    Terminal=false
-                    X-GNOME-Autostart-enabled=true
-
-                    """);
-            }
-            return true;
+            if (!enabled) { RemoveStartupFile(AutostartPath); return true; }
+            if (!File.Exists(executable)) return false;
+            return WriteStartupFile(AutostartPath, AutostartEntry(executable));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return false; }
     }
 
+    private static void RememberAutostartExecutable(string? executable)
+    {
+        UiSettings saved = UiSettings.Load();
+        if (saved.AutostartExecutable == executable) return;
+        (saved with { AutostartExecutable = executable }).Save();
+    }
+
+    /// <summary>What a startup repair did, so Options can report it.</summary>
+    public enum AutostartRepair
+    {
+        /// <summary>The preference is off, or the entry is already right.</summary>
+        NotNeeded,
+        /// <summary>The entry was created, or its launch path was corrected.</summary>
+        Repaired,
+        /// <summary>The entry is gone and was left gone: it was removed outside OpenXLR.</summary>
+        RemovedOutside,
+        /// <summary>The entry could not be written.</summary>
+        Failed,
+    }
+
+    /// <summary>The outcome of the repair this launch ran, for Options to show.</summary>
+    public static AutostartRepair LastRepair { get; private set; } = AutostartRepair.NotNeeded;
+
     /// <summary>
-    /// Recreate a missing entry or update its launch path after an installation
-    /// moves. Keep desktop-specific settings, including an external disable.
+    /// Bring the autostart entry back in line with the installation, once per
+    /// installation path change rather than on every launch:
+    ///
+    /// - an entry whose Exec names a program that still exists is never
+    ///   rewritten, so a user who edited the command keeps it;
+    /// - an entry whose Exec names a program that is gone gets this
+    ///   installation's path, keeping every other key, including an external
+    ///   Hidden=true disable;
+    /// - a missing entry is recreated only when the recorded launch path
+    ///   differs from this one. An entry removed with a desktop tool while the
+    ///   path is unchanged stays removed, and Options says so.
+    ///
     /// A saved choice to start only the daemon never enables the window.
     /// </summary>
-    public static bool RepairWindowAutostart()
-        => RepairWindowAutostart(UiSettings.Load(), UiBinary);
-
-    internal static bool RepairWindowAutostart(UiSettings settings, string executable)
+    public static AutostartRepair RepairWindowAutostart()
     {
-        if (!settings.OpenWindowAtLogin) return true;
+        string executable = UiBinary;
+        AutostartRepair result = RepairWindowAutostart(UiSettings.Load(), executable);
+        if (result == AutostartRepair.Repaired) RememberAutostartExecutable(executable);
+        LastRepair = result;
+        return result;
+    }
+
+    internal static AutostartRepair RepairWindowAutostart(UiSettings settings, string executable)
+    {
+        if (!settings.OpenWindowAtLogin) return AutostartRepair.NotNeeded;
         try
         {
-            if (!File.Exists(executable)) return false;
-            if (!File.Exists(AutostartPath)) return SetWindowAtLogin(true, executable);
+            if (!File.Exists(executable)) return AutostartRepair.Failed;
+            if (!EntryExists(AutostartPath))
+                return settings.AutostartExecutable == executable
+                    ? AutostartRepair.RemovedOutside
+                    : Written(SetWindowAtLogin(true, executable));
+
             var lines = File.ReadAllLines(AutostartPath).ToList();
             int start = lines.FindIndex(l => l.Trim() == "[Desktop Entry]");
-            if (start < 0) return SetWindowAtLogin(true, executable);
+            if (start < 0) return Written(SetWindowAtLogin(true, executable));
             int end = lines.FindIndex(start + 1, l => l.TrimStart().StartsWith("[", StringComparison.Ordinal));
             if (end < 0) end = lines.Count;
+
+            // The spec allows space around the separator, so "Exec = x" is the
+            // same key as "Exec=x". Matching on the literal "Exec=" missed it
+            // and appended a second Exec, which desktop-file-validate rejects.
+            var execLines = Enumerable.Range(start + 1, end - start - 1)
+                .Where(i => DesktopKey(lines[i]) == "Exec").ToList();
             string expected = "Exec=" + DesktopExec(executable);
-            int exec = lines.FindIndex(start + 1, end - start - 1,
-                l => l.TrimStart().StartsWith("Exec=", StringComparison.Ordinal));
-            if (exec >= 0)
+
+            if (execLines.Count == 1)
             {
-                if (lines[exec] == expected) return true;
-                lines[exec] = expected;
+                string? program = DesktopExecBinary(DesktopValue(lines[execLines[0]]));
+                if (DesktopExecTargetExists(program)) return AutostartRepair.NotNeeded;
+                lines[execLines[0]] = expected;
             }
-            else lines.Insert(end, expected);
-            OpenXlrPaths.WriteAtomic(AutostartPath, string.Join("\n", lines) + "\n");
-            return true;
+            else if (execLines.Count == 0) lines.Insert(end, expected);
+            else
+            {
+                // More than one Exec in the group is already invalid. Keep the
+                // first, pointing at this installation, and drop the rest.
+                lines[execLines[0]] = expected;
+                foreach (int i in execLines.Skip(1).OrderDescending()) lines.RemoveAt(i);
+            }
+            return Written(WriteStartupFile(AutostartPath, string.Join("\n", lines) + "\n"));
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return false; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return AutostartRepair.Failed; }
+
+        static AutostartRepair Written(bool ok) => ok ? AutostartRepair.Repaired : AutostartRepair.Failed;
+    }
+
+    /// <summary>An entry is there when the file exists, or when a symlink stands in its place.</summary>
+    private static bool EntryExists(string path) => File.Exists(path) || IsSymbolicLink(path);
+
+    /// <summary>
+    /// The key a desktop entry line declares, per the Desktop Entry
+    /// specification: everything before the first '=', trimmed. Null for a
+    /// comment, a blank line, a group header or a line with no separator.
+    /// </summary>
+    internal static string? DesktopKey(string line)
+    {
+        string trimmed = line.TrimStart();
+        if (trimmed.Length == 0 || trimmed[0] is '#' or '[') return null;
+        int separator = trimmed.IndexOf('=');
+        return separator < 0 ? null : trimmed[..separator].TrimEnd();
+    }
+
+    /// <summary>The value of a desktop entry line: everything after the first '=', leading space dropped.</summary>
+    internal static string DesktopValue(string line)
+    {
+        int separator = line.IndexOf('=');
+        return separator < 0 ? "" : line[(separator + 1)..].TrimStart();
     }
 
     /// <summary>

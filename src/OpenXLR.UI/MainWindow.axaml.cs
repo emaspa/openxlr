@@ -13,7 +13,7 @@ namespace OpenXLR.UI;
 
 public partial class MainWindow : Window
 {
-    private readonly DaemonClient _client = new();
+    private readonly DaemonClient _client;
     private readonly MainViewModel _vm;
     private TrayIcon? _tray;
     private bool _reallyExit;
@@ -21,8 +21,15 @@ public partial class MainWindow : Window
     private readonly CancellationTokenSource _lifetime = new();
     private bool _automaticUpdateCheckStarted;
 
-    public MainWindow()
+    public MainWindow() : this(new DaemonClient()) { }
+
+    /// <summary>
+    /// For the window tests, which point the client at a port nothing serves
+    /// so a developer's running daemon is not part of the test.
+    /// </summary>
+    internal MainWindow(DaemonClient client)
     {
+        _client = client;
         InitializeComponent();
         _vm = new MainViewModel(_client);
         DataContext = _vm;
@@ -37,11 +44,19 @@ public partial class MainWindow : Window
             await _vm.Updates.CheckAsync(manual: false, cancellation: _lifetime.Token);
         };
 
-        // Start hidden in the tray when configured (and a tray actually
-        // exists; otherwise the window must show or nothing is reachable).
-        // App reads this and leaves the window unshown; it is never mapped
-        // and unmapped, which is what produced a hollow frame at login.
-        StartsHidden = UiSettings.Load().StartMinimized && _tray is not null;
+        // Start hidden in the tray when configured. App reads this and leaves
+        // the window unshown; it is never mapped and unmapped, which is what
+        // produced a hollow frame at login.
+        //
+        // There is no check for a usable tray here because Avalonia 12.1.2
+        // offers none on Linux: constructing a TrayIcon always succeeds, and
+        // the implementation behind it either talks to a StatusNotifier host
+        // over D-Bus or, with no session bus, is a stub that swallows every
+        // call. Neither is reachable from public API, and the D-Bus one only
+        // learns whether a host exists after the constructor returns. So the
+        // option does what it says and the manual says what happens on a
+        // desktop with no tray.
+        StartsHidden = UiSettings.Load().StartMinimized;
 
         Closing += (_, e) =>
         {
@@ -50,7 +65,7 @@ public partial class MainWindow : Window
             // user-initiated window close is intercepted: cancelling an
             // OS/application shutdown request here blocks the whole system
             // from logging out or rebooting.
-            if (_vm.MinimizeToTray && _tray is not null && !_reallyExit &&
+            if (_vm.MinimizeToTray && !_reallyExit &&
                 e.CloseReason == WindowCloseReason.WindowClosing)
             {
                 e.Cancel = true;
@@ -124,7 +139,8 @@ public partial class MainWindow : Window
         }
         catch (Exception)
         {
-            // No tray host available: the option simply has no effect.
+            // Only the icon asset or the menu can fail here; the tray
+            // implementation itself never reports a missing host.
             _tray = null;
         }
     }
