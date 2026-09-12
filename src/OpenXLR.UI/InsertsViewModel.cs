@@ -8,7 +8,7 @@ using Avalonia.Threading;
 
 namespace OpenXLR.UI;
 
-/// <summary>A plugin the picker offers (mono in / mono out only for the mic path).</summary>
+/// <summary>A plugin the picker offers (one that can run mono, for the mic path).</summary>
 public sealed record PluginChoice(string Uri, string Name, string Category, JsonNode Params,
     bool NativeEditorAvailable = false, bool NativeEditorSupported = false, string Kind = "lv2", bool NativeUiBlocked = false)
 {
@@ -54,7 +54,7 @@ public sealed class InsertsViewModel : ViewModelBase
 
     /// <summary>Picker header: which plugins fit this chain.</summary>
     public string PickerHint => _channels == 1
-        ? "Plugins that fit the mono mic path (one input, one output)"
+        ? "Plugins that can run mono on the mic path"
         : "Plugins that fit a stereo mix (two inputs, two outputs)";
 
     public ObservableCollection<InsertViewModel> Items { get; } = [];
@@ -108,12 +108,8 @@ public sealed class InsertsViewModel : ViewModelBase
             foreach (JsonNode? p in arr)
             {
                 if (p is null) continue;
-                // Mono chains take mono in / mono out plugins; stereo chains take
-                // plugins with at least two ins and two outs (extra ports stay unlinked).
                 if (p["supported"]?.GetValue<bool>() == false) continue;   // needs a host feature the chain lacks
-                int ins = p["audioIns"]?.GetValue<int>() ?? 0, outs = p["audioOuts"]?.GetValue<int>() ?? 0;
-                bool fits = _channels == 1 ? ins == 1 && outs == 1 : ins >= 2 && outs >= 2;
-                if (!fits) continue;
+                if (!Fits(p, _channels)) continue;
                 PluginChoices.Add(new PluginChoice(
                     p["plugin"]!.GetValue<string>(),
                     p["name"]?.GetValue<string>() ?? p["plugin"]!.GetValue<string>(),
@@ -130,6 +126,22 @@ public sealed class InsertsViewModel : ViewModelBase
                 ? $"No {width} plugins found. Install some, or add one with the buttons below"
                 : $"{PluginChoices.Count} {width} plugins available";
         });
+    }
+
+    /// <summary>
+    /// Whether a catalogue entry can sit in a chain of this width. A daemon
+    /// that asked the plugin says so in <c>widths</c>, which is how a VST3
+    /// plugin that reports stereo but runs mono reaches the mic path; an
+    /// entry without it goes by its ports, as it always did: one each way
+    /// for the mono chains, two or more for a stereo mix (extra ports stay
+    /// unlinked).
+    /// </summary>
+    internal static bool Fits(JsonNode plugin, int channels)
+    {
+        if (plugin["widths"] is JsonArray widths)
+            return widths.Any(w => w is JsonValue value && value.TryGetValue(out int width) && width == channels);
+        int ins = plugin["audioIns"]?.GetValue<int>() ?? 0, outs = plugin["audioOuts"]?.GetValue<int>() ?? 0;
+        return channels == 1 ? ins == 1 && outs == 1 : ins >= 2 && outs >= 2;
     }
 
     public void ResetForNewConnection() { _pluginsRequested = false; _catalogTask = null; }

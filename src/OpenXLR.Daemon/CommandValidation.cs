@@ -21,6 +21,10 @@ public static class CommandValidation
     public const int MaxOverrides = 512;     // remembered app assignments
 
     public static string? Check(Command cmd, ILayoutInfo layout, Func<InsertDefinition, PluginInfo?> findPlugin)
+        => Check(cmd, layout, findPlugin, nativeHostInstalled: null);
+
+    internal static string? Check(Command cmd, ILayoutInfo layout, Func<InsertDefinition, PluginInfo?> findPlugin,
+        bool? nativeHostInstalled)
     {
         switch (cmd.Cmd)
         {
@@ -116,10 +120,27 @@ public static class CommandValidation
                         if (plugin is null) return $"setInserts: plugin '{Short(i.Plugin)}' is not installed";
                         if (i.NativeHost && !plugin.NativeEditorSupported)
                             return $"setInserts: '{plugin.Name}' has no editor the native host can open";
-                        if (i.RunsNatively && !PluginCatalog.HostInstalled)
+                        if (i.RunsNatively && !(nativeHostInstalled ?? PluginCatalog.HostInstalled))
                             return "setInserts: the native plugin host is not installed on this machine";
                         if (!plugin.Supported)
                             return $"setInserts: '{plugin.Name}' needs {string.Join(", ", plugin.UnsupportedFeatures.Select(Tail))}, which the PipeWire chain does not provide";
+                        // The chain's width is the plugin's to fit: one channel on an
+                        // input, two on a mix. An insert already in the chain, the same
+                        // plugin under the same id, is left to the chain builder, so
+                        // removing it stays possible; an id kept while its plugin
+                        // changes is an addition and is held to the rule.
+                        bool alreadyThere = cmd.Channel is not null
+                            && layout.InsertInChain(cmd.Channel, i.Id) is { } existing
+                            && findPlugin(existing) is { } current
+                            && current.Kind == plugin.Kind && current.Plugin == plugin.Plugin;
+                        if (cmd.Channel is not null && !alreadyThere)
+                        {
+                            int width = layout.InsertChannels(cmd.Channel);
+                            if (!plugin.Fits(width))
+                                return width == 1
+                                    ? $"setInserts: '{plugin.Name}' has no mono layout for an input chain"
+                                    : $"setInserts: '{plugin.Name}' has no stereo layout for a mix chain";
+                        }
                         if (i.Params.Count > MaxParamsPerInsert) return "setInserts: too many parameters";
                         foreach ((string symbol, double value) in i.Params)
                         {

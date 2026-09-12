@@ -122,7 +122,9 @@ devices; the hardware input channels are hidden from it.
 
 LV2, CLAP and VST3 effects can form a mono chain on each XLR input and a
 stereo chain on every mix, including virtual microphones you add. The
-picker filters by format, name, category and compatible channel width.
+picker filters by format, name, category and compatible channel width; a
+VST3 effect that reports stereo buses but accepts a mono layout when asked
+is offered for the inputs, since the helper asks each plugin as it scans.
 Unsupported host requirements are reported instead of loading a plugin
 that the chosen backend cannot run. VST2 is not supported.
 

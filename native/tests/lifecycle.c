@@ -80,6 +80,38 @@ static long option(int argc, char **argv, int first, const char *name, long fall
   return fallback;
 }
 
+// Every `--set SYMBOL=VALUE`: move that control before the first cycle, so
+// a run can show the plugin doing something to the audio rather than
+// passing it through at its defaults. Returns how many were applied.
+static unsigned apply_sets(Host *h, int argc, char **argv, int first) {
+  unsigned applied = 0;
+  for (int i = first; i + 1 < argc; ++i) {
+    if (strcmp(argv[i], "--set"))
+      continue;
+    const char *setting = argv[i + 1];
+    const char *equals = strchr(setting, '=');
+    if (!equals) {
+      fprintf(stderr, "lifecycle: --set wants SYMBOL=VALUE, not '%s'\n", setting);
+      continue;
+    }
+    size_t length = (size_t)(equals - setting);
+    bool found = false;
+    for (uint32_t c = 0; c < h->control_count; ++c) {
+      Control *control = &h->controls[c];
+      if (strlen(control->symbol) != length || strncmp(control->symbol, setting, length))
+        continue;
+      float value = strtof(equals + 1, NULL);
+      control_set_desired(control, value);
+      fprintf(stderr, "lifecycle: set %s to %g\n", control->symbol, value);
+      found = true;
+      ++applied;
+    }
+    if (!found)
+      fprintf(stderr, "lifecycle: no control named '%.*s'\n", (int)length, setting);
+  }
+  return applied;
+}
+
 int main(int argc, char **argv) {
   started = now_ms();
   struct sigaction on_child = {0};
@@ -90,13 +122,20 @@ int main(int argc, char **argv) {
   int first = backend ? 2 + backend->argument_count : 0;
   if (!backend || argc < first) {
     fputs("usage: lifecycle (lv2 URI | clap FILE ID | vst3 BUNDLE CLASS-ID)\n"
-          "       [--frames N] [--cycles N] [--wait-before-activate MS]\n"
-          "       [--wait-after-activate MS] [--editor-at N] [--reactivate-at N]\n",
+          "       [--channels N] [--frames N] [--cycles N] [--tone HZ] [--wait-before-activate MS]\n"
+          "       [--wait-after-activate MS] [--editor-at N] [--reactivate-at N]\n"
+          "       [--set SYMBOL=VALUE]...\n",
           stderr);
     return 2;
   }
+  long channels = option(argc, argv, first, "--channels", 2);
+  if (channels < 1 || channels > MAX_CHANNELS)
+    return 2;
   uint32_t frames = (uint32_t)option(argc, argv, first, "--frames", 2048);
   long cycles = option(argc, argv, first, "--cycles", 60);
+  long tone = option(argc, argv, first, "--tone", 440);
+  if (tone < 1 || tone > 20000)
+    return 2;
   long before = option(argc, argv, first, "--wait-before-activate", 0);
   long after = option(argc, argv, first, "--wait-after-activate", 0);
   long editor_at = option(argc, argv, first, "--editor-at", -1);
@@ -108,7 +147,7 @@ int main(int argc, char **argv) {
   h.backend = backend;
   h.node_name = "openxlr-lifecycle";
   h.rate = 48000;
-  h.channels = 2;
+  h.channels = (unsigned)channels;
   h.main_thread = pthread_self();
   h.silence = calloc(MAX_FRAMES, sizeof(float));
   h.scratch = calloc(MAX_FRAMES, sizeof(float));
@@ -136,6 +175,10 @@ int main(int argc, char **argv) {
     return 1;
   }
   report("activated, result", 1);
+  // Settings are delivered the way the daemon's are: the main-thread tick
+  // hands them to the plugin, here once before the first cycle.
+  if (apply_sets(&h, argc, argv, first) > 0 && backend->main_thread)
+    backend->main_thread(&h);
   if (after > 0)
     wait_ms(&h, after, "post-activate");
 
@@ -161,7 +204,7 @@ int main(int argc, char **argv) {
     }
     for (uint32_t i = 0; i < frames; ++i) {
       float sample = 0.25f * (float)sin(phase);
-      phase += 2 * 3.14159265358979323846 * 440.0 / 48000.0;
+      phase += 2 * 3.14159265358979323846 * (double)tone / 48000.0;
       for (unsigned c = 0; c < h.channels; ++c)
         in[c][i] = sample;
     }

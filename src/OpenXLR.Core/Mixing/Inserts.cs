@@ -78,6 +78,26 @@ public sealed record PluginInfo(
 
     /// <summary>CLAP and VST3: the bundle the plugin is loaded from. Null for LV2, which lilv locates.</summary>
     public string? Path { get; init; }
+
+    /// <summary>
+    /// The chain widths, in channels, the native helper found the plugin's
+    /// main buses take when asked the way the host asks at load: a VST3
+    /// plugin that reports stereo and accepts mono is listed with both.
+    /// Null where nothing asked: LV2 and CLAP, whose port counts say it,
+    /// and descriptions an older helper wrote. Empty when it was asked and
+    /// refused every width the host carries.
+    /// </summary>
+    public IReadOnlyList<int>? Widths { get; init; }
+
+    /// <summary>
+    /// Whether the plugin can sit in a chain of this width. A plugin that
+    /// was asked is what it answered; otherwise its ports decide, as they
+    /// always did: one each way for the mono input chains, two or more for
+    /// a stereo mix.
+    /// </summary>
+    public bool Fits(int channels) => Widths is not null ? Widths.Contains(channels)
+        : channels == 1 ? AudioIns == 1 && AudioOuts == 1
+        : AudioIns >= channels && AudioOuts >= channels;
     /// <summary>Required features of the X11 UI selected by the native helper.</summary>
     public IReadOnlyList<string> NativeUiRequiredFeatures { get; init; } = [];
 

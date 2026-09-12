@@ -818,6 +818,26 @@ int main_bus_channels(Vst3 *v, BusDirection direction) {
   return info.channelCount;
 }
 
+// Whether the main buses carry `width` channels: they already do, or they
+// do once asked. A plugin that reports stereo and takes a mono arrangement
+// when asked is a mono plugin for the chain's purposes, which is how the
+// Elgato effects sit on an XLR input. Asking changes the instance, so the
+// answer belongs to a fresh one: the host asks once, before activating,
+// for the chain's own width, and the scanner asks the way the host does.
+// The arrangements known here are the widths the host carries, one and two
+// channels; any other width is refused without asking.
+bool accepts_width(Vst3 *v, unsigned width) {
+  if (main_bus_channels(v, kInput) == (int)width &&
+      main_bus_channels(v, kOutput) == (int)width)
+    return true;
+  if (!v->processor || (width != 1 && width != 2))
+    return false;
+  SpeakerArrangement wanted = width == 1 ? SpeakerArr::kMono : SpeakerArr::kStereo;
+  return v->processor->setBusArrangements(&wanted, 1, &wanted, 1) == kResultOk &&
+         main_bus_channels(v, kInput) == (int)width &&
+         main_bus_channels(v, kOutput) == (int)width;
+}
+
 void release_plugin(Vst3 *v) {
   if (v->component_point && v->controller_point) {
     v->component_point->disconnect(v->controller_point);
@@ -860,18 +880,12 @@ bool vst3_load(Host *h, char **arguments) {
   }
   if (!open_module(v, arguments[0]) || !instantiate(v, cid))
     return false;
-  unsigned channels = host_channels(h);
-  if (main_bus_channels(v, kInput) != (int)channels ||
-      main_bus_channels(v, kOutput) != (int)channels) {
-    // Ask for the chain's width; a plugin that can take it says so.
-    SpeakerArrangement wanted = channels == 1 ? SpeakerArr::kMono : SpeakerArr::kStereo;
-    if (v->processor->setBusArrangements(&wanted, 1, &wanted, 1) != kResultOk ||
-        main_bus_channels(v, kInput) != (int)channels ||
-        main_bus_channels(v, kOutput) != (int)channels) {
-      fputs("the plugin's main buses do not match the chain's channels\n",
-            stderr);
-      return false;
-    }
+  // Ask for the chain's width; a plugin that can take it says so, and the
+  // catalogue was told the same answer when the bundle was scanned.
+  if (!accepts_width(v, host_channels(h))) {
+    fputs("the plugin's main buses do not match the chain's channels\n",
+          stderr);
+    return false;
   }
   if (v->processor->canProcessSampleSize(kSample32) != kResultTrue) {
     fputs("the plugin cannot process 32-bit audio\n", stderr);
@@ -1287,8 +1301,12 @@ extern "C" int vst3_scan(const char *path) {
       }
       start = end + 1;
     }
-    printf("],\"audioIns\":%d,\"audioOuts\":%d", main_bus_channels(&v, kInput),
-           main_bus_channels(&v, kOutput));
+    // The default width, as the untouched instance reports it. The width
+    // probes below come after everything else, since asking changes the
+    // instance.
+    int default_in = main_bus_channels(&v, kInput);
+    int default_out = main_bus_channels(&v, kOutput);
+    printf("],\"audioIns\":%d,\"audioOuts\":%d", default_in, default_out);
     // Whether a VST3 plugin has an editor can only be learnt by creating
     // one, which for a module of two hundred plugins is most of a minute.
     // Nearly every VST3 plugin ships one, so the catalogue assumes it does;
@@ -1320,6 +1338,36 @@ extern "C" int vst3_scan(const char *path) {
              (pinfo.flags & ParameterInfo::kIsReadOnly) ? "true" : "false",
              pinfo.stepCount > 0 ? "true" : "false",
              (pinfo.flags & ParameterInfo::kIsList) ? "true" : "false");
+    }
+    // The chain widths this plugin can be inserted at, out of the ones the
+    // host carries. Each answer is the one a load would get: the default
+    // width is what the fresh instance reports, and another width is asked
+    // of a fresh instance the way the host asks before activating. With
+    // two widths the first probe has the instance the description came
+    // from, still unasked; a second probe, needed only when the default is
+    // neither width, gets an instance of its own. A plugin that takes no
+    // width is listed with none and offered nowhere, rather than failing
+    // at load.
+    static_assert(MAX_CHANNELS == 2, "accepts_width knows the arrangement of each width the host carries");
+    printf("],\"widths\":[");
+    bool first_width = true, asked = false;
+    for (unsigned width = 1; width <= MAX_CHANNELS; ++width) {
+      bool accepted;
+      if (default_in == (int)width && default_out == (int)width) {
+        accepted = true;
+      } else {
+        if (asked) {
+          release_plugin(&v);
+          if (!instantiate(&v, info.cid))
+            break;
+        }
+        asked = true;
+        accepted = accepts_width(&v, width);
+      }
+      if (!accepted)
+        continue;
+      printf("%s%u", first_width ? "" : ",", width);
+      first_width = false;
     }
     printf("]}");
     release_plugin(&v);

@@ -18,6 +18,16 @@ public interface ILayoutInfo
     bool IsMonitorOutput(string device);
     /// <summary>An insert chain key: an XLR input id or "mix:&lt;id&gt;".</summary>
     bool IsInsertKey(string key);
+    /// <summary>The channels an insert chain carries: one on an XLR input, two on a mix.</summary>
+    int InsertChannels(string key) => key.StartsWith("mix:", StringComparison.Ordinal) ? 2 : 1;
+    /// <summary>
+    /// The insert the chain already holds under this id, or null. A rule
+    /// that refuses a plugin at the chain's width applies to what is being
+    /// added, never to what is already there, or a chain with one such
+    /// insert could not be edited to remove it; the caller compares the
+    /// plugin too, since an id kept while its plugin changes is an addition.
+    /// </summary>
+    InsertDefinition? InsertInChain(string key, string id) => null;
     /// <summary>Remembered application identities (pinned assignments).</summary>
     int OverrideCount { get; }
 }

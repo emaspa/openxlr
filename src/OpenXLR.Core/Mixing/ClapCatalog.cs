@@ -223,6 +223,7 @@ internal static class HostScan
         string? id = null, name = null, layoutRefused = null;
         var features = new List<string>();
         var parameters = new List<PluginParam>();
+        List<int>? widths = null;
         int ins = 0, outs = 0;
         bool gui = false;
         while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
@@ -232,6 +233,20 @@ internal static class HostScan
             else if (reader.ValueTextEquals("audioIns"u8)) { reader.Read(); ins = Whole(ref reader); }
             else if (reader.ValueTextEquals("audioOuts"u8)) { reader.Read(); outs = Whole(ref reader); }
             else if (reader.ValueTextEquals("gui"u8)) { reader.Read(); gui = reader.TokenType == JsonTokenType.True; }
+            // The widths the helper asked the plugin about. Present and
+            // empty is an answer too: the plugin refused every one.
+            else if (reader.ValueTextEquals("widths"u8))
+            {
+                reader.Read();
+                if (reader.TokenType != JsonTokenType.StartArray) { reader.Skip(); continue; }
+                widths = [];
+                while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
+                {
+                    if (reader.TokenType is JsonTokenType.StartArray or JsonTokenType.StartObject) { reader.Skip(); continue; }
+                    int width = Whole(ref reader);
+                    if (width > 0 && widths.Count < 8 && !widths.Contains(width)) widths.Add(width);
+                }
+            }
             // The helper says so when the plugin's port layout is one it
             // would refuse to load, in the words it would print. Carrying
             // that here keeps the picker from offering a plugin that cannot
@@ -266,6 +281,7 @@ internal static class HostScan
         {
             HasNativeUi = gui,
             Path = file,
+            Widths = widths,
             UnsupportedFeatures = string.IsNullOrWhiteSpace(layoutRefused) ? [] : [layoutRefused],
         };
     }

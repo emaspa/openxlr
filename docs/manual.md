@@ -248,8 +248,11 @@ channel, with its level and lock in the INPUTS card.
 
 1. Under XLR 1, XLR 2 or a mix, press "Inserts". The chain window opens
    with that chain's plugins and an "Add plugin" button. The picker lists
-   compatible installed LV2, CLAP and VST3 effects (mono for an input,
-   stereo for a mix), searchable by name, category or format. Host
+   compatible installed LV2, CLAP and VST3 effects (ones that can run
+   mono for an input, stereo for a mix), searchable by name, category or
+   format. A VST3 effect that reports stereo buses but accepts a mono
+   layout when asked, as the Elgato effects do, is offered for the inputs
+   too: OpenXLR asks each plugin when it scans it. Host
    feature requirements can exclude a plugin; install a compatible set
    such as `lsp-plugins-lv2` if the list is empty.
 2. Add. The plugin appears in the chain window and in the Inserts row on
