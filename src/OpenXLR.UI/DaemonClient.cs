@@ -22,6 +22,7 @@ public sealed class DaemonClient : IAsyncDisposable
     private readonly CancellationTokenSource _cts = new();
     private ClientWebSocket? _socket;
     private readonly SemaphoreSlim _sendLock = new(1, 1);
+    private readonly SemaphoreSlim _pluginChanges = new(1, 1);
     private readonly object _lifecycle = new();
     private Task? _runTask;
     private Task? _disposeTask;
@@ -75,15 +76,37 @@ public sealed class DaemonClient : IAsyncDisposable
     /// bundle can take a while, so callers wait generously.
     /// </summary>
     public Task<JsonNode?> InstallPluginAsync(string path, TimeSpan timeout)
-        => QueryAsync("pluginInstall", "installPlugin", timeout, new Dictionary<string, object> { ["path"] = path });
+        => ChangePluginsAsync("installPlugin", timeout, new Dictionary<string, object> { ["path"] = path });
+
+    public Task<JsonNode?> AddWindowsPluginFolderAsync(string path, TimeSpan timeout)
+        => ChangePluginsAsync("addWindowsPluginFolder", timeout, new Dictionary<string, object> { ["path"] = path });
+
+    public Task<JsonNode?> RemoveWindowsPluginFolderAsync(string path, TimeSpan timeout)
+        => ChangePluginsAsync("removeWindowsPluginFolder", timeout, new Dictionary<string, object> { ["path"] = path });
 
     /// <summary>Bridge again what yabridge knows; the reply is as for an install.</summary>
     public Task<JsonNode?> SyncWindowsPluginsAsync(TimeSpan timeout)
-        => QueryAsync("pluginInstall", "syncWindowsPlugins", timeout);
+        => ChangePluginsAsync("syncWindowsPlugins", timeout);
 
     /// <summary>Read the catalogues again, for plugins installed by other means.</summary>
     public Task<JsonNode?> RescanPluginsAsync(TimeSpan timeout)
-        => QueryAsync("pluginInstall", "rescanPlugins", timeout);
+        => ChangePluginsAsync("rescanPlugins", timeout);
+
+    // Reads may share a reply; changes must each reach the daemon, even
+    // when two windows issue them together and both answer pluginInstall.
+    private async Task<JsonNode?> ChangePluginsAsync(string command, TimeSpan timeout, Dictionary<string, object>? fields = null)
+    {
+        CancellationToken stopping;
+        lock (_lifecycle)
+        {
+            if (_disposed) return null;
+            stopping = _cts.Token;
+        }
+        try { await _pluginChanges.WaitAsync(stopping); }
+        catch (OperationCanceledException) { return null; }
+        try { return await QueryAsync("pluginInstall", command, timeout, fields); }
+        finally { _pluginChanges.Release(); }
+    }
 
     private async Task<JsonNode?> QueryAsync(string type, string command, TimeSpan timeout, Dictionary<string, object>? fields = null)
     {

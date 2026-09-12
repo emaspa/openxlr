@@ -46,13 +46,14 @@ public static class PluginInstall
     }
 
     /// <summary>Let the user pick a folder: a .vst3 or .lv2 bundle, or a folder holding plugins.</summary>
-    public static async Task<IReadOnlyList<string>> PickFolderAsync(Window owner)
+    public static async Task<IReadOnlyList<string>> PickFolderAsync(Window owner,
+        string title = "Install a plugin folder", bool allowMultiple = true)
     {
         IStorageFolder? start = await owner.StorageProvider.TryGetWellKnownFolderAsync(WellKnownFolder.Downloads);
         IReadOnlyList<IStorageFolder> folders = await owner.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
-            Title = "Install a plugin folder",
-            AllowMultiple = true,
+            Title = title,
+            AllowMultiple = allowMultiple,
             SuggestedStartLocation = start,
         });
         return folders.Select(LocalPath).OfType<string>().ToList();

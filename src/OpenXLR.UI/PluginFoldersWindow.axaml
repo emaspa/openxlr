@@ -1,0 +1,47 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:OpenXLR.UI"
+        x:Class="OpenXLR.UI.PluginFoldersWindow"
+        x:DataType="vm:OptionsViewModel"
+        Title="Windows plugin folders" Width="720" Height="480" MinWidth="480" MinHeight="380"
+        WindowStartupLocation="CenterOwner" Background="#16181d">
+  <Grid Margin="18" RowDefinitions="Auto,12,*,12,Auto,10,Auto,12,Auto">
+    <StackPanel Spacing="6">
+      <TextBlock Text="Windows VST3 and CLAP folders" FontSize="17" FontWeight="SemiBold"/>
+      <TextBlock Text="Add a folder containing Windows plugins to scan it through yabridge. Plugin files stay where they are."
+                 FontSize="12" Foreground="#8b93a7" TextWrapping="Wrap"/>
+      <TextBlock Text="{Binding WindowsImportNote}" IsVisible="{Binding WindowsImportNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                 FontSize="12" Foreground="#8b93a7" TextWrapping="Wrap"/>
+      <TextBlock Text="These folders are shared with other applications using system yabridge."
+                 IsVisible="{Binding SystemBridge}" FontSize="12" Foreground="#e0a05a" TextWrapping="Wrap"/>
+    </StackPanel>
+    <Border Grid.Row="2" Background="#1d2027" CornerRadius="8" Padding="8">
+      <Grid>
+        <ListBox Name="FolderList" ItemsSource="{Binding WindowsDirectories}"
+                 SelectionMode="Single" SelectionChanged="OnSelectionChanged"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="x:String">
+              <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,4,12,4" FontSize="12"/>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+        <TextBlock Text="No registered folders." IsVisible="{Binding !HasWindowsDirectories}"
+                   Margin="8" Foreground="#8b93a7" IsHitTestVisible="False"/>
+      </Grid>
+    </Border>
+    <WrapPanel Grid.Row="4" Orientation="Horizontal">
+      <Button Name="AddFolder" Content="Add folder…" Padding="14,5" Margin="0,0,8,0" Click="OnAddFolder"/>
+      <Button Name="RemoveFolder" Content="Remove from list" Padding="14,5" Margin="0,0,8,0" Click="OnRemoveFolder" IsEnabled="False"/>
+      <Button Name="RescanFolders" Content="Rescan" Padding="14,5" Click="OnRescan"/>
+    </WrapPanel>
+    <TextBlock Grid.Row="6" Text="Removal keeps the original files and removes their generated VST3 and CLAP wrappers. Remove affected inserts from your chains first."
+               FontSize="12" Foreground="#8b93a7" TextWrapping="Wrap"/>
+    <Grid Grid.Row="8" ColumnDefinitions="*,12,Auto">
+      <ScrollViewer MaxHeight="96" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <TextBlock Name="Status" FontSize="12" Foreground="#8b93a7" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0"/>
+      </ScrollViewer>
+      <Button Grid.Column="2" Name="CloseButton" Content="Close" Padding="18,6" Click="OnClose"/>
+    </Grid>
+  </Grid>
+</Window>

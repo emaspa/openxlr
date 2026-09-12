@@ -53,6 +53,12 @@ public partial class OptionsWindow : Window
             await vm.Client.SyncWindowsPluginsAsync(TimeSpan.FromMinutes(4)), "the sync"), "Bridging Windows plugins…", vm);
     }
 
+    private async void OnManagePluginFolders(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is OptionsViewModel vm)
+            await new PluginFoldersWindow(vm).ShowDialog(this);
+    }
+
     private async void OnRescanPlugins(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not OptionsViewModel vm) return;
@@ -62,7 +68,7 @@ public partial class OptionsWindow : Window
 
     private async System.Threading.Tasks.Task PluginStepAsync(Func<System.Threading.Tasks.Task<string>> step, string busy, OptionsViewModel vm)
     {
-        InstallFile.IsEnabled = InstallFolder.IsEnabled = Rescan.IsEnabled = false;
+        InstallFile.IsEnabled = InstallFolder.IsEnabled = Rescan.IsEnabled = ManageFolders.IsEnabled = false;
         bool sync = SyncWindows.IsEnabled;
         SyncWindows.IsEnabled = BridgeWine.IsEnabled = false;
         PluginStatus.Text = busy;
@@ -70,7 +76,7 @@ public partial class OptionsWindow : Window
         catch (Exception ex) { PluginStatus.Text = ex.Message; }
         finally
         {
-            InstallFile.IsEnabled = InstallFolder.IsEnabled = Rescan.IsEnabled = true;
+            InstallFile.IsEnabled = InstallFolder.IsEnabled = Rescan.IsEnabled = ManageFolders.IsEnabled = true;
             SyncWindows.IsEnabled = sync;
             BridgeWine.IsEnabled = true;
             await vm.LoadPluginSetupAsync();

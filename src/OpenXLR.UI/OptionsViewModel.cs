@@ -64,6 +64,18 @@ public sealed class OptionsViewModel : ViewModelBase
     private bool _canSyncWindows;
     public bool CanSyncWindows { get => _canSyncWindows; private set => Set(ref _canSyncWindows, value); }
 
+    private string? _windowsImportNote;
+    public string? WindowsImportNote { get => _windowsImportNote; private set => Set(ref _windowsImportNote, value); }
+
+    public ObservableCollection<string> WindowsDirectories { get; } = [];
+    public bool HasWindowsDirectories => WindowsDirectories.Count > 0;
+
+    private bool _canManageWindows;
+    public bool CanManageWindows { get => _canManageWindows; private set => Set(ref _canManageWindows, value); }
+
+    private bool _systemBridge;
+    public bool SystemBridge { get => _systemBridge; private set => Set(ref _systemBridge, value); }
+
     /// <summary>Wine's own plugin folders waiting to be bridged, absolute.</summary>
     public System.Collections.Generic.IReadOnlyList<string> WineFolders { get; private set; } = [];
 
@@ -89,7 +101,7 @@ public sealed class OptionsViewModel : ViewModelBase
     public async System.Threading.Tasks.Task LoadPluginSetupAsync()
     {
         System.Text.Json.Nodes.JsonNode? setup = await _client.RequestPluginSetupAsync(TimeSpan.FromSeconds(10));
-        Avalonia.Threading.Dispatcher.UIThread.Post(() => ApplyPluginSetup(setup));
+        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => ApplyPluginSetup(setup));
     }
 
     internal void ApplyPluginSetup(System.Text.Json.Nodes.JsonNode? setup)
@@ -98,6 +110,7 @@ public sealed class OptionsViewModel : ViewModelBase
         {
             WindowsPlugins = "Windows plugins: the daemon did not answer.";
             CanSyncWindows = false;
+            CanManageWindows = false;
             return;
         }
         string lv2 = setup["lv2Directory"]?.GetValue<string>() ?? "~/.lv2";
@@ -113,7 +126,16 @@ public sealed class OptionsViewModel : ViewModelBase
         WindowsPlugins = WindowsLine(yabridge, wine, folders, setup["bridgeProvider"]?.GetValue<string>() == "openxlr");
         if (setup["windowsPluginDirectory"]?.GetValue<string>() is { } managedDirectory)
             PluginDirectories += $" OpenXLR's Windows plugin wrappers are in {managedDirectory}.";
+        WindowsImportNote = setup["windowsImportDirectory"]?.GetValue<string>() is { } imports
+            ? $"Single-plugin imports are kept in {imports}." : null;
         CanSyncWindows = yabridge is not null && wine;
+        CanManageWindows = yabridge is not null;
+        SystemBridge = yabridge is not null && setup["bridgeProvider"]?.GetValue<string>() != "openxlr";
+        WindowsDirectories.Clear();
+        foreach (string directory in (setup["windowsDirectories"] as System.Text.Json.Nodes.JsonArray ?? [])
+            .Select(f => f?.GetValue<string>()).OfType<string>().Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal))
+            WindowsDirectories.Add(directory);
+        Raise(nameof(HasWindowsDirectories));
         WineFolders = [.. (setup["wineFolders"] as System.Text.Json.Nodes.JsonArray ?? [])
             .Select(f => f?.GetValue<string>()).OfType<string>()];
         CanBridgeWine = WineFolders.Count > 0;

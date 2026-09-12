@@ -60,8 +60,10 @@ public sealed class PluginInstallerTests : IDisposable
         return bundle;
     }
 
+    private string WindowsImports => Path.Combine(_root, "home", "windows-plugins");
+
     private PluginInstaller Installer(string? yabridgectl = null, string? wine = null, bool host = true)
-        => new(_lv2, _clap, _vst3, yabridgectl, wine, host);
+        => new(_lv2, _clap, _vst3, yabridgectl, wine, host, windowsImportDirectory: WindowsImports);
 
     [Fact]
     public void WhatAPathIsComesFromItsNameAndItsFirstBytes()
@@ -243,17 +245,46 @@ public sealed class PluginInstallerTests : IDisposable
     private string[] YabridgeCalls() => File.Exists(Path.Combine(_root, "yabridgectl.log"))
         ? File.ReadAllLines(Path.Combine(_root, "yabridgectl.log")) : [];
 
+    [Theory]
+    [InlineData("vst3")]
+    [InlineData("clap")]
+    public void ASingleWindowsFileImportsOnlyThatPlugin(string format)
+    {
+        string selected = File_("Chosen." + format, Windows);
+        File_("Other.vst3", Windows);
+        File_("Third.clap", Windows);
+        File_("Fourth.vst3", Windows);
+        var installer = Installer(FakeYabridgectl(), wine: "/bin/true");
+
+        InstallOutcome result = installer.Install(selected);
+
+        Assert.True(result.Ok, result.Message);
+        string directory = Path.Combine(WindowsImports, format, "Chosen");
+        Assert.Equal(["list", $"add {directory}", "sync"], YabridgeCalls());
+        string imported = Path.Combine(directory, "Chosen." + format);
+        Assert.Equal(Windows, File.ReadAllBytes(imported));
+        Assert.Null(new FileInfo(imported).LinkTarget);
+        Assert.Single(Directory.GetFileSystemEntries(directory));
+        Assert.Equal(4, Directory.GetFiles(_picked).Length);
+        File.Delete(selected);
+        Assert.Equal(Windows, File.ReadAllBytes(imported));
+    }
+
     [Fact]
-    public void AWindowsPluginIsHandedToYabridgeByItsDirectory()
+    public void ASingleWindowsBundleIsCopiedWholeButAnExplicitFolderIsRegisteredInPlace()
     {
         string bundle = WindowsVst3(Path.Combine("VST3", "Comp-win.vst3"));
+        File_(Path.Combine("VST3", "Comp-win.vst3", "Contents", "Resources", "preset.txt"), [1, 2, 3]);
         string directory = Path.GetDirectoryName(bundle)!;
         PluginInstaller installer = Installer(FakeYabridgectl(), wine: "/bin/true");
 
         InstallOutcome outcome = installer.Install(bundle);
         Assert.True(outcome.Ok, outcome.Message);
         Assert.Contains("Bridged the Windows plugins", outcome.Message);
-        Assert.Equal([$"list", $"add {directory}", "sync"], YabridgeCalls());
+        string imported = Path.Combine(WindowsImports, "vst3", "Comp-win");
+        Assert.Equal(["list", $"add {imported}", "sync"], YabridgeCalls());
+        Assert.Equal(Windows, File.ReadAllBytes(Path.Combine(imported, "Comp-win.vst3", "Contents", "x86_64-win", "Comp-win.vst3")));
+        Assert.Equal(new byte[] { 1, 2, 3 }, File.ReadAllBytes(Path.Combine(imported, "Comp-win.vst3", "Contents", "Resources", "preset.txt")));
         Assert.Equal([Path.Combine(_vst3, "yabridge"), Path.Combine(_clap, "yabridge")], outcome.Destinations);
 
         // A picked folder of Windows plugins is the folder itself, added once.
@@ -270,7 +301,7 @@ public sealed class PluginInstallerTests : IDisposable
         string bundle = WindowsVst3(Path.Combine("VST3", "Comp-win.vst3"));
         string directory = Path.GetDirectoryName(bundle)!;
         PluginInstaller installer = Installer(FakeYabridgectl(directory), wine: "/bin/true");
-        Assert.True(installer.Install(bundle).Ok);
+        Assert.True(installer.Install(directory).Ok);
         Assert.Equal(["list", "sync"], YabridgeCalls());
 
         InstallOutcome sync = installer.SyncWindows();
@@ -279,6 +310,83 @@ public sealed class PluginInstallerTests : IDisposable
         Assert.Equal("5.1.1", setup.YabridgeVersion);
         Assert.True(setup.Wine);
         Assert.Equal([directory], setup.WindowsDirectories);
+    }
+
+    [Fact]
+    public void ASingleWineInstalledPluginIsLinkedWithoutRegisteringItsSiblings()
+    {
+        string selected = File_(Path.Combine("prefix", "drive_c", "VST3", "Chosen.vst3"), Windows);
+        File_(Path.Combine("prefix", "drive_c", "VST3", "Other.vst3"), Windows);
+        File_(Path.Combine("prefix", "system.reg"), [1]);
+        var installer = Installer(FakeYabridgectl(), wine: "/bin/true");
+
+        var result = installer.Install(selected);
+
+        Assert.True(result.Ok, result.Message);
+        string imported = Path.Combine(WindowsImports, "vst3", "Chosen");
+        Assert.Equal(["list", $"add {imported}", "sync"], YabridgeCalls());
+        Assert.Equal(selected, new FileInfo(Path.Combine(imported, "Chosen.vst3")).LinkTarget);
+        Assert.Equal(Windows, File.ReadAllBytes(selected));
+        Assert.Contains("Linked Chosen.vst3 from its Wine prefix", result.Message);
+        Assert.Single(Directory.GetFileSystemEntries(imported));
+    }
+
+    [Fact]
+    public void ReimportUsesTheSameManagedFolderAndReplacesOnlyTheSelectedPlugin()
+    {
+        string source = File_("Chosen.vst3", Windows);
+        string imported = Path.Combine(WindowsImports, "vst3", "Chosen");
+        var installer = Installer(FakeYabridgectl(imported), wine: "/bin/true");
+        Assert.True(installer.Install(source).Ok);
+        byte[] updated = [.. Windows, 10, 20];
+        File.WriteAllBytes(source, updated);
+        Assert.True(installer.Install(source).Ok);
+        Assert.Equal(updated, File.ReadAllBytes(Path.Combine(imported, "Chosen.vst3")));
+        Assert.Equal(["list", "sync", "list", "sync"], YabridgeCalls());
+        Assert.Single(Directory.GetFileSystemEntries(imported));
+    }
+
+    [Fact]
+    public void FailedManagedCopyDoesNotRegisterDownloads()
+    {
+        string source = File_("Chosen.vst3", Windows);
+        Directory.CreateDirectory(Path.GetDirectoryName(WindowsImports)!);
+        File.WriteAllText(WindowsImports, "not a directory");
+        var installer = Installer(FakeYabridgectl(), wine: "/bin/true");
+        var result = installer.Install(source);
+        Assert.False(result.Ok);
+        Assert.Contains("Could not copy", result.Message);
+        Assert.Empty(YabridgeCalls());
+        Assert.Equal(Windows, File.ReadAllBytes(source));
+    }
+
+    [Theory]
+    [InlineData(".vst3")]
+    [InlineData("..vst3")]
+    [InlineData("...vst3")]
+    public void AnInvalidPluginNameCannotRegisterAnImportParent(string name)
+    {
+        string source = File_(name, Windows);
+        var result = Installer(FakeYabridgectl(), wine: "/bin/true").Install(source);
+        Assert.False(result.Ok);
+        Assert.Empty(YabridgeCalls());
+        Assert.False(Directory.Exists(WindowsImports));
+    }
+
+    [Fact]
+    public void ADownloadCanReplaceABrokenWinePluginLink()
+    {
+        string original = File_(Path.Combine("prefix", "drive_c", "VST3", "Chosen.vst3"), Windows);
+        File_(Path.Combine("prefix", "system.reg"), [1]);
+        string managed = Path.Combine(WindowsImports, "vst3", "Chosen", "Chosen.vst3");
+        var installer = Installer(FakeYabridgectl(), wine: "/bin/true");
+        Assert.True(installer.Install(original).Ok);
+        File.Delete(original);
+        string download = File_("Chosen.vst3", Windows);
+        Assert.True(installer.Install(download).Ok);
+        Assert.Null(new FileInfo(managed).LinkTarget);
+        Assert.Equal(Windows, File.ReadAllBytes(managed));
+        Assert.Single(Directory.GetFileSystemEntries(Path.GetDirectoryName(managed)!));
     }
 
     [Fact]
@@ -407,6 +515,7 @@ public sealed class PluginInstallerTests : IDisposable
         Assert.False(setup.Wine);
         Assert.Empty(setup.WindowsDirectories);
         Assert.EndsWith(".clap", setup.ClapDirectory);
+        Assert.Equal(WindowsImports, setup.WindowsImportDirectory);
         Assert.True(setup.HostInstalled);
     }
 

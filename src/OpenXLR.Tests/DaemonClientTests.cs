@@ -128,6 +128,8 @@ public sealed class DaemonClientTests
         Assert.Throws<ObjectDisposedException>(client.Start);
         await client.SetLevelAsync("music", "monitor", 0.5);
         Assert.Null(await client.RequestDiagnosticsAsync(TimeSpan.FromSeconds(30)));
+        Assert.Null(await client.AddWindowsPluginFolderAsync("/plugins", TimeSpan.FromSeconds(30)));
+        Assert.Null(await client.RemoveWindowsPluginFolderAsync("/plugins", TimeSpan.FromSeconds(30)));
     }
 
     [Fact]
@@ -149,6 +151,50 @@ public sealed class DaemonClientTests
         await received.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await client.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Null(await query.WaitAsync(TimeSpan.FromSeconds(1)));
+    }
+
+    [Fact]
+    public async Task PluginFolderChangesAreSentSeparatelyInsteadOfSharingAnInstallReply()
+    {
+        var received = Completion();
+        var release = Completion();
+        var commands = new List<(string Command, string? Path)>();
+        await using var server = await SocketTestServer.Start(async (socket, stop) =>
+        {
+            while (!stop.IsCancellationRequested)
+            {
+                var command = await SocketTestServer.Receive(socket, stop);
+                string name = command["cmd"]!.GetValue<string>();
+                if (name == "auth") continue;
+                commands.Add((name, command["path"]?.GetValue<string>()));
+                if (commands.Count == 1)
+                {
+                    received.SetResult();
+                    await release.Task.WaitAsync(stop);
+                }
+                await SocketTestServer.Send(socket, new { type = "pluginInstall", ok = true, message = name }, stop);
+                await SocketTestServer.Send(socket, new { type = "commandResult", requestId = command["requestId"]!.GetValue<string>() }, stop);
+            }
+        });
+        await using var client = new DaemonClient(server.Url);
+        var connected = Completion();
+        client.ConnectionChanged += up => { if (up) connected.TrySetResult(); };
+        client.Start();
+        await connected.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var add = client.AddWindowsPluginFolderAsync("/plugins/new", TimeSpan.FromSeconds(5));
+        await received.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var remove = client.RemoveWindowsPluginFolderAsync("/plugins/old", TimeSpan.FromSeconds(5));
+        var sync = client.SyncWindowsPluginsAsync(TimeSpan.FromSeconds(5));
+        release.SetResult();
+        Assert.Equal("addWindowsPluginFolder", (await add)!["message"]!.GetValue<string>());
+        Assert.Equal("removeWindowsPluginFolder", (await remove)!["message"]!.GetValue<string>());
+        Assert.Equal("syncWindowsPlugins", (await sync)!["message"]!.GetValue<string>());
+        Assert.Equal(new (string, string?)[]
+        {
+            ("addWindowsPluginFolder", "/plugins/new"),
+            ("removeWindowsPluginFolder", "/plugins/old"),
+            ("syncWindowsPlugins", null),
+        }, commands);
     }
 
     private static TaskCompletionSource Completion()

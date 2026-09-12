@@ -44,6 +44,7 @@ public sealed record PluginSetup(
     public string BridgeProvider { get; init; } = "system";
     public string? BridgeDirectory { get; init; }
     public string? WindowsPluginDirectory { get; init; }
+    public string? WindowsImportDirectory { get; init; }
 }
 
 /// <summary>
@@ -64,7 +65,7 @@ public sealed class PluginInstaller
     /// <summary>How long yabridge gets to bridge a directory: it copies files, it does not run them.</summary>
     private static readonly TimeSpan YabridgeTimeout = TimeSpan.FromMinutes(3);
 
-    private readonly string _lv2, _clap, _vst3, _winePrefix;
+    private readonly string _lv2, _clap, _vst3, _winePrefix, _windowsImports;
     private readonly string? _yabridgectl, _wine;
     private readonly bool _hostInstalled;
     private readonly ManagedYabridge? _managed;
@@ -79,7 +80,8 @@ public sealed class PluginInstaller
     }
 
     public PluginInstaller(string lv2Directory, string clapDirectory, string vst3Directory,
-        string? yabridgectl, string? wine, bool hostInstalled = true, string? winePrefix = null)
+        string? yabridgectl, string? wine, bool hostInstalled = true, string? winePrefix = null,
+        string? windowsImportDirectory = null)
     {
         _lv2 = lv2Directory;
         _clap = clapDirectory;
@@ -88,6 +90,7 @@ public sealed class PluginInstaller
         _wine = wine;
         _hostInstalled = hostInstalled;
         _winePrefix = winePrefix ?? DefaultWinePrefix();
+        _windowsImports = windowsImportDirectory ?? Path.Combine(Path.GetDirectoryName(ManagedYabridge.PluginHome)!, "windows-plugins");
     }
 
     private static string HomeDirectory(string name)
@@ -231,9 +234,16 @@ public sealed class PluginInstaller
                 case PluginItemKind.ClapBundle: Copy(item.Path, _clap, installed, destinations, notes); break;
                 case PluginItemKind.Vst3Bundle: Copy(item.Path, _vst3, installed, destinations, notes); break;
                 case PluginItemKind.WindowsPlugin:
-                    // yabridge takes directories: a picked plugin means the
-                    // directory it is in, a picked directory means itself.
-                    windows.Add(string.Equals(item.Path, path, StringComparison.Ordinal) ? Path.GetDirectoryName(path.TrimEnd('/'))! : path);
+                    if (string.Equals(item.Path, path, StringComparison.Ordinal))
+                    {
+                        // A single selection must not register its siblings.
+                        // Missing bridge tools are reported below without copying.
+                        string? directory = _yabridgectl is null || _wine is null
+                            ? Path.GetDirectoryName(path.TrimEnd('/'))
+                            : ImportWindowsPlugin(path, notes);
+                        if (directory is not null) windows.Add(directory);
+                    }
+                    else windows.Add(path);   // an explicit folder pick stays in place
                     break;
                 case PluginItemKind.WindowsVst2: vst2++; break;
             }
@@ -259,7 +269,39 @@ public sealed class PluginInstaller
         _ => $"Nothing to install at {name}. Pick a .clap file, a .vst3 or .lv2 folder, or a folder holding plugins.",
     };
 
-    private static void Copy(string source, string directory, List<string> installed, List<string> destinations, List<string> notes)
+    private string? ImportWindowsPlugin(string source, List<string> notes)
+    {
+        string name = Path.GetFileName(source.TrimEnd('/'));
+        string stem = Path.GetFileNameWithoutExtension(name);
+        if (stem.Length == 0 || stem is "." or ".." || name.Any(char.IsControl))
+        {
+            notes.Add("The plugin needs a valid file name without control characters.");
+            return null;
+        }
+        string format = Path.GetExtension(name).TrimStart('.').ToLowerInvariant();
+        string directory = Path.Combine(_windowsImports, format, stem);
+        var imported = new List<string>();
+        // Installed plugins can depend on their Wine prefix and neighbours.
+        // One link isolates the selection without moving it out of that prefix.
+        try { Copy(source, directory, imported, [], notes, linkSource: InWinePrefix(source)); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            notes.Add($"Could not import {name}: {ex.Message}");
+        }
+        return imported.Count > 0 ? directory : null;
+    }
+
+    private static bool InWinePrefix(string source)
+    {
+        FileSystemInfo info = Directory.Exists(source) ? new DirectoryInfo(source) : new FileInfo(source);
+        string path = info.ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? Path.GetFullPath(source);
+        for (string? parent = Path.GetDirectoryName(path); parent is not null; parent = Path.GetDirectoryName(parent))
+            if (File.Exists(Path.Combine(parent, "system.reg")) && Directory.Exists(Path.Combine(parent, "drive_c"))) return true;
+        return false;
+    }
+
+    private static void Copy(string source, string directory, List<string> installed, List<string> destinations, List<string> notes,
+        bool linkSource = false)
     {
         string name = Path.GetFileName(source.TrimEnd('/'));
         string destination = Path.Combine(directory, name);
@@ -283,9 +325,14 @@ public sealed class PluginInstaller
             Directory.CreateDirectory(directory);
             Remove(staged);
             Remove(retired);
-            if (Directory.Exists(source)) CopyTree(source, staged);
+            if (linkSource)
+            {
+                if (Directory.Exists(source)) Directory.CreateSymbolicLink(staged, Path.GetFullPath(source));
+                else File.CreateSymbolicLink(staged, Path.GetFullPath(source));
+            }
+            else if (Directory.Exists(source)) CopyTree(source, staged);
             else File.Copy(source, staged);
-            bool replacing = Directory.Exists(destination) || File.Exists(destination);
+            bool replacing = Directory.Exists(destination) || File.Exists(destination) || new FileInfo(destination).LinkTarget is not null;
             if (replacing) Move(destination, retired);
             try { Move(staged, destination); }
             catch { if (replacing) Move(retired, destination); throw; }
@@ -293,7 +340,9 @@ public sealed class PluginInstaller
             try { Remove(retired); } catch (Exception) { /* removed on the next install */ }
             installed.Add(name);
             destinations.Add(destination);
-            notes.Add($"Installed {name} in {Shorten(directory)}.");
+            notes.Add(linkSource
+                ? $"Linked {name} from its Wine prefix into {Shorten(directory)}."
+                : $"Installed {name} in {Shorten(directory)}.");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -306,7 +355,7 @@ public sealed class PluginInstaller
     private static void Remove(string path)
     {
         if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
-        else if (File.Exists(path)) File.Delete(path);
+        else if (File.Exists(path) || new FileInfo(path).LinkTarget is not null) File.Delete(path);
     }
 
     /// <summary>Rename within one directory, for either kind of bundle.</summary>
@@ -356,7 +405,8 @@ public sealed class PluginInstaller
             return $"{what}, and {missing} not installed. Install {(missing.StartsWith("yabridge and", StringComparison.Ordinal) ? "them" : "it")}, then add {(picked is not null || directories.Count == 1 ? "it" : "them")} again.";
         }
         if (!PrepareManagedBridge()) return "The OpenXLR bridge could not select its packaged libraries.";
-        HashSet<string> known = WindowsDirectories().ToHashSet(StringComparer.Ordinal);
+        if (!TryWindowsDirectories(out IReadOnlyList<string> directoriesBefore, out string? listError)) return listError!;
+        HashSet<string> known = directoriesBefore.ToHashSet(StringComparer.Ordinal);
         foreach (string directory in directories)
         {
             if (known.Contains(Path.GetFullPath(directory).TrimEnd('/'))) continue;
@@ -372,6 +422,76 @@ public sealed class PluginInstaller
         return directories.Count == 1
             ? $"Bridged the Windows plugins in {Shorten(directories[0])} with yabridge."
             : $"Bridged the Windows plugins in {directories.Count} folders with yabridge.";
+    }
+
+    /// <summary>Register a Windows plugin folder without copying any native plugins beside it.</summary>
+    public InstallOutcome AddWindowsFolder(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path))
+            return new(false, "The folder path has to be absolute.", []);
+        if (!Directory.Exists(path)) return new(false, $"There is no folder at {path}.", []);
+        try
+        {
+            if (!Items(path).Any(i => i.Kind == PluginItemKind.WindowsPlugin))
+                return new(false, "This folder holds no Windows VST3 or CLAP plugins. Use Install file or Install folder for native Linux plugins.", []);
+            var installed = new List<string>();
+            var destinations = new List<string>();
+            string message = Bridge([path], null, installed, destinations);
+            return new(installed.Count > 0, message, installed, destinations);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return new(false, $"Could not add the plugin folder: {ex.Message}", []);
+        }
+    }
+
+    /// <summary>Unregister one source and remove only its unused VST3/CLAP wrappers, never its plugins.</summary>
+    public InstallOutcome RemoveWindowsFolder(string path, IReadOnlyCollection<string>? inUsePluginPaths = null)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path))
+            return new(false, "The folder path has to be absolute.", []);
+        if (_yabridgectl is null) return new(false, "yabridge is not installed.", []);
+        bool unregistered = false;
+        try
+        {
+            path = WindowsPluginWrappers.Normalize(path);
+            if (!TryWindowsDirectories(out IReadOnlyList<string> known, out string? listError))
+                return new(false, listError!, []);
+            string? registered = known.FirstOrDefault(d => WindowsPluginWrappers.Normalize(d) == path);
+            if (registered is null) return new(false, "This folder is not in yabridge's registered plugin folders.", []);
+            string[] retained = [.. known.Where(d => d != registered).Select(WindowsPluginWrappers.Normalize)];
+            IReadOnlyList<WindowsPluginWrappers.Wrapper> wrappers = WindowsPluginWrappers.Find(BridgedVst3Directory, BridgedClapDirectory, path, retained);
+            if (inUsePluginPaths is not null && wrappers.Any(w => inUsePluginPaths.Any(p => WindowsPluginWrappers.Under(WindowsPluginWrappers.Normalize(p), w.Path))))
+                return new(false, "Remove the inserts using this folder from the mixer before removing the folder.", []);
+            // A retained source may share a wrapper name. Sync gets the chance
+            // to retarget it before deciding which wrappers are ours to delete.
+            if (retained.Length > 0 && _wine is null)
+                return new(false, "Wine is not installed. It is needed to sync the remaining plugin folders safely.", []);
+            if (!PrepareManagedBridge()) return new(false, "The OpenXLR bridge could not select its packaged libraries.", []);
+            ProcessResult? remove = Run("rm", registered);
+            if (remove?.Ok != true) return new(false, $"yabridge could not remove the folder: {Tail(remove)}", []);
+            unregistered = true;
+            if (!TryWindowsDirectories(out IReadOnlyList<string> remaining, out listError))
+                return new(false, $"The folder was removed from the list, but wrappers were kept: {listError}", []);
+            if (remaining.Any(d => WindowsPluginWrappers.Normalize(d) == path))
+                return new(false, "yabridge still lists the folder. Its wrappers were kept.", []);
+            if (remaining.Count > 0)
+            {
+                ProcessResult? sync = Run("sync");
+                if (sync?.Ok != true)
+                    return new(false, $"The folder was removed from the list, but its wrappers were kept because syncing the remaining folders failed: {Tail(sync)}", []);
+            }
+            wrappers = WindowsPluginWrappers.Find(BridgedVst3Directory, BridgedClapDirectory, path,
+                remaining.Select(WindowsPluginWrappers.Normalize).ToArray());
+            foreach (WindowsPluginWrappers.Wrapper wrapper in wrappers) wrapper.Remove();
+            return new(true, $"Removed {Shorten(registered)} from the plugin folders and cleaned up {wrappers.Count} bridge wrappers. Original plugin files were kept.", []);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return new(false, unregistered
+                ? $"The folder was removed from the list, but wrapper cleanup did not finish: {ex.Message} Original plugin files were kept."
+                : $"Could not remove the plugin folder: {ex.Message}", []);
+        }
     }
 
     /// <summary>Bridge again whatever yabridge knows, for plugins installed into those folders since.</summary>
@@ -400,12 +520,21 @@ public sealed class PluginInstaller
 
     /// <summary>The directories yabridge watches, from `yabridgectl list`.</summary>
     public IReadOnlyList<string> WindowsDirectories()
+        => TryWindowsDirectories(out IReadOnlyList<string> directories, out _) ? directories : [];
+
+    private bool TryWindowsDirectories(out IReadOnlyList<string> directories, out string? error)
     {
-        if (_yabridgectl is null) return [];
+        directories = [];
         ProcessResult? list = Run("list");
-        if (list is null || list.ExitCode != 0) return [];
-        return Encoding.UTF8.GetString(list.Stdout).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(line => line.StartsWith('/')).Select(line => line.TrimEnd('/')).ToList();
+        if (list?.Ok != true)
+        {
+            error = $"yabridge could not list the plugin folders: {Tail(list)}";
+            return false;
+        }
+        directories = Encoding.UTF8.GetString(list.Stdout).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(line => line.StartsWith('/')).Select(Path.TrimEndingDirectorySeparator).Distinct(StringComparer.Ordinal).ToList();
+        error = null;
+        return true;
     }
 
     /// <summary>Where Wine keeps its own drive: WINEPREFIX, or ~/.wine as Wine itself does.</summary>
@@ -557,6 +686,7 @@ public sealed class PluginInstaller
             BridgeProvider = _managed is null ? "system" : "openxlr",
             BridgeDirectory = _managed is null ? null : Shorten(_managed.Directory),
             WindowsPluginDirectory = _managed is null ? null : Shorten(ManagedYabridge.PluginHome),
+            WindowsImportDirectory = Shorten(_windowsImports),
             WindowsEditorNote = _managed is null && EditorsIgnoreTheMouse(version, wineVersion)
                 ? $"A Windows plugin's own editor can ignore the mouse with yabridge {version} and {wineVersion}: since Wine 9.22 its clicks can arrive somewhere else entirely. The optional openxlr-yabridge package includes the input fix. The manual covers bridge selection."
                 : null,

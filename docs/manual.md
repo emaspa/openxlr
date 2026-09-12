@@ -384,8 +384,33 @@ a system bridge. OpenXLR reads its catalogues again,
 and the plugin is in the picker with a VST3 or CLAP badge. Nothing else
 has to be restarted.
 
-The first press is the one that needs explaining. Wine keeps its Windows
-drive in `~/.wine` unless `WINEPREFIX` says otherwise, and an installer
+<a name="plugin-folders"></a>
+**Managing Windows plugin folders.** Open Options, PLUGINS, then "Manage
+folders…" to see the folders registered with the selected yabridge provider.
+
+- "Add folder…" registers a folder holding Windows VST3 or CLAP plugins,
+  syncs it and refreshes the catalogue. The original files stay in that
+  folder. Use "Install file…" or "Install folder…" for native Linux plugins.
+- Select a folder and press "Remove from list" to unregister it. A
+  confirmation explains what will be removed. OpenXLR cleans up only that
+  folder's generated VST3 and CLAP wrappers; original plugin files and
+  wrappers still covered by another registered folder are kept. A folder
+  that was moved or deleted can still be removed from the list.
+- "Rescan" syncs the registered folders and reads the catalogue again.
+
+Remove affected plugins from your insert chains before removing their
+folder, including bypassed inserts. Folder removal does not edit saved
+profiles; re-add the folder before recalling a profile that needs it. It
+does not restart the audio service. If unregistering succeeds but cleanup
+fails, the result says so and the list refreshes to show the current state.
+
+With the OpenXLR companion, this manages its private registry and wrappers.
+With system yabridge, the same registry is used by other applications, so
+removing a folder affects those applications too. The window and its removal
+confirmation call this out. This manager does not change native Linux plugin
+search paths or uninstall plugins installed by your package manager.
+
+Wine keeps its Windows drive in `~/.wine` unless `WINEPREFIX` says otherwise, and an installer
 writes into `Program Files/Common Files/VST3` inside it, or the same for
 CLAP. That is a dotted folder, which file dialogs hide, so OpenXLR looks
 there itself and offers what it finds as "Bridge Wine's plugins" rather
@@ -393,12 +418,26 @@ than asking you to go and find it. Once a folder is bridged, yabridge keeps
 it on its own list, so a second plugin installed into it needs only the
 sync, and the Bridge button has nothing left to offer.
 
-A plugin that comes as a bare Windows `.vst3` or `.clap` file, with no
-installer, is picked with "Install file…". Put it in a folder of its own
-first: OpenXLR bridges the folder a Windows plugin sits in, and a file
-picked straight out of Downloads would hand yabridge your whole Downloads
-folder. VST2 `.dll` files are left out either way, since OpenXLR cannot
-load VST2.
+Picking one Windows `.vst3` or `.clap` file with "Install file…" installs
+only that plugin. OpenXLR copies it into its own folder under
+`~/.local/share/openxlr/windows-plugins`, grouped by format and plugin name,
+and registers that folder with yabridge. A single Windows `.vst3` bundle
+picked with "Install folder…" is copied whole, including its resources.
+The original download is kept and can be deleted afterwards. Other plugins
+beside the selected one, including other downloads, are not registered.
+Selecting the same plugin name again updates its managed copy.
+
+A plugin already installed inside a Wine prefix is linked from its managed
+folder instead of being copied or moved. It keeps its original location,
+Wine prefix and neighbouring files. Selecting an ordinary folder or using
+"Add folder…" in the folder manager still registers that folder in place.
+VST2 `.dll` files are left out because OpenXLR cannot load VST2.
+
+Older folder registrations are not silently removed. If an earlier
+single-file import registered Downloads, remove that entry with "Manage
+folders…" and import the plugins you want individually. Remove affected
+inserts first if the manager asks you to. Removing a folder refreshes the
+catalogue and the open plugin pickers.
 
 <a name="bundle-not-read"></a>
 **A bridged plugin is not in the picker.** A successful yabridge sync means
