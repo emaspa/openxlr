@@ -40,6 +40,8 @@ public sealed class WindowLayoutTests
                 AppBuilder.Configure<App>().UseSkia().UseHarfBuzz().UseX11().SetupWithoutStarting();
                 Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
                 var main = new MainWindow();
+                if (Environment.GetEnvironmentVariable("OPENXLR_LAYOUT_FONT") is { Length: > 0 } font)
+                    main.FontFamily = new Avalonia.Media.FontFamily(font);
                 windows.Add(main);
                 // Stop the window's background connection before supplying a fixed fixture.
                 ((DaemonClient)typeof(MainWindow).GetField("_client", BindingFlags.Instance | BindingFlags.NonPublic)!
@@ -57,6 +59,16 @@ public sealed class WindowLayoutTests
                     AddInsert(mix.Inserts);
                     vm.Mixes.Add(mix);
                 }
+                foreach (string name in new[] { "Google Chrome", "Discord", "Karere", "Signal", "Steam", "Balatro" })
+                {
+                    var app = new AppStreamViewModel(new DaemonClient(), name, name,
+                        [new ChannelChoice("browser", "Browser"), new ChannelChoice("voicechat", "Voice Chat"), new ChannelChoice("game", "Game")]);
+                    app.ApplyFromDaemon(name == "Google Chrome" ? "browser" : name is "Steam" or "Balatro" ? "game" : "voicechat", true, true);
+                    vm.Apps.Add(app);
+                    vm.ActiveApps.Add(app);
+                }
+                main.DataContext = null;
+                main.DataContext = vm;
                 main.Show();
 
                 // No floor above the widest row: the window squeezes to 640.
@@ -112,6 +124,48 @@ public sealed class WindowLayoutTests
                             t => t.Classes.Contains("insertName"));
                         Assert.Single(master.GetVisualDescendants().OfType<Slider>());
                     }
+                    var appRows = main.FindControl<ItemsControl>("ApplicationRows")!;
+                    var manageApps = main.FindControl<Button>("ManageApps")!;
+                    var appCards = appRows.GetVisualDescendants().OfType<Border>()
+                        .Where(b => b.DataContext is AppStreamViewModel && b.Padding == new Thickness(8, 6)).ToArray();
+                    Assert.Equal(6, appCards.Length);
+                    var appWrap = appRows.GetVisualDescendants().OfType<WrapPanel>().Single();
+                    foreach (var appCard in appCards) Assert.Equal(4, appCard.Margin.Right);
+                    // Font metrics differ across desktops. A chip stays on
+                    // the preceding row exactly when its measured width fits.
+                    for (int i = 1; i < appCards.Length; i++)
+                    {
+                        var previous = appCards[i - 1];
+                        var current = appCards[i];
+                        var before = previous.TranslatePoint(default, appWrap)!.Value;
+                        var here = current.TranslatePoint(default, appWrap)!.Value;
+                        double end = before.X + previous.Bounds.Width + previous.Margin.Right
+                            + current.Margin.Left + current.Bounds.Width + current.Margin.Right;
+                        if (end <= appWrap.Bounds.Width)
+                            Assert.Equal(before.Y, here.Y);
+                        else
+                            Assert.True(here.Y > before.Y, "An app wider than the remaining space did not wrap.");
+                    }
+                    var appHeader = (StackPanel)main.FindControl<Expander>("ApplicationsTile")!.Header!;
+                    var heading = appHeader.Children.OfType<TextBlock>().Single();
+                    Assert.Same(appHeader, manageApps.Parent);
+                    double headingCenter = heading.TranslatePoint(default, main)!.Value.Y + heading.Bounds.Height / 2;
+                    double manageCenter = manageApps.TranslatePoint(default, main)!.Value.Y + manageApps.Bounds.Height / 2;
+                    Assert.InRange(Math.Abs(headingCenter - manageCenter), 0, 1);
+                    Assert.True(manageApps.TranslatePoint(default, main)!.Value.X > heading.TranslatePoint(default, main)!.Value.X + heading.Bounds.Width);
+                    var editLayout = main.GetVisualDescendants().OfType<Button>().Single(b => b.Content as string == "Edit layout…");
+                    Assert.Equal(editLayout.Padding, manageApps.Padding);
+                    Assert.Equal(editLayout.FontSize, manageApps.FontSize);
+                    Assert.Equal(editLayout.MinHeight, manageApps.MinHeight);
+                    Assert.True(manageApps.IsEnabled);
+                    AssertInside(manageApps, main);
+                    foreach (var appCard in appCards)
+                    {
+                        AssertInside(appCard, main);
+                        AssertNoOverlap([appCard, manageApps]);
+                    }
+                    Assert.DoesNotContain(main.GetVisualDescendants().OfType<TextBlock>(),
+                        t => t.Text?.StartsWith("Running audio-capable apps appear here", StringComparison.Ordinal) == true);
                     Capture(main, "mixer-" + width);
                     var page = main.GetVisualDescendants().OfType<ScrollViewer>().First();
                     page.Offset = new Vector(0, page.Extent.Height);

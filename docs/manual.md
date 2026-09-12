@@ -194,7 +194,9 @@ scroll horizontally and vertically. Resizing the window manually turns off autom
 ### 3.3 Put an application on a different channel
 
 The APPLICATIONS card lists every app that is currently registered with
-PipeWire as an audio client; a green light means it is playing.
+PipeWire as an audio client; a green light means it is playing. Manage… sits
+beside the APPLICATIONS heading, like Edit layout… beside SUBMIXER. The app
+controls wrap onto further rows when the window is narrower.
 
 An app's playback streams and audio client share the same identity even
 when PipeWire puts the process name only on the client. Windows executable
