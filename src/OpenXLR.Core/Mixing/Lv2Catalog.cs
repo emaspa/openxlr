@@ -139,7 +139,7 @@ public static class Lv2Catalog
     /// will read.
     /// </summary>
     internal static int Footprint(PluginInfo p)
-        => 220 + p.Plugin.Length + p.Name.Length + p.Category.Length
+        => 252 + p.Plugin.Length + p.Name.Length + p.Category.Length
            + p.Params.Sum(q => 152 + q.Symbol.Length + q.Name.Length + q.ScalePoints.Sum(sp => 24 + sp.Label.Length))
            + p.RequiredFeatures.Sum(f => f.Length + 4) + (p.InputSymbols.Count + p.OutputSymbols.Count) * 16;
 

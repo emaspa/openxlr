@@ -43,6 +43,8 @@ public sealed class HttpApiTests
         builder.Services.AddSingleton<DeviceManager>();
         builder.Services.AddSingleton<MixerService>();
         builder.Services.AddSingleton<WebSocketHub>();
+        string policyDirectory = Path.Combine(Path.GetTempPath(), "openxlr-editor-policy-api-" + Guid.NewGuid());
+        builder.Services.AddSingleton(new OpenXLR.Core.Mixing.NativeEditorPolicy(Path.Combine(policyDirectory, "rules.json")));
         await using var app = builder.Build();
         app.UseWebSockets();
         // The endpoints read the daemon's live token per request; publish one
@@ -105,6 +107,18 @@ public sealed class HttpApiTests
                 Assert.Equal(HttpStatusCode.BadRequest, folder.StatusCode);
                 Assert.Contains("absolute path", await folder.Content.ReadAsStringAsync());
             }
+            const string deEsser = "ABCDEF019182FAEB4D616E75466C7665";
+            foreach (bool? blocked in new bool?[] { false, null })
+            {
+                using var rule = await http.PostAsync("/api/v1/commands", new StringContent(
+                    System.Text.Json.JsonSerializer.Serialize(new { cmd = "setNativeEditorRule", kind = "vst3", plugin = deEsser, name = "Elgato De-Esser", blocked }),
+                    Encoding.UTF8, "application/json"));
+                Assert.Equal(HttpStatusCode.OK, rule.StatusCode);
+                using var policy = System.Text.Json.JsonDocument.Parse(await rule.Content.ReadAsStringAsync());
+                var rules = policy.RootElement.GetProperty("messages")[0];
+                Assert.Equal("nativeEditorRules", rules.GetProperty("type").GetString());
+                Assert.Equal(blocked ?? true, rules.GetProperty("rules")[0].GetProperty("blocked").GetBoolean());
+            }
             using var pluginDiagnostics = await http.PostAsync("/api/v1/commands",
                 new StringContent("{\"cmd\":\"getPluginDiagnostics\"}", Encoding.UTF8, "application/json"));
             Assert.Equal(HttpStatusCode.OK, pluginDiagnostics.StatusCode);
@@ -114,6 +128,10 @@ public sealed class HttpApiTests
             Assert.True(discovery.GetProperty("discovery").TryGetProperty("searchPaths", out _));
             Assert.True(discovery.GetProperty("discovery").TryGetProperty("scans", out _));
         }
-        finally { await app.StopAsync(); }
+        finally
+        {
+            await app.StopAsync();
+            if (Directory.Exists(policyDirectory)) Directory.Delete(policyDirectory, recursive: true);
+        }
     }
 }

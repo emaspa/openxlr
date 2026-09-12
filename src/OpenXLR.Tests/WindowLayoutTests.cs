@@ -199,6 +199,16 @@ public sealed class WindowLayoutTests
                     AssertNoOverlap(((Grid)slider.Parent!).Children.Where(c => c.IsVisible).ToArray());
                     Capture(controls, "plugin-" + width);
                 }
+                Assert.False(controls.FindControl<Button>("ManageNativeEditors")!.IsVisible);
+                insert.ApplyFromDaemon(JsonNode.Parse("""{"nativeHost":true}""")!, null, true, true, "This editor is blocked by its compatibility rule.");
+                Layout(controls, 420, 560);
+                var manageEditors = controls.FindControl<Button>("ManageNativeEditors")!;
+                Assert.True(manageEditors.IsVisible);
+                var actionRows = controls.FindControl<WrapPanel>("PluginActions")!;
+                Assert.Equal("Bypass", ((Avalonia.Controls.Primitives.ToggleButton)actionRows.Children[actionRows.Children.IndexOf(manageEditors) - 1]).Content);
+                foreach (var button in actionRows.Children.Where(c => c.IsVisible)) AssertInside(button, controls);
+                Capture(controls, "plugin-compatibility-420");
+
                 insert.ApplyFromDaemon(JsonNode.Parse("{\"nativeHost\":true}")!,
                     "The plugin could not start. " + new string('x', 160), false);
                 Layout(controls, 420, controls.MinHeight);
@@ -262,6 +272,39 @@ public sealed class WindowLayoutTests
                 Assert.False(UiSettings.Load().MinimizeToTray);
                 Assert.False(vm.MinimizeToTray);
                 Capture(options, "options-startup");
+
+                var focusedRules = new NativeEditorRulesWindow(new DaemonClient(), "vst3", "ABCDEF019182FAEB4D616E75466C7665");
+                windows.Add(focusedRules);
+                focusedRules.ApplyRules(JsonNode.Parse("""
+                    {"rules":[{"kind":"vst3","plugin":"ABCDEF019182FAEB4D616E75466C7665","name":"Elgato De-Esser","reason":"Known issue","defaultBlocked":true,"blocked":true}]}
+                    """));
+                Assert.Equal("Elgato De-Esser", ((NativeEditorRuleRow)focusedRules.FindControl<ListBox>("RuleList")!.SelectedItem!).Name);
+
+                var editorRules = new NativeEditorRulesWindow();
+                windows.Add(editorRules);
+                editorRules.Show();
+                editorRules.ApplyRules(JsonNode.Parse("""
+                    {"rules":[
+                      {"kind":"vst3","plugin":"ABCDEF019182FAEB4D616E75466C7665","name":"Elgato De-Esser","reason":"Its native editor freezes under Wine.","defaultBlocked":true,"blocked":true},
+                      {"kind":"clap","plugin":"example.effect","name":"Example effect","reason":"You allowed this native editor.","defaultBlocked":false,"override":false,"blocked":false}
+                    ]}
+                    """));
+                foreach (double width in new[] { 480d, 780 })
+                {
+                    Layout(editorRules, width, 590);
+                    var rules = editorRules.FindControl<ListBox>("RuleList")!;
+                    rules.SelectedIndex = 0;
+                    Assert.True(editorRules.FindControl<Button>("AllowSelected")!.IsEnabled);
+                    Assert.False(editorRules.FindControl<Button>("DefaultSelected")!.IsEnabled);
+                    rules.SelectedIndex = 1;
+                    Assert.True(editorRules.FindControl<Button>("BlockSelected")!.IsEnabled);
+                    Assert.True(editorRules.FindControl<Button>("DefaultSelected")!.IsEnabled);
+                    rules.SelectedIndex = 0;
+                    Layout(editorRules, width, 590);
+                    foreach (var button in editorRules.GetVisualDescendants().OfType<Button>().Where(b => b.IsVisible))
+                        AssertInside(button, editorRules);
+                    Capture(editorRules, "native-editor-rules-" + width);
+                }
 
                 optionsVm.ApplyPluginSetup(JsonNode.Parse("""
                     {"yabridge":"5.1.1","wine":true,"bridgeProvider":"system",

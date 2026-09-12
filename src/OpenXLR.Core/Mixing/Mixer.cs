@@ -841,11 +841,14 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     }
 
     /// <summary>Capture the host under the mixer lock, then open its UI outside it.</summary>
-    public void ShowInsertUi(string channel, string insertId)
+    public void ShowInsertUi(string channel, string insertId, Func<InsertDefinition, string?>? editorError = null)
     {
         NativePluginHost? host;
         lock (_gate)
         {
+            InsertDefinition? insert = InsertsFor(channel).FirstOrDefault(i => i.Id == insertId);
+            if (insert is not null && editorError?.Invoke(insert) is string reason)
+                throw new InvalidOperationException($"Native editor disabled: {reason}");
             host = _chains.GetValueOrDefault(channel)?.InsertStages
                 .FirstOrDefault(stage => stage.Id == insertId).Stage?.NativeHost;
             if (host is null)

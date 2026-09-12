@@ -82,6 +82,24 @@ public sealed record Command
 
     /// <summary>Plugin installs and folder management: the file or directory the user picked, absolute.</summary>
     [JsonPropertyName("path")] public string? Path { get; init; }
+
+    /// <summary>Native-editor compatibility rules identify a plugin by format and stable id.</summary>
+    [JsonPropertyName("kind")] public string? Kind { get; init; }
+    [JsonPropertyName("plugin")] public string? Plugin { get; init; }
+    /// <summary>True blocks the editor, false allows it, null follows the release default.</summary>
+    [JsonPropertyName("blocked")] public bool? Blocked { get; init; }
+}
+
+public sealed record NativeEditorRulesMessage(
+    [property: JsonPropertyName("rules")] IReadOnlyList<NativeEditorRuleState> Rules,
+    [property: JsonPropertyName("error")] string? Error)
+{
+    [JsonPropertyName("type")] public string Type => "nativeEditorRules";
+}
+
+public sealed record NativeEditorRulesChangedMessage
+{
+    [JsonPropertyName("type")] public string Type => "nativeEditorRulesChanged";
 }
 
 /// <summary>Reply to "getPluginSetup": where plugins go and what bridges Windows ones.</summary>

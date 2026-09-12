@@ -37,7 +37,11 @@ public sealed record InsertDefinition
 /// <summary>An insert as pushed to clients: its definition plus live status.</summary>
 public sealed record InsertStatus(InsertDefinition Insert, string? Error,
     IReadOnlyDictionary<string, double>? Meters = null,
-    bool NativeHostRunning = false);
+    bool NativeHostRunning = false)
+{
+    public bool NativeUiBlocked { get; init; }
+    public string? NativeUiBlockReason { get; init; }
+}
 
 /// <summary>A control port of a plugin, enough to build a sensible slider.</summary>
 public sealed record PluginParam(
@@ -69,6 +73,8 @@ public sealed record PluginInfo(
 
     public bool Supported => UnsupportedFeatures.Count == 0;
     public bool HasNativeUi { get; init; }
+    /// <summary>Editor compatibility only; never changes whether the plugin can process audio.</summary>
+    public bool NativeUiBlocked { get; init; }
 
     /// <summary>CLAP and VST3: the bundle the plugin is loaded from. Null for LV2, which lilv locates.</summary>
     public string? Path { get; init; }

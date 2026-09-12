@@ -235,6 +235,36 @@ public sealed class DaemonClientTests
         Assert.Equal(2, requests);
     }
 
+    [Fact]
+    public async Task EditorRuleOverridesAndDefaultResetHaveDistinctWireValues()
+    {
+        await using var server = await SocketTestServer.Start(async (socket, stop) =>
+        {
+            while (!stop.IsCancellationRequested)
+            {
+                var command = await SocketTestServer.Receive(socket, stop);
+                if (command["cmd"]!.GetValue<string>() == "auth") continue;
+                Assert.Equal("setNativeEditorRule", command["cmd"]!.GetValue<string>());
+                bool blocked = command["blocked"]?.GetValue<bool>() ?? true;
+                await SocketTestServer.Send(socket, new { type = "nativeEditorRulesChanged" }, stop);
+                await SocketTestServer.Send(socket, new { type = "nativeEditorRules", rules = new[] { new { blocked } } }, stop);
+                await SocketTestServer.Send(socket, new { type = "commandResult", requestId = command["requestId"]!.GetValue<string>() }, stop);
+            }
+        });
+        await using var client = new DaemonClient(server.Url);
+        int changed = 0;
+        client.NativeEditorRulesChanged += () => changed++;
+        var connected = Completion();
+        client.ConnectionChanged += up => { if (up) connected.TrySetResult(); };
+        client.Start();
+        await connected.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var allow = await client.SetNativeEditorRuleAsync("clap", "example", "Example", false, TimeSpan.FromSeconds(5));
+        Assert.False(allow!["rules"]![0]!["blocked"]!.GetValue<bool>());
+        var reset = await client.SetNativeEditorRuleAsync("clap", "example", "Example", null, TimeSpan.FromSeconds(5));
+        Assert.True(reset!["rules"]![0]!["blocked"]!.GetValue<bool>());
+        Assert.Equal(2, changed);
+    }
+
     private static TaskCompletionSource Completion()
         => new(TaskCreationOptions.RunContinuationsAsynchronously);
 }

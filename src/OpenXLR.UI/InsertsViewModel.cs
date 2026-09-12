@@ -10,7 +10,7 @@ namespace OpenXLR.UI;
 
 /// <summary>A plugin the picker offers (mono in / mono out only for the mic path).</summary>
 public sealed record PluginChoice(string Uri, string Name, string Category, JsonNode Params,
-    bool NativeEditorAvailable = false, bool NativeEditorSupported = false, string Kind = "lv2")
+    bool NativeEditorAvailable = false, bool NativeEditorSupported = false, string Kind = "lv2", bool NativeUiBlocked = false)
 {
     /// <summary>The format, as the picker shows it: two plugins can share a name and differ in nothing else.</summary>
     public string Format => Kind.ToUpperInvariant();
@@ -121,8 +121,10 @@ public sealed class InsertsViewModel : ViewModelBase
                     p["params"] ?? new JsonArray(),
                     p["nativeEditorAvailable"]?.GetValue<bool>() == true,
                     p["nativeEditorSupported"]?.GetValue<bool>() == true,
-                    p["kind"]?.GetValue<string>() ?? "lv2"));
+                    p["kind"]?.GetValue<string>() ?? "lv2",
+                    p["nativeUiBlocked"]?.GetValue<bool>() == true));
             }
+            foreach (InsertViewModel insert in Items) insert.RefreshNativeFlags();
             string width = _channels == 1 ? "mono" : "stereo";
             Note = PluginChoices.Count == 0
                 ? $"No {width} plugins found. Install some, or add one with the buttons below"
@@ -169,7 +171,9 @@ public sealed class InsertsViewModel : ViewModelBase
                     vm = new InsertViewModel(this, id, ins["plugin"]!.GetValue<string>(), ins["label"]?.GetValue<string>() ?? id,
                         ins["kind"]?.GetValue<string>() ?? "lv2");
                 vm.ApplyFromDaemon(ins, entry?["error"]?.GetValue<string>(),
-                    entry?["nativeHostRunning"]?.GetValue<bool>() == true);
+                    entry?["nativeHostRunning"]?.GetValue<bool>() == true,
+                    entry?["nativeUiBlocked"]?.GetValue<bool>() == true,
+                    entry?["nativeUiBlockReason"]?.GetValue<string>());
                 next.Add(vm);
             }
             if (!next.SequenceEqual(Items))
@@ -276,7 +280,14 @@ public sealed class InsertViewModel : ViewModelBase
     /// <summary>The helper is here too, so turning the host on can work.</summary>
     public bool NativeHostInstalled => _owner.PluginChoices.Any(p => p.Uri == Plugin && p.NativeEditorAvailable);
 
-    public bool NativeEditorAvailable => NativeHostInstalled && NativeHost && !Bypass && !HasError && NativeHostRunning;
+    private bool _nativeUiBlocked;
+    private string? _nativeUiBlockReason;
+    public bool NativeUiBlocked => _nativeUiBlocked || _owner.PluginChoices.Any(p => p.Kind == Kind && p.Uri == Plugin && p.NativeUiBlocked);
+    public string? NativeUiBlockReason => NativeUiBlocked
+        ? _nativeUiBlockReason ?? "This native editor is disabled in Options. Use the OpenXLR controls."
+        : null;
+
+    public bool NativeEditorAvailable => !NativeUiBlocked && NativeHostInstalled && NativeHost && !Bypass && !HasError && NativeHostRunning;
 
     /// <summary>
     /// The switch can be turned on only where the helper is installed. It
@@ -290,8 +301,12 @@ public sealed class InsertViewModel : ViewModelBase
         : "Open this plugin's controls";
 
     /// <summary>Everything the row and the controls window derive from the host state.</summary>
+    internal void RefreshNativeFlags() => RaiseNativeFlags();
+
     private void RaiseNativeFlags()
     {
+        Raise(nameof(NativeUiBlocked));
+        Raise(nameof(NativeUiBlockReason));
         Raise(nameof(NativeEditorSupported));
         Raise(nameof(NativeHostInstalled));
         Raise(nameof(NativeEditorAvailable));
@@ -413,8 +428,11 @@ public sealed class InsertViewModel : ViewModelBase
                 Groups.Add(new InsertParamGroup(g, true, l));
     }
 
-    public void ApplyFromDaemon(JsonNode ins, string? error, bool nativeHostRunning)
+    public void ApplyFromDaemon(JsonNode ins, string? error, bool nativeHostRunning,
+        bool nativeUiBlocked = false, string? nativeUiBlockReason = null)
     {
+        _nativeUiBlocked = nativeUiBlocked;
+        _nativeUiBlockReason = nativeUiBlockReason;
         _bypass = ins["bypass"]?.GetValue<bool>() ?? false;
         _nativeHost = ins["nativeHost"]?.GetValue<bool>() ?? false;
         Raise(nameof(NativeHost));

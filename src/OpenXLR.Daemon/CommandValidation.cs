@@ -24,6 +24,10 @@ public static class CommandValidation
     {
         switch (cmd.Cmd)
         {
+            case "getNativeEditorRules":
+                return null;
+            case "setNativeEditorRule":
+                return CheckEditorRule(cmd);
             case "addWindowsPluginFolder":
             case "removeWindowsPluginFolder":
             case "getWindowsPluginFiles":
@@ -137,6 +141,13 @@ public static class CommandValidation
                 return null;   // the service knows the rest, or reports the command as unknown
         }
     }
+
+    internal static string? CheckEditorRule(Command cmd)
+        => cmd.Kind is not ("lv2" or "clap" or "vst3") || string.IsNullOrWhiteSpace(cmd.Plugin)
+           || cmd.Plugin.Length > MaxUri || cmd.Plugin.Any(char.IsControl)
+           || cmd.Name is { Length: > 200 } || cmd.Name?.Any(char.IsControl) == true
+            ? "setNativeEditorRule: need a valid kind, plugin id and optional name"
+            : null;
 
     internal static string? CheckPluginPath(Command cmd)
         => string.IsNullOrWhiteSpace(cmd.Path) || cmd.Path.Length > 4096

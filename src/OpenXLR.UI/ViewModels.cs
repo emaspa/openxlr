@@ -58,6 +58,7 @@ public sealed class MainViewModel : ViewModelBase
             else { Inserts.EnsurePluginsLoaded(); Inserts2.EnsurePluginsLoaded(); }
         });
         _client.ErrorReceived += msg => Dispatcher.UIThread.Post(() => Status = msg);
+        _client.NativeEditorRulesChanged += () => Dispatcher.UIThread.Post(() => InsertsViewModel.ReloadAll?.Invoke());
         _client.MetersReceived += levels => Dispatcher.UIThread.Post(() => ApplyMeters(levels));
         InsertsViewModel.ReloadAll = () =>
         {
