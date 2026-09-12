@@ -28,9 +28,7 @@ public sealed class WindowsIndividualPluginTests : IDisposable
     {
         File.WriteAllLines(Registry, folders);
         File.WriteAllLines(Exclusions, excluded ?? []);
-        string controller = Path.Combine(_root, "yabridgectl");
-        File.WriteAllText(controller, $$"""
-            #!/bin/sh
+        string controller = ExecutableScript.Write(Path.Combine(_root, "yabridgectl"), $$"""
             printf '%s\n' "$*" >> '{{_root}}/calls'
             stage="$1"
             if [ "$1" = blacklist ]; then stage="$1 $2"; fi
@@ -55,8 +53,6 @@ public sealed class WindowsIndividualPluginTests : IDisposable
             esac
             exit 0
             """);
-        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(controller,
-            UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         return new(Path.Combine(_root, "lv2"), Path.Combine(_root, "clap"), Path.Combine(_root, "vst3"), controller, "/bin/true",
             windowsImportDirectory: Path.Combine(_root, "imports"));
     }

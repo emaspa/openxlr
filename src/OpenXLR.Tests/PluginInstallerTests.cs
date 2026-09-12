@@ -225,9 +225,7 @@ public sealed class PluginInstallerTests : IDisposable
     private string FakeYabridgectl(string knownDirectory = "")
     {
         string log = Path.Combine(_root, "yabridgectl.log");
-        string script = Path.Combine(_root, "yabridgectl");
-        File.WriteAllText(script, $$"""
-            #!/bin/sh
+        return ExecutableScript.Write(Path.Combine(_root, "yabridgectl"), $$"""
             echo "$@" >> "{{log}}"
             case "$1" in
               --version) echo "yabridgectl 5.1.1" ;;
@@ -237,9 +235,16 @@ public sealed class PluginInstallerTests : IDisposable
             esac
             exit 0
             """);
-        if (!OperatingSystem.IsWindows())   // where these tests run; the analyser wants it said
-            File.SetUnixFileMode(script, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-        return script;
+    }
+
+    [Fact]
+    public void AControllerThatCannotStartKeepsTheReasonTheSystemGave()
+    {
+        string missing = Path.Combine(_root, "no-yabridgectl-here");
+        WindowsPluginFiles listed = new PluginInstaller(_lv2, _clap, _vst3, missing, null).ListWindowsPlugins(_picked);
+        Assert.False(listed.Ok);
+        Assert.Contains("could not be started", listed.Message);
+        Assert.Contains(missing, listed.Message);   // without the reason the failure cannot be diagnosed
     }
 
     private string[] YabridgeCalls() => File.Exists(Path.Combine(_root, "yabridgectl.log"))

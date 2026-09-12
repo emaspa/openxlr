@@ -15,9 +15,8 @@ public sealed class PluginScanDiagnosticsTests
         string dir = Directory.CreateTempSubdirectory("bridge-diagnostics-").FullName;
         try
         {
-            string controller = Path.Combine(dir, "yabridgectl");
-            File.WriteAllText(controller, "#!/bin/sh\n[ \"$1\" = status ] || exit 99\necho 'Example.vst3 -> missing wrapper'\necho 'bridge libraries missing' >&2\nexit 17\n");
-            File.SetUnixFileMode(controller, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            string controller = ExecutableScript.Write(Path.Combine(dir, "yabridgectl"),
+                "[ \"$1\" = status ] || exit 99\necho 'Example.vst3 -> missing wrapper'\necho 'bridge libraries missing' >&2\nexit 17\n");
             var installer = new PluginInstaller(dir, dir, dir, controller, null, winePrefix: Path.Combine(dir, "prefix"));
             var data = System.Text.Json.JsonSerializer.SerializeToElement(installer.Diagnostics(), new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
             Assert.Equal(controller, data.GetProperty("controller").GetString());
