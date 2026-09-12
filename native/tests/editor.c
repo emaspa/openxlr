@@ -60,6 +60,32 @@ static const Backend test_backend = {
     .editor_idle = test_idle, .editor_resized = test_resize,
     .editor_constrain = test_constrain, .editor_coordinate_nudge = true};
 
+// A backend that learns only while opening that the plugin has no editor,
+// as the VST3 backend does now that it creates no view while loading.
+static bool refuse_open(Host *h) {
+  host_set_has_editor(h, false);
+  return false;
+}
+
+// Run one command as the daemon would and hand back the reply line.
+static void reply_to(Host *h, const char *line, char *reply, size_t size) {
+  FILE *capture = tmpfile();
+  assert(capture);
+  fflush(stdout);
+  int saved = dup(STDOUT_FILENO);
+  assert(saved >= 0 && dup2(fileno(capture), STDOUT_FILENO) >= 0);
+  char command_line[32];
+  snprintf(command_line, sizeof(command_line), "%s", line);
+  command(h, command_line);
+  fflush(stdout);
+  assert(dup2(saved, STDOUT_FILENO) >= 0);
+  close(saved);
+  rewind(capture);
+  assert(fgets(reply, (int)size, capture));
+  reply[strcspn(reply, "\n")] = 0;
+  fclose(capture);
+}
+
 static void drain(Host *h) {
   // No host timer is installed. Only readiness of the real X connection can
   // deliver these events. The old 30 Hz polling path cannot pass this test.
@@ -239,6 +265,25 @@ int main(void) {
   assert_bounds(&h, 128, 96, 128, 96);
   puts("PASS: fixed editors reject border resizing but accept plugin scaling");
   close_ui(&h);
+
+  // Whether a plugin has an editor is settled when one is asked for, not by
+  // creating a view while loading, and the reply to show still tells a
+  // plugin without an editor apart from a missing display.
+  Backend no_editor_backend = test_backend;
+  no_editor_backend.editor_open = refuse_open;
+  h.backend = &no_editor_backend;
+  char reply[160];
+  reply_to(&h, "show", reply, sizeof(reply));
+  assert(!strcmp(reply, "ui unavailable: this plugin has no editor the host can show"));
+  assert(!h.has_editor && !h.editor_source && !h.display && !h.editor_open);
+  reply_to(&h, "show", reply, sizeof(reply));  // and it is remembered
+  assert(!strcmp(reply, "ui unavailable: this plugin has no editor the host can show"));
+  h.has_editor = true;
+  h.backend = &test_backend;
+  reply_to(&h, "show", reply, sizeof(reply));
+  assert(!strcmp(reply, "ui opened") && h.editor_open);
+  close_ui(&h);
+  puts("PASS: a plugin without an editor is found out on opening and says so");
   fixed_editor = false;
   assert(open_ui(&h));
   drain(&h);

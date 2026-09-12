@@ -687,13 +687,15 @@ static void command(Host *h, char *line) {
   char symbol[MAX_SYMBOL + 1], extra;
   float value;
   if (!strcmp(line, "show")) {
-    // Two different disappointments, and the user can act on only one.
-    if (!h->has_editor)
-      puts("ui unavailable: this plugin has no editor the host can show");
-    else
-      puts(open_ui(h) ? "ui opened"
-                      : "ui unavailable: no X display; the daemon has none "
-                        "from your desktop session");
+    // Two different disappointments, and the user can act on only one. A
+    // backend may learn only while opening that there is no editor, so the
+    // answer is chosen after the attempt.
+    bool opened = h->has_editor && open_ui(h);
+    puts(opened          ? "ui opened"
+         : !h->has_editor ? "ui unavailable: this plugin has no editor the "
+                            "host can show"
+                          : "ui unavailable: no X display; the daemon has "
+                            "none from your desktop session");
   }
   else if (!strcmp(line, "hide"))
     close_ui(h);
