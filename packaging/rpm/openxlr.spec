@@ -5,7 +5,7 @@
 %global _build_id_links none
 
 Name:           openxlr
-Version:        0.1.33
+Version:        0.1.34
 Release:        1%{?dist}
 Summary:        Control suite and PipeWire submixer for Elgato XLR interfaces
 License:        GPL-3.0-only
@@ -149,6 +149,18 @@ MSG
 %{_datadir}/openxlr/
 
 %changelog
+* Sat Sep 12 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.34-1
+- Options separates login startup, window behavior and software mixing into their own cards, with the audio notes next to the controls they describe and every saved preference preserved.
+- The applications card carries Manage in its heading and drops the hint line, so more application cards fit at the same window width.
+- Button labels lost their trailing ellipses and a mix's mute button now reads Mute; progress text and shortened names are unchanged.
+- Native plugin editors drain the X11 events already queued after a round trip, so an editor resize is no longer left waiting for the next event.
+- A VST3 editor is created only when it is asked for, which stops Elgato EQ aborting as the plugin is activated, and a plugin without an editor still says so.
+- Registered Windows plugin folders are managed from the window: a folder is removed with the wrappers it brought, the catalogue refreshes itself, and importing one plugin registers that plugin instead of its siblings.
+- Individual Windows plugins, their exclusions and their uninstallers are managed the same way, and a confirmed removal takes the plugin out of every insert chain that uses it while leaving unrelated plugins and profiles alone.
+- Which plugins open their own editor is an editable rule list in Options, with the release defaults kept apart from your own overrides, the De-Esser defaulting to the OpenXLR controls, and availability updating as plugins come and go; the rules decide the editor only and change no processing.
+- VST3 effects are offered by the channel layouts they actually support, probed as mono and stereo arrangements, so a compatible effect appears on the XLR inputs and an incompatible one is refused.
+- A plugin installation that cannot start a helper reports the operating system's error instead of an unspecified failure.
+
 * Fri Sep 11 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.33-1
 - Closing the window to the tray waits for the close to complete, "Show mixer" restores a minimized window, and "Quit OpenXLR" exits while close to tray is on.
 - The mixer follows the window width up to 1300 logical pixels and squeezes down to about 640, content scrolls when the window is short, mix cards wrap, and long plugin names are shortened with the full name in the tooltip.
