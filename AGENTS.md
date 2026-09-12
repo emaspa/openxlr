@@ -92,5 +92,10 @@ and [package checks](packaging/yabridge/README.md).
   that uses it.
 - Tests that redirect `XDG_CONFIG_HOME` or `XDG_RUNTIME_DIR` join the
   xUnit collection `xdg-config`.
+- A test that needs a fake helper program builds it with
+  `ExecutableScript.Write`. A program the test process wrote itself
+  cannot be run while other test classes start helpers: the write
+  handle reaches their forked children and Linux answers exec with
+  "Text file busy".
 - Hardware behaviour is verified on hardware. When you cannot, say so
   in the pull request instead of describing a test you did not run.

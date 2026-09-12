@@ -26,9 +26,7 @@ public sealed class WindowsPluginFolderTests : IDisposable
     private PluginInstaller Installer(string[] folders, string? fail = null, string? sync = null, bool wine = true)
     {
         File.WriteAllLines(Registry, folders);
-        string controller = Path.Combine(_root, "yabridgectl");
-        File.WriteAllText(controller, $$"""
-            #!/bin/sh
+        string controller = ExecutableScript.Write(Path.Combine(_root, "yabridgectl"), $$"""
             printf '%s\n' "$*" >> '{{_root}}/calls'
             if [ "$1" = '{{fail}}' ]; then printf 'test failure\n' >&2; exit 1; fi
             case "$1" in
@@ -39,7 +37,6 @@ public sealed class WindowsPluginFolderTests : IDisposable
             esac
             exit 0
             """);
-        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(controller, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         return new(Path.Combine(_root, "lv2"), Path.Combine(_root, "clap"), Path.Combine(_root, "vst3"), controller, wine ? "/bin/true" : null);
     }
 

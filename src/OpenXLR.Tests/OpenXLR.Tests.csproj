@@ -17,6 +17,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="run-script.sh" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="../OpenXLR.Core/OpenXLR.Core.csproj" />
     <ProjectReference Include="../OpenXLR.Daemon/OpenXLR.Daemon.csproj" />
     <ProjectReference Include="../OpenXLR.UI/OpenXLR.UI.csproj" />

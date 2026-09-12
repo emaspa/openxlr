@@ -905,17 +905,22 @@ public sealed class PluginInstaller
         };
     }
 
+    /// <summary>
+    /// Null only when there is no controller to run. A controller that cannot
+    /// be started comes back as a failed run carrying the reason the operating
+    /// system gave, because that reason is the whole diagnosis.
+    /// </summary>
     private ProcessResult? Run(params string[] arguments)
     {
         if (_yabridgectl is null) return null;
         try { return ProcessRunner.Run(_yabridgectl, arguments, YabridgeTimeout, cLocale: false,
             environment: _managed?.ControllerEnvironment()); }
-        catch (Exception) { return null; }
+        catch (Exception ex) { return new(-1, [], "it could not be started: " + ex.Message, TimedOut: false, Truncated: false); }
     }
 
     private static string Tail(ProcessResult? result)
     {
-        if (result is null) return "it could not be started.";
+        if (result is null) return "it is not installed.";
         if (result.TimedOut) return "it did not finish in time.";
         string text = (result.Stderr.Length > 0 ? result.Stderr : Encoding.UTF8.GetString(result.Stdout)).Trim();
         string[] lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);

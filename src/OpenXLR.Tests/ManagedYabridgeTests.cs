@@ -124,12 +124,7 @@ public sealed class ManagedYabridgeTests : IDisposable
         Assert.Equal(original, Environment.GetEnvironmentVariable("OPENXLR_BRIDGE_CHILD_TEST"));
     }
 
-    private void Script(string name, string body)
-    {
-        string path = Path.Combine(Package, name);
-        File.WriteAllText(path, "#!/bin/sh\n" + body);
-        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-    }
+    private void Script(string name, string body) => ExecutableScript.Write(Path.Combine(Package, name), body);
 
     public void Dispose()
     {
