@@ -107,6 +107,7 @@ void host_editor_lost(Host *h) {
 static bool same_editor_size(Host *h, unsigned width, unsigned height);
 static bool dragging(Host *h);
 static void update_editor_hints(Host *h);
+static void settle_editor_queue(Host *h);
 
 void host_set_editor_resizable(Host *h, bool resizable) {
   h->editor_resizable = resizable;
@@ -135,6 +136,7 @@ void host_resize_editor(Host *h, unsigned width, unsigned height) {
   XResizeWindow(h->display, h->window, width, height);
   XFlush(h->display);
   x_escape_armed = 0;
+  settle_editor_queue(h);
 }
 
 void host_show_editor(Host *h, bool show) {
@@ -177,6 +179,7 @@ void host_run_guarded(Host *h, void (*call)(void *), void *argument) {
   x_escape_armed = 1;
   call(argument);
   x_escape_armed = 0;
+  settle_editor_queue(h);
 }
 
 uint32_t host_rate(const Host *h) { return h->rate; }
@@ -405,6 +408,7 @@ static bool raise_ui(Host *h) {
 // life happens here, in raise_ui, in the event pump or in a backend's guarded
 // callback. Watch the X connection so a drag need not wait for the idle tick.
 static void editor_events(void *data, int fd, uint32_t mask);
+static void pump_editor(Host *h, bool idle);
 
 static bool open_ui(Host *h) {
   if (h->editor_open)
@@ -458,6 +462,10 @@ static bool open_ui(Host *h) {
   x_escape_armed = 0;
   if (!h->editor_open)
     close_ui(h);
+  else
+    // Mapping the frame and measuring the plugin both wait for replies, so
+    // the events that opening brought in may already be off the socket.
+    pump_editor(h, false);
   return h->editor_open;
 }
 
@@ -485,7 +493,7 @@ static bool same_editor_size(Host *h, unsigned width, unsigned height) {
 
 // One pass of the editor: its events and the backend's idle work. Losing
 // the display here costs the editor and nothing else.
-static void pump_editor(Host *h, bool idle) {
+static void pump_editor_once(Host *h, bool idle) {
   if (sigsetjmp(x_escape, 0)) {
     x_escape_armed = 0;
     host_editor_lost(h);
@@ -625,6 +633,29 @@ static void pump_editor(Host *h, bool idle) {
   x_escape_armed = 0;
   if (finished)
     close_ui(h);
+}
+
+// Xlib reads the connection dry whenever it waits for a reply, so a round
+// trip made after the queue was emptied can leave events in Xlib's own queue
+// with nothing left on the socket. The editor's source only wakes on the
+// socket, so those events would wait for an unrelated one or for the tick,
+// and the plugin would hear its new size late or not at all. A pass ends
+// with the queue empty instead.
+static void pump_editor(Host *h, bool idle) {
+  pump_editor_once(h, idle);
+  for (unsigned pass = 0; pass < 8 && h->editor_open && h->display &&
+                          XEventsQueued(h->display, QueuedAlready) > 0;
+       ++pass)
+    pump_editor_once(h, false);
+}
+
+// The same for X work done outside the pump: a plugin's resize request and a
+// backend's own callbacks both wait for replies. A caller that is already
+// inside the escape leaves the queue to the section that armed it.
+static void settle_editor_queue(Host *h) {
+  if (!x_escape_armed && h->editor_open && h->display &&
+      XEventsQueued(h->display, QueuedAlready) > 0)
+    pump_editor(h, false);
 }
 
 static void editor_events(void *data, int fd, uint32_t mask) {

@@ -93,6 +93,11 @@ static void assert_bounds(Host *h, int min_width, int min_height,
 }
 
 int main(void) {
+  // An X server resets when its last client disconnects, and a connection
+  // opened while it resets is refused. Closing the editor drops every
+  // connection this test holds, so one is kept open for the whole run.
+  Display *keepalive = XOpenDisplay(NULL);
+  assert(keepalive);
   const char *renderer = getenv("LSP_WS_LIB_GLXSURFACE");
   char *saved_renderer = renderer ? strdup(renderer) : NULL;
   assert(!renderer || saved_renderer);
@@ -249,6 +254,7 @@ int main(void) {
   pw_loop_leave(host_loop(&h));
   pw_main_loop_destroy(h.loop);
   pw_deinit();
+  XCloseDisplay(keepalive);
   puts("PASS: closing, reopening and losing a display remove its event source");
   return 0;
 }
