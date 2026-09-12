@@ -304,7 +304,7 @@ post in the Discord support forum, yourself.
 - [rikkichy](https://github.com/rikkichy): prior protocol research.
 - [nekename](https://github.com/nekename): upstream software.
 - [FrostyCoolSlug](https://github.com/FrostyCoolSlug): technical guidance.
-- Unnamed community testers: hardware and packaging testing.
+- All the various community testers (thank you!): hardware and packaging testing.
 
 ## Status
 
