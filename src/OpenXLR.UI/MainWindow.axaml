@@ -148,7 +148,7 @@
        the cards follow the available width. Every card sizes to its content;
        the page scrolls when the window is shorter. -->
   <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-  <StackPanel Name="MixerContent" Margin="16" MaxWidth="1300" HorizontalAlignment="Center">
+  <StackPanel Name="MixerContent" Margin="16" MaxWidth="1300" HorizontalAlignment="Stretch">
 
     <!-- header -->
     <Border Classes="card" Margin="0,0,0,8">
@@ -528,15 +528,20 @@
     <!-- running applications and the channel each is routed to -->
     <Border Classes="card" Margin="0,0,0,8" IsVisible="{Binding HasMixer}">
       <Expander Name="ApplicationsTile" Classes="tile" Theme="{StaticResource TileExpanderTheme}" IsExpanded="True">
-        <Expander.Header><TextBlock Text="APPLICATIONS" Classes="h"/></Expander.Header>
-      <StackPanel Spacing="8">
-        <ItemsControl ItemsSource="{Binding ActiveApps}">
+        <Expander.Header>
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <TextBlock Text="APPLICATIONS" Classes="h" VerticalAlignment="Center"/>
+            <Button Name="ManageApps" Content="Manage…" Padding="8,1" FontSize="11" MinHeight="0" VerticalAlignment="Center"
+                    IsEnabled="{Binding HasApps}" Click="OnManageApps"/>
+          </StackPanel>
+        </Expander.Header>
+        <ItemsControl Name="ApplicationRows" ItemsSource="{Binding ActiveApps}">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:AppStreamViewModel">
-              <Border Background="#23262f" CornerRadius="6" Padding="8,6" Margin="0,0,8,8">
+              <Border Background="#23262f" CornerRadius="6" Padding="8,6" Margin="0,0,4,8">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <Ellipse Width="8" Height="8" VerticalAlignment="Center"
                            Fill="{Binding Active, Converter={x:Static vm:Converters.BoolToBrush}}"
@@ -549,14 +554,6 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
-        <Grid ColumnDefinitions="*,Auto">
-          <TextBlock TextWrapping="Wrap" VerticalAlignment="Center"
-                     Text="Running audio-capable apps appear here (green light = playing) and are routed automatically. Changing one is remembered."
-                     FontSize="11" Foreground="#6b7285"/>
-          <Button Grid.Column="1" Content="Manage…" Padding="12,4" Margin="8,0,0,0"
-                  Click="OnManageApps" IsEnabled="{Binding HasApps}"/>
-        </Grid>
-      </StackPanel>
       </Expander>
     </Border>
 
