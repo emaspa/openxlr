@@ -25,6 +25,9 @@ public enum PluginItemKind
 
 public sealed record PluginItem(PluginItemKind Kind, string Path);
 
+public sealed record WindowsPluginFile(string Path, string Name, string Format, bool Enabled, bool CanDelete, string? WinePrefix, bool InUse = false);
+public sealed record WindowsPluginFiles(bool Ok, string Message, IReadOnlyList<WindowsPluginFile> Plugins);
+
 /// <summary>Where plugins are found and installed, and what is there to bridge Windows ones.</summary>
 public sealed record PluginSetup(
     bool HostInstalled,
@@ -291,13 +294,14 @@ public sealed class PluginInstaller
         return imported.Count > 0 ? directory : null;
     }
 
-    private static bool InWinePrefix(string source)
+    private static bool InWinePrefix(string source) => WinePrefixFor(source) is not null;
+
+    private static string? WinePrefixFor(string source)
     {
-        FileSystemInfo info = Directory.Exists(source) ? new DirectoryInfo(source) : new FileInfo(source);
-        string path = info.ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? Path.GetFullPath(source);
+        string path = WindowsPluginWrappers.Canonical(source);
         for (string? parent = Path.GetDirectoryName(path); parent is not null; parent = Path.GetDirectoryName(parent))
-            if (File.Exists(Path.Combine(parent, "system.reg")) && Directory.Exists(Path.Combine(parent, "drive_c"))) return true;
-        return false;
+            if (File.Exists(Path.Combine(parent, "system.reg")) && Directory.Exists(Path.Combine(parent, "drive_c"))) return parent;
+        return null;
     }
 
     private static void Copy(string source, string directory, List<string> installed, List<string> destinations, List<string> notes,
@@ -445,6 +449,196 @@ public sealed class PluginInstaller
         }
     }
 
+    /// <summary>The individual Windows plugins reachable from one registered folder, including exclusions.</summary>
+    public WindowsPluginFiles ListWindowsPlugins(string folder, IReadOnlyCollection<string>? inUsePluginPaths = null)
+    {
+        if (!ValidPluginPath(folder)) return new(false, "The folder path has to be absolute and contain no control characters.", []);
+        try
+        {
+            folder = WindowsPluginWrappers.Normalize(folder);
+            if (!TryWindowsDirectories(out IReadOnlyList<string> folders, out string? error)) return new(false, error!, []);
+            if (!folders.Contains(folder, StringComparer.Ordinal)) return new(false, "This folder is not registered with yabridge.", []);
+            if (!TryBlacklist(out HashSet<string> excluded, out error)) return new(false, error!, []);
+            string[] usedTargets = inUsePluginPaths is { Count: > 0 }
+                ? WindowsPluginWrappers.Read(BridgedVst3Directory, BridgedClapDirectory)
+                    .Where(w => WindowsPluginWrappers.InUse(w, inUsePluginPaths))
+                    .SelectMany(w => w.Targets).Select(WindowsPluginWrappers.Canonical).Distinct(StringComparer.Ordinal).ToArray()
+                : [];
+            var plugins = new List<WindowsPluginFile>();
+            foreach (PluginItem item in Items(folder).Where(i => i.Kind == PluginItemKind.WindowsPlugin))
+            {
+                string path = WindowsPluginWrappers.Normalize(item.Path);
+                string? prefix = WinePrefixFor(path);
+                string canonical = WindowsPluginWrappers.Canonical(path);
+                bool used = usedTargets.Any(t => WindowsPluginWrappers.Under(t, canonical));
+                plugins.Add(new(path, Path.GetFileName(path), Path.GetExtension(path).TrimStart('.').ToLowerInvariant(),
+                    !PluginBlocked(path, folders, excluded), prefix is null && !WindowsPluginWrappers.HasLink(path), prefix, used));
+            }
+            return new(true, "", plugins.DistinctBy(p => p.Path).OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase).ToArray());
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return new(false, $"Could not list the plugins: {ex.Message}", []);
+        }
+    }
+
+    /// <summary>Resolve the selected source to bridge paths without changing files or exclusions.</summary>
+    public bool TryWindowsPluginWrappers(string path, out IReadOnlyList<string> wrappers, out string? error)
+    {
+        wrappers = [];
+        try
+        {
+            if (!TryPlugin(path, out path, out _, out _, out error)) return false;
+            wrappers = WindowsPluginWrappers.ForPlugin(
+                WindowsPluginWrappers.Read(BridgedVst3Directory, BridgedClapDirectory), path)
+                .Select(w => w.Path).ToArray();
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            error = $"Could not resolve the plugin's bridge wrappers: {ex.Message}";
+            return false;
+        }
+    }
+
+    /// <summary>Exclude or restore one canonical Windows plugin without changing its source files.</summary>
+    public InstallOutcome SetWindowsPluginEnabled(string path, bool enabled, IReadOnlyCollection<string>? inUsePluginPaths = null)
+    {
+        bool changed = false;
+        try
+        {
+            if (!TryPlugin(path, out path, out IReadOnlyList<string> folders, out HashSet<string> excluded, out string? error))
+                return new(false, error!, []);
+            string canonical = WindowsPluginWrappers.Canonical(path);
+            if (enabled && PluginBlocked(path, folders, excluded, ignoreExact: canonical))
+                return new(false, "This plugin is excluded by a folder-level rule. Remove that rule in yabridge before enabling the plugin.", []);
+            if (enabled && !excluded.Contains(canonical)) return new(true, "This plugin is already enabled.", []);
+            IReadOnlyList<WindowsPluginWrappers.Wrapper> wrappers = WindowsPluginWrappers.ForPlugin(
+                WindowsPluginWrappers.Read(BridgedVst3Directory, BridgedClapDirectory), path);
+            if (!enabled && wrappers.Any(w => WindowsPluginWrappers.InUse(w, inUsePluginPaths)))
+                return new(false, "Remove this plugin from your insert chains before excluding it.", []);
+            if (_wine is null) return new(false, "Wine is not installed. It is needed to sync the plugin wrappers safely.", []);
+            if (!PrepareManagedBridge()) return new(false, "The OpenXLR bridge could not select its packaged libraries.", []);
+            if (enabled || !excluded.Contains(canonical))
+            {
+                ProcessResult? result = Run("blacklist", enabled ? "rm" : "add", canonical);
+                if (result?.Ok != true) return new(false, $"yabridge could not change the plugin exclusion: {Tail(result)}", []);
+                changed = true;
+            }
+            if (!TryBlacklist(out excluded, out error))
+                return new(false, $"The exclusion command completed, but its result could not be checked: {error} Wrappers were kept.", []);
+            if (excluded.Contains(canonical) == enabled)
+                return new(false, "yabridge did not apply the requested exclusion. Wrappers were kept.", []);
+            ProcessResult? sync = Run("sync");
+            if (sync?.Ok != true)
+                return new(false, $"The plugin exclusion is saved, but syncing failed and wrappers were kept: {Tail(sync)}", []);
+            int removed = 0;
+            if (!enabled)
+            {
+                // Sync may have retargeted a shared wrapper name to another
+                // plugin. Only delete wrappers still pointing at this one.
+                wrappers = WindowsPluginWrappers.ForPlugin(WindowsPluginWrappers.Read(BridgedVst3Directory, BridgedClapDirectory), path);
+                foreach (var wrapper in wrappers) { wrapper.Remove(); removed++; }
+            }
+            return new(true, enabled ? $"Enabled {Path.GetFileName(path)} and synced its bridge wrappers."
+                : $"Excluded {Path.GetFileName(path)} and removed {removed} bridge wrappers. Original plugin files were kept.", [],
+                [BridgedVst3Directory, BridgedClapDirectory]);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return new(false, changed ? $"The exclusion changed, but wrapper cleanup did not finish: {ex.Message} Original files were kept."
+                : $"Could not change the plugin exclusion: {ex.Message}", []);
+        }
+    }
+
+    /// <summary>Delete one standalone Windows plugin, never an installer-managed or linked source.</summary>
+    public InstallOutcome DeleteWindowsPlugin(string path, IReadOnlyCollection<string>? inUsePluginPaths = null)
+    {
+        bool deleting = false;
+        try
+        {
+            if (!TryPlugin(path, out path, out _, out HashSet<string> excluded, out string? error)) return new(false, error!, []);
+            if (WinePrefixFor(path) is not null || WindowsPluginWrappers.HasLink(path))
+                return new(false, "This plugin is installed in Wine or reached through a symbolic link. Use its Wine uninstaller; its files were kept.", []);
+            string canonical = WindowsPluginWrappers.Canonical(path);
+            IReadOnlyList<WindowsPluginWrappers.Wrapper> wrappers = WindowsPluginWrappers.ForPlugin(
+                WindowsPluginWrappers.Read(BridgedVst3Directory, BridgedClapDirectory), path);
+            if (wrappers.Any(w => WindowsPluginWrappers.InUse(w, inUsePluginPaths)))
+                return new(false, "Remove this plugin from your insert chains before deleting its files.", []);
+            if (_wine is null) return new(false, "Wine is not installed. It is needed to sync the remaining plugins safely.", []);
+            if (!PrepareManagedBridge()) return new(false, "The OpenXLR bridge could not select its packaged libraries.", []);
+            deleting = true;
+            Remove(path);
+            if (excluded.Contains(canonical))
+            {
+                // rm accepts a missing path when it exactly matches a saved
+                // canonical entry; an obsolete symlink alias would not work.
+                ProcessResult? unexclude = Run("blacklist", "rm", canonical);
+                if (unexclude?.Ok != true) return new(false, $"Plugin files were deleted, but their exclusion could not be removed: {Tail(unexclude)}", []);
+            }
+            ProcessResult? sync = Run("sync");
+            if (sync?.Ok != true) return new(false, $"Plugin files were deleted, but syncing failed and wrappers were kept: {Tail(sync)}", []);
+            wrappers = WindowsPluginWrappers.ForPlugin(WindowsPluginWrappers.Read(BridgedVst3Directory, BridgedClapDirectory), path);
+            foreach (var wrapper in wrappers) wrapper.Remove();
+            return new(true, $"Deleted {Path.GetFileName(path)} and removed {wrappers.Count} bridge wrappers. Other plugins were kept.", []);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return new(false, deleting ? $"Plugin deletion did not finish; some files may already be removed: {ex.Message}"
+                : $"Could not delete the plugin: {ex.Message}", []);
+        }
+    }
+
+    private static bool ValidPluginPath(string? path)
+        => !string.IsNullOrWhiteSpace(path) && path.Length <= 4096 && !path.Any(char.IsControl) && Path.IsPathFullyQualified(path);
+
+    private bool TryPlugin(string path, out string normalized, out IReadOnlyList<string> folders, out HashSet<string> excluded, out string? error)
+    {
+        normalized = path;
+        folders = [];
+        excluded = new(StringComparer.Ordinal);
+        error = "The plugin path must be absolute and contain no control characters.";
+        if (!ValidPluginPath(path)) return false;
+        normalized = WindowsPluginWrappers.Normalize(path);
+        if (!TryWindowsDirectories(out folders, out error)) return false;
+        string requested = normalized;
+        if (!folders.Where(f => WindowsPluginWrappers.Under(requested, f))
+            .Any(f => Items(f).Any(i => i.Kind == PluginItemKind.WindowsPlugin && WindowsPluginWrappers.Normalize(i.Path) == requested)))
+        {
+            error = "This is not a Windows VST3 or CLAP plugin in a registered folder.";
+            return false;
+        }
+        return TryBlacklist(out excluded, out error);
+    }
+
+    private bool TryBlacklist(out HashSet<string> excluded, out string? error)
+    {
+        excluded = new(StringComparer.Ordinal);
+        ProcessResult? list = Run("blacklist", "list");
+        if (list?.Ok != true) { error = $"yabridge could not list plugin exclusions: {Tail(list)}"; return false; }
+        foreach (string line in list.StdoutText.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            if (line.StartsWith('/')) excluded.Add(WindowsPluginWrappers.Normalize(line));
+        error = null;
+        return true;
+    }
+
+    private static bool PluginBlocked(string path, IReadOnlyList<string> folders, HashSet<string> excluded, string? ignoreExact = null)
+    {
+        // yabridge checks each canonical entry it visits. An ancestor outside
+        // a registered root is not visited, nor are the parents of a link's target.
+        foreach (string folder in folders.Where(f => WindowsPluginWrappers.Under(path, f)))
+        {
+            bool blocked = false;
+            for (string? current = path; current is not null && WindowsPluginWrappers.Under(current, folder); current = Path.GetDirectoryName(current))
+            {
+                string canonical = WindowsPluginWrappers.Canonical(current);
+                if (canonical != ignoreExact && excluded.Contains(canonical)) { blocked = true; break; }
+            }
+            if (!blocked) return false;
+        }
+        return true;
+    }
+
     /// <summary>Unregister one source and remove only its unused VST3/CLAP wrappers, never its plugins.</summary>
     public InstallOutcome RemoveWindowsFolder(string path, IReadOnlyCollection<string>? inUsePluginPaths = null)
     {
@@ -495,19 +689,37 @@ public sealed class PluginInstaller
     }
 
     /// <summary>Bridge again whatever yabridge knows, for plugins installed into those folders since.</summary>
-    public InstallOutcome SyncWindows()
+    public InstallOutcome SyncWindows(IReadOnlyCollection<string>? inUsePluginPaths = null)
     {
         if (_yabridgectl is null) return new(false, "yabridge is not installed.", []);
         if (_wine is null) return new(false, "Wine is not installed, and yabridge needs it.", []);
         if (!PrepareManagedBridge()) return new(false, "The OpenXLR bridge could not select its packaged libraries.", []);
-        IReadOnlyList<string> directories = WindowsDirectories();
+        if (!TryWindowsDirectories(out IReadOnlyList<string> directories, out string? error)) return new(false, error!, []);
         if (directories.Count == 0) return new(false, "yabridge has no plugin folders yet. Add a Windows plugin to give it one.", []);
         ProcessResult? sync = Run("sync");
-        if (sync is null || sync.ExitCode != 0) return new(false, $"yabridge could not bridge the plugins: {Tail(sync)}", []);
-        return new(true, directories.Count == 1
+        if (sync?.Ok != true) return new(false, $"yabridge could not bridge the plugins: {Tail(sync)}", []);
+        if (!TryWindowsDirectories(out directories, out error))
+            return new(false, $"Plugins were synced, but missing-source wrappers were kept: {error}", []);
+        int removed = 0, kept = 0;
+        try
+        {
+            foreach (var wrapper in WindowsPluginWrappers.Missing(BridgedVst3Directory, BridgedClapDirectory, directories))
+            {
+                if (WindowsPluginWrappers.InUse(wrapper, inUsePluginPaths)) { kept++; continue; }
+                wrapper.Remove();
+                removed++;
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return new(false, $"Plugins were synced, but missing-source wrapper cleanup did not finish: {ex.Message}", []);
+        }
+        string message = directories.Count == 1
             ? $"Bridged the Windows plugins in {Shorten(directories[0])}."
-            : $"Bridged the Windows plugins in {directories.Count} folders.", directories.Select(Shorten).ToList(),
-            [BridgedVst3Directory, BridgedClapDirectory]);
+            : $"Bridged the Windows plugins in {directories.Count} folders.";
+        if (removed > 0) message += $" Removed {removed} wrappers whose source plugins are missing.";
+        if (kept > 0) message += $" Kept {kept} missing-source wrappers still used by insert chains.";
+        return new(true, message, directories.Select(Shorten).ToList(), [BridgedVst3Directory, BridgedClapDirectory]);
     }
 
     private string BridgedVst3Directory => _managed is null ? Path.Combine(_vst3, "yabridge")

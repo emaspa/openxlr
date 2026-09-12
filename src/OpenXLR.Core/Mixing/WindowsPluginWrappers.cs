@@ -3,7 +3,7 @@ namespace OpenXLR.Core.Mixing;
 /// <summary>Only yabridge wrappers whose Windows targets belong to a removed source folder.</summary>
 internal static class WindowsPluginWrappers
 {
-    internal sealed record Wrapper(string Path, string? WindowsLink = null)
+    internal sealed record Wrapper(string Path, string? WindowsLink, IReadOnlyList<string> Targets)
     {
         public void Remove()
         {
@@ -22,6 +22,42 @@ internal static class WindowsPluginWrappers
         => path == directory || path.StartsWith(directory == "/" ? "/" : directory + "/", StringComparison.Ordinal);
 
     internal static IReadOnlyList<Wrapper> Find(string vst3, string clap, string removed, IReadOnlyCollection<string> retained)
+        => Select(Read(vst3, clap), targets => targets.All(t => Under(t, removed))
+            && !targets.Any(t => retained.Any(d => Under(t, d))));
+
+    internal static IReadOnlyList<Wrapper> ForPlugin(IReadOnlyList<Wrapper> wrappers, string plugin)
+    {
+        string canonical = Canonical(plugin);
+        return Select(wrappers, targets =>
+        {
+            int matching = targets.Count(t => Under(Canonical(t), canonical));
+            if (matching > 0 && matching != targets.Count)
+                throw new IOException("A bridge wrapper is shared by multiple source plugins; its files were kept.");
+            return matching == targets.Count;
+        });
+    }
+
+    internal static IReadOnlyList<Wrapper> Missing(string vst3, string clap, IReadOnlyCollection<string> folders)
+        => Select(Read(vst3, clap), targets => targets.All(t => !File.Exists(t) && !Directory.Exists(t)
+            && folders.Any(d => Under(t, d) || Under(Canonical(t), Canonical(d)))));
+
+    internal static bool InUse(Wrapper wrapper, IReadOnlyCollection<string>? paths)
+        => paths?.Any(p => Under(Normalize(p), wrapper.Path)) == true;
+
+    private static IReadOnlyList<Wrapper> Select(IReadOnlyList<Wrapper> wrappers, Func<IReadOnlyList<string>, bool> matches)
+    {
+        var selected = new List<Wrapper>();
+        foreach (Wrapper wrapper in wrappers)
+        {
+            if (wrapper.Targets.Count == 0 || !matches(wrapper.Targets)) continue;
+            if (wrapper.WindowsLink is null) CheckBundle(wrapper.Path);
+            else if (!IsElf(wrapper.Path)) throw new IOException($"The CLAP file {wrapper.Path} is not a Linux bridge wrapper.");
+            selected.Add(wrapper);
+        }
+        return selected;
+    }
+
+    internal static IReadOnlyList<Wrapper> Read(string vst3, string clap)
     {
         var wrappers = new List<Wrapper>();
         foreach (string bundle in Entries(vst3, vst3: true))
@@ -40,21 +76,13 @@ internal static class WindowsPluginWrappers
                     targets.Add(LinkTarget(module) ?? throw new IOException($"The Windows module in {bundle} is not a yabridge link."));
                 }
             }
-            if (targets.Count > 0 && targets.All(t => Under(t, removed)) && !targets.Any(t => retained.Any(d => Under(t, d))))
-            {
-                CheckBundle(bundle);
-                wrappers.Add(new(bundle));
-            }
+            if (targets.Count > 0) wrappers.Add(new(bundle, null, targets));
         }
         foreach (string module in Entries(clap, vst3: false))
         {
             string link = System.IO.Path.ChangeExtension(module, ".clap-win");
             string? target = LinkTarget(link);
-            if (target is not null && Under(target, removed) && !retained.Any(d => Under(target, d)))
-            {
-                if (!IsElf(module)) throw new IOException($"The CLAP file {module} is not a Linux bridge wrapper.");
-                wrappers.Add(new(module, link));
-            }
+            if (target is not null) wrappers.Add(new(module, link, [target]));
         }
         return wrappers;
     }
@@ -118,6 +146,39 @@ internal static class WindowsPluginWrappers
     {
         string? target = new FileInfo(path).LinkTarget;
         return target is null ? null : Normalize(System.IO.Path.GetFullPath(target, System.IO.Path.GetDirectoryName(path)!));
+    }
+
+    // yabridgectl stores canonical blacklist paths. Resolve ancestor links
+    // too, and retain a missing tail so an uninstalled path can be matched.
+    internal static string Canonical(string path)
+    {
+        int links = 0;
+        return Resolve(System.IO.Path.IsPathFullyQualified(path) ? path : System.IO.Path.GetFullPath(path));
+
+        string Resolve(string full)
+        {
+            string root = System.IO.Path.GetPathRoot(full)!;
+            string current = root;
+            foreach (string part in full[root.Length..].Split(System.IO.Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (part == ".") continue;
+                if (part == "..") { current = System.IO.Path.GetDirectoryName(current) ?? root; continue; }
+                current = System.IO.Path.Combine(current, part);
+                string? target = new FileInfo(current).LinkTarget;
+                if (target is null) continue;
+                if (++links > 40) throw new IOException($"Too many symbolic links in {path}.");
+                current = Resolve(System.IO.Path.IsPathFullyQualified(target) ? target
+                    : System.IO.Path.Combine(System.IO.Path.GetDirectoryName(current)!, target));
+            }
+            return Normalize(current);
+        }
+    }
+
+    internal static bool HasLink(string path)
+    {
+        for (string? current = Normalize(path); current is not null; current = System.IO.Path.GetDirectoryName(current))
+            if (new FileInfo(current).LinkTarget is not null) return true;
+        return false;
     }
 
     private static void EnsureNotLink(string path)

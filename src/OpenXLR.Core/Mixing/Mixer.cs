@@ -743,6 +743,69 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         }
     }
 
+    /// <summary>Remove every occurrence of the selected plugins, then save before acknowledging.</summary>
+    public (int Removed, int Chains, string? Error) RemovePluginInserts(
+        IReadOnlySet<(string Kind, string Plugin)> plugins, Func<MixerSettings, string?> save)
+    {
+        lock (_gate)
+        {
+            try
+            {
+                return RemovePluginInserts(_inserts, plugins,
+                    keys => { if (_built) RewireInsertKeysLocked(keys, endWine: false); },
+                    () =>
+                    {
+                        if (save(ExportSettings()) is string error) throw new IOException(error);
+                    });
+            }
+            finally { if (_built) EndUnusedWineLocked(); }
+        }
+    }
+
+    internal static (int Removed, int Chains, string? Error) RemovePluginInserts(
+        IDictionary<string, List<InsertDefinition>> inserts, IReadOnlySet<(string Kind, string Plugin)> plugins,
+        Action<IReadOnlyList<string>> rewire, Action save)
+    {
+        var edits = inserts.Select(e => (e.Key, Before: e.Value,
+            After: e.Value.Where(i => !plugins.Contains((i.Kind, i.Plugin))).ToList()))
+            .Where(e => e.Before.Count != e.After.Count).ToArray();
+        // Both hardware inputs share one feed rebuild; mixes are independent.
+        var groups = edits.GroupBy(e => (Input: e.Key is "xlr1" or "xlr2",
+            Key: e.Key is "xlr1" or "xlr2" ? "" : e.Key)).Select(g => g.ToArray()).ToArray();
+        var completed = new List<string[]>();
+        var errors = new List<string>();
+        int removed = 0, chains = 0;
+        foreach (var group in groups)
+        {
+            string[] keys = [.. group.Select(e => e.Key)];
+            foreach (var edit in group) inserts[edit.Key] = edit.After;
+            try { rewire(keys); }
+            catch (Exception ex)
+            {
+                foreach (var edit in group) inserts[edit.Key] = edit.Before;
+                errors.Add($"{string.Join(", ", keys)}: {ex.Message}");
+                try { rewire(keys); }
+                catch (Exception rollback) { errors.Add($"Could not restore {string.Join(", ", keys)} audio: {rollback.Message}"); }
+                continue;
+            }
+            completed.Add(keys);
+            removed += group.Sum(e => e.Before.Count - e.After.Count);
+            chains += group.Length;
+        }
+        try { save(); }
+        catch (Exception ex)
+        {
+            foreach (var edit in edits) inserts[edit.Key] = edit.Before;
+            var rollbackErrors = new List<string>(errors);
+            foreach (string[] keys in completed)
+                try { rewire(keys); }
+                catch (Exception rollback) { rollbackErrors.Add(rollback.Message); }
+            throw new InvalidOperationException("Could not save plugin removal; previous chain settings were restored: " + ex.Message
+                + (rollbackErrors.Count == 0 ? "" : " Audio recovery also reported: " + string.Join("; ", rollbackErrors)), ex);
+        }
+        return (removed, chains, errors.Count == 0 ? null : "Some chains could not be changed: " + string.Join("; ", errors));
+    }
+
     /// <summary>Bypass or re-enable one insert; rewires when built.</summary>
     public void SetInsertBypass(string channel, string insertId, bool bypass)
     {
@@ -756,11 +819,18 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         }
     }
 
-    private void RewireInsertKeyLocked(string key)
+    private void RewireInsertKeyLocked(string key) => RewireInsertKeysLocked([key]);
+
+    private void RewireInsertKeysLocked(IReadOnlyList<string> keys, bool endWine = true)
     {
-        _restarts.Forget(key);
-        if (MixForKey(key) is MixDefinition mix) WireMixChainLocked(mix);
-        else if (IsInsertChannel(key)) WireInputFeedsLocked();
+        foreach (string key in keys) _restarts.Forget(key);
+        if (MixForKey(keys[0]) is MixDefinition mix) WireMixChainLocked(mix);
+        else if (keys.Any(IsInsertChannel)) WireInputFeedsLocked();
+        if (endWine) EndUnusedWineLocked();
+    }
+
+    private void EndUnusedWineLocked()
+    {
         // The new chain is up: if it holds no bridged plugin any more, Wine is
         // resident for nothing, and it would still be resident hours later
         // when the daemon stops. The decision is taken here, under the lock,

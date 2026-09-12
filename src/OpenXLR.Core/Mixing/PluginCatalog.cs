@@ -70,6 +70,18 @@ public static class PluginCatalog
     public static HashSet<(string Kind, string Plugin)> Identities()
         => [.. Plugins.Select(p => (p.Kind, p.Plugin))];
 
+    /// <summary>Plugin identities supplied by exactly these files or bundle directories.</summary>
+    public static HashSet<(string Kind, string Plugin)> IdentitiesUnder(IReadOnlyCollection<string> paths)
+        => IdentitiesUnder(Plugins, paths);
+
+    internal static HashSet<(string Kind, string Plugin)> IdentitiesUnder(IEnumerable<PluginInfo> catalogue, IReadOnlyCollection<string> paths)
+    {
+        string[] roots = [.. paths.Select(WindowsPluginWrappers.Normalize)];
+        return [.. catalogue.Where(p => p.Path is not null
+                && roots.Any(root => WindowsPluginWrappers.Under(WindowsPluginWrappers.Normalize(p.Path), root)))
+            .Select(p => (p.Kind, p.Plugin))];
+    }
+
     /// <summary>The same, but only for plugins that came from one of these directories.</summary>
     public static int CountUnder(IReadOnlyCollection<string> directories, HashSet<(string Kind, string Plugin)> known)
         => Plugins.Count(p => !known.Contains((p.Kind, p.Plugin))

@@ -494,6 +494,29 @@ public sealed class MixerService : IHostedService, IDisposable
         return null;
     }
 
+    /// <summary>Remove current uses and persist them before file-management actions become available.</summary>
+    public (int Removed, int Chains, string? Error) RemovePluginInserts(IReadOnlySet<(string Kind, string Plugin)> plugins)
+    {
+        if (!_mixer.Built) return (0, 0, "The audio mixer must be running to remove plugins from its current chains.");
+        (int Removed, int Chains, string? Error) result = (0, 0, null);
+        try
+        {
+            _saves.RunSaved(() =>
+            {
+                if (_stopping.IsCancellationRequested || _saves.Closed)
+                    throw new InvalidOperationException("The mixer is stopping.");
+                result = _mixer.RemovePluginInserts(plugins, settings => settings.Save());
+            });
+        }
+        catch (Exception ex)
+        {
+            Changed?.Invoke();
+            return (0, 0, ex.Message);
+        }
+        Changed?.Invoke();
+        return result;
+    }
+
     /// <summary>The current mixer scene for saving into a profile, or null.</summary>
     public OpenXLR.Core.MixerScene? ExportScene() => _mixer.Built ? _mixer.ExportScene() : null;
 

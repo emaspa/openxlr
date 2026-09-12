@@ -213,15 +213,44 @@ public sealed class WebSocketHub
                 break;
             case "addWindowsPluginFolder":
             case "removeWindowsPluginFolder":
-                error = CommandValidation.CheckPluginFolderPath(cmd);
+                error = CommandValidation.CheckPluginPath(cmd);
                 if (error is not null) break;
                 await reply(await Task.Run(() => InstallPlugin(installer =>
                     cmd.Cmd == "addWindowsPluginFolder"
                         ? installer.AddWindowsFolder(cmd.Path!)
                         : installer.RemoveWindowsFolder(cmd.Path!, InsertPluginPaths()))));
                 break;
+            case "getWindowsPluginFiles":
+                error = CommandValidation.CheckPluginPath(cmd);
+                if (error is not null) break;
+                await reply(await Task.Run(() =>
+                {
+                    lock (_installGate)
+                        return new WindowsPluginFilesMessage(new OpenXLR.Core.Mixing.PluginInstaller()
+                            .ListWindowsPlugins(cmd.Path!, InsertPluginPaths()));
+                }));
+                break;
+            case "removeWindowsPluginInserts":
+                error = CommandValidation.CheckPluginPath(cmd);
+                if (error is not null) break;
+                await reply(await Task.Run(() => RemoveWindowsPluginInserts(cmd.Path!)));
+                break;
+            case "setWindowsPluginEnabled":
+            case "deleteWindowsPlugin":
+                error = CommandValidation.CheckPluginPath(cmd);
+                if (error is not null) break;
+                if (cmd.Cmd == "setWindowsPluginEnabled" && cmd.Value.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                {
+                    error = "setWindowsPluginEnabled: value must be a boolean";
+                    break;
+                }
+                await reply(await Task.Run(() => InstallPlugin(installer =>
+                    cmd.Cmd == "setWindowsPluginEnabled"
+                        ? installer.SetWindowsPluginEnabled(cmd.Path!, cmd.Value.GetBoolean(), InsertPluginPaths())
+                        : installer.DeleteWindowsPlugin(cmd.Path!, InsertPluginPaths()))));
+                break;
             case "syncWindowsPlugins":
-                await reply(await Task.Run(() => InstallPlugin(installer => installer.SyncWindows())));
+                await reply(await Task.Run(() => InstallPlugin(installer => installer.SyncWindows(InsertPluginPaths()))));
                 break;
             case "rescanPlugins":
                 await reply(await Task.Run(() => InstallPlugin(_ => new OpenXLR.Core.Mixing.InstallOutcome(true, "", []))));
@@ -413,6 +442,29 @@ public sealed class WebSocketHub
             string message = note.Length == 0 ? outcome.Message
                 : outcome.Message.Length == 0 ? note : outcome.Message + " " + note;
             return new PluginInstallMessage(outcome.Ok, message, outcome.Installed, added, total);
+        }
+    }
+
+    private PluginInstallMessage RemoveWindowsPluginInserts(string path)
+    {
+        lock (_installGate)
+        {
+            try
+            {
+                var installer = new OpenXLR.Core.Mixing.PluginInstaller();
+                if (!installer.TryWindowsPluginWrappers(path, out var wrappers, out string? error))
+                    return new(false, error!, [], 0, OpenXLR.Core.Mixing.PluginCatalog.Plugins.Count);
+                var identities = OpenXLR.Core.Mixing.PluginCatalog.IdentitiesUnder(wrappers);
+                var result = _mixer.RemovePluginInserts(identities);
+                string message = result.Removed == 0 ? "No inserts were removed."
+                    : $"Removed {result.Removed} inserts from {result.Chains} current chains. Plugin files and saved profiles were kept.";
+                if (result.Error is not null) message += " " + result.Error;
+                return new(result.Error is null, message, [], 0, OpenXLR.Core.Mixing.PluginCatalog.Plugins.Count);
+            }
+            catch (Exception ex)
+            {
+                return new(false, ex.Message, [], 0, OpenXLR.Core.Mixing.PluginCatalog.Plugins.Count);
+            }
         }
     }
 

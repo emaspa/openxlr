@@ -97,13 +97,13 @@ public sealed class HttpApiTests
                 new StringContent("{\"cmd\":\"getDiagnostics\"}", Encoding.UTF8, "application/json"));
             Assert.Equal(HttpStatusCode.OK, valid.StatusCode);
             Assert.Contains("\"ok\":true", await valid.Content.ReadAsStringAsync());
-            foreach (string command in new[] { "addWindowsPluginFolder", "removeWindowsPluginFolder" })
+            foreach (string command in new[] { "addWindowsPluginFolder", "removeWindowsPluginFolder", "getWindowsPluginFiles", "removeWindowsPluginInserts", "setWindowsPluginEnabled", "deleteWindowsPlugin" })
             {
                 using var folder = await http.PostAsync("/api/v1/commands",
                     new StringContent(System.Text.Json.JsonSerializer.Serialize(new { cmd = command, path = "relative/plugins" }),
                         Encoding.UTF8, "application/json"));
                 Assert.Equal(HttpStatusCode.BadRequest, folder.StatusCode);
-                Assert.Contains("absolute folder path", await folder.Content.ReadAsStringAsync());
+                Assert.Contains("absolute path", await folder.Content.ReadAsStringAsync());
             }
             using var pluginDiagnostics = await http.PostAsync("/api/v1/commands",
                 new StringContent("{\"cmd\":\"getPluginDiagnostics\"}", Encoding.UTF8, "application/json"));

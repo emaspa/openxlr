@@ -3,42 +3,70 @@
         xmlns:vm="using:OpenXLR.UI"
         x:Class="OpenXLR.UI.PluginFoldersWindow"
         x:DataType="vm:OptionsViewModel"
-        Title="Windows plugin folders" Width="720" Height="480" MinWidth="480" MinHeight="380"
+        Title="Windows plugins" Width="760" Height="820" MinWidth="480" MinHeight="380"
         WindowStartupLocation="CenterOwner" Background="#16181d">
-  <Grid Margin="18" RowDefinitions="Auto,12,*,12,Auto,10,Auto,12,Auto">
-    <StackPanel Spacing="6">
-      <TextBlock Text="Windows VST3 and CLAP folders" FontSize="17" FontWeight="SemiBold"/>
-      <TextBlock Text="Add a folder containing Windows plugins to scan it through yabridge. Plugin files stay where they are."
-                 FontSize="12" Foreground="#8b93a7" TextWrapping="Wrap"/>
-      <TextBlock Text="{Binding WindowsImportNote}" IsVisible="{Binding WindowsImportNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                 FontSize="12" Foreground="#8b93a7" TextWrapping="Wrap"/>
-      <TextBlock Text="These folders are shared with other applications using system yabridge."
-                 IsVisible="{Binding SystemBridge}" FontSize="12" Foreground="#e0a05a" TextWrapping="Wrap"/>
-    </StackPanel>
-    <Border Grid.Row="2" Background="#1d2027" CornerRadius="8" Padding="8">
-      <Grid>
-        <ListBox Name="FolderList" ItemsSource="{Binding WindowsDirectories}"
-                 SelectionMode="Single" SelectionChanged="OnSelectionChanged"
-                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-          <ListBox.ItemTemplate>
-            <DataTemplate x:DataType="x:String">
-              <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,4,12,4" FontSize="12"/>
-            </DataTemplate>
-          </ListBox.ItemTemplate>
-        </ListBox>
-        <TextBlock Text="No registered folders." IsVisible="{Binding !HasWindowsDirectories}"
-                   Margin="8" Foreground="#8b93a7" IsHitTestVisible="False"/>
-      </Grid>
-    </Border>
-    <WrapPanel Grid.Row="4" Orientation="Horizontal">
-      <Button Name="AddFolder" Content="Add folder…" Padding="14,5" Margin="0,0,8,0" Click="OnAddFolder"/>
-      <Button Name="RemoveFolder" Content="Remove from list" Padding="14,5" Margin="0,0,8,0" Click="OnRemoveFolder" IsEnabled="False"/>
-      <Button Name="RescanFolders" Content="Rescan" Padding="14,5" Click="OnRescan"/>
-    </WrapPanel>
-    <TextBlock Grid.Row="6" Text="Removal keeps the original files and removes their generated VST3 and CLAP wrappers. Remove affected inserts from your chains first."
-               FontSize="12" Foreground="#8b93a7" TextWrapping="Wrap"/>
-    <Grid Grid.Row="8" ColumnDefinitions="*,12,Auto">
-      <ScrollViewer MaxHeight="96" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+  <Grid Margin="18" RowDefinitions="*,12,Auto">
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+      <StackPanel Spacing="8" Margin="0,0,12,0">
+        <TextBlock Text="Windows VST3 and CLAP plugins" FontSize="17" FontWeight="SemiBold"/>
+        <TextBlock Text="Choose a folder, then select an individual plugin below."
+                   FontSize="12" Foreground="#8b93a7" TextWrapping="Wrap"/>
+        <TextBlock Text="{Binding WindowsImportNote}" IsVisible="{Binding WindowsImportNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                   FontSize="12" Foreground="#8b93a7" TextWrapping="Wrap"/>
+        <TextBlock Text="These folders and exclusions are shared with other applications using system yabridge."
+                   IsVisible="{Binding SystemBridge}" FontSize="12" Foreground="#e0a05a" TextWrapping="Wrap"/>
+        <Border Background="#1d2027" CornerRadius="8" Padding="8" Height="240">
+          <Grid>
+            <ListBox Name="FolderList" ItemsSource="{Binding WindowsDirectories}"
+                     SelectionMode="Single" SelectionChanged="OnSelectionChanged"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                  <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,4,12,4" FontSize="12"/>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+            <TextBlock Text="No registered folders." IsVisible="{Binding !HasWindowsDirectories}"
+                       Margin="8" Foreground="#8b93a7" IsHitTestVisible="False"/>
+          </Grid>
+        </Border>
+        <WrapPanel Orientation="Horizontal">
+          <Button Name="AddFolder" Content="Add folder…" Padding="14,5" Margin="0,0,8,4" Click="OnAddFolder"/>
+          <Button Name="RemoveFolder" Content="Remove from list" Padding="14,5" Margin="0,0,8,4" Click="OnRemoveFolder" IsEnabled="False"/>
+          <Button Name="RescanFolders" Content="Rescan" Padding="14,5" Margin="0,0,0,4" Click="OnRescan"/>
+        </WrapPanel>
+        <Border Background="#1d2027" CornerRadius="8" Padding="8" Height="190">
+          <Grid>
+            <ListBox Name="PluginList" SelectionMode="Single" SelectionChanged="OnPluginSelectionChanged"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:WindowsPluginEntry">
+                  <Grid ColumnDefinitions="*,8,45,8,64" Margin="0,5,12,5">
+                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Path}"/>
+                    <TextBlock Grid.Column="2" Text="{Binding FormatLabel}" FontSize="11" Foreground="#8b93a7"/>
+                    <TextBlock Grid.Column="4" Text="{Binding Status}" FontSize="11"/>
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+            <TextBlock Name="EmptyPlugins" Text="Select a folder to see its plugins." Margin="8"
+                       Foreground="#8b93a7" IsHitTestVisible="False" TextWrapping="Wrap"/>
+          </Grid>
+        </Border>
+        <WrapPanel Orientation="Horizontal">
+          <Button Name="RemoveUses" Content="Remove from all chains…" Padding="14,5" Margin="0,0,8,4"
+                  Click="OnRemoveUses" IsVisible="False"/>
+          <Button Name="TogglePlugin" Content="Disable in OpenXLR" Padding="14,5" Margin="0,0,8,4" Click="OnTogglePlugin" IsEnabled="False"/>
+          <Button Name="DeletePlugin" Content="Delete file…" Padding="14,5" Margin="0,0,8,4" Click="OnDeletePlugin" IsEnabled="False"/>
+          <Button Name="WineUninstaller" Content="Wine uninstaller…" Padding="14,5" Margin="0,0,0,4" Click="OnWineUninstaller" IsVisible="False"/>
+        </WrapPanel>
+        <TextBlock Name="PluginDetail" Text="Select a plugin to manage it." FontSize="12" Foreground="#8b93a7" TextWrapping="Wrap"/>
+        <TextBlock Text="Disabling keeps the files. Delete file permanently removes a standalone plugin. Wine-installed plugins use their uninstaller. Changes refresh the plugin catalogue."
+                   FontSize="12" Foreground="#8b93a7" TextWrapping="Wrap"/>
+      </StackPanel>
+    </ScrollViewer>
+    <Grid Grid.Row="2" ColumnDefinitions="*,12,Auto">
+      <ScrollViewer MaxHeight="80" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
         <TextBlock Name="Status" FontSize="12" Foreground="#8b93a7" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0"/>
       </ScrollViewer>
       <Button Grid.Column="2" Name="CloseButton" Content="Close" Padding="18,6" Click="OnClose"/>

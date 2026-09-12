@@ -185,16 +185,54 @@ public sealed class DaemonClientTests
         await received.Task.WaitAsync(TimeSpan.FromSeconds(5));
         var remove = client.RemoveWindowsPluginFolderAsync("/plugins/old", TimeSpan.FromSeconds(5));
         var sync = client.SyncWindowsPluginsAsync(TimeSpan.FromSeconds(5));
+        var removeUses = client.RemoveWindowsPluginInsertsAsync("/plugins/new/EQ.vst3", TimeSpan.FromSeconds(5));
         release.SetResult();
         Assert.Equal("addWindowsPluginFolder", (await add)!["message"]!.GetValue<string>());
         Assert.Equal("removeWindowsPluginFolder", (await remove)!["message"]!.GetValue<string>());
         Assert.Equal("syncWindowsPlugins", (await sync)!["message"]!.GetValue<string>());
+        Assert.Equal("removeWindowsPluginInserts", (await removeUses)!["message"]!.GetValue<string>());
         Assert.Equal(new (string, string?)[]
         {
             ("addWindowsPluginFolder", "/plugins/new"),
             ("removeWindowsPluginFolder", "/plugins/old"),
             ("syncWindowsPlugins", null),
+            ("removeWindowsPluginInserts", "/plugins/new/EQ.vst3"),
         }, commands);
+    }
+
+    [Fact]
+    public async Task FilesFromDifferentFoldersDoNotShareAReply()
+    {
+        var received = Completion();
+        var release = Completion();
+        int requests = 0;
+        await using var server = await SocketTestServer.Start(async (socket, stop) =>
+        {
+            while (!stop.IsCancellationRequested)
+            {
+                var command = await SocketTestServer.Receive(socket, stop);
+                if (command["cmd"]!.GetValue<string>() == "auth") continue;
+                if (++requests == 1) { received.SetResult(); await release.Task.WaitAsync(stop); }
+                await SocketTestServer.Send(socket, new
+                {
+                    type = "windowsPluginFiles", ok = true,
+                    plugins = new[] { new { path = command["path"]!.GetValue<string>() + "/EQ.vst3" } },
+                }, stop);
+                await SocketTestServer.Send(socket, new { type = "commandResult", requestId = command["requestId"]!.GetValue<string>() }, stop);
+            }
+        });
+        await using var client = new DaemonClient(server.Url);
+        var connected = Completion();
+        client.ConnectionChanged += up => { if (up) connected.TrySetResult(); };
+        client.Start();
+        await connected.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var first = client.RequestWindowsPluginFilesAsync("/first", TimeSpan.FromSeconds(5));
+        await received.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var second = client.RequestWindowsPluginFilesAsync("/second", TimeSpan.FromSeconds(5));
+        release.SetResult();
+        Assert.Equal("/first/EQ.vst3", (await first)!["plugins"]![0]!["path"]!.GetValue<string>());
+        Assert.Equal("/second/EQ.vst3", (await second)!["plugins"]![0]!["path"]!.GetValue<string>());
+        Assert.Equal(2, requests);
     }
 
     private static TaskCompletionSource Completion()

@@ -108,6 +108,16 @@ public sealed record PluginSetupMessage(PluginSetup Setup)
     [JsonIgnore] public PluginSetup Setup { get; } = Setup;
 }
 
+/// <summary>Files in one registered Windows plugin folder, including excluded files.</summary>
+public sealed record WindowsPluginFilesMessage(WindowsPluginFiles Result)
+{
+    [JsonPropertyName("type")] public string Type => "windowsPluginFiles";
+    [JsonPropertyName("ok")] public bool Ok => Result.Ok;
+    [JsonPropertyName("message")] public string Message => Result.Message;
+    [JsonPropertyName("plugins")] public IReadOnlyList<WindowsPluginFile> Plugins => Result.Plugins;
+    [JsonIgnore] public WindowsPluginFiles Result { get; } = Result;
+}
+
 /// <summary>Reply to plugin installation, folder management, sync and rescan: what happened, and what the catalogue gained.</summary>
 public sealed record PluginInstallMessage(bool Ok, string Message, IReadOnlyList<string> Installed, int Added, int Total)
 {
