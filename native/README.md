@@ -107,6 +107,44 @@ the helper by hand for a quick look:
 OPENXLR_HOST_TRACE=1 native/openxlr-lv2-host vst3 /usr/lib/vst3/Plugin.vst3 <class-id> test 2 48000
 ```
 
+## Checking a plugin's lifecycle
+
+`make -C native tests/lifecycle` builds a check that takes a real plugin
+through the host's own backend, load, activate, audio cycles, the editor
+and back, with no PipeWire graph and no daemon, and reports how any child
+process (a Wine plugin host) ended. It takes the same plugin arguments as
+the helper:
+
+```sh
+PATH="/usr/lib/openxlr/yabridge:$PATH" \
+  native/tests/lifecycle vst3 "$HOME/.local/share/openxlr/yabridge/vst3/Plugin.vst3" <class-id> \
+  --cycles 60 --editor-at 10
+```
+
+For a custom companion, replace `/usr/lib/openxlr/yabridge` with the selected
+bridge directory reported by `getPluginSetup`. Run under `xvfb-run -a` to
+keep the test editor off your desktop.
+
+`--frames N` sets the cycle length (2048), `--wait-before-activate MS` and
+`--wait-after-activate MS` add pauses that tell a time-based failure from
+one a call causes, `--editor-at N` opens the plugin's real editor on
+`DISPLAY` at that cycle and closes it ten cycles later (use `xvfb-run -a`
+to keep it off the desktop), and `--reactivate-at N` switches the plugin
+off and on again. It exits 0 with `PASS` when every step completed and the
+plugin unloaded; a plugin whose bridge process dies takes the check down
+with it, which is the point. The check does not reproduce the daemon's
+separate audio thread; thread-sensitive behaviour still needs a live insert.
+
+This is how the Elgato EQ 1.3.0 failure was found: the plugin answered
+audio, then its Wine process exited with status 255 (a pure virtual call)
+about 20 ms after activation, every time the host had created and released
+a view before activating. The host used to do exactly that while loading,
+to learn whether the plugin had an editor. It now assumes one and finds
+out when the editor is opened; the check with `--editor-at` shows the
+editor itself is fine, and `--reactivate-at` after it shows the plugin's
+limit, which the daemon never reaches because it activates once per
+process.
+
 ## Scope
 
 For the plugin: URID map and unmap, the worker extension, options, and the
@@ -143,7 +181,8 @@ daemon speaks plain values and the processor takes normalised ones, so the
 conversion happens on the main thread where the controller lives. The
 scanner (`openxlr-lv2-host scan-vst3 BUNDLE`) does not create editors,
 since that is most of the cost of describing a large module; every VST3
-plugin is assumed to have one and the host finds out when asked. The
+plugin is assumed to have one, and the host too creates no view before it
+is asked to open the editor, when a plugin without one says so. The
 interface headers are vendored under `vst3/` (MIT, VST 3.8.1); only their
 inline parts are used, so nothing of the SDK is compiled. Windows VST3
 plugins arrive through yabridge as ordinary bundles. The optional

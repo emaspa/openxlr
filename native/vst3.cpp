@@ -818,16 +818,6 @@ int main_bus_channels(Vst3 *v, BusDirection direction) {
   return info.channelCount;
 }
 
-bool editor_available(Vst3 *v) {
-  IPlugView *view = v->controller->createView(ViewType::kEditor);
-  if (!view)
-    return false;
-  bool ok = view->isPlatformTypeSupported(kPlatformTypeX11EmbedWindowID) ==
-            kResultTrue;
-  view->release();
-  return ok;
-}
-
 void release_plugin(Vst3 *v) {
   if (v->component_point && v->controller_point) {
     v->component_point->disconnect(v->controller_point);
@@ -931,7 +921,13 @@ bool vst3_load(Host *h, char **arguments) {
     v->records.push_back(r);
   }
   v->frame = new PlugFrame(v);
-  host_set_has_editor(h, editor_available(v));
+  // Whether the plugin has an editor is learnt when one is asked for, as the
+  // scanner already assumes. Creating a view here only to release it again
+  // is not a harmless question: a plugin can leave a callback to that view
+  // behind, and Elgato EQ 1.3.0 ends its process with a pure virtual call on
+  // the activation that follows. The daemon never activates twice in one
+  // process, so a view created after activation is the only kind it sees.
+  host_set_has_editor(h, true);
   return true;
 }
 
@@ -1143,12 +1139,15 @@ void vst3_main_thread(Host *h) {
 bool vst3_editor_open(Host *h) {
   Vst3 *v = of(h);
   v->view = v->controller->createView(ViewType::kEditor);
-  if (!v->view)
+  if (!v->view) {
+    host_set_has_editor(h, false);  // now known for certain
     return false;
+  }
   if (v->view->isPlatformTypeSupported(kPlatformTypeX11EmbedWindowID) !=
       kResultTrue) {
     v->view->release();
     v->view = nullptr;
+    host_set_has_editor(h, false);
     return false;
   }
   v->view->setFrame(v->frame);

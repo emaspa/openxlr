@@ -42,6 +42,13 @@ tests/clap.o: tests/clap.c host.c clap.c $(HEADERS)
 tests/clap: tests/clap.o lv2.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
+# A plugin lifecycle check against a real plugin, run by hand (see README).
+tests/lifecycle.o: tests/lifecycle.c host.c $(HEADERS)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
+tests/lifecycle: tests/lifecycle.o lv2.o clap.o vst3.o
+	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
 .PHONY: test test-editor test-audio test-clap clean
 # The editor tests need a display; the others need nothing.
 test: test-audio test-clap test-editor
@@ -56,4 +63,4 @@ test-clap: tests/clap
 	./tests/clap
 
 clean:
-	rm -f openxlr-lv2-host $(OBJECTS) tests/editor tests/editor.o tests/audio tests/audio.o tests/clap tests/clap.o
+	rm -f openxlr-lv2-host $(OBJECTS) tests/editor tests/editor.o tests/audio tests/audio.o tests/clap tests/clap.o tests/lifecycle tests/lifecycle.o
