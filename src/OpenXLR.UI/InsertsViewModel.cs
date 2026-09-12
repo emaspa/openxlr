@@ -71,7 +71,7 @@ public sealed class InsertsViewModel : ViewModelBase
     };
 
     /// <summary>Label for a compact button that opens the chain window.</summary>
-    public string ButtonText => Items.Count == 0 ? "Inserts…" : $"Inserts ({Items.Count})…";
+    public string ButtonText => Items.Count == 0 ? "Inserts" : $"Inserts ({Items.Count})";
 
     private PluginChoice? _selectedPlugin;
     public PluginChoice? SelectedPlugin

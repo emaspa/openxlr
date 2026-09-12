@@ -461,7 +461,7 @@ public sealed class MainViewModel : ViewModelBase
     /// <summary>Running audio-capable apps (the main card shows these).</summary>
     public ObservableCollection<AppStreamViewModel> ActiveApps { get; } = [];
 
-    /// <summary>True when the registry holds anything (enables Manage…).</summary>
+    /// <summary>True when the registry holds anything (enables Manage).</summary>
     public bool HasApps => Apps.Count > 0;
 
     /// <summary>Pre-register an installed app with a channel (Manage dialog).</summary>

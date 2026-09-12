@@ -22,7 +22,7 @@
                    TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Title}"/>
         <TextBlock Text="{Binding ChainHint}" Classes="h" FontSize="11" TextWrapping="Wrap"/>
       </StackPanel>
-      <Button Grid.Column="1" Content="Add plugin…" Padding="12,4" VerticalAlignment="Top" Click="OnAddInsert"/>
+      <Button Grid.Column="1" Content="Add plugin" Padding="12,4" VerticalAlignment="Top" Click="OnAddInsert"/>
     </Grid>
     <Button DockPanel.Dock="Bottom" Content="Close" HorizontalAlignment="Right" Padding="18,6" Margin="0,10,0,0" Click="OnClose"/>
     <TextBlock DockPanel.Dock="Top" Text="No inserts yet." Classes="h" IsVisible="{Binding !HasItems}"/>
