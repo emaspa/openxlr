@@ -57,6 +57,8 @@ Messages from the daemon, each a JSON object with a `type` field:
 | `plugins` | in answer to `listPlugins` | the installed LV2, CLAP and VST3 plugins with their controls, within the message size limit above and always including the plugins the saved chains use; `supported` is false, with `unsupportedFeatures` listed, for a plugin that needs a host feature the PipeWire chain lacks |
 | `pluginSetup` | in answer to `getPluginSetup` | where installs go (`lv2Directory`, `clapDirectory`, `vst3Directory`), `hostInstalled`, `yabridge` (its version, or null when not installed), `wine`, `windowsDirectories` (the folders yabridge bridges) and `wineFolders` (Wine's own plugin folders that hold a plugin and are not bridged yet, offered as one press since a file dialog hides them) |
 | `windowsPluginFiles` | in answer to `getWindowsPluginFiles` | `ok`, `message` and `plugins`; each plugin file carries `path`, `name`, `format`, `enabled`, `canDelete`, `winePrefix` and `inUse`. Excluded files remain listed |
+| `nativeEditorRules` | in answer to `getNativeEditorRules` or `setNativeEditorRule` | `rules` with `kind`, `plugin`, `name`, `reason`, `defaultBlocked`, `override` and effective `blocked`; `error` describes a refused change or unreadable configuration |
+| `nativeEditorRulesChanged` | after a successful rule change | notification to refresh the catalogue and editor availability; no plugin rescan is needed |
 | `pluginDiagnostics` | in answer to `getPluginDiagnostics` | `discovery`: daemon host/controller paths, Wine prefix, architecture, effective search paths, bounded `yabridgectl status` output and latest completed CLAP/VST3 scan reports |
 | `pluginInstall` | in answer to `installPlugin`, `addWindowsPluginFolder`, `removeWindowsPluginFolder`, `removeWindowsPluginInserts`, `setWindowsPluginEnabled`, `deleteWindowsPlugin`, `syncWindowsPlugins` and `rescanPlugins` | `ok`, `message` (a sentence or two for the user, ending with the bundles the scan that followed could not read, up to three by name and the rest as a count), `installed` (the bundles or folders put in place), `added` (plugins in the catalogue that were not before) and `total` |
 | `error` | when a command without a `requestId` is rejected | `message` |
@@ -106,7 +108,9 @@ a bare `error` message, so an editor can wait for the acknowledgement:
 | `setInserts` | `channel`, `inserts[]` | replace a chain; `channel` is `xlr1`, `xlr2` or `mix:<id>`, each insert is `{id, kind, plugin, label?, bypass?, params?}` where `kind` is `"lv2"` with the plugin URI, `"clap"` with the plugin's id, or `"vst3"` with the class id as 32 hex digits; a CLAP or VST3 insert always runs in the native host, so its `nativeHost` reads true whatever was sent |
 | `setInsertBypass` | `channel`, `insertId`, `value` | bypass one insert |
 | `setInsertParam` | `channel`, `insertId`, `symbol`, `value` | one plugin control, by the catalogue's `symbol` (LV2 port symbol or decimal CLAP/VST3 parameter id); use catalogue ranges and scale points |
-| `showInsertUi` | `channel`, `insertId` | open an enabled insert's native editor when the optional host is installed |
+| `getNativeEditorRules` | none | read release defaults and explicit user overrides for native editor compatibility |
+| `setNativeEditorRule` | `kind`, `plugin`, `name?`, `blocked?` | set `blocked:true` to use OpenXLR controls, `false` to allow the native editor, or null/absent to remove the override and follow release defaults. Saved atomically before success; answered with `nativeEditorRules` |
+| `showInsertUi` | `channel`, `insertId` | open an enabled insert's native editor when the optional host is installed and the editor policy allows it; a blocked editor is refused without changing the audio instance |
 | `assignApp` | `identity`, `channel`, `label?` | route an app (creates a registry entry if unseen); `channel: "ignore"` stops managing it, its streams go back to the system default output and stay wherever the desktop routes them |
 | `assignStream` | `streamId`, `channel` | route one live stream by its PipeWire id; also remembered for the app; `ignore` works here too |
 | `forgetApp` | `identity` | drop an app and its remembered channel |
@@ -167,6 +171,22 @@ class-ID bans: a separately installed copy can still appear in the catalogue.
 installed-apps list in the reported `winePrefix`, waits for it to close, then
 syncs and rescans. It never imposes a deadline on an interactive uninstaller.
 
+Native editor compatibility is separate from DSP support. Catalogue entries
+carry `nativeUiBlocked`; live insert status also carries `nativeUiBlocked`
+and `nativeUiBlockReason`. Blocking leaves `supported`, native-host support,
+processing, parameters and bypass state unchanged. Clients should open their
+generated controls when blocked and refresh availability on
+`nativeEditorRulesChanged`. Existing editor windows are not closed.
+
+Rules use the format and stable plugin id, not the filename or display name.
+Only explicit overrides are saved; an untouched plugin follows the defaults
+in each release. An explicit allow or block survives future default changes.
+The initial release default blocks the Elgato De-Esser VST3 editor. Rule ids
+are bounded at 512 characters, names at 200, and the file at 1024 overrides
+and 1 MiB.
+Malformed stored choices are not silently overwritten; release defaults stay
+in force and the rules response reports the error.
+
 LV2 insert definitions optionally carry `nativeHost: true` to select the native
 helper for that insert. Missing or false keeps LV2 in PipeWire filter-chain, even
 when the helper is installed. Unsupported native selections are rejected.
@@ -207,6 +227,10 @@ All under `~/.config/openxlr/` (or `$XDG_CONFIG_HOME/openxlr/`):
 - `bridge/yabridgectl/config.toml`: the managed companion's folder registry,
   separate from the system yabridgectl configuration. Private wrappers live
   under `$XDG_DATA_HOME/openxlr/yabridge` (default `~/.local/share/openxlr/yabridge`).
+- `native-editors.json`: native editor compatibility overrides. Format
+  `{"version":1,"overrides":[{"kind":"vst3","plugin":"<class-id>","name":"Plugin name","blocked":true}]}`.
+  Release defaults are not copied into this file. Remove an override through
+  `setNativeEditorRule` with null `blocked` to follow release defaults again.
 - `ui.json`: window preferences (tray, start minimized, autostart
   toggles)
 

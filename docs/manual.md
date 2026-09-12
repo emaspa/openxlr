@@ -267,6 +267,33 @@ plugin. A plugin's own editor can be opened as well, with the native
 host described in 3.12. CLAP and VST3 plugins appear in the same picker
 and always run in that host. VST2 plugins cannot be loaded.
 
+<a name="native-editor-compatibility"></a>
+**Native editor compatibility.** Open Options, PLUGINS, then "Native editors"
+to choose plugins that should use OpenXLR's generated controls instead of their
+own editor. The initial release list includes Elgato De-Esser because its
+native editor freezes under Wine.
+
+- Find an installed plugin and press "Use OpenXLR controls" to add a block.
+- Select a blocked entry and choose "Allow native editor" to try its own
+  window again, for example after a Wine or plugin update.
+- "Use release default" removes your override. Untouched entries follow the
+  list shipped with each OpenXLR release, so a plugin can be unblocked when
+  its editor has been verified to work. Your explicit choices always win.
+
+A blocked plugin keeps processing audio in the same host. Its cog opens the
+OpenXLR controls, and the Plugin UI button is unavailable. A "Native editors"
+button after Bypass opens the compatibility list with that plugin selected.
+The rule takes effect on the next open; an existing native window is not forcibly closed.
+Changes are saved immediately without an audio restart. Allowed overrides
+remain listed so you can return them to release defaults later.
+
+Rules identify plugins by format and stable id, so moving or renaming a file
+does not bypass a rule. Only your overrides are stored in
+`~/.config/openxlr/native-editors.json`, honoring `XDG_CONFIG_HOME`. If that
+file is damaged, Options reports it and keeps the release defaults in force
+rather than overwriting it. Repair or remove the file and restart the daemon
+to reload it.
+
 <a name="install-plugins"></a>
 **Installing plugins.** The quickest set comes from your distribution:
 on Arch, `lsp-plugins-lv2` and `x42-plugins` cover the microphone path

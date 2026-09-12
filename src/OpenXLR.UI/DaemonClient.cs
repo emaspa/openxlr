@@ -65,6 +65,16 @@ public sealed class DaemonClient : IAsyncDisposable
     public Task<JsonNode?> RequestPluginDiagnosticsAsync(TimeSpan timeout)
         => QueryAsync("pluginDiagnostics", "getPluginDiagnostics", timeout);
 
+    public Task<JsonNode?> RequestNativeEditorRulesAsync(TimeSpan timeout)
+        => PluginOperationAsync("getNativeEditorRules", timeout, replyType: "nativeEditorRules");
+
+    public Task<JsonNode?> SetNativeEditorRuleAsync(string kind, string plugin, string name, bool? blocked, TimeSpan timeout)
+    {
+        var fields = new Dictionary<string, object> { ["kind"] = kind, ["plugin"] = plugin, ["name"] = name };
+        if (blocked is bool value) fields["blocked"] = value;
+        return PluginOperationAsync("setNativeEditorRule", timeout, fields, "nativeEditorRules");
+    }
+
     /// <summary>Where plugins go and what bridges Windows ones (a "pluginSetup" message); null on timeout.</summary>
     public Task<JsonNode?> RequestPluginSetupAsync(TimeSpan timeout)
         => QueryAsync("pluginSetup", "getPluginSetup", timeout);
@@ -174,6 +184,7 @@ public sealed class DaemonClient : IAsyncDisposable
 
     /// <summary>Raised when an error message arrives from the daemon.</summary>
     public event Action<string>? ErrorReceived;
+    public event Action? NativeEditorRulesChanged;
 
     /// <summary>Raised on every meter frame (id to peak, 0..1 and above when clipping).</summary>
     public event Action<JsonNode>? MetersReceived;
@@ -273,7 +284,8 @@ public sealed class DaemonClient : IAsyncDisposable
             else if (type == "state") { LastStateJson = text; StateReceived?.Invoke(node); }
             else if (type == "diagnostics") StoreReply(type, node);
             else if (type == "plugins") StoreReply(type, node["plugins"]);
-            else if (type is "pluginSetup" or "pluginInstall" or "pluginDiagnostics" or "windowsPluginFiles") StoreReply(type, node);
+            else if (type == "nativeEditorRulesChanged") NativeEditorRulesChanged?.Invoke();
+            else if (type is "pluginSetup" or "pluginInstall" or "pluginDiagnostics" or "windowsPluginFiles" or "nativeEditorRules") StoreReply(type, node);
             else if (type == "commandResult" && node["requestId"]?.GetValue<string>() is string requestId)
             {
                 CompleteQuery(requestId);

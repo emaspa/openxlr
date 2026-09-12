@@ -75,6 +75,13 @@ return `pluginInstall` and refresh the catalogue. Wine-installed and linked
 files cannot be deleted through this API; use the Windows uninstaller in the
 appropriate Wine prefix.
 
+`getNativeEditorRules` and `setNativeEditorRule` use the same command endpoint.
+The setter takes `kind`, `plugin`, optional `name`, and `blocked`: true forces
+OpenXLR controls, false allows the native editor, and null/absent restores the
+release default. It returns `nativeEditorRules` after saving. This changes only
+editor availability, not audio processing or insert chains. `showInsertUi`
+rejects blocked editors over HTTP just as it does over WebSocket.
+
 The [OpenAPI document](openapi-v1.json) describes the HTTP endpoints. Restarting
 the daemon rotates its per-session token once the new instance listens;
 clients must reread it.

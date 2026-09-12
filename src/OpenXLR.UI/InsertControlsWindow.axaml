@@ -61,6 +61,8 @@
         <Button Content="Defaults" Padding="12,4" Margin="0,0,6,6" Click="OnDefaults"
                 ToolTip.Tip="Put every control back to the plugin's own defaults"/>
         <ToggleButton Content="Bypass" IsChecked="{Binding Bypass, Mode=TwoWay}" Padding="12,4" Margin="0,0,6,6"/>
+        <Button Name="ManageNativeEditors" Content="Native editors" Padding="12,4" Margin="0,0,6,6" Click="OnNativeEditorRules"
+                IsVisible="{Binding NativeUiBlocked}" ToolTip.Tip="Manage this plugin's native editor compatibility rule"/>
         <ToggleButton Content="Native host" IsChecked="{Binding NativeHost, Mode=TwoWay}" Padding="12,4" Margin="0,0,6,6"
                       IsVisible="{Binding CanChooseNativeHost}"
                       ToolTip.Tip="Run this insert in its own process, which is what lets its own editor open. Switching rebuilds the chain and interrupts audio for a moment."/>
@@ -73,6 +75,8 @@
          of floating over the value readouts -->
     <ScrollViewer VerticalScrollBarVisibility="Auto" AllowAutoHide="False">
       <StackPanel>
+      <TextBlock Text="{Binding NativeUiBlockReason}" Foreground="#8b93a7" FontSize="11" TextWrapping="Wrap"
+                 Margin="0,0,0,8" IsVisible="{Binding NativeUiBlocked}"/>
       <TextBlock Text="{Binding Error}" Foreground="#e0a05a" FontSize="11" TextWrapping="Wrap"
                  Margin="0,0,0,8" IsVisible="{Binding HasError}"/>
       <ItemsControl ItemsSource="{Binding Groups}" Margin="0,0,10,0">

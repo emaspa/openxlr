@@ -48,14 +48,16 @@ public sealed class MixerService : IHostedService, IDisposable
     /// mixer over the user's file.
     /// </summary>
     private readonly SettingsSaver _saves;
+    public NativeEditorPolicy EditorPolicy { get; }
 
     public MixerService(ILogger<MixerService> log, IConfiguration config, DeviceManager devices,
-        IHostApplicationLifetime? lifetime = null)
+        IHostApplicationLifetime? lifetime = null, NativeEditorPolicy? editorPolicy = null)
     {
         _log = log;
         _config = config;
         _devices = devices;
         _lifetime = lifetime;
+        EditorPolicy = editorPolicy ?? new NativeEditorPolicy();
         _mixer = new(new PipeWireAdapter(_progress.Mark, note => _log.LogInformation("{msg}", note)));
         _saves = new SettingsSaver(
             () => _mixer.ExportSettings().Save(),
@@ -147,7 +149,20 @@ public sealed class MixerService : IHostedService, IDisposable
     public event Action? Changed;
 
     /// <summary>Null until the graph is built.</summary>
-    public MixerState? Snapshot() => _mixer.Built ? _mixer.Snapshot() with { LayoutWarning = ResourceWarning } : null;
+    public MixerState? Snapshot()
+    {
+        if (!_mixer.Built) return null;
+        MixerState state = _mixer.Snapshot();
+        return state with
+        {
+            LayoutWarning = ResourceWarning,
+            Inserts = state.Inserts.ToDictionary(e => e.Key, e => (IReadOnlyList<InsertStatus>)e.Value.Select(insert =>
+            {
+                string? reason = EditorPolicy.BlockReason(insert.Insert.Kind, insert.Insert.Plugin);
+                return insert with { NativeUiBlocked = reason is not null, NativeUiBlockReason = reason };
+            }).ToArray()),
+        };
+    }
 
     /// <summary>Selectable sinks and sources, or null when the mixer is off.</summary>
     public IReadOnlyList<AudioNode>? Devices() => _mixer.Built ? _mixer.ListDevices() : null;
@@ -479,7 +494,7 @@ public sealed class MixerService : IHostedService, IDisposable
                     break;
                 case "showInsertUi":
                     if (cmd.Channel is null || cmd.InsertId is null) return "showInsertUi: need 'channel' and 'insertId'";
-                    _mixer.ShowInsertUi(cmd.Channel, cmd.InsertId);
+                    _mixer.ShowInsertUi(cmd.Channel, cmd.InsertId, insert => EditorPolicy.BlockReason(insert.Kind, insert.Plugin));
                     return null;
                 default:
                     return $"unknown mixer command '{cmd.Cmd}'";

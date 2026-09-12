@@ -53,6 +53,12 @@ public partial class OptionsWindow : Window
             await vm.Client.SyncWindowsPluginsAsync(TimeSpan.FromMinutes(4)), "the sync"), "Bridging Windows plugins…", vm);
     }
 
+    private async void OnNativeEditorRules(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is OptionsViewModel vm)
+            await new NativeEditorRulesWindow(vm.Client).ShowDialog(this);
+    }
+
     private async void OnManagePluginFolders(object? sender, RoutedEventArgs e)
     {
         if (DataContext is OptionsViewModel vm)

@@ -199,7 +199,24 @@ public sealed class WebSocketHub
                 IReadOnlyList<OpenXLR.Core.Mixing.PluginInfo> plugins =
                     await Task.Run(() => OpenXLR.Core.Mixing.ClientCatalog.ForClient(
                         OpenXLR.Core.Mixing.PluginCatalog.Plugins, _mixer.InsertPlugins()));
-                await reply(new PluginsMessage(plugins));
+                await reply(new PluginsMessage(plugins.Select(p => p with
+                {
+                    NativeUiBlocked = _mixer.EditorPolicy.IsBlocked(p.Kind, p.Plugin),
+                }).ToArray()));
+                break;
+            case "getNativeEditorRules":
+                await reply(new NativeEditorRulesMessage(_mixer.EditorPolicy.Rules, _mixer.EditorPolicy.Error));
+                break;
+            case "setNativeEditorRule":
+                error = CommandValidation.CheckEditorRule(cmd);
+                if (error is not null) break;
+                error = _mixer.EditorPolicy.Set(cmd.Kind!, cmd.Plugin!, cmd.Name, cmd.Blocked);
+                if (error is null)
+                {
+                    Broadcast(new NativeEditorRulesChangedMessage());
+                    Broadcast(Snapshot());
+                }
+                await reply(new NativeEditorRulesMessage(_mixer.EditorPolicy.Rules, error ?? _mixer.EditorPolicy.Error));
                 break;
             case "getPluginDiagnostics":
                 await reply(new PluginDiagnosticsMessage(await Task.Run(() => new OpenXLR.Core.Mixing.PluginInstaller().Diagnostics())));
