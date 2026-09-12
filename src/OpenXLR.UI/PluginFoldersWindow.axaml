@@ -31,7 +31,7 @@
           </Grid>
         </Border>
         <WrapPanel Orientation="Horizontal">
-          <Button Name="AddFolder" Content="Add folder…" Padding="14,5" Margin="0,0,8,4" Click="OnAddFolder"/>
+          <Button Name="AddFolder" Content="Add folder" Padding="14,5" Margin="0,0,8,4" Click="OnAddFolder"/>
           <Button Name="RemoveFolder" Content="Remove from list" Padding="14,5" Margin="0,0,8,4" Click="OnRemoveFolder" IsEnabled="False"/>
           <Button Name="RescanFolders" Content="Rescan" Padding="14,5" Margin="0,0,0,4" Click="OnRescan"/>
         </WrapPanel>
@@ -54,11 +54,11 @@
           </Grid>
         </Border>
         <WrapPanel Orientation="Horizontal">
-          <Button Name="RemoveUses" Content="Remove from all chains…" Padding="14,5" Margin="0,0,8,4"
+          <Button Name="RemoveUses" Content="Remove from all chains" Padding="14,5" Margin="0,0,8,4"
                   Click="OnRemoveUses" IsVisible="False"/>
           <Button Name="TogglePlugin" Content="Disable in OpenXLR" Padding="14,5" Margin="0,0,8,4" Click="OnTogglePlugin" IsEnabled="False"/>
-          <Button Name="DeletePlugin" Content="Delete file…" Padding="14,5" Margin="0,0,8,4" Click="OnDeletePlugin" IsEnabled="False"/>
-          <Button Name="WineUninstaller" Content="Wine uninstaller…" Padding="14,5" Margin="0,0,0,4" Click="OnWineUninstaller" IsVisible="False"/>
+          <Button Name="DeletePlugin" Content="Delete file" Padding="14,5" Margin="0,0,8,4" Click="OnDeletePlugin" IsEnabled="False"/>
+          <Button Name="WineUninstaller" Content="Wine uninstaller" Padding="14,5" Margin="0,0,0,4" Click="OnWineUninstaller" IsVisible="False"/>
         </WrapPanel>
         <TextBlock Name="PluginDetail" Text="Select a plugin to manage it." FontSize="12" Foreground="#8b93a7" TextWrapping="Wrap"/>
         <TextBlock Text="Disabling keeps the files. Delete file permanently removes a standalone plugin. Wine-installed plugins use their uninstaller. Changes refresh the plugin catalogue."

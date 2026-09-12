@@ -194,8 +194,8 @@ scroll horizontally and vertically. Resizing the window manually turns off autom
 ### 3.3 Put an application on a different channel
 
 The APPLICATIONS card lists every app that is currently registered with
-PipeWire as an audio client; a green light means it is playing. Manage… sits
-beside the APPLICATIONS heading, like Edit layout… beside SUBMIXER. The app
+PipeWire as an audio client; a green light means it is playing. Manage sits
+beside the APPLICATIONS heading, like Edit layout beside SUBMIXER. The app
 controls wrap onto further rows when the window is narrower.
 
 An app's playback streams and audio client share the same identity even
@@ -211,7 +211,7 @@ alias, the existing normalized assignment takes precedence.
    so you can see there which OpenXLR channel an app is playing into;
    the hardware inputs (XLR 1, XLR 2, Aux In) are deliberately not
    listed, nothing should play into a microphone's channel.
-2. To pre-assign an app that has not played yet, open Manage…, pick it
+2. To pre-assign an app that has not played yet, open Manage, pick it
    from the installed-application list, choose a channel and press Add.
    The identity is guessed from its launcher; if the app reports a
    different name on first play it shows up as a new entry.
@@ -246,8 +246,8 @@ channel, with its level and lock in the INPUTS card.
 <a name="plugins"></a>
 ### 3.5 Add a plugin to the signal path
 
-1. Under XLR 1, XLR 2 or a mix, press "Inserts…". The chain window opens
-   with that chain's plugins and an "Add plugin…" button. The picker lists
+1. Under XLR 1, XLR 2 or a mix, press "Inserts". The chain window opens
+   with that chain's plugins and an "Add plugin" button. The picker lists
    compatible installed LV2, CLAP and VST3 effects (mono for an input,
    stereo for a mix), searchable by name, category or format. Host
    feature requirements can exclude a plugin; install a compatible set
@@ -299,7 +299,7 @@ to reload it.
 on Arch, `lsp-plugins-lv2` and `x42-plugins` cover the microphone path
 well. Choose LV2, CLAP or VST3 packages available for your distribution;
 the picker offers only plugins compatible with the selected slot.
-For a plugin you downloaded, press "Install file…" or "Install folder…" in the picker or in Options and pick it; OpenXLR puts it where
+For a plugin you downloaded, press "Install file" or "Install folder" in the picker or in Options and pick it; OpenXLR puts it where
 it looks and the picker lists it a moment later. A file is a `.clap` or a
 single-file `.vst3`; a folder is a `.vst3` or `.lv2` bundle, or a folder
 holding several of them, such as an extracted download. Linux plugins are
@@ -403,7 +403,7 @@ yabridge has seen that folder before:
 |---|---|
 | Bridge Wine's plugins | The first Windows plugin, and any later one installed somewhere new. The button names what it found and disappears once that folder is bridged |
 | Sync Windows plugins | Every plugin after that, when the installer wrote into a folder already bridged. This is the usual case |
-| Install folder… | An installer that wrote outside Wine's usual folders. Press Ctrl+H in the dialog to see `~/.wine`, which is hidden |
+| Install folder | An installer that wrote outside Wine's usual folders. Press Ctrl+H in the dialog to see `~/.wine`, which is hidden |
 | Rescan | Plugins that arrived by other means, such as a package from your distribution. Nothing to press after a bridge or a sync, since both read the catalogues again |
 
 Bridging and syncing end the same way: yabridge wraps each Windows plugin
@@ -415,11 +415,11 @@ has to be restarted.
 
 <a name="plugin-folders"></a>
 **Managing Windows plugin folders.** Open Options, PLUGINS, then "Manage Windows
-plugins…" to see the folders registered with the selected yabridge provider.
+plugins" to see the folders registered with the selected yabridge provider.
 
-- "Add folder…" registers a folder holding Windows VST3 or CLAP plugins,
+- "Add folder" registers a folder holding Windows VST3 or CLAP plugins,
   syncs it and refreshes the catalogue. The original files stay in that
-  folder. Use "Install file…" or "Install folder…" for native Linux plugins.
+  folder. Use "Install file" or "Install folder" for native Linux plugins.
 - Select a folder and press "Remove from list" to unregister it. A
   confirmation explains what will be removed. OpenXLR cleans up only that
   folder's generated VST3 and CLAP wrappers; original plugin files and
@@ -441,17 +441,17 @@ disabled or in use by an insert chain.
   its generated wrappers. Its files stay in place and the row remains listed.
   "Enable in OpenXLR" restores it. A separately installed copy can still
   appear in the picker; disabling one source does not ban a plugin name.
-- "Delete file…" permanently deletes a standalone file or bundle after a
+- "Delete file" permanently deletes a standalone file or bundle after a
   confirmation. Other files in the same folder are kept. It is unavailable
   for Wine-installed or linked sources, which may depend on an installer,
   registry entries or shared resources.
-- "Wine uninstaller…" opens the installed-apps list in the selected plugin's
+- "Wine uninstaller" opens the installed-apps list in the selected plugin's
   Wine prefix. Choose the plugin's installer entry there. Close other Wine
   applications and remove affected inserts first: one installer entry may
   remove several effects from the same package. OpenXLR waits without killing
   the uninstaller on a timeout, then syncs and rescans when it closes.
 
-When a row says "In use", choose "Remove from all chains…" and confirm to
+When a row says "In use", choose "Remove from all chains" and confirm to
 remove every occurrence from the current input and mix chains, including
 bypassed inserts. Other plugins keep their order and settings. This requires
 a running mixer and can briefly interrupt affected audio paths. The current
@@ -484,11 +484,11 @@ than asking you to go and find it. Once a folder is bridged, yabridge keeps
 it on its own list, so a second plugin installed into it needs only the
 sync, and the Bridge button has nothing left to offer.
 
-Picking one Windows `.vst3` or `.clap` file with "Install file…" installs
+Picking one Windows `.vst3` or `.clap` file with "Install file" installs
 only that plugin. OpenXLR copies it into its own folder under
 `~/.local/share/openxlr/windows-plugins`, grouped by format and plugin name,
 and registers that folder with yabridge. A single Windows `.vst3` bundle
-picked with "Install folder…" is copied whole, including its resources.
+picked with "Install folder" is copied whole, including its resources.
 The original download is kept and can be deleted afterwards. Other plugins
 beside the selected one, including other downloads, are not registered.
 Selecting the same plugin name again updates its managed copy.
@@ -496,12 +496,12 @@ Selecting the same plugin name again updates its managed copy.
 A plugin already installed inside a Wine prefix is linked from its managed
 folder instead of being copied or moved. It keeps its original location,
 Wine prefix and neighbouring files. Selecting an ordinary folder or using
-"Add folder…" in the folder manager still registers that folder in place.
+"Add folder" in the folder manager still registers that folder in place.
 VST2 `.dll` files are left out because OpenXLR cannot load VST2.
 
 Older folder registrations are not silently removed. If an earlier
 single-file import registered Downloads, remove that entry with "Manage Windows
-plugins…" and import the plugins you want individually. Remove affected
+plugins" and import the plugins you want individually. Remove affected
 inserts first if the manager asks you to. Removing a folder refreshes the
 catalogue and the open plugin pickers.
 
@@ -801,7 +801,7 @@ the release page matches the daemon of that release.
 <a name="layout"></a>
 ### 3.11 Edit the mixer layout
 
-The default channels and mixes are a starting point. Edit layout… in the
+The default channels and mixes are a starting point. Edit layout in the
 SUBMIXER card opens the layout editor: application channels on the left,
 mixes on the right, each with move up and down, Rename and Delete, and a
 box at the bottom to add one. The hardware inputs, Monitor A, Monitor B

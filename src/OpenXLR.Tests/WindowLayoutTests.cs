@@ -153,7 +153,7 @@ public sealed class WindowLayoutTests
                     double manageCenter = manageApps.TranslatePoint(default, main)!.Value.Y + manageApps.Bounds.Height / 2;
                     Assert.InRange(Math.Abs(headingCenter - manageCenter), 0, 1);
                     Assert.True(manageApps.TranslatePoint(default, main)!.Value.X > heading.TranslatePoint(default, main)!.Value.X + heading.Bounds.Width);
-                    var editLayout = main.GetVisualDescendants().OfType<Button>().Single(b => b.Content as string == "Edit layout…");
+                    var editLayout = main.GetVisualDescendants().OfType<Button>().Single(b => b.Content as string == "Edit layout");
                     Assert.Equal(editLayout.Padding, manageApps.Padding);
                     Assert.Equal(editLayout.FontSize, manageApps.FontSize);
                     Assert.Equal(editLayout.MinHeight, manageApps.MinHeight);

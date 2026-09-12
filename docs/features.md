@@ -146,7 +146,7 @@ Chains and exposed parameter values are saved with the mixer and profiles.
 Opaque plugin state, loaded sample files and plugin preset data are not
 persisted by OpenXLR. A plugin may save its own preferences separately.
 
-"Install file…" and "Install folder…" accept extracted Linux plugins or
+"Install file" and "Install folder" accept extracted Linux plugins or
 Windows plugin folders. Linux bundles are copied into `~/.lv2`, `~/.clap`
 or `~/.vst3`. Windows installers must run in Wine first; OpenXLR bridges
 the installed plugins and rescans automatically. Options offers a rescan,
