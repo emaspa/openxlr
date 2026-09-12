@@ -26,7 +26,11 @@ public static class CommandValidation
         {
             case "addWindowsPluginFolder":
             case "removeWindowsPluginFolder":
-                return CheckPluginFolderPath(cmd);
+            case "getWindowsPluginFiles":
+            case "removeWindowsPluginInserts":
+            case "setWindowsPluginEnabled":
+            case "deleteWindowsPlugin":
+                return CheckPluginPath(cmd);
             case "createChannel":
             case "createMix":
                 return BadName(cmd.Name) ? $"{cmd.Cmd}: name must contain 1 to 60 printable characters" : null;
@@ -134,10 +138,10 @@ public static class CommandValidation
         }
     }
 
-    internal static string? CheckPluginFolderPath(Command cmd)
+    internal static string? CheckPluginPath(Command cmd)
         => string.IsNullOrWhiteSpace(cmd.Path) || cmd.Path.Length > 4096
            || cmd.Path.Any(char.IsControl) || !Path.IsPathFullyQualified(cmd.Path)
-            ? $"{cmd.Cmd}: path must be an absolute folder path of at most 4096 characters"
+            ? $"{cmd.Cmd}: path must be an absolute path of at most 4096 characters"
             : null;
 
     private static string? Finite(Command cmd, string field)

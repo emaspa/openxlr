@@ -41,6 +41,23 @@ public sealed class ProcessRunnerTests
     }
 
     [Fact]
+    public async Task InteractiveProgramsKeepArgumentsAndEnvironmentSeparate()
+    {
+        string output = Path.Combine(Path.GetTempPath(), "openxlr-interactive-" + Guid.NewGuid());
+        string? before = Environment.GetEnvironmentVariable("WINEPREFIX");
+        try
+        {
+            int exit = await ProcessRunner.RunInteractiveAsync("sh",
+                ["-c", "printf '%s\\n%s' \"$WINEPREFIX\" \"$1\" > \"$2\"; exit 7", "test", "literal ; $HOME", output],
+                new Dictionary<string, string> { ["WINEPREFIX"] = "/a prefix with spaces" });
+            Assert.Equal(7, exit);
+            Assert.Equal("/a prefix with spaces\nliteral ; $HOME", File.ReadAllText(output));
+            Assert.Equal(before, Environment.GetEnvironmentVariable("WINEPREFIX"));
+        }
+        finally { File.Delete(output); }
+    }
+
+    [Fact]
     public async Task HelpersRunInTheCLocale()
     {
         ProcessResult r = await ProcessRunner.RunAsync("sh", ["-c", "printf '%s' \"$LC_ALL\""]);

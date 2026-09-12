@@ -220,11 +220,36 @@ public sealed class WindowLayoutTests
                 folders.Show();
                 foreach (double width in new[] { 480d, 720 })
                 {
-                    Layout(folders, width, 480);
+                    Layout(folders, width, width >= 720 ? 820 : 680);
                     var list = folders.FindControl<ListBox>("FolderList")!;
                     Assert.Equal(2, list.ItemCount);
+                    Assert.InRange(list.Bounds.Height, 220, 240);
                     list.SelectedIndex = 0;
                     Assert.True(folders.FindControl<Button>("RemoveFolder")!.IsEnabled);
+                    folders.ApplyPluginFiles(JsonNode.Parse("""
+                        {"ok":true,"plugins":[
+                          {"path":"/imports/EQ.vst3","name":"Elgato EQ","format":"vst3","enabled":true,"canDelete":true,"inUse":false},
+                          {"path":"/wine/TDR.clap","name":"TDR plugin","format":"clap","enabled":false,"canDelete":false,"winePrefix":"/wine","inUse":false},
+                          {"path":"/wine/Active.vst3","name":"Active effect","format":"vst3","enabled":true,"canDelete":false,"winePrefix":"/wine","inUse":true}
+                        ]}
+                        """));
+                    var files = folders.FindControl<ListBox>("PluginList")!;
+                    Assert.Equal(3, files.ItemCount);
+                    files.SelectedIndex = 0;
+                    Assert.True(folders.FindControl<Button>("DeletePlugin")!.IsEnabled);
+                    Assert.False(folders.FindControl<Button>("RemoveUses")!.IsVisible);
+                    Assert.False(folders.FindControl<Button>("WineUninstaller")!.IsVisible);
+                    files.SelectedIndex = 1;
+                    Assert.False(folders.FindControl<Button>("DeletePlugin")!.IsEnabled);
+                    Assert.Equal("Enable in OpenXLR", folders.FindControl<Button>("TogglePlugin")!.Content);
+                    Assert.True(folders.FindControl<Button>("WineUninstaller")!.IsEnabled);
+                    files.SelectedIndex = 2;
+                    Assert.False(folders.FindControl<Button>("TogglePlugin")!.IsEnabled);
+                    Assert.False(folders.FindControl<Button>("WineUninstaller")!.IsEnabled);
+                    Assert.True(folders.FindControl<Button>("RemoveUses")!.IsVisible);
+                    Assert.True(folders.FindControl<Button>("RemoveUses")!.IsEnabled);
+                    folders.FindControl<TextBlock>("Status")!.Text = "";   // the fixture replaces the disconnected query
+                    Layout(folders, width, width >= 720 ? 820 : 680);
                     foreach (var button in folders.GetVisualDescendants().OfType<Button>().Where(b => b.IsVisible))
                         AssertInside(button, folders);
                     AssertInside(list, folders);

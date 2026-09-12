@@ -106,6 +106,22 @@ public static class ProcessRunner
         return new ProcessResult(exit, outData, Encoding.UTF8.GetString(errData), timedOut, outTrunc || errTrunc);
     }
 
+    /// <summary>
+    /// Run a user-facing program without a deadline or captured output. Its
+    /// lifetime belongs to the user: never kill an installer halfway through.
+    /// </summary>
+    public static async Task<int> RunInteractiveAsync(string exe, IReadOnlyList<string> args,
+        IReadOnlyDictionary<string, string>? environment = null)
+    {
+        var start = new ProcessStartInfo(exe) { UseShellExecute = false };
+        foreach (string argument in args) start.ArgumentList.Add(argument);
+        if (environment is not null)
+            foreach ((string name, string value) in environment) start.Environment[name] = value;
+        using Process process = Process.Start(start) ?? throw new InvalidOperationException($"failed to start {exe}");
+        await process.WaitForExitAsync().ConfigureAwait(false);
+        return process.ExitCode;
+    }
+
     private static async Task<(byte[] Data, bool Truncated)> ReadCappedAsync(Stream pipe, int cap, CancellationTokenSource breach)
     {
         var buf = new byte[16 * 1024];

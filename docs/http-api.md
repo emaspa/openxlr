@@ -64,7 +64,16 @@ message after refreshing the catalogue. Check that message's `ok` and
 reported there. Removal keeps the original files and refuses folders backing
 current inserts. With the system bridge, folder registration is shared with
 other applications. The [folder-management contract](api.md) covers partial
-failures and path limits.
+failures and path limits. `getWindowsPluginFiles` lists individual files in
+one registered folder. `removeWindowsPluginInserts` takes `path` and removes
+that file's plugin classes from all current chains, saving before it answers;
+confirm with the user first because affected audio paths are rebuilt. It
+keeps other inserts and saved profiles. `setWindowsPluginEnabled` takes `path` and a boolean
+`value`; `deleteWindowsPlugin` takes `path` and permanently removes a standalone
+file or bundle after the client has obtained confirmation. Both mutations
+return `pluginInstall` and refresh the catalogue. Wine-installed and linked
+files cannot be deleted through this API; use the Windows uninstaller in the
+appropriate Wine prefix.
 
 The [OpenAPI document](openapi-v1.json) describes the HTTP endpoints. Restarting
 the daemon rotates its per-session token once the new instance listens;

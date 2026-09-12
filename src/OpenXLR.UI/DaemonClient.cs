@@ -76,25 +76,38 @@ public sealed class DaemonClient : IAsyncDisposable
     /// bundle can take a while, so callers wait generously.
     /// </summary>
     public Task<JsonNode?> InstallPluginAsync(string path, TimeSpan timeout)
-        => ChangePluginsAsync("installPlugin", timeout, new Dictionary<string, object> { ["path"] = path });
+        => PluginOperationAsync("installPlugin", timeout, new Dictionary<string, object> { ["path"] = path });
 
     public Task<JsonNode?> AddWindowsPluginFolderAsync(string path, TimeSpan timeout)
-        => ChangePluginsAsync("addWindowsPluginFolder", timeout, new Dictionary<string, object> { ["path"] = path });
+        => PluginOperationAsync("addWindowsPluginFolder", timeout, new Dictionary<string, object> { ["path"] = path });
 
     public Task<JsonNode?> RemoveWindowsPluginFolderAsync(string path, TimeSpan timeout)
-        => ChangePluginsAsync("removeWindowsPluginFolder", timeout, new Dictionary<string, object> { ["path"] = path });
+        => PluginOperationAsync("removeWindowsPluginFolder", timeout, new Dictionary<string, object> { ["path"] = path });
+
+    public Task<JsonNode?> RequestWindowsPluginFilesAsync(string folder, TimeSpan timeout)
+        => PluginOperationAsync("getWindowsPluginFiles", timeout, new Dictionary<string, object> { ["path"] = folder }, "windowsPluginFiles");
+
+    public Task<JsonNode?> SetWindowsPluginEnabledAsync(string path, bool enabled, TimeSpan timeout)
+        => PluginOperationAsync("setWindowsPluginEnabled", timeout, new Dictionary<string, object> { ["path"] = path, ["value"] = enabled });
+
+    public Task<JsonNode?> RemoveWindowsPluginInsertsAsync(string path, TimeSpan timeout)
+        => PluginOperationAsync("removeWindowsPluginInserts", timeout, new Dictionary<string, object> { ["path"] = path });
+
+    public Task<JsonNode?> DeleteWindowsPluginAsync(string path, TimeSpan timeout)
+        => PluginOperationAsync("deleteWindowsPlugin", timeout, new Dictionary<string, object> { ["path"] = path });
 
     /// <summary>Bridge again what yabridge knows; the reply is as for an install.</summary>
     public Task<JsonNode?> SyncWindowsPluginsAsync(TimeSpan timeout)
-        => ChangePluginsAsync("syncWindowsPlugins", timeout);
+        => PluginOperationAsync("syncWindowsPlugins", timeout);
 
     /// <summary>Read the catalogues again, for plugins installed by other means.</summary>
     public Task<JsonNode?> RescanPluginsAsync(TimeSpan timeout)
-        => ChangePluginsAsync("rescanPlugins", timeout);
+        => PluginOperationAsync("rescanPlugins", timeout);
 
     // Reads may share a reply; changes must each reach the daemon, even
     // when two windows issue them together and both answer pluginInstall.
-    private async Task<JsonNode?> ChangePluginsAsync(string command, TimeSpan timeout, Dictionary<string, object>? fields = null)
+    private async Task<JsonNode?> PluginOperationAsync(string command, TimeSpan timeout,
+        Dictionary<string, object>? fields = null, string replyType = "pluginInstall")
     {
         CancellationToken stopping;
         lock (_lifecycle)
@@ -104,7 +117,7 @@ public sealed class DaemonClient : IAsyncDisposable
         }
         try { await _pluginChanges.WaitAsync(stopping); }
         catch (OperationCanceledException) { return null; }
-        try { return await QueryAsync("pluginInstall", command, timeout, fields); }
+        try { return await QueryAsync(replyType, command, timeout, fields); }
         finally { _pluginChanges.Release(); }
     }
 
@@ -260,7 +273,7 @@ public sealed class DaemonClient : IAsyncDisposable
             else if (type == "state") { LastStateJson = text; StateReceived?.Invoke(node); }
             else if (type == "diagnostics") StoreReply(type, node);
             else if (type == "plugins") StoreReply(type, node["plugins"]);
-            else if (type is "pluginSetup" or "pluginInstall" or "pluginDiagnostics") StoreReply(type, node);
+            else if (type is "pluginSetup" or "pluginInstall" or "pluginDiagnostics" or "windowsPluginFiles") StoreReply(type, node);
             else if (type == "commandResult" && node["requestId"]?.GetValue<string>() is string requestId)
             {
                 CompleteQuery(requestId);

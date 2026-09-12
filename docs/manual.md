@@ -385,8 +385,8 @@ and the plugin is in the picker with a VST3 or CLAP badge. Nothing else
 has to be restarted.
 
 <a name="plugin-folders"></a>
-**Managing Windows plugin folders.** Open Options, PLUGINS, then "Manage
-folders…" to see the folders registered with the selected yabridge provider.
+**Managing Windows plugin folders.** Open Options, PLUGINS, then "Manage Windows
+plugins…" to see the folders registered with the selected yabridge provider.
 
 - "Add folder…" registers a folder holding Windows VST3 or CLAP plugins,
   syncs it and refreshes the catalogue. The original files stay in that
@@ -403,6 +403,43 @@ folder, including bypassed inserts. Folder removal does not edit saved
 profiles; re-add the folder before recalling a profile that needs it. It
 does not restart the audio service. If unregistering succeeds but cleanup
 fails, the result says so and the list refreshes to show the current state.
+
+**Managing individual plugins.** Select a registered folder to see its
+Windows VST3 and CLAP files. Each row says whether that source is enabled,
+disabled or in use by an insert chain.
+
+- "Disable in OpenXLR" excludes the selected source from yabridge and removes
+  its generated wrappers. Its files stay in place and the row remains listed.
+  "Enable in OpenXLR" restores it. A separately installed copy can still
+  appear in the picker; disabling one source does not ban a plugin name.
+- "Delete file…" permanently deletes a standalone file or bundle after a
+  confirmation. Other files in the same folder are kept. It is unavailable
+  for Wine-installed or linked sources, which may depend on an installer,
+  registry entries or shared resources.
+- "Wine uninstaller…" opens the installed-apps list in the selected plugin's
+  Wine prefix. Choose the plugin's installer entry there. Close other Wine
+  applications and remove affected inserts first: one installer entry may
+  remove several effects from the same package. OpenXLR waits without killing
+  the uninstaller on a timeout, then syncs and rescans when it closes.
+
+When a row says "In use", choose "Remove from all chains…" and confirm to
+remove every occurrence from the current input and mix chains, including
+bypassed inserts. Other plugins keep their order and settings. This requires
+a running mixer and can briefly interrupt affected audio paths. The current
+settings are saved before the operation completes, then the row refreshes so
+you can disable, delete or uninstall the plugin. Files and exclusions are not
+changed by this step. Saved profiles are kept too; recalling one can add the
+plugin back. If a chain could not be changed, the result names it rather than
+claiming the whole operation succeeded.
+
+Disable and delete actions are refused while the plugin remains in an insert
+chain, including a bypassed insert. The controls refresh the catalogue and
+open pickers after each change. Sync also removes wrappers whose source
+files have gone, but keeps unrelated wrappers and those still used by inserts.
+Exclusions are stored in the selected bridge's configuration; system-bridge
+exclusions affect other applications using that bridge too. A folder-level
+blacklist rule made outside OpenXLR must be removed through yabridge before a
+plugin blocked by that rule can be enabled here.
 
 With the OpenXLR companion, this manages its private registry and wrappers.
 With system yabridge, the same registry is used by other applications, so
@@ -434,8 +471,8 @@ Wine prefix and neighbouring files. Selecting an ordinary folder or using
 VST2 `.dll` files are left out because OpenXLR cannot load VST2.
 
 Older folder registrations are not silently removed. If an earlier
-single-file import registered Downloads, remove that entry with "Manage
-folders…" and import the plugins you want individually. Remove affected
+single-file import registered Downloads, remove that entry with "Manage Windows
+plugins…" and import the plugins you want individually. Remove affected
 inserts first if the manager asks you to. Removing a folder refreshes the
 catalogue and the open plugin pickers.
 

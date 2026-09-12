@@ -48,13 +48,37 @@ public sealed class PluginFolderUiTests : IDisposable
         Assert.False(vm.CanSyncWindows);
     }
 
+    [Fact]
+    public void PluginFileReplyUsesTheFieldsTheManagerReads()
+    {
+        var result = new OpenXLR.Core.Mixing.WindowsPluginFiles(true, "", [
+            new("/wine/EQ.vst3", "EQ.vst3", "vst3", false, false, "/wine", true),
+        ]);
+        string wire = System.Text.Json.JsonSerializer.Serialize(new WindowsPluginFilesMessage(result),
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+        JsonNode reply = JsonNode.Parse(wire)!;
+        Assert.Equal("windowsPluginFiles", reply["type"]!.GetValue<string>());
+        Assert.True(reply["ok"]!.GetValue<bool>());
+        JsonNode row = reply["plugins"]![0]!;
+        Assert.Equal("/wine/EQ.vst3", row["path"]!.GetValue<string>());
+        Assert.False(row["enabled"]!.GetValue<bool>());
+        Assert.False(row["canDelete"]!.GetValue<bool>());
+        Assert.Equal("/wine", row["winePrefix"]!.GetValue<string>());
+        Assert.True(row["inUse"]!.GetValue<bool>());
+        Assert.Null(reply["result"]);
+    }
+
     [Theory]
     [InlineData("addWindowsPluginFolder")]
     [InlineData("removeWindowsPluginFolder")]
+    [InlineData("getWindowsPluginFiles")]
+    [InlineData("removeWindowsPluginInserts")]
+    [InlineData("setWindowsPluginEnabled")]
+    [InlineData("deleteWindowsPlugin")]
     public void FolderCommandsRequireBoundedAbsolutePaths(string command)
     {
         foreach (string? path in new[] { null, "", "plugins", "~/plugins", "/plugins\nother", "/" + new string('x', 4096) })
-            Assert.Contains(command, CommandValidation.CheckPluginFolderPath(new Command { Cmd = command, Path = path }));
-        Assert.Null(CommandValidation.CheckPluginFolderPath(new Command { Cmd = command, Path = "/home/user/Windows plugins" }));
+            Assert.Contains(command, CommandValidation.CheckPluginPath(new Command { Cmd = command, Path = path }));
+        Assert.Null(CommandValidation.CheckPluginPath(new Command { Cmd = command, Path = "/home/user/Windows plugins" }));
     }
 }
