@@ -57,6 +57,15 @@ the effective plugin host, Wine and bridge provider. `getPluginDiagnostics` read
 scan evidence without syncing or changing inserts. Both reply shapes are
 documented in [api.md](api.md); the transport does not select a bridge itself.
 
+`addWindowsPluginFolder` and `removeWindowsPluginFolder` also use
+`POST /api/v1/commands`, with an absolute `path`. They return a `pluginInstall`
+message after refreshing the catalogue. Check that message's `ok` and
+`message`, not just the HTTP status: registry or wrapper-cleanup failures are
+reported there. Removal keeps the original files and refuses folders backing
+current inserts. With the system bridge, folder registration is shared with
+other applications. The [folder-management contract](api.md) covers partial
+failures and path limits.
+
 The [OpenAPI document](openapi-v1.json) describes the HTTP endpoints. Restarting
 the daemon rotates its per-session token once the new instance listens;
 clients must reread it.

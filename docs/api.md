@@ -57,7 +57,7 @@ Messages from the daemon, each a JSON object with a `type` field:
 | `plugins` | in answer to `listPlugins` | the installed LV2, CLAP and VST3 plugins with their controls, within the message size limit above and always including the plugins the saved chains use; `supported` is false, with `unsupportedFeatures` listed, for a plugin that needs a host feature the PipeWire chain lacks |
 | `pluginSetup` | in answer to `getPluginSetup` | where installs go (`lv2Directory`, `clapDirectory`, `vst3Directory`), `hostInstalled`, `yabridge` (its version, or null when not installed), `wine`, `windowsDirectories` (the folders yabridge bridges) and `wineFolders` (Wine's own plugin folders that hold a plugin and are not bridged yet, offered as one press since a file dialog hides them) |
 | `pluginDiagnostics` | in answer to `getPluginDiagnostics` | `discovery`: daemon host/controller paths, Wine prefix, architecture, effective search paths, bounded `yabridgectl status` output and latest completed CLAP/VST3 scan reports |
-| `pluginInstall` | in answer to `installPlugin`, `syncWindowsPlugins` and `rescanPlugins` | `ok`, `message` (a sentence or two for the user, ending with the bundles the scan that followed could not read, up to three by name and the rest as a count), `installed` (the bundles or folders put in place), `added` (plugins in the catalogue that were not before) and `total` |
+| `pluginInstall` | in answer to `installPlugin`, `addWindowsPluginFolder`, `removeWindowsPluginFolder`, `syncWindowsPlugins` and `rescanPlugins` | `ok`, `message` (a sentence or two for the user, ending with the bundles the scan that followed could not read, up to three by name and the rest as a count), `installed` (the bundles or folders put in place), `added` (plugins in the catalogue that were not before) and `total` |
 | `error` | when a command without a `requestId` is rejected | `message` |
 | `commandResult` | in answer to a command that carried a `requestId` | `requestId`, `error` (null on success); preceded by the state the result refers to |
 
@@ -93,7 +93,9 @@ a bare `error` message, so an editor can wait for the acknowledgement:
 | `listPlugins` | none | the installed LV2, CLAP and VST3 plugins, answered with a `plugins` message |
 | `getPluginDiagnostics` | none | read bridge status and existing native scan evidence without syncing, rescanning or changing inserts; answered with `pluginDiagnostics` |
 | `getPluginSetup` | none | where plugins are installed and what bridges Windows ones, answered with a `pluginSetup` message |
-| `installPlugin` | `path` | install what is at an absolute path the user picked: a `.clap` or single-file `.vst3` is copied into `~/.clap` or `~/.vst3`, a `.vst3` or `.lv2` directory into `~/.vst3` or `~/.lv2`, a plain directory installs every plugin inside it, and a Windows VST3 or CLAP plugin has its directory added to yabridge and synced. Archives, installers and VST2 files are refused with a message that says what to do. The catalogues are read again before the `pluginInstall` answer |
+| `installPlugin` | `path` | install what is at an absolute path the user picked: a `.clap` or single-file `.vst3` is copied into `~/.clap` or `~/.vst3`, a `.vst3` or `.lv2` directory into `~/.vst3` or `~/.lv2`, a plain directory installs every plugin inside it. A single Windows VST3/CLAP file or VST3 bundle is copied into its own folder under `windowsImportDirectory`, and only that folder is registered and synced; a plugin already installed inside a Wine prefix is linked from the managed folder instead, preserving its original location and prefix. An explicit Windows plugin folder is registered in place. Archives, installers and VST2 files are refused with a message that says what to do. The catalogues are read again before the `pluginInstall` answer |
+| `addWindowsPluginFolder` | `path` | register an existing folder holding Windows VST3 or CLAP plugins and sync it, without copying source files or installing any native plugins alongside them; answered with `pluginInstall` |
+| `removeWindowsPluginFolder` | `path` | unregister a folder from `windowsDirectories`, sync retained folders and remove only its unused generated VST3/CLAP wrappers. Original files are kept. Refused while affected plugins remain in the mixer's insert chains. A missing source folder can still be removed from the list; answered with `pluginInstall` |
 | `syncWindowsPlugins` | none | run yabridge's sync over the folders it knows, then read the catalogues again; answered with `pluginInstall` |
 | `rescanPlugins` | none | read the plugin directories again, for plugins installed by other means; answered with `pluginInstall` |
 | `setInserts` | `channel`, `inserts[]` | replace a chain; `channel` is `xlr1`, `xlr2` or `mix:<id>`, each insert is `{id, kind, plugin, label?, bypass?, params?}` where `kind` is `"lv2"` with the plugin URI, `"clap"` with the plugin's id, or `"vst3"` with the class id as 32 hex digits; a CLAP or VST3 insert always runs in the native host, so its `nativeHost` reads true whatever was sent |
@@ -119,12 +121,26 @@ loading conflicting old and normalized overrides, the normalized key wins.
 
 `pluginSetup` also reports `bridgeProvider` (`openxlr` or `system`),
 `bridgeDirectory` (the selected companion directory, or null), and
-`windowsPluginDirectory` (OpenXLR's private wrapper root, or null).
+`windowsPluginDirectory` (OpenXLR's private wrapper root, or null), and
+`windowsImportDirectory` (the managed single-plugin source folders, normally
+`~/.local/share/openxlr/windows-plugins`, honoring `XDG_DATA_HOME`). Imports
+use one folder per format and plugin name; selecting the same name again
+updates that folder. These source files are separate from generated wrappers.
 `wine` is a boolean; `wineVersion` is a string or null. `windowsEditorNote`
 is a user-facing compatibility message or null. With provider `openxlr`,
 `yabridge` is the companion package version.
 The `openxlr` provider includes the pinned Wine input fix. Its directory
 registry and generated wrappers are separate from the system controller.
+
+Folder-management paths must be absolute, at most 4096 characters and contain
+no control characters. Removing a folder changes the selected provider's
+registry; with `system`, that registry is shared with other applications.
+The daemon never runs a global prune. Wrappers still covered by a retained
+folder are kept. Folder changes, installs and rescans are serialized, as are
+insert-chain replacements and profile loads against those operations. Check
+`pluginInstall.ok` and `message` for the operation's outcome: a failed cleanup
+can leave the folder unregistered with some wrappers still present. Refresh
+`getPluginSetup` after either success or failure. Profiles are not rewritten.
 
 LV2 insert definitions optionally carry `nativeHost: true` to select the native
 helper for that insert. Missing or false keeps LV2 in PipeWire filter-chain, even

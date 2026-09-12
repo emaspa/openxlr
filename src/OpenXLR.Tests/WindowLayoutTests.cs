@@ -208,6 +208,28 @@ public sealed class WindowLayoutTests
                 Assert.False(UiSettings.Load().MinimizeToTray);
                 Assert.False(vm.MinimizeToTray);
                 Capture(options, "options-startup");
+
+                optionsVm.ApplyPluginSetup(JsonNode.Parse("""
+                    {"yabridge":"5.1.1","wine":true,"bridgeProvider":"system",
+                     "windowsImportDirectory":"~/.local/share/openxlr/windows-plugins",
+                     "windowsDirectories":["/home/test/.wine/drive_c/Program Files/Common Files/VST3",
+                     "/home/test/Downloads/A plugin collection with a long folder name/Windows/VST3/x64"]}
+                    """));
+                var folders = new PluginFoldersWindow { DataContext = optionsVm };
+                windows.Add(folders);
+                folders.Show();
+                foreach (double width in new[] { 480d, 720 })
+                {
+                    Layout(folders, width, 480);
+                    var list = folders.FindControl<ListBox>("FolderList")!;
+                    Assert.Equal(2, list.ItemCount);
+                    list.SelectedIndex = 0;
+                    Assert.True(folders.FindControl<Button>("RemoveFolder")!.IsEnabled);
+                    foreach (var button in folders.GetVisualDescendants().OfType<Button>().Where(b => b.IsVisible))
+                        AssertInside(button, folders);
+                    AssertInside(list, folders);
+                    Capture(folders, "plugin-folders-" + width);
+                }
             }
             catch (Exception ex) { failure = ex; }
             finally

@@ -24,6 +24,9 @@ public static class CommandValidation
     {
         switch (cmd.Cmd)
         {
+            case "addWindowsPluginFolder":
+            case "removeWindowsPluginFolder":
+                return CheckPluginFolderPath(cmd);
             case "createChannel":
             case "createMix":
                 return BadName(cmd.Name) ? $"{cmd.Cmd}: name must contain 1 to 60 printable characters" : null;
@@ -130,6 +133,12 @@ public static class CommandValidation
                 return null;   // the service knows the rest, or reports the command as unknown
         }
     }
+
+    internal static string? CheckPluginFolderPath(Command cmd)
+        => string.IsNullOrWhiteSpace(cmd.Path) || cmd.Path.Length > 4096
+           || cmd.Path.Any(char.IsControl) || !Path.IsPathFullyQualified(cmd.Path)
+            ? $"{cmd.Cmd}: path must be an absolute folder path of at most 4096 characters"
+            : null;
 
     private static string? Finite(Command cmd, string field)
         => cmd.Value.ValueKind == JsonValueKind.Number && cmd.Value.TryGetDouble(out double d) && double.IsFinite(d)

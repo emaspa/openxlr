@@ -211,11 +211,26 @@ public sealed class WebSocketHub
                 if (string.IsNullOrWhiteSpace(cmd.Path)) { error = "installPlugin: missing 'path'"; break; }
                 await reply(await Task.Run(() => InstallPlugin(installer => installer.Install(cmd.Path))));
                 break;
+            case "addWindowsPluginFolder":
+            case "removeWindowsPluginFolder":
+                error = CommandValidation.CheckPluginFolderPath(cmd);
+                if (error is not null) break;
+                await reply(await Task.Run(() => InstallPlugin(installer =>
+                    cmd.Cmd == "addWindowsPluginFolder"
+                        ? installer.AddWindowsFolder(cmd.Path!)
+                        : installer.RemoveWindowsFolder(cmd.Path!, InsertPluginPaths()))));
+                break;
             case "syncWindowsPlugins":
                 await reply(await Task.Run(() => InstallPlugin(installer => installer.SyncWindows())));
                 break;
             case "rescanPlugins":
                 await reply(await Task.Run(() => InstallPlugin(_ => new OpenXLR.Core.Mixing.InstallOutcome(true, "", []))));
+                break;
+            case "setInserts":
+                // A folder cannot be removed between checking its users and
+                // creating an insert from it on another client.
+                lock (_installGate) error = _mixer.Apply(cmd);
+                stateOnError = true;
                 break;
             case "set":
                 error = cmd.Control is null ? "set: missing 'control'" : _devices.Apply(cmd.Control, cmd.Value);  // broadcasts on success
@@ -242,7 +257,6 @@ public sealed class WebSocketHub
             case "setAuxPortEnabled":
             case "setLowCutHz":
             case "setSoftClipGuard":
-            case "setInserts":
             case "setInsertBypass":
             case "setInsertParam":
             case "showInsertUi":
@@ -289,6 +303,11 @@ public sealed class WebSocketHub
     /// skipped when this run has no submixer. Null on success.
     /// </summary>
     private string? ApplyNamedProfile(string devId, string name, bool restoring = false)
+    {
+        lock (_installGate) return ApplyNamedProfileLocked(devId, name, restoring);
+    }
+
+    private string? ApplyNamedProfileLocked(string devId, string name, bool restoring)
     {
         OpenXLR.Core.Profile? p = OpenXLR.Core.ProfileStore.Load(devId, name);
         if (p is null) return $"no profile named '{name}'";
@@ -396,6 +415,11 @@ public sealed class WebSocketHub
             return new PluginInstallMessage(outcome.Ok, message, outcome.Installed, added, total);
         }
     }
+
+    private IReadOnlyCollection<string> InsertPluginPaths()
+        => _mixer.InsertPlugins()
+            .Select(id => OpenXLR.Core.Mixing.PluginCatalog.Find(id.Kind, id.Plugin)?.Path)
+            .OfType<string>().Distinct(StringComparer.Ordinal).ToArray();
 
     private readonly object _installGate = new();
 

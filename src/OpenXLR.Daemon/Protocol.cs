@@ -80,7 +80,7 @@ public sealed record Command
     /// <summary>"setInsertParam": the control port symbol.</summary>
     [JsonPropertyName("symbol")] public string? Symbol { get; init; }
 
-    /// <summary>"installPlugin": the file or directory the user picked, absolute.</summary>
+    /// <summary>Plugin installs and folder management: the file or directory the user picked, absolute.</summary>
     [JsonPropertyName("path")] public string? Path { get; init; }
 }
 
@@ -104,10 +104,11 @@ public sealed record PluginSetupMessage(PluginSetup Setup)
     [JsonPropertyName("bridgeProvider")] public string BridgeProvider => Setup.BridgeProvider;
     [JsonPropertyName("bridgeDirectory")] public string? BridgeDirectory => Setup.BridgeDirectory;
     [JsonPropertyName("windowsPluginDirectory")] public string? WindowsPluginDirectory => Setup.WindowsPluginDirectory;
+    [JsonPropertyName("windowsImportDirectory")] public string? WindowsImportDirectory => Setup.WindowsImportDirectory;
     [JsonIgnore] public PluginSetup Setup { get; } = Setup;
 }
 
-/// <summary>Reply to "installPlugin", "syncWindowsPlugins" and "rescanPlugins": what happened, and what the catalogue gained.</summary>
+/// <summary>Reply to plugin installation, folder management, sync and rescan: what happened, and what the catalogue gained.</summary>
 public sealed record PluginInstallMessage(bool Ok, string Message, IReadOnlyList<string> Installed, int Added, int Total)
 {
     [JsonPropertyName("type")] public string Type => "pluginInstall";
