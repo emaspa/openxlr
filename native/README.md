@@ -125,7 +125,13 @@ For a custom companion, replace `/usr/lib/openxlr/yabridge` with the selected
 bridge directory reported by `getPluginSetup`. Run under `xvfb-run -a` to
 keep the test editor off your desktop.
 
-`--frames N` sets the cycle length (2048), `--wait-before-activate MS` and
+`--channels N` sets the chain width (2; 1 is the XLR inputs' width, and a
+plugin that reports stereo is asked for a mono arrangement the way the
+host asks), `--frames N` the cycle length (2048), `--tone HZ` the test
+tone (440), `--set SYMBOL=VALUE`, repeatable, moves a control before the
+first cycle so the printed peaks show the plugin acting on the signal
+rather than passing it through at its defaults (VST3 symbols are the
+parameter ids the scanner prints), `--wait-before-activate MS` and
 `--wait-after-activate MS` add pauses that tell a time-based failure from
 one a call causes, `--editor-at N` opens the plugin's real editor on
 `DISPLAY` at that cycle and closes it ten cycles later (use `xvfb-run -a`
@@ -144,6 +150,21 @@ out when the editor is opened; the check with `--editor-at` shows the
 editor itself is fine, and `--reactivate-at` after it shows the plugin's
 limit, which the daemon never reaches because it activates once per
 process.
+
+It is also how the Elgato effects' mono support was measured before the
+catalogue started reporting `widths`. Each of EQ 1.3.0, Compressor 1.0.1,
+Noise Removal 1.1.2 and De-Esser 1.0.1 scans as stereo, takes a mono
+arrangement at `--channels 1` (the trace shows one channel per main bus,
+arrangement `80000`), and at defaults passes a 440 Hz tone at its input
+peak apart from its own transient or latency. With a control moved the
+mono output follows it: the compressor's threshold at 0 takes the peak
+from 0.250 to 0.004 without make-up gain, the EQ's first band at its top
+frequency cuts the tone to 0.000, the noise remover's VAD threshold at 1
+gates it to 0.000 after a few cycles, and the de-esser's first band on a
+6 kHz tone (`--tone 6000`) with its frequency at 0.3, threshold at 0 and
+ratio at 1 takes it from 0.234 to 0.034; the same runs at `--channels 2`
+give the same figures. A stereo-only plugin asked the same way, Dragonfly
+Plate Reverb, is listed with `widths` of 2 alone.
 
 ## Scope
 
@@ -183,6 +204,18 @@ scanner (`openxlr-lv2-host scan-vst3 BUNDLE`) does not create editors,
 since that is most of the cost of describing a large module; every VST3
 plugin is assumed to have one, and the host too creates no view before it
 is asked to open the editor, when a plugin without one says so. The
+scanner does ask each plugin which chain widths its main buses take, one
+and two channels being the widths the host carries: the default width the
+fresh instance reports counts as accepted, and the other is requested
+through `setBusArrangements` and confirmed through the bus info, which is
+what the host does at load for the chain's own width. Asking changes the
+instance, so each question goes to one in the state a load finds it: the
+description is read first, the first question goes to that still unasked
+instance, and a plugin whose default is neither width gets a fresh
+instance for the second. The answer is the plugin's `widths` in the
+catalogue, so a plugin that reports stereo and accepts mono, as the
+Elgato effects do, is offered on the mono inputs, and one that refuses
+both widths is offered nowhere instead of failing at load. The
 interface headers are vendored under `vst3/` (MIT, VST 3.8.1); only their
 inline parts are used, so nothing of the SDK is compiled. Windows VST3
 plugins arrive through yabridge as ordinary bundles. The optional

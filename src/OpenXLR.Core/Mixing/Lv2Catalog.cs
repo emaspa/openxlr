@@ -141,7 +141,8 @@ public static class Lv2Catalog
     internal static int Footprint(PluginInfo p)
         => 252 + p.Plugin.Length + p.Name.Length + p.Category.Length
            + p.Params.Sum(q => 152 + q.Symbol.Length + q.Name.Length + q.ScalePoints.Sum(sp => 24 + sp.Label.Length))
-           + p.RequiredFeatures.Sum(f => f.Length + 4) + (p.InputSymbols.Count + p.OutputSymbols.Count) * 16;
+           + p.RequiredFeatures.Sum(f => f.Length + 4) + (p.InputSymbols.Count + p.OutputSymbols.Count) * 16
+           + (p.Widths is null ? 0 : 12 + p.Widths.Count * 3);
 
     /// <summary>
     /// Keep a list under the budget by dropping the largest plugins first: a

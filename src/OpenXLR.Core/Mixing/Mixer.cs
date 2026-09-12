@@ -568,6 +568,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         return marker < 0 ? [] : _monitorOutputs.Where(o => o.StartsWith(output[..(marker + 1)], StringComparison.Ordinal));
     }
     public bool IsInsertKey(string key) { lock (_gate) return IsInsertChannel(key); }
+
+    public InsertDefinition? InsertInChain(string key, string id) { lock (_gate) return InsertsFor(key).FirstOrDefault(i => i.Id == id); }
     public int OverrideCount { get { lock (_gate) return Matcher.Overrides.Count; } }
 
     private MixDefinition? MixForKey(string key)
@@ -593,7 +595,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         _insertErrors.Remove(key);
 
         List<InsertDefinition> inserts = InsertsFor(key);
-        bool anyInsert = inserts.Any(i => !i.Bypass && PluginCatalog.Find(i) is { } p && p.AudioIns >= 2 && p.AudioOuts >= 2);
+        bool anyInsert = inserts.Any(i => !i.Bypass && PluginCatalog.Find(i) is { } p && p.Fits(2));
         if (anyInsert && _restarts.Blocked(key)) _insertErrors[key] = RestartPolicy.GivenUp;
         else if (anyInsert)
         {
