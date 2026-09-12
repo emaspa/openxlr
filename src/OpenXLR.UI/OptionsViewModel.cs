@@ -160,6 +160,7 @@ public sealed class OptionsViewModel : ViewModelBase
             StartupError = null;
             _startDaemonAtLogin = value;
             Raise();
+            Raise(nameof(StartupHint));
             Persist();
         }
     }
@@ -213,9 +214,26 @@ public sealed class OptionsViewModel : ViewModelBase
         _ => null,
     };
 
-    public string StartupHint => OpenWindowAtLogin
-        ? "The mixer and tray icon will start when you sign in."
-        : "The mixer and tray icon will not start at login. Starting minimized does not enable autostart.";
+    public string StartupHint => (StartDaemonAtLogin, OpenWindowAtLogin) switch
+    {
+        (true, true) => "Audio and the app will start when you sign in.",
+        (false, true) => "The app will start at login. Start the audio service separately to use it.",
+        (true, false) => "Audio will start at login without the app or tray icon.",
+        _ => "Neither audio nor the app will start at login.",
+    };
+
+    // The selectors keep the existing saved booleans, including their defaults.
+    public int LaunchBehavior
+    {
+        get => StartMinimized ? 1 : 0;
+        set { if (value is 0 or 1) StartMinimized = value == 1; }
+    }
+
+    public int CloseBehavior
+    {
+        get => MinimizeToTray ? 0 : 1;
+        set { if (value is 0 or 1) MinimizeToTray = value == 0; }
+    }
 
     private bool _minimizeToTray;
     public bool MinimizeToTray
@@ -224,6 +242,7 @@ public sealed class OptionsViewModel : ViewModelBase
         set
         {
             if (!Set(ref _minimizeToTray, value)) return;
+            Raise(nameof(CloseBehavior));
             Persist();
             _main.MinimizeToTray = value;
         }
@@ -236,6 +255,7 @@ public sealed class OptionsViewModel : ViewModelBase
         set
         {
             if (!Set(ref _startMinimized, value)) return;
+            Raise(nameof(LaunchBehavior));
             Persist();
         }
     }

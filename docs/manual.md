@@ -46,8 +46,8 @@ The window's header shows the connected interface with a green dot.
 "No device" means the daemon cannot open the interface: replug it once
 after installing so the udev rule applies ([section 5.1](#no-device)).
 
-If you only want hardware control and no mixer, turn the submixer off
-in Options ([section 3.8](#hardware-only)). The daemon restarts in hardware-control mode
+If you only want hardware control and no mixer, turn off "Enable software
+mixer" in Options, AUDIO ([section 3.8](#hardware-only)). The daemon restarts in hardware-control mode
 and the `OpenXLR …` devices disappear.
 
 Update checks are also controlled in Options. They are off by default. You can
@@ -598,23 +598,27 @@ hold; it re-asserts them once a second and reverts any outside change.
 <a name="hardware-only"></a>
 ### 3.8 Hardware control only
 
-Options, Submixer: off. The daemon restarts in hardware-control mode:
-the sound card keeps its stock PipeWire layout (on the Pro, its UCM
-profile where one is installed), and the `OpenXLR …` devices, mixes,
+In Options, AUDIO, turn off "Enable software mixer". This controls the
+application channels, mixes, virtual microphones and plugin inserts. The
+daemon restarts when you change it, briefly interrupting audio. With it
+off, the sound card keeps its stock PipeWire layout, including the Pro's
+UCM profile where one is installed, and the `OpenXLR …` devices, mixes,
 virtual microphones and inserts go away. The INPUTS and HEADPHONES
 cards keep working. Turn it on again the same way.
 
 <a name="autostart"></a>
 ### 3.9 Start at login, tray
 
-Options, STARTUP:
+Options separates login startup from window behaviour.
 
-- "Start audio service at login (background only)" enables the daemon's
+Under AT LOGIN:
+
+- "Start audio in the background" enables the daemon's
   systemd user service. On a packaged install this is the package's own
   unit. This does not start the mixer window or create a tray icon. If
   the service cannot be enabled or disabled, Options says so and keeps
   the previous preference rather than saving one the system does not have.
-- "Start mixer window and tray icon at login" writes a desktop autostart
+- "Start the OpenXLR app" writes a desktop autostart
   entry for the window in `~/.config/autostart/openxlr.desktop`,
   including on KDE Plasma and CachyOS. The file is written the way any
   desktop application writes there: the folder keeps its own permissions,
@@ -632,21 +636,35 @@ Options, STARTUP:
     moved since it last wrote one. If you removed the entry yourself
     with a desktop tool, it stays removed and Options says so; turn the
     option off and on again to get it back.
-- With "Close button minimizes to tray", the window hides instead of
-  quitting; the tray icon's "Show mixer" menu item restores it, including
-  when the window was minimized. "Quit OpenXLR" exits even with
-  close-to-tray enabled. The close button always hides the window when
-  this option is on: a Linux desktop gives an application no way to find
-  out whether a system tray is there, so OpenXLR cannot fall back to
-  quitting when there is none. On a desktop with no tray, leave this
-  option off. "Start minimized to tray" starts with no window at all; the
-  tray icon shows it the first time you click it, and with no tray there
-  is nothing to click, so leave that off too. It changes how the window
-  opens; it does not enable autostart. For a tray icon at login, enable
-  both the mixer-at-login option and "Start minimized to tray".
-- Only one window runs per user. Starting OpenXLR again, from the menu
-  or a shell, brings the running window to the front (out of the tray
-  if it is hidden there) instead of opening a second one.
+
+The two login switches are independent. Enable both for audio and the app
+at login. Audio alone starts without a window or tray icon. The app alone
+starts without the audio service, which you must start separately to use
+it. With both off, neither starts at login. The hint below the switches
+describes the combination you chose.
+
+Under WINDOW:
+
+- "On launch" chooses "Show mixer" or "Tray only". It applies the next
+  time the app starts, whether at login or by hand; changing it does not
+  hide the current window or enable autostart. "Tray only" starts with no
+  window at all; the tray icon shows it the first time you click it. For
+  a tray icon at login, enable "Start the OpenXLR app" and choose "Tray
+  only".
+- "When closing" chooses "Keep running in tray" or "Quit app" and takes
+  effect immediately. Keeping the app in the tray hides the window
+  instead of quitting; the tray icon's "Show mixer" menu item restores it,
+  including when the window was minimized. "Quit OpenXLR" in the tray
+  menu always exits. Neither choice stops the background audio service.
+
+A Linux desktop gives an application no way to find out whether a system
+tray is there, so OpenXLR cannot fall back to quitting when there is none.
+On a desktop with no tray, choose "Show mixer" on launch and "Quit app"
+when closing. These window choices do not change either login switch.
+
+Only one window runs per user. Starting OpenXLR again, from the menu or a
+shell, brings the running window to the front, out of the tray if it is
+hidden there, instead of opening a second one.
 
 To land on a known scene at every login, mark a profile to recall on
 connect ([section 3.6](#profiles)). An interface using connect-time restoration comes back
@@ -668,7 +686,7 @@ systemctl --user restart openxlr-daemon
 ```
 
 Until then the window offers only the controls the old daemon reports.
-Toggling the submixer in Options also restarts the daemon.
+Changing "Enable software mixer" in Options, AUDIO also restarts the daemon.
 
 Since 0.1.23 every client presents a token the daemon writes at start
 ([section 6](#files)). A window or OpenDeck plugin older than the daemon is

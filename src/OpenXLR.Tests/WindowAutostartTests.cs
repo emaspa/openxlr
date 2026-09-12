@@ -153,7 +153,168 @@ public sealed class WindowAutostartTests : IDisposable
         Assert.True(options.StartDaemonAtLogin);
         Assert.True(options.StartMinimized);
         Assert.False(options.OpenWindowAtLogin);
-        Assert.Contains("does not enable autostart", options.StartupHint);
+        Assert.Equal("Audio will start at login without the app or tray icon.", options.StartupHint);
+    }
+
+    [Theory]
+    [InlineData(true, true, "Audio and the app will start when you sign in.")]
+    [InlineData(false, true, "The app will start at login. Start the audio service separately to use it.")]
+    [InlineData(true, false, "Audio will start at login without the app or tray icon.")]
+    [InlineData(false, false, "Neither audio nor the app will start at login.")]
+    public void StartupHintDescribesBothSavedLoginFlags(bool audio, bool app, string expected)
+    {
+        // Load saved flags rather than calling setters that change systemd services.
+        new UiSettings { StartDaemonAtLogin = audio, OpenWindowAtLogin = app }.Save();
+        var client = new DaemonClient();
+        var options = new OptionsViewModel(client, new MainViewModel(client));
+
+        Assert.Equal(audio, options.StartDaemonAtLogin);
+        Assert.Equal(app, options.OpenWindowAtLogin);
+        Assert.Equal(expected, options.StartupHint);
+        Assert.False(Directory.Exists(AutostartDir));
+    }
+
+    private static ComboBox BindSelector(OptionsViewModel options, string property, params string[] items)
+    {
+        var box = new ComboBox { DataContext = options, ItemsSource = items };
+        box.Bind(ComboBox.SelectedIndexProperty,
+            new Binding { Path = property, Mode = BindingMode.TwoWay });
+        return box;
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void WindowSelectorsLoadAndPersistIndependently(bool startMinimized, bool minimizeToTray)
+    {
+        var saved = new UiSettings
+        {
+            StartMinimized = startMinimized,
+            MinimizeToTray = minimizeToTray,
+            StartDaemonAtLogin = startMinimized,
+            OpenWindowAtLogin = minimizeToTray,
+            AutostartExecutable = Executable,
+            CheckForUpdates = true,
+            LastUpdateCheckUtc = new DateTimeOffset(2026, 9, 1, 12, 0, 0, TimeSpan.Zero),
+            DismissedUpdate = "v0.1.32",
+            CollapsedSections = ["INPUTS", "MONITOR"],
+        };
+        saved.Save();
+        if (saved.OpenWindowAtLogin)
+            Assert.True(StartupIntegration.SetWindowAtLogin(true, Executable));
+        string? entryBefore = File.Exists(Entry) ? File.ReadAllText(Entry) : null;
+        var marker = new DateTime(2001, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        if (entryBefore is not null) File.SetLastWriteTimeUtc(Entry, marker);
+
+        var client = new DaemonClient();
+        var main = new MainViewModel(client);
+        var options = new OptionsViewModel(client, main);
+        var launch = BindSelector(options, nameof(OptionsViewModel.LaunchBehavior), "Show mixer", "Tray only");
+        var close = BindSelector(options, nameof(OptionsViewModel.CloseBehavior), "Keep running in tray", "Quit app");
+        AssertState(startMinimized, minimizeToTray);
+
+        launch.SelectedIndex = startMinimized ? 0 : 1;
+        AssertState(!startMinimized, minimizeToTray);
+        close.SelectedIndex = minimizeToTray ? 1 : 0;
+        AssertState(!startMinimized, !minimizeToTray);
+        launch.SelectedIndex = startMinimized ? 1 : 0;
+        AssertState(startMinimized, !minimizeToTray);
+        close.SelectedIndex = minimizeToTray ? 0 : 1;
+        AssertState(startMinimized, minimizeToTray);
+
+        void AssertState(bool minimized, bool tray)
+        {
+            Assert.Equal(minimized, options.StartMinimized);
+            Assert.Equal(tray, options.MinimizeToTray);
+            Assert.Equal(tray, main.MinimizeToTray);
+            Assert.Equal(minimized ? 1 : 0, options.LaunchBehavior);
+            Assert.Equal(tray ? 0 : 1, options.CloseBehavior);
+            Assert.Equal(options.LaunchBehavior, launch.SelectedIndex);
+            Assert.Equal(options.CloseBehavior, close.SelectedIndex);
+
+            UiSettings persisted = UiSettings.Load();
+            Assert.Equal(minimized, persisted.StartMinimized);
+            Assert.Equal(tray, persisted.MinimizeToTray);
+            Assert.Equal(saved.StartDaemonAtLogin, persisted.StartDaemonAtLogin);
+            Assert.Equal(saved.OpenWindowAtLogin, persisted.OpenWindowAtLogin);
+            Assert.Equal(saved.AutostartExecutable, persisted.AutostartExecutable);
+            Assert.Equal(saved.CheckForUpdates, persisted.CheckForUpdates);
+            Assert.Equal(saved.LastUpdateCheckUtc, persisted.LastUpdateCheckUtc);
+            Assert.Equal(saved.DismissedUpdate, persisted.DismissedUpdate);
+            Assert.Equal(saved.CollapsedSections, persisted.CollapsedSections);
+            Assert.Equal(saved.StartDaemonAtLogin, options.StartDaemonAtLogin);
+            Assert.Equal(saved.OpenWindowAtLogin, options.OpenWindowAtLogin);
+            if (entryBefore is null)
+                Assert.False(Directory.Exists(AutostartDir));
+            else
+            {
+                Assert.Equal(entryBefore, File.ReadAllText(Entry));
+                Assert.Equal(marker, File.GetLastWriteTimeUtc(Entry));
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void BooleanChangesNotifyAndUpdateBoundWindowSelectors(bool initial)
+    {
+        new UiSettings { StartMinimized = initial, MinimizeToTray = initial }.Save();
+        var client = new DaemonClient();
+        var main = new MainViewModel(client);
+        var options = new OptionsViewModel(client, main);
+        var launch = BindSelector(options, nameof(OptionsViewModel.LaunchBehavior), "Show mixer", "Tray only");
+        var close = BindSelector(options, nameof(OptionsViewModel.CloseBehavior), "Keep running in tray", "Quit app");
+        var changes = new List<string?>();
+        options.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+
+        foreach (bool value in new[] { !initial, initial })
+        {
+            changes.Clear();
+            options.StartMinimized = value;
+            Assert.Contains(nameof(OptionsViewModel.LaunchBehavior), changes);
+            Assert.Equal(value ? 1 : 0, launch.SelectedIndex);
+            Assert.Equal(value, UiSettings.Load().StartMinimized);
+
+            changes.Clear();
+            options.MinimizeToTray = value;
+            Assert.Contains(nameof(OptionsViewModel.CloseBehavior), changes);
+            Assert.Equal(value ? 0 : 1, close.SelectedIndex);
+            Assert.Equal(value, main.MinimizeToTray);
+            Assert.Equal(value, UiSettings.Load().MinimizeToTray);
+        }
+        Assert.False(Directory.Exists(AutostartDir));
+    }
+
+    [Theory]
+    [InlineData(false, -1)]
+    [InlineData(true, -1)]
+    [InlineData(false, 2)]
+    [InlineData(true, 2)]
+    public void WindowSelectorsIgnoreInvalidIndexes(bool initial, int index)
+    {
+        new UiSettings { StartMinimized = initial, MinimizeToTray = initial }.Save();
+        string settingsPath = Path.Combine(UiSettings.ConfigDir, "ui.json");
+        string before = File.ReadAllText(settingsPath);
+        var marker = new DateTime(2001, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(settingsPath, marker);
+        var client = new DaemonClient();
+        var main = new MainViewModel(client);
+        var options = new OptionsViewModel(client, main);
+
+        options.LaunchBehavior = index;
+        options.CloseBehavior = index;
+
+        Assert.Equal(initial ? 1 : 0, options.LaunchBehavior);
+        Assert.Equal(initial ? 0 : 1, options.CloseBehavior);
+        Assert.Equal(initial, options.StartMinimized);
+        Assert.Equal(initial, options.MinimizeToTray);
+        Assert.Equal(initial, main.MinimizeToTray);
+        Assert.Equal(before, File.ReadAllText(settingsPath));
+        Assert.Equal(marker, File.GetLastWriteTimeUtc(settingsPath));
+        Assert.False(Directory.Exists(AutostartDir));
     }
 
     /// <summary>
@@ -272,10 +433,14 @@ public sealed class WindowAutostartTests : IDisposable
         Assert.NotNull(options.StartupError);
 
         Directory.Delete(Entry);
+        var changes = new List<string?>();
+        options.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
         options.OpenWindowAtLogin = false;
         Assert.False(options.OpenWindowAtLogin);
         Assert.False(UiSettings.Load().OpenWindowAtLogin);
         Assert.Null(options.StartupError);
+        Assert.Contains(nameof(OptionsViewModel.StartupHint), changes);
+        Assert.Equal("Neither audio nor the app will start at login.", options.StartupHint);
     }
 
     /// <summary>

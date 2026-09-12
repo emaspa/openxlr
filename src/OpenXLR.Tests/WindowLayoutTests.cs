@@ -169,6 +169,45 @@ public sealed class WindowLayoutTests
                     }
                 }
                 Capture(chain, "chain-440");
+
+                new UiSettings { StartMinimized = true, MinimizeToTray = true }.Save();
+                var optionsVm = new OptionsViewModel(new DaemonClient(), vm);
+                var options = new OptionsWindow { DataContext = optionsVm };
+                windows.Add(options);
+                options.Show();
+                Layout(options, 980, 800);
+                var launch = options.FindControl<ComboBox>("LaunchBehavior")!;
+                var close = options.FindControl<ComboBox>("CloseBehavior")!;
+                Assert.Equal(1, launch.SelectedIndex);
+                Assert.Equal(0, close.SelectedIndex);
+                Assert.Equal("Tray only", ((ComboBoxItem)launch.SelectedItem!).Content);
+                Assert.Equal("Keep running in tray", ((ComboBoxItem)close.SelectedItem!).Content);
+                foreach (var picker in new[] { launch, close })
+                {
+                    AssertInside(picker, options);
+                    AssertNoOverlap(((Grid)picker.Parent!).Children.Where(c => c.IsVisible).ToArray());
+                }
+                foreach (string heading in new[] { "AT LOGIN", "WINDOW", "AUDIO" })
+                    Assert.Single(options.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == heading);
+                var notes = options.FindControl<StackPanel>("SoftwareMixerNotes")!;
+                var audioHeading = options.GetVisualDescendants().OfType<TextBlock>()
+                    .Single(t => t.Text == "AUDIO");
+                Assert.Equal(audioHeading.TranslatePoint(default, options)!.Value.X,
+                    notes.TranslatePoint(default, options)!.Value.X);
+                var noteLines = notes.Children.OfType<TextBlock>().Where(t => t.IsVisible).ToArray();
+                Assert.Equal(2, noteLines.Length);
+                foreach (var line in noteLines)
+                {
+                    Assert.Equal(notes.TranslatePoint(default, options)!.Value.X,
+                        line.TranslatePoint(default, options)!.Value.X);
+                    AssertInside(line, notes);
+                }
+                launch.SelectedIndex = 0;
+                close.SelectedIndex = 1;
+                Assert.False(UiSettings.Load().StartMinimized);
+                Assert.False(UiSettings.Load().MinimizeToTray);
+                Assert.False(vm.MinimizeToTray);
+                Capture(options, "options-startup");
             }
             catch (Exception ex) { failure = ex; }
             finally
