@@ -36,23 +36,55 @@
 
     <Border Classes="card">
       <StackPanel Spacing="6">
-        <TextBlock Text="STARTUP" Classes="h"/>
-        <CheckBox Content="Start audio service at login (background only)"
+        <TextBlock Text="AT LOGIN" Classes="h"/>
+        <CheckBox Content="Start audio in the background"
                   IsChecked="{Binding StartDaemonAtLogin, Mode=TwoWay}"/>
-        <CheckBox Content="Start mixer window and tray icon at login"
+        <CheckBox Content="Start the OpenXLR app"
                   IsChecked="{Binding OpenWindowAtLogin, Mode=TwoWay}"/>
-        <TextBlock Text="{Binding StartupHint}" FontSize="11" Foreground="#8b93a7" TextWrapping="Wrap" Margin="26,0,0,4"/>
+        <TextBlock Text="{Binding StartupHint}" FontSize="11" Foreground="#8b93a7" TextWrapping="Wrap"/>
         <TextBlock Text="{Binding StartupError}" FontSize="11" Foreground="#e0a05a" TextWrapping="Wrap"
                    IsVisible="{Binding StartupError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-        <CheckBox Content="Close button minimizes to tray instead of quitting"
-                  IsChecked="{Binding MinimizeToTray, Mode=TwoWay}"/>
-        <CheckBox Content="Start minimized to tray"
-                  IsChecked="{Binding StartMinimized, Mode=TwoWay}"/>
-        <CheckBox Content="Submixer (per-app channels, mixes, virtual microphones, inserts)"
+      </StackPanel>
+    </Border>
+
+    <Border Classes="card">
+      <StackPanel Spacing="6">
+        <TextBlock Text="WINDOW" Classes="h"/>
+        <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,8,Auto">
+          <TextBlock Text="On launch" Classes="h" VerticalAlignment="Center"/>
+          <ComboBox Name="LaunchBehavior" Grid.Column="1" HorizontalAlignment="Stretch"
+                    SelectedIndex="{Binding LaunchBehavior, Mode=TwoWay}"
+                    AutomationProperties.Name="On launch">
+            <ComboBoxItem Content="Show mixer"/>
+            <ComboBoxItem Content="Tray only"/>
+          </ComboBox>
+          <TextBlock Grid.Row="2" Text="When closing" Classes="h" VerticalAlignment="Center"/>
+          <ComboBox Name="CloseBehavior" Grid.Row="2" Grid.Column="1" HorizontalAlignment="Stretch"
+                    SelectedIndex="{Binding CloseBehavior, Mode=TwoWay}"
+                    AutomationProperties.Name="When closing">
+            <ComboBoxItem Content="Keep running in tray"/>
+            <ComboBoxItem Content="Quit app"/>
+          </ComboBox>
+        </Grid>
+        <TextBlock Text="On launch applies the next time the app starts. Quitting the app leaves audio running."
+                   FontSize="11" Foreground="#8b93a7" TextWrapping="Wrap"/>
+      </StackPanel>
+    </Border>
+
+    <Border Classes="card">
+      <StackPanel Spacing="6">
+        <TextBlock Text="AUDIO" Classes="h"/>
+        <CheckBox Content="Enable software mixer"
                   IsChecked="{Binding Submixer, Mode=TwoWay}"
-                  ToolTip.Tip="Off: OpenXLR controls the hardware only and leaves the sound card in its stock PipeWire layout (the UCM profile where one exists). Plugin inserts go with the submixer. Toggling restarts the daemon."/>
-        <TextBlock Text="{Binding SubmixerNote}" Foreground="#8b93a7" FontSize="11" TextWrapping="Wrap"
-                   Margin="26,0,0,0" IsVisible="{Binding SubmixerNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                  ToolTip.Tip="Off: OpenXLR controls the hardware only and leaves the sound card in its stock PipeWire layout (the UCM profile where one exists)."/>
+        <StackPanel Name="SoftwareMixerNotes" Spacing="6">
+          <TextBlock Text="Application channels, mixes, virtual microphones and inserts."
+                     FontSize="11" Foreground="#8b93a7" TextWrapping="Wrap"/>
+          <TextBlock Text="Changing this restarts the audio service and briefly interrupts audio."
+                     FontSize="11" Foreground="#8b93a7" TextWrapping="Wrap"/>
+          <TextBlock Text="{Binding SubmixerNote}" Foreground="#8b93a7" FontSize="11" TextWrapping="Wrap"
+                     IsVisible="{Binding SubmixerNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+        </StackPanel>
       </StackPanel>
     </Border>
 
