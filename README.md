@@ -24,8 +24,9 @@ Mixer screenshot from 0.1.25. This README and the linked guides describe
 current `main`; for a released build, read the docs at its release tag.
 Changes merged after a release are available from source until the next release.
 
-Elgato ships no Linux software. These devices enumerate as
-class-compliant USB audio interfaces, so audio flows out of the box.
+Elgato ships no Linux software. These devices expose class-compliant USB
+audio; OpenXLR also supplies device-specific configuration, including a
+WirePlumber workaround for XLR Dock capture.
 Controls beyond standard USB audio use device-specific protocols, decoded
 from Wave Link USB captures and prior open-source protocol work. OpenXLR
 uses those mappings alongside ALSA controls where available.
@@ -52,7 +53,8 @@ Collect diagnostics).
 
 ## Features
 
-- **Hardware control** over the vendor USB protocol. On the Pro: gain,
+- **Hardware control** through device-specific USB protocols and standard
+  ALSA controls. On the Pro: gain,
   mute, low cut, expander, voice tune and phantom power per input,
   ClipGuard, compressor, aux input level and lock, two headphone
   volumes with low-impedance mode, the mic/PC crossfade, and the
@@ -75,9 +77,20 @@ Collect diagnostics).
   monitor mixes on several outputs at once.
 - **Inserts**: LV2, CLAP and VST3 plugin chains on each XLR input and each mix, with a
   plugin picker, generated controls, bypass and native plugin editors.
+  Input chains use mono effects; mix chains use stereo effects. VST3 discovery
+  checks supported layouts, so effects that default to stereo but accept mono
+  are also available on XLR inputs. Editable native editor compatibility rules
+  select OpenXLR controls for troublesome editors without changing audio processing.
   Windows VST3 and CLAP plugins use Wine and yabridge; the
   `openxlr-yabridge` package supplies a tested bridge with the Wine editor
   input fix and private wrappers.
+- **Plugin installation and management** from Options: import extracted files
+  or bundles, rescan, and manage Windows plugin folders and individual plugins.
+  Single Windows-plugin imports do not register neighbouring plugins.
+  Disable or re-enable plugins, remove their uses from current chains,
+  delete standalone plugins, or open Wine's uninstaller for installed packages.
+  Removing a folder from the list keeps its source files and refreshes discovery.
+  See the [Windows plugin guide](docs/manual.md#windows-plugins).
 - **Application routing**: audio clients are detected from their
   PipeWire registration and routed to a channel by name rules, with the
   assignment remembered per app; an app can also be left to the
@@ -101,7 +114,9 @@ Collect diagnostics).
   and source once a second, and serves a WebSocket API and a versioned
   HTTP API (`/api/v1`) on 127.0.0.1:37890. The UI has a Flow window with
   selectable signal paths through inputs, channels, mixes and outputs,
-  a tray icon and a diagnostics archive exporter.
+  a tray icon and a diagnostics archive exporter. Options separates background
+  audio and app startup at login, with independent choices for launch visibility
+  and whether closing the window keeps the app in the tray or quits.
 - **Optional update notice**: the UI can check the upstream GitHub release
   feed for a newer stable release. Startup checks are off by default and,
   when enabled, run at most once per day. Nothing is installed automatically.
@@ -265,7 +280,7 @@ historical protocol research.
 Support, hardware reports, feature requests and release news also live
 on the OpenXLR Discord server, [discord.gg/4bswtnGPW4](https://discord.gg/4bswtnGPW4),
 and on Reddit at [r/OpenXLR](https://www.reddit.com/r/OpenXLR/). The
-window links to both from Options, About. Confirmed bugs still end up
+window links to both from About in the main header. Confirmed bugs still end up
 as GitHub issues, so any of the three works to start. Want to help
 with code or hardware reports? Read [CONTRIBUTING.md](CONTRIBUTING.md)
 first.
@@ -280,56 +295,16 @@ post in the Discord support forum, yourself.
 
 ## Credits
 
-OpenXLR is written and maintained by Emanuele Sparvoli. It exists in its
-current form because other people gave it code, hardware time and prior
-work.
-
-Code:
-
-- [Carina Schoppe](https://github.com/CarinaSchoppe): much of the
-  daemon's hardening (safe routing and device control, transactional
-  graph changes, the bounded send queue, diagnostics redaction, systemd
-  sandboxing, the test project and CI), the progress-gated watchdog, the
-  update notice, the versioned HTTP API, the OpenDeck choices generated
-  from daemon state, the first pieces of the editable layout (its saved
-  format, live channel creation and the saved order), and the optional
-  native LV2 host that opens a plugin's own editor on the instance
-  processing your audio.
-- [Michael Brooks](https://github.com/Michael-Brooks): the stream-sweep
-  starvation fix ([#7](https://github.com/emaspa/openxlr/pull/7)) and the
-  diagnosis that led to it.
-
-Hardware testing, on devices the maintainer does not own:
-
-- [BenjyEX3](https://github.com/BenjyEX3): Wave XLR MK.2, every control
-  verified, including the block dump that placed phantom power, ClipGuard
-  and the compressor ([#2](https://github.com/emaspa/openxlr/issues/2)).
-- [Michael Brooks](https://github.com/Michael-Brooks) and a second owner:
-  the original Wave XLR on two units
-  ([#6](https://github.com/emaspa/openxlr/issues/6)).
-- [chromacurse](https://github.com/chromacurse): the Wave XLR Pro
-  headphone-mix report and the two diagnostics archives that let the
-  hardware mix membership be decoded
-  ([#8](https://github.com/emaspa/openxlr/issues/8)).
-- [Astros52](https://github.com/Astros52): the XLR Dock MK.2 descriptor
-  dump that got the device registered before one was on hand
-  ([#1](https://github.com/emaspa/openxlr/issues/1)).
-- The CachyOS tester whose first-run failure found the missing ASP.NET
-  runtime dependency in the AUR package.
-
-Prior work OpenXLR builds on:
-
-- [openwave](https://github.com/rikkichy/openwave) by rikkichy: the
-  original Wave XLR's class protocol, and the phantom-power byte found in
-  [openwave PR #8](https://github.com/rikkichy/openwave/pull/8), which the
-  XLR Dock turned out to share.
-- [OpenDeck](https://github.com/nekename/OpenDeck) by nekename: the
-  Stream Deck host the plugin runs in, including the touch-tap support
-  merged upstream for the Stream Deck + XL.
-- [FrostyCoolSlug](https://github.com/FrostyCoolSlug), author of
-  [goxlr-utility](https://github.com/GoXLR-on-Linux/goxlr-utility) and
-  [PipeWeaver](https://github.com/FrostyCoolSlug/pipeweaver), for
-  suggesting ALSA UCM for the Pro's channel split.
+- [Emanuele Sparvoli](https://github.com/emaspa): author, maintainer and code.
+- [Carina Schoppe](https://github.com/CarinaSchoppe): maintainer and code.
+- [Michael Brooks](https://github.com/Michael-Brooks): code and hardware testing.
+- [BenjyEX3](https://github.com/BenjyEX3): hardware testing.
+- [chromacurse](https://github.com/chromacurse): hardware testing.
+- [Astros52](https://github.com/Astros52): hardware testing.
+- [rikkichy](https://github.com/rikkichy): prior protocol research.
+- [nekename](https://github.com/nekename): upstream software.
+- [FrostyCoolSlug](https://github.com/FrostyCoolSlug): technical guidance.
+- Unnamed community testers: hardware and packaging testing.
 
 ## Status
 
