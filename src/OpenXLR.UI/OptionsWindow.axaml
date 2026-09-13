@@ -5,21 +5,11 @@
         x:DataType="vm:OptionsViewModel"
         Title="OpenXLR Options" Width="980" SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
-        Background="#16181d" CanResize="False">
+        Background="{DynamicResource Ox.Window.Background}" CanResize="False">
 
   <Window.Styles>
-    <Style Selector="TextBlock.h">
-      <Setter Property="FontSize" Value="12"/>
-      <Setter Property="FontWeight" Value="SemiBold"/>
-      <Setter Property="Foreground" Value="#8b93a7"/>
-    </Style>
     <Style Selector="Border.card">
-      <Setter Property="Background" Value="#1d2027"/>
-      <Setter Property="CornerRadius" Value="8"/>
       <Setter Property="Padding" Value="14"/>
-    </Style>
-    <Style Selector="CheckBox">
-      <Setter Property="Foreground" Value="#e6e9f0"/>
     </Style>
   </Window.Styles>
 
@@ -41,8 +31,8 @@
                   IsChecked="{Binding StartDaemonAtLogin, Mode=TwoWay}"/>
         <CheckBox Content="Start the OpenXLR app"
                   IsChecked="{Binding OpenWindowAtLogin, Mode=TwoWay}"/>
-        <TextBlock Text="{Binding StartupHint}" FontSize="11" Foreground="#8b93a7" TextWrapping="Wrap"/>
-        <TextBlock Text="{Binding StartupError}" FontSize="11" Foreground="#e0a05a" TextWrapping="Wrap"
+        <TextBlock Text="{Binding StartupHint}" FontSize="11" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
+        <TextBlock Text="{Binding StartupError}" FontSize="11" Foreground="{DynamicResource Ox.Text.Warning}" TextWrapping="Wrap"
                    IsVisible="{Binding StartupError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
       </StackPanel>
     </Border>
@@ -67,7 +57,7 @@
           </ComboBox>
         </Grid>
         <TextBlock Text="On launch applies the next time the app starts. Quitting the app leaves audio running."
-                   FontSize="11" Foreground="#8b93a7" TextWrapping="Wrap"/>
+                   FontSize="11" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
       </StackPanel>
     </Border>
 
@@ -79,10 +69,10 @@
                   ToolTip.Tip="Off: OpenXLR controls the hardware only and leaves the sound card in its stock PipeWire layout (the UCM profile where one exists)."/>
         <StackPanel Name="SoftwareMixerNotes" Spacing="6">
           <TextBlock Text="Application channels, mixes, virtual microphones and inserts."
-                     FontSize="11" Foreground="#8b93a7" TextWrapping="Wrap"/>
+                     FontSize="11" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
           <TextBlock Text="Changing this restarts the audio service and briefly interrupts audio."
-                     FontSize="11" Foreground="#8b93a7" TextWrapping="Wrap"/>
-          <TextBlock Text="{Binding SubmixerNote}" Foreground="#8b93a7" FontSize="11" TextWrapping="Wrap"
+                     FontSize="11" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
+          <TextBlock Text="{Binding SubmixerNote}" Foreground="{DynamicResource Ox.Text.Secondary}" FontSize="11" TextWrapping="Wrap"
                      IsVisible="{Binding SubmixerNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
         </StackPanel>
       </StackPanel>
@@ -92,7 +82,7 @@
       <StackPanel Spacing="6">
         <TextBlock Text="SYSTEM DEFAULT DEVICES" Classes="h"/>
         <TextBlock Text="When set, OpenXLR holds these as the system defaults and reverts any outside change, like Wave Link does. Applications that follow the system default will use them."
-                   FontSize="11" Foreground="#6b7285" TextWrapping="Wrap"/>
+                   FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
 
         <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,8,Auto">
           <TextBlock Text="Default output" Classes="h" VerticalAlignment="Center"/>
@@ -119,7 +109,7 @@
         </Grid>
 
         <TextBlock Text="Tip: enforcing OpenXLR Chat as default input makes voice apps record the Chat mix automatically."
-                   FontSize="11" Foreground="#6b7285" TextWrapping="Wrap"/>
+                   FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
       </StackPanel>
     </Border>
 
@@ -127,7 +117,7 @@
       <StackPanel Spacing="6">
         <TextBlock Text="INTERFACE" Classes="h"/>
         <TextBlock Text="{Binding Main.ResetDescription}"
-                   FontSize="11" Foreground="#6b7285" TextWrapping="Wrap"/>
+                   FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
         <Button Content="Reset device to defaults" Padding="14,5" HorizontalAlignment="Left" Click="OnResetDevice"/>
       </StackPanel>
     </Border>
@@ -138,9 +128,9 @@
     <Border Classes="card">
       <StackPanel Spacing="6">
         <TextBlock Text="PLUGINS" Classes="h"/>
-        <TextBlock Text="{Binding PluginDirectories}" FontSize="11" Foreground="#6b7285" TextWrapping="Wrap"/>
+        <TextBlock Text="{Binding PluginDirectories}" FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
         <TextBlock Text="Pick a plugin you downloaded and OpenXLR puts it in place: a .clap or .vst3 file, a .vst3 or .lv2 folder, or a folder holding plugins."
-                   FontSize="11" Foreground="#6b7285" TextWrapping="Wrap"/>
+                   FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
         <StackPanel Orientation="Horizontal" Spacing="8">
           <Button Name="InstallFile" Content="Install file" Padding="14,5" Click="OnInstallPluginFile"/>
           <Button Name="InstallFolder" Content="Install folder" Padding="14,5" Click="OnInstallPluginFolder"/>
@@ -151,11 +141,11 @@
           <Button Name="ManageFolders" Content="Manage Windows plugins" Padding="14,5" Click="OnManagePluginFolders"/>
           <Button Content="Native editors" Padding="14,5" Click="OnNativeEditorRules"/>
         </StackPanel>
-        <TextBlock Text="{Binding WindowsPlugins}" FontSize="11" Foreground="#8b93a7" TextWrapping="Wrap" Margin="0,4,0,0"/>
+        <TextBlock Text="{Binding WindowsPlugins}" FontSize="11" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap" Margin="0,4,0,0"/>
         <!-- A pair of versions that leaves a bridged plugin's own editor deaf
              to the mouse. Worth saying before the user spends an evening on it. -->
         <TextBlock Text="{Binding WindowsEditorNote}" IsVisible="{Binding HasWindowsEditorNote}"
-                   FontSize="11" Foreground="#e0b050" TextWrapping="Wrap"/>
+                   FontSize="11" Foreground="{DynamicResource Ox.Text.Alert}" TextWrapping="Wrap"/>
         <!-- Wine keeps its plugins under a dot directory a file dialog hides,
              so what is found there is offered rather than browsed to. -->
         <Button Name="BridgeWine" Content="{Binding BridgeWineLabel}" Padding="14,5" HorizontalAlignment="Left"
@@ -167,8 +157,36 @@
                   ToolTip.Tip="Bridge again every folder yabridge knows, for Windows plugins installed since"/>
           <Button Grid.Column="2" Content="Manual" Padding="10,5" Click="OnPluginsManual"
                   ToolTip.Tip="Open the manual section on installing plugins"/>
-          <TextBlock Grid.Column="4" Name="PluginStatus" FontSize="11" Foreground="#8b93a7" VerticalAlignment="Center" TextWrapping="Wrap"/>
+          <TextBlock Grid.Column="4" Name="PluginStatus" FontSize="11" Foreground="{DynamicResource Ox.Text.Secondary}" VerticalAlignment="Center" TextWrapping="Wrap"/>
         </Grid>
+      </StackPanel>
+    </Border>
+
+    <Border Classes="card">
+      <StackPanel Spacing="6">
+        <TextBlock Text="APPEARANCE" Classes="h"/>
+        <Grid ColumnDefinitions="110,*,Auto">
+          <TextBlock Text="Skin" Classes="h" VerticalAlignment="Center"/>
+          <ComboBox Name="SkinPicker" Grid.Column="1" HorizontalAlignment="Stretch"
+                    ItemsSource="{Binding SkinChoices}"
+                    SelectedItem="{Binding SelectedSkin, Mode=TwoWay}"
+                    AutomationProperties.Name="Skin">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:SkinChoice">
+                <TextBlock Text="{Binding Label}"/>
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <Button Grid.Column="2" Content="Reload" Margin="8,0,0,0" Padding="14,5" Click="OnReloadSkins"
+                  ToolTip.Tip="Read the skin folders again, for a skin added or edited since"/>
+        </Grid>
+        <TextBlock Text="{Binding SkinNote}" FontSize="11" Classes="hint" TextWrapping="Wrap"
+                   IsVisible="{Binding SkinNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+        <TextBlock Text="{Binding SkinFolderHint}" FontSize="11" Classes="note" TextWrapping="Wrap"/>
+        <TextBlock Text="{Binding SkinError}" FontSize="11" Classes="warn" TextWrapping="Wrap"
+                   IsVisible="{Binding HasSkinError}"/>
+        <Button Content="Manual" Padding="10,5" HorizontalAlignment="Left" Click="OnSkinsManual"
+                ToolTip.Tip="Open the manual section on skins"/>
       </StackPanel>
     </Border>
 
@@ -180,8 +198,8 @@
         <CheckBox Content="Check GitHub for stable releases at startup&#x0a;(at most once per day)"
                   IsChecked="{Binding CheckForUpdates, Mode=TwoWay}"/>
         <TextBlock Text="Off by default. Check now makes one explicit request. Nothing is downloaded or installed."
-                   FontSize="11" Foreground="#6b7285" TextWrapping="Wrap"/>
-        <TextBlock Text="{Binding Updates.Title}" Foreground="#5ba8f5" TextWrapping="Wrap"/>
+                   FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
+        <TextBlock Text="{Binding Updates.Title}" Foreground="{DynamicResource Ox.Link.Foreground}" TextWrapping="Wrap"/>
         <StackPanel Orientation="Horizontal" Spacing="8">
           <Button Content="Check now" Click="OnCheckUpdates" IsEnabled="{Binding !Updates.Busy}"/>
           <Button Content="View result" Click="OnUpdates"/>
@@ -193,10 +211,10 @@
       <StackPanel Spacing="6">
         <TextBlock Text="SUPPORT" Classes="h"/>
         <TextBlock Text="Collect diagnostics gathers app and device state, the PipeWire graph, daemon logs and configs into one archive in your home folder, ready to attach to a bug report. Nothing is uploaded."
-                   FontSize="11" Foreground="#6b7285" TextWrapping="Wrap"/>
+                   FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
         <Grid ColumnDefinitions="Auto,10,*">
           <Button Content="Collect diagnostics" Padding="14,5" Click="OnCollectDiagnostics"/>
-          <TextBlock Grid.Column="2" Name="DiagStatus" FontSize="11" Foreground="#8b93a7"
+          <TextBlock Grid.Column="2" Name="DiagStatus" FontSize="11" Foreground="{DynamicResource Ox.Text.Secondary}"
                      VerticalAlignment="Center" TextWrapping="Wrap"/>
         </Grid>
       </StackPanel>

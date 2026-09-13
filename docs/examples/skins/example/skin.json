@@ -1,0 +1,87 @@
+{
+  "$schema": "https://raw.githubusercontent.com/emaspa/openxlr/main/docs/skin.schema.json",
+  "schema": 1,
+  "id": "example",
+  "name": "Example",
+  "description": "A starting point for your own skin: a cooler ground, lit keys and a green to amber to red meter.",
+  "author": "OpenXLR",
+  "controls": {
+    "meter": "segmented",
+    "led": "lamp"
+  },
+  "tokens": {
+    "Ox.Window.Background": {
+      "type": "linear",
+      "from": [0, 0],
+      "to": [0, 1],
+      "stops": [
+        { "offset": 0, "color": "#141821" },
+        { "offset": 1, "color": "#0d1017" }
+      ]
+    },
+    "Ox.Card.Background": "#1a1f2b",
+    "Ox.Card.BorderBrush": "#242b3a",
+    "Ox.Card.BorderThickness": 1,
+    "Ox.Card.CornerRadius": 10,
+    "Ox.Tile.Background": "#212838",
+    "Ox.Tile.CornerRadius": 8,
+    "Ox.Dialog.Background": "#1a1f2b",
+    "Ox.Divider": "#2b3345",
+    "Ox.Badge.Background": "#2b3345",
+
+    "Ox.Text.Primary": "#eef1f7",
+    "Ox.Text.Secondary": "#98a2b8",
+    "Ox.Text.Muted": "#727c92",
+    "Ox.Text.Detail": "#c3cade",
+    "Ox.Link.Foreground": "#6fb4ff",
+    "Ox.Link.ForegroundPointerOver": "#9bcdff",
+
+    "Ox.Led.On": "#4ad98a",
+    "Ox.Led.Off": "#3b4353",
+    "Ox.Led.Alert": "#ff4a5c",
+    "Ox.Led.Size": 12,
+    "Ox.Led.Bezel": "#0c0f16",
+    "Ox.Led.BezelThickness": 1.5,
+    "Ox.Led.Glow": 0.6,
+    "Ox.Led.CoreScale": 0.6,
+
+    "Ox.Meter.Fill": "#3ecf7a",
+    "Ox.Meter.Warning": "#e8b23c",
+    "Ox.Meter.Hot": "#ff4a5c",
+    "Ox.Meter.Track": "#10141c",
+    "Ox.Meter.Height": 6,
+    "Ox.Meter.Segments": 20,
+    "Ox.Meter.SegmentGap": 2,
+
+    "Ox.Mute.Background": "#1e5c3a",
+    "Ox.Mute.BackgroundPointerOver": "#27754b",
+    "Ox.Mute.BackgroundChecked": "#a03434",
+
+    "Ox.Control.Background": "#2a3143",
+    "Ox.Control.BackgroundPointerOver": "#333b50",
+    "Ox.Control.BackgroundPressed": "#222836",
+    "Ox.Control.BackgroundChecked": "#2f6f52",
+    "Ox.Control.BackgroundDisabled": "#20252f",
+    "Ox.Control.Foreground": "#eef1f7",
+    "Ox.Control.ForegroundDisabled": "#6b7285",
+    "Ox.Control.BorderBrush": "#39415a",
+    "Ox.Control.BorderBrushPointerOver": "#4a5472",
+    "Ox.Control.CornerRadius": 6,
+    "Ox.Control.DisabledOpacity": 0.6,
+
+    "Ox.Fader.Track": "#10141c",
+    "Ox.Fader.Fill": "#4ad98a",
+    "Ox.Fader.TrackHeight": 4,
+    "Ox.Fader.Thumb.Background": "#c9d1e2",
+    "Ox.Fader.Thumb.CornerRadius": 3,
+
+    "Ox.Input.Background": "#10141c",
+    "Ox.Input.Foreground": "#eef1f7",
+    "Ox.Input.BorderBrush": "#39415a",
+    "Ox.Flyout.Background": "#1a1f2b",
+    "Ox.Tooltip.Background": "#10141c",
+    "Ox.Tooltip.Foreground": "#eef1f7",
+    "Ox.Tooltip.BorderBrush": "#39415a",
+    "Ox.Accent": "#4ad98a"
+  }
+}

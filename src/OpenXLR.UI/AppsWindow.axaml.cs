@@ -15,7 +15,22 @@ public partial class AppsWindow : Window
         {
             if (DataContext is MainViewModel vm)
                 ChannelPicker.ItemsSource = vm.Channels.Select(c => c.Id).Append(AppStreamViewModel.Ignore).ToList();
+            ConstrainToScreen();
         };
+    }
+
+    /// <summary>
+    /// Keep the window inside the screen it opens on. It sizes itself to its
+    /// cards and cannot be resized, so on a short screen, or with a long list
+    /// of known applications, its bottom would otherwise fall off the desktop
+    /// and take the add controls and Close with it. The list scrolls instead.
+    /// </summary>
+    private void ConstrainToScreen()
+    {
+        var screen = Screens.ScreenFromWindow(Owner as Window ?? this) ?? Screens.Primary;
+        if (screen is null) return;
+        double usable = screen.WorkingArea.Height / screen.Scaling;
+        if (usable > 240) MaxHeight = System.Math.Min(MaxHeight, usable - 60);
     }
 
     private void OnAdd(object? sender, RoutedEventArgs e)

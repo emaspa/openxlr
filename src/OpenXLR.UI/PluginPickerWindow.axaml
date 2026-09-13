@@ -5,15 +5,7 @@
         x:DataType="vm:InsertsViewModel"
         Title="Add plugin insert" Width="560" Height="520" MinWidth="420" MinHeight="360"
         WindowStartupLocation="CenterOwner"
-        Background="#16181d">
-
-  <Window.Styles>
-    <Style Selector="TextBlock.h">
-      <Setter Property="FontSize" Value="12"/>
-      <Setter Property="FontWeight" Value="SemiBold"/>
-      <Setter Property="Foreground" Value="#8b93a7"/>
-    </Style>
-  </Window.Styles>
+        Background="{DynamicResource Ox.Window.Background}">
 
   <DockPanel Margin="16">
     <TextBlock DockPanel.Dock="Top" Text="{Binding PickerHint}" Classes="h" Margin="0,0,0,8"/>
@@ -42,16 +34,16 @@
         <Button Grid.Column="6" Content="Cancel" Padding="18,6" Click="OnCancel"/>
       </Grid>
     </StackPanel>
-    <ListBox Name="List" Background="#1d2027" CornerRadius="8" Padding="4"
+    <ListBox Name="List" Background="{DynamicResource Ox.Card.Background}" CornerRadius="8" Padding="4"
              SelectionChanged="OnSelectionChanged" DoubleTapped="OnDoubleTapped">
       <ListBox.ItemTemplate>
         <DataTemplate x:DataType="vm:PluginChoice">
           <StackPanel Orientation="Horizontal" Spacing="10">
-            <TextBlock Text="{Binding Name}" Foreground="#e6e9f0"/>
+            <TextBlock Text="{Binding Name}" Foreground="{DynamicResource Ox.Text.Primary}"/>
             <TextBlock Text="{Binding Category}" Classes="h" FontSize="11" VerticalAlignment="Center"/>
             <!-- the format: the same plugin often ships as both -->
-            <Border Background="#2a2e38" CornerRadius="4" Padding="6,1" VerticalAlignment="Center">
-              <TextBlock Text="{Binding Format}" Foreground="#8b93a7" FontSize="10" FontWeight="SemiBold"/>
+            <Border Background="{DynamicResource Ox.Badge.Background}" CornerRadius="4" Padding="6,1" VerticalAlignment="Center">
+              <TextBlock Text="{Binding Format}" Foreground="{DynamicResource Ox.Text.Secondary}" FontSize="10" FontWeight="SemiBold"/>
             </Border>
           </StackPanel>
         </DataTemplate>

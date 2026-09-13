@@ -1,0 +1,339 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:skin="using:OpenXLR.UI.Skinning">
+
+  <!--
+    The application's own control appearance.
+
+    A skin does not supply markup. It names one of the variants below for each
+    control in its "controls" section, and tints it with Ox.* tokens. The
+    variant a skin does not name is the one the window has always used, which
+    for the fader, the mute button and the dropdowns is the framework's own.
+
+    Every variant here keeps the framework's control behaviour. The fader's
+    template still hands its Track, its two repeat buttons and its Thumb to
+    Slider under the names Slider looks for, so dragging, the keyboard, the
+    tick snapping and display scaling are the framework's and not ours.
+  -->
+
+  <!-- ==== the fader, console variant ==== -->
+
+  <!--
+    The groove either side of the cap. The two halves are the repeat buttons
+    Slider drives, so a click beside the cap still pages the value.
+
+    The colours come from the theme keys the Ox.Fader.* tokens are bridged to
+    rather than from the tokens directly: a skin that selects this variant
+    without naming a colour then gets the framework's, instead of nothing.
+  -->
+  <ControlTheme x:Key="Ox.Fader.FilledGroove" TargetType="RepeatButton">
+    <Setter Property="Focusable" Value="False"/>
+    <Setter Property="Template">
+      <ControlTemplate TargetType="RepeatButton">
+        <Border Background="Transparent" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+          <Border Height="{DynamicResource SliderTrackThemeHeight}" VerticalAlignment="Center"
+                  Background="{DynamicResource SliderTrackValueFill}"
+                  CornerRadius="{DynamicResource Ox.Fader.TrackCornerRadius}"/>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+
+  <ControlTheme x:Key="Ox.Fader.EmptyGroove" TargetType="RepeatButton">
+    <Setter Property="Focusable" Value="False"/>
+    <Setter Property="Template">
+      <ControlTemplate TargetType="RepeatButton">
+        <Border Background="Transparent" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+          <Border Height="{DynamicResource SliderTrackThemeHeight}" VerticalAlignment="Center"
+                  Background="{DynamicResource SliderTrackFill}"
+                  CornerRadius="{DynamicResource Ox.Fader.TrackCornerRadius}"/>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+
+  <!-- The cap: a machined block with an optional grip line across its middle. -->
+  <ControlTheme x:Key="Ox.Fader.Cap" TargetType="Thumb">
+    <Setter Property="Background" Value="{DynamicResource SliderThumbBackground}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource Ox.Fader.Thumb.BorderBrush}"/>
+    <Setter Property="BorderThickness" Value="{DynamicResource Ox.Fader.Thumb.BorderThickness}"/>
+    <Setter Property="CornerRadius" Value="{DynamicResource Ox.Fader.Thumb.CornerRadius}"/>
+    <Setter Property="Width" Value="{DynamicResource Ox.Fader.Thumb.Width}"/>
+    <Setter Property="Height" Value="{DynamicResource Ox.Fader.Thumb.Height}"/>
+    <Setter Property="Template">
+      <ControlTemplate TargetType="Thumb">
+        <Panel>
+          <Border Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
+                  CornerRadius="{TemplateBinding CornerRadius}"/>
+          <Rectangle Width="2" Height="{DynamicResource Ox.Fader.Thumb.GripLength}"
+                     HorizontalAlignment="Center" VerticalAlignment="Center"
+                     RadiusX="1" RadiusY="1" IsHitTestVisible="False"
+                     Fill="{DynamicResource Ox.Fader.Thumb.Grip}"/>
+        </Panel>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:pointerover">
+      <Setter Property="Background" Value="{DynamicResource SliderThumbBackgroundPointerOver}"/>
+    </Style>
+    <Style Selector="^:pressed">
+      <Setter Property="Background" Value="{DynamicResource SliderThumbBackgroundPressed}"/>
+    </Style>
+  </ControlTheme>
+
+  <ControlTheme x:Key="Ox.Slider.Console" TargetType="Slider">
+    <Setter Property="MinHeight" Value="{DynamicResource SliderHorizontalHeight}"/>
+    <Setter Property="Template">
+      <ControlTemplate TargetType="Slider">
+        <Grid Name="SliderContainer" Background="Transparent">
+          <Track Name="PART_Track" Orientation="Horizontal"
+                 Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}"
+                 Value="{TemplateBinding Value, Mode=TwoWay}"
+                 IsDirectionReversed="{TemplateBinding IsDirectionReversed}">
+            <Track.DecreaseButton>
+              <RepeatButton Name="PART_DecreaseButton" Theme="{StaticResource Ox.Fader.FilledGroove}"/>
+            </Track.DecreaseButton>
+            <Track.IncreaseButton>
+              <RepeatButton Name="PART_IncreaseButton" Theme="{StaticResource Ox.Fader.EmptyGroove}"/>
+            </Track.IncreaseButton>
+            <Track.Thumb>
+              <Thumb Name="thumb" Theme="{StaticResource Ox.Fader.Cap}"/>
+            </Track.Thumb>
+          </Track>
+        </Grid>
+      </ControlTemplate>
+    </Setter>
+    <!-- The window has no vertical fader. If one is ever added, it keeps the
+         framework's own appearance rather than a template that was never seen. -->
+    <Style Selector="^:vertical">
+      <Setter Property="Template" Value="{x:Null}"/>
+    </Style>
+    <Style Selector="^:disabled">
+      <Setter Property="Opacity" Value="0.5"/>
+    </Style>
+  </ControlTheme>
+
+  <!-- ==== level meters ==== -->
+
+  <ControlTheme x:Key="{x:Type skin:LevelMeter}" TargetType="skin:LevelMeter">
+    <Setter Property="Presentation" Value="Continuous"/>
+    <Setter Property="Height" Value="{DynamicResource Ox.Meter.Height}"/>
+    <Setter Property="HorizontalAlignment" Value="Stretch"/>
+    <Setter Property="CornerRadius" Value="{DynamicResource Ox.Meter.CornerRadius}"/>
+    <Setter Property="Track" Value="{DynamicResource Ox.Meter.Track}"/>
+    <Setter Property="Fill" Value="{DynamicResource Ox.Meter.Fill}"/>
+    <Setter Property="Warning" Value="{DynamicResource Ox.Meter.Warning}"/>
+    <Setter Property="Hot" Value="{DynamicResource Ox.Meter.Hot}"/>
+    <Setter Property="WarningLevel" Value="{DynamicResource Ox.Meter.WarningLevel}"/>
+    <Setter Property="HotLevel" Value="{DynamicResource Ox.Meter.HotLevel}"/>
+  </ControlTheme>
+
+  <ControlTheme x:Key="Ox.Meter.Segmented" TargetType="skin:LevelMeter"
+                BasedOn="{StaticResource {x:Type skin:LevelMeter}}">
+    <Setter Property="Presentation" Value="Segmented"/>
+    <Setter Property="Segments" Value="{DynamicResource Ox.Meter.Segments}"/>
+    <Setter Property="SegmentGap" Value="{DynamicResource Ox.Meter.SegmentGap}"/>
+  </ControlTheme>
+
+  <!-- ==== indicator lamps ==== -->
+
+  <ControlTheme x:Key="{x:Type skin:StatusLed}" TargetType="skin:StatusLed">
+    <Setter Property="Presentation" Value="Flat"/>
+    <Setter Property="Width" Value="{DynamicResource Ox.Led.Size}"/>
+    <Setter Property="Height" Value="{DynamicResource Ox.Led.Size}"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+    <Setter Property="OnBrush" Value="{DynamicResource Ox.Led.On}"/>
+    <Setter Property="OffBrush" Value="{DynamicResource Ox.Led.Off}"/>
+    <Style Selector="^[Kind=Insert]">
+      <Setter Property="OffBrush" Value="{DynamicResource Ox.Led.Alert}"/>
+    </Style>
+  </ControlTheme>
+
+  <ControlTheme x:Key="Ox.Led.Lamp" TargetType="skin:StatusLed"
+                BasedOn="{StaticResource {x:Type skin:StatusLed}}">
+    <Setter Property="Presentation" Value="Lamp"/>
+    <Setter Property="Bezel" Value="{DynamicResource Ox.Led.Bezel}"/>
+    <Setter Property="BezelThickness" Value="{DynamicResource Ox.Led.BezelThickness}"/>
+    <Setter Property="Glow" Value="{DynamicResource Ox.Led.Glow}"/>
+    <Setter Property="CoreScale" Value="{DynamicResource Ox.Led.CoreScale}"/>
+  </ControlTheme>
+
+
+  <!-- ==== the raised key face ==== -->
+
+  <!--
+    One drawing for every rectangular control that has a raised face: the
+    control paints its own background, border and corner, and this lays the
+    same gloss over it. Button, ToggleButton and the mute button all use this
+    template rather than each carrying a copy, so the face is defined once and
+    a skin tints it through the ordinary theme keys.
+
+    The dropdown button keeps the framework's template, which carries its
+    chevron; App.axaml gives its inner surface the same gloss.
+  -->
+  <ControlTemplate x:Key="Ox.Cap.Face" TargetType="Button">
+    <Panel>
+      <ContentPresenter Name="PART_ContentPresenter"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="{TemplateBinding CornerRadius}"
+                        Content="{TemplateBinding Content}"
+                        ContentTemplate="{TemplateBinding ContentTemplate}"
+                        Padding="{TemplateBinding Padding}"
+                        Foreground="{TemplateBinding Foreground}"
+                        HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                        VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                        RecognizesAccessKey="True"/>
+      <Border Name="Bevel" IsHitTestVisible="False"
+              Margin="{TemplateBinding BorderThickness}"
+              CornerRadius="{TemplateBinding CornerRadius}"
+              Background="{DynamicResource Ox.Cap.Bevel}"/>
+    </Panel>
+  </ControlTemplate>
+
+  <!-- The face a plain button wears. The colours are the theme keys the
+       Ox.Control.* tokens are bridged to, so nothing here is a colour. -->
+  <ControlTheme x:Key="Ox.Button.Cap" TargetType="Button">
+    <Setter Property="Background" Value="{DynamicResource ButtonBackground}"/>
+    <Setter Property="Foreground" Value="{DynamicResource ButtonForeground}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource ButtonBorderBrush}"/>
+    <Setter Property="BorderThickness" Value="{DynamicResource Ox.Control.BorderThickness}"/>
+    <Setter Property="CornerRadius" Value="{DynamicResource ControlCornerRadius}"/>
+    <Setter Property="Padding" Value="{DynamicResource ButtonPadding}"/>
+    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+    <Setter Property="Template" Value="{StaticResource Ox.Cap.Face}"/>
+    <Style Selector="^:pointerover">
+      <Setter Property="Background" Value="{DynamicResource ButtonBackgroundPointerOver}"/>
+      <Setter Property="Foreground" Value="{DynamicResource ButtonForegroundPointerOver}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource ButtonBorderBrushPointerOver}"/>
+    </Style>
+    <Style Selector="^:pressed">
+      <Setter Property="Background" Value="{DynamicResource ButtonBackgroundPressed}"/>
+      <Setter Property="Foreground" Value="{DynamicResource ButtonForegroundPressed}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource ButtonBorderBrushPressed}"/>
+    </Style>
+    <Style Selector="^:disabled">
+      <Setter Property="Background" Value="{DynamicResource ButtonBackgroundDisabled}"/>
+      <Setter Property="Foreground" Value="{DynamicResource ButtonForegroundDisabled}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource ButtonBorderBrushDisabled}"/>
+      <Setter Property="Opacity" Value="{DynamicResource Ox.Control.DisabledOpacity}"/>
+    </Style>
+  </ControlTheme>
+
+  <!-- The same face on a toggle, which adds the states a toggle has. -->
+  <ControlTheme x:Key="Ox.ToggleButton.Cap" TargetType="ToggleButton">
+    <Setter Property="Background" Value="{DynamicResource ToggleButtonBackground}"/>
+    <Setter Property="Foreground" Value="{DynamicResource ToggleButtonForeground}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource ToggleButtonBorderBrush}"/>
+    <Setter Property="BorderThickness" Value="{DynamicResource Ox.Control.BorderThickness}"/>
+    <Setter Property="CornerRadius" Value="{DynamicResource ControlCornerRadius}"/>
+    <Setter Property="Padding" Value="{DynamicResource ButtonPadding}"/>
+    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+    <Setter Property="Template" Value="{StaticResource Ox.Cap.Face}"/>
+    <Style Selector="^:pointerover">
+      <Setter Property="Background" Value="{DynamicResource ToggleButtonBackgroundPointerOver}"/>
+      <Setter Property="Foreground" Value="{DynamicResource ToggleButtonForegroundPointerOver}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource ToggleButtonBorderBrushPointerOver}"/>
+    </Style>
+    <Style Selector="^:pressed">
+      <Setter Property="Background" Value="{DynamicResource ToggleButtonBackgroundPressed}"/>
+      <Setter Property="Foreground" Value="{DynamicResource ToggleButtonForegroundPressed}"/>
+    </Style>
+    <Style Selector="^:checked">
+      <Setter Property="Background" Value="{DynamicResource ToggleButtonBackgroundChecked}"/>
+      <Setter Property="Foreground" Value="{DynamicResource ToggleButtonForegroundChecked}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource ToggleButtonBorderBrushChecked}"/>
+    </Style>
+    <Style Selector="^:checked:pointerover">
+      <Setter Property="Background" Value="{DynamicResource ToggleButtonBackgroundCheckedPointerOver}"/>
+      <Setter Property="Foreground" Value="{DynamicResource ToggleButtonForegroundCheckedPointerOver}"/>
+    </Style>
+    <Style Selector="^:checked:pressed">
+      <Setter Property="Background" Value="{DynamicResource ToggleButtonBackgroundCheckedPressed}"/>
+      <Setter Property="Foreground" Value="{DynamicResource ToggleButtonForegroundCheckedPressed}"/>
+    </Style>
+    <Style Selector="^:disabled">
+      <Setter Property="Background" Value="{DynamicResource ToggleButtonBackgroundDisabled}"/>
+      <Setter Property="Foreground" Value="{DynamicResource ToggleButtonForegroundDisabled}"/>
+      <Setter Property="Opacity" Value="{DynamicResource Ox.Control.DisabledOpacity}"/>
+    </Style>
+  </ControlTheme>
+
+  <!--
+    A dropdown button wears the same face. The framework's own template puts
+    its chevron in a grid inside the border, and a grid cannot round off the
+    gloss laid over it, so the face is built here instead: the same content
+    presenter and the same bevel as every other key, with the chevron beside
+    the content. The parts a DropDownButton needs, its content presenter and
+    its flyout handling, are untouched.
+  -->
+  <ControlTheme x:Key="Ox.DropDownButton.Cap" TargetType="DropDownButton">
+    <Setter Property="Background" Value="{DynamicResource ButtonBackground}"/>
+    <Setter Property="Foreground" Value="{DynamicResource ButtonForeground}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource ButtonBorderBrush}"/>
+    <Setter Property="BorderThickness" Value="{DynamicResource Ox.Control.BorderThickness}"/>
+    <Setter Property="CornerRadius" Value="{DynamicResource ControlCornerRadius}"/>
+    <Setter Property="Padding" Value="{DynamicResource ButtonPadding}"/>
+    <Setter Property="HorizontalContentAlignment" Value="Left"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+    <Setter Property="Template">
+      <ControlTemplate TargetType="DropDownButton">
+        <Panel>
+          <Border Name="Face" Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
+                  CornerRadius="{TemplateBinding CornerRadius}">
+            <Grid ColumnDefinitions="*,Auto">
+              <ContentPresenter Name="PART_ContentPresenter"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                Padding="{TemplateBinding Padding}"
+                                Foreground="{TemplateBinding Foreground}"
+                                HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                RecognizesAccessKey="True"/>
+              <Path Grid.Column="1" Margin="0,0,10,0" Width="10" Height="6"
+                    Stretch="Uniform" VerticalAlignment="Center"
+                    IsHitTestVisible="False"
+                    Stroke="{TemplateBinding Foreground}" StrokeThickness="1.4"
+                    StrokeLineCap="Round" StrokeJoin="Round"
+                    Data="M 0,0 L 5,5 L 10,0"/>
+            </Grid>
+          </Border>
+          <Border Name="Bevel" IsHitTestVisible="False"
+                  Margin="{TemplateBinding BorderThickness}"
+                  CornerRadius="{TemplateBinding CornerRadius}"
+                  Background="{DynamicResource Ox.Cap.Bevel}"/>
+        </Panel>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:pointerover">
+      <Setter Property="Background" Value="{DynamicResource ButtonBackgroundPointerOver}"/>
+      <Setter Property="Foreground" Value="{DynamicResource ButtonForegroundPointerOver}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource ButtonBorderBrushPointerOver}"/>
+    </Style>
+    <Style Selector="^:pressed">
+      <Setter Property="Background" Value="{DynamicResource ButtonBackgroundPressed}"/>
+      <Setter Property="Foreground" Value="{DynamicResource ButtonForegroundPressed}"/>
+    </Style>
+    <Style Selector="^:disabled">
+      <Setter Property="Background" Value="{DynamicResource ButtonBackgroundDisabled}"/>
+      <Setter Property="Foreground" Value="{DynamicResource ButtonForegroundDisabled}"/>
+      <Setter Property="Opacity" Value="{DynamicResource Ox.Control.DisabledOpacity}"/>
+    </Style>
+  </ControlTheme>
+
+  <!-- ==== mute buttons ==== -->
+
+  <ControlTheme x:Key="Ox.MuteButton.Cap" TargetType="ToggleButton"
+                BasedOn="{StaticResource Ox.ToggleButton.Cap}">
+    <!-- The mute button's colours come from the application's own .mute styles,
+         which reach the content presenter this face shares with every other
+         rectangular control. Nothing about the face differs. -->
+  </ControlTheme>
+
+</ResourceDictionary>

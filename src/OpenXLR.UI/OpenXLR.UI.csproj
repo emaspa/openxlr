@@ -14,7 +14,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <AvaloniaResource Include="Assets/**"/>
+    <AvaloniaResource Include="Assets/**" Exclude="Assets/Skins/**"/>
+    <!-- The skins the application ships with. They are read through the
+         assembly's own manifest rather than through the asset loader, so the
+         same code path works in a test with no rendering platform, and every
+         packaging channel carries them without a rule of its own. -->
+    <EmbeddedResource Include="Assets/Skins/*/skin.json" LogicalName="OpenXLR.UI.Assets.Skins.$([System.String]::Copy('%(RecursiveDir)').TrimEnd('/')).skin.json"/>
   </ItemGroup>
 
   <ItemGroup>

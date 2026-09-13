@@ -91,17 +91,23 @@ few releases, and they get to settle in users' hands first.
 
 ## Next: appearance
 
-The window currently hard-codes its colours in the views. Before any theme
-can exist, those become named tokens in one resource dictionary that
-every view binds to.
+The views no longer hold colours. Every surface, label, indicator, meter,
+fader and control reads a named token, the defaults live in one place, and
+a skin overlays values on top of them.
 
-- [ ] Colour tokens: one dictionary for the faceplate, LEDs, meters,
-  faders, text and accents; views reference tokens only.
+- [x] Appearance tokens: one set of names for the faceplate, LEDs, meters,
+  faders, text and accents; views reference tokens only, and the tokens a
+  skin sets also feed the theme keys behind buttons, sliders and dropdowns.
+- [x] Skins: a user-supplied value set loaded from a file, selectable in
+  Options, so the mixer can look like the hardware it drives. Shipped with
+  a Deck appearance built from the plugin's own key and dial art.
+  Skins are data: no markup, no code, no path outside their own folder, no
+  network. [skins.md](skins.md) is the contract.
 - [ ] System, light and dark appearance, following the desktop by default.
-- [ ] Skins: a user-supplied token set loaded from a file, selectable in
-  Options, so the mixer can look like the hardware it drives, like Wave
-  Link, or like whatever the user wants. The Stream Deck plugin reads the
-  same tokens for its key art.
+  The token set is the groundwork; what remains is a second set of values
+  for a light ground and following the desktop's preference.
+- [ ] The Stream Deck plugin reading the same tokens for its key art. The
+  plugin draws its own images today and is unaffected by the window's skin.
 - [ ] Layout density: a compact mode for small screens and a large mode
   for touch.
 - [ ] Localization infrastructure and the first translations.

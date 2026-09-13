@@ -7,6 +7,9 @@ namespace OpenXLR.UI;
 /// <summary>One entry in the enforced-default pickers; Name null = don't enforce.</summary>
 public sealed record DeviceChoice(string? Name, string Label);
 
+/// <summary>One skin in the appearance picker; the id is what ui.json keeps.</summary>
+public sealed record SkinChoice(string Id, string Label);
+
 /// <summary>
 /// Backs the Options window. Startup toggles apply immediately to the system
 /// (systemd unit, autostart entry) and persist in ui.json; the enforced-default
@@ -42,13 +45,16 @@ public sealed class OptionsViewModel : ViewModelBase
         _submixer = DaemonPrefs.Load().Submixer ?? true;
 
         BuildChoices();
+        BuildSkinChoices();
         _applying = true;
         try
         {
+            SelectedSkin = SkinChoices.FirstOrDefault(c => c.Id == Skinning.SkinService.Current.Id) ?? SkinChoices[0];
             EnforcedOutput = OutputChoices.FirstOrDefault(c => c.Name == main.EnforcedDefaultSink) ?? OutputChoices[0];
             EnforcedInput = InputChoices.FirstOrDefault(c => c.Name == main.EnforcedDefaultSource) ?? InputChoices[0];
         }
         finally { _applying = false; }
+        ReportSkin(Skinning.SkinService.Errors);
     }
 
     // --- plugins ---
@@ -346,6 +352,76 @@ public sealed class OptionsViewModel : ViewModelBase
 
     private void SendEnforced()
         => _ = _client.SetEnforcedDefaultsAsync(_enforcedOutput?.Name, _enforcedInput?.Name);
+
+    // --- appearance ---
+
+    public ObservableCollection<SkinChoice> SkinChoices { get; } = [];
+
+    private SkinChoice? _selectedSkin;
+    /// <summary>
+    /// The appearance. Choosing one saves it in ui.json and puts it on
+    /// immediately; no window is rebuilt and nothing about the mixer, the
+    /// daemon or the audio graph is touched.
+    /// </summary>
+    public SkinChoice? SelectedSkin
+    {
+        get => _selectedSkin;
+        set
+        {
+            if (!Set(ref _selectedSkin, value) || _applying || value is null) return;
+            ReportSkin(Skinning.SkinService.Choose(value.Id));
+        }
+    }
+
+    private string _skinNote = "";
+    /// <summary>What the chosen skin says about itself, and where it came from.</summary>
+    public string SkinNote { get => _skinNote; private set => Set(ref _skinNote, value); }
+
+    private string? _skinError;
+    /// <summary>Everything wrong with the chosen skin, or null when it applied cleanly.</summary>
+    public string? SkinError
+    {
+        get => _skinError;
+        private set { if (Set(ref _skinError, value)) Raise(nameof(HasSkinError)); }
+    }
+
+    public bool HasSkinError => !string.IsNullOrEmpty(_skinError);
+
+    /// <summary>Where a downloaded skin folder goes, spelled out for the user.</summary>
+    public string SkinFolderHint =>
+        $"Skins are folders holding a skin.json, read from {Skinning.SkinCatalog.UserSkinDir} "
+        + "and from the system data directories. Start OpenXLR with OPENXLR_SKIN=default to "
+        + "get the shipped appearance back without opening this window.";
+
+    /// <summary>Read the skin folders again, keeping the current choice if it is still there.</summary>
+    public void ReloadSkins()
+    {
+        string id = Skinning.SkinService.Current.Id;
+        BuildSkinChoices();
+        _applying = true;
+        try { SelectedSkin = SkinChoices.FirstOrDefault(c => c.Id == id) ?? SkinChoices[0]; }
+        finally { _applying = false; }
+        ReportSkin(Skinning.SkinService.Reload());
+    }
+
+    private void BuildSkinChoices()
+    {
+        SkinChoices.Clear();
+        foreach (Skinning.SkinEntry entry in Skinning.SkinCatalog.Discover())
+            SkinChoices.Add(new SkinChoice(entry.Id, $"{entry.Name} ({entry.Package.OriginLabel})"));
+    }
+
+    private void ReportSkin(System.Collections.Generic.IReadOnlyList<string> errors)
+    {
+        Skinning.SkinPackage package = Skinning.SkinService.Current.Package;
+        string note = package.Description ?? "";
+        if (package.Author is { Length: > 0 } author) note = note.Length == 0 ? $"By {author}." : $"{note} By {author}.";
+        if (Skinning.SkinService.Overridden)
+            note = (note.Length == 0 ? "" : note + " ")
+                + $"This run was started with {Skinning.SkinService.OverrideVariable} set, so the launch chose it.";
+        SkinNote = note;
+        SkinError = errors.Count == 0 ? null : string.Join("\n", errors);
+    }
 
     private void BuildChoices()
     {

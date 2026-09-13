@@ -284,6 +284,24 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   It also holds every sink it created at full volume and unmuted, since
   a desktop applet or the session manager can turn one down and quietly
   cut the mixes it feeds
+- Skins: every surface, label, indicator, meter, fader and control in the
+  window reads a named appearance value. A skin is a folder with a
+  versioned `skin.json` that replaces some or all of those values and picks,
+  per control, one of the appearances OpenXLR itself draws: a flat or a
+  console fader, a continuous or a segmented meter, a flat dot or a lamp in
+  a bezel, a flat or a bevelled mute cap. A meter is coloured by position on
+  its scale, so a skin can give it a hi-fi green, amber and red ladder
+  without the bar ever repainting itself end to end. What a skin leaves out
+  keeps the shipped default. Two appearances ship: Material, the window's
+  own, and Deck, built from the OpenDeck plugin's key and dial art. The
+  picker is in Options, the choice lives in `ui.json` alone, and switching
+  repaints open windows without touching audio or the layout. A skin is
+  data. It carries no markup and no code, reaches no file outside its own
+  folder, makes no network request, and its images are bounded and measured
+  before they are decoded. It cannot change what a control does either: the
+  console fader is the framework's slider with OpenXLR's drawing over it,
+  and a plugin's own editor window is drawn by the plugin and is not
+  skinned. [skins.md](skins.md) is the contract
 - One window per user: a second launch brings the running window to the
   front, out of the tray if it is hidden there, and exits
 - Tray icon, start-minimized option, daemon and window autostart from

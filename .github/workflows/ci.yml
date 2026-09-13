@@ -61,6 +61,9 @@ jobs:
       - name: A tooltip at a screen edge does not take the click
         run: OPENXLR_TEST_TOOLTIP=1 xvfb-run -a -s '-screen 0 1600x1000x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~ToolTipInputTests
 
+      - name: Skins reach every window and the default comes back
+        run: OPENXLR_TEST_SKIN=1 xvfb-run -a -s '-screen 0 2560x1440x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~SkinWindowTests
+
       - name: Locked restore enforced on every packaging path
         run: tools/check-locked-restore.sh
 

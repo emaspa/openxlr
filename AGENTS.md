@@ -27,7 +27,8 @@ read before touching the tree.
   [docs/api.md](docs/api.md) for commands and state,
   [docs/http-api.md](docs/http-api.md) for the HTTP transport,
   [docs/mixer-layout.md](docs/mixer-layout.md) for the layout file and
-  its live commands, [docs/manual.md](docs/manual.md) for behaviour
+  its live commands, [docs/skins.md](docs/skins.md) for appearance values
+  and the skin format, [docs/manual.md](docs/manual.md) for behaviour
   users see.
 
 ## Build and check
@@ -50,6 +51,7 @@ xvfb-run -a make -C native test-editor  # also needs Xvfb and xauth
 OPENXLR_TEST_DESKTOP=1 xvfb-run -a dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~TrayWindowTests
 OPENXLR_TEST_LAYOUT=1 xvfb-run -a -s '-screen 0 2560x1440x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~WindowLayoutTests
 OPENXLR_TEST_TOOLTIP=1 xvfb-run -a -s '-screen 0 1600x1000x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~ToolTipInputTests
+OPENXLR_TEST_SKIN=1 xvfb-run -a -s '-screen 0 2560x1440x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~SkinWindowTests
 ```
 
 These cover the main CI build and tests; the workflow also checks packaged
@@ -90,8 +92,23 @@ and [package checks](packaging/yabridge/README.md).
 - A new command is registered in `CommandValidation`, dispatched in
   `WebSocketHub`, documented in `docs/api.md`, and handled in the client
   that uses it.
-- Tests that redirect `XDG_CONFIG_HOME` or `XDG_RUNTIME_DIR` join the
-  xUnit collection `xdg-config`.
+- Tests that redirect `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_DATA_DIRS`
+  or `XDG_RUNTIME_DIR` join the xUnit collection `xdg-config`.
+- The window holds no colour, font size or corner radius of its own. A new
+  surface reads an `Ox.*` resource with `DynamicResource`, and a new value
+  is added to `src/OpenXLR.UI/Skinning/SkinTokens.cs`, which is the one
+  place the default appearance is written down, then to its table in
+  [docs/skins.md](docs/skins.md) and to
+  [docs/skin.schema.json](docs/skin.schema.json). `SkinDocumentTests` holds
+  the three to each other, down to the default and the bounds. A token used
+  by a converter rather than by markup is a flat colour and comes from
+  `SkinService.LiveBrush`.
+- A control appearance a skin can choose is an entry in
+  `src/OpenXLR.UI/Skinning/SkinControls.cs` and a control theme in
+  `Skinning/Controls.axaml`. A skin never supplies markup, so nothing
+  outside that list can reach the window, and a template we own has to keep
+  the parts the framework control drives under the names it looks for. The
+  appearances are documented and checked the same way the tokens are.
 - A test that needs a fake helper program builds it with
   `ExecutableScript.Write`. A program the test process wrote itself
   cannot be run while other test classes start helpers: the write

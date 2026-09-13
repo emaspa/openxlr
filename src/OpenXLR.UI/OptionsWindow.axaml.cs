@@ -91,6 +91,17 @@ public partial class OptionsWindow : Window
 
     private void OnPluginsManual(object? sender, RoutedEventArgs e) => ExternalLink.Open(PluginInstall.Manual);
 
+    // Appearance: the picker applies on selection; this reads the folders again
+    // for a skin added or edited while the window was open.
+    private void OnReloadSkins(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is OptionsViewModel vm) vm.ReloadSkins();
+    }
+
+    private void OnSkinsManual(object? sender, RoutedEventArgs e) => ExternalLink.Open(SkinsManual);
+
+    private const string SkinsManual = "https://github.com/emaspa/openxlr/blob/main/docs/manual.md#skins";
+
     private async void OnCollectDiagnostics(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not OptionsViewModel vm) return;

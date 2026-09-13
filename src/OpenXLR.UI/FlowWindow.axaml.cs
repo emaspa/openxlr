@@ -42,7 +42,10 @@ public partial class FlowWindow : Window
         };
         _animation.Tick += (_, _) => Animate();
         Opened += (_, _) => { ConstrainToScreen(); Rebuild(); };
-        Closed += (_, _) => _animation.Stop();
+        // The cards and the routes hold the brushes they were drawn with, so a
+        // new skin needs the graph drawn again.
+        Skinning.SkinService.Changed += RenderGraph;
+        Closed += (_, _) => { Skinning.SkinService.Changed -= RenderGraph; _animation.Stop(); };
     }
 
     public FlowWindow(MainViewModel vm) : this()
@@ -65,10 +68,17 @@ public partial class FlowWindow : Window
             UpdateHint();
     }
 
-    private IBrush Brush(string name) => (IBrush)Resources[name]!;
+    /// <summary>
+    /// One of the window's appearance tokens. The graph is built in code, so a
+    /// skin change cannot repaint it through a binding; the window rebuilds
+    /// instead, which is what the subscription in the constructor is for.
+    /// </summary>
+    private IBrush Brush(string name) =>
+        this.TryFindResource(name, out object? value) && value is IBrush brush ? brush : Brushes.Transparent;
+
     private IBrush RouteBrush(FlowStage stage) => Brush(stage switch
     {
-        FlowStage.Input => "FlowInput", FlowStage.Channel => "FlowChannel", _ => "FlowOutput",
+        FlowStage.Input => "Ox.Flow.Input", FlowStage.Channel => "Ox.Flow.Channel", _ => "Ox.Flow.Output",
     });
 
     private void Rebuild()
@@ -134,8 +144,8 @@ public partial class FlowWindow : Window
             var label = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             label.Children.Add(CreateIcon(icon, 15));
             label.Children.Add(new TextBlock { Text = title, FontSize = 11, FontWeight = FontWeight.SemiBold,
-                Foreground = Brush("FlowText"), VerticalAlignment = VerticalAlignment.Center });
-            var header = new Border { Background = Brush("FlowCard"), CornerRadius = new CornerRadius(4),
+                Foreground = Brush("Ox.Flow.Text"), VerticalAlignment = VerticalAlignment.Center });
+            var header = new Border { Background = Brush("Ox.Flow.Card"), CornerRadius = new CornerRadius(4),
                 Padding = new Thickness(12, 8), Child = label };
             header.Measure(Size.Infinity);
             Place(header, X(stage) + (cardWidth - header.DesiredSize.Width) / 2, 8);
@@ -171,12 +181,12 @@ public partial class FlowWindow : Window
             var text = new StackPanel { Spacing = 3, Margin = new Thickness(9, 0, 0, 0) };
             Grid.SetColumn(text, 1);
             text.Children.Add(new TextBlock { Text = node.Label, FontSize = 13, FontWeight = FontWeight.Medium,
-                Foreground = Brush("FlowText"), TextTrimming = TextTrimming.CharacterEllipsis });
-            text.Children.Add(new TextBlock { Text = node.Detail, FontSize = 11, Foreground = Brush("FlowTextDim"),
+                Foreground = Brush("Ox.Flow.Text"), TextTrimming = TextTrimming.CharacterEllipsis });
+            text.Children.Add(new TextBlock { Text = node.Detail, FontSize = 11, Foreground = Brush("Ox.Flow.TextDim"),
                 TextTrimming = TextTrimming.CharacterEllipsis });
             if (node.Processing.Length > 0)
                 text.Children.Add(new TextBlock { Text = "FX  " + node.Processing.Replace("\n", " · "),
-                    FontSize = 10, Foreground = Brush("FlowInput"), Margin = new Thickness(0, 4, 0, 0),
+                    FontSize = 10, Foreground = Brush("Ox.Flow.Input"), Margin = new Thickness(0, 4, 0, 0),
                     TextTrimming = TextTrimming.CharacterEllipsis });
             content.Children.Add(text);
             var card = new Button { Width = cardWidth, Height = node.Height, Content = content };
@@ -211,13 +221,13 @@ public partial class FlowWindow : Window
         {
             Button card = _cards[node.Key];
             card.Opacity = key is not null && !related.Contains(node.Key) ? 0.28 : node.Active ? 1 : 0.65;
-            card.Background = Brush(node.Key == key ? "FlowCardSelected" : "FlowCard");
-            card.BorderBrush = node.Key == key ? Brush("FlowTextDim") : Brushes.Transparent;
+            card.Background = Brush(node.Key == key ? "Ox.Flow.CardSelected" : "Ox.Flow.Card");
+            card.BorderBrush = node.Key == key ? Brush("Ox.Flow.TextDim") : Brushes.Transparent;
         }
         foreach (RouteVisual visual in _routes)
         {
             bool inPath = path is null || path.Contains(visual.Route);
-            IBrush color = inPath && visual.Route.Active ? RouteBrush(visual.Route.Stage) : Brush("FlowMuted");
+            IBrush color = inPath && visual.Route.Active ? RouteBrush(visual.Route.Stage) : Brush("Ox.Flow.Muted");
             visual.Line.Stroke = color;
             visual.Line.Opacity = inPath ? 0.9 : 0.16;
             visual.Line.StrokeDashArray = visual.Route.Active ? null : [3, 4];
@@ -259,6 +269,6 @@ public partial class FlowWindow : Window
         };
         return new Viewbox { Width = size, Height = size, VerticalAlignment = VerticalAlignment.Center,
             Child = new Path { Width = 24, Height = 24, Data = Geometry.Parse(data),
-                Stroke = Brush("FlowTextDim"), StrokeThickness = 1.6, StrokeLineCap = PenLineCap.Round } };
+                Stroke = Brush("Ox.Flow.TextDim"), StrokeThickness = 1.6, StrokeLineCap = PenLineCap.Round } };
     }
 }

@@ -33,6 +33,13 @@ public sealed record UiSettings
     public string? AutostartExecutable { get; init; }
     /// <summary>Names of the main window's tiles the user collapsed (INPUTS, HEADPHONES, ...).</summary>
     public IReadOnlyList<string> CollapsedSections { get; init; } = [];
+    /// <summary>
+    /// The appearance the window wears, by skin id; null is the one the
+    /// application ships with. It lives here and nowhere else: the mixer
+    /// layout, the daemon's preferences and the audio profiles know nothing
+    /// about it, so changing appearance cannot disturb what is playing.
+    /// </summary>
+    public string? Skin { get; init; }
 
     private static readonly JsonSerializerOptions Json = new()
     {

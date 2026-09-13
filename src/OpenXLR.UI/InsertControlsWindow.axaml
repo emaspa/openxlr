@@ -1,11 +1,12 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:OpenXLR.UI"
+        xmlns:skin="using:OpenXLR.UI.Skinning"
         x:Class="OpenXLR.UI.InsertControlsWindow"
         x:DataType="vm:InsertViewModel"
         Title="{Binding Label}" Width="620" Height="560" MinWidth="420" MinHeight="320"
         WindowStartupLocation="CenterOwner"
-        Background="#16181d">
+        Background="{DynamicResource Ox.Window.Background}">
 
   <!-- same flat fader thumbs as the main window: the Fluent slider sizes
        its thumb from these theme resources -->
@@ -21,15 +22,6 @@
     <Style Selector="Slider /template/ Thumb">
       <Setter Property="CornerRadius" Value="2"/>
     </Style>
-    <Style Selector="TextBlock.h">
-      <Setter Property="FontSize" Value="12"/>
-      <Setter Property="FontWeight" Value="SemiBold"/>
-      <Setter Property="Foreground" Value="#8b93a7"/>
-    </Style>
-    <Style Selector="TextBlock.val">
-      <Setter Property="Foreground" Value="#e6e9f0"/>
-      <Setter Property="FontFamily" Value="monospace"/>
-    </Style>
     <Style Selector="Slider">
       <Setter Property="MinHeight" Value="0"/>
       <Setter Property="Height" Value="30"/>
@@ -40,17 +32,17 @@
   <DockPanel Margin="16">
     <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,12">
       <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
-        <Ellipse Width="10" Height="10" VerticalAlignment="Center"
-                 Fill="{Binding IsActive, Converter={x:Static vm:Converters.ActiveLed}}"/>
+        <skin:StatusLed IsOn="{Binding IsActive}" Kind="Insert"
+                        AutomationProperties.Name="Plugin state"/>
         <TextBlock Grid.Column="1" Name="PluginTitle" Text="{Binding Label}" FontSize="16" FontWeight="Bold"
-                   Foreground="#e6e9f0" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
+                   Foreground="{DynamicResource Ox.Text.Primary}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
         <TextBlock Grid.Column="2" Text="{Binding StateText}" Classes="h" VerticalAlignment="Center"/>
       </Grid>
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
         <TextBlock Text="{Binding Plugin}" Classes="h" FontSize="11" VerticalAlignment="Center"
                    TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Plugin}"/>
-        <Border Grid.Column="1" Background="#2a2e38" CornerRadius="4" Padding="6,1" VerticalAlignment="Center">
-          <TextBlock Text="{Binding Format}" Foreground="#8b93a7" FontSize="10" FontWeight="SemiBold"/>
+        <Border Grid.Column="1" Background="{DynamicResource Ox.Badge.Background}" CornerRadius="4" Padding="6,1" VerticalAlignment="Center">
+          <TextBlock Text="{Binding Format}" Foreground="{DynamicResource Ox.Text.Secondary}" FontSize="10" FontWeight="SemiBold"/>
         </Border>
       </Grid>
       <!-- Actions get their own row and wrap instead of competing with the title. -->
@@ -75,17 +67,17 @@
          of floating over the value readouts -->
     <ScrollViewer VerticalScrollBarVisibility="Auto" AllowAutoHide="False">
       <StackPanel>
-      <TextBlock Text="{Binding NativeUiBlockReason}" Foreground="#8b93a7" FontSize="11" TextWrapping="Wrap"
+      <TextBlock Text="{Binding NativeUiBlockReason}" Foreground="{DynamicResource Ox.Text.Secondary}" FontSize="11" TextWrapping="Wrap"
                  Margin="0,0,0,8" IsVisible="{Binding NativeUiBlocked}"/>
-      <TextBlock Text="{Binding Error}" Foreground="#e0a05a" FontSize="11" TextWrapping="Wrap"
+      <TextBlock Text="{Binding Error}" Foreground="{DynamicResource Ox.Text.Warning}" FontSize="11" TextWrapping="Wrap"
                  Margin="0,0,0,8" IsVisible="{Binding HasError}"/>
       <ItemsControl ItemsSource="{Binding Groups}" Margin="0,0,10,0">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:InsertParamGroup">
             <StackPanel Margin="0,0,0,10">
-              <Border IsVisible="{Binding ShowHeader}" BorderBrush="#2d313c" BorderThickness="0,0,0,1"
+              <Border IsVisible="{Binding ShowHeader}" BorderBrush="{DynamicResource Ox.Divider}" BorderThickness="0,0,0,1"
                       Margin="0,0,0,6" Padding="0,0,0,3">
-                <TextBlock Text="{Binding Name}" Foreground="#b9bfcc" FontSize="12" FontWeight="SemiBold"/>
+                <TextBlock Text="{Binding Name}" Foreground="{DynamicResource Ox.Text.Detail}" FontSize="12" FontWeight="SemiBold"/>
               </Border>
               <ItemsControl ItemsSource="{Binding Params}">
                 <ItemsControl.ItemTemplate>

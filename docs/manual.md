@@ -29,7 +29,7 @@ happen on your system:
   microphone. By default that is `OpenXLR Game`, `OpenXLR Music`,
   `OpenXLR Browser`, `OpenXLR System`, `OpenXLR Voice Chat`, `OpenXLR
   SFX` and the hardware channels as outputs, and `OpenXLR Stream` and
-  `OpenXLR Chat` as inputs; a layout you have edited ([section 3.11](#layout))
+  `OpenXLR Chat` as inputs; a layout you have edited ([section 3.12](#layout))
   comes back as you left it.
 - Applications that play audio are moved onto a channel output by name
   ([section 2](#concepts)). They keep playing; only the device they play into
@@ -64,7 +64,7 @@ interface's inputs (XLR 1, XLR 2 where the device has one, Aux In for
 the Pro's Line In and USB Aux input) and the rest carry application
 groups: Game, Music, Browser, System, Voice Chat and SFX by default, and
 whatever you add, rename or remove in the layout editor
-([section 3.11](#layout)). Each channel is a PipeWire output device an
+([section 3.12](#layout)). Each channel is a PipeWire output device an
 application can play into.
 
 **Mixes** are where audio leaves. The default layout has five; the
@@ -783,7 +783,48 @@ MONITOR, APPLICATIONS, SUBMIXER) you collapsed with the chevron in
 their header, across restarts.
 
 <a name="upgrade"></a>
-### 3.10 Upgrade
+<a name="skins"></a>
+### 3.10 Change how the window looks
+
+Options, APPEARANCE picks a skin. OpenXLR ships two:
+
+- **Material**, the default, which is what the window has always looked
+  like;
+- **Deck**, which dresses the window in the visual language of the
+  OpenDeck keys and the Wave interfaces: near-black faceplates, black keys
+  whose lettering is backlit green when a control is on and red when
+  something is muted or bypassed, console faders with a machined cap,
+  indicator lamps in a bezel, and meters that run green to amber to red
+  across the scale.
+
+The choice takes effect at once. Windows that are already open repaint;
+audio, the mixer, the routing and the layout are untouched, and nothing is
+restarted. The choice is saved in `~/.config/openxlr/ui.json` and is not
+part of a profile or of the mixer layout.
+
+Anything wrong with a skin is listed under the picker, not in the mixer
+window. A skin that sets only part of the appearance keeps the default for
+everything else.
+
+Your own skins go in `~/.local/share/openxlr/skins/<name>/skin.json`;
+"Reload" reads the folders again without restarting. A skin is a data file:
+it holds named colours, sizes and local images, and it picks from the
+control appearances OpenXLR itself draws. It cannot carry code, markup or
+a template, reach a file outside its own folder, or make a network
+request, and it cannot change what a control does: a fader a skin has
+redrawn is still the same fader underneath. A plugin's own editor window belongs to the plugin and is
+not skinned. [skins.md](skins.md) is the full list of values and the rules
+a skin is read under.
+
+If a skin makes something unreadable, start the window once with
+
+```sh
+OPENXLR_SKIN=default openxlr
+```
+
+which ignores the saved choice for that run and lets you pick another one.
+
+### 3.11 Upgrade
 
 Packages do not restart a running daemon. After an upgrade the window
 shows a banner naming the daemon's version and its own, with a Restart
@@ -802,7 +843,7 @@ refused with "unauthorized" until it is updated too; the plugin zip on
 the release page matches the daemon of that release.
 
 <a name="layout"></a>
-### 3.11 Edit the mixer layout
+### 3.12 Edit the mixer layout
 
 The default channels and mixes are a starting point. Edit layout in the
 SUBMIXER card opens the layout editor: application channels on the left,
@@ -836,7 +877,7 @@ and Stream Deck keys survive a rename. The layout file is described in
 [mixer-layout.md](mixer-layout.md).
 
 <a name="plugin-editors"></a>
-### 3.12 Open a plugin's own editor
+### 3.13 Open a plugin's own editor
 
 The controls window is generated from the plugin's parameters and works
 for every plugin. Some plugins also ship an editor of their own, with the
@@ -1163,7 +1204,7 @@ Review plugin names, paths and scanner output before sharing the archive.
 | `~/.config/openxlr/mixer.json` | every mixer decision, the layout included (`userChannels`, `userMixes`, see [mixer-layout.md](mixer-layout.md)), written by the daemon |
 | `~/.config/openxlr/profiles/<vid-pid>/<name>.json` | saved profiles, one file each |
 | `~/.config/openxlr/profiles/<vid-pid>/recall-on-connect` | the profile recalled when that interface connects, when one is chosen |
-| `$XDG_RUNTIME_DIR/openxlr/token` (or `~/.config/openxlr/token` without a runtime directory) | the control API token for this daemon run, readable by your user only; the window and the OpenDeck plugin read it, a daemon older than the window will not have it ([section 3.10](#upgrade)) |
+| `$XDG_RUNTIME_DIR/openxlr/token` (or `~/.config/openxlr/token` without a runtime directory) | the control API token for this daemon run, readable by your user only; the window and the OpenDeck plugin read it, a daemon older than the window will not have it ([section 3.11](#upgrade)) |
 | `$XDG_RUNTIME_DIR/openxlr/daemon.lock` | held by the running daemon; a second daemon started for the same user stops at once instead of waiting for the port |
 | `~/.config/openxlr/devices/<vid-pid>/last-state.json` | the settings restored on connect when `retainsSettings` is false |
 | `~/.config/openxlr/devices/<vid-pid>/defaults.json` | the firmware defaults of such an interface, recorded after a power cycle, written back by "Reset device to defaults" (the Pro has no such file: its reset writes OpenXLR's baseline) |
@@ -1171,7 +1212,8 @@ Review plugin names, paths and scanner output before sharing the archive.
 | `~/.config/openxlr/gainlock.json` | which devices have the gain lock set |
 | `~/.config/openxlr/bridge/yabridgectl/config.toml` | companion bridge folder registry, separate from the system bridge |
 | `~/.local/share/openxlr/yabridge/{vst3,clap,vst2}` | companion-generated wrappers; OpenXLR loads VST3 and CLAP only |
-| `~/.config/openxlr/ui.json` | window preferences |
+| `~/.config/openxlr/ui.json` | window preferences, the chosen skin included ([section 3.10](#skins)) |
+| `~/.local/share/openxlr/skins/<id>/skin.json` | a skin you installed; system skins come from `$XDG_DATA_DIRS` ([skins.md](skins.md)) |
 | `openxlr-daemon.service` (systemd user unit) | the daemon; `journalctl --user -u openxlr-daemon` for its log |
 | `/usr/lib/systemd/user/pipewire-pulse.service.d/openxlr.conf` | installed by the packages: raises pipewire-pulse's open-file limit ([section 5.8](#open-files)) |
 | `ws://127.0.0.1:37890/ws` | the daemon's API, documented in [api.md](api.md); the same commands over HTTP at `/api/v1` ([http-api.md](http-api.md)) |

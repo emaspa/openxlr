@@ -3,17 +3,10 @@
         x:Class="OpenXLR.UI.FlowWindow"
         Title="OpenXLR · Audio flow" SizeToContent="WidthAndHeight" MinWidth="900" MinHeight="500"
         WindowStartupLocation="CenterOwner" RequestedThemeVariant="Dark"
-        Background="#242624">
-  <Window.Resources>
-    <SolidColorBrush x:Key="FlowCard" Color="#333633"/>
-    <SolidColorBrush x:Key="FlowCardSelected" Color="#414541"/>
-    <SolidColorBrush x:Key="FlowText" Color="#f0f2ef"/>
-    <SolidColorBrush x:Key="FlowTextDim" Color="#a3aaa3"/>
-    <SolidColorBrush x:Key="FlowInput" Color="#20c4d1"/>
-    <SolidColorBrush x:Key="FlowChannel" Color="#c958e5"/>
-    <SolidColorBrush x:Key="FlowOutput" Color="#20d49a"/>
-    <SolidColorBrush x:Key="FlowMuted" Color="#757d75"/>
-  </Window.Resources>
+        Background="{DynamicResource Ox.Flow.Background}">
+  <!-- The graph's colours are the application's Ox.Flow.* tokens. The cards
+       and the routes are built in code, which reads the same tokens and
+       rebuilds when the skin changes. -->
   <Window.Styles>
     <Style Selector="Button.flowNode">
       <Setter Property="Padding" Value="12,9"/>
@@ -24,18 +17,18 @@
       <Setter Property="Cursor" Value="Hand"/>
     </Style>
     <Style Selector="Button.flowNode:pointerover /template/ ContentPresenter">
-      <Setter Property="Background" Value="#414541"/>
-      <Setter Property="BorderBrush" Value="#717971"/>
+      <Setter Property="Background" Value="{DynamicResource Ox.Flow.NodeHoverBackground}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Ox.Flow.NodeHoverBorderBrush}"/>
     </Style>
   </Window.Styles>
   <Grid RowDefinitions="Auto,*,Auto" Margin="28,24,28,18">
     <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,20">
       <StackPanel Spacing="5">
-        <TextBlock Text="Audio flow" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource FlowText}"/>
-        <TextBlock Name="FlowHint" Text="Click any element to trace its signal path" FontSize="12" Foreground="{StaticResource FlowTextDim}"/>
+        <TextBlock Text="Audio flow" FontSize="24" FontWeight="SemiBold" Foreground="{DynamicResource Ox.Flow.Text}"/>
+        <TextBlock Name="FlowHint" Text="Click any element to trace its signal path" FontSize="12" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
       </StackPanel>
       <Button Name="ClearSelection" Grid.Column="1" Content="×  Clear selection" Click="OnClearSelection"
-              VerticalAlignment="Center" FontSize="12" Background="#333633" Foreground="{StaticResource FlowText}"
+              VerticalAlignment="Center" FontSize="12" Background="{DynamicResource Ox.Flow.Card}" Foreground="{DynamicResource Ox.Flow.Text}"
               CornerRadius="4" Padding="12,7" IsEnabled="False"/>
     </Grid>
     <ScrollViewer Name="GraphScroll" Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
@@ -43,24 +36,24 @@
     </ScrollViewer>
     <WrapPanel Grid.Row="2" Margin="0,18,0,0">
       <StackPanel Orientation="Horizontal" Spacing="7" Margin="0,0,22,8">
-        <Path Width="20" Height="3" Data="M0,1 L20,1" Stroke="{StaticResource FlowInput}" StrokeThickness="2"/>
-        <TextBlock Text="Input to channel" FontSize="11" Foreground="{StaticResource FlowTextDim}"/>
+        <Path Width="20" Height="3" Data="M0,1 L20,1" Stroke="{DynamicResource Ox.Flow.Input}" StrokeThickness="2"/>
+        <TextBlock Text="Input to channel" FontSize="11" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
       </StackPanel>
       <StackPanel Orientation="Horizontal" Spacing="7" Margin="0,0,22,8">
-        <Path Width="20" Height="3" Data="M0,1 L20,1" Stroke="{StaticResource FlowChannel}" StrokeThickness="2"/>
-        <TextBlock Text="Channel to mix" FontSize="11" Foreground="{StaticResource FlowTextDim}"/>
+        <Path Width="20" Height="3" Data="M0,1 L20,1" Stroke="{DynamicResource Ox.Flow.Channel}" StrokeThickness="2"/>
+        <TextBlock Text="Channel to mix" FontSize="11" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
       </StackPanel>
       <StackPanel Orientation="Horizontal" Spacing="7" Margin="0,0,22,8">
-        <Path Width="20" Height="3" Data="M0,1 L20,1" Stroke="{StaticResource FlowOutput}" StrokeThickness="2"/>
-        <TextBlock Text="Mix to output" FontSize="11" Foreground="{StaticResource FlowTextDim}"/>
+        <Path Width="20" Height="3" Data="M0,1 L20,1" Stroke="{DynamicResource Ox.Flow.Output}" StrokeThickness="2"/>
+        <TextBlock Text="Mix to output" FontSize="11" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
       </StackPanel>
       <StackPanel Orientation="Horizontal" Spacing="7" Margin="0,0,22,8">
-        <Path Width="20" Height="3" Data="M0,1 L20,1" Stroke="{StaticResource FlowMuted}" StrokeThickness="2" StrokeDashArray="3,3"/>
-        <TextBlock Text="Muted / inactive" FontSize="11" Foreground="{StaticResource FlowTextDim}"/>
+        <Path Width="20" Height="3" Data="M0,1 L20,1" Stroke="{DynamicResource Ox.Flow.Muted}" StrokeThickness="2" StrokeDashArray="3,3"/>
+        <TextBlock Text="Muted / inactive" FontSize="11" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
       </StackPanel>
       <StackPanel Orientation="Horizontal" Spacing="7" Margin="0,0,22,8">
-        <Path Width="20" Height="3" Data="M0,1 L20,1" Stroke="{StaticResource FlowMuted}" StrokeThickness="2" Opacity="0.3"/>
-        <TextBlock Text="Not in path" FontSize="11" Foreground="{StaticResource FlowTextDim}"/>
+        <Path Width="20" Height="3" Data="M0,1 L20,1" Stroke="{DynamicResource Ox.Flow.Muted}" StrokeThickness="2" Opacity="0.3"/>
+        <TextBlock Text="Not in path" FontSize="11" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
       </StackPanel>
     </WrapPanel>
   </Grid>

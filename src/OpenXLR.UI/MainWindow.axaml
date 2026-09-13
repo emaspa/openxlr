@@ -1,21 +1,16 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:OpenXLR.UI"
+        xmlns:skin="using:OpenXLR.UI.Skinning"
         x:Class="OpenXLR.UI.MainWindow"
         x:DataType="vm:MainViewModel"
         Title="OpenXLR" Width="1040" Height="900" MinHeight="480"
-        Icon="avares://OpenXLR.UI/Assets/icon.png"
-        Background="#16181d">
+        Icon="avares://OpenXLR.UI/Assets/icon.png">
 
-  <!-- flat rectangular fader knobs instead of the round Fluent thumb: the
-       Fluent slider sizes its thumb from these theme resources -->
+  <!-- The window's ground, its cards, its labels, its meters and its fader
+       caps come from the application's Ox.* appearance tokens (App.axaml and
+       Skinning/SkinTokens.cs). What is left here is this window's own layout. -->
   <Window.Resources>
-    <x:Double x:Key="SliderHorizontalThumbWidth">22</x:Double>
-    <x:Double x:Key="SliderHorizontalThumbHeight">10</x:Double>
-    <x:Double x:Key="SliderVerticalThumbWidth">10</x:Double>
-    <x:Double x:Key="SliderVerticalThumbHeight">22</x:Double>
-    <CornerRadius x:Key="SliderThumbCornerRadius">2</CornerRadius>
-
     <ControlTheme x:Key="TileExpanderTheme" TargetType="Expander">
       <Setter Property="HorizontalAlignment" Value="Stretch"/>
       <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -53,21 +48,7 @@
   </Window.Resources>
 
   <Window.Styles>
-    <Style Selector="Slider /template/ Thumb">
-      <Setter Property="CornerRadius" Value="2"/>
-    </Style>
-    <Style Selector="TextBlock.h">
-      <Setter Property="FontSize" Value="12"/>
-      <Setter Property="FontWeight" Value="SemiBold"/>
-      <Setter Property="Foreground" Value="#8b93a7"/>
-    </Style>
-    <Style Selector="TextBlock.val">
-      <Setter Property="Foreground" Value="#e6e9f0"/>
-      <Setter Property="FontFamily" Value="monospace"/>
-    </Style>
     <Style Selector="Border.card">
-      <Setter Property="Background" Value="#1d2027"/>
-      <Setter Property="CornerRadius" Value="8"/>
       <Setter Property="Padding" Value="12,9"/>
     </Style>
     <!-- compact device-control rows: shorter sliders and buttons than the
@@ -84,7 +65,7 @@
       <Setter Property="MinHeight" Value="0"/>
     </Style>
     <!-- collapsible tiles: a flat expander whose header looks like the old card title -->
-    <Style Selector="Expander.tile">
+    <Style Selector="Expander.section">
       <Setter Property="VerticalAlignment" Value="Top"/>
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="BorderThickness" Value="0"/>
@@ -122,25 +103,6 @@
       <Setter Property="VerticalContentAlignment" Value="Center"/>
       <Setter Property="HorizontalContentAlignment" Value="Center"/>
     </Style>
-    <!-- mute buttons: green while audio passes, red when muted. The compact
-         strip buttons also swap their letter: O = open, M = muted. -->
-    <Style Selector="ToggleButton.mutemini">
-      <Setter Property="Content" Value="O"/>
-    </Style>
-    <Style Selector="ToggleButton.mutemini:checked">
-      <Setter Property="Content" Value="M"/>
-    </Style>
-    <Style Selector="ToggleButton.mute">
-      <Setter Property="Background" Value="#1e5c3a"/>
-      <Setter Property="Foreground" Value="#d9efe2"/>
-    </Style>
-    <Style Selector="ToggleButton.mute:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="#27754b"/>
-    </Style>
-    <Style Selector="ToggleButton.mute:checked /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="#a03434"/>
-      <Setter Property="Foreground" Value="#f6dede"/>
-    </Style>
   </Window.Styles>
 
   <!-- MaxWidth keeps sliders and dropdowns a sane length on an ultrawide or when
@@ -154,17 +116,17 @@
     <Border Classes="card" Margin="0,0,0,8">
       <Grid ColumnDefinitions="Auto,8,*,Auto">
         <Button Name="OptionsButton" Content="⚙" FontSize="18" Padding="8,4"
-                VerticalAlignment="Center" Background="Transparent"
+                VerticalAlignment="Center" Classes="ghost"
                 Click="OnOptions" ToolTip.Tip="Options"/>
         <StackPanel Grid.Column="2">
-          <TextBlock Text="OpenXLR" FontSize="20" FontWeight="Bold" Foreground="#e6e9f0"/>
+          <TextBlock Text="OpenXLR" Classes="title"/>
           <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,2,0,0">
-            <Ellipse Width="9" Height="9" VerticalAlignment="Center"
-                     Fill="{Binding DeviceConnected, Converter={x:Static vm:Converters.BoolToBrush}}"/>
+            <skin:StatusLed IsOn="{Binding DeviceConnected}"
+                            AutomationProperties.Name="Interface connection"/>
             <TextBlock Text="{Binding StatusLine}" Classes="h" VerticalAlignment="Center"
                        IsVisible="{Binding !HasMultipleDevices}"/>
             <DropDownButton Name="DevicePicker" Content="{Binding ActiveDeviceName}" FontSize="11" Padding="6,1"
-                            MinHeight="0" VerticalAlignment="Center" Background="Transparent"
+                            MinHeight="0" VerticalAlignment="Center" Classes="ghost"
                             IsVisible="{Binding HasMultipleDevices}"
                             ToolTip.Tip="More than one supported interface is attached; pick which one OpenXLR drives">
               <DropDownButton.Flyout>
@@ -174,7 +136,7 @@
                       <DataTemplate x:DataType="vm:DetectedDeviceItem">
                         <Button Content="{Binding Name}" HorizontalAlignment="Stretch"
                                 HorizontalContentAlignment="Left" FontSize="12"
-                                Background="Transparent" Click="OnPickDevice" Tag="{Binding}"/>
+                                Classes="ghost" Click="OnPickDevice" Tag="{Binding}"/>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
@@ -184,7 +146,7 @@
           </StackPanel>
         </StackPanel>
         <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-          <DropDownButton Content="Profiles" Padding="10,3" FontSize="12" Background="Transparent"
+          <DropDownButton Content="Profiles" Padding="10,3" FontSize="12" Classes="ghost"
                           ToolTip.Tip="Save and recall complete scenes: hardware DSP plus the whole submix">
             <DropDownButton.Flyout>
               <Flyout Placement="BottomEdgeAlignedRight">
@@ -200,10 +162,10 @@
                         <Grid ColumnDefinitions="*,Auto">
                           <Button Content="{Binding}" HorizontalAlignment="Stretch"
                                   HorizontalContentAlignment="Left" FontSize="12"
-                                  Background="Transparent" Click="OnProfileLoad"
+                                  Classes="ghost" Click="OnProfileLoad"
                                   ToolTip.Tip="Load this profile"/>
                           <Button Grid.Column="1" Content="&#x2715;" FontSize="11" Padding="6,3"
-                                  Background="Transparent" Click="OnProfileDelete"
+                                  Classes="ghost" Click="OnProfileDelete"
                                   Tag="{Binding}" ToolTip.Tip="Delete this profile"/>
                         </Grid>
                       </DataTemplate>
@@ -222,13 +184,13 @@
               </Flyout>
             </DropDownButton.Flyout>
           </DropDownButton>
-          <Button Content="Flow" Padding="10,3" FontSize="12" Background="Transparent"
+          <Button Content="Flow" Padding="10,3" FontSize="12" Classes="ghost"
                   Click="OnFlow" ToolTip.Tip="Show the live audio routing graph"/>
-          <Button Content="Restart daemon" Padding="10,3" FontSize="12" Background="Transparent"
+          <Button Content="Restart daemon" Padding="10,3" FontSize="12" Classes="ghost"
                   IsEnabled="{Binding DaemonRestart.CanRestart}" Click="OnRestartDaemon"
                   ToolTip.Tip="Restart the OpenXLR user service. Audio will be interrupted briefly."/>
           <TextBlock Name="HeaderVersion" Text="v0.0.0" Classes="h" VerticalAlignment="Center"/>
-          <Button Content="About" Padding="10,3" FontSize="12" Background="Transparent"
+          <Button Content="About" Padding="10,3" FontSize="12" Classes="ghost"
                   Click="OnAbout"/>
         </StackPanel>
       </Grid>
@@ -236,15 +198,15 @@
 
     <TextBlock Text="{Binding DaemonRestart.Status}" Classes="h" TextWrapping="Wrap"
                Margin="0,0,0,8" IsVisible="{Binding DaemonRestart.Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-    <TextBlock Text="{Binding DaemonWarning}" Foreground="#e0a030" TextWrapping="Wrap" FontSize="12"
+    <TextBlock Text="{Binding DaemonWarning}" Classes="alert" TextWrapping="Wrap" FontSize="12"
                Margin="0,0,0,8" IsVisible="{Binding DaemonWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 
     <Border Classes="card" Margin="0,0,0,8" IsVisible="{Binding Updates.BannerVisible}">
       <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-        <TextBlock Text="{Binding Updates.Title}" Foreground="#5ba8f5"
+        <TextBlock Text="{Binding Updates.Title}" Classes="info"
                    TextWrapping="Wrap" VerticalAlignment="Center"/>
         <Button Grid.Column="1" Content="View changes" Click="OnUpdates"/>
-        <Button Grid.Column="2" Content="Dismiss" Click="OnDismissUpdate" Background="Transparent"/>
+        <Button Grid.Column="2" Content="Dismiss" Click="OnDismissUpdate" Classes="ghost"/>
       </Grid>
     </Border>
 
@@ -262,7 +224,7 @@
 
     <!-- device controls -->
     <Border Classes="card" Margin="0,0,0,8">
-      <Expander Name="InputsTile" Classes="tile" Theme="{StaticResource TileExpanderTheme}" IsExpanded="True">
+      <Expander Name="InputsTile" Classes="section" Theme="{StaticResource TileExpanderTheme}" IsExpanded="True">
         <Expander.Header><TextBlock Text="INPUTS" Classes="h"/></Expander.Header>
       <StackPanel Classes="dev" Spacing="4">
 
@@ -294,7 +256,8 @@
           <ToggleButton Content="Voice Tune" IsChecked="{Binding VoiceTune, Mode=TwoWay}"  Margin="0,0,6,0" IsVisible="{Binding CapVoiceTune}"/>
           <ToggleButton Content="Phantom"  IsChecked="{Binding Phantom, Mode=TwoWay}"    Margin="0,0,6,0" IsVisible="{Binding CapPhantom}"/>
           <ToggleButton Content="ClipGuard" IsChecked="{Binding ClipGuard, Mode=TwoWay}" Margin="0,0,6,0" IsVisible="{Binding CapClipGuard}"/>
-          <ToggleButton Content="Compressor" IsChecked="{Binding Compressor, Mode=TwoWay}" IsVisible="{Binding CapCompressor}"/>
+          <ToggleButton Content="Compressor" IsChecked="{Binding Compressor, Mode=TwoWay}" Margin="0,0,6,0"
+                        IsVisible="{Binding CapCompressor}"/>
         </UniformGrid>
         <Grid ColumnDefinitions="90,*,64" IsVisible="{Binding VoiceTune}">
           <TextBlock Text="VT strength" Classes="h" VerticalAlignment="Center"/>
@@ -321,14 +284,14 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:InsertViewModel">
                 <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="0,0,0,3">
-                  <Ellipse Width="9" Height="9" VerticalAlignment="Center" Margin="0,0,8,0"
-                           Fill="{Binding IsActive, Converter={x:Static vm:Converters.ActiveLed}}"/>
+                  <skin:StatusLed IsOn="{Binding IsActive}" Kind="Insert" Margin="0,0,8,0"
+                                  AutomationProperties.Name="Plugin state"/>
                   <Grid Grid.Column="1" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"
                         ColumnSpacing="8" VerticalAlignment="Center" ClipToBounds="True">
-                    <TextBlock Text="{Binding Label}" Classes="insertName" Foreground="#e6e9f0" FontSize="12"
+                    <TextBlock Text="{Binding Label}" Classes="insertName body" FontSize="12"
                                TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
                     <TextBlock Grid.Column="1" Text="{Binding StateText}" Classes="h" FontSize="11"/>
-                    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Error}" Foreground="#e0a05a"
+                    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Error}" Classes="warn"
                                FontSize="11" TextWrapping="Wrap" IsVisible="{Binding HasError}"/>
                   </Grid>
                   <ToggleButton Grid.Column="2" Content="N" Classes="insertmini"
@@ -338,7 +301,7 @@
                                 Margin="4,0,0,0"
                                 AutomationProperties.Name="Run this plugin in its own process"
                                 ToolTip.Tip="Run this plugin in its own process, which is what lets its own editor open. Switching rebuilds the chain and interrupts audio for a moment."/>
-                  <ToggleButton Grid.Column="3" Content="B" Classes="insertmini"
+                  <ToggleButton Grid.Column="3" Content="B" Classes="insertmini bypass"
                                 IsChecked="{Binding Bypass, Mode=TwoWay}"
                                 Margin="4,0,2,0"
                                 AutomationProperties.Name="Bypass this plugin"
@@ -369,7 +332,7 @@
           <ToggleButton Content="Voice Tune" IsChecked="{Binding VoiceTune2, Mode=TwoWay}"  Margin="0,0,6,0"/>
           <ToggleButton Content="Phantom"  IsChecked="{Binding Phantom2, Mode=TwoWay}"    Margin="0,0,6,0"/>
           <ToggleButton Content="ClipGuard" IsChecked="{Binding ClipGuard2, Mode=TwoWay}" Margin="0,0,6,0"/>
-          <ToggleButton Content="Compressor" IsChecked="{Binding Compressor2, Mode=TwoWay}"/>
+          <ToggleButton Content="Compressor" IsChecked="{Binding Compressor2, Mode=TwoWay}" Margin="0,0,6,0"/>
         </UniformGrid>
         <!-- XLR 2 plugin inserts: same chain concept, its own mono filter-chain -->
         <StackPanel IsVisible="{Binding HasXlr2}">
@@ -386,14 +349,14 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:InsertViewModel">
                 <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="0,0,0,3">
-                  <Ellipse Width="9" Height="9" VerticalAlignment="Center" Margin="0,0,8,0"
-                           Fill="{Binding IsActive, Converter={x:Static vm:Converters.ActiveLed}}"/>
+                  <skin:StatusLed IsOn="{Binding IsActive}" Kind="Insert" Margin="0,0,8,0"
+                                  AutomationProperties.Name="Plugin state"/>
                   <Grid Grid.Column="1" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"
                         ColumnSpacing="8" VerticalAlignment="Center" ClipToBounds="True">
-                    <TextBlock Text="{Binding Label}" Classes="insertName" Foreground="#e6e9f0" FontSize="12"
+                    <TextBlock Text="{Binding Label}" Classes="insertName body" FontSize="12"
                                TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
                     <TextBlock Grid.Column="1" Text="{Binding StateText}" Classes="h" FontSize="11"/>
-                    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Error}" Foreground="#e0a05a"
+                    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Error}" Classes="warn"
                                FontSize="11" TextWrapping="Wrap" IsVisible="{Binding HasError}"/>
                   </Grid>
                   <ToggleButton Grid.Column="2" Content="N" Classes="insertmini"
@@ -403,7 +366,7 @@
                                 Margin="4,0,0,0"
                                 AutomationProperties.Name="Run this plugin in its own process"
                                 ToolTip.Tip="Run this plugin in its own process, which is what lets its own editor open. Switching rebuilds the chain and interrupts audio for a moment."/>
-                  <ToggleButton Grid.Column="3" Content="B" Classes="insertmini"
+                  <ToggleButton Grid.Column="3" Content="B" Classes="insertmini bypass"
                                 IsChecked="{Binding Bypass, Mode=TwoWay}"
                                 Margin="4,0,2,0"
                                 AutomationProperties.Name="Bypass this plugin"
@@ -441,7 +404,7 @@
 
     <!-- headphone outputs (jack 1 on the front of the unit, jack 2 on the back) -->
     <Border Classes="card" Margin="0,0,0,8">
-      <Expander Name="HeadphonesTile" Classes="tile" Theme="{StaticResource TileExpanderTheme}" IsExpanded="True">
+      <Expander Name="HeadphonesTile" Classes="section" Theme="{StaticResource TileExpanderTheme}" IsExpanded="True">
         <Expander.Header><TextBlock Text="HEADPHONES" Classes="h"/></Expander.Header>
       <StackPanel Classes="dev" Spacing="4">
         <Grid ColumnDefinitions="90,*,64,20,90,*,64">
@@ -477,7 +440,7 @@
 
     <!-- monitor destination: the device you hear the Monitor mix on -->
     <Border Classes="card" Margin="0,0,0,8" IsVisible="{Binding HasMixer}">
-      <Expander Name="MonitorTile" Classes="tile" Theme="{StaticResource TileExpanderTheme}" IsExpanded="True">
+      <Expander Name="MonitorTile" Classes="section" Theme="{StaticResource TileExpanderTheme}" IsExpanded="True">
         <Expander.Header>
           <StackPanel Orientation="Horizontal" Spacing="6">
             <TextBlock Text="MONITOR" Classes="h" VerticalAlignment="Center"/>
@@ -527,7 +490,7 @@
 
     <!-- running applications and the channel each is routed to -->
     <Border Classes="card" Margin="0,0,0,8" IsVisible="{Binding HasMixer}">
-      <Expander Name="ApplicationsTile" Classes="tile" Theme="{StaticResource TileExpanderTheme}" IsExpanded="True">
+      <Expander Name="ApplicationsTile" Classes="section" Theme="{StaticResource TileExpanderTheme}" IsExpanded="True">
         <Expander.Header>
           <StackPanel Orientation="Horizontal" Spacing="10">
             <TextBlock Text="APPLICATIONS" Classes="h" VerticalAlignment="Center"/>
@@ -541,12 +504,12 @@
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:AppStreamViewModel">
-              <Border Background="#23262f" CornerRadius="6" Padding="8,6" Margin="0,0,4,8">
+              <Border Classes="tile" Padding="8,6" Margin="0,0,4,8">
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Ellipse Width="8" Height="8" VerticalAlignment="Center"
-                           Fill="{Binding Active, Converter={x:Static vm:Converters.BoolToBrush}}"
-                           ToolTip.Tip="{Binding StatusText}"/>
-                  <TextBlock Text="{Binding Label}" Foreground="#e6e9f0" VerticalAlignment="Center"/>
+                  <skin:StatusLed IsOn="{Binding Active}"
+                                  AutomationProperties.Name="Stream state"
+                                  ToolTip.Tip="{Binding StatusText}"/>
+                  <TextBlock Text="{Binding Label}" Classes="body" VerticalAlignment="Center"/>
                   <ComboBox ItemsSource="{Binding Channels}" MinWidth="110"
                             SelectedItem="{Binding SelectedChannel, Mode=TwoWay}"/>
                 </StackPanel>
@@ -559,7 +522,7 @@
 
     <!-- mixer -->
     <Border Classes="card">
-      <Expander Name="SubmixerTile" Classes="tile" Theme="{StaticResource TileExpanderTheme}" IsExpanded="True">
+      <Expander Name="SubmixerTile" Classes="section" Theme="{StaticResource TileExpanderTheme}" IsExpanded="True">
         <Expander.Header>
           <StackPanel Orientation="Horizontal" Spacing="10">
             <TextBlock Text="SUBMIXER" Classes="h" VerticalAlignment="Center"/>
@@ -570,7 +533,7 @@
         </Expander.Header>
       <DockPanel>
         <TextBlock DockPanel.Dock="Top" Text="{Binding MixerPlaceholder}" TextWrapping="Wrap"
-                   Foreground="#6b7285" IsVisible="{Binding !HasMixer}"/>
+                   Classes="note" IsVisible="{Binding !HasMixer}"/>
 
         <!-- master row -->
         <ItemsControl DockPanel.Dock="Bottom" ItemsSource="{Binding Mixes}" IsVisible="{Binding HasMixer}"
@@ -580,25 +543,17 @@
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:MixViewModel">
-              <Border Background="#23262f" CornerRadius="6" Padding="10" Margin="0,0,8,8" Width="232"
+              <Border Classes="tile" Padding="10" Margin="0,0,8,8" Width="232"
                       IsVisible="{Binding Visible}">
                 <StackPanel Spacing="6">
                   <Grid ColumnDefinitions="*,Auto">
-                    <TextBlock Text="{Binding Name}" Foreground="#e6e9f0" FontWeight="SemiBold"
+                    <TextBlock Text="{Binding Name}" Classes="strip"
                                TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" Margin="0,0,8,0"/>
                     <TextBlock Grid.Column="1" Text="{Binding VolumeText}" Classes="val"/>
                   </Grid>
                   <StackPanel Spacing="1">
-                    <Border Background="#14161b" CornerRadius="2" Height="4">
-                      <Border Background="#3ecf7a" CornerRadius="2" HorizontalAlignment="Stretch"
-                              RenderTransformOrigin="0,0.5"
-                              RenderTransform="{Binding MeterL, Converter={x:Static vm:Converters.MeterScale}}"/>
-                    </Border>
-                    <Border Background="#14161b" CornerRadius="2" Height="4">
-                      <Border Background="#3ecf7a" CornerRadius="2" HorizontalAlignment="Stretch"
-                              RenderTransformOrigin="0,0.5"
-                              RenderTransform="{Binding MeterR, Converter={x:Static vm:Converters.MeterScale}}"/>
-                    </Border>
+                    <skin:LevelMeter Level="{Binding MeterL}" AutomationProperties.Name="Left level"/>
+                    <skin:LevelMeter Level="{Binding MeterR}" AutomationProperties.Name="Right level"/>
                   </StackPanel>
                   <Slider Minimum="0" Maximum="1" Value="{Binding Volume, Mode=TwoWay}"/>
                   <ToggleButton Content="Mute" Classes="mute" IsChecked="{Binding Muted, Mode=TwoWay}"/>
@@ -611,10 +566,10 @@
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="vm:InsertViewModel">
                         <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="0,2,0,0">
-                          <Ellipse Width="8" Height="8" VerticalAlignment="Center" Margin="0,0,6,0"
-                                   Fill="{Binding IsActive, Converter={x:Static vm:Converters.ActiveLed}}"/>
-                          <TextBlock Grid.Column="1" Text="{Binding Label}" Classes="insertName"
-                                     Foreground="#e6e9f0" FontSize="11" VerticalAlignment="Center"
+                          <skin:StatusLed IsOn="{Binding IsActive}" Kind="Insert" Margin="0,0,6,0"
+                                          AutomationProperties.Name="Plugin state"/>
+                          <TextBlock Grid.Column="1" Text="{Binding Label}" Classes="insertName body"
+                                     FontSize="11" VerticalAlignment="Center"
                                      TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
                           <ToggleButton Grid.Column="2" Content="N" Classes="insertmini"
                                         IsChecked="{Binding NativeHost, Mode=TwoWay}"
@@ -623,7 +578,7 @@
                                         Margin="4,0,0,0" HorizontalAlignment="Right"
                                         AutomationProperties.Name="Run this plugin in its own process"
                                         ToolTip.Tip="Run this plugin in its own process, which is what lets its own editor open. Switching rebuilds the chain and interrupts audio for a moment."/>
-                          <ToggleButton Grid.Column="3" Content="B" Classes="insertmini"
+                          <ToggleButton Grid.Column="3" Content="B" Classes="insertmini bypass"
                                         IsChecked="{Binding Bypass, Mode=TwoWay}"
                                         Margin="4,0,2,0" HorizontalAlignment="Right"
                                         AutomationProperties.Name="Bypass this plugin"
@@ -655,23 +610,14 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:ChannelViewModel">
-                <Border Background="#23262f" CornerRadius="6" Padding="10" Margin="0,0,8,0" Width="132"
+                <Border Classes="tile" Padding="10" Margin="0,0,8,0" Width="132"
                         IsVisible="{Binding Visible}">
                   <StackPanel Spacing="8">
-                    <TextBlock Text="{Binding Name}" Foreground="#e6e9f0" FontWeight="SemiBold"
-                               HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding Name}" Classes="strip" HorizontalAlignment="Center"/>
                     <!-- stereo level meter (L over R), dB scale -->
                     <StackPanel Spacing="1">
-                      <Border Background="#14161b" CornerRadius="2" Height="4">
-                        <Border Background="#3ecf7a" CornerRadius="2" HorizontalAlignment="Stretch"
-                                RenderTransformOrigin="0,0.5"
-                                RenderTransform="{Binding MeterL, Converter={x:Static vm:Converters.MeterScale}}"/>
-                      </Border>
-                      <Border Background="#14161b" CornerRadius="2" Height="4">
-                        <Border Background="#3ecf7a" CornerRadius="2" HorizontalAlignment="Stretch"
-                                RenderTransformOrigin="0,0.5"
-                                RenderTransform="{Binding MeterR, Converter={x:Static vm:Converters.MeterScale}}"/>
-                      </Border>
+                      <skin:LevelMeter Level="{Binding MeterL}" AutomationProperties.Name="Left level"/>
+                      <skin:LevelMeter Level="{Binding MeterR}" AutomationProperties.Name="Right level"/>
                     </StackPanel>
                     <ItemsControl ItemsSource="{Binding Sends}">
                       <ItemsControl.ItemTemplate>

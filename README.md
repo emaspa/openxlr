@@ -117,6 +117,13 @@ Collect diagnostics).
   a tray icon and a diagnostics archive exporter. Options separates background
   audio and app startup at login, with independent choices for launch visibility
   and whether closing the window keeps the app in the tray or quits.
+- **Skins**: the window's appearance is a set of named values a skin file
+  can replace. OpenXLR ships Material, its own look, and Deck, which dresses
+  the window in the visual language of the OpenDeck plugin's keys and dials. A skin
+  is data, not code: colours, sizes, local images from its own folder and a
+  choice between the control appearances OpenXLR draws, picked in Options
+  and applied to open windows without touching audio.
+  See [docs/skins.md](docs/skins.md).
 - **Optional update notice**: the UI can check the upstream GitHub release
   feed for a newer stable release. Startup checks are off by default and,
   when enabled, run at most once per day. Nothing is installed automatically.
@@ -263,6 +270,8 @@ historical protocol research.
   commands over plain HTTP
 - [Saved mixer layout](docs/mixer-layout.md): the layout file and the
   live layout commands
+- [Skins](docs/skins.md): the appearance values a skin sets, where skins
+  are found, and what a skin is not allowed to do
 - [Architecture](docs/architecture.md): daemon, UI and plugin, the
   PipeWire graph, the device protocols, repository layout
 - [Hardware support](docs/hardware-support.md): per-control status of

@@ -1,8 +1,19 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:skin="using:OpenXLR.UI.Skinning"
              x:Class="OpenXLR.UI.App"
              RequestedThemeVariant="Default">
              <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- The control appearances the application owns and a skin
+                     chooses between; see Skinning/SkinControls.cs. -->
+                <ResourceInclude Source="avares://OpenXLR.UI/Skinning/Controls.axaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
 
     <Application.Styles>
         <FluentTheme />
@@ -18,6 +29,201 @@
         <Style Selector=":is(Control)">
             <Setter Property="ToolTip.Placement" Value="Bottom"/>
             <Setter Property="ToolTip.VerticalOffset" Value="0"/>
+        </Style>
+
+        <!-- The appearance every window shares. The values are the Ox.* tokens
+             the skin service writes into the application's resources, read with
+             DynamicResource so a skin change repaints windows that are already
+             open. SkinTokens.cs holds the defaults and docs/skins.md the
+             contract; nothing here hard-codes a colour. -->
+
+        <!-- A section card: the faceplate a group of controls sits on. -->
+        <Style Selector="Border.card">
+            <Setter Property="Background" Value="{DynamicResource Ox.Card.Background}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Ox.Card.BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="{DynamicResource Ox.Card.BorderThickness}"/>
+            <Setter Property="CornerRadius" Value="{DynamicResource Ox.Card.CornerRadius}"/>
+        </Style>
+        <!-- A tile on a card: a channel strip, a mix master, an application chip. -->
+        <Style Selector="Border.tile">
+            <Setter Property="Background" Value="{DynamicResource Ox.Tile.Background}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Ox.Tile.BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="{DynamicResource Ox.Tile.BorderThickness}"/>
+            <Setter Property="CornerRadius" Value="{DynamicResource Ox.Tile.CornerRadius}"/>
+        </Style>
+
+        <!-- Labels, readouts and the running text between them. -->
+        <Style Selector="TextBlock.h">
+            <Setter Property="FontSize" Value="{DynamicResource Ox.Label.FontSize}"/>
+            <Setter Property="FontWeight" Value="{DynamicResource Ox.Label.FontWeight}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Text.Secondary}"/>
+        </Style>
+        <Style Selector="TextBlock.val">
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Text.Primary}"/>
+            <Setter Property="FontFamily" Value="{DynamicResource Ox.Value.FontFamily}"/>
+        </Style>
+        <Style Selector="TextBlock.title">
+            <Setter Property="FontSize" Value="{DynamicResource Ox.Title.FontSize}"/>
+            <Setter Property="FontWeight" Value="{DynamicResource Ox.Title.FontWeight}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Text.Primary}"/>
+        </Style>
+        <Style Selector="TextBlock.body">
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Text.Primary}"/>
+        </Style>
+        <Style Selector="TextBlock.note">
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Text.Muted}"/>
+        </Style>
+        <Style Selector="TextBlock.hint">
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Text.Secondary}"/>
+        </Style>
+        <Style Selector="TextBlock.warn">
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Text.Warning}"/>
+        </Style>
+        <Style Selector="TextBlock.alert">
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Text.Alert}"/>
+        </Style>
+        <Style Selector="TextBlock.info">
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Text.Info}"/>
+        </Style>
+        <!-- The name over a channel strip or a mix master. -->
+        <Style Selector="TextBlock.strip">
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Text.Primary}"/>
+            <Setter Property="FontWeight" Value="{DynamicResource Ox.Strip.FontWeight}"/>
+        </Style>
+        <!-- The label beside a checkbox. A style set here beats the theme keys
+             the token is also bridged to, so the token is read directly:
+             bridging alone left Ox.Check.Foreground with nothing to do. -->
+        <Style Selector="CheckBox">
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Check.Foreground}"/>
+        </Style>
+
+        <!-- The fader cap. Fluent sizes and rounds the thumb from its own theme
+             keys, which the Ox.Fader.Thumb.* tokens feed; the border is the
+             thumb's own property, so it is set here. The template is Fluent's,
+             which keeps dragging, the keyboard and display scaling exactly as
+             they were. -->
+        <Style Selector="Slider /template/ Thumb">
+            <Setter Property="BorderBrush" Value="{DynamicResource Ox.Fader.Thumb.BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="{DynamicResource Ox.Fader.Thumb.BorderThickness}"/>
+            <Setter Property="CornerRadius" Value="{DynamicResource Ox.Fader.Thumb.CornerRadius}"/>
+        </Style>
+
+        <!-- Which appearance each restyleable control wears. The skin service
+             publishes the chosen control theme under these keys, or publishes
+             nothing, which leaves the control with its built-in appearance.
+             SkinControls.cs holds the list of variants. -->
+        <Style Selector="Slider">
+            <Setter Property="Theme" Value="{DynamicResource Ox.Slider.Theme}"/>
+        </Style>
+        <Style Selector="skin|LevelMeter">
+            <Setter Property="Theme" Value="{DynamicResource Ox.Meter.Theme}"/>
+        </Style>
+        <Style Selector="skin|StatusLed">
+            <Setter Property="Theme" Value="{DynamicResource Ox.Led.Theme}"/>
+        </Style>
+        <Style Selector="ToggleButton.mute">
+            <Setter Property="Theme" Value="{DynamicResource Ox.MuteButton.Theme}"/>
+        </Style>
+        <Style Selector="Button">
+            <Setter Property="Theme" Value="{DynamicResource Ox.Button.Theme}"/>
+        </Style>
+        <Style Selector="ToggleButton">
+            <Setter Property="Theme" Value="{DynamicResource Ox.ToggleButton.Theme}"/>
+        </Style>
+        <Style Selector="DropDownButton">
+            <Setter Property="Theme" Value="{DynamicResource Ox.DropDownButton.Theme}"/>
+        </Style>
+
+        <!-- Mute buttons: lit while audio passes, red when muted. -->
+        <Style Selector="ToggleButton.mute">
+            <Setter Property="Background" Value="{DynamicResource Ox.Mute.Background}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Mute.Foreground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Ox.Mute.BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="{DynamicResource Ox.Mute.BorderThickness}"/>
+        </Style>
+        <Style Selector="ToggleButton.mute /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Ox.Mute.Background}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Ox.Mute.BorderBrush}"/>
+        </Style>
+        <Style Selector="ToggleButton.mute:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Ox.Mute.BackgroundPointerOver}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Mute.Foreground}"/>
+        </Style>
+        <Style Selector="ToggleButton.mute:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Ox.Mute.BackgroundPointerOver}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Mute.Foreground}"/>
+        </Style>
+        <Style Selector="ToggleButton.mute:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Ox.Mute.BackgroundChecked}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Mute.ForegroundChecked}"/>
+        </Style>
+        <Style Selector="ToggleButton.mute:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Ox.Mute.BackgroundChecked}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Mute.ForegroundChecked}"/>
+        </Style>
+        <Style Selector="ToggleButton.mute:checked:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Ox.Mute.BackgroundChecked}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Mute.ForegroundChecked}"/>
+        </Style>
+        <!-- The compact strip buttons swap their letter: O = open, M = muted. -->
+        <Style Selector="ToggleButton.mutemini">
+            <Setter Property="Content" Value="O"/>
+        </Style>
+        <Style Selector="ToggleButton.mutemini:checked">
+            <Setter Property="Content" Value="M"/>
+        </Style>
+
+        <!-- A window's own ground. Set here so a skin reaches every window,
+             including the ones built in code. The small confirmation and
+             rename dialogs carry the "dialog" class and sit on their own
+             surface. -->
+        <Style Selector=":is(Window)">
+            <Setter Property="Background" Value="{DynamicResource Ox.Window.Background}"/>
+        </Style>
+        <Style Selector=":is(Window).dialog">
+            <Setter Property="Background" Value="{DynamicResource Ox.Dialog.Background}"/>
+        </Style>
+
+        <!-- A button a view asks to stay out of the way: the header actions and
+             the rows inside a flyout. The face is transparent by default, which
+             is what those views used to say inline; a skin can give them the
+             same face as every other button.
+
+             Only the control's own Background is set. Reaching into the
+             template for the content presenter instead painted the content
+             column rather than the face, which left a dropdown button square
+             down its left side and rounded on the right. -->
+        <Style Selector="Button.ghost">
+            <Setter Property="Background" Value="{DynamicResource Ox.Ghost.Background}"/>
+        </Style>
+        <Style Selector="DropDownButton.ghost">
+            <Setter Property="Background" Value="{DynamicResource Ox.Ghost.Background}"/>
+        </Style>
+
+        <!-- The plugin bypass key. Its checked state is the one that takes the
+             plugin out of the path, so its lettering runs the other way round
+             to an ordinary toggle: it says what the audio is doing, not what
+             the checkbox holds. Both colours have a plain readable default, so
+             an appearance that does not letter by state still shows the key.
+             A key that cannot be used keeps the ordinary disabled lettering. -->
+        <Style Selector="ToggleButton.bypass /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Bypass.Foreground}"/>
+        </Style>
+        <Style Selector="ToggleButton.bypass:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Bypass.ForegroundBypassed}"/>
+        </Style>
+        <Style Selector="ToggleButton.bypass:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="{DynamicResource ToggleButtonForegroundDisabled}"/>
+        </Style>
+
+        <!-- The button that deletes something. -->
+        <Style Selector="Button.danger">
+            <Setter Property="Background" Value="{DynamicResource Ox.Danger.Background}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Danger.Foreground}"/>
+        </Style>
+        <Style Selector="Button.danger /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Ox.Danger.Background}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Danger.Foreground}"/>
         </Style>
     </Application.Styles>
 </Application>

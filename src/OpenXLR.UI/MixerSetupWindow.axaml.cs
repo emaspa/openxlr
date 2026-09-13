@@ -122,7 +122,7 @@ public partial class MixerSetupWindow : Window
             SizeToContent = SizeToContent.WidthAndHeight,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             CanResize = false,
-            Background = Brush.Parse("#1d2027"),
+            Classes = { "dialog" },
             Content = new StackPanel
             {
                 Margin = new Avalonia.Thickness(18),
@@ -131,7 +131,7 @@ public partial class MixerSetupWindow : Window
                 {
                     input,
                     new TextBlock { Text = hint, TextWrapping = TextWrapping.Wrap, MaxWidth = 380, FontSize = 11,
-                        Foreground = Brush.Parse("#8b93a7") },
+                        Classes = { "hint" } },
                     new StackPanel
                     {
                         Orientation = Avalonia.Layout.Orientation.Horizontal,
@@ -157,7 +157,7 @@ public partial class MixerSetupWindow : Window
 
     private async Task<bool> Confirm(string title, string message)
     {
-        var yes = new Button { Content = "Delete", Background = Brush.Parse("#a03434") };
+        var yes = new Button { Content = "Delete", Classes = { "danger" } };
         var no = new Button { Content = "Cancel", IsCancel = true };
         var done = new TaskCompletionSource<bool>();
         var dialog = new Window
@@ -166,7 +166,7 @@ public partial class MixerSetupWindow : Window
             SizeToContent = SizeToContent.WidthAndHeight,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             CanResize = false,
-            Background = Brush.Parse("#1d2027"),
+            Classes = { "dialog" },
             Content = new StackPanel
             {
                 Margin = new Avalonia.Thickness(18),

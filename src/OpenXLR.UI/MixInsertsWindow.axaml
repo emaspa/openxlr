@@ -1,24 +1,17 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:OpenXLR.UI"
+        xmlns:skin="using:OpenXLR.UI.Skinning"
         x:Class="OpenXLR.UI.MixInsertsWindow"
         x:DataType="vm:InsertsViewModel"
         Title="{Binding Title, StringFormat='{}{0} inserts'}" Width="560" Height="360" MinWidth="440" MinHeight="220"
         WindowStartupLocation="CenterOwner"
-        Background="#16181d">
-
-  <Window.Styles>
-    <Style Selector="TextBlock.h">
-      <Setter Property="FontSize" Value="12"/>
-      <Setter Property="FontWeight" Value="SemiBold"/>
-      <Setter Property="Foreground" Value="#8b93a7"/>
-    </Style>
-  </Window.Styles>
+        Background="{DynamicResource Ox.Window.Background}">
 
   <DockPanel Margin="16">
     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,0,0,10">
       <StackPanel>
-        <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="Bold" Foreground="#e6e9f0"
+        <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource Ox.Text.Primary}"
                    TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Title}"/>
         <TextBlock Text="{Binding ChainHint}" Classes="h" FontSize="11" TextWrapping="Wrap"/>
       </StackPanel>
@@ -30,16 +23,16 @@
       <ItemsControl ItemsSource="{Binding Items}" Margin="0,0,10,0">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:InsertViewModel">
-            <Border Background="#23262f" CornerRadius="6" Padding="10" Margin="0,0,0,8">
+            <Border Classes="tile" Padding="10" Margin="0,0,0,8">
               <StackPanel Spacing="8">
                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
-                  <Ellipse Width="9" Height="9" VerticalAlignment="Center"
-                           Fill="{Binding IsActive, Converter={x:Static vm:Converters.ActiveLed}}"/>
-                  <TextBlock Grid.Column="1" Text="{Binding Label}" Classes="insertName" Foreground="#e6e9f0" FontSize="12"
+                  <skin:StatusLed IsOn="{Binding IsActive}" Kind="Insert"
+                                  AutomationProperties.Name="Plugin state"/>
+                  <TextBlock Grid.Column="1" Text="{Binding Label}" Classes="insertName" Foreground="{DynamicResource Ox.Text.Primary}" FontSize="12"
                              TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
                   <TextBlock Grid.Column="2" Text="{Binding StateText}" Classes="h" FontSize="11"/>
                 </Grid>
-                <TextBlock Text="{Binding Error}" Foreground="#e0a05a" FontSize="11"
+                <TextBlock Text="{Binding Error}" Foreground="{DynamicResource Ox.Text.Warning}" FontSize="11"
                            TextWrapping="Wrap" IsVisible="{Binding HasError}"/>
                 <WrapPanel>
                   <Button Content="Controls" Padding="8,3" MinHeight="0" FontSize="11" Margin="0,0,6,0" Click="OnInsertControls"/>
@@ -49,7 +42,7 @@
                           AutomationProperties.Name="Move plugin up" ToolTip.Tip="Move up"/>
                   <Button Content="▼" Padding="6,3" MinHeight="0" FontSize="10" Margin="0,0,6,0" Click="OnInsertDown"
                           AutomationProperties.Name="Move plugin down" ToolTip.Tip="Move down"/>
-                  <Button Content="✕" Padding="6,3" MinHeight="0" FontSize="10" Click="OnInsertRemove"
+                  <Button Content="✕" Classes="danger" Padding="6,3" MinHeight="0" FontSize="10" Click="OnInsertRemove"
                           AutomationProperties.Name="Remove plugin" ToolTip.Tip="Remove plugin"/>
                 </WrapPanel>
               </StackPanel>

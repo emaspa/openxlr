@@ -1,41 +1,58 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:OpenXLR.UI"
+        xmlns:skin="using:OpenXLR.UI.Skinning"
         x:Class="OpenXLR.UI.AppsWindow"
         x:DataType="vm:MainViewModel"
-        Title="OpenXLR Applications" Width="620" SizeToContent="Height" MaxHeight="700"
+        Title="OpenXLR Applications" Width="620" SizeToContent="Height" MaxHeight="700" MinHeight="320"
         WindowStartupLocation="CenterOwner"
-        Background="#16181d" CanResize="False">
+        Background="{DynamicResource Ox.Window.Background}" CanResize="False">
 
   <Window.Styles>
-    <Style Selector="TextBlock.h">
-      <Setter Property="FontSize" Value="12"/>
-      <Setter Property="FontWeight" Value="SemiBold"/>
-      <Setter Property="Foreground" Value="#8b93a7"/>
-    </Style>
     <Style Selector="Border.card">
-      <Setter Property="Background" Value="#1d2027"/>
-      <Setter Property="CornerRadius" Value="8"/>
       <Setter Property="Padding" Value="14"/>
     </Style>
   </Window.Styles>
 
-  <StackPanel Margin="14" Spacing="8">
-    <Border Classes="card">
+  <!-- The card that adds an application and the Close button are docked to the
+       bottom, so the list of known applications takes what is left and scrolls
+       inside it. Sized to its content up to the screen's working area (the code
+       behind caps it), a long list used to push those controls off the bottom
+       of a window that cannot be resized. -->
+  <DockPanel Margin="14" LastChildFill="True">
+    <Button DockPanel.Dock="Bottom" Content="Close" HorizontalAlignment="Right" Padding="18,6"
+            Margin="0,8,0,0" Click="OnClose"/>
+    <Border DockPanel.Dock="Bottom" Classes="card" Margin="0,8,0,0">
       <StackPanel Spacing="6">
-        <TextBlock Text="KNOWN APPLICATIONS" Classes="h"/>
-        <TextBlock Text="Every app OpenXLR has routed, playing or silent. Assignments apply to the next stream the app opens; ignore hands the app back to the desktop's own routing and keeps it that way; Forget drops the app and its remembered channel."
-                   FontSize="11" Foreground="#6b7285" TextWrapping="Wrap"/>
-        <ScrollViewer MaxHeight="480" VerticalScrollBarVisibility="Auto">
+        <TextBlock Text="ADD INSTALLED APPLICATION" Classes="h"/>
+        <TextBlock Text="Pre-assign a channel to an app that has not played audio yet. The identity is guessed from its launcher; if the app reports differently on first play, it simply appears as a new entry."
+                   FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
+        <Grid ColumnDefinitions="*,8,130,8,Auto">
+          <ComboBox Name="InstalledPicker" HorizontalAlignment="Stretch" MaxDropDownHeight="380"
+                    PlaceholderText="choose an application"/>
+          <ComboBox Name="ChannelPicker" Grid.Column="2" HorizontalAlignment="Stretch"
+                    PlaceholderText="channel"/>
+          <Button Grid.Column="4" Content="Add" Padding="14,4" Click="OnAdd"/>
+        </Grid>
+      </StackPanel>
+    </Border>
+
+    <Border Classes="card">
+      <DockPanel LastChildFill="True">
+        <TextBlock DockPanel.Dock="Top" Text="KNOWN APPLICATIONS" Classes="h" Margin="0,0,0,6"/>
+        <TextBlock DockPanel.Dock="Top" Text="Every app OpenXLR has routed, playing or silent. Assignments apply to the next stream the app opens; ignore hands the app back to the desktop's own routing and keeps it that way; Forget drops the app and its remembered channel."
+                   FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"
+                   Margin="0,0,0,6"/>
+        <ScrollViewer Name="KnownApps" MinHeight="96" VerticalScrollBarVisibility="Auto">
           <!-- the overlay scrollbar would sit on the Forget column -->
           <ItemsControl ItemsSource="{Binding Apps}" Margin="0,0,16,0">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:AppStreamViewModel">
                 <Grid ColumnDefinitions="10,8,*,130,8,Auto" Margin="0,3">
-                  <Ellipse Width="8" Height="8" VerticalAlignment="Center"
-                           Fill="{Binding Active, Converter={x:Static vm:Converters.BoolToBrush}}"
-                           ToolTip.Tip="{Binding StatusText}"/>
-                  <TextBlock Grid.Column="2" Text="{Binding Label}" Foreground="#e6e9f0"
+                  <skin:StatusLed IsOn="{Binding Active}"
+                                  AutomationProperties.Name="Stream state"
+                                  ToolTip.Tip="{Binding StatusText}"/>
+                  <TextBlock Grid.Column="2" Text="{Binding Label}" Foreground="{DynamicResource Ox.Text.Primary}"
                              VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                              ToolTip.Tip="{Binding Identity}"/>
                   <ComboBox Grid.Column="3" HorizontalAlignment="Stretch"
@@ -48,24 +65,7 @@
             </ItemsControl.ItemTemplate>
           </ItemsControl>
         </ScrollViewer>
-      </StackPanel>
+      </DockPanel>
     </Border>
-
-    <Border Classes="card">
-      <StackPanel Spacing="6">
-        <TextBlock Text="ADD INSTALLED APPLICATION" Classes="h"/>
-        <TextBlock Text="Pre-assign a channel to an app that has not played audio yet. The identity is guessed from its launcher; if the app reports differently on first play, it simply appears as a new entry."
-                   FontSize="11" Foreground="#6b7285" TextWrapping="Wrap"/>
-        <Grid ColumnDefinitions="*,8,130,8,Auto">
-          <ComboBox Name="InstalledPicker" HorizontalAlignment="Stretch" MaxDropDownHeight="380"
-                    PlaceholderText="choose an application"/>
-          <ComboBox Name="ChannelPicker" Grid.Column="2" HorizontalAlignment="Stretch"
-                    PlaceholderText="channel"/>
-          <Button Grid.Column="4" Content="Add" Padding="14,4" Click="OnAdd"/>
-        </Grid>
-      </StackPanel>
-    </Border>
-
-    <Button Content="Close" HorizontalAlignment="Right" Padding="18,6" Margin="0,2,0,6" Click="OnClose"/>
-  </StackPanel>
+  </DockPanel>
 </Window>

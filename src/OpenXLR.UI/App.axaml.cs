@@ -10,6 +10,9 @@ public partial class App : Application
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
+        // The appearance is in the resources before anything can be built, so
+        // no window is ever drawn unskinned and repainted a moment later.
+        Skinning.SkinService.Initialize();
     }
 
     public override void OnFrameworkInitializationCompleted()

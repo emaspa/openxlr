@@ -1,0 +1,470 @@
+{
+  "schema": 1,
+  "id": "opendeck",
+  "name": "Deck",
+  "description": "The hardware language of the OpenDeck keys and the Wave interfaces: near-black faceplates, black keys with backlit green and red lettering, and meters that run green to amber to red across the scale.",
+  "author": "OpenXLR",
+  "controls": {
+    "fader": "console",
+    "button": "cap",
+    "meter": "segmented",
+    "led": "lamp",
+    "mute": "cap"
+  },
+  "tokens": {
+    "Ox.Window.Background": {
+      "type": "linear",
+      "from": [
+        0,
+        0
+      ],
+      "to": [
+        0,
+        1
+      ],
+      "stops": [
+        {
+          "offset": 0,
+          "color": "#0e0e0e"
+        },
+        {
+          "offset": 1,
+          "color": "#050505"
+        }
+      ]
+    },
+    "Ox.Card.Background": {
+      "type": "linear",
+      "from": [
+        0,
+        0.5
+      ],
+      "to": [
+        1,
+        0.5
+      ],
+      "stops": [
+        {
+          "offset": 0,
+          "color": "#131313"
+        },
+        {
+          "offset": 1,
+          "color": "#1b1b1b"
+        }
+      ]
+    },
+    "Ox.Card.BorderBrush": "#34383f",
+    "Ox.Card.BorderThickness": 2,
+    "Ox.Card.CornerRadius": 12,
+    "Ox.Tile.Background": {
+      "type": "linear",
+      "from": [
+        0,
+        0
+      ],
+      "to": [
+        0,
+        1
+      ],
+      "stops": [
+        {
+          "offset": 0,
+          "color": "#232323"
+        },
+        {
+          "offset": 1,
+          "color": "#161616"
+        }
+      ]
+    },
+    "Ox.Tile.BorderBrush": "#2b2f35",
+    "Ox.Tile.BorderThickness": 1,
+    "Ox.Tile.CornerRadius": 8,
+    "Ox.Dialog.Background": "#161616",
+    "Ox.Badge.Background": "#101010",
+    "Ox.Divider": "#34383f",
+    "Ox.Link.Foreground": "#5ba8f5",
+    "Ox.Link.ForegroundPointerOver": "#8cc4ff",
+    "Ox.Danger.Background": {
+      "type": "linear",
+      "from": [
+        0,
+        0
+      ],
+      "to": [
+        0,
+        1
+      ],
+      "stops": [
+        {
+          "offset": 0,
+          "color": "#1d0f11"
+        },
+        {
+          "offset": 1,
+          "color": "#120a0c"
+        }
+      ]
+    },
+    "Ox.Danger.Foreground": "#ff5566",
+    "Ox.Text.Primary": "#e8ebf2",
+    "Ox.Text.Secondary": "#b3b8c2",
+    "Ox.Text.Muted": "#8f95a1",
+    "Ox.Text.Detail": "#c8ccd6",
+    "Ox.Text.Warning": "#e0a05a",
+    "Ox.Text.Alert": "#e0b050",
+    "Ox.Text.Info": "#5ba8f5",
+    "Ox.Label.FontWeight": "Bold",
+    "Ox.Title.FontWeight": "Bold",
+    "Ox.Strip.FontWeight": "Bold",
+    "Ox.Led.On": "#3ecf7a",
+    "Ox.Led.Off": "#1d2024",
+    "Ox.Led.Alert": "#ff3c4e",
+    "Ox.Led.Size": 16,
+    "Ox.Led.CoreScale": 0.5,
+    "Ox.Led.Bezel": "#080909",
+    "Ox.Led.BezelThickness": 2,
+    "Ox.Led.Glow": 0.95,
+    "Ox.Meter.Fill": "#2ecc71",
+    "Ox.Meter.Hot": "#ff4b4b",
+    "Ox.Meter.WarningLevel": 0.7,
+    "Ox.Meter.HotLevel": 0.9,
+    "Ox.Meter.Track": "#0d0d0d",
+    "Ox.Meter.CornerRadius": 4,
+    "Ox.Meter.Height": 8,
+    "Ox.Meter.Segments": 14,
+    "Ox.Meter.SegmentGap": 2,
+    "Ox.Mute.Background": {
+      "type": "linear",
+      "from": [
+        0,
+        0
+      ],
+      "to": [
+        0,
+        1
+      ],
+      "stops": [
+        {
+          "offset": 0,
+          "color": "#181818"
+        },
+        {
+          "offset": 1,
+          "color": "#0d0d0d"
+        }
+      ]
+    },
+    "Ox.Mute.BackgroundPointerOver": {
+      "type": "linear",
+      "from": [
+        0,
+        0
+      ],
+      "to": [
+        0,
+        1
+      ],
+      "stops": [
+        {
+          "offset": 0,
+          "color": "#222222"
+        },
+        {
+          "offset": 1,
+          "color": "#141414"
+        }
+      ]
+    },
+    "Ox.Mute.Foreground": "#5ce39a",
+    "Ox.Mute.BackgroundChecked": {
+      "type": "linear",
+      "from": [
+        0,
+        0
+      ],
+      "to": [
+        0,
+        1
+      ],
+      "stops": [
+        {
+          "offset": 0,
+          "color": "#1e1012"
+        },
+        {
+          "offset": 1,
+          "color": "#130a0c"
+        }
+      ]
+    },
+    "Ox.Mute.ForegroundChecked": "#ff5566",
+    "Ox.Mute.BorderBrush": "#2a2f36",
+    "Ox.Mute.BorderThickness": 2,
+    "Ox.Fader.Track": "#070707",
+    "Ox.Fader.Fill": "#c2c6ce",
+    "Ox.Fader.TrackHeight": 6,
+    "Ox.Fader.TrackCornerRadius": 3,
+    "Ox.Fader.Thumb.Background": {
+      "type": "radial",
+      "from": [
+        0.5,
+        0.25
+      ],
+      "to": [
+        0.5,
+        0.5
+      ],
+      "radius": 0.9,
+      "stops": [
+        {
+          "offset": 0,
+          "color": "#343434"
+        },
+        {
+          "offset": 0.7,
+          "color": "#2b2b2b"
+        },
+        {
+          "offset": 1,
+          "color": "#202020"
+        }
+      ]
+    },
+    "Ox.Fader.Thumb.BorderBrush": "#44484f",
+    "Ox.Fader.Thumb.BorderThickness": 2,
+    "Ox.Fader.Thumb.Width": 26,
+    "Ox.Fader.Thumb.Height": 14,
+    "Ox.Fader.Thumb.CornerRadius": 3,
+    "Ox.Fader.Thumb.Grip": "#0a0b0d",
+    "Ox.Fader.Thumb.GripLength": 8,
+    "Ox.Control.Background": {
+      "type": "linear",
+      "from": [
+        0,
+        0
+      ],
+      "to": [
+        0,
+        1
+      ],
+      "stops": [
+        {
+          "offset": 0,
+          "color": "#181818"
+        },
+        {
+          "offset": 1,
+          "color": "#0d0d0d"
+        }
+      ]
+    },
+    "Ox.Control.BackgroundPointerOver": {
+      "type": "linear",
+      "from": [
+        0,
+        0
+      ],
+      "to": [
+        0,
+        1
+      ],
+      "stops": [
+        {
+          "offset": 0,
+          "color": "#222222"
+        },
+        {
+          "offset": 1,
+          "color": "#141414"
+        }
+      ]
+    },
+    "Ox.Control.BackgroundPressed": {
+      "type": "linear",
+      "from": [
+        0,
+        0
+      ],
+      "to": [
+        0,
+        1
+      ],
+      "stops": [
+        {
+          "offset": 0,
+          "color": "#0b0b0b"
+        },
+        {
+          "offset": 1,
+          "color": "#111111"
+        }
+      ]
+    },
+    "Ox.Control.BackgroundChecked": {
+      "type": "linear",
+      "from": [
+        0,
+        0
+      ],
+      "to": [
+        0,
+        1
+      ],
+      "stops": [
+        {
+          "offset": 0,
+          "color": "#101a14"
+        },
+        {
+          "offset": 1,
+          "color": "#0a1210"
+        }
+      ]
+    },
+    "Ox.Control.Foreground": "#54dd94",
+    "Ox.Control.ForegroundChecked": "#5ce39a",
+    "Ox.Control.BorderBrush": "#2a2f36",
+    "Ox.Control.CornerRadius": 0,
+    "Ox.Cap.Bevel": {
+      "type": "linear",
+      "from": [
+        0,
+        0
+      ],
+      "to": [
+        0,
+        1
+      ],
+      "stops": [
+        {
+          "offset": 0,
+          "color": "#26ffffff"
+        },
+        {
+          "offset": 0.5,
+          "color": "#00ffffff"
+        },
+        {
+          "offset": 1,
+          "color": "#24000000"
+        }
+      ]
+    },
+    "Ox.Toggle.Foreground": "#ff5566",
+    "Ox.Toggle.ForegroundChecked": "#5ce39a",
+    "Ox.Toggle.ForegroundDisabled": "#ff5566",
+    "Ox.Bypass.Foreground": "#5ce39a",
+    "Ox.Bypass.ForegroundBypassed": "#ff5566",
+    "Ox.Toggle.BorderBrushChecked": "#2a2f36",
+    "Ox.Check.Foreground": "#e8ebf2",
+    "Ox.Input.Background": {
+      "type": "linear",
+      "from": [
+        0,
+        0
+      ],
+      "to": [
+        0,
+        1
+      ],
+      "stops": [
+        {
+          "offset": 0,
+          "color": "#101010"
+        },
+        {
+          "offset": 1,
+          "color": "#080808"
+        }
+      ]
+    },
+    "Ox.Input.Foreground": "#e8ebf2",
+    "Ox.Input.BorderBrush": "#34383f",
+    "Ox.Flyout.Background": "#161616",
+    "Ox.Tooltip.Background": "#050608",
+    "Ox.Tooltip.Foreground": "#d2d6de",
+    "Ox.Tooltip.BorderBrush": "#34383f",
+    "Ox.Accent": "#3ecf7a",
+    "Ox.Flow.Background": {
+      "type": "linear",
+      "from": [
+        0,
+        0
+      ],
+      "to": [
+        0,
+        1
+      ],
+      "stops": [
+        {
+          "offset": 0,
+          "color": "#0e0e0e"
+        },
+        {
+          "offset": 1,
+          "color": "#050505"
+        }
+      ]
+    },
+    "Ox.Flow.Card": "#1a1a1a",
+    "Ox.Flow.CardSelected": "#272727",
+    "Ox.Flow.Text": "#e8ebf2",
+    "Ox.Flow.TextDim": "#a8adb8",
+    "Ox.Flow.Input": "#20c4d1",
+    "Ox.Flow.Channel": "#c958e5",
+    "Ox.Flow.Output": "#3ecf7a",
+    "Ox.Flow.Muted": "#5d626c",
+    "Ox.Flow.NodeHoverBackground": "#262626",
+    "Ox.Flow.NodeHoverBorderBrush": "#3a3f47",
+    "Ox.Control.BackgroundDisabled": {
+      "type": "linear",
+      "from": [
+        0,
+        0
+      ],
+      "to": [
+        0,
+        1
+      ],
+      "stops": [
+        {
+          "offset": 0,
+          "color": "#121212"
+        },
+        {
+          "offset": 1,
+          "color": "#0b0b0b"
+        }
+      ]
+    },
+    "Ox.Control.ForegroundDisabled": "#ff5566",
+    "Ox.Control.BorderBrushPointerOver": "#3d444e",
+    "Ox.Control.BorderBrushDisabled": "#2a2f36",
+    "Ox.Control.DisabledOpacity": 0.45,
+    "Ox.Ghost.Background": {
+      "type": "linear",
+      "from": [
+        0,
+        0
+      ],
+      "to": [
+        0,
+        1
+      ],
+      "stops": [
+        {
+          "offset": 0,
+          "color": "#181818"
+        },
+        {
+          "offset": 1,
+          "color": "#0d0d0d"
+        }
+      ]
+    },
+    "Ox.Meter.Warning": "#f2c14e",
+    "Ox.Control.BorderThickness": 2
+  }
+}

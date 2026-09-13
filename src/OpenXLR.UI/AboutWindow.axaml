@@ -3,7 +3,7 @@
         x:Class="OpenXLR.UI.AboutWindow"
         Title="About OpenXLR" Width="460" SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
-        Background="#16181d" CanResize="False">
+        Background="{DynamicResource Ox.Window.Background}" CanResize="False">
 
   <Window.Resources>
     <!-- Brand marks from Simple Icons (CC0), 24x24 view box. -->
@@ -16,14 +16,14 @@
   <Window.Styles>
     <Style Selector="Button.link">
       <Setter Property="Background" Value="Transparent"/>
-      <Setter Property="Foreground" Value="#5ba8f5"/>
+      <Setter Property="Foreground" Value="{DynamicResource Ox.Link.Foreground}"/>
       <Setter Property="Padding" Value="2,1"/>
       <Setter Property="Cursor" Value="Hand"/>
       <Setter Property="HorizontalAlignment" Value="Left"/>
     </Style>
     <Style Selector="Button.link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="Transparent"/>
-      <Setter Property="TextElement.Foreground" Value="#8cc4ff"/>
+      <Setter Property="TextElement.Foreground" Value="{DynamicResource Ox.Link.ForegroundPointerOver}"/>
     </Style>
   </Window.Styles>
 
@@ -31,48 +31,48 @@
     <StackPanel Orientation="Horizontal" Spacing="12">
       <Image Source="avares://OpenXLR.UI/Assets/icon.png" Width="48" Height="48"/>
       <StackPanel VerticalAlignment="Center">
-        <TextBlock Text="OpenXLR" FontSize="22" FontWeight="Bold" Foreground="#e6e9f0"/>
-        <TextBlock Name="VersionText" Text="v0.0.0" FontSize="12" Foreground="#8b93a7"/>
+        <TextBlock Text="OpenXLR" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource Ox.Text.Primary}"/>
+        <TextBlock Name="VersionText" Text="v0.0.0" FontSize="12" Foreground="{DynamicResource Ox.Text.Secondary}"/>
       </StackPanel>
     </StackPanel>
 
-    <TextBlock TextWrapping="Wrap" Foreground="#b9bfcc" FontSize="13"
+    <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Ox.Text.Detail}" FontSize="13"
                Text="Open-source control suite for Elgato XLR interfaces on Linux (Wave XLR Pro, XLR Dock, XLR Dock MK.2, Wave XLR, Wave XLR MK.2): hardware control over reverse-engineered protocols, a Wave Link style PipeWire submixer with per-application channels and virtual microphones, multi-output monitoring, a dedicated mix for a second computer on the USB Aux port, and an OpenDeck plugin for Stream Deck control."/>
 
-    <TextBlock TextWrapping="Wrap" Foreground="#6b7285" FontSize="11"
+    <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Ox.Text.Muted}" FontSize="11"
                Text="Not affiliated with or endorsed by Elgato. Built by protocol analysis on the author's own hardware, with credit to the openwave project for the Wave XLR dialect."/>
 
-    <TextBlock TextWrapping="Wrap" Foreground="#b9bfcc" FontSize="12"
+    <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Ox.Text.Detail}" FontSize="12"
                Text="Thanks to everyone who contributed code, tested on their own interfaces or did the earlier protocol work this project builds on."/>
 
     <StackPanel Spacing="2" Margin="0,4,0,0">
       <Button Classes="link" Click="OnRepo">
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <Path Data="{StaticResource GitHubMark}" Fill="#5ba8f5" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"/>
+          <Path Data="{StaticResource GitHubMark}" Fill="{DynamicResource Ox.Link.Foreground}" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"/>
           <TextBlock Text="github.com/emaspa/openxlr" VerticalAlignment="Center"/>
         </StackPanel>
       </Button>
       <Button Classes="link" Click="OnCredits">
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <Path Data="{StaticResource GitHubMark}" Fill="#5ba8f5" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"/>
+          <Path Data="{StaticResource GitHubMark}" Fill="{DynamicResource Ox.Link.Foreground}" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"/>
           <TextBlock Text="Contributors and credits" VerticalAlignment="Center"/>
         </StackPanel>
       </Button>
       <Button Classes="link" Click="OnDiscord">
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <Path Data="{StaticResource DiscordMark}" Fill="#5ba8f5" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"/>
+          <Path Data="{StaticResource DiscordMark}" Fill="{DynamicResource Ox.Link.Foreground}" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"/>
           <TextBlock Text="Discord community" VerticalAlignment="Center"/>
         </StackPanel>
       </Button>
       <Button Classes="link" Click="OnReddit">
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <Path Data="{StaticResource RedditMark}" Fill="#5ba8f5" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"/>
+          <Path Data="{StaticResource RedditMark}" Fill="{DynamicResource Ox.Link.Foreground}" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"/>
           <TextBlock Text="r/OpenXLR on Reddit" VerticalAlignment="Center"/>
         </StackPanel>
       </Button>
       <Button Classes="link" Click="OnCoffee">
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <Path Data="{StaticResource CoffeeMark}" Fill="#5ba8f5" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"/>
+          <Path Data="{StaticResource CoffeeMark}" Fill="{DynamicResource Ox.Link.Foreground}" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"/>
           <TextBlock Text="Buy me a coffee" VerticalAlignment="Center"/>
         </StackPanel>
       </Button>

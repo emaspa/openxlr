@@ -1,0 +1,805 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/emaspa/openxlr/main/docs/skin.schema.json",
+  "title": "OpenXLR skin",
+  "description": "A skin for the OpenXLR window. docs/skins.md is the contract; this file is a writing aid for editors that complete and check JSON.",
+  "type": "object",
+  "required": [
+    "schema",
+    "tokens"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Ignored by OpenXLR; it points an editor at this file."
+    },
+    "schema": {
+      "const": 1,
+      "description": "The skin format version this file is written for."
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
+      "maxLength": 64,
+      "description": "The id the author intended. The folder name wins when they disagree."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 400,
+      "description": "What the picker shows."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 400,
+      "description": "One line, shown under the picker."
+    },
+    "author": {
+      "type": "string",
+      "maxLength": 400,
+      "description": "Shown under the picker."
+    },
+    "controls": {
+      "type": "object",
+      "description": "One of OpenXLR's own appearances per control.",
+      "additionalProperties": false,
+      "properties": {
+        "button": {
+          "enum": [
+            "flat",
+            "cap"
+          ],
+          "default": "flat",
+          "description": "`flat` is the framework's button."
+        },
+        "fader": {
+          "enum": [
+            "flat",
+            "console"
+          ],
+          "default": "flat",
+          "description": "`flat` is the framework's slider."
+        },
+        "meter": {
+          "enum": [
+            "continuous",
+            "segmented"
+          ],
+          "default": "continuous",
+          "description": "`continuous` is one bar that grows."
+        },
+        "led": {
+          "enum": [
+            "flat",
+            "lamp"
+          ],
+          "default": "flat",
+          "description": "`flat` is a filled dot."
+        },
+        "mute": {
+          "enum": [
+            "flat",
+            "cap"
+          ],
+          "default": "flat",
+          "description": "`flat` is the framework's button."
+        }
+      }
+    },
+    "tokens": {
+      "type": "object",
+      "description": "The appearance values. A token OpenXLR does not have is reported and ignored.",
+      "additionalProperties": false,
+      "properties": {
+        "Ox.Window.Background": {
+          "$ref": "#/$defs/brush",
+          "description": "the ground behind every window"
+        },
+        "Ox.Card.Background": {
+          "$ref": "#/$defs/brush",
+          "description": "a section card: INPUTS, HEADPHONES, an Options group"
+        },
+        "Ox.Card.BorderBrush": {
+          "$ref": "#/$defs/brush",
+          "description": "that card's border"
+        },
+        "Ox.Card.BorderThickness": {
+          "$ref": "#/$defs/thickness",
+          "description": "that border's width"
+        },
+        "Ox.Card.CornerRadius": {
+          "$ref": "#/$defs/radius",
+          "description": "that card's corners"
+        },
+        "Ox.Tile.Background": {
+          "$ref": "#/$defs/brush",
+          "description": "a tile on a card: a channel strip, a mix master, an application chip"
+        },
+        "Ox.Tile.BorderBrush": {
+          "$ref": "#/$defs/brush",
+          "description": "that tile's border"
+        },
+        "Ox.Tile.BorderThickness": {
+          "$ref": "#/$defs/thickness",
+          "description": "that border's width"
+        },
+        "Ox.Tile.CornerRadius": {
+          "$ref": "#/$defs/radius",
+          "description": "that tile's corners"
+        },
+        "Ox.Dialog.Background": {
+          "$ref": "#/$defs/brush",
+          "description": "the small confirmation and rename dialogs"
+        },
+        "Ox.Danger.Background": {
+          "$ref": "#/$defs/brush",
+          "description": "a button that deletes something"
+        },
+        "Ox.Danger.Foreground": {
+          "$ref": "#/$defs/brush",
+          "description": "that button's label"
+        },
+        "Ox.Text.Primary": {
+          "$ref": "#/$defs/brush",
+          "description": "names and readouts"
+        },
+        "Ox.Text.Secondary": {
+          "$ref": "#/$defs/brush",
+          "description": "labels and section headings"
+        },
+        "Ox.Text.Muted": {
+          "$ref": "#/$defs/brush",
+          "description": "explanatory lines"
+        },
+        "Ox.Text.Warning": {
+          "$ref": "#/$defs/brush",
+          "description": "something went wrong"
+        },
+        "Ox.Text.Alert": {
+          "$ref": "#/$defs/brush",
+          "description": "something needs attention"
+        },
+        "Ox.Text.Info": {
+          "$ref": "#/$defs/brush",
+          "description": "an update is available"
+        },
+        "Ox.Text.Detail": {
+          "$ref": "#/$defs/brush",
+          "description": "paragraphs in About, release notes, plugin group headings"
+        },
+        "Ox.Link.Foreground": {
+          "$ref": "#/$defs/brush",
+          "description": "a link"
+        },
+        "Ox.Link.ForegroundPointerOver": {
+          "$ref": "#/$defs/brush",
+          "description": "a link under the pointer"
+        },
+        "Ox.Badge.Background": {
+          "$ref": "#/$defs/brush",
+          "description": "the small format badge beside a plugin name"
+        },
+        "Ox.Divider": {
+          "$ref": "#/$defs/brush",
+          "description": "the rule under a plugin control group"
+        },
+        "Ox.Label.FontSize": {
+          "type": "number",
+          "minimum": 8,
+          "maximum": 24,
+          "description": "section headings and labels"
+        },
+        "Ox.Label.FontWeight": {
+          "$ref": "#/$defs/fontWeight",
+          "description": "those same headings and labels"
+        },
+        "Ox.Title.FontSize": {
+          "type": "number",
+          "minimum": 10,
+          "maximum": 40,
+          "description": "the window's own title line"
+        },
+        "Ox.Title.FontWeight": {
+          "$ref": "#/$defs/fontWeight",
+          "description": "that title line"
+        },
+        "Ox.Strip.FontWeight": {
+          "$ref": "#/$defs/fontWeight",
+          "description": "the name over a channel strip or a mix"
+        },
+        "Ox.Value.FontFamily": {
+          "$ref": "#/$defs/fontFamily",
+          "description": "the numeric readouts"
+        },
+        "Ox.Font.Family": {
+          "$ref": "#/$defs/fontFamily",
+          "description": "the font the buttons, labels and dropdowns use"
+        },
+        "Ox.Led.On": {
+          "$ref": "#/$defs/flatColour",
+          "description": "a connected device, a plugin that is processing"
+        },
+        "Ox.Led.Off": {
+          "$ref": "#/$defs/flatColour",
+          "description": "a device that is not there"
+        },
+        "Ox.Led.Alert": {
+          "$ref": "#/$defs/flatColour",
+          "description": "a plugin bypassed or failed"
+        },
+        "Ox.Meter.Fill": {
+          "$ref": "#/$defs/flatColour",
+          "description": "the quiet end of the scale"
+        },
+        "Ox.Meter.Warning": {
+          "$ref": "#/$defs/flatColour",
+          "description": "the middle of the scale"
+        },
+        "Ox.Meter.Hot": {
+          "$ref": "#/$defs/flatColour",
+          "description": "the loud end of the scale"
+        },
+        "Ox.Meter.WarningLevel": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "-18 dBFS, the usual alignment level"
+        },
+        "Ox.Meter.HotLevel": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "-6 dBFS, where an RMS reading leaves no headroom for the peaks"
+        },
+        "Ox.Meter.Track": {
+          "$ref": "#/$defs/brush",
+          "description": "the groove a meter sits in, and an unlit cell"
+        },
+        "Ox.Meter.CornerRadius": {
+          "$ref": "#/$defs/radius",
+          "description": "the meter's corners, and each cell's"
+        },
+        "Ox.Meter.Height": {
+          "type": "number",
+          "minimum": 2,
+          "maximum": 24,
+          "description": "how tall a meter is"
+        },
+        "Ox.Meter.Segments": {
+          "type": "number",
+          "minimum": 2,
+          "maximum": 64,
+          "description": "how many cells, `meter: segmented` only"
+        },
+        "Ox.Meter.SegmentGap": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 8,
+          "description": "the gap between cells in pixels, `meter: segmented` only"
+        },
+        "Ox.Led.Size": {
+          "type": "number",
+          "minimum": 4,
+          "maximum": 40,
+          "description": "the box a lamp or a dot is drawn in, both appearances"
+        },
+        "Ox.Led.Bezel": {
+          "$ref": "#/$defs/brush",
+          "description": "the ring around the core, `led: lamp` only"
+        },
+        "Ox.Led.BezelThickness": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 6,
+          "description": "that ring's width, `led: lamp` only"
+        },
+        "Ox.Led.Glow": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "the halo while the lamp is lit, 0 for none, `led: lamp` only"
+        },
+        "Ox.Led.CoreScale": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 1,
+          "description": "how much of the box the lit core fills, `led: lamp` only"
+        },
+        "Ox.Mute.Background": {
+          "$ref": "#/$defs/brush",
+          "description": "the face while audio passes"
+        },
+        "Ox.Mute.Foreground": {
+          "$ref": "#/$defs/brush",
+          "description": "its label while audio passes"
+        },
+        "Ox.Mute.BackgroundPointerOver": {
+          "$ref": "#/$defs/brush",
+          "description": "the face under the pointer"
+        },
+        "Ox.Mute.BackgroundChecked": {
+          "$ref": "#/$defs/brush",
+          "description": "the face when muted"
+        },
+        "Ox.Mute.ForegroundChecked": {
+          "$ref": "#/$defs/brush",
+          "description": "its label when muted"
+        },
+        "Ox.Mute.BorderBrush": {
+          "$ref": "#/$defs/brush",
+          "description": "its ring"
+        },
+        "Ox.Mute.BorderThickness": {
+          "$ref": "#/$defs/thickness",
+          "description": "that ring's width"
+        },
+        "Ox.Fader.Thumb.Width": {
+          "type": "number",
+          "minimum": 4,
+          "maximum": 64,
+          "description": "the cap across the groove"
+        },
+        "Ox.Fader.Thumb.Height": {
+          "type": "number",
+          "minimum": 4,
+          "maximum": 64,
+          "description": "the cap along the groove"
+        },
+        "Ox.Fader.Thumb.CornerRadius": {
+          "$ref": "#/$defs/radius",
+          "description": "the cap's corners"
+        },
+        "Ox.Fader.Thumb.Background": {
+          "$ref": "#/$defs/brush",
+          "description": "the cap"
+        },
+        "Ox.Fader.Thumb.BorderBrush": {
+          "$ref": "#/$defs/brush",
+          "description": "the cap's ring"
+        },
+        "Ox.Fader.Thumb.BorderThickness": {
+          "$ref": "#/$defs/thickness",
+          "description": "that ring's width"
+        },
+        "Ox.Fader.Track": {
+          "$ref": "#/$defs/brush",
+          "description": "the part of the groove above the value"
+        },
+        "Ox.Fader.Fill": {
+          "$ref": "#/$defs/brush",
+          "description": "the part below the value"
+        },
+        "Ox.Fader.TrackHeight": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 24,
+          "description": "how thick the groove is"
+        },
+        "Ox.Fader.TrackCornerRadius": {
+          "$ref": "#/$defs/radius",
+          "description": "the groove's corners, `fader: console` only"
+        },
+        "Ox.Fader.Thumb.Grip": {
+          "$ref": "#/$defs/brush",
+          "description": "the line across the cap, `fader: console` only"
+        },
+        "Ox.Fader.Thumb.GripLength": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 64,
+          "description": "how long that line is, `fader: console` only"
+        },
+        "Ox.Control.Background": {
+          "$ref": "#/$defs/brush",
+          "description": "a button, a toggle, a dropdown"
+        },
+        "Ox.Control.BackgroundPointerOver": {
+          "$ref": "#/$defs/brush",
+          "description": "one under the pointer"
+        },
+        "Ox.Control.BackgroundPressed": {
+          "$ref": "#/$defs/brush",
+          "description": "one held down"
+        },
+        "Ox.Control.BackgroundChecked": {
+          "$ref": "#/$defs/brush",
+          "description": "a toggle that is on"
+        },
+        "Ox.Control.Foreground": {
+          "$ref": "#/$defs/brush",
+          "description": "the lettering on a button or a dropdown"
+        },
+        "Ox.Control.ForegroundChecked": {
+          "$ref": "#/$defs/brush",
+          "description": "a toggle's lettering when on, unless `Ox.Toggle.ForegroundChecked` is set"
+        },
+        "Ox.Control.ForegroundDisabled": {
+          "$ref": "#/$defs/brush",
+          "description": "the lettering when the control cannot be used"
+        },
+        "Ox.Control.BackgroundDisabled": {
+          "$ref": "#/$defs/brush",
+          "description": "one that cannot be used"
+        },
+        "Ox.Control.BorderBrush": {
+          "$ref": "#/$defs/brush",
+          "description": "the ring"
+        },
+        "Ox.Control.BorderBrushPointerOver": {
+          "$ref": "#/$defs/brush",
+          "description": "the ring under the pointer"
+        },
+        "Ox.Ghost.Background": {
+          "$ref": "#/$defs/brush",
+          "description": "the face behind a button a view keeps out of the way: the header actions, the rows inside a flyout"
+        },
+        "Ox.Cap.Bevel": {
+          "$ref": "#/$defs/brush",
+          "description": "the gloss over every raised key face, `button: cap` and `mute: cap` only; usually a gradient, and one brush for all of them so the keys cannot drift apart"
+        },
+        "Ox.Toggle.Foreground": {
+          "$ref": "#/$defs/brush",
+          "description": "a toggle that is off"
+        },
+        "Ox.Toggle.ForegroundChecked": {
+          "$ref": "#/$defs/brush",
+          "description": "a toggle that is on"
+        },
+        "Ox.Toggle.ForegroundDisabled": {
+          "$ref": "#/$defs/brush",
+          "description": "a toggle that cannot be used"
+        },
+        "Ox.Toggle.BorderBrushChecked": {
+          "$ref": "#/$defs/brush",
+          "description": "the ring of a toggle that is on"
+        },
+        "Ox.Bypass.Foreground": {
+          "$ref": "#/$defs/brush",
+          "description": "the plugin bypass key while the plugin is processing"
+        },
+        "Ox.Bypass.ForegroundBypassed": {
+          "$ref": "#/$defs/brush",
+          "description": "the same key while the plugin is bypassed"
+        },
+        "Ox.Check.Foreground": {
+          "$ref": "#/$defs/brush",
+          "description": "the label beside a checkbox, which is running text rather than a lit legend"
+        },
+        "Ox.Control.CornerRadius": {
+          "$ref": "#/$defs/radius",
+          "description": "the corners of every key, and of the boxes the framework rounds"
+        },
+        "Ox.Control.BorderThickness": {
+          "$ref": "#/$defs/thickness",
+          "description": "the ring's width on a raised key, `button: cap` and `mute: cap` only"
+        },
+        "Ox.Control.DisabledOpacity": {
+          "type": "number",
+          "minimum": 0.2,
+          "maximum": 1,
+          "description": "how far a key fades when it cannot be used, 1 for no fade"
+        },
+        "Ox.Control.BorderBrushDisabled": {
+          "$ref": "#/$defs/brush",
+          "description": "the ring when the control cannot be used"
+        },
+        "Ox.Input.Background": {
+          "$ref": "#/$defs/brush",
+          "description": "a text box"
+        },
+        "Ox.Input.Foreground": {
+          "$ref": "#/$defs/brush",
+          "description": "what you type"
+        },
+        "Ox.Input.BorderBrush": {
+          "$ref": "#/$defs/brush",
+          "description": "its ring"
+        },
+        "Ox.Flyout.Background": {
+          "$ref": "#/$defs/brush",
+          "description": "a dropdown's list and a flyout"
+        },
+        "Ox.Tooltip.Background": {
+          "$ref": "#/$defs/brush",
+          "description": "a tooltip"
+        },
+        "Ox.Tooltip.Foreground": {
+          "$ref": "#/$defs/brush",
+          "description": "its text"
+        },
+        "Ox.Tooltip.BorderBrush": {
+          "$ref": "#/$defs/brush",
+          "description": "its border"
+        },
+        "Ox.Accent": {
+          "$ref": "#/$defs/flatColour",
+          "description": "the tick in a checkbox and the selection in a list; must be flat, since the theme reads it as a colour"
+        },
+        "Ox.Flow.Background": {
+          "$ref": "#/$defs/brush",
+          "description": "the ground behind the graph"
+        },
+        "Ox.Flow.Card": {
+          "$ref": "#/$defs/brush",
+          "description": "a node"
+        },
+        "Ox.Flow.CardSelected": {
+          "$ref": "#/$defs/brush",
+          "description": "the node whose path is being traced"
+        },
+        "Ox.Flow.Text": {
+          "$ref": "#/$defs/brush",
+          "description": "a node's name and the window's title"
+        },
+        "Ox.Flow.TextDim": {
+          "$ref": "#/$defs/brush",
+          "description": "a node's second line, the legend and the selected node's outline"
+        },
+        "Ox.Flow.Input": {
+          "$ref": "#/$defs/brush",
+          "description": "an edge from an input to a channel"
+        },
+        "Ox.Flow.Channel": {
+          "$ref": "#/$defs/brush",
+          "description": "an edge from a channel to a mix"
+        },
+        "Ox.Flow.Output": {
+          "$ref": "#/$defs/brush",
+          "description": "an edge from a mix to an output"
+        },
+        "Ox.Flow.Muted": {
+          "$ref": "#/$defs/brush",
+          "description": "an edge that is muted or not in the traced path"
+        },
+        "Ox.Flow.NodeHoverBackground": {
+          "$ref": "#/$defs/brush",
+          "description": "a node under the pointer"
+        },
+        "Ox.Flow.NodeHoverBorderBrush": {
+          "$ref": "#/$defs/brush",
+          "description": "that node's outline"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "colour": {
+      "type": "string",
+      "minLength": 1,
+      "description": "#rgb, #rrggbb, #aarrggbb or a colour name."
+    },
+    "solid": {
+      "type": "object",
+      "required": [
+        "type",
+        "color"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "solid"
+        },
+        "color": {
+          "type": "string",
+          "minLength": 1,
+          "description": "#rgb, #rrggbb, #aarrggbb or a colour name."
+        }
+      }
+    },
+    "gradient": {
+      "type": "object",
+      "required": [
+        "type",
+        "stops"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "linear",
+            "radial"
+          ]
+        },
+        "from": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number",
+            "minimum": -2,
+            "maximum": 3
+          },
+          "description": "The near end of a linear gradient, or a radial's highlight."
+        },
+        "to": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number",
+            "minimum": -2,
+            "maximum": 3
+          },
+          "description": "The far end of a linear gradient, or a radial's centre."
+        },
+        "radius": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 4,
+          "description": "A radial gradient's radius, relative to the box."
+        },
+        "stops": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "required": [
+              "color"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "offset": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "color": {
+                "type": "string",
+                "minLength": 1,
+                "description": "#rgb, #rrggbb, #aarrggbb or a colour name."
+              }
+            }
+          }
+        }
+      }
+    },
+    "image": {
+      "type": "object",
+      "required": [
+        "type",
+        "source"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "image"
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "description": "A relative path inside the skin's own folder."
+        },
+        "stretch": {
+          "enum": [
+            "fill",
+            "uniform",
+            "uniformToFill",
+            "none"
+          ]
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "brush": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/colour"
+        },
+        {
+          "$ref": "#/$defs/solid"
+        },
+        {
+          "$ref": "#/$defs/gradient"
+        },
+        {
+          "$ref": "#/$defs/image"
+        }
+      ]
+    },
+    "flatColour": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/colour"
+        },
+        {
+          "$ref": "#/$defs/solid"
+        }
+      ],
+      "description": "An indicator colour, which is drawn in code and must stay flat."
+    },
+    "radius": {
+      "oneOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 48
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 48
+          },
+          "minItems": 1,
+          "maxItems": 1
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 48
+          },
+          "minItems": 4,
+          "maxItems": 4
+        }
+      ],
+      "description": "One number, or four: top left, top right, bottom right, bottom left."
+    },
+    "thickness": {
+      "oneOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 16
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 16
+          },
+          "minItems": 1,
+          "maxItems": 1
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 16
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 16
+          },
+          "minItems": 4,
+          "maxItems": 4
+        }
+      ],
+      "description": "One number, two, or four: left, top, right, bottom."
+    },
+    "fontFamily": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120,
+      "description": "A font family the machine already has."
+    },
+    "fontWeight": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 1000
+        }
+      ]
+    }
+  }
+}

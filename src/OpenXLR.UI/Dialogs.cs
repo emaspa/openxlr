@@ -9,7 +9,7 @@ internal static class Dialogs
     /// <summary>True when the user accepts; closing the dialog any other way is a no.</summary>
     public static async Task<bool> ConfirmAsync(Window owner, string title, string message, string yesLabel)
     {
-        var yes = new Button { Content = yesLabel, Background = Avalonia.Media.Brush.Parse("#a03434") };
+        var yes = new Button { Content = yesLabel, Classes = { "danger" } };
         var no = new Button { Content = "Cancel", IsCancel = true };
         var dialog = new Window
         {
@@ -17,7 +17,7 @@ internal static class Dialogs
             SizeToContent = SizeToContent.WidthAndHeight,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             CanResize = false,
-            Background = Avalonia.Media.Brush.Parse("#1d2027"),
+            Classes = { "dialog" },
             Content = new StackPanel
             {
                 Margin = new Avalonia.Thickness(18),
