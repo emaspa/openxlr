@@ -162,6 +162,7 @@ configuration.
    changing the other mix or its channel sends. Its **150%** button unlocks
    boost in OpenXLR too. OpenDeck's monitor and output dials also support
    0 to 150%, so a boosted desktop value changes smoothly with each tick.
+   Those needles sweep the full range; every other dial keeps its 0 to 100% scale.
    Desktop changes are saved with the mixer settings
    and recalled after a daemon restart; explicitly loading a profile restores
    the values saved in that profile. A physical device named simply

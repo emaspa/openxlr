@@ -475,7 +475,7 @@ function toggleLabel(target, inst) {
 const isMuteLike = (t) =>
   MUTE_LIKE.has(t) || t?.startsWith("mixmute:") || t?.startsWith("sendmute:");
 
-// A dial target as {label, pct 0..100, text, muted}, or null when unknown.
+// A dial target as {label, pct, maxPct, text, muted}, or null when unknown.
 function dialValue(target, inst) {
   if (!daemonState || !target) return null;
   const pct = (v) => Math.round(v * 100);
@@ -503,7 +503,7 @@ function dialValue(target, inst) {
   if (target.startsWith("mixvol:")) {
     const mix = mixOf(target.slice(7));
     if (!mix) return null;
-    return { label: `${mix.name} mix`, pct: pct(mix.volume),
+    return { label: `${mix.name} mix`, pct: pct(mix.volume), maxPct: mix.kind === "monitor" ? 150 : 100,
              text: mix.muted ? "MUTED" : `${pct(mix.volume)}%`, muted: mix.muted };
   }
   const s = dev(), x = mixer();
@@ -511,7 +511,7 @@ function dialValue(target, inst) {
     case "outputVolume": {
       const v = x?.outputVolume ?? 0;
       const muted = mixOf("monitor")?.muted ?? false;
-      return { label: "Monitor", pct: pct(v), text: muted ? "MUTED" : `${pct(v)}%`, muted };
+      return { label: "Monitor", pct: pct(v), maxPct: 150, text: muted ? "MUTED" : `${pct(v)}%`, muted };
     }
     case "gain": case "gain2": {
       if (!deviceTargetSupported(target)) return null;
@@ -857,9 +857,9 @@ function dialIcon(t) {
 }
 
 // The rotating needle over the half-knob, Wave Link style: a tick rotated
-// around a center below the visible strip. 0..100% sweeps -50°..+50°.
-function needleSvg(pct) {
-  const angle = (Math.max(0, Math.min(100, pct)) / 100) * 100 - 50;
+// around a center below the visible strip. The full range sweeps -50°..+50°.
+function needleSvg(pct, maxPct = 100) {
+  const angle = (Math.max(0, Math.min(maxPct, pct)) / maxPct) * 100 - 50;
   return "data:image/svg+xml;base64," + Buffer.from(
     `<svg xmlns="http://www.w3.org/2000/svg" width="130" height="52" viewBox="0 0 130 52">
       <g transform="rotate(${angle}, 65, 61)">
@@ -990,7 +990,7 @@ function refresh(context) {
           value: isDb && !d.muted ? d.text.replace(" dB", "") : d.text,
           unit: { enabled: isDb && !d.muted },
           icon: dialIcon(t),
-          needle: needleSvg(d.pct),
+          needle: needleSvg(d.pct, d.maxPct),
           muteOverlay: { enabled: d.muted } }
       : { title: "OpenXLR", value: daemonUp ? "set up" : "offline",
           unit: { enabled: false }, icon: dialIcon(null),

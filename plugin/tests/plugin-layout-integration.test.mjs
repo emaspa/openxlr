@@ -58,6 +58,29 @@ test("plugin publishes layout updates and keeps monitor feed commands intact", a
     ];
     state.mixer.outputVolume = 1.5;
     daemon.receive(state);
+    for (const [target, volume, maximum] of [
+      ["mixvol:monitor", 0, 1.5],
+      ["mixvol:monitor", 1, 1.5],
+      ["mixvol:monitor", 1.2, 1.5],
+      ["mixvol:monitor", 1.5, 1.5],
+      ["mixvol:monitor2", 1.2, 1.5],
+      ["outputVolume", 1, 1.5],
+      ["outputVolume", 1.2, 1.5],
+      ["outputVolume", 1.5, 1.5],
+      ["mixvol:chat", 0.5, 1],
+      ["mixvol:chat", 1, 1],
+      ["send:system:monitor", 1, 1],
+    ]) {
+      if (target.startsWith("mixvol:")) state.mixer.mixes.find(m => m.id === target.slice(7)).volume = volume;
+      else if (target === "outputVolume") state.mixer.outputVolume = volume;
+      daemon.receive(state);
+      host.receive({event:"willAppear",context:"needle-dial",action:"com.emaspa.openxlr.dial",payload:{settings:{target}}});
+      const feedback = host.messages.filter(m => m.event === "setFeedback" && m.context === "needle-dial").at(-1).payload;
+      assert.equal(feedback.value, `${Math.round(volume * 100)}%`);
+      const svg = Buffer.from(feedback.needle.split(",")[1], "base64").toString();
+      const angle = Number(svg.match(/rotate\(([^,]+)/)[1]);
+      assert.ok(Math.abs(angle - (volume / maximum * 100 - 50)) < 0.0001, target);
+    }
     for (const [target, ticks, expected] of [
       ["mixvol:monitor", -1, {cmd:"setMixVolume",mix:"monitor",value:1.49}],
       ["mixvol:monitor", 1, {cmd:"setMixVolume",mix:"monitor",value:1.5}],
