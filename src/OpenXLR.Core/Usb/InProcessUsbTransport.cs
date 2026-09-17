@@ -22,12 +22,29 @@ public sealed class InProcessUsbTransport : IUsbTransport
         }
         Close();
         _handle = LibUsb.libusb_open_device_with_vid_pid(_ctx, vendorId, productId);
-        return _handle != IntPtr.Zero;
+        if (_handle == IntPtr.Zero) return false;
+        int claim = LibUsb.libusb_claim_interface(_handle, LibUsb.VendorInterface);
+        if (claim != 0)
+        {
+            LibUsb.libusb_close(_handle);
+            _handle = IntPtr.Zero;
+            // No logger here, and the helper's loop must not see an exception:
+            // say why on stderr (the journal, when libusb runs in the daemon
+            // itself) and report the device as not opened.
+            Console.Error.WriteLine($"usb: claiming interface {LibUsb.VendorInterface} failed: {LibUsb.StrError(claim)}");
+            return false;
+        }
+        return true;
     }
 
     public void Close()
     {
-        if (_handle != IntPtr.Zero) { LibUsb.libusb_close(_handle); _handle = IntPtr.Zero; }
+        if (_handle != IntPtr.Zero)
+        {
+            LibUsb.libusb_release_interface(_handle, LibUsb.VendorInterface);
+            LibUsb.libusb_close(_handle);
+            _handle = IntPtr.Zero;
+        }
     }
 
     public int ControlTransfer(byte bmRequestType, byte bRequest, ushort wValue, ushort wIndex,

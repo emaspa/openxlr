@@ -7,13 +7,21 @@ namespace OpenXLR.Core;
 /// Minimal P/Invoke over libusb-1.0, just enough for the Wave XLR Pro's vendor
 /// control transfers. Mirrors the validated Python/ctypes prototype rather than
 /// depending on a higher-level wrapper for the critical path. The vendor
-/// interface (3) is unclaimed by any kernel driver, so no detach is needed.
+/// interface (3) is unclaimed by any kernel driver, so claiming it needs no
+/// detach. It is claimed anyway: for the class-request dialects (MK.1, Dock)
+/// usbfs otherwise claims it itself on the first transfer and logs "did not
+/// claim interface 3 before use" once per open, and for the vendor-request
+/// dialects the claim states which interface the daemon owns. Claiming
+/// changes nothing on the wire.
 /// Only <see cref="InProcessUsbTransport"/> calls into it; in the daemon that
 /// transport runs inside the USB helper process (see HelperUsbTransport).
 /// </summary>
 internal static class LibUsb
 {
     private const string Lib = "libusb-1.0.so.0";
+
+    /// <summary>The vendor control interface, constant across the whole Wave XLR/XLR Dock family.</summary>
+    internal const int VendorInterface = 3;
 
     [DllImport(Lib)] internal static extern int libusb_init(out IntPtr ctx);
     [DllImport(Lib)] internal static extern void libusb_exit(IntPtr ctx);
@@ -23,6 +31,9 @@ internal static class LibUsb
         IntPtr ctx, ushort vendorId, ushort productId);
 
     [DllImport(Lib)] internal static extern void libusb_close(IntPtr devHandle);
+
+    [DllImport(Lib)] internal static extern int libusb_claim_interface(IntPtr devHandle, int interfaceNumber);
+    [DllImport(Lib)] internal static extern int libusb_release_interface(IntPtr devHandle, int interfaceNumber);
 
     [DllImport(Lib)]
     internal static extern int libusb_control_transfer(
