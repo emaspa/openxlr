@@ -43,7 +43,10 @@ characters, more than 4096 ports, or one that would push the message
 past 7 MiB is left out of `plugins` altogether, and at most 512
 controls, 256 scale points and 64 required features are read per plugin;
 a plugin that is listed with `supported: false` is a different case, one
-the chain host cannot run. The limit is on the message, not on what the
+the chain host cannot run. A meter whose symbol the catalogue does not
+declare for its plugin is dropped by the native host rather than kept, so a
+library that writes to the helper's output cannot fill the meter table with
+names of its own. The limit is on the message, not on what the
 daemon knows: every plugin a saved insert names is listed whatever the
 size, and `setInserts`, chain building and insert status all resolve a
 plugin against everything installed. A plugin missing from `plugins` can

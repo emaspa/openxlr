@@ -6,9 +6,34 @@ namespace OpenXLR.Tests;
 public sealed class NativeHostProtocolTests
 {
     private static NativePluginHost Start(string script, TimeSpan? startupTimeout = null,
-        TimeSpan? patience = null)
+        TimeSpan? patience = null, IReadOnlySet<string>? meters = null)
         => new(new InsertDefinition { Id = "test", Kind = "lv2", Plugin = "urn:test" },
-            "test", 2, 48000, "/usr/bin/python3", ["-u", "-c", script], startupTimeout, patience);
+            "test", 2, 48000, "/usr/bin/python3", ["-u", "-c", script], startupTimeout, patience,
+            meterSymbols: meters);
+
+    [Fact]
+    public void UndeclaredMeterNamesAreDroppedOnArrival()
+    {
+        using var host = Start("""
+            import sys
+            print('ready')
+            print('meter peak 0.25')
+            for i in range(5000):
+                print('meter m%d 0.5' % i)
+            print('meter rms 0.5')
+            for line in sys.stdin:
+                if line.strip() == 'show':
+                    print('meter peak 0.75')
+                    print('ui opened')
+            """, meters: new HashSet<string>(["peak", "rms"], StringComparer.Ordinal));
+        host.ShowUi();
+        // Five thousand names the catalogue never declared take no place in
+        // the table, so none of them reaches a state snapshot, and a meter
+        // first reported after the flood still lands.
+        Assert.Equal(2, host.Meters.Count);
+        Assert.Equal(0.75, host.Meters["peak"]);
+        Assert.Equal(0.5, host.Meters["rms"]);
+    }
 
     [Fact]
     public void FakeHelperCoversReadyControlMeterAndUiReplies()
