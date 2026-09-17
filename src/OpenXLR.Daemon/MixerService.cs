@@ -17,6 +17,7 @@ public sealed class MixerService : IHostedService, IDisposable
     private readonly ILogger<MixerService> _log;
     private readonly IConfiguration _config;
     private readonly DeviceManager _devices;
+    private readonly StartupDefaults? _startupDefaults;
     private readonly Mixer _mixer;
     private readonly ServiceProgress _progress = new();
     private volatile bool _checkingProgress;
@@ -51,7 +52,8 @@ public sealed class MixerService : IHostedService, IDisposable
     public NativeEditorPolicy EditorPolicy { get; }
 
     public MixerService(ILogger<MixerService> log, IConfiguration config, DeviceManager devices,
-        IHostApplicationLifetime? lifetime = null, NativeEditorPolicy? editorPolicy = null)
+        IHostApplicationLifetime? lifetime = null, NativeEditorPolicy? editorPolicy = null,
+        StartupDefaults? startupDefaults = null)
     {
         _log = log;
         _config = config;
@@ -59,6 +61,7 @@ public sealed class MixerService : IHostedService, IDisposable
                              Environment.GetEnvironmentVariable("OPENXLR_BUILD_MIXER") == "1";
         SubmixerEnabled = DaemonSettings.SubmixerEnabled(launchDefault);
         _devices = devices;
+        _startupDefaults = startupDefaults;
         _lifetime = lifetime;
         EditorPolicy = editorPolicy ?? new NativeEditorPolicy();
         _mixer = new(new PipeWireAdapter(_progress.Mark, note => _log.LogInformation("{msg}", note)));
@@ -220,15 +223,14 @@ public sealed class MixerService : IHostedService, IDisposable
                          ?? Environment.GetEnvironmentVariable("OPENXLR_MONITOR_OUTPUT");
 
         // WirePlumber auto-switches the system defaults to newly created sinks
-        // and sources, asynchronously, some time after they appear. Remember
-        // what the user had so it can be defended after the graph settles.
-        string? defaultSinkBefore = null, defaultSourceBefore = null;
-        try
-        {
-            defaultSinkBefore = Run("pactl", "get-default-sink");
-            defaultSourceBefore = Run("pactl", "get-default-source");
-        }
-        catch (Exception) { /* best effort */ }
+        // and sources, asynchronously, some time after they appear. Defend what
+        // the user had before this process touched anything. Program.cs takes
+        // that snapshot before any hosted service starts: DeviceManager parks
+        // the card in pro-audio as soon as it connects, and WirePlumber may
+        // move the defaults to the card's new nodes before this service runs
+        // (see StartupDefaults).
+        StartupDefaults before = _startupDefaults ?? StartupDefaults.Capture();
+        string? defaultSinkBefore = before.Sink, defaultSourceBefore = before.Source;
 
         try
         {
