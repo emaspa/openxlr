@@ -84,13 +84,15 @@ XLR Dock owners need one more file. The Linux kernel starves the dock's
 capture endpoint whenever playback to it starts before capture, and the
 mic then records pure silence (Windows schedules the same duplex fine;
 the kernel also logs "bad transfer trb length" warnings from the dock's
-malformed feedback endpoint). A WirePlumber rule keeps the dock's
-capture source always active, so playback can never come first:
+malformed feedback endpoint). The original Wave XLR has the same
+ordering bug. WirePlumber rules keep both capture sources always active,
+so playback can never come first:
 
 ```sh
 mkdir -p ~/.config/wireplumber/wireplumber.conf.d
 cp packaging/50-xlr-dock-capture-hold.conf ~/.config/wireplumber/wireplumber.conf.d/
 cp packaging/51-openxlr-pro-raw-names.conf ~/.config/wireplumber/wireplumber.conf.d/
+cp packaging/52-openxlr-mk1-capture-hold.conf ~/.config/wireplumber/wireplumber.conf.d/
 systemctl --user restart wireplumber
 ```
 
@@ -198,6 +200,7 @@ sudo rm /etc/udev/rules.d/70-openxlr.rules
 rm -rf ~/.config/opendeck/plugins/com.emaspa.openxlr.sdPlugin
 rm ~/.config/wireplumber/wireplumber.conf.d/50-xlr-dock-capture-hold.conf
 rm -f ~/.config/wireplumber/wireplumber.conf.d/51-openxlr-pro-raw-names.conf
+rm -f ~/.config/wireplumber/wireplumber.conf.d/52-openxlr-mk1-capture-hold.conf
 rm -f ~/.config/systemd/user/pipewire-pulse.service.d/openxlr.conf
 rm -f ~/.config/autostart/openxlr.desktop
 systemctl --user daemon-reload

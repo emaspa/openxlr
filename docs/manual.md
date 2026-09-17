@@ -1224,13 +1224,14 @@ Restart OpenDeck after installing or updating the plugin.
   picker; the mixer's input channels follow the chosen one.
 
 <a name="dock-silent"></a>
-### 5.2 Microphone silent on the XLR Dock
+### 5.2 Microphone silent on the XLR Dock or the original Wave XLR
 
 The kernel starves the dock's capture when playback to it starts before
-capture, and the microphone records silence. The package installs a
-WirePlumber rule that keeps the dock's capture source always active
-(`50-xlr-dock-capture-hold.conf`). On a source install copy it from
-`packaging/` into `~/.config/wireplumber/wireplumber.conf.d/` and
+capture, and the microphone records silence. The original Wave XLR (MK.1)
+has the same ordering bug. The package installs WirePlumber rules that
+keep both capture sources always active (`50-xlr-dock-capture-hold.conf`
+and `52-openxlr-mk1-capture-hold.conf`). On a source install copy them
+from `packaging/` into `~/.config/wireplumber/wireplumber.conf.d/` and
 restart WirePlumber.
 
 A second cause, when the microphone is silent only after a reboot: the

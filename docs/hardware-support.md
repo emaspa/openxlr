@@ -81,6 +81,15 @@ turned out not to be the USB write, which completes in milliseconds,
 but the daemon's stream sweep starving its own clients; fixed in
 0.1.13 by the reporter's own change ([PR #7](https://github.com/emaspa/openxlr/pull/7)).
 
+Kernel behaviour: the same full-duplex ordering bug as the dock. In the
+pro-audio profile the MK.1's capture and playback nodes share one node
+group, and a playback stream opening first leaves the mic recording
+silence for the life of the capture stream. OpenXLR ships a second
+WirePlumber rule
+([packaging/52-openxlr-mk1-capture-hold.conf](../packaging/52-openxlr-mk1-capture-hold.conf))
+that keeps the MK.1's capture source always active. A community tester
+found the bug and verified the rule on their unit ([PR #140](https://github.com/emaspa/openxlr/pull/140)).
+
 | Control | State | Notes |
 |---|---|---|
 | Gain, mute | verified | community tester; scale is 256 raw units per dB ([openwave PR #8](https://github.com/rikkichy/openwave/pull/8) measured it on the shared protocol) |
