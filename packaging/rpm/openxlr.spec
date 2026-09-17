@@ -97,6 +97,8 @@ install -Dm644 packaging/50-xlr-dock-capture-hold.conf \
     %{buildroot}%{_datadir}/wireplumber/wireplumber.conf.d/50-xlr-dock-capture-hold.conf
 install -Dm644 packaging/51-openxlr-pro-raw-names.conf \
     %{buildroot}%{_datadir}/wireplumber/wireplumber.conf.d/51-openxlr-pro-raw-names.conf
+install -Dm644 packaging/52-openxlr-mk1-capture-hold.conf \
+    %{buildroot}%{_datadir}/wireplumber/wireplumber.conf.d/52-openxlr-mk1-capture-hold.conf
 
 # The reference unit points into a source checkout; the package runs
 # the wrapper.
@@ -142,6 +144,7 @@ MSG
 %{_udevrulesdir}/70-openxlr.rules
 %{_datadir}/wireplumber/wireplumber.conf.d/50-xlr-dock-capture-hold.conf
 %{_datadir}/wireplumber/wireplumber.conf.d/51-openxlr-pro-raw-names.conf
+%{_datadir}/wireplumber/wireplumber.conf.d/52-openxlr-mk1-capture-hold.conf
 %{_userunitdir}/openxlr-daemon.service
 %{_userunitdir}/pipewire-pulse.service.d/openxlr.conf
 %{_datadir}/applications/openxlr.desktop

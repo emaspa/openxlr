@@ -53,6 +53,8 @@ override_dh_auto_install:
 		$(PKG)/usr/share/wireplumber/wireplumber.conf.d/50-xlr-dock-capture-hold.conf
 	install -Dm644 packaging/51-openxlr-pro-raw-names.conf \
 		$(PKG)/usr/share/wireplumber/wireplumber.conf.d/51-openxlr-pro-raw-names.conf
+	install -Dm644 packaging/52-openxlr-mk1-capture-hold.conf \
+		$(PKG)/usr/share/wireplumber/wireplumber.conf.d/52-openxlr-mk1-capture-hold.conf
 
 	# The reference unit points into a source checkout; the package runs
 	# the wrapper.

@@ -174,7 +174,10 @@ public abstract class Mk1ClassProtocolDevice : IAudioDevice
 
 /// <summary>The original Wave XLR (MK.1, 0fd9:007d). Protocol from the
 /// openwave project; gain, mute, headphone volume, low impedance and phantom
-/// verified on two units by community testers (issues #6 and earlier).</summary>
+/// verified on two units by community testers (issues #6 and earlier).
+/// Mic capture needs 52-openxlr-mk1-capture-hold.conf (packaging/): without
+/// it, a playback stream opening before capture starts silences the mic for
+/// that capture stream's whole life; see the file for why.</summary>
 public sealed class WaveXlrMk1Device : Mk1ClassProtocolDevice
 {
     public const ushort ProductId = 0x007D;
