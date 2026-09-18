@@ -456,3 +456,8 @@ identity comes from KDE Plasma's KWin; on other desktops the routing key
 reports that it cannot identify the application. See
 [Desktop keys](manual.md#desktop-keys) and
 [Output keys](manual.md#output-keys).
+
+Mixer presentation supports per-channel and per-mix icons, colours and display
+order, channel hiding without routing changes, and a compact selected-channel
+view. Stream Deck keys follow the same icons and colours. See
+[mixer presentation](manual.md#mixer-presentation).

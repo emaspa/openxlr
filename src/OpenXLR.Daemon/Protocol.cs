@@ -40,6 +40,8 @@ public sealed record Command
     /// <summary>Mixer commands: which mix.</summary>
     [JsonPropertyName("mix")] public string? Mix { get; init; }
 
+    [JsonPropertyName("appearance")] public LayoutAppearance? Appearance { get; init; }
+
     /// <summary>setLayoutOrder: complete ordered lists of editable stable IDs.</summary>
     [JsonPropertyName("channels")] public List<string>? Channels { get; init; }
     [JsonPropertyName("mixes")] public List<string>? Mixes { get; init; }

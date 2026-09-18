@@ -13,6 +13,9 @@ namespace OpenXLR.Core.Mixing;
 /// </summary>
 public sealed record MixerSettings
 {
+    /// <summary>Display metadata keyed by channel:id or mix:id; independent of audio scenes.</summary>
+    public Dictionary<string, LayoutAppearance> Appearance { get; init; } = [];
+
     /// <summary>Ordered application channels; null preserves the legacy defaults.</summary>
     public List<UserChannelDefinition>? UserChannels { get; init; }
 

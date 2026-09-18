@@ -31,6 +31,14 @@ test("plugin publishes layout updates and keeps monitor feed commands intact", a
       monitorOutputs:["qa-output"], monitorFeeds:{}, inserts:{}
     }};
     daemon.receive(state);
+    state.mixer.channels[0].mutedIn = [];
+    state.mixer.channels[0].appearance = {icon:"♫",colour:"#1234AB",hidden:true};
+    host.receive({event:"willAppear",context:"appearance-key",action:"com.emaspa.openxlr.toggle",payload:{settings:{target:"sendmute:system:monitor"}}});
+    daemon.receive(state);
+    const appearanceImage = host.messages.filter(m => m.event === "setImage" && m.context === "appearance-key").at(-1).payload.image;
+    const appearanceSvg = Buffer.from(appearanceImage.split(",")[1], "base64").toString();
+    assert.ok(appearanceSvg.includes("♫"));
+    assert.ok(appearanceSvg.includes("#1234AB"));
     host.receive({event:"sendToPlugin",context:"qa",payload:{request:"layout"}});
     assert.ok(host.messages.at(-1).payload.levelGroups.flatMap(g => g.items)
       .some(item => item.target === "send:system:monitor2"));

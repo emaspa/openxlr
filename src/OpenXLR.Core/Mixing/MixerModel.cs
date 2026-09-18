@@ -190,7 +190,10 @@ public sealed record MixerState
 }
 
 /// <param name="Kind">"monitor", "virtualMic" or "auxPort", so clients can tell monitor mixes apart.</param>
-public sealed record MixStatus(string Id, string Name, double Volume, bool Muted, string Kind = "monitor");
+public sealed record MixStatus(string Id, string Name, double Volume, bool Muted, string Kind = "monitor")
+{
+    public LayoutAppearance Appearance { get; init; } = LayoutAppearance.Default;
+}
 
 /// <param name="Present">
 /// False when the active device has no jack behind this channel, so a client
@@ -201,7 +204,10 @@ public sealed record ChannelStatus(string Id, string Name,
     IReadOnlyDictionary<string, double> Levels,
     IReadOnlyList<string> MutedIn,
     bool Hardware = false, string? CaptureSource = null, int CapturePair = 0, bool CaptureConnected = false,
-    bool Present = true);
+    bool Present = true)
+{
+    public LayoutAppearance Appearance { get; init; } = LayoutAppearance.Default;
+}
 
 
 /// <summary>

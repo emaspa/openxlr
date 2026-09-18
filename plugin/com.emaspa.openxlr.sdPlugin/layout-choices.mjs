@@ -101,3 +101,20 @@ export function layoutChoices(mixer, devices = []) {
   });
   return { toggleGroups, levelGroups };
 }
+
+// Presentation cannot supply arbitrary SVG markup or colour attributes.
+export function targetAppearance(mixer, target) {
+  if (typeof target !== "string") return {};
+  let item;
+  if (/^(mixmute|mixvol):/.test(target)) item = mixer?.mixes?.find(m => m.id === target.split(":")[1]);
+  else if (/^(sendmute|send|focus):/.test(target)) item = mixer?.channels?.find(c => c.id === target.split(":")[1]);
+  else if (/^(insert|inschain|insparam)\|/.test(target)) {
+    const key = target.split("|")[1];
+    item = key.startsWith("mix:") ? mixer?.mixes?.find(m => m.id === key.slice(4)) : mixer?.channels?.find(c => c.id === key);
+  }
+  const value = item?.appearance;
+  return {
+    icon: ["●", "♪", "♫", "✦", "◆", "▶", "◉"].includes(value?.icon) ? value.icon : "",
+    colour: typeof value?.colour === "string" && /^#[0-9a-f]{6}$/i.test(value.colour) ? value.colour : null,
+  };
+}

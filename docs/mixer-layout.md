@@ -181,3 +181,14 @@ are written with one feed.
 
 `outputRoutes`, the per-route level list that 0.1.40 and 0.1.41 wrote, is
 ignored on read, in this file and in profiles.
+
+## Mixer presentation
+
+Display metadata lives in the `appearance` map in `mixer.json`, keyed by
+`channel:<id>` or `mix:<id>`, with `icon`, `colour`, `hidden` and optional `order`.
+Missing entries retain the existing appearance and layout order. Equal or
+missing positions use the original layout order. Deleted items lose their
+metadata. This is global layout configuration, not part of an audio profile.
+Saving a failed edit restores the previous presentation. No PipeWire nodes
+are rebuilt by these edits. `setLayoutOrder` changes routing order for editable items; the window calls it
+when **Use displayed order for routing** is chosen. `setDisplayOrder` overrides its visual order for all items.
