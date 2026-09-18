@@ -41,6 +41,13 @@ public sealed class CommandLimitsTests
     [InlineData("""{"cmd":"setOutputRoute","device":"alsa_output.headset","mix":"stream"}""", "finite")]
     [InlineData("""{"cmd":"setOutputRoute","device":"alsa_output.headset","mix":"removed","value":0.5}""", "mix must exist")]
     [InlineData("""{"cmd":"setOutputRoute","device":"missing","mix":"stream","value":0.5}""", "selected output")]
+    [InlineData("""{"cmd":"setOutputDeviceVolume","device":"alsa_output.headset","value":1.5}""", null)]
+    [InlineData("""{"cmd":"setOutputDeviceVolume","value":0}""", null)]
+    [InlineData("""{"cmd":"setOutputDeviceVolume","value":1.6}""", "between 0 and 1.5")]
+    [InlineData("""{"cmd":"setOutputDeviceVolume","value":-0.1}""", "between 0 and 1.5")]
+    [InlineData("""{"cmd":"setOutputDeviceVolume","value":1e999}""", "finite")]
+    [InlineData("""{"cmd":"setOutputDeviceVolume","device":"alsa_output.headset"}""", "finite")]
+    [InlineData("""{"cmd":"setOutputDeviceVolume","device":"","value":1}""", "invalid output name")]
     [InlineData("""{"cmd":"setMonitorFeed","device":"alsa_output.headset","mix":"monitor2"}""", null)]
     [InlineData("""{"cmd":"setMonitorFeed","device":"alsa_output.headset","mix":"nope"}""", "not a mix")]
     [InlineData("""{"cmd":"setLevel","channel":"nope","mix":"monitor","value":0.5}""", "unknown channel")]
@@ -77,6 +84,8 @@ public sealed class CommandLimitsTests
         string many = string.Join(",", Enumerable.Range(0, 17).Select(i => $"\"sink{i}\""));
         Assert.Contains("at most", CommandValidation.Check(Cmd("{\"cmd\":\"setMonitorOutputs\",\"devices\":[" + many + "]}"), layout, Find));
         Assert.Contains("too long", CommandValidation.Check(Cmd("{\"cmd\":\"assignApp\",\"channel\":\"system\",\"identity\":\"" + new string('x', 300) + "\"}"), layout, Find));
+        Assert.Contains("invalid output name", CommandValidation.Check(Cmd("{\"cmd\":\"setOutputDeviceVolume\",\"device\":\"" + new string('x', 257) + "\",\"value\":1}"), layout, Find));
+        Assert.Null(CommandValidation.Check(Cmd("{\"cmd\":\"setOutputDeviceVolume\",\"device\":\"" + new string('x', 256) + "\",\"value\":1}"), layout, Find));
         layout.OverrideCount = CommandValidation.MaxOverrides;
         Assert.Contains("remembered", CommandValidation.Check(Cmd("""{"cmd":"assignApp","channel":"system","identity":"new-app"}"""), layout, Find));
     }

@@ -136,7 +136,11 @@ returns the normal command error response and does not select a guessed app.
 Output keys use the same authenticated command endpoint:
 `{"cmd":"adjustOutputVolume","value":-0.05}` lowers the current system output
 by five percentage points; an optional `device` binds an exact output name.
-`{"cmd":"toggleOutputMute"}` toggles the current output's mute.
+`{"cmd":"setOutputDeviceVolume","value":1.0}` sets that output to 100%,
+`value` from 0 to 1.5 on the desktop scale.
+`{"cmd":"toggleOutputMute"}` toggles the current output's mute; on a selected
+monitor output it toggles the mixes feeding that output, on a monitor mix
+sink that mix.
 `{"cmd":"setMainOutput","device":"alsa_output.usb-headset"}` selects and enforces
 that output. `@monitor` follows the selected monitor output. Limits, rejected
 targets and linked-monitor behavior match the [WebSocket contract](api.md).

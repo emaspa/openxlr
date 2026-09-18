@@ -294,7 +294,8 @@ public sealed class MixerService : IHostedService, IDisposable
                     if (_mixer.SyncStreams() | _mixer.EnforceDefaults()
                         | _mixer.EnsureInputFeeds() | _mixer.EnsureAuxRoute()
                         | _mixer.EnsureFilterRoutes()
-                        | _mixer.EnsureMonitorRoutes()) Changed?.Invoke();
+                        | _mixer.EnsureMonitorRoutes()
+                        | _mixer.SyncSinkLevels()) Changed?.Invoke();
                     SyncOutputSelectors();
                     // Once a minute: is the PulseAudio server close to its
                     // open-file limit? Cheap (one /proc directory listing).
@@ -453,6 +454,7 @@ public sealed class MixerService : IHostedService, IDisposable
                     _mixer.SetMixMuted(cmd.Mix, cmd.Value.GetBoolean());
                     break;
                 case "adjustOutputVolume": _mixer.AdjustOutputVolume(cmd.Device, cmd.Value.GetDouble()); break;
+                case "setOutputDeviceVolume": _mixer.SetOutputDeviceVolume(cmd.Device, cmd.Value.GetDouble()); break;
                 case "toggleOutputMute": _mixer.ToggleOutputMute(cmd.Device); break;
                 case "setMainOutput": _mixer.SetMainOutput(cmd.Device!); break;
                 case "routeFocusedApp":

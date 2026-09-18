@@ -21,7 +21,7 @@ function replaceLayoutOptions(groups, wanted) {
     }
     place(element);
   }
-  if (/^(mixvol:|mixmute:|send:|sendmute:|focus:|outputup:|outputdown:|outputmute:|mainoutput:)/.test(selected) &&
+  if (/^(mixvol:|mixmute:|send:|sendmute:|focus:|output:|outputup:|outputdown:|outputmute:|mainoutput:)/.test(selected) &&
       !Array.from(select.options).some(option => option.value === selected)) {
     const unavailable = document.createElement("option");
     unavailable.id = "unavailable-layout-target";

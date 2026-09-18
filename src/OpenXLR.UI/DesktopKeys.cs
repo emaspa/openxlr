@@ -23,7 +23,16 @@ internal sealed class DesktopKeys(DaemonClient client) : IDisposable
 
     internal async Task ConfigureAsync(DesktopKeySettings settings, bool save = true)
     {
-        if (_lifetime.IsCancellationRequested || !await _configure.WaitAsync(0)) return;
+        if (_lifetime.IsCancellationRequested) return;
+        if (!await _configure.WaitAsync(0))
+        {
+            // A configuration can sit in the desktop's permission dialog for
+            // a while. Queue this one behind it rather than dropping it: the
+            // window's Apply stays disabled until it has run.
+            SetStatus("Waiting for the previous configuration to finish...");
+            try { await _configure.WaitAsync(_lifetime.Token); }
+            catch (OperationCanceledException) { return; }
+        }
         bool replacing = false;
         try
         {

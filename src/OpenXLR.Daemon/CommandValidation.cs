@@ -78,6 +78,7 @@ public static class CommandValidation
             case "setOutputVolume":
                 return Finite(cmd, "value");
             case "adjustOutputVolume":
+            case "setOutputDeviceVolume":
             case "toggleOutputMute":
             case "setMainOutput":
                 if (cmd.Device is not null && (cmd.Device.Length is 0 or > 256 || cmd.Device.Any(char.IsControl)))
@@ -85,6 +86,8 @@ public static class CommandValidation
                 if (cmd.Cmd == "setMainOutput" && cmd.Device is null) return "setMainOutput: need 'device'";
                 if (cmd.Cmd == "adjustOutputVolume")
                     return Finite(cmd, "value") ?? (cmd.Value.GetDouble() is >= -.5 and <= .5 ? null : "adjustOutputVolume: step must be between -0.5 and 0.5");
+                if (cmd.Cmd == "setOutputDeviceVolume")
+                    return Finite(cmd, "value") ?? (cmd.Value.GetDouble() is >= 0 and <= 1.5 ? null : "setOutputDeviceVolume: volume must be between 0 and 1.5");
                 return null;
             case "routeFocusedApp":
                 return cmd.Channel is { Length: > 0 and <= 36 } && layout.HasApplicationChannel(cmd.Channel)

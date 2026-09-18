@@ -51,7 +51,8 @@ public sealed class Lv2CatalogBudgetTests
             Params = [new PluginParam(large, large, -double.MaxValue, double.MaxValue, double.Epsilon,
                 false, false, false, false, [new ScalePoint(large, double.MaxValue)])],
         };
-        Assert.True(Lv2Catalog.Footprint(plugin) >= JsonSerializer.SerializeToUtf8Bytes(plugin, Json).Length);
+        // Measured, not estimated: the wire bytes plus the list separator.
+        Assert.Equal(JsonSerializer.SerializeToUtf8Bytes(plugin, Json).Length + 1, Lv2Catalog.Footprint(plugin));
     }
 
     [Fact]

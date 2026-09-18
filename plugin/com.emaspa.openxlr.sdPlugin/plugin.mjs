@@ -410,7 +410,12 @@ function toggleValue(target, inst) {
     if (output.kind === "main" && output.device === "@monitor")
       return mixer().monitorOutputs?.length ? mixer().enforcedDefaultSink === "@monitor" : null;
     if (output.device && !controllableOutputs(mixer(), daemonState?.devices).some(d => d.name === output.device)) return null;
-    return output.kind === "main" ? mixer().enforcedDefaultSink === output.device : false;
+    if (output.kind === "main") return mixer().enforcedDefaultSink === output.device;
+    if (output.kind !== "mute") return false;   // louder and quieter are momentary
+    // The system default key stays momentary while the daemon cannot say
+    // which sink it is, so the key still works.
+    const name = outputDeviceName(output.device);
+    return output.device ? outputMuted(name) : outputMuted(name) ?? false;
   }
   if (target.startsWith("insert|")) {
     const [, ch, id] = target.split("|");
@@ -477,6 +482,37 @@ const nextFeed = (feed) => {
     ...mixes.filter(m => (m.kind ?? "monitor") !== "monitor").map(m => m.id)];
   return choices.length ? choices[(choices.indexOf(feed) + 1) % choices.length] : "monitor";
 };
+// The mixes the monitor dial's press mutes: what the first selected
+// monitor output hears.
+const monitorDialMixes = () => {
+  const first = mixer()?.monitorOutputs?.[0];
+  return first ? feedOf(first).split("+") : ["monitor"];
+};
+
+// ---------- outputs at the audio server ----------
+// Output targets name a PipeWire sink; the empty name is the system default,
+// which is a known sink only while the daemon enforces one by name.
+const deviceOf = (name) => daemonState?.devices?.find((d) => d.name === name);
+const outputDeviceName = (name) => {
+  if (name) return name;
+  const enforced = mixer()?.enforcedDefaultSink;
+  return enforced && deviceOf(enforced) ? enforced : null;
+};
+// Muted as toggleOutputMute sees it: a mix sink is its mix, a monitor output
+// is every mix feeding it or the sink itself, any other sink is the server's
+// own flag. null when unknown.
+function outputMuted(name) {
+  const mix = name?.startsWith("OpenXLR_mix_") ? mixOf(name.slice(12)) : null;
+  if (mix) return mix.muted ?? null;
+  const own = deviceOf(name)?.muted ?? null;
+  if (mixer()?.monitorOutputs?.includes(name))
+    return feedOf(name).split("+").every((id) => mixOf(id)?.muted === true) || own === true;
+  return own;
+}
+function outputVolume(name) {
+  const mix = name?.startsWith("OpenXLR_mix_") ? mixOf(name.slice(12)) : null;
+  return mix?.volume ?? deviceOf(name)?.volume ?? null;
+}
 
 function toggleLabel(target, inst) {
   if (!target) return "OpenXLR";
@@ -522,7 +558,7 @@ function toggleLabel(target, inst) {
 }
 
 const isMuteLike = (t) =>
-  MUTE_LIKE.has(t) || t?.startsWith("mixmute:") || t?.startsWith("sendmute:");
+  MUTE_LIKE.has(t) || t?.startsWith("mixmute:") || t?.startsWith("sendmute:") || t?.startsWith("outputmute:");
 
 // ---------- turning a dial ----------
 // One turn fires many rotate events inside a single daemon round trip. Stepping
@@ -602,11 +638,20 @@ function dialValue(target, inst) {
     return { label: `${mix.name} mix`, pct: pct(v), maxPct: mix.kind === "monitor" ? 150 : 100,
              text: mix.muted ? "MUTED" : `${pct(v)}%`, muted: mix.muted };
   }
+  if (target.startsWith("output:")) {
+    const name = outputDeviceName(target.slice(7));
+    const volume = outputVolume(name);
+    if (volume == null) return null;
+    const v = dialNow(target, volume);
+    const muted = outputMuted(name) === true;
+    const label = target.length > 7 ? deviceOf(name)?.description || name : "System default";
+    return { label, pct: pct(v), maxPct: 150, text: muted ? "MUTED" : `${pct(v)}%`, muted };
+  }
   const s = dev(), x = mixer();
   switch (target) {
     case "outputVolume": {
       const v = dialNow(target, x?.outputVolume ?? 0);
-      const muted = mixOf("monitor")?.muted ?? false;
+      const muted = monitorDialMixes().every((id) => mixOf(id)?.muted === true);
       return { label: "Monitor", pct: pct(v), maxPct: 150, text: muted ? "MUTED" : `${pct(v)}%`, muted };
     }
     case "gain": case "gain2": {
@@ -730,6 +775,11 @@ function onDialRotate(context, inst, ticks) {
     if (mixer()?.outputVolume == null) return;
     const value = level(dialNow(t, mixer().outputVolume), 0, 1.5);
     dialTurn(t, value, () => cmd({ cmd: "setOutputVolume", value }));
+  } else if (t.startsWith("output:")) {
+    const name = t.slice(7), current = outputVolume(outputDeviceName(name));
+    if (current == null) return;
+    const value = level(dialNow(t, current), 0, 1.5);
+    dialTurn(t, value, () => cmd({ cmd: "setOutputDeviceVolume", device: name || null, value }));
   } else if (t === "gain" || t === "gain2") {
     const db = t === "gain" ? dev()?.gainDb : dev()?.gain2Db;
     if (db == null) return;
@@ -784,8 +834,12 @@ function onDialPress(context, inst) {
     const muted = dev()?.[control];
     if (muted != null) cmd({ cmd: "set", control, value: !muted });
   } else if (t === "outputVolume") {
-    const muted = mixOf("monitor")?.muted;
-    if (muted != null) cmd({ cmd: "setMixMuted", mix: "monitor", value: !muted });
+    const ids = monitorDialMixes(), states = ids.map((id) => mixOf(id)?.muted);
+    if (!states.every((m) => m != null)) return;
+    const allMuted = states.every(Boolean);
+    for (const id of ids) cmd({ cmd: "setMixMuted", mix: id, value: !allMuted });
+  } else if (t.startsWith("output:")) {
+    cmd({ cmd: "toggleOutputMute", device: t.slice(7) || null });
   } else if (t === "hp" || t === "hp2") {
     // no per-jack mute register exists; the output selector is the mute
     const control = t === "hp" ? "outHp1" : "outHp2";
@@ -969,7 +1023,7 @@ function dialIcon(t) {
   let name = "knob";
   if (t?.startsWith("send:")) name = "fader";
   else if (t?.startsWith("mixvol:")) name = "speaker";
-  else if (t === "outputVolume") name = "speaker";
+  else if (t === "outputVolume" || t?.startsWith("output:")) name = "speaker";
   else if (t === "gain" || t === "gain2") name = "mic";
   else if (t === "hp" || t === "hp2") name = "headphones";
   else if (t === "crossfade") name = "xfade";
@@ -1001,6 +1055,12 @@ function meterKeyFor(t) {
   if (t.startsWith("insparam|")) {
     const ch = t.split("|")[1];
     return ch.startsWith("mix:") ? ch : `ch:${ch}`;
+  }
+  // An output shows the mix it hears; a sink the mixer does not feed has no meter.
+  if (t.startsWith("output:")) {
+    const name = outputDeviceName(t.slice(7));
+    if (name?.startsWith("OpenXLR_mix_")) return `mix:${name.slice(12)}`;
+    return mixer()?.monitorOutputs?.includes(name) ? `mix:${feedOf(name).split("+")[0]}` : null;
   }
   return "mix:monitor";   // outputVolume, hp, hp2, crossfade
 }

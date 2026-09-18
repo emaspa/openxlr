@@ -15,6 +15,11 @@ internal sealed class DesktopBus(DBusConnection connection)
     internal delegate void Body(ref MessageWriter writer);
     internal DBusConnection Connection => connection;
 
+    /// <summary>The user's session bus, as the desktop and the tests set it.</summary>
+    internal static string SessionAddress()
+        => Environment.GetEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS") ?? DBusAddress.Session
+           ?? throw new InvalidOperationException("No session bus is available.");
+
     internal Task<T> Call<T>(string destination, string path, string iface, string method,
         string? signature, Body? body, MessageValueReader<T> reader, CancellationToken cancel = default)
     {

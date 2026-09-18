@@ -182,7 +182,7 @@ affects only the display; the daemon continues processing audio.
    and recalled after a daemon restart; explicitly loading a profile restores
    the values saved in that profile. A physical device named simply
    "Monitor" (often HDMI audio) is a separate output device, not a third mix.
-4. **Output matrix** opens one row per selected output, with a send for every
+4. <a name="output-matrix"></a>**Output matrix** opens one row per selected output, with a send for every
    mix, including Stream, Chat, Aux and custom microphones. Each send runs
    from Off to 100%, independently of that mix's feeds to other outputs.
    Off disconnects the route; an output whose sends are all Off stays silent.
@@ -280,18 +280,10 @@ Identity matching ignores letter case, including live channel changes and
 the running and playing indicators. If PipeWire reuses a node id for a new
 stream, or a stream later reports its actual app identity, the next sweep
 applies that app's routing instead of keeping the previous placement.
-The daemon subscribes to PipeWire registry changes through one persistent
-`pw-dump --monitor --no-colors` process. Devices, running clients, playback
-streams and sink levels share its incremental snapshot. An unchanged graph
-is neither dumped nor parsed again during the one-second routing sweep.
-That sweep still reconciles routing and device state. If the subscription
-ends, its old registry is discarded and a fresh connection is retried with
-backoff, up to five seconds between attempts. The journal reports outages
-and recovery. Each JSON batch is limited to 8 MiB, and the retained registry
-to 16 MiB of decoded text and 65,536 objects, leaving room for parsing within
-the daemon's heap limit;
-invalid or oversized output ends that subscription instead of growing the
-daemon indefinitely.
+The daemon watches PipeWire for graph changes and, while that subscription
+is reconnecting, reads the graph with a one-shot `pw-dump` so routing, default
+enforcement and route repair continue. The journal reports outages and
+recovery.
 
 1. Change the channel in the dropdown next to the app. The move happens
    immediately and is remembered for that app. The channels also appear
@@ -902,20 +894,8 @@ The message limit includes escaped Unicode names, parameter labels and
 native-plugin metadata such as bundle paths. A large or unusually named
 collection is shortened before sending, so it cannot make the window
 discard the entire list as an oversized message.
-Controls with non-finite ranges or default values are omitted from the
-generated controls; non-finite LV2 scale points are omitted too. Other
-controls and plugins remain available, so malformed plugin metadata cannot
-prevent the whole catalogue from reaching the window.
-Controls whose minimum exceeds their maximum are omitted too. Equal bounds
-remain valid, and finite defaults outside the declared range are limited to
-its nearest endpoint, including when resetting generated controls.
-CLAP and VST3 controls also need a valid, unique numeric parameter id.
-Missing, fractional, negative, overflowing or reserved ids are omitted;
-when a scanner repeats an id, only its first control is offered. Invalid
-ids are never rounded or wrapped into a different control.
-Nested objects or arrays in scalar scanner fields are ignored as a whole,
-so their contents cannot rename a plugin or address another control. Invalid
-plugin-list entries do not hide the valid entries that follow them.
+Controls with malformed metadata are left out; the rest of the plugin and
+the catalogue remain available.
 
 <a name="profiles"></a>
 ### 3.6 Save and recall a scene
@@ -1278,7 +1258,9 @@ lock), the software low cut (cycling Off, 80, 120), a mix or send mute,
 the monitor output (switching the monitor mixes to one specific device),
 an output's feed (cycling Monitor A, Monitor B, Monitor A+B and the remaining mixes, lit
 when not on A),
-the bypass of one insert or of a whole chain, or a profile to recall.
+the bypass of one insert or of a whole chain, a desktop output's mute or
+its selection as the enforced system default, the routing of the focused
+application, or a profile to recall.
 The key's LED is green for an engaged feature, red for a mute, and grey
 when the daemon is offline or the target does not exist on the
 connected interface. A key's icon can be chosen in its settings, and a
@@ -1286,7 +1268,8 @@ title typed there replaces the built-in label.
 
 **Dial** (an encoder) changes a level: the monitor output volume, a
 gain, a headphone volume, the aux level, the crossfade, a mix master, a
-channel's send into one mix or into all mixes, or one control of an
+channel's send into one mix or into all mixes, a desktop output's volume
+(the system default or a named output, up to 150%), or one control of an
 insert. The touch strip shows a knob, a level meter, the value and a
 mute overlay; pressing the dial mutes (or, for a gain, mutes the input;
 for the crossfade, recentres). A dial can hold several targets, cycled
@@ -1591,6 +1574,7 @@ an interrupted write leaves the previous file in place.
 Uninstalling a package leaves `~/.config/openxlr` in place; remove it
 by hand if you want a clean slate.
 
+<a name="capture-inputs"></a>
 ## Additional capture inputs
 
 Open **Edit layout**, then **Add capture input**. Enter a channel name,
@@ -1610,6 +1594,7 @@ picker still chooses the single interface whose hardware controls OpenXLR
 shows. The software input effects and XLR inserts retain their existing scope;
 additional capture inputs can use the effects on the mixes they feed.
 
+<a name="desktop-keys"></a>
 ## Desktop keys and focused application routing
 
 Open **Desktop keys** and enable desktop integration. For PC shortcuts, select
@@ -1648,15 +1633,22 @@ Disabling or replacing a shortcut session stops further activations. A
 command already sent to the daemon may still finish; its delayed reply
 does not replace the status of the disabled, closed or replacement session.
 
+<a name="output-keys"></a>
 ### Output volume, mute and system output keys
 
 In **Desktop keys**, select **Add volume and mute keys** and choose the current
 system default or a named output. Each volume press moves five percentage
-points within 0 to 150%. Mute toggles at the audio server. Monitor A and B
-update their corresponding mix masters; a selected external monitor output
-uses the existing linked monitor-volume behavior. Other external outputs
-change independently. Ordinary internal OpenXLR application sinks are not
-volume targets because their gains must stay at unity.
+points within 0 to 150%. Monitor A and B update their corresponding mix
+masters; a selected external monitor output uses the existing linked
+monitor-volume behavior. Other external outputs change independently.
+Ordinary internal OpenXLR application sinks are not volume targets because
+their gains must stay at unity.
+
+What the mute key toggles depends on the output. On one of the selected
+monitor outputs it mutes and unmutes the mixes feeding that output, the same
+as pressing a Deck dial on the monitor, so the mixer window, the dial rings
+and the keys agree. On a monitor mix sink it toggles that mix. On any other
+output it toggles the sink's mute at the audio server.
 
 Select **Switch system output** entries to register keys which select and
 enforce that default sink. **Follow selected monitor output** follows the
@@ -1666,9 +1658,13 @@ their bindings remain saved for reconnection. At most 16 output-selection
 shortcuts and 32 focused-channel shortcuts are retained.
 
 For OpenDeck, use the Toggle inspector's **System output controls** and
-**Enforced system output** groups. Volume and mute keys are momentary actions;
-they acknowledge the command without displaying a persistent mute indicator.
-Output-selection keys indicate the enforced choice. These Deck actions only
+**Enforced system output** groups. Volume up and down keys are momentary:
+they acknowledge the press and show no state. The mute key lights red while
+its output is muted. Output-selection keys indicate the enforced choice. A
+Dial can also take a target from the **Outputs** group, the system default or
+any controllable output: turning it sets that output's desktop volume, up to
+150%, and pressing it toggles the mute; the ring shows the level and the
+mute. These Deck actions only
 need the daemon. PC shortcuts also need the running UI and a desktop supporting
 the GlobalShortcuts portal, but do not need KDE's focused-window integration.
 Desktop shortcuts are explicitly selected in the portal; existing media-key

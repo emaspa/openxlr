@@ -1,5 +1,7 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Text.Encodings.Web;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace OpenXLR.Core.Mixing;
 
@@ -141,34 +143,23 @@ public static class Lv2Catalog
     /// </summary>
     internal static int Footprint(PluginInfo p)
     {
-        // Include every transmitted string, including optional native-host
-        // metadata. Fixed allowances cover property names, booleans, quotes,
-        // separators and the longest finite numeric representations.
-        long size = 512 + TextBytes(p.Kind) + TextBytes(p.Plugin) + TextBytes(p.Name) + TextBytes(p.Category)
-            + TextBytes(p.InputSymbol) + TextBytes(p.OutputSymbol) + TextBytes(p.Path);
-        foreach (PluginParam parameter in p.Params)
-        {
-            size += 256 + TextBytes(parameter.Symbol) + TextBytes(parameter.Name);
-            foreach (ScalePoint point in parameter.ScalePoints) size += 64 + TextBytes(point.Label);
-        }
-        foreach (IReadOnlyList<string> values in new[] { p.RequiredFeatures, p.UnsupportedFeatures,
-                     p.NativeUiRequiredFeatures, p.InputSymbols, p.OutputSymbols })
-            foreach (string value in values) size += TextBytes(value) + 3;
-        if (p.Widths is not null) size += (long)p.Widths.Count * 12;
-        return (int)Math.Min(size, int.MaxValue);
+        if (Footprints.TryGetValue(p, out object? cached)) return (int)cached;
+        // Measured, not estimated: the bytes the daemon writes for this entry
+        // under its wire options, plus the separator. An estimate that ran
+        // over the truth trimmed real catalogues from the picker for nothing.
+        int size = JsonSerializer.SerializeToUtf8Bytes(p, WireJson).Length + 1;
+        Footprints.AddOrUpdate(p, size);
+        return size;
     }
 
-    private static long TextBytes(string? text)
+    // The daemon's message options; PluginInfo is immutable, so one measure
+    // per instance serves every ordering and budget pass.
+    private static readonly JsonSerializerOptions WireJson = new()
     {
-        long bytes = 0;
-        if (text is not null)
-            foreach (char character in text)
-                // The default JSON encoder escapes non-ASCII and selected
-                // ASCII characters. Six bytes per UTF-16 code unit also covers
-                // surrogate pairs and short escapes without allocating JSON.
-                bytes += character <= 0x7f && !JavaScriptEncoder.Default.WillEncode(character) ? 1 : 6;
-        return bytes;
-    }
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    };
+    private static readonly ConditionalWeakTable<PluginInfo, object> Footprints = new();
 
     /// <summary>
     /// Keep a list under the budget by dropping the largest plugins first: a

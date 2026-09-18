@@ -1376,6 +1376,26 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             => a.HasValue != b.HasValue || (a.HasValue && Math.Abs(a.Value - b!.Value) > 0.005);
     }
 
+    /// <summary>
+    /// True when any output's desktop volume or mute moved since the last
+    /// call. Keys and dials show every output's level, so such a change is
+    /// worth a state push; it is not a setting, so nothing is saved for it.
+    /// </summary>
+    public bool SyncSinkLevels()
+    {
+        lock (_gate)
+        {
+            if (!_built) return false;
+            string levels = string.Join('\n', _pw.ListDevices()
+                .Where(d => d.Kind == AudioNodeKind.Sink)
+                .Select(d => $"{d.Name}\t{d.Volume}\t{d.Muted}"));
+            if (levels == _sinkLevels) return false;
+            _sinkLevels = levels;
+            return true;
+        }
+    }
+    private string? _sinkLevels;
+
     /// <summary>Repair internal sinks and read monitor masters from one dump under the mixer lock.</summary>
     public bool SyncOwnSinkLevels(out IReadOnlyList<string> restored)
     {
@@ -1410,7 +1430,10 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 var route = _routeGains.FirstOrDefault(pair => pair.Value.Node == sink.Name);
                 if (route.Value is not null)
                 {
-                    double expected = _outputRouteLevels.GetValueOrDefault(route.Key, 1);
+                    // pactl takes whole percents and the registry reports
+                    // them back rounded, so compare at that resolution or a
+                    // half-percent level is rewritten on every sweep.
+                    double expected = Math.Round(_outputRouteLevels.GetValueOrDefault(route.Key, 1), 2);
                     if (Math.Abs(sink.DesktopVolume - expected) > .005) _pw.SetSinkVolume(sink.Name, expected);
                     if (sink.Muted) _pw.SetSinkMuted(sink.Name, false);
                 }

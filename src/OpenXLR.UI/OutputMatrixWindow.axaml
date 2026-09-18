@@ -13,7 +13,11 @@
       <TextBlock Text="Select an output in the main window's MONITOR card to add a row."
                  IsVisible="{Binding !HasMatrixOutputs}" TextWrapping="Wrap"/>
     </StackPanel>
-    <Button DockPanel.Dock="Bottom" Content="Close" HorizontalAlignment="Right" Margin="0,12,0,0" Click="OnClose"/>
+    <DockPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
+      <Button DockPanel.Dock="Right" Content="Close" Click="OnClose"/>
+      <Button Content="Manual" Padding="10,4" HorizontalAlignment="Left" Click="OnManual"
+              ToolTip.Tip="Open the manual section on the output matrix"/>
+    </DockPanel>
     <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
       <ItemsControl ItemsSource="{Binding OutputMatrix}">
         <ItemsControl.ItemTemplate>

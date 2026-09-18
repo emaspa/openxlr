@@ -61,3 +61,24 @@ test("output choices reject internal sinks and ambiguous names, retaining monito
   assert.deepEqual(outputKey("outputdown:"), {kind:"down",device:null});
   assert.equal(outputKey("feed:headset"), null);
 });
+
+test("output dials list the system default then every controllable sink, after the mix masters", () => {
+  const state = {...mixer, mixes:[{id:"monitor", name:"My Ears", kind:"monitor"}]};
+  const devices = [
+    {name:"headset:analog", description:"Headset", kind:0},
+    {name:"OpenXLR_mix_monitor", description:"", kind:0, isOwn:true},
+    {name:"OpenXLR_ch_system", kind:0, isOwn:true},
+    {name:"sink#hp1", kind:0},
+    {name:"mic", kind:1},
+  ];
+  const groups = layoutChoices(state, devices).levelGroups;
+  assert.equal(groups[0].id, "layout-mix-levels");
+  assert.deepEqual(groups[1], {id:"layout-output-levels", label:"Outputs", items:[
+    {target:"output:", label:"Current system default"},
+    {target:"output:headset:analog", label:"Headset"},
+    {target:"output:OpenXLR_mix_monitor", label:"OpenXLR_mix_monitor"},
+  ]});
+  assert.equal(groups[2].id, "layout-all-sends");
+  assert.equal(outputKey("output:headset:analog"), null);
+  assert.equal(outputKey("output:"), null);
+});

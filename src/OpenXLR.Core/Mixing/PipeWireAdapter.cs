@@ -312,31 +312,40 @@ public sealed class PipeWireAdapter
             string? name = props.TryGetProperty("node.name", out JsonElement n) ? n.GetString() : null;
             if (name is null || !name.StartsWith("OpenXLR_", StringComparison.Ordinal)) continue;
             if (!props.TryGetProperty("media.class", out JsonElement m) || m.GetString() != "Audio/Sink") continue;
-            if (!info.TryGetProperty("params", out JsonElement pars) ||
-                !pars.TryGetProperty("Props", out JsonElement list) || list.ValueKind != JsonValueKind.Array) continue;
-            foreach (JsonElement p in list.EnumerateArray())
-            {
-                if (!p.TryGetProperty("channelVolumes", out JsonElement cv) || cv.ValueKind != JsonValueKind.Array) continue;
-                double volume = 1.0, maximum = 0.0;
-                bool any = false;
-                foreach (JsonElement v in cv.EnumerateArray())
-                    if (v.ValueKind == JsonValueKind.Number && v.TryGetDouble(out double d) && double.IsFinite(d) && d >= 0)
-                    {
-                        volume = any ? Math.Min(volume, d) : d;
-                        maximum = Math.Max(maximum, d);
-                        any = true;
-                    }
-                if (!any) continue;
-                bool muted = p.TryGetProperty("mute", out JsonElement mu) && mu.ValueKind == JsonValueKind.True;
-                // PipeWire stores linear amplitude; Pulse desktop percentages
-                // use its cube root. Keep the loudest channel, as desktop
-                // master controls do, without flattening channel balance.
-                found.Add(new OwnSinkLevel(name, volume, muted)
-                { DesktopVolume = Math.Round(Math.Cbrt(maximum) * 100) / 100 });
-                break;
-            }
+            if (SinkLevel(info) is (double volume, double desktop, bool muted))
+                found.Add(new OwnSinkLevel(name, volume, muted) { DesktopVolume = desktop });
         }
         return found;
+    }
+
+    /// <summary>
+    /// A sink node's level from its Props param: the quietest channel as
+    /// linear amplitude, the loudest as a desktop percentage, and mute.
+    /// </summary>
+    private static (double Volume, double DesktopVolume, bool Muted)? SinkLevel(JsonElement info)
+    {
+        if (!info.TryGetProperty("params", out JsonElement pars) ||
+            !pars.TryGetProperty("Props", out JsonElement list) || list.ValueKind != JsonValueKind.Array) return null;
+        foreach (JsonElement p in list.EnumerateArray())
+        {
+            if (!p.TryGetProperty("channelVolumes", out JsonElement cv) || cv.ValueKind != JsonValueKind.Array) continue;
+            double volume = 1.0, maximum = 0.0;
+            bool any = false;
+            foreach (JsonElement v in cv.EnumerateArray())
+                if (v.ValueKind == JsonValueKind.Number && v.TryGetDouble(out double d) && double.IsFinite(d) && d >= 0)
+                {
+                    volume = any ? Math.Min(volume, d) : d;
+                    maximum = Math.Max(maximum, d);
+                    any = true;
+                }
+            if (!any) continue;
+            bool muted = p.TryGetProperty("mute", out JsonElement mu) && mu.ValueKind == JsonValueKind.True;
+            // PipeWire stores linear amplitude; Pulse desktop percentages
+            // use its cube root. Keep the loudest channel, as desktop
+            // master controls do, without flattening channel balance.
+            return (volume, Math.Round(Math.Cbrt(maximum) * 100) / 100, muted);
+        }
+        return null;
     }
 
     /// <summary>
@@ -372,12 +381,13 @@ public sealed class PipeWireAdapter
 
     private void WaitForSinkLevel(string sinkName, Func<OwnSinkLevel, bool> matches)
     {
-        if (_graph is null || !BareSink(sinkName).StartsWith("OpenXLR_", StringComparison.Ordinal)) return;
-        // pactl and the registry are separate connections. Do not let the next
-        // sweep treat the pre-write snapshot as a new desktop volume change.
-        if (!_graph.WaitFor(objects => OwnSinkLevels(objects).Any(level => level.Name == BareSink(sinkName) && matches(level)),
-            TimeSpan.FromSeconds(1)))
-            throw new InvalidOperationException("PipeWire did not report the updated sink level");
+        if (_graph is null || !_graph.IsReady || !BareSink(sinkName).StartsWith("OpenXLR_", StringComparison.Ordinal)) return;
+        // pactl and the registry are separate connections. Give the registry a
+        // moment to echo the write so the next sweep does not read the old
+        // level as a new desktop change. pactl already applied the write, so
+        // a late echo is only that: the sweep after it reads the same value.
+        _graph.WaitFor(objects => OwnSinkLevels(objects).Any(level => level.Name == BareSink(sinkName) && matches(level)),
+            TimeSpan.FromSeconds(1));
     }
 
     /// <summary>Read a sink's mute directly, without a cached graph snapshot.</summary>
@@ -1239,8 +1249,11 @@ public sealed class PipeWireAdapter
             // software-created source or sink does not.
             bool physical = props.TryGetProperty("device.api", out JsonElement api) &&
                             !string.IsNullOrEmpty(api.GetString());
+            // Sinks carry their desktop level so keys and dials can show it.
+            var level = isSink ? SinkLevel(info) : null;
             found.Add(new AudioNode(name, desc, isSink ? AudioNodeKind.Sink : AudioNodeKind.Source,
-                name.StartsWith("OpenXLR", StringComparison.Ordinal), physical));
+                name.StartsWith("OpenXLR", StringComparison.Ordinal), physical)
+                { Volume = level?.DesktopVolume, Muted = level?.Muted });
         }
 
         // The Pro's physical outputs all share its hardware monitor bus, fed by
@@ -1530,7 +1543,9 @@ public sealed class PipeWireAdapter
     }
 
     // Standalone callers without a subscription retain a short-lived snapshot.
-    // A daemon subscription owns its cache and never falls back to polling.
+    // A daemon subscription owns its cache while it is connected; while it
+    // reconnects, the same one-shot dump keeps the sweep working, so routing,
+    // default enforcement and route repair never wait on the registry.
     private readonly object DumpGate = new();
     private JsonElement[]? _dumpObjects;
     private long _dumpAt;   // monotonic ms
@@ -1547,7 +1562,7 @@ public sealed class PipeWireAdapter
     {
         lock (DumpGate)
         {
-            if (_graph is not null) return _graph.Read();
+            if (_graph is not null && _graph.IsReady) return _graph.Read();
             if (_dumpObjects is not null && Environment.TickCount64 - _dumpAt < DumpWindow.TotalMilliseconds) return _dumpObjects;
             _dumpObjects = ParseObjects(RunBytes("pw-dump"));
             _dumpAt = Environment.TickCount64;
@@ -1645,7 +1660,13 @@ public enum AudioNodeKind { Sink, Source }
 /// hardware (device.api present), letting pickers filter to actual devices.
 /// </summary>
 public sealed record AudioNode(string Name, string Description, AudioNodeKind Kind, bool IsOwn,
-    bool IsPhysical = false);
+    bool IsPhysical = false)
+{
+    /// <summary>A sink's desktop volume (1.0 = 100%), null for sources and pseudo-outputs.</summary>
+    public double? Volume { get; init; }
+    /// <summary>A sink's mute, null for sources and pseudo-outputs.</summary>
+    public bool? Muted { get; init; }
+}
 
 /// <summary>One of the daemon's own sinks: its linear volume (1.0 = unity) and mute.</summary>
 public sealed record OwnSinkLevel(string Name, double Volume, bool Muted)

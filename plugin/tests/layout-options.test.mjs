@@ -64,3 +64,26 @@ test("both structural monitor mixes retain distinct dial labels and choices", ()
   assert.ok(choices.levelGroups.flatMap(g => g.items).some(i => i.target === "send:game:monitor2"));
   assert.ok(choices.toggleGroups.flatMap(g => g.items).some(i => i.target === "mixmute:monitor"));
 });
+
+test("a removed output dial target is kept as an unavailable choice", () => {
+  const select = new Element("select");
+  select.id = "target";
+  const anchor = new Element("optgroup"); anchor.dataset.layoutAnchor = "";
+  select.appendChild(anchor);
+  const all = node => [node, ...node.children.flatMap(all)];
+  const document = { createElement: tag => new Element(tag), getElementById: id => all(select).find(node => node.id === id) };
+  const context = vm.createContext({ document });
+  vm.runInContext(readFileSync(new URL("../com.emaspa.openxlr.sdPlugin/propertyInspector/layout-options.js", import.meta.url), "utf8"), context);
+  const state = { channels:[{id:"system",name:"System"}], mixes:[{id:"monitor",name:"Monitor A",kind:"monitor"}] };
+  const devices = [{name:"desk",description:"Desk speakers",kind:0}];
+  context.replaceLayoutOptions(layoutChoices(state, devices).levelGroups);
+  select.value = "output:desk";
+  assert.equal(select.options.find(o => o.value === select.value).textContent, "Desk speakers");
+  context.replaceLayoutOptions(layoutChoices(state, []).levelGroups);
+  assert.equal(select.value, "output:desk");
+  assert.equal(document.getElementById("unavailable-layout-target").disabled, true);
+  select.value = "output:";
+  context.replaceLayoutOptions(layoutChoices(state, []).levelGroups);
+  assert.equal(select.value, "output:");
+  assert.equal(document.getElementById("unavailable-layout-target"), undefined);
+});

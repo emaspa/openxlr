@@ -16,6 +16,7 @@
 , alsa-utils
 , pulseaudio
 , xdg-utils
+, glib
 }:
 
 buildDotnetModule {
@@ -63,10 +64,10 @@ buildDotnetModule {
     libsm
   ];
 
-  # The daemon shells out to amixer, parec, pw-cli and pw-loopback; the UI
-  # opens links with xdg-open.
+  # The daemon shells out to amixer, parec, pw-cli, pw-loopback and gdbus
+  # (focused-application routing); the UI opens links with xdg-open.
   makeWrapperArgs = [
-    "--prefix PATH : ${lib.makeBinPath [ alsa-utils pipewire pulseaudio xdg-utils ]}"
+    "--prefix PATH : ${lib.makeBinPath [ alsa-utils pipewire pulseaudio xdg-utils glib ]}"
   ];
 
   # The bin/ wrappers are created during fixup, so the friendly names

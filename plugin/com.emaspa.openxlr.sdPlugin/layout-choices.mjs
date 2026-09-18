@@ -83,6 +83,11 @@ export function layoutChoices(mixer, devices = []) {
       items: mixes.map((mix) => option(`mixvol:${mix.id}`, `${mix.name} mix master`)),
     },
     {
+      id: "layout-output-levels",
+      label: "Outputs",
+      items: outputs.map((d) => option(`output:${d.name}`, d.description || d.name)),
+    },
+    {
       id: "layout-all-sends",
       label: "Sends: all mixes",
       items: channels.map((channel) => option(`send:${channel.id}:all`, `${channel.name} in all mixes`)),

@@ -36,7 +36,9 @@ public sealed record StartupDefaults(string? Sink, string? Source)
     /// </summary>
     internal static string Run(string exe, IReadOnlyList<string> args, TimeSpan? timeout = null)
     {
-        ProcessResult result = ProcessRunner.Run(exe, args, timeout ?? TimeSpan.FromSeconds(3),
+        // Long enough for a socket-activated pipewire-pulse on a cold login:
+        // a missed snapshot leaves the earlier default undefended.
+        ProcessResult result = ProcessRunner.Run(exe, args, timeout ?? TimeSpan.FromSeconds(10),
             stdoutCap: 64 * 1024, stderrCap: 16 * 1024);
         if (result.TimedOut) throw new TimeoutException($"{exe} timed out while reading the startup default");
         if (result.Truncated) throw new InvalidOperationException($"{exe} output exceeded the startup default limit");

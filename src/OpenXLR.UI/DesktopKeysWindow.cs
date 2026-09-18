@@ -11,6 +11,8 @@ namespace OpenXLR.UI;
 
 internal sealed class DesktopKeysWindow : Window
 {
+    private const string Manual = "https://github.com/emaspa/openxlr/blob/main/docs/manual.md#desktop-keys";
+
     internal DesktopKeysWindow(DesktopKeys keys, MainViewModel vm)
     {
         Title = "OpenXLR Desktop keys";
@@ -38,6 +40,8 @@ internal sealed class DesktopKeysWindow : Window
         var status = new TextBlock { Text = keys.Status, TextWrapping = TextWrapping.Wrap, Classes = { "hint" } };
         var apply = new Button { Content = "Apply and configure keys", IsDefault = true };
         var close = new Button { Content = "Close", IsCancel = true };
+        var manual = new Button { Content = "Manual" };
+        ToolTip.SetTip(manual, "Open the manual section on desktop keys");
         var content = new StackPanel { Margin = new Thickness(18), Spacing = 12 };
         content.Children.Add(enabled);
         content.Children.Add(new TextBlock
@@ -51,12 +55,13 @@ internal sealed class DesktopKeysWindow : Window
         content.Children.Add(new TextBlock { Text = "Volume keys move by 5%, up to 150%. System-output keys change the enforced desktop default; mixer feeds keep their own selections.", TextWrapping = TextWrapping.Wrap });
         foreach (var choice in mainChoices) content.Children.Add(choice.Box);
         content.Children.Add(status);
-        content.Children.Add(new WrapPanel { Orientation = Orientation.Horizontal, Children = { apply, close } });
+        content.Children.Add(new WrapPanel { Orientation = Orientation.Horizontal, Children = { apply, close, manual } });
         Content = new ScrollViewer { Content = content };
         void Update() => Dispatcher.UIThread.Post(() => status.Text = keys.Status);
         keys.Changed += Update;
         Closed += (_, _) => keys.Changed -= Update;
         close.Click += (_, _) => Close();
+        manual.Click += (_, _) => ExternalLink.Open(Manual);
         apply.Click += async (_, _) =>
         {
             apply.IsEnabled = false;

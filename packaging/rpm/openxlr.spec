@@ -40,6 +40,7 @@ Requires:       fontconfig
 Requires:       libX11
 Requires:       libICE
 Requires:       libSM
+Requires:       glib2
 Recommends:     alsa-utils
 Recommends:     pulseaudio-utils
 Recommends:     xdg-utils

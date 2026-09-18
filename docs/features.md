@@ -250,7 +250,8 @@ hardware.
 
 Dials render a touch panel: a knob with a needle, a level meter, the
 value readout, and a mute overlay. Every send, mix master, gain,
-headphone volume, and the crossfade is a dial target, and one dial can
+headphone volume, the crossfade and each desktop output's volume (up to
+150%, pressing toggles its mute) is a dial target, and one dial can
 hold several targets cycled by tap or press.
 
 ![Dial panels](plugin-dials.png)
@@ -260,7 +261,8 @@ green for an engaged feature or the active monitor output. Every
 hardware switch and mute is a key target, plus the software low cut
 (its frequency shown on the LED, cycling Off, 80, 120), ClipGuard, gain
 lock, switching the monitor output to a specific device, and cycling
-an output's feed through Monitor A, Monitor B and Monitor A+B. Each key
+an output's feed through Monitor A, Monitor B and Monitor A+B, a desktop
+output's mute (red while muted) and the enforced system output. Each key
 can pick its icon, and a typed title replaces the built-in label.
 
 ![Keys](plugin-keys.png)

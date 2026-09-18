@@ -12,7 +12,7 @@ namespace OpenXLR.Tests;
 [Collection("xdg-config")]
 public sealed class DesktopKeysTests
 {
-    [Fact]
+    [DesktopBusFact]
     public async Task PortalKeysAndDeckQueriesUseTheSameFocusServiceAndCleanUp()
     {
         await using var environment = await PrivateBus.Start();
@@ -76,7 +76,7 @@ public sealed class DesktopKeysTests
         Assert.Equal("Desktop keys are disabled.", keys.Status);
     }
 
-    [Theory]
+    [DesktopBusTheory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task RapidOutputKeysAreOrderedBoundedAndDiscardedWhenDisabled(bool disable)
@@ -136,7 +136,7 @@ public sealed class DesktopKeysTests
         }
     }
 
-    [Theory]
+    [DesktopBusTheory]
     [InlineData("disable", null)]
     [InlineData("disable", "old command failed")]
     [InlineData("close", null)]
@@ -197,7 +197,7 @@ public sealed class DesktopKeysTests
         Assert.DoesNotContain("failed", keys.Status);
     }
 
-    [Theory]
+    [DesktopBusTheory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task AbandonedMethodCallsCloseTheConnectionAndReleasePendingReplies(bool cancelled)
@@ -239,7 +239,7 @@ public sealed class DesktopKeysTests
         public void Dispose() => _context?.Dispose();
     }
 
-    [Fact]
+    [DesktopBusFact]
     public async Task DeckOnlyIntegrationReportsALostDesktopConnection()
     {
         var environment = await PrivateBus.Start();
@@ -257,7 +257,7 @@ public sealed class DesktopKeysTests
         finally { if (!stopped) await environment.DisposeAsync(); }
     }
 
-    [Fact]
+    [DesktopBusFact]
     public async Task SettingsFailureDoesNotReportAnEnabledIntegration()
     {
         await using var environment = await PrivateBus.Start();
@@ -386,4 +386,26 @@ public sealed class DesktopKeysTests
             Directory.Delete(_directory, recursive: true);
         }
     }
+}
+
+/// <summary>The private session bus of these tests needs <c>dbus-daemon</c> on PATH.</summary>
+internal static class DesktopBusSkip
+{
+    public static readonly string? Reason = Environment.GetEnvironmentVariable("PATH")?
+        .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+        .Any(dir => Executable(Path.Combine(dir, "dbus-daemon"))) == true
+        ? null : "dbus-daemon is not installed; these tests start a private session bus.";
+
+    private static bool Executable(string file)
+        => File.Exists(file) && (OperatingSystem.IsWindows() || (File.GetUnixFileMode(file) & UnixFileMode.UserExecute) != 0);
+}
+
+internal sealed class DesktopBusFactAttribute : FactAttribute
+{
+    public DesktopBusFactAttribute() { if (DesktopBusSkip.Reason is { } reason) Skip = reason; }
+}
+
+internal sealed class DesktopBusTheoryAttribute : TheoryAttribute
+{
+    public DesktopBusTheoryAttribute() { if (DesktopBusSkip.Reason is { } reason) Skip = reason; }
 }

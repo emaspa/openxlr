@@ -70,9 +70,12 @@ public sealed partial class Mixer
             bool active = mixes.Contains(mixId);
             if (active && level > 0 && _routeGains.TryGetValue(routeKey, out RouteGain? gain))
             {
-                _pw.SetSinkVolume(gain.Node, level);
+                // Record the intent first: the next sweep repairs the node
+                // from it, so a write that fails or echoes late is retried
+                // rather than reverted.
                 if (level == 1) _outputRouteLevels.Remove(routeKey);
                 else _outputRouteLevels[routeKey] = level;
+                _pw.SetSinkVolume(gain.Node, level);
                 return null;
             }
             if ((active && level == 1 && !_outputRouteLevels.ContainsKey(routeKey)) || (!active && level == 0)) return null;

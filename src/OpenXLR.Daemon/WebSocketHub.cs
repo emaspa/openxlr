@@ -333,6 +333,7 @@ public sealed class WebSocketHub
             case "setMixVolume":
             case "setMixMuted":
             case "adjustOutputVolume":
+            case "setOutputDeviceVolume":
             case "toggleOutputMute":
             case "setMainOutput":
             case "routeFocusedApp":

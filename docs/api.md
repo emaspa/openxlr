@@ -60,7 +60,7 @@ Messages from the daemon, each a JSON object with a `type` field:
 
 | Type | When | Content |
 |---|---|---|
-| `state` | on connect and on every change | `daemonVersion`, device state, capabilities, mixer state, the device list, the app registry, profile names, `activeProfile` (the profile last recalled or saved for the active device; not cleared by later manual changes), `recallOnConnect` (the profile recalled when the device connects, or null), `warning` (one sentence the user should see, or null: mixer settings that cannot be written to disk, which the daemon keeps retrying with backoff, or a device set aside after three hung USB transfers in one run). In the mixer state, each channel carries `hardware` (true for the fixed input channels), `captureSource` (exact external source name or null), `capturePair` (zero-based pair), and `captureConnected` (its capture route exists). A capture channel is editable but cannot receive application assignments; `renamedSinceStart` says a virtual microphone was renamed since the daemon started (its PipeWire device keeps the old name until a restart), and `layoutWarning` is a sentence for the layout editor when pipewire-pulse nears its open-file limit, or null. Each mix carries `id`, `name`, `volume`, `muted` and `kind` (`monitor`, `virtualMic` or `auxPort`), which gives a client the mix's volume ceiling; `outputVolume` is the first selected output's volume, 0 to 1.5, or null with no output selected |
+| `state` | on connect and on every change | `daemonVersion`, device state, capabilities, mixer state, the device list, the app registry, profile names, `activeProfile` (the profile last recalled or saved for the active device; not cleared by later manual changes), `recallOnConnect` (the profile recalled when the device connects, or null), `warning` (one sentence the user should see, or null: mixer settings that cannot be written to disk, which the daemon keeps retrying with backoff, or a device set aside after three hung USB transfers in one run). In the mixer state, each channel carries `hardware` (true for the fixed input channels), `captureSource` (exact external source name or null), `capturePair` (zero-based pair), and `captureConnected` (its capture route exists). A capture channel is editable but cannot receive application assignments; `renamedSinceStart` says a virtual microphone was renamed since the daemon started (its PipeWire device keeps the old name until a restart), and `layoutWarning` is a sentence for the layout editor when pipewire-pulse nears its open-file limit, or null. Each mix carries `id`, `name`, `volume`, `muted` and `kind` (`monitor`, `virtualMic` or `auxPort`), which gives a client the mix's volume ceiling; `outputVolume` is the first selected output's volume, 0 to 1.5, or null with no output selected. In `devices`, every entry that is a sink carries `volume` (desktop scale, 1.0 = 100%) and `muted`; sources and the Wave XLR Pro pseudo-outputs omit both. A state is pushed whenever a sink's volume or mute changes |
 | `diagnostics` | in answer to `getDiagnostics` | `blocks`, mapping vendor block names to hex strings or read errors |
 | `meters` | 15 Hz while the mixer is built | live stereo levels per channel and mix |
 | `plugins` | in answer to `listPlugins` | the installed LV2, CLAP and VST3 plugins with their controls, within the message size limit above and always including the plugins the saved chains use; `supported` is false, with `unsupportedFeatures` listed, for a plugin that needs a host feature the PipeWire chain lacks. `audioIns` and `audioOuts` are the plugin's own port counts, or for VST3 its main buses' default width; a VST3 entry also carries `widths`, the chain widths in channels (1 and 2 are the ones the host carries) its main buses accepted when the helper asked the way the host asks at load, so a plugin that reports 2 and lists 1 in `widths` can be inserted on a mono input. An entry without `widths` (LV2, CLAP, or a description an older helper wrote) fits a mono input with one port each way and a stereo mix with two or more |
@@ -132,7 +132,8 @@ that final acknowledgement (or an `error` without a request id):
 | `setNativeEditorRule` | `kind`, `plugin`, `name?`, `blocked?` | set `blocked:true` to use OpenXLR controls, `false` to allow the native editor, or null/absent to remove the override and follow release defaults. Saved atomically before success; answered with `nativeEditorRules` |
 | `showInsertUi` | `channel`, `insertId` | open an enabled insert's native editor when the optional host is installed and the editor policy allows it; a blocked editor is refused without changing the audio instance |
 | `adjustOutputVolume` | optional `device`, `value` | change a PipeWire output by desktop percentage points (`0.05` is 5%). Finite steps from -0.5 to 0.5, final volume clamped to 0 through 1.5. Omit `device` for the current desktop default |
-| `toggleOutputMute` | optional `device` | toggle mute at the audio server; omit `device` for the current desktop default |
+| `setOutputDeviceVolume` | optional `device`, `value` | set a PipeWire output's desktop volume; `value` finite, 0 to 1.5 on the desktop scale (1.0 is 100%), rejected outside that range. A monitor mix sink is set through its mix master; a selected monitor output follows the linked monitor-volume behaviour. Omit `device` for the current desktop default; device names are accepted and rejected as for `adjustOutputVolume` |
+| `toggleOutputMute` | optional `device` | toggle an output's mute; omit `device` for the current desktop default. On one of the selected monitor outputs it toggles the mute of the mixes feeding that output (what pressing a Deck dial on the monitor does), so the mixer window, dial rings and keys agree; on a monitor mix sink it toggles that mix; on any other output it toggles the sink's mute at the audio server |
 | `setMainOutput` | `device` | select and enforce an available PipeWire output as the system default, or `@monitor` for the first selected monitor output. Retains capture-default policy and mixer feeds |
 | `routeFocusedApp` | `channel` | route the focused KDE application to an application channel and remember the assignment; requires the running UI with Desktop keys enabled and `gdbus`. Missing or ambiguous process identity is an error, with no guessed routing |
 | `assignApp` | `identity`, `channel`, `label?` | route an app (creates a registry entry if unseen); `channel: "ignore"` stops managing it, its streams go back to the system default output and stay wherever the desktop routes them |
@@ -200,6 +201,9 @@ loading conflicting old and normalized overrides, the normalized key wins.
 Identity comparisons ignore letter case for live routing as well as saved
 assignments. `forgetApp` discards the cached placement of matching streams,
 so the next sweep reapplies automatic routing even while the app is playing.
+`assignApp` and `assignStream` take only application channels (and `ignore`);
+the hardware channels `xlr1`, `xlr2` and the aux input are refused with
+`unknown channel`.
 `assignStream` requires a currently tracked PipeWire node id. An unknown id
 returns an error without being treated as a PulseAudio stream serial. A
 refused stream move does not store an unapplied assignment, including an
@@ -453,6 +457,10 @@ Relative volume reads the audio server at key-press time. It uses the same
 monitor master and linked output synchronization as desktop volume changes;
 it never uses the client's previous slider value. Named keys remain bound to
 that output across default changes. A key with no device resolves the desktop
-default anew on every press. External mute toggles use pipewire-pulse's atomic toggle. Monitor mixes read
-mute directly from the audio server and use the existing mix setter so state
-and graph updates follow the same path as the mixer mute control.
+default anew on every press. `setOutputDeviceVolume` takes the same targets
+and sets the level outright. A mute toggle on one of the selected monitor
+outputs toggles the mixes feeding that output, so the mixer window, the Deck
+dial rings and the keys agree; on a monitor mix sink it goes through the
+existing mix setter, so state and graph updates follow the same path as the
+mixer mute control; on any other output it uses pipewire-pulse's atomic
+toggle. The daemon pushes state whenever a sink's volume or mute changes.

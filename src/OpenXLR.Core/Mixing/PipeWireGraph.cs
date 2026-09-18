@@ -31,6 +31,9 @@ internal sealed class PipeWireGraph : IDisposable
         _worker = Task.Run(RunAsync);
     }
 
+    /// <summary>True while a complete registry is held; false while reconnecting.</summary>
+    internal bool IsReady { get { lock (_gate) return _ready; } }
+
     internal JsonElement[] Read()
     {
         lock (_gate)

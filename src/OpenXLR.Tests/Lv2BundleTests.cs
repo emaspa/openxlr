@@ -122,9 +122,9 @@ public sealed class Lv2BundleTests
         string dir = Path.Combine(Path.GetTempPath(), "openxlr-lv2-" + Guid.NewGuid().ToString("N"));
         try
         {
-            // Ninety plugins at the control limit: more than a client reads
-            // in one message, which used to end the scan short.
-            const int count = 90;
+            // Plugins at the control limit adding up to more than a client
+            // reads in one message, which used to end the scan short.
+            const int count = 120;
             for (int i = 0; i < count; i++)
             {
                 string bundle = Path.Combine(dir, $"big{i}.lv2");

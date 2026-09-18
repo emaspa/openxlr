@@ -146,6 +146,95 @@ test("plugin publishes layout updates and keeps monitor feed commands intact", a
     assert.deepEqual(daemon.messages.at(-1), {cmd:"setOutputVolume",value:0.55});
     daemon.receive(state);
     assert.equal(shown(), "55%");
+
+    // Output mute keys read the sink's state: a mix sink is its mix, a monitor
+    // output is the mixes feeding it or the sink itself, any other sink is the
+    // server's flag, and the system default is the enforced sink when named.
+    state.devices = [
+      {kind:0,name:"qa-output",description:"QA speakers",volume:0.8,muted:false},
+      {kind:0,name:"desk",description:"Desk speakers",volume:1.2,muted:true},
+      {kind:0,name:"OpenXLR_mix_monitor",description:"Monitor A",isOwn:true,volume:1,muted:false},
+      {kind:0,name:"legacy",description:"Old sink"},
+    ];
+    state.mixer.monitorFeeds = {"qa-output":"monitor+monitor2"};
+    state.mixer.mixes[0].muted = true;
+    state.mixer.mixes[1].muted = false;
+    state.mixer.enforcedDefaultSink = "desk";
+    const keyFace = (context) => {
+      const image = host.messages.filter(m => m.event === "setImage" && m.context === context).at(-1).payload.image;
+      const svg = Buffer.from(image.split(",")[1], "base64").toString();
+      return svg.includes("#FF3C4E") ? "muted" : svg.includes("#4a4f5c") ? "unknown" : "off";
+    };
+    const keyTarget = (context, target) =>
+      host.receive({event:"willAppear",context,action:"com.emaspa.openxlr.toggle",payload:{settings:{target}}});
+    for (const [context, target] of [["mix-key","outputmute:OpenXLR_mix_monitor"], ["monitor-key","outputmute:qa-output"],
+      ["desk-key","outputmute:desk"], ["legacy-key","outputmute:legacy"], ["default-key","outputmute:"]]) keyTarget(context, target);
+    daemon.receive(state);
+    assert.equal(keyFace("mix-key"), "muted");
+    assert.equal(keyFace("monitor-key"), "off");
+    assert.equal(keyFace("desk-key"), "muted");
+    assert.equal(keyFace("legacy-key"), "unknown");
+    assert.equal(keyFace("default-key"), "muted");
+    state.mixer.mixes[1].muted = true;
+    daemon.receive(state);
+    assert.equal(keyFace("monitor-key"), "muted");
+    state.mixer.mixes[0].muted = state.mixer.mixes[1].muted = false;
+    state.devices[0].muted = true;
+    daemon.receive(state);
+    assert.equal(keyFace("monitor-key"), "muted");
+    state.devices[0].muted = false;
+    state.mixer.enforcedDefaultSink = "@monitor";
+    daemon.receive(state);
+    assert.equal(keyFace("monitor-key"), "off");
+    assert.equal(keyFace("default-key"), "off");   // momentary while the default is not a named sink
+    const beforeLegacy = daemon.messages.length;
+    host.receive({event:"keyDown",context:"legacy-key"});
+    assert.equal(daemon.messages.length, beforeLegacy);
+    host.receive({event:"keyDown",context:"default-key"});
+    assert.deepEqual({...daemon.messages.at(-1), requestId:undefined}, {cmd:"toggleOutputMute",device:null,requestId:undefined});
+    state.mixer.enforcedDefaultSink = "desk";
+    daemon.receive(state);
+
+    // Output dials: the level and mute of a sink, the system default resolved
+    // through the enforced sink, sent with the target's own device name.
+    const dialTarget = (context, target) =>
+      host.receive({event:"willAppear",context,action:"com.emaspa.openxlr.dial",payload:{settings:{target}}});
+    const feedbackOf = (context) => host.messages.filter(m => m.event === "setFeedback" && m.context === context).at(-1).payload;
+    for (const [target, value, rotate, expected] of [
+      ["output:", "MUTED", 1, {cmd:"setOutputDeviceVolume",device:null,value:1.21}],
+      ["output:qa-output", "80%", -1, {cmd:"setOutputDeviceVolume",device:"qa-output",value:0.79}],
+      ["output:OpenXLR_mix_monitor", "150%", 1, {cmd:"setOutputDeviceVolume",device:"OpenXLR_mix_monitor",value:1.5}],
+    ]) {
+      dialTarget("output-dial", target);
+      assert.equal(feedbackOf("output-dial").value, value, target);
+      assert.equal(feedbackOf("output-dial").muteOverlay.enabled, value === "MUTED", target);
+      host.receive({event:"dialRotate",context:"output-dial",payload:{ticks:rotate}});
+      assert.deepEqual(daemon.messages.at(-1), expected);
+      host.receive({event:"dialDown",context:"output-dial"});
+      assert.deepEqual(daemon.messages.at(-1), {cmd:"toggleOutputMute",device:expected.device});
+    }
+    dialTarget("output-dial", "output:legacy");
+    assert.equal(feedbackOf("output-dial").value, "set up");
+    const beforeLegacyDial = daemon.messages.length;
+    host.receive({event:"dialRotate",context:"output-dial",payload:{ticks:1}});
+    assert.equal(daemon.messages.length, beforeLegacyDial);
+
+    // The monitor dial's press mutes what the first monitor output hears.
+    dialTarget("monitor-dial", "outputVolume");
+    assert.equal(feedbackOf("monitor-dial").muteOverlay.enabled, false);
+    host.receive({event:"dialDown",context:"monitor-dial"});
+    assert.deepEqual(daemon.messages.slice(-2), [
+      {cmd:"setMixMuted",mix:"monitor",value:true}, {cmd:"setMixMuted",mix:"monitor2",value:true}]);
+    state.mixer.mixes[0].muted = state.mixer.mixes[1].muted = true;
+    daemon.receive(state);
+    assert.equal(feedbackOf("monitor-dial").muteOverlay.enabled, true);
+    host.receive({event:"dialDown",context:"monitor-dial"});
+    assert.deepEqual(daemon.messages.slice(-2), [
+      {cmd:"setMixMuted",mix:"monitor",value:false}, {cmd:"setMixMuted",mix:"monitor2",value:false}]);
+    state.mixer.monitorFeeds = {"qa-output":"monitor2"};
+    daemon.receive(state);
+    host.receive({event:"dialDown",context:"monitor-dial"});
+    assert.deepEqual(daemon.messages.at(-1), {cmd:"setMixMuted",mix:"monitor2",value:false});
   }
   finally {
     intervals.forEach(clearInterval);
