@@ -92,9 +92,26 @@ test("plugin publishes layout updates and keeps monitor feed commands intact", a
     ]) {
       host.receive({event:"willAppear",context:"volume-dial",action:"com.emaspa.openxlr.dial",payload:{settings:{target}}});
       host.receive({event:"dialRotate",context:"volume-dial",payload:{ticks}});
+      await new Promise(resolve => setTimeout(resolve, 120));   // past the send window
       assert.deepEqual(daemon.messages.at(-1), expected);
     }
 
+    // Every tick of a burst has to land. The dial steps from its own last
+    // value, so ticks arriving before the daemon's echo are not lost, and the
+    // echo cannot pull the strip back to where the turn started.
+    await new Promise(resolve => setTimeout(resolve, 900));   // let the turns above cool
+    state.mixer.outputVolume = 0.5;
+    daemon.receive(state);
+    host.receive({event:"willAppear",context:"burst-dial",action:"com.emaspa.openxlr.dial",payload:{settings:{target:"outputVolume"}}});
+    for (let tick = 0; tick < 5; tick++)
+      host.receive({event:"dialRotate",context:"burst-dial",payload:{ticks:1}});
+    const shown = () => host.messages
+      .filter(m => m.event === "setFeedback" && m.context === "burst-dial").at(-1).payload.value;
+    assert.equal(shown(), "55%");
+    await new Promise(resolve => setTimeout(resolve, 150));
+    assert.deepEqual(daemon.messages.at(-1), {cmd:"setOutputVolume",value:0.55});
+    daemon.receive(state);
+    assert.equal(shown(), "55%");
   }
   finally {
     intervals.forEach(clearInterval);

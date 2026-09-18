@@ -475,6 +475,51 @@ function toggleLabel(target, inst) {
 const isMuteLike = (t) =>
   MUTE_LIKE.has(t) || t?.startsWith("mixmute:") || t?.startsWith("sendmute:");
 
+// ---------- turning a dial ----------
+// One turn fires many rotate events inside a single daemon round trip. Stepping
+// from the value the last broadcast carried loses every tick that arrives before
+// the echo (a quarter of them on a Stream Deck +, measured), and repainting only
+// on the echo makes the strip jerk. The window's sliders have the same problem
+// and solve it the same way (SliderSync): the turn leads locally. The local
+// value is what the next tick steps from and what the strip shows, the daemon
+// hears the first tick at once and a burst as one send per window, and its echo
+// cannot pull the dial back while the turn is still warm.
+const DIAL_SEND_MS = 80;    // trailing edge, as the window's sliders use
+const DIAL_HOLD_MS = 800;   // how long the local value outranks the echo
+const dialTurns = new Map();   // value key -> {value, at}
+const dialSends = new Map();   // value key -> {send, timer, at}
+
+// The value a dial steps from and shows: the local one while the turn is warm,
+// the daemon's own once it has settled.
+function dialNow(key, remote) {
+  const turn = dialTurns.get(key);
+  if (turn && Date.now() - turn.at < DIAL_HOLD_MS) return turn.value;
+  dialTurns.delete(key);
+  return remote;
+}
+
+// Take the turn's new value locally, and get it to the daemon: the first tick
+// goes out at once, the rest of a burst collapse into one send per window.
+function dialTurn(key, value, send) {
+  dialTurns.set(key, { value, at: Date.now() });
+  const pending = dialSends.get(key);
+  if (pending?.timer) { pending.send = send; return; }   // the edge sends the latest
+  if (pending && Date.now() - pending.at < DIAL_SEND_MS) {
+    const timer = setTimeout(() => {
+      const entry = dialSends.get(key);
+      if (!entry) return;
+      entry.timer = null;
+      entry.at = Date.now();
+      entry.send();
+    }, DIAL_SEND_MS);
+    timer.unref?.();
+    dialSends.set(key, { send, timer, at: pending.at });
+    return;
+  }
+  dialSends.set(key, { send, timer: null, at: Date.now() });
+  send();
+}
+
 // A dial target as {label, pct, maxPct, text, muted}, or null when unknown.
 function dialValue(target, inst) {
   if (!daemonState || !target) return null;
@@ -484,7 +529,7 @@ function dialValue(target, inst) {
     const ins = resolveInsert(ch, id, metaOf(inst, target));
     const p = ins ? paramInfo(ins.plugin, symbol) : null;
     if (!ins || !p) return null;
-    const v = ins.params?.[symbol] ?? p.default;
+    const v = dialNow(`insparam|${ch}|${ins.id}|${symbol}`, ins.params?.[symbol] ?? p.default);
     return { pin: pluginShort(ins.label, ins.plugin), scroll: p.name,
              pct: paramPct(p, v), text: ins.bypass ? "BYPASS" : paramText(p, v), muted: !!ins.bypass };
   }
@@ -492,7 +537,8 @@ function dialValue(target, inst) {
     const [, chId, mix] = target.split(":");
     const ch = chOf(chId);
     if (!ch) return null;
-    const v = mix === "all" ? (ch.levels?.monitor ?? 0) : (ch.levels?.[mix] ?? 0);
+    const shown = mix === "all" ? "monitor" : mix;   // the whole-channel dial reads Monitor A
+    const v = dialNow(`lvl:${chId}:${shown}`, ch.levels?.[shown] ?? 0);
     const muted = mix === "all"
       ? Object.keys(ch.levels ?? {}).every((m) => ch.mutedIn?.includes(m))
       : ch.mutedIn?.includes(mix) ?? false;
@@ -501,30 +547,33 @@ function dialValue(target, inst) {
              pct: pct(v), text: muted ? "MUTED" : `${pct(v)}%`, muted };
   }
   if (target.startsWith("mixvol:")) {
-    const mix = mixOf(target.slice(7));
+    const id = target.slice(7), mix = mixOf(id);
     if (!mix) return null;
-    return { label: `${mix.name} mix`, pct: pct(mix.volume), maxPct: mix.kind === "monitor" ? 150 : 100,
-             text: mix.muted ? "MUTED" : `${pct(mix.volume)}%`, muted: mix.muted };
+    const v = dialNow(`mixvol:${id}`, mix.volume);
+    return { label: `${mix.name} mix`, pct: pct(v), maxPct: mix.kind === "monitor" ? 150 : 100,
+             text: mix.muted ? "MUTED" : `${pct(v)}%`, muted: mix.muted };
   }
   const s = dev(), x = mixer();
   switch (target) {
     case "outputVolume": {
-      const v = x?.outputVolume ?? 0;
+      const v = dialNow(target, x?.outputVolume ?? 0);
       const muted = mixOf("monitor")?.muted ?? false;
       return { label: "Monitor", pct: pct(v), maxPct: 150, text: muted ? "MUTED" : `${pct(v)}%`, muted };
     }
     case "gain": case "gain2": {
       if (!deviceTargetSupported(target)) return null;
-      const db = target === "gain" ? s?.gainDb : s?.gain2Db;
+      const reported = target === "gain" ? s?.gainDb : s?.gain2Db;
       const muted = target === "gain" ? s?.mute : s?.mute2;
-      if (db == null) return null;
+      if (reported == null) return null;
+      const db = dialNow(target, reported);
       return { label: target === "gain" ? "XLR 1 gain" : "XLR 2 gain",
                pct: Math.round((db / 80) * 100), text: muted ? "MUTED" : `${db} dB`, muted };
     }
     case "hp": case "hp2": {
       if (!deviceTargetSupported(target)) return null;
-      const db = target === "hp" ? s?.hpVolumeDb : s?.hp2VolumeDb;
-      if (db == null) return null;
+      const reported = target === "hp" ? s?.hpVolumeDb : s?.hp2VolumeDb;
+      if (reported == null) return null;
+      const db = dialNow(target, reported);
       const p = Math.round(((60 + db) / 60) * 100);
       const jackOff = (target === "hp" ? s?.outHp1 : s?.outHp2) === false;
       return { label: target === "hp" ? "Phones 1" : "Phones 2", pct: p,
@@ -532,15 +581,15 @@ function dialValue(target, inst) {
     }
     case "auxLevel": {
       if (!deviceTargetSupported(target)) return null;
-      const db = s?.auxLevelDb;
-      if (db == null) return null;
+      if (s?.auxLevelDb == null) return null;
+      const db = dialNow(target, s.auxLevelDb);
       const p = Math.round(((60 + db) / 60) * 100);
       return { label: "Aux In level", pct: p, text: `${p}%`, muted: false };
     }
     case "crossfade": {
       if (!deviceTargetSupported(target)) return null;
-      const v = s?.crossfade;
-      if (v == null) return null;
+      if (s?.crossfade == null) return null;
+      const v = dialNow(target, s.crossfade);
       const text = v === 100 ? "centre" : v < 100 ? `mic +${100 - v}` : `pc +${v - 100}`;
       return { label: "Mic ↔ PC", pct: Math.round(v / 2), text, muted: false };
     }
@@ -590,48 +639,64 @@ function onDialRotate(context, inst, ticks) {
     return;
   }
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  // A level steps in whole percent and a dB control in tenths, so a long turn
+  // never accumulates float dust in the value the daemon is told.
+  const level = (v, lo, hi) => Math.round(clamp(v + ticks * 0.01, lo, hi) * 100) / 100;
+  const decibels = (v, size) => Math.round(clamp(v + ticks * size, -60, 0) * 10) / 10;
+  let turned = true;
   if (t.startsWith("insparam|")) {
     const [, ch, id, symbol] = t.split("|");
     const ins = resolveInsert(ch, id, metaOf(inst, t));
     const p = ins ? paramInfo(ins.plugin, symbol) : null;
     if (!ins || !p) return;
-    const v = ins.params?.[symbol] ?? p.default;
-    cmd({ cmd: "setInsertParam", channel: ch, insertId: ins.id, symbol, value: paramStep(p, v, ticks) });
+    const key = `insparam|${ch}|${ins.id}|${symbol}`;
+    const value = paramStep(p, dialNow(key, ins.params?.[symbol] ?? p.default), ticks);
+    dialTurn(key, value, () =>
+      cmd({ cmd: "setInsertParam", channel: ch, insertId: ins.id, symbol, value }));
   } else if (t.startsWith("send:")) {
     const [, ch, mix] = t.split(":");
     const levels = chOf(ch)?.levels;
     if (!levels) return;
     for (const m of mix === "all" ? Object.keys(levels) : [mix]) {
       if (levels[m] == null) continue;
-      cmd({ cmd: "setLevel", channel: ch, mix: m, value: clamp(levels[m] + ticks * 0.01, 0, 1) });
+      const key = `lvl:${ch}:${m}`;
+      const value = level(dialNow(key, levels[m]), 0, 1);
+      dialTurn(key, value, () => cmd({ cmd: "setLevel", channel: ch, mix: m, value }));
     }
   } else if (t.startsWith("mixvol:")) {
-    const mix = t.slice(7), state = mixOf(mix), v = state?.volume;
-    if (v == null) return;
-    cmd({ cmd: "setMixVolume", mix, value: clamp(v + ticks * 0.01, 0, state.kind === "monitor" ? 1.5 : 1) });
+    const mix = t.slice(7), state = mixOf(mix);
+    if (state?.volume == null) return;
+    const key = `mixvol:${mix}`;
+    const value = level(dialNow(key, state.volume), 0, state.kind === "monitor" ? 1.5 : 1);
+    dialTurn(key, value, () => cmd({ cmd: "setMixVolume", mix, value }));
   } else if (t === "outputVolume") {
-    const v = mixer()?.outputVolume;
-    if (v == null) return;
-    cmd({ cmd: "setOutputVolume", value: clamp(v + ticks * 0.01, 0, 1.5) });
+    if (mixer()?.outputVolume == null) return;
+    const value = level(dialNow(t, mixer().outputVolume), 0, 1.5);
+    dialTurn(t, value, () => cmd({ cmd: "setOutputVolume", value }));
   } else if (t === "gain" || t === "gain2") {
     const db = t === "gain" ? dev()?.gainDb : dev()?.gain2Db;
     if (db == null) return;
-    cmd({ cmd: "set", control: t === "gain" ? "gain" : "gain2",
-          value: clamp(db + ticks, 0, 80) });
+    const value = clamp(dialNow(t, db) + ticks, 0, 80);
+    dialTurn(t, value, () => cmd({ cmd: "set", control: t, value }));
   } else if (t === "hp" || t === "hp2") {
     const db = t === "hp" ? dev()?.hpVolumeDb : dev()?.hp2VolumeDb;
     if (db == null) return;
-    cmd({ cmd: "set", control: t === "hp" ? "hpVolumeDb" : "hp2VolumeDb",
-          value: clamp(db + ticks * 0.6, -60, 0) });
+    const control = t === "hp" ? "hpVolumeDb" : "hp2VolumeDb";
+    const value = decibels(dialNow(t, db), 0.6);
+    dialTurn(t, value, () => cmd({ cmd: "set", control, value }));
   } else if (t === "auxLevel") {
     const db = dev()?.auxLevelDb;
     if (db == null) return;
-    cmd({ cmd: "set", control: "auxLevelDb", value: clamp(db + ticks * 0.6, -60, 0) });
+    const value = decibels(dialNow(t, db), 0.6);
+    dialTurn(t, value, () => cmd({ cmd: "set", control: "auxLevelDb", value }));
   } else if (t === "crossfade") {
     const v = dev()?.crossfade;
     if (v == null) return;
-    cmd({ cmd: "set", control: "crossfade", value: clamp(v + ticks * 5, 0, 200) });
-  }
+    const value = clamp(dialNow(t, v) + ticks * 5, 0, 200);
+    dialTurn(t, value, () => cmd({ cmd: "set", control: "crossfade", value }));
+  } else turned = false;
+  // The strip follows the finger, not the echo.
+  if (turned) refresh(context);
 }
 
 function onDialPress(context, inst) {
