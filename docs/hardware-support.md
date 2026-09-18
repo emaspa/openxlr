@@ -54,8 +54,8 @@ expose, reached over the original Wave XLR's protocol dialect.
 
 | Control | State | Notes |
 |---|---|---|
-| Gain 0 to 75 dB | verified | analog preamp; confirmed by level measurement |
-| Mute, headphone volume | verified | standard ALSA controls |
+| Gain 0 to 75 dB | verified | analog preamp; confirmed by level measurement. Through the standard ALSA control, or through the gain word of the dock's config block on a unit whose card lacks that control (see below) |
+| Mute, headphone volume | verified | standard ALSA controls, with the same config block fallback |
 | Low cut 80 / 120 Hz | software | PipeWire high-pass in the mic path; response measured with test tones as second-order |
 | ClipGuard | software | post-ADC hard limiter at -3 dB, measured with test tones; needs `swh-plugins` and cannot repair analogue/ADC clipping. If the plugin is missing, the control is disabled and the current mic route remains live |
 | Gain lock | software | the daemon rejects all gain changes while set; the dock has no physical dial to bypass it. The gain the dock is given back on connect is not a change and is written even when locked, since the dock forgets it at every power cycle |
@@ -63,6 +63,20 @@ expose, reached over the original Wave XLR's protocol dialect.
 | Low impedance | verified | byte 33 of the same config block, verified by listening on the dock's headphone jack |
 | Device info block (0x000A) | read | 51 bytes; carries the unit's USB serial in ASCII from offset 35, so the diagnostics exporter masks it in the hex dump |
 | Hardware sidetone | unmapped | no control path found in the byte sweep; this does not establish whether the hardware supports it |
+
+The config block follows the original Wave XLR's layout: gain as a Q8.8 dB
+word at offset 0, mute at byte 4, phantom at byte 6, headphone volume as a
+signed Q8.8 word at offset 9, low impedance at byte 33. One dock in the
+field, the same product and firmware revision 2.10 as the unit verified
+here, answers the capture volume's range query with a maximum no higher
+than the minimum. The kernel then drops the 'Mic Capture Volume' control
+and the card carries only the two switches and the playback volume. The
+block reads the live register, and with a microphone attached the capture
+level moved by the same 70 dB whether gain was set through ALSA or through
+the word. On such a unit the daemon drives the missing control through the
+block and says so in its journal on connect. Each control uses one path
+only, because the kernel caches mixer values and would not see a block
+write behind its back.
 
 Kernel behaviour: the kernel starves the dock's capture endpoint when
 playback to it starts first, and the mic records silence. OpenXLR

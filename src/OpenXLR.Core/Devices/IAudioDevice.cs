@@ -18,6 +18,13 @@ public interface IAudioDevice : IDisposable
 
     bool Connected { get; }
 
+    /// <summary>
+    /// What a connect found worth telling the operator once: a control the
+    /// unit lacks and how it is reached instead. Null when nothing is
+    /// unusual. Read after <see cref="Connect"/>.
+    /// </summary>
+    string? ConnectionNote => null;
+
     void Connect();
     void Disconnect();
 

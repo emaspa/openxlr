@@ -371,6 +371,7 @@ public sealed class DeviceManager : BackgroundService
             _device = dev;
             _last = null;
             _log.LogInformation("connected {dev}", dev.Info.DisplayName);
+            if (dev.ConnectionNote is string note) _log.LogWarning("{dev}: {note}", dev.Info.DisplayName, note);
             _lastLoopError = null;
             // The UCM split profile that hides the raw multichannel nodes exists
             // for the Wave XLR Pro only; on the other devices the check would
