@@ -327,6 +327,8 @@ public sealed class WebSocketHub
             case "createMix":
             case "renameMix":
             case "deleteMix":
+            case "setLayoutAppearance":
+            case "setDisplayOrder":
             case "setLayoutOrder":
             case "setLevel":
             case "setChannelMuted":

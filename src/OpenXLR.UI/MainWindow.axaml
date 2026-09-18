@@ -10,6 +10,11 @@
   <!-- The window's ground, its cards, its labels, its meters and its fader
        caps come from the application's Ox.* appearance tokens (App.axaml and
        Skinning/SkinTokens.cs). What is left here is this window's own layout. -->
+  <Window.Styles>
+    <Style Selector="TextBlock.layoutAccent">
+      <Setter Property="Foreground" Value="{ReflectionBinding Appearance.Accent}"/>
+    </Style>
+  </Window.Styles>
   <Window.Resources>
     <ControlTheme x:Key="TileExpanderTheme" TargetType="Expander">
       <Setter Property="HorizontalAlignment" Value="Stretch"/>
@@ -541,6 +546,14 @@
         <TextBlock DockPanel.Dock="Top" Text="{Binding MixerPlaceholder}" TextWrapping="Wrap"
                    Classes="note" IsVisible="{Binding !HasMixer}"/>
 
+        <WrapPanel DockPanel.Dock="Top" IsVisible="{Binding HasMixer}" Margin="0,0,0,8">
+          <ToggleButton Content="Compact" IsChecked="{Binding CompactMixer, Mode=TwoWay}" Margin="0,0,8,0"
+                        ToolTip.Tip="Show one selected channel. Audio routing stays unchanged."/>
+          <ComboBox ItemsSource="{Binding Channels}" SelectedItem="{Binding SelectedCompactChannel, Mode=TwoWay}"
+                    IsVisible="{Binding CompactMixer}" MinWidth="150" MaxWidth="300">
+            <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:ChannelViewModel"><TextBlock Text="{Binding Name}"/></DataTemplate></ComboBox.ItemTemplate>
+          </ComboBox>
+        </WrapPanel>
         <!-- master row -->
         <ItemsControl DockPanel.Dock="Bottom" ItemsSource="{Binding Mixes}" IsVisible="{Binding HasMixer}"
                       Margin="0,10,0,0">
@@ -552,8 +565,9 @@
               <Border Classes="tile" Padding="10" Margin="0,0,8,8" Width="232"
                       IsVisible="{Binding Visible}">
                 <StackPanel Spacing="6">
+                  <TextBlock Text="{Binding Appearance.Icon}" Classes.layoutAccent="{Binding Appearance.HasColour}" IsVisible="{Binding Appearance.Icon, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                   <Grid ColumnDefinitions="*,Auto">
-                    <TextBlock Text="{Binding Name}" Classes="strip"
+                    <TextBlock Text="{Binding Name}" Classes.layoutAccent="{Binding Appearance.HasColour}" Classes="strip"
                                TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" Margin="0,0,8,0"/>
                     <TextBlock Grid.Column="1" Text="{Binding VolumeText}" Classes="val"/>
                   </Grid>
@@ -622,9 +636,10 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:ChannelViewModel">
                 <Border Classes="tile" Padding="10" Margin="0,0,8,0" Width="132"
-                        IsVisible="{Binding Visible}">
+                        IsVisible="{Binding DisplayVisible}">
                   <StackPanel Spacing="8">
-                    <TextBlock Text="{Binding Name}" Classes="strip" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding Appearance.Icon}" Classes.layoutAccent="{Binding Appearance.HasColour}" HorizontalAlignment="Center" IsVisible="{Binding Appearance.Icon, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                    <TextBlock Text="{Binding Name}" Classes.layoutAccent="{Binding Appearance.HasColour}" Classes="strip" HorizontalAlignment="Center"/>
                     <!-- stereo level meter (L over R), dB scale -->
                     <StackPanel Spacing="1">
                       <skin:LevelMeter Level="{Binding MeterL}" AutomationProperties.Name="Left level"/>

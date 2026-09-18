@@ -31,6 +31,9 @@ mix-to-output feed commands, which accept any existing mix or a sum of distinct
 mix ids, and `setOutputRoute` for an individual route's level. For example,
 `{"cmd":"setOutputRoute","device":"alsa_output.headset","mix":"chat","value":0.5}`
 adds a 50% Chat feed to an already selected headset; `value:0` disconnects it.
+`setLayoutAppearance` and `setDisplayOrder` also use this endpoint. Their
+changes are acknowledged only after the layout settings are saved; rejected
+appearance values or incomplete ID lists return an error without changing audio.
 Both transports share the dispatcher,
 validation and broadcasts. HTTP returns
 `{"apiVersion":"1","ok":true,"messages":[]}` after a successful mutation.

@@ -14,6 +14,8 @@ namespace OpenXLR.UI;
 /// </summary>
 public sealed record UiSettings
 {
+    public bool CompactMixer { get; init; }
+    public string? CompactChannel { get; init; }
     public bool StartDaemonAtLogin { get; init; }
     public bool OpenWindowAtLogin { get; init; }
     public bool MinimizeToTray { get; init; }

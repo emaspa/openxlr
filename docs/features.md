@@ -361,3 +361,8 @@ PipeWire output volume, mute and enforced system-output selection are available
 from the same PC shortcut session and OpenDeck Toggle keys. Volume steps use
 desktop percentages up to 150%; targets can follow the current default or stay
 bound to a named external output or monitor mix.
+
+Mixer presentation supports per-channel and per-mix icons, colours and display
+order, channel hiding without routing changes, and a compact selected-channel
+view. Stream Deck keys follow the same icons and colours. See
+[mixer presentation](mixer-layout.md#mixer-presentation).

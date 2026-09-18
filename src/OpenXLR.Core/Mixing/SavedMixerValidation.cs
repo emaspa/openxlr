@@ -29,6 +29,7 @@ internal static class SavedMixerValidation
         dropped = notes;
         return settings with
         {
+            Appearance = Appearance(settings.Appearance, notes),
             UserChannels = settings.UserChannels is null ? null : Entries(settings.UserChannels, "userChannels", notes),
             UserMixes = settings.UserMixes is null ? null : Entries(settings.UserMixes, "userMixes", notes),
             MixVolumes = Levels(settings.MixVolumes, "mixVolumes", notes),
@@ -57,6 +58,14 @@ internal static class SavedMixerValidation
                 scene.OutputRoutes.All(OutputRouteLevel.IsValid), "invalid route", "outputRoutes");
         if (scene.Inserts is not null) Inserts(scene.Inserts);
         Require(scene.OutputVolume is null || double.IsFinite(scene.OutputVolume.Value), NonFinite, "outputVolume");
+    }
+
+    private static Dictionary<string, LayoutAppearance> Appearance(Dictionary<string, LayoutAppearance>? values, List<string> notes)
+    {
+        var kept = (values ?? []).Where(p => p.Key.Length <= 44 && LayoutAppearance.IsValid(p.Value))
+            .Take(LayoutAppearance.MaxEntries).ToDictionary();
+        if (values is null || kept.Count != values.Count) notes.Add("appearance: invalid or excessive entries");
+        return kept;
     }
 
     private const string NullEntry = "null entry";

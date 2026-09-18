@@ -553,6 +553,14 @@ public sealed class WindowLayoutTests
                 .OrderBy(s => s.TranslatePoint(default, channel)!.Value.Y).ToArray();
             Assert.Equal(["monitor", "chat", "stream"], sliders.Select(s => ((SendViewModel)s.DataContext!).MixId));
         }
+        model.SelectedCompactChannel = model.Channels[1];
+        model.CompactMixer = true;
+        Layout(main, 640, 900);
+        Assert.Single(channels, c => c.IsVisible);
+        Assert.Same(model.SelectedCompactChannel, channels.Single(c => c.IsVisible).DataContext);
+        model.CompactMixer = false;
+        Layout(main, 640, 900);
+        Assert.All(channels, c => Assert.True(c.IsVisible));
         var mixes = main.GetVisualDescendants().OfType<Border>()
             .Where(b => b.DataContext is MixViewModel && b.Width == 232)
             .OrderBy(b => b.TranslatePoint(default, main)!.Value.Y)

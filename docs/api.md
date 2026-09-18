@@ -79,7 +79,7 @@ changing the other channel or later valid frames. This protects metering and
 its JSON messages; it does not modify the audio signal sent to outputs.
 
 Commands are single JSON objects with a `cmd` field. The layout commands
-(`createChannel` through `setLayoutOrder` below) succeed only after the
+(`createChannel` through `setDisplayOrder` below) succeed only after the
 new layout is written to `mixer.json`; a failed write restores the previous
 layout and answers with an error. Any command may carry a `requestId` of up to 64 characters; the
 daemon then answers with a `commandResult {requestId, error}` message after
@@ -104,6 +104,8 @@ that final acknowledgement (or an `error` without a request id):
 | `renameMix` | `mix`, `name` | rename a virtual microphone in OpenXLR; the PipeWire device keeps its old description until the daemon restarts (reloading it would throw recording apps off), and the mixer state's `renamedSinceStart` says so |
 | `deleteMix` | `mix` | remove a virtual microphone with its sends, inserts and capture device |
 | `setLayoutOrder` | `channels[]`, `mixes[]` | complete ordered lists of editable-channel and virtual-microphone ids; structural nodes stay fixed |
+| `setLayoutAppearance` | exactly one of `channel`, `mix`; `appearance {icon, colour, hidden}` | update presentation only; icon is empty or one of ● ♪ ♫ ✦ ◆ ▶ ◉, colour is null or #RRGGBB, hidden applies to channels only; omitted appearance fields reset to defaults; existing order is retained |
+| `setDisplayOrder` | `channels[]`, `mixes[]` | complete ordered lists including structural IDs; changes display order without changing routing priority |
 | `setChannelMuted` | `channel`, `mix`, `value` | one send mute |
 | `setMixVolume` / `setMixMuted` | `mix`, `value` | mix masters; monitor volume range 0 to 1.5, other mixes 0 to 1; values outside the range are clamped |
 | `setMonitorOutputs` | `devices[]` | every sink the monitor mixes feed; a newly listed output is fed by the first monitor mix |
@@ -464,3 +466,7 @@ dial rings and the keys agree; on a monitor mix sink it goes through the
 existing mix setter, so state and graph updates follow the same path as the
 mixer mute control; on any other output it uses pipewire-pulse's atomic
 toggle. The daemon pushes state whenever a sink's volume or mute changes.
+
+Mixer channel and mix state entries carry `appearance {icon, colour, hidden, order}`.
+Older clients may ignore it. Display order is reflected in the state arrays;
+channel levels, routing IDs and mix kinds retain their existing meaning.

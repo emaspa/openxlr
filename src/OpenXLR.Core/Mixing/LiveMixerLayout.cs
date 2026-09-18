@@ -184,6 +184,7 @@ public sealed partial class Mixer
                 try { _pw.MoveStreamToSink(serial, fallback.SinkName); }
                 catch (InvalidOperationException) { /* the stream ended meanwhile */ }
             }
+            _appearance.Remove("channel:" + id);
             _meters.Remove($"ch:{id}");
             RemoveCaptureFeedLocked(id);
             _inserts.Remove(id);
@@ -329,6 +330,7 @@ public sealed partial class Mixer
                 throw;
             }
 
+            _appearance.Remove("mix:" + id);
             if (previousFeeds.Values.Any(feed => MonitorFeed.Includes(feed, id)))
                 SetMonitorOutputsLocked([.. _monitorOutputs]);
             RemoveMixChainLocked(key);

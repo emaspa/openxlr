@@ -145,3 +145,33 @@ PipeWire gain sink, created muted before it is connected. Unity routes use
 direct links until they need a gain node. Existing gain nodes update in
 place, and unrelated outputs keep their links. Gain-node creation checks
 pipewire-pulse's open-file headroom and adds no helper process per route.
+
+## Mixer presentation
+
+Use **Edit layout**, **Appearance** to select an icon and an optional `#RRGGBB`
+colour for any channel or mix. Clear the colour to follow the current skin.
+The channel's **Hide** option removes its full-size strip, not its sends,
+meters, application assignments or audio connections. Hidden channels remain
+in Edit layout, application choices and Stream Deck actions.
+
+The up and down buttons move any display item, including hardware channels,
+Monitor A, Monitor B and Aux. Routing priority, the first default application
+channel and stable IDs do not change. Icons and colours reach the corresponding
+Stream Deck keys; an explicit icon chosen on a key takes precedence. Mute and
+offline indicators retain their status colours.
+
+**Compact** above the mixer shows one selected channel. Its selector includes
+hidden channels, so they can still be adjusted. If a selected channel is removed
+or unavailable on the active device, the window shows an available channel;
+with no available channels it shows none. Turning Compact off restores the
+full layout. The compact preference and selected channel are local window
+preferences in `ui.json`.
+
+Display metadata lives in the `appearance` map in `mixer.json`, keyed by
+`channel:<id>` or `mix:<id>`, with `icon`, `colour`, `hidden` and optional `order`.
+Missing entries retain the existing appearance and layout order. Equal or
+missing positions use the original layout order. Deleted items lose their
+metadata. This is global layout configuration, not part of an audio profile.
+Saving a failed edit restores the previous presentation. No PipeWire nodes
+are rebuilt by these edits. `setLayoutOrder` remains the legacy editable-only
+layout command; `setDisplayOrder` overrides its visual order for all items.

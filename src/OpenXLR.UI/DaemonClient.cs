@@ -372,6 +372,12 @@ public sealed class DaemonClient : IAsyncDisposable
         => EditLayoutAsync(new() { ["cmd"] = "renameMix", ["mix"] = mix, ["name"] = name });
     public Task<string?> DeleteMixAsync(string mix)
         => EditLayoutAsync(new() { ["cmd"] = "deleteMix", ["mix"] = mix });
+    public Task<string?> SetLayoutAppearanceAsync(string id, bool mix, string icon, string? colour, bool hidden)
+        => EditLayoutAsync(new() { ["cmd"] = "setLayoutAppearance", [mix ? "mix" : "channel"] = id,
+            ["appearance"] = new { icon, colour, hidden } });
+    public Task<string?> SetDisplayOrderAsync(IReadOnlyList<string> channels, IReadOnlyList<string> mixes)
+        => EditLayoutAsync(new() { ["cmd"] = "setDisplayOrder", ["channels"] = channels, ["mixes"] = mixes });
+
     public Task<string?> SetLayoutOrderAsync(IReadOnlyList<string> channels, IReadOnlyList<string> mixes)
         => EditLayoutAsync(new() { ["cmd"] = "setLayoutOrder", ["channels"] = channels, ["mixes"] = mixes });
 

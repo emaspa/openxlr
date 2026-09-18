@@ -54,7 +54,7 @@
           </Grid>
           <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
             <TextBlock Text="CHANNELS" Classes="h"/>
-            <TextBlock Text="A new channel starts muted in every mix. Hardware inputs stay where they are."
+            <TextBlock Text="A new channel starts muted in every mix. Display order does not change routing."
                        FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
           </StackPanel>
           <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -66,17 +66,17 @@
                     <Grid ColumnDefinitions="*,Auto,4,Auto,8,Auto,4,Auto">
                       <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="{Binding Name}" Foreground="{DynamicResource Ox.Text.Primary}" FontWeight="SemiBold"/>
+                        <Button Content="Appearance" Classes="small" HorizontalAlignment="Left" Click="OnAppearance"/>
                         <TextBlock Text="{Binding Id}" Foreground="{DynamicResource Ox.Text.Muted}" FontFamily="monospace" FontSize="10"/>
                         <TextBlock Text="{Binding CaptureLabel}" Foreground="{DynamicResource Ox.Text.Secondary}"
                                    TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding CaptureSource}"
                                    IsVisible="{Binding CaptureSource, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                       </StackPanel>
-                      <TextBlock Grid.Column="1" Text="hardware input" Foreground="{DynamicResource Ox.Text.Muted}" FontSize="11"
-                                 VerticalAlignment="Center" IsVisible="{Binding IsHardware}"/>
+
                       <Button Grid.Column="1" Content="▲" Classes="small" ToolTip.Tip="Move up"
-                              IsVisible="{Binding IsEditable}" Click="OnChannelUp"/>
+                              Click="OnChannelUp"/>
                       <Button Grid.Column="3" Content="▼" Classes="small" ToolTip.Tip="Move down"
-                              IsVisible="{Binding IsEditable}" Click="OnChannelDown"/>
+                              Click="OnChannelDown"/>
                       <Button Grid.Column="5" Content="Rename" Classes="small"
                               IsVisible="{Binding IsEditable}" Click="OnRenameChannel"/>
                       <Button Grid.Column="7" Content="Delete" Classes="small danger"
@@ -100,7 +100,7 @@
           </Grid>
           <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
             <TextBlock Text="MIXES" Classes="h"/>
-            <TextBlock Text="Each virtual microphone has its own master, sends and inserts. A new one receives nothing until you open a send. Monitor A, Monitor B and Aux stay where they are."
+            <TextBlock Text="Each virtual microphone has its own master, sends and inserts. A new one receives nothing until you open a send. Structural mixes can also be moved in the display."
                        FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
           </StackPanel>
           <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -112,14 +112,14 @@
                     <Grid ColumnDefinitions="*,Auto,4,Auto,8,Auto,4,Auto">
                       <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="{Binding Name}" Foreground="{DynamicResource Ox.Text.Primary}" FontWeight="SemiBold"/>
+                        <Button Content="Appearance" Classes="small" HorizontalAlignment="Left" Click="OnAppearance"/>
                         <TextBlock Text="{Binding Id}" Foreground="{DynamicResource Ox.Text.Muted}" FontFamily="monospace" FontSize="10"/>
                       </StackPanel>
-                      <TextBlock Grid.Column="1" Text="{Binding KindLabel}" Foreground="{DynamicResource Ox.Text.Muted}" FontSize="11"
-                                 VerticalAlignment="Center" IsVisible="{Binding !IsEditable}"/>
+
                       <Button Grid.Column="1" Content="▲" Classes="small" ToolTip.Tip="Move up"
-                              IsVisible="{Binding IsEditable}" Click="OnMixUp"/>
+                              Click="OnMixUp"/>
                       <Button Grid.Column="3" Content="▼" Classes="small" ToolTip.Tip="Move down"
-                              IsVisible="{Binding IsEditable}" Click="OnMixDown"/>
+                              Click="OnMixDown"/>
                       <Button Grid.Column="5" Content="Rename" Classes="small"
                               IsVisible="{Binding IsEditable}" Click="OnRenameMix"/>
                       <Button Grid.Column="7" Content="Delete" Classes="small danger"

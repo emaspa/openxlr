@@ -5,7 +5,7 @@
 
 import process from "node:process";
 import { randomUUID } from "node:crypto";
-import { channelName, mixName, mixShortName, layoutChoices, controllableOutputs, outputKey } from "./layout-choices.mjs";
+import { channelName, mixName, mixShortName, layoutChoices, controllableOutputs, outputKey, targetAppearance } from "./layout-choices.mjs";
 import fs from "node:fs";
 import os from "node:os";
 
@@ -937,7 +937,7 @@ function sevenSegText(text, x, y, h, color) {
   return out;
 }
 
-function keySvg(on, muteLike, known, glyphName, badge, label, offColor = null) {
+function keySvg(on, muteLike, known, glyphName, badge, label, offColor = null, appearance = {}) {
   // The keys speak the touch strips' hardware language: the same faceplate
   // material (the strip tiles' #383838 with the side-lit gradient and #505050
   // border), a machined round button cap like the dial knob, a status LED,
@@ -950,7 +950,9 @@ function keySvg(on, muteLike, known, glyphName, badge, label, offColor = null) {
   // Button cap (glyph keys) or LED display window (badge keys) or lamp only.
   const capY = lines.length ? 52 : 66;
   let face;
-  if (glyphName) {
+  if (appearance.icon) {
+    face = `<text x="72" y="${capY + 15}" text-anchor="middle" font-family="sans-serif" font-size="48" fill="${known ? (appearance.colour ?? ink) : ink}">${escXml(appearance.icon)}</text>`;
+  } else if (glyphName) {
     const glyph = GLYPHS[glyphName].replaceAll("currentColor", ink);
     face = `
       <circle cx="72" cy="${capY}" r="38" fill="none" stroke="#000" stroke-opacity="0.4" stroke-width="6"/>
@@ -985,7 +987,7 @@ function keySvg(on, muteLike, known, glyphName, badge, label, offColor = null) {
   const labelSvg = lines.map((line, i) => {
     const size = line.length > 11 ? 19 : line.length > 8 ? 22 : 26;
     const y = lines.length === 1 ? 126 : 106 + i * 24;
-    return `<text x="72" y="${y}" text-anchor="middle" fill="#e8ebf2" ` +
+    return `<text x="72" y="${y}" text-anchor="middle" fill="${known ? (appearance.colour ?? "#e8ebf2") : "#e8ebf2"}" ` +
       `stroke="#000" stroke-width="4" paint-order="stroke" stroke-linejoin="round" ` +
       `font-family="Inter, Noto Sans, DejaVu Sans, sans-serif" font-size="${size}" font-weight="700">` +
       escXml(line) + `</text>`;
@@ -1011,15 +1013,16 @@ function keySvg(on, muteLike, known, glyphName, badge, label, offColor = null) {
       </defs>
       <rect x="6" y="6" width="132" height="132" rx="14" fill="#383838"/>
       <rect x="6" y="6" width="132" height="132" rx="14" fill="url(#side)"/>
-      <rect x="9" y="9" width="126" height="126" rx="12" fill="none" stroke="#50555e" stroke-width="4"/>
+      <rect x="9" y="9" width="126" height="126" rx="12" fill="none" stroke="${known ? (appearance.colour ?? "#50555e") : "#50555e"}" stroke-width="4"/>
       ${face}${slash}${led}${lampDot}${labelSvg}
     </svg>`).toString("base64");
 }
 
 // 24x24 white icons for the dial layout's corner slot.
 function dialIcon(t) {
+  const appearance = targetAppearance(mixer(), t);
   const inner = (name) => GLYPHS[name]
-    ? `<g transform="scale(0.1667)">${GLYPHS[name].replaceAll("currentColor", "#ffffff")}</g>` : "";
+    ? `<g transform="scale(0.1667)">${GLYPHS[name].replaceAll("currentColor", appearance.colour ?? "#ffffff")}</g>` : "";
   let name = "knob";
   if (t?.startsWith("send:")) name = "fader";
   else if (t?.startsWith("mixvol:")) name = "speaker";
@@ -1028,7 +1031,7 @@ function dialIcon(t) {
   else if (t === "hp" || t === "hp2") name = "headphones";
   else if (t === "crossfade") name = "xfade";
   return "data:image/svg+xml;base64," + Buffer.from(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">${inner(name)}</svg>`
+    `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">${appearance.icon ? `<text x="12" y="19" text-anchor="middle" font-size="21" fill="${appearance.colour ?? "#ffffff"}">${escXml(appearance.icon)}</text>` : inner(name)}</svg>`
   ).toString("base64");
 }
 
@@ -1163,7 +1166,7 @@ function refresh(context) {
     const glyphName = iconChoice && GLYPHS[iconChoice] ? iconChoice : glyphFor(t);
     const offColor = isInsertTarget(t) ? "#FF3C4E" : null;   // bypassed = red, as in the UI
     send({ event: "setImage", context,
-           payload: { image: keySvg(v === true, isMuteLike(t), v !== null && daemonUp, glyphName, badge, label, offColor) } });
+           payload: { image: keySvg(v === true, isMuteLike(t), v !== null && daemonUp, glyphName, badge, label, offColor, { ...targetAppearance(mixer(), t), ...(iconChoice && GLYPHS[iconChoice] ? {icon:""} : {}) }) } });
   } else if (inst.action === "com.emaspa.openxlr.dial") {
     const d = dialValue(t, inst);
     const isDb = t === "gain" || t === "gain2";
