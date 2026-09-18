@@ -69,6 +69,24 @@ def prepare(source):
     (source / "openxlr-packaging/prepared.json").write_text(json.dumps(PIN, sort_keys=True) + "\n")
 
 
+TARGET_FLAG = re.compile(r"-(march|mtune|mcpu)=\S+|-m(no-)?(avx|sse|fma|bmi|f16c|lzcnt|movbe|popcnt|xsave|aes|pclmul)\S*")
+GENERIC_TARGET = "-march=x86-64 -mtune=generic"
+
+
+def generic_target_flags(flags):
+    """Keep the packager's flags but compile for the baseline x86-64.
+
+    The bridge host calls into Windows code through the Microsoft calling
+    convention. GCC 16.2 spills AVX registers around those calls and reloads
+    them from the wrong stack slot: with AVX-512 the reload faults on the
+    first plugin factory call, with AVX2 it reads garbage. Baseline code has
+    no such spills, and the host is IPC glue that gains nothing from the
+    wider registers.
+    """
+    kept = " ".join(TARGET_FLAG.sub("", flags).split())
+    return f"{kept} {GENERIC_TARGET}".strip()
+
+
 def build(source, output, jobs):
     prepared = source / "openxlr-packaging/prepared.json"
     if not prepared.exists() or json.loads(prepared.read_text()) != PIN:
@@ -76,6 +94,8 @@ def build(source, output, jobs):
     output.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
     env["SOURCE_DATE_EPOCH"] = str(PIN["sourceDateEpoch"])
+    for name in ("CFLAGS", "CXXFLAGS"):
+        env[name] = generic_target_flags(env.get(name, ""))
     native = output / "native"
     if not (native / "build.ninja").exists():
         run(["meson", "setup", native, source, "--buildtype=release", "--cross-file=" + str(source / "cross-wine.conf"),
