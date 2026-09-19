@@ -31,7 +31,7 @@ internal sealed class MixerView : View
         _column = Math.Clamp(_column, 0, mixes.Count - 1);
         MixEntry selectedMix = mixes[_column];
         bool tall = area.Height >= 26;
-        int overviewHeight = tall ? 8 : 4;
+        int overviewHeight = tall ? 9 : 4;
         Overview(screen, new Rect(area.X, area.Y, area.Width, overviewHeight), app, selectedMix, tall);
 
         int bankY = area.Y + overviewHeight + (tall ? 1 : 0);
@@ -64,14 +64,16 @@ internal sealed class MixerView : View
             bool keyMuted = hardwareMute is null ? channel.IsMuted(selectedMix.Id) : state.Flag(hardwareMute);
             DrawStrip(screen, strip, app, channel.Name, kind, channel.Level(selectedMix.Id), 1,
                 keyMuted, app.Link.StereoMeter("ch", channel.Id), _row == index + 1, false,
-                sendMuted: hardwareMute is not null && channel.IsMuted(selectedMix.Id), mono: channel.Mono);
+                sendMuted: hardwareMute is not null && channel.IsMuted(selectedMix.Id), mono: channel.Mono,
+                last: i == channelCount - 1);
         }
         for (int i = 0; i < masterCount; i++)
         {
             MixEntry mix = mixes[_mixScroll + i];
             string kind = mix.Kind == "monitor" ? "MON" : mix.Kind == "virtualMic" ? "MIC" : "AUX";
             DrawStrip(screen, Slot(masterBank, i, masterCount), app, mix.Name, kind, mix.Volume, mix.Ceiling,
-                mix.Muted, app.Link.StereoMeter("mix", mix.Id), _row == 0 && _column == _mixScroll + i, true);
+                mix.Muted, app.Link.StereoMeter("mix", mix.Id), _row == 0 && _column == _mixScroll + i, true,
+                last: i == masterCount - 1);
         }
         if (channelCount == 0)
             screen.Text(channelBank.X + 2, bankY + 2, "No channels", theme.TextSecondary, theme.Card,
@@ -90,12 +92,16 @@ internal sealed class MixerView : View
             theme.TextPrimary, theme.Selection, bold: true);
     }
 
+    /// <summary>
+    /// One strip's place in a bank. Every strip is the same width, so a key
+    /// or a fader sits in the same place in each of them; the first stands
+    /// against the bank's left edge and the cells left over stay at the
+    /// right, before its right edge.
+    /// </summary>
     private static Rect Slot(Rect bank, int index, int count)
     {
-        int width = bank.Width - 2;
-        int left = index * width / count;
-        int right = (index + 1) * width / count;
-        return new Rect(bank.X + 1 + left, bank.Y + 1, right - left, bank.Height - 2);
+        int each = (bank.Width - 2) / count;
+        return new Rect(bank.X + 1 + index * each, bank.Y + 1, each, bank.Height - 2);
     }
 
     private static void KeepVisible(ref int scroll, int selected, int shown, int total)
@@ -118,13 +124,16 @@ internal sealed class MixerView : View
 
     private static void DrawStrip(Screen screen, Rect area, App app, string name, string kind,
         double value, double ceiling, bool muted, MeterReading meter, bool focused, bool master,
-        bool sendMuted = false, bool mono = false)
+        bool sendMuted = false, bool mono = false, bool last = false)
     {
         Theme theme = app.Theme;
         Rgb back = focused ? theme.SelectedFace : master ? theme.Tile : theme.Card;
         screen.Fill(area.X, area.Y, area.Width, area.Height, back);
-        for (int y = area.Y; y < area.Bottom; y++)
-            screen.Set(area.Right - 1, y, '│', theme.Rule, back);
+        // A rule parts a strip from the next one; the last strip's right
+        // edge is the bank's own, which needs no second line beside it.
+        if (!last)
+            for (int y = area.Y; y < area.Bottom; y++)
+                screen.Set(area.Right - 1, y, '│', theme.Rule, back);
         int width = area.Width - 2;
         string first = name, second = string.Empty;
         if (name.Length > width)
@@ -169,9 +178,11 @@ internal sealed class MixerView : View
             screen.Text(area.X + 1, top, $"{ceiling * 100:0}", theme.TextMuted, back, maxWidth: 3);
             screen.Text(area.X + 1, top + height - 1, "  0", theme.TextMuted, back);
         }
-        // Four letters or two: both sit centred between the brackets.
+        // Four letters or two: both sit centred between the brackets, and the
+        // six-cell key is centred on the strip's face the way its name is,
+        // short of the rule down its right edge.
         string mute = muted ? "MUTE" : " ON ";
-        Widgets.MuteKey(screen, area.X + Math.Max(0, (area.Width - 7) / 2), area.Bottom - (compact ? 1 : 2),
+        Widgets.MuteKey(screen, area.X + Math.Max(0, (area.Width - 1 - 6) / 2), area.Bottom - (compact ? 1 : 2),
             mute, muted, theme, focused: false);
         if (focused && !compact)
             screen.Set(area.X, area.Bottom - 1, '━', theme.Accent, back);
@@ -193,27 +204,29 @@ internal sealed class MixerView : View
                 theme.Card, maxWidth: 27);
             return;
         }
+        // The headings on the first row, a blank row under them, then the
+        // bars and the history, and the scales on the last row.
         string held = $"{Math.Round(meter.Hold * 60 - 60):0}";
-        Widgets.BigNumber(screen, area.X + 3, area.Y + 2, held, theme, theme.Card);
-        screen.Text(area.X + 3, area.Y + 6, "HOLD / dBFS", theme.TextSecondary, theme.Card);
+        Widgets.BigNumber(screen, area.X + 3, area.Y + 3, held, theme, theme.Card);
+        screen.Text(area.X + 3, area.Y + 7, "HOLD / dBFS", theme.TextSecondary, theme.Card);
         int meterX = area.X + 20;
         int meterWidth = Math.Max(12, Math.Min(30, area.Width / 4));
         screen.Text(meterX, area.Y + 1, "STEREO / RMS", theme.TextMuted, theme.Card);
         // A row between the two, so a full-height bar reads as left or right.
-        screen.Text(meterX, area.Y + 2, "L", theme.TextSecondary, theme.Card);
-        screen.Text(meterX, area.Y + 4, "R", theme.TextSecondary, theme.Card);
-        Widgets.Meter(screen, meterX + 2, area.Y + 2, meterWidth, meter.Left, theme, theme.Card);
-        Widgets.Meter(screen, meterX + 2, area.Y + 4, meterWidth, meter.Right, theme, theme.Card);
-        screen.Text(meterX + 2, area.Y + 5, "-60", theme.TextMuted, theme.Card);
-        screen.Text(meterX + meterWidth / 2, area.Y + 5, "-30", theme.TextMuted, theme.Card);
-        screen.Text(meterX + meterWidth, area.Y + 5, "0", theme.TextMuted, theme.Card);
+        screen.Text(meterX, area.Y + 3, "L", theme.TextSecondary, theme.Card);
+        screen.Text(meterX, area.Y + 5, "R", theme.TextSecondary, theme.Card);
+        Widgets.Meter(screen, meterX + 2, area.Y + 3, meterWidth, meter.Left, theme, theme.Card);
+        Widgets.Meter(screen, meterX + 2, area.Y + 5, meterWidth, meter.Right, theme, theme.Card);
+        screen.Text(meterX + 2, area.Y + 6, "-60", theme.TextMuted, theme.Card);
+        screen.Text(meterX + meterWidth / 2, area.Y + 6, "-30", theme.TextMuted, theme.Card);
+        screen.Text(meterX + meterWidth, area.Y + 6, "0", theme.TextMuted, theme.Card);
         int historyX = meterX + meterWidth + 5;
         int historyWidth = area.Right - historyX - 2;
         screen.Text(historyX, area.Y + 1, "LEVEL HISTORY / 15 s", theme.TextMuted, theme.Card, maxWidth: historyWidth);
-        Widgets.History(screen, new Rect(historyX, area.Y + 2, historyWidth, 4),
+        Widgets.History(screen, new Rect(historyX, area.Y + 3, historyWidth, 4),
             app.Link.MeterHistory("mix", mix.Id), theme, theme.Card);
-        screen.Text(historyX, area.Y + 6, "-15 s", theme.TextMuted, theme.Card);
-        screen.Text(area.Right - 5, area.Y + 6, "now", theme.TextMuted, theme.Card);
+        screen.Text(historyX, area.Y + 7, "-15 s", theme.TextMuted, theme.Card);
+        screen.Text(area.Right - 5, area.Y + 7, "now", theme.TextMuted, theme.Card);
     }
 
     public override bool Handle(KeyPress key, App app)

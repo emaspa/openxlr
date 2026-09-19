@@ -302,6 +302,16 @@ public sealed class TuiSkinTests : IDisposable
         Assert.Equal(theme.TextPrimary, screen.At(20, 40).Fore);
         Assert.Equal(theme.Card, screen.At(30, 3).Back);
         Assert.Equal(theme.Accent, screen.At(1, 5).Fore);
+        // A vertical bar colours each cell by its top edge over the bar's
+        // height, so the warning zone's colours are those of every such edge
+        // between the warning level and the hot level, whatever the height.
+        HashSet<Rgb> warning = [];
+        for (int height = 1; height <= 60; height++)
+            for (int row = 1; row <= height; row++)
+            {
+                double position = (double)row / height;
+                if (position >= 0.7 && position <= 0.9) warning.Add(theme.MeterColour(position));
+            }
         bool cap = false, meter = false;
         for (int y = 0; y < screen.Height; y++)
             for (int x = 0; x < screen.Width; x++)
@@ -312,7 +322,7 @@ public sealed class TuiSkinTests : IDisposable
                     Assert.Equal(theme.On(theme.FocusedCap), cell.Fore);
                     cap = true;
                 }
-                if (cell.Ch == '█' && Enumerable.Range(70, 21).Any(i => theme.MeterColour(i / 100.0) == cell.Fore)) meter = true;
+                if (cell.Ch == '█' && warning.Contains(cell.Fore)) meter = true;
             }
         Assert.True(cap, "the focused fader cap was not drawn");
         Assert.True(meter, "the light skin's warning zone was not drawn");

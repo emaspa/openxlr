@@ -40,11 +40,15 @@ internal sealed class MatrixView : View
         _column = Math.Clamp(_column, 0, mixes.Count - 1);
 
         // With height to spare every meter is stereo, on two rows of its own,
-        // and a channel takes two rows so its neighbours do not touch. A short
+        // and a channel takes those two rows and a blank one under them, so
+        // its lower bar never touches the next channel's upper bar. A short
         // terminal keeps one row a channel and one summed bar.
-        bool roomy = area.Height - 8 >= channels.Count * 2;
+        bool roomy = area.Height - 9 >= channels.Count * 3;
         int nameWidth = roomy ? 22 : NameWidth;
-        int masterHeight = roomy ? 6 : 3;
+        // A master tile is its name, fader and key, a blank row, then its two
+        // bars a row apart and a blank row under the lower one, so neither
+        // bar sits against the key or the tile's edge.
+        int masterHeight = roomy ? 8 : 3;
 
         int cells = Math.Max(1, (area.Width - nameWidth - 2) / MinCell);
         int shown = Math.Min(mixes.Count, cells);
@@ -76,7 +80,7 @@ internal sealed class MatrixView : View
             MeterReading level = app.Link.StereoMeter("mix", mix.Id);
             if (roomy)
             {
-                Stereo(screen, x + 1, y + 3, y + 5, cellWidth - 4, level, theme, back);
+                Stereo(screen, x + 1, y + 4, y + 6, cellWidth - 4, level, theme, back);
             }
             else
             {
@@ -92,11 +96,14 @@ internal sealed class MatrixView : View
         // Three rows a channel where they fit: the name and the sends on the
         // middle one, the left bar on the row above and the right bar on the
         // row below, so the name sits centred between its two bars. Two rows
-        // where only those fit, with the name beside the left bar. One row and
-        // a summed bar in a short terminal.
+        // where only those fit, with the name beside the left bar. Either way
+        // a blank row follows, in the panel's ground, so one channel's pair
+        // stands apart from the next one's. One row and a summed bar in a
+        // short terminal, with nothing between.
         int available = Math.Max(1, area.Bottom - y);
-        int step = !roomy ? 1 : channels.Count * 3 <= available ? 3 : 2;
-        int rows = Math.Max(1, available / step);
+        int step = !roomy ? 1 : channels.Count * 4 <= available ? 3 : 2;
+        int pitch = roomy ? step + 1 : 1;
+        int rows = Math.Max(1, available / pitch);
         int first = Math.Max(0, Math.Min(_row - 1 - rows + 2, channels.Count - rows));
         if (_row == 0) first = 0;
         int meterWidth = roomy ? nameWidth - 13 : 4;
@@ -104,15 +111,14 @@ internal sealed class MatrixView : View
         for (int index = 0; index < rows && first + index < channels.Count; index++)
         {
             ChannelEntry channel = channels[first + index];
-            int line = y + index * step;
+            int line = y + index * pitch;
             int nameLine = line + (step == 3 ? 1 : 0);
             bool selectedRow = _row == first + index + 1;
-            // Every other channel takes a slightly different ground, so the
-            // rows of one channel read as its own block rather than pairing a
-            // channel's lower meter with the next channel's upper one.
-            Rgb rowBack = selectedRow ? theme.SelectedFace
-                : step > 1 && (first + index) % 2 == 1 ? theme.Card.Mix(theme.Window, 0.6) : theme.Card;
+            // A channel's rows are one tile, and the blank row after them is
+            // the ground the tiles stand on.
+            Rgb rowBack = selectedRow ? theme.SelectedFace : theme.Tile;
             screen.Fill(area.X, line, area.Width, step, rowBack);
+            if (pitch > step) screen.Fill(area.X, line + step, area.Width, 1, theme.Card);
 
             Rgb nameColour = channel.Hardware ? theme.TextPrimary : theme.TextDetail;
             screen.Text(x0, nameLine, channel.Name, nameColour, rowBack, bold: selectedRow,
