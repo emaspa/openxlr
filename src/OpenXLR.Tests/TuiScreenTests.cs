@@ -134,7 +134,7 @@ public sealed class TuiScreenTests
 
         for (int cell = 0; cell < 8; cell++)
         {
-            Assert.Equal('▁', screen.At(cell, 0).Ch);
+            Assert.Equal('─', screen.At(cell, 0).Ch);
             Assert.Equal(Theme.Material.MeterTrack, screen.At(cell, 0).Fore);
         }
     }

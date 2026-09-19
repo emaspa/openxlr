@@ -199,9 +199,10 @@ internal sealed class MixerView : View
         int meterX = area.X + 20;
         int meterWidth = Math.Max(12, Math.Min(30, area.Width / 4));
         screen.Text(meterX, area.Y + 1, "STEREO / RMS", theme.TextMuted, theme.Card);
-        screen.Text(meterX, area.Y + 3, "L", theme.TextSecondary, theme.Card);
+        // A row between the two, so a full-height bar reads as left or right.
+        screen.Text(meterX, area.Y + 2, "L", theme.TextSecondary, theme.Card);
         screen.Text(meterX, area.Y + 4, "R", theme.TextSecondary, theme.Card);
-        Widgets.Meter(screen, meterX + 2, area.Y + 3, meterWidth, meter.Left, theme, theme.Card);
+        Widgets.Meter(screen, meterX + 2, area.Y + 2, meterWidth, meter.Left, theme, theme.Card);
         Widgets.Meter(screen, meterX + 2, area.Y + 4, meterWidth, meter.Right, theme, theme.Card);
         screen.Text(meterX + 2, area.Y + 5, "-60", theme.TextMuted, theme.Card);
         screen.Text(meterX + meterWidth / 2, area.Y + 5, "-30", theme.TextMuted, theme.Card);
