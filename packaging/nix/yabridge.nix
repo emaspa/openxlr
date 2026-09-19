@@ -24,6 +24,14 @@ let
       rm -rf "$sourceRoot/subprojects/asio"
       cp -R --no-preserve=mode,ownership ${asio} "$sourceRoot/subprojects/asio"
     '';
+    # The host calls into Windows code through the Microsoft calling
+    # convention, and GCC spills AVX registers around those calls to the
+    # wrong stack slot. The other packages compile it for the baseline
+    # x86-64 (packaging/yabridge/build.py); a platform with gcc.arch set
+    # would otherwise get the faulting build here.
+    env = (old.env or { }) // {
+      NIX_CFLAGS_COMPILE = toString ((old.env.NIX_CFLAGS_COMPILE or "") + " -march=x86-64 -mtune=generic");
+    };
   });
   controller = (yabridgectl.override { yabridge = bridge; wineWow64Packages = winePackages; }).overrideAttrs (old: {
     patches = old.patches ++ [ ../yabridge/private-plugin-home.patch ];
