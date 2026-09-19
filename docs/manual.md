@@ -81,8 +81,8 @@ virtual microphones among them can be added, renamed and removed:
 | Aux | what a second computer receives | the interface's USB Aux port (Wave XLR Pro only) |
 
 An output is not tied to the monitor mixes: its feed picker can name any
-mix, and the Output matrix gives it a level for each mix it hears
-([section 3.2](#output-matrix)).
+mix, and the API can name a sum of mixes ([section 3.2](#monitor)). A
+blend at other levels is a mix of its own, with the sends set there.
 
 Every channel has a **send** into every mix: a level and a mute. The
 SUBMIXER card shows them as a grid, channels down, mixes across. Each
@@ -187,20 +187,7 @@ affects only the display; the daemon continues processing audio.
    and recalled after a daemon restart; explicitly loading a profile restores
    the values saved in that profile. A physical device named simply
    "Monitor" (often HDMI audio) is a separate output device, not a third mix.
-4. <a name="output-matrix"></a>**Output matrix** opens one row per selected output, with a send for every
-   mix, including Stream, Chat, Aux and custom microphones. Each send runs
-   from Off to 100%, independently of that mix's feeds to other outputs.
-   Off disconnects the route; an output whose sends are all Off stays silent.
-   Mix masters and insert processing still apply before these sends.
-   The percentages use the same PipeWire volume scale as other mixer controls.
-   Summing several loud mixes can exceed unity, so adjust their sends to keep
-   headroom. Settings and profiles remember the matrix.
-
-   Pro jacks that share the USB return bus appear in one row. Their software
-   mix and send levels change together. A route below unity uses software
-   microphone monitoring so the direct hardware path cannot bypass its gain.
-   Independent physical jack mixes require hardware support beyond that bus.
-5. The Volume slider sets the level of the selected devices. To control this
+4. The Volume slider sets the level of the selected devices. To control this
    same level with a keyboard volume wheel, media keys or the Linux audio
    applet, open Options, SYSTEM DEFAULT DEVICES, and choose **Follow MONITOR
    output (system volume controls)** as Default output. Linux then uses the
@@ -228,7 +215,7 @@ affects only the display; the daemon continues processing audio.
    Existing fixed default-device choices remain available; a virtual channel
    such as OpenXLR System is a routing destination, not a monitor volume
    control.
-6. The HEADPHONES card holds the interface's own headphone volume,
+5. The HEADPHONES card holds the interface's own headphone volume,
    low-impedance mode, and on the Pro the Mic ↔ PC crossfade, which is
    the zero-latency direct monitor inside the device: left is only your
    microphone, right is only computer audio.

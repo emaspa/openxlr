@@ -869,7 +869,6 @@ public sealed partial class MainViewModel : ViewModelBase
         string primaryMonitor = monitorMixes.FirstOrDefault()?.Id ?? "monitor";
         foreach (MonitorOutputItem item in MonitorOutputs)
             item.SyncFeed(monitorMixes, feeds?[item.Name]?.GetValue<string>() ?? primaryMonitor);
-        SyncOutputMatrix(mixer);
         Raise(nameof(MonitorSummary));
     }
 
@@ -1249,7 +1248,6 @@ public sealed class MonitorOutputItem : ViewModelBase
             // every possible combination of the layout's mixes.
             if (!options.Any(o => o.Id == mixId))
             {
-                if (mixId.Length == 0) options = [.. options, new MixOption("", "Silent")];
                 string[] ids = mixId.Split('+');
                 if (ids.Length > 1 && ids.All(id => options.Any(o => o.Id == id)))
                     options = [.. options, new MixOption(mixId, string.Join(" + ", ids.Select(id => options.First(o => o.Id == id).Name)))];

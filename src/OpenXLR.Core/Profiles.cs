@@ -26,8 +26,6 @@ public sealed record MixerScene
     /// <summary>Output name to the monitor mix feeding it; null in profiles saved before Monitor B.</summary>
     public Dictionary<string, string>? MonitorFeeds { get; init; }
 
-    /// <summary>Per-route gain exceptions; null belongs to legacy scenes.</summary>
-    public List<OutputRouteLevel>? OutputRoutes { get; init; }
     public bool AuxPortEnabled { get; init; }
     public double? OutputVolume { get; init; }
     /// <summary>Software low cut (0, 80, or 120 Hz); absent in older profiles.</summary>
