@@ -1055,7 +1055,8 @@ their header, across restarts.
 <a name="skins"></a>
 ### 3.10 Change how the window looks
 
-Options, APPEARANCE picks a skin. OpenXLR ships two:
+Options, APPEARANCE picks a skin. OpenXLR ships thirteen, all built into
+the application, so a package brings them with it:
 
 - **Material**, the default, which is what the window has always looked
   like;
@@ -1064,7 +1065,11 @@ Options, APPEARANCE picks a skin. OpenXLR ships two:
   whose lettering is backlit green when a control is on and red when
   something is muted or bypassed, console faders with a machined cap,
   indicator lamps in a bezel, and meters that run green to amber to red
-  across the scale.
+  across the scale;
+- eleven built from the Omarchy palettes, for a desktop already wearing
+  one of them: Catppuccin, Catppuccin Latte, Everforest, Gruvbox,
+  Kanagawa, Matte Black, Nord, Osaka Jade, Ristretto, Rose Pine and Tokyo
+  Night. Catppuccin Latte and Rose Pine are light.
 
 The choice takes effect at once. Windows that are already open repaint;
 audio, the mixer, the routing and the layout are untouched, and nothing is

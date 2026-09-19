@@ -239,14 +239,15 @@ public sealed class TuiSkinTests : IDisposable
         Assert.Equal("nord", UiSettingsFile.ReadSkin());
     }
 
-    // --- the skins this repository ships as examples ---
+    // --- the skins this repository ships ---
 
     [Fact]
-    public void TheExampleSkinsReadIntoAPaletteThatIsNotTheDefaultOne()
+    public void TheShippedSkinsReadIntoAPaletteThatIsNotTheDefaultOne()
     {
-        string examples = Path.Combine(Root(), "docs", "examples", "skins");
-        string[] folders = Directory.GetDirectories(examples);
-        Assert.True(folders.Length > 1, "the examples folder holds only one skin");
+        string shipped = Path.Combine(Root(), "src", "OpenXLR.UI", "Assets", "Skins");
+        string[] folders = [.. Directory.GetDirectories(shipped),
+            Path.Combine(Root(), "docs", "examples", "skins", "example")];
+        Assert.True(folders.Length > 2, "only one appearance ships");
 
         foreach (string folder in folders)
         {
@@ -255,7 +256,7 @@ public sealed class TuiSkinTests : IDisposable
             Assert.NotEqual(Theme.Material.Window, theme.Window);
             Assert.NotEqual(Theme.Material.TextPrimary, theme.TextPrimary);
             // A meter that never changes colour wastes the scale, and every
-            // example here sets its three zones.
+            // shipped appearance sets its three zones.
             if (id != "example")
                 Assert.NotEqual(theme.MeterFill, theme.MeterHot);
         }
@@ -283,7 +284,8 @@ public sealed class TuiSkinTests : IDisposable
     [InlineData("catppuccin-latte")]
     public void LightSkinsKeepTheDeskSelectionAndFaderCapsLegible(string id)
     {
-        Theme theme = Theme.FromJson(File.ReadAllText(Path.Combine(Root(), "docs", "examples", "skins", id, "skin.json")), id, id);
+        Theme theme = Theme.FromJson(
+            File.ReadAllText(Path.Combine(Root(), "src", "OpenXLR.UI", "Assets", "Skins", id, "skin.json")), id, id);
         Assert.True(theme.Light);
         Assert.True(Contrast(theme.TextPrimary, theme.Selection) >= 4.5);
         Assert.True(Contrast(theme.On(theme.FocusedCap), theme.FocusedCap) >= 4.5);

@@ -76,7 +76,7 @@
     "Ox.Control.BorderBrushPointerOver": "#094dd2",
     "Ox.Control.BorderBrushDisabled": "#ccd0da",
     "Ox.Control.CornerRadius": 3,
-    "Ox.Control.DisabledOpacity": 1,
+    "Ox.Control.DisabledOpacity": 0.6,
     "Ox.Ghost.Background": "#eff1f5",
     "Ox.Toggle.Foreground": "#4c4f69",
     "Ox.Toggle.ForegroundChecked": "#2b6d1d",

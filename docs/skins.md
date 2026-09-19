@@ -5,16 +5,22 @@ A skin changes how the OpenXLR window looks. It is a folder with a
 appearance values; it carries no markup, no script and no code, and it
 cannot reach a file outside its own folder.
 
-OpenXLR ships two appearances:
+OpenXLR ships thirteen appearances, all compiled into the application, so
+every package has them and there is nothing to install:
 
 - **Material**, the default, which is what the window has always looked
-  like. It is compiled in and is what every unset value falls back to.
+  like. It is what every unset value falls back to.
 - **Deck**, which dresses the window in the visual language of the
   OpenDeck keys and the Wave interfaces: near-black faceplates, black keys
   whose lettering is backlit green when a control is on and red when
   something is muted, bypassed or destructive, console faders with a
   machined cap, indicator lamps in a bezel, and meters that run green to
   amber to red across the scale.
+- Eleven built from the [Omarchy](https://omarchy.org) palettes, so the
+  window matches the rest of a themed desktop: Catppuccin, Catppuccin
+  Latte, Everforest, Gruvbox, Kanagawa, Matte Black, Nord, Osaka Jade,
+  Ristretto, Rose Pine and Tokyo Night. Rose Pine and Catppuccin Latte
+  are the light ones.
 
 Pick one in Options under APPEARANCE. The terminal mixer reads the same
 folders and the same saved choice, on its own Options tab, so an appearance
@@ -71,10 +77,8 @@ just edited, added or removed is picked up without restarting the window.
 
 ### Start from a working skin
 
-Two complete files are in the source repository. Neither is installed on
-disk by a package, because the shipped skins are compiled into the
-application, so copy the one you want from the repository with one of
-these two:
+The shipped appearances are compiled in, so a package installs none of
+them on disk. Copy the one you want to start from out of the repository:
 
 ```sh
 mkdir -p ~/.local/share/openxlr/skins/my-skin
@@ -86,14 +90,19 @@ curl -fLo ~/.local/share/openxlr/skins/my-skin/skin.json \
   https://raw.githubusercontent.com/emaspa/openxlr/main/src/OpenXLR.UI/Assets/Skins/opendeck/skin.json
 ```
 
+Any of the other appearances works the same way. They are the `skin.json`
+files under
+[src/OpenXLR.UI/Assets/Skins](../src/OpenXLR.UI/Assets/Skins), one folder
+per id. A palette skin sets colours and nothing else, so it is a shorter
+read than Deck.
+
 Then change `name` (and `id`, if you keep one) so your copy is not
 confused with the original, and edit from there. In a source checkout the
-same two files are at
-[docs/examples/skins/example/skin.json](examples/skins/example/skin.json)
-and `src/OpenXLR.UI/Assets/Skins/opendeck/skin.json`.
+starting point is at
+[docs/examples/skins/example/skin.json](examples/skins/example/skin.json).
 
-The example skin is read by the test suite on every build, so it is always
-a file this version accepts.
+The example skin and every shipped one are read by the test suite on every
+build, so they are always files this version accepts.
 
 ### Editor help
 
