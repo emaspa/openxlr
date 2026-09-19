@@ -263,6 +263,66 @@ public sealed class TuiViewTests
     }
 
     [Fact]
+    public void TheMatrixGivesEveryMeterARowOfItsOwnWhenThereIsHeightAndOneWhenThereIsNot()
+    {
+        (App app, _) = Desk();
+        app.ShowTab(1);
+
+        Screen tall = new(150, 42);
+        app.Draw(tall);
+        string[] rows = Frame(tall).Split('\n');
+        int first = Array.FindIndex(rows, row => row.Contains("Aux In", StringComparison.Ordinal));
+        Assert.True(first > 0);
+        // The two sides sit on neighbouring rows, so they read as the one
+        // meter of that channel, and the next channel starts three rows down.
+        Assert.Contains("L", rows[first], StringComparison.Ordinal);
+        Assert.Contains("R", rows[first + 1], StringComparison.Ordinal);
+        Assert.Contains("Game", rows[first + 3], StringComparison.Ordinal);
+        // The masters carry the same pair, under their mute key.
+        int mixes = Array.FindIndex(rows, row => row.Contains("MIXES", StringComparison.Ordinal));
+        Assert.Contains("L", rows[mixes + 3], StringComparison.Ordinal);
+        Assert.Contains("R", rows[mixes + 4], StringComparison.Ordinal);
+
+        // Nine channels do not fit twice over in twenty-four rows, so there
+        // the grid stays one row a channel with a single summed bar.
+        Screen small = new(80, 24);
+        app.Draw(small);
+        string[] tight = Frame(small).Split('\n');
+        int line = Array.FindIndex(tight, row => row.Contains("XLR 1", StringComparison.Ordinal));
+        Assert.True(line > 0);
+        Assert.Contains("XLR 2", tight[line + 1], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AMonoInputIsMeteredOnceRatherThanAsAPairOfTheSameReading()
+    {
+        // The XLR inputs are mono and the daemon repeats the one reading in
+        // both sides of the pair it sends.
+        (App app, _) = Desk();
+        app.ShowTab(1);
+        Screen screen = new(150, 42);
+        app.Draw(screen);
+        string[] rows = Frame(screen).Split('\n');
+
+        int xlr = Array.FindIndex(rows, row => row.Contains("XLR 1", StringComparison.Ordinal));
+        Assert.True(xlr > 0);
+        Assert.DoesNotContain(" L ", rows[xlr], StringComparison.Ordinal);
+        Assert.DoesNotContain(" R ", rows[xlr + 1], StringComparison.Ordinal);
+        // Its bar stands on the name's own row, where the stereo pair would
+        // have flanked it.
+        Assert.Contains('\u2581', rows[xlr]);
+
+        // On the desk the same input carries one bar and no lettering.
+        app.ShowTab(0);
+        app.Draw(screen);
+        string[] desk = Frame(screen).Split('\n');
+        int plate = Array.FindIndex(desk, row => row.Contains("XLR 1", StringComparison.Ordinal));
+        Assert.True(plate > 0);
+        Assert.DoesNotContain("L R", desk[plate + 3][..24], StringComparison.Ordinal);
+        Assert.Contains("L R", desk[plate + 3], StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AMutedSendIsUnmutedByTheSameKey()
     {
         (App app, List<string> sent) = Ready();
@@ -609,7 +669,8 @@ public sealed class TuiViewTests
         foreach (string name in names)
             channels.Add(new System.Text.Json.Nodes.JsonObject
             {
-                ["id"] = name, ["name"] = name, ["hardware"] = name.StartsWith("XLR", StringComparison.Ordinal),
+                ["id"] = name.Replace(" ", string.Empty).ToLowerInvariant(), ["name"] = name,
+                ["hardware"] = name.StartsWith("XLR", StringComparison.Ordinal),
                 ["levels"] = new System.Text.Json.Nodes.JsonObject { ["monitor"] = 1, ["aux"] = 0.5 },
             });
         mixer["channels"] = channels;
@@ -667,7 +728,7 @@ public sealed class TuiViewTests
         Assert.Contains("4-5/5", frame, StringComparison.Ordinal);
         app.Handle(new KeyPress(Key.Char, '+'));
         JsonElement command = Command(sent);
-        Assert.Equal("SFX", Text(command, "channel"));
+        Assert.Equal("sfx", Text(command, "channel"));
         Assert.Equal("aux", Text(command, "mix"));
         Assert.Equal(0.55, command.GetProperty("value").GetDouble(), 6);
     }

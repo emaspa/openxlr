@@ -28,6 +28,13 @@ internal sealed record ChannelEntry
     public int CapturePair { get; init; }
     public bool CaptureConnected { get; init; }
 
+    /// <summary>
+    /// True for the XLR microphone inputs, which are mono. The daemon still
+    /// sends a pair for every channel and repeats the one reading in both
+    /// sides of it, so a stereo meter here would draw the same bar twice.
+    /// </summary>
+    public bool Mono => Id is "xlr1" or "xlr2";
+
     public double Level(string mix) => Levels.TryGetValue(mix, out double value) ? value : 0;
 
     public bool IsMuted(string mix) => MutedIn.Contains(mix);

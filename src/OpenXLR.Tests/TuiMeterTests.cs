@@ -173,4 +173,32 @@ public sealed class TuiMeterTests
         Assert.Equal(default, link.StereoMeter("mix", "stream"));
         Assert.All(link.MeterHistory("mix", "stream"), sample => Assert.Equal(0, sample));
     }
+
+    [Fact]
+    public void ALampSitsOnTheMiddleOfTheLineWhicheverFaceItWears()
+    {
+        Screen screen = new(4, 2);
+        Theme lamp = Theme.FromJson("""{"controls":{"led":"lamp"}}""", "lamp", "Lamp");
+        Widgets.Lamp(screen, 0, 0, on: true, lamp, lamp.Card);
+        Widgets.Lamp(screen, 1, 0, on: true, Theme.Material, Theme.Material.Card);
+
+        // A half block would sit under the lettering beside it.
+        Assert.Equal('\u25a0', screen.At(0, 0).Ch);
+        Assert.Equal('\u25cf', screen.At(1, 0).Ch);
+    }
+
+    [Fact]
+    public void TheTwoBarsOfAStereoPairStayApartOnNeighbouringRows()
+    {
+        Screen screen = new(6, 2);
+        Theme theme = Zones();
+        screen.Clear(theme.Card);
+        Widgets.Meter(screen, 0, 0, 4, 1, theme, theme.Card);
+        Widgets.Meter(screen, 0, 1, 4, 1, theme, theme.Card);
+
+        // Each bar keeps three quarters of its own row, so the quarter above
+        // the lower one still reads as the line between a left and a right.
+        Assert.Equal('\u2586', screen.At(0, 0).Ch);
+        Assert.Equal('\u2586', screen.At(0, 1).Ch);
+    }
 }

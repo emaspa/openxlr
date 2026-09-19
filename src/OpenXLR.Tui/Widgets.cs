@@ -23,6 +23,11 @@ internal static class Widgets
     /// A level meter. Each cell is coloured by where it sits on the scale
     /// rather than by how loud the signal is, which is the rule the window's
     /// meter follows, so the quiet end stays calm however hot the peak gets.
+    ///
+    /// A bar stands three quarters of its row, level with the lettering beside
+    /// it, and keeps the quarter above it clear. That quarter is what keeps
+    /// the two bars of a stereo pair readable as a left and a right rather
+    /// than as one block, while leaving them close enough to belong together.
     /// </summary>
     public static void Meter(Screen screen, int x, int y, int width, double level, Theme theme, Rgb back)
     {
@@ -34,11 +39,8 @@ internal static class Widgets
             double position = (cell + 1.0) / width;
             Rgb colour = theme.MeterColour(position);
             double within = filled - cell;
-            // The bar sits in the lower half of its row, so two meters on
-            // neighbouring rows, or a meter and the text above it, do not run
-            // into one another. The half block halves the resolution to two
-            // steps a cell, which a bar this short does not miss.
-            char ch = within >= 1 ? '▄' : within >= 0.5 ? '▖' : '▁';
+            // Two steps a cell, which a bar this short does not miss.
+            char ch = within >= 1 ? '▆' : within >= 0.5 ? '▖' : '▁';
             screen.Set(x + cell, y, ch, within >= 0.5 ? colour : theme.MeterTrack, back);
         }
     }
@@ -187,9 +189,12 @@ internal static class Widgets
         screen.Text(x, y, theme.CapMutes ? $"[{label}]" : $" {label} ", fore, back, bold: true);
     }
 
-    /// <summary>A lamp: on, off, or alert.</summary>
+    /// <summary>
+    /// A lamp: on, off, or alert. Both faces sit on the middle of the line,
+    /// level with the lettering beside them, which a half block would not.
+    /// </summary>
     public static void Lamp(Screen screen, int x, int y, bool on, Theme theme, Rgb back, bool alert = false)
-        => screen.Set(x, y, theme.LampLeds ? '▄' : '●', alert ? theme.LedAlert : on ? theme.LedOn : theme.LedOff, back);
+        => screen.Set(x, y, theme.LampLeds ? '■' : '●', alert ? theme.LedAlert : on ? theme.LedOn : theme.LedOff, back);
 
     /// <summary>A percentage the way the window writes it.</summary>
     public static string Percent(double value) => $"{Math.Round(value * 100)}%";
