@@ -11,7 +11,7 @@ internal sealed class OutputsView : View
 
     public override string Title => "Outputs";
 
-    public override string Keys => "space select  left right feed  enter main output";
+    public override string Keys => "Space select  Left/Right feed  Enter main output  -/+ volume  m mute";
 
     public override void Draw(Screen screen, Rect area, App app)
     {

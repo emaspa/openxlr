@@ -72,8 +72,6 @@ internal static class Program
         using PosixSignalRegistration interrupted = PosixSignalRegistration.Create(
             PosixSignal.SIGTERM, context => { context.Cancel = true; app.Stop(); });
 
-        bool dirty = true;
-        link.Changed += () => dirty = true;
         link.Start();
         terminal.Start();
 
@@ -86,7 +84,6 @@ internal static class Program
                 if (key.Key != Key.None)
                 {
                     app.Handle(key);
-                    dirty = true;
                 }
                 else
                 {
@@ -100,15 +97,13 @@ internal static class Program
                 if (nowWide != screen.Width || nowHigh != screen.Height)
                 {
                     screen.Resize(nowWide, nowHigh);
-                    dirty = true;
                 }
 
-                // Meters move at 15 Hz, so the screen is redrawn no faster than
-                // that however much arrives, and only when something changed.
+                // Tick the hold markers and message expiry even between packets.
+                // The diff renderer emits nothing for an unchanged frame.
                 DateTime now = DateTime.UtcNow;
-                if (!dirty || now < nextFrame) continue;
+                if (now < nextFrame) continue;
                 nextFrame = now.AddMilliseconds(66);
-                dirty = false;
 
                 app.Draw(screen);
                 terminal.Write(screen.Render());

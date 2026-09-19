@@ -137,11 +137,12 @@ a skin overlays values on top of them.
   reading the colour tokens out of the same files and following the same
   saved choice, so an appearance picked in one is the appearance in the
   other. Example skins for the Omarchy palettes ship in
-  [docs/examples/skins](examples/skins). Tabs across the top in the manner
-  of btop: the submixer grid, the hardware inputs, the outputs, the
-  applications, the insert chains, the profiles and the appearance. It
-  draws its own cells in true colour rather than taking a widget toolkit,
-  so it adds no dependency to any package.
+  [docs/examples/skins](examples/skins). A desk of vertical sends and mix
+  masters, with stereo meters and level history, and eight keyboard
+  sections for the mixer, hardware, outputs, applications, inserts,
+  profiles and appearance. A compact layout fits 80x24. It draws its own
+  cells in true colour rather than taking a widget toolkit, so it adds no
+  dependency to any package.
 - [ ] The Stream Deck plugin reading the same tokens for its key art. The
   plugin draws its own images today and is unaffected by the window's skin.
 - [ ] Layout density: a compact mode for small screens and a large mode

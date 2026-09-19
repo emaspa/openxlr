@@ -15,7 +15,7 @@ internal sealed class InsertsView : View
 
     public override string Title => "Inserts";
 
-    public override string Keys => "space bypass  ctrl+up move  d remove  e editor";
+    public override string Keys => "Space bypass  Ctrl+Up/Down move  d remove  e editor";
 
     public override void Draw(Screen screen, Rect area, App app)
     {

@@ -1,120 +1,210 @@
 namespace OpenXLR.Tui;
 
-/// <summary>
-/// The submixer: every channel's send into every mix, the mix masters above
-/// them, and the live meters. The grid is the window's strip view laid flat,
-/// so a cell is one send and the row above it is the mix that send feeds.
-/// </summary>
+/// <summary>Channel sends into the selected mix, with the master bank beside them.</summary>
 internal sealed class MixerView : View
 {
-    private const int NameWidth = 16;
-    private const int MinCell = 12;
-
     private int _row;      // 0 is the mix masters, 1 and up are the channels.
     private int _column;
-    private int _scroll;
+    private int _channelScroll;
+    private int _mixScroll;
 
     public override string Title => "Mixer";
 
     public override string Keys =>
-        "space mute  - + level  [ ] fine  r rename  n new  d delete";
+        "Up/Down channel  Left/Right mix  Space mute  -/+ [/] level  Home masters  End last  r rename  n/N new  c capture  d delete";
 
     public override void Draw(Screen screen, Rect area, App app)
     {
         Theme theme = app.Theme;
         Snapshot? state = State(app);
-        if (state is null)
+        if (state is null || state.Mixer.Mixes.Count == 0)
         {
-            screen.Text(area.X + 2, area.Y + 1, "Waiting for the daemon", theme.TextMuted, theme.Window);
+            screen.Panel(area.X, area.Y, area.Width, area.Height, theme.Rule, theme.Card, "Mixer");
+            screen.Text(area.X + 2, area.Y + 2, state is null ? "Waiting for the daemon" : "The mixer is not built yet",
+                theme.TextSecondary, theme.Card, maxWidth: area.Width - 4);
             return;
         }
 
         List<MixEntry> mixes = state.Mixer.Mixes;
         List<ChannelEntry> channels = state.Mixer.Channels;
-        if (mixes.Count == 0 || channels.Count == 0)
-        {
-            screen.Text(area.X + 2, area.Y + 1, "The mixer is not built yet", theme.TextMuted, theme.Window);
-            return;
-        }
-
         _row = Math.Clamp(_row, 0, channels.Count);
         _column = Math.Clamp(_column, 0, mixes.Count - 1);
+        MixEntry selectedMix = mixes[_column];
+        bool tall = area.Height >= 26;
+        int overviewHeight = tall ? 8 : 4;
+        Overview(screen, new Rect(area.X, area.Y, area.Width, overviewHeight), app, selectedMix, tall);
 
-        int cells = Math.Max(1, (area.Width - NameWidth - 2) / MinCell);
-        int shown = Math.Min(mixes.Count, cells);
-        if (_column < _scroll) _scroll = _column;
-        if (_column >= _scroll + shown) _scroll = _column - shown + 1;
-        _scroll = Math.Clamp(_scroll, 0, Math.Max(0, mixes.Count - shown));
-        int cellWidth = Math.Max(MinCell, (area.Width - NameWidth - 2) / shown);
+        int bankY = area.Y + overviewHeight + (tall ? 1 : 0);
+        int bankHeight = area.Bottom - bankY - 1;
+        if (bankHeight < 7) return;
+        int masterWidth = area.Width >= 128
+            ? Math.Min(mixes.Count * 9 + 2, area.Width / 2)
+            : Math.Max(20, area.Width / 3);
+        int channelWidth = area.Width - masterWidth - 1;
+        Rect channelBank = new(area.X, bankY, channelWidth, bankHeight);
+        Rect masterBank = new(channelBank.Right + 1, bankY, masterWidth, bankHeight);
+        screen.Panel(channelBank.X, bankY, channelBank.Width, bankHeight, theme.Rule, theme.Card,
+            $"Sends to {selectedMix.Name}", theme.TextPrimary);
+        screen.Panel(masterBank.X, bankY, masterBank.Width, bankHeight, theme.Rule, theme.Tile,
+            "Masters", theme.TextPrimary);
 
-        int x0 = area.X + 1;
-        int y = area.Y;
-
-        // The mix masters: name, volume, mute and the mix's own meter.
-        screen.Text(x0, y, "MIXES", theme.TextSecondary, theme.Window, bold: true, maxWidth: NameWidth);
-        for (int index = 0; index < shown; index++)
+        int channelCount = Math.Min(channels.Count, Math.Max(1, (channelBank.Width - 2) / 9));
+        int masterCount = Math.Min(mixes.Count, Math.Max(1, (masterBank.Width - 2) / 9));
+        KeepVisible(ref _channelScroll, Math.Max(0, _row - 1), channelCount, channels.Count);
+        KeepVisible(ref _mixScroll, _column, masterCount, mixes.Count);
+        for (int i = 0; i < channelCount; i++)
         {
-            MixEntry mix = mixes[_scroll + index];
-            int x = x0 + NameWidth + index * cellWidth;
-            bool here = _row == 0 && _scroll + index == _column;
-            Rgb back = here ? theme.Selection : theme.Card;
-            screen.Fill(x, y, cellWidth - 1, 3, back);
-            screen.Text(x + 1, y, mix.Name, theme.TextPrimary, back, bold: true, maxWidth: cellWidth - 3);
-
-            int barWidth = cellWidth - 8;
-            Widgets.Fader(screen, x + 1, y + 1, barWidth, mix.Volume, mix.Ceiling, theme, back, here);
-            screen.Text(x + barWidth + 2, y + 1, Widgets.Percent(mix.Volume).PadLeft(4),
-                theme.TextDetail, back);
-
-            Widgets.MuteKey(screen, x + 1, y + 2, mix.Muted ? "MUTED" : " ON  ", mix.Muted, theme, here);
-            Widgets.Meter(screen, x + 8, y + 2, cellWidth - 10, app.Link.Meter("mix", mix.Id), theme, back);
+            int index = _channelScroll + i;
+            ChannelEntry channel = channels[index];
+            Rect strip = Slot(channelBank, i, channelCount);
+            string kind = channel.Hardware ? "INPUT" : channel.CaptureSource is not null ? "CAPTURE" : "APP";
+            // An XLR strip is the interface, so its key is the input's own mute;
+            // its send into the chosen mix shows as a word where the level goes.
+            string? hardwareMute = HardwareMute(channel);
+            bool keyMuted = hardwareMute is null ? channel.IsMuted(selectedMix.Id) : state.Flag(hardwareMute);
+            DrawStrip(screen, strip, app, channel.Name, kind, channel.Level(selectedMix.Id), 1,
+                keyMuted, app.Link.StereoMeter("ch", channel.Id), _row == index + 1, false,
+                sendMuted: hardwareMute is not null && channel.IsMuted(selectedMix.Id));
         }
-
-        y += 3;
-        for (int column = 0; column < area.Width; column++)
-            screen.Set(area.X + column, y, '─', theme.Divider, theme.Window);
-        y++;
-
-        // One row per channel: its name, its meter, and its send into each mix.
-        int rows = Math.Max(1, area.Bottom - y);
-        int first = Math.Max(0, Math.Min(_row - 1 - rows + 2, channels.Count - rows));
-        if (_row == 0) first = 0;
-        for (int index = 0; index < rows && first + index < channels.Count; index++)
+        for (int i = 0; i < masterCount; i++)
         {
-            ChannelEntry channel = channels[first + index];
-            int line = y + index;
-            bool selectedRow = _row == first + index + 1;
-            Rgb rowBack = selectedRow ? theme.Card.Mix(theme.Accent, 0.12) : theme.Window;
-            screen.Fill(area.X, line, area.Width, 1, rowBack);
-
-            Rgb nameColour = channel.Hardware ? theme.TextPrimary : theme.TextDetail;
-            screen.Text(x0, line, channel.Name, nameColour, rowBack, bold: selectedRow, maxWidth: NameWidth - 6);
-            Widgets.Meter(screen, x0 + NameWidth - 5, line, 4, app.Link.Meter("ch", channel.Id), theme, rowBack);
-
-            for (int cell = 0; cell < shown; cell++)
-            {
-                MixEntry mix = mixes[_scroll + cell];
-                int x = x0 + NameWidth + cell * cellWidth;
-                bool here = selectedRow && _scroll + cell == _column;
-                Rgb back = here ? theme.Selection : rowBack;
-                bool muted = channel.IsMuted(mix.Id);
-                double level = channel.Level(mix.Id);
-
-                screen.Fill(x, line, cellWidth - 1, 1, back);
-                int barWidth = cellWidth - 7;
-                if (muted)
-                {
-                    screen.Text(x + 1, line, "muted".PadRight(barWidth), theme.MuteForeChecked,
-                        back.Mix(theme.MuteBackChecked, 0.55), maxWidth: barWidth);
-                }
-                else
-                {
-                    Widgets.Fader(screen, x + 1, line, barWidth, level, 1, theme, back, here);
-                }
-                screen.Text(x + barWidth + 2, line, Widgets.Percent(level).PadLeft(4),
-                    muted ? theme.TextMuted : theme.TextDetail, back);
-            }
+            MixEntry mix = mixes[_mixScroll + i];
+            string kind = mix.Kind == "monitor" ? "MON" : mix.Kind == "virtualMic" ? "MIC" : "AUX";
+            DrawStrip(screen, Slot(masterBank, i, masterCount), app, mix.Name, kind, mix.Volume, mix.Ceiling,
+                mix.Muted, app.Link.StereoMeter("mix", mix.Id), _row == 0 && _column == _mixScroll + i, true);
         }
+        if (channelCount == 0)
+            screen.Text(channelBank.X + 2, bankY + 2, "No channels", theme.TextSecondary, theme.Card,
+                maxWidth: channelBank.Width - 4);
+        Range(screen, channelBank, _channelScroll, channelCount, channels.Count, theme);
+        Range(screen, masterBank, _mixScroll, masterCount, mixes.Count, theme);
+
+        ChannelEntry? selectedChannel = _row > 0 ? channels[_row - 1] : null;
+        string focus = selectedChannel is null ? $"MASTER / {selectedMix.Name}"
+            : $"{selectedChannel.Name} > {selectedMix.Name}";
+        double value = selectedChannel?.Level(selectedMix.Id) ?? selectedMix.Volume;
+        bool muted = selectedChannel is null ? selectedMix.Muted
+            : HardwareMute(selectedChannel) is { } control ? state.Flag(control) : selectedChannel.IsMuted(selectedMix.Id);
+        screen.TextPad(area.X + 1, area.Bottom - 1,
+            $" {focus}   {Widgets.Percent(value)}   {(muted ? "MUTED" : "ON")}", area.Width - 2,
+            theme.TextPrimary, theme.Selection, bold: true);
+    }
+
+    private static Rect Slot(Rect bank, int index, int count)
+    {
+        int width = bank.Width - 2;
+        int left = index * width / count;
+        int right = (index + 1) * width / count;
+        return new Rect(bank.X + 1 + left, bank.Y + 1, right - left, bank.Height - 2);
+    }
+
+    private static void KeepVisible(ref int scroll, int selected, int shown, int total)
+    {
+        if (selected < scroll) scroll = selected;
+        if (selected >= scroll + shown) scroll = selected - shown + 1;
+        scroll = Math.Clamp(scroll, 0, Math.Max(0, total - shown));
+    }
+
+    private static void Range(Screen screen, Rect bank, int first, int shown, int total, Theme theme)
+    {
+        string text = $" {first + (total == 0 ? 0 : 1)}-{first + shown}/{total} ";
+        screen.Text(bank.Right - text.Length - 2, bank.Bottom - 1, text, theme.TextSecondary, theme.Card,
+            maxWidth: bank.Width - 4);
+    }
+
+    /// <summary>The device control behind an XLR input's mute, or null for any other channel.</summary>
+    private static string? HardwareMute(ChannelEntry channel) =>
+        channel.Id == "xlr1" ? "mute" : channel.Id == "xlr2" ? "mute2" : null;
+
+    private static void DrawStrip(Screen screen, Rect area, App app, string name, string kind,
+        double value, double ceiling, bool muted, MeterReading meter, bool focused, bool master,
+        bool sendMuted = false)
+    {
+        Theme theme = app.Theme;
+        Rgb back = focused ? theme.SelectedFace : master ? theme.Tile : theme.Card;
+        screen.Fill(area.X, area.Y, area.Width, area.Height, back);
+        for (int y = area.Y; y < area.Bottom; y++)
+            screen.Set(area.Right - 1, y, '│', theme.Rule, back);
+        int width = area.Width - 2;
+        string first = name, second = string.Empty;
+        if (name.Length > width)
+        {
+            int space = name.LastIndexOf(' ', Math.Min(width, name.Length - 1));
+            int split = space > 0 ? space : width;
+            first = name[..split];
+            second = name[split..].TrimStart();
+        }
+        Rgb plate = focused ? theme.Selection : back;
+        screen.Fill(area.X, area.Y, area.Width - 1, 2, plate);
+        Widgets.Center(screen, area.X, area.Y, area.Width - 1, first, theme.TextPrimary, plate, true);
+        Widgets.Center(screen, area.X, area.Y + 1, area.Width - 1, second.Length > 0 ? second : kind,
+            second.Length > 0 ? theme.TextPrimary : theme.TextMuted, plate);
+        if (sendMuted)
+            Widgets.Center(screen, area.X, area.Y + 2, area.Width - 1, "muted", theme.MuteBackChecked, back, true);
+        else
+            Widgets.Center(screen, area.X, area.Y + 2, area.Width - 1, Widgets.Percent(value),
+                focused ? theme.Accent : theme.TextDetail, back, true);
+
+        bool compact = area.Height < 14;
+        int top = area.Y + (compact ? 3 : 4);
+        int height = Math.Max(1, area.Height - (compact ? 5 : 7));
+        int faderX = area.X + Math.Max(1, (area.Width - 8) / 2 + 1);
+        int meterX = area.Right - 4;
+        Widgets.VerticalFader(screen, faderX, top, height, value, ceiling, theme, back, focused);
+        Widgets.VerticalMeter(screen, meterX, top, height, meter.Left, meter.HoldLeft, theme, back);
+        // A blank column between the two bars, so left and right read apart
+        // even when both are full.
+        Widgets.VerticalMeter(screen, meterX + 2, top, height, meter.Right, meter.HoldRight, theme, back);
+        screen.Text(meterX, compact ? area.Bottom - 2 : top - 1, "L R", theme.TextMuted, back);
+        if (area.Width >= 14)
+        {
+            screen.Text(area.X + 1, top, $"{ceiling * 100:0}", theme.TextMuted, back, maxWidth: 3);
+            screen.Text(area.X + 1, top + height - 1, "  0", theme.TextMuted, back);
+        }
+        // Four letters or two: both sit centred between the brackets.
+        string mute = muted ? "MUTE" : " ON ";
+        Widgets.MuteKey(screen, area.X + Math.Max(0, (area.Width - 7) / 2), area.Bottom - (compact ? 1 : 2),
+            mute, muted, theme, focused: false);
+        if (focused && !compact)
+            screen.Set(area.X, area.Bottom - 1, '━', theme.Accent, back);
+    }
+
+    private static void Overview(Screen screen, Rect area, App app, MixEntry mix, bool tall)
+    {
+        Theme theme = app.Theme;
+        MeterReading meter = app.Link.StereoMeter("mix", mix.Id);
+        screen.Panel(area.X, area.Y, area.Width, area.Height, theme.Rule, theme.Card,
+            $"{mix.Name} / live RMS", theme.TextPrimary);
+        if (!tall)
+        {
+            screen.Text(area.X + 2, area.Y + 1, $"L {Widgets.Rms(meter.Left),4}  R {Widgets.Rms(meter.Right),4} dBFS",
+                theme.TextDetail, theme.Card, maxWidth: 27);
+            Widgets.History(screen, new Rect(area.X + 29, area.Y + 1, Math.Max(1, area.Width - 31), 2),
+                app.Link.MeterHistory("mix", mix.Id), theme, theme.Card);
+            screen.Text(area.X + 2, area.Y + 2, $"Hold {Widgets.Rms(meter.Hold)} dBFS / 15 s", theme.TextSecondary,
+                theme.Card, maxWidth: 27);
+            return;
+        }
+        string held = $"{Math.Round(meter.Hold * 60 - 60):0}";
+        Widgets.BigNumber(screen, area.X + 3, area.Y + 2, held, theme, theme.Card);
+        screen.Text(area.X + 3, area.Y + 6, "HOLD / dBFS", theme.TextSecondary, theme.Card);
+        int meterX = area.X + 20;
+        int meterWidth = Math.Max(12, Math.Min(30, area.Width / 4));
+        screen.Text(meterX, area.Y + 1, "STEREO / RMS", theme.TextMuted, theme.Card);
+        screen.Text(meterX, area.Y + 3, "L", theme.TextSecondary, theme.Card);
+        screen.Text(meterX, area.Y + 4, "R", theme.TextSecondary, theme.Card);
+        Widgets.Meter(screen, meterX + 2, area.Y + 3, meterWidth, meter.Left, theme, theme.Card);
+        Widgets.Meter(screen, meterX + 2, area.Y + 4, meterWidth, meter.Right, theme, theme.Card);
+        screen.Text(meterX + 2, area.Y + 5, "-60", theme.TextMuted, theme.Card);
+        screen.Text(meterX + meterWidth / 2, area.Y + 5, "-30", theme.TextMuted, theme.Card);
+        screen.Text(meterX + meterWidth, area.Y + 5, "0", theme.TextMuted, theme.Card);
+        int historyX = meterX + meterWidth + 5;
+        int historyWidth = area.Right - historyX - 2;
+        screen.Text(historyX, area.Y + 1, "LEVEL HISTORY / 15 s", theme.TextMuted, theme.Card, maxWidth: historyWidth);
+        Widgets.History(screen, new Rect(historyX, area.Y + 2, historyWidth, 4),
+            app.Link.MeterHistory("mix", mix.Id), theme, theme.Card);
+        screen.Text(historyX, area.Y + 6, "-15 s", theme.TextMuted, theme.Card);
+        screen.Text(area.Right - 5, area.Y + 6, "now", theme.TextMuted, theme.Card);
     }
 
     public override bool Handle(KeyPress key, App app)
@@ -125,7 +215,9 @@ internal sealed class MixerView : View
         List<ChannelEntry> channels = state.Mixer.Channels;
         if (mixes.Count == 0) return false;
 
-        MixEntry mix = mixes[Math.Clamp(_column, 0, mixes.Count - 1)];
+        _row = Math.Clamp(_row, 0, channels.Count);
+        _column = Math.Clamp(_column, 0, mixes.Count - 1);
+        MixEntry mix = mixes[_column];
         ChannelEntry? channel = _row > 0 && _row <= channels.Count ? channels[_row - 1] : null;
 
         switch (key.Key)
@@ -149,6 +241,8 @@ internal sealed class MixerView : View
             {
                 case ' ':
                     if (channel is null) app.Link.Send("setMixMuted", body => { body["mix"] = mix.Id; body["value"] = !mix.Muted; });
+                    else if (HardwareMute(channel) is { } control)
+                        app.Link.Send("set", body => { body["control"] = control; body["value"] = !state.Flag(control); });
                     else app.Link.Send("setChannelMuted", body =>
                     {
                         body["channel"] = channel.Id;

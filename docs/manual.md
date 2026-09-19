@@ -1696,30 +1696,94 @@ Start it with the daemon running:
 openxlr-tui
 ```
 
-Seven tabs run across the top, chosen with the number keys or with tab and
-shift tab:
+The mixer opens as a desk of vertical channel strips; the Matrix section
+shows the same sends as one grid, every channel against every mix. The left bank shows
+sends into the selected mix; the right bank holds the mix masters. Each
+strip has a name plate, a percentage, a fader, separate left and right
+meters and a mute key. On the two XLR strips the key is the input's own
+mute, the same control as Mute on the Inputs page, since those strips are
+the interface; when an XLR send into the chosen mix is muted, the word
+muted stands where its percentage would be, and the matrix is where that
+send is toggled. Up and down choose a channel, starting with the
+masters. Left and right choose the destination mix. The line above the
+key hints names the exact send or master under the cursor. Monitor masters
+can reach 150%; other masters and channel sends stop at 100%.
 
-| Tab | What is on it |
+Above the strips, the selected mix has a stereo meter, a large held RMS
+reading and fifteen seconds of level history. Meters read -60 to 0 dBFS
+RMS. A hold mark keeps the highest recent RMS reading for one second, then
+falls by 18 dB per second. It is not a sample peak measurement. Each meter
+cell takes its colour from its place on the scale. Missing meter packets
+leave gaps in the history; a reading older than one second falls to zero.
+
+At 150 columns the usual nine channels and five masters fit side by side.
+At 120 columns the banks show fewer strips and follow the selection. At
+80x24 the section rail becomes a top row, the held reading becomes text,
+and shorter strips keep the same controls. Resizing keeps the selection.
+The counters below each bank show which strips are visible. Below 80x24,
+the terminal asks for more room and keeps the selection for when it fits.
+
+Eight sections are reachable with `1` to `8`, Tab and Shift+Tab:
+
+| Section | What is on it |
 |---|---|
-| Mixer | the submix grid: every channel's send into every mix, the mix masters above them, and live meters. Space mutes the send under the cursor, `-` and `+` move it by five points, `[` and `]` by one, `r` renames a channel or a virtual microphone, `n` adds a channel, `N` adds a virtual microphone, `c` adds a capture input and `d` removes one |
-| Inputs | the hardware: gain, mute, low cut, expander, voice tune and its strength, phantom power, ClipGuard and the compressor for each XLR input, the software low cut and ClipGuard, the headphone outputs and the direct monitor blend, the hardware output routing and the USB Aux return |
-| Outputs | which sinks the monitor mixes feed, what feeds each one, the volume they share, and the system default sink and source the daemon holds |
-| Apps | every application the daemon knows, the channel it plays into, and the keys to move it: left and right walk the channels, `i` leaves it to the desktop and `f` forgets it |
-| Inserts | the plugin chain on each input and each mix: space bypasses one, ctrl with up or down moves it, `d` removes it and `e` asks for the plugin's own editor. Adding a plugin and editing its controls stay in the window, which has the catalogue |
-| Profiles | load, save over and delete a profile, choose the one recalled when the interface connects, switch to another attached interface, and write the recorded defaults back |
-| Options | the appearance, the connection and the daemon's version |
+| 1 Mixer | channel sends, mix masters, stereo meters and level history; channel and virtual microphone creation, renaming, removal and ordering |
+| 2 Matrix | the whole submixer as one grid: every channel's send into every mix, the mix masters and their meters across the top, a meter beside each channel |
+| 3 Inputs | hardware controls in grouped cards with gain arcs on a wide terminal, or a scrolling list in a small one; gain, mute, low cut, expander, voice tune and its strength, phantom power, ClipGuard and the compressor for each XLR input; software processing, headphones, direct monitor blend, hardware output routing and USB Aux return |
+| 4 Outputs | selected monitor sinks and their feeds, shared output volume, each sink's volume and mute, and the system default sink and source |
+| 5 Apps | every known application and its channel assignment, including the desktop's own routing |
+| 6 Inserts | the chain on each input and mix, its order, bypass and status; adding plugins and editing their controls stay in the window |
+| 7 Profiles | load, save over, save as, delete and recall on connect; interface selection and recorded device defaults |
+| 8 Options | the skin picker, connection status, daemon version and fresh state request |
 
-The arrow keys move, space toggles, left and right change a value, ctrl
-with an arrow takes a finer step, enter confirms and escape cancels. `F1`
-lists the keys and `q` quits. Anything that cannot be undone, such as
-deleting a channel or resetting the device, asks you to type `yes` first.
+The bottom line shows the current section's keys, with help and quit at
+its right end when there is room.
+`F1` or `?` opens the complete key table. Up and down scroll that table if
+it does not fit. An unadvertised hardware control is marked unavailable.
+Controls below the visible hardware cards appear as the selection moves.
+
+| Where | Keys | Action |
+|---|---|---|
+| Everywhere | `1` to `8`, Tab, Shift+Tab | choose a section |
+| Everywhere | `F1`, `?` | show help |
+| Everywhere | `q`, Ctrl+C | quit; in a text prompt `q` is text and Ctrl+C quits |
+| Mixer | Up/Down, PageUp/PageDown | choose a channel, or jump ten channels |
+| Mixer | Left/Right | choose the mix the sends feed |
+| Mixer | Home, End | choose the masters or the last channel |
+| Mixer | Space | mute or unmute the selected master or send |
+| Mixer | `-`, `+`, `[`, `]` | lower or raise the level by five points, or by one point |
+| Mixer | `r`, `n`, `N`, `c`, `d` | rename, add an application channel, add a virtual microphone, add a capture input, or delete |
+| Mixer | Ctrl+Left/Right | reorder the selected channel or virtual microphone |
+| Matrix | Up/Down, Left/Right, Home, End | move through the grid; Home is the masters row |
+| Matrix | Space, `-`, `+`, `[`, `]` | mute the cell, or change its level by five points or by one |
+| Lists | Up/Down, PageUp/PageDown | move between controls |
+| Inputs and numeric controls | Left/Right, `-`, `+` | change a value; Ctrl+Left/Right or `[` and `]` takes the finer step |
+| Inputs and numeric controls | Home, End | set the minimum or maximum |
+| Toggles and choices | Space, Enter, Left/Right | toggle or choose a value |
+| Outputs, on a sink | Space, Left/Right, Enter | select the sink, choose its feed, or make it the main output |
+| Outputs, on a sink | `-`, `+`, `m` | change its volume or toggle its mute |
+| Apps | Left/Right, `i`, `f` | assign a channel, leave routing to the desktop, or forget the assignment |
+| Inserts | Space, Ctrl+Up/Down, `d`, `e` | bypass, reorder, remove, or open the plugin's native editor |
+| Profiles, on a profile | Enter, `s`, `r`, `d` | load, overwrite, recall on connect, or delete |
+| Options | Enter, `R` | use a skin or reload the skin list |
+| Text prompts | Enter, Escape | accept or cancel |
+
+Anything that cannot be undone, such as deleting a channel or resetting
+the device, asks you to type `yes` first. To create a profile, select
+Save settings as and press Enter.
 
 The terminal mixer wears the same skins as the window. It reads the same
 files, in the same order, and the choice in Options is the same choice, so
 picking Gruvbox in one picks it in the other ([skins.md](skins.md)).
 `--skin <id>` uses one appearance for this run without saving it, and
-`--list-skins` prints what this machine has. A terminal without true colour
-gets the nearest of its 256, so the skin still reads.
+`--list-skins` prints what this machine has. Deck and the Omarchy skins get
+console fader caps, bracketed keys and lamps; flat skins get plain ones.
+The terminal reads these choices from `controls` and derives its surfaces
+and selection from the skin's colours, including light skins. A meter is
+one solid bar whichever appearance the skin names, and its colour runs from
+the fill colour through the warning colour to the hot colour along the
+scale, so the top of a loud bar is red and the bottom stays green. A terminal advertising true colour through
+`COLORTERM` gets RGB cells; otherwise it gets xterm-256 colours. Each frame
+writes only changed cells, at most fifteen times per second.
 
 It needs a terminal. With its output piped somewhere it says so and stops.
-

@@ -129,9 +129,17 @@ public sealed class TuiSkinTests : IDisposable
             """), "mine", "Mine");
 
         Assert.Equal(Rgb.Parse("#00ff00"), theme.MeterColour(0.10));
-        Assert.Equal(Rgb.Parse("#00ff00"), theme.MeterColour(0.69));
+        Assert.Equal(Rgb.Parse("#00ff00"), theme.MeterColour(0.35));
         Assert.Equal(Rgb.Parse("#ffff00"), theme.MeterColour(0.70));
+        Assert.Equal(Rgb.Parse("#ff0000"), theme.MeterColour(0.90));
         Assert.Equal(Rgb.Parse("#ff0000"), theme.MeterColour(0.95));
+        // Between the anchors the colour runs from one to the next.
+        Rgb lime = theme.MeterColour(0.525);
+        Assert.Equal((255, 0), (lime.G, lime.B));
+        Assert.InRange(lime.R, 120, 136);
+        Rgb orange = theme.MeterColour(0.80);
+        Assert.Equal((255, 0), (orange.R, orange.B));
+        Assert.InRange(orange.G, 120, 136);
     }
 
     [Fact]
@@ -252,6 +260,66 @@ public sealed class TuiSkinTests : IDisposable
                 Assert.NotEqual(theme.MeterFill, theme.MeterHot);
         }
     }
+
+
+    [Fact]
+    public void ControlAppearancesAreReadEvenWithoutAnyColourOverrides()
+    {
+        Theme theme = Theme.FromJson("""
+            {"controls":{"meter":"segmented","fader":"console","button":"cap","mute":"cap","led":"lamp"}}
+            """, "console", "Console");
+        Assert.True(theme.ConsoleFaders);
+        Assert.True(theme.CapKeys);
+        Assert.True(theme.CapMutes);
+        Assert.True(theme.LampLeds);
+        Assert.False(Theme.Material.ConsoleFaders);
+        Theme unknown = Theme.FromJson("""{"controls":{"meter":17,"fader":"future"},"tokens":{}}""", "x", "X");
+        Assert.False(unknown.ConsoleFaders);
+        Assert.False(unknown.CapKeys);
+    }
+
+    [Theory]
+    [InlineData("rose-pine")]
+    [InlineData("catppuccin-latte")]
+    public void LightSkinsKeepTheDeskSelectionAndFaderCapsLegible(string id)
+    {
+        Theme theme = Theme.FromJson(File.ReadAllText(Path.Combine(Root(), "docs", "examples", "skins", id, "skin.json")), id, id);
+        Assert.True(theme.Light);
+        Assert.True(Contrast(theme.TextPrimary, theme.Selection) >= 4.5);
+        Assert.True(Contrast(theme.On(theme.FocusedCap), theme.FocusedCap) >= 4.5);
+        Assert.True(Contrast(theme.On(theme.FaderThumb), theme.FaderThumb) >= 4.5);
+        DaemonLink link = new();
+        link.Receive("""
+            {"type":"state","connected":true,"mixer":{
+              "mixes":[{"id":"monitor","name":"Monitor A","kind":"monitor","volume":1}],
+              "channels":[{"id":"mic","name":"Microphone","levels":{"monitor":0.5}}]}}
+            """);
+        link.Receive("""{"type":"meters","levels":{"ch:mic":[0.5,0.8],"mix:monitor":[0.3,0.6]}}""");
+        App app = new(link, theme);
+        Screen screen = new(150, 42);
+        app.Draw(screen);
+        Assert.Equal(theme.Selection, screen.At(20, 40).Back);
+        Assert.Equal(theme.TextPrimary, screen.At(20, 40).Fore);
+        Assert.Equal(theme.Card, screen.At(30, 3).Back);
+        Assert.Equal(theme.Accent, screen.At(1, 5).Fore);
+        bool cap = false, meter = false;
+        for (int y = 0; y < screen.Height; y++)
+            for (int x = 0; x < screen.Width; x++)
+            {
+                Cell cell = screen.At(x, y);
+                if (cell.Ch == '╞' && cell.Back == theme.FocusedCap)
+                {
+                    Assert.Equal(theme.On(theme.FocusedCap), cell.Fore);
+                    cap = true;
+                }
+                if (cell.Ch == '█' && Enumerable.Range(70, 21).Any(i => theme.MeterColour(i / 100.0) == cell.Fore)) meter = true;
+            }
+        Assert.True(cap, "the focused fader cap was not drawn");
+        Assert.True(meter, "the light skin's warning zone was not drawn");
+    }
+
+    private static double Contrast(Rgb a, Rgb b) =>
+        (Math.Max(a.Luminance(), b.Luminance()) + 0.05) / (Math.Min(a.Luminance(), b.Luminance()) + 0.05);
 
     /// <summary>The repository root, found from the test assembly.</summary>
     private static string Root()

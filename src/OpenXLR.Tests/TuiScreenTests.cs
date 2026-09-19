@@ -116,9 +116,12 @@ public sealed class TuiScreenTests
 
         Widgets.Meter(screen, 0, 0, 10, 1.0, theme, Rgb.Parse("#000000"));
 
-        // Full scale: the quiet end is still green and only the top is red.
+        // Full scale: the quiet end is still green, the warning level is
+        // yellow and only the top is red; between them the colour blends.
         Assert.Equal(Rgb.Parse("#00ff00"), screen.At(0, 0).Fore);
-        Assert.Equal(Rgb.Parse("#ffff00"), screen.At(7, 0).Fore);
+        Assert.Equal(Rgb.Parse("#ffff00"), screen.At(6, 0).Fore);
+        Assert.InRange(screen.At(7, 0).Fore.G, 120, 136);
+        Assert.Equal((255, 0), (screen.At(7, 0).Fore.R, screen.At(7, 0).Fore.B));
         Assert.Equal(Rgb.Parse("#ff0000"), screen.At(9, 0).Fore);
     }
 
@@ -131,7 +134,7 @@ public sealed class TuiScreenTests
 
         for (int cell = 0; cell < 8; cell++)
         {
-            Assert.Equal('─', screen.At(cell, 0).Ch);
+            Assert.Equal('▁', screen.At(cell, 0).Ch);
             Assert.Equal(Theme.Material.MeterTrack, screen.At(cell, 0).Fore);
         }
     }

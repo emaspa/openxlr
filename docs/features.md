@@ -311,15 +311,24 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   desktop session, an ssh connection or a tiling setup. It speaks the same
   WebSocket the window does, so both can be open at once and each shows
   what the other changed
-- Seven tabs in the manner of btop: the submix grid with live meters, the
-  hardware inputs, the monitor outputs and the system defaults, the
-  application routing, the insert chains, the profiles and the appearance.
-  Adding a plugin and editing its controls stay in the window, which has
-  the catalogue and the plugin's own editor
+- A desk of vertical channel sends and separate mix masters, with stereo
+  meters, hold markers and fifteen seconds of level history for the chosen
+  mix. The scale is RMS dBFS; the hold lasts one second, then falls by
+  18 dB per second. Meter colours belong to positions on the scale
+- Eight keyboard sections: the desk, the matrix of every send into every
+  mix, hardware inputs, outputs and defaults,
+  application routing, inserts, profiles and options. Wide terminals have
+  a section rail and grouped hardware cards with gain arcs. At 80x24 the
+  rail becomes a top row and the strips shorten. Both banks scroll to keep
+  the selection visible. F1 or `?` lists all keys. Adding a plugin and
+  editing its controls stay in the window
 - The same skins as the window, read from the same folders and following
   the same saved choice, so an appearance chosen in one is the appearance
-  in the other. `--skin <id>` tries one for a single run. A terminal
-  without true colour gets the nearest of its 256
+  in the other. Console faders, cap keys and lamps follow the skin's
+  control choices, and every meter is a solid bar that blends the skin's
+  fill, warning and hot colours along its scale. Light skins use their own
+  colours for the selection and cap lettering. `--skin <id>` tries one for a single run.
+  A terminal without true colour gets xterm-256 colours
 - It draws its own cells rather than taking a widget toolkit, so it adds no
   dependency to any package. A frame writes only the cells that changed
 

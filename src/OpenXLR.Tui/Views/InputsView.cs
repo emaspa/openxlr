@@ -12,7 +12,7 @@ internal sealed class InputsView : View
 
     public override string Title => "Inputs";
 
-    public override string Keys => "space toggle  left right change  ctrl fine";
+    public override string Keys => "Up/Down control  Space toggle  Left/Right or -/+ change  [/] fine";
 
     public override void Draw(Screen screen, Rect area, App app)
     {
@@ -22,7 +22,7 @@ internal sealed class InputsView : View
             screen.Text(area.X + 2, area.Y + 1, "Waiting for the daemon", app.Theme.TextMuted, app.Theme.Window);
             return;
         }
-        _list.Draw(screen, area.Inset(0), app.Theme, Build(app, state));
+        _list.DrawGroups(screen, area, app.Theme, Build(app, state));
     }
 
     public override bool Handle(KeyPress key, App app)
@@ -43,7 +43,7 @@ internal sealed class InputsView : View
             rows.Add(new HeadingRow($"XLR {input}"));
             rows.Add(new NumberRow($"Gain", state.Number($"gain{suffix}Db"), 0, 80, 1,
                 value => $"{value:0} dB", value => Set(link, $"gain{suffix}", (int)Math.Round(value)))
-            { Enabled = state.Can("gain"), Note = state.Flag("gainLocked") ? "locked" : null });
+            { Enabled = state.Can("gain"), FineStep = 1, Note = state.Flag("gainLocked") ? "locked" : null });
             rows.Add(new ToggleRow("Mute", state.Flag($"mute{suffix}"),
                 value => Set(link, $"mute{suffix}", value)) { Enabled = state.Can("mute") });
             rows.Add(new ToggleRow("Low cut", state.Flag($"lowCut{suffix}"),
