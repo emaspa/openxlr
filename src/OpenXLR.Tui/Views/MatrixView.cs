@@ -42,9 +42,9 @@ internal sealed class MatrixView : View
         // With height to spare every meter is stereo, on two rows of its own,
         // and a channel takes two rows so its neighbours do not touch. A short
         // terminal keeps one row a channel and one summed bar.
-        bool roomy = area.Height - 7 >= channels.Count * 2;
+        bool roomy = area.Height - 8 >= channels.Count * 2;
         int nameWidth = roomy ? 22 : NameWidth;
-        int masterHeight = roomy ? 5 : 3;
+        int masterHeight = roomy ? 6 : 3;
 
         int cells = Math.Max(1, (area.Width - nameWidth - 2) / MinCell);
         int shown = Math.Min(mixes.Count, cells);
@@ -76,7 +76,7 @@ internal sealed class MatrixView : View
             MeterReading level = app.Link.StereoMeter("mix", mix.Id);
             if (roomy)
             {
-                Stereo(screen, x + 1, y + 3, y + 4, cellWidth - 4, level, theme, back);
+                Stereo(screen, x + 1, y + 3, y + 5, cellWidth - 4, level, theme, back);
             }
             else
             {
@@ -90,11 +90,10 @@ internal sealed class MatrixView : View
         y++;
 
         // Three rows a channel where they fit: the name and the sends on the
-        // middle one, the left bar hugging it from the row above and the right
-        // bar from the row below, so the name sits centred between its two
-        // bars and the bars stay one row apart. Two rows where only those fit,
-        // with the name beside the left bar. One row and a summed bar in a
-        // short terminal.
+        // middle one, the left bar on the row above and the right bar on the
+        // row below, so the name sits centred between its two bars. Two rows
+        // where only those fit, with the name beside the left bar. One row and
+        // a summed bar in a short terminal.
         int available = Math.Max(1, area.Bottom - y);
         int step = !roomy ? 1 : channels.Count * 3 <= available ? 3 : 2;
         int rows = Math.Max(1, available / step);
@@ -150,17 +149,14 @@ internal sealed class MatrixView : View
         }
     }
 
-    /// <summary>
-    /// Left above right, each lettered. With a row between them the right bar
-    /// takes the upper half of its row, so both bars hug the row between.
-    /// </summary>
+    /// <summary>Left above right, each lettered, on the rows it is given.</summary>
     private static void Stereo(Screen screen, int x, int left, int right, int width, MeterReading level, Theme theme, Rgb back)
     {
         if (width < 4) return;
         screen.Text(x, left, "L", theme.TextMuted, back);
         screen.Text(x, right, "R", theme.TextMuted, back);
         Widgets.Meter(screen, x + 2, left, width - 2, level.Left, theme, back);
-        Widgets.Meter(screen, x + 2, right, width - 2, level.Right, theme, back, upper: right > left + 1);
+        Widgets.Meter(screen, x + 2, right, width - 2, level.Right, theme, back);
     }
 
     public override bool Handle(KeyPress key, App app)

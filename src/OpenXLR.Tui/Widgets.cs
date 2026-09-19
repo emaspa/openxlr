@@ -24,27 +24,25 @@ internal static class Widgets
     /// rather than by how loud the signal is, which is the rule the window's
     /// meter follows, so the quiet end stays calm however hot the peak gets.
     ///
-    /// A bar takes half its row: the lower half, or the upper half when it
-    /// is the right side of a pair drawn below the row its name is on, so the
-    /// two bars of a stereo pair hug that row from either side. The half
-    /// block is the glyph terminals draw as one clean rectangle; the finer
-    /// fractions come from the font in some of them and show a seam along the
-    /// bottom, which reads as a second, thinner bar.
+    /// A bar fills its row, so it sits centred on the lettering beside it,
+    /// and its empty track is the line through the middle of the row. Two
+    /// bars that belong together are kept a row apart by whoever draws them.
+    /// The full and half blocks are the glyphs terminals draw as clean
+    /// rectangles; the finer fractions come from the font in some of them and
+    /// show a seam, which reads as a second, thinner bar.
     /// </summary>
-    public static void Meter(Screen screen, int x, int y, int width, double level, Theme theme, Rgb back,
-        bool upper = false)
+    public static void Meter(Screen screen, int x, int y, int width, double level, Theme theme, Rgb back)
     {
         if (width <= 0) return;
         double clamped = Math.Clamp(level, 0, 1);
         double filled = clamped * width;
-        (char full, char half, char track) = upper ? ('▀', '▘', '▔') : ('▄', '▖', '▁');
         for (int cell = 0; cell < width; cell++)
         {
             double position = (cell + 1.0) / width;
             Rgb colour = theme.MeterColour(position);
             double within = filled - cell;
             // Two steps a cell, which a bar this short does not miss.
-            char ch = within >= 1 ? full : within >= 0.5 ? half : track;
+            char ch = within >= 1 ? '█' : within >= 0.5 ? '▌' : '─';
             screen.Set(x + cell, y, ch, within >= 0.5 ? colour : theme.MeterTrack, back);
         }
     }

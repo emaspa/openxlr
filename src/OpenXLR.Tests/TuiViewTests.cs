@@ -278,14 +278,13 @@ public sealed class TuiViewTests
         Assert.Contains("L", rows[first - 1], StringComparison.Ordinal);
         Assert.Contains("R", rows[first + 1], StringComparison.Ordinal);
         Assert.Contains("Game", rows[first + 3], StringComparison.Ordinal);
-        // The right bar hangs from the top of its row, so both bars hug the
-        // name's row; its empty track is the upper eighth.
         int track = rows[first + 1].IndexOf("R ", StringComparison.Ordinal) + 2;
-        Assert.Equal('\u2594', rows[first + 1][track]);
+        Assert.Equal('\u2500', rows[first + 1][track]);
         // The masters carry the same pair, under their mute key.
         int mixes = Array.FindIndex(rows, row => row.Contains("MIXES", StringComparison.Ordinal));
+        // The masters carry the same pair, a row apart, under their mute key.
         Assert.Contains("L", rows[mixes + 3], StringComparison.Ordinal);
-        Assert.Contains("R", rows[mixes + 4], StringComparison.Ordinal);
+        Assert.Contains("R", rows[mixes + 5], StringComparison.Ordinal);
 
         // Nine channels do not fit twice over in twenty-four rows, so there
         // the grid stays one row a channel with a single summed bar.
@@ -314,7 +313,7 @@ public sealed class TuiViewTests
         Assert.DoesNotContain(" R ", rows[xlr + 1], StringComparison.Ordinal);
         // Its bar stands on the name's own row, where the stereo pair would
         // have flanked it.
-        Assert.Contains('\u2581', rows[xlr]);
+        Assert.Contains('\u2500', rows[xlr]);
 
         // On the desk the same input carries one bar and no lettering.
         app.ShowTab(0);

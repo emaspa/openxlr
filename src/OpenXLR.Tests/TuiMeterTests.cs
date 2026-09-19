@@ -188,21 +188,19 @@ public sealed class TuiMeterTests
     }
 
     [Fact]
-    public void TheTwoBarsOfAStereoPairStayApartOnNeighbouringRows()
+    public void AHorizontalBarFillsItsRowAndItsTrackRunsThroughTheMiddle()
     {
-        Screen screen = new(6, 2);
+        Screen screen = new(6, 1);
         Theme theme = Zones();
         screen.Clear(theme.Card);
-        Widgets.Meter(screen, 0, 0, 4, 1, theme, theme.Card);
-        Widgets.Meter(screen, 0, 1, 4, 1, theme, theme.Card);
+        Widgets.Meter(screen, 0, 0, 4, 0.625, theme, theme.Card);
 
-        // Each bar keeps the lower half of its own row, so the half above the
-        // lower one still reads as the line between a left and a right.
-        Assert.Equal('\u2584', screen.At(0, 0).Ch);
-        Assert.Equal('\u2584', screen.At(0, 1).Ch);
-        // Asked to hang from the top instead, a bar takes the upper half.
-        Widgets.Meter(screen, 0, 1, 4, 0.5, theme, theme.Card, upper: true);
-        Assert.Equal('\u2580', screen.At(0, 1).Ch);
-        Assert.Equal('\u2594', screen.At(3, 1).Ch);
+        // Full height, so the bar sits centred on the letter beside it; the
+        // half step is a left half block and the track the middle line.
+        Assert.Equal('\u2588', screen.At(0, 0).Ch);
+        Assert.Equal('\u2588', screen.At(1, 0).Ch);
+        Assert.Equal('\u258c', screen.At(2, 0).Ch);
+        Assert.Equal('\u2500', screen.At(3, 0).Ch);
+        Assert.Equal(theme.MeterTrack, screen.At(3, 0).Fore);
     }
 }
