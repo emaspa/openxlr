@@ -679,6 +679,23 @@ public sealed class PipeWireAdapter
         IReadOnlyList<InsertDefinition>? inserts = null)
         => CreateFilterChain($"OpenXLR_lc_{id}_in", $"OpenXLR_lc_{id}_out", "OpenXLR Mic Filter", 1, lowCutHz, clipGuard, inserts);
 
+    internal FilterHandle CreateSoundCheck(string id, out int rate)
+    {
+        rate = ParseGraphSampleRate(Run("pw-metadata", "-n", "settings"));
+        string node = "OpenXLR_soundcheck_" + id;
+        var host = new NativePluginHost(new() { Id = id, Kind = "soundcheck", Plugin = "soundcheck" },
+            node, 1, rate, NativePluginHost.Executable, [], meterSymbols: new HashSet<string> { "frames", "mode" });
+        _nativeHosts.Add(host);
+        var filter = new FilterHandle(node, node, node, host.Process) { NativeHost = host };
+        if (!WaitForPorts(node, "playback", false, TimeSpan.FromSeconds(3), host.Process)
+            || !WaitForPorts(node, "capture", true, TimeSpan.FromSeconds(3), host.Process))
+        {
+            StopFilter(filter);
+            throw new InvalidOperationException("Sound Check audio ports did not appear.");
+        }
+        return filter;
+    }
+
     /// <summary>A stereo insert chain for a mix, spliced between the mix and its consumers.</summary>
     public FilterHandle CreateMixChain(string id, string description, IReadOnlyList<InsertDefinition> inserts)
         => CreateFilterChain($"OpenXLR_ins_{id}_in", $"OpenXLR_ins_{id}_out", description, 2, 0, false, inserts);
@@ -1235,7 +1252,7 @@ public sealed class PipeWireAdapter
 
             string? name = props.TryGetProperty("node.name", out JsonElement n) ? n.GetString() : null;
             if (name is null) continue;
-            if (name.StartsWith("OpenXLR_route_", StringComparison.Ordinal)) continue;
+            if (name.StartsWith("OpenXLR_route_", StringComparison.Ordinal) || name.StartsWith("OpenXLR_soundcheck_", StringComparison.Ordinal)) continue;
             string mc = props.TryGetProperty("media.class", out JsonElement m) ? m.GetString() ?? "" : "";
 
             bool isSink = mc == "Audio/Sink";

@@ -436,6 +436,10 @@ public sealed class MixerService : IHostedService, IDisposable
                     });
                     Changed?.Invoke();
                     return null;
+                case "soundCheck":
+                    _mixer.SoundCheck(cmd.Channel!, cmd.Action!);
+                    Changed?.Invoke();
+                    return null; // Recording and playback state never enter saved settings.
                 case "setLevel":
                     if (cmd.Channel is null || cmd.Mix is null) return "setLevel: need 'channel' and 'mix'";
                     _mixer.SetLevel(cmd.Channel, cmd.Mix, cmd.Value.GetDouble());

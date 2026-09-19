@@ -198,6 +198,7 @@ void control_set_observed(Control *c, float value);
 bool control_is_output(const Control *c);
 void *control_backend(const Control *c);
 
+extern const Backend sound_check_backend;
 extern const Backend lv2_backend;
 extern const Backend clap_backend;
 extern const Backend vst3_backend;

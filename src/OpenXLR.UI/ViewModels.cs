@@ -54,6 +54,7 @@ public sealed partial class MainViewModel : ViewModelBase
             {
                 DeviceConnected = false; Status = "daemon not running";
                 Inserts.ResetForNewConnection(); Inserts2.ResetForNewConnection();
+                Inserts.SoundCheck.Apply(null); Inserts2.SoundCheck.Apply(null);
                 foreach (MixViewModel mv in Mixes) mv.Inserts.ResetForNewConnection();
             }
             else { Inserts.EnsurePluginsLoaded(); Inserts2.EnsurePluginsLoaded(); }
@@ -981,7 +982,7 @@ public sealed partial class MainViewModel : ViewModelBase
 
     private void ApplyMixer(JsonNode? mixer)
     {
-        if (mixer is null) { HasMixer = false; RenamedSinceStart = false; LayoutWarning = ""; return; }
+        if (mixer is null) { Inserts.SoundCheck.Apply(null); Inserts2.SoundCheck.Apply(null); HasMixer = false; RenamedSinceStart = false; LayoutWarning = ""; return; }
         HasMixer = true;
         RenamedSinceStart = mixer["renamedSinceStart"]?.GetValue<bool>() ?? false;
         LayoutWarning = mixer["layoutWarning"]?.GetValue<string>() ?? "";
@@ -991,6 +992,8 @@ public sealed partial class MainViewModel : ViewModelBase
         SoftClipGuard = mixer["softClipGuard"]?.GetValue<bool>() ?? false;
         Inserts.Apply(mixer["inserts"]?["xlr1"]);
         Inserts2.Apply(mixer["inserts"]?["xlr2"]);
+        Inserts.SoundCheck.Apply(mixer["soundCheck"]);
+        Inserts2.SoundCheck.Apply(mixer["soundCheck"]);
         bool auxAudible = mixer["monitorFeeds"] is JsonObject monitorFeeds && monitorFeeds.Any(
             feed => (feed.Value?.GetValue<string>() ?? "").Split('+').Contains("auxout"));
 

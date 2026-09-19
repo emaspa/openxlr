@@ -125,6 +125,7 @@ that final acknowledgement (or an `error` without a request id):
 | `deleteWindowsPlugin` | `path` | permanently delete one standalone plugin file or bundle and its wrappers, then refresh the catalogue. Refused for unregistered, Wine-installed, symbolic-link or in-use sources; answered with `pluginInstall`. Clients must confirm deletion with the user first |
 | `syncWindowsPlugins` | none | run yabridge's sync over the folders it knows, clean missing-source wrappers belonging to those folders unless inserts still use them, then read the catalogues again; answered with `pluginInstall` |
 | `rescanPlugins` | none | read the plugin directories again, for plugins installed by other means; answered with `pluginInstall` |
+| `soundCheck` | `channel`, `action` | use `xlr1` or `xlr2` and `record`, `loop`, `live` or `stop`. One microphone session at a time; recording replaces the sample and ends after ten seconds, looping needs at least 0.1 seconds. Live keeps the sample, stop discards it. Requires the native helper and a connected microphone. Commands acknowledge with `requestId` using the normal command reply. |
 | `setInserts` | `channel`, `inserts[]` | replace a chain; `channel` is `xlr1`, `xlr2` or `mix:<id>`, each insert is `{id, kind, plugin, label?, bypass?, params?}` where `kind` is `"lv2"` with the plugin URI, `"clap"` with the plugin's id, or `"vst3"` with the class id as 32 hex digits; a CLAP or VST3 insert always runs in the native host, so its `nativeHost` reads true whatever was sent. An insert being added is refused when its plugin cannot run at the chain's width (one channel on an input, two on a mix, by `widths` or the port counts as `plugins` describes them); an insert already in the chain, the same plugin under the same id, is left to the chain builder, so one can always be removed; an id kept while its `kind` or `plugin` changes counts as an addition |
 | `setInsertBypass` | `channel`, `insertId`, `value` | bypass one insert |
 | `setInsertParam` | `channel`, `insertId`, `symbol`, `value` | one plugin control, by the catalogue's `symbol` (LV2 port symbol or decimal CLAP/VST3 parameter id); use catalogue ranges and scale points. Refused when the insert is not in the chain or the catalogue does not declare the symbol for its plugin |
@@ -464,3 +465,14 @@ dial rings and the keys agree; on a monitor mix sink it goes through the
 existing mix setter, so state and graph updates follow the same path as the
 mixer mute control; on any other output it uses pipewire-pulse's atomic
 toggle. The daemon pushes state whenever a sink's volume or mute changes.
+
+### Sound Check state
+
+`mixer.soundCheck` contains `channel` (null when idle), `mode` (`idle`,
+`recording`, `looping` or `live`), `seconds` (recorded duration, 0 to 10) and
+nullable `error`. Progress arrives in mixer state updates. The sample exists
+only in helper memory, before software input processing and inserts but after
+hardware gain and processing. No recording or session state is saved in profiles.
+Device changes, helper failure, daemon restart and a ten-minute session limit
+end replay and restore the physical input. `stop` is idempotent; commands for
+another microphone are refused while a session is active.

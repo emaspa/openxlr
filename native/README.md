@@ -260,3 +260,13 @@ while the user is resizing the frame.
 
 State and presets, and VST2, are separate work. Changing an insert's host
 rebuilds its chain; nothing here swaps a plugin without a gap.
+
+### Sound Check helper
+
+The `soundcheck` backend uses the same isolated host, ports and control protocol
+as native inserts. It preallocates ten seconds of mono floating-point samples
+at the graph rate. The audio callback does not allocate, lock or access files.
+`command` selects live (0), record (1) or loop (2); output meters `frames` and
+`mode` report progress. Recording has both a sample-count and a monotonic-time
+limit. `make test-sound-check` checks replacement, bounds and replay; the managed
+`SoundCheckIntegrationTests` exercise a private PipeWire graph and real audio.

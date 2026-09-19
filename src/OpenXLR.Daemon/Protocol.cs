@@ -19,6 +19,7 @@ public sealed record Command
     /// WebSocket table is the canonical public list so this DTO cannot drift
     /// into a second protocol specification.
     /// </summary>
+    [JsonPropertyName("action")] public string? Action { get; init; }
     [JsonPropertyName("cmd")] public string Cmd { get; init; } = "";
 
     /// <summary>

@@ -438,6 +438,9 @@ public sealed class DaemonClient : IAsyncDisposable
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setSoftClipGuard", ["value"] = on });
 
     /// <summary>Replace a channel's plugin insert chain (ordered).</summary>
+    public Task<string?> SoundCheckAsync(string channel, string action)
+        => EditLayoutAsync(new() { ["cmd"] = "soundCheck", ["channel"] = channel, ["action"] = action });
+
     public Task SetInsertsAsync(string channel, IReadOnlyList<object> inserts)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setInserts", ["channel"] = channel, ["inserts"] = inserts });
 

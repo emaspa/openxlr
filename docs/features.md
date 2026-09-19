@@ -361,3 +361,10 @@ PipeWire output volume, mute and enforced system-output selection are available
 from the same PC shortcut session and OpenDeck Toggle keys. Volume steps use
 desktop percentages up to 150%; targets can follow the current default or stay
 bound to a named external output or monitor mix.
+
+### Sound Check
+
+Record up to ten seconds from an XLR microphone and loop the dry sample through
+the current software processing and insert chain. Live mode retains the sample;
+stop discards it and restores the microphone. The session stays in memory and
+ends after ten minutes or a lost audio path. Hardware processing remains upstream.

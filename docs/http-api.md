@@ -145,3 +145,11 @@ sink that mix.
 that output. `@monitor` follows the selected monitor output. Limits, rejected
 targets and linked-monitor behavior match the [WebSocket contract](api.md).
 These commands require the daemon but do not require a running UI or KDE.
+
+### Sound Check
+
+`POST /api/v1/commands` also accepts `soundCheck` with `channel` (`xlr1` or `xlr2`)
+and `action` (`record`, `loop`, `live`, `stop`). It uses the same validation and
+acknowledgement as the WebSocket command. See [Sound Check state](api.md#sound-check-state)
+for limits and the transient `mixer.soundCheck` object. Recordings never leave
+the helper's memory through this API.
