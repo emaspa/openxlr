@@ -8,6 +8,13 @@ internal abstract class View
     /// <summary>The keys this tab adds, for the help line at the bottom.</summary>
     public abstract string Keys { get; }
 
+    /// <summary>
+    /// True while the tab is taking typed text, such as a filter, so a letter
+    /// or a digit is its own rather than a quit or a section switch. Ctrl+C,
+    /// Tab and F1 stay the frame's.
+    /// </summary>
+    public virtual bool WantsText => false;
+
     public abstract void Draw(Screen screen, Rect area, App app);
 
     /// <summary>True when the key was this tab's to handle.</summary>
@@ -98,7 +105,8 @@ internal sealed class App
 
         if (key.Ctrl && key.Is('c')) { Stop(); return; }
         if (Prompting) { Typing(key); return; }
-        if (key.Is('q')) { Stop(); return; }
+        bool typing = Current.WantsText;
+        if (!typing && key.Is('q')) { Stop(); return; }
 
         if (_help)
         {
@@ -115,7 +123,7 @@ internal sealed class App
             case Key.F1: _help = true; return;
         }
 
-        if (key.Key == Key.Char && key.Char is >= '1' and <= '9' && !key.Ctrl)
+        if (!typing && key.Key == Key.Char && key.Char is >= '1' and <= '9' && !key.Ctrl)
         {
             int index = key.Char - '1';
             if (index < _views.Count) { Tab = index; return; }
@@ -124,7 +132,7 @@ internal sealed class App
         if (Current.Handle(key, this)) return;
 
         if (key.Is('q')) { Stop(); return; }
-        if (key.Is('?')) { _help = true; return; }
+        if (!typing && key.Is('?')) { _help = true; return; }
     }
 
     private void Typing(KeyPress key)

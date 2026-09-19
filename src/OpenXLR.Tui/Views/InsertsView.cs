@@ -5,13 +5,18 @@ namespace OpenXLR.Tui;
 /// <summary>
 /// The plugin chains: one target at a time, its inserts in order, and what the
 /// daemon says about each of them. Editing asks for the native editor first,
-/// with generated controls when it is blocked or cannot open.
+/// with generated controls when it is blocked or cannot open. Adding opens a
+/// picker over the catalogue, narrowed by typing, which offers the plugins
+/// that can sit in a chain of the target's width.
 /// </summary>
 internal sealed class InsertsView : View
 {
     private readonly RowList _list = new();
     private readonly RowList _header = new();
     private RowList _controls = new();
+    private RowList _picker = new();
+    private bool _picking;
+    private string _filter = string.Empty;
     private int _target;
     private EditTarget? _editing;
     private Task<string?>? _opening;
@@ -26,10 +31,15 @@ internal sealed class InsertsView : View
 
     public override string Title => "Inserts";
 
-    public override string Keys => _showControls
+    public override string Keys => _picking
+        ? "type to filter  Up/Down choose  Enter add  Esc back"
+        : _showControls
         ? "Esc back  r defaults  -/+ [/] value  Space toggle  Left/Right choose  e editor"
         : _opening is not null ? "Waiting for the native editor  Esc cancel"
-        : "e editor  Space bypass  Ctrl+Up/Down move  d remove";
+        : "a add  e editor  Space bypass  Ctrl+Up/Down move  d remove";
+
+    /// <summary>The picker's filter takes every letter and digit typed.</summary>
+    public override bool WantsText => _picking;
 
     public override void Draw(Screen screen, Rect area, App app)
     {
@@ -40,6 +50,16 @@ internal sealed class InsertsView : View
             return;
         }
         Update(app, state);
+        if (_picking)
+        {
+            (string key, string name) = Targets(state)[_target];
+            _header.Draw(screen, area with { Height = 2 }, app.Theme,
+                [new HeadingRow($"Add to {name}"), new TextRow("Filter", _filter.Length > 0 ? _filter : "type to narrow the list")],
+                labelWidth: 22, focus: false);
+            _picker.Draw(screen, new Rect(area.X, area.Y + 3, area.Width, Math.Max(0, area.Height - 3)),
+                app.Theme, PickRows(app, key), labelWidth: 40);
+            return;
+        }
         if (_showControls && Find(state) is { } entry)
         {
             PluginEntry? plugin = Plugin(app, entry);
@@ -60,6 +80,21 @@ internal sealed class InsertsView : View
         Snapshot? state = State(app);
         if (state is null) return false;
         Update(app, state);
+        if (_picking)
+        {
+            switch (key.Key)
+            {
+                case Key.Escape: ClosePicker(); return true;
+                case Key.Backspace:
+                    if (_filter.Length > 0) _filter = _filter[..^1];
+                    return true;
+                case Key.Char when !key.Ctrl && !char.IsControl(key.Char) && _filter.Length < 40:
+                    _filter += key.Char;
+                    return true;
+                default:
+                    return _picker.Handle(key, PickRows(app, Targets(state)[_target].Key));
+            }
+        }
         if (_editing is not null && key.Key == Key.Escape) { CloseControls(); return true; }
         if (_showControls && Find(state) is { } entry)
         {
@@ -73,7 +108,119 @@ internal sealed class InsertsView : View
             if (key.Is('e')) { Edit(app, _editing!.Channel, entry); return true; }
             return _controls.Handle(key, ControlRows(app, state, entry, plugin));
         }
+        if (key.Is('a') && _editing is null && Targets(state).Count > 0)
+        {
+            _picking = true;
+            _filter = string.Empty;
+            _picker = new RowList();
+            return true;
+        }
         return _list.Handle(key, Build(app, state));
+    }
+
+    private void ClosePicker()
+    {
+        _picking = false;
+        _filter = string.Empty;
+    }
+
+    /// <summary>The plugins the picker offers for a chain, in name order, narrowed by the filter.</summary>
+    private List<Row> PickRows(App app, string target)
+    {
+        if (!app.Link.PluginsLoaded) return [new TextRow("Plugins", "Waiting for the plugin catalogue")];
+        // An input's chain is mono and a mix's is stereo, which is the width
+        // a plugin has to fit, as the window's picker decides it too.
+        int channels = target.StartsWith("xlr", StringComparison.Ordinal) ? 1 : 2;
+        List<Row> rows = [];
+        foreach (PluginChoice choice in app.Link.Choices)
+        {
+            if (!choice.Supported || !choice.Fits(channels)) continue;
+            if (_filter.Length > 0 &&
+                !choice.Name.Contains(_filter, StringComparison.OrdinalIgnoreCase) &&
+                !choice.Category.Contains(_filter, StringComparison.OrdinalIgnoreCase) &&
+                !choice.Kind.Contains(_filter, StringComparison.OrdinalIgnoreCase)) continue;
+            rows.Add(new PickRow(choice, () => Add(app, target, choice)));
+        }
+        if (rows.Count == 0)
+            rows.Add(new TextRow("No plugins", _filter.Length > 0
+                ? "none match the filter"
+                : $"no {(channels == 1 ? "mono" : "stereo")} plugin is installed"));
+        return rows;
+    }
+
+    /// <summary>
+    /// Appends a plugin to the chain, the way the window does: a fresh short
+    /// id, the catalogue name as its label, no bypass and no control values,
+    /// so every control starts at its default.
+    /// </summary>
+    private void Add(App app, string target, PluginChoice choice)
+    {
+        Snapshot? state = State(app);
+        if (state is null) return;
+        List<InsertEntry> chain = state.Mixer.Inserts.TryGetValue(target, out List<InsertEntry>? entries) ? entries : [];
+        JsonArray array = Chain(chain);
+        array.Add(new JsonObject
+        {
+            ["id"] = Guid.NewGuid().ToString("N")[..8],
+            ["kind"] = choice.Kind,
+            ["plugin"] = choice.Plugin,
+            ["label"] = choice.Name,
+            ["bypass"] = false,
+            ["params"] = new JsonObject(),
+        });
+        SendChain(app, target, array);
+        ClosePicker();
+        app.Say($"Added {choice.Name}");
+    }
+
+    /// <summary>A chain as the daemon takes it back: every insert with the fields it was read with.</summary>
+    private static JsonArray Chain(IEnumerable<InsertEntry> inserts)
+    {
+        JsonArray array = [];
+        foreach (InsertEntry item in inserts)
+        {
+            JsonObject values = [];
+            foreach ((string symbol, double value) in item.Insert.Params) values[symbol] = value;
+            array.Add(new JsonObject
+            {
+                ["id"] = item.Insert.Id,
+                ["kind"] = item.Insert.Kind,
+                ["plugin"] = item.Insert.Plugin,
+                ["label"] = item.Insert.Label,
+                ["bypass"] = item.Insert.Bypass,
+                ["nativeHost"] = item.Insert.NativeHost,
+                ["params"] = values,
+            });
+        }
+        return array;
+    }
+
+    /// <summary>
+    /// Writes a chain back. The whole chain goes at once, which is the one
+    /// command the daemon has for it.
+    /// </summary>
+    private static void SendChain(App app, string target, JsonArray inserts) =>
+        app.Link.Send("setInserts", body =>
+        {
+            body["channel"] = target;
+            body["inserts"] = inserts;
+        });
+
+    /// <summary>One plugin the picker offers: its name, its category and its format.</summary>
+    private sealed class PickRow(PluginChoice choice, Action add) : Row(choice.Name)
+    {
+        public override void DrawValue(Screen screen, int x, int y, int width, Theme theme, Rgb back, bool focused)
+        {
+            screen.Text(x, y, choice.Category, theme.TextDetail, back, bold: focused, maxWidth: Math.Max(4, width - 8));
+            screen.Text(x + Math.Max(6, width - 6), y, $" {choice.Kind} ", theme.TextSecondary, theme.Badge, maxWidth: 6);
+        }
+
+        public override bool Handle(KeyPress key)
+        {
+            if (key.Key != Key.Enter) return false;
+            add();
+            return true;
+        }
     }
 
     private static PluginEntry? Plugin(App app, InsertEntry entry) =>
@@ -234,7 +381,7 @@ internal sealed class InsertsView : View
             ? entries
             : [];
         if (chain.Count == 0)
-            rows.Add(new TextRow("No plugins", "add them from the window"));
+            rows.Add(new TextRow("No plugins", "a adds one from the catalogue"));
         for (int index = 0; index < chain.Count; index++)
             rows.Add(new InsertRow(chain[index], index, chain, targets[_target].Key, app, this));
 
@@ -278,7 +425,7 @@ internal sealed class InsertsView : View
                     app.Ask($"Type yes to remove {Label}", string.Empty, answer =>
                     {
                         if (!answer.Equals("yes", StringComparison.OrdinalIgnoreCase)) return;
-                        Write(chain.Where((_, at) => at != index));
+                        SendChain(app, target, Chain(chain.Where((_, at) => at != index)));
                     });
                     return true;
 
@@ -297,37 +444,7 @@ internal sealed class InsertsView : View
             List<InsertEntry> moved = [.. chain];
             moved.RemoveAt(index);
             moved.Insert(to, entry);
-            Write(moved);
-        }
-
-        /// <summary>
-        /// Writes a chain back. The whole chain goes at once, which is the one
-        /// command the daemon has for it, so every insert is sent with the
-        /// fields it was read with.
-        /// </summary>
-        private void Write(IEnumerable<InsertEntry> inserts)
-        {
-            JsonArray array = [];
-            foreach (InsertEntry item in inserts)
-            {
-                JsonObject values = [];
-                foreach ((string symbol, double value) in item.Insert.Params) values[symbol] = value;
-                array.Add(new JsonObject
-                {
-                    ["id"] = item.Insert.Id,
-                    ["kind"] = item.Insert.Kind,
-                    ["plugin"] = item.Insert.Plugin,
-                    ["label"] = item.Insert.Label,
-                    ["bypass"] = item.Insert.Bypass,
-                    ["nativeHost"] = item.Insert.NativeHost,
-                    ["params"] = values,
-                });
-            }
-            app.Link.Send("setInserts", body =>
-            {
-                body["channel"] = target;
-                body["inserts"] = array;
-            });
+            SendChain(app, target, Chain(moved));
         }
     }
 }

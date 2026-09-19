@@ -1732,7 +1732,7 @@ Eight sections are reachable with `1` to `8`, Tab and Shift+Tab:
 | 3 Inputs | hardware controls in grouped cards with gain arcs on a wide terminal, or a scrolling list in a small one; gain, mute, low cut, expander, voice tune and its strength, phantom power, ClipGuard and the compressor for each XLR input; software processing, headphones, direct monitor blend, hardware output routing and USB Aux return |
 | 4 Outputs | selected monitor sinks and their feeds, shared output volume, each sink's volume and mute, and the system default sink and source |
 | 5 Apps | every known application and its channel assignment, including the desktop's own routing |
-| 6 Inserts | the chain on each input and mix, its order, bypass and status; open a plugin's native editor or edit its generated controls when the editor is blocked or refused; adding plugins stays in the window |
+| 6 Inserts | the chain on each input and mix, its order, bypass and status; add a plugin from the catalogue, narrowed by typing, of those that fit the chain's width; open a plugin's native editor or edit its generated controls when the editor is blocked or refused |
 | 7 Profiles | load, save over, save as, delete and recall on connect; interface selection and recorded device defaults |
 | 8 Options | the skin picker, connection status, daemon version and fresh state request |
 
@@ -1764,6 +1764,8 @@ Controls below the visible hardware cards appear as the selection moves.
 | Outputs, on a sink | `-`, `+`, `m` | change its volume or toggle its mute |
 | Apps | Left/Right, `i`, `f` | assign a channel, leave routing to the desktop, or forget the assignment |
 | Inserts | Space, Ctrl+Up/Down, `d`, `e` | bypass, reorder, remove, or open the plugin's native editor, with generated controls when blocked or refused |
+| Inserts | `a` | add a plugin: the picker lists the installed plugins that fit the chain, mono for an input and stereo for a mix |
+| Plugin picker | letters and digits, Backspace, Up/Down, Enter, Escape | narrow the list by name, category or format; choose; add the plugin after the chain's last one; go back. While the picker is open `q` and the digits are filter text |
 | Insert controls | Escape, `r`, `e` | return to the chain, reset every declared control to its default, or try the native editor again |
 | Insert controls | Up/Down, PageUp/PageDown, Left/Right, Space, Enter | select a control, change a number or choice, or toggle a switch |
 | Insert controls | `-`, `+`, `[`, `]`, Home, End | lower or raise a number, take a fine step, or set the minimum or maximum; Ctrl+Left/Right also takes a fine step |
