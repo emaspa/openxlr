@@ -186,6 +186,7 @@ public sealed class InsertsViewModel : ViewModelBase
                     entry?["nativeHostRunning"]?.GetValue<bool>() == true,
                     entry?["nativeUiBlocked"]?.GetValue<bool>() == true,
                     entry?["nativeUiBlockReason"]?.GetValue<string>());
+                vm.LatencyMilliseconds = entry?["latencyMilliseconds"]?.GetValue<double>();
                 next.Add(vm);
             }
             if (!next.SequenceEqual(Items))
@@ -277,6 +278,14 @@ public sealed class InsertViewModel : ViewModelBase
     public string Plugin { get; }
     public string Label { get; }
     public string Kind { get; }
+    private double? _latencyMilliseconds;
+    public double? LatencyMilliseconds
+    {
+        get => _latencyMilliseconds;
+        internal set { if (Set(ref _latencyMilliseconds, value)) Raise(nameof(LatencyText)); }
+    }
+    public string LatencyText => LatencyMilliseconds is { } ms && double.IsFinite(ms) && ms >= 0
+        ? $"Plugin latency: {ms:0.###} ms" : "Plugin latency: unavailable (use native hosting to measure LV2 latency)";
     public string Format => Kind.ToUpperInvariant();
 
     /// <summary>The channel chain this insert belongs to (row buttons route through it).</summary>

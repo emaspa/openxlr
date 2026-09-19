@@ -9,6 +9,38 @@ public sealed class PluginCatalogTests
             [.. Enumerable.Range(0, controls).Select(i => new PluginParam($"p{i}", $"Param {i}", 0, 1, 0, false, false, false, false, []))],
             [], ["in"], ["out"]);
 
+    [Fact]
+    public void IndexedLookupKeepsFormatCaseAndFirstMatchWithoutRescanningTheList()
+    {
+        var first = Plugin("lv2", "first", 0) with { Plugin = "shared" };
+        var duplicate = first with { Name = "duplicate" };
+        var otherFormat = first with { Kind = "clap" };
+        var source = new ReadOnceList([first, duplicate, otherFormat]);
+        var snapshot = new PluginCatalog.Snapshot(source);
+        source.AllowReads = false;
+        for (int i = 0; i < 10000; i++)
+        {
+            Assert.Same(first, snapshot.Find("lv2", "shared"));
+            Assert.Same(otherFormat, snapshot.Find("clap", "shared"));
+            Assert.Null(snapshot.Find("LV2", "shared"));
+            Assert.Null(snapshot.Find("lv2", "SHARED"));
+        }
+        var refreshed = new PluginCatalog.Snapshot([duplicate]);
+        Assert.Same(duplicate, refreshed.Find("lv2", "shared"));
+        Assert.Null(refreshed.Find("clap", "shared"));
+        Assert.Same(first, snapshot.Find("lv2", "shared"));
+    }
+
+    private sealed class ReadOnceList(IReadOnlyList<PluginInfo> values) : IReadOnlyList<PluginInfo>
+    {
+        internal bool AllowReads = true;
+        public int Count => AllowReads ? values.Count : throw new InvalidOperationException("List read after indexing");
+        public PluginInfo this[int index] => AllowReads ? values[index] : throw new InvalidOperationException("List read after indexing");
+        public IEnumerator<PluginInfo> GetEnumerator()
+            => AllowReads ? values.GetEnumerator() : throw new InvalidOperationException("List read after indexing");
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
     /// <summary>
     /// Enough ordinary LV2 plugins to fill the message a client is sent, in
     /// a size that leaves less room over than one large plugin needs.
@@ -30,8 +62,8 @@ public sealed class PluginCatalogTests
         // whole LV2 scan is there, and so is the plugin there was no room for.
         Assert.Equal(lv2.Count + 1, all.Count);
         Assert.True(all.Sum(p => (long)Lv2Catalog.Footprint(p)) > Lv2Catalog.CatalogBudgetBytes);
-        Assert.NotNull(PluginCatalog.Find(all, "vst3", vst3.Plugin));
-        Assert.NotNull(PluginCatalog.Find(all, "lv2", lv2[^1].Plugin));
+        Assert.NotNull(new PluginCatalog.Snapshot(all).Find("vst3", vst3.Plugin));
+        Assert.NotNull(new PluginCatalog.Snapshot(all).Find("lv2", lv2[^1].Plugin));
     }
 
     [Fact]
@@ -56,7 +88,7 @@ public sealed class PluginCatalogTests
 
         // An insert is resolved against the whole catalogue either way, so
         // the chain loads whether or not the picker could show the plugin.
-        Assert.NotNull(PluginCatalog.Find(all, "vst3", unused.Plugin));
+        Assert.NotNull(new PluginCatalog.Snapshot(all).Find("vst3", unused.Plugin));
     }
 
     [Fact]

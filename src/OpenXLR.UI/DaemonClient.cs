@@ -426,6 +426,9 @@ public sealed class DaemonClient : IAsyncDisposable
         => SendAsync(new Dictionary<string, object?> { ["cmd"] = "assignApp", ["identity"] = identity, ["channel"] = channel, ["label"] = label });
 
     /// <summary>Send or stop sending the Aux mix to the USB Aux port.</summary>
+    public Task SetMixLatencyCompensationAsync(bool enabled)
+        => SendAsync(new Dictionary<string, object> { ["cmd"] = "setMixLatencyCompensation", ["value"] = enabled });
+
     public Task SetAuxPortEnabledAsync(bool on)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setAuxPortEnabled", ["value"] = on });
 

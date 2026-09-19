@@ -1,3 +1,5 @@
+using System.Collections.Frozen;
+
 namespace OpenXLR.Core.Mixing;
 
 /// <summary>
@@ -12,10 +14,24 @@ namespace OpenXLR.Core.Mixing;
 /// </summary>
 public static class PluginCatalog
 {
-    private static readonly Refreshable<IReadOnlyList<PluginInfo>> All = new(Build);
+    private static readonly Refreshable<Snapshot> All = new(() => new(
+        Combine(() => Lv2Catalog.Plugins, () => ClapCatalog.Plugins, () => Vst3Catalog.Plugins)));
 
-    private static IReadOnlyList<PluginInfo> Build()
-        => Combine(() => Lv2Catalog.Plugins, () => ClapCatalog.Plugins, () => Vst3Catalog.Plugins);
+    // The list and lookup belong to one refresh generation. Tracking live
+    // insert latency must not scan the entire catalogue for every insert.
+    internal sealed class Snapshot
+    {
+        internal IReadOnlyList<PluginInfo> Plugins { get; }
+        private readonly FrozenDictionary<(string Kind, string Plugin), PluginInfo> _byIdentity;
+        internal Snapshot(IReadOnlyList<PluginInfo> plugins)
+        {
+            Plugins = plugins;
+            var entries = new Dictionary<(string, string), PluginInfo>();
+            foreach (var plugin in plugins) entries.TryAdd((plugin.Kind, plugin.Plugin), plugin);
+            _byIdentity = entries.ToFrozenDictionary();
+        }
+        internal PluginInfo? Find(string kind, string plugin) => _byIdentity.GetValueOrDefault((kind, plugin));
+    }
 
     /// <summary>
     /// Every source's plugins as one list. Each source on its own: one that
@@ -34,7 +50,7 @@ public static class PluginCatalog
     }
 
     /// <summary>Every plugin installed, in every format (blocks on the first call).</summary>
-    public static IReadOnlyList<PluginInfo> Plugins => All.Value;
+    public static IReadOnlyList<PluginInfo> Plugins => All.Value.Plugins;
 
     /// <summary>
     /// Read every source again, for plugins installed since. What was
@@ -63,7 +79,7 @@ public static class PluginCatalog
         All.Reset();
         GC.Collect(2, GCCollectionMode.Aggressive, blocking: true);
         NativeHeap.Trim();
-        IReadOnlyList<PluginInfo> plugins = All.Value;
+        IReadOnlyList<PluginInfo> plugins = All.Value.Plugins;
         // lilv builds and frees a large model to answer this; without the
         // trim the C library keeps every megabyte of it for a use that never
         // comes, and a few rescans cost more memory than the daemon ever needs.
@@ -106,10 +122,7 @@ public static class PluginCatalog
     });
 
     /// <summary>The plugin an insert names, by its kind and its identifier.</summary>
-    public static PluginInfo? Find(string kind, string plugin) => Find(Plugins, kind, plugin);
-
-    internal static PluginInfo? Find(IReadOnlyList<PluginInfo> catalogue, string kind, string plugin)
-        => catalogue.FirstOrDefault(p => p.Kind == kind && p.Plugin == plugin);
+    public static PluginInfo? Find(string kind, string plugin) => All.Value.Find(kind, plugin);
 
     public static PluginInfo? Find(InsertDefinition insert) => Find(insert.Kind, insert.Plugin);
 

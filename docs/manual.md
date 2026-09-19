@@ -1676,3 +1676,40 @@ Desktop keys reports that the additional press was not queued. Disabling or
 reconfiguring the shortcuts discards their waiting commands; an already sent
 command may still finish. This queue also preserves the order of an output
 switch followed by a volume change.
+
+### Plugin latency
+
+A plugin's OpenXLR controls show its reported processing latency in milliseconds.
+“Unavailable” means no valid live measurement, not zero delay. Native LV2, CLAP
+and VST3 report their running instance's value. An LV2 plugin in the PipeWire
+filter-chain reports zero only when its metadata declares no latency port.
+
+Options → Audio → **Compensate plugin latency across mixes** is off by default.
+Turn it on when parallel mixes need their plugin processing aligned. Faster mix
+outputs are delayed to match the slowest mix's inserts, including routes to
+virtual microphones and the output matrix. This can increase monitoring delay.
+Enabling or disabling it rebuilds the paths and briefly interrupts audio. It
+uses the native host for LV2 latency measurement where supported, without
+changing the plugin's saved editor switch. A missing native helper, unsupported
+host feature or missing report is shown in Options. Alignment waits until every
+mix's report is valid; it never guesses a missing latency.
+
+The limit is two seconds. Delays update without restarting plugins when their
+reported latency changes. Bypass removes that insert's latency. Internal delay
+nodes are hidden from device choices and removed when the option is disabled.
+The setting survives restart, but profile changes do not toggle it.
+
+This aligns mix-insert algorithmic delay, not the device's round-trip latency,
+the hardware direct-monitor path, PipeWire resampling offsets, or different
+microphones' input chains. An intentional echo is an effect, not processing
+latency, unless the plugin explicitly reports it as latency.
+
+Changing latency compensation also rebuilds existing supported input chains,
+so their latency reporting follows the new setting without re-adding effects.
+
+Live insert status uses one format-and-identifier index per catalogue refresh;
+large plugin libraries are not rescanned for each latency reading.
+
+A transient delay-control failure retries through the existing bounded recovery
+policy. Repairing a compensation stage retains healthy plugin instances,
+including their private state. Repeated failures still stop automatic retries.

@@ -145,3 +145,9 @@ sink that mix.
 that output. `@monitor` follows the selected monitor output. Limits, rejected
 targets and linked-monitor behavior match the [WebSocket contract](api.md).
 These commands require the daemon but do not require a running UI or KDE.
+
+Plugin latency is included in each insert's `latencyMilliseconds` state field.
+Send `{"cmd":"setMixLatencyCompensation","value":true}` through the command
+endpoint to opt in. Check `mixer.mixLatencyError` and
+`mixer.mixDelayMilliseconds` for the actual alignment, including unavailable
+reports. The option is off by default. See [api.md](api.md#plugin-latency-and-optional-mix-alignment).

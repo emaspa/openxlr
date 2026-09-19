@@ -36,6 +36,28 @@ public sealed class NativeHostProtocolTests
     }
 
     [Fact]
+    public void LiveLatencyReportsReplaceOldValuesAndRejectAChangedSampleRate()
+    {
+        using var host = Start("""
+            import sys
+            print('ready')
+            print('latency 480 48000')
+            count = 0
+            for line in sys.stdin:
+                if line.strip() == 'show':
+                    count += 1
+                    if count == 2: print('latency 960 48000')
+                    if count == 3: print('latency 960 44100')
+                    if count == 4: print('latency 0 48000')
+                    print('ui opened')
+            """);
+        host.ShowUi(); Assert.Equal(10, host.LatencyMilliseconds);
+        host.ShowUi(); Assert.Equal(20, host.LatencyMilliseconds);
+        host.ShowUi(); Assert.Null(host.LatencyMilliseconds);
+        host.ShowUi(); Assert.Equal(0, host.LatencyMilliseconds);
+    }
+
+    [Fact]
     public void APartialProtocolLineHasAFixedBoundAndRecoversAtTheNextNewline()
     {
         var line = new System.Text.StringBuilder();

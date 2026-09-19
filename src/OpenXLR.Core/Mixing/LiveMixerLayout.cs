@@ -514,6 +514,7 @@ public sealed partial class Mixer
     /// <summary>Take down one mix's insert chain and the links that read the mix.</summary>
     private void RemoveMixChainLocked(string key)
     {
+        RemoveMixDelayLocked(key["mix:".Length..]);
         if (_mixTaps.Remove(key, out PortLink? tap)) _pw.Unlink(tap);
         if (_mixPostLinks.Remove(key, out PortLink? post)) _pw.Unlink(post);
         if (_chains.Remove(key, out FilterHandle? chain)) _pw.StopFilter(chain);

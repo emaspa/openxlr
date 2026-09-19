@@ -121,6 +121,11 @@ public sealed record ChannelDefinition(string Id, string Name)
 /// <summary>Live mixer state pushed to clients.</summary>
 public sealed record MixerState
 {
+    /// <summary>Opt-in alignment of mix insert latency; absent settings preserve the low-latency path.</summary>
+    public bool CompensateMixLatency { get; init; }
+    public Dictionary<string, double> MixDelayMilliseconds { get; init; } = [];
+    public string? MixLatencyError { get; init; }
+
     public required IReadOnlyList<MixStatus> Mixes { get; init; }
     public required IReadOnlyList<ChannelStatus> Channels { get; init; }
 

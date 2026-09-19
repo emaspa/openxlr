@@ -260,3 +260,15 @@ while the user is resizing the frame.
 
 State and presets, and VST2, are separate work. Changing an insert's host
 rebuilds its chain; nothing here swaps a plugin without a gap.
+
+The host emits `latency SAMPLES RATE` after audio starts and whenever the
+algorithmic latency changes. UINT32_MAX means unavailable. LV2 reads its
+latency output atomically, CLAP uses its latency extension, and VST3 uses
+`getLatencySamples`. Reporting runs on the main thread; no logging or new
+allocation is added to the audio callback. A VST3 latency notification alone
+does not restart the processor.
+
+`make tests/latency.lv2/latency.so` builds a deterministic latency fixture.
+After a native-enabled managed build, `OPENXLR_TEST_FILTER=FullyQualifiedName~PluginLatencyIntegrationTests python3 tools/test-monitor-volume.py`
+checks live reports, parameter changes, bypass, failed delay-node recovery and
+sample-accurate delay using synthetic audio on private PipeWire sockets.

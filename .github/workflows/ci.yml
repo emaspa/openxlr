@@ -44,7 +44,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             pipewire pipewire-pulse wireplumber pulseaudio-utils g++ libpipewire-0.3-dev liblilv-dev lv2-dev libx11-dev libxtst6 xvfb xauth
-          make -C native
+          make -C native tests/latency.lv2/latency.so
+          dotnet build src/OpenXLR.slnx -c Release --no-restore -warnaserror -p:EnableNativeLv2Host=true
           test -x native/openxlr-lv2-host
           make -C native test-audio test-clap test-vst3 test-scan
           xvfb-run -a make -C native test-editor

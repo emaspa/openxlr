@@ -57,6 +57,10 @@ although each leg's gain is right. With DC the sum does not depend on that
 delay. The test measures the settled part of the capture and the peak of
 the whole capture; it does not measure frequency response.
 
+The idle graph allocation check measures reads on a dedicated warmed thread,
+so test-runner diagnostic allocations are outside the measured interval. It
+still requires zero bytes and the same cached snapshot across 10,000 reads.
+
 The private PipeWire runner also checks profile startup ordering. To exercise
 ClipGuard with recorded test audio, low cut and a native LSP gate, run
 `OPENXLR_TEST_DSP=1 python3 tools/test-monitor-volume.py` after a native-enabled
