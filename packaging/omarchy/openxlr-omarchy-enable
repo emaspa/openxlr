@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Link the package-owned plugin, then let Omarchy persist its placement.
+set -euo pipefail
+
+fail() { printf 'openxlr-omarchy-enable: %s\n' "$*" >&2; exit 1; }
+if [[ ${1:-} == --help ]]; then
+    printf 'Usage: openxlr-omarchy-enable [system-plugin-directory]\n'
+    exit 0
+fi
+(( $# <= 1 )) || fail 'expected at most one plugin directory'
+command -v omarchy >/dev/null || fail 'Omarchy 4 is required'
+command -v omarchy-shell >/dev/null || fail 'omarchy-shell is required'
+[[ $(omarchy-shell shell ping) == ok ]] || fail 'run this inside your Omarchy session'
+
+source_dir=$(realpath -e -- "${1:-/usr/share/openxlr/omarchy/openxlr.mixer}")
+[[ -d $source_dir ]] || fail 'the packaged plugin directory is missing'
+omarchy plugin validate "$source_dir"
+[[ $(jq -r '.id' "$source_dir/manifest.json") == openxlr.mixer ]] || fail 'expected openxlr.mixer'
+
+# Omarchy itself uses HOME/.config, even when XDG_CONFIG_HOME is set.
+destination="$HOME/.config/omarchy/plugins/openxlr.mixer"
+if [[ -L $destination ]]; then
+    [[ $(readlink -f -- "$destination") == "$source_dir" ]] || fail "a different plugin is already linked at $destination"
+elif [[ -e $destination ]]; then
+    fail "a plugin already exists at $destination; move it yourself before enabling the packaged copy"
+else
+    mkdir -p -- "$(dirname -- "$destination")"
+    ln -s -- "$source_dir" "$destination"
+fi
+
+omarchy-shell shell rescanPlugins >/dev/null
+omarchy plugin enable openxlr.mixer
+printf 'OpenXLR is enabled. Move it with: omarchy bar move openxlr.mixer right\n'

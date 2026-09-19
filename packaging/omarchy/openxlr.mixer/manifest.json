@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "openxlr.mixer",
+  "name": "OpenXLR mixer",
+  "version": "1.0.0",
+  "author": "OpenXLR contributors",
+  "description": "XLR input meters, channel sends and mix masters",
+  "kinds": ["bar-widget"],
+  "entryPoints": { "barWidget": "Widget.qml" },
+  "barWidget": {
+    "displayName": "OpenXLR",
+    "category": "Audio",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {},
+    "schema": []
+  }
+}

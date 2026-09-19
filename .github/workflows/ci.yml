@@ -11,6 +11,20 @@ permissions:
   contents: read
 
 jobs:
+  omarchy-qml:
+    runs-on: ubuntu-latest
+    container: archlinux:base
+    steps:
+      - name: Install QML check tools
+        run: pacman -Syu --noconfirm git python qt6-declarative qt6-websockets ttf-dejavu
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check Omarchy QML with external type declarations
+        run: python3 tools/check-omarchy.py
+      - name: Check the generated Omarchy meter palettes
+        run: python3 tools/omarchy-skins.py --check
+      - name: Exercise Omarchy strip controls with a fake daemon
+        run: QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner -input packaging/omarchy/tests
+
   build-and-test:
     runs-on: ubuntu-latest
     steps:
@@ -38,6 +52,8 @@ jobs:
           python3 -m json.tool plugin/com.emaspa.openxlr.sdPlugin/manifest.json >/dev/null
           python3 tools/check-openapi.py docs/openapi-v1.json
           node --test plugin/tests/*.test.mjs
+          node --test packaging/omarchy/tests/*.test.mjs
+          python3 -m json.tool packaging/omarchy/openxlr.mixer/manifest.json >/dev/null
 
       - name: Optional native LV2 host compiles
         run: |
@@ -59,7 +75,7 @@ jobs:
         run: OPENXLR_TEST_DESKTOP=1 xvfb-run -a dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~TrayWindowTests
 
       - name: Lint shell scripts
-        run: shellcheck --severity=error tools/check-version.sh tools/check-locked-restore.sh packaging/ppa/make-source.sh
+        run: shellcheck --severity=error tools/check-version.sh tools/check-locked-restore.sh packaging/ppa/make-source.sh packaging/omarchy/openxlr-omarchy-enable
 
       - name: Window layout at narrow and wide sizes
         run: OPENXLR_TEST_LAYOUT=1 xvfb-run -a -s '-screen 0 2560x1440x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~WindowLayoutTests
