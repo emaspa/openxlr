@@ -196,9 +196,9 @@ public sealed class TuiMeterTests
         Widgets.Meter(screen, 0, 0, 4, 1, theme, theme.Card);
         Widgets.Meter(screen, 0, 1, 4, 1, theme, theme.Card);
 
-        // Each bar keeps three quarters of its own row, so the quarter above
-        // the lower one still reads as the line between a left and a right.
-        Assert.Equal('\u2586', screen.At(0, 0).Ch);
-        Assert.Equal('\u2586', screen.At(0, 1).Ch);
+        // Each bar keeps the lower half of its own row, so the half above the
+        // lower one still reads as the line between a left and a right.
+        Assert.Equal('\u2584', screen.At(0, 0).Ch);
+        Assert.Equal('\u2584', screen.At(0, 1).Ch);
     }
 }
