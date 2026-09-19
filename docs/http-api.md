@@ -145,3 +145,8 @@ sink that mix.
 that output. `@monitor` follows the selected monitor output. Limits, rejected
 targets and linked-monitor behavior match the [WebSocket contract](api.md).
 These commands require the daemon but do not require a running UI or KDE.
+
+The existing insert commands accept every current channel id, including
+software, Aux and external-capture channels, as well as `mix:<id>`. Stereo
+channels require a stereo-compatible plugin; XLR 1 and XLR 2 remain mono.
+Validation and effect status are shared with the WebSocket transport.

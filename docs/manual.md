@@ -334,7 +334,7 @@ channel, with its level and lock in the INPUTS card.
 <a name="plugins"></a>
 ### 3.5 Add a plugin to the signal path
 
-1. Under XLR 1, XLR 2 or a mix, press "Inserts". The chain window opens
+1. On any channel strip or mix, press "Inserts". The chain window opens
    with that chain's plugins and an "Add plugin" button. The picker lists
    compatible installed LV2, CLAP and VST3 effects (ones that can run
    mono for an input, stereo for a mix), searchable by name, category or
@@ -1676,3 +1676,39 @@ Desktop keys reports that the additional press was not queued. Disabling or
 reconfiguring the shortcuts discards their waiting commands; an already sent
 command may still finish. This queue also preserves the order of an output
 switch followed by a volume change.
+
+## Effects on software and capture channels
+
+Every channel strip has an **Inserts** button. It opens the same chain editor
+used by microphone inputs and mixes, with the same controls, bypass and native
+editors. Software channels process all applications assigned to them together;
+external-capture channels process their selected source. Channel effects run
+before the sends, so every mix receives the processed signal. Mix effects still
+run after the channels are summed.
+
+XLR 1 and XLR 2 use mono plugins. Aux In, application channels and external
+capture channels use stereo-compatible plugins. Hiding or muting a channel
+does not remove its chain. Removing a user channel removes its saved chain too.
+
+Software and capture channels use a stable public sink and one hidden send bus.
+Adding or bypassing effects does not recreate the device applications use;
+rewiring can still cause a short gap. Failed effects report an error and leave
+a direct route, and broken routes are repaired by the daemon's existing sweep.
+The extra internal bus consumes PipeWire resources, included in the live-layout
+file-limit check. Internal buses are not offered as output or capture devices.
+
+If PipeWire cannot create an LV2 filter chain, OpenXLR can retry it in the
+bundled native DSP host when that host supports every active plugin's required
+features. This also covers distributions without PipeWire's optional LV2
+module. The saved host/editor choice is kept. A failed fallback reports both
+errors and leaves the channel's direct audio route in place.
+
+A successful native fallback is remembered for that plugin during the current
+daemon run, avoiding repeated failed loader probes on subsequent edits.
+
+New channel links wait up to three seconds for both stereo sides after a
+sink reload. A failed attempt removes its partial links before retrying.
+
+Deleting a channel or mix also closes its effect-chain and control windows.
+Recreating the same layout ID opens a fresh chain instead of reusing stale
+controls from the removed item.

@@ -226,6 +226,12 @@ public partial class MainWindow : Window
         else InsertWindows.OpenControls(this, insert);
     }
 
+    private void OnChannelInserts(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is ChannelViewModel channel)
+            InsertWindows.OpenChain(this, channel.Inserts, channel.Id);
+    }
+
     private void OnMixInserts(object? sender, RoutedEventArgs e)
     {
         if ((sender as Control)?.DataContext is MixViewModel mix) InsertWindows.OpenChain(this, mix.Inserts, $"mix:{mix.Id}");

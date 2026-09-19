@@ -21,7 +21,7 @@ public interface ILayoutInfo
     /// <summary>An insert chain key: an XLR input id or "mix:&lt;id&gt;".</summary>
     bool IsInsertKey(string key);
     /// <summary>The channels an insert chain carries: one on an XLR input, two on a mix.</summary>
-    int InsertChannels(string key) => key.StartsWith("mix:", StringComparison.Ordinal) ? 2 : 1;
+    int InsertChannels(string key) => key is "xlr1" or "xlr2" ? 1 : 2;
     /// <summary>
     /// The insert the chain already holds under this id, or null. A rule
     /// that refuses a plugin at the chain's width applies to what is being

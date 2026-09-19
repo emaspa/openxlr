@@ -42,20 +42,21 @@ public sealed class InsertsViewModel : ViewModelBase
     }
 
     /// <summary>What the chain belongs to, for window titles ("XLR 1", "Stream mix").</summary>
-    public string Title { get; }
+    private string _title = "";
+    public string Title { get => _title; set => Set(ref _title, value); }
 
     public Task ShowNativeEditorAsync(InsertViewModel insert)
         => _client.ShowInsertUiAsync(_channel, insert.Id);
 
     /// <summary>Chain window subtitle: where these plugins sit in the path.</summary>
-    public string ChainHint => _channels == 1
-        ? "Plugins, in order, before this input reaches the mixes"
-        : "Stereo plugins, in order, before this mix reaches its outputs";
+    public string ChainHint => _channel.StartsWith("mix:", StringComparison.Ordinal)
+        ? "Stereo plugins, in order, before this mix reaches its outputs"
+        : "Plugins, in order, before this channel reaches the mixes";
 
     /// <summary>Picker header: which plugins fit this chain.</summary>
     public string PickerHint => _channels == 1
         ? "Plugins that can run mono on the mic path"
-        : "Plugins that fit a stereo mix (two inputs, two outputs)";
+        : "Plugins that fit a stereo chain (two inputs, two outputs)";
 
     public ObservableCollection<InsertViewModel> Items { get; } = [];
     public ObservableCollection<PluginChoice> PluginChoices { get; } = [];

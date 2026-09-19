@@ -676,8 +676,8 @@ public sealed class PipeWireAdapter
     /// mic into it) and a source half (link onward to the channel).
     /// </summary>
     public FilterHandle CreateMicFilter(string id, int lowCutHz, bool clipGuard,
-        IReadOnlyList<InsertDefinition>? inserts = null)
-        => CreateFilterChain($"OpenXLR_lc_{id}_in", $"OpenXLR_lc_{id}_out", "OpenXLR Mic Filter", 1, lowCutHz, clipGuard, inserts);
+        IReadOnlyList<InsertDefinition>? inserts = null, int channels = 1)
+        => CreateFilterChain($"OpenXLR_lc_{id}_in", $"OpenXLR_lc_{id}_out", "OpenXLR Mic Filter", channels, lowCutHz, clipGuard, inserts);
 
     /// <summary>A stereo insert chain for a mix, spliced between the mix and its consumers.</summary>
     public FilterHandle CreateMixChain(string id, string description, IReadOnlyList<InsertDefinition> inserts)
@@ -689,10 +689,15 @@ public sealed class PipeWireAdapter
     /// order, each channel linked stage to stage. Mono chains link a plugin's
     /// first audio in and out; stereo chains link its first two.
     /// </summary>
+    private readonly HashSet<string> _nativeLv2Fallbacks = [];
+    private bool UsesNativeLv2Fallback(InsertDefinition insert)
+        => insert.Kind == "lv2" && _nativeLv2Fallbacks.Contains(insert.Plugin)
+            && PluginCatalog.Find(insert) is { } plugin && NativePluginHost.SupportsFeatures(plugin.RequiredFeatures);
+
     private FilterHandle CreateFilterChain(string sinkName, string srcName, string description, int channels,
         int lowCutHz, bool clipGuard, IReadOnlyList<InsertDefinition>? inserts)
     {
-        if (inserts?.Any(i => !i.Bypass && i.RunsNatively) == true)
+        if (inserts?.Any(i => !i.Bypass && (i.RunsNatively || UsesNativeLv2Fallback(i))) == true)
             return CreateHostedChain(sinkName, srcName, description, channels, lowCutHz, clipGuard, inserts);
         if (clipGuard)
         {
@@ -773,16 +778,32 @@ public sealed class PipeWireAdapter
         {
             string detail = StopFailedFilter(handle, stdoutTask, stderrTask);
             string missing = !sinkReady ? sinkName : srcName;
-            throw new InvalidOperationException(
-                $"PipeWire filter chain did not create the required ports for {missing}" +
-                (detail.Length == 0 ? "" : $": {detail}"));
+            string failure = $"PipeWire filter chain did not create the required ports for {missing}"
+                + (detail.Length == 0 ? "" : $": {detail}");
+            // Some distributions ship filter-chain without its LV2 module.
+            // Retry DSP in our existing host, without opting into an editor.
+            var active = inserts?.Where(i => !i.Bypass).ToArray() ?? [];
+            if (NativePluginHost.HostInstalled && active.Length > 0
+                && active.All(i => i.Kind == "lv2" && PluginCatalog.Find(i) is { } plugin
+                    && NativePluginHost.SupportsFeatures(plugin.RequiredFeatures)))
+            {
+                try
+                {
+                    var fallback = CreateHostedChain(sinkName, srcName, description, channels, lowCutHz, clipGuard, inserts!, forceNativeLv2: true);
+                    foreach (var insert in active) _nativeLv2Fallbacks.Add(insert.Plugin);
+                    return fallback;
+                }
+                catch (Exception fallbackError)
+                { throw new InvalidOperationException(failure + " Native LV2 fallback also failed: " + fallbackError.Message, fallbackError); }
+            }
+            throw new InvalidOperationException(failure);
         }
         return handle;
     }
 
     /// <summary>Splice native editors into the chain, retaining filter-chain for other plugins.</summary>
     private FilterHandle CreateHostedChain(string sinkName, string sourceName, string description, int channels,
-        int lowCutHz, bool clipGuard, IReadOnlyList<InsertDefinition> inserts)
+        int lowCutHz, bool clipGuard, IReadOnlyList<InsertDefinition> inserts, bool forceNativeLv2 = false)
     {
         var stages = new List<FilterHandle>();
         var insertStages = new List<(string Id, FilterHandle Stage)>();
@@ -803,7 +824,7 @@ public sealed class PipeWireAdapter
                         $"{(string.IsNullOrWhiteSpace(insert.Label) ? insert.Plugin : insert.Label)} is unavailable or requires unsupported host features.");
                 string node = $"{sinkName}_stage_{insertStages.Count}";
                 FilterHandle stage;
-                if (insert.RunsNatively)
+                if (insert.RunsNatively || forceNativeLv2 && insert.Kind == "lv2" || UsesNativeLv2Fallback(insert))
                 {
                     if (!NativePluginHost.HostInstalled)
                         throw new InvalidOperationException("The native plugin host is not installed.");
@@ -1099,6 +1120,23 @@ public sealed class PipeWireAdapter
         return new PortLink(pairs);
     }
 
+    /// <summary>Wait for both sides of an owned stereo route after asynchronous node creation.</summary>
+    internal PortLink LinkStereoNodes(string fromNode, string fromPrefix, string toNode, string toPrefix,
+        TimeSpan? timeout = null)
+    {
+        long deadline = Environment.TickCount64 + (long)(timeout ?? TimeSpan.FromSeconds(3)).TotalMilliseconds;
+        do
+        {
+            var link = LinkNodes(fromNode, fromPrefix, toNode, toPrefix);
+            if (link.Pairs.Count == 2) return link;
+            // Never leave one side attached across retries or on failure.
+            Unlink(link);
+            if (Environment.TickCount64 >= deadline)
+                throw new InvalidOperationException($"The stereo route from {fromNode} to {toNode} is incomplete.");
+            Thread.Sleep(25);
+        } while (true);
+    }
+
     /// <summary>
     /// Select a stereo pair from an ordered port list. Missing pairs never
     /// fall back to pair zero; a final mono port is kept so mono devices can
@@ -1235,7 +1273,8 @@ public sealed class PipeWireAdapter
 
             string? name = props.TryGetProperty("node.name", out JsonElement n) ? n.GetString() : null;
             if (name is null) continue;
-            if (name.StartsWith("OpenXLR_route_", StringComparison.Ordinal)) continue;
+            if (name.StartsWith("OpenXLR_route_", StringComparison.Ordinal)
+                || name.StartsWith("OpenXLR_bus_", StringComparison.Ordinal)) continue;
             string mc = props.TryGetProperty("media.class", out JsonElement m) ? m.GetString() ?? "" : "";
 
             bool isSink = mc == "Audio/Sink";

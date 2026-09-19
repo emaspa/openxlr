@@ -145,3 +145,11 @@ PipeWire gain sink, created muted before it is connected. Unity routes use
 direct links until they need a gain node. Existing gain nodes update in
 place, and unrelated outputs keep their links. Gain-node creation checks
 pipewire-pulse's open-file headroom and adds no helper process per route.
+
+### Channel insert paths
+
+All channel ids are valid insert keys. Software and external-capture channels
+retain the public `OpenXLR_ch_<id>` sink while inserts change; their hidden
+`OpenXLR_bus_<id>` combine distributes the processed signal to the mixes. Display
+order does not alter effect order or sends. Deleting a user channel removes its
+insert definition in the same saved settings change as its routing.

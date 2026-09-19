@@ -45,12 +45,16 @@ modules or custom drivers:
   two monitor mixes, one per virtual microphone, and Aux.
 - One combine sink per channel (`module-combine-sink`) whose internal
   streams, one per mix, are the send faders: setting a send is setting
-  that stream's volume. Applications play into these sinks. The combine
-  names its targets by pattern (`slaves=~OpenXLR_mix_`), and PipeWire's
+  that stream's volume. Hardware inputs feed their combine sink after
+  processing. Software and external-capture channels have a stable input
+  null sink feeding a hidden `OpenXLR_bus_<id>` combine, directly or through
+  the channel's stereo inserts. Applications retain the public sink when
+  effects change. The combine names its targets by pattern (`slaves=~OpenXLR_mix_`), and PipeWire's
   combine keeps watching the registry, so a mix sink created later gets
   its own stream in every combine and a removed one loses them without
-  any channel being reloaded. The default layout's 9 channels and 5
-  mixes are 14 sinks and no loopback processes.
+  any channel being reloaded. Each software or external-capture channel adds
+  one input null sink to the channel and mix sinks; resource admission counts
+  that extra node.
 - For every virtual-microphone mix, a post sink fed from the mix
   (directly or through the mix's insert chain) and a remap source
   (`module-remap-source`) reading its monitor: the virtual microphone an

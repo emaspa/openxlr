@@ -54,7 +54,8 @@ display or installed plugin. The normal host build still uses C++17.
 `python3 native/tests/lsp-editor.py` is an opt-in desktop regression using
 an isolated LSP Gate Mono LV2 instance. It needs python-xlib, the installed
 plugin, a running PipeWire server and a display large enough for the tested
-sizes. It drags the editor to large sizes and back, checking that changed
+sizes. It drags the editor to large sizes and back, moves it, closes and reopens
+it, checking that changed
 parameters still repaint. `--host PATH` selects another build; `--opengl`
 tests the explicit OpenGL override. It creates no audio links.
 
