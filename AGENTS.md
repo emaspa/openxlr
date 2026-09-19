@@ -97,8 +97,11 @@ and [package checks](packaging/yabridge/README.md).
 
 - Files under `~/.config/openxlr` are written through
   `OpenXlrPaths.WriteAtomic`; helper processes run through
-  `ProcessRunner`. Do not add a `Process.Start` or a `File.WriteAllText`
-  for either.
+  `ProcessRunner`, a program handed to the user (an installer, the
+  desktop's link opener) through its `RunInteractiveAsync`. Do not add a
+  `Process.Start` or a `File.WriteAllText` for either. The one raw
+  process is the meter reader's `parec`, which streams for the sink's
+  whole life and is stopped with the meter.
 - A new command is registered in `CommandValidation`, dispatched in
   `WebSocketHub`, documented in `docs/api.md`, and handled in the client
   that uses it.

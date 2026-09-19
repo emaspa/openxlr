@@ -168,7 +168,11 @@ brief an agent should read before working on the tree.
 - Every file under `~/.config/openxlr` is written through
   `OpenXlrPaths.WriteAtomic` (private modes, atomic replace), and every
   helper process runs through `ProcessRunner` (C locale, deadline,
-  output cap, process tree killed past either).
+  output cap, process tree killed past either); a program handed to the
+  user, such as an installer or the desktop's link opener, goes through
+  its `RunInteractiveAsync`, which sets no deadline. The one raw process
+  is the meter reader's `parec`, which streams for the sink's whole life
+  and is stopped with the meter.
 - Commands are validated in `CommandValidation` before the mixer sees
   them; a new command needs an entry there, in the hub's dispatch, in
   the API doc, and in whichever client uses it.
