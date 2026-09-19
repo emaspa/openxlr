@@ -305,6 +305,24 @@ serving; the packages ship the folder in `/usr/share/openxlr/`). Touch
 taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
 ([nekename/OpenDeck#437](https://github.com/nekename/OpenDeck/pull/437)).
 
+## Terminal mixer
+
+- `openxlr-tui`: the whole mixer in a terminal, for a machine with no
+  desktop session, an ssh connection or a tiling setup. It speaks the same
+  WebSocket the window does, so both can be open at once and each shows
+  what the other changed
+- Seven tabs in the manner of btop: the submix grid with live meters, the
+  hardware inputs, the monitor outputs and the system defaults, the
+  application routing, the insert chains, the profiles and the appearance.
+  Adding a plugin and editing its controls stay in the window, which has
+  the catalogue and the plugin's own editor
+- The same skins as the window, read from the same folders and following
+  the same saved choice, so an appearance chosen in one is the appearance
+  in the other. `--skin <id>` tries one for a single run. A terminal
+  without true colour gets the nearest of its 256
+- It draws its own cells rather than taking a widget toolkit, so it adds no
+  dependency to any package. A frame writes only the cells that changed
+
 ## Other
 
 - Enforced defaults: the daemon re-asserts the chosen system default

@@ -1537,6 +1537,7 @@ Review plugin names, paths and scanner output before sharing the archive.
 | `openxlr-daemon.service` (systemd user unit) | the daemon; `journalctl --user -u openxlr-daemon` for its log |
 | `/usr/lib/systemd/user/pipewire-pulse.service.d/openxlr.conf` | installed by the packages: raises pipewire-pulse's open-file limit ([section 5.8](#open-files)) |
 | `/usr/share/wireplumber/wireplumber.conf.d/50-xlr-dock-capture-hold.conf`, `52-openxlr-mk1-capture-hold.conf` | installed by the packages: keep the XLR Dock's and the original Wave XLR's capture running ([section 5.2](#dock-silent)) |
+| `openxlr-tui` | the mixer in a terminal, the same daemon and the same skins ([The terminal mixer](#terminal)) |
 | `ws://127.0.0.1:37890/ws` | the daemon's API, documented in [api.md](api.md); the same commands over HTTP at `/api/v1` ([http-api.md](http-api.md)) |
 
 The daemon makes a final attempt to save pending mixer settings when it
@@ -1679,3 +1680,46 @@ Desktop keys reports that the additional press was not queued. Disabling or
 reconfiguring the shortcuts discards their waiting commands; an already sent
 command may still finish. This queue also preserves the order of an output
 switch followed by a volume change.
+
+<a name="terminal"></a>
+## The terminal mixer
+
+`openxlr-tui` is the same mixer in a terminal. It talks to the same daemon
+the window does, over the same socket, so the two can be open at once and
+each shows what the other changed. Run it on a machine with no desktop
+session, over ssh, or on a tiling setup where one floating window is the
+odd one out.
+
+Start it with the daemon running:
+
+```sh
+openxlr-tui
+```
+
+Seven tabs run across the top, chosen with the number keys or with tab and
+shift tab:
+
+| Tab | What is on it |
+|---|---|
+| Mixer | the submix grid: every channel's send into every mix, the mix masters above them, and live meters. Space mutes the send under the cursor, `-` and `+` move it by five points, `[` and `]` by one, `r` renames a channel or a virtual microphone, `n` adds a channel, `N` adds a virtual microphone, `c` adds a capture input and `d` removes one |
+| Inputs | the hardware: gain, mute, low cut, expander, voice tune and its strength, phantom power, ClipGuard and the compressor for each XLR input, the software low cut and ClipGuard, the headphone outputs and the direct monitor blend, the hardware output routing and the USB Aux return |
+| Outputs | which sinks the monitor mixes feed, what feeds each one, the volume they share, and the system default sink and source the daemon holds |
+| Apps | every application the daemon knows, the channel it plays into, and the keys to move it: left and right walk the channels, `i` leaves it to the desktop and `f` forgets it |
+| Inserts | the plugin chain on each input and each mix: space bypasses one, ctrl with up or down moves it, `d` removes it and `e` asks for the plugin's own editor. Adding a plugin and editing its controls stay in the window, which has the catalogue |
+| Profiles | load, save over and delete a profile, choose the one recalled when the interface connects, switch to another attached interface, and write the recorded defaults back |
+| Options | the appearance, the connection and the daemon's version |
+
+The arrow keys move, space toggles, left and right change a value, ctrl
+with an arrow takes a finer step, enter confirms and escape cancels. `F1`
+lists the keys and `q` quits. Anything that cannot be undone, such as
+deleting a channel or resetting the device, asks you to type `yes` first.
+
+The terminal mixer wears the same skins as the window. It reads the same
+files, in the same order, and the choice in Options is the same choice, so
+picking Gruvbox in one picks it in the other ([skins.md](skins.md)).
+`--skin <id>` uses one appearance for this run without saving it, and
+`--list-skins` prints what this machine has. A terminal without true colour
+gets the nearest of its 256, so the skin still reads.
+
+It needs a terminal. With its output piped somewhere it says so and stops.
+

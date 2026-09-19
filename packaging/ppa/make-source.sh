@@ -55,7 +55,7 @@ maint=$(dpkg-parsechangelog -l "$tree/debian/changelog" -S Maintainer)
 
 # Restore exactly what debian/rules publishes into a private packages
 # folder, then lay the .nupkg files out as a local feed.
-for proj in OpenXLR.Daemon OpenXLR.UI; do
+for proj in OpenXLR.Daemon OpenXLR.UI OpenXLR.Tui; do
     dotnet restore "$tree/src/$proj" -r linux-x64 -p:SelfContained=false \
         --locked-mode --packages "$work/packages"
 done

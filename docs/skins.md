@@ -16,7 +16,13 @@ OpenXLR ships two appearances:
   machined cap, indicator lamps in a bezel, and meters that run green to
   amber to red across the scale.
 
-Pick one in Options under APPEARANCE. The choice is saved in
+Pick one in Options under APPEARANCE. The terminal mixer reads the same
+folders and the same saved choice, on its own Options tab, so an appearance
+picked in one is the appearance in the other. A terminal has no gradients, no images and no corner radii, so it takes a
+gradient at its first stop and reads the colours alone. Everything else in
+a skin is the window's.
+
+The choice is saved in
 `~/.config/openxlr/ui.json` as `"skin": "<id>"` and nowhere else: it is not
 part of the mixer layout, the daemon's preferences or a profile, and
 changing it never touches audio. Windows that are already open repaint;

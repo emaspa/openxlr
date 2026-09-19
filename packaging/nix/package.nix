@@ -28,6 +28,7 @@ buildDotnetModule {
   projectFile = [
     "src/OpenXLR.Daemon/OpenXLR.Daemon.csproj"
     "src/OpenXLR.UI/OpenXLR.UI.csproj"
+    "src/OpenXLR.Tui/OpenXLR.Tui.csproj"
   ];
   nugetDeps = ./deps.json;
 
@@ -50,7 +51,7 @@ buildDotnetModule {
   dotnet-sdk = dotnetCorePackages.sdk_10_0;
   dotnet-runtime = dotnetCorePackages.aspnetcore_10_0;
 
-  executables = [ "OpenXLR.Daemon" "OpenXLR.UI" ];
+  executables = [ "OpenXLR.Daemon" "OpenXLR.UI" "openxlr-tui" ];
 
   runtimeDeps = [
     fontconfig

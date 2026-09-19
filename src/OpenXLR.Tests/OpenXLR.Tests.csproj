@@ -23,6 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="../OpenXLR.Core/OpenXLR.Core.csproj" />
     <ProjectReference Include="../OpenXLR.Daemon/OpenXLR.Daemon.csproj" />
+    <ProjectReference Include="../OpenXLR.Tui/OpenXLR.Tui.csproj" />
     <ProjectReference Include="../OpenXLR.UI/OpenXLR.UI.csproj" />
   </ItemGroup>
 </Project>

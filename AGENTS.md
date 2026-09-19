@@ -85,6 +85,12 @@ and [package checks](packaging/yabridge/README.md).
   connection behind desktop keys (`DesktopBus.cs`, `DesktopKeys.cs`,
   `KWinFocus.cs`). It has no reference to Core; the two files both need
   are compiled in as linked sources.
+- `src/OpenXLR.Tui`: the terminal mixer (`openxlr-tui`). It draws its own
+  cells (`Screen.cs`, `Widgets.cs`), reads the window's skins into a
+  palette (`Theme.cs`), speaks the documented WebSocket (`DaemonLink.cs`)
+  and holds one tab per file under `Views/`. Like the window it has no
+  reference to Core and no NuGet dependency at all; `OpenXlrPaths.cs` is a
+  linked source, under its own namespace through `OPENXLR_TUI`.
 - `plugin/com.emaspa.openxlr.sdPlugin`: the OpenDeck plugin
   (`plugin.mjs`) and its property inspectors; tests in `plugin/tests`.
 - `native/`: C/C++ LV2, CLAP and VST3 host, editor regression tests.
