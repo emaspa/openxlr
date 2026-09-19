@@ -267,32 +267,55 @@ public sealed class TuiViewTests
         Assert.Contains("ON", keyRow[column..(column + 8)], StringComparison.Ordinal);
     }
 
+    /// <summary>A row's grid part, between the panel's edges, with no rail text in it.</summary>
+    private static string Grid(string row)
+    {
+        int left = row.IndexOf('│'), right = row.LastIndexOf('│');
+        return right > left ? row[(left + 1)..right].Trim() : row[(left + 1)..].Trim();
+    }
+
     [Fact]
     public void TheMatrixGivesEveryMeterARowOfItsOwnWhenThereIsHeightAndOneWhenThereIsNot()
     {
         (App app, _) = Desk();
         app.ShowTab(1);
 
-        Screen tall = new(150, 42);
+        Screen tall = new(150, 50);
         app.Draw(tall);
         string[] rows = Frame(tall).Split('\n');
         int first = Array.FindIndex(rows, row => row.Contains("Aux In", StringComparison.Ordinal));
         Assert.True(first > 0);
         // The name sits between its two sides, one row above and one below,
-        // and the next channel starts three rows down.
+        // a blank row keeps the right bar off the next channel's left one,
+        // and so the next channel starts four rows down.
         Assert.Contains("L", rows[first - 1], StringComparison.Ordinal);
         Assert.Contains("R", rows[first + 1], StringComparison.Ordinal);
-        Assert.Contains("Game", rows[first + 3], StringComparison.Ordinal);
+        Assert.Equal(string.Empty, Grid(rows[first + 2]));
+        Assert.Contains("Game", rows[first + 4], StringComparison.Ordinal);
         int track = rows[first + 1].IndexOf("R ", StringComparison.Ordinal) + 2;
         Assert.Equal('\u2500', rows[first + 1][track]);
-        // The masters carry the same pair, under their mute key.
-        int mixes = Array.FindIndex(rows, row => row.Contains("MIXES", StringComparison.Ordinal));
-        // The masters carry the same pair, a row apart, under their mute key.
-        Assert.Contains("L", rows[mixes + 3], StringComparison.Ordinal);
-        Assert.Contains("R", rows[mixes + 5], StringComparison.Ordinal);
 
-        // Nine channels do not fit twice over in twenty-four rows, so there
-        // the grid stays one row a channel with a single summed bar.
+        // With fewer rows the name shares the left bar's row, the right bar
+        // is under it, and the blank row still follows.
+        Screen middling = new(150, 42);
+        app.Draw(middling);
+        string[] mid = Frame(middling).Split('\n');
+        int aux = Array.FindIndex(mid, row => row.Contains("Aux In", StringComparison.Ordinal));
+        Assert.True(aux > 0);
+        Assert.Contains("L", mid[aux], StringComparison.Ordinal);
+        Assert.Contains("R", mid[aux + 1], StringComparison.Ordinal);
+        Assert.Equal(string.Empty, Grid(mid[aux + 2]));
+        Assert.Contains("Game", mid[aux + 3], StringComparison.Ordinal);
+        // The masters carry the same pair, a row apart, a blank row under
+        // their mute key and another under the lower bar.
+        int mixes = Array.FindIndex(rows, row => row.Contains("MIXES", StringComparison.Ordinal));
+        Assert.Equal(string.Empty, Grid(rows[mixes + 3]));
+        Assert.Contains("L", rows[mixes + 4], StringComparison.Ordinal);
+        Assert.Contains("R", rows[mixes + 6], StringComparison.Ordinal);
+        Assert.Equal(string.Empty, Grid(rows[mixes + 7]));
+
+        // Nine channels do not fit three rows apiece in twenty-four rows, so
+        // there the grid stays one row a channel with a single summed bar.
         Screen small = new(80, 24);
         app.Draw(small);
         string[] tight = Frame(small).Split('\n');
@@ -788,8 +811,8 @@ public sealed class TuiViewTests
         string changed = screen.Render();
         Assert.NotEmpty(changed);
         Assert.True(changed.Length < first.Length / 3, $"meter update {changed.Length}, full frame {first.Length}");
-        Assert.Equal('╻', screen.At(26, 4).Ch);
-        Assert.Equal('┏', screen.At(29, 4).Ch);
+        Assert.Equal('╻', screen.At(26, 5).Ch);
+        Assert.Equal('┏', screen.At(29, 5).Ch);
     }
 
     [Theory]

@@ -211,7 +211,9 @@ internal sealed class App
             if (chosen) screen.Set(1, y, '┃', theme.Accent, back);
         }
         int bottom = screen.Height - 2;
-        screen.Text(3, bottom - 9, "INTERFACE", theme.TextMuted, theme.Card);
+        // Each input is its gain line, its bar and a blank row, so one
+        // input's bar does not run into the next input's name.
+        screen.Text(3, bottom - 10, "INTERFACE", theme.TextMuted, theme.Card);
         Snapshot? state = Link.State;
         if (state is not null && state.Connected)
         {
@@ -219,12 +221,12 @@ internal sealed class App
             for (int i = 0; i < inputs; i++)
             {
                 string suffix = i == 0 ? string.Empty : "2";
-                screen.Text(3, bottom - 7 + i * 2, $"XLR {i + 1} {state.Number($"gain{suffix}Db"),3:0} dB",
+                screen.Text(3, bottom - 8 + i * 3, $"XLR {i + 1} {state.Number($"gain{suffix}Db"),3:0} dB",
                     theme.TextDetail, theme.Card, maxWidth: 12);
-                Widgets.Meter(screen, 3, bottom - 6 + i * 2, 11, Link.Meter("ch", $"xlr{i + 1}"), theme, theme.Card);
+                Widgets.Meter(screen, 3, bottom - 7 + i * 3, 11, Link.Meter("ch", $"xlr{i + 1}"), theme, theme.Card);
             }
         }
-        else screen.Text(3, bottom - 7, "Offline", theme.TextMuted, theme.Card);
+        else screen.Text(3, bottom - 8, "Offline", theme.TextMuted, theme.Card);
         screen.Text(3, bottom - 2, "SKIN", theme.TextMuted, theme.Card);
         screen.Text(3, bottom - 1, theme.Name, theme.TextDetail, theme.Card, maxWidth: 12);
     }
