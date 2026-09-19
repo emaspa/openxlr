@@ -15,7 +15,7 @@ feature that is measured over one that is described.
 
 ## Where it stands (0.1.42)
 
-This is what 0.1.43 ships. A checked item is in the released packages.
+This is what 0.1.44 ships. A checked item is in the released packages.
 
 - [x] Wave XLR Pro, XLR Dock (MK.1 and MK.2 modules), Wave XLR, Wave XLR
   MK.2: hardware controls, verified by owners of each device.

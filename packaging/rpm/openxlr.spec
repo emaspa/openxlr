@@ -5,7 +5,7 @@
 %global _build_id_links none
 
 Name:           openxlr
-Version:        0.1.43
+Version:        0.1.44
 Release:        1%{?dist}
 Summary:        Control suite and PipeWire submixer for Elgato XLR interfaces
 License:        GPL-3.0-only
@@ -162,6 +162,11 @@ MSG
 %{_datadir}/openxlr/
 
 %changelog
+* Sat Sep 19 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.44-1
+- Mixer: XLR 2 and Aux In are shown only on a device that has them, which is the Wave XLR Pro. The daemon says per channel whether the active device can feed it, so the window, the terminal mixer and the Omarchy bar agree; the channel keeps its levels for when a Pro comes back.
+- Omarchy: openxlr-omarchy-enable waits for the shell to finish its rescan instead of reporting the plugin as unknown, and reads the plugin id without jq.
+- Docs: the readme says how to pick up an upgrade without rebooting.
+
 * Sat Sep 19 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.43-1
 - Omarchy: the mixer joins the Omarchy 4 bar as a shell plugin, openxlr.mixer. An XLR input shows its meter while it has had signal in the last ten seconds and stays, dimmed, when muted; beside them the first monitor output's feed has its own meter. The popout carries the terminal mixer's strips, channel sends and mix masters, and takes the OpenXLR skin matching the active Omarchy theme. An Arch package built on Omarchy carries the plugin and openxlr-omarchy-enable.
 - Window: a continuous meter draws its lit part as one bar, so the zones no longer leave a notch or a seam where they meet.
