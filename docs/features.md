@@ -361,3 +361,11 @@ PipeWire output volume, mute and enforced system-output selection are available
 from the same PC shortcut session and OpenDeck Toggle keys. Volume steps use
 desktop percentages up to 150%; targets can follow the current default or stay
 bound to a named external output or monitor mix.
+
+### Effect chains and comparison
+
+Copy individual effects or complete chains between compatible channels, rename
+instances, save reusable named chain presets and store A/B snapshots for live
+comparison. Snapshots preserve exposed parameters, order, bypass and host choices;
+they do not contain plugin-private binary state or external samples. Replacing
+a chain can briefly interrupt audio. A/B snapshots clear on reconnect.

@@ -1676,3 +1676,40 @@ Desktop keys reports that the additional press was not queued. Disabling or
 reconfiguring the shortcuts discards their waiting commands; an already sent
 command may still finish. This queue also preserves the order of an output
 switch followed by a volume change.
+
+## Copying, presets and A/B comparison
+
+In the insert editor, **Copy** copies one effect into OpenXLR's internal
+clipboard. **Rename** gives that instance a name without restarting it.
+Open **Chains and A/B** for the complete-chain workflow:
+
+- **Copy chain** captures the whole chain. **Paste effects** appends copied
+  instances with fresh ids; **Replace chain** replaces the target's chain.
+- **Store A** and **Store B** capture two independent parameter snapshots.
+  **Hear A** or **Hear B** applies the saved snapshot. Later edits are kept
+  only when you store that slot again. A failed command leaves the comparison
+  indicator unchanged. Reconnecting to the daemon clears both slots.
+- Enter a name and **Save current chain** to keep a reusable preset. Presets
+  can be loaded on another compatible chain. Names are unique without regard
+  to case; delete an old preset explicitly to reuse its name. Loading replaces
+  the current chain, while deleting a preset leaves live processing unchanged.
+
+Snapshots include effect order, instance names, bypass, host choices and the
+exposed parameter values. Plugin-private binary state, external samples and
+third-party preset files are not included. Missing plugins and incompatible
+channel widths are refused by the daemon. Switching chains can briefly
+interrupt audio. Sound Check can continue looping while these settings change.
+
+The clipboard and A/B slots are in memory. Up to 64 named presets are saved in
+`effect-chain-presets.json`, with an 8 MiB file limit and private permissions.
+Corrupt or oversized data is reported and preserved instead of overwritten.
+The controls use the existing application skin and remain scrollable at small
+window sizes.
+
+Invalid preset names, duplicate names and damaged preset data are shown in
+the chain window as errors. They do not close the window or replace the file.
+
+Effect control windows belong to their channel and effect instance. Removing or
+replacing an effect closes its old control window and discards queued parameter
+changes. Controls on different channels stay independent even when a profile
+uses the same effect ID in both. Disconnecting discards queued parameter changes.

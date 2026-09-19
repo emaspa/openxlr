@@ -441,6 +441,12 @@ public sealed class DaemonClient : IAsyncDisposable
     public Task SetInsertsAsync(string channel, IReadOnlyList<object> inserts)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setInserts", ["channel"] = channel, ["inserts"] = inserts });
 
+    public Task<string?> ReplaceInsertsAsync(string channel, JsonArray inserts)
+        => EditLayoutAsync(new() { ["cmd"] = "setInserts", ["channel"] = channel, ["inserts"] = inserts });
+
+    public Task<string?> RenameInsertAsync(string channel, string insertId, string name)
+        => EditLayoutAsync(new() { ["cmd"] = "renameInsert", ["channel"] = channel, ["insertId"] = insertId, ["name"] = name });
+
     public Task SetInsertBypassAsync(string channel, string insertId, bool bypass)
         => SendAsync(new Dictionary<string, object>
         { ["cmd"] = "setInsertBypass", ["channel"] = channel, ["insertId"] = insertId, ["value"] = bypass });

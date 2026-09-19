@@ -145,3 +145,9 @@ sink that mix.
 that output. `@monitor` follows the selected monitor output. Limits, rejected
 targets and linked-monitor behavior match the [WebSocket contract](api.md).
 These commands require the daemon but do not require a running UI or KDE.
+
+`renameInsert` through `POST /api/v1/commands` takes `channel`, `insertId` and
+`name`. It changes an existing instance's label without rebuilding its audio
+path. Effect-chain paste and recall use the existing `setInserts` command and
+its normal validation; the UI's preset library and comparison slots are local
+UI state, not new HTTP resources.

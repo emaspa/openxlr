@@ -1,0 +1,44 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:OpenXLR.UI"
+        x:Class="OpenXLR.UI.EffectWorkflowWindow" x:DataType="vm:InsertsViewModel"
+        Title="{Binding Title, StringFormat='{}{0} effect chains'}"
+        Width="560" Height="540" MinWidth="380" MinHeight="280"
+        WindowStartupLocation="CenterOwner" Background="{DynamicResource Ox.Window.Background}">
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Margin="16" Spacing="12" IsEnabled="{Binding CanEditEffects}">
+      <TextBlock Text="Copy and paste" Classes="h"/>
+      <TextBlock Text="Copy an effect from its row, or copy this whole chain. Paste appends the copied effects; Replace chain removes the current chain first. Copies stay in OpenXLR."
+                 TextWrapping="Wrap" Foreground="{DynamicResource Ox.Text.Secondary}"/>
+      <WrapPanel>
+        <Button Content="Copy chain" Click="OnCopy" Margin="0,0,8,8"/>
+        <Button Content="Paste effects" Click="OnPaste" Margin="0,0,8,8"/>
+        <Button Content="Replace chain" Click="OnReplace" Margin="0,0,8,8"/>
+      </WrapPanel>
+      <TextBlock Text="A/B comparison" Classes="h"/>
+      <TextBlock Text="Store the current settings as A or B, then hear either snapshot. Store again to keep later edits. These snapshots last until the daemon reconnects. Switching can briefly interrupt audio."
+                 TextWrapping="Wrap" Foreground="{DynamicResource Ox.Text.Secondary}"/>
+      <WrapPanel>
+        <Button Content="Store A" Click="OnStoreA" Margin="0,0,8,8"/>
+        <Button Content="Hear A" Click="OnHearA" Margin="0,0,8,8"/>
+        <Button Content="Store B" Click="OnStoreB" Margin="0,0,8,8"/>
+        <Button Content="Hear B" Click="OnHearB" Margin="0,0,8,8"/>
+      </WrapPanel>
+      <TextBlock Text="{Binding Comparison}" TextWrapping="Wrap" Foreground="{DynamicResource Ox.Text.Primary}"/>
+      <TextBlock Text="Reusable chain presets" Classes="h"/>
+      <TextBox Text="{Binding PresetName, Mode=TwoWay}" PlaceholderText="New preset name" MaxLength="80"/>
+      <Button Content="Save current chain" Click="OnSave"/>
+      <ComboBox ItemsSource="{Binding Presets}" SelectedItem="{Binding SelectedPreset, Mode=TwoWay}"
+                HorizontalAlignment="Stretch" PlaceholderText="Choose a chain preset"/>
+      <WrapPanel>
+        <Button Content="Load preset" Click="OnLoad" Margin="0,0,8,8"/>
+        <Button Content="Delete preset" Click="OnDelete" Margin="0,0,8,8"/>
+        <Button Content="Refresh presets" Click="OnRefresh" Margin="0,0,8,8"/>
+      </WrapPanel>
+      <TextBlock Text="Presets keep order, names, bypass, host choices and exposed controls. Plugin-private state and external samples are not included. Loading replaces the chain; missing or incompatible plugins are refused."
+                 TextWrapping="Wrap" Foreground="{DynamicResource Ox.Text.Secondary}"/>
+      <TextBlock Text="{Binding WorkflowError}" TextWrapping="Wrap" Foreground="{DynamicResource Ox.Text.Warning}"
+                 IsVisible="{Binding WorkflowError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+    </StackPanel>
+  </ScrollViewer>
+</Window>

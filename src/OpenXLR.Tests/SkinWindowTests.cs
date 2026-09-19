@@ -404,6 +404,7 @@ public sealed class SkinWindowTests
             ("plugin-picker", new PluginPickerWindow { DataContext = vm.Inserts }),
             ("native-editors", new NativeEditorRulesWindow()),
             ("plugin-folders", new PluginFoldersWindow()),
+            ("effect-workflow", new EffectWorkflowWindow { DataContext = vm.Inserts }),
             ("updates", new UpdatesWindow { DataContext = vm.Updates }),
         ];
         try

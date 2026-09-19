@@ -11,6 +11,26 @@ public partial class MixInsertsWindow : Window
         InitializeComponent();
     }
 
+    private EffectWorkflowWindow? _workflow;
+    private void OnWorkflow(object? sender, RoutedEventArgs e)
+    {
+        if (Chain is null) return;
+        if (_workflow is not null) { _workflow.Activate(); return; }
+        _workflow = new EffectWorkflowWindow { DataContext = Chain };
+        _workflow.Closed += (_, _) => _workflow = null;
+        _workflow.Show(this);
+    }
+    private void OnCopyInsert(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is InsertViewModel insert) insert.Owner.CopyEffects(insert);
+    }
+    private async void OnRenameInsert(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is not InsertViewModel insert) return;
+        string? name = await Dialogs.NameAsync(this, "Rename effect", insert.Label, 256);
+        if (name is not null) await insert.Owner.RenameEffectAsync(insert, name);
+    }
+
     private InsertsViewModel? Chain => DataContext as InsertsViewModel;
 
     private async void OnAddInsert(object? sender, RoutedEventArgs e)

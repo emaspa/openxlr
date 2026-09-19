@@ -23,7 +23,7 @@ public sealed record PluginChoice(string Uri, string Name, string Category, Json
 /// picker to add more. Edits go to the daemon as a whole new chain (order
 /// matters); parameter moves go live one control at a time.
 /// </summary>
-public sealed class InsertsViewModel : ViewModelBase
+public sealed partial class InsertsViewModel : ViewModelBase
 {
     private readonly DaemonClient _client;
     private readonly string _channel;
@@ -144,7 +144,13 @@ public sealed class InsertsViewModel : ViewModelBase
         return channels == 1 ? ins == 1 && outs == 1 : ins >= 2 && outs >= 2;
     }
 
-    public void ResetForNewConnection() { _pluginsRequested = false; _catalogTask = null; }
+    public void ResetForNewConnection()
+    {
+        _pluginsRequested = false;
+        _catalogTask = null;
+        foreach (var insert in Items) insert.ForgetPendingParameters();
+        ResetEffectWorkflow();
+    }
 
     /// <summary>
     /// After a plugin was installed: every chain fetches the catalogue
@@ -179,7 +185,9 @@ public sealed class InsertsViewModel : ViewModelBase
                 JsonNode? ins = entry?["insert"];
                 if (ins is null) continue;
                 string id = ins["id"]!.GetValue<string>();
-                if (!byId.TryGetValue(id, out InsertViewModel? vm))
+                if (!byId.TryGetValue(id, out InsertViewModel? vm)
+                    || vm.Plugin != ins["plugin"]!.GetValue<string>()
+                    || vm.Kind != (ins["kind"]?.GetValue<string>() ?? "lv2"))
                     vm = new InsertViewModel(this, id, ins["plugin"]!.GetValue<string>(), ins["label"]?.GetValue<string>() ?? id,
                         ins["kind"]?.GetValue<string>() ?? "lv2");
                 vm.ApplyFromDaemon(ins, entry?["error"]?.GetValue<string>(),
@@ -190,6 +198,7 @@ public sealed class InsertsViewModel : ViewModelBase
             }
             if (!next.SequenceEqual(Items))
             {
+                foreach (var removed in Items.Except(next)) removed.Detach();
                 Items.Clear();
                 foreach (InsertViewModel vm in next) Items.Add(vm);
                 Raise(nameof(HasItems));
@@ -240,10 +249,14 @@ public sealed class InsertsViewModel : ViewModelBase
     internal void SendParam(InsertViewModel item, string symbol, double value)
     {
         if (_applying) return;
-        string key = $"ins:{item.Id}:{symbol}";
+        string key = ParameterKey(item.Id, symbol);
         SliderSync.Touch(key);
         SliderSync.Send(key, () => _ = _client.SetInsertParamAsync(_channel, item.Id, symbol, value));
     }
+
+    // Channel and insert IDs cannot contain '/', so each control has one key
+    // even when a profile uses the same insert ID in several channels.
+    internal string ParameterKey(string id, string symbol) => $"ins:{_channel}/{id}/{symbol}";
 
     internal bool Applying => _applying;
 
@@ -257,7 +270,7 @@ public sealed class InsertsViewModel : ViewModelBase
         => [.. (order ?? Items).Where(i => i.Id != skip).Select(i => (object)i.ToPayload())];
 
     /// <summary>Parameter metadata for a plugin uri, from the catalog.</summary>
-    internal JsonNode? ParamsFor(string uri) => PluginChoices.FirstOrDefault(p => p.Uri == uri)?.Params;
+    internal JsonNode? ParamsFor(string kind, string uri) => PluginChoices.FirstOrDefault(p => p.Kind == kind && p.Uri == uri)?.Params;
 }
 
 public sealed class InsertViewModel : ViewModelBase
@@ -275,7 +288,8 @@ public sealed class InsertViewModel : ViewModelBase
 
     public string Id { get; }
     public string Plugin { get; }
-    public string Label { get; }
+    private string _label = "";
+    public string Label { get => _label; private set => Set(ref _label, value); }
     public string Kind { get; }
     public string Format => Kind.ToUpperInvariant();
 
@@ -287,10 +301,10 @@ public sealed class InsertViewModel : ViewModelBase
     /// it calls available is by definition supported.
     /// </summary>
     public bool NativeEditorSupported => _owner.PluginChoices.Any(
-        p => p.Uri == Plugin && (p.NativeEditorSupported || p.NativeEditorAvailable));
+        p => p.Kind == Kind && p.Uri == Plugin && (p.NativeEditorSupported || p.NativeEditorAvailable));
 
     /// <summary>The helper is here too, so turning the host on can work.</summary>
-    public bool NativeHostInstalled => _owner.PluginChoices.Any(p => p.Uri == Plugin && p.NativeEditorAvailable);
+    public bool NativeHostInstalled => _owner.PluginChoices.Any(p => p.Kind == Kind && p.Uri == Plugin && p.NativeEditorAvailable);
 
     private bool _nativeUiBlocked;
     private string? _nativeUiBlockReason;
@@ -443,6 +457,7 @@ public sealed class InsertViewModel : ViewModelBase
     public void ApplyFromDaemon(JsonNode ins, string? error, bool nativeHostRunning,
         bool nativeUiBlocked = false, string? nativeUiBlockReason = null)
     {
+        Label = ins["label"]?.GetValue<string>() ?? Plugin;
         _nativeUiBlocked = nativeUiBlocked;
         _nativeUiBlockReason = nativeUiBlockReason;
         _bypass = ins["bypass"]?.GetValue<bool>() ?? false;
@@ -463,7 +478,7 @@ public sealed class InsertViewModel : ViewModelBase
             // While a control is being dragged the daemon's echo lags the
             // slider; applying it would make the thumb jitter (the mixer's
             // faders use the same guard).
-            if (SliderSync.RecentlyTouched($"ins:{Id}:{p.Symbol}")) continue;
+            if (SliderSync.RecentlyTouched(_owner.ParameterKey(Id, p.Symbol))) continue;
             if (_params.TryGetValue(p.Symbol, out double v)) p.ApplyFromDaemon(v);
         }
     }
@@ -478,7 +493,7 @@ public sealed class InsertViewModel : ViewModelBase
     private void BuildParams()
     {
         RaiseNativeFlags();
-        if (_owner.ParamsFor(Plugin) is not JsonArray arr) return;
+        if (_owner.ParamsFor(Kind, Plugin) is not JsonArray arr) return;
         foreach (JsonNode? p in arr)
         {
             if (p is null) continue;
@@ -494,8 +509,22 @@ public sealed class InsertViewModel : ViewModelBase
         RebuildGroups();
     }
 
+    private readonly HashSet<string> _editedParameters = [];
+    internal void ForgetPendingParameters()
+    {
+        foreach (string symbol in _editedParameters) SliderSync.Forget(_owner.ParameterKey(Id, symbol));
+        _editedParameters.Clear();
+    }
+
+    internal void Detach()
+    {
+        ForgetPendingParameters();
+        InsertWindows.CloseControls(this);
+    }
+
     internal void SendParam(string symbol, double value)
     {
+        _editedParameters.Add(symbol);
         _params[symbol] = value;
         _owner.SendParam(this, symbol, value);
     }
