@@ -29,7 +29,7 @@ internal sealed class MatrixView : View
         }
 
         List<MixEntry> mixes = state.Mixer.Mixes;
-        List<ChannelEntry> channels = state.Mixer.Channels;
+        List<ChannelEntry> channels = state.Mixer.Shown;
         if (mixes.Count == 0 || channels.Count == 0)
         {
             screen.Text(area.X + 2, area.Y + 1, "The mixer is not built yet", theme.TextMuted, theme.Card);
@@ -170,7 +170,7 @@ internal sealed class MatrixView : View
         Snapshot? state = State(app);
         if (state is null) return false;
         List<MixEntry> mixes = state.Mixer.Mixes;
-        List<ChannelEntry> channels = state.Mixer.Channels;
+        List<ChannelEntry> channels = state.Mixer.Shown;
         if (mixes.Count == 0) return false;
 
         MixEntry mix = mixes[Math.Clamp(_column, 0, mixes.Count - 1)];

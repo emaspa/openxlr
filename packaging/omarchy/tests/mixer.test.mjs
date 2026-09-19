@@ -205,3 +205,19 @@ test('send edits address the selected mix and monitor masters alone reach 150 pe
   assert.equal(mixer.volumeCommand(state.mixer.mixes[1], '', true, 1.5).value, 1);
   assert.equal(mixer.muteCommand({ id: 'custom', muted: true }, '', true).value, false);
 });
+
+test('a channel the device cannot feed is left out, and an older daemon keeps them all', () => {
+  // Only the Wave XLR Pro has a second XLR jack and the aux input stage, so
+  // the daemon marks those channels absent on every other model.
+  const channels = [
+    { id: 'xlr1', name: 'XLR 1', present: true },
+    { id: 'xlr2', name: 'XLR 2', present: false },
+    { id: 'aux', name: 'Aux In', present: false },
+    { id: 'game', name: 'Game' },
+  ];
+  assert.deepEqual(plain(mixer.shownChannels(channels)).map(c => c.id), ['xlr1', 'game']);
+  // A daemon that does not send the field says nothing, not absent.
+  assert.deepEqual(plain(mixer.shownChannels([{ id: 'xlr2' }])).map(c => c.id), ['xlr2']);
+  assert.deepEqual(plain(mixer.shownChannels(null)), []);
+  assert.deepEqual(plain(mixer.shownChannels(undefined)), []);
+});

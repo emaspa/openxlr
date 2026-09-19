@@ -1039,15 +1039,11 @@ public sealed partial class MainViewModel : ViewModelBase
                 foreach (SendViewModel send in c.Sends)
                     send.MixName = Mixes.FirstOrDefault(m => m.Id == send.MixId)?.Name ?? send.MixId;
             // Hardware input tiles only make sense for jacks the active
-            // device has; without a device, show everything as before.
+            // device has. The daemon works that out and says so per channel,
+            // so the window, the terminal mixer and the bar agree.
             foreach (ChannelViewModel c in Channels)
             {
-                c.Visible = c.Id switch
-                {
-                    "xlr2" => !DeviceConnected || HasXlr2,
-                    "aux" => !DeviceConnected || CapAuxInput,
-                    _ => true,
-                };
+                c.Visible = c.Present;
                 foreach (SendViewModel send in c.Sends.Where(s => s.MixId == "auxout"))
                     send.Visible = !DeviceConnected || CapOutputRouting || auxAudible;
             }
@@ -1401,6 +1397,9 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
     public string? CaptureSource { get => _captureSource; set { if (Set(ref _captureSource, value)) Raise(nameof(IsApplication)); } }
     public bool IsApplication => !IsHardware && CaptureSource is null;
     public bool CaptureConnected { get; private set; }
+
+    /// <summary>False when the active device has no jack behind this channel.</summary>
+    public bool Present { get; private set; } = true;
     private string _captureLabel = "";
     public string CaptureLabel { get => _captureLabel; set => Set(ref _captureLabel, value); }
 
@@ -1438,6 +1437,7 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
     {
         if (n["name"]?.GetValue<string>() is { Length: > 0 } name) Name = name;
         IsHardware = n["hardware"]?.GetValue<bool>() ?? false;
+        Present = n["present"]?.GetValue<bool>() ?? true;
         CaptureSource = n["captureSource"]?.GetValue<string>();
         CaptureConnected = n["captureConnected"]?.GetValue<bool>() ?? false;
         CaptureLabel = CaptureSource is null ? "" : $"{(CaptureConnected ? "Connected" : "Offline")} · pair {(n["capturePair"]?.GetValue<int>() ?? 0) + 1}";

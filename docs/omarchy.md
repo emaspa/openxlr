@@ -32,6 +32,10 @@ name otherwise. `No output` means none is selected, and `Silent` is an
 empty feed. Long names shorten to fit the bar without moving neighbouring
 widgets. The same strip turns with a vertical bar.
 
+The popout and the bar show only the channels the active device can feed,
+which the daemon says per channel, so XLR 2 and Aux In are absent on every
+model but the Wave XLR Pro.
+
 Click to open the mixer. The arrows choose which mix the channel sends
 control. Channels remain in layout order, with a separate bank of mix
 masters. Each bank fits only whole strips and has previous and next page

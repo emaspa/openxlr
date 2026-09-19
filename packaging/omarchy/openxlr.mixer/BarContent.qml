@@ -11,7 +11,7 @@ Item {
     required property string fontFamily
     required property int pixelSize
     readonly property var mixer: link.snapshot && link.snapshot.mixer ? link.snapshot.mixer : ({})
-    readonly property var channels: mixer.channels || []
+    readonly property var channels: Mixer.shownChannels(mixer.channels)
     readonly property var mixes: mixer.mixes || []
     readonly property var feeds: Mixer.monitorFeeds(mixer)
     readonly property var feed: feeds.length ? feeds[0] : null

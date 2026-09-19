@@ -89,6 +89,25 @@ TestCase {
             return bar.implicitWidth > feedOnlyWidth;
         });
     }
+    function test_anInputTheDeviceCannotFeedNeverAppears(): void {
+        // Only the Wave XLR Pro has a second jack, so the daemon marks XLR 2
+        // absent on every other model. Signal on an absent channel must not
+        // put it on the bar.
+        var snapshot = snapshotFor(false);
+        snapshot.mixer.channels[1].present = false;
+        fakeLink.snapshot = snapshot;
+        fakeLink.levels = {
+            "ch:xlr2": [0.4, 0.4]
+        };
+        wait(0);
+        compare(findChild(bar, "input-xlr2").visible, false);
+        fakeLink.levels = {
+            "ch:xlr1": [0.4, 0.4]
+        };
+        wait(0);
+        compare(findChild(bar, "input-xlr1").visible, true);
+    }
+
     function test_labelsAndMetersShareTheirVerticalCentre(): void {
         fakeLink.levels = {
             "ch:xlr1": [0.4, 0.4],

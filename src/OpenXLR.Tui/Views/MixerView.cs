@@ -26,7 +26,7 @@ internal sealed class MixerView : View
         }
 
         List<MixEntry> mixes = state.Mixer.Mixes;
-        List<ChannelEntry> channels = state.Mixer.Channels;
+        List<ChannelEntry> channels = state.Mixer.Shown;
         _row = Math.Clamp(_row, 0, channels.Count);
         _column = Math.Clamp(_column, 0, mixes.Count - 1);
         MixEntry selectedMix = mixes[_column];
@@ -234,7 +234,7 @@ internal sealed class MixerView : View
         Snapshot? state = State(app);
         if (state is null) return false;
         List<MixEntry> mixes = state.Mixer.Mixes;
-        List<ChannelEntry> channels = state.Mixer.Channels;
+        List<ChannelEntry> channels = state.Mixer.Shown;
         if (mixes.Count == 0) return false;
 
         _row = Math.Clamp(_row, 0, channels.Count);
@@ -343,9 +343,9 @@ internal sealed class MixerView : View
         List<string> channels = state.Mixer.Channels.Where(entry => !entry.Hardware).Select(entry => entry.Id).ToList();
         List<string> mixes = state.Mixer.Mixes.Where(entry => entry.Kind == "virtualMic").Select(entry => entry.Id).ToList();
 
-        if (_row > 0 && _row <= state.Mixer.Channels.Count)
+        if (_row > 0 && _row <= state.Mixer.Shown.Count)
         {
-            ChannelEntry channel = state.Mixer.Channels[_row - 1];
+            ChannelEntry channel = state.Mixer.Shown[_row - 1];
             int at = channels.IndexOf(channel.Id);
             if (at < 0) { app.Say("A hardware channel keeps its place"); return; }
             int to = Math.Clamp(at + by, 0, channels.Count - 1);

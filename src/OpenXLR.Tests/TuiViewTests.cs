@@ -267,6 +267,36 @@ public sealed class TuiViewTests
         Assert.Contains("ON", keyRow[column..(column + 8)], StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AStripTheDeviceCannotFeedIsLeftOutOfTheDesk(bool present)
+    {
+        // Only the Wave XLR Pro has a second XLR jack, so on the other models
+        // the daemon marks XLR 2 absent and the desk skips it, as the window
+        // does. The daemon still sends the strip, so this is the client's cut.
+        System.Text.Json.Nodes.JsonNode root = System.Text.Json.Nodes.JsonNode.Parse(StateJson)!;
+        // A device with one jack says so in both places: the capability the
+        // interface rail reads, and the channel the desk draws.
+        root["capabilities"]!["xlrInputs"] = present ? 2 : 1;
+        var channels = (System.Text.Json.Nodes.JsonArray)root["mixer"]!["channels"]!;
+        channels.Add(new System.Text.Json.Nodes.JsonObject
+        {
+            ["id"] = "xlr2", ["name"] = "XLR 2", ["hardware"] = true, ["present"] = present,
+            ["levels"] = new System.Text.Json.Nodes.JsonObject { ["monitor"] = 1 },
+            ["mutedIn"] = new System.Text.Json.Nodes.JsonArray(),
+        });
+        DaemonLink link = new();
+        link.Receive(root.ToJsonString());
+        App app = new(link, Theme.Material);
+        Screen screen = new(150, 42);
+        app.Draw(screen);
+        string frame = Frame(screen);
+
+        Assert.Contains("XLR 1", frame, StringComparison.Ordinal);
+        Assert.Equal(present, frame.Contains("XLR 2", StringComparison.Ordinal));
+    }
+
     /// <summary>A row's grid part, between the panel's edges, with no rail text in it.</summary>
     private static string Grid(string row)
     {

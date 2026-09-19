@@ -42,14 +42,14 @@ public sealed partial record MixerConfig
         Channels =
         [
             new ChannelDefinition("xlr1", "XLR 1") { Levels = Level(1.0, 1.0, 1.0, 1.0), MutedIn = new HashSet<string> { "monitor", "monitor2" }, InputPair = 0 },
-            new ChannelDefinition("xlr2", "XLR 2") { Levels = Level(1.0, 1.0, 1.0, 1.0), MutedIn = new HashSet<string> { "monitor", "monitor2" }, InputPair = 1 },
+            new ChannelDefinition("xlr2", "XLR 2") { Levels = Level(1.0, 1.0, 1.0, 1.0), MutedIn = new HashSet<string> { "monitor", "monitor2" }, InputPair = 1, NeedsXlrInputs = 2 },
             // The third hardware input stage is shared: the USB Aux port and the
             // Line In jack both arrive on capture pair 2 (verified live with a
             // MacBook on USB Aux; every other capture channel stayed at digital
             // zero). One channel therefore serves both.
             // Aux In must NEVER feed the Aux mix: that would loop the second
             // computer's audio straight back to it.
-            new ChannelDefinition("aux", "Aux In") { Levels = Level(1.0, 1.0, 1.0, 0.0), MutedIn = new HashSet<string> { "monitor", "monitor2", "auxout" }, InputPair = 2 },
+            new ChannelDefinition("aux", "Aux In") { Levels = Level(1.0, 1.0, 1.0, 0.0), MutedIn = new HashSet<string> { "monitor", "monitor2", "auxout" }, InputPair = 2, NeedsAuxInput = true },
             new ChannelDefinition("game", "Game") { Levels = Level(0.5, 0.5, 0.5, 0.5) },
             new ChannelDefinition("music", "Music") { Levels = Level(1.0, 1.0, 1.0, 1.0) },
             new ChannelDefinition("browser", "Browser") { Levels = Level(1.0, 1.0, 1.0, 1.0) },
@@ -108,6 +108,16 @@ public sealed record ChannelDefinition(string Id, string Name)
     /// Line In.
     /// </summary>
     public int? InputPair { get; init; }
+
+    /// <summary>
+    /// How many XLR jacks the interface must have for this channel to carry
+    /// anything, or null when the channel does not need one. Only the Wave
+    /// XLR Pro has a second jack, so XLR 2 is absent on every other model.
+    /// </summary>
+    public int? NeedsXlrInputs { get; init; }
+
+    /// <summary>Whether this channel needs the device's auxiliary input stage, which is the Pro's Line In.</summary>
+    public bool NeedsAuxInput { get; init; }
 
     /// <summary>Explicit capture node name for a user input, independent of the active Wave interface.</summary>
     public string? CaptureSource { get; init; }
@@ -182,10 +192,16 @@ public sealed record MixerState
 /// <param name="Kind">"monitor", "virtualMic" or "auxPort", so clients can tell monitor mixes apart.</param>
 public sealed record MixStatus(string Id, string Name, double Volume, bool Muted, string Kind = "monitor");
 
+/// <param name="Present">
+/// False when the active device has no jack behind this channel, so a client
+/// can leave it out rather than offering a strip that can never carry audio.
+/// True for every channel while no device is connected.
+/// </param>
 public sealed record ChannelStatus(string Id, string Name,
     IReadOnlyDictionary<string, double> Levels,
     IReadOnlyList<string> MutedIn,
-    bool Hardware = false, string? CaptureSource = null, int CapturePair = 0, bool CaptureConnected = false);
+    bool Hardware = false, string? CaptureSource = null, int CapturePair = 0, bool CaptureConnected = false,
+    bool Present = true);
 
 
 /// <summary>

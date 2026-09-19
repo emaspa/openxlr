@@ -271,6 +271,10 @@ public sealed class MixerService : IHostedService, IDisposable
                     _mixer.SetInputDeviceHint(
                         _devices.ActiveInfo?.Model.Replace(' ', '_'),
                         _devices.ActiveCapabilities?.OutputRouting ?? false);
+                    // Which input jacks the device actually has, so a client
+                    // does not offer a strip the hardware cannot feed.
+                    if (_mixer.SetInputJacks(_devices.ActiveCapabilities?.XlrInputs,
+                            _devices.ActiveCapabilities?.AuxInput)) Changed?.Invoke();
                     // Software DSP only for devices without the hardware version.
                     _mixer.SetLowCutApplicable(!(_devices.ActiveCapabilities?.LowCut ?? false));
                     _mixer.SetClipGuardApplicable(!(_devices.ActiveCapabilities?.ClipGuard ?? false));

@@ -62,7 +62,12 @@ downloads or installs an update.
 
 **Channels** are where audio enters the mixer. Three carry the
 interface's inputs (XLR 1, XLR 2 where the device has one, Aux In for
-the Pro's Line In and USB Aux input) and the rest carry application
+the Pro's Line In and USB Aux input). Only the Wave XLR Pro has the
+second jack and the aux stage, so on every other model the window, the
+terminal mixer and the Omarchy bar leave those two strips out rather than
+offering a fader that reaches nothing. The channels keep their levels, so
+plugging a Pro back in brings them back as they were. The rest carry
+application
 groups: Game, Music, Browser, System, Voice Chat and SFX by default, and
 whatever you add, rename or remove in the layout editor
 ([section 3.12](#layout)). Each channel is a PipeWire output device an

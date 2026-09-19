@@ -29,6 +29,13 @@ internal sealed record ChannelEntry
     public bool CaptureConnected { get; init; }
 
     /// <summary>
+    /// False when the active device has no jack behind this channel, which is
+    /// XLR 2 and Aux In on everything but the Wave XLR Pro. The daemon keeps
+    /// sending the strip so its levels survive a device change.
+    /// </summary>
+    public bool Present { get; init; } = true;
+
+    /// <summary>
     /// True for the XLR microphone inputs, which are mono. The daemon still
     /// sends a pair for every channel and repeats the one reading in both
     /// sides of it, so a stereo meter here would draw the same bar twice.
@@ -109,6 +116,15 @@ internal sealed record MixerSnapshot
 {
     public List<MixEntry> Mixes { get; init; } = [];
     public List<ChannelEntry> Channels { get; init; } = [];
+
+    private List<ChannelEntry>? _shown;
+
+    /// <summary>
+    /// The channels worth drawing: every one the active device can feed. A
+    /// snapshot is replaced rather than edited, so this is worked out once.
+    /// </summary>
+    [JsonIgnore]
+    public List<ChannelEntry> Shown => _shown ??= [.. Channels.Where(channel => channel.Present)];
     public List<string> MonitorOutputs { get; init; } = [];
     public Dictionary<string, string> MonitorFeeds { get; init; } = [];
     public double? OutputVolume { get; init; }

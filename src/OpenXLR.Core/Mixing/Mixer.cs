@@ -955,6 +955,40 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         return result;
     }
 
+    // What the active device's input side actually has. Null means no device
+    // is connected, and then every channel is reported present, which is what
+    // the window has always shown without one.
+    private int? _deviceXlrInputs;
+    private bool? _deviceAuxInput;
+
+    /// <summary>
+    /// The active device's XLR jack count and whether it has the auxiliary
+    /// input stage. The channels the device cannot feed are still built and
+    /// still hold their levels; they are reported as not present so clients
+    /// leave them out. Returns true when the answer changed.
+    /// </summary>
+    public bool SetInputJacks(int? xlrInputs, bool? auxInput)
+    {
+        lock (_gate)
+        {
+            if (_deviceXlrInputs == xlrInputs && _deviceAuxInput == auxInput) return false;
+            _deviceXlrInputs = xlrInputs;
+            _deviceAuxInput = auxInput;
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Whether the active device has the jack this channel reads. A channel
+    /// that needs nothing is always present, and so is every channel while no
+    /// device is connected.
+    /// </summary>
+    private bool ChannelPresentLocked(ChannelDefinition channel)
+    {
+        if (channel.NeedsXlrInputs is int needed && _deviceXlrInputs is int jacks && jacks < needed) return false;
+        return !channel.NeedsAuxInput || _deviceAuxInput is not false;
+    }
+
     /// <summary>
     /// Name fragment of the interface whose capture should feed the input
     /// channels (the daemon's active device). A change re-wires the feeds.
@@ -2055,7 +2089,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                     c.Id, c.Name,
                     _config.Mixes.ToDictionary(m => m.Id, m => _levels.GetValueOrDefault(Cell(c.Id, m.Id), 0.0)),
                     [.. _config.Mixes.Where(m => _muted.Contains(Cell(c.Id, m.Id))).Select(m => m.Id)],
-                    c.InputPair is not null, c.CaptureSource, c.CapturePair, _captureFeeds.ContainsKey(c.Id)))],
+                    c.InputPair is not null, c.CaptureSource, c.CapturePair, _captureFeeds.ContainsKey(c.Id),
+                    ChannelPresentLocked(c)))],
                 RenamedSinceStart = _renamedSinceBuild,
                 MonitorOutput = _monitorOutputs.FirstOrDefault(),
                 MonitorOutputs = [.. _monitorOutputs],

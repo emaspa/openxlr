@@ -23,7 +23,7 @@ Item {
     readonly property color face: Qt.rgba(background.r, background.g, background.b, 1)
     readonly property string family: bar ? bar.fontFamily : Style.font.family
     readonly property var mixer: daemon.snapshot ? daemon.snapshot.mixer : ({})
-    readonly property var channels: mixer.channels || []
+    readonly property var channels: Mixer.shownChannels(mixer.channels)
     readonly property var mixes: mixer.mixes || []
     readonly property var inputs: channels.filter(function (channel) {
         return Mixer.mono(channel.id);

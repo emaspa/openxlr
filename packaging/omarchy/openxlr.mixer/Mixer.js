@@ -62,6 +62,13 @@ function verticalGlyph(level, row, count) {
 }
 
 // One label per selected output, including sums and deliberately silent feeds.
+// The daemon marks a channel absent when the active device has no jack
+// behind it, which is XLR 2 and Aux In on everything but the Wave XLR Pro.
+// An older daemon does not send the field, so a missing one means present.
+function shownChannels(channels) {
+    return (channels || []).filter(function (channel) { return channel.present !== false; });
+}
+
 function monitorFeeds(mixer) {
     var mixes = mixer.mixes || [];
     var first = mixes.filter(function (mix) { return mix.kind === "monitor"; })[0];

@@ -88,7 +88,9 @@ the tooltip lists each insert in signal order. See [Audio flow](manual.md#audio-
 Built from PipeWire nodes, no kernel modules or custom drivers:
 - Channels for the hardware inputs (XLR 1, XLR 2, Aux In), for
   application groups (Game, Music, Browser, System, Voice Chat, SFX) and
-  for other PipeWire capture sources (below)
+  for other PipeWire capture sources (below). XLR 2 and Aux In are shown
+  only where the device has them, which is the Wave XLR Pro; every client
+  reads that from the state rather than deciding for itself
 - Mixes: Monitor A (what you hear), Monitor B (a second selection for
   outputs that should hear something else), the virtual microphones
   (Stream and Chat by default, published as capture devices selectable
