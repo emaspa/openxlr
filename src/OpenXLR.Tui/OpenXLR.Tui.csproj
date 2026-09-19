@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>openxlr-tui</AssemblyName>
+    <RootNamespace>OpenXLR.Tui</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <DefineConstants>$(DefineConstants);OPENXLR_TUI</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Shared with the daemon and the window (see the file): XDG paths and
+         private atomic writes. The terminal mixer has no reference to Core for
+         the same reason the window has none: it speaks to the daemon over the
+         documented socket and needs nothing else from it. -->
+    <Compile Include="../OpenXLR.Core/OpenXlrPaths.cs" Link="OpenXlrPaths.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The skins the application ships with, read from the window's assets so
+         the terminal and the window always offer the same two appearances. A
+         skin is data, so both read the same file rather than each keeping a
+         copy. -->
+    <EmbeddedResource Include="../OpenXLR.UI/Assets/Skins/*/skin.json"
+                      LogicalName="OpenXLR.Tui.Skins.$([System.String]::Copy('%(RecursiveDir)').TrimEnd('/')).skin.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="OpenXLR.Tests" />
+  </ItemGroup>
+
+</Project>

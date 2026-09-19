@@ -131,6 +131,17 @@ a skin overlays values on top of them.
 - [ ] System, light and dark appearance, following the desktop by default.
   The token set is the groundwork; what remains is a second set of values
   for a light ground and following the desktop's preference.
+- [x] A terminal mixer, `openxlr-tui`, for a desk without a desktop
+  session and for a tiling setup where a window is the odd one out. It
+  speaks the same WebSocket the window does and draws the same skins,
+  reading the colour tokens out of the same files and following the same
+  saved choice, so an appearance picked in one is the appearance in the
+  other. Example skins for the Omarchy palettes ship in
+  [docs/examples/skins](examples/skins). Tabs across the top in the manner
+  of btop: the submixer grid, the hardware inputs, the outputs, the
+  applications, the insert chains, the profiles and the appearance. It
+  draws its own cells in true colour rather than taking a widget toolkit,
+  so it adds no dependency to any package.
 - [ ] The Stream Deck plugin reading the same tokens for its key art. The
   plugin draws its own images today and is unaffected by the window's skin.
 - [ ] Layout density: a compact mode for small screens and a large mode

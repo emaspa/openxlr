@@ -131,12 +131,22 @@ Collect diagnostics).
   separates background audio and app startup at login, with independent
   choices for launch visibility and whether closing the window keeps the
   app in the tray or quits.
+- **Terminal mixer**: `openxlr-tui` is the whole mixer in a terminal, for a
+  machine with no desktop session, an ssh connection or a tiling setup. It
+  speaks the same socket as the window, so both can be open at once, and it
+  wears the same skins. Tabs in the manner of btop: the submix grid with
+  live meters, the hardware inputs, the outputs, the applications, the
+  insert chains, the profiles and the appearance.
+  See [the manual](docs/manual.md#terminal).
 - **Skins**: the window's appearance is a set of named values a skin file
   can replace. OpenXLR ships Material, its own look, and Deck, which dresses
   the window in the visual language of the OpenDeck plugin's keys and dials. A skin
   is data, not code: colours, sizes, local images from its own folder and a
   choice between the control appearances OpenXLR draws, picked in Options
-  and applied to open windows without touching audio.
+  and applied to open windows without touching audio. The terminal mixer
+  reads the same files and follows the same choice, and
+  [docs/examples/skins](docs/examples/skins) holds a skin for each of the
+  Omarchy palettes.
   See [docs/skins.md](docs/skins.md).
 - **Optional update notice**: the UI can check the upstream GitHub release
   feed for a newer stable release. Startup checks are off by default and,

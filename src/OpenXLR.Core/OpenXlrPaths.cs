@@ -5,6 +5,8 @@ using System.Text.Json;
 
 #if OPENXLR_UI
 namespace OpenXLR.UI;
+#elif OPENXLR_TUI
+namespace OpenXLR.Tui;
 #else
 namespace OpenXLR.Core;
 #endif
@@ -18,12 +20,13 @@ namespace OpenXLR.Core;
 /// temporary file next to the target, then a rename, so a crash mid-write
 /// never leaves a truncated file behind.
 ///
-/// Compiled into the daemon through OpenXLR.Core and into the window as a
-/// linked source file (internal, in the window's own namespace, so the test
-/// project sees one public type), so both agree without the window taking a
-/// dependency on the device and mixer code.
+/// Compiled into the daemon through OpenXLR.Core and into the window and the
+/// terminal mixer as a linked source file (internal, in that application's own
+/// namespace, so the test project sees one public type), so all three agree
+/// without the two front ends taking a dependency on the device and mixer
+/// code.
 /// </summary>
-#if OPENXLR_UI
+#if OPENXLR_UI || OPENXLR_TUI
 internal static class OpenXlrPaths
 #else
 public static class OpenXlrPaths

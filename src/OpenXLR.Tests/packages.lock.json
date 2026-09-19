@@ -306,13 +306,16 @@
           "xunit.extensibility.core": "[2.9.3]"
         }
       },
+      "openxlr-tui": {
+        "type": "Project"
+      },
       "openxlr.core": {
         "type": "Project"
       },
       "openxlr.daemon": {
         "type": "Project",
         "dependencies": {
-          "OpenXLR.Core": "[0.1.34, )"
+          "OpenXLR.Core": "[0.1.41, )"
         }
       },
       "openxlr.ui": {

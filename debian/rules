@@ -29,23 +29,30 @@ override_dh_auto_build:
 		$(RESTORE_SOURCE) -o $(OUT)/daemon
 	dotnet publish src/OpenXLR.UI -c Release -r linux-x64 \
 		--self-contained false -p:RestoreLockedMode=true $(RESTORE_SOURCE) -o $(OUT)/ui
+	dotnet publish src/OpenXLR.Tui -c Release -r linux-x64 \
+		--self-contained false -p:RestoreLockedMode=true $(RESTORE_SOURCE) -o $(OUT)/tui
 
 override_dh_auto_install:
 	install -dm755 $(PKG)/usr/lib/openxlr
 	cp -r $(OUT)/daemon $(PKG)/usr/lib/openxlr/daemon
 	cp -r $(OUT)/ui $(PKG)/usr/lib/openxlr/ui
+	cp -r $(OUT)/tui $(PKG)/usr/lib/openxlr/tui
 	# dotnet publish marks assemblies executable; only the apphosts are.
 	find $(PKG)/usr/lib/openxlr -type f -exec chmod 644 {} +
 	chmod 755 $(PKG)/usr/lib/openxlr/daemon/OpenXLR.Daemon \
 		$(PKG)/usr/lib/openxlr/daemon/openxlr-lv2-host \
-		$(PKG)/usr/lib/openxlr/ui/OpenXLR.UI
+		$(PKG)/usr/lib/openxlr/ui/OpenXLR.UI \
+		$(PKG)/usr/lib/openxlr/tui/openxlr-tui
 
 	install -dm755 $(PKG)/usr/bin
 	printf '#!/bin/sh\nexec /usr/lib/openxlr/daemon/OpenXLR.Daemon "$$@"\n' \
 		> $(PKG)/usr/bin/openxlr-daemon
 	printf '#!/bin/sh\nexec /usr/lib/openxlr/ui/OpenXLR.UI "$$@"\n' \
 		> $(PKG)/usr/bin/openxlr
-	chmod 755 $(PKG)/usr/bin/openxlr-daemon $(PKG)/usr/bin/openxlr
+	printf '#!/bin/sh\nexec /usr/lib/openxlr/tui/openxlr-tui "$$@"\n' \
+		> $(PKG)/usr/bin/openxlr-tui
+	chmod 755 $(PKG)/usr/bin/openxlr-daemon $(PKG)/usr/bin/openxlr \
+		$(PKG)/usr/bin/openxlr-tui
 
 	install -Dm644 packaging/70-openxlr.rules \
 		$(PKG)/usr/lib/udev/rules.d/70-openxlr.rules

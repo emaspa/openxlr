@@ -74,23 +74,30 @@ dotnet publish src/OpenXLR.Daemon -c Release -r linux-x64 \
     -p:EnableNativeLv2Host=true -o out/daemon
 dotnet publish src/OpenXLR.UI -c Release -r linux-x64 \
     --self-contained false -p:RestoreLockedMode=true -o out/ui
+dotnet publish src/OpenXLR.Tui -c Release -r linux-x64 \
+    --self-contained false -p:RestoreLockedMode=true -o out/tui
 
 %install
 install -dm755 %{buildroot}%{_prefix}/lib/openxlr
 cp -r out/daemon %{buildroot}%{_prefix}/lib/openxlr/daemon
 cp -r out/ui %{buildroot}%{_prefix}/lib/openxlr/ui
+cp -r out/tui %{buildroot}%{_prefix}/lib/openxlr/tui
 # dotnet publish marks assemblies executable; only the apphosts are.
 find %{buildroot}%{_prefix}/lib/openxlr -type f -exec chmod 644 {} +
 chmod 755 %{buildroot}%{_prefix}/lib/openxlr/daemon/OpenXLR.Daemon \
     %{buildroot}%{_prefix}/lib/openxlr/daemon/openxlr-lv2-host \
-    %{buildroot}%{_prefix}/lib/openxlr/ui/OpenXLR.UI
+    %{buildroot}%{_prefix}/lib/openxlr/ui/OpenXLR.UI \
+    %{buildroot}%{_prefix}/lib/openxlr/tui/openxlr-tui
 
 install -dm755 %{buildroot}%{_bindir}
 printf '#!/bin/sh\nexec %{_prefix}/lib/openxlr/daemon/OpenXLR.Daemon "$@"\n' \
     > %{buildroot}%{_bindir}/openxlr-daemon
 printf '#!/bin/sh\nexec %{_prefix}/lib/openxlr/ui/OpenXLR.UI "$@"\n' \
     > %{buildroot}%{_bindir}/openxlr
-chmod 755 %{buildroot}%{_bindir}/openxlr-daemon %{buildroot}%{_bindir}/openxlr
+printf '#!/bin/sh\nexec %{_prefix}/lib/openxlr/tui/openxlr-tui "$@"\n' \
+    > %{buildroot}%{_bindir}/openxlr-tui
+chmod 755 %{buildroot}%{_bindir}/openxlr-daemon %{buildroot}%{_bindir}/openxlr \
+    %{buildroot}%{_bindir}/openxlr-tui
 
 install -Dm644 packaging/70-openxlr.rules \
     %{buildroot}%{_udevrulesdir}/70-openxlr.rules
@@ -132,6 +139,7 @@ cat <<'MSG'
 OpenXLR: replug your interface once so the udev rule applies.
 Start the daemon:  systemctl --user enable --now openxlr-daemon
 Start the mixer:   openxlr   (or from your application menu)
+In a terminal:     openxlr-tui
 Stream Deck via OpenDeck:
   cp -r /usr/share/openxlr/com.emaspa.openxlr.sdPlugin ~/.config/opendeck/plugins/
 MSG
@@ -142,6 +150,7 @@ MSG
 %{_prefix}/lib/openxlr/
 %{_bindir}/openxlr
 %{_bindir}/openxlr-daemon
+%{_bindir}/openxlr-tui
 %{_udevrulesdir}/70-openxlr.rules
 %{_datadir}/wireplumber/wireplumber.conf.d/50-xlr-dock-capture-hold.conf
 %{_datadir}/wireplumber/wireplumber.conf.d/51-openxlr-pro-raw-names.conf
