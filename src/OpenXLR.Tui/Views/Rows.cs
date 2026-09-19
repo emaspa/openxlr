@@ -55,8 +55,19 @@ internal sealed class NumberRow(
     /// <summary>The finer step, taken with ctrl and an arrow.</summary>
     public double FineStep { get; init; } = step / 5;
 
+    /// <summary>Positive logarithmic ranges use ratios for both movement and position.</summary>
+    public bool Logarithmic { get; init; }
+
+    public bool Integer { get; init; }
+
+    private bool UseLog => Logarithmic && minimum > 0 && maximum > minimum;
+
+    private double Fraction => maximum <= minimum ? 0 : UseLog
+        ? Math.Log(Math.Clamp(value, minimum, maximum) / minimum) / Math.Log(maximum / minimum)
+        : (value - minimum) / (maximum - minimum);
+
     public void DrawDial(Screen screen, int x, int y, Theme theme, Rgb back, bool focused) =>
-        Widgets.Dial(screen, x, y, maximum <= minimum ? 0 : (value - minimum) / (maximum - minimum),
+        Widgets.Dial(screen, x, y, Fraction,
             Enabled ? format(value) : "n/a", theme, back, focused);
 
     public override void DrawValue(Screen screen, int x, int y, int width, Theme theme, Rgb back, bool focused)
@@ -67,9 +78,9 @@ internal sealed class NumberRow(
             return;
         }
         int barWidth = Math.Max(4, width - 10);
-        double span = maximum - minimum;
-        Widgets.Fader(screen, x, y, barWidth, span <= 0 ? 0 : value - minimum, span <= 0 ? 1 : span, theme, back, focused);
-        screen.Text(x + barWidth + 1, y, format(value).PadLeft(8), theme.TextDetail, back);
+        Widgets.Fader(screen, x, y, barWidth, Fraction, 1, theme, back, focused);
+        screen.Text(x + barWidth + 1, y, format(value).PadLeft(8), theme.TextDetail, back,
+            maxWidth: Math.Max(0, width - barWidth - 1));
     }
 
     public override bool Handle(KeyPress key)
@@ -89,7 +100,13 @@ internal sealed class NumberRow(
             default: return false;
         }
 
-        void Apply(double delta) => set(Math.Clamp(value + delta, minimum, maximum));
+        void Apply(double delta)
+        {
+            double next = UseLog
+                ? Math.Clamp(value, minimum, maximum) * Math.Pow(maximum / minimum, delta / (maximum - minimum))
+                : value + delta;
+            set(Math.Clamp(Integer ? Math.Round(next) : next, minimum, maximum));
+        }
     }
 }
 
@@ -224,7 +241,8 @@ internal sealed class RowList
         if (rows[_index] is HeadingRow) Step(rows, 1);
     }
 
-    public void Draw(Screen screen, Rect area, Theme theme, IReadOnlyList<Row> rows, int labelWidth = 26)
+    public void Draw(Screen screen, Rect area, Theme theme, IReadOnlyList<Row> rows, int labelWidth = 26,
+        bool focus = true)
     {
         if (rows.Count == 0) return;
         Settle(rows);
@@ -238,7 +256,7 @@ internal sealed class RowList
         {
             int at = _scroll + line;
             int y = area.Y + line;
-            DrawRow(screen, new Rect(area.X, y, area.Width, 1), theme, rows[at], at == _index, labelWidth);
+            DrawRow(screen, new Rect(area.X, y, area.Width, 1), theme, rows[at], focus && at == _index, labelWidth);
         }
     }
 

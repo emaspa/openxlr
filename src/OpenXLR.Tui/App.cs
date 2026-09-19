@@ -317,6 +317,7 @@ internal sealed class App
         string[] lines =
         [
             "Sections  1-8 or Tab / Shift+Tab. F1 or ? opens this table.",
+            "Quit      q or Ctrl+C. In a text prompt use Ctrl+C to quit.",
             "Mixer     Up/Down channel; Home masters; End last channel.",
             "          Left/Right mix; PgUp/PgDn jump ten channels.",
             "          Space mute; -/+ five points; [/] one point.",
@@ -328,14 +329,16 @@ internal sealed class App
             "Outputs   Space select; Left/Right feed; Enter main output.",
             "          -/+ sink volume; m sink mute. Arrows set defaults.",
             "Apps      Left/Right channel; i desktop routing; f forget.",
-            "Inserts   Arrows choose chain; Space bypass; e open editor.",
-            "          Ctrl+Up/Down reorder; d remove. Add in the window.",
+            "Inserts   e open editor, or controls if blocked or refused.",
+            "          Space bypass; Ctrl+Up/Down reorder; d remove.",
+            "Controls  Esc back; r defaults; -/+ value; [/] fine; e editor.",
+            "          Left/Right value/choice; Space/Enter toggle/choice.",
+            "          Ctrl+Left/Right fine; Home/End limits.",
             "Profiles  Enter load; s overwrite; r recall; d delete.",
             "          Save settings as creates a profile. Arrows set recall.",
             "Options   Enter use skin; R reload skins; arrows move.",
             "Lists     Up/Down or PgUp/PgDn move; Enter or Space acts.",
             "Confirm   Enter accepts; Escape cancels. Deletion needs yes.",
-            "Quit      q or Ctrl+C. In a text prompt use Ctrl+C to quit.",
             "Meters    RMS -60 to 0 dBFS; hold 1 s, fall 18 dB/s.",
         ];
         int width = Math.Max(4, Math.Min(78, screen.Width - 2));

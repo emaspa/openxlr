@@ -57,6 +57,8 @@ internal sealed record InsertEntry
     public InsertBody Insert { get; init; } = new();
     public string? Error { get; init; }
     public bool NativeHostRunning { get; init; }
+    public bool NativeUiBlocked { get; init; }
+    public string? NativeUiBlockReason { get; init; }
 }
 
 internal sealed record InsertBody

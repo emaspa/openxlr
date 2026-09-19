@@ -1732,7 +1732,7 @@ Eight sections are reachable with `1` to `8`, Tab and Shift+Tab:
 | 3 Inputs | hardware controls in grouped cards with gain arcs on a wide terminal, or a scrolling list in a small one; gain, mute, low cut, expander, voice tune and its strength, phantom power, ClipGuard and the compressor for each XLR input; software processing, headphones, direct monitor blend, hardware output routing and USB Aux return |
 | 4 Outputs | selected monitor sinks and their feeds, shared output volume, each sink's volume and mute, and the system default sink and source |
 | 5 Apps | every known application and its channel assignment, including the desktop's own routing |
-| 6 Inserts | the chain on each input and mix, its order, bypass and status; adding plugins and editing their controls stay in the window |
+| 6 Inserts | the chain on each input and mix, its order, bypass and status; open a plugin's native editor or edit its generated controls when the editor is blocked or refused; adding plugins stays in the window |
 | 7 Profiles | load, save over, save as, delete and recall on connect; interface selection and recorded device defaults |
 | 8 Options | the skin picker, connection status, daemon version and fresh state request |
 
@@ -1763,7 +1763,10 @@ Controls below the visible hardware cards appear as the selection moves.
 | Outputs, on a sink | Space, Left/Right, Enter | select the sink, choose its feed, or make it the main output |
 | Outputs, on a sink | `-`, `+`, `m` | change its volume or toggle its mute |
 | Apps | Left/Right, `i`, `f` | assign a channel, leave routing to the desktop, or forget the assignment |
-| Inserts | Space, Ctrl+Up/Down, `d`, `e` | bypass, reorder, remove, or open the plugin's native editor |
+| Inserts | Space, Ctrl+Up/Down, `d`, `e` | bypass, reorder, remove, or open the plugin's native editor, with generated controls when blocked or refused |
+| Insert controls | Escape, `r`, `e` | return to the chain, reset every declared control to its default, or try the native editor again |
+| Insert controls | Up/Down, PageUp/PageDown, Left/Right, Space, Enter | select a control, change a number or choice, or toggle a switch |
+| Insert controls | `-`, `+`, `[`, `]`, Home, End | lower or raise a number, take a fine step, or set the minimum or maximum; Ctrl+Left/Right also takes a fine step |
 | Profiles, on a profile | Enter, `s`, `r`, `d` | load, overwrite, recall on connect, or delete |
 | Options | Enter, `R` | use a skin or reload the skin list |
 | Text prompts | Enter, Escape | accept or cancel |
@@ -1771,6 +1774,25 @@ Controls below the visible hardware cards appear as the selection moves.
 Anything that cannot be undone, such as deleting a channel or resetting
 the device, asks you to type `yes` first. To create a profile, select
 Save settings as and press Enter.
+
+On an insert, `e` first asks the daemon for the plugin's own editor. If
+compatibility rules block it or the daemon refuses to open it, the terminal
+shows generated controls and the reason on one line. The heading names the
+plugin and its chain. Controls follow catalogue order and show the saved
+parameter value, falling back to the plugin's default when no value is saved.
+Switches toggle on or off, enumerations use their scale point labels, and
+integer controls move in whole numbers. Continuous controls move by one
+twentieth of their range, or one hundredth with the fine keys. Positive
+logarithmic ranges move by ratios over that range. A range that includes
+zero or negative values uses linear steps. A refused value appears on the
+bottom line, and the daemon's state restores the displayed value. Plugins
+without declared controls say so.
+
+The terminal requests the catalogue when Inserts is first shown and refreshes
+it after chain or native editor rule changes. It keeps the descriptions for
+plugins in the chains. Escape returns to the chain, and `r` restores every
+declared parameter to its default. These edits use the same live parameters
+and persistence as the window.
 
 The terminal mixer wears the same skins as the window. It reads the same
 files, in the same order, and the choice in Options is the same choice, so
