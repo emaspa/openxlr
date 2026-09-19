@@ -320,8 +320,13 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   application routing, inserts, profiles and options. Wide terminals have
   a section rail and grouped hardware cards with gain arcs. At 80x24 the
   rail becomes a top row and the strips shorten. Both banks scroll to keep
-  the selection visible. F1 or `?` lists all keys. Adding a plugin and
-  editing its controls stay in the window
+  the selection visible. F1 or `?` lists all keys. Adding a plugin stays
+  in the window
+- Insert editing opens the plugin's native editor. A blocked or refused
+  editor falls back to terminal controls with the reason shown. Controls
+  follow the catalogue's order, defaults, switches, named scale points and
+  integer ranges, with ratio steps for positive logarithmic ranges. Escape
+  returns to the chain and `r` resets the controls to their defaults
 - The same skins as the window, read from the same folders and following
   the same saved choice, so an appearance chosen in one is the appearance
   in the other. Console faders, cap keys and lamps follow the skin's

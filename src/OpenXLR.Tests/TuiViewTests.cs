@@ -82,6 +82,11 @@ public sealed class TuiViewTests
         app.ShowTab(tab);
         // A frame settles the selections the way a running terminal would.
         app.Draw(new Screen(140, 36));
+        if (tab == 5)
+        {
+            Assert.Equal("listPlugins", Text(Command(sent), "cmd"));
+            sent.Clear();
+        }
         return (app, sent);
     }
 
@@ -600,12 +605,14 @@ public sealed class TuiViewTests
         const string chain = "\"xlr1\": [";
         const string withKeeper = chain +
             "{ \"insert\": { \"id\": \"keepme\", \"kind\": \"lv2\", \"plugin\": \"URI\"," +
-            " \"label\": \"Keep\", \"bypass\": true, \"params\": { \"gain\": 0.75 } }," +
+            " \"label\": \"Keep\", \"bypass\": true, \"nativeHost\": true, \"params\": { \"gain\": 0.75 } }," +
             " \"error\": null },";
         link.Receive(StateJson.Replace(chain, withKeeper, StringComparison.Ordinal));
         App app = new(link, Theme.Material);
         app.ShowTab(5);
         app.Draw(new Screen(140, 36));
+        Assert.Equal("listPlugins", Text(Command(sent), "cmd"));
+        sent.Clear();
 
         app.Handle(new KeyPress(Key.Down));      // Keep
         app.Handle(new KeyPress(Key.Down));      // Elgato EQ
@@ -620,6 +627,7 @@ public sealed class TuiViewTests
         Assert.Equal("keepme", kept.GetProperty("id").GetString());
         Assert.Equal(0.75, kept.GetProperty("params").GetProperty("gain").GetDouble());
         Assert.True(kept.GetProperty("bypass").GetBoolean());
+        Assert.True(kept.GetProperty("nativeHost").GetBoolean());
     }
 
     // --- the profiles ---
@@ -849,8 +857,12 @@ public sealed class TuiViewTests
         app.Handle(new KeyPress(Key.Char, '?'));
         app.Draw(screen);
         string frame = Frame(screen);
+        // A compact terminal scrolls the full table, including plugin controls.
+        for (int i = 0; i < 4; i++) app.Handle(new KeyPress(Key.Down));
+        app.Draw(screen);
+        frame += Frame(screen);
         foreach (string command in new[] { "Ctrl+Left/Right", "c capture input", "m sink mute", "f forget",
-            "e open editor", "s overwrite", "R reload skins", "Ctrl+C" })
+            "e open editor", "r defaults", "Space/Enter toggle/choice", "s overwrite", "R reload skins", "Ctrl+C" })
             Assert.Contains(command, frame, StringComparison.Ordinal);
         app.Handle(new KeyPress(Key.Char, 'q'));
         Assert.False(app.Running);

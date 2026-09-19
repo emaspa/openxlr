@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
@@ -23,6 +24,17 @@ internal sealed class DaemonLink : IAsyncDisposable
     private readonly System.Diagnostics.Stopwatch _clock = System.Diagnostics.Stopwatch.StartNew();
     private ClientWebSocket? _socket;
     private Task? _pump;
+    private readonly SemaphoreSlim _sendGate = new(1);
+    private readonly ConcurrentDictionary<string, TaskCompletionSource<string?>> _requests = new();
+    private readonly Lock _pluginGate = new();
+    private bool _pluginsWanted;
+    private bool _pluginsRequested;
+    private (string Channel, string Id, string Kind, string Plugin)[] _chains = [];
+
+    public IReadOnlyDictionary<(string Kind, string Plugin), PluginEntry> Plugins { get; private set; } =
+        new Dictionary<(string, string), PluginEntry>();
+
+    public bool PluginsLoaded { get; private set; }
 
     /// <summary>The latest state, or null before the first one arrives.</summary>
     public Snapshot? State { get; private set; }
@@ -75,14 +87,83 @@ internal sealed class DaemonLink : IAsyncDisposable
 
     public void ClearError() => LastError = null;
 
+    /// <summary>Activate catalogue updates when the Inserts section is first shown.</summary>
+    public void EnsurePlugins()
+    {
+        lock (_pluginGate)
+        {
+            _pluginsWanted = true;
+            if (_pluginsRequested || State is null || !Connected) return;
+            _pluginsRequested = true;
+            Send("listPlugins");
+        }
+    }
+
+    private void RefreshPlugins()
+    {
+        lock (_pluginGate)
+        {
+            _pluginsRequested = false;
+            PluginsLoaded = false;
+            if (_pluginsWanted) EnsurePlugins();
+        }
+    }
+
+    private void UpdateChains(Snapshot snapshot)
+    {
+        lock (_pluginGate)
+        {
+            var chains = snapshot.Mixer.Inserts.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                .SelectMany(pair => pair.Value.Select(entry =>
+                    (pair.Key, entry.Insert.Id, entry.Insert.Kind, entry.Insert.Plugin))).ToArray();
+            if (_chains.SequenceEqual(chains))
+            {
+                if (_pluginsWanted) EnsurePlugins();
+                return;
+            }
+            _chains = chains;
+            HashSet<(string, string)> used = chains.Select(slot => (slot.Kind, slot.Plugin)).ToHashSet();
+            Plugins = Plugins.Where(pair => used.Contains(pair.Key)).ToDictionary();
+            RefreshPlugins();
+        }
+    }
+
+    /// <summary>Match an editor outcome to its request, never to an unrelated error.</summary>
+    public Task<string?> Request(string command, Action<JsonObject> fill)
+    {
+        string id = Guid.NewGuid().ToString("N");
+        TaskCompletionSource<string?> result = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        _requests[id] = result;
+        _ = ExpireRequest(id, result);
+        Send(command, body => { fill(body); body["requestId"] = id; });
+        return result.Task;
+    }
+
+    private async Task ExpireRequest(string id, TaskCompletionSource<string?> result)
+    {
+        try { await result.Task.WaitAsync(TimeSpan.FromSeconds(20), _stopping.Token).ConfigureAwait(false); }
+        catch (TimeoutException) { result.TrySetResult("The daemon did not answer the editor request"); }
+        catch (OperationCanceledException) { result.TrySetResult("Disconnected from the daemon"); }
+        finally { _requests.TryRemove(id, out _); }
+    }
+
     private async Task SendAsync(string json)
     {
         ClientWebSocket? socket = _socket;
         if (socket is null || socket.State != WebSocketState.Open) return;
         try
         {
-            await socket.SendAsync(Encoding.UTF8.GetBytes(json), WebSocketMessageType.Text, true, _stopping.Token)
-                .ConfigureAwait(false);
+            await _sendGate.WaitAsync(_stopping.Token).ConfigureAwait(false);
+            try
+            {
+                if (socket.State != WebSocketState.Open) return;
+                await socket.SendAsync(Encoding.UTF8.GetBytes(json), WebSocketMessageType.Text, true, _stopping.Token)
+                    .ConfigureAwait(false);
+                // Defaults can send hundreds of controls. Serialize writes and
+                // stay within the daemon's sustained 100 commands per second.
+                await Task.Delay(11, _stopping.Token).ConfigureAwait(false);
+            }
+            finally { _sendGate.Release(); }
         }
         catch (WebSocketException) { }
         catch (ObjectDisposedException) { }
@@ -105,13 +186,26 @@ internal sealed class DaemonLink : IAsyncDisposable
                 Status = "daemon not reachable";
             }
 
-            Connected = false;
-            Changed?.Invoke();
+            EndSession();
             if (_stopping.IsCancellationRequested) return;
             try { await Task.Delay(TimeSpan.FromSeconds(backoffSeconds), _stopping.Token).ConfigureAwait(false); }
             catch (OperationCanceledException) { return; }
             backoffSeconds = Math.Min(backoffSeconds * 2, 10);
         }
+    }
+
+    /// <summary>Drop replies and cached descriptions when the socket closes.</summary>
+    internal void EndSession()
+    {
+        Connected = false;
+        foreach (var request in _requests.Values) request.TrySetResult("Disconnected from the daemon");
+        lock (_pluginGate)
+        {
+            _pluginsRequested = false;
+            PluginsLoaded = false;
+            Plugins = new Dictionary<(string, string), PluginEntry>();
+        }
+        Changed?.Invoke();
     }
 
     private async Task SessionAsync()
@@ -140,7 +234,7 @@ internal sealed class DaemonLink : IAsyncDisposable
         await SendAsync("{\"cmd\":\"getState\"}").ConfigureAwait(false);
 
         byte[] buffer = new byte[64 * 1024];
-        StringBuilder message = new();
+        using MemoryStream message = new();
         while (socket.State == WebSocketState.Open && !_stopping.IsCancellationRequested)
         {
             WebSocketReceiveResult result = await socket.ReceiveAsync(buffer, _stopping.Token).ConfigureAwait(false);
@@ -149,10 +243,13 @@ internal sealed class DaemonLink : IAsyncDisposable
                 Status = result.CloseStatusDescription is { Length: > 0 } reason ? reason : "closed";
                 return;
             }
-            message.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
+            message.Write(buffer, 0, result.Count);
             if (!result.EndOfMessage) continue;
-            Handle(message.ToString());
-            message.Clear();
+            // Decode only a complete message: a large catalogue can split a
+            // parameter name's UTF-8 character between socket reads.
+            Handle(Encoding.UTF8.GetString(message.GetBuffer(), 0, (int)message.Length));
+            message.SetLength(0);
+            if (message.Capacity > buffer.Length) message.Capacity = buffer.Length;
         }
     }
 
@@ -174,7 +271,9 @@ internal sealed class DaemonLink : IAsyncDisposable
             case "state":
                 if (Snapshot.Parse(json) is { } snapshot)
                 {
+                    Connected = true;
                     State = snapshot;
+                    UpdateChains(snapshot);
                     Status = snapshot.Connected ? "connected" : "no interface";
                     Changed?.Invoke();
                 }
@@ -191,11 +290,35 @@ internal sealed class DaemonLink : IAsyncDisposable
                 break;
 
             case "commandResult":
+                if (Message(json, "requestId") is { } id && _requests.TryRemove(id, out var request))
+                {
+                    request.TrySetResult(Message(json, "error"));
+                    Changed?.Invoke();
+                    break;
+                }
                 if (Message(json, "error") is { Length: > 0 } failure)
                 {
                     LastError = failure;
                     Changed?.Invoke();
                 }
+                break;
+
+            case "plugins":
+                lock (_pluginGate)
+                {
+                    try
+                    {
+                        Plugins = PluginCatalog.Read(json, _chains.Select(slot => (slot.Kind, slot.Plugin)).ToHashSet());
+                        PluginsLoaded = true;
+                    }
+                    catch (JsonException) { LastError = "Could not read the plugin controls"; }
+                }
+                Changed?.Invoke();
+                break;
+
+            case "nativeEditorRulesChanged":
+                RefreshPlugins();
+                Changed?.Invoke();
                 break;
         }
     }
