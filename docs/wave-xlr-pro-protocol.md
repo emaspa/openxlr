@@ -6,7 +6,7 @@ notebook: provisional labels are retained as evidence, not API promises.
 For supported controls, start with [hardware-support.md](hardware-support.md).
 
 Source: `wavexlrpro.pcapng` (7.4 GB, 4.6M packets, 649 s, Wave Link on Windows, 2026-08-25).
-Decoded on Linux with tshark. No companion action-log was captured, so **block/offset → named
+Decoded on Linux with tshark. No companion action-log was captured, so **block/offset to named
 control mapping is partially inferred** (see §4); the transport, framing, and value encodings
 below are directly observed and solid.
 
@@ -38,9 +38,9 @@ Everything below was validated live against the plugged-in Pro with a ctypes-lib
   (Pro **0x0103** vs MK.2 0x0203; the XLR Dock MK.2 has the MK.2 layout but answers at the
   Pro's 0x0103). MK.2's constants therefore label most Pro fields directly.
 - **Mic gain = block 0x0004 offset 0, value = dB.** Proven bidirectionally: ALSA `numid=3` and
-  vendor off0 track 1:1 (40↔0x28, 65↔0x41, 52↔0x34), reading AND writing either side.
-- **Mic mute = block 0x0004 offset 1, bit 0.** Proven: vendor bit0=1 ⇒ ALSA capture switch off
-  (muted); bit0=0 ⇒ on. Read-modify-write of the block is confirmed non-destructive to audio.
+  vendor off0 track 1:1 (40 = 0x28, 65 = 0x41, 52 = 0x34), reading AND writing either side.
+- **Mic mute = block 0x0004 offset 1, bit 0.** Proven: vendor bit0=1 means ALSA capture switch off
+  (muted); bit0=0 means on. Read-modify-write of the block is confirmed non-destructive to audio.
 - Current device state read live: gain 0x34 (52 dB, matches the Windows config), flags off1=0xd8
   (bits 3,4,6,7 set), HP block `00 00 00 00 50 00 00 00`.
 
@@ -55,7 +55,7 @@ interface, class 0xFF, that has no kernel driver, so no audio-driver detach need
 
 | field          | write            | read             |
 |----------------|------------------|------------------|
-| bmRequestType  | **0x41** (host→dev, vendor, interface) | **0xc1** (dev→host, vendor, interface) |
+| bmRequestType  | **0x41** (host to dev, vendor, interface) | **0xc1** (dev to host, vendor, interface) |
 | bRequest       | **1**            | **1**            |
 | wValue         | **block number** (0x0001…0x0008) | same |
 | wIndex         | **0x0103** (=259; low byte 0x03 = interface 3, high byte 0x01 = unit/entity 1) | same |
@@ -116,8 +116,8 @@ but the exact field/bit split needs one confirming toggle, **LOW** = region know
 
 ### Mic gain in block 0x0004 offset 0, value = gain in dB (HIGH)
 Gain moves gradually only (both the Wave Link UI and the Stream Deck dials drive it as a dial, per
-the user), which is exactly the signature of block 0x0004 **offset 0**: it climbs 0x01→0x3c during
-2:41–3:08, later falls to 0x00, ends 0x33. `0x3c = 60` maps 1:1 to the plan's "gain → 60 dB", so
+the user), which is exactly the signature of block 0x0004 **offset 0**: it climbs 0x01 to 0x3c during
+2:41–3:08, later falls to 0x00, ends 0x33. `0x3c = 60` maps 1:1 to the plan's "gain to 60 dB", so
 **the byte is gain in dB** (range 0x00–0x50 = 0–80, matching the ALSA control's 0–80 dB span).
 Proof it is a control and not a write-counter: when off1/off2/off10 changed, off0 stayed stable in
 65 of 66 writes (a counter would increment every write); off0 moved alone in 100 writes.
@@ -127,32 +127,32 @@ an alternative, not required, for gain.
 
 ### Block 0x0004 offset 1, packed byte of 8 booleans (bit-level decoded)
 Baseline `0xba = 1011_1010`. Flips observed, in order:
-- **bit 0**, toggled on/off/on/off at 3:17–3:24 → **MIC MUTE** (the "do it twice" step). HIGH.
-- **bit 1**, single flip at 3:50 → a mic toggle, **phantom power or low-cut** (first single mic
+- **bit 0**, toggled on/off/on/off at 3:17–3:24: **MIC MUTE** (the "do it twice" step). HIGH.
+- **bit 1**, single flip at 3:50: a mic toggle, **phantom power or low-cut** (first single mic
   toggle after mute). MED.
-- **bit 4**, flips at 4:01 & 4:11 (paired with bit 0) → **ClipGuard or the other of phantom/
+- **bit 4**, flips at 4:01 & 4:11 (paired with bit 0): **ClipGuard or the other of phantom/
   low-cut**. MED.
-- **bit 6**, flip at 8:24 (start of the output/monitor cluster) → **headphone impedance**. MED.
-- **bit 5**, flip at 8:42 → **polarity or mic-output mute**. LOW.
-- **bit 7**, on/off at 8:48–8:49; **bit 3**, on/off at 8:50–8:52 → the remaining output toggles
+- **bit 6**, flip at 8:24 (start of the output/monitor cluster): **headphone impedance**. MED.
+- **bit 5**, flip at 8:42: **polarity or mic-output mute**. LOW.
+- **bit 7**, on/off at 8:48–8:49; **bit 3**, on/off at 8:50–8:52: the remaining output toggles
   (mic-output mute / polarity). LOW.
 
 Early bits (0,1,4) are the **mic** toggles (plan steps 5–13); late bits (3,5,6,7) are the
 **output/monitor** toggles (plan steps 18/21/22). The mic-vs-output split is solid; which bit is
 exactly which within each group is the only soft part.
 
-### Block 0x0004 offset 2, 3-state enum, values 00 / 01 / 05 → **LOW-CUT TYPE / mode** (MED).
-Cycled 01→05→01 at 4:11–4:18 (during the mic-toggle window), consistent with low-cut type.
+### Block 0x0004 offset 2, 3-state enum, values 00 / 01 / 05: **LOW-CUT TYPE / mode** (MED).
+Cycled 01, 05, 01 at 4:11–4:18 (during the mic-toggle window), consistent with low-cut type.
 
 ### Block 0x0005, the two swept faders (framing `[o0] 00 [o2] 00  50 00 00 00`)
-- **offset 0**: swept full-range first, 6:00–6:19 → **HEADPHONE VOLUME** (plan steps 15–17, done
+- **offset 0**: swept full-range first, 6:00–6:19: **HEADPHONE VOLUME** (plan steps 15–17, done
   before monitor blend). MED-HIGH.
-- **offset 2**: swept full-range second, 6:27–6:45 → **MONITOR / DIRECT-MONITOR BLEND** (plan step
+- **offset 2**: swept full-range second, 6:27–6:45: **MONITOR / DIRECT-MONITOR BLEND** (plan step
   19). MED-HIGH.
 - offset 4 constant **0x50**, a third level parked at default (candidate: a second monitor/mic
   level). Range for both faders 0x00–0xf0.
 
-### Block 0x0004 offset 10, one-byte fader, range **0x00–0x64 (0–100 %)**, swept 8:25–8:36 →
+### Block 0x0004 offset 10, one-byte fader, range **0x00–0x64 (0–100 %)**, swept 8:25–8:36:
 **MIC OUTPUT VOLUME** (plan step 20, in the output cluster). MED.
 
 ### Block 0x0001 (108 B), mic channel config + the unremembered extras
@@ -341,3 +341,42 @@ after each phantom write; the hold ends the moment the firmware's own
 unmute shows up in the readback (a 15 s window is only the cap, with a
 2 s grace before the mute is first observed). The UI disables the
 matching mute button and counts the hold down on it.
+
+## 9. The class-request dialect of the original Wave XLR and the XLR Dock
+
+The original Wave XLR (`0fd9:007d`) and the XLR Dock (`0fd9:00a6`) do not
+speak the block bank above. Their backends use the class-request dialect
+the openwave project documented, with wIndex naming interface 3:
+
+| field         | write  | read   |
+|---------------|--------|--------|
+| bmRequestType | 0x21   | 0xA1   |
+| bRequest      | 0x05   | 0x85   |
+| wValue        | block  | block  |
+| wIndex        | 0x3303 | 0x3303 |
+
+wIndex 0x3303 rather than 0x3300 bypasses the kernel's ownership check
+for interface 0, which snd-usb-audio holds; the firmware validates only
+the 0x33 prefix. Block 0x0000 is the config block, read and written whole
+(34 bytes on the Wave XLR, 64 on the dock). Block 0x000A is a 51-byte
+device info record carrying the unit's USB serial in ASCII from offset
+35. The config block layout the code uses on both devices:
+
+| offset | field | encoding |
+|---|---|---|
+| 0 | gain | u16 little-endian, Q8.8 dB (256 raw units per dB), written 0 to 75 dB |
+| 4 | mute | byte, nonzero = muted |
+| 6 | phantom 48V | byte, 0x01 = on |
+| 9 | headphone volume | int16 little-endian, Q8.8 dB, -60 to 0 dB |
+| 33 | low impedance | byte, 0x01 = on |
+
+On the XLR Dock the kernel also exposes gain (`Mic Capture Volume`, 0 to
+150 for 0 to 75 dB), mute (`Mic Capture Switch`) and headphone volume
+(`PCM Playback Volume`, 0 to 120 for -60 to 0 dB) as ALSA controls backed
+by the same registers. The dock backend lists the card's controls at
+connect and drives each of the three through its ALSA control when the
+card has it, else through the block field above, one path per control:
+the kernel caches feature unit values and does not re-read them, so a
+block write behind ALSA's back would leave the two disagreeing. An ALSA
+write shows up in the block at once. Phantom power and low impedance
+have no ALSA control and always go through the block.

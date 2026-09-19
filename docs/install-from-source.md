@@ -2,8 +2,10 @@
 
 ## Requirements
 
-- Linux with PipeWire, `pipewire-pulse`
-  and WirePlumber; `pactl`, `pw-cli`, `pw-link`, `pw-dump`, `parec`, `wpctl` and `amixer` on PATH
+- Linux with PipeWire, `pipewire-pulse` and WirePlumber; `pactl`,
+  `pw-cli`, `pw-link`, `pw-dump`, `parec`, `wpctl` and `amixer` on PATH
+- `gdbus` (the GLib command-line tools) for focused application routing
+  from desktop and Deck keys; `xdg-open` for the links the window opens
 - `swh-plugins` (LADSPA) for the software ClipGuard; everything else
   works without it
 - `lilv` for LV2 discovery and compatible LV2, CLAP or VST3 plugins
@@ -29,18 +31,18 @@ The native editor tests additionally use Xvfb and xauth.
 
 ```sh
 # Arch
-sudo pacman -S --needed dotnet-sdk aspnet-runtime pipewire pipewire-pulse wireplumber libusb libpulse alsa-utils
+sudo pacman -S --needed dotnet-sdk aspnet-runtime pipewire pipewire-pulse wireplumber libusb libpulse alsa-utils glib2 xdg-utils
 # optional: software ClipGuard for the XLR Dock, and LV2 plugins for inserts
 sudo pacman -S --needed swh-plugins lilv lsp-plugins-lv2
 # native host and editor test dependencies
 sudo pacman -S --needed base-devel lv2 libx11 xorg-server-xvfb xorg-xauth
 
 # Fedora
-sudo dnf install dotnet-sdk-10.0 aspnetcore-runtime-10.0 pipewire pipewire-pulseaudio wireplumber libusb1 pulseaudio-utils alsa-utils ladspa-swh-plugins lilv-libs lsp-plugins-lv2
+sudo dnf install dotnet-sdk-10.0 aspnetcore-runtime-10.0 pipewire pipewire-pulseaudio wireplumber libusb1 pulseaudio-utils alsa-utils glib2 xdg-utils ladspa-swh-plugins lilv-libs lsp-plugins-lv2
 sudo dnf install gcc-c++ make pkgconf-pkg-config pipewire-devel lilv-devel lv2-devel libX11-devel xorg-x11-server-Xvfb xorg-x11-xauth
 
 # Debian / Ubuntu (dotnet from Microsoft's feed if the distro lacks 10.0)
-sudo apt install dotnet-sdk-10.0 aspnetcore-runtime-10.0 pipewire pipewire-pulse wireplumber libusb-1.0-0 pulseaudio-utils alsa-utils swh-plugins liblilv-0-0 lsp-plugins-lv2
+sudo apt install dotnet-sdk-10.0 aspnetcore-runtime-10.0 pipewire pipewire-pulse wireplumber libusb-1.0-0 pulseaudio-utils alsa-utils libglib2.0-bin xdg-utils swh-plugins liblilv-0-0 lsp-plugins-lv2
 sudo apt install build-essential pkg-config libpipewire-0.3-dev liblilv-dev lv2-dev libx11-dev xvfb xauth
 ```
 
@@ -80,13 +82,14 @@ Replug the interface after reloading the rules.
 
 ## 4. WirePlumber rules
 
-XLR Dock owners need one more file. The Linux kernel starves the dock's
-capture endpoint whenever playback to it starts before capture, and the
-mic then records pure silence (Windows schedules the same duplex fine;
-the kernel also logs "bad transfer trb length" warnings from the dock's
-malformed feedback endpoint). The original Wave XLR has the same
-ordering bug. WirePlumber rules keep both capture sources always active,
-so playback can never come first:
+XLR Dock and original Wave XLR owners need one more file. The Linux
+kernel starves the dock's capture endpoint whenever playback to it starts
+before capture, and the mic then records pure silence (Windows schedules
+the same duplex fine; the kernel also logs "bad transfer trb length"
+warnings from the dock's malformed feedback endpoint). The original Wave
+XLR (MK.1) has the same ordering bug over its full-speed USB link.
+WirePlumber rules keep both capture sources always active, so playback
+can never come first:
 
 ```sh
 mkdir -p ~/.config/wireplumber/wireplumber.conf.d
@@ -97,9 +100,10 @@ systemctl --user restart wireplumber
 ```
 
 The raw-name rule gives the Pro's multichannel nodes readable descriptions
-in desktop audio settings. It does not change their routing identities. Both files match only their target hardware, so they can be
-installed together on any supported setup. These
-`.conf` rules use WirePlumber 0.5 syntax.
+in desktop audio settings. It does not change their routing identities.
+Each of the three files matches only its target hardware, so they can be
+installed together on any supported setup, which is what the packages do.
+These `.conf` rules use WirePlumber 0.5 syntax.
 
 ## 5. First run
 

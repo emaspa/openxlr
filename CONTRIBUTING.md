@@ -40,9 +40,9 @@ tools/check-locked-restore.sh                   # every packaging path restores 
 tools/check-openapi.py docs/openapi-v1.json     # the HTTP API document keeps its shape
 tools/check-spec.py packaging/rpm/openxlr.spec  # every installed file is in %files
 make -C native  # C/C++, PipeWire, lilv, LV2 and X11 development headers
-make -C native test-audio test-clap test-vst3  # audio bounds, stall detection, CLAP bus layouts and VST3 parameter and stream checks
+make -C native test-audio test-clap test-vst3 test-scan  # audio bounds, stall detection, CLAP bus layouts, VST3 parameter and stream checks, scan phase markers
 dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~Lv2BundleTests  # run with lilv installed, even if the earlier suite ran without it
-python3 tools/test-monitor-volume.py  # private PipeWire server; pipewire-pulse, wireplumber, pactl
+python3 tools/test-monitor-volume.py  # private PipeWire server and session bus; pipewire-pulse, wireplumber, pactl, dbus-daemon
 xvfb-run -a make -C native test-editor  # also needs Xvfb and xauth
 OPENXLR_TEST_DESKTOP=1 xvfb-run -a dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~TrayWindowTests
 OPENXLR_TEST_LAYOUT=1 xvfb-run -a -s '-screen 0 2560x1440x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~WindowLayoutTests
@@ -56,6 +56,11 @@ so a 1 kHz sine summed from Monitor A and B reads below the expected level
 although each leg's gain is right. With DC the sum does not depend on that
 delay. The test measures the settled part of the capture and the peak of
 the whole capture; it does not measure frequency response.
+
+The desktop keys tests in the main suite start a private session bus with
+`dbus-daemon` and skip when it is not installed. `OPENXLR_TEST_KWIN=1` adds
+a check that asks a running KDE Plasma session for its focused process; it
+routes no audio and is not part of CI.
 
 The private PipeWire runner also checks profile startup ordering. To exercise
 ClipGuard with recorded test audio, low cut and a native LSP gate, run
@@ -131,7 +136,8 @@ checks as a pull request.
   field goes into [docs/api.md](docs/api.md) (and
   [docs/http-api.md](docs/http-api.md) when the HTTP transport is
   affected, [docs/mixer-layout.md](docs/mixer-layout.md) for the layout
-  file and its commands); user-facing behaviour into
+  file and its commands, [docs/skins.md](docs/skins.md) for appearance
+  values and the skin format); user-facing behaviour into
   [docs/manual.md](docs/manual.md) and, when it is a feature,
   [docs/features.md](docs/features.md). Tests live in
   `src/OpenXLR.Tests` (xUnit) and `plugin/tests` (Node's test runner).
@@ -166,9 +172,22 @@ brief an agent should read before working on the tree.
 - Commands are validated in `CommandValidation` before the mixer sees
   them; a new command needs an entry there, in the hub's dispatch, in
   the API doc, and in whichever client uses it.
-- Tests that redirect `XDG_CONFIG_HOME` or `XDG_RUNTIME_DIR` join the
-  xUnit collection `xdg-config`, so they never run in parallel with
-  each other.
+- Tests that redirect `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_DATA_DIRS`
+  or `XDG_RUNTIME_DIR` join the xUnit collection `xdg-config`, so they
+  never run in parallel with each other.
+- A test that needs a fake helper program builds it with
+  `ExecutableScript.Write`. A program the test process wrote itself
+  cannot be run while other test classes start helpers: the write handle
+  reaches their forked children and Linux answers exec with "Text file
+  busy".
+- The window holds no colour, font size or corner radius of its own. A
+  new surface reads an `Ox.*` resource with `DynamicResource`, and a new
+  value is added to `src/OpenXLR.UI/Skinning/SkinTokens.cs`, then to its
+  table in [docs/skins.md](docs/skins.md) and to
+  [docs/skin.schema.json](docs/skin.schema.json); `SkinDocumentTests`
+  holds the three together. A control appearance a skin can choose is an
+  entry in `src/OpenXLR.UI/Skinning/SkinControls.cs` and a control theme
+  in `Skinning/Controls.axaml`.
 - Prose in docs, comments and messages: plain sentences, no em dashes.
 
 ## License

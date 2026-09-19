@@ -36,6 +36,14 @@ fixed-size editors and plugin-driven scaling, the Wine coordinate nudge
 and display cleanup. Real plugin repainting and mouse input still need
 desktop testing.
 
+`make -C native test-audio` checks the audio thread's two safety rules
+without a graph: a cycle the fixed buffers cannot carry is refused before
+anything is written, and a plugin stuck inside one process call is told
+apart from a node that has no work. `make -C native test-clap` checks the
+CLAP port layout against fake plugins that declare more buses than the
+chain uses, and that the scanner and the loader agree about which layouts
+can be carried. Neither needs PipeWire, a display or an installed plugin.
+
 `make -C native test-vst3` checks VST3 parameter queue indices, attribute
 identifiers and buffers, and the component-state memory stream. Invalid
 lengths, seek modes and arithmetic overflow are rejected without changing

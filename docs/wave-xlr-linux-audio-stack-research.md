@@ -34,7 +34,7 @@ driver work.
   adding a Wave Link style submixer (Personal, Chat and Record mixes,
   virtual microphones, source groups, meters) built from PipeWire null
   sinks and one `pw-loopback` per mix, plus a Wave XLR MK.2 backend
-  (`0fd9:00b6`, standard class requests, `wIndex=0x0203`). Its MK.2
+  (`0fd9:00b6`, vendor requests, `wIndex=0x0203`). Its MK.2
   pull request to upstream was closed unmerged (2026-06-25). Its README
   install instructions pointed at upstream, so following them installed
   the version without the mixer.

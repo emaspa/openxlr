@@ -26,8 +26,8 @@ current `main`; for a released build, read the docs at its release tag.
 Changes merged after a release are available from source until the next release.
 
 Elgato ships no Linux software. These devices expose class-compliant USB
-audio; OpenXLR also supplies device-specific configuration, including a
-WirePlumber workaround for XLR Dock capture.
+audio; OpenXLR also supplies device-specific configuration, including
+WirePlumber rules that keep XLR Dock and original Wave XLR capture alive.
 Controls beyond standard USB audio use device-specific protocols, decoded
 from Wave Link USB captures and prior open-source protocol work. OpenXLR
 uses those mappings alongside ALSA controls where available.
@@ -60,23 +60,26 @@ Collect diagnostics).
   ClipGuard, compressor, aux input level and lock, two headphone
   volumes with low-impedance mode, the mic/PC crossfade, and the
   physical output routing (HP1, HP2, Line Out, USB Aux). The other
-  devices expose the subset their protocol has; see the table above.
+  devices expose the subset their protocol has; see the table above. An
+  XLR Dock whose kernel driver lacks a gain, mute or headphone control
+  gets that control through the dock's config block instead.
   Where a hardware low cut or ClipGuard control is unavailable, OpenXLR
   offers software processing in PipeWire. Gain lock is a daemon policy
   for devices without physical gain controls. Hardware EQ, ducking, mix
   maximizer and channel booster are not exposed; plugin effects run on
   the computer, separate from the device's onboard processing.
 - **Submixer** built from PipeWire nodes (null sinks, remap sources,
-  filter chains), no kernel modules. Channels for the hardware inputs
-  and for application groups; mixes for what you hear (Monitor A and
-  Monitor B, each output choosing one of the two or both summed), for
-  virtual microphones other apps record from, and for the USB Aux port.
-  The default layout is Game, Music, Browser, System, Voice Chat and
-  SFX with Stream and Chat microphones; channels and microphones can be
-  added, renamed, reordered and removed while audio plays, from the
-  window or the API. Per-send levels and mutes, level meters, the
-  monitor mixes on several outputs at once, and an optional boost that
-  takes the monitor volume to 150%.
+  filter chains), no kernel modules. Channels for the hardware inputs,
+  for application groups and for other PipeWire capture sources (a
+  second microphone, a headset, a capture card); mixes for what you hear
+  (Monitor A and Monitor B), for virtual microphones other apps record
+  from, and for the USB Aux port. Any mix feeds any selected output,
+  with its own level per route. The default layout is Game, Music,
+  Browser, System, Voice Chat and SFX with Stream and Chat microphones;
+  channels and microphones can be added, renamed, reordered and removed
+  while audio plays, from the window or the API. Per-send levels and
+  mutes, level meters, the monitor mixes on several outputs at once, and
+  an optional boost that takes the monitor volume to 150%.
 - **Inserts**: LV2, CLAP and VST3 plugin chains on each XLR input and each mix, with a
   plugin picker, generated controls, bypass and native plugin editors.
   Input chains use mono effects; mix chains use stereo effects. VST3 discovery
@@ -100,6 +103,8 @@ Collect diagnostics).
   binary rather than the "Chromium" name they report. Missing stream
   metadata falls back to the owning client, and Windows executable names
   share an identity with their Wine/Proton client so saved routing persists.
+  A desktop shortcut or a Stream Deck key routes the application that has
+  the focus to a channel.
 - **Profiles**: named scenes holding the hardware settings and the
   whole submix (levels, mutes, outputs, insert chains), saved per device
   and recalled from the UI, the API or a Stream Deck key. One profile
@@ -108,17 +113,24 @@ Collect diagnostics).
   last settings on the original Wave XLR and first XLR Dock without a
   profile, with a reset to the defaults recorded after a power cycle.
 - **OpenDeck plugin**: key and dial actions for every switch, mute,
-  level and insert, rendered with level meters and status LEDs. It is a
-  client of the daemon's API, so it reflects changes made in the UI or
-  on the hardware.
+  level, insert and output, rendered with level meters and status LEDs,
+  plus output volume and mute keys, the system output switch and
+  focused-application routing. It is a client of the daemon's API, so it
+  reflects changes made in the UI or on the hardware; a dial turn leads
+  locally, so the daemon's echo never pulls the dial back mid-turn.
 - **Daemon and UI**: the daemon owns the device and the graph, keeps
-  running with the window closed, re-asserts the chosen default sink
-  and source once a second, and serves a WebSocket API and a versioned
-  HTTP API (`/api/v1`) on 127.0.0.1:37890. The UI has a Flow window with
-  selectable signal paths through inputs, channels, mixes and outputs,
-  a tray icon and a diagnostics archive exporter. Options separates background
-  audio and app startup at login, with independent choices for launch visibility
-  and whether closing the window keeps the app in the tray or quits.
+  running with the window closed, follows the PipeWire registry through
+  one subscription, re-asserts the chosen default sink and source once a
+  second, and serves a WebSocket API and a versioned HTTP API (`/api/v1`)
+  on 127.0.0.1:37890. The UI has a Flow window with selectable signal
+  paths through inputs, channels, mixes and outputs, a tray icon and a
+  diagnostics archive exporter. It also owns the desktop keys: global
+  shortcuts registered through the desktop portal that route the focused
+  application, step an output's volume, toggle its mute or switch the
+  system output, active while the window sits in the tray. Options
+  separates background audio and app startup at login, with independent
+  choices for launch visibility and whether closing the window keeps the
+  app in the tray or quits.
 - **Skins**: the window's appearance is a set of named values a skin file
   can replace. OpenXLR ships Material, its own look, and Deck, which dresses
   the window in the visual language of the OpenDeck plugin's keys and dials. A skin
@@ -214,7 +226,10 @@ install-from-file, or copy the folder the package puts in
 `/usr/share/openxlr/` into `~/.config/opendeck/plugins/`. Inserts show
 compatible LV2, CLAP and VST3 plugins (`lsp-plugins-lv2` is the set used
 during development); the software ClipGuard for the XLR Dock needs
-`swh-plugins`. The NixOS module wires both up itself. The packages also
+`swh-plugins`. The NixOS module wires both up itself. Focused-application
+routing asks the window over D-Bus with `gdbus` from the GLib command-line
+tools (`glib2` on Arch and Fedora, `libglib2.0-bin` on Ubuntu), which the
+packages depend on. The packages also
 raise pipewire-pulse's open-file limit with a systemd drop-in, which
 applies at the next login or after `systemctl --user restart
 pipewire-pulse`; a source install needs the same file before growing the
@@ -222,8 +237,9 @@ layout ([manual: open-file limit](docs/manual.md#open-files)).
 
 ### Build from source
 
-Needs the .NET 10 SDK, PipeWire tools, libusb, lilv, a C/C++ compiler
-and the native host's development headers. Install the prerequisites in
+Needs the .NET 10 SDK, PipeWire tools, libusb, lilv, the GLib
+command-line tools, a C/C++ compiler and the native host's development
+headers. Install the prerequisites in
 [the source guide](docs/install-from-source.md) first. From the repository root:
 
 ```sh

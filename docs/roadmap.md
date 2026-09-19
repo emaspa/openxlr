@@ -24,10 +24,12 @@ This is what 0.1.41 ships. A checked item is in the released packages.
   default) and Aux; an editable layout (channels and microphones added,
   renamed, reordered and removed live from the window's layout editor
   or the API, every change saved before it is acknowledged); monitoring
-  on several outputs with each output choosing which monitor mix feeds it,
-  the USB Aux port as a second computer's feed, live meters, profiles,
-  one profile per device recalled on connect, Wave XLR and the first XLR Dock
-  restored to their last settings on connect with a
+  on several outputs with each output choosing which mixes feed it, any
+  mix sent to any output with a level per route, the enforced default
+  output chosen from the window or a key, any PipeWire capture source as
+  an input channel, the USB Aux port as a second computer's feed, live
+  meters, profiles, one profile per device recalled on connect, Wave XLR
+  and the first XLR Dock restored to their last settings on connect with a
   reset to firmware defaults, and an app can be left to the desktop's
   own routing.
 - [x] Software low cut and limiting where the backend does not expose
@@ -41,17 +43,32 @@ This is what 0.1.41 ships. A checked item is in the released packages.
 - [x] Flow window: four routing columns, selectable signal paths,
   processing inside cards and automatic initial sizing.
 - [x] OpenDeck plugin: dials and keys drawn like the hardware, profile
-  keys, insert keys and dials, monitor feed keys.
+  keys, insert keys and dials, monitor feed keys, output volume and mute
+  keys and dials, a main-output switch, and a key that routes the
+  focused application to a channel. A dial turn moves the strip at once
+  and the commands are coalesced, so a fast turn lands every tick.
+- [x] Desktop shortcuts: the same actions bound to global keys through
+  the desktop portal, so they work on Wayland; the focused application
+  is asked from KWin, so focused routing is KDE Plasma only today, and
+  matched to its PipeWire client.
 - [x] Packages: AUR, Debian/Ubuntu, Fedora, NixOS flake and module.
 - [x] Daemon recovery basics: fast shutdown, busy-port wait, self-healing
-  input feeds, UCM coexistence on the Pro, a rebuild after a
-  pipewire-pulse restart, and a refusal to grow the layout past
-  pipewire-pulse's open-file headroom (the packages raise that limit).
+  input and capture feeds, UCM coexistence on the Pro, a rebuild after a
+  pipewire-pulse restart, a refusal to grow the layout past
+  pipewire-pulse's open-file headroom (the packages raise that limit), a
+  read backoff for a device that opens but fails every read, and the
+  default sink and source snapshot taken before any service touches the
+  card.
+- [x] Device access: the USB vendor interface is claimed before
+  control transfers, the original Wave XLR keeps its capture node running
+  so a playback stream cannot silence the microphone, and an XLR Dock
+  whose card lacks a mixer control is driven through its config block.
 - [x] Control API hygiene: commands validated before the mixer, per-client
   command budget, connection cap, foreign browser origins refused.
-- [x] Daemon memory: workstation GC under a hard limit, one graph dump
-  per sweep; channels and virtual microphones visible in desktop audio
-  applets; LV2 plugins gated on the chain host's features.
+- [x] Daemon memory: workstation GC under a hard limit, an incremental
+  PipeWire registry kept from one monitoring subscription with a one-shot
+  dump while it reconnects; channels and virtual microphones visible in
+  desktop audio applets; LV2 plugins gated on the chain host's features.
 
 ## Next: mixer layout and customization
 
@@ -79,15 +96,20 @@ few releases, and they get to settle in users' hands first.
   hide a channel without deleting its routing, a compact layout that
   keeps one selected channel visible. Icons and colours also reach the
   Stream Deck keys.
-- [ ] Listen to any mix: an output can already follow Monitor A or
-  Monitor B; letting it follow Stream, Chat or Aux as well is the rest.
-- [ ] Many-to-many mix-to-output matrix: two monitor mixes with
-  per-output feeds cover the common case (a headset with a game side and
-  a chat side). The general form, any mix to any output with a level per
-  route, the way Wave Link 3 does it, comes after the layout work.
-- [ ] Any PipeWire capture source as an input channel (a second
-  microphone, a capture card, a headset), and inputs from more than one
-  attached Wave interface at once.
+- [x] Listen to any mix: an output follows any mix in the layout, Stream,
+  Chat and Aux included, not only Monitor A and Monitor B.
+- [x] Many-to-many mix-to-output matrix: any mix to any output with a
+  level per route, the way Wave Link 3 does it. Route levels survive
+  profile recall, deletion and reconnect, and the matrix nodes stay out
+  of the output choices.
+- [x] Any PipeWire capture source as an input channel: a second
+  microphone, a capture card or a headset bound by node name and channel
+  pair, healed by the sweep when the device returns. A capture channel
+  is edited like an application channel but takes no application
+  assignments.
+- [ ] Inputs from more than one attached Wave interface at once. The
+  daemon drives one interface today; a second one is reachable only as a
+  capture source.
 
 ## Next: appearance
 
@@ -177,14 +199,20 @@ while fixes to existing hosts remain part of normal maintenance.
   over HTTP on the session token, with an OpenAPI document, next to the
   WebSocket the window and the OpenDeck plugin use
   ([docs/http-api.md](http-api.md)).
-- [ ] Route the focused application to a channel from a key, with a
-  portal-based approach that works on Wayland.
-- [ ] Generic PipeWire output volume and mute keys, and a main-output
-  switch tied to the enforced default sink.
-- [ ] Graph discovery without polling: the sweep parses a 2 MB pw-dump
-  every second; the daemon should subscribe to registry events (pw-mon,
-  or libpipewire directly) and keep an incremental view, which is what
-  finally brings its memory and CPU to what a control daemon should use.
+- [x] Route the focused application to a channel from a key: the window
+  registers global shortcuts through the desktop portal and asks KWin for
+  the focused window, and the daemon resolves that process to one
+  PipeWire client, refusing to guess when several match. Other
+  compositors need a focus source of their own before the key works
+  there.
+- [x] Generic PipeWire output volume and mute keys, and a main-output
+  switch tied to the enforced default sink, from the window, the desktop
+  keys and the Deck.
+- [x] Graph discovery without polling: the daemon subscribes to the
+  registry through one monitoring dump and keeps an incremental view, so
+  a sweep reads a snapshot instead of parsing a fresh dump. While the
+  subscription reconnects a one-shot dump keeps routing and default
+  enforcement running.
 - [x] Client authentication for the control API: a per-session token the
   daemon writes at start, presented by every client, on top of the
   origin check. Still open: binding the API to a Unix socket with peer

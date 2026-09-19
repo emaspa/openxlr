@@ -50,7 +50,7 @@ scheme. Do the USBPcap pass first regardless.
 
 1. Open Wireshark. In the capture-interface list you'll see `USBPcapN` entries, one per USB
    root hub. You need the one the Pro is under.
-2. To find it: open **Device Manager → View → Devices by connection**, expand the USB host
+2. To find it: open **Device Manager, View, Devices by connection**, expand the USB host
    controllers, and locate "Elgato Wave XLR Pro" (or its audio/vendor child nodes). Note which
    host controller / root hub it hangs off. Match that to the USBPcap interface, in Wireshark's
    capture options, hovering a `USBPcapN` interface lists the devices under it; pick the one
@@ -108,15 +108,15 @@ cadence. Save as `session1-init.pcapng`.
 
 1. **Quit Wave Link completely** (check the tray, fully exit, don't just close the window).
 2. Start the Wireshark capture on the Pro's USBPcap interface.
-3. Log `START`. **Unplug the Pro, wait 3 s, replug it.** → clean enumeration (descriptors).
-4. Wait **30 s** doing nothing. Log `idle, WaveLink closed`. → shows if anything polls the
+3. Log `START`. **Unplug the Pro, wait 3 s, replug it.** Result: clean enumeration (descriptors).
+4. Wait **30 s** doing nothing. Log `idle, WaveLink closed`. Result: shows if anything polls the
    device without Wave Link (probably not, but we want to know the true baseline).
 5. **Launch Wave Link.** Wait until the Pro appears in its UI and settles. Log `WaveLink
-   launched`. → this window contains the **init / handshake sequence**, the crown jewel.
-6. Touch nothing for **60 s**. Log `idle, WaveLink running`. → reveals keepalive / poll cadence
+   launched`. Result: this window contains the **init / handshake sequence**, the crown jewel.
+6. Touch nothing for **60 s**. Log `idle, WaveLink running`. Result: reveals keepalive / poll cadence
    (or confirms it's silent). This matters because upstream OpenWave holds the capture stream
    open to dodge a firmware silence race; we need to see if the Pro needs periodic pokes.
-7. **Quit Wave Link cleanly.** Log `WaveLink quit`. → any teardown/release commands.
+7. **Quit Wave Link cleanly.** Log `WaveLink quit`. Result: any teardown/release commands.
 8. Stop the capture. Save. Note the device address you saw at enumeration.
 
 ---
@@ -127,10 +127,10 @@ Wave Link running. Save as `session2-controls.pcapng`. Do each in order, exact v
 apart, one log line each. If a control isn't present in Wave Link for the Pro, note "N/A" and
 move on.
 
-1. Mic gain → **10 dB** (log the starting value first).
-2. Mic gain → **20 dB**.
-3. Mic gain → **40 dB**.
-4. Mic gain → **60 dB**. (Four distinct values reveal whether encoding is dB-linear like the
+1. Mic gain to **10 dB** (log the starting value first).
+2. Mic gain to **20 dB**.
+3. Mic gain to **40 dB**.
+4. Mic gain to **60 dB**. (Four distinct values reveal whether encoding is dB-linear like the
    ALSA capture-volume control, or a raw index.)
 5. Mic **mute** on. 6. Mic mute off. (Do it twice: on, off, on, off, confirms the toggle is
    stateless-per-write vs a toggle command.)
@@ -138,20 +138,20 @@ move on.
 9. **Low-cut** on. 10. Low-cut off. 11. Low-cut **type** change if the Pro exposes more than one.
 12. **ClipGuard** on. 13. ClipGuard off, then **back on** and leave it on for the next step.
 14. **Talk into the mic loudly enough to trigger ClipGuard / clip the preamp for ~10 s**, then
-    speak normally ~20 s. Log `speaking loud (clipguard)` / `speaking normal`. → THIS is the test
+    speak normally ~20 s. Log `speaking loud (clipguard)` / `speaking normal`. Result: THIS is the test
     for what the 6-byte interrupt IN endpoint carries: if it streams metering / clip /
     gain-reduction notifications, this is when they appear. Watch `usb.transfer_type == 0x01`.
     (This is the one moment sustained input is deliberate, not noise.)
-15. **Headphone volume** → 25%. 16. → 50%. 17. → 100%.
-18. **Headphone impedance / low-impedance mode** toggle (high → low → high).
+15. **Headphone volume** to 25%. 16. To 50%. 17. To 100%.
+18. **Headphone impedance / low-impedance mode** toggle (high, low, high).
 19. **Monitor blend / direct-monitor volume**: move it in ~4 discrete steps from one end to the
-    other (e.g. 0% → 33% → 66% → 100%), ~5 s each. Log each step. → resolves the open question of
+    other (e.g. 0%, 33%, 66%, 100%), ~5 s each. Log each step. Result: resolves the open question of
     whether the zero-latency monitor blend is exposed as a vendor command or only in DSP.
-20. **Mic output volume** (the "Microphone Output Volume" in your config) → a couple of distinct
+20. **Mic output volume** (the "Microphone Output Volume" in your config) to a couple of distinct
     values. 21. **Mic output mute** on/off.
 22. **Polarity / polarization** toggle if present.
 23. (Optional confirmation) Change mic gain once **from the Stream Deck dial** instead of the
-    Wave Link UI. Log it. → the bytes should be identical to step 1–4, confirming the Stream Deck
+    Wave Link UI. Log it. Result: the bytes should be identical to step 1–4, confirming the Stream Deck
     just drives Wave Link and there's no separate path. This is the one time re-enabling the
     Stream Deck app during capture is worth the noise.
 24. Stop capture, save.
@@ -162,7 +162,7 @@ move on.
 
 Wave Link running. Save as `session3-edge.pcapng`.
 
-1. With Wave Link open, **unplug the Pro, wait 5 s, replug**. Log it. → the reconnect/re-init
+1. With Wave Link open, **unplug the Pro, wait 5 s, replug**. Log it. Result: the reconnect/re-init
    path (differs from cold start in step 5 of Session 1; a Linux backend needs both).
 2. If Wave Link exposes **hardware submix routing** for the Pro (the teardown showed
    `EWLWHardwareMixerHelperWaveXLRPro` / `SoftwareMixerHelper`, the Pro may do on-device
@@ -202,7 +202,7 @@ Copy to a location readable from Linux:
 Analysis steps on Linux:
 1. Extract every vendor/class SETUP packet + data payload, aligned to your log timestamps.
 2. Decode the request scheme (bmRequestType / bRequest / wValue / wIndex layout, is it the
-   MK.1 0x3303 trick, the MK.2 0x0203 standard-class scheme, or new) and the value encodings.
+   MK.1 0x3303 trick, the MK.2 0x0203 vendor scheme, or new) and the value encodings.
 3. Identify the init sequence and any keepalive.
 4. Determine what the interrupt endpoint carries (from the speaking/clip test).
 5. Write the `0x00b4` backend against that.

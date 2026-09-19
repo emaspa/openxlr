@@ -4,6 +4,8 @@
 flowchart TD
     UI["Avalonia UI / OpenDeck"] -->|"authenticated WebSocket"| Daemon["OpenXLR daemon"]
     Scripts["Scripts / tools"] -->|"authenticated HTTP or WebSocket"| Daemon
+    UI -->|"D-Bus"| Desktop["Desktop portal: global shortcuts; KWin: focused process"]
+    Daemon -->|"gdbus: focused process"| UI
     Daemon --> Core["Core: device control, mixer, profiles"]
     Core --> USB["USB helper: libusb vendor transfers"]
     Core --> ALSA["amixer: first XLR Dock controls"]
@@ -16,15 +18,27 @@ flowchart TD
 
 - `OpenXLR.Daemon` owns the device and graph. It polls hardware, maintains
   the mixer, routes application streams and broadcasts state to clients.
-  The WebSocket endpoints and HTTP API share one dispatcher on
-  `127.0.0.1:37890`. Clients authenticate with a private per-run token;
-  browser Origins, command sizes and rates are checked as well.
+  The process reads the system default sink and source at the top of
+  `Main`, before any hosted service, since connecting the device switches
+  the card's profile and WirePlumber then moves the defaults to the new
+  nodes; the hosted services start in the order watchdog, device manager,
+  mixer service. The content root is the install directory, whatever the
+  working directory. The WebSocket endpoints and HTTP API share one
+  dispatcher on `127.0.0.1:37890`. Clients authenticate with a private
+  per-run token; browser Origins, command sizes and rates are checked as
+  well.
 - `OpenXLR.UI` is an Avalonia client with no Core assembly dependency. It
   parses state and sends commands. It also manages local window preferences,
   autostart and the daemon service, collects diagnostics, and optionally
   checks GitHub releases. Closing it leaves audio running. Its Flow window
   builds a four-column view from state; selecting a path changes only
-  the visualization.
+  the visualization. The window also owns the desktop keys: it registers
+  shortcuts through the `org.freedesktop.portal.GlobalShortcuts` portal on
+  a private session-bus connection and turns a press into a daemon
+  command, while hidden in the tray as well. For focused-application
+  routing it serves `org.openxlr.Desktop` on that bus; a short-lived KWin
+  script reports the focused process id back, and the daemon asks the
+  window for it with `gdbus`, one request at a time.
 - The OpenDeck plugin is an OpenAction plugin in OpenDeck's Node runtime,
   using the same authenticated API and live choices as the window.
 - `OpenXLR.Core` contains device backends, the PipeWire adapter, mixer,
@@ -86,8 +100,20 @@ modules or custom drivers:
   wired by capture-channel pair (XLR 1 = pair 0, XLR 2 = pair 1, Line
   In/USB Aux = pair 2); the Aux mix feeds the device's aux return pair
   so the hardware forwards it to the USB Aux port.
-- `pw-dump` reads the graph, once per sweep and parsed straight from
-  its bytes; `wpctl` sets card profiles (parking the Pro on pro-audio) and
+- The output matrix links each mix to each selected output. A route at
+  full level is a direct port link from the mix's monitor; a lower level
+  runs through a hidden null sink (`OpenXLR_route_<hash>_<mix>`) whose
+  volume is the route gain, changed in place without touching other
+  routes. Outputs on one hardware bus share one route identity. A
+  capture channel is linked from its source node by pair offset, both
+  sides of a mono source, and only a complete link counts as healthy.
+- The daemon follows the graph through one `pw-dump --monitor`
+  subscription, held in an incremental snapshot keyed by object id and
+  bounded at 8 MiB. A disconnect discards every object before an id can
+  be reused and reconnects with a delay growing from 250 ms to 5 s;
+  while it reconnects, a one-shot `pw-dump` cached for 400 ms serves the
+  sweep, and standalone tools use that path alone. `wpctl` sets card
+  profiles (parking the Pro on pro-audio) and
   send-leg volumes; `pactl` sets sink, source and application-stream
   volumes and mutes; `pw-cli set-param` sets filter-chain controls; and
   `parec` on the sinks' monitors feeds the level meters. Helpers run in the C locale, since `pactl`'s output is parsed
@@ -125,7 +151,11 @@ names and Wine/Proton executable names are normalized before looking up
 routing rules and saved overrides. On loading legacy aliases, an existing
 canonical override wins. Assigning or forgetting an app uses the same key.
 Pre-assignments from desktop launchers remain best-effort when the running
-application reports a different identity.
+application reports a different identity. A focused-application request
+carries a process id, resolved against the daemon's live audio clients,
+directly or through a client's parent chain, and never guessed from a
+window title; an id that matches no client, or several identities, is
+refused.
 
 ## The device protocols
 
@@ -145,13 +175,19 @@ controls, all reached without detaching the kernel's audio driver:
   documented by the openwave project. The dock answers it too, which is
   how it gained phantom power (config byte 6) and low impedance (byte
   33); its everyday controls (gain, mute, headphone volume) go through
-  the kernel's standard ALSA controls with `amixer`, and its DSP is
-  provided host-side by the submixer
+  the kernel's standard ALSA controls with `amixer` when the kernel
+  created them, and through the block (gain word at 0, mute byte 4,
+  headphone word at 9) when it did not: a unit whose firmware answers the
+  capture volume's range query badly loses that ALSA control. Each
+  control takes one path only, since the kernel caches feature-unit
+  values. Its DSP is provided host-side by the submixer
 
 libusb never runs inside the daemon: a helper process (the daemon
 binary started with `--usb-helper`) owns it and answers open, close and
 control-transfer requests over length-prefixed frames on its stdin and
-stdout. Every transfer runs under a watchdog (the libusb timeout plus
+stdout. The helper claims the vendor interface when it opens the device
+and releases it on close; a claim that fails counts as the device not
+opened. Every transfer runs under a watchdog (the libusb timeout plus
 3 s); one that never returns is reported, the helper is killed so the
 operating system reclaims the stuck thread and the device handle, the
 device is dropped and reconnected through a fresh helper, and the
@@ -160,7 +196,8 @@ the daemon sets it aside instead of retrying. A helper whose device
 could not be opened at all (no permission yet, a busy interface) is
 killed at once, and the next attempt waits two seconds, so a device the
 udev rule has not reached yet never turns into a stream of helper
-processes.
+processes. A device that opens but answers a poll badly is dropped and
+reopened after 2 s, doubling on each further failure up to 32 s.
 
 ## Repository layout
 

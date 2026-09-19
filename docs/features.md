@@ -29,7 +29,13 @@ OpenXLR's LV2, CLAP and VST3 inserts process audio on the Linux host.
 
 XLR Dock: gain, mute and headphone volume through the kernel's standard
 ALSA controls, plus phantom power and headphone low impedance over the
-original Wave XLR's protocol dialect, which the dock also answers. The
+original Wave XLR's protocol dialect, which the dock also answers. A dock
+whose firmware answers the kernel's range query badly comes up without
+the capture volume control; OpenXLR then drives gain, or any of the three
+the card lacks, through that same config block, and the connection note
+in the window says so. Each control takes exactly one path, since the
+kernel caches feature-unit values and a block write behind ALSA's back
+would leave the two disagreeing. The
 phantom byte was identified by the
 [openwave](https://github.com/rikkichy/openwave) project on the Wave XLR
 ([openwave PR #8](https://github.com/rikkichy/openwave/pull/8)) and
@@ -74,20 +80,15 @@ does not reach the speakers until unmuted.
 
 ## Submixer
 
-The output matrix sends any mix to any selected output with an independent
-0 to 100% route level. Profiles recall those sends, and an all-Off row stays
-silent. Outputs sharing a hardware bus have one row and one set of sends.
-Mix inserts remain upstream of the matrix. Internal gain nodes are hidden
-from device pickers and do not require a process for each route.
-
 The **Flow** window shows inputs, channels, mixes and outputs in four columns.
 Click a card to trace its signal path, with colours for each routing stage and
 unrelated routes dimmed. Processing stays inside the channel and mix cards;
 the tooltip lists each insert in signal order. See [Audio flow](manual.md#audio-flow).
 
 Built from PipeWire nodes, no kernel modules or custom drivers:
-- Channels for the hardware inputs (XLR 1, XLR 2, Aux In) and for
-  application groups (Game, Music, Browser, System, Voice Chat, SFX)
+- Channels for the hardware inputs (XLR 1, XLR 2, Aux In), for
+  application groups (Game, Music, Browser, System, Voice Chat, SFX) and
+  for other PipeWire capture sources (below)
 - Mixes: Monitor A (what you hear), Monitor B (a second selection for
   outputs that should hear something else), the virtual microphones
   (Stream and Chat by default, published as capture devices selectable
@@ -101,12 +102,18 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
   while audio plays, as does the API, with stable ids so profiles and
   Stream Deck keys survive a rename. Every change is saved before it is
   confirmed
-- Any mix can play on several outputs at once, hardware outputs included:
-  Monitor A/B, Stream, Chat, Aux and custom virtual microphones. Outputs
-  pick a mix or a sum (Monitor A+B in the picker, any sum through the API),
-  so a headset with a game sink and a chat
-  sink hears two selections, and one pair of headphones can hear the
-  desktop from A with a separately processed mic from B
+- Any mix feeds any selected output, hardware outputs included: the
+  output matrix holds a route from each mix (Monitor A/B, Stream, Chat,
+  Aux and custom virtual microphones) to each output with its own 0 to
+  100% level. A route at full level is a direct port link; a lower level
+  runs through a hidden null sink whose volume is the route gain, so no
+  route costs a process and none shows in a device picker. Outputs that
+  share a hardware bus form one row with one set of routes, a row with
+  every route off stays silent, and mix inserts sit upstream of the
+  matrix so every route hears the processed mix. Profiles recall the
+  routes. A headset with a game sink and a chat sink hears two
+  selections, and one pair of headphones can hear the desktop from A
+  with a separately processed mic from B
 - Level meters throughout, dB-scaled, pushed at 15 Hz
 
 Each channel is a combine sink with one internal stream per mix; that
@@ -129,11 +136,15 @@ devices; the hardware input channels are hidden from it.
 
 ### External capture channels
 
-Additional microphones, headsets, capture cards and attached Wave interfaces
-can feed independent channels from their PipeWire sources. Select a stereo
-pair in the layout editor, then use the existing mix sends, mutes, meters and
-profiles. Exact source bindings survive hotplug; absent inputs stay silent.
-
+Additional microphones, headsets, capture cards and other attached Wave
+interfaces feed their own channels from their PipeWire sources. Pick the
+source and a stereo pair in the layout editor; the channel then has the
+same sends, mutes, meters and profile entries as any other. The binding
+names the source node, never a registry id, so it survives a replug. While
+the source or the pair is absent the channel stays silent and no other
+microphone takes its place; the sweep links it again when the ports
+return. A mono source is linked to both sides of the channel. See
+[Additional capture inputs](manual.md#capture-inputs).
 
 ## Inserts
 
@@ -223,6 +234,12 @@ restores the split profile when it stops.
 - An app can be set to "Not managed": the mixer hands its streams back to
   the system default output and never touches them again, so a headset
   with separate game and chat sinks keeps its own routing for that app
+- The application that has the focus can be sent to a channel from a
+  desktop shortcut or a Stream Deck key. The window reads the focused
+  process id through a short-lived KWin script on KDE Plasma, the daemon
+  asks the window for it over D-Bus, and the id is matched against the
+  daemon's live audio clients; an application that cannot be identified
+  without guessing is refused
 
 ## Profiles
 
@@ -252,7 +269,9 @@ Dials render a touch panel: a knob with a needle, a level meter, the
 value readout, and a mute overlay. Every send, mix master, gain,
 headphone volume, the crossfade and each desktop output's volume (up to
 150%, pressing toggles its mute) is a dial target, and one dial can
-hold several targets cycled by tap or press.
+hold several targets cycled by tap or press. A turn leads locally: the
+dial steps from its own value, sends a burst as one command per 80 ms,
+and the daemon's echo cannot pull it back while the turn is warm.
 
 ![Dial panels](plugin-dials.png)
 
@@ -261,8 +280,9 @@ green for an engaged feature or the active monitor output. Every
 hardware switch and mute is a key target, plus the software low cut
 (its frequency shown on the LED, cycling Off, 80, 120), ClipGuard, gain
 lock, switching the monitor output to a specific device, and cycling
-an output's feed through Monitor A, Monitor B and Monitor A+B, a desktop
-output's mute (red while muted) and the enforced system output. Each key
+an output's feed through Monitor A, Monitor B and Monitor A+B, an
+output's volume in 5% steps and its mute (red while muted), the enforced
+system output, and routing the focused application to a channel. Each key
 can pick its icon, and a typed title replaces the built-in label.
 
 ![Keys](plugin-keys.png)
@@ -292,7 +312,14 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
 
 - Enforced defaults: the daemon re-asserts the chosen system default
   sink and source on its one-second sweep, undoing WirePlumber's
-  auto-switch to newly created nodes
+  auto-switch to newly created nodes. The defaults to restore are read
+  at the top of the daemon process, before the device connects, since
+  connecting switches the card's profile and WirePlumber then moves the
+  defaults to the card's new nodes
+- Capture hold: WirePlumber rules keep the XLR Dock's and the original
+  Wave XLR's capture node running. On those devices a playback stream
+  opened before the capture stream silences the microphone for the life
+  of that capture stream, so capture is never allowed to suspend
 - Desktop monitor volume: the default output can follow the first selected
   MONITOR device. Keyboard volume controls and the desktop applet then use
   the same output volume as the mixer window, including synchronization to
@@ -308,10 +335,13 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   and browser pages from other origins are refused; see
   [api.md](api.md). The same commands are served over HTTP at `/api/v1`
   with an OpenAPI document ([http-api.md](http-api.md))
-- Registry discovery uses one persistent PipeWire event subscription and
-  an incremental snapshot, without periodically launching full graph dumps.
-  Disconnects discard stale object ids and reconnect with bounded backoff.
-  The routing and device reconciliation timer remains in place.
+- The daemon follows the PipeWire graph through one `pw-dump --monitor`
+  subscription and keeps an incremental snapshot keyed by object id, so
+  the one-second sweep reads memory instead of launching a dump. A
+  disconnect discards the whole snapshot before ids can be reused and
+  reconnects with a delay growing from 250 ms to 5 s; until it is back, a
+  one-shot `pw-dump` serves the sweep, so routing, default enforcement
+  and route repair keep working
 - The daemon rebuilds its graph after a pipewire-pulse restart, and
   refuses to grow the layout when pipewire-pulse has no open-file
   headroom left; the packages raise that limit with a systemd drop-in.
@@ -350,14 +380,18 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   it. Scans get much slower and produce large logs. The switch takes effect
   without a daemon restart and is not saved across restarts
 
-### Desktop routing keys
+### Desktop keys
 
-Focused-application routing is available from OpenDeck Toggle keys and PC
-global shortcuts. The latter use the desktop GlobalShortcuts portal, including
-on Wayland. Focus identity currently comes from KDE Plasma's KWin; ambiguous
-or unavailable process identities are refused instead of guessed.
-
-PipeWire output volume, mute and enforced system-output selection are available
-from the same PC shortcut session and OpenDeck Toggle keys. Volume steps use
-desktop percentages up to 150%; targets can follow the current default or stay
-bound to a named external output or monitor mix.
+The window registers global shortcuts through the desktop's GlobalShortcuts
+portal, which works on Wayland, and keeps them active while it sits in the
+tray. The daemon owns no shortcut session. A key routes the application
+that has the focus to a chosen channel, steps an output's volume by five
+percentage points within 0 to 150%, toggles its mute, or switches the
+enforced system output. A volume or mute key follows the current default
+output or stays bound to a named output or monitor mix; on a selected
+monitor output the mute key mutes the mixes feeding it, the same as a
+dial press, so the window, the dial rings and the keys agree. Focus
+identity comes from KDE Plasma's KWin; on other desktops the routing key
+reports that it cannot identify the application. See
+[Desktop keys](manual.md#desktop-keys) and
+[Output keys](manual.md#output-keys).
