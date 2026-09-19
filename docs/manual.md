@@ -1816,3 +1816,31 @@ scale, so the top of a loud bar is red and the bottom stays green. A terminal ad
 writes only changed cells, at most fifteen times per second.
 
 It needs a terminal. With its output piped somewhere it says so and stops.
+
+<a name="omarchy"></a>
+## The Omarchy bar
+
+On Omarchy 4, run `openxlr-omarchy-enable` once after installing an Arch
+package built with the shell plugin. The bar then shows XLR input meters,
+dimmed for hardware mute, and the first selected monitor output's feed and
+meter. An input appears only while it has had signal above -60 dBFS within
+the last 10 seconds. Muting keeps that history; a quiet input disappears
+when those 10 seconds elapse. Labels use the bar's regular body font.
+Click it for
+the mixer, and use the arrows to choose the mix whose sends you are editing.
+The bracketed mute key affects that send or master; each XLR strip's
+separate mic button affects its hardware mute in every destination.
+
+Each bank shows whole strips. Use its lower arrows and range indicator to
+reach the remaining channels or masters. The header uses friendly output
+names and shortens long labels. The popout stays within the screen margins.
+
+The popout uses the terminal mixer's strips with the bar's colours and
+font. Its meters take the OpenXLR skin matching the active Omarchy theme,
+and repaint on a theme change. An unmatched theme or unreadable theme
+file uses foreground shades. Bar meters remain monochrome.
+It needs the daemon, but the window can be closed. When the daemon
+is absent the widget dims, clears its meters and waits to reconnect.
+`omarchy plugin disable openxlr.mixer` removes it from the bar.
+[omarchy.md](omarchy.md) covers installation, package changes, commands
+and the checks still needed in a running Omarchy shell.

@@ -141,6 +141,10 @@ Collect diagnostics).
   live meters, the hardware inputs, the outputs, the applications, the
   insert chains, the profiles and the appearance.
   See [the manual](docs/manual.md#terminal).
+- **Omarchy bar**: `openxlr.mixer` shows XLR meters, mute and monitor feeds
+  in Omarchy 4, with channel sends and mix masters in a popout. The Arch
+  package integration and user enable command are in
+  [docs/omarchy.md](docs/omarchy.md). Desktop acceptance on Omarchy is pending.
 - **Skins**: the window's appearance is a set of named values a skin file
   can replace. Thirteen ship, all built into the application: Material, its
   own look, Deck, which dresses the window in the visual language of the

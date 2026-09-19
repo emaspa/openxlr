@@ -150,6 +150,11 @@ a skin overlays values on top of them.
   dependency to any package.
 - [ ] The Stream Deck plugin reading the same tokens for its key art. The
   plugin draws its own images today and is unaffected by the window's skin.
+- [ ] Omarchy 4 bar integration: XLR meters and monitor feeds in the bar,
+  channel sends and mix masters in a popout. The implementation and Arch
+  package instructions are in [omarchy.md](omarchy.md). The bar and the
+  popout are confirmed on Omarchy 4.0.4; the hardware controls still need
+  desktop acceptance.
 - [ ] Layout density: a compact mode for small screens and a large mode
   for touch.
 - [ ] Localization infrastructure and the first translations.

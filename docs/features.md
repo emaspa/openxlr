@@ -338,6 +338,25 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
 - It draws its own cells rather than taking a widget toolkit, so it adds no
   dependency to any package. A frame writes only the cells that changed
 
+## Omarchy shell plugin
+
+- `openxlr.mixer`: XLR input meters and hardware mute state in the Omarchy
+  4 bar, beside the selected monitor output's feed and meter. Inputs appear
+  after signal and stay for 10 seconds after it falls quiet. Muted inputs
+  dim, labels keep the bar's regular body font, and levels do not move
+  neighbouring widgets while an input is shown
+- A popout of channel sends and mix masters, with volume and mute
+  controls, separate XLR hardware mute, and the terminal mixer's block
+  meters and strip layout in the bar's colours and font
+- Popout meters take the OpenXLR skin matching the active Omarchy theme,
+  with foreground shades for unmatched themes. Theme changes repaint the
+  meters; the bar stays monochrome
+- Whole-strip pages with visible range controls, friendly output names,
+  and the same screen bounds as Omarchy's first-party audio panel
+- Authenticated daemon events, quiet disconnects and bounded reconnects.
+  The Arch package supplies the files on Omarchy; a user command links
+  and enables them. See [omarchy.md](omarchy.md) for the recipe and limits
+
 ## Other
 
 - Enforced defaults: the daemon re-asserts the chosen system default

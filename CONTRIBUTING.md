@@ -39,6 +39,11 @@ tools/check-version.sh                          # the five version locations agr
 tools/check-locked-restore.sh                   # every packaging path restores locked
 tools/check-openapi.py docs/openapi-v1.json     # the HTTP API document keeps its shape
 tools/check-spec.py packaging/rpm/openxlr.spec  # every installed file is in %files
+python3 tools/check-omarchy.py  # Qt 6 QML tools, with external type declarations
+python3 tools/omarchy-skins.py --check  # embedded meter tokens match the generated table
+QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner -input packaging/omarchy/tests
+node --test packaging/omarchy/tests/*.test.mjs
+shellcheck --severity=error packaging/omarchy/openxlr-omarchy-enable
 make -C native  # C/C++, PipeWire, lilv, LV2 and X11 development headers
 make -C native test-audio test-clap test-vst3 test-scan  # audio bounds, stall detection, CLAP bus layouts, VST3 parameter and stream checks, scan phase markers
 dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~Lv2BundleTests  # run with lilv installed, even if the earlier suite ran without it
