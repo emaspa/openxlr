@@ -209,32 +209,6 @@ public sealed class WindowLayoutTests
                     page.Offset = default;
                 }
 
-                var matrixRow = new OutputMatrixRow("headset", new DaemonClient()) { Label = "Headphones with a long output name" };
-                matrixRow.Sync(vm.Mixes, _ => .5);
-                vm.OutputMatrix.Add(matrixRow);
-                var matrix = new OutputMatrixWindow { DataContext = vm };
-                windows.Add(matrix);
-                matrix.Show();
-                foreach (double width in new[] { 600d, 1000, 1800 })
-                {
-                    Layout(matrix, width, 550);
-                    var scroll = matrix.GetVisualDescendants().OfType<ScrollViewer>().First();
-                    AssertInside(scroll, matrix);
-                    Assert.True(scroll.Extent.Width > 1000);
-                    var routeCards = matrix.GetVisualDescendants().OfType<Border>()
-                        .Where(border => border.DataContext is OutputRouteViewModel && border.Width == 160).ToArray();
-                    Assert.Equal(8, routeCards.Length);
-                    AssertNoOverlap(routeCards);
-                    foreach (Border card in routeCards)
-                        foreach (Control child in card.GetVisualDescendants().OfType<Control>()
-                            .Where(control => control is Slider or TextBlock)) AssertInside(child, card);
-                    Capture(matrix, "output-matrix-" + width);
-                }
-                var matrixSlider = matrix.GetVisualDescendants().OfType<Slider>().First();
-                matrixSlider.Value = .37;
-                Assert.Equal(.37, matrixRow.Routes[0].Level);
-                matrix.Close();
-
                 var insert = vm.Inserts.Items[0];
                 var controls = new InsertControlsWindow { DataContext = insert };
                 windows.Add(controls);

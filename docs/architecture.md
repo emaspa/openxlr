@@ -100,11 +100,10 @@ modules or custom drivers:
   wired by capture-channel pair (XLR 1 = pair 0, XLR 2 = pair 1, Line
   In/USB Aux = pair 2); the Aux mix feeds the device's aux return pair
   so the hardware forwards it to the USB Aux port.
-- The output matrix links each mix to each selected output. A route at
-  full level is a direct port link from the mix's monitor; a lower level
-  runs through a hidden null sink (`OpenXLR_route_<hash>_<mix>`) whose
-  volume is the route gain, changed in place without touching other
-  routes. Outputs on one hardware bus share one route identity. A
+- Each mix in an output's feed is a direct port link from the mix's
+  monitor into that output, and PipeWire sums what arrives on one port,
+  so a feed of several mixes costs no node. Outputs on one hardware bus
+  share one route identity. A
   capture channel is linked from its source node by pair offset, both
   sides of a mono source, and only a complete link counts as healthy.
 - The daemon follows the graph through one `pw-dump --monitor`

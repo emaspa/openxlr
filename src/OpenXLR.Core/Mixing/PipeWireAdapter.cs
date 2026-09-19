@@ -1235,7 +1235,6 @@ public sealed class PipeWireAdapter
 
             string? name = props.TryGetProperty("node.name", out JsonElement n) ? n.GetString() : null;
             if (name is null) continue;
-            if (name.StartsWith("OpenXLR_route_", StringComparison.Ordinal)) continue;
             string mc = props.TryGetProperty("media.class", out JsonElement m) ? m.GetString() ?? "" : "";
 
             bool isSink = mc == "Audio/Sink";

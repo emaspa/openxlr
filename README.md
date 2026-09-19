@@ -73,8 +73,8 @@ Collect diagnostics).
   for application groups and for other PipeWire capture sources (a
   second microphone, a headset, a capture card); mixes for what you hear
   (Monitor A and Monitor B), for virtual microphones other apps record
-  from, and for the USB Aux port. Any mix feeds any selected output,
-  with its own level per route. The default layout is Game, Music,
+  from, and for the USB Aux port. Any mix, or a sum of mixes, feeds
+  any selected output. The default layout is Game, Music,
   Browser, System, Voice Chat and SFX with Stream and Chat microphones;
   channels and microphones can be added, renamed, reordered and removed
   while audio plays, from the window or the API. Per-send levels and

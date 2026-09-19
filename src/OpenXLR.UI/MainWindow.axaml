@@ -445,13 +445,11 @@
         <Expander.Header>
           <StackPanel Orientation="Horizontal" Spacing="6">
             <TextBlock Text="MONITOR" Classes="h" VerticalAlignment="Center"/>
-            <Button Content="Output matrix" Click="OnOutputMatrix" Padding="8,1"
-                    FontSize="{DynamicResource Ox.Label.FontSize}" IsEnabled="{Binding HasMixer}"/>
             <ToggleButton Name="OutputBoost" Content="150%" IsChecked="{Binding OutputVolumeRange.Boost, Mode=TwoWay}"
                           Padding="8,1" FontSize="{DynamicResource Ox.Label.FontSize}" MinHeight="0" VerticalAlignment="Center"
                           ToolTip.Tip="Allow output volume above 100%, up to 150%. Turning this off returns a boosted output to 100%."/>
             <TextBlock Text="&#x24D8;" Classes="h" FontSize="12" VerticalAlignment="Center" Margin="0,-1,0,0" Cursor="Help"
-                       ToolTip.Tip="Tick the outputs you want to hear. Choose a mix beside each output, or open Output matrix to combine mixes with separate send levels. The Wave XLR Pro's own outputs (Headphones 1/2, USB Aux, Line Out) switch the hardware when ticked and share one feed. The USB Aux port is fed by the dedicated Aux mix in the submixer instead. XLR 1, XLR 2 and Line In feed their channels automatically. System default devices for apps are set in Options."/>
+                       ToolTip.Tip="Tick the outputs you want to hear. Choose a mix beside each output. The Wave XLR Pro's own outputs (Headphones 1/2, USB Aux, Line Out) switch the hardware when ticked and share one feed. The USB Aux port is fed by the dedicated Aux mix in the submixer instead. XLR 1, XLR 2 and Line In feed their channels automatically. System default devices for apps are set in Options."/>
           </StackPanel>
         </Expander.Header>
       <StackPanel Classes="dev" Spacing="4">
@@ -476,7 +474,7 @@
                         <ComboBox Grid.Column="1" ItemsSource="{Binding Feeds}" SelectedItem="{Binding Feed}"
                                   FontSize="11" HorizontalAlignment="Stretch" Margin="8,0,0,0" VerticalAlignment="Center"
                                   IsVisible="{Binding IsSelected}"
-                                  ToolTip.Tip="Which mix this output hears. Use Output matrix to combine mixes with separate levels."/>
+                                  ToolTip.Tip="Which mix this output hears."/>
                       </Grid>
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>

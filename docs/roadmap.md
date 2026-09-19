@@ -24,8 +24,8 @@ This is what 0.1.41 ships. A checked item is in the released packages.
   default) and Aux; an editable layout (channels and microphones added,
   renamed, reordered and removed live from the window's layout editor
   or the API, every change saved before it is acknowledged); monitoring
-  on several outputs with each output choosing which mixes feed it, any
-  mix sent to any output with a level per route, the enforced default
+  on several outputs with each output choosing which mix or sum of
+  mixes feeds it, the enforced default
   output chosen from the window or a key, any PipeWire capture source as
   an input channel, the USB Aux port as a second computer's feed, live
   meters, profiles, one profile per device recalled on connect, Wave XLR
@@ -98,10 +98,13 @@ few releases, and they get to settle in users' hands first.
   Stream Deck keys.
 - [x] Listen to any mix: an output follows any mix in the layout, Stream,
   Chat and Aux included, not only Monitor A and Monitor B.
-- [x] Many-to-many mix-to-output matrix: any mix to any output with a
-  level per route, the way Wave Link 3 does it. Route levels survive
-  profile recall, deletion and reconnect, and the matrix nodes stay out
-  of the output choices.
+- [x] Sums: an output can follow several mixes at once, each at unity,
+  which covers a headset with a game side and a chat side. A per-route
+  level on top, the way Wave Link 3 does it, shipped in 0.1.40 and was
+  taken out again: it was a second mixing layer over the sends, cost a
+  hidden node per route, and a blend at other levels is what a mix is
+  for. What is missing for that is a monitor-kind mix a user can add,
+  one that is not also a microphone.
 - [x] Any PipeWire capture source as an input channel: a second
   microphone, a capture card or a headset bound by node name and channel
   pair, healed by the sweep when the device returns. A capture channel
