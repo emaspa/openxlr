@@ -145,3 +145,8 @@ sink that mix.
 that output. `@monitor` follows the selected monitor output. Limits, rejected
 targets and linked-monitor behavior match the [WebSocket contract](api.md).
 These commands require the daemon but do not require a running UI or KDE.
+
+Plugin search-path commands (`addPluginSearchPath` and `removePluginSearchPath`)
+use the same command endpoint, validation and `pluginInstall` replies as the
+WebSocket API. A failed operation returns `ok:false`. `getPluginSetup` includes
+the effective search directories and any saved-path warning.

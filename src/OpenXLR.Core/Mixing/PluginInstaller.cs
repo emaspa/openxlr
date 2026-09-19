@@ -38,6 +38,8 @@ public sealed record PluginSetup(
 {
     /// <summary>Wine's version as it reports it, or null when Wine is not installed.</summary>
     public string? WineVersion { get; init; }
+    public IReadOnlyList<PluginSearchDirectory> SearchDirectories { get; init; } = [];
+    public string? SearchPathWarning { get; init; }
     public bool WineTrace { get; init; }
 
     /// <summary>
@@ -966,8 +968,11 @@ public sealed class PluginInstaller
             ? []
             : [.. WinePluginFolders().Where(f => !known.Contains(Path.GetFullPath(f).TrimEnd('/')))];
         var memoryLock = PluginMemoryLock.ReadLimits();
+        _ = PluginSearchPaths.Read(out string? searchWarning);
         return new(_hostInstalled, Shorten(_lv2), Shorten(_clap), Shorten(_vst3), _managed?.Version ?? version, _wine is not null, bridged, wine)
         {
+            SearchDirectories = PluginSearchPaths.Snapshot(),
+            SearchPathWarning = searchWarning,
             MemoryLockLimitBytes = memoryLock.Soft,
             MemoryLockHardLimitBytes = memoryLock.Hard,
             MemoryLockNote = PluginMemoryLock.Note(memoryLock.Soft, memoryLock.Hard, _hostInstalled && _yabridgectl is not null && _wine is not null),

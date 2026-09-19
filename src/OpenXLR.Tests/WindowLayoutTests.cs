@@ -476,6 +476,8 @@ public sealed class WindowLayoutTests
                 optionsVm.ApplyPluginSetup(JsonNode.Parse("""
                     {"yabridge":"5.1.1","wine":true,"bridgeProvider":"system",
                      "windowsImportDirectory":"~/.local/share/openxlr/windows-plugins",
+                     "searchDirectories":[{"kind":"lv2","path":"/usr/lib/lv2","custom":false,"exists":true},
+                       {"kind":"clap","path":"/offline/custom plugins","custom":true,"exists":false}],
                      "windowsDirectories":["/home/test/.wine/drive_c/Program Files/Common Files/VST3",
                      "/home/test/Downloads/A plugin collection with a long folder name/Windows/VST3/x64"]}
                     """));
@@ -485,6 +487,12 @@ public sealed class WindowLayoutTests
                 foreach (double width in new[] { 480d, 720 })
                 {
                     Layout(folders, width, width >= 720 ? 820 : 680);
+                    var searchPaths = folders.FindControl<ListBox>("SearchDirectoryList")!;
+                    Assert.Equal(2, searchPaths.ItemCount);
+                    searchPaths.SelectedIndex = 0;
+                    Assert.False(folders.FindControl<Button>("RemoveSearchPath")!.IsEnabled);
+                    searchPaths.SelectedIndex = 1;
+                    Assert.True(folders.FindControl<Button>("RemoveSearchPath")!.IsEnabled);
                     var list = folders.FindControl<ListBox>("FolderList")!;
                     Assert.Equal(2, list.ItemCount);
                     Assert.InRange(list.Bounds.Height, 220, 240);
@@ -520,6 +528,7 @@ public sealed class WindowLayoutTests
                     Capture(folders, "plugin-folders-" + width);
                 }
                 AssertLiveLayoutOrder(main, vm);
+                PluginCatalogueUiTests.CheckStaleReplies();
             }
             catch (Exception ex) { failure = ex; }
             finally

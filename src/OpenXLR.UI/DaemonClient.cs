@@ -94,6 +94,10 @@ public sealed class DaemonClient : IAsyncDisposable
     public Task<JsonNode?> InstallPluginAsync(string path, TimeSpan timeout)
         => PluginOperationAsync("installPlugin", timeout, new Dictionary<string, object> { ["path"] = path });
 
+    public Task<JsonNode?> ChangePluginSearchPathAsync(string kind, string path, bool add, TimeSpan timeout)
+        => PluginOperationAsync(add ? "addPluginSearchPath" : "removePluginSearchPath", timeout,
+            new Dictionary<string, object> { ["kind"] = kind, ["path"] = path });
+
     public Task<JsonNode?> AddWindowsPluginFolderAsync(string path, TimeSpan timeout)
         => PluginOperationAsync("addWindowsPluginFolder", timeout, new Dictionary<string, object> { ["path"] = path });
 

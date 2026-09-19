@@ -61,6 +61,7 @@ public static class Lv2Catalog
     /// </summary>
     internal static IReadOnlyList<PluginInfo> ScanNow(string? lv2Path = null)
     {
+        lv2Path ??= PluginSearchPaths.Lv2Override();
         var result = new List<PluginInfo>();
         IntPtr world;
         try { world = Lilv.lilv_world_new(); }

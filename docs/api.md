@@ -464,3 +464,21 @@ dial rings and the keys agree; on a monitor mix sink it goes through the
 existing mix setter, so state and graph updates follow the same path as the
 mixer mute control; on any other output it uses pipewire-pulse's atomic
 toggle. The daemon pushes state whenever a sink's volume or mute changes.
+
+### Plugin search paths
+
+`getPluginSetup` includes `searchDirectories`, a list of `{kind, path, custom,
+exists}` entries for LV2, CLAP and VST3, and optional `searchPathWarning`.
+Default and environment paths remain active; `custom` marks additions in
+`plugin-paths.json`. Missing paths remain visible and removable. Existence is
+a directory check, not a guarantee that every bundle can be read or loaded.
+
+`addPluginSearchPath {kind, path}` and `removePluginSearchPath {kind, path}`
+accept `kind` equal to `lv2`, `clap` or `vst3` and an absolute directory path,
+at most 4096 characters, without colons or control characters. The filesystem
+root is refused. Add requires an existing directory; removal works offline.
+At most 32 additions across all formats are stored. Changes are saved atomically
+before the existing catalogue refresh runs, under the installation lock.
+Both commands return the existing `pluginInstall` result and correlated error
+handling. A failed save leaves the old paths intact; a corrupt configuration
+must be repaired before editing it. No plugin file is removed.

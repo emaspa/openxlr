@@ -35,8 +35,8 @@ public static class ClapCatalog
     }
 
     private static IReadOnlyList<string> WithManagedPath(IEnumerable<string> paths)
-        => ManagedYabridge.Discover() is null ? [.. paths]
-            : [Path.Combine(ManagedYabridge.PluginHome, "clap"), .. paths];
+        => PluginSearchPaths.Include("clap", ManagedYabridge.Discover() is null ? paths
+            : [Path.Combine(ManagedYabridge.PluginHome, "clap"), .. paths]);
 
     internal static IReadOnlyList<PluginInfo> ScanNow(IEnumerable<string>? directories = null, bool retryFailures = false)
         => HostScan.Run("clap", "scan-clap", directories ?? SearchPath(),
@@ -83,8 +83,8 @@ public static class Vst3Catalog
     }
 
     private static IReadOnlyList<string> WithManagedPath(IEnumerable<string> paths)
-        => ManagedYabridge.Discover() is null ? [.. paths]
-            : [Path.Combine(ManagedYabridge.PluginHome, "vst3"), .. paths];
+        => PluginSearchPaths.Include("vst3", ManagedYabridge.Discover() is null ? paths
+            : [Path.Combine(ManagedYabridge.PluginHome, "vst3"), .. paths]);
 
     /// <summary>Bundles at any depth, since yabridge keeps its own directory under ~/.vst3, never descending into one.</summary>
     internal static IEnumerable<string> Bundles(string directory)

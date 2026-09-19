@@ -361,3 +361,6 @@ PipeWire output volume, mute and enforced system-output selection are available
 from the same PC shortcut session and OpenDeck Toggle keys. Volume steps use
 desktop percentages up to 150%; targets can follow the current default or stay
 bound to a named external output or monitor mix.
+
+The plugin manager combines effective LV2, CLAP and VST3 search paths, extra
+folders, all-format rescanning and the existing Windows-plugin controls.

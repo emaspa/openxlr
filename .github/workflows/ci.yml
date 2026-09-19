@@ -50,7 +50,7 @@ jobs:
           xvfb-run -a make -C native test-editor
 
       - name: LV2 catalogue metadata with lilv installed
-        run: dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~Lv2BundleTests
+        run: dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter "FullyQualifiedName~Lv2BundleTests|FullyQualifiedName~PluginSearchPathTests"
 
       - name: Desktop monitor volume controls
         run: python3 tools/test-monitor-volume.py

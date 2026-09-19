@@ -308,6 +308,13 @@ public sealed class WebSocketHub
             case "syncWindowsPlugins":
                 await ReplyOperationAsync(await Task.Run(() => InstallPlugin(installer => installer.SyncWindows(InsertPluginPaths()))));
                 break;
+            case "addPluginSearchPath":
+            case "removePluginSearchPath":
+                if (!OpenXLR.Core.Mixing.PluginSearchPaths.Valid(cmd.Kind, cmd.Path))
+                { error = "invalid plugin format or search path"; break; }
+                await ReplyOperationAsync(await Task.Run(() => InstallPlugin(_ =>
+                    OpenXLR.Core.Mixing.PluginSearchPaths.Change(cmd.Kind!, cmd.Path!, cmd.Cmd == "addPluginSearchPath"))));
+                break;
             case "rescanPlugins":
                 await ReplyOperationAsync(await Task.Run(() => InstallPlugin(_ => new OpenXLR.Core.Mixing.InstallOutcome(true, "", []))));
                 break;

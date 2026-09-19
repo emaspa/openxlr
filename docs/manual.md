@@ -1676,3 +1676,41 @@ Desktop keys reports that the additional press was not queued. Disabling or
 reconfiguring the shortcuts discards their waiting commands; an already sent
 command may still finish. This queue also preserves the order of an output
 switch followed by a volume change.
+
+## Plugin manager
+
+Open **Options**, **Plugins**, **Plugin manager** to see all three native
+plugin formats' search paths and manage Windows plugins in the same window.
+The path list distinguishes added paths from defaults or environment settings
+and marks directories that are missing or inaccessible.
+
+Choose LV2, CLAP or VST3 and **Add search folder** to scan plugins in place.
+No copy or installation is made. **Remove added path** stops searching that
+extra location without deleting its files. Paths from environment variables
+and standard locations cannot be removed here. A path may still be searched
+if a default or environment setting includes it. The manager allows 32 extra
+paths across all formats. Paths must be absolute directories, not the filesystem
+root, and cannot contain colons or control characters.
+
+**Rescan all plugins** refreshes every format and retries failed bundles using
+the existing scanner and cache. Windows **Rescan** also synchronizes yabridge.
+The current insert hosts are not restarted by a rescan. If a removed path was
+a plugin's only location, that plugin cannot be loaded again until the path is
+restored. Search paths are saved privately in `plugin-paths.json`; environment
+variables keep their existing precedence. Native LV2 hosts and PipeWire LV2
+filter chains receive the same extra LV2 paths as discovery.
+
+If the saved path file is corrupt, normal paths remain usable and the manager
+shows a warning. Repair that file before editing paths so a partial read cannot
+overwrite your configuration. Scanning reports failed bundles as before.
+
+The LV2 default list also includes the common Debian multiarch library
+directories for the running architecture. An explicit `LV2_PATH` keeps its
+precedence; custom folders are appended to it.
+
+An unfinished catalogue request from an old daemon connection cannot replace
+the current plugin list or re-enable an outdated picker selection.
+
+Open effect controls refresh after a complete plugin rescan. They retain current
+parameter values and replace old control definitions when a plugin changes.
+An unavailable plugin leaves no stale parameter controls in its window.
