@@ -1334,9 +1334,10 @@ microphone sound dead rather than quiet.
 The dock's gain, mute and headphone volume are controls of its ALSA
 card. When the card lacks one of them, OpenXLR drives that control
 through the dock's own config block instead and says so in the daemon's
-log when the dock connects. If the USB handle is not open either, because
-the udev rule has not applied yet ([section 5.1](#no-device)), the daemon
-reports that control unavailable until the dock connects again.
+log when the dock connects and in Options, under INTERFACE. If the USB
+handle is not open either, because the udev rule has not applied yet
+([section 5.1](#no-device)), the daemon reports that control unavailable
+until the dock connects again.
 
 <a name="daemon-not-starting"></a>
 ### 5.3 Daemon does not start after an upgrade, or after a reboot

@@ -219,7 +219,12 @@ public sealed record DetectedDevice(
     [property: JsonPropertyName("name")] string Name,
     [property: JsonPropertyName("active")] bool Active);
 
-public sealed record DeviceDescriptor(string Vendor, string Model, string UsbId);
+/// <summary>
+/// The connected interface. <c>Note</c> is a sentence about how this unit is
+/// driven that differs from the usual, or null: today, an XLR Dock whose
+/// card lacks a mixer control and takes it through the config block.
+/// </summary>
+public sealed record DeviceDescriptor(string Vendor, string Model, string UsbId, string? Note = null);
 
 /// <summary>
 /// Live levels, sent far more often than full state and kept deliberately small:

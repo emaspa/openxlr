@@ -169,6 +169,12 @@ public sealed partial class MainViewModel : ViewModelBase
     private bool _showResetDefaults;
     public bool ShowResetDefaults { get => _showResetDefaults; private set => Set(ref _showResetDefaults, value); }
 
+    // The daemon's sentence about a unit driven differently from the usual
+    // (an XLR Dock taking a control through its config block), or empty.
+    private string _deviceNote = "";
+    public string DeviceNote { get => _deviceNote; private set { if (Set(ref _deviceNote, value)) Raise(nameof(ShowInterfaceCard)); } }
+    public bool ShowInterfaceCard => ShowResetDefaults || DeviceNote.Length > 0;
+
     // The daemon-side gain lock cannot stop a physical dial, so it only
     // shows for devices without one.
     private bool _showGainLock;
@@ -623,7 +629,11 @@ public sealed partial class MainViewModel : ViewModelBase
             DaemonVersion = node["daemonVersion"]?.GetValue<string>();
             DeviceConnected = node["connected"]?.GetValue<bool>() ?? false;
             if (node["device"] is JsonNode dev)
+            {
                 DeviceName = $"{dev["vendor"]?.GetValue<string>()} {dev["model"]?.GetValue<string>()}".Trim();
+                DeviceNote = dev["note"]?.GetValue<string>() ?? "";
+            }
+            else DeviceNote = "";
 
             if (node["capabilities"] is JsonNode caps)
             {
@@ -693,6 +703,7 @@ public sealed partial class MainViewModel : ViewModelBase
             ShowGainLock = DeviceConnected && !CapPhysicalControls;
             ShowResetDefaults = DeviceConnected && (!CapRetainsSettings || CapBuiltInDefaults);
             Raise(nameof(ResetDescription));
+            Raise(nameof(ShowInterfaceCard));
             Status = DeviceConnected ? "ready" : "no device";
         }
         finally { _applying = false; }

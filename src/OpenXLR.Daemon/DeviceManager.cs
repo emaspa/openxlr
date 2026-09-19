@@ -211,7 +211,7 @@ public sealed class DeviceManager : BackgroundService
             {
                 Connected = true,
                 Device = new DeviceDescriptor(_device.Info.Vendor, _device.Info.Model,
-                    $"{_device.Info.VendorId:x4}:{_device.Info.ProductId:x4}"),
+                    $"{_device.Info.VendorId:x4}:{_device.Info.ProductId:x4}", _device.ConnectionNote),
                 Capabilities = _device.Capabilities,
                 State = _last ?? Stamp(_device.ReadState()),
             };
@@ -890,7 +890,7 @@ public sealed class DeviceManager : BackgroundService
             {
                 Connected = true,
                 Device = new DeviceDescriptor(_device.Info.Vendor, _device.Info.Model,
-                    $"{_device.Info.VendorId:x4}:{_device.Info.ProductId:x4}"),
+                    $"{_device.Info.VendorId:x4}:{_device.Info.ProductId:x4}", _device.ConnectionNote),
                 Capabilities = _device.Capabilities,
                 State = _last,
             }
