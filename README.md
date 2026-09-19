@@ -19,12 +19,12 @@ LV2, CLAP and VST3 plugin inserts, multi-output monitoring, a dedicated mix for 
 second computer on the USB Aux port, and an OpenDeck plugin for Stream
 Deck control.
 
-![OpenXLR mixer](docs/screenshot-mixer-0125.png)
+![OpenXLR mixer](docs/screenshot-mixer-0142.png)
 
-![OpenXLR terminal mixer](docs/screenshot-tui-tokyo-night.png)
+![OpenXLR terminal mixer](docs/screenshot-tui-0142.png)
 
-Mixer screenshot from 0.1.25, and the terminal mixer on current `main` in
-the Tokyo Night skin. This README and the linked guides describe
+The window and the terminal mixer, both from 0.1.42, the terminal mixer
+in the Tokyo Night skin. This README and the linked guides describe
 current `main`; for a released build, read the docs at its release tag.
 Changes merged after a release are available from source until the next release.
 
