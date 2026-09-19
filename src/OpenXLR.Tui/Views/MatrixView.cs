@@ -116,8 +116,10 @@ internal sealed class MatrixView : View
             screen.Text(x0, nameLine, channel.Name, nameColour, rowBack, bold: selectedRow,
                 maxWidth: meterX - x0 - 1);
             MeterReading level = app.Link.StereoMeter("ch", channel.Id);
-            if (roomy) Stereo(screen, meterX, line, line + step - 1, meterWidth + 2, level, theme, rowBack);
-            else Widgets.Meter(screen, meterX, line, meterWidth, level.Level, theme, rowBack);
+            if (!roomy) Widgets.Meter(screen, meterX, line, meterWidth, level.Level, theme, rowBack);
+            else if (channel.Mono)
+                Widgets.Meter(screen, meterX + 2, nameLine, meterWidth, level.Level, theme, rowBack);
+            else Stereo(screen, meterX, line, line + step - 1, meterWidth + 2, level, theme, rowBack);
 
             for (int cell = 0; cell < shown; cell++)
             {

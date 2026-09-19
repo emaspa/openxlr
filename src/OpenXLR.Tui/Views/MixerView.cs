@@ -64,7 +64,7 @@ internal sealed class MixerView : View
             bool keyMuted = hardwareMute is null ? channel.IsMuted(selectedMix.Id) : state.Flag(hardwareMute);
             DrawStrip(screen, strip, app, channel.Name, kind, channel.Level(selectedMix.Id), 1,
                 keyMuted, app.Link.StereoMeter("ch", channel.Id), _row == index + 1, false,
-                sendMuted: hardwareMute is not null && channel.IsMuted(selectedMix.Id));
+                sendMuted: hardwareMute is not null && channel.IsMuted(selectedMix.Id), mono: channel.Mono);
         }
         for (int i = 0; i < masterCount; i++)
         {
@@ -118,7 +118,7 @@ internal sealed class MixerView : View
 
     private static void DrawStrip(Screen screen, Rect area, App app, string name, string kind,
         double value, double ceiling, bool muted, MeterReading meter, bool focused, bool master,
-        bool sendMuted = false)
+        bool sendMuted = false, bool mono = false)
     {
         Theme theme = app.Theme;
         Rgb back = focused ? theme.SelectedFace : master ? theme.Tile : theme.Card;
@@ -151,11 +151,19 @@ internal sealed class MixerView : View
         int faderX = area.X + Math.Max(1, (area.Width - 8) / 2 + 1);
         int meterX = area.Right - 4;
         Widgets.VerticalFader(screen, faderX, top, height, value, ceiling, theme, back, focused);
-        Widgets.VerticalMeter(screen, meterX, top, height, meter.Left, meter.HoldLeft, theme, back);
-        // A blank column between the two bars, so left and right read apart
-        // even when both are full.
-        Widgets.VerticalMeter(screen, meterX + 2, top, height, meter.Right, meter.HoldRight, theme, back);
-        screen.Text(meterX, compact ? area.Bottom - 2 : top - 1, "L R", theme.TextMuted, back);
+        if (mono)
+        {
+            // One reading, so one bar, as wide as the pair it replaces.
+            Widgets.VerticalMeter(screen, meterX + 1, top, height, meter.Level, meter.Hold, theme, back, width: 2);
+        }
+        else
+        {
+            Widgets.VerticalMeter(screen, meterX, top, height, meter.Left, meter.HoldLeft, theme, back);
+            // A blank column between the two bars, so left and right read apart
+            // even when both are full.
+            Widgets.VerticalMeter(screen, meterX + 2, top, height, meter.Right, meter.HoldRight, theme, back);
+            screen.Text(meterX, compact ? area.Bottom - 2 : top - 1, "L R", theme.TextMuted, back);
+        }
         if (area.Width >= 14)
         {
             screen.Text(area.X + 1, top, $"{ceiling * 100:0}", theme.TextMuted, back, maxWidth: 3);
