@@ -273,11 +273,15 @@ public sealed class TuiViewTests
         string[] rows = Frame(tall).Split('\n');
         int first = Array.FindIndex(rows, row => row.Contains("Aux In", StringComparison.Ordinal));
         Assert.True(first > 0);
-        // The two sides sit on neighbouring rows, so they read as the one
-        // meter of that channel, and the next channel starts three rows down.
-        Assert.Contains("L", rows[first], StringComparison.Ordinal);
+        // The name sits between its two sides, one row above and one below,
+        // and the next channel starts three rows down.
+        Assert.Contains("L", rows[first - 1], StringComparison.Ordinal);
         Assert.Contains("R", rows[first + 1], StringComparison.Ordinal);
         Assert.Contains("Game", rows[first + 3], StringComparison.Ordinal);
+        // The right bar hangs from the top of its row, so both bars hug the
+        // name's row; its empty track is the upper eighth.
+        int track = rows[first + 1].IndexOf("R ", StringComparison.Ordinal) + 2;
+        Assert.Equal('\u2594', rows[first + 1][track]);
         // The masters carry the same pair, under their mute key.
         int mixes = Array.FindIndex(rows, row => row.Contains("MIXES", StringComparison.Ordinal));
         Assert.Contains("L", rows[mixes + 3], StringComparison.Ordinal);
@@ -306,7 +310,7 @@ public sealed class TuiViewTests
 
         int xlr = Array.FindIndex(rows, row => row.Contains("XLR 1", StringComparison.Ordinal));
         Assert.True(xlr > 0);
-        Assert.DoesNotContain(" L ", rows[xlr], StringComparison.Ordinal);
+        Assert.DoesNotContain(" L ", rows[xlr - 1], StringComparison.Ordinal);
         Assert.DoesNotContain(" R ", rows[xlr + 1], StringComparison.Ordinal);
         // Its bar stands on the name's own row, where the stereo pair would
         // have flanked it.

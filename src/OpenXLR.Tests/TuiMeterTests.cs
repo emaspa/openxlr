@@ -200,5 +200,9 @@ public sealed class TuiMeterTests
         // lower one still reads as the line between a left and a right.
         Assert.Equal('\u2584', screen.At(0, 0).Ch);
         Assert.Equal('\u2584', screen.At(0, 1).Ch);
+        // Asked to hang from the top instead, a bar takes the upper half.
+        Widgets.Meter(screen, 0, 1, 4, 0.5, theme, theme.Card, upper: true);
+        Assert.Equal('\u2580', screen.At(0, 1).Ch);
+        Assert.Equal('\u2594', screen.At(3, 1).Ch);
     }
 }
