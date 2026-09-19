@@ -21,7 +21,10 @@ Deck control.
 
 ![OpenXLR mixer](docs/screenshot-mixer-0125.png)
 
-Mixer screenshot from 0.1.25. This README and the linked guides describe
+![OpenXLR terminal mixer](docs/screenshot-tui-tokyo-night.png)
+
+Mixer screenshot from 0.1.25, and the terminal mixer on current `main` in
+the Tokyo Night skin. This README and the linked guides describe
 current `main`; for a released build, read the docs at its release tag.
 Changes merged after a release are available from source until the next release.
 
