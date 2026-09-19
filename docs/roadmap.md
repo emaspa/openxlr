@@ -15,7 +15,7 @@ feature that is measured over one that is described.
 
 ## Where it stands (0.1.42)
 
-This is what 0.1.42 ships. A checked item is in the released packages.
+This is what 0.1.43 ships. A checked item is in the released packages.
 
 - [x] Wave XLR Pro, XLR Dock (MK.1 and MK.2 modules), Wave XLR, Wave XLR
   MK.2: hardware controls, verified by owners of each device.
@@ -55,6 +55,12 @@ This is what 0.1.42 ships. A checked item is in the released packages.
   daemon's socket, with every skin the window has, one of them for each
   Omarchy palette; inserts open the plugin's own editor or generated
   controls and a picker adds plugins from the catalogue.
+- [x] Omarchy 4 bar: `openxlr.mixer`, a shell plugin showing the XLR
+  inputs that have signal and the monitor feed, with channel sends and
+  mix masters in a popout whose meters follow the active Omarchy theme.
+  An Arch package built on Omarchy carries it; [omarchy.md](omarchy.md)
+  has the recipe. The live theme switch and the popout's hardware
+  controls still need desktop acceptance.
 - [x] Packages: AUR (Arch Linux, CachyOS and Omarchy), Debian/Ubuntu,
   Fedora, NixOS flake and module.
 - [x] Daemon recovery basics: fast shutdown, busy-port wait, self-healing
@@ -151,11 +157,6 @@ a skin overlays values on top of them.
   dependency to any package.
 - [ ] The Stream Deck plugin reading the same tokens for its key art. The
   plugin draws its own images today and is unaffected by the window's skin.
-- [ ] Omarchy 4 bar integration: XLR meters and monitor feeds in the bar,
-  channel sends and mix masters in a popout. The implementation and Arch
-  package instructions are in [omarchy.md](omarchy.md). The bar and the
-  popout are confirmed on Omarchy 4.0.4; the live theme switch and the
-  hardware controls still need desktop acceptance.
 - [ ] Layout density: a compact mode for small screens and a large mode
   for touch.
 - [ ] Localization infrastructure and the first translations.

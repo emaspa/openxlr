@@ -5,7 +5,7 @@
 %global _build_id_links none
 
 Name:           openxlr
-Version:        0.1.42
+Version:        0.1.43
 Release:        1%{?dist}
 Summary:        Control suite and PipeWire submixer for Elgato XLR interfaces
 License:        GPL-3.0-only
@@ -162,6 +162,12 @@ MSG
 %{_datadir}/openxlr/
 
 %changelog
+* Sat Sep 19 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.43-1
+- Omarchy: the mixer joins the Omarchy 4 bar as a shell plugin, openxlr.mixer. An XLR input shows its meter while it has had signal in the last ten seconds and stays, dimmed, when muted; beside them the first monitor output's feed has its own meter. The popout carries the terminal mixer's strips, channel sends and mix masters, and takes the OpenXLR skin matching the active Omarchy theme. An Arch package built on Omarchy carries the plugin and openxlr-omarchy-enable.
+- Window: a continuous meter draws its lit part as one bar, so the zones no longer leave a notch or a seam where they meet.
+- Window: the eleven Omarchy palette skins are built into the application, so every package carries them.
+- Docs: every page is swept against main, and the install pages name Arch Linux, CachyOS and Omarchy where they named Arch alone.
+
 * Sat Sep 19 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.42-1
 - A terminal mixer, openxlr-tui: the whole mixer in a terminal over the daemon's socket, a desk of channel strips with stereo meters and level history, a matrix of every send, the hardware inputs, outputs, application routing, inserts, profiles and options; an insert opens the plugin's own editor or generated controls, and a picker adds plugins from the catalogue; it shares the window's skins and ships one for each Omarchy palette.
 - Mixer: the per-route output levels shipped in 0.1.40 are gone; an output's feed names a mix or a sum of mixes, which PipeWire sums at unity.
