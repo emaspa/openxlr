@@ -344,10 +344,6 @@ public sealed class DaemonClient : IAsyncDisposable
     public Task SetMixMutedAsync(string mix, bool muted)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setMixMuted", ["mix"] = mix, ["value"] = muted });
 
-    public Task SetOutputRouteAsync(string device, string mix, double level)
-        => SendAsync(new Dictionary<string, object>
-            { ["cmd"] = "setOutputRoute", ["device"] = device, ["mix"] = mix, ["value"] = level });
-
     // --- layout editing: each call resolves to null on success or the daemon's error ---
 
     public Task<string?> CreateCaptureChannelAsync(string name, string source, int pair)

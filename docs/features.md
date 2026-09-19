@@ -103,17 +103,14 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
   Stream Deck keys survive a rename. Every change is saved before it is
   confirmed
 - Any mix feeds any selected output, hardware outputs included: the
-  output matrix holds a route from each mix (Monitor A/B, Stream, Chat,
-  Aux and custom virtual microphones) to each output with its own 0 to
-  100% level. A route at full level is a direct port link; a lower level
-  runs through a hidden null sink whose volume is the route gain, so no
-  route costs a process and none shows in a device picker. Outputs that
-  share a hardware bus form one row with one set of routes, a row with
-  every route off stays silent, and mix inserts sit upstream of the
-  matrix so every route hears the processed mix. Profiles recall the
-  routes. A headset with a game sink and a chat sink hears two
-  selections, and one pair of headphones can hear the desktop from A
-  with a separately processed mic from B
+  picker beside each output names Monitor A/B, Stream, Chat, Aux or a
+  custom virtual microphone, and the API names a sum of mixes, each a
+  direct port link at unity so a summed feed costs no node. Outputs that
+  share a hardware bus follow one feed, and mix inserts sit upstream so
+  every output hears the processed mix. Profiles recall the feeds. A
+  headset with a game sink and a chat sink hears two selections, and
+  one pair of headphones can hear the desktop from A with a separately
+  processed mic from B; a blend at other levels is a mix of its own
 - Level meters throughout, dB-scaled, pushed at 15 Hz
 
 Each channel is a combine sink with one internal stream per mix; that

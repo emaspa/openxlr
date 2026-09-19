@@ -28,9 +28,9 @@ message deadlines and command budgets remain the same on both socket paths.
 
 Commands use the names and fields in [the WebSocket API](api.md), including
 mix-to-output feed commands, which accept any existing mix or a sum of distinct
-mix ids, and `setOutputRoute` for an individual route's level. For example,
-`{"cmd":"setOutputRoute","device":"alsa_output.headset","mix":"chat","value":0.5}`
-adds a 50% Chat feed to an already selected headset; `value:0` disconnects it.
+mix ids. For example,
+`{"cmd":"setMonitorFeed","device":"alsa_output.headset","feed":"monitor+chat"}`
+makes an already selected headset hear Monitor A and Chat summed.
 Both transports share the dispatcher,
 validation and broadcasts. HTTP returns
 `{"apiVersion":"1","ok":true,"messages":[]}` after a successful mutation.

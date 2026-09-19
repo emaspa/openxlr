@@ -37,7 +37,6 @@ internal static class SavedMixerValidation
             ChannelMuted = Entries(settings.ChannelMuted, "channelMuted", notes),
             MonitorOutputs = Entries(settings.MonitorOutputs, "monitorOutputs", notes),
             MonitorFeeds = Mapping(settings.MonitorFeeds, "monitorFeeds", notes),
-            OutputRoutes = Routes(settings.OutputRoutes, notes),
             AppOverrides = Mapping(settings.AppOverrides, "appOverrides", notes),
             KnownApps = Apps(settings.KnownApps, notes),
             Inserts = Inserts(settings.Inserts, notes),
@@ -52,9 +51,6 @@ internal static class SavedMixerValidation
         Names(scene.ChannelMuted, "channelMuted");
         if (scene.MonitorOutputs is not null) Names(scene.MonitorOutputs, "monitorOutputs");
         if (scene.MonitorFeeds is not null) Mapping(scene.MonitorFeeds, "monitorFeeds");
-        if (scene.OutputRoutes is not null)
-            Require(scene.OutputRoutes.Count <= OutputRouteLevel.MaxCount &&
-                scene.OutputRoutes.All(OutputRouteLevel.IsValid), "invalid route", "outputRoutes");
         if (scene.Inserts is not null) Inserts(scene.Inserts);
         Require(scene.OutputVolume is null || double.IsFinite(scene.OutputVolume.Value), NonFinite, "outputVolume");
     }
@@ -62,14 +58,6 @@ internal static class SavedMixerValidation
     private const string NullEntry = "null entry";
     private const string NonFinite = "non-finite number";
     private const string TooMany = "too many entries";
-
-    private static List<OutputRouteLevel> Routes(List<OutputRouteLevel>? routes, List<string> notes)
-    {
-        if (routes is null) { notes.Add("outputRoutes: null entry"); return []; }
-        var kept = routes.Where(OutputRouteLevel.IsValid).Take(OutputRouteLevel.MaxCount).ToList();
-        if (kept.Count != routes.Count) notes.Add("outputRoutes: invalid or excessive entries");
-        return kept;
-    }
 
     // Lenient pass for the settings file.
 

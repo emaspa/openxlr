@@ -343,7 +343,6 @@ public sealed class WebSocketHub
             case "setMonitorOutput":
             case "setMonitorOutputs":
             case "setMonitorFeed":
-            case "setOutputRoute":
             case "setOutputVolume":
             case "setEnforcedDefaults":
             case "setAuxPortEnabled":

@@ -49,8 +49,7 @@ every save. Every field is optional on read; an absent one is empty or off.
 | `channelMuted` | `channel\|mix` cells whose send is muted |
 | `monitorOutputs` | the selected outputs, in order; the first one is what `@monitor` resolves to |
 | `monitorOutput` | the older single selection, read only when `monitorOutputs` is empty |
-| `monitorFeeds` | output to feed, see [Output routes](#output-routes) |
-| `outputRoutes` | per-route gains, see [Output routes](#output-routes) |
+| `monitorFeeds` | output to feed, see [Output feeds](#output-feeds) |
 | `auxPortEnabled` | whether the Aux mix reaches the USB Aux port; when absent, a saved `#usbaux` monitor selection turns it on once and is dropped from the selection |
 | `enforcedDefaultSink` | the output held as the system default, or `@monitor`; `setEnforcedDefaults` and `setMainOutput` write it |
 | `enforcedDefaultSource` | the source held as the system default |
@@ -107,10 +106,9 @@ debounced, retried behaviour.
 - `deleteMix {mix}` removes the virtual microphone, its sends, inserts and
   capture device. Anything recording from it loses the device.
   Outputs listening to that mix keep the other mixes in their feed, or return
-  to the first monitor mix if none remain. Its route gains go with it, and
-  an enforced default source that was this microphone is cleared. All of
-  that is part of the saved deletion and rolls back with it when saving
-  fails.
+  to the first monitor mix if none remain. An enforced default source
+  that was this microphone is cleared. All of that is part of the saved
+  deletion and rolls back with it when saving fails.
 - `setLayoutOrder {channels, mixes}` reorders the editable ids. Supply every
   application and capture channel id and every virtual-microphone id exactly
   once; hardware inputs, Monitor A/B and Aux keep their positions. No node
@@ -171,32 +169,15 @@ built-in input DSP still belong to the selected Wave interface. Capture inputs
 can feed mix insert chains; per-input insert hosting remains limited to the
 existing XLR channels.
 
-## Output routes
+## Output feeds
 
 `monitorFeeds` records the mixes included in each selected output, as one mix
-id or several joined with `+`. An output without an entry hears the first
-monitor mix. The output matrix can store an empty string for a deliberately
-silent output; it stays silent across recalls and unrelated mix deletion.
-Deleting its last included mix retains the existing fallback to the primary
-monitor mix. The jacks of one interface share a return bus, so they are
-written with one feed.
+id or several joined with `+`. Every mix in a feed reaches the output at
+unity, as a direct port link from the mix; a blend at other levels is a mix
+of its own, with the sends set there. An output without an entry, or with
+an empty or unknown one, hears the first monitor mix. Deleting a mix drops
+it from every feed. The jacks of one interface share a return bus, so they
+are written with one feed.
 
-`outputRoutes` stores gain exceptions as `{device, mix, level}` entries. A
-selected feed absent from this list uses 100%. Levels are positive and at
-most 1; an entry at 1 is read as absent, and zero is represented by removing
-the mix from `monitorFeeds`. `device` is at most 256 characters and `mix`
-at most 36; at most 304 entries are read. The state, mixer settings and
-profile scenes carry this list. Shared Pro jack routes use the canonical
-`device#bus` key. Removing an output or mix removes its gains; a failed
-mix-deletion save restores them. A legacy scene that recalls output
-selection or feeds without gains uses unity gains.
-
-`setOutputRoute {device, mix, value}` changes one route. A positive value
-adds the mix to the output's feed or adjusts its level; zero removes it, and
-an output whose last mix is removed this way is stored silent. Fader saves
-retain the normal debounced and retried persistence behaviour. A route
-below unity uses a hidden PipeWire gain sink, created muted before it is
-connected. Unity routes use direct links until they need a gain node.
-Existing gain nodes update in place, and unrelated outputs keep their links.
-Gain-node creation checks pipewire-pulse's open-file headroom and adds no
-helper process per route.
+`outputRoutes`, the per-route level list that 0.1.40 and 0.1.41 wrote, is
+ignored on read, in this file and in profiles.

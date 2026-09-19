@@ -620,7 +620,7 @@ you intend to share is worth checking against the same ones by eye:
 
 Walk the windows before you share a skin: the mixer, Options, the audio
 flow window, the plugin controls window, the mixer layout window, the
-output matrix, the desktop keys dialog, a confirmation dialog, a tooltip
+desktop keys dialog, a confirmation dialog, a tooltip
 and a dropdown list. The pointer-over, pressed, checked and disabled
 states are separate tokens, and an appearance that only sets the resting
 ones looks broken as soon as the pointer moves.

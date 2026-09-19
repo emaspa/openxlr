@@ -122,13 +122,6 @@ public static class CommandValidation
             case "setEnforcedDefaults":
                 if (TooLong(cmd.Sink, MaxText) || TooLong(cmd.Source, MaxText)) return "setEnforcedDefaults: device name too long";
                 return null;
-            case "setOutputRoute":
-                if (cmd.Device is null || TooLong(cmd.Device, MaxText) || !layout.IsMonitorOutput(cmd.Device))
-                    return "setOutputRoute: device must be a selected output";
-                if (cmd.Mix is null || TooLong(cmd.Mix, 36) || !layout.HasMix(cmd.Mix))
-                    return "setOutputRoute: mix must exist";
-                if (Finite(cmd, "value") is string invalidRoute) return invalidRoute;
-                return cmd.Value.GetDouble() is < 0 or > 1 ? "setOutputRoute: value must be between 0 and 1" : null;
             case "setInserts":
                 if (cmd.Channel is null || cmd.Inserts is null) return "setInserts: need 'channel' and 'inserts'";
                 if (!layout.IsInsertKey(cmd.Channel)) return $"setInserts: '{Short(cmd.Channel)}' has no insert chain";

@@ -136,9 +136,6 @@ public sealed record MixerState
     /// </summary>
     public IReadOnlyDictionary<string, string> MonitorFeeds { get; init; } = new Dictionary<string, string>();
 
-    /// <summary>Per-route gain exceptions; unlisted selected feeds use unity.</summary>
-    public IReadOnlyList<OutputRouteLevel> OutputRoutes { get; init; } = [];
-
     /// <summary>Volume of the selected output device (0..1.5), or null.</summary>
     public double? OutputVolume { get; init; }
 
