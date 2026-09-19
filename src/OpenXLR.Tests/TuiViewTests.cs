@@ -278,15 +278,18 @@ public sealed class TuiViewTests
         string[] rows = Frame(tall).Split('\n');
         int first = Array.FindIndex(rows, row => row.Contains("Aux In", StringComparison.Ordinal));
         Assert.True(first > 0);
-        // The two sides sit on neighbouring rows, so they read as the one
-        // meter of that channel, and the next channel starts three rows down.
-        Assert.Contains("L", rows[first], StringComparison.Ordinal);
+        // The name sits between its two sides, one row above and one below,
+        // and the next channel starts three rows down.
+        Assert.Contains("L", rows[first - 1], StringComparison.Ordinal);
         Assert.Contains("R", rows[first + 1], StringComparison.Ordinal);
         Assert.Contains("Game", rows[first + 3], StringComparison.Ordinal);
+        int track = rows[first + 1].IndexOf("R ", StringComparison.Ordinal) + 2;
+        Assert.Equal('\u2500', rows[first + 1][track]);
         // The masters carry the same pair, under their mute key.
         int mixes = Array.FindIndex(rows, row => row.Contains("MIXES", StringComparison.Ordinal));
+        // The masters carry the same pair, a row apart, under their mute key.
         Assert.Contains("L", rows[mixes + 3], StringComparison.Ordinal);
-        Assert.Contains("R", rows[mixes + 4], StringComparison.Ordinal);
+        Assert.Contains("R", rows[mixes + 5], StringComparison.Ordinal);
 
         // Nine channels do not fit twice over in twenty-four rows, so there
         // the grid stays one row a channel with a single summed bar.
@@ -311,11 +314,11 @@ public sealed class TuiViewTests
 
         int xlr = Array.FindIndex(rows, row => row.Contains("XLR 1", StringComparison.Ordinal));
         Assert.True(xlr > 0);
-        Assert.DoesNotContain(" L ", rows[xlr], StringComparison.Ordinal);
+        Assert.DoesNotContain(" L ", rows[xlr - 1], StringComparison.Ordinal);
         Assert.DoesNotContain(" R ", rows[xlr + 1], StringComparison.Ordinal);
         // Its bar stands on the name's own row, where the stereo pair would
         // have flanked it.
-        Assert.Contains('\u2581', rows[xlr]);
+        Assert.Contains('\u2500', rows[xlr]);
 
         // On the desk the same input carries one bar and no lettering.
         app.ShowTab(0);
