@@ -201,8 +201,8 @@ internal sealed class MixerView : View
         screen.Text(meterX, area.Y + 1, "STEREO / RMS", theme.TextMuted, theme.Card);
         screen.Text(meterX, area.Y + 3, "L", theme.TextSecondary, theme.Card);
         screen.Text(meterX, area.Y + 4, "R", theme.TextSecondary, theme.Card);
-        Widgets.Meter(screen, meterX + 2, area.Y + 3, meterWidth, meter.Left, theme, theme.Card);
-        Widgets.Meter(screen, meterX + 2, area.Y + 4, meterWidth, meter.Right, theme, theme.Card);
+        Widgets.Meter(screen, meterX + 2, area.Y + 3, meterWidth, meter.Left, theme, theme.Card, Widgets.Align.Lower);
+        Widgets.Meter(screen, meterX + 2, area.Y + 4, meterWidth, meter.Right, theme, theme.Card, Widgets.Align.Upper);
         screen.Text(meterX + 2, area.Y + 5, "-60", theme.TextMuted, theme.Card);
         screen.Text(meterX + meterWidth / 2, area.Y + 5, "-30", theme.TextMuted, theme.Card);
         screen.Text(meterX + meterWidth, area.Y + 5, "0", theme.TextMuted, theme.Card);

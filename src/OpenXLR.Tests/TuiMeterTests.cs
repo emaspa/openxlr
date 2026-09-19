@@ -186,4 +186,22 @@ public sealed class TuiMeterTests
         Assert.Equal('\u25a0', screen.At(0, 0).Ch);
         Assert.Equal('\u25cf', screen.At(1, 0).Ch);
     }
+
+    [Fact]
+    public void TheTwoBarsOfAStereoPairMeetAtTheLineBetweenTheirRows()
+    {
+        Screen screen = new(6, 3);
+        Theme theme = Zones();
+        screen.Clear(theme.Card);
+        Widgets.Meter(screen, 0, 0, 4, 1, theme, theme.Card, Widgets.Align.Lower);
+        Widgets.Meter(screen, 0, 1, 4, 1, theme, theme.Card, Widgets.Align.Upper);
+        Widgets.Meter(screen, 0, 2, 4, 1, theme, theme.Card);
+
+        // The upper bar stands on the floor of its row and the lower one hangs
+        // from the ceiling of its own, so a mono source reads as one bar.
+        Assert.Equal('\u2584', screen.At(0, 0).Ch);
+        Assert.Equal('\u2580', screen.At(0, 1).Ch);
+        // A bar on its own keeps three quarters of its row.
+        Assert.Equal('\u2586', screen.At(0, 2).Ch);
+    }
 }

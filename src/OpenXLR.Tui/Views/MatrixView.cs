@@ -147,14 +147,21 @@ internal sealed class MatrixView : View
         }
     }
 
-    /// <summary>Left above right, each lettered, on a row of its own.</summary>
+    /// <summary>
+    /// Left above right, each lettered, on a row of its own. On neighbouring
+    /// rows the two bars take the halves that meet, so the pair reads as one
+    /// meter rather than as the same bar twice.
+    /// </summary>
     private static void Stereo(Screen screen, int x, int left, int right, int width, MeterReading level, Theme theme, Rgb back)
     {
         if (width < 4) return;
+        bool touching = right == left + 1;
         screen.Text(x, left, "L", theme.TextMuted, back);
         screen.Text(x, right, "R", theme.TextMuted, back);
-        Widgets.Meter(screen, x + 2, left, width - 2, level.Left, theme, back);
-        Widgets.Meter(screen, x + 2, right, width - 2, level.Right, theme, back);
+        Widgets.Meter(screen, x + 2, left, width - 2, level.Left, theme, back,
+            touching ? Widgets.Align.Lower : Widgets.Align.Alone);
+        Widgets.Meter(screen, x + 2, right, width - 2, level.Right, theme, back,
+            touching ? Widgets.Align.Upper : Widgets.Align.Alone);
     }
 
     public override bool Handle(KeyPress key, App app)
