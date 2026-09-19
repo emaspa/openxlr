@@ -1728,7 +1728,7 @@ Eight sections are reachable with `1` to `8`, Tab and Shift+Tab:
 | Section | What is on it |
 |---|---|
 | 1 Mixer | channel sends, mix masters, stereo meters and level history; channel and virtual microphone creation, renaming, removal and ordering |
-| 2 Matrix | the whole submixer as one grid: every channel's send into every mix, the mix masters and their meters across the top, a meter beside each channel |
+| 2 Matrix | the whole submixer as one grid: every channel's send into every mix, the mix masters and their meters across the top, a meter beside each channel. With height to spare every meter is stereo, left above right on rows of its own, and a channel takes two rows; a short terminal keeps one row a channel and one summed bar |
 | 3 Inputs | hardware controls in grouped cards with gain arcs on a wide terminal, or a scrolling list in a small one; gain, mute, low cut, expander, voice tune and its strength, phantom power, ClipGuard and the compressor for each XLR input; software processing, headphones, direct monitor blend, hardware output routing and USB Aux return |
 | 4 Outputs | selected monitor sinks and their feeds, shared output volume, each sink's volume and mute, and the system default sink and source |
 | 5 Apps | every known application and its channel assignment, including the desktop's own routing |

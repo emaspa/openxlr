@@ -187,9 +187,12 @@ internal static class Widgets
         screen.Text(x, y, theme.CapMutes ? $"[{label}]" : $" {label} ", fore, back, bold: true);
     }
 
-    /// <summary>A lamp: on, off, or alert.</summary>
+    /// <summary>
+    /// A lamp: on, off, or alert. Both faces sit on the middle of the line,
+    /// level with the lettering beside them, which a half block would not.
+    /// </summary>
     public static void Lamp(Screen screen, int x, int y, bool on, Theme theme, Rgb back, bool alert = false)
-        => screen.Set(x, y, theme.LampLeds ? '▄' : '●', alert ? theme.LedAlert : on ? theme.LedOn : theme.LedOff, back);
+        => screen.Set(x, y, theme.LampLeds ? '■' : '●', alert ? theme.LedAlert : on ? theme.LedOn : theme.LedOff, back);
 
     /// <summary>A percentage the way the window writes it.</summary>
     public static string Percent(double value) => $"{Math.Round(value * 100)}%";

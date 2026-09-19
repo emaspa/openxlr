@@ -263,6 +263,37 @@ public sealed class TuiViewTests
     }
 
     [Fact]
+    public void TheMatrixGivesEveryMeterTwoRowsWhenThereIsHeightAndOneWhenThereIsNot()
+    {
+        (App app, _) = Desk();
+        app.ShowTab(1);
+
+        Screen tall = new(150, 42);
+        app.Draw(tall);
+        string[] rows = Frame(tall).Split('\n');
+        int first = Array.FindIndex(rows, row => row.Contains("XLR 1", StringComparison.Ordinal));
+        Assert.True(first > 0);
+        // Each side keeps a row of its own, so the next channel starts two
+        // rows down rather than touching this one.
+        Assert.Contains("L", rows[first], StringComparison.Ordinal);
+        Assert.Contains("R", rows[first + 1], StringComparison.Ordinal);
+        Assert.Contains("XLR 2", rows[first + 2], StringComparison.Ordinal);
+        // The masters carry the same pair, under their mute key.
+        int mixes = Array.FindIndex(rows, row => row.Contains("MIXES", StringComparison.Ordinal));
+        Assert.Contains("L", rows[mixes + 3], StringComparison.Ordinal);
+        Assert.Contains("R", rows[mixes + 4], StringComparison.Ordinal);
+
+        // Nine channels do not fit twice over in twenty-four rows, so there
+        // the grid stays one row a channel with a single summed bar.
+        Screen small = new(80, 24);
+        app.Draw(small);
+        string[] tight = Frame(small).Split('\n');
+        int line = Array.FindIndex(tight, row => row.Contains("XLR 1", StringComparison.Ordinal));
+        Assert.True(line > 0);
+        Assert.Contains("XLR 2", tight[line + 1], StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AMutedSendIsUnmutedByTheSameKey()
     {
         (App app, List<string> sent) = Ready();

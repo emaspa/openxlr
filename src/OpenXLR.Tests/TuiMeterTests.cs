@@ -173,4 +173,17 @@ public sealed class TuiMeterTests
         Assert.Equal(default, link.StereoMeter("mix", "stream"));
         Assert.All(link.MeterHistory("mix", "stream"), sample => Assert.Equal(0, sample));
     }
+
+    [Fact]
+    public void ALampSitsOnTheMiddleOfTheLineWhicheverFaceItWears()
+    {
+        Screen screen = new(4, 2);
+        Theme lamp = Theme.FromJson("""{"controls":{"led":"lamp"}}""", "lamp", "Lamp");
+        Widgets.Lamp(screen, 0, 0, on: true, lamp, lamp.Card);
+        Widgets.Lamp(screen, 1, 0, on: true, Theme.Material, Theme.Material.Card);
+
+        // A half block would sit under the lettering beside it.
+        Assert.Equal('\u25a0', screen.At(0, 0).Ch);
+        Assert.Equal('\u25cf', screen.At(1, 0).Ch);
+    }
 }

@@ -21,7 +21,7 @@ folders and the same saved choice, on its own Options tab, so an appearance
 picked in one is the appearance in the other. A terminal has no gradients,
 images or corner radii, so it takes a gradient at its first stop. It also
 reads `controls`: console faders get a three-cell cap, cap keys get
-brackets and lamp LEDs get a block face. The pixel sizes and segment counts
+brackets and lamp LEDs get a square face rather than a round one. The pixel sizes and segment counts
 remain the window's; the terminal sizes these drawings to its cells. A
 meter is a solid bar in eighth blocks whichever appearance is named, and
 its colour blends from `Ox.Meter.Fill` through `Ox.Meter.Warning` to

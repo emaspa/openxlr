@@ -39,25 +39,32 @@ internal sealed class MatrixView : View
         _row = Math.Clamp(_row, 0, channels.Count);
         _column = Math.Clamp(_column, 0, mixes.Count - 1);
 
-        int cells = Math.Max(1, (area.Width - NameWidth - 2) / MinCell);
+        // With height to spare every meter is stereo, on two rows of its own,
+        // and a channel takes two rows so its neighbours do not touch. A short
+        // terminal keeps one row a channel and one summed bar.
+        bool roomy = area.Height - 7 >= channels.Count * 2;
+        int nameWidth = roomy ? 22 : NameWidth;
+        int masterHeight = roomy ? 5 : 3;
+
+        int cells = Math.Max(1, (area.Width - nameWidth - 2) / MinCell);
         int shown = Math.Min(mixes.Count, cells);
         if (_column < _scroll) _scroll = _column;
         if (_column >= _scroll + shown) _scroll = _column - shown + 1;
         _scroll = Math.Clamp(_scroll, 0, Math.Max(0, mixes.Count - shown));
-        int cellWidth = Math.Max(MinCell, (area.Width - NameWidth - 2) / shown);
+        int cellWidth = Math.Max(MinCell, (area.Width - nameWidth - 2) / shown);
 
         int x0 = area.X + 1;
         int y = area.Y;
 
         // The mix masters: name, volume, mute and the mix's own meter.
-        screen.Text(x0, y, "MIXES", theme.TextSecondary, theme.Card, bold: true, maxWidth: NameWidth);
+        screen.Text(x0, y, "MIXES", theme.TextSecondary, theme.Card, bold: true, maxWidth: nameWidth);
         for (int index = 0; index < shown; index++)
         {
             MixEntry mix = mixes[_scroll + index];
-            int x = x0 + NameWidth + index * cellWidth;
+            int x = x0 + nameWidth + index * cellWidth;
             bool here = _row == 0 && _scroll + index == _column;
             Rgb back = here ? theme.Selection : theme.Tile;
-            screen.Fill(x, y, cellWidth - 1, 3, back);
+            screen.Fill(x, y, cellWidth - 1, masterHeight, back);
             screen.Text(x + 1, y, mix.Name, theme.TextPrimary, back, bold: true, maxWidth: cellWidth - 3);
 
             int barWidth = cellWidth - 8;
@@ -66,38 +73,52 @@ internal sealed class MatrixView : View
                 theme.TextDetail, back);
 
             Widgets.MuteKey(screen, x + 1, y + 2, mix.Muted ? "MUTE" : " ON ", mix.Muted, theme, here);
-            Widgets.Meter(screen, x + 8, y + 2, cellWidth - 10, app.Link.Meter("mix", mix.Id), theme, back);
+            MeterReading level = app.Link.StereoMeter("mix", mix.Id);
+            if (roomy)
+            {
+                Stereo(screen, x + 1, y + 3, cellWidth - 4, level, theme, back);
+            }
+            else
+            {
+                Widgets.Meter(screen, x + 8, y + 2, cellWidth - 10, level.Level, theme, back);
+            }
         }
 
-        y += 3;
+        y += masterHeight;
         for (int column = 0; column < area.Width; column++)
-            screen.Set(area.X + column, y, '─', theme.Rule, theme.Card);
+            screen.Set(area.X + column, y, '\u2500', theme.Rule, theme.Card);
         y++;
 
-        // One row per channel: its name, its meter, and its send into each mix.
-        int rows = Math.Max(1, area.Bottom - y);
+        // One channel per row, or two rows with its own stereo meter.
+        int step = roomy ? 2 : 1;
+        int rows = Math.Max(1, (area.Bottom - y) / step);
         int first = Math.Max(0, Math.Min(_row - 1 - rows + 2, channels.Count - rows));
         if (_row == 0) first = 0;
+        int meterWidth = roomy ? nameWidth - 13 : 4;
+        int meterX = x0 + nameWidth - meterWidth - 2;
         for (int index = 0; index < rows && first + index < channels.Count; index++)
         {
             ChannelEntry channel = channels[first + index];
-            int line = y + index;
+            int line = y + index * step;
             bool selectedRow = _row == first + index + 1;
             Rgb rowBack = selectedRow ? theme.SelectedFace : theme.Card;
-            screen.Fill(area.X, line, area.Width, 1, rowBack);
+            screen.Fill(area.X, line, area.Width, step, rowBack);
 
             Rgb nameColour = channel.Hardware ? theme.TextPrimary : theme.TextDetail;
-            screen.Text(x0, line, channel.Name, nameColour, rowBack, bold: selectedRow, maxWidth: NameWidth - 6);
-            Widgets.Meter(screen, x0 + NameWidth - 5, line, 4, app.Link.Meter("ch", channel.Id), theme, rowBack);
+            screen.Text(x0, line, channel.Name, nameColour, rowBack, bold: selectedRow,
+                maxWidth: meterX - x0 - 1);
+            MeterReading level = app.Link.StereoMeter("ch", channel.Id);
+            if (roomy) Stereo(screen, meterX, line, meterWidth + 2, level, theme, rowBack);
+            else Widgets.Meter(screen, meterX, line, meterWidth, level.Level, theme, rowBack);
 
             for (int cell = 0; cell < shown; cell++)
             {
                 MixEntry mix = mixes[_scroll + cell];
-                int x = x0 + NameWidth + cell * cellWidth;
+                int x = x0 + nameWidth + cell * cellWidth;
                 bool here = selectedRow && _scroll + cell == _column;
                 Rgb back = here ? theme.Selection : rowBack;
                 bool muted = channel.IsMuted(mix.Id);
-                double level = channel.Level(mix.Id);
+                double value = channel.Level(mix.Id);
 
                 screen.Fill(x, line, cellWidth - 1, 1, back);
                 int barWidth = cellWidth - 7;
@@ -108,12 +129,22 @@ internal sealed class MatrixView : View
                 }
                 else
                 {
-                    Widgets.Fader(screen, x + 1, line, barWidth, level, 1, theme, back, here);
+                    Widgets.Fader(screen, x + 1, line, barWidth, value, 1, theme, back, here);
                 }
-                screen.Text(x + barWidth + 2, line, Widgets.Percent(level).PadLeft(4),
+                screen.Text(x + barWidth + 2, line, Widgets.Percent(value).PadLeft(4),
                     muted ? theme.TextMuted : theme.TextDetail, back);
             }
         }
+    }
+
+    /// <summary>Left above right, each lettered, on two rows of its own.</summary>
+    private static void Stereo(Screen screen, int x, int y, int width, MeterReading level, Theme theme, Rgb back)
+    {
+        if (width < 4) return;
+        screen.Text(x, y, "L", theme.TextMuted, back);
+        screen.Text(x, y + 1, "R", theme.TextMuted, back);
+        Widgets.Meter(screen, x + 2, y, width - 2, level.Left, theme, back);
+        Widgets.Meter(screen, x + 2, y + 1, width - 2, level.Right, theme, back);
     }
 
     public override bool Handle(KeyPress key, App app)
