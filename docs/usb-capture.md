@@ -1,7 +1,7 @@
 # Capturing USB traffic for testers
 
 This guide is for owners of the original Wave XLR (`0fd9:007d`) who want
-to help map the rest of its protocol. No programming needed, just
+to help map the rest of its protocol. No programming needed, only
 Wireshark and about 15 minutes.
 
 The remaining targets are low cut, ClipGuard, mic/PC crossfade and the

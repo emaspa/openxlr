@@ -30,7 +30,7 @@ release and enabled repositories; the .NET SDK must be version 10.
 The native editor tests additionally use Xvfb and xauth.
 
 ```sh
-# Arch
+# Arch Linux, CachyOS and Omarchy
 sudo pacman -S --needed dotnet-sdk aspnet-runtime pipewire pipewire-pulse wireplumber libusb libpulse alsa-utils glib2 xdg-utils
 # optional: software ClipGuard for the XLR Dock, and LV2 plugins for inserts
 sudo pacman -S --needed swh-plugins lilv lsp-plugins-lv2
@@ -62,8 +62,10 @@ dotnet build src/OpenXLR.slnx -c Release --no-restore -warnaserror -p:EnableNati
 ```
 
 Binaries land in `src/OpenXLR.Daemon/bin/Release/net10.0/` and
-`src/OpenXLR.UI/bin/Release/net10.0/`. The native flag builds `native/` and
-copies `openxlr-lv2-host` next to the daemon. CLAP/VST3 headers are vendored.
+`src/OpenXLR.UI/bin/Release/net10.0/`; the terminal mixer is
+`src/OpenXLR.Tui/bin/Release/net10.0/openxlr-tui`. The native flag builds
+`native/` and copies `openxlr-lv2-host` next to the daemon. CLAP/VST3
+headers are vendored.
 
 You may omit the flag for hardware control and LV2 filter-chain inserts
 without native editors. CLAP and VST3 require the helper. Keep the flag
@@ -184,7 +186,19 @@ mkdir -p ~/.config/opendeck/plugins
 cp -r plugin/com.emaspa.openxlr.sdPlugin ~/.config/opendeck/plugins/
 ```
 
-## 8. Updating
+## 8. Omarchy bar plugin (optional)
+
+On Omarchy 4, link the checkout's plugin into the shell and enable it:
+
+```sh
+bash packaging/omarchy/openxlr-omarchy-enable "$PWD/packaging/omarchy/openxlr.mixer"
+```
+
+It needs `qt6-websockets` and the running daemon. `omarchy plugin remove
+openxlr.mixer` takes it out again; [omarchy.md](omarchy.md) has the
+commands and the package recipe.
+
+## 9. Updating
 
 ```sh
 git pull --ff-only
@@ -210,7 +224,8 @@ rm -f ~/.config/autostart/openxlr.desktop
 systemctl --user daemon-reload
 ```
 
-Stop the UI as well. These commands remove the files installed by this
+Stop the UI as well. On Omarchy, `omarchy plugin remove openxlr.mixer`
+unlinks the bar plugin. These commands remove the files installed by this
 guide and preserve other service overrides. Saved settings and private
 Windows wrappers remain in `~/.config/openxlr` and
 `~/.local/share/openxlr/yabridge`; back them up before removing them if you

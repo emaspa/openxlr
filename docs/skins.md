@@ -434,7 +434,10 @@ meter, which is why the loud end starts lower than you might expect.
 The colour belongs to the **place on the scale**, not to the reading. The
 quiet end is drawn in `Ox.Meter.Fill` however loud the signal gets, and
 the warning and top colours appear only on the parts of the bar the signal
-has actually reached. A meter never repaints itself end to end. A cell of
+has actually reached. A meter never repaints itself end to end. A
+continuous meter draws the lit part as one bar: only its two ends are
+rounded, and the zone edges sit on whole pixels, so where the colours are
+the same the bar is unbroken. A cell of
 a segmented meter is coloured by its own place on the scale for the same
 reason. A hot level below the warning level is read as equal to it, so the
 zones can never cross.
@@ -621,7 +624,7 @@ six flat indicator colours.
 
 ## Colour, contrast and testing
 
-The test suite holds both shipped appearances to a few rules, and a skin
+The test suite holds every shipped appearance to a few rules, and a skin
 you intend to share is worth checking against the same ones by eye:
 
 - text stays readable on the surface it lands on, and an indicator stays

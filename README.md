@@ -51,9 +51,9 @@ the author's own hardware.
 The UI shows the controls OpenXLR exposes for the connected device, and a picker
 in the header switches between several attached interfaces. The
 per-control state of every device is in
-[docs/hardware-support.md](docs/hardware-support.md). Own an untested
-device? Open an issue with a diagnostics archive (Options, SUPPORT,
-Collect diagnostics).
+[docs/hardware-support.md](docs/hardware-support.md). If you own an
+untested device, open an issue with a diagnostics archive (Options,
+SUPPORT, Collect diagnostics).
 
 ## Features
 
@@ -144,7 +144,9 @@ Collect diagnostics).
 - **Omarchy bar**: `openxlr.mixer` shows XLR meters, mute and monitor feeds
   in Omarchy 4, with channel sends and mix masters in a popout. The Arch
   package integration and user enable command are in
-  [docs/omarchy.md](docs/omarchy.md). Desktop acceptance on Omarchy is pending.
+  [docs/omarchy.md](docs/omarchy.md). The bar and the popout have been
+  checked on Omarchy 4.0.4; the live theme switch and the hardware
+  controls still need desktop acceptance.
 - **Skins**: the window's appearance is a set of named values a skin file
   can replace. Thirteen ship, all built into the application: Material, its
   own look, Deck, which dresses the window in the visual language of the
@@ -176,20 +178,25 @@ mute, level and insert is a target.
 
 ## Install
 
-Packages exist for Arch (AUR), Ubuntu (PPA), Fedora (COPR) and NixOS
-(flake); every release also carries a `.deb` and an `.rpm` for a manual
-install, with SHA-256 checksums and a GitHub build provenance
-attestation (`gh attestation verify <file> --owner emaspa`). Pick your
-distribution:
+Packages exist for Arch Linux, CachyOS and Omarchy (AUR), Ubuntu (PPA),
+Fedora (COPR) and NixOS (flake); every release also carries a `.deb` and
+an `.rpm` for a manual install, with SHA-256 checksums and a GitHub build
+provenance attestation (`gh attestation verify <file> --owner emaspa`).
+Pick your distribution:
 
-**Arch Linux**, from the
-[AUR](https://aur.archlinux.org/packages/openxlr):
+**Arch Linux, CachyOS and Omarchy**, from the
+[AUR](https://aur.archlinux.org/packages/openxlr); the two derivatives
+install the same package:
 
 ```sh
 yay -S openxlr        # or: paru -S openxlr
 systemctl --user enable --now openxlr-daemon
 openxlr               # the mixer UI, also in your application menu
 ```
+
+A package built on Omarchy also carries the bar plugin. Run
+`openxlr-omarchy-enable` once to link and enable it, as
+[docs/omarchy.md](docs/omarchy.md) describes.
 
 **Ubuntu** 24.04 and 26.04, from the
 [PPA](https://launchpad.net/~sparvoli/+archive/ubuntu/openxlr):
@@ -306,6 +313,8 @@ historical protocol research.
   live layout commands
 - [Skins](docs/skins.md): the appearance values a skin sets, where skins
   are found, and what a skin is not allowed to do
+- [Omarchy bar plugin](docs/omarchy.md): the shell plugin, its enable
+  command, the Arch package recipe and what the popout does not do
 - [Architecture](docs/architecture.md): daemon, UI and plugin, the
   PipeWire graph, the device protocols, repository layout
 - [Hardware support](docs/hardware-support.md): per-control status of
@@ -324,8 +333,8 @@ Support, hardware reports, feature requests and release news also live
 on the OpenXLR Discord server, [discord.gg/4bswtnGPW4](https://discord.gg/4bswtnGPW4),
 and on Reddit at [r/OpenXLR](https://www.reddit.com/r/OpenXLR/). The
 window links to both from About in the main header. Confirmed bugs still end up
-as GitHub issues, so any of the three works to start. Want to help
-with code or hardware reports? Read [CONTRIBUTING.md](CONTRIBUTING.md)
+as GitHub issues, so any of the three works to start. To help with
+code or hardware reports, read [CONTRIBUTING.md](CONTRIBUTING.md)
 first.
 
 ## Reporting problems

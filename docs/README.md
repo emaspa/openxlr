@@ -8,13 +8,16 @@ open `main`, so they can describe changes newer than the installed release.
 
 - [Project README](../README.md): supported devices, packages and quick start.
 - [Manual](manual.md): mixer tasks, application routing, plugins, profiles,
-  Flow, Stream Deck, troubleshooting and local files.
+  Flow, Stream Deck, troubleshooting, local files, the terminal mixer and
+  the Omarchy bar.
 - [Features](features.md): supported behaviour by area.
 - [Skins](skins.md): the window's appearance values, where skins live and
   the rules one is read under, with a [JSON schema](skin.schema.json) and an
   [example skin](examples/skins/example/skin.json) to start from.
 - [Hardware support](hardware-support.md): mapped controls, verification
   records and unmapped hardware features.
+- [Omarchy shell plugin](omarchy.md): the bar plugin, its enable command,
+  the Arch package recipe and its limits.
 - [Source installation](install-from-source.md): prerequisites, native build,
   service setup, updates, uninstall and environment variables.
 - [Windows bridge](../packaging/yabridge/README.md): companion availability,

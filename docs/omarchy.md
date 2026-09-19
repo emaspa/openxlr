@@ -153,11 +153,11 @@ if (( _openxlr_omarchy )); then
 fi
 ```
 
-A package built on Omarchy differs from one built elsewhere, including a
-clean Arch build chroot: only the Omarchy build carries the plugin and the
-command. Omarchy is Arch only, so the Debian, RPM and Nix packages do not
-install it. The manifest's version is the plugin's own and is not tied to
-the application version.
+A package built on Omarchy differs from one built elsewhere, on Arch
+Linux, on CachyOS or in a clean Arch build chroot: only the Omarchy build
+carries the plugin and the command. Omarchy is Arch only, so the Debian,
+RPM and Nix packages do not install it. The manifest's version is the
+plugin's own and is not tied to the application version.
 
 ## Connection and limits
 

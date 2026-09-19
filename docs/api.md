@@ -305,9 +305,11 @@ when the helper is installed. Unsupported native selections are rejected.
 Changing this choice via `setInserts` rebuilds the chain and can interrupt audio.
 Only exposed parameter values are persisted, not opaque plugin state or presets.
 
-The OpenDeck plugin in `plugin/` is a client of this API; the command
-handler is `WebSocketHub.cs` and the message shapes are in
-`Protocol.cs`, both under `src/OpenXLR.Daemon/`.
+The OpenDeck plugin in `plugin/`, the terminal mixer
+(`src/OpenXLR.Tui/DaemonLink.cs`) and the Omarchy plugin
+(`packaging/omarchy/openxlr.mixer/DaemonLink.qml`) are clients of this
+API; the command handler is `WebSocketHub.cs` and the message shapes are
+in `Protocol.cs`, both under `src/OpenXLR.Daemon/`.
 
 ## Configuration files
 
@@ -344,7 +346,7 @@ All under `~/.config/openxlr/` (or `$XDG_CONFIG_HOME/openxlr/`):
   Release defaults are not copied into this file. Remove an override through
   `setNativeEditorRule` with null `blocked` to follow release defaults again.
 - `ui.json`: window preferences (tray, start minimized, autostart
-  toggles)
+  toggles, the chosen skin)
 
 ## Plugin discovery diagnostics
 
@@ -409,7 +411,7 @@ omissions do not produce repeated warnings. Options shows the count and
 list under PLUGINS, and Rescan retries the failures.
 
 `status` is null without a controller. Otherwise it contains `exitCode`,
-`timedOut`, `truncated`, `output` and `error`, or just `error` when the
+`timedOut`, `truncated`, `output` and `error`, or only `error` when the
 controller cannot start. The status command has a five-second deadline,
 64 KiB stdout and 16 KiB stderr limits. It does not run a sync.
 

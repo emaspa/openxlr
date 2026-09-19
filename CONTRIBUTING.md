@@ -7,8 +7,8 @@ or in a GitHub issue.
 
 ## What helps most
 
-- **Hardware reports.** Own a device we could not test ourselves? Run
-  the controls, note what works and what does not, and open an issue
+- **Hardware reports.** If you own a device we could not test ourselves,
+  run the controls, note what works and what does not, and open an issue
   with a diagnostics archive (Options, SUPPORT, Collect diagnostics in
   the window). The per-control table in
   [docs/hardware-support.md](docs/hardware-support.md) shows what is

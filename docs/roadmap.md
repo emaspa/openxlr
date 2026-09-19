@@ -55,7 +55,8 @@ This is what 0.1.42 ships. A checked item is in the released packages.
   daemon's socket, with every skin the window has, one of them for each
   Omarchy palette; inserts open the plugin's own editor or generated
   controls and a picker adds plugins from the catalogue.
-- [x] Packages: AUR, Debian/Ubuntu, Fedora, NixOS flake and module.
+- [x] Packages: AUR (Arch Linux, CachyOS and Omarchy), Debian/Ubuntu,
+  Fedora, NixOS flake and module.
 - [x] Daemon recovery basics: fast shutdown, busy-port wait, self-healing
   input and capture feeds, UCM coexistence on the Pro, a rebuild after a
   pipewire-pulse restart, a refusal to grow the layout past
@@ -153,8 +154,8 @@ a skin overlays values on top of them.
 - [ ] Omarchy 4 bar integration: XLR meters and monitor feeds in the bar,
   channel sends and mix masters in a popout. The implementation and Arch
   package instructions are in [omarchy.md](omarchy.md). The bar and the
-  popout are confirmed on Omarchy 4.0.4; the hardware controls still need
-  desktop acceptance.
+  popout are confirmed on Omarchy 4.0.4; the live theme switch and the
+  hardware controls still need desktop acceptance.
 - [ ] Layout density: a compact mode for small screens and a large mode
   for touch.
 - [ ] Localization infrastructure and the first translations.

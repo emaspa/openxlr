@@ -4,6 +4,7 @@
 flowchart TD
     UI["Avalonia UI / OpenDeck"] -->|"authenticated WebSocket"| Daemon["OpenXLR daemon"]
     Scripts["Scripts / tools"] -->|"authenticated HTTP or WebSocket"| Daemon
+    Clients["Terminal mixer / Omarchy plugin"] -->|"authenticated WebSocket"| Daemon
     UI -->|"D-Bus"| Desktop["Desktop portal: global shortcuts; KWin: focused process"]
     Daemon -->|"gdbus: focused process"| UI
     Daemon --> Core["Core: device control, mixer, profiles"]
@@ -41,6 +42,13 @@ flowchart TD
   window for it with `gdbus`, one request at a time.
 - The OpenDeck plugin is an OpenAction plugin in OpenDeck's Node runtime,
   using the same authenticated API and live choices as the window.
+- `OpenXLR.Tui` is the terminal mixer, `openxlr-tui`. It speaks the same
+  authenticated WebSocket, draws its own cells, and reads the window's
+  skins from the same folders and the same saved choice. Like the window
+  it has no reference to Core, and it has no NuGet dependency.
+- The Omarchy plugin, `packaging/omarchy/openxlr.mixer/`, is QML for
+  Omarchy 4's bar. It connects to `/api/v1/events` with the same token and
+  uses the documented commands; [omarchy.md](omarchy.md) has its limits.
 - `OpenXLR.Core` contains device backends, the PipeWire adapter, mixer,
   application matching, plugin catalogues and profile storage. The native
   host processes plugin audio without passing samples through managed code.
@@ -181,7 +189,8 @@ controls, all reached without detaching the kernel's audio driver:
   control takes one path only, since the kernel caches feature-unit
   values. Its DSP is provided host-side by the submixer
 
-libusb never runs inside the daemon: a helper process (the daemon
+libusb runs outside the daemon (`OPENXLR_USB_INPROCESS=1` keeps it
+inside, for debugging): a helper process (the daemon
 binary started with `--usb-helper`) owns it and answers open, close and
 control-transfer requests over length-prefixed frames on its stdin and
 stdout. The helper claims the vendor interface when it opens the device
@@ -201,7 +210,7 @@ reopened after 2 s, doubling on each further failure up to 32 s.
 ## Repository layout
 
 ```
-src/            .NET solution: Core (device + mixer), Daemon, UI, Probe, Tests
+src/            .NET solution: Core (device + mixer), Daemon, UI, Tui, Probe, Tests
 native/         optional C/C++ plugin host, vendored interface headers, editor tests
 plugin/         the OpenDeck (Stream Deck) plugin
 docs/           this documentation, protocol write-up, capture guides
@@ -210,6 +219,7 @@ tools/          proprobe.py, a standalone Python probe for the vendor protocol,
                 document's shape, the rpm recipe's %files)
 packaging/      systemd unit, the pipewire-pulse open-file drop-in, udev rule,
                 WirePlumber rules, UCM profile, rpm and nix packaging, OpenDeck patches,
+                the Omarchy bar plugin and its enable command,
                 optional yabridge companion source and package recipes
 debian/         Debian/Ubuntu packaging
 ```

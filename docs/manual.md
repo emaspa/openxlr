@@ -185,7 +185,7 @@ affects only the display; the daemon continues processing audio.
    Those needles sweep the full range; every other dial keeps its 0 to 100% scale.
    Desktop changes are saved with the mixer settings
    and recalled after a daemon restart; explicitly loading a profile restores
-   the values saved in that profile. A physical device named simply
+   the values saved in that profile. A physical device named
    "Monitor" (often HDMI audio) is a separate output device, not a third mix.
 4. The Volume slider sets the level of the selected devices. To control this
    same level with a keyboard volume wheel, media keys or the Linux audio
@@ -347,8 +347,8 @@ channel, with its level and lock in the INPUTS card.
 
 The generated controls cover the parameters the daemon read from the
 plugin. A plugin's own editor can be opened as well, with the native
-host described in 3.12. CLAP and VST3 plugins appear in the same picker
-and always run in that host. VST2 plugins cannot be loaded.
+host described in [section 3.13](#plugin-editors). CLAP and VST3 plugins
+appear in the same picker and always run in that host. VST2 plugins cannot be loaded.
 
 <a name="native-editor-compatibility"></a>
 **Native editor compatibility.** Open Options, PLUGINS, then "Native editors"
@@ -433,7 +433,7 @@ editor input fix. Install it from the same place you installed OpenXLR.
 Wine comes with it as a dependency.
 
 ```sh
-# Arch, from the AUR
+# Arch Linux, CachyOS and Omarchy, from the AUR
 yay -S openxlr-yabridge
 
 # Ubuntu, from the PPA you already added for OpenXLR
@@ -775,7 +775,7 @@ companion includes the input fix.
 
 Wine changed how it tracks where a window is in 9.22. A plugin editor is
 embedded in a window belonging to its host, and Wine never learns where
-that window really is, so it keeps believing the window sits in the very
+that window really is, so it keeps believing the window sits in the
 corner of the screen. Every click arrives offset by the distance between
 those two positions, which for a window anywhere else on a desktop lands
 far outside the plugin, and Wine drops it before the plugin sees it. The
@@ -1820,8 +1820,9 @@ It needs a terminal. With its output piped somewhere it says so and stops.
 <a name="omarchy"></a>
 ## The Omarchy bar
 
-On Omarchy 4, run `openxlr-omarchy-enable` once after installing an Arch
-package built with the shell plugin. The bar then shows XLR input meters,
+On Omarchy 4 the AUR package carries the shell plugin when it is built
+there. Run `openxlr-omarchy-enable` once after installing it. The bar
+then shows XLR input meters,
 dimmed for hardware mute, and the first selected monitor output's feed and
 meter. An input appears only while it has had signal above -60 dBFS within
 the last 10 seconds. Muting keeps that history; a quiet input disappears
