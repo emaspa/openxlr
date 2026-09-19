@@ -4,9 +4,9 @@ The daemon reads the layout from `mixer.json` before building its graph.
 Stop the daemon before editing this file manually: while running, its normal
 settings saves overwrite the file with the live configuration.
 
-`userChannels` is an ordered list of application and capture channels and `userMixes` an
-ordered list of virtual microphones. Each entry has a stable `id` and a display
-`name`. For example:
+`userChannels` is an ordered list of application and capture channels and
+`userMixes` an ordered list of virtual microphones. Each entry has a stable
+`id` and a display `name`. For example:
 
 ```json
 {
@@ -19,30 +19,65 @@ These are fields in the existing settings object; retain its other fields when
 editing. Missing or null lists keep the legacy defaults. A single invalid entry
 is dropped and logged with its path, and the rest of the file still applies; a
 file that cannot be parsed at all is copied to `mixer.json.corrupt` before the
-next save replaces it. An empty mix list
-removes the editable virtual microphones. An empty application list falls back
-to System so incoming applications have a destination.
+next save replaces it. An empty mix list removes the editable virtual
+microphones. An empty application list falls back to System so incoming
+applications have a destination.
 
 Hardware inputs, Monitor A (`monitor`), Monitor B (`monitor2`) and Aux
 (`auxout`) remain structural. The `ignore` application target is reserved.
-Invalid or duplicate entries are ignored. IDs contain at most 36 lowercase
-ASCII letters, digits, underscores or hyphens, beginning with a letter. Names
-contain 1 to 60 printable characters. At most 32 editable channels and 16
-virtual microphones are restored.
+Invalid or duplicate entries are ignored; ids compare without regard to case,
+and an entry that repeats a structural id is dropped. IDs contain at most 36
+lowercase ASCII letters, digits, underscores or hyphens, beginning with a
+letter. Names contain 1 to 60 printable characters and are trimmed. At most
+32 editable channels and 16 virtual microphones are restored.
 
 Node names derive from IDs, not labels. The list order survives a settings
 save and restart. Removed application destinations fall back to the first
 application channel, never a hardware input; ignored applications stay ignored.
 Existing monitor-feed settings and profile semantics are unchanged.
 
+## Other fields
+
+The rest of the settings object is the live state the daemon writes back on
+every save. Every field is optional on read; an absent one is empty or off.
+
+| Field | Holds |
+|---|---|
+| `mixVolumes` | mix id to master level |
+| `mixMuted` | mix ids whose master is muted |
+| `levels` | `channel\|mix` to send level |
+| `channelMuted` | `channel\|mix` cells whose send is muted |
+| `monitorOutputs` | the selected outputs, in order; the first one is what `@monitor` resolves to |
+| `monitorOutput` | the older single selection, read only when `monitorOutputs` is empty |
+| `monitorFeeds` | output to feed, see [Output routes](#output-routes) |
+| `outputRoutes` | per-route gains, see [Output routes](#output-routes) |
+| `auxPortEnabled` | whether the Aux mix reaches the USB Aux port; when absent, a saved `#usbaux` monitor selection turns it on once and is dropped from the selection |
+| `enforcedDefaultSink` | the output held as the system default, or `@monitor`; `setEnforcedDefaults` and `setMainOutput` write it |
+| `enforcedDefaultSource` | the source held as the system default |
+| `appOverrides` | application identity to remembered channel |
+| `knownApps` | `{identity, label, channelId}` for every application seen |
+| `lowCutHz` | the software low cut, 0, 80 or 120 |
+| `softClipGuard` | the software ClipGuard |
+| `inserts` | insert chains by `xlr1`, `xlr2` or `mix:<id>` |
+
+A null field or a null entry inside one is dropped and logged; so is a
+non-finite number in `mixVolumes`, `levels` or an insert's `params`. A
+`monitorFeeds` entry for an output that is not selected is removed the next
+time the selection is written.
+
 ## Editing while running
 
 The window's Edit layout button, and the commands below over the API,
 edit the running graph. Adding or reordering preserves existing routes;
 renaming an application channel can cause a short gap on that channel,
-and deleting a virtual microphone disconnects its recorders. Each one is saved before it is
-acknowledged; a failed save restores the previous layout and reports an
-error. Ordinary fader saves keep their debounced, retried behaviour.
+and deleting a virtual microphone disconnects its recorders. A command
+whose ids, names or lists fail validation is refused before anything
+changes. Each one is then saved before it is acknowledged, with the
+whole settings object, so a fader move pending in the debounced save is
+on disk with it and an earlier save error is cleared; a failed save
+restores the previous layout and reports an error. A rename to the current
+name is acknowledged without a save. Ordinary fader saves keep their
+debounced, retried behaviour.
 
 - `createChannel {name}` adds an application channel. Only its sink is
   loaded; it starts muted in every mix. The sink's sends into the mixes
@@ -53,9 +88,12 @@ error. Ordinary fader saves keep their debounced, retried behaviour.
   playback device under it, so desktop applets show the new name at once.
   PipeWire parks the streams that were playing into it on the default
   output for the moment the sink is away, and the daemon puts them back.
-- `deleteChannel {channel}` moves the apps routed to it, remembered
-  assignments included, to the first remaining application channel and
-  unloads its sink. The last application channel stays.
+  A capture channel's sink is hidden, so its name changes without a reload.
+- `deleteChannel {channel}` removes an application or capture channel. Apps
+  routed to it, remembered assignments included, and whatever is playing
+  into its sink at that moment move to the first remaining application
+  channel; then its sink is unloaded, and a capture channel's link to its
+  source with it. The last application channel stays.
 - `createMix {name}` adds a virtual microphone. The channel sinks feed the
   mix sinks by name pattern, so every channel grows a send into the new mix
   by itself, muted before the capture device is published. If a channel's
@@ -69,20 +107,26 @@ error. Ordinary fader saves keep their debounced, retried behaviour.
 - `deleteMix {mix}` removes the virtual microphone, its sends, inserts and
   capture device. Anything recording from it loses the device.
   Outputs listening to that mix keep the other mixes in their feed, or return
-  to the first monitor mix if none remain. Feed changes are part of the saved
-  deletion and roll back with it when saving fails.
+  to the first monitor mix if none remain. Its route gains go with it, and
+  an enforced default source that was this microphone is cleared. All of
+  that is part of the saved deletion and rolls back with it when saving
+  fails.
 - `setLayoutOrder {channels, mixes}` reorders the editable ids. Supply every
-  application-channel id and every virtual-microphone id exactly once;
-  hardware inputs, Monitor A/B and Aux keep their positions. No node changes.
-  Open windows apply the published order to channel tiles, mix controls and
-  send rows while retaining the existing controls and their values.
+  application and capture channel id and every virtual-microphone id exactly
+  once; hardware inputs, Monitor A/B and Aux keep their positions. No node
+  changes. Open windows apply the published order to channel tiles, mix
+  controls and send rows while retaining the existing controls and their
+  values.
 
 Every added channel or mix costs pipewire-pulse a few dozen open files;
 the daemon refuses an addition the server has no room for, and the packages
 raise the server's limit ([manual: open-file limit](manual.md#open-files)).
 
-Ids are generated from names (lowercase letters, digits and hyphens,
-starting with a letter, unique with a numeric suffix) and never change
+Ids are generated from names: lowercase letters and digits with hyphens,
+starting with a letter, at most 28 characters, made unique against the
+existing ids and the reserved ones with a numeric suffix (`-2`, `-3`). A
+name that leaves nothing usable becomes `channel` or `mix`, and one that
+starts with a digit gets that word in front. An id never changes
 afterwards, so node names, profiles and Stream Deck keys survive a rename.
 
 Other manual changes, including external PipeWire descriptions, take effect
@@ -90,12 +134,13 @@ at startup.
 
 ## Capture inputs
 
-`createCaptureChannel {name, source, capturePair}` adds a channel from an external
-PipeWire capture source. `source` is its exact `node.name`, at most 256 printable
-characters. `capturePair` is a zero-based stereo pair from 0 to 31 and defaults
-to 0. Mono sources feed both sides. A missing pair stays silent. The source must
-be present when creating the channel. OpenXLR's own devices and sink monitor
-sources are not capture inputs, to avoid direct feedback.
+`createCaptureChannel {name, source, capturePair}` adds a channel from an
+external PipeWire capture source. `source` is its exact `node.name`, at most
+256 printable characters. `capturePair` is a zero-based stereo pair from 0 to
+31 and defaults to 0. Mono sources feed both sides. A missing pair stays
+silent. The source must be present when creating the channel. OpenXLR's own
+devices and sink monitor sources are not capture inputs, to avoid direct
+feedback: a name starting with `OpenXLR` or ending in `.monitor` is refused.
 
 Capture channels share the editable-channel limit of 32. They start muted in
 all mixes. Their hidden combine sink supports the existing sends, faders,
@@ -107,11 +152,13 @@ same id and display name.
 
 Bindings are stored in `userChannels`, for example
 `{"id":"second-mic","name":"Second microphone","captureSource":"alsa_input.usb-headset","capturePair":0}`.
-An entry without `captureSource` is an application channel, as in older files.
+An entry without `captureSource` is an application channel, as in older files;
+one that carries a `capturePair` other than 0 without a source is dropped.
 Invalid capture bindings are discarded, not converted into application channels.
 The binding belongs to the layout, not a profile. Rename, reorder and delete
 use the existing channel commands. Renaming leaves the capture graph running.
-To use a different source or pair, create a new capture channel and remove the old one.
+To use a different source or pair, create a new capture channel and remove the
+old one.
 
 Disconnected sources retain their exact binding and faders. They reconnect
 when that node and pair return, without falling back to another microphone.
@@ -126,22 +173,30 @@ existing XLR channels.
 
 ## Output routes
 
-`monitorFeeds` records the mixes included in each selected output. The output
-matrix can store an empty string for a deliberately silent output; it stays
-silent across recalls and unrelated mix deletion. Deleting its last included
-mix retains the existing fallback to the primary monitor mix.
+`monitorFeeds` records the mixes included in each selected output, as one mix
+id or several joined with `+`. An output without an entry hears the first
+monitor mix. The output matrix can store an empty string for a deliberately
+silent output; it stays silent across recalls and unrelated mix deletion.
+Deleting its last included mix retains the existing fallback to the primary
+monitor mix. The jacks of one interface share a return bus, so they are
+written with one feed.
 
 `outputRoutes` stores gain exceptions as `{device, mix, level}` entries. A
 selected feed absent from this list uses 100%. Levels are positive and at
-most 1; zero is represented by removing the mix from `monitorFeeds`.
-The state, mixer settings and profile scenes carry this list. Shared Pro
-jack routes use the canonical `device#bus` key. Removing an output or mix
-removes its gains; a failed mix-deletion save restores them. A legacy scene
-that recalls output selection or feeds without gains uses unity gains.
+most 1; an entry at 1 is read as absent, and zero is represented by removing
+the mix from `monitorFeeds`. `device` is at most 256 characters and `mix`
+at most 36; at most 304 entries are read. The state, mixer settings and
+profile scenes carry this list. Shared Pro jack routes use the canonical
+`device#bus` key. Removing an output or mix removes its gains; a failed
+mix-deletion save restores them. A legacy scene that recalls output
+selection or feeds without gains uses unity gains.
 
-`setOutputRoute` changes one route. Fader saves retain the normal debounced
-and retried persistence behaviour. A route below unity uses a hidden
-PipeWire gain sink, created muted before it is connected. Unity routes use
-direct links until they need a gain node. Existing gain nodes update in
-place, and unrelated outputs keep their links. Gain-node creation checks
-pipewire-pulse's open-file headroom and adds no helper process per route.
+`setOutputRoute {device, mix, value}` changes one route. A positive value
+adds the mix to the output's feed or adjusts its level; zero removes it, and
+an output whose last mix is removed this way is stored silent. Fader saves
+retain the normal debounced and retried persistence behaviour. A route
+below unity uses a hidden PipeWire gain sink, created muted before it is
+connected. Unity routes use direct links until they need a gain node.
+Existing gain nodes update in place, and unrelated outputs keep their links.
+Gain-node creation checks pipewire-pulse's open-file headroom and adds no
+helper process per route.

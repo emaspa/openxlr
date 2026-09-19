@@ -29,7 +29,8 @@ read before touching the tree.
   [docs/mixer-layout.md](docs/mixer-layout.md) for the layout file and
   its live commands, [docs/skins.md](docs/skins.md) for appearance values
   and the skin format, [docs/manual.md](docs/manual.md) for behaviour
-  users see.
+  users see and [docs/features.md](docs/features.md) when it is a
+  feature.
 
 ## Build and check
 
@@ -46,7 +47,9 @@ tools/check-locked-restore.sh
 tools/check-openapi.py docs/openapi-v1.json
 tools/check-spec.py packaging/rpm/openxlr.spec
 make -C native  # C/C++, PipeWire, lilv, LV2 and X11 development headers
-make -C native test-audio test-clap test-vst3  # audio bounds, stall detection, CLAP bus layouts and VST3 parameter and stream checks
+make -C native test-audio test-clap test-vst3 test-scan  # audio bounds, stall detection, CLAP bus layouts, VST3 parameter and stream checks, scan phase markers
+dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~Lv2BundleTests  # run with lilv installed, even if the earlier suite ran without it
+python3 tools/test-monitor-volume.py  # private PipeWire server and session bus; pipewire-pulse, wireplumber, pactl, dbus-daemon
 xvfb-run -a make -C native test-editor  # also needs Xvfb and xauth
 OPENXLR_TEST_DESKTOP=1 xvfb-run -a dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~TrayWindowTests
 OPENXLR_TEST_LAYOUT=1 xvfb-run -a -s '-screen 0 2560x1440x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~WindowLayoutTests
@@ -55,8 +58,10 @@ OPENXLR_TEST_SKIN=1 xvfb-run -a -s '-screen 0 2560x1440x24' dotnet test src/Open
 ```
 
 These cover the main CI build and tests; the workflow also checks packaged
-service inputs. The build treats warnings as errors, so a build
-counts as clean only with `0 Error(s)` and `0 Warning(s)`.
+service inputs. The desktop keys tests in the main suite start a private
+session bus with `dbus-daemon` and skip without it. The build treats
+warnings as errors, so a build counts as clean only with `0 Error(s)` and
+`0 Warning(s)`.
 After a package change, regenerate the lock files with a plain
 `dotnet restore src/OpenXLR.slnx` and the Nix dependency list with
 `nix build .#openxlr.passthru.fetch-deps -o /tmp/fd && /tmp/fd packaging/nix/deps.json`,
@@ -74,21 +79,29 @@ and [package checks](packaging/yabridge/README.md).
 - `src/OpenXLR.Core`: device protocols (`Devices/`), the PipeWire
   submixer (`Mixing/`), profiles, shared paths and the process runner.
 - `src/OpenXLR.Daemon`: the hosted service, WebSocket hub, command
-  validation, token, watchdog.
-- `src/OpenXLR.UI`: the Avalonia window. It has no reference to Core;
-  the two files both need are compiled in as linked sources.
+  validation, token, watchdog, and the focused-application query the
+  daemon puts to the window through `gdbus`.
+- `src/OpenXLR.UI`: the Avalonia window, and the desktop portal and KWin
+  connection behind desktop keys (`DesktopBus.cs`, `DesktopKeys.cs`,
+  `KWinFocus.cs`). It has no reference to Core; the two files both need
+  are compiled in as linked sources.
 - `plugin/com.emaspa.openxlr.sdPlugin`: the OpenDeck plugin
   (`plugin.mjs`) and its property inspectors; tests in `plugin/tests`.
 - `native/`: C/C++ LV2, CLAP and VST3 host, editor regression tests.
-- `packaging/`: optional yabridge companion, unit, udev rule, WirePlumber rules, RPM spec, Nix,
-  PPA script; `debian/` for the .deb.
+- `packaging/`: optional yabridge companion, unit, udev rule, WirePlumber
+  rules, pipewire-pulse drop-in, desktop entry, RPM spec, Nix, PPA script,
+  the experimental UCM profile and OpenDeck patches; `debian/` for the
+  .deb.
 
 ## Rules the code already follows
 
 - Files under `~/.config/openxlr` are written through
   `OpenXlrPaths.WriteAtomic`; helper processes run through
-  `ProcessRunner`. Do not add a `Process.Start` or a `File.WriteAllText`
-  for either.
+  `ProcessRunner`, a program handed to the user (an installer, the
+  desktop's link opener) through its `RunInteractiveAsync`. Do not add a
+  `Process.Start` or a `File.WriteAllText` for either. The one raw
+  process is the meter reader's `parec`, which streams for the sink's
+  whole life and is stopped with the meter.
 - A new command is registered in `CommandValidation`, dispatched in
   `WebSocketHub`, documented in `docs/api.md`, and handled in the client
   that uses it.

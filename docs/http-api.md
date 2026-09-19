@@ -48,6 +48,8 @@ on the events route without a WebSocket upgrade; 401 missing/wrong token;
 403 foreign Origin; 408 body-read deadline; 413 body over 64 KiB; 415 wrong
 Content-Type; 429 budget exhausted or another HTTP mutation in flight. Chunked bodies have the same 64 KiB cap and
 five-second deadline. One HTTP command runs at a time, with no waiting queue.
+The HTTP command budget is one bucket shared by every HTTP caller, the size
+of a socket's own (bursts of 300, a sustained 100 per second).
 All authenticated HTTP responses use `Cache-Control: no-store`.
 
 For a read-only check from a shell in the daemon's user session:

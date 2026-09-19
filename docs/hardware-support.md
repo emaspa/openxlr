@@ -13,6 +13,19 @@ the checks that still need an owner.
 | Wave XLR MK.2 | `0fd9:00b6` | exposed controls verified on hardware by a community tester |
 | XLR Dock MK.2 | `0fd9:00c7` | MK.2 backend at the Pro's block bank; exposed controls verified on hardware |
 
+## USB access
+
+The udev rule ([packaging/70-openxlr.rules](../packaging/70-openxlr.rules))
+grants the logged-in user access to the five product ids above. Every
+backend opens its device through libusb and claims the vendor-specific
+interface 3 before the first control transfer, both when libusb runs in
+the daemon and in the USB helper process. No kernel driver owns that
+interface on any model in the family, so nothing is detached. A claim
+that fails closes the handle, says why on stderr and reports the device
+as not opened. A device that opens but fails a state read is dropped and
+reopened after 2 s; the wait doubles on each failed read that follows,
+up to 32 s, and a read that succeeds resets it.
+
 ## Wave XLR Pro (0fd9:00b4)
 
 Vendor block protocol decoded and documented in
@@ -73,10 +86,14 @@ than the minimum. The kernel then drops the 'Mic Capture Volume' control
 and the card carries only the two switches and the playback volume. The
 block reads the live register, and with a microphone attached the capture
 level moved by the same 70 dB whether gain was set through ALSA or through
-the word. On such a unit the daemon drives the missing control through the
-block and says so in its journal on connect. Each control uses one path
-only, because the kernel caches mixer values and would not see a block
-write behind its back.
+the word, and an ALSA write shows up in the block at once. On such a unit
+the daemon drives the missing control through the block and says so in
+its journal on connect. Each control uses one path only, because the
+kernel caches mixer values and would not see a block write behind its
+back. A control the card lacks while the USB handle is not open (the
+udev rule not yet applied) is reported unavailable and left out of the
+capabilities; the dock stays connected and the journal names the control.
+The diagnostics dump lists the path of each of the three controls.
 
 Kernel behaviour: the kernel starves the dock's capture endpoint when
 playback to it starts first, and the mic records silence. OpenXLR
@@ -101,8 +118,11 @@ group, and a playback stream opening first leaves the mic recording
 silence for the life of the capture stream. OpenXLR ships a second
 WirePlumber rule
 ([packaging/52-openxlr-mk1-capture-hold.conf](../packaging/52-openxlr-mk1-capture-hold.conf))
-that keeps the MK.1's capture source always active. A community tester
-found the bug and verified the rule on their unit ([PR #140](https://github.com/emaspa/openxlr/pull/140)).
+that keeps the MK.1's capture source always active. The rule matches
+the Wave XLR's node name; the Pro's nodes carry a different vendor
+string and are not touched. The Debian, RPM and Nix packages install
+it; a source install copies it by hand. A
+community tester found the bug and verified the rule on their unit.
 
 | Control | State | Notes |
 |---|---|---|
@@ -147,6 +167,13 @@ once. Gain, mute and headphone volume were cross-checked against the
 kernel's ALSA controls for the card, which mirror the feature units:
 every write showed up there and read back from the block. Blocks
 0x0002 and 0x0006 exist too and are not decoded yet.
+
+The backend asks for the three blocks at those lengths. An answer
+shorter than the block but long enough for the offsets in use (11 bytes
+of the settings block, both headphone bytes, the first crossfade byte)
+is decoded as it is, and the diagnostics dump shows the length the
+firmware answered; an answer shorter than that is refused as a failed
+read.
 
 | Control | State | Notes |
 |---|---|---|

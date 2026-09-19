@@ -35,8 +35,9 @@ happen on your system:
   ([section 2](#concepts)). They keep playing; only the device they play into
   changes.
 - Your system default output and input are left as they were. The
-  daemon remembers them at start and puts them back if the session
-  manager switches to one of the new devices in the following seconds.
+  daemon reads them before it touches anything and puts them back if
+  the session manager switches to one of the new devices in the
+  following seconds.
   If you set defaults in Options ([section 3.7](#default-devices)), those are held instead.
 - On the Wave XLR Pro the daemon parks the card on its pro-audio
   profile while it runs, so the raw multichannel device is available to
@@ -72,12 +73,16 @@ virtual microphones among them can be added, renamed and removed:
 
 | Mix | What it is | Where it goes |
 |---|---|---|
-| Monitor A | what you hear | the ticked outputs in the MONITOR card, unless their feed is set to Monitor B |
+| Monitor A | what you hear | the ticked outputs in the MONITOR card, unless their feed is set to another mix |
 | Monitor B | a second selection to hear | the ticked outputs whose feed is set to Monitor B, or summed with A on outputs set to Monitor A+B |
 | Stream | what your audience hears | the `OpenXLR Stream` virtual microphone, for OBS or any recorder |
 | Chat | what your call partners hear | the `OpenXLR Chat` virtual microphone, for Discord, Zoom and the like |
 | any you add | whatever you route into it | its own `OpenXLR <name>` virtual microphone |
 | Aux | what a second computer receives | the interface's USB Aux port (Wave XLR Pro only) |
+
+An output is not tied to the monitor mixes: its feed picker can name any
+mix, and the Output matrix gives it a level for each mix it hears
+([section 3.2](#output-matrix)).
 
 Every channel has a **send** into every mix: a level and a mute. The
 SUBMIXER card shows them as a grid, channels down, mixes across. Each
@@ -223,7 +228,7 @@ affects only the display; the daemon continues processing audio.
    Existing fixed default-device choices remain available; a virtual channel
    such as OpenXLR System is a routing destination, not a monitor volume
    control.
-5. The HEADPHONES card holds the interface's own headphone volume,
+6. The HEADPHONES card holds the interface's own headphone volume,
    low-impedance mode, and on the Pro the Mic ↔ PC crossfade, which is
    the zero-latency direct monitor inside the device: left is only your
    microphone, right is only computer audio.
@@ -1060,7 +1065,6 @@ The window also remembers which of its sections (INPUTS, HEADPHONES,
 MONITOR, APPLICATIONS, SUBMIXER) you collapsed with the chevron in
 their header, across restarts.
 
-<a name="upgrade"></a>
 <a name="skins"></a>
 ### 3.10 Change how the window looks
 
@@ -1102,6 +1106,7 @@ OPENXLR_SKIN=default openxlr
 
 which ignores the saved choice for that run and lets you pick another one.
 
+<a name="upgrade"></a>
 ### 3.11 Upgrade
 
 Packages do not restart a running daemon. After an upgrade the window
@@ -1115,7 +1120,7 @@ systemctl --user restart openxlr-daemon
 Until then the window offers only the controls the old daemon reports.
 Changing "Enable software mixer" in Options, AUDIO also restarts the daemon.
 
-Since 0.1.23 every client presents a token the daemon writes at start
+Every client presents a token the daemon writes at start
 ([section 6](#files)). A window or OpenDeck plugin older than the daemon is
 refused with "unauthorized" until it is updated too; the plugin zip on
 the release page matches the daemon of that release.
@@ -1126,8 +1131,10 @@ the release page matches the daemon of that release.
 The default channels and mixes are a starting point. Edit layout in the
 SUBMIXER card opens the layout editor: application channels on the left,
 mixes on the right, each with move up and down, Rename and Delete, and a
-box at the bottom to add one. The hardware inputs, Monitor A, Monitor B
-and Aux are listed but fixed.
+box at the bottom to add one. Add capture input, above the channel
+list, turns another PipeWire capture source into a channel
+([Additional capture inputs](#capture-inputs)). The hardware inputs,
+Monitor A, Monitor B and Aux are listed but fixed.
 
 Reordering updates the open window as soon as the daemon publishes the saved
 layout, including changes made through the API. Channel tiles, mix controls
@@ -1273,7 +1280,11 @@ channel's send into one mix or into all mixes, a desktop output's volume
 insert. The touch strip shows a knob, a level meter, the value and a
 mute overlay; pressing the dial mutes (or, for a gain, mutes the input;
 for the crossfade, recentres). A dial can hold several targets, cycled
-by tap or press as chosen in its settings.
+by tap or press as chosen in its settings. A turn leads: the strip
+follows the dial at once and each tick steps from the value shown, while
+the daemon hears the first tick immediately and a fast turn as a short
+series of changes. The daemon's own value takes over once the turn has
+settled.
 
 Installing: the plugin zip from the release through OpenDeck's
 install-from-file, or the folder the package ships in
@@ -1295,7 +1306,7 @@ Restart OpenDeck after installing or updating the plugin.
   be opened" can mean missing USB permission or a busy interface; check
   the udev rule and whether another hardware-control program is running.
 - If the desktop audio server is not ready at login, OpenXLR waits up to
-  three seconds each for its initial default-output and default-input
+  ten seconds each for its initial default-output and default-input
   queries. A failed query leaves that default unknown and the daemon still
   starts; select your preferred desktop default afterwards.
 - With more than one supported interface attached, the header shows a
@@ -1315,10 +1326,17 @@ restart WirePlumber.
 A second cause, when the microphone is silent only after a reboot: the
 dock forgets its gain at every power cycle and comes back at the gain its
 firmware restores, which can differ from the gain used by your insert chain.
-Since 0.1.30 OpenXLR gives the
-gain back when the dock connects, even when the gain lock is on; on an
-older build, take the lock off and set the gain again. A gate or expander tuned at the gain you meant to have stays shut at a lower one and passes nothing at all, which
-is what makes the microphone sound dead rather than quiet.
+OpenXLR gives the gain back when the dock connects, even when the gain
+lock is on. A gate or expander tuned at the gain you meant to have stays
+shut at a lower one and passes nothing at all, which is what makes the
+microphone sound dead rather than quiet.
+
+The dock's gain, mute and headphone volume are controls of its ALSA
+card. When the card lacks one of them, OpenXLR drives that control
+through the dock's own config block instead and says so in the daemon's
+log when the dock connects. If the USB handle is not open either, because
+the udev rule has not applied yet ([section 5.1](#no-device)), the daemon
+reports that control unavailable until the dock connects again.
 
 <a name="daemon-not-starting"></a>
 ### 5.3 Daemon does not start after an upgrade, or after a reboot
@@ -1349,12 +1367,6 @@ is what makes the microphone sound dead rather than quiet.
   flag removes it. Check the format filter and press Rescan after an
   external installation. A Windows bundle also needs Wine and a working
   bridge; see [Windows plugins](#windows-plugins).
-- Before 0.1.27 an insert whose plugin URI contains a `#` (the x42
-  plugins, for one: `darc#mono`) failed with "PipeWire filter chain did
-  not create the required ports ... Could not load module", because
-  PipeWire's argument parser reads the `#` as a comment. The daemon now
-  escapes it; on an older version pick a plugin without one, such as the
-  LSP set.
 
 <a name="wrong-device"></a>
 ### 5.5 Sound comes out of the wrong device
@@ -1383,7 +1395,7 @@ the button is disabled until the service command finishes. If it fails,
 check `journalctl --user -u openxlr-daemon`. A daemon started by hand must
 be restarted by hand.
 
-Since 0.1.11 a USB transfer that never returns fails after a few
+A USB transfer that never returns fails after a few
 seconds instead of stalling the daemon; the device is dropped and
 reconnected after 10 seconds, and the fault is recorded. The USB
 library runs in a small helper process of its own (the daemon binary
@@ -1394,7 +1406,11 @@ window's header, while the submixer and any other interface keep
 working. Unplug the interface and plug it back in, or restart the
 daemon, to try again. A helper whose device could not be opened at all
 (the udev rule not applied yet, see [section 5.1](#no-device)) is
-killed straight away and the daemon tries again two seconds later.
+killed straight away and the daemon tries again two seconds later. A
+device that opens but answers its reads with errors is dropped and
+reopened after two seconds, and the wait doubles on each failure that
+follows, up to 32 seconds, so the log shows the retries at growing
+intervals rather than a flood.
 Collect diagnostics afterwards ([section 5.10](#reporting)): the archive contains the
 exact transfer, and that is what makes the report actionable.
 
@@ -1458,13 +1474,8 @@ down. The channel sinks are playback devices, and a desktop applet or
 the session manager restoring a remembered level can set one to half
 volume. Only the Monitor A and Monitor B sinks carry a master of their
 own; on every other OpenXLR sink the volume is not a control, so turning
-it down only cuts audio. Since 0.1.27 the daemon puts those other sinks
-back to full volume on its sweep and logs when it had to. On an older
-version, set them by hand:
-
-```sh
-for s in $(pactl list sinks short | awk '/OpenXLR_/ && !/OpenXLR_mix_monitor/ {print $2}'); do pactl set-sink-volume "$s" 100%; done
-```
+it down only cuts audio. The daemon puts those other sinks back to full
+volume on its sweep and logs when it had to.
 
 <a name="reporting"></a>
 ### 5.10 Reporting a problem
@@ -1529,12 +1540,15 @@ Review plugin names, paths and scanner output before sharing the archive.
 | `~/.config/openxlr/devices/<vid-pid>/defaults.json` | the firmware defaults of such an interface, recorded after a power cycle, written back by "Reset device to defaults" (the Pro has no such file: its reset writes OpenXLR's baseline) |
 | `~/.config/openxlr/daemon.json` | the submixer on/off preference |
 | `~/.config/openxlr/gainlock.json` | which devices have the gain lock set |
+| `~/.config/openxlr/native-editors.json` | your native editor overrides ([section 3.5](#native-editor-compatibility)) |
+| `~/.config/openxlr/desktop-keys.json` | desktop shortcut bindings, written by the window ([Desktop keys](#desktop-keys)) |
 | `~/.config/openxlr/bridge/yabridgectl/config.toml` | companion bridge folder registry, separate from the system bridge |
 | `~/.local/share/openxlr/yabridge/{vst3,clap,vst2}` | companion-generated wrappers; OpenXLR loads VST3 and CLAP only |
 | `~/.config/openxlr/ui.json` | window preferences, the chosen skin included ([section 3.10](#skins)) |
 | `~/.local/share/openxlr/skins/<id>/skin.json` | a skin you installed; system skins come from `$XDG_DATA_DIRS` ([skins.md](skins.md)) |
 | `openxlr-daemon.service` (systemd user unit) | the daemon; `journalctl --user -u openxlr-daemon` for its log |
 | `/usr/lib/systemd/user/pipewire-pulse.service.d/openxlr.conf` | installed by the packages: raises pipewire-pulse's open-file limit ([section 5.8](#open-files)) |
+| `/usr/share/wireplumber/wireplumber.conf.d/50-xlr-dock-capture-hold.conf`, `52-openxlr-mk1-capture-hold.conf` | installed by the packages: keep the XLR Dock's and the original Wave XLR's capture running ([section 5.2](#dock-silent)) |
 | `ws://127.0.0.1:37890/ws` | the daemon's API, documented in [api.md](api.md); the same commands over HTTP at `/api/v1` ([http-api.md](http-api.md)) |
 
 The daemon makes a final attempt to save pending mixer settings when it
@@ -1597,7 +1611,8 @@ additional capture inputs can use the effects on the mixes they feed.
 <a name="desktop-keys"></a>
 ## Desktop keys and focused application routing
 
-Open **Desktop keys** and enable desktop integration. For PC shortcuts, select
+Open **Desktop keys** from the window's header and enable desktop
+integration. For PC shortcuts, select
 the application channels you want, then choose **Apply and configure keys**.
 The desktop portal asks for the shortcuts and permission to use them. For an
 OpenDeck key, choose **Route focused application** and the destination channel

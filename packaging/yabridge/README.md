@@ -6,6 +6,18 @@ the commit in `source.json`, including the Wine 9.22+ window-position fix.
 `private-plugin-home.patch` adds an environment-controlled output directory
 to yabridgectl. It is the only local patch to the pinned source.
 
+`source.json` also carries the package revision: the package version is
+`<version>-<revision>`, and a rebuild of the same commit bumps the
+revision. `build.py` strips any `-march`, `-mtune` or instruction-set flag
+from the packager's `CFLAGS` and `CXXFLAGS` and compiles the host for
+baseline x86-64: the bridge calls into Windows code through the Microsoft
+calling convention, and GCC spills AVX registers around those calls to the
+wrong stack slot, which faults on the first plugin factory call with
+AVX-512 and reads garbage with AVX2. The staged bridge directory carries
+an `openxlr-yabridge.json` receipt with that version, the source commit,
+the Wine input fix flag and the Windows architectures it bridges
+(`x86_64`); the daemon reads the receipt before it selects a companion.
+
 The package installs in `/usr/lib/openxlr/yabridge` and provides the separate
 `openxlr-yabridgectl` command. Its registry is under
 `$XDG_CONFIG_HOME/openxlr/bridge/yabridgectl`, and its wrappers are under

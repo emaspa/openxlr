@@ -35,7 +35,10 @@ non-finite numbers, and over-long strings or lists all come back as an
 `error` message instead of being silently ignored. Insert entries must
 be objects with a nonempty id, a supported kind and a plugin identifier.
 Omitted `params` defaults to an empty object; explicit `null` entries or
-parameters are rejected. A client may send bursts of up to 300 commands
+parameters are rejected. An insert holds at most 256 control values:
+`setInserts` refuses a chain past that, `setInsertParam` refuses a new
+symbol on an insert already holding 256, and a saved chain read back at
+startup is held to the same cap. A client may send bursts of up to 300 commands
 and a sustained 100 per second; beyond that it is disconnected with
 close code 1008. At most 32 clients can be connected at once. The
 `plugins` message is bounded too: a plugin with a URI over 512
@@ -61,7 +64,7 @@ Messages from the daemon, each a JSON object with a `type` field:
 | Type | When | Content |
 |---|---|---|
 | `state` | on connect and on every change | `daemonVersion`, device state, capabilities, mixer state, the device list, the app registry, profile names, `activeProfile` (the profile last recalled or saved for the active device; not cleared by later manual changes), `recallOnConnect` (the profile recalled when the device connects, or null), `warning` (one sentence the user should see, or null: mixer settings that cannot be written to disk, which the daemon keeps retrying with backoff, or a device set aside after three hung USB transfers in one run). In the mixer state, each channel carries `hardware` (true for the fixed input channels), `captureSource` (exact external source name or null), `capturePair` (zero-based pair), and `captureConnected` (its capture route exists). A capture channel is editable but cannot receive application assignments; `renamedSinceStart` says a virtual microphone was renamed since the daemon started (its PipeWire device keeps the old name until a restart), and `layoutWarning` is a sentence for the layout editor when pipewire-pulse nears its open-file limit, or null. Each mix carries `id`, `name`, `volume`, `muted` and `kind` (`monitor`, `virtualMic` or `auxPort`), which gives a client the mix's volume ceiling; `outputVolume` is the first selected output's volume, 0 to 1.5, or null with no output selected. In `devices`, every entry that is a sink carries `volume` (desktop scale, 1.0 = 100%) and `muted`; sources and the Wave XLR Pro pseudo-outputs omit both. A state is pushed whenever a sink's volume or mute changes |
-| `diagnostics` | in answer to `getDiagnostics` | `blocks`, mapping vendor block names to hex strings or read errors |
+| `diagnostics` | in answer to `getDiagnostics` | `blocks`, mapping vendor block names to hex strings or read errors. An XLR Dock adds `paths`, the card number and the path each of its gain, mute and headphone controls takes (`Alsa` through the card's mixer, `Block` through the dock's config block when the card lacks the control, `None` when the USB handle is closed too, so the control is unavailable), and `alsa`, the values read through the card. `usbFault` carries the last USB fault of this run and `error` a dump that failed |
 | `meters` | 15 Hz while the mixer is built | live stereo levels per channel and mix |
 | `plugins` | in answer to `listPlugins` | the installed LV2, CLAP and VST3 plugins with their controls, within the message size limit above and always including the plugins the saved chains use; `supported` is false, with `unsupportedFeatures` listed, for a plugin that needs a host feature the PipeWire chain lacks. `audioIns` and `audioOuts` are the plugin's own port counts, or for VST3 its main buses' default width; a VST3 entry also carries `widths`, the chain widths in channels (1 and 2 are the ones the host carries) its main buses accepted when the helper asked the way the host asks at load, so a plugin that reports 2 and lists 1 in `widths` can be inserted on a mono input. An entry without `widths` (LV2, CLAP, or a description an older helper wrote) fits a mono input with one port each way and a stereo mix with two or more |
 | `pluginSetup` | in answer to `getPluginSetup` or `setPluginWineTrace` | where installs go (`lv2Directory`, `clapDirectory`, `vst3Directory`), `hostInstalled`, `wineTrace` (deep tracing enabled in the running daemon), `yabridge` (its version, or null when not installed), `wine`, `windowsDirectories` (the folders yabridge bridges) and `wineFolders` (Wine's own plugin folders that hold a plugin and are not bridged yet, offered as one press since a file dialog hides them), `memoryLockLimitBytes` (the running daemon's soft limit in bytes; -1 means unlimited, null means unknown) and `memoryLockNote` (recovery advice when Windows plugin support is available and the limit is below 256 MiB, otherwise null) |
@@ -72,6 +75,34 @@ Messages from the daemon, each a JSON object with a `type` field:
 | `pluginInstall` | in answer to `installPlugin`, `addWindowsPluginFolder`, `removeWindowsPluginFolder`, `removeWindowsPluginInserts`, `setWindowsPluginEnabled`, `deleteWindowsPlugin`, `syncWindowsPlugins` and `rescanPlugins` | `ok`, `message` (a sentence or two for the user, ending with the bundles the scan that followed could not read, up to three by name and the rest as a count), `installed` (the bundles or folders put in place), `added` (plugins in the catalogue that were not before) and `total` |
 | `error` | when a command without a `requestId` is rejected | `message`; for the mixer commands a `state` follows, so an optimistic edit can be reverted |
 | `commandResult` | in answer to a command that carried a `requestId` | `requestId`, `error` (null on success); preceded by the state the result refers to |
+
+The state message in full. At the top level: `daemonVersion`, `warning`,
+`connected`, `device` (`vendor`, `model`, `usbId`), `capabilities` (`gain`,
+`mute`, `lowCut`, `expander`, `voiceTune`, `hpVolume`, `lowImpedance`,
+`crossfade`, `phantom`, `clipGuard`, `compressor`, `outputRouting`,
+`auxInput`, `xlrInputs`, `hpOutputs`, `physicalControls`, `retainsSettings`,
+`builtInDefaults`), `state` (the hardware settings: `gainDb`, `mute`,
+`lowCut`, `expander`, `voiceTune`, `voiceTuneStrength`, `hpVolumeDb`,
+`hp2VolumeDb`, `lowImpedance`, `crossfade`, `phantom`, `clipGuard`,
+`compressor`, their `2` variants for XLR 2, `outHp1`, `outHp2`, `outUsbAux`,
+`outLineOut`, `hpMixMonitorReturn`, `hpMixMicDirect`, `auxReturnEnabled`,
+`auxLevelDb`, `auxLevelLock`, plus the daemon-stamped `gainLocked`,
+`phantomSettling`, `phantomSettling2`, `phantomSettleSeconds` and
+`phantomSettleSeconds2`),
+`mixer`, `devices`, `profiles`, `activeProfile`, `recallOnConnect` and
+`detected` (`usbId`, `name`, `active` for every attached interface). The
+mixer state carries `mixes`, `channels`, `monitorOutput` (the first selected
+output), `monitorOutputs`, `monitorFeeds`, `outputRoutes`, `outputVolume`,
+`auxPortEnabled`, `lowCutHz`, `softClipGuard`, `softClipGuardAvailable`,
+`softClipGuardError`, `inserts` (chains by insert key, `xlr1`, `xlr2` or
+`mix:<id>`; each entry carries `insert`, `error`, `meters`,
+`nativeHostRunning`, `nativeUiBlocked` and `nativeUiBlockReason`),
+`enforcedDefaultSink`, `enforcedDefaultSource`, `streams` (`id`, `serial`,
+`label`, `identity`, `channelId`, `active`, `running`), `renamedSinceStart`
+and `layoutWarning`. A `devices` entry carries `name`, `description`, `kind`
+(0 for a sink, 1 for a source), `isOwn`, `isPhysical` and, for a sink,
+`volume` and `muted`. Over the WebSocket a field whose value is null is left
+out of the message; the HTTP state reply writes it as `null`.
 
 Meter readings stay finite when an audio source emits NaN or infinity: an
 invalid sample contributes silence to its channel's RMS calculation, without
@@ -92,14 +123,14 @@ that final acknowledgement (or an `error` without a request id):
 | Command | Fields | Purpose |
 |---|---|---|
 | `getState` | none | request a state push |
-| `set` | `control`, `value` | hardware control (`gain`, `mute`, `lowCut`, `expander`, `voiceTune`, `voiceTuneStrength`, `phantom`, `clipGuard`, `compressor`, their `…2` variants for XLR 2, `hpVolumeDb`, `hp2VolumeDb`, `lowImpedance`, `crossfade`, `auxLevelDb`, `auxLevelLock`, `outHp1`, `outHp2`, `outUsbAux`, `outLineOut`) and the software `gainLock` |
+| `set` | `control`, `value` | hardware control (`gain`, `mute`, `lowCut`, `expander`, `voiceTune`, `voiceTuneStrength`, `phantom`, `clipGuard`, `compressor`, their `…2` variants for XLR 2, `hpVolumeDb`, `hp2VolumeDb`, `lowImpedance`, `crossfade`, `auxLevelDb`, `auxLevelLock`, `outHp1`, `outHp2`, `outUsbAux`, `outLineOut`) and the software `gainLock`. A control the active device's capabilities do not advertise is refused with an error, as is an XLR Dock control the card lacks while the USB handle is closed |
 | `setLowCutHz` | `value` | software low cut: 0, 80, or 120 |
 | `setSoftClipGuard` | `value` | software ClipGuard (post-ADC limiter at -3 dB); enabling is rejected if `swh-plugins` is unavailable, without replacing or disconnecting the live microphone route |
 | `setLevel` | `channel`, `mix`, `value` | one send fader |
-| `createCaptureChannel` | `name`, `source`, optional `capturePair` | add an external PipeWire capture input, muted in every mix; exact source name, zero-based stereo pair 0 to 31 (default 0). See [capture inputs](mixer-layout.md#capture-inputs) |
+| `createCaptureChannel` | `name`, `source`, optional `capturePair` | add an external PipeWire capture input, muted in every mix; exact source name of up to 256 characters, zero-based stereo pair 0 to 31 (default 0). A source named `OpenXLR...` or ending in `.monitor` is refused. See [capture inputs](mixer-layout.md#capture-inputs) |
 | `createChannel` | `name` | add an application channel, muted in every mix, without touching existing nodes; its generated stable id is in the next state. Undone with an error when its sends have not appeared within 3 s |
-| `renameChannel` | `channel`, `name` | rename an application channel; its playback device is reloaded under the new name and the streams on it are put back (a short gap on that channel only) |
-| `deleteChannel` | `channel` | remove an application channel; apps and remembered assignments on it move to the first remaining application channel. The last application channel cannot be removed |
+| `renameChannel` | `channel`, `name` | rename an application or capture channel; an application channel's playback device is reloaded under the new name and the streams on it are put back (a short gap on that channel only), a capture channel's label changes without touching its route |
+| `deleteChannel` | `channel` | remove an application or capture channel; apps and remembered assignments on it move to the first remaining application channel. The last application channel cannot be removed |
 | `createMix` | `name` | add a virtual microphone; every channel gets a muted send into it before the capture device is published. Undone with an error when a channel's send has not appeared within 3 s |
 | `renameMix` | `mix`, `name` | rename a virtual microphone in OpenXLR; the PipeWire device keeps its old description until the daemon restarts (reloading it would throw recording apps off), and the mixer state's `renamedSinceStart` says so |
 | `deleteMix` | `mix` | remove a virtual microphone with its sends, inserts and capture device |
@@ -135,7 +166,7 @@ that final acknowledgement (or an `error` without a request id):
 | `setOutputDeviceVolume` | optional `device`, `value` | set a PipeWire output's desktop volume; `value` finite, 0 to 1.5 on the desktop scale (1.0 is 100%), rejected outside that range. A monitor mix sink is set through its mix master; a selected monitor output follows the linked monitor-volume behaviour. Omit `device` for the current desktop default; device names are accepted and rejected as for `adjustOutputVolume` |
 | `toggleOutputMute` | optional `device` | toggle an output's mute; omit `device` for the current desktop default. On one of the selected monitor outputs it toggles the mute of the mixes feeding that output (what pressing a Deck dial on the monitor does), so the mixer window, dial rings and keys agree; on a monitor mix sink it toggles that mix; on any other output it toggles the sink's mute at the audio server |
 | `setMainOutput` | `device` | select and enforce an available PipeWire output as the system default, or `@monitor` for the first selected monitor output. Retains capture-default policy and mixer feeds |
-| `routeFocusedApp` | `channel` | route the focused KDE application to an application channel and remember the assignment; requires the running UI with Desktop keys enabled and `gdbus`. Missing or ambiguous process identity is an error, with no guessed routing |
+| `routeFocusedApp` | `channel` | route the focused KDE application to an application channel and remember the assignment; requires the running UI with Desktop keys enabled and `gdbus`. Missing or ambiguous process identity is an error, with no guessed routing. One request runs at a time; another sent while it runs is refused |
 | `assignApp` | `identity`, `channel`, `label?` | route an app (creates a registry entry if unseen); `channel: "ignore"` stops managing it, its streams go back to the system default output and stay wherever the desktop routes them |
 | `assignStream` | `streamId`, `channel` | route one live stream by its PipeWire id; also remembered for the app; `ignore` works here too |
 | `forgetApp` | `identity` | drop an app and its remembered channel |
@@ -223,7 +254,8 @@ use one folder per format and plugin name; selecting the same name again
 updates that folder. These source files are separate from generated wrappers.
 `wine` is a boolean; `wineVersion` is a string or null. `windowsEditorNote`
 is a user-facing compatibility message or null. With provider `openxlr`,
-`yabridge` is the companion package version.
+`yabridge` is the companion package version with its packaging revision
+after a hyphen, as the companion's receipt records it.
 The `openxlr` provider includes the pinned Wine input fix. Its directory
 registry and generated wrappers are separate from the system controller.
 
