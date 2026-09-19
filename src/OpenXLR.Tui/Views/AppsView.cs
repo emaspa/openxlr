@@ -11,7 +11,7 @@ internal sealed class AppsView : View
 
     public override string Title => "Apps";
 
-    public override string Keys => "left right channel  i ignore  f forget";
+    public override string Keys => "Left/Right channel  i ignore  f forget";
 
     public override void Draw(Screen screen, Rect area, App app)
     {

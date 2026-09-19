@@ -12,7 +12,7 @@ internal sealed class ProfilesView : View
 
     public override string Title => "Profiles";
 
-    public override string Keys => "enter load  s save  d delete  r recall";
+    public override string Keys => "Enter load  s save  d delete  r recall";
 
     public override void Draw(Screen screen, Rect area, App app)
     {

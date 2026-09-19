@@ -19,7 +19,8 @@ internal sealed class DaemonLink : IAsyncDisposable
 
     private readonly CancellationTokenSource _stopping = new();
     private readonly Lock _meterGate = new();
-    private Dictionary<string, double[]> _meters = [];
+    private readonly Dictionary<string, MeterTrace> _meters = [];
+    private readonly System.Diagnostics.Stopwatch _clock = System.Diagnostics.Stopwatch.StartNew();
     private ClientWebSocket? _socket;
     private Task? _pump;
 
@@ -44,14 +45,22 @@ internal sealed class DaemonLink : IAsyncDisposable
     public void Start() => _pump ??= Task.Run(PumpAsync);
 
     /// <summary>The live level for a channel or a mix, 0 to 1, or 0 when it is not metering.</summary>
-    public double Meter(string prefix, string id)
+    public double Meter(string prefix, string id) => StereoMeter(prefix, id).Level;
+
+    public MeterReading StereoMeter(string prefix, string id)
     {
         lock (_meterGate)
         {
-            if (!_meters.TryGetValue($"{prefix}:{id}", out double[]? value) || value.Length == 0) return 0;
-            // The daemon sends a stereo pair; a single bar shows the louder side.
-            return Math.Clamp(value.Max(), 0, 1);
+            return _meters.TryGetValue($"{prefix}:{id}", out MeterTrace? trace)
+                ? trace.Read(_clock.Elapsed.TotalSeconds) : default;
         }
+    }
+
+    public double[] MeterHistory(string prefix, string id)
+    {
+        lock (_meterGate)
+            return _meters.TryGetValue($"{prefix}:{id}", out MeterTrace? trace)
+                ? trace.History(_clock.Elapsed.TotalSeconds) : new double[MeterTrace.Samples];
     }
 
     /// <summary>Sends one command object, as the API names them.</summary>
@@ -210,16 +219,26 @@ internal sealed class DaemonLink : IAsyncDisposable
         {
             using JsonDocument document = JsonDocument.Parse(json);
             if (!document.RootElement.TryGetProperty("levels", out JsonElement levels)) return;
-            Dictionary<string, double[]> read = new(StringComparer.Ordinal);
-            foreach (JsonProperty entry in levels.EnumerateObject())
+            if (levels.ValueKind != JsonValueKind.Object) return;
+            lock (_meterGate)
             {
-                if (entry.Value.ValueKind != JsonValueKind.Array) continue;
-                read[entry.Name] = entry.Value.EnumerateArray()
-                    .Where(item => item.ValueKind == JsonValueKind.Number)
-                    .Select(item => item.GetDouble())
-                    .ToArray();
+                double now = _clock.Elapsed.TotalSeconds;
+                HashSet<string> present = [];
+                foreach (JsonProperty entry in levels.EnumerateObject())
+                {
+                    if (entry.Value.ValueKind != JsonValueKind.Array) continue;
+                    double[] pair = entry.Value.EnumerateArray()
+                        .Where(item => item.ValueKind == JsonValueKind.Number)
+                        .Take(2).Select(item => item.GetDouble()).ToArray();
+                    if (pair.Length == 0) continue;
+                    present.Add(entry.Name);
+                    if (!_meters.TryGetValue(entry.Name, out MeterTrace? trace))
+                        _meters[entry.Name] = trace = new MeterTrace();
+                    trace.Push(pair[0], pair.Length > 1 ? pair[1] : pair[0], now);
+                }
+                foreach (string missing in _meters.Keys.Where(key => !present.Contains(key)).ToArray())
+                    _meters.Remove(missing);
             }
-            lock (_meterGate) _meters = read;
         }
         catch (JsonException) { }
     }

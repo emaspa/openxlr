@@ -13,7 +13,7 @@ internal sealed class OptionsView : View
 
     public override string Title => "Options";
 
-    public override string Keys => "enter use skin  R reload skins";
+    public override string Keys => "Enter use skin  R reload skins";
 
     public override void Draw(Screen screen, Rect area, App app)
     {

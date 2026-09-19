@@ -10,7 +10,7 @@ internal sealed record SkinEntry(string Id, string Name, string? Description, st
 /// The colours the terminal mixer draws with, read from the same skin files
 /// the window reads. A terminal has no gradients, no images and no corner
 /// radii, so a gradient is taken at its first stop and everything that is not
-/// a colour is ignored; the palette is what carries a skin into the terminal.
+/// a colour or a supported control appearance is ignored.
 /// </summary>
 internal sealed class Theme
 {
@@ -66,6 +66,25 @@ internal sealed class Theme
     public Rgb FaderThumb { get; private set; } = Rgb.Parse("#c9d1e2");
     public Rgb Accent { get; private set; } = Rgb.Parse("#5ba8f5");
 
+    public bool ConsoleFaders { get; private set; }
+    public bool CapKeys { get; private set; }
+    public bool CapMutes { get; private set; }
+    public bool LampLeds { get; private set; }
+
+    public Rgb Rule => Card.Mix(TextSecondary, Light ? 0.35 : 0.25);
+    public Rgb Groove => Card.Mix(TextMuted, Light ? 0.28 : 0.22);
+    public Rgb QuietFill => FaderFill.Mix(Card, 0.55);
+    public Rgb SelectedFace => Card.Mix(Accent, Light ? 0.08 : 0.10);
+    public Rgb FocusedCap => Light ? Accent.Mix(TextPrimary, 0.18) : Accent;
+
+    /// <summary>Choose the skin's light or dark lettering for a solid face.</summary>
+    public Rgb On(Rgb face)
+    {
+        static double Contrast(Rgb a, Rgb b) =>
+            (Math.Max(a.Luminance(), b.Luminance()) + 0.05) / (Math.Min(a.Luminance(), b.Luminance()) + 0.05);
+        return Contrast(TextPrimary, face) >= Contrast(Window, face) ? TextPrimary : Window;
+    }
+
     /// <summary>True when the skin paints on a light ground, which flips a few shades.</summary>
     public bool Light => Window.Luminance() > 0.4;
 
@@ -84,6 +103,16 @@ internal sealed class Theme
         try { root = JsonNode.Parse(json) as JsonObject; }
         catch (JsonException) { return theme; }
         if (root is null) return theme;
+
+        if (root["controls"] is JsonObject controls)
+        {
+            bool Is(string key, string appearance) => controls[key] is JsonValue value &&
+                value.TryGetValue(out string? text) && text == appearance;
+            theme.ConsoleFaders = Is("fader", "console");
+            theme.CapKeys = Is("button", "cap");
+            theme.CapMutes = Is("mute", "cap");
+            theme.LampLeds = Is("led", "lamp");
+        }
 
         if (root["name"]?.GetValue<string>() is { Length: > 0 } name) theme.Name = name;
         if (root["tokens"] is not JsonObject tokens) return theme;
@@ -162,8 +191,25 @@ internal sealed class Theme
     }
 
     /// <summary>The colour a meter cell takes at that place on the scale.</summary>
-    public Rgb MeterColour(double position) =>
-        position >= MeterHotLevel ? MeterHot : position >= MeterWarningLevel ? MeterWarning : MeterFill;
+    /// <summary>
+    /// The colour at a place on the scale. The fill runs into the warning
+    /// colour over the upper half of its zone, the warning colour into the hot
+    /// one across its zone, so a bar reads as one gradient rather than three
+    /// blocks. A skin that gives the three the same colour gets one flat bar.
+    /// </summary>
+    public Rgb MeterColour(double position)
+    {
+        double p = Math.Clamp(position, 0, 1);
+        if (p >= MeterHotLevel) return MeterHot;
+        if (p >= MeterWarningLevel)
+        {
+            double zone = MeterHotLevel - MeterWarningLevel;
+            return zone <= 0 ? MeterWarning : MeterWarning.Mix(MeterHot, (p - MeterWarningLevel) / zone);
+        }
+        double start = MeterWarningLevel / 2;
+        if (p <= start) return MeterFill;
+        return MeterFill.Mix(MeterWarning, (p - start) / (MeterWarningLevel - start));
+    }
 }
 
 /// <summary>

@@ -18,9 +18,14 @@ OpenXLR ships two appearances:
 
 Pick one in Options under APPEARANCE. The terminal mixer reads the same
 folders and the same saved choice, on its own Options tab, so an appearance
-picked in one is the appearance in the other. A terminal has no gradients, no images and no corner radii, so it takes a
-gradient at its first stop and reads the colours alone. Everything else in
-a skin is the window's.
+picked in one is the appearance in the other. A terminal has no gradients,
+images or corner radii, so it takes a gradient at its first stop. It also
+reads `controls`: console faders get a three-cell cap, cap keys get
+brackets and lamp LEDs get a block face. The pixel sizes and segment counts
+remain the window's; the terminal sizes these drawings to its cells. A
+meter is a solid bar in eighth blocks whichever appearance is named, and
+its colour blends from `Ox.Meter.Fill` through `Ox.Meter.Warning` to
+`Ox.Meter.Hot` along the scale, anchored at the warning and hot levels.
 
 The choice is saved in
 `~/.config/openxlr/ui.json` as `"skin": "<id>"` and nowhere else: it is not

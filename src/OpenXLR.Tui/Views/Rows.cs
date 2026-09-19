@@ -55,6 +55,10 @@ internal sealed class NumberRow(
     /// <summary>The finer step, taken with ctrl and an arrow.</summary>
     public double FineStep { get; init; } = step / 5;
 
+    public void DrawDial(Screen screen, int x, int y, Theme theme, Rgb back, bool focused) =>
+        Widgets.Dial(screen, x, y, maximum <= minimum ? 0 : (value - minimum) / (maximum - minimum),
+            Enabled ? format(value) : "n/a", theme, back, focused);
+
     public override void DrawValue(Screen screen, int x, int y, int width, Theme theme, Rgb back, bool focused)
     {
         if (!Enabled)
@@ -78,6 +82,8 @@ internal sealed class NumberRow(
             case Key.Right: Apply(by); return true;
             case Key.Char when key.Char is '-' or '_': Apply(-by); return true;
             case Key.Char when key.Char is '+' or '=': Apply(by); return true;
+            case Key.Char when key.Char == '[': Apply(-FineStep); return true;
+            case Key.Char when key.Char == ']': Apply(FineStep); return true;
             case Key.Home: set(minimum); return true;
             case Key.End: set(maximum); return true;
             default: return false;
@@ -94,9 +100,9 @@ internal sealed class ChoiceRow(string label, IReadOnlyList<string> options, int
     {
         string text = options.Count == 0 ? "none" : options[Math.Clamp(selected, 0, options.Count - 1)];
         Rgb fore = focused ? theme.TextPrimary : theme.TextDetail;
-        screen.Text(x, y, "‹ ", focused ? theme.Accent : theme.TextMuted, back);
+        screen.Text(x, y, "< ", focused ? theme.Accent : theme.TextMuted, back);
         screen.Text(x + 2, y, text, fore, back, bold: focused, maxWidth: Math.Max(1, width - 6));
-        screen.Text(x + Math.Max(3, Math.Min(width - 2, text.Length + 3)), y, " ›",
+        screen.Text(x + Math.Max(3, Math.Min(width - 2, text.Length + 3)), y, " >",
             focused ? theme.Accent : theme.TextMuted, back);
     }
 
@@ -161,11 +167,67 @@ internal sealed class RowList
     private int _index;
     private int _scroll;
 
-    public void Draw(Screen screen, Rect area, Theme theme, IReadOnlyList<Row> rows, int labelWidth = 26)
+    /// <summary>Hardware groups share the desk, preserving the same control order and selection.</summary>
+    public void DrawGroups(Screen screen, Rect area, Theme theme, IReadOnlyList<Row> rows)
+    {
+        if (area.Width < 90 || area.Height < 26) { Draw(screen, area, theme, rows); return; }
+        Settle(rows);
+        List<(int Start, int End, Rect Box, bool Dial)> groups = [];
+        int[] bottoms = [0, 0];
+        for (int start = 0; start < rows.Count;)
+        {
+            int end = start + 1;
+            while (end < rows.Count && rows[end] is not HeadingRow) end++;
+            bool dial = rows[start].Label.StartsWith("XLR", StringComparison.Ordinal) && rows[start + 1] is NumberRow;
+            int height = end - start + 2 + (dial ? 4 : 0);
+            int column = bottoms[0] <= bottoms[1] ? 0 : 1;
+            int x = area.X + column * ((area.Width + 1) / 2);
+            int width = column == 0 ? area.Width / 2 : area.Width - (area.Width + 1) / 2;
+            groups.Add((start, end, new Rect(x, area.Y + bottoms[column], width, height), dial));
+            bottoms[column] += height;
+            start = end;
+        }
+        var selected = groups.First(group => _index >= group.Start && _index < group.End);
+        int offset = Math.Max(0, selected.Box.Bottom - area.Bottom);
+        foreach (var group in groups)
+        {
+            Rect box = group.Box with { Y = group.Box.Y - offset };
+            // Whole cards move together when the hardware needs more than one screen.
+            if (box.Y < area.Y || box.Bottom > area.Bottom) continue;
+            screen.Panel(box.X, box.Y, box.Width, box.Height, theme.Rule, theme.Card,
+                rows[group.Start].Label, theme.TextPrimary);
+            int y = box.Y + 1;
+            int first = group.Start + 1;
+            if (group.Dial && rows[first] is NumberRow gain)
+            {
+                Rgb back = first == _index ? theme.SelectedFace : theme.Card;
+                screen.Fill(box.X + 1, y, box.Width - 2, 5, back);
+                gain.DrawDial(screen, box.X + 3, y, theme, back, first == _index);
+                screen.Text(box.X + 19, y + 1, "GAIN", theme.TextSecondary, back);
+                screen.Text(box.X + 19, y + 3, gain.Note ?? (first == _index ? "- / +" : "0 to 80 dB"),
+                    first == _index ? theme.Accent : theme.TextMuted, back, maxWidth: box.Width - 21);
+                y += 5;
+                first++;
+            }
+            for (int at = first; at < group.End; at++, y++)
+                DrawRow(screen, new Rect(box.X + 1, y, box.Width - 2, 1), theme, rows[at], at == _index,
+                    box.Width >= 55 ? 23 : 19);
+        }
+        if (bottoms.Max() > area.Height)
+            screen.Text(area.Right - 25, area.Bottom - 1, " Up/Down reveals controls ", theme.TextSecondary, theme.Card);
+    }
+
+    private void Settle(IReadOnlyList<Row> rows)
     {
         if (rows.Count == 0) return;
         _index = Math.Clamp(_index, 0, rows.Count - 1);
         if (rows[_index] is HeadingRow) Step(rows, 1);
+    }
+
+    public void Draw(Screen screen, Rect area, Theme theme, IReadOnlyList<Row> rows, int labelWidth = 26)
+    {
+        if (rows.Count == 0) return;
+        Settle(rows);
 
         int height = Math.Max(1, area.Height);
         if (_index < _scroll) _scroll = _index;
@@ -175,37 +237,37 @@ internal sealed class RowList
         for (int line = 0; line < height && _scroll + line < rows.Count; line++)
         {
             int at = _scroll + line;
-            Row row = rows[at];
             int y = area.Y + line;
-            bool focused = at == _index;
-            Rgb back = focused ? theme.Selection : theme.Window;
-            screen.Fill(area.X, y, area.Width, 1, back);
-
-            if (row is HeadingRow)
-            {
-                screen.Text(area.X + 1, y, row.Label.ToUpperInvariant(), theme.TextSecondary, back, bold: true,
-                    maxWidth: area.Width - 2);
-                continue;
-            }
-
-            Rgb label = row.Enabled ? (focused ? theme.TextPrimary : theme.TextDetail) : theme.ControlDisabled;
-            // The label stops short of the value column, so a name that runs
-            // long is cut with a gap rather than touching the control.
-            screen.Text(area.X + 2, y, row.Label, label, back, bold: focused, maxWidth: labelWidth - 4);
-            int valueX = area.X + labelWidth;
-            int valueWidth = Math.Max(4, area.Right - valueX - 2);
-            row.DrawValue(screen, valueX, y, valueWidth, theme, back, focused);
-            if (row.Note is { Length: > 0 } note)
-                screen.Text(Math.Min(valueX + valueWidth + 1, area.Right - 1), y, note, theme.TextAlert, back,
-                    maxWidth: Math.Max(0, area.Right - valueX - valueWidth - 1));
+            DrawRow(screen, new Rect(area.X, y, area.Width, 1), theme, rows[at], at == _index, labelWidth);
         }
+    }
+
+    private static void DrawRow(Screen screen, Rect area, Theme theme, Row row, bool focused, int labelWidth)
+    {
+        Rgb back = focused ? theme.Selection : theme.Card;
+        screen.Fill(area.X, area.Y, area.Width, 1, back);
+        if (row is HeadingRow)
+        {
+            screen.Text(area.X + 1, area.Y, row.Label.ToUpperInvariant(), theme.TextSecondary, back, true,
+                maxWidth: area.Width - 2);
+            return;
+        }
+        Rgb label = row.Enabled ? focused ? theme.TextPrimary : theme.TextDetail : theme.ControlDisabled;
+        screen.Text(area.X + 2, area.Y, row.Label, label, back, focused, maxWidth: labelWidth - 3);
+        if (focused) screen.Set(area.X, area.Y, '┃', theme.Accent, back);
+        int valueX = area.X + labelWidth;
+        int valueWidth = Math.Max(4, area.Right - valueX - 2);
+        int noteWidth = row.Note is { Length: > 0 } note ? Math.Min(note.Length + 1, Math.Max(0, valueWidth - 14)) : 0;
+        row.DrawValue(screen, valueX, area.Y, valueWidth - noteWidth, theme, back, focused);
+        if (noteWidth > 0)
+            screen.Text(area.Right - noteWidth - 1, area.Y, row.Note!, theme.TextAlert, back, maxWidth: noteWidth);
     }
 
     /// <summary>Moves or hands the key to the selected row.</summary>
     public bool Handle(KeyPress key, IReadOnlyList<Row> rows)
     {
         if (rows.Count == 0) return false;
-        _index = Math.Clamp(_index, 0, rows.Count - 1);
+        Settle(rows);
         switch (key.Key)
         {
             // A plain arrow walks the list; ctrl and an arrow belong to the
