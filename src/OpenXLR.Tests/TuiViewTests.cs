@@ -263,7 +263,7 @@ public sealed class TuiViewTests
     }
 
     [Fact]
-    public void TheMatrixGivesEveryMeterTwoRowsWhenThereIsHeightAndOneWhenThereIsNot()
+    public void TheMatrixGivesEveryMeterARowOfItsOwnWhenThereIsHeightAndOneWhenThereIsNot()
     {
         (App app, _) = Desk();
         app.ShowTab(1);
@@ -273,11 +273,11 @@ public sealed class TuiViewTests
         string[] rows = Frame(tall).Split('\n');
         int first = Array.FindIndex(rows, row => row.Contains("XLR 1", StringComparison.Ordinal));
         Assert.True(first > 0);
-        // Each side keeps a row of its own, so the next channel starts two
-        // rows down rather than touching this one.
-        Assert.Contains("L", rows[first], StringComparison.Ordinal);
+        // Each side keeps a row of its own and the name sits between them, so
+        // the next channel starts three rows down rather than touching this one.
+        Assert.Contains("L", rows[first - 1], StringComparison.Ordinal);
         Assert.Contains("R", rows[first + 1], StringComparison.Ordinal);
-        Assert.Contains("XLR 2", rows[first + 2], StringComparison.Ordinal);
+        Assert.Contains("XLR 2", rows[first + 3], StringComparison.Ordinal);
         // The masters carry the same pair, under their mute key.
         int mixes = Array.FindIndex(rows, row => row.Contains("MIXES", StringComparison.Ordinal));
         Assert.Contains("L", rows[mixes + 3], StringComparison.Ordinal);

@@ -34,11 +34,11 @@ internal static class Widgets
             double position = (cell + 1.0) / width;
             Rgb colour = theme.MeterColour(position);
             double within = filled - cell;
-            // The bar sits in the lower half of its row, so two meters on
-            // neighbouring rows, or a meter and the text above it, do not run
-            // into one another. The half block halves the resolution to two
-            // steps a cell, which a bar this short does not miss.
-            char ch = within >= 1 ? '▄' : within >= 0.5 ? '▖' : '▁';
+            // The bar stands three quarters of its row, level with the
+            // lettering beside it, and keeps the quarter above it clear so
+            // meters on neighbouring rows do not run together. Two steps a
+            // cell, which a bar this short does not miss.
+            char ch = within >= 1 ? '▆' : within >= 0.5 ? '▖' : '▁';
             screen.Set(x + cell, y, ch, within >= 0.5 ? colour : theme.MeterTrack, back);
         }
     }
