@@ -19,48 +19,28 @@ internal static class Widgets
 {
     private const string VerticalEighths = " ▁▂▃▄▅▆▇█";
 
-    /// <summary>Where in its row a bar stands, which is what lets a pair meet.</summary>
-    public enum Align
-    {
-        /// <summary>Three quarters of the row, level with the lettering beside it.</summary>
-        Alone,
-
-        /// <summary>The lower half, for the upper bar of a pair.</summary>
-        Lower,
-
-        /// <summary>The upper half, for the lower bar of a pair.</summary>
-        Upper,
-    }
-
     /// <summary>
     /// A level meter. Each cell is coloured by where it sits on the scale
     /// rather than by how loud the signal is, which is the rule the window's
     /// meter follows, so the quiet end stays calm however hot the peak gets.
     ///
-    /// A bar on its own stands three quarters of its row. The two bars of a
-    /// stereo pair take the halves that meet at the line between their rows,
-    /// so the pair reads as one meter with a step in it rather than as the
-    /// same bar drawn twice, which is what a mono source makes of it.
+    /// A bar stands three quarters of its row, level with the lettering beside
+    /// it, and keeps the quarter above it clear. That quarter is what keeps
+    /// the two bars of a stereo pair readable as a left and a right rather
+    /// than as one block, while leaving them close enough to belong together.
     /// </summary>
-    public static void Meter(Screen screen, int x, int y, int width, double level, Theme theme, Rgb back,
-        Align align = Align.Alone)
+    public static void Meter(Screen screen, int x, int y, int width, double level, Theme theme, Rgb back)
     {
         if (width <= 0) return;
         double clamped = Math.Clamp(level, 0, 1);
         double filled = clamped * width;
-        (char full, char half, char track) = align switch
-        {
-            Align.Lower => ('▄', '▖', '▁'),
-            Align.Upper => ('▀', '▘', '▔'),
-            _ => ('▆', '▖', '▁'),
-        };
         for (int cell = 0; cell < width; cell++)
         {
             double position = (cell + 1.0) / width;
             Rgb colour = theme.MeterColour(position);
             double within = filled - cell;
             // Two steps a cell, which a bar this short does not miss.
-            char ch = within >= 1 ? full : within >= 0.5 ? half : track;
+            char ch = within >= 1 ? '▆' : within >= 0.5 ? '▖' : '▁';
             screen.Set(x + cell, y, ch, within >= 0.5 ? colour : theme.MeterTrack, back);
         }
     }

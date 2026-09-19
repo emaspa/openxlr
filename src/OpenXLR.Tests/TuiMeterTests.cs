@@ -188,20 +188,17 @@ public sealed class TuiMeterTests
     }
 
     [Fact]
-    public void TheTwoBarsOfAStereoPairMeetAtTheLineBetweenTheirRows()
+    public void TheTwoBarsOfAStereoPairStayApartOnNeighbouringRows()
     {
-        Screen screen = new(6, 3);
+        Screen screen = new(6, 2);
         Theme theme = Zones();
         screen.Clear(theme.Card);
-        Widgets.Meter(screen, 0, 0, 4, 1, theme, theme.Card, Widgets.Align.Lower);
-        Widgets.Meter(screen, 0, 1, 4, 1, theme, theme.Card, Widgets.Align.Upper);
-        Widgets.Meter(screen, 0, 2, 4, 1, theme, theme.Card);
+        Widgets.Meter(screen, 0, 0, 4, 1, theme, theme.Card);
+        Widgets.Meter(screen, 0, 1, 4, 1, theme, theme.Card);
 
-        // The upper bar stands on the floor of its row and the lower one hangs
-        // from the ceiling of its own, so a mono source reads as one bar.
-        Assert.Equal('\u2584', screen.At(0, 0).Ch);
-        Assert.Equal('\u2580', screen.At(0, 1).Ch);
-        // A bar on its own keeps three quarters of its row.
-        Assert.Equal('\u2586', screen.At(0, 2).Ch);
+        // Each bar keeps three quarters of its own row, so the quarter above
+        // the lower one still reads as the line between a left and a right.
+        Assert.Equal('\u2586', screen.At(0, 0).Ch);
+        Assert.Equal('\u2586', screen.At(0, 1).Ch);
     }
 }

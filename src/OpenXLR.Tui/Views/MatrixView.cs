@@ -89,9 +89,10 @@ internal sealed class MatrixView : View
             screen.Set(area.X + column, y, '\u2500', theme.Rule, theme.Card);
         y++;
 
-        // Three rows a channel where they fit, which puts its name on the row
-        // between its two meters; two rows where only those fit, with the name
-        // beside the left one; one row and a summed bar in a short terminal.
+        // A channel's two bars sit on neighbouring rows, so they read as its
+        // one stereo meter. A third row, where it fits, is left blank to keep
+        // one channel clear of the next. A short terminal gets one row and one
+        // summed bar.
         int available = Math.Max(1, area.Bottom - y);
         int step = !roomy ? 1 : channels.Count * 3 <= available ? 3 : 2;
         int rows = Math.Max(1, available / step);
@@ -103,7 +104,7 @@ internal sealed class MatrixView : View
         {
             ChannelEntry channel = channels[first + index];
             int line = y + index * step;
-            int nameLine = line + (step == 3 ? 1 : 0);
+            int nameLine = line;
             bool selectedRow = _row == first + index + 1;
             // Every other channel takes a slightly different ground, so the
             // rows of one channel read as its own block rather than pairing a
@@ -119,7 +120,7 @@ internal sealed class MatrixView : View
             if (!roomy) Widgets.Meter(screen, meterX, line, meterWidth, level.Level, theme, rowBack);
             else if (channel.Mono)
                 Widgets.Meter(screen, meterX + 2, nameLine, meterWidth, level.Level, theme, rowBack);
-            else Stereo(screen, meterX, line, line + step - 1, meterWidth + 2, level, theme, rowBack);
+            else Stereo(screen, meterX, line, line + 1, meterWidth + 2, level, theme, rowBack);
 
             for (int cell = 0; cell < shown; cell++)
             {
@@ -147,21 +148,14 @@ internal sealed class MatrixView : View
         }
     }
 
-    /// <summary>
-    /// Left above right, each lettered, on a row of its own. On neighbouring
-    /// rows the two bars take the halves that meet, so the pair reads as one
-    /// meter rather than as the same bar twice.
-    /// </summary>
+    /// <summary>Left above right, each lettered, on neighbouring rows.</summary>
     private static void Stereo(Screen screen, int x, int left, int right, int width, MeterReading level, Theme theme, Rgb back)
     {
         if (width < 4) return;
-        bool touching = right == left + 1;
         screen.Text(x, left, "L", theme.TextMuted, back);
         screen.Text(x, right, "R", theme.TextMuted, back);
-        Widgets.Meter(screen, x + 2, left, width - 2, level.Left, theme, back,
-            touching ? Widgets.Align.Lower : Widgets.Align.Alone);
-        Widgets.Meter(screen, x + 2, right, width - 2, level.Right, theme, back,
-            touching ? Widgets.Align.Upper : Widgets.Align.Alone);
+        Widgets.Meter(screen, x + 2, left, width - 2, level.Left, theme, back);
+        Widgets.Meter(screen, x + 2, right, width - 2, level.Right, theme, back);
     }
 
     public override bool Handle(KeyPress key, App app)
