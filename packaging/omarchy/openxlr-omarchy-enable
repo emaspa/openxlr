@@ -33,5 +33,17 @@ else
 fi
 
 omarchy-shell shell rescanPlugins >/dev/null
-omarchy plugin enable openxlr.mixer
+# rescanPlugins answers before the shell has finished rebuilding the registry
+# that enablePlugin reads, so an enable sent straight after it is told the
+# plugin is unknown. Wait for the shell rather than making the user run the
+# command a second time.
+deadline=$(( SECONDS + 10 ))
+while :; do
+    if enable_output=$(omarchy plugin enable openxlr.mixer 2>&1); then
+        break
+    fi
+    (( SECONDS < deadline )) || fail "Omarchy did not pick up the plugin: $enable_output"
+    sleep 0.5
+done
+printf '%s\n' "$enable_output"
 printf 'OpenXLR is enabled. Move it with: omarchy bar move openxlr.mixer right\n'

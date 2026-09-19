@@ -258,6 +258,25 @@ applies at the next login or after `systemctl --user restart
 pipewire-pulse`; a source install needs the same file before growing the
 layout ([manual: open-file limit](docs/manual.md#open-files)).
 
+### Upgrading
+
+A package upgrade replaces the files on disk and leaves the running
+programs on the code they started with, so a new version appears only
+after they restart. Rebooting does that, and so does this:
+
+```sh
+systemctl --user restart openxlr-daemon
+```
+
+Then close the mixer window and open it again, and quit `openxlr-tui` if
+it is running. On Omarchy, reload the bar plugin with:
+
+```sh
+omarchy-shell shell rescanPlugins
+```
+
+Replug the interface only when the release says the udev rule changed.
+
 ### Build from source
 
 Needs the .NET 10 SDK, PipeWire tools, libusb, lilv, the GLib

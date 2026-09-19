@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -165,6 +166,23 @@ public sealed class OmarchyPluginTests
         Assert.DoesNotContain("shell rescanPlugins", File.ReadAllLines(fixture.Log));
     }
 
+    /// <summary>
+    /// rescanPlugins answers before the shell has rebuilt the registry that
+    /// enablePlugin reads, so the first enable after it can be told the plugin
+    /// is unknown. The command waits instead of leaving the user to run it
+    /// again.
+    /// </summary>
+    [Fact]
+    public async Task EnablingWaitsForOmarchyToLearnThePlugin()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using EnableFixture fixture = new();
+        ProcessResult result = await fixture.Run(enableFailures: 2);
+        Assert.True(result.Ok, result.Stderr);
+        Assert.Equal(3, File.ReadAllLines(fixture.Log).Count(line => line == "plugin enable openxlr.mixer"));
+        Assert.Equal(fixture.Plugin, new DirectoryInfo(fixture.Destination).LinkTarget);
+    }
+
     private sealed class EnableFixture : IDisposable
     {
         private readonly string _directory = Path.Combine(Path.GetTempPath(), "openxlr-omarchy-" + Guid.NewGuid());
@@ -186,10 +204,17 @@ public sealed class OmarchyPluginTests
                     if [ "$1 $2" = 'plugin validate' ]; then
                         [ "$OPENXLR_TEST_FAILURE" != validate ] || exit 1
                     fi
+                    if [ "$1 $2" = 'plugin enable' ]; then
+                        tries=$(grep -c '^plugin enable' "$OPENXLR_TEST_CALLS")
+                        if [ "$tries" -le "${OPENXLR_TEST_ENABLE_FAILS:-0}" ]; then
+                            printf "plugin '%s' is not known\n" "$3" >&2
+                            exit 1
+                        fi
+                    fi
                     """);
         }
 
-        public Task<ProcessResult> Run(string failure = "", string? plugin = null) => ProcessRunner.RunAsync("bash",
+        public Task<ProcessResult> Run(string failure = "", string? plugin = null, int enableFailures = 0) => ProcessRunner.RunAsync("bash",
             [Path.Combine(Root(), "packaging", "omarchy", "openxlr-omarchy-enable"), plugin ?? Plugin],
             environment: new Dictionary<string, string>
             {
@@ -197,7 +222,8 @@ public sealed class OmarchyPluginTests
                 ["XDG_CONFIG_HOME"] = Path.Combine(_directory, "different-config"),
                 ["PATH"] = _directory + ":/usr/bin:/bin",
                 ["OPENXLR_TEST_CALLS"] = Log,
-                ["OPENXLR_TEST_FAILURE"] = failure
+                ["OPENXLR_TEST_FAILURE"] = failure,
+                ["OPENXLR_TEST_ENABLE_FAILS"] = enableFailures.ToString(CultureInfo.InvariantCulture)
             });
 
         public void Dispose() => Directory.Delete(_directory, recursive: true);

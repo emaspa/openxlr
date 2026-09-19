@@ -98,7 +98,9 @@ openxlr-omarchy-enable
 The command validates the system copy, links it at
 `~/.config/omarchy/plugins/openxlr.mixer`, asks `omarchy-shell shell
 rescanPlugins` to discover it, then runs `omarchy plugin enable
-openxlr.mixer`. Omarchy writes its own `~/.config/omarchy/shell.json` and
+openxlr.mixer`. That rescan answers before the shell has rebuilt the
+registry the enable reads, so the command retries the enable for up to ten
+seconds rather than reporting the plugin as unknown. Omarchy writes its own `~/.config/omarchy/shell.json` and
 places the widget on the right. The command can be run again; it refuses
 to overwrite an existing folder or a link to a different plugin.
 Omarchy uses `~/.config/omarchy` even when `XDG_CONFIG_HOME` differs.
@@ -113,6 +115,8 @@ omarchy plugin remove openxlr.mixer
 Removal disables the plugin and unlinks its directory. It leaves the
 system copy for the package manager. A package upgrade replaces that
 copy; run `omarchy-shell shell rescanPlugins` after upgrading to reload it.
+The daemon and the window keep the code they started with until they are
+restarted, which the README's upgrading section covers.
 The plugin is package-managed, so `omarchy plugin update` does not update it.
 No package hook writes to a user's home or restarts a service.
 
