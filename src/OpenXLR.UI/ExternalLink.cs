@@ -1,5 +1,5 @@
 using System;
-using System.Diagnostics;
+using System.Threading.Tasks;
 
 namespace OpenXLR.UI;
 
@@ -11,15 +11,19 @@ internal static class ExternalLink
 {
     private static readonly string[] Hosts = ["github.com", "www.reddit.com", "discord.gg", "buymeacoffee.com"];
 
+    /// <summary>The program handed the link; tests point it at a fake.</summary>
+    internal static string Opener = "xdg-open";
+
     public static bool Open(string url)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? uri) || uri.Scheme != "https" || Array.IndexOf(Hosts, uri.Host) < 0)
             return false;
-        try
-        {
-            Process.Start(new ProcessStartInfo("xdg-open", uri.ToString()) { UseShellExecute = false });
-            return true;
-        }
-        catch (Exception) { return false; }
+        // The opener hands the link to the browser and returns on its own
+        // time, so it runs as a program of the user's: no deadline, no
+        // captured output. A start failure is already in the returned task.
+        Task<int> run = ProcessRunner.RunInteractiveAsync(Opener, [uri.ToString()]);
+        if (run.IsFaulted) return false;
+        _ = run.ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+        return true;
     }
 }
