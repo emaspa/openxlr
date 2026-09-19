@@ -142,14 +142,13 @@ Collect diagnostics).
   insert chains, the profiles and the appearance.
   See [the manual](docs/manual.md#terminal).
 - **Skins**: the window's appearance is a set of named values a skin file
-  can replace. OpenXLR ships Material, its own look, and Deck, which dresses
-  the window in the visual language of the OpenDeck plugin's keys and dials. A skin
-  is data, not code: colours, sizes, local images from its own folder and a
-  choice between the control appearances OpenXLR draws, picked in Options
-  and applied to open windows without touching audio. The terminal mixer
-  reads the same files and follows the same choice, and
-  [docs/examples/skins](docs/examples/skins) holds a skin for each of the
-  Omarchy palettes.
+  can replace. Thirteen ship, all built into the application: Material, its
+  own look, Deck, which dresses the window in the visual language of the
+  OpenDeck plugin's keys and dials, and one for each of the eleven Omarchy
+  palettes. A skin is data, not code: colours, sizes, local images from its
+  own folder and a choice between the control appearances OpenXLR draws,
+  picked in Options and applied to open windows without touching audio. The
+  terminal mixer reads the same files and follows the same choice.
   See [docs/skins.md](docs/skins.md).
 - **Optional update notice**: the UI can check the upstream GitHub release
   feed for a newer stable release. Startup checks are off by default and,

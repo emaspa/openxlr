@@ -84,7 +84,7 @@
     "Ox.Control.BorderBrushDisabled": "#504945",
     "Ox.Control.BorderThickness": 1,
     "Ox.Control.CornerRadius": 2,
-    "Ox.Control.DisabledOpacity": 1,
+    "Ox.Control.DisabledOpacity": 0.65,
     "Ox.Ghost.Background": "#282828",
     "Ox.Cap.Bevel": {
       "type": "linear",

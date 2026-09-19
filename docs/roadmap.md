@@ -52,9 +52,9 @@ This is what 0.1.42 ships. A checked item is in the released packages.
   is asked from KWin, so focused routing is KDE Plasma only today, and
   matched to its PipeWire client.
 - [x] Terminal mixer: `openxlr-tui`, the whole mixer in a terminal over the
-  daemon's socket, with the window's skins and one for each Omarchy
-  palette; inserts open the plugin's own editor or generated controls
-  and a picker adds plugins from the catalogue.
+  daemon's socket, with every skin the window has, one of them for each
+  Omarchy palette; inserts open the plugin's own editor or generated
+  controls and a picker adds plugins from the catalogue.
 - [x] Packages: AUR, Debian/Ubuntu, Fedora, NixOS flake and module.
 - [x] Daemon recovery basics: fast shutdown, busy-port wait, self-healing
   input and capture feeds, UCM coexistence on the Pro, a rebuild after a
@@ -128,8 +128,10 @@ a skin overlays values on top of them.
   faders, text and accents; views reference tokens only, and the tokens a
   skin sets also feed the theme keys behind buttons, sliders and dropdowns.
 - [x] Skins: a user-supplied value set loaded from a file, selectable in
-  Options, so the mixer can look like the hardware it drives. Shipped with
-  a Deck appearance built from the plugin's own key and dial art.
+  Options, so the mixer can look like the hardware it drives. Thirteen
+  appearances are compiled into the application, so every package carries
+  them: Material, a Deck appearance built from the plugin's own key and
+  dial art, and one for each of the eleven Omarchy palettes.
   Skins are data: no markup, no code, no path outside their own folder, no
   network. [skins.md](skins.md) is the contract.
 - [ ] System, light and dark appearance, following the desktop by default.
@@ -140,8 +142,7 @@ a skin overlays values on top of them.
   speaks the same WebSocket the window does and draws the same skins,
   reading the colour tokens out of the same files and following the same
   saved choice, so an appearance picked in one is the appearance in the
-  other. Example skins for the Omarchy palettes ship in
-  [docs/examples/skins](examples/skins). A desk of vertical sends and mix
+  other, the palette skins included. A desk of vertical sends and mix
   masters, with stereo meters and level history, and eight keyboard
   sections for the mixer, hardware, outputs, applications, inserts,
   profiles and appearance. A compact layout fits 80x24. It draws its own

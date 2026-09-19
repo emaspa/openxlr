@@ -48,11 +48,24 @@ public sealed class SkinPackageTests : IDisposable
     public void BuiltInSkinsReadWithoutComplaint()
     {
         SkinEntry[] built = [.. SkinCatalog.BuiltIn()];
+        // Every appearance the application carries is compiled in, so a
+        // package has them all without installing a single file.
+        Assert.Equal(
+            ["catppuccin", "catppuccin-latte", "everforest", "gruvbox", "kanagawa", "matte-black",
+                "nord", "opendeck", "osaka-jade", "ristretto", "rose-pine", "tokyo-night"],
+            built.Select(e => e.Id).Order(StringComparer.Ordinal));
+        foreach (SkinEntry entry in built)
+        {
+            Assert.Empty(entry.Errors);
+            Assert.NotEqual("", entry.Name);
+            // A whole appearance, not a recolour of a few labels.
+            Assert.True(entry.Package.Tokens.Count > 40,
+                $"{entry.Id} sets only {entry.Package.Tokens.Count} tokens");
+        }
+
         SkinEntry openDeck = Assert.Single(built, e => e.Id == "opendeck");
         Assert.Empty(openDeck.Errors);
         Assert.Equal("Deck", openDeck.Name);
-        // The skin is a whole appearance, not a recolour of a few labels.
-        Assert.True(openDeck.Package.Tokens.Count > 40, $"only {openDeck.Package.Tokens.Count} tokens");
 
         // It speaks the plugin's language: the faceplate is side lit, the fader
         // cap is machined, and every key wears the face the mute key wears.
@@ -623,8 +636,11 @@ public sealed class SkinPackageTests : IDisposable
     /// gradient rather than its average.
     /// </summary>
     [Fact]
-    public void BothShippedAppearancesKeepTheirTextReadable()
+    public void EveryShippedAppearanceKeepsItsTextReadable()
     {
+        // Twelve appearances times every pair: a failure names all of them, so
+        // a skin is fixed in one pass rather than one colour per test run.
+        var thin = new List<string>();
         foreach (SkinEntry entry in new[] { new SkinEntry(SkinPackage.Default, []) }
                      .Concat(SkinCatalog.BuiltIn()))
         {
@@ -637,15 +653,16 @@ public sealed class SkinPackageTests : IDisposable
                          })
                 {
                     double ratio = Worst(Colours(entry, ink), Colours(entry, surface));
-                    Assert.True(ratio >= least,
-                        $"{entry.Id}: {ink} on {surface} is {ratio:F2}:1, under {least}:1");
+                    if (ratio < least)
+                        thin.Add($"{entry.Id}: {ink} on {surface} is {ratio:F2}:1, under {least}:1");
                 }
 
             // The indicators have to be told apart from the surface they sit on.
             foreach (string led in new[] { "Ox.Led.On", "Ox.Led.Alert", "Ox.Meter.Fill" })
-                Assert.True(Worst(Colours(entry, led), Colours(entry, "Ox.Tile.Background")) >= 3.0,
-                    $"{entry.Id}: {led} does not stand out on a strip");
+                if (Worst(Colours(entry, led), Colours(entry, "Ox.Tile.Background")) < 3.0)
+                    thin.Add($"{entry.Id}: {led} does not stand out on a strip");
         }
+        Assert.True(thin.Count == 0, string.Join("\n", thin));
     }
 
     /// <summary>
@@ -657,6 +674,7 @@ public sealed class SkinPackageTests : IDisposable
     [Fact]
     public void ControlLetteringStaysReadableOnItsFace()
     {
+        var thin = new List<string>();
         foreach (SkinEntry entry in SkinCatalog.BuiltIn())
         {
             foreach ((string ink, string face, double least) in new[]
@@ -677,17 +695,18 @@ public sealed class SkinPackageTests : IDisposable
             {
                 if (!entry.Package.Tokens.ContainsKey(ink) || !entry.Package.Tokens.ContainsKey(face)) continue;
                 double ratio = Worst(Colours(entry, ink), Colours(entry, face));
-                Assert.True(ratio >= least, $"{entry.Id}: {ink} on {face} is {ratio:F2}:1, under {least}:1");
+                if (ratio < least) thin.Add($"{entry.Id}: {ink} on {face} is {ratio:F2}:1, under {least}:1");
             }
 
             // A switched-off toggle and an unavailable action are both red, so
             // the difference between them cannot be the colour. It is the fade,
             // which the control themes apply and the rendered comparison in the
             // desktop tests checks; here it only has to be asked for.
-            if (entry.Package.Tokens.ContainsKey("Ox.Toggle.ForegroundDisabled"))
-                Assert.True(((SkinNumber)entry.Package.Tokens["Ox.Control.DisabledOpacity"]).Value < 1,
-                    $"{entry.Id}: a disabled key does not fade, so it reads as merely switched off");
+            if (entry.Package.Tokens.ContainsKey("Ox.Toggle.ForegroundDisabled")
+                && ((SkinNumber)entry.Package.Tokens["Ox.Control.DisabledOpacity"]).Value >= 1)
+                thin.Add($"{entry.Id}: a disabled key does not fade, so it reads as merely switched off");
         }
+        Assert.True(thin.Count == 0, string.Join("\n", thin));
     }
 
     /// <summary>

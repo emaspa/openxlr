@@ -43,6 +43,7 @@ public sealed class SkinWindowTests
             ACheckBoxLabelTakesItsOwnToken(options);
             IndicatorsAndMetersDrawInsideTheBoxTheyAreGiven();
             AMeterIsColouredByPositionAndNotByItsReading();
+            AContinuousBarIsWholeWhereItsZonesMeet();
             ButtonsCarryTheirStateInTheirLettering(main);
             EveryRectangularControlWearsTheSameFace(main, options);
             EveryKeyIsDrawnLikeTheMuteKey();
@@ -679,6 +680,69 @@ public sealed class SkinWindowTests
             Assert.True(loud.Red > 0, "a full meter lights no red cells");
         }
         finally { probe.Close(); SkinService.Apply(new SkinEntry(SkinPackage.Default, [])); }
+    }
+
+    /// <summary>
+    /// A continuous bar is one bar, whatever zone it has reached. The shipped
+    /// appearance paints all three zones the same green, so crossing -18 dBFS
+    /// or -6 dBFS should change nothing about how the bar looks. Every span
+    /// used to be rounded at both of its ends and to begin wherever the
+    /// arithmetic put it rather than on a pixel, so a threshold cut a notch
+    /// across the four-pixel bar and the monitor mixes read as a long bar
+    /// followed by a short second one.
+    /// </summary>
+    private static void AContinuousBarIsWholeWhereItsZonesMeet()
+    {
+        var track = Color.FromRgb(0x14, 0x16, 0x1b);
+        var green = Color.FromRgb(0x3e, 0xcf, 0x7a);
+        var meter = new LevelMeter
+        {
+            Presentation = MeterPresentation.Continuous,
+            Width = 212, Height = 4, CornerRadius = new CornerRadius(2),
+            Track = new SolidColorBrush(track),
+            Fill = new SolidColorBrush(green),
+            Warning = new SolidColorBrush(green),
+            Hot = new SolidColorBrush(green),
+            WarningLevel = 0.7, HotLevel = 0.9,
+        };
+        var host = new Border { Background = new SolidColorBrush(Color.FromRgb(0, 0, 0)), Child = meter };
+        var probe = new Window { Content = host, Width = 212, Height = 4,
+            WindowDecorations = WindowDecorations.None };
+        probe.Show();
+        try
+        {
+            // -15.5 dBFS is past the amber threshold, -2 dBFS past the red one,
+            // and a full bar is past both.
+            foreach (double level in new[] { (-15.5 + 60) / 60, (-2.0 + 60) / 60, 1.0 })
+            {
+                meter.Level = level;
+                Layout(probe, 212, 4);
+                var size = new PixelSize((int)host.Bounds.Width, (int)host.Bounds.Height);
+                byte[] pixels = Read(host, size);
+
+                // How much of a column the fill covers, read off the middle
+                // channel, which is green whichever way round the ends are
+                // stored. A column between the bar's two rounded caps is
+                // covered whole.
+                double Covered(int x)
+                {
+                    double most = 0;
+                    for (int y = 0; y < size.Height; y++)
+                        most = Math.Max(most, (pixels[(y * size.Width + x) * 4 + 1] - track.G)
+                                              / (double)(green.G - track.G));
+                    return most;
+                }
+
+                const int cap = 2;   // the corner radius, where the caps curve away
+                int last = Enumerable.Range(0, size.Width).Last(x => Covered(x) >= 0.5);
+                Assert.True(last > size.Width / 2, $"at {level:F3} the bar hardly drew at all, ending at {last}");
+                int[] gaps = [.. Enumerable.Range(cap, Math.Max(0, last - 2 * cap)).Where(x => Covered(x) < 0.9)];
+                Assert.True(gaps.Length == 0,
+                    $"at {level:F3} the bar is notched at "
+                    + string.Join(" ", gaps.Take(8).Select(x => $"{x} ({Covered(x):P0} covered)")));
+            }
+        }
+        finally { probe.Close(); }
     }
 
     /// <summary>How many cells of each zone colour are lit across the middle of a ladder.</summary>
