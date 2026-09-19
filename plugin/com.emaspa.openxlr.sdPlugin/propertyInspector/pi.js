@@ -19,12 +19,15 @@ function connect(inPort, inPropertyInspectorUUID, inRegisterEvent, inInfo, inAct
     ws.send(JSON.stringify({ event: inRegisterEvent, uuid: piUuid }));
     const sel = document.getElementById("target");
     const iconSel = document.getElementById("icon");
+    const momentary = document.getElementById("momentary");
+    if (momentary) momentary.checked = settings.momentary === true;
     if (wanted) sel.value = wanted;
     if (iconSel && settings.icon) iconSel.value = settings.icon;
     const save = () => {
       settings.target = sel.value;
       wanted = sel.value;
       if (iconSel) settings.icon = iconSel.value;
+      if (momentary) settings.momentary = momentary.checked;
       // Insert options carry {plugin, index} so the key survives a chain
       // rebuild that hands the insert a new id.
       const opt = sel.selectedOptions[0];
@@ -36,6 +39,7 @@ function connect(inPort, inPropertyInspectorUUID, inRegisterEvent, inInfo, inAct
     };
     sel.addEventListener("change", save);
     iconSel?.addEventListener("change", save);
+    momentary?.addEventListener("change", save);
     // Ask the plugin for the live output-device list, the insert chains and
     // the saved profiles.
     for (const request of ["layout", "outputs", "inserts", "profiles"])

@@ -31,6 +31,9 @@ public sealed record Command
     /// <summary>For "set": the control name (see <see cref="ControlNames"/>).</summary>
     [JsonPropertyName("control")] public string? Control { get; init; }
 
+    [JsonPropertyName("holdId")] public string? HoldId { get; init; }
+    [JsonPropertyName("action")] public string? Action { get; init; }
+
     /// <summary>The value: number for levels, bool for toggles.</summary>
     [JsonPropertyName("value")] public System.Text.Json.JsonElement Value { get; init; }
 

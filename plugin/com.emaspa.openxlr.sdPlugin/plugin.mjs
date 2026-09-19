@@ -3,6 +3,7 @@
 // daemon. The daemon owns all state and broadcasts every change, so keys
 // and dials stay in sync with the UI (and with the hardware) for free.
 
+import { MomentaryEffects } from "./momentary-effects.mjs";
 import process from "node:process";
 import { randomUUID } from "node:crypto";
 import { channelName, mixName, mixShortName, layoutChoices, controllableOutputs, outputKey } from "./layout-choices.mjs";
@@ -115,13 +116,14 @@ function connectDaemon() {
       catalog = new Map((m.plugins ?? []).map((p) => [p.plugin, p]));
       refreshAll();
     }
-    else if (m.type === "commandResult") finishKey(m.requestId, !!m.error);
+    else if (m.type === "commandResult") { finishKey(m.requestId, !!m.error); momentary.reply(m.requestId, m.error); }
     else if (m.type === "error") console.error("OpenXLR daemon:", m.message);
   };
   socket.onclose = (e) => {
     if (daemon !== socket) return;
     if (e && e.code === 1008) console.error("OpenXLR daemon refused the plugin:", e.reason);
     for (const id of pendingKeys.keys()) finishKey(id, true);
+    momentary.clear();
     daemonUp = false; daemonState = null; refreshAll();
     scheduleDaemonReconnect(generation);
   };
@@ -143,7 +145,8 @@ const cmd = (o) => {
 const host = new WebSocket(`ws://localhost:${port}`);
 const send = (o) => host.send(JSON.stringify(o));
 host.onopen = () => send({ event: registerEvent, uuid: pluginUUID });
-host.onclose = () => process.exit(0);
+host.onclose = () => { momentary.clear(true); process.exit(0); };
+const momentary = new MomentaryEffects(cmd, randomUUID, context => send({event:"showAlert", context}));
 
 // Visible action instances: context -> {action, settings, controller}
 const instances = new Map();
@@ -302,14 +305,19 @@ host.onmessage = (e) => {
       refresh(m.context);
       break;
     case "willDisappear":
+      momentary.end(m.context);
       instances.delete(m.context);
       emptyTitle.delete(m.context);
       break;
     case "didReceiveSettings":
+      momentary.end(m.context);
       if (inst) { inst.settings = m.payload?.settings ?? {}; refresh(m.context); }
       break;
     case "keyDown":
       if (inst) onKeyDown(m.context, inst);
+      break;
+    case "keyUp":
+      momentary.end(m.context);
       break;
     case "dialRotate":
       if (inst) onDialRotate(m.context, inst, m.payload?.ticks ?? 0);
@@ -696,6 +704,15 @@ function onKeyDown(context, inst) {
   const t = inst.settings.target;
   const cur = toggleValue(t, inst);
   if (cur === null) { send({ event: "showAlert", context }); return; }
+  if (inst.settings.momentary === true && (t.startsWith("insert|") || t.startsWith("inschain|"))) {
+    if (t.startsWith("insert|")) {
+      const [, channel, id] = t.split("|");
+      const insert = resolveInsert(channel, id, metaOf(inst, t));
+      if (!insert) { send({event:"showAlert", context}); return; }
+      momentary.begin(context, channel, insert.id);
+    } else momentary.begin(context, t.slice(9));
+    return;
+  }
   const output = outputKey(t);
   if (output) {
     const payload = output.kind === "main" ? {cmd:"setMainOutput",device:output.device}

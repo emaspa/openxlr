@@ -510,6 +510,9 @@ public sealed class MixerService : IHostedService, IDisposable
                 case "setSoftClipGuard":
                     _mixer.SetSoftClipGuard(cmd.Value.GetBoolean());
                     break;
+                case "holdInsert":
+                    if (_mixer.HoldInsert(cmd.HoldId!, cmd.Action!, cmd.Channel, cmd.InsertId)) Changed?.Invoke();
+                    return null; // A held key never schedules a settings write.
                 case "setInserts":
                     _mixer.SetInserts(cmd.Channel!, cmd.Inserts!);   // both checked by CommandValidation
                     break;

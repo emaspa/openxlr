@@ -361,3 +361,10 @@ PipeWire output volume, mute and enforced system-output selection are available
 from the same PC shortcut session and OpenDeck Toggle keys. Volume steps use
 desktop percentages up to 150%; targets can follow the current default or stay
 bound to a named external output or monitor mix.
+
+### Held effect keys in OpenDeck
+
+Effect and whole-chain keys can activate processing only while held. Overlapping
+holds restore the original bypass states after the last release. Lost releases
+expire after five seconds plus graph reconciliation; manual edits and profile
+recall take precedence. Temporary held states are not saved in profiles.
