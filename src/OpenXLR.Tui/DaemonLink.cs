@@ -36,6 +36,9 @@ internal sealed class DaemonLink : IAsyncDisposable
 
     public bool PluginsLoaded { get; private set; }
 
+    /// <summary>Every installed plugin, for the picker; empty until the catalogue arrives.</summary>
+    public IReadOnlyList<PluginChoice> Choices { get; private set; } = [];
+
     /// <summary>The latest state, or null before the first one arrives.</summary>
     public Snapshot? State { get; private set; }
 
@@ -204,6 +207,7 @@ internal sealed class DaemonLink : IAsyncDisposable
             _pluginsRequested = false;
             PluginsLoaded = false;
             Plugins = new Dictionary<(string, string), PluginEntry>();
+            Choices = [];
         }
         Changed?.Invoke();
     }
@@ -308,7 +312,10 @@ internal sealed class DaemonLink : IAsyncDisposable
                 {
                     try
                     {
-                        Plugins = PluginCatalog.Read(json, _chains.Select(slot => (slot.Kind, slot.Plugin)).ToHashSet());
+                        PluginCatalogue catalogue = PluginCatalog.Read(json,
+                            _chains.Select(slot => (slot.Kind, slot.Plugin)).ToHashSet());
+                        Plugins = catalogue.Entries;
+                        Choices = catalogue.Choices;
                         PluginsLoaded = true;
                     }
                     catch (JsonException) { LastError = "Could not read the plugin controls"; }

@@ -23,9 +23,11 @@ public sealed class TuiInsertTests
             {"symbol":"gain","name":"Gain","min":-24,"max":24,"default":0},
             {"symbol":"freq","name":"Frequency","min":20,"max":20000,"default":1000,"logarithmic":true},
             {"symbol":"missing","name":"Unsaved","min":0,"max":10,"default":1.5}]},
-          {"kind":"clap","plugin":"urn:eq","name":"Same id, other format","params":[
+          {"kind":"clap","plugin":"urn:eq","name":"Same id, other format","audioIns":2,"audioOuts":2,"params":[
             {"symbol":"wrong","name":"Not in a chain","min":0,"max":1,"default":0}]},
-          {"kind":"lv2","plugin":"urn:unused","name":"Unused","params":[]}]}
+          {"kind":"lv2","plugin":"urn:unused","name":"Unused","category":"Dynamics","audioIns":1,"audioOuts":1,"params":[]},
+          {"kind":"vst3","plugin":"ABCDEF0123456789ABCDEF0123456789","name":"Both widths","audioIns":2,"audioOuts":2,"widths":[1,2],"params":[]},
+          {"kind":"lv2","plugin":"urn:needy","name":"Needs a feature","audioIns":1,"audioOuts":1,"supported":false,"params":[]}]}
         """;
 
     private sealed class Session : IAsyncDisposable
@@ -428,5 +430,75 @@ public sealed class TuiInsertTests
         Assert.DoesNotContain("Generated controls", session.Draw(), StringComparison.Ordinal);
         session.Key(' ');
         Assert.Equal("setInsertBypass", session.Command()["cmd"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task ThePickerOffersWhatFitsTheChainAndAddsTheChosenPluginAfterTheRest()
+    {
+        await using Session session = new();
+        session.Key('a');
+        string frame = session.Draw();
+        Assert.Contains("ADD TO XLR 1", frame, StringComparison.Ordinal);
+        // A mono input takes a plugin with one port each way, or one whose
+        // widths say so; a stereo one and an unsupported one are left out.
+        Assert.Contains("Unused", frame, StringComparison.Ordinal);
+        Assert.Contains("Dynamics", frame, StringComparison.Ordinal);
+        Assert.Contains("Both widths", frame, StringComparison.Ordinal);
+        Assert.DoesNotContain("Same id, other format", frame, StringComparison.Ordinal);
+        Assert.DoesNotContain("Needs a feature", frame, StringComparison.Ordinal);
+        Assert.Empty(session.Sent);
+
+        session.Key('u'); session.Key('n');
+        frame = session.Draw();
+        Assert.Contains("Unused", frame, StringComparison.Ordinal);
+        Assert.DoesNotContain("Both widths", frame, StringComparison.Ordinal);
+
+        session.Key(OpenXLR.Tui.Key.Enter);
+        JsonNode command = session.Command();
+        Assert.Equal("setInserts", command["cmd"]!.GetValue<string>());
+        Assert.Equal("xlr1", command["channel"]!.GetValue<string>());
+        JsonArray inserts = command["inserts"]!.AsArray();
+        Assert.Equal(2, inserts.Count);
+        // The saved insert goes back as it was read, values included.
+        Assert.Equal("eq", inserts[0]!["id"]!.GetValue<string>());
+        Assert.Equal(6.125, inserts[0]!["params"]!["gain"]!.GetValue<double>());
+        Assert.Equal("lv2", inserts[1]!["kind"]!.GetValue<string>());
+        Assert.Equal("urn:unused", inserts[1]!["plugin"]!.GetValue<string>());
+        Assert.Equal("Unused", inserts[1]!["label"]!.GetValue<string>());
+        Assert.Equal(8, inserts[1]!["id"]!.GetValue<string>().Length);
+        Assert.False(inserts[1]!["bypass"]!.GetValue<bool>());
+        Assert.Empty(inserts[1]!["params"]!.AsObject());
+        // The picker closes on the chain again.
+        frame = session.Draw();
+        Assert.DoesNotContain("ADD TO XLR 1", frame, StringComparison.Ordinal);
+        Assert.Contains("Saved EQ", frame, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TheFilterKeepsTheLettersAndDigitsThatOtherwiseQuitOrSwitchSections()
+    {
+        await using Session session = new();
+        session.Key('a');
+        session.Key('q'); session.Key('1');
+        Assert.True(session.App.Running);
+        Assert.Equal(5, session.App.Tab);
+        Assert.Contains("q1", session.Draw(), StringComparison.Ordinal);
+        session.Key(OpenXLR.Tui.Key.Backspace); session.Key(OpenXLR.Tui.Key.Backspace);
+        Assert.Contains("type to narrow the list", session.Draw(), StringComparison.Ordinal);
+
+        session.Key(OpenXLR.Tui.Key.Escape);
+        session.Key('1');
+        Assert.Equal(0, session.App.Tab);
+    }
+
+    [Fact]
+    public async Task ThePickerWaitsForTheCatalogueAndSaysWhenNothingFits()
+    {
+        await using Session session = new(catalogue: false);
+        session.Key('a');
+        Assert.Contains("Waiting for the plugin catalogue", session.Draw(), StringComparison.Ordinal);
+        session.Catalogue["plugins"] = new JsonArray();
+        session.ReceiveCatalogue();
+        Assert.Contains("no mono plugin is installed", session.Draw(), StringComparison.Ordinal);
     }
 }
