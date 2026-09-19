@@ -146,12 +146,7 @@ public sealed class LevelMeter : Control
 
         if (Presentation == MeterPresentation.Continuous)
         {
-            Draw(context, Track, bounds);
-            // One span per zone the bar has reached, each painted where it sits
-            // on the scale. The quiet end keeps its colour however loud it gets.
-            DrawSpan(context, bounds, 0, Math.Min(level, warn), Fill);
-            DrawSpan(context, bounds, warn, Math.Min(level, hot), Warning ?? Fill);
-            DrawSpan(context, bounds, hot, level, Hot ?? Fill);
+            Bar(context, bounds, level, warn, hot);
             return;
         }
 
@@ -161,10 +156,7 @@ public sealed class LevelMeter : Control
         if (cell < 1)
         {
             // Too narrow to draw a ladder in: one bar reads better than a smear.
-            Draw(context, Track, bounds);
-            DrawSpan(context, bounds, 0, Math.Min(level, warn), Fill);
-            DrawSpan(context, bounds, warn, Math.Min(level, hot), Warning ?? Fill);
-            DrawSpan(context, bounds, hot, level, Hot ?? Fill);
+            Bar(context, bounds, level, warn, hot);
             return;
         }
 
@@ -187,19 +179,54 @@ public sealed class LevelMeter : Control
         }
     }
 
-    /// <summary>Paint the part of the bar between two points on the scale.</summary>
-    private void DrawSpan(DrawingContext context, Rect bounds, double from, double to, IBrush? brush)
+    /// <summary>
+    /// The track, and over it one span per zone the bar has reached, each
+    /// painted where it sits on the scale. The quiet end keeps its colour
+    /// however loud the signal gets.
+    ///
+    /// The lit part is one bar, so only its own two ends are rounded and the
+    /// zones meet on a whole pixel. Rounding every span notched the bar at
+    /// each threshold, and a zone edge on a fraction of a pixel left a paler
+    /// seam there: with the shipped colours, where all three zones are the
+    /// same green, the mixes read as a long bar followed by a short one.
+    /// </summary>
+    private void Bar(DrawingContext context, Rect bounds, double level, double warn, double hot)
     {
-        if (to <= from) return;
-        double left = bounds.Width * from;
-        Draw(context, brush, new Rect(left, 0, bounds.Width * to - left, bounds.Height));
+        Draw(context, Track, bounds, CornerRadius);
+        double end = bounds.Width * level;
+        double first = Math.Round(bounds.Width * warn);
+        double second = Math.Round(bounds.Width * hot);
+        DrawSpan(context, bounds, 0, Math.Min(end, first), Fill, end);
+        DrawSpan(context, bounds, first, Math.Min(end, second), Warning ?? Fill, end);
+        DrawSpan(context, bounds, second, end, Hot ?? Fill, end);
     }
 
-    private void Draw(DrawingContext context, IBrush? brush, Rect rect)
+    /// <summary>
+    /// Paint the part of the bar between two pixel positions, rounded at the
+    /// left only if it starts the bar and at the right only if it ends it.
+    /// </summary>
+    private void DrawSpan(DrawingContext context, Rect bounds, double left, double right, IBrush? brush, double end)
     {
-        if (brush is null || rect.Width <= 0) return;
-        double radius = Math.Min(CornerRadius.TopLeft, Math.Min(rect.Width, rect.Height) / 2);
-        if (radius > 0) context.DrawRectangle(brush, null, rect, radius, radius);
-        else context.DrawRectangle(brush, null, rect);
+        if (right <= left) return;
+        bool starts = left <= 0, ends = right >= end - 1e-9;
+        Draw(context, brush, new Rect(left, 0, right - left, bounds.Height),
+            new CornerRadius(starts ? CornerRadius.TopLeft : 0, ends ? CornerRadius.TopRight : 0,
+                ends ? CornerRadius.BottomRight : 0, starts ? CornerRadius.BottomLeft : 0));
+    }
+
+    private void Draw(DrawingContext context, IBrush? brush, Rect rect) =>
+        Draw(context, brush, rect, CornerRadius);
+
+    private static void Draw(DrawingContext context, IBrush? brush, Rect rect, CornerRadius corners)
+    {
+        if (brush is null || rect.Width <= 0 || rect.Height <= 0) return;
+        // A corner cannot take more than half the shape, or the curves of one
+        // side meet and eat the straight part between them.
+        double limit = Math.Min(rect.Width, rect.Height) / 2;
+        CornerRadius radius = new(Math.Min(corners.TopLeft, limit), Math.Min(corners.TopRight, limit),
+            Math.Min(corners.BottomRight, limit), Math.Min(corners.BottomLeft, limit));
+        if (radius.TopLeft <= 0 && radius.TopRight <= 0 && radius.BottomRight <= 0 && radius.BottomLeft <= 0)
+            context.DrawRectangle(brush, null, rect);
+        else context.DrawRectangle(brush, null, new RoundedRect(rect, radius));
     }
 }
