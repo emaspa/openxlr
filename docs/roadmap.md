@@ -13,9 +13,9 @@ behaviour verified on hardware before it ships. The project is small on
 purpose. It prefers one small, idiomatic change over a framework, and a
 feature that is measured over one that is described.
 
-## Where it stands (0.1.41)
+## Where it stands (0.1.42)
 
-This is what 0.1.41 ships. A checked item is in the released packages.
+This is what 0.1.42 ships. A checked item is in the released packages.
 
 - [x] Wave XLR Pro, XLR Dock (MK.1 and MK.2 modules), Wave XLR, Wave XLR
   MK.2: hardware controls, verified by owners of each device.
@@ -51,6 +51,10 @@ This is what 0.1.41 ships. A checked item is in the released packages.
   the desktop portal, so they work on Wayland; the focused application
   is asked from KWin, so focused routing is KDE Plasma only today, and
   matched to its PipeWire client.
+- [x] Terminal mixer: `openxlr-tui`, the whole mixer in a terminal over the
+  daemon's socket, with the window's skins and one for each Omarchy
+  palette; inserts open the plugin's own editor or generated controls
+  and a picker adds plugins from the catalogue.
 - [x] Packages: AUR, Debian/Ubuntu, Fedora, NixOS flake and module.
 - [x] Daemon recovery basics: fast shutdown, busy-port wait, self-healing
   input and capture feeds, UCM coexistence on the Pro, a rebuild after a

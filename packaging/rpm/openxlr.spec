@@ -5,7 +5,7 @@
 %global _build_id_links none
 
 Name:           openxlr
-Version:        0.1.41
+Version:        0.1.42
 Release:        1%{?dist}
 Summary:        Control suite and PipeWire submixer for Elgato XLR interfaces
 License:        GPL-3.0-only
@@ -162,6 +162,13 @@ MSG
 %{_datadir}/openxlr/
 
 %changelog
+* Sat Sep 19 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.42-1
+- A terminal mixer, openxlr-tui: the whole mixer in a terminal over the daemon's socket, a desk of channel strips with stereo meters and level history, a matrix of every send, the hardware inputs, outputs, application routing, inserts, profiles and options; an insert opens the plugin's own editor or generated controls, and a picker adds plugins from the catalogue; it shares the window's skins and ships one for each Omarchy palette.
+- Mixer: the per-route output levels shipped in 0.1.40 are gone; an output's feed names a mix or a sum of mixes, which PipeWire sums at unity.
+- Daemon: a device connected through a fallback path, such as an XLR Dock driven through its config block, says so in the state, and the window shows the note in Options.
+- Window: links to the manual open through the interactive process runner.
+- Nix: the Windows bridge companion is compiled for the baseline x86-64, as the other packages' companions are.
+
 * Fri Sep 18 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.41-1
 - The XLR Dock connects when the kernel dropped its capture volume control: gain, mute and headphone volume each use the ALSA control when present and the dock's config block when not, and a control the block cannot reach is reported instead of failing the connection.
 - The Windows bridge companion carries revision 2 so its packages and the Options window agree on the baseline x86-64 build.

@@ -21,7 +21,7 @@
 
 buildDotnetModule {
   pname = "openxlr";
-  version = "0.1.41";
+  version = "0.1.42";
 
   src = ../..;
 
