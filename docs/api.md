@@ -77,7 +77,7 @@ Messages from the daemon, each a JSON object with a `type` field:
 | `commandResult` | in answer to a command that carried a `requestId` | `requestId`, `error` (null on success); preceded by the state the result refers to |
 
 The state message in full. At the top level: `daemonVersion`, `warning`,
-`connected`, `device` (`vendor`, `model`, `usbId`), `capabilities` (`gain`,
+`connected`, `device` (`vendor`, `model`, `usbId` and, when the unit is driven differently from the usual, `note`: today an XLR Dock taking a control through its config block), `capabilities` (`gain`,
 `mute`, `lowCut`, `expander`, `voiceTune`, `hpVolume`, `lowImpedance`,
 `crossfade`, `phantom`, `clipGuard`, `compressor`, `outputRouting`,
 `auxInput`, `xlrInputs`, `hpOutputs`, `physicalControls`, `retainsSettings`,

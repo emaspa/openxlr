@@ -88,7 +88,8 @@ block reads the live register, and with a microphone attached the capture
 level moved by the same 70 dB whether gain was set through ALSA or through
 the word, and an ALSA write shows up in the block at once. On such a unit
 the daemon drives the missing control through the block and says so in
-its journal on connect. Each control uses one path only, because the
+its journal on connect and in the window's Options, under INTERFACE.
+Each control uses one path only, because the
 kernel caches mixer values and would not see a block write behind its
 back. A control the card lacks while the USB handle is not open (the
 udev rule not yet applied) is reported unavailable and left out of the

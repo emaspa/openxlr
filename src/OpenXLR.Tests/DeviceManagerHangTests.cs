@@ -15,6 +15,8 @@ public sealed class DeviceManagerHangTests
     private sealed class FlakyDevice : IAudioDevice
     {
         public bool Hanging;
+        public string? Note;
+        public string? ConnectionNote => Note;
         public int Disposals;
         public void Dispose() => Disposals++;
         public int Connects, Hangs;
@@ -123,6 +125,33 @@ public sealed class DeviceManagerHangTests
         finally
         {
             DeviceManager.HungReconnectDelay = prevDelay;
+            Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", prev);
+            try { Directory.Delete(dir, recursive: true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void TheConnectionNoteTravelsWithTheDeviceInTheState()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "openxlr-note-" + Guid.NewGuid().ToString("N"));
+        string? prev = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
+        Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", dir);
+        try
+        {
+            var quiet = new FlakyDevice();
+            var manager = new DeviceManager(NullLogger<DeviceManager>.Instance, new ConfigurationBuilder().Build(), () => [quiet]);
+            manager.SweepOnce();
+            Assert.True(manager.Snapshot().Connected);
+            Assert.Null(manager.Snapshot().Device!.Note);
+
+            var noted = new FlakyDevice { Note = "the card has no 'Mic Capture Volume'; driving it through the dock's config block instead" };
+            manager = new DeviceManager(NullLogger<DeviceManager>.Instance, new ConfigurationBuilder().Build(), () => [noted]);
+            manager.SweepOnce();
+            Assert.Equal(noted.Note, manager.Snapshot().Device!.Note);
+            Assert.Null(manager.Warning);   // a note is not a warning: the unit works
+        }
+        finally
+        {
             Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", prev);
             try { Directory.Delete(dir, recursive: true); } catch (IOException) { }
         }
