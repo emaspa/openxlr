@@ -15,7 +15,11 @@ command -v omarchy-shell >/dev/null || fail 'omarchy-shell is required'
 source_dir=$(realpath -e -- "${1:-/usr/share/openxlr/omarchy/openxlr.mixer}")
 [[ -d $source_dir ]] || fail 'the packaged plugin directory is missing'
 omarchy plugin validate "$source_dir"
-[[ $(jq -r '.id' "$source_dir/manifest.json") == openxlr.mixer ]] || fail 'expected openxlr.mixer'
+# Omarchy has validated the manifest by now, so this is a guard against
+# being pointed at some other valid plugin. It reads the id with sed rather
+# than jq, which a user's machine is not required to have.
+plugin_id=$(sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$source_dir/manifest.json" | head -n 1)
+[[ $plugin_id == openxlr.mixer ]] || fail 'expected openxlr.mixer'
 
 # Omarchy itself uses HOME/.config, even when XDG_CONFIG_HOME is set.
 destination="$HOME/.config/omarchy/plugins/openxlr.mixer"

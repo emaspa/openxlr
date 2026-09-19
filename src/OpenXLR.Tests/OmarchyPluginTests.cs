@@ -144,6 +144,27 @@ public sealed class OmarchyPluginTests
         Assert.DoesNotContain("shell rescanPlugins", File.ReadAllLines(fixture.Log));
     }
 
+    /// <summary>
+    /// The enable command reads the plugin's id itself, so it refuses a
+    /// directory that holds a different plugin. It reads the manifest without
+    /// jq, which the RPM build container does not have and a user's machine
+    /// is not required to have either.
+    /// </summary>
+    [Fact]
+    public async Task EnablingRefusesAPluginDirectoryWithAnotherId()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using EnableFixture fixture = new();
+        string other = Path.Combine(fixture.Home, "other.plugin");
+        Directory.CreateDirectory(other);
+        await File.WriteAllTextAsync(Path.Combine(other, "manifest.json"), @"{ ""schemaVersion"": 1, ""id"": ""other.plugin"" }");
+        ProcessResult result = await fixture.Run(plugin: other);
+        Assert.False(result.Ok);
+        Assert.Contains("expected openxlr.mixer", result.Stderr, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(fixture.Destination));
+        Assert.DoesNotContain("shell rescanPlugins", File.ReadAllLines(fixture.Log));
+    }
+
     private sealed class EnableFixture : IDisposable
     {
         private readonly string _directory = Path.Combine(Path.GetTempPath(), "openxlr-omarchy-" + Guid.NewGuid());
@@ -168,8 +189,8 @@ public sealed class OmarchyPluginTests
                     """);
         }
 
-        public Task<ProcessResult> Run(string failure = "") => ProcessRunner.RunAsync("bash",
-            [Path.Combine(Root(), "packaging", "omarchy", "openxlr-omarchy-enable"), Plugin],
+        public Task<ProcessResult> Run(string failure = "", string? plugin = null) => ProcessRunner.RunAsync("bash",
+            [Path.Combine(Root(), "packaging", "omarchy", "openxlr-omarchy-enable"), plugin ?? Plugin],
             environment: new Dictionary<string, string>
             {
                 ["HOME"] = Home,
