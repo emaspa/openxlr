@@ -1,3 +1,9 @@
+openxlr (0.1.45) resolute; urgency=medium
+
+  * Project: the test runner moves to Microsoft.NET.Test.Sdk 18.10.1. Nothing in the daemon, the mixer, the window, the terminal mixer or the plugin changed, so the packages behave exactly as 0.1.44 did.
+
+ -- Emanuele Sparvoli <sparvoli@gmail.com>  Sun, 20 Sep 2026 09:25:00 +0100
+
 openxlr (0.1.44) resolute; urgency=medium
 
   * Mixer: XLR 2 and Aux In are shown only on a device that has them, which is the Wave XLR Pro. The daemon says per channel whether the active device can feed it, so the window, the terminal mixer and the Omarchy bar agree; the channel keeps its levels for when a Pro comes back.

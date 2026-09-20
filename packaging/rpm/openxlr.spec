@@ -5,7 +5,7 @@
 %global _build_id_links none
 
 Name:           openxlr
-Version:        0.1.44
+Version:        0.1.45
 Release:        1%{?dist}
 Summary:        Control suite and PipeWire submixer for Elgato XLR interfaces
 License:        GPL-3.0-only
@@ -162,6 +162,9 @@ MSG
 %{_datadir}/openxlr/
 
 %changelog
+* Sun Sep 20 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.45-1
+- Project: the test runner moves to Microsoft.NET.Test.Sdk 18.10.1. Nothing in the daemon, the mixer, the window, the terminal mixer or the plugin changed, so the packages behave exactly as 0.1.44 did.
+
 * Sat Sep 19 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.44-1
 - Mixer: XLR 2 and Aux In are shown only on a device that has them, which is the Wave XLR Pro. The daemon says per channel whether the active device can feed it, so the window, the terminal mixer and the Omarchy bar agree; the channel keeps its levels for when a Pro comes back.
 - Omarchy: openxlr-omarchy-enable waits for the shell to finish its rescan instead of reporting the plugin as unknown, and reads the plugin id without jq.
