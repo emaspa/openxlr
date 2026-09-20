@@ -7,29 +7,40 @@ namespace OpenXLR.Core.Devices;
 ///
 /// Detection reads sysfs only (/sys/bus/usb/devices), so it works without USB
 /// permissions or the udev rule; opening the device for control still needs it.
+///
+/// The order of the table is also the daemon's preference when several
+/// supported interfaces are attached and none is chosen: <see cref="DetectAll"/>
+/// lists them in this order, so an interface verified on hardware comes before
+/// one that is not. The Wave:3 backend is coded from public research and not
+/// yet run on the device, so it is last, and drives the mixer only when it is
+/// the only supported interface on the bus or the user picks it.
 /// </summary>
 public static class DeviceRegistry
 {
     private readonly record struct Key(ushort Vid, ushort Pid);
 
-    private static readonly Dictionary<Key, Func<IAudioDevice>> Factories = new()
-    {
-        [new Key(WaveXlrProDevice.VendorId, WaveXlrProDevice.ProductId)] = () => new WaveXlrProDevice(),
-        [new Key(Mk1ClassProtocolDevice.VendorId, WaveXlrMk1Device.ProductId)] = () => new WaveXlrMk1Device(),
-        [new Key(XlrDockDevice.VendorId, XlrDockDevice.ProductId)] = () => new XlrDockDevice(),
-        [new Key(WaveXlrMk2Device.VendorId, WaveXlrMk2Device.ProductId)] = () => new WaveXlrMk2Device(),
-        [new Key(XlrDockMk2Device.VendorId, XlrDockMk2Device.ProductId)] = () => new XlrDockMk2Device(),
+    private static readonly (Key Key, Func<IAudioDevice> Make)[] Factories =
+    [
+        (new Key(WaveXlrProDevice.VendorId, WaveXlrProDevice.ProductId), () => new WaveXlrProDevice()),
+        (new Key(Mk1ClassProtocolDevice.VendorId, WaveXlrMk1Device.ProductId), () => new WaveXlrMk1Device()),
+        (new Key(XlrDockDevice.VendorId, XlrDockDevice.ProductId), () => new XlrDockDevice()),
+        (new Key(WaveXlrMk2Device.VendorId, WaveXlrMk2Device.ProductId), () => new WaveXlrMk2Device()),
+        (new Key(XlrDockMk2Device.VendorId, XlrDockMk2Device.ProductId), () => new XlrDockMk2Device()),
+        (new Key(Wave3Device.VendorId, Wave3Device.ProductId), () => new Wave3Device()),   // last: not yet run on the device
         // Add more brands/models here, e.g.:
-        // [new Key(0x1220, 0x8fe0)] = () => new GoXlrDevice(),
-    };
+        // (new Key(0x1220, 0x8fe0), () => new GoXlrDevice()),
+    ];
 
-    /// <summary>Every supported device currently attached, newest API first is not guaranteed.</summary>
-    public static IReadOnlyList<IAudioDevice> DetectAll()
+    /// <summary>Every supported device currently attached, in the table's order.</summary>
+    public static IReadOnlyList<IAudioDevice> DetectAll() => Match(EnumerateUsbIds());
+
+    /// <summary>The backends for these attached ids, in the table's order, one per attached unit.</summary>
+    internal static IReadOnlyList<IAudioDevice> Match(IEnumerable<(ushort Vid, ushort Pid)> attached)
     {
+        List<Key> keys = [.. attached.Select(a => new Key(a.Vid, a.Pid))];
         var found = new List<IAudioDevice>();
-        foreach (var (vid, pid) in EnumerateUsbIds())
-            if (Factories.TryGetValue(new Key(vid, pid), out var make))
-                found.Add(make());
+        foreach ((Key key, Func<IAudioDevice> make) in Factories)
+            for (int n = keys.Count(k => k == key); n > 0; n--) found.Add(make());
         return found;
     }
 

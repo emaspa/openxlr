@@ -312,18 +312,26 @@ while fixes to existing hosts remain part of normal maintenance.
 - [ ] UCM profile for the Pro upstreamed to alsa-ucm-conf once a second
   owner confirms the split.
 - [ ] Wave:3 (`0fd9:0070`), the USB condenser microphone rather than an
-  XLR interface, waiting on an owner. Its controls fit the device
-  interface as it stands: gain, mute, Clipguard, low cut, headphone
-  volume and mute, and a direct monitor balance that is the same control
-  as the crossfade. The device layer is one class and one registry line,
-  and the submixer is plain PipeWire, so nothing above the device has to
-  change. What is missing is the hardware. Nobody on the project owns a
-  Wave:3, so the protocol would come from public research instead of a
-  capture taken here, and this project does not ship a device it has not
-  driven. A Wave:3 owner willing to run the probe and confirm each
-  control unblocks it. Anyone who wants the microphone working today
-  should look at [openwave](https://github.com/rikkichy/openwave), which
-  supports it.
+  XLR interface, waiting on an owner. A backend exists, `Wave3Device`,
+  one class and one registry line, with gain, mute, ClipGuard, headphone
+  volume and the direct monitor balance as the crossfade; the low cut is
+  the submixer's by design, as no implementation that runs on the
+  hardware touches a low cut byte. The submixer is plain PipeWire, so
+  above the device only two things changed: the node-name fragment
+  spells a colon the way udev does, and the registry's order is the
+  daemon's preference, so with a verified interface attached the Wave:3
+  is driven only when picked. It is written from public research
+  (openwave, which runs on the hardware, wave3-research and LibreWave)
+  with each fact's source named in the code. The bytes the sources
+  dispute and no setter owns are retransmitted with the values read,
+  never changed. None of it has been run on a Wave:3: nobody on the
+  project owns one, and this project does not call a device supported
+  that it has not driven, so [hardware-support.md](hardware-support.md)
+  records every control as coded, with the checks an owner runs to move
+  them, and the README's supported list leaves it out. A Wave:3 owner
+  willing to run those checks and confirm each control unblocks it.
+  Anyone who wants the microphone working today should look at
+  [openwave](https://github.com/rikkichy/openwave), which supports it.
 
 ## How a change lands
 

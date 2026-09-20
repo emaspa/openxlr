@@ -12,11 +12,12 @@ the checks that still need an owner.
 | Wave XLR | `0fd9:007d` | core controls verified on hardware by community testers on two units (0.1.13) |
 | Wave XLR MK.2 | `0fd9:00b6` | exposed controls verified on hardware by a community tester |
 | XLR Dock MK.2 | `0fd9:00c7` | MK.2 backend at the Pro's block bank; exposed controls verified on hardware |
+| Wave:3 | `0fd9:0070` | coded from public protocol research; not run on a Wave:3 by anyone on the project, every control waits on an owner |
 
 ## USB access
 
 The udev rule ([packaging/70-openxlr.rules](../packaging/70-openxlr.rules))
-grants the logged-in user access to the five product ids above. Every
+grants the logged-in user access to the six product ids above. Every
 backend opens its device through libusb and claims the vendor-specific
 interface 3 before the first control transfer, both when libusb runs in
 the daemon and in the USB helper process. No kernel driver owns that
@@ -186,6 +187,93 @@ Every exposed control listed above was confirmed on the dock on
 2026-09-05, the DSP ones by ear through the monitor mix and phantom with a condenser microphone.
 Hardware EQ is not mapped. Blocks 0x0002 and 0x0006 exist and are not decoded.
 
+## Wave:3 (0fd9:0070), coded and unverified
+
+The USB condenser microphone with a headphone jack, not an XLR
+interface. Nobody on the project owns one, so nothing in this section
+has been run on a Wave:3 from here. The backend,
+`src/OpenXLR.Core/Devices/Wave3Device.cs`, takes every protocol fact
+from three public sources and names the source on each line. Every
+control below is coded, none verified.
+
+- [rikkichy/openwave](https://github.com/rikkichy/openwave/blob/main/docs/protocol.md):
+  an implementation that runs on the hardware and has users. Where it
+  and a schema reading differ, it wins.
+- [LukasParke/wave3-research](https://github.com/LukasParke/wave3-research):
+  live probing of one unit (firmware 0.3.7, API 5.3) from Linux, with
+  descriptor and PipeWire dumps.
+- [zhgmx/LibreWave](https://github.com/zhgmx/LibreWave/blob/main/docs/protocol-evidence.md):
+  a 16-byte `/config` schema recovered from Wave Link for API 5.3 and
+  5.4, not run on hardware by that project.
+
+They agree on the transport: the original Wave XLR's class-request
+dialect (read 0xA1/0x85, write 0x21/0x05, wIndex 0x3303) with a 16-byte
+config block at wValue 0 and a device info block at 0x000A.
+wave3-research found that vendor-type requests stall and that a block
+scan with them rebooted the unit into its DFU product id 0x0071, so the
+backend sends class requests only, and only for those two blocks. On the
+layout they agree on the gain (a Q8.8 dB word at 0, 0 to 40), the mute
+(byte 4), ClipGuard (byte 5), the headphone level (a signed Q8.8 dB word
+at 7, -60 to 0), the headphone mute (byte 9) and the dial's target (byte
+12). openwave writes the monitor balance as a Q8.8 percent word at 10 on
+the hardware, LibreWave's schema reads it the same way, and
+wave3-research reads byte 11 as the dial's mix value, which is that
+word's integer byte; the backend writes the word as the crossfade.
+
+Three bytes are read differently by the sources and touched by none of
+the backend's setters. Byte 6 is the low cut in LibreWave's schema;
+openwave has no code path that reaches it on any device and keeps its
+low cut as a filter in the capture chain, and wave3-research wrote it
+and saw no effect. The low cut on the Wave:3 is the submixer's, by
+design, not as a fallback. Byte 15 is a gain lock in LibreWave, a device
+policy that ignores the host's volume requests, and the LED brightness
+in wave3-research. Bytes 13 and 14 are the ring's blue and a second,
+software monitor mix in wave3-research and unnamed in LibreWave. Every
+write reads the block, changes one field and sends all 16 bytes back, so
+those bytes, and 2 and 3, are retransmitted with the values read and
+never changed by OpenXLR. No value is snapped to a grid: openwave writes
+arbitrary raw values on the hardware, so the firmware needs none, and a
+grid would swallow the Stream Deck's five-unit crossfade ticks.
+
+| Control | State | Notes |
+|---|---|---|
+| Gain 0 to 40 dB | coded | Q8.8 word at 0. openwave reads and writes it there; wave3-research logged the same word following the dial in each of its modes and says host writes are ignored. The backend trusts the word while the dial is on gain, where both agree, remembers it, and reports that while the dial is elsewhere; until the dial has been on gain once since the connect, it reports the word as openwave does |
+| Mute | coded | byte 4; the capacitive mute pad toggles the same byte in wave3-research's log |
+| ClipGuard | coded | byte 5; taken as hardware, so the software limiter is not offered |
+| Headphone volume -60 to 0 dB | coded | signed Q8.8 word at 7, written truncated toward zero as openwave does ("matching the firmware setter's int()") |
+| Direct monitor balance, as the crossfade | coded | Q8.8 percent at 10, half a percent per crossfade unit, shown as the Mic and PC crossfade (0 to 200). 0 is taken as microphone only and 100 as PC only; none of the sources states the direction |
+| Headphone mute | read | byte 9, in the state as `hpMute`. wave3-research saw the firmware assert it when the level reaches its floor; a level written above the floor releases it, so the jack cannot stay silent with nothing in OpenXLR to release it. No control sets it |
+| Low cut | software | the submixer's high-pass, by design; byte 6 is carried as read |
+| Gain lock | software | the daemon's own lock, kept off the window because of the dial, as on every device with one; byte 15 is carried as read |
+| Dial target | read | byte 12: 1 gain, 2 headphones, 3 monitor mix; named in the diagnostics dump, with where the reported gain came from |
+| Mute ring colour, LED brightness | unmapped | wave3-research's bytes 10, 11, 13 and 15; carried as read where no setter owns them |
+| Device info block (0x000A) | read | 51 bytes as wave3-research read it (openwave asks for 64 and places the serial elsewhere); the diagnostics exporter masks the serial wherever it lands |
+
+The one input strip is the capsule; it carries the XLR 1 name the mixer
+gives its first hardware input. The Wave:3 has no XLR jack, no phantom
+power, no second input, no output routing and no aux port, and none of
+those is offered. None of the sources says whether the microphone keeps
+its settings across a power cycle. The backend leaves `retainsSettings`
+at true, so the daemon writes nothing on connect that the user did not
+ask for, and a replug on real hardware decides it.
+
+With another supported interface attached, the daemon drives that one:
+the registry lists attached devices in its own order, verified backends
+first and the Wave:3 last, and the daemon takes the first when none is
+chosen. The Wave:3 is driven when it is alone on the bus or picked from
+the header, or through `OPENXLR_DEVICE=0070`.
+
+The PipeWire node names in wave3-research's dump are
+`alsa_input.usb-Elgato_Systems_Elgato_Wave_3_<serial>-00.mono-fallback`
+and the matching `alsa_output`: udev turns the colon in the product
+string into an underscore, and that is the fragment the daemon looks
+for. No capture-hold WirePlumber rule ships for it. openwave applies its
+own rule to the Wave:3 alongside the Wave XLR, but the ordering bug the
+XLR Dock and the original Wave XLR have has not been reported on a
+Wave:3 and its dump shows no shared node group. An owner who records
+silence after a playback stream opened first would need a copy of
+`52-openxlr-mk1-capture-hold.conf` matching `Elgato_Wave_3_`.
+
 ## Every device gets
 
 - Capability-driven UI: controls, channels, and mixes the device does
@@ -221,3 +309,44 @@ MK.1 owners can help map low cut, ClipGuard, mic/PC crossfade and the
 hardware-save action with an ordered Wave Link capture. The
 [USB capture guide](usb-capture.md) explains the process in about 15
 minutes, no programming needed.
+
+A Wave:3 owner moves that section from coded to verified with the
+following, in the order that risks least, each result with the
+diagnostics archive:
+
+1. Plug the microphone in with the udev rule installed. Alone on the
+   bus the daemon drives it at once; next to another supported
+   interface it drives that one and lists the Wave:3 in the header
+   picker, so pick it. The diagnostics dump shows a 16-byte `config`
+   block, a `dial` line and a `gain` line. If the block is another
+   length, stop there and report it.
+2. Turn the dial through its three modes and take a dump in each: the
+   `dial` line follows (gain, headphones, monitor mix), and the first
+   two bytes of the block either stay at the gain or follow the dial's
+   value in headphone and mix mode. That decides which reading of those
+   bytes is right and whether the backend's gain handling can be
+   simplified.
+3. Mute from the window and from the capacitive pad: the state and the
+   LED ring agree both ways.
+4. ClipGuard from the window: the setting survives a readback, and a
+   loud signal is caught by the hardware. If the byte does nothing, say
+   so; the software limiter can take over.
+5. Headphone volume from the window: the level in the headphones
+   follows, -60 dB is near silence, 0 dB is the loudest. Then turn the
+   dial in headphone mode down to its floor and take a dump: `hpMute`
+   in the state turns on if the firmware asserts it there. Raise the
+   volume from the window: sound is back and `hpMute` is off.
+6. Gain from the window with the dial on gain: the microphone's own
+   gain display and the recorded level follow, or they do not and the
+   value snaps back, which is what wave3-research predicts.
+7. The crossfade from the window: with a playback stream running and
+   the microphone live, the left end leaves only the microphone in the
+   headphones and the right end only the computer. If the ends are the
+   other way round, say so.
+8. Clear the "On connect" profile picker under the profile list, so
+   nothing is written on connect, then unplug and replug: the settings
+   from before are still there, or the microphone came back at
+   defaults, which decides `retainsSettings`.
+9. Play through the microphone's own sink before anything records from
+   it, then record: sound, or the silence that would call for a
+   capture-hold rule.
