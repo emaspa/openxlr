@@ -10,16 +10,21 @@ namespace OpenXLR.UI;
 /// </summary>
 public static class InsertWindows
 {
-    private static readonly Dictionary<string, InsertControlsWindow> Controls = new();
+    private static readonly Dictionary<InsertViewModel, InsertControlsWindow> Controls = new();
     private static readonly Dictionary<string, MixInsertsWindow> Chains = new();
 
     public static void OpenControls(Window owner, InsertViewModel insert)
     {
-        if (Controls.TryGetValue(insert.Id, out InsertControlsWindow? open)) { open.Activate(); return; }
+        if (Controls.TryGetValue(insert, out InsertControlsWindow? open)) { open.Activate(); return; }
         var w = new InsertControlsWindow { DataContext = insert };
-        w.Closed += (_, _) => Controls.Remove(insert.Id);
-        Controls[insert.Id] = w;
+        w.Closed += (_, _) => Controls.Remove(insert);
+        Controls[insert] = w;
         w.Show(owner);
+    }
+
+    internal static void CloseControls(InsertViewModel insert)
+    {
+        if (Controls.TryGetValue(insert, out var window)) window.Close();
     }
 
     public static void OpenChain(Window owner, InsertsViewModel chain, string key)
