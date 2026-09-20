@@ -529,7 +529,7 @@ public sealed class DeviceManager : BackgroundService
         // The USB device is visible to libusb before WirePlumber has created
         // (and profiled) the card, so a single check at connect misses the
         // boot case entirely: keep checking until the card settles.
-        _profileCardFragment = info.Model.Replace(' ', '_');
+        _profileCardFragment = info.NodeNameFragment;
         _profileChecksLeft = 60;
         _profileNextCheck = DateTime.UtcNow;
         TryParkCardProfile();

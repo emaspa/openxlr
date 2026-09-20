@@ -81,6 +81,17 @@ public interface IAudioDevice : IDisposable
 public sealed record DeviceInfo(string Vendor, string Model, ushort VendorId, ushort ProductId)
 {
     public string DisplayName => $"{Vendor} {Model}";
+
+    /// <summary>
+    /// The model as it appears inside the card's PipeWire node names, which
+    /// udev builds from the USB product string with each space and colon
+    /// turned into an underscore: "Wave XLR" is Wave_XLR, and "Wave:3" is
+    /// Wave_3 (the source in a Wave:3 owner's dump, LukasParke/wave3-research
+    /// pipewire/pactl-source-wave3.txt, is named
+    /// alsa_input.usb-Elgato_Systems_Elgato_Wave_3_...). The daemon finds the
+    /// capture node and the card by this fragment.
+    /// </summary>
+    public string NodeNameFragment => Model.Replace(' ', '_').Replace(':', '_');
 }
 
 /// <summary>Flags for which controls a device exposes, so the UI/plugin adapt per model.</summary>
