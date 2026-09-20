@@ -107,6 +107,12 @@ few releases, and they get to settle in users' hands first.
   hide a channel without deleting its routing, a compact layout that
   keeps one selected channel visible. Icons and colours also reach the
   Stream Deck keys.
+- [ ] Exclusive channel groups: several input channels marked as one
+  group, where unmuting a member mutes the rest. A desk with a broadcast
+  microphone and a headset, or a capture card switched between two
+  consoles, is one key or one click instead of two. The group is layout
+  state, so it saves and recalls with everything else and a Stream Deck
+  key can address it.
 - [x] Listen to any mix: an output follows any mix in the layout, Stream,
   Chat and Aux included, not only Monitor A and Monitor B.
 - [x] Sums: an output can follow several mixes at once, each at unity,
@@ -244,6 +250,19 @@ while fixes to existing hosts remain part of normal maintenance.
   daemon writes at start, presented by every client, on top of the
   origin check. Still open: binding the API to a Unix socket with peer
   credentials instead of a loopback port, so no token file is needed.
+- [ ] An installation receipt and a `doctor` command. The daemon and the
+  packages put files in several places a user never sees: a systemd unit,
+  a udev rule, three WirePlumber rules, a pipewire-pulse drop-in, a
+  desktop entry, the plugin host and the yabridge companion. Nothing
+  today can answer what OpenXLR put on this machine, whether the running
+  daemon is the build that was last installed, or whether a removal left
+  something behind. The receipt records every path an install owns,
+  together with the version, the commit and a hash of any user file that
+  was replaced. `openxlr doctor` reads it back, reports a path that is
+  missing, stale or modified, says whether the running daemon matches the
+  installed build, and names the exact command to fix what it found. A
+  removal refuses to touch a path the receipt does not own, so it never
+  deletes by directory or by filename pattern.
 
 ## Next: distribution
 
@@ -292,6 +311,27 @@ while fixes to existing hosts remain part of normal maintenance.
 - [ ] LED controls where captures show the registers; nothing is guessed.
 - [ ] UCM profile for the Pro upstreamed to alsa-ucm-conf once a second
   owner confirms the split.
+- [ ] Wave:3 (`0fd9:0070`), the USB condenser microphone rather than an
+  XLR interface, waiting on an owner. A backend exists, `Wave3Device`,
+  one class and one registry line, with gain, mute, ClipGuard, headphone
+  volume and the direct monitor balance as the crossfade; the low cut is
+  the submixer's by design, as no implementation that runs on the
+  hardware touches a low cut byte. The submixer is plain PipeWire, so
+  above the device only two things changed: the node-name fragment
+  spells a colon the way udev does, and the registry's order is the
+  daemon's preference, so with a verified interface attached the Wave:3
+  is driven only when picked. It is written from public research
+  (openwave, which runs on the hardware, wave3-research and LibreWave)
+  with each fact's source named in the code. The bytes the sources
+  dispute and no setter owns are retransmitted with the values read,
+  never changed. None of it has been run on a Wave:3: nobody on the
+  project owns one, and this project does not call a device supported
+  that it has not driven, so [hardware-support.md](hardware-support.md)
+  records every control as coded, with the checks an owner runs to move
+  them, and the README's supported list leaves it out. A Wave:3 owner
+  willing to run those checks and confirm each control unblocks it.
+  Anyone who wants the microphone working today should look at
+  [openwave](https://github.com/rikkichy/openwave), which supports it.
 
 ## How a change lands
 

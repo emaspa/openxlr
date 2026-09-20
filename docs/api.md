@@ -83,7 +83,10 @@ The state message in full. At the top level: `daemonVersion`, `warning`,
 `auxInput`, `xlrInputs`, `hpOutputs`, `physicalControls`, `retainsSettings`,
 `builtInDefaults`), `state` (the hardware settings: `gainDb`, `mute`,
 `lowCut`, `expander`, `voiceTune`, `voiceTuneStrength`, `hpVolumeDb`,
-`hp2VolumeDb`, `lowImpedance`, `crossfade`, `phantom`, `clipGuard`,
+`hp2VolumeDb`, `hpMute` (read-only: the headphone mute the Wave:3's
+firmware keeps and asserts at the headphone floor, released by a level
+written above it; false on every other model), `lowImpedance`,
+`crossfade`, `phantom`, `clipGuard`,
 `compressor`, their `2` variants for XLR 2, `outHp1`, `outHp2`, `outUsbAux`,
 `outLineOut`, `hpMixMonitorReturn`, `hpMixMicDirect`, `auxReturnEnabled`,
 `auxLevelDb`, `auxLevelLock`, plus the daemon-stamped `gainLocked`,

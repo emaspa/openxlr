@@ -267,9 +267,9 @@ public sealed class MixerService : IHostedService, IDisposable
                 {
                     if (GraphLost()) return;
                     // Channel feeds follow the actively driven interface; the
-                    // node name contains the model with underscores for spaces.
+                    // node name contains the model as udev spells it.
                     _mixer.SetInputDeviceHint(
-                        _devices.ActiveInfo?.Model.Replace(' ', '_'),
+                        _devices.ActiveInfo?.NodeNameFragment,
                         _devices.ActiveCapabilities?.OutputRouting ?? false);
                     // Which input jacks the device actually has, so a client
                     // does not offer a strip the hardware cannot feed.

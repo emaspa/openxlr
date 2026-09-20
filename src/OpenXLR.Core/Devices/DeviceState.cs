@@ -18,6 +18,14 @@ public sealed record DeviceState
     public double Hp2VolumeDb { get; init; }    // block 0x0005 off2 (second headphone out)
     public bool LowImpedance { get; init; }     // block 0x0005 off1 bit1
 
+    /// <summary>
+    /// Wave:3 only: the headphone mute the firmware keeps in its config block
+    /// (byte 9) and, per public research not yet run here, asserts itself
+    /// when the headphone level reaches its floor. Read-only; a headphone
+    /// level written above the floor releases it. False on every other model.
+    /// </summary>
+    public bool HpMute { get; init; }
+
     public int Crossfade { get; init; }         // block 0x0001 off0, 0..200 (100 = centre)
 
     // Mic DSP, confirmed on the Pro against the logged capture of 2026-08-25:

@@ -22,6 +22,14 @@ volume, low impedance, crossfade.
 
 Wave XLR: gain, mute, headphone volume, low impedance, phantom power.
 
+Wave:3: gain, mute, ClipGuard, headphone volume and the direct monitor
+balance, shown as the crossfade; the low cut is the submixer's, by
+design. Written from public protocol research and not yet run on the
+microphone by anyone on the project, so with another supported
+interface attached the daemon drives that one and the Wave:3 only when
+picked from the header. [hardware-support.md](hardware-support.md)
+names the sources, the bytes they dispute and what an owner checks.
+
 Hardware EQ is not mapped on the Wave FX devices. The Pro's ducking, mix
 maximizer, channel booster and remaining hardware mix matrix are also
 unmapped. Wave Link configures those onboard effects on supported systems;
