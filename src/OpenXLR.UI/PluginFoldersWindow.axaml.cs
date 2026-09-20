@@ -27,6 +27,8 @@ public partial class PluginFoldersWindow : Window
     {
         InitializeComponent();
         PluginList.ItemsSource = _plugins;
+        SearchFormat.ItemsSource = new[] { "lv2", "clap", "vst3" };
+        SearchFormat.SelectedIndex = 0;
         Closing += (_, e) =>
         {
             if (_busy && e.CloseReason == WindowCloseReason.WindowClosing) e.Cancel = true;
@@ -49,6 +51,8 @@ public partial class PluginFoldersWindow : Window
     private void UpdateButtons()
     {
         if (DataContext is not OptionsViewModel vm) return;
+        AddSearchPath.IsEnabled = RescanAll.IsEnabled = SearchDirectoryList.IsEnabled = SearchFormat.IsEnabled = !_busy;
+        RemoveSearchPath.IsEnabled = !_busy && SearchDirectoryList.SelectedItem is PluginSearchDirectoryItem { Custom: true };
         AddFolder.IsEnabled = RescanFolders.IsEnabled = !_busy && vm.CanSyncWindows;
         RemoveFolder.IsEnabled = !_busy && vm.CanManageWindows && FolderList.SelectedItem is string;
         FolderList.IsEnabled = PluginList.IsEnabled = CloseButton.IsEnabled = !_busy;
@@ -70,7 +74,6 @@ public partial class PluginFoldersWindow : Window
         await vm.LoadPluginSetupAsync();
         FolderList.SelectedItem = folder is not null && vm.WindowsDirectories.Contains(folder)
             ? folder : vm.WindowsDirectories.FirstOrDefault();
-        if (!vm.CanManageWindows) Status.Text = vm.WindowsPlugins;
         await LoadFilesAsync(vm);
     }
 
@@ -187,6 +190,28 @@ public partial class PluginFoldersWindow : Window
             string result = PluginInstall.Describe(await vm.Client.SyncWindowsPluginsAsync(ChangeTimeout), "the rescan");
             return (exit == 0 ? "Wine uninstaller closed. " : $"Wine uninstaller exited with code {exit}. ") + result;
         }, "Waiting for Wine uninstaller…");
+    }
+
+    private void OnSearchPathSelected(object? sender, SelectionChangedEventArgs e) => UpdateButtons();
+
+    private async void OnAddSearchPath(object? sender, RoutedEventArgs e)
+    {
+        if (_busy || DataContext is not OptionsViewModel vm || SearchFormat.SelectedItem is not string kind) return;
+        var folders = await PluginInstall.PickFolderAsync(this, "Add plugin search folder", allowMultiple: false);
+        if (folders.Count == 1 && !_busy)
+            await ChangeAsync(vm, () => vm.Client.ChangePluginSearchPathAsync(kind, folders[0], true, ChangeTimeout), "Adding path and scanning plugins…");
+    }
+
+    private async void OnRemoveSearchPath(object? sender, RoutedEventArgs e)
+    {
+        if (_busy || DataContext is not OptionsViewModel vm || SearchDirectoryList.SelectedItem is not PluginSearchDirectoryItem { Custom: true } item) return;
+        await ChangeAsync(vm, () => vm.Client.ChangePluginSearchPathAsync(item.Kind, item.Path, false, ChangeTimeout), "Removing search path and refreshing plugins…");
+    }
+
+    private async void OnRescanAll(object? sender, RoutedEventArgs e)
+    {
+        if (!_busy && DataContext is OptionsViewModel vm)
+            await ChangeAsync(vm, () => vm.Client.RescanPluginsAsync(ChangeTimeout), "Rescanning all plugins…");
     }
 
     private async void OnRescan(object? sender, RoutedEventArgs e)
