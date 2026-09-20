@@ -1850,3 +1850,10 @@ is absent the widget dims, clears its meters and waits to reconnect.
 `omarchy plugin disable openxlr.mixer` removes it from the bar.
 [omarchy.md](omarchy.md) covers installation, package changes, commands
 and the checks still needed in a running Omarchy shell.
+
+### XLR Dock MK.2 control bank
+
+OpenXLR detects the two reported USB control banks of the XLR Dock MK.2
+when it connects. Options shows the selected bank in the connection note.
+Detection does not change microphone settings. If neither bank answers,
+the error names both banks; collect diagnostics for a device report.

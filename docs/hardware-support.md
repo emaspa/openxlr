@@ -11,7 +11,7 @@ the checks that still need an owner.
 | XLR Dock | `0fd9:00a6` | exposed controls verified on hardware |
 | Wave XLR | `0fd9:007d` | core controls verified on hardware by community testers on two units (0.1.13) |
 | Wave XLR MK.2 | `0fd9:00b6` | exposed controls verified on hardware by a community tester |
-| XLR Dock MK.2 | `0fd9:00c7` | MK.2 backend at the Pro's block bank; exposed controls verified on hardware |
+| XLR Dock MK.2 | `0fd9:00c7` | MK.2 backend with bank detection; exposed controls verified on the original 0x0103 unit |
 | Wave:3 | `0fd9:0070` | coded from public protocol research; not run on a Wave:3 by anyone on the project, every control waits on an owner |
 
 ## USB access
@@ -163,7 +163,21 @@ interface 3 that carries the control protocol. Run against one on
 2026-09-05: the blocks have the MK.2 layout (0x0004 input settings,
 38 bytes; 0x0005 headphones, 2 bytes; 0x0001 crossfade, 6 bytes) but
 the firmware serves them at `wIndex 0x0103`, the Pro's bank, and stalls
-the MK.2's `0x0203`; the backend uses 0x0103 for the dock since 0.1.20.
+the MK.2's `0x0203`. A later owner report describes the reverse: a
+`0fd9:00c7` unit stalled at `0x0103` and returned all three expected
+blocks at `0x0203`; using that bank restored control on OpenXLR 0.1.45.
+The September 20 Omarchy diagnostics confirm repeated settings-block
+stalls while ordinary PipeWire audio remains available. They do not
+contain successful alternate-bank reads, so that part remains owner-reported.
+
+The backend probes `0x0103` first, then `0x0203` only if a block stalls
+or has an unexpected length. Detection writes nothing and accepts a bank
+only after all three blocks return 38, 2 and 6 bytes. Other USB errors
+keep their normal failure handling. The selected bank is shown in the
+connection note, stays fixed until disconnect and is detected again on
+reconnect. Both banks failing closes the handle without writing. Automated
+transport tests cover both variants; the automatic probe still needs an
+owner run on each physical variant.
 There is no commit block (0x0003 stalls) and writes take effect at
 once. Gain, mute and headphone volume were cross-checked against the
 kernel's ALSA controls for the card, which mirror the feature units:

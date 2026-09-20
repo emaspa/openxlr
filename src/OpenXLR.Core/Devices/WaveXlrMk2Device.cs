@@ -59,13 +59,12 @@ public class WaveXlrMk2Device : IAudioDevice
 
     private readonly object _lock = new();
 
-    /// <summary>
-    /// wIndex of every vendor transfer: the low byte is the vendor interface
-    /// (3 on both), the high byte selects the block bank the firmware exposes
-    /// there, 0x02 on the Wave XLR MK.2 and 0x01 on the XLR Dock MK.2 (which
-    /// stalls 0x0203 and answers 0x0103 like the Pro).
-    /// </summary>
-    private readonly ushort _vIndex;
+    // A dock can expose either known bank. Selection is read-only and lasts
+    // for one connection; no failed write ever switches a live device's bank.
+    private readonly ushort _preferredVIndex;
+    private readonly ushort? _alternateVIndex;
+    private ushort _vIndex;
+    public string? ConnectionNote { get; private set; }
 
     public DeviceInfo Info { get; }
 
@@ -76,9 +75,12 @@ public class WaveXlrMk2Device : IAudioDevice
     /// <param name="model">Must match the device's iProduct string minus the
     /// vendor, since the daemon derives the PipeWire node-name hint from it.</param>
     /// <param name="vIndex">wIndex of the vendor transfers, see <see cref="_vIndex"/>.</param>
-    protected WaveXlrMk2Device(ushort productId, string model, bool physicalControls, ushort vIndex, bool retainsSettings = true)
+    protected WaveXlrMk2Device(ushort productId, string model, bool physicalControls, ushort vIndex, bool retainsSettings = true,
+        ushort? alternateVIndex = null, IUsbTransport? usb = null)
     {
-        _vIndex = vIndex;
+        _preferredVIndex = _vIndex = vIndex;
+        _alternateVIndex = alternateVIndex;
+        _usb = usb ?? UsbTransport.Create();
         Info = new DeviceInfo("Elgato", model, VendorId, productId);
         Capabilities = new DeviceCapabilities
         {
@@ -100,7 +102,7 @@ public class WaveXlrMk2Device : IAudioDevice
         };
     }
 
-    private readonly IUsbTransport _usb = UsbTransport.Create();
+    private readonly IUsbTransport _usb;
 
     public bool Connected => _usb.IsOpen;
 
@@ -109,11 +111,57 @@ public class WaveXlrMk2Device : IAudioDevice
 
     public void Connect()
     {
-        if (!_usb.Open(VendorId, Info.ProductId))
-            throw new InvalidOperationException($"{Info.Model} present but could not be opened (udev rule?)");
+        lock (_lock)
+        {
+            ConnectionNote = null;
+            _vIndex = _preferredVIndex;
+            if (!_usb.Open(VendorId, Info.ProductId))
+                throw new InvalidOperationException($"{Info.Model} present but could not be opened (udev rule?)");
+            try
+            {
+                if (_alternateVIndex is not ushort alternate) return;
+                if (!ProbeBank())
+                {
+                    _vIndex = alternate;
+                    if (!ProbeBank())
+                        throw new InvalidOperationException($"{Info.Model}: neither USB control bank 0x{_preferredVIndex:x4} nor 0x{alternate:x4} returned the expected settings, headphones and crossfade blocks.");
+                }
+                ConnectionNote = $"USB control bank 0x{_vIndex:x4} detected.";
+            }
+            catch
+            {
+                _usb.Close();
+                _vIndex = _preferredVIndex;
+                throw;
+            }
+        }
     }
 
-    public void Disconnect() => _usb.Close();
+    // A successful settings read alone is not enough to authorize writes.
+    // Check all three known block lengths; stalls and incomplete banks may
+    // select the alternative, while disconnects and timeouts fail normally.
+    private bool ProbeBank()
+    {
+        foreach ((ushort block, int length) in new[]
+            { (BlockSettings, SettingsLen), (BlockHp, HpLen), (BlockCrossfade, CrossfadeLen) })
+        {
+            int count = TransferWithRetry(RtRead, VReq, block, new byte[length], length);
+            if (count == -9) return false; // LIBUSB_ERROR_PIPE: this bank is unsupported.
+            if (count < 0) throw new InvalidOperationException($"probe bank 0x{_vIndex:x4}, block {block:x4}: {LibUsb.StrError(count)}");
+            if (count != length) return false;
+        }
+        return true;
+    }
+
+    public void Disconnect()
+    {
+        lock (_lock)
+        {
+            _usb.Close();
+            _vIndex = _preferredVIndex;
+            ConnectionNote = null;
+        }
+    }
 
     /// <summary>
     /// All control transfers go through here. A transfer that never returns
