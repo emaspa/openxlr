@@ -505,7 +505,8 @@ Default and environment paths remain active; `custom` marks additions in
 a directory check, not a guarantee that every bundle can be read or loaded.
 When `LV2_PATH` is unset, lilv's compiled defaults remain active and are not
 listed; additional LV2 paths extend catalogue discovery only. Set `LV2_PATH`
-explicitly to make custom LV2 directories available to live hosts.
+explicitly to make custom LV2 directories available to live hosts. An explicit
+value is applied to both discovery and child hosts even without added paths.
 
 `addPluginSearchPath {kind, path}` and `removePluginSearchPath {kind, path}`
 accept `kind` equal to `lv2`, `clap` or `vst3` and an absolute directory path,

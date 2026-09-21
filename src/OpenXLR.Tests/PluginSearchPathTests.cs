@@ -92,9 +92,10 @@ public sealed class PluginSearchPathTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void AnAdditionalLv2BundleIsFoundWithoutReplacingAnUnsetDefault(bool unset)
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public void ExplicitAndAdditionalLv2PathsAreAppliedWithoutReplacingAnUnsetDefault(bool unset, bool add)
     {
         if (unset) Environment.SetEnvironmentVariable("LV2_PATH", null);
         if (!NativeLibrary.TryLoad("liblilv-0.so.0", out IntPtr library)) return;
@@ -109,7 +110,8 @@ public sealed class PluginSearchPathTests : IDisposable
               lv2:port [ a lv2:AudioPort, lv2:InputPort ; lv2:index 0 ; lv2:symbol "in" ; lv2:name "In" ],
                        [ a lv2:AudioPort, lv2:OutputPort ; lv2:index 1 ; lv2:symbol "out" ; lv2:name "Out" ] .
             """);
-        Assert.True(PluginSearchPaths.Change("lv2", root, true).Ok);
+        if (add) Assert.True(PluginSearchPaths.Change("lv2", root, true).Ok);
+        else Environment.SetEnvironmentVariable("LV2_PATH", root);
         Assert.Contains(Lv2Catalog.ScanNow(), p => p.Plugin == "urn:openxlr:custom-path-test");
         var start = new ProcessStartInfo();
         PluginSearchPaths.ApplyLv2(start);
@@ -120,7 +122,7 @@ public sealed class PluginSearchPathTests : IDisposable
             Assert.Contains(Environment.GetEnvironmentVariable("LV2_PATH")!, start.Environment["LV2_PATH"]!.Split(':'));
         }
         Assert.True(PluginSearchPaths.Change("lv2", root, false).Ok);
-        Assert.Null(PluginSearchPaths.Lv2Override());
+        Assert.Equal(Environment.GetEnvironmentVariable("LV2_PATH"), PluginSearchPaths.Lv2Override());
         Assert.True(File.Exists(Path.Combine(bundle, "manifest.ttl")));
     }
 

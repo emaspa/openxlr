@@ -108,7 +108,7 @@ public static class PluginSearchPaths
     public static IReadOnlyList<string> Lv2Path() => Include("lv2",
         (Environment.GetEnvironmentVariable("LV2_PATH") ?? "").Split(':', StringSplitOptions.RemoveEmptyEntries));
 
-    internal static string? Lv2Override() => Additional("lv2").Count == 0 ||
+    internal static string? Lv2Override() =>
         string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("LV2_PATH")) ? null : string.Join(':', Lv2Path());
 
     private static IReadOnlyList<string> Effective(string kind) => kind switch
