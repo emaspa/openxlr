@@ -19,7 +19,6 @@ public sealed record Command
     /// WebSocket table is the canonical public list so this DTO cannot drift
     /// into a second protocol specification.
     /// </summary>
-    [JsonPropertyName("action")] public string? Action { get; init; }
     [JsonPropertyName("cmd")] public string Cmd { get; init; } = "";
 
     /// <summary>
@@ -31,6 +30,8 @@ public sealed record Command
 
     /// <summary>For "set": the control name (see <see cref="ControlNames"/>).</summary>
     [JsonPropertyName("control")] public string? Control { get; init; }
+
+    [JsonPropertyName("action")] public string? Action { get; init; }
 
     /// <summary>The value: number for levels, bool for toggles.</summary>
     [JsonPropertyName("value")] public System.Text.Json.JsonElement Value { get; init; }
