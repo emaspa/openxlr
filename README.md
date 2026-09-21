@@ -378,6 +378,7 @@ while it is on, and it clears itself on a daemon restart.
 - [BenjyEX3](https://github.com/BenjyEX3): hardware testing.
 - [chromacurse](https://github.com/chromacurse): hardware testing.
 - [Astros52](https://github.com/Astros52): hardware testing.
+- [marv4u](https://github.com/marv4u): hardware testing and protocol research.
 - [rikkichy](https://github.com/rikkichy): prior protocol research.
 - [nekename](https://github.com/nekename): upstream software.
 - [FrostyCoolSlug](https://github.com/FrostyCoolSlug): technical guidance.
