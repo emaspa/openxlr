@@ -477,9 +477,9 @@ const feedLabel = (feed) => feed === "" ? "Silent" : feed.split("+").every(id =>
 // Keep A, B, A+B first, then include every other live mix.
 const nextFeed = (feed) => {
   const mixes = mixer()?.mixes ?? [];
-  const monitors = mixes.filter(m => (m.kind ?? "monitor") === "monitor").map(m => m.id);
+  const monitors = mixes.filter(m => Object.hasOwn(FEED_LETTER, m.id)).map(m => m.id);
   const choices = [...monitors, ...(monitors.length > 1 ? [monitors.join("+")] : []),
-    ...mixes.filter(m => (m.kind ?? "monitor") !== "monitor").map(m => m.id)];
+    ...mixes.filter(m => !Object.hasOwn(FEED_LETTER, m.id)).map(m => m.id)];
   return choices.length ? choices[(choices.indexOf(feed) + 1) % choices.length] : "monitor";
 };
 // The mixes the monitor dial's press mutes: what the first selected

@@ -50,7 +50,7 @@ public sealed partial class MonitorVolumeIntegrationTests
                 Assert.False(ReadMute());
                 Assert.Throws<IOException>(() =>
                 {
-                    if (removeMix) mixer.DeleteVirtualMix("chat", _ => "disk full");
+                    if (removeMix) mixer.DeleteMix("chat", _ => "disk full");
                     else mixer.DeleteApplicationChannel("game", _ => "disk full");
                 });
                 Assert.True(SpinWait.SpinUntil(() =>

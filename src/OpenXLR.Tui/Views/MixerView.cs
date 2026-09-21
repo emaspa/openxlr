@@ -11,7 +11,7 @@ internal sealed class MixerView : View
     public override string Title => "Mixer";
 
     public override string Keys =>
-        "Up/Down channel  Left/Right mix  Space mute  -/+ [/] level  Home masters  End last  r rename  n/N new  c capture  d delete";
+        "Up/Down channel  Left/Right mix  Space mute  -/+ [/] level  Home masters  End last  r rename  n/N new  M monitor  c capture  d delete";
 
     public override void Draw(Screen screen, Rect area, App app)
     {
@@ -281,6 +281,8 @@ internal sealed class MixerView : View
                 case 'n': NewChannel(app); return true;
                 case 'N': app.Ask("New virtual microphone", string.Empty,
                     name => app.Link.Send("createMix", body => body["name"] = name)); return true;
+                case 'M': app.Ask("New monitor mix", string.Empty,
+                    name => app.Link.Send("createMix", body => { body["name"] = name; body["kind"] = "monitor"; })); return true;
                 case 'c': NewCaptureChannel(app); return true;
 
                 case 'r': Rename(app, mix, channel); return true;
@@ -307,7 +309,7 @@ internal sealed class MixerView : View
     {
         if (channel is null)
         {
-            if (mix.Kind != "virtualMic") { app.Say("Only a virtual microphone can be renamed"); return; }
+            if (!mix.IsEditable) { app.Say("Only a user mix can be renamed"); return; }
             app.Ask($"Rename {mix.Name}", mix.Name, name =>
                 app.Link.Send("renameMix", body => { body["mix"] = mix.Id; body["name"] = name; }));
             return;
@@ -321,7 +323,7 @@ internal sealed class MixerView : View
     {
         if (channel is null)
         {
-            if (mix.Kind != "virtualMic") { app.Say("Only a virtual microphone can be removed"); return; }
+            if (!mix.IsEditable) { app.Say("Only a user mix can be removed"); return; }
             app.Ask($"Type yes to delete {mix.Name}", string.Empty, answer =>
             {
                 if (answer.Equals("yes", StringComparison.OrdinalIgnoreCase))
@@ -337,11 +339,11 @@ internal sealed class MixerView : View
         });
     }
 
-    /// <summary>Moves the selected channel or virtual microphone in the saved order.</summary>
+    /// <summary>Moves the selected channel or user mix in the saved order.</summary>
     private void Reorder(App app, Snapshot state, int by)
     {
         List<string> channels = state.Mixer.Channels.Where(entry => !entry.Hardware).Select(entry => entry.Id).ToList();
-        List<string> mixes = state.Mixer.Mixes.Where(entry => entry.Kind == "virtualMic").Select(entry => entry.Id).ToList();
+        List<string> mixes = state.Mixer.Mixes.Where(entry => entry.IsEditable).Select(entry => entry.Id).ToList();
 
         if (_row > 0 && _row <= state.Mixer.Shown.Count)
         {
@@ -357,7 +359,7 @@ internal sealed class MixerView : View
         {
             MixEntry mix = state.Mixer.Mixes[_column];
             int at = mixes.IndexOf(mix.Id);
-            if (at < 0) { app.Say("Only a virtual microphone moves"); return; }
+            if (at < 0) { app.Say("Only a user mix moves"); return; }
             int to = Math.Clamp(at + by, 0, mixes.Count - 1);
             if (to == at) return;
             mixes.RemoveAt(at);

@@ -201,21 +201,23 @@ public sealed partial class Mixer
     }
 
     /// <summary>
-    /// Add a virtual microphone. Its mix sink is loaded first and every channel
-    /// combine grows a leg into it by itself; those legs are muted before the
-    /// capture device is published, so nothing reaches the new microphone until
+    /// Add a user mix. Its sink is loaded first and every channel combine grows
+    /// a leg into it; those legs are muted before any capture device is
+    /// published, so nothing reaches the new mix until
     /// the user opens a send. The layout is saved before the command succeeds.
     /// </summary>
-    public void CreateVirtualMix(string name, Func<MixerSettings, string?> persist)
+    public void CreateMix(string name, Func<MixerSettings, string?> persist, MixKind kind = MixKind.VirtualMic)
     {
         ArgumentNullException.ThrowIfNull(persist);
         name = CleanName(name);
         lock (_gate)
         {
             if (!_built) throw new InvalidOperationException("mixer is not built");
-            EnsurePulseHeadroomLocked(newStreams: _config.Channels.Count, newNodes: 4);
+            if (kind is not (MixKind.Monitor or MixKind.VirtualMic))
+                throw new InvalidOperationException("only monitor mixes and virtual microphones can be added");
+            EnsurePulseHeadroomLocked(newStreams: _config.Channels.Count, newNodes: kind == MixKind.Monitor ? 1 : 4);
             string id = MixerConfig.NewId(name, "mix", _config.Mixes.Select(m => m.Id));
-            var mix = new MixDefinition(id, name, MixKind.VirtualMic);
+            var mix = new MixDefinition(id, name, kind);
             MixerConfig previous = _config;
             MixerConfig next = _config.WithMix(mix);   // validates the limit before any node is loaded
             string key = MixKey(mix);
@@ -233,9 +235,12 @@ public sealed partial class Mixer
                 }
                 if (!WaitForLegsLocked([.. _combineModules.Values], [mix.SinkName]))
                     throw new InvalidOperationException("not every channel grew a send into the new mix within 3 s; nothing was changed");
-                foreach (ChannelDefinition ch in _config.Channels) ApplyCellLocked(ch.Id, id);
-                _postModules[id] = _pw.CreateNullSink(mix.PostSinkName, $"OpenXLR {name} (post)");
-                _virtualMicModules[id] = _pw.CreateVirtualMic(mix.VirtualMicName, $"{mix.PostSinkName}.monitor", $"OpenXLR {name}");
+                ReapplyMixLocked(id);
+                if (kind == MixKind.VirtualMic)
+                {
+                    _postModules[id] = _pw.CreateNullSink(mix.PostSinkName, $"OpenXLR {name} (post)");
+                    _virtualMicModules[id] = _pw.CreateVirtualMic(mix.VirtualMicName, $"{mix.PostSinkName}.monitor", $"OpenXLR {name}");
+                }
                 WireMixChainLocked(mix);
                 PersistLocked(persist);
             }
@@ -260,21 +265,21 @@ public sealed partial class Mixer
     }
 
     /// <summary>
-    /// Rename a virtual microphone. Only the layout changes: reloading the
-    /// capture device would throw every app recording from it onto another
+    /// Rename a user mix. Only the layout changes: reloading the
+    /// mix or capture device would throw every app using it onto another
     /// source (verified: a recorder does not come back to a reloaded device
     /// of the same name), so the PipeWire description keeps the old name
     /// until the daemon restarts and the state says so.
     /// </summary>
-    public void RenameVirtualMix(string id, string name, Func<MixerSettings, string?> persist)
+    public void RenameMix(string id, string name, Func<MixerSettings, string?> persist)
     {
         ArgumentNullException.ThrowIfNull(persist);
         name = CleanName(name);
         lock (_gate)
         {
             if (!_built) throw new InvalidOperationException("mixer is not built");
-            MixDefinition mix = _config.Mixes.FirstOrDefault(m => m.Id == id && m.Kind == MixKind.VirtualMic)
-                ?? throw new InvalidOperationException($"'{id}' is not a virtual microphone");
+            MixDefinition mix = _config.Mixes.FirstOrDefault(m => m.Id == id && m.IsEditable)
+                ?? throw new InvalidOperationException($"'{id}' is not an editable mix");
             if (mix.Name == name) return;
             MixerConfig previous = _config;
             _config = _config.WithMixName(id, name);
@@ -285,25 +290,27 @@ public sealed partial class Mixer
     }
 
     /// <summary>
-    /// Remove a virtual microphone: its insert chain, capture device, post
+    /// Remove a user mix: its insert chain, optional capture device and post
     /// sink and mix sink go, and the channel combines drop their legs into it
     /// on their own. Saved before the command succeeds.
     /// </summary>
-    public void DeleteVirtualMix(string id, Func<MixerSettings, string?> persist)
+    public void DeleteMix(string id, Func<MixerSettings, string?> persist)
     {
         ArgumentNullException.ThrowIfNull(persist);
         lock (_gate)
         {
             if (!_built) throw new InvalidOperationException("mixer is not built");
-            MixDefinition mix = _config.Mixes.FirstOrDefault(m => m.Id == id && m.Kind == MixKind.VirtualMic)
-                ?? throw new InvalidOperationException($"'{id}' is not a virtual microphone");
+            MixDefinition mix = _config.Mixes.FirstOrDefault(m => m.Id == id && m.IsEditable)
+                ?? throw new InvalidOperationException($"'{id}' is not an editable mix");
             string key = MixKey(mix);
             MixerConfig previous = _config;
             _config = _config.WithoutMix(id);
             _inserts.Remove(key, out List<InsertDefinition>? savedInserts);
             string? previousSource = _enforcedSource;
+            string? previousSink = _enforcedSink;
+            if (_enforcedSink == mix.SinkName) _enforcedSink = null;
             var previousFeeds = new Dictionary<string, string>(_monitorFeeds);
-            if (_enforcedSource == mix.VirtualMicName) _enforcedSource = null;
+            if (mix.Kind == MixKind.VirtualMic && _enforcedSource == mix.VirtualMicName) _enforcedSource = null;
             foreach ((string output, string feed) in previousFeeds)
             {
                 if (!MonitorFeed.Includes(feed, id)) continue;
@@ -319,6 +326,7 @@ public sealed partial class Mixer
                 cells.Restore(this);
                 if (savedInserts is not null) _inserts[key] = savedInserts;
                 _enforcedSource = previousSource;
+                _enforcedSink = previousSink;
                 _monitorFeeds.Clear();
                 foreach (var (output, feed) in previousFeeds) _monitorFeeds[output] = feed;
                 throw;

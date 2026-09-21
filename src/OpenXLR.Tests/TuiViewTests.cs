@@ -99,6 +99,21 @@ public sealed class TuiViewTests
     private static string Text(JsonElement command, string property) =>
         command.GetProperty(property).GetString() ?? string.Empty;
 
+    [Fact]
+    public void MonitorCreationAndEditingUseTheDaemonContract()
+    {
+        (App app, List<string> sent) = Ready();
+        app.Handle(new KeyPress(Key.Char, 'M'));
+        foreach (char c in "Headset") app.Handle(new KeyPress(Key.Char, c));
+        app.Handle(new KeyPress(Key.Enter));
+        Assert.Equal("createMix", Text(Command(sent), "cmd"));
+        Assert.Equal("monitor", Text(Command(sent), "kind"));
+        Assert.Equal("Headset", Text(Command(sent), "name"));
+        Assert.True(JsonSerializer.Deserialize<MixEntry>("""{"Kind":"monitor","Editable":true}""")!.IsEditable);
+        Assert.False(JsonSerializer.Deserialize<MixEntry>("""{"Kind":"monitor","Editable":false}""")!.IsEditable);
+        Assert.True(new MixEntry { Kind = "virtualMic" }.IsEditable);
+    }
+
     // --- the state ---
 
     [Fact]

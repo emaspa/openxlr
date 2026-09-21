@@ -44,8 +44,11 @@ public static class CommandValidation
             case "createCaptureChannel":
                 if (BadName(cmd.Name)) return "createCaptureChannel: name must contain 1 to 60 printable characters";
                 return CaptureBinding.IsValid(cmd.Source, cmd.CapturePair) ? null : "createCaptureChannel: need an external source and a pair from 0 to 31";
-            case "createChannel":
             case "createMix":
+                if (cmd.Kind is not (null or "virtualMic" or "monitor"))
+                    return "createMix: kind must be virtualMic or monitor";
+                return BadName(cmd.Name) ? "createMix: name must contain 1 to 60 printable characters" : null;
+            case "createChannel":
                 return BadName(cmd.Name) ? $"{cmd.Cmd}: name must contain 1 to 60 printable characters" : null;
             case "renameChannel":
             case "deleteChannel":
@@ -56,12 +59,12 @@ public static class CommandValidation
             case "renameMix":
             case "deleteMix":
                 if (cmd.Mix is null) return $"{cmd.Cmd}: need 'mix'";
-                if (TooLong(cmd.Mix, 36) || !layout.HasVirtualMix(cmd.Mix))
-                    return $"{cmd.Cmd}: '{Short(cmd.Mix)}' is not a virtual microphone";
+                if (TooLong(cmd.Mix, 36) || !layout.HasEditableMix(cmd.Mix))
+                    return $"{cmd.Cmd}: '{Short(cmd.Mix)}' is not an editable mix";
                 return cmd.Cmd == "renameMix" && BadName(cmd.Name) ? "renameMix: name must contain 1 to 60 printable characters" : null;
             case "setLayoutOrder":
                 if (cmd.Channels is null || cmd.Mixes is null) return "setLayoutOrder: need 'channels' and 'mixes'";
-                if (cmd.Channels.Count > MixerConfig.MaxApplicationChannels || cmd.Mixes.Count > MixerConfig.MaxVirtualMixes)
+                if (cmd.Channels.Count > MixerConfig.MaxApplicationChannels || cmd.Mixes.Count > MixerConfig.MaxUserMixes)
                     return "setLayoutOrder: too many IDs";
                 if (cmd.Channels.Concat(cmd.Mixes).Any(id => id is null || id.Length is 0 or > 36))
                     return "setLayoutOrder: invalid ID";
