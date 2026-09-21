@@ -46,6 +46,10 @@ internal static class SavedMixerValidation
 
     internal static void Validate(MixerScene scene)
     {
+        if (scene.Appearance is not null)
+            Require(scene.Appearance.Count <= LayoutAppearance.MaxEntries &&
+                scene.Appearance.All(p => LayoutAppearance.IsValidEntry(p.Key, p.Value)),
+                "invalid or excessive entries", "appearance");
         Levels(scene.MixVolumes, "mixVolumes");
         Levels(scene.Levels, "levels");
         Names(scene.MixMuted, "mixMuted");
@@ -58,7 +62,7 @@ internal static class SavedMixerValidation
 
     private static Dictionary<string, LayoutAppearance> Appearance(Dictionary<string, LayoutAppearance>? values, List<string> notes)
     {
-        var kept = (values ?? []).Where(p => p.Key.Length <= 44 && LayoutAppearance.IsValid(p.Value))
+        var kept = (values ?? []).Where(p => LayoutAppearance.IsValidEntry(p.Key, p.Value))
             .Take(LayoutAppearance.MaxEntries).ToDictionary();
         if (values is null || kept.Count != values.Count) notes.Add("appearance: invalid or excessive entries");
         return kept;

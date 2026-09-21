@@ -5,6 +5,11 @@ public sealed record LayoutAppearance(string Icon = "", string? Colour = null, b
 {
     public static LayoutAppearance Default { get; } = new();
     public const int MaxEntries = MixerConfig.MaxApplicationChannels + MixerConfig.MaxVirtualMixes + 6;
+    internal static bool IsValidEntry(string key, LayoutAppearance? value) =>
+        key.Length <= 44 && IsValid(value) &&
+        (key.StartsWith("channel:", StringComparison.Ordinal) && key.Length > 8 ||
+         key.StartsWith("mix:", StringComparison.Ordinal) && key.Length > 4 && !value!.Hidden);
+
     public static bool IsValid(LayoutAppearance? value) => value is not null &&
         value.Icon is "" or "●" or "♪" or "♫" or "✦" or "◆" or "▶" or "◉" &&
         (value.Colour is null || value.Colour.Length == 7 && value.Colour[0] == '#' &&

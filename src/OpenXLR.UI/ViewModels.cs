@@ -716,6 +716,7 @@ public sealed partial class MainViewModel : ViewModelBase
             Status = DeviceConnected ? "ready" : "no device";
         }
         finally { _applying = false; }
+        ApplyProfilePresentation(node["profilePresentation"]);
         StateApplied?.Invoke();
     }
 

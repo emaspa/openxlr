@@ -105,7 +105,8 @@ lands in Voice Chat. An app you move to another channel is remembered
 
 **Profiles** are named scenes: the interface's hardware settings plus
 the whole submixer (sends, masters, monitor outputs, aux state, insert
-chains). They are saved per interface. Application routing and the
+chains), channel and mix presentation, and the window's skin, collapsed
+sections and compact view. They are saved per interface. Application routing and the
 system default devices are not part of a profile, so recalling one
 does not rewire the desktop.
 
@@ -1890,3 +1891,12 @@ terminal and Omarchy bar keep showing its actual default mix even when another
 monitor mix is displayed first. Stream Deck feed keys also use that default.
 The combined Monitor A+B feed stays one choice, and a Deck key advances past
 it even when the monitor mixes are displayed in a different order.
+
+Profiles saved from the window also recall its skin, collapsed sections,
+compact view and selected compact channel. Channel and mix icons, colours,
+hidden channels and display order are saved in the mixer scene. Older profiles
+that have no presentation leave it unchanged. A missing skin uses the shipped
+default; a missing compact channel falls back to an available channel without
+forgetting the saved selection. Startup, tray, update and security preferences
+remain local. A recall is applied once, including after reconnecting to the
+daemon; subsequent manual edits remain until another profile is loaded.

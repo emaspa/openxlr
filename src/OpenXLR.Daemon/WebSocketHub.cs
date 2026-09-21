@@ -69,6 +69,7 @@ public sealed class WebSocketHub
     // Captured on arrival and advanced on a successful manual recall, under
     // the device lock so a newer connection cannot inherit an obsolete value.
     private long _manualProfileRevision;
+    private ProfilePresentationMessage? _profilePresentation;
 
     internal StateMessage Snapshot() =>
         _devices.Snapshot() with
@@ -76,6 +77,7 @@ public sealed class WebSocketHub
             DaemonVersion = OpenXLR.Daemon.DaemonVersion.Current,
             Warning = string.Join(" ", new[] { _devices.Warning, _mixer.PersistenceWarning }.Where(w => w is not null)) is { Length: > 0 } w ? w : null,
             ActiveProfile = ActiveDeviceId() is string apId && _activeProfile.TryGetValue(apId, out string? ap) ? ap : null,
+            ProfilePresentation = Volatile.Read(ref _profilePresentation),
             Mixer = _mixer.Snapshot(),
             Devices = _mixer.Devices(),
             Profiles = ActiveDeviceId() is string devId ? OpenXLR.Core.ProfileStore.List(devId) : [],
@@ -423,7 +425,12 @@ public sealed class WebSocketHub
             }) || _stopping.IsCancellationRequested || _devices.CurrentConnection != connection)
             return devErr ?? "the active device changed during profile recall";
         string? mixErr = p.Mixer is null || !_mixer.SubmixerEnabled ? null : _mixer.ApplyScene(p.Mixer);
-        if (devErr is null && mixErr is null) _activeProfile[connection.DeviceId] = name;
+        if (devErr is null && mixErr is null)
+        {
+            _activeProfile[connection.DeviceId] = name;
+            Volatile.Write(ref _profilePresentation, p.Presentation is null ? null :
+                new ProfilePresentationMessage(Guid.NewGuid().ToString("N"), p.Presentation));
+        }
         return devErr ?? (mixErr is not null && p.Device is not null
             ? $"device settings were applied, but mixer settings failed: {mixErr}" : mixErr);
     }
@@ -592,8 +599,13 @@ public sealed class WebSocketHub
             switch (cmd.Cmd)
             {
                 case "saveProfile":
+                    cmd.Presentation?.Validate();
+                    // Older clients do not send window choices. Preserve those
+                    // in an existing profile when only its audio is overwritten.
+                    var presentation = cmd.Presentation ?? OpenXLR.Core.ProfileStore.Load(devId, name)?.Presentation;
                     OpenXLR.Core.ProfileStore.Save(devId, name, new OpenXLR.Core.Profile
                     {
+                        Presentation = presentation,
                         Device = _devices.Snapshot().State,
                         Mixer = _mixer.ExportScene(),
                     });

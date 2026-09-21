@@ -311,7 +311,7 @@ public sealed class DaemonClient : IAsyncDisposable
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setActiveDevice", ["device"] = usbId });
 
     public Task SaveProfileAsync(string name)
-        => SendAsync(new Dictionary<string, object> { ["cmd"] = "saveProfile", ["name"] = name });
+        => SendAsync(new Dictionary<string, object> { ["cmd"] = "saveProfile", ["name"] = name, ["presentation"] = UiSettings.Load().ExportPresentation() });
 
     public Task LoadProfileAsync(string name)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "loadProfile", ["name"] = name });

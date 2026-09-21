@@ -196,3 +196,9 @@ when **Use displayed order for routing** is chosen. `setDisplayOrder` overrides 
 The live state names the default output feed in `primaryMonitorMix`. This is
 the first monitor mix in routing order, even if display ordering puts another
 mix first. It is derived state, not an additional saved routing preference.
+
+Profiles include this map as `mixer.appearance`. A missing or null map keeps
+current presentation; `{}` clears it. Entries for deleted channels or mixes
+are dropped when recalling. Malformed entries reject the whole profile before
+hardware or mixer settings change. Presentation ordering never changes the
+routing order of channels and mixes.

@@ -1113,7 +1113,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         {
             if (!_built) return;
 
-            _appearance = (s.Appearance ?? []).Where(p => AppearanceTargetExists(p.Key) && LayoutAppearance.IsValid(p.Value))
+            _appearance = (s.Appearance ?? []).Where(p => AppearanceTargetExists(p.Key) && LayoutAppearance.IsValidEntry(p.Key, p.Value))
                 .Take(LayoutAppearance.MaxEntries).ToDictionary();
 
             foreach ((string mixId, double vol) in s.MixVolumes)
@@ -1199,6 +1199,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         {
             return new MixerScene
             {
+                Appearance = ExportAppearanceLocked(),
                 MixVolumes = new Dictionary<string, double>(_mixVolume),
                 MixMuted = [.. _mixMuted],
                 Levels = new Dictionary<string, double>(_levels),
@@ -1221,9 +1222,13 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// </summary>
     public void ApplyScene(MixerScene s)
     {
+        SavedMixerValidation.Validate(s);
         lock (_gate)
         {
             if (!_built) return;
+
+            if (s.Appearance is not null)
+                _appearance = s.Appearance.Where(p => AppearanceTargetExists(p.Key)).ToDictionary();
 
             foreach ((string mixId, double vol) in s.MixVolumes)
                 if (_mixVolume.ContainsKey(mixId)) _mixVolume[mixId] = Math.Clamp(vol, 0, MixVolumeMaximumLocked(mixId));

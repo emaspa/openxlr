@@ -34,9 +34,11 @@ its colour blends from `Ox.Meter.Fill` through `Ox.Meter.Warning` to
 `Ox.Meter.Hot` along the scale, anchored at the warning and hot levels.
 
 The choice is saved in
-`~/.config/openxlr/ui.json` as `"skin": "<id>"` and nowhere else: it is not
-part of the mixer layout, the daemon's preferences or a profile, and
-changing it never touches audio. Windows that are already open repaint;
+`~/.config/openxlr/ui.json` as `"skin": "<id>"`. Profiles saved from the
+window also capture this ID, so recalling a profile can restore its skin.
+A skin unavailable on this installation falls back to the shipped default.
+The command-line skin override still takes precedence. Changing a skin
+never touches audio. Windows that are already open repaint;
 nothing is rebuilt and nothing is restarted.
 
 If a skin ever makes something unreadable, start the window once with

@@ -40,6 +40,7 @@ public partial class MainWindow : Window
         HeaderVersion.Text = $"v{AppVersion.Current}";
         SetupTray();
         RestoreSectionState();
+        _vm.PresentationRecalled += OnPresentationRecalled;
         Opened += async (_, _) =>
         {
             if (_automaticUpdateCheckStarted) return;
@@ -261,30 +262,52 @@ public partial class MainWindow : Window
         ["InputsTile", "HeadphonesTile", "MonitorTile", "ApplicationsTile", "SubmixerTile"];
     private bool _restoringSections;
 
+    private void OnPresentationRecalled()
+    {
+        ApplySectionState();
+        if (!Skinning.SkinService.Overridden)
+        {
+            string? id = UiSettings.Load().Skin;
+            var entry = Skinning.SkinCatalog.Find(id);
+            Skinning.SkinService.Apply(entry ?? new Skinning.SkinEntry(Skinning.SkinPackage.Default, []));
+            if (entry is null) _vm.ReportPresentationError($"Profile skin '{id}' is unavailable; using the default skin.");
+        }
+    }
+
     private void RestoreSectionState()
     {
-        var collapsed = new HashSet<string>(UiSettings.Load().CollapsedSections, StringComparer.Ordinal);
+        ApplySectionState();
+        foreach (string name in SectionTiles)
+            if (this.FindControl<Expander>(name) is { } tile)
+                tile.PropertyChanged += (_, e) =>
+                {
+                    if (e.Property == Expander.IsExpandedProperty && !_restoringSections && e.OldValue is bool wasExpanded)
+                        SaveSectionState(tile, wasExpanded);
+                };
+    }
+
+    private void ApplySectionState()
+    {
+        var collapsed = new HashSet<string>(UiSettings.Load().CollapsedSections ?? [], StringComparer.Ordinal);
         _restoringSections = true;
         try
         {
             foreach (string name in SectionTiles)
-            {
-                if (this.FindControl<Expander>(name) is not Expander tile) continue;
-                tile.IsExpanded = !collapsed.Contains(name);
-                tile.PropertyChanged += (_, e) =>
-                {
-                    if (e.Property == Expander.IsExpandedProperty && !_restoringSections) SaveSectionState();
-                };
-            }
+                if (this.FindControl<Expander>(name) is { } tile) tile.IsExpanded = !collapsed.Contains(name);
         }
         finally { _restoringSections = false; }
     }
 
-    private void SaveSectionState()
+    private void SaveSectionState(Expander changed, bool wasExpanded)
     {
         List<string> collapsed = [];
         foreach (string name in SectionTiles)
             if (this.FindControl<Expander>(name) is { IsExpanded: false }) collapsed.Add(name);
-        (UiSettings.Load() with { CollapsedSections = collapsed }).Save();
+        if (!_vm.SavePresentationChoice(UiSettings.Load() with { CollapsedSections = collapsed }))
+        {
+            _restoringSections = true;
+            try { changed.IsExpanded = wasExpanded; }
+            finally { _restoringSections = false; }
+        }
     }
 }

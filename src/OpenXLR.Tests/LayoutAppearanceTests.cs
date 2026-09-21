@@ -184,6 +184,29 @@ public sealed class LayoutAppearanceTests
         Assert.NotEmpty(dropped);
     }
 
+    [Fact]
+    public void ProfileRecallsAppearanceWithoutChangingRoutingAndLegacyScenesPreserveIt()
+    {
+        using var mixer = new Mixer();
+        SetField(mixer, "_built", true);
+        try
+        {
+            var config = MixerConfig.Default();
+            mixer.SetDisplayOrder(config.Channels.Reverse().Select(c => c.Id).ToArray(),
+                config.Mixes.Reverse().Select(m => m.Id).ToArray(), _ => null);
+            mixer.SetLayoutAppearance("channel:game", new("♫", "#123456", true), _ => null);
+            string expected = JsonSerializer.Serialize(mixer.ExportSettings().Appearance);
+            var scene = mixer.ExportScene();
+            mixer.SetLayoutAppearance("channel:game", new("◆"), _ => null);
+            mixer.ApplyScene(scene);
+            Assert.Equal(expected, JsonSerializer.Serialize(mixer.ExportSettings().Appearance));
+            mixer.ApplyScene(new());
+            Assert.Equal(expected, JsonSerializer.Serialize(mixer.ExportSettings().Appearance));
+            Assert.Equal(config.Channels.Where(c => c.InputPair is null).Select(c => c.Id), mixer.ExportSettings().UserChannels!.Select(c => c.Id));
+        }
+        finally { SetField(mixer, "_built", false); }
+    }
+
     private static void SetField(Mixer mixer, string name, object value) =>
         typeof(Mixer).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(mixer, value);
 

@@ -41,8 +41,13 @@ public sealed partial class MainViewModel
         get => _compactMixer;
         set
         {
-            if (!Set(ref _compactMixer, value)) return;
-            (UiSettings.Load() with { CompactMixer = value }).Save();
+            if (_compactMixer == value) return;
+            if (!SavePresentationChoice(UiSettings.Load() with { CompactMixer = value }))
+            {
+                Raise(nameof(CompactMixer));
+                return;
+            }
+            Set(ref _compactMixer, value);
             RefreshChannelPresentation();
         }
     }
@@ -53,9 +58,15 @@ public sealed partial class MainViewModel
         get => _selectedCompactChannel;
         set
         {
-            if (_applying || !Set(ref _selectedCompactChannel, value)) return;
+            if (_applying || ReferenceEquals(_selectedCompactChannel, value)) return;
+            if (value is not null && !Channels.Contains(value)) return;
+            if (!SavePresentationChoice(UiSettings.Load() with { CompactChannel = value?.Id }))
+            {
+                Raise(nameof(SelectedCompactChannel));
+                return;
+            }
             _compactChannelId = value?.Id;
-            (UiSettings.Load() with { CompactChannel = _compactChannelId }).Save();
+            Set(ref _selectedCompactChannel, value);
             RefreshChannelPresentation();
         }
     }

@@ -181,6 +181,27 @@ that final acknowledgement (or an `error` without a request id):
 | `resetDevice` | none | write the recorded defaults back to a device using connect-time restoration and forget its last settings (an error until the daemon has seen the device connect after a power cycle once); on the Wave XLR Pro, which keeps its own settings, write OpenXLR's baseline instead: gain 30 dB on both inputs, every processing stage and phantom off, headphones and aux level at half, the crossfade fully on PC, routing untouched, refused while the gain lock is on. The capabilities say `builtInDefaults` when a model has a baseline |
 | `getDiagnostics` | none | vendor block dump for bug reports |
 
+`saveProfile` accepts an optional `presentation` object containing
+`compactMixer` (boolean), `compactChannel` (nullable ID, at most 36 characters),
+`skin` (nullable ID, at most 64 characters), `collapsedSections` and
+`sectionOrder` (distinct lists of at most 16 nonempty IDs, at most 64 characters
+each). Identifiers cannot contain control characters. An empty object restores
+default presentation. Omission preserves presentation already saved in that
+profile, allowing older clients to update audio without discarding it.
+
+A successful profile recall publishes `state.profilePresentation` as
+`{ "revision": "<32-character recall ID>", "settings": { ... } }`, or null for
+a profile without window choices. This remains in state so a disconnected
+window can catch up. The window persists the revision together with the choices
+and applies it only once, including across window restarts. A fresh explicit or
+on-connect recall gets a new ID even for the same profile. Failed recalls do not
+publish new presentation. Unknown section IDs are retained but not displayed;
+unavailable skins use the window's default. These choices affect no startup,
+update or security preferences. The current window uses compact view, skin and
+collapsed sections; `sectionOrder` is also retained for windows with tile ordering.
+The mixer scene separately stores `appearance` as described in
+[mixer presentation](mixer-layout.md#presentation).
+
 When `loadProfile` writes the device settings but the mixer settings fail, the
 error says the device settings were applied and gives the mixer error. A
 profile file that fails validation, or that cannot be parsed, is refused

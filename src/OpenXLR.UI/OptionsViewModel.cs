@@ -429,8 +429,14 @@ public sealed class OptionsViewModel : ViewModelBase
         get => _selectedSkin;
         set
         {
+            SkinChoice? previous = _selectedSkin;
             if (!Set(ref _selectedSkin, value) || _applying || value is null) return;
-            ReportSkin(Skinning.SkinService.Choose(value.Id));
+            try { ReportSkin(Skinning.SkinService.Choose(value.Id)); }
+            catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+            {
+                Set(ref _selectedSkin, previous);
+                SkinError = $"Skin choice could not be saved: {ex.Message}";
+            }
         }
     }
 
