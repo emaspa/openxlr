@@ -14,13 +14,15 @@ internal sealed class SocketTestServer(WebApplication app) : IAsyncDisposable
 {
     public string Url => app.Urls.Single().Replace("http:", "ws:", StringComparison.Ordinal) + "/ws";
 
-    public static async Task<SocketTestServer> Start(Func<WebSocket, CancellationToken, Task> handler)
+    public static async Task<SocketTestServer> Start(Func<WebSocket, CancellationToken, Task> handler,
+        Action<WebApplication>? configure = null)
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Logging.ClearProviders();
         var app = builder.Build();
         app.UseWebSockets();
+        configure?.Invoke(app);
         app.Map("/ws", async (HttpContext context) =>
         {
             using var socket = await context.WebSockets.AcceptWebSocketAsync();

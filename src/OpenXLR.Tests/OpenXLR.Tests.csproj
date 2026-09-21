@@ -17,6 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="Fixtures/tst_plasma_volume.qml" CopyToOutputDirectory="PreserveNewest" />
     <None Update="run-script.sh" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
