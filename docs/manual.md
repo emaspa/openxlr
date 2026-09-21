@@ -1850,3 +1850,13 @@ is absent the widget dims, clears its meters and waits to reconnect.
 `omarchy plugin disable openxlr.mixer` removes it from the bar.
 [omarchy.md](omarchy.md) covers installation, package changes, commands
 and the checks still needed in a running Omarchy shell.
+
+### XLR Dock MK.2 control bank
+
+Two revisions of the XLR Dock MK.2 are in the field, and they answer
+their settings on different USB addresses. OpenXLR works out which one
+it has every time it connects, and changes no microphone setting doing
+it. The usual revision needs no note. The rarer one is named in the
+Options connection note, and so is a dock that answers on neither
+address. Such a dock still connects, so save diagnostics from Options
+and open an issue with them.
