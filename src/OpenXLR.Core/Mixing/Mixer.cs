@@ -166,6 +166,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             }
             DiscoverLegsLocked();
 
+            NormalizeExclusiveGroupsLocked();
             // Push initial fader values.
             foreach (MixDefinition mix in config.Mixes) ReapplyMixLocked(mix.Id);
 
@@ -1045,6 +1046,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         {
             return new MixerSettings
             {
+                ExclusiveGroups = ExclusiveGroupsModel.Copy(_config.ExclusiveGroups),
                 UserChannels = [.. _config.Channels.Where(c => c.InputPair is null)
                     .Select(c => new UserChannelDefinition(c.Id, c.Name, c.CaptureSource, c.CapturePair))],
                 UserMixes = [.. _config.Mixes.Where(m => m.Kind == MixKind.VirtualMic)
@@ -1119,6 +1121,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             foreach ((string cell, double lvl) in s.Levels)
                 if (_cells.Contains(cell)) _levels[cell] = Math.Clamp(lvl, 0, 1);
             RecallMutes(_muted, _cells, s.Levels.Keys, s.ChannelMuted);
+            NormalizeExclusiveGroupsLocked();
 
             foreach ((string identity, string channelId) in StreamMatcher.MigrateOverrides(s.AppOverrides))
                 Matcher.SetOverride(identity, _config.ResolveApplicationChannel(channelId));
@@ -1195,6 +1198,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         {
             return new MixerScene
             {
+                ExclusiveGroups = ExclusiveGroupsModel.Copy(_config.ExclusiveGroups),
                 MixVolumes = new Dictionary<string, double>(_mixVolume),
                 MixMuted = [.. _mixMuted],
                 Levels = new Dictionary<string, double>(_levels),
@@ -1217,12 +1221,15 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// </summary>
     public void ApplyScene(MixerScene s)
     {
+        SavedMixerValidation.Validate(s);
         lock (_gate)
         {
             if (!_built) return;
 
             foreach ((string mixId, double vol) in s.MixVolumes)
                 if (_mixVolume.ContainsKey(mixId)) _mixVolume[mixId] = Math.Clamp(vol, 0, MixVolumeMaximumLocked(mixId));
+            if (s.ExclusiveGroups is not null)
+                _config = _config with { ExclusiveGroups = ExclusiveGroupsModel.Restore(s.ExclusiveGroups, _config.Channels) };
             // A profile saved before a channel or a mix existed says nothing
             // about its sends, and those sends sit at unity behind a mute.
             // Recalling it must not open them.
@@ -1231,6 +1238,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             foreach ((string cell, double lvl) in s.Levels)
                 if (_cells.Contains(cell)) _levels[cell] = Math.Clamp(lvl, 0, 1);
             RecallMutes(_muted, _cells, s.Levels.Keys, s.ChannelMuted);
+            NormalizeExclusiveGroupsLocked();
 
             foreach (MixDefinition mix in _config.Mixes) ReapplyMixLocked(mix.Id);
 
@@ -1792,6 +1800,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         {
             string cell = Cell(channelId, mixId);
             if (!_cells.Contains(cell)) return;
+            if (!muted) CloseExclusivePeersLocked(channelId, mixId);
             if (muted) _muted.Add(cell); else _muted.Remove(cell);
             ApplyCellLocked(channelId, mixId);
         }
@@ -2081,6 +2090,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             DspFeatureAvailability clipGuard = _pw.GetSoftwareClipGuardAvailability();
             return new MixerState
             {
+                ExclusiveGroups = ExclusiveGroupsModel.Copy(_config.ExclusiveGroups),
                 Mixes = [.. _config.Mixes.Select(m => new MixStatus(
                     m.Id, m.Name,
                     _mixVolume.GetValueOrDefault(m.Id, 1.0),
@@ -2090,7 +2100,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                     _config.Mixes.ToDictionary(m => m.Id, m => _levels.GetValueOrDefault(Cell(c.Id, m.Id), 0.0)),
                     [.. _config.Mixes.Where(m => _muted.Contains(Cell(c.Id, m.Id))).Select(m => m.Id)],
                     c.InputPair is not null, c.CaptureSource, c.CapturePair, _captureFeeds.ContainsKey(c.Id),
-                    ChannelPresentLocked(c)))],
+                    ChannelPresentLocked(c), GroupForChannelLocked(c.Id)?.Id))],
                 RenamedSinceStart = _renamedSinceBuild,
                 MonitorOutput = _monitorOutputs.FirstOrDefault(),
                 MonitorOutputs = [.. _monitorOutputs],
@@ -2123,7 +2133,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         string cell = Cell(channelId, mixId);
         bool monitor = MonitorMixLocked(mixId) is not null;
         double level = _levels.GetValueOrDefault(cell, 0.0) * (monitor ? 1 : _mixVolume.GetValueOrDefault(mixId, 1.0));
-        bool muted = _muted.Contains(cell) || (!monitor && _mixMuted.Contains(mixId));
+        bool waiting = !_muted.Contains(cell) && ExclusivePeerPendingLocked(channelId, mixId);
+        bool muted = waiting || _muted.Contains(cell) || (!monitor && _mixMuted.Contains(mixId));
         if (_hardwareMicMonitor && monitor && channelId == "xlr1" && MonitorFeed.Includes(JackFeedLocked(), mixId))
             muted = true;   // the hardware direct path carries it to the jacks
 
@@ -2140,7 +2151,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         {
             _pw.SetSinkInputVolume(idx, level);
             _pw.SetSinkInputMuted(idx, muted);
-            _pendingCells.Remove(cell);
+            if (waiting) MarkCellPendingLocked(cell); else _pendingCells.Remove(cell);
         }
         catch (InvalidOperationException)
         {
@@ -2148,7 +2159,12 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             DiscoverLegsLocked();
             if (_legIndex.TryGetValue(cell, out idx))
             {
-                try { _pw.SetSinkInputVolume(idx, level); _pw.SetSinkInputMuted(idx, muted); _pendingCells.Remove(cell); }
+                try
+                {
+                    _pw.SetSinkInputVolume(idx, level);
+                    _pw.SetSinkInputMuted(idx, muted);
+                    if (waiting) MarkCellPendingLocked(cell); else _pendingCells.Remove(cell);
+                }
                 catch (InvalidOperationException) { MarkCellPendingLocked(cell); }
             }
             else MarkCellPendingLocked(cell);
@@ -2236,8 +2252,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             _pw.SetSinkVolume(monitor.SinkName, _mixVolume.GetValueOrDefault(mixId, 1));
             _pw.SetSinkMuted(monitor.SinkName, _mixMuted.Contains(mixId));
         }
-        foreach (ChannelDefinition ch in _config.Channels)
-            ApplyCellLocked(ch.Id, mixId);
+        ReapplyCellsLocked(mixId);
     }
 
     private void TearDownLocked()

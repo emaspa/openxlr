@@ -65,6 +65,11 @@ export function layoutChoices(mixer, devices = []) {
       `sendmute:${channel.id}:${mix.id}`, `${channel.name} in ${mix.name}`)),
   });
 
+  for (const group of mixer.exclusiveGroups ?? []) toggleGroups.push({
+    id: `layout-group-${group.id}`, label: `Exclusive group: ${group.name}`,
+    items: mixes.map(mix => option(`group:${group.id}:${mix.id}`, `Next ${group.name} member in ${mix.name}`)),
+  });
+
   const outputs = [{name:"", description:"Current system default"}, ...controllableOutputs(mixer, devices)];
   toggleGroups.push({id:"layout-output-keys", label:"System output controls", items:outputs.flatMap(d => [
     option(`outputup:${d.name}`, `${d.description || d.name}: louder 5%`),

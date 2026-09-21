@@ -120,6 +120,7 @@ internal sealed class MixerView : View
 
     /// <summary>The device control behind an XLR input's mute, or null for any other channel.</summary>
     private static string? HardwareMute(ChannelEntry channel) =>
+        channel.ExclusiveGroup is not null ? null :
         channel.Id == "xlr1" ? "mute" : channel.Id == "xlr2" ? "mute2" : null;
 
     private static void DrawStrip(Screen screen, Rect area, App app, string name, string kind,

@@ -52,7 +52,8 @@ public sealed partial record MixerConfig
             throw new InvalidOperationException($"'{id}' is not an application channel");
         if (Channels.First(c => c.Id == id).IsApplication && Channels.Count(c => c.IsApplication) == 1)
             throw new InvalidOperationException("the last application channel cannot be deleted");
-        return this with { Channels = [.. Channels.Where(c => c.Id != id)] };
+        var channels = Channels.Where(c => c.Id != id).ToArray();
+        return this with { Channels = channels, ExclusiveGroups = ExclusiveGroupsModel.Restore(ExclusiveGroups, channels) };
     }
 
     /// <summary>Without one virtual microphone; the per-channel sends into it go with it.</summary>
@@ -165,7 +166,8 @@ public sealed partial record MixerConfig
                 : (defaults.Channels.FirstOrDefault(d => d.Id == c.Id) ?? new ChannelDefinition(c.Id, c.Name))
                     with { Name = c.Name });
         }));
-        return new MixerConfig { Mixes = mixes, Channels = channels };
+        return new MixerConfig { Mixes = mixes, Channels = channels,
+            ExclusiveGroups = ExclusiveGroupsModel.Restore(settings?.ExclusiveGroups, channels) };
 
         ChannelDefinition Normalize(ChannelDefinition channel)
         {

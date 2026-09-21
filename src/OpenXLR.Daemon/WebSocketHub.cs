@@ -321,6 +321,9 @@ public sealed class WebSocketHub
                 error = cmd.Control is null ? "set: missing 'control'" : _devices.Apply(cmd.Control, cmd.Value);  // broadcasts on success
                 break;
             case "createCaptureChannel":
+            case "setExclusiveGroup":
+            case "deleteExclusiveGroup":
+            case "cycleExclusiveGroup":
             case "createChannel":
             case "renameChannel":
             case "deleteChannel":

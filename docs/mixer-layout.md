@@ -185,3 +185,37 @@ ignored on read, in this file and in profiles.
 If a channel or mix deletion cannot be saved, its previous routing settings
 and any pending volume or mute writes are restored together. The normal
 reconciliation keeps retrying those writes when PipeWire becomes available.
+
+## Exclusive channel groups
+
+The layout editor's **Exclusive groups** button creates or edits a named
+group of channels. Choose at least two members and save. An existing group
+can be selected to rename it, replace its members or delete it. A channel
+can belong to only one group. Failed saves leave membership and mutes
+unchanged; the dialog keeps the error visible for correction.
+
+The settings file stores `exclusiveGroups`, for example:
+
+```json
+"exclusiveGroups": [
+  {"id":"microphones","name":"Microphones","channels":["xlr1","headset"]}
+]
+```
+
+Membership and each mix's selection survive restarts and are included in
+new profiles. Legacy profiles preserve membership. Channel deletion removes
+that member; a group with fewer than two channels dissolves without changing
+remaining mutes. Malformed settings entries and overlapping groups are
+ignored on load. The limits are 16 groups and 2 to 35 members per group.
+
+Use the existing send mute button to open a member in a particular mix.
+The other members close in that mix, keeping their levels and their sends
+in every other mix. All members may be muted. When creating a group or
+recalling a profile with multiple open members in a mix, that whole group
+starts silent in the affected mix. Select the wanted member explicitly.
+
+The commands are `setExclusiveGroup {group?, name, channels}`,
+`deleteExclusiveGroup {group}` and `cycleExclusiveGroup {group, mix}`.
+The first two save before replying. Cycling uses the saved member order
+and resolves from current daemon state, including repeated key presses.
+No nodes or additional gain stages are created for groups.
