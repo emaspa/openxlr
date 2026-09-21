@@ -38,8 +38,14 @@ public sealed class WindowOrderTests
             while (!stop.IsCancellationRequested)
             {
                 JsonNode command = await SocketTestServer.Receive(socket, stop);
-                if (command["cmd"]!.GetValue<string>() != "setDisplayOrder") continue;
+                if (command["cmd"]!.GetValue<string>() == "listPlugins")
+                {
+                    await SocketTestServer.Send(socket, new { type = "plugins", plugins = Array.Empty<object>() }, stop);
+                    await SocketTestServer.Send(socket, new { type = "commandResult", requestId = command["requestId"]!.GetValue<string>() }, stop);
+                    continue;
+                }
                 commands.Enqueue(command);
+                if (command["cmd"]!.GetValue<string>() != "setDisplayOrder") continue;
                 if (Interlocked.Exchange(ref rejectNext, 0) == 1)
                 {
                     await rejectGate.WaitAsync(stop);
