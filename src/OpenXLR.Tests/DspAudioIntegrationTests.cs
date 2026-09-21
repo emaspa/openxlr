@@ -67,6 +67,48 @@ public sealed class DspAudioIntegrationTests
         finally { pw.TearDown(); }
     }
 
+    [DspPipeWireFact]
+    public void ProfileRecallStopsHeldProcessorsOnEverySupportedChannel()
+    {
+        const string plugin = "http://lsp-plug.in/plugins/lv2/gate_stereo";
+        Assert.Contains(PluginCatalog.Refresh(), p => p.Plugin == plugin);
+        var pw = new PipeWireAdapter();
+        using var registry = pw.WatchGraph();
+        using var mixer = new Mixer(pw);
+        mixer.Build(new MixerConfig
+        {
+            Channels = [new("software", "Software"), new("capture", "Capture") { CaptureSource = "absent" }],
+            Mixes = [new("monitor", "Monitor", MixKind.Monitor)],
+        });
+        // Capability enumeration also covers application and capture inserts
+        // when those channels support effects, without requiring their hardware.
+        foreach (string key in new[] { "mix:monitor", "software", "capture" }.Where(mixer.IsInsertKey))
+        foreach (string recall in new[] { "scene", "settings", "old scene", "partial settings" })
+        {
+            mixer.SetInserts(key, [new() { Id = "gate", Kind = "lv2", Plugin = plugin, Bypass = true, NativeHost = true }]);
+            var scene = mixer.ExportScene();
+            var settings = mixer.ExportSettings();
+            string hold = Guid.NewGuid().ToString("N");
+            string prefix = "OpenXLR_ins_" + (key.StartsWith("mix:", StringComparison.Ordinal) ? key[4..] : "channel_" + key) + "_";
+            mixer.HoldInsert(hold, "begin", key, "gate");
+            Assert.Null(Assert.Single(mixer.Snapshot().Inserts[key]).Error);
+            Assert.True(SpinWait.SpinUntil(HasProcessor, TimeSpan.FromSeconds(3)));
+            switch (recall)
+            {
+                case "scene": mixer.ApplyScene(scene); break;
+                case "settings": mixer.ApplySettings(settings); break;
+                case "old scene": mixer.ApplyScene(scene with { Inserts = null }); break;
+                case "partial settings": mixer.ApplySettings(settings with { Inserts = [] }); break;
+            }
+            Assert.True(mixer.InsertInChain(key, "gate")!.Bypass);
+            Assert.True(SpinWait.SpinUntil(() => !HasProcessor(), TimeSpan.FromSeconds(3)),
+                $"{recall} must stop the held processor on {key}, not only restore its saved bypass flag.");
+            Assert.False(mixer.HoldInsert(hold, "end", null, null));
+            mixer.SetInserts(key, []);
+            bool HasProcessor() => pw.DumpNodes().Any(n => n.Name.StartsWith(prefix, StringComparison.Ordinal));
+        }
+    }
+
 }
 
 internal sealed class DspPipeWireFactAttribute : FactAttribute
