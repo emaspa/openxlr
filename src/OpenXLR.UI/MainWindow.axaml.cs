@@ -269,8 +269,9 @@ public partial class MainWindow : Window
         {
             string? id = UiSettings.Load().Skin;
             var entry = Skinning.SkinCatalog.Find(id);
-            Skinning.SkinService.Apply(entry ?? new Skinning.SkinEntry(Skinning.SkinPackage.Default, []));
+            var errors = Skinning.SkinService.Apply(entry ?? new Skinning.SkinEntry(Skinning.SkinPackage.Default, []));
             if (entry is null) _vm.ReportPresentationError($"Profile skin '{id}' is unavailable; using the default skin.");
+            else if (errors.Count > 0) _vm.ReportPresentationError($"Profile skin '{id}': {string.Join(" ", errors)}");
         }
     }
 

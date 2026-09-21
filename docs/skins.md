@@ -37,6 +37,8 @@ The choice is saved in
 `~/.config/openxlr/ui.json` as `"skin": "<id>"`. Profiles saved from the
 window also capture this ID, so recalling a profile can restore its skin.
 A skin unavailable on this installation falls back to the shipped default.
+A recalled skin with invalid values uses the same validation fallbacks as
+manually choosing it, and the window reports the errors.
 The command-line skin override still takes precedence. Changing a skin
 never touches audio. Windows that are already open repaint;
 nothing is rebuilt and nothing is restarted.
