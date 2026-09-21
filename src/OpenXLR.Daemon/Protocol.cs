@@ -40,6 +40,11 @@ public sealed record Command
     /// <summary>Mixer commands: which mix.</summary>
     [JsonPropertyName("mix")] public string? Mix { get; init; }
 
+    /// <summary>Optional window choices when saving a profile.</summary>
+    [JsonPropertyName("presentation")] public OpenXLR.Core.WindowPresentation? Presentation { get; init; }
+
+    [JsonPropertyName("appearance")] public LayoutAppearance? Appearance { get; init; }
+
     /// <summary>setLayoutOrder: complete ordered lists of editable stable IDs.</summary>
     [JsonPropertyName("channels")] public List<string>? Channels { get; init; }
     [JsonPropertyName("mixes")] public List<string>? Mixes { get; init; }
@@ -203,6 +208,8 @@ public sealed record StateMessage
     /// A bookkeeping value: later manual changes do not clear it, so a
     /// client shows it as "last recalled", not "state matches".
     /// </summary>
+    /// <summary>Last successful recall with window choices, identified once per recall.</summary>
+    [JsonPropertyName("profilePresentation")] public ProfilePresentationMessage? ProfilePresentation { get; init; }
     [JsonPropertyName("activeProfile")] public string? ActiveProfile { get; init; }
     /// <summary>
     /// The profile recalled whenever the active device connects fresh
@@ -298,3 +305,6 @@ public sealed record PluginDiagnosticsMessage(object Discovery)
     [JsonPropertyName("type")] public string Type => "pluginDiagnostics";
     [JsonPropertyName("discovery")] public object Discovery { get; } = Discovery;
 }
+
+/// <summary>Level-triggered presentation recall, so a reconnect cannot lose it.</summary>
+public sealed record ProfilePresentationMessage(string Revision, OpenXLR.Core.WindowPresentation Settings);

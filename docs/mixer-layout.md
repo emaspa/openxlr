@@ -185,3 +185,24 @@ ignored on read, in this file and in profiles.
 If a channel or mix deletion cannot be saved, its previous routing settings
 and any pending volume or mute writes are restored together. The normal
 reconciliation keeps retrying those writes when PipeWire becomes available.
+
+## Mixer presentation
+
+Display metadata lives in the `appearance` map in `mixer.json`, keyed by
+`channel:<id>` or `mix:<id>`, with `icon`, `colour`, `hidden` and optional `order`.
+Missing entries retain the existing appearance and layout order. Equal or
+missing positions use the original layout order. Deleted items lose their
+metadata. This is saved mixer presentation and is also included in profiles.
+Saving a failed edit restores the previous presentation. No PipeWire nodes
+are rebuilt by these edits. `setLayoutOrder` changes routing order for editable items; the window calls it
+when **Use displayed order for routing** is chosen. `setDisplayOrder` overrides its visual order for all items.
+
+The live state names the default output feed in `primaryMonitorMix`. This is
+the first monitor mix in routing order, even if display ordering puts another
+mix first. It is derived state, not an additional saved routing preference.
+
+Profiles include this map as `mixer.appearance`. A missing or null map keeps
+current presentation; `{}` clears it. Entries for deleted channels or mixes
+are dropped when recalling. Malformed entries reject the whole profile before
+hardware or mixer settings change. Presentation ordering never changes the
+routing order of channels and mixes.

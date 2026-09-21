@@ -112,7 +112,7 @@ public sealed class ProfileStartupTests
             devices.SweepOnce();
             ProfileStore.Save("0fd9:00a6", "Saved", new()
             {
-                Device = new() { GainDb = 55 }, Mixer = new(),
+                Device = new() { GainDb = 55 }, Mixer = new(), Presentation = new() { Skin = "deck" },
             });
             using var lifetime = new Lifetime();
             using var mixer = new MixerService(NullLogger<MixerService>.Instance, config, devices);
@@ -124,11 +124,60 @@ public sealed class ProfileStartupTests
             Assert.Equal("device settings were applied, but mixer settings failed: mixer not built (start the daemon with --mixer)", Assert.Single(result.Messages.OfType<ErrorMessage>()).Message);
             Assert.Equal(55, dock.Gain);
             Assert.Null(hub.Snapshot().ActiveProfile);
+            Assert.Null(hub.Snapshot().ProfilePresentation);
         }
         finally
         {
             Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", previous);
             Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ProfileCommandsPreserveWindowChoicesAndPublishOnlySuccessfulRecalls()
+    {
+        string dir = Directory.CreateTempSubdirectory("openxlr-profile-presentation-").FullName;
+        string? previous = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
+        Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", dir);
+        try
+        {
+            new DaemonSettings { Submixer = false }.Save();
+            var config = new ConfigurationBuilder().Build();
+            var dock = new Dock();
+            using var devices = new DeviceManager(NullLogger<DeviceManager>.Instance, config, () => [dock]);
+            devices.SweepOnce();
+            using var lifetime = new Lifetime();
+            using var mixer = new MixerService(NullLogger<MixerService>.Instance, config, devices);
+            var hub = new WebSocketHub(devices, mixer, NullLogger<WebSocketHub>.Instance, lifetime);
+            Assert.True((await hub.ExecuteForApiAsync("""
+                {"cmd":"saveProfile","name":"Saved","presentation":{"skin":"deck","compactMixer":true,
+                 "sectionOrder":["SubmixerTile","MonitorTile"],"collapsedSections":["InputsTile"]}}
+                """)).Ok);
+            Assert.Null(hub.Snapshot().ProfilePresentation); // saving does not recall
+            Assert.True((await hub.ExecuteForApiAsync("""{"cmd":"saveProfile","name":"Saved"}""")).Ok);
+            Assert.Equal("deck", ProfileStore.Load("0fd9:00a6", "Saved")!.Presentation!.Skin);
+            Assert.False((await hub.ExecuteForApiAsync("""
+                {"cmd":"saveProfile","name":"Saved","presentation":{"sectionOrder":[null]}}
+                """)).Ok);
+            Assert.Equal("deck", ProfileStore.Load("0fd9:00a6", "Saved")!.Presentation!.Skin);
+            Assert.True((await hub.ExecuteForApiAsync("""{"cmd":"loadProfile","name":"Saved"}""")).Ok);
+            var first = Assert.IsType<ProfilePresentationMessage>(hub.Snapshot().ProfilePresentation);
+            Assert.Equal("deck", first.Settings.Skin);
+            Assert.True(first.Settings.CompactMixer);
+            Assert.Same(first, hub.Snapshot().ProfilePresentation);
+            Assert.False((await hub.ExecuteForApiAsync("""{"cmd":"loadProfile","name":"Missing"}""")).Ok);
+            Assert.Same(first, hub.Snapshot().ProfilePresentation);
+            Assert.True((await hub.ExecuteForApiAsync("""{"cmd":"loadProfile","name":"Saved"}""")).Ok);
+            Assert.NotEqual(first.Revision, hub.Snapshot().ProfilePresentation!.Revision);
+            ProfileStore.Save("0fd9:00a6", "Legacy", new() { Device = new() { GainDb = 40 } });
+            Assert.True((await hub.ExecuteForApiAsync("""{"cmd":"loadProfile","name":"Legacy"}""")).Ok);
+            Assert.Null(hub.Snapshot().ProfilePresentation);
+            Assert.Equal(40, dock.Gain);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", previous);
+            Directory.Delete(dir, true);
         }
     }
 

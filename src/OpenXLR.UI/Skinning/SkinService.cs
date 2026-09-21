@@ -198,14 +198,13 @@ public static class SkinService
 
     /// <summary>
     /// Save this skin as the one to wear and put it on. The choice lives in
-    /// ui.json alone: it is not part of the mixer layout, the daemon's
-    /// preferences or any audio profile, so switching appearance never touches
-    /// what is playing.
+    /// ui.json and can also be recalled by a profile. Switching appearance
+    /// itself never touches what is playing.
     /// </summary>
     public static IReadOnlyList<string> Choose(string id)
     {
         SkinEntry entry = SkinCatalog.Find(id) ?? new SkinEntry(SkinPackage.Default, []);
-        (UiSettings.Load() with { Skin = entry.Id == SkinPackage.DefaultId ? null : entry.Id }).Save();
+        (UiSettings.Load() with { Skin = entry.Id == SkinPackage.DefaultId ? null : entry.Id }).SaveChecked();
         return Apply(entry);
     }
 

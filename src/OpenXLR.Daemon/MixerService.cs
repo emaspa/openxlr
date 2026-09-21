@@ -419,6 +419,8 @@ public sealed class MixerService : IHostedService, IDisposable
                 case "createMix":
                 case "renameMix":
                 case "deleteMix":
+                case "setLayoutAppearance":
+                case "setDisplayOrder":
                 case "setLayoutOrder":
                     // Layout commands save synchronously, under the same gate
                     // as the debounced fader saves, and succeed only once the
@@ -435,6 +437,8 @@ public sealed class MixerService : IHostedService, IDisposable
                             case "createMix": _mixer.CreateVirtualMix(cmd.Name!, save); break;
                             case "renameMix": _mixer.RenameVirtualMix(cmd.Mix!, cmd.Name!, save); break;
                             case "deleteMix": _mixer.DeleteVirtualMix(cmd.Mix!, save); break;
+                            case "setLayoutAppearance": _mixer.SetLayoutAppearance(cmd.Channel is null ? "mix:" + cmd.Mix : "channel:" + cmd.Channel, cmd.Appearance!, save); break;
+                            case "setDisplayOrder": _mixer.SetDisplayOrder(cmd.Channels!, cmd.Mixes!, save); break;
                             default: _mixer.SetLayoutOrder(cmd.Channels!, cmd.Mixes!, save); break;
                         }
                     });

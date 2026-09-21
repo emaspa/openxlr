@@ -1045,6 +1045,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         {
             return new MixerSettings
             {
+                Appearance = ExportAppearanceLocked(),
                 UserChannels = [.. _config.Channels.Where(c => c.InputPair is null)
                     .Select(c => new UserChannelDefinition(c.Id, c.Name, c.CaptureSource, c.CapturePair))],
                 UserMixes = [.. _config.Mixes.Where(m => m.Kind == MixKind.VirtualMic)
@@ -1111,6 +1112,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         lock (_gate)
         {
             if (!_built) return;
+
+            _appearance = (s.Appearance ?? []).Where(p => AppearanceTargetExists(p.Key) && LayoutAppearance.IsValidEntry(p.Key, p.Value))
+                .Take(LayoutAppearance.MaxEntries).ToDictionary();
 
             foreach ((string mixId, double vol) in s.MixVolumes)
                 if (_mixVolume.ContainsKey(mixId)) _mixVolume[mixId] = Math.Clamp(vol, 0, MixVolumeMaximumLocked(mixId));
@@ -1195,6 +1199,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         {
             return new MixerScene
             {
+                Appearance = ExportAppearanceLocked(),
                 MixVolumes = new Dictionary<string, double>(_mixVolume),
                 MixMuted = [.. _mixMuted],
                 Levels = new Dictionary<string, double>(_levels),
@@ -1217,9 +1222,13 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// </summary>
     public void ApplyScene(MixerScene s)
     {
+        SavedMixerValidation.Validate(s);
         lock (_gate)
         {
             if (!_built) return;
+
+            if (s.Appearance is not null)
+                _appearance = s.Appearance.Where(p => AppearanceTargetExists(p.Key)).ToDictionary();
 
             foreach ((string mixId, double vol) in s.MixVolumes)
                 if (_mixVolume.ContainsKey(mixId)) _mixVolume[mixId] = Math.Clamp(vol, 0, MixVolumeMaximumLocked(mixId));
@@ -2081,20 +2090,21 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             DspFeatureAvailability clipGuard = _pw.GetSoftwareClipGuardAvailability();
             return new MixerState
             {
-                Mixes = [.. _config.Mixes.Select(m => new MixStatus(
+                Mixes = [.. _config.Mixes.OrderBy(m => Appearance("mix:" + m.Id).Order ?? int.MaxValue).Select(m => new MixStatus(
                     m.Id, m.Name,
                     _mixVolume.GetValueOrDefault(m.Id, 1.0),
-                    _mixMuted.Contains(m.Id), KindName(m.Kind)))],
-                Channels = [.. _config.Channels.Select(c => new ChannelStatus(
+                    _mixMuted.Contains(m.Id), KindName(m.Kind)) { Appearance = Appearance("mix:" + m.Id) })],
+                Channels = [.. _config.Channels.OrderBy(c => Appearance("channel:" + c.Id).Order ?? int.MaxValue).Select(c => new ChannelStatus(
                     c.Id, c.Name,
                     _config.Mixes.ToDictionary(m => m.Id, m => _levels.GetValueOrDefault(Cell(c.Id, m.Id), 0.0)),
                     [.. _config.Mixes.Where(m => _muted.Contains(Cell(c.Id, m.Id))).Select(m => m.Id)],
                     c.InputPair is not null, c.CaptureSource, c.CapturePair, _captureFeeds.ContainsKey(c.Id),
-                    ChannelPresentLocked(c)))],
+                    ChannelPresentLocked(c)) { Appearance = Appearance("channel:" + c.Id) })],
                 RenamedSinceStart = _renamedSinceBuild,
                 MonitorOutput = _monitorOutputs.FirstOrDefault(),
                 MonitorOutputs = [.. _monitorOutputs],
                 MonitorFeeds = new Dictionary<string, string>(_monitorFeeds),
+                PrimaryMonitorMix = PrimaryMonitorLocked()?.Id,
                 OutputVolume = _outputVolume,
                 LowCutHz = _lowCutHz,
                 SoftClipGuard = _softClipGuard,
