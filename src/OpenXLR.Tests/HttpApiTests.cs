@@ -59,6 +59,13 @@ public sealed class HttpApiTests
         builder.Services.AddSingleton(new OpenXLR.Core.Mixing.NativeEditorPolicy(Path.Combine(policyDirectory, "rules.json")));
         await using var app = builder.Build();
         app.UseWebSockets();
+        TaskCompletionSource? commandReading = null;
+        app.Use(async (context, next) =>
+        {
+            if (context.Request.Headers.ContainsKey("X-Test-Observe-Body") && commandReading is { } reading)
+                context.Request.Body = new ObservedReadStream(context.Request.Body, reading);
+            await next(context);
+        });
         // The endpoints read the daemon's live token per request; publish one
         // into a scratch runtime directory the way the daemon does at start.
         string runtimeDir = Path.Combine(Path.GetTempPath(), "openxlr-test-" + Guid.NewGuid().ToString("N"));
@@ -82,6 +89,17 @@ public sealed class HttpApiTests
                 using var protectedRequest = await http.GetAsync(path);
                 Assert.Equal(HttpStatusCode.Unauthorized, protectedRequest.StatusCode);
             }
+            foreach (string header in new[] { "Basic " + token, "Bearer " + token[..63],
+                "Bearer " + (token[0] == '0' ? "1" : "0") + token[1..], "Bearer " + token + ", Bearer " + token })
+            {
+                http.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", header);
+                using var rejected = await http.GetAsync("/api/v1/state");
+                Assert.Equal(HttpStatusCode.Unauthorized, rejected.StatusCode);
+                Assert.True(rejected.Headers.CacheControl?.NoStore);
+                http.DefaultRequestHeaders.Remove("Authorization");
+            }
+            using var queryToken = await http.GetAsync("/api/v1/state?token=" + token);
+            Assert.Equal(HttpStatusCode.Unauthorized, queryToken.StatusCode);
             using var deniedCommand = await http.PostAsync("/API/V1/commands/",
                 new StringContent("{\"cmd\":\"getDiagnostics\"}", Encoding.UTF8, "application/json"));
             Assert.Equal(HttpStatusCode.Unauthorized, deniedCommand.StatusCode);
@@ -130,9 +148,20 @@ public sealed class HttpApiTests
             using var oversized = await http.PostAsync("/api/v1/commands",
                 new StringContent(new string(' ', ApiEndpoints.MaxCommandBytes + 1), Encoding.UTF8, "application/json"));
             Assert.Equal(HttpStatusCode.RequestEntityTooLarge, oversized.StatusCode);
+            using var chunked = new HttpRequestMessage(HttpMethod.Post, "/api/v1/commands")
+            {
+                Content = new StringContent(new string(' ', ApiEndpoints.MaxCommandBytes + 1), Encoding.UTF8, "application/json"),
+            };
+            chunked.Headers.TransferEncodingChunked = true;
+            using var chunkedOversize = await http.SendAsync(chunked);
+            Assert.Equal(HttpStatusCode.RequestEntityTooLarge, chunkedOversize.StatusCode);
             using var invalid = await http.PostAsync("/api/v1/commands",
                 new StringContent("null", Encoding.UTF8, "application/json"));
             Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+            using var invalidUtf8Body = new ByteArrayContent([0xc3, 0x28]);
+            invalidUtf8Body.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+            using var invalidUtf8 = await http.PostAsync("/api/v1/commands", invalidUtf8Body);
+            Assert.Equal(HttpStatusCode.BadRequest, invalidUtf8.StatusCode);
             using var valid = await http.PostAsync("/api/v1/commands",
                 new StringContent("{\"cmd\":\"getDiagnostics\"}", Encoding.UTF8, "application/json"));
             Assert.Equal(HttpStatusCode.OK, valid.StatusCode);
@@ -189,6 +218,78 @@ public sealed class HttpApiTests
             Assert.True(hostEnvironment.TryGetProperty("loaderEnvironment", out _));
             Assert.True(discovery.GetProperty("discovery").TryGetProperty("skippedFailedCount", out _));
             Assert.True(discovery.GetProperty("discovery").TryGetProperty("skippedFailedBundles", out _));
+
+            // A slow streamed command occupies the shared command slot, but
+            // snapshot reads remain available and no second command is queued.
+            using var body = new PausedCommandContent();
+            commandReading = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var pendingRequest = new HttpRequestMessage(HttpMethod.Post, "/api/v1/commands") { Content = body };
+            pendingRequest.Headers.Add("X-Test-Observe-Body", "true");
+            Task<HttpResponseMessage> pending = http.SendAsync(pendingRequest);
+            HttpStatusCode completedStatus = default;
+            try
+            {
+                await commandReading.Task.WaitAsync(TimeSpan.FromSeconds(3));
+                using var busy = await http.GetAsync("/api/v1/diagnostics");
+                Assert.Equal(HttpStatusCode.TooManyRequests, busy.StatusCode);
+                using var snapshot = await http.GetAsync("/api/v1/state");
+                Assert.Equal(HttpStatusCode.OK, snapshot.StatusCode);
+                using var concurrent = await http.PostAsync("/api/v1/commands",
+                    new StringContent("{\"cmd\":\"getState\"}", Encoding.UTF8, "application/json"));
+                Assert.Equal(HttpStatusCode.TooManyRequests, concurrent.StatusCode);
+            }
+            finally
+            {
+                body.Release();
+                using var completed = await pending;
+                completedStatus = completed.StatusCode;
+            }
+            Assert.Equal(HttpStatusCode.OK, completedStatus);
+            using var afterCommand = await http.GetAsync("/api/v1/diagnostics");
+            Assert.Equal(HttpStatusCode.OK, afterCommand.StatusCode);
+
+            using var abortedBody = new PausedCommandContent();
+            using var cancel = new CancellationTokenSource();
+            commandReading = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var abortedRequest = new HttpRequestMessage(HttpMethod.Post, "/api/v1/commands") { Content = abortedBody };
+            abortedRequest.Headers.Add("X-Test-Observe-Body", "true");
+            Task<HttpResponseMessage> aborted = http.SendAsync(abortedRequest, cancel.Token);
+            try
+            {
+                await commandReading.Task.WaitAsync(TimeSpan.FromSeconds(3));
+            }
+            finally
+            {
+                cancel.Cancel();
+                abortedBody.Release();
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => aborted.WaitAsync(TimeSpan.FromSeconds(3)));
+            }
+            using (var recovered = new CancellationTokenSource(TimeSpan.FromSeconds(3)))
+            {
+                while (true)
+                {
+                    using var retry = await http.GetAsync("/api/v1/diagnostics", recovered.Token);
+                    if (retry.StatusCode == HttpStatusCode.OK) break;
+                    Assert.Equal(HttpStatusCode.TooManyRequests, retry.StatusCode);
+                    await Task.Delay(10, recovered.Token);
+                }
+            }
+
+            // Rotation must affect already mapped endpoints and existing HTTP
+            // connections, without writing a token into the user's runtime.
+            Environment.SetEnvironmentVariable("XDG_RUNTIME_DIR", runtimeDir);
+            try { ApiToken.Initialize(); }
+            finally
+            {
+                Environment.SetEnvironmentVariable("XDG_RUNTIME_DIR", previousRuntime);
+                Directory.Delete(runtimeDir, recursive: true);
+            }
+            using var staleToken = await http.GetAsync("/api/v1/state");
+            Assert.Equal(HttpStatusCode.Unauthorized, staleToken.StatusCode);
+            http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ApiToken.Current!);
+            using var rotatedToken = await http.GetAsync("/api/v1/state");
+            Assert.Equal(HttpStatusCode.OK, rotatedToken.StatusCode);
+
         }
         finally
         {
@@ -196,4 +297,40 @@ public sealed class HttpApiTests
             if (Directory.Exists(policyDirectory)) Directory.Delete(policyDirectory, recursive: true);
         }
     }
+    // Signal only once the endpoint owns its command slot and starts reading.
+    // Polling a command-backed GET here could itself take the slot first.
+    private sealed class ObservedReadStream(Stream inner, TaskCompletionSource reading) : Stream
+    {
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken stop = default)
+        {
+            reading.TrySetResult();
+            return inner.ReadAsync(buffer, stop);
+        }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override void Flush() => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    private sealed class PausedCommandContent : HttpContent
+    {
+        private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public PausedCommandContent() => Headers.ContentType = new MediaTypeHeaderValue("application/json");
+        public void Release() => _release.TrySetResult();
+        protected override bool TryComputeLength(out long length) { length = 0; return false; }
+        protected override async Task SerializeToStreamAsync(Stream stream, TransportContext? context)
+        {
+            await stream.WriteAsync(Encoding.UTF8.GetBytes("{"));
+            await stream.FlushAsync();
+            await _release.Task;
+            await stream.WriteAsync(Encoding.UTF8.GetBytes("\"cmd\":\"getDiagnostics\"}"));
+        }
+    }
+
 }

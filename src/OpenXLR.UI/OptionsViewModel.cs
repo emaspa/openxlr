@@ -358,6 +358,7 @@ public sealed class OptionsViewModel : ViewModelBase
         set
         {
             if (_httpApiEnabled == value) return;
+            if (!_main.DaemonRestart.CanRestart) { Raise(nameof(HttpApiEnabled)); return; }
             try { (DaemonPrefs.Load() with { HttpApiEnabled = value }).Save(); }
             catch (Exception ex)
             {
@@ -366,9 +367,7 @@ public sealed class OptionsViewModel : ViewModelBase
                 return;
             }
             Set(ref _httpApiEnabled, value);
-            HttpApiNote = StartupIntegration.RestartDaemon()
-                ? "API setting saved and the audio service restarted."
-                : "Saved. Restart the audio service to apply the API setting.";
+            _ = RestartForSettingAsync(api: true);
         }
     }
 
@@ -383,6 +382,7 @@ public sealed class OptionsViewModel : ViewModelBase
         get => _submixer;
         set
         {
+            if (!_main.DaemonRestart.CanRestart) { Raise(nameof(Submixer)); return; }
             if (!Set(ref _submixer, value)) return;
             try
             {
@@ -395,10 +395,7 @@ public sealed class OptionsViewModel : ViewModelBase
                 SubmixerNote = $"Could not save the setting: {ex.Message}";
                 return;
             }
-            SubmixerNote = StartupIntegration.RestartDaemon()
-                ? (value ? "Daemon restarted with the submixer on."
-                         : "Daemon restarted in hardware-control mode; the sound card keeps its stock layout and inserts are not loaded.")
-                : "Saved. Restart the daemon to apply (systemctl --user restart openxlr-daemon).";
+            _ = RestartForSettingAsync(api: false);
         }
     }
 
@@ -407,6 +404,20 @@ public sealed class OptionsViewModel : ViewModelBase
     {
         get => _submixerNote;
         private set => Set(ref _submixerNote, value);
+    }
+
+    private async System.Threading.Tasks.Task RestartForSettingAsync(bool api)
+    {
+        SetNote("Saved. Restarting the audio service...");
+        bool restarted = await _main.DaemonRestart.RestartAsync();
+        SetNote(restarted ? "Setting saved and the audio service restarted."
+            : "Saved. Restart the audio service to apply the setting.");
+
+        void SetNote(string note)
+        {
+            if (api) HttpApiNote = note;
+            else SubmixerNote = note;
+        }
     }
 
     // Start from the file so fields owned elsewhere (the main window's

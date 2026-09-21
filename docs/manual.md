@@ -1874,3 +1874,8 @@ restarts the audio service, briefly interrupting audio. If restarting fails,
 restart the daemon manually to apply the saved choice. The window, terminal
 and OpenDeck continue to use their own authenticated connection when the HTTP
 API is disabled. See [HTTP API](http-api.md) for the resource endpoints.
+
+Changing a daemon setting keeps the window responsive during the service restart.
+The API and software mixer switches and the other restart buttons are unavailable
+until the current restart finishes. A failed restart retains the saved choice
+and asks you to restart the service manually.
