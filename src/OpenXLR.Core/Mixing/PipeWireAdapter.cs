@@ -773,16 +773,31 @@ public sealed class PipeWireAdapter
         {
             string detail = StopFailedFilter(handle, stdoutTask, stderrTask);
             string missing = !sinkReady ? sinkName : srcName;
-            throw new InvalidOperationException(
-                $"PipeWire filter chain did not create the required ports for {missing}" +
-                (detail.Length == 0 ? "" : $": {detail}"));
+            string failure = $"PipeWire filter chain did not create the required ports for {missing}"
+                + (detail.Length == 0 ? "" : $": {detail}");
+            // Some distributions ship filter-chain without its LV2 module.
+            // Retry DSP in our existing host, without opting into an editor.
+            var active = inserts?.Where(i => !i.Bypass).ToArray() ?? [];
+            if (NativePluginHost.HostInstalled && active.Length > 0
+                && active.All(i => i.Kind == "lv2" && PluginCatalog.Find(i) is { } plugin
+                    && NativePluginHost.SupportsFeatures(plugin.RequiredFeatures)))
+            {
+                try
+                {
+                    var fallback = CreateHostedChain(sinkName, srcName, description, channels, lowCutHz, clipGuard, inserts!, forceNativeLv2: true);
+                    return fallback;
+                }
+                catch (Exception fallbackError)
+                { throw new InvalidOperationException(failure + " Native LV2 fallback also failed: " + fallbackError.Message, fallbackError); }
+            }
+            throw new InvalidOperationException(failure);
         }
         return handle;
     }
 
     /// <summary>Splice native editors into the chain, retaining filter-chain for other plugins.</summary>
     private FilterHandle CreateHostedChain(string sinkName, string sourceName, string description, int channels,
-        int lowCutHz, bool clipGuard, IReadOnlyList<InsertDefinition> inserts)
+        int lowCutHz, bool clipGuard, IReadOnlyList<InsertDefinition> inserts, bool forceNativeLv2 = false)
     {
         var stages = new List<FilterHandle>();
         var insertStages = new List<(string Id, FilterHandle Stage)>();
@@ -803,7 +818,7 @@ public sealed class PipeWireAdapter
                         $"{(string.IsNullOrWhiteSpace(insert.Label) ? insert.Plugin : insert.Label)} is unavailable or requires unsupported host features.");
                 string node = $"{sinkName}_stage_{insertStages.Count}";
                 FilterHandle stage;
-                if (insert.RunsNatively)
+                if (insert.RunsNatively || forceNativeLv2 && insert.Kind == "lv2")
                 {
                     if (!NativePluginHost.HostInstalled)
                         throw new InvalidOperationException("The native plugin host is not installed.");

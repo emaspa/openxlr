@@ -4,7 +4,7 @@ using OpenXLR.Core.Mixing;
 namespace OpenXLR.Tests;
 
 [Collection("xdg-config")]
-public sealed class DspAudioIntegrationTests
+public sealed partial class DspAudioIntegrationTests
 {
     [DspPipeWireFact]
     public void SoftwareClipGuardCarriesAudioWithAndWithoutLowCut()

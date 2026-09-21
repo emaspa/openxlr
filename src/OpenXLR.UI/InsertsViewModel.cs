@@ -299,7 +299,7 @@ public sealed class InsertViewModel : ViewModelBase
         ? _nativeUiBlockReason ?? "This native editor is disabled in Options. Use the OpenXLR controls."
         : null;
 
-    public bool NativeEditorAvailable => !NativeUiBlocked && NativeHostInstalled && NativeHost && !Bypass && !HasError && NativeHostRunning;
+    public bool NativeEditorAvailable => !NativeUiBlocked && NativeHostInstalled && !Bypass && !HasError && NativeHostRunning;
 
     /// <summary>
     /// The switch can be turned on only where the helper is installed. It

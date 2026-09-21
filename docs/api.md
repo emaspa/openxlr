@@ -495,3 +495,10 @@ dial rings and the keys agree; on a monitor mix sink it goes through the
 existing mix setter, so state and graph updates follow the same path as the
 mixer mute control; on any other output it uses pipewire-pulse's atomic
 toggle. The daemon pushes state whenever a sink's volume or mute changes.
+
+If PipeWire cannot load an LV2 chain, OpenXLR can retry it with the native host
+when that host supports every active insert. `nativeHostRunning` reports the
+actual running host even if `insert.nativeHost` is false; the latter remains
+the saved preference. Clients use the live flag to offer an available editor.
+Fallback is local to the failed chain and does not change other instances of
+the same plugin. A later rebuild attempts the saved host preference again.

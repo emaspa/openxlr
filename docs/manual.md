@@ -1860,3 +1860,11 @@ it. The usual revision needs no note. The rarer one is named in the
 Options connection note, and so is a dock that answers on neither
 address. Such a dock still connects, so save diagnostics from Options
 and open an issue with them.
+
+### LV2 host fallback
+
+Some PipeWire packages lack the LV2 loader. If an LV2 chain cannot start,
+OpenXLR tries its bundled native host when it supports the active effects.
+The saved host switch is unchanged; native controls and editors follow the
+host actually running. A failure in both hosts reports both causes. Other
+instances of the same plugin retain their own host choices.
