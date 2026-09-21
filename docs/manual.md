@@ -207,7 +207,18 @@ affects only the display; the daemon continues processing audio.
    OpenXLR slider writes the same device volumes, so Linux sees its changes
    too. Both show the same percentage: 100% is unity, not two thirds of
    another control's scale. The **150%** button unlocks boost above 100%;
-   switching it off returns a boosted output to 100%. A boosted desktop
+   switching it off returns a boosted output to 100%. On KDE Plasma 6,
+   OpenXLR follows **Raise maximum volume** in the desktop's Volume Controls.
+   Changing any OpenXLR monitor **150%** button changes that same desktop
+   preference and all OpenXLR monitor ranges. Enabling it keeps the current
+   percentage: 67% remains 67%, with the thumb moving from 67% of a 100% scale
+   to about 45% of a 150% scale. Disabling it preserves levels up to 100% and
+   lowers boosted OpenXLR monitor levels to 100%; Stream, Chat and channel
+   sends are unaffected. The desktop preference is global, persists through
+   KDE, and is not stored in an OpenXLR profile. Other desktops keep the local
+   per-control boost buttons. Plasma synchronization needs `kreadconfig6` and
+   `kwriteconfig6`; a missing helper or failed preference write is shown below
+   the monitor slider, with local controls still available. A boosted desktop
    value automatically enables the expanded range so opening the window
    cannot turn the volume down. Changing the first selected device
    adopts its current volume. Relinking the same device, including after a

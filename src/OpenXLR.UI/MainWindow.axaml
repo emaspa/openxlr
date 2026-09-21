@@ -447,7 +447,7 @@
             <TextBlock Text="MONITOR" Classes="h" VerticalAlignment="Center"/>
             <ToggleButton Name="OutputBoost" Content="150%" IsChecked="{Binding OutputVolumeRange.Boost, Mode=TwoWay}"
                           Padding="8,1" FontSize="{DynamicResource Ox.Label.FontSize}" MinHeight="0" VerticalAlignment="Center"
-                          ToolTip.Tip="Allow output volume above 100%, up to 150%. Turning this off returns a boosted output to 100%."/>
+                          ToolTip.Tip="Allow output volume above 100%, up to 150%. On Plasma this follows the desktop setting for all monitor controls. Turning it off lowers boosted levels to 100%."/>
             <TextBlock Text="&#x24D8;" Classes="h" FontSize="12" VerticalAlignment="Center" Margin="0,-1,0,0" Cursor="Help"
                        ToolTip.Tip="Tick the outputs you want to hear. Choose a mix beside each output. The Wave XLR Pro's own outputs (Headphones 1/2, USB Aux, Line Out) switch the hardware when ticked and share one feed. The USB Aux port is fed by the dedicated Aux mix in the submixer instead. XLR 1, XLR 2 and Line In feed their channels automatically. System default devices for apps are set in Options."/>
           </StackPanel>
@@ -488,6 +488,8 @@
           <TextBlock Grid.Column="5" Text="{Binding OutputVolumeText}" Classes="val"
                      VerticalAlignment="Center" HorizontalAlignment="Right"/>
         </Grid>
+        <TextBlock Text="{Binding VolumeRangeError}" IsVisible="{Binding HasVolumeRangeError}"
+                   Classes="h" TextWrapping="Wrap"/>
       </StackPanel>
       </Expander>
     </Border>
@@ -564,7 +566,7 @@
                     <ToggleButton Content="Mute" Classes="mute" IsChecked="{Binding Muted, Mode=TwoWay}"/>
                     <ToggleButton Grid.Column="1" Content="150%" IsChecked="{Binding VolumeRange.Boost, Mode=TwoWay}"
                                   IsVisible="{Binding IsMonitor}" Margin="6,0,0,0"
-                                  ToolTip.Tip="Allow this monitor mix above 100%, up to 150%. Turning this off returns a boosted mix to 100%."/>
+                                  ToolTip.Tip="Allow this monitor mix above 100%, up to 150%. On Plasma this follows the desktop setting for all monitor controls. Turning it off lowers boosted levels to 100%."/>
                   </Grid>
                   <Button Content="{Binding Inserts.ButtonText}" HorizontalAlignment="Stretch"
                           HorizontalContentAlignment="Center" Padding="8,4" FontSize="12" Click="OnMixInserts"
