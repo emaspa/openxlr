@@ -66,6 +66,7 @@
         <TextBlock Text="AUDIO" Classes="h"/>
         <CheckBox Content="Enable software mixer"
                   IsChecked="{Binding Submixer, Mode=TwoWay}"
+                  IsEnabled="{Binding Main.DaemonRestart.CanRestart}"
                   ToolTip.Tip="Off: OpenXLR controls the hardware only and leaves the sound card in its stock PipeWire layout (the UCM profile where one exists)."/>
         <StackPanel Name="SoftwareMixerNotes" Spacing="6">
           <TextBlock Text="Application channels, mixes, virtual microphones and inserts."
@@ -75,6 +76,19 @@
           <TextBlock Text="{Binding SubmixerNote}" Foreground="{DynamicResource Ox.Text.Secondary}" FontSize="11" TextWrapping="Wrap"
                      IsVisible="{Binding SubmixerNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
         </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <Border Classes="card">
+      <StackPanel Spacing="6">
+        <TextBlock Text="LOCAL API" Classes="h"/>
+        <CheckBox Name="HttpApiEnabled" Content="Enable local HTTP API"
+                  IsChecked="{Binding HttpApiEnabled, Mode=TwoWay}"
+                  IsEnabled="{Binding Main.DaemonRestart.CanRestart}"/>
+        <TextBlock Text="Allows authenticated local integrations. The mixer window, terminal and OpenDeck remain available when this is off. Changing this restarts the audio service and briefly interrupts audio."
+                   Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
+        <TextBlock Text="{Binding HttpApiNote}" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"
+                   IsVisible="{Binding HttpApiNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
       </StackPanel>
     </Border>
 
