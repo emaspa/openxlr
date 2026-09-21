@@ -743,6 +743,30 @@ public sealed class PipeWireAdapter
             $"playback.props = {{ node.name = {srcName} media.class = Audio/Source " +
             $"audio.channels = {channels} audio.position = {position} node.suspend-on-idle = false " +
             "priority.session = 100 } }";
+        try { return StartFilterChain(sinkName, srcName, spa); }
+        catch (InvalidOperationException failure)
+        {
+            // Some distributions ship filter-chain without its LV2 module.
+            // Retry DSP in our existing host, without opting into an editor.
+            var active = inserts?.Where(i => !i.Bypass).ToArray() ?? [];
+            if (NativePluginHost.HostInstalled && active.Length > 0
+                && active.All(i => i.Kind == "lv2" && PluginCatalog.Find(i) is { } plugin
+                    && NativePluginHost.SupportsFeatures(plugin.RequiredFeatures)))
+            {
+                try
+                {
+                    var fallback = CreateHostedChain(sinkName, srcName, description, channels, lowCutHz, clipGuard, inserts!, forceNativeLv2: true);
+                    return fallback;
+                }
+                catch (Exception fallbackError)
+                { throw new InvalidOperationException(failure.Message + " Native LV2 fallback also failed: " + fallbackError.Message, fallbackError); }
+            }
+            throw;
+        }
+    }
+
+    private FilterHandle StartFilterChain(string sinkName, string srcName, string spa)
+    {
         var psi = new ProcessStartInfo("pw-cli")
         {
             RedirectStandardOutput = true,
@@ -775,21 +799,6 @@ public sealed class PipeWireAdapter
             string missing = !sinkReady ? sinkName : srcName;
             string failure = $"PipeWire filter chain did not create the required ports for {missing}"
                 + (detail.Length == 0 ? "" : $": {detail}");
-            // Some distributions ship filter-chain without its LV2 module.
-            // Retry DSP in our existing host, without opting into an editor.
-            var active = inserts?.Where(i => !i.Bypass).ToArray() ?? [];
-            if (NativePluginHost.HostInstalled && active.Length > 0
-                && active.All(i => i.Kind == "lv2" && PluginCatalog.Find(i) is { } plugin
-                    && NativePluginHost.SupportsFeatures(plugin.RequiredFeatures)))
-            {
-                try
-                {
-                    var fallback = CreateHostedChain(sinkName, srcName, description, channels, lowCutHz, clipGuard, inserts!, forceNativeLv2: true);
-                    return fallback;
-                }
-                catch (Exception fallbackError)
-                { throw new InvalidOperationException(failure + " Native LV2 fallback also failed: " + fallbackError.Message, fallbackError); }
-            }
             throw new InvalidOperationException(failure);
         }
         return handle;
