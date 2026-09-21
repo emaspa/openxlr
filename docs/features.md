@@ -123,10 +123,12 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
   processed mic from B; a blend at other levels is a mix of its own
 - Level meters throughout, dB-scaled, pushed at 15 Hz
 
-Each channel is a combine sink with one internal stream per mix; that
-stream's volume is the send fader. The default layout's 9 by 5 matrix
-is 14 sinks and no loopback processes, and mixes come and go without
-touching the channel nodes. Details in [architecture.md](architecture.md).
+Each channel has a combine sink with one internal stream per mix; that
+stream's volume is the send fader. Only software and external-capture channels
+with inserts use a separate input sink before a hidden combine bus. Empty
+chains keep the original node set.
+Mixes come and go without reloading channel sinks. Details in
+[architecture.md](architecture.md).
 
 On the Wave XLR Pro the headphone jacks are fed by a mix inside the
 device. Whenever a Pro jack is a monitor output the daemon makes sure
@@ -156,8 +158,9 @@ return. A mono source is linked to both sides of the channel. See
 ## Inserts
 
 LV2, CLAP and VST3 effects can form a mono chain on each XLR input and a
-stereo chain on every mix, including virtual microphones you add. The
-picker filters by format, name, category and compatible channel width; a
+stereo chain on Aux In, application/software channels, external-capture channels
+and every mix, including virtual microphones you add. Channel effects process
+audio before the mix sends; mix effects process the summed audio. The picker filters by format, name, category and compatible channel width; a
 VST3 effect that reports stereo buses but accepts a mono layout when asked
 is offered for the inputs, since the helper asks each plugin as it scans.
 Unsupported host requirements are reported instead of loading a plugin

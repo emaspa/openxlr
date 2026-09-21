@@ -54,8 +54,8 @@ def main():
                     processes.append(subprocess.Popen(["wireplumber", *policy], env=env, stdout=log, stderr=log))
                 subprocess.run(["dotnet", "test", "src/OpenXLR.Tests/OpenXLR.Tests.csproj",
                                 "-c", "Release", "--no-build", "--filter",
-                                os.environ.get("OPENXLR_TEST_FILTER", "FullyQualifiedName~MonitorVolumeIntegrationTests|FullyQualifiedName~ProfileStartupTests|FullyQualifiedName~DspAudioIntegrationTests"), *sys.argv[1:]],
-                               env=env, check=True, timeout=180,
+                                os.environ.get("OPENXLR_TEST_FILTER", "FullyQualifiedName~MonitorVolumeIntegrationTests|FullyQualifiedName~ProfileStartupTests|FullyQualifiedName~DspAudioIntegrationTests|FullyQualifiedName~ChannelInsertIntegrationTests"), *sys.argv[1:]],
+                               env=env, check=True, timeout=300,
                                cwd=Path(__file__).resolve().parent.parent)
             except Exception:
                 log.flush()

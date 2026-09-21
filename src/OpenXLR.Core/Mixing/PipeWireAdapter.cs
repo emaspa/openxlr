@@ -676,8 +676,8 @@ public sealed class PipeWireAdapter
     /// mic into it) and a source half (link onward to the channel).
     /// </summary>
     public FilterHandle CreateMicFilter(string id, int lowCutHz, bool clipGuard,
-        IReadOnlyList<InsertDefinition>? inserts = null)
-        => CreateFilterChain($"OpenXLR_lc_{id}_in", $"OpenXLR_lc_{id}_out", "OpenXLR Mic Filter", 1, lowCutHz, clipGuard, inserts);
+        IReadOnlyList<InsertDefinition>? inserts = null, int channels = 1)
+        => CreateFilterChain($"OpenXLR_lc_{id}_in", $"OpenXLR_lc_{id}_out", "OpenXLR Mic Filter", channels, lowCutHz, clipGuard, inserts);
 
     /// <summary>A stereo insert chain for a mix, spliced between the mix and its consumers.</summary>
     public FilterHandle CreateMixChain(string id, string description, IReadOnlyList<InsertDefinition> inserts)
@@ -743,6 +743,30 @@ public sealed class PipeWireAdapter
             $"playback.props = {{ node.name = {srcName} media.class = Audio/Source " +
             $"audio.channels = {channels} audio.position = {position} node.suspend-on-idle = false " +
             "priority.session = 100 } }";
+        try { return StartFilterChain(sinkName, srcName, spa); }
+        catch (InvalidOperationException failure)
+        {
+            // Some distributions ship filter-chain without its LV2 module.
+            // Retry DSP in our existing host, without opting into an editor.
+            var active = inserts?.Where(i => !i.Bypass).ToArray() ?? [];
+            if (NativePluginHost.HostInstalled && active.Length > 0
+                && active.All(i => i.Kind == "lv2" && PluginCatalog.Find(i) is { } plugin
+                    && NativePluginHost.SupportsFeatures(plugin.RequiredFeatures)))
+            {
+                try
+                {
+                    var fallback = CreateHostedChain(sinkName, srcName, description, channels, lowCutHz, clipGuard, inserts!, forceNativeLv2: true);
+                    return fallback;
+                }
+                catch (Exception fallbackError)
+                { throw new InvalidOperationException(failure.Message + " Native LV2 fallback also failed: " + fallbackError.Message, fallbackError); }
+            }
+            throw;
+        }
+    }
+
+    private FilterHandle StartFilterChain(string sinkName, string srcName, string spa)
+    {
         var psi = new ProcessStartInfo("pw-cli")
         {
             RedirectStandardOutput = true,
@@ -773,16 +797,16 @@ public sealed class PipeWireAdapter
         {
             string detail = StopFailedFilter(handle, stdoutTask, stderrTask);
             string missing = !sinkReady ? sinkName : srcName;
-            throw new InvalidOperationException(
-                $"PipeWire filter chain did not create the required ports for {missing}" +
-                (detail.Length == 0 ? "" : $": {detail}"));
+            string failure = $"PipeWire filter chain did not create the required ports for {missing}"
+                + (detail.Length == 0 ? "" : $": {detail}");
+            throw new InvalidOperationException(failure);
         }
         return handle;
     }
 
     /// <summary>Splice native editors into the chain, retaining filter-chain for other plugins.</summary>
     private FilterHandle CreateHostedChain(string sinkName, string sourceName, string description, int channels,
-        int lowCutHz, bool clipGuard, IReadOnlyList<InsertDefinition> inserts)
+        int lowCutHz, bool clipGuard, IReadOnlyList<InsertDefinition> inserts, bool forceNativeLv2 = false)
     {
         var stages = new List<FilterHandle>();
         var insertStages = new List<(string Id, FilterHandle Stage)>();
@@ -803,7 +827,7 @@ public sealed class PipeWireAdapter
                         $"{(string.IsNullOrWhiteSpace(insert.Label) ? insert.Plugin : insert.Label)} is unavailable or requires unsupported host features.");
                 string node = $"{sinkName}_stage_{insertStages.Count}";
                 FilterHandle stage;
-                if (insert.RunsNatively)
+                if (insert.RunsNatively || forceNativeLv2 && insert.Kind == "lv2")
                 {
                     if (!NativePluginHost.HostInstalled)
                         throw new InvalidOperationException("The native plugin host is not installed.");
@@ -1099,6 +1123,23 @@ public sealed class PipeWireAdapter
         return new PortLink(pairs);
     }
 
+    /// <summary>Wait for both sides of an owned stereo route after asynchronous node creation.</summary>
+    internal PortLink LinkStereoNodes(string fromNode, string fromPrefix, string toNode, string toPrefix,
+        TimeSpan? timeout = null)
+    {
+        long deadline = Environment.TickCount64 + (long)(timeout ?? TimeSpan.FromSeconds(3)).TotalMilliseconds;
+        do
+        {
+            var link = LinkNodes(fromNode, fromPrefix, toNode, toPrefix);
+            if (link.Pairs.Count == 2) return link;
+            // Never leave one side attached across retries or on failure.
+            Unlink(link);
+            if (Environment.TickCount64 >= deadline)
+                throw new InvalidOperationException($"The stereo route from {fromNode} to {toNode} is incomplete.");
+            Thread.Sleep(25);
+        } while (true);
+    }
+
     /// <summary>
     /// Select a stereo pair from an ordered port list. Missing pairs never
     /// fall back to pair zero; a final mono port is kept so mono devices can
@@ -1135,8 +1176,10 @@ public sealed class PipeWireAdapter
     public LinkHealth EnsureLinks(PortLink link)
     {
         var health = LinkHealth.Healthy;
+        var known = GraphLinks();
         foreach ((string from, string to) in link.Pairs)
         {
+            if (known.Contains((from, to))) continue;
             try
             {
                 Run("pw-link", from, to);
@@ -1149,6 +1192,50 @@ public sealed class PipeWireAdapter
             }
         }
         return health;
+    }
+
+    private JsonElement[]? _linkObjects;
+    private HashSet<(string From, string To)> _graphLinks = [];
+    private HashSet<(string From, string To)> GraphLinks()
+    {
+        lock (DumpGate)
+        {
+            var objects = GraphObjects();
+            if (ReferenceEquals(objects, _linkObjects)) return _graphLinks;
+            _graphLinks = ParseGraphLinks(objects);
+            _linkObjects = objects;
+            return _graphLinks;
+        }
+    }
+
+    internal static HashSet<(string From, string To)> ParseGraphLinks(IEnumerable<JsonElement> objects)
+    {
+        var nodes = new Dictionary<int, string>();
+        var ports = new Dictionary<int, (int Node, string Name)>();
+        var links = new List<(int From, int To)>();
+        foreach (var entry in objects)
+        {
+            if (!entry.TryGetProperty("id", out var id) || !id.TryGetInt32(out int number)
+                || !entry.TryGetProperty("type", out var type) || !entry.TryGetProperty("info", out var info)) continue;
+            if (type.GetString() == "PipeWire:Interface:Link")
+            {
+                if (info.TryGetProperty("output-port-id", out var from) && from.TryGetInt32(out int source)
+                    && info.TryGetProperty("input-port-id", out var to) && to.TryGetInt32(out int target)) links.Add((source, target));
+                continue;
+            }
+            if (!info.TryGetProperty("props", out var props)) continue;
+            if (type.GetString() == "PipeWire:Interface:Node" && props.TryGetProperty("node.name", out var name))
+                nodes[number] = name.GetString() ?? "";
+            else if (type.GetString() == "PipeWire:Interface:Port" && props.TryGetProperty("node.id", out var node)
+                && int.TryParse(node.ToString(), out int owner) && props.TryGetProperty("port.name", out var port))
+                ports[number] = (owner, port.GetString() ?? "");
+        }
+        var result = new HashSet<(string, string)>();
+        foreach (var (from, to) in links)
+            if (ports.TryGetValue(from, out var source) && ports.TryGetValue(to, out var target)
+                && nodes.TryGetValue(source.Node, out string? sourceName) && nodes.TryGetValue(target.Node, out string? targetName))
+                result.Add(($"{sourceName}:{source.Name}", $"{targetName}:{target.Name}"));
+        return result;
     }
 
     /// <summary>Remove a set of port links made by <see cref="LinkNodes"/>.</summary>
@@ -1235,6 +1322,7 @@ public sealed class PipeWireAdapter
 
             string? name = props.TryGetProperty("node.name", out JsonElement n) ? n.GetString() : null;
             if (name is null) continue;
+            if (name.StartsWith("OpenXLR_bus_", StringComparison.Ordinal)) continue;
             string mc = props.TryGetProperty("media.class", out JsonElement m) ? m.GetString() ?? "" : "";
 
             bool isSink = mc == "Audio/Sink";

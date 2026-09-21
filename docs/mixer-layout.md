@@ -185,3 +185,13 @@ ignored on read, in this file and in profiles.
 If a channel or mix deletion cannot be saved, its previous routing settings
 and any pending volume or mute writes are restored together. The normal
 reconciliation keeps retrying those writes when PipeWire becomes available.
+
+### Channel insert paths
+
+All channel ids are valid insert keys. Software and external-capture channels
+use the public `OpenXLR_ch_<id>` sink. While a chain exists, a hidden
+`OpenXLR_bus_<id>` combine distributes the processed signal to the mixes. Display
+order does not alter effect order or sends. Adding the first or removing the
+last insert recreates only that channel sink with the same name. Empty chains
+use the original combine sink and no hidden bus. Deleting a user channel removes its
+insert definition in the same saved settings change as its routing.
