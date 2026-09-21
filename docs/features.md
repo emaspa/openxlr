@@ -456,3 +456,10 @@ identity comes from KDE Plasma's KWin; on other desktops the routing key
 reports that it cannot identify the application. See
 [Desktop keys](manual.md#desktop-keys) and
 [Output keys](manual.md#output-keys).
+
+### Sound Check
+
+Record up to ten seconds from an XLR microphone and loop the dry sample through
+the current software processing and insert chain. Live mode retains the sample;
+stop discards it and restores the microphone. The session stays in memory and
+ends after ten minutes or a lost audio path. Hardware processing remains upstream.

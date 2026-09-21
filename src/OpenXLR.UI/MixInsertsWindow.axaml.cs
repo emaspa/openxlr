@@ -11,6 +11,16 @@ public partial class MixInsertsWindow : Window
         InitializeComponent();
     }
 
+    private SoundCheckWindow? _soundCheck;
+    private void OnSoundCheck(object? sender, RoutedEventArgs e)
+    {
+        if (Chain is not { CanSoundCheck: true } chain) return;
+        if (_soundCheck is not null) { _soundCheck.Activate(); return; }
+        _soundCheck = new SoundCheckWindow { DataContext = chain.SoundCheck };
+        _soundCheck.Closed += (_, _) => _soundCheck = null;
+        _soundCheck.Show(this);
+    }
+
     private InsertsViewModel? Chain => DataContext as InsertsViewModel;
 
     private async void OnAddInsert(object? sender, RoutedEventArgs e)
