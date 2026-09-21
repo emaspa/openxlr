@@ -5,7 +5,7 @@
 %global _build_id_links none
 
 Name:           openxlr
-Version:        0.1.45
+Version: 0.1.46
 Release:        1%{?dist}
 Summary:        Control suite and PipeWire submixer for Elgato XLR interfaces
 License:        GPL-3.0-only
@@ -162,6 +162,11 @@ MSG
 %{_datadir}/openxlr/
 
 %changelog
+* Mon Sep 21 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.46-1
+- Devices: the XLR Dock MK.2 works on both of the revisions in the field. They answer their settings on different USB addresses, and the daemon now works out which one a dock uses every time it connects. A dock that failed every settings read with a pipe error, and so never connected, works on this release.
+- Devices: a backend for the Wave:3, coded from public protocol research. Gain, mute, ClipGuard, headphone volume and the direct monitor balance are mapped, and the low cut stays the submixer's. Nobody on the project owns a Wave:3, so no control has been run on the hardware; docs/hardware-support.md names the bytes the sources dispute and lists the checks an owner runs.
+- Daemon: a device's PipeWire node name is spelled the way udev spells it, which a model with a colon in its name needs.
+
 * Sun Sep 20 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.45-1
 - Project: the test runner moves to Microsoft.NET.Test.Sdk 18.10.1. Nothing in the daemon, the mixer, the window, the terminal mixer or the plugin changed, so the packages behave exactly as 0.1.44 did.
 
