@@ -61,6 +61,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             pipewire pipewire-pulse wireplumber pulseaudio-utils swh-plugins lsp-plugins-lv2 g++ libpipewire-0.3-dev liblilv-dev lv2-dev libx11-dev libxtst6 xvfb xauth
           make -C native
+          make -C native tests/gain.lv2/gain.so
           dotnet build src/OpenXLR.slnx -c Release --no-restore -warnaserror -p:EnableNativeLv2Host=true
           test -x native/openxlr-lv2-host
           make -C native test-audio test-clap test-vst3 test-scan
@@ -70,7 +71,7 @@ jobs:
         run: dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~Lv2BundleTests
 
       - name: Desktop monitor volume controls
-        run: python3 tools/test-monitor-volume.py
+        run: LV2_PATH="$PWD/native/tests" python3 tools/test-monitor-volume.py
 
       - name: Software ClipGuard audio with a native LV2 insert
         run: OPENXLR_TEST_DSP=1 OPENXLR_TEST_FILTER=FullyQualifiedName~DspAudioIntegrationTests LV2_PATH=/usr/lib/lv2 python3 tools/test-monitor-volume.py

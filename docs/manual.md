@@ -331,7 +331,7 @@ channel, with its level and lock in the INPUTS card.
 <a name="plugins"></a>
 ### 3.5 Add a plugin to the signal path
 
-1. Under XLR 1, XLR 2 or a mix, press "Inserts". The chain window opens
+1. On any channel strip or mix, press "Inserts". The chain window opens
    with that chain's plugins and an "Add plugin" button. The picker lists
    compatible installed LV2, CLAP and VST3 effects (ones that can run
    mono for an input, stereo for a mix), searchable by name, category or
@@ -1868,3 +1868,30 @@ OpenXLR tries its bundled native host when it supports the active effects.
 The saved host switch is unchanged; native controls and editors follow the
 host actually running. A failure in both hosts reports both causes. Other
 instances of the same plugin retain their own host choices.
+
+## Effects on software and capture channels
+
+Every channel strip has an **Inserts** button. It opens the same chain editor
+used by microphone inputs and mixes, with the same controls, bypass and native
+editors. Software channels process all applications assigned to them together;
+external-capture channels process their selected source. Channel effects run
+before the sends, so every mix receives the processed signal. Mix effects still
+run after the channels are summed.
+
+XLR 1 and XLR 2 use mono plugins. Aux In, application channels and external
+capture channels use stereo-compatible plugins. Hiding or muting a channel
+does not remove its chain. Removing a user channel removes its saved chain too.
+
+A channel without effects keeps its normal direct sends and adds no hidden
+bus. Adding the first effect or removing the last one recreates that channel's
+sink under the same name and restores its application and capture feeds.
+These changes can briefly interrupt that channel. Editing or bypassing effects
+within an existing chain keeps its public sink. Recalling unchanged effects
+keeps the running plugin instances. Failed effects report an error and use a
+direct audio route when available. OpenXLR retries failed processing within
+its recovery limit, even while direct audio is working. Other channels continue
+independently.
+
+Deleting a channel or mix also closes its effect-chain and control windows.
+Recreating the same layout ID opens a fresh chain instead of reusing stale
+controls from the removed item.
