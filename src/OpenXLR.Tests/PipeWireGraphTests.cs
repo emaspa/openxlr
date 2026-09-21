@@ -59,13 +59,27 @@ public sealed class PipeWireGraphTests
         {
             using var graph = new PipeWireGraph(executable: script);
             Assert.True(graph.WaitFor(items => items.Length == 1000, TimeSpan.FromSeconds(5)));
-            JsonElement[] first = graph.Read();
-            for (int i = 0; i < 100; i++) graph.Read(); // warm the read path
-            long allocated = GC.GetAllocatedBytesForCurrentThread();
-            for (int i = 0; i < 10000; i++) graph.Read();
-            allocated = GC.GetAllocatedBytesForCurrentThread() - allocated;
-            Assert.Equal(0, allocated);
-            Assert.Same(first, graph.Read());
+            // Measure on a dedicated thread, outside the runner's worker and
+            // its diagnostic callbacks. Keep the zero-allocation requirement.
+            Exception? failure = null;
+            var probe = new Thread(() =>
+            {
+                try
+                {
+                    JsonElement[] first = graph.Read();
+                    for (int i = 0; i < 100; i++) graph.Read();
+                    _ = GC.GetAllocatedBytesForCurrentThread();
+                    long allocated = GC.GetAllocatedBytesForCurrentThread();
+                    for (int i = 0; i < 10000; i++) graph.Read();
+                    allocated = GC.GetAllocatedBytesForCurrentThread() - allocated;
+                    Assert.Same(first, graph.Read());
+                    Assert.Equal(0, allocated);
+                }
+                catch (Exception ex) { failure = ex; }
+            }) { IsBackground = true };
+            probe.Start();
+            Assert.True(probe.Join(TimeSpan.FromSeconds(5)), "Graph read allocation probe hung.");
+            if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
         }
         finally { Directory.Delete(dir, true); }
     }
