@@ -519,4 +519,6 @@ An already registered addition or absent removal succeeds without rescanning.
 Recursive discovery stops after 16,384 entries per root and reports that limit.
 Both commands return the existing `pluginInstall` result and correlated error
 handling. A failed save leaves the old paths intact; a corrupt configuration
-must be repaired before editing it. No plugin file is removed.
+must be repaired before editing it. Unresolvable saved entries are ignored with
+`searchPathWarning`; healthy entries remain available and edits are refused until
+the saved paths can be read completely. No plugin file is removed.

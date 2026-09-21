@@ -30,10 +30,8 @@ public static class PluginSearchPaths
             stream.ReadExactly(bytes);
             if (stream.ReadByte() != -1) throw new IOException("plugin path file changed while reading");
             var entries = JsonSerializer.Deserialize<List<Entry>>(bytes, Json) ?? throw new JsonException("empty plugin path list");
-            var kept = entries.Where(e => e is not null && Valid(e.Kind, e.Path))
-                .Select(e => e with { Path = WindowsPluginWrappers.Canonical(e.Path) })
-                .Where(e => Valid(e.Kind, e.Path) && !BroadRoot(e.Path)).Distinct().Take(MaxPaths).ToArray();
-            if (kept.Length != entries.Count) warning = "Invalid, duplicate or excessive plugin search paths were ignored.";
+            var kept = entries.Select(ResolveEntry).OfType<Entry>().Distinct().Take(MaxPaths).ToArray();
+            if (kept.Length != entries.Count) warning = "Invalid, unreadable, duplicate or excessive plugin search paths were ignored.";
             return kept;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException)
@@ -41,6 +39,20 @@ public static class PluginSearchPaths
             warning = "Could not read plugin search paths: " + ex.Message;
             return [];
         }
+    }
+
+    // A directory can become unreadable after registration. Keep the healthy
+    // entries available, but retain the warning so edits cannot erase the bad one.
+    private static Entry? ResolveEntry(Entry? entry)
+    {
+        if (entry is null || !Valid(entry.Kind, entry.Path)) return null;
+        try
+        {
+            string path = WindowsPluginWrappers.Canonical(entry.Path);
+            return Valid(entry.Kind, path) && !BroadRoot(path) ? entry with { Path = path } : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        { return null; }
     }
 
     public static InstallOutcome Change(string kind, string path, bool add)

@@ -1884,8 +1884,10 @@ restored. Search paths are saved privately in `plugin-paths.json`; environment
 variables keep their existing precedence. The LV2 loading rules below apply to additional folders.
 
 If the saved path file is corrupt, normal paths remain usable and the manager
-shows a warning. Repair that file before editing paths so a partial read cannot
-overwrite your configuration. Scanning reports failed bundles as before.
+shows a warning. An added path that can no longer be resolved, such as a symbolic
+link loop, is ignored without hiding healthy added paths. Repair the path or the
+saved file before editing paths so a partial read cannot overwrite your
+configuration. Scanning reports failed bundles as before.
 
 When `LV2_PATH` is unset, lilv keeps its own compiled-in default paths,
 including distribution-specific paths. The manager lists explicit and added

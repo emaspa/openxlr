@@ -196,6 +196,35 @@ public sealed class PluginSearchPathTests : IDisposable
         Assert.False(PluginSearchPaths.Change("clap", loop, true).Ok);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AStoredDirectoryThatBecomesASymlinkLoopDoesNotHideHealthyRoots(bool brokenFirst)
+    {
+        string healthy = Directory.CreateDirectory(Path.Combine(_directory, "healthy")).FullName;
+        string broken = Directory.CreateDirectory(Path.Combine(_directory, "broken")).FullName;
+        foreach (string path in brokenFirst ? new[] { broken, healthy } : new[] { healthy, broken })
+            Assert.True(PluginSearchPaths.Change("lv2", path, true).Ok);
+        string file = OpenXlrPaths.ConfigFile("plugin-paths.json");
+        string saved = File.ReadAllText(file);
+        Directory.Delete(broken);
+        Directory.CreateSymbolicLink(broken, broken);
+
+        var roots = PluginSearchPaths.Read(out string? warning);
+        Assert.Equal(new PluginSearchPaths.Entry("lv2", healthy), Assert.Single(roots));
+        Assert.NotNull(warning);
+        Assert.Contains(healthy, PluginSearchPaths.Lv2Path());
+        Assert.Contains(PluginSearchPaths.Snapshot(), p => p.Kind == "lv2" && p.Path == healthy && p.Custom && p.Exists);
+        Assert.False(PluginSearchPaths.Change("lv2", healthy, false).Ok);
+        Assert.Equal(saved, File.ReadAllText(file));
+
+        File.Delete(broken);
+        Directory.CreateDirectory(broken);
+        Assert.Equal(2, PluginSearchPaths.Read(out warning).Count);
+        Assert.Null(warning);
+        Assert.True(PluginSearchPaths.Change("lv2", broken, false).Ok);
+    }
+
     public void Dispose()
     {
         foreach (var (key, value) in _environment) Environment.SetEnvironmentVariable(key, value);
