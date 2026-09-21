@@ -10,7 +10,7 @@ internal static class EffectWorkflowWindowTests
 {
     internal static void CheckControlOwnership(Window owner, DaemonClient client)
     {
-        Task pending = CheckQueuedParameters();
+        Task pending = CheckParameterOrdering();
         var deadline = DateTime.UtcNow.AddSeconds(10);
         while (!pending.IsCompleted && DateTime.UtcNow < deadline)
         {
@@ -44,6 +44,67 @@ internal static class EffectWorkflowWindowTests
         {
             foreach (var window in owner.OwnedWindows.OfType<InsertControlsWindow>().ToArray()) window.Close();
         }
+    }
+
+    private static async Task CheckParameterOrdering()
+    {
+        await CheckQueuedParameters();
+        await CheckQueuedComparison();
+    }
+
+    private static async Task CheckQueuedComparison()
+    {
+        var commands = new ConcurrentQueue<JsonNode>();
+        bool reject = false;
+        double liveGain = .5;
+        await using var server = await SocketTestServer.Start(async (socket, stop) =>
+        {
+            while (!stop.IsCancellationRequested)
+            {
+                var command = await SocketTestServer.Receive(socket, stop);
+                if (command["cmd"]!.GetValue<string>() == "auth") continue;
+                commands.Enqueue(command);
+                if (command["cmd"]!.GetValue<string>() == "setInsertParam" && command["channel"]!.GetValue<string>() == "xlr1")
+                    liveGain = command["value"]!.GetValue<double>();
+                if (command["cmd"]!.GetValue<string>() == "setInserts")
+                {
+                    if (!reject) liveGain = command["inserts"]![0]!["params"]!["gain"]!.GetValue<double>();
+                    await SocketTestServer.Send(socket, new { type = "commandResult",
+                        requestId = command["requestId"]!.GetValue<string>(), error = reject ? "Cannot load chain" : null }, stop);
+                }
+            }
+        });
+        await using var client = new DaemonClient(server.Url);
+        var connected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.ConnectionChanged += up => { if (up) connected.TrySetResult(); };
+        client.Start();
+        await connected.Task.WaitAsync(TimeSpan.FromSeconds(3));
+        var first = new InsertsViewModel(client, "xlr1");
+        var second = new InsertsViewModel(client, "xlr2");
+        var initial = Chain("urn:one");
+        initial[0]!["insert"]!["params"] = new JsonObject { ["gain"] = .5 };
+        first.Apply(initial);
+        second.Apply(Chain("urn:one"));
+        first.StoreComparison(false);
+        foreach (bool fail in new[] { false, true })
+        {
+            reject = fail;
+            commands.Clear();
+            first.Items[0].SendParam("gain", .8);
+            Task comparison = first.HearComparisonAsync(false);
+            second.Items[0].SendParam("gain", .6); // next timer tick is an independent barrier
+            await comparison;
+            await WaitFor(() => commands.Count >= 3);
+            Assert.Equal(new[] { "setInsertParam", "setInserts", "setInsertParam" },
+                commands.Select(c => c["cmd"]!.GetValue<string>()));
+            Assert.Equal(.8, commands.First()["value"]!.GetValue<double>());
+            Assert.Equal("xlr2", commands.Last()["channel"]!.GetValue<string>());
+            Assert.Equal(fail ? .8 : .5, liveGain);
+            Assert.False(SliderSync.RecentlyTouched(first.ParameterKey("shared", "gain")));
+            Assert.Equal(fail ? "Cannot load chain" : null, first.WorkflowError);
+        }
+        first.ResetForNewConnection();
+        second.ResetForNewConnection();
     }
 
     private static async Task CheckQueuedParameters()
@@ -90,12 +151,13 @@ internal static class EffectWorkflowWindowTests
             Assert.Equal("xlr2", commands.Last()["channel"]!.GetValue<string>());
         }
         second.ResetForNewConnection();
-        static async Task WaitFor(Func<bool> ready)
-        {
-            var deadline = DateTime.UtcNow.AddSeconds(3);
-            while (!ready() && DateTime.UtcNow < deadline) await Task.Delay(10);
-            Assert.True(ready(), "Queued parameter commands did not arrive.");
-        }
+    }
+
+    private static async Task WaitFor(Func<bool> ready)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(3);
+        while (!ready() && DateTime.UtcNow < deadline) await Task.Delay(10);
+        Assert.True(ready(), "Queued parameter commands did not arrive.");
     }
 
     private static JsonNode Chain(string plugin) => new JsonArray(new JsonObject

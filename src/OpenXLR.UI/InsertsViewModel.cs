@@ -517,6 +517,12 @@ public sealed class InsertViewModel : ViewModelBase
     }
 
     private readonly HashSet<string> _editedParameters = [];
+    internal void FlushPendingParameters()
+    {
+        foreach (string symbol in _editedParameters) SliderSync.Flush(_owner.ParameterKey(Id, symbol));
+        ForgetPendingParameters();
+    }
+
     internal void ForgetPendingParameters()
     {
         foreach (string symbol in _editedParameters) SliderSync.Forget(_owner.ParameterKey(Id, symbol));

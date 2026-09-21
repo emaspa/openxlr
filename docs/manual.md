@@ -1906,3 +1906,6 @@ changes. Controls on different channels stay independent even when a profile
 uses the same effect ID in both. Disconnecting discards queued parameter changes.
 A change received from another client while a comparison is loading also
 clears its listening label; a delayed acknowledgement cannot restore it.
+Loading a chain or an A/B snapshot applies earlier knob changes first, so
+those changes cannot overwrite the newly loaded settings. If loading fails,
+the earlier knob changes remain applied to the current chain.

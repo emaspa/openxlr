@@ -112,6 +112,10 @@ public sealed partial class InsertsViewModel
         _workflowBusy = true; Raise(nameof(CanEditEffects));
         try
         {
+            // The socket serializes sends. Finish earlier knob edits before
+            // replacing the chain, so they cannot overwrite the new snapshot.
+            // Sending rather than discarding also preserves them if it is refused.
+            foreach (var insert in Items) insert.FlushPendingParameters();
             string? error = await _client.ReplaceInsertsAsync(_channel, data.Inserts);
             if (epoch != _connectionEpoch) return false;
             WorkflowError = error;
