@@ -41,6 +41,16 @@ public static class CommandValidation
             case "setWindowsPluginEnabled":
             case "deleteWindowsPlugin":
                 return CheckPluginPath(cmd);
+            case "setExclusiveGroup":
+                if (cmd.Group is not null && !ExclusiveGroupsModel.ValidId(cmd.Group)) return "invalid group ID";
+                var group = new ExclusiveGroupDefinition(cmd.Group ?? "new", cmd.Name!, cmd.Channels!);
+                return ExclusiveGroupsModel.Validate(group)
+                    ?? (cmd.Channels!.Any(ch => !layout.HasChannel(ch)) ? "unknown channel in exclusive group" : null);
+            case "deleteExclusiveGroup":
+            case "cycleExclusiveGroup":
+                if (!ExclusiveGroupsModel.ValidId(cmd.Group)) return "need a valid group ID";
+                return cmd.Cmd == "cycleExclusiveGroup" && (cmd.Mix is null || !layout.HasMix(cmd.Mix))
+                    ? "need a known mix" : null;
             case "createCaptureChannel":
                 if (BadName(cmd.Name)) return "createCaptureChannel: name must contain 1 to 60 printable characters";
                 return CaptureBinding.IsValid(cmd.Source, cmd.CapturePair) ? null : "createCaptureChannel: need an external source and a pair from 0 to 31";

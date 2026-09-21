@@ -293,6 +293,31 @@ public sealed class WindowLayoutTests
                 Assert.True(captureDialog.IsVisible); // incomplete input cannot submit
                 Capture(captureDialog, "capture-input-360");
                 captureDialog.Close();
+                var groupsVm = new MainViewModel(new DaemonClient());
+                typeof(MainViewModel).GetMethod("ApplyMixer", BindingFlags.Instance | BindingFlags.NonPublic)!
+                    .Invoke(groupsVm, [JsonNode.Parse("""
+                        {"mixes":[{"id":"monitor","name":"Monitor","volume":1}],
+                         "channels":[{"id":"xlr1","name":"Microphone one","levels":{"monitor":1},"mutedIn":[]},
+                                     {"id":"xlr2","name":"Microphone two","levels":{"monitor":1},"mutedIn":["monitor"]}],
+                         "exclusiveGroups":[{"id":"mics","name":"Microphones","channels":["xlr1","xlr2"]}]}
+                        """)]);
+                var groupsDialog = new ExclusiveGroupsWindow(groupsVm);
+                windows.Add(groupsDialog);
+                groupsDialog.Show();
+                Layout(groupsDialog, 360, 340);
+                var groupControls = groupsDialog.GetVisualDescendants().ToArray();
+                var groupSave = groupControls.OfType<Button>().Single(b => b.Name == "SaveGroup");
+                groupSave.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+                Assert.True(groupsDialog.IsVisible);
+                Assert.Contains("at least two", groupControls.OfType<TextBlock>().Single(b => b.Name == "GroupError").Text);
+                var groupPicker = groupControls.OfType<ComboBox>().Single(b => b.Name == "Groups");
+                groupPicker.SelectedIndex = 1;
+                Dispatcher.UIThread.RunJobs();
+                Assert.All(groupControls.OfType<CheckBox>(), b => Assert.True(b.IsChecked));
+                Assert.Equal("Microphones", groupControls.OfType<TextBox>().Single(b => b.Name == "GroupName").Text);
+                Assert.True(groupControls.OfType<Button>().Single(b => b.Name == "DeleteGroup").IsEnabled);
+                Capture(groupsDialog, "exclusive-groups-360");
+                groupsDialog.Close();
                 setup.Close();
 
                 for (int i = 0; i < 32; i++) vm.Channels.Add(new ChannelViewModel(new DaemonClient(), "key-channel" + i, "Shortcut channel " + i, []));

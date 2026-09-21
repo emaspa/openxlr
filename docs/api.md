@@ -138,7 +138,10 @@ that final acknowledgement (or an `error` without a request id):
 | `renameMix` | `mix`, `name` | rename a virtual microphone in OpenXLR; the PipeWire device keeps its old description until the daemon restarts (reloading it would throw recording apps off), and the mixer state's `renamedSinceStart` says so |
 | `deleteMix` | `mix` | remove a virtual microphone with its sends, inserts and capture device |
 | `setLayoutOrder` | `channels[]`, `mixes[]` | complete ordered lists of editable-channel and virtual-microphone ids; structural nodes stay fixed |
-| `setChannelMuted` | `channel`, `mix`, `value` | one send mute |
+| `setExclusiveGroup` | `group?`, `name`, `channels[]` | create a group when `group` is absent, otherwise replace a known group's name and membership; saved before acknowledgement |
+| `deleteExclusiveGroup` | `group` | remove a known group while preserving current send mutes; saved before acknowledgement |
+| `cycleExclusiveGroup` | `group`, `mix` | select the next member in this mix, or the first if all are muted; resolved on the daemon so rapid presses advance in order |
+| `setChannelMuted` | `channel`, `mix`, `value` | one send mute; opening a grouped send first closes its peers in this mix |
 | `setMixVolume` / `setMixMuted` | `mix`, `value` | mix masters; monitor volume range 0 to 1.5, other mixes 0 to 1; values outside the range are clamped |
 | `setMonitorOutputs` | `devices[]` | every sink the monitor mixes feed; a newly listed output is fed by the first monitor mix |
 | `setMonitorOutput` | `device` | a single monitor sink; `null` disconnects the route |
@@ -495,3 +498,28 @@ dial rings and the keys agree; on a monitor mix sink it goes through the
 existing mix setter, so state and graph updates follow the same path as the
 mixer mute control; on any other output it uses pipewire-pulse's atomic
 toggle. The daemon pushes state whenever a sink's volume or mute changes.
+
+### Exclusive channel groups
+
+`mixer.exclusiveGroups` contains `{id, name, channels[]}` entries. Each
+`mixer.channels[]` also carries `exclusiveGroup` (a group ID, or `null`).
+There are at most 16 groups, each with 2 to 35 distinct existing channel
+IDs. A channel belongs to at most one group. Group IDs use the layout ID
+format, names contain 1 to 60 printable characters, and generated IDs stay
+stable across renames. Invalid live edits fail without changing state.
+
+Selection is represented by the existing `channels[].mutedIn` lists, not a
+second selection flag. Unmuting a member closes peers only in the addressed
+mix. Muting it leaves no selection; send levels remain unchanged. A failed
+peer mute holds the selected member silent while the existing cell recovery
+retries. Group creation, editing and profile recall close all members in a
+mix when the supplied state would open more than one. They never choose an
+arbitrary microphone. A missing channel is pruned on restore or deletion;
+groups with fewer than two remaining members disappear without opening sends.
+
+Profiles include `mixer.exclusiveGroups` and existing per-send mutes. Missing
+or `null` groups in older profiles preserve membership; `[]` removes it.
+Malformed or overlapping profile groups refuse the profile before changes.
+Hardware `set` mute controls remain device-wide; use `setChannelMuted` for
+per-mix selection. Grouped XLR 1 uses software monitoring at the interface's
+headphone jacks so the device's direct path cannot bypass this selection.

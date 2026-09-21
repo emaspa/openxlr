@@ -458,6 +458,11 @@ function toggleValue(target, inst) {
     if (!outs || !outs.includes(out)) return null;
     return feedOf(out) !== "monitor";
   }
+  if (target.startsWith("group:")) {
+    const [, id, mix] = target.split(":");
+    const group = mixer()?.exclusiveGroups?.find(g => g.id === id);
+    return group && mixOf(mix) ? group.channels.some(ch => chOf(ch) && !chOf(ch).mutedIn?.includes(mix)) : null;
+  }
   if (target.startsWith("mixmute:")) return mixOf(target.slice(8))?.muted ?? null;
   if (target.startsWith("sendmute:")) {
     const [, ch, mix] = target.split(":");
@@ -548,6 +553,12 @@ function toggleLabel(target, inst) {
     const d = daemonState?.devices?.find((x) => x.name === sink);
     const name = d?.description ?? sink.split(".").pop();
     return `${name}\n${feedLabel(feedOf(sink))}`;
+  }
+  if (target.startsWith("group:")) {
+    const [, id, mix] = target.split(":");
+    const group = mixer()?.exclusiveGroups?.find(g => g.id === id);
+    const active = group?.channels.find(ch => chOf(ch) && !chOf(ch).mutedIn?.includes(mix));
+    return `${group?.name ?? id} · ${mixShortName(mixer(), mix)}\n${active ? channelName(mixer(), active) : "None"}`;
   }
   if (target.startsWith("mixmute:")) return `${mixName(mixer(), target.slice(8))}\nMute`;
   if (target.startsWith("sendmute:")) {
@@ -724,6 +735,10 @@ function onKeyDown(context, inst) {
   else if (t === "gainLocked") cmd({ cmd: "set", control: "gainLock", value: !cur });
   else if (t.startsWith("monitor:")) cmd({ cmd: "setMonitorOutputs", devices: [t.slice(8)] });
   else if (t.startsWith("feed:")) cmd({ cmd: "setMonitorFeed", device: t.slice(5), mix: nextFeed(feedOf(t.slice(5))) });
+  else if (t.startsWith("group:")) {
+    const [, group, mix] = t.split(":");
+    cmd({cmd: "cycleExclusiveGroup", group, mix});
+  }
   else if (t.startsWith("mixmute:"))
     cmd({ cmd: "setMixMuted", mix: t.slice(8), value: !cur });
   else if (t.startsWith("sendmute:")) {
@@ -894,7 +909,7 @@ function glyphFor(t) {
   if (t === "outHp1" || t === "outHp2" || t === "lowImpedance") return "headphones";
   if (t === "outLineOut") return "jack";
   if (t.startsWith("monitor:") || t.startsWith("feed:") || t.startsWith("mixmute:")) return "speaker";
-  if (t.startsWith("sendmute:")) return "fader";
+  if (t.startsWith("sendmute:") || t.startsWith("group:")) return "fader";
   if (isProfileTarget(t)) return "scene";
   return null;
 }

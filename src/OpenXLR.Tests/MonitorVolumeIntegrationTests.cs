@@ -460,60 +460,61 @@ public sealed partial class MonitorVolumeIntegrationTests
         Capture(.1 * Math.Pow(.7, 3), false, "test_feed_other");
         Capture(.1 * (Math.Pow(.8, 3) + Math.Pow(.7, 3)), false);
 
-        static void Capture(double expected, bool direct, string output = "test_master_output")
-        {
-            var result = ProcessRunner.Run("python3", ["-c", """
-                import struct, subprocess, sys, tempfile
-                rate = 48000
-                # Separate combine streams can acquire different latencies. A sine
-                # can cancel itself when Monitor A and B are summed, although both
-                # gains are correct. DC tests the gain independently of that phase.
-                samples = struct.pack('<ff', 0.1, 0.1) * (rate * 2)
-                args = ['--format=f32', '--rate=48000', '--channels=2']
-                # Older pw-cat versions use raw audio on stdin/stdout implicitly.
-                if '--raw' in subprocess.check_output(['pw-cat', '--help'], text=True):
-                    args.append('--raw')
-                capture = tempfile.TemporaryFile()
-                record = subprocess.Popen(['pw-cat', '--record', *args, '--target', sys.argv[3], '--properties={ stream.capture.sink = true }', '-'], stdout=capture, stderr=subprocess.PIPE)
-                play = None
-                try:
-                    play = subprocess.Popen(['pw-cat', '--playback', *args, '--target', sys.argv[2], '-'], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-                    _, playback_errors = play.communicate(samples, timeout=10)
-                    assert play.returncode == 0, playback_errors.decode()
-                    record.terminate()
-                    record.communicate(timeout=5)
-                    capture.seek(0)
-                    audio = capture.read()
-                    values = struct.unpack('<' + 'f' * (len(audio) // 4), audio)
-                    assert len(values) > rate, 'Capture did not run'
-                    expected = float(sys.argv[1])
-                    # The capture starts before playback and is cut when it
-                    # ends, so the settled window is found from the audio
-                    # itself: 100 ms inside the first and last frame carrying
-                    # signal. A resampler on a combine leg rings for a few
-                    # samples at the DC edges, well inside that margin.
-                    frames = [values[i:i + 2] for i in range(0, len(values), 2)]
-                    floor = max(expected / 2, 0.001)
-                    carrying = [0, len(frames) - 1] if expected == 0 else [i for i, frame in enumerate(frames) if max(map(abs, frame)) > floor]
-                    assert carrying, 'No audio reached the output; links=' + subprocess.check_output(['pw-link', '-l'], text=True)
-                    margin = rate // 10
-                    steady = frames[carrying[0] + margin : carrying[-1] + 1 - margin]
-                    assert len(steady) >= rate, f'Only {len(steady)} settled frames'
-                    settled = [value for frame in steady for value in frame]
-                    matching = sum(abs(value - expected) < 0.002 for value in settled) / len(settled)
-                    peak = max(map(abs, values))
-                    assert matching > 0.99 and peak < 1.1 * expected + 0.002, f'Wrong master gain: peak={peak}, expected={expected}, matching={matching}; links=' + subprocess.check_output(['pw-link', '-l'], text=True)
-                    print(f'Expected {expected:.5f}: peak={peak:.5f}, matching={matching:.1%}')
-                finally:
-                    for process in (play, record):
-                        if process is None: continue
-                        if process.poll() is None: process.kill()
-                        process.wait()
-                    capture.close()
-                """, expected.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                direct ? "OpenXLR_mix_monitor" : "OpenXLR_ch_test", output], TimeSpan.FromSeconds(20));
-            Assert.True(result.Ok, result.StdoutText + result.Stderr);
-        }
+    }
+
+    private static void Capture(double expected, bool direct, string output = "test_master_output")
+    {
+        var result = ProcessRunner.Run("python3", ["-c", """
+            import struct, subprocess, sys, tempfile
+            rate = 48000
+            # Separate combine streams can acquire different latencies. A sine
+            # can cancel itself when Monitor A and B are summed, although both
+            # gains are correct. DC tests the gain independently of that phase.
+            samples = struct.pack('<ff', 0.1, 0.1) * (rate * 2)
+            args = ['--format=f32', '--rate=48000', '--channels=2']
+            # Older pw-cat versions use raw audio on stdin/stdout implicitly.
+            if '--raw' in subprocess.check_output(['pw-cat', '--help'], text=True):
+                args.append('--raw')
+            capture = tempfile.TemporaryFile()
+            record = subprocess.Popen(['pw-cat', '--record', *args, '--target', sys.argv[3], '--properties={ stream.capture.sink = true }', '-'], stdout=capture, stderr=subprocess.PIPE)
+            play = None
+            try:
+                play = subprocess.Popen(['pw-cat', '--playback', *args, '--target', sys.argv[2], '-'], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                _, playback_errors = play.communicate(samples, timeout=10)
+                assert play.returncode == 0, playback_errors.decode()
+                record.terminate()
+                record.communicate(timeout=5)
+                capture.seek(0)
+                audio = capture.read()
+                values = struct.unpack('<' + 'f' * (len(audio) // 4), audio)
+                assert len(values) > rate, 'Capture did not run'
+                expected = float(sys.argv[1])
+                # The capture starts before playback and is cut when it
+                # ends, so the settled window is found from the audio
+                # itself: 100 ms inside the first and last frame carrying
+                # signal. A resampler on a combine leg rings for a few
+                # samples at the DC edges, well inside that margin.
+                frames = [values[i:i + 2] for i in range(0, len(values), 2)]
+                floor = max(expected / 2, 0.001)
+                carrying = [0, len(frames) - 1] if expected == 0 else [i for i, frame in enumerate(frames) if max(map(abs, frame)) > floor]
+                assert carrying, 'No audio reached the output; links=' + subprocess.check_output(['pw-link', '-l'], text=True)
+                margin = rate // 10
+                steady = frames[carrying[0] + margin : carrying[-1] + 1 - margin]
+                assert len(steady) >= rate, f'Only {len(steady)} settled frames'
+                settled = [value for frame in steady for value in frame]
+                matching = sum(abs(value - expected) < 0.002 for value in settled) / len(settled)
+                peak = max(map(abs, values))
+                assert matching > 0.99 and peak < 1.1 * expected + 0.002, f'Wrong master gain: peak={peak}, expected={expected}, matching={matching}; links=' + subprocess.check_output(['pw-link', '-l'], text=True)
+                print(f'Expected {expected:.5f}: peak={peak:.5f}, matching={matching:.1%}')
+            finally:
+                for process in (play, record):
+                    if process is None: continue
+                    if process.poll() is None: process.kill()
+                    process.wait()
+                capture.close()
+            """, expected.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            direct ? "OpenXLR_mix_monitor" : "OpenXLR_ch_test", output], TimeSpan.FromSeconds(20));
+        Assert.True(result.Ok, result.StdoutText + result.Stderr);
     }
 
 }
