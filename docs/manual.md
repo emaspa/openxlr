@@ -1900,6 +1900,7 @@ default; a missing compact channel falls back to an available channel without
 forgetting the saved selection. Startup, tray, update and security preferences
 remain local. A recall is applied once, including after reconnecting to the
 daemon; subsequent manual edits remain until another profile is loaded.
+Loading a profile cancels a drag in progress before restoring its order.
 
 ### Arranging the window
 

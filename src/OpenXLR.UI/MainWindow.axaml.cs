@@ -265,6 +265,8 @@ public partial class MainWindow : Window
 
     private void OnPresentationRecalled()
     {
+        CancelReorder();
+        ApplySectionOrder(UiSettings.Load().SectionOrder);
         ApplySectionState();
         if (!Skinning.SkinService.Overridden)
         {

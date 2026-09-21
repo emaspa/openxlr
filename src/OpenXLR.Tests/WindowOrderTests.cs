@@ -19,6 +19,9 @@ public sealed class WindowOrderTests
     public async Task RealDraggingPreservesSkinsControlsAndSavedOrder()
     {
         var commands = new ConcurrentQueue<JsonNode>();
+        var profileCommands = new ConcurrentQueue<JsonNode>();
+        JsonNode? savedPresentation = null;
+        JsonNode? savedMixer = null;
         using var rejectGate = new SemaphoreSlim(0);
         int rejectNext = 0;
         JsonNode state = JsonNode.Parse("""
@@ -44,6 +47,26 @@ public sealed class WindowOrderTests
                     await SocketTestServer.Send(socket, new { type = "commandResult", requestId = command["requestId"]!.GetValue<string>() }, stop);
                     continue;
                 }
+                if (command["cmd"]!.GetValue<string>() == "saveProfile")
+                {
+                    savedPresentation = command["presentation"]!.DeepClone();
+                    savedMixer = state["mixer"]!.DeepClone();
+                    profileCommands.Enqueue(command);
+                    continue;
+                }
+                if (command["cmd"]!.GetValue<string>() == "loadProfile")
+                {
+                    var presentation = savedPresentation!.DeepClone();
+                    if (command["name"]!.GetValue<string>() == "MissingSkin") presentation["skin"] = "not-installed";
+                    state["profilePresentation"] = new JsonObject
+                    {
+                        ["revision"] = Guid.NewGuid().ToString("N"), ["settings"] = presentation,
+                    };
+                    state["mixer"] = savedMixer!.DeepClone();
+                    await SocketTestServer.Send(socket, state, stop);
+                    profileCommands.Enqueue(command);
+                    continue;
+                }
                 commands.Enqueue(command);
                 if (command["cmd"]!.GetValue<string>() != "setDisplayOrder") continue;
                 if (Interlocked.Exchange(ref rejectNext, 0) == 1)
@@ -64,6 +87,9 @@ public sealed class WindowOrderTests
         });
         string config = Directory.CreateTempSubdirectory("openxlr-order-").FullName;
         string? oldConfig = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
+        string? oldData = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
+        string? oldDirs = Environment.GetEnvironmentVariable("XDG_DATA_DIRS");
+        string? oldSkin = Environment.GetEnvironmentVariable(SkinService.OverrideVariable);
         string? oldRuntime = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
         string? oldBus = Environment.GetEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS");
         MainWindow? main = null;
@@ -75,6 +101,9 @@ public sealed class WindowOrderTests
             try
             {
                 Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", config);
+                Environment.SetEnvironmentVariable("XDG_DATA_HOME", Path.Combine(config, "data"));
+                Environment.SetEnvironmentVariable("XDG_DATA_DIRS", Path.Combine(config, "system-data"));
+                Environment.SetEnvironmentVariable(SkinService.OverrideVariable, null);
                 Environment.SetEnvironmentVariable("XDG_RUNTIME_DIR", config);
                 Environment.SetEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS", "unix:path=/nonexistent");
                 new UiSettings { CollapsedSections = Sections, CheckForUpdates = false }.Save();
@@ -87,6 +116,9 @@ public sealed class WindowOrderTests
             finally
             {
                 Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", oldConfig);
+                Environment.SetEnvironmentVariable("XDG_DATA_HOME", oldData);
+                Environment.SetEnvironmentVariable("XDG_DATA_DIRS", oldDirs);
+                Environment.SetEnvironmentVariable(SkinService.OverrideVariable, oldSkin);
                 Environment.SetEnvironmentVariable("XDG_RUNTIME_DIR", oldRuntime);
                 Environment.SetEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS", oldBus);
             }
@@ -98,6 +130,8 @@ public sealed class WindowOrderTests
         try
         {
             Wait(() => Ui(() => ((MainViewModel)main!.DataContext!).CanEditLayout));
+            if (Environment.GetEnvironmentVariable("AVALONIA_GLOBAL_SCALE_FACTOR") is string scale)
+                Assert.Equal(double.Parse(scale, System.Globalization.CultureInfo.InvariantCulture), Ui(() => main!.RenderScaling), 3);
             Click(Ui(() => main!.FindControl<ToggleButton>("ArrangeButton")!));
             Wait(() => Ui(() => Handle("SubmixerTile").IsEffectivelyVisible));
             Border original = Ui(() => (Border)main!.FindControl<Expander>("InputsTile")!.Parent!);
@@ -240,6 +274,80 @@ public sealed class WindowOrderTests
             Click(Ui(() => main!.FindControl<Button>("ResetSectionsButton")!));
             Wait(() => Ui(() => Order().SequenceEqual(Sections)));
             Assert.Null(Ui(() => UiSettings.Load().Skin));
+            Ui(() =>
+            {
+                foreach (string id in Sections) main!.FindControl<Expander>(id)!.IsExpanded = false;
+                return true;
+            });
+            // Exercise real drags under every shipped resource set, including
+            // different header sizes and control themes, with no rebuilt cards.
+            foreach (var skin in SkinCatalog.BuiltIn())
+            {
+                Ui(() => { Assert.Empty(SkinService.Choose(skin.Id)); return true; });
+                Drag("SubmixerTile", "InputsTile", false);
+                Wait(() => Ui(() => Order()[0] == "SubmixerTile"));
+                Drag("SubmixerTile", "ApplicationsTile", true);
+                Wait(() => Ui(() => Order().SequenceEqual(Sections)));
+                Assert.Equal(skin.Id, Ui(() => SkinService.Current.Id));
+                Assert.Equal(Sections, Ui(() => UiSettings.Load().SectionOrder));
+            }
+            // Collapse persistence failures must restore only the changed tile,
+            // rather than reading defaults from the unavailable settings file.
+            before = Ui(Order);
+            File.Move(path, path + ".saved"); Directory.CreateDirectory(path);
+            try
+            {
+                Ui(() => { main!.FindControl<Expander>("MonitorTile")!.IsExpanded = true; return true; });
+                Assert.All(Sections, id => Assert.False(Ui(() => main!.FindControl<Expander>(id)!.IsExpanded)));
+                Assert.Equal(before, Ui(Order));
+            }
+            finally { Directory.Delete(path); File.Move(path + ".saved", path); }
+
+            Ui(() =>
+            {
+                Assert.Empty(SkinService.Choose("opendeck"));
+                var vm = (MainViewModel)main!.DataContext!;
+                vm.SelectedCompactChannel = vm.Channels.Single(c => c.Id == "music");
+                vm.CompactMixer = true;
+                vm.SaveProfile("Presentation");
+                return true;
+            });
+            Wait(() => profileCommands.Count == 1);
+            Assert.Equal("opendeck", profileCommands.First()["presentation"]!["skin"]!.GetValue<string>());
+            Drag("SubmixerTile", "InputsTile", false);
+            Ui(() =>
+            {
+                Assert.Empty(SkinService.Choose("material"));
+                ((MainViewModel)main!.DataContext!).CompactMixer = false;
+                return true;
+            });
+            // Recall while the pointer is still captured. Releasing afterward
+            // must not overwrite the recalled order with the old drag target.
+            Move(Center(Handle("MonitorTile"))); pointer.SetButton(true);
+            Move(Center(Handle("InputsTile")));
+            Ui(() => { ((MainViewModel)main!.DataContext!).LoadProfile("Presentation"); return true; });
+            Wait(() => Ui(() => UiSettings.Load().AppliedPresentation is not null));
+            Assert.Equal(Sections, Ui(Order));
+            pointer.SetButton(false); Thread.Sleep(150);
+            Assert.Equal(Sections, Ui(Order));
+            Assert.Equal("opendeck", Ui(() => SkinService.Current.Id));
+            Assert.True(Ui(() => ((MainViewModel)main!.DataContext!).CompactMixer));
+            Assert.Equal("music", Ui(() => ((MainViewModel)main!.DataContext!).SelectedCompactChannel!.Id));
+            Assert.All(Sections, id => Assert.False(Ui(() => main!.FindControl<Expander>(id)!.IsExpanded)));
+            Ui(() => { ((MainViewModel)main!.DataContext!).LoadProfile("MissingSkin"); return true; });
+            Wait(() => Ui(() => SkinService.Current.Id == SkinPackage.DefaultId));
+            Assert.Equal(Sections, Ui(Order));
+            Assert.Contains("unavailable", Ui(() => ((MainViewModel)main!.DataContext!).Status));
+            // A repeated state on reconnect must retain changes made since recall.
+            Drag("SubmixerTile", "InputsTile", false);
+            string[] afterRecall = Ui(Order);
+            Ui(() => { Assert.Empty(SkinService.Choose("opendeck")); main!.Close(); main = Open(); return true; });
+            Wait(() => Ui(() => ((MainViewModel)main!.DataContext!).CanEditLayout));
+            Assert.Equal(afterRecall, Ui(Order));
+            Assert.Equal("opendeck", Ui(() => UiSettings.Load().Skin));
+            Assert.Equal("opendeck", Ui(() => SkinService.Current.Id));
+            Assert.Equal(3, commands.Count); // no audio changes or stray reorder commands
+            Ui(() => { Assert.Empty(SkinService.Choose("material")); return true; });
             Ui(() => { main!.Width = 640; return true; });
             Wait(() => Ui(() => main!.ClientSize.Width == 640));
             Thread.Sleep(100);
