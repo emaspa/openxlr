@@ -67,11 +67,17 @@ The desktop keys tests in the main suite start a private session bus with
 a check that asks a running KDE Plasma session for its focused process; it
 routes no audio and is not part of CI.
 
+The idle graph allocation check measures reads on a dedicated warmed thread,
+so test-runner diagnostic allocations are outside the measured interval. It
+still requires zero bytes and the same cached snapshot across 10,000 reads.
+
 The private PipeWire runner also checks profile startup ordering. To exercise
 ClipGuard with recorded test audio, low cut and a native LSP gate, run
 `OPENXLR_TEST_DSP=1 python3 tools/test-monitor-volume.py` after a native-enabled
 build, with swh-plugins and LSP LV2 plugins installed. The runner isolates
 plugin scans from user-installed CLAP and VST3 bundles.
+CI installs the DSP test plugins, rebuilds with the native helper and runs
+this check separately with `OPENXLR_TEST_FILTER=FullyQualifiedName~DspAudioIntegrationTests`.
 For a focused rerun on the same private server, set `OPENXLR_TEST_FILTER` to
 the desired `dotnet test` filter instead of passing a second `--filter`.
 

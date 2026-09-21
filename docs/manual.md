@@ -903,6 +903,11 @@ the catalogue remain available.
 2. Header, Profiles: type a name and press Save.
 3. To recall: Profiles, then the name. To remove: the cross next to it.
 
+Saving or loading from the window first sends any waiting slider edits.
+Saving immediately after a drag therefore includes its last value. Loading
+then restores the selected snapshot, and an older queued edit cannot overwrite
+it. If loading fails, the preceding edits remain in place.
+
 Profiles belong to the interface they were saved with; another device
 shows its own list. With the OpenDeck plugin a key can recall a
 profile ([section 4](#stream-deck)).

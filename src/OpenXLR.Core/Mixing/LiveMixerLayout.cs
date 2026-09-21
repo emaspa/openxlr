@@ -445,7 +445,7 @@ public sealed partial class Mixer
     }
 
     /// <summary>The fader state of removed cells, so a failed save can put them back.</summary>
-    private sealed record CellSnapshot(Dictionary<string, double> Levels, HashSet<string> Muted, Dictionary<string, int> Legs,
+    private sealed record CellSnapshot(Dictionary<string, double> Levels, HashSet<string> Muted, Dictionary<string, int> Legs, HashSet<string> Pending,
         double? MixVolume, bool MixMuted, string? MixId)
     {
         public void Restore(Mixer m)
@@ -453,6 +453,7 @@ public sealed partial class Mixer
             foreach ((string cell, double level) in Levels) { m._cells.Add(cell); m._levels[cell] = level; }
             foreach (string cell in Muted) m._muted.Add(cell);
             foreach ((string cell, int index) in Legs) m._legIndex[cell] = index;
+            m._pendingCells.UnionWith(Pending);
             if (MixId is not null && MixVolume is double volume) m._mixVolume[MixId] = volume;
             if (MixId is not null && MixMuted) m._mixMuted.Add(MixId);
         }
@@ -466,7 +467,7 @@ public sealed partial class Mixer
 
     private CellSnapshot TakeCellsLocked(List<string> cells, string? mixId)
     {
-        var snapshot = new CellSnapshot([], [], [],
+        var snapshot = new CellSnapshot([], [], [], [],
             mixId is not null && _mixVolume.TryGetValue(mixId, out double volume) ? volume : null,
             mixId is not null && _mixMuted.Contains(mixId), mixId);
         foreach (string cell in cells)
@@ -475,7 +476,7 @@ public sealed partial class Mixer
             _levels.Remove(cell);
             if (_muted.Remove(cell)) snapshot.Muted.Add(cell);
             if (_legIndex.Remove(cell, out int index)) snapshot.Legs[cell] = index;
-            _pendingCells.Remove(cell);
+            if (_pendingCells.Remove(cell)) snapshot.Pending.Add(cell);
         }
         if (mixId is not null) { _mixVolume.Remove(mixId); _mixMuted.Remove(mixId); }
         return snapshot;

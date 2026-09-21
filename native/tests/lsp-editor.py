@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
-"""Opt-in desktop regression: LSP Gate must repaint after large resize drags.
+"""Opt-in desktop regression: LSP Gate repaints after resizing, moving and reopening.
 
 Requires python-xlib, LSP Gate Mono LV2, DISPLAY and a running PipeWire server.
 The isolated instance has no audio links and never changes the user's chain.
@@ -46,7 +46,7 @@ def main():
             def find(window):
                 try:
                     prop = window.get_full_property(atom, X.AnyPropertyType)
-                    if prop and prop.value == node.encode():
+                    if prop and prop.value == node.encode() and window.get_attributes().map_state == X.IsViewable:
                         return window
                     for child in window.query_tree().children:
                         found = find(child)
@@ -96,6 +96,24 @@ def main():
                 connection.sync()
                 time.sleep(0.4)
                 repaint(f"after dragging to {width} x {height}")
+            window.configure(x=args.position[0] + 120, y=args.position[1] + 100)
+            connection.sync()
+            time.sleep(0.5)
+            repaint("after moving the editor")
+            command("hide")
+            for _ in range(50):
+                time.sleep(0.1)
+                if find(root) is None: break
+            assert find(root) is None, "Editor did not close"
+            command("show")
+            window = None
+            for _ in range(50):
+                time.sleep(0.1)
+                window = find(root)
+                if window is not None: break
+            assert window is not None, "Editor did not reopen"
+            time.sleep(0.5)
+            repaint("after closing and reopening")
         except Exception:
             log.seek(0)
             print(log.read()[-4000:])
