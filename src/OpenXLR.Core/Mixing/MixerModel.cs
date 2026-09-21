@@ -140,9 +140,11 @@ public sealed record MixerState
     /// <summary>node.names of every sink the monitor mixes feed.</summary>
     public IReadOnlyList<string> MonitorOutputs { get; init; } = [];
 
+    /// <summary>The default output feed, independent of the displayed mix order.</summary>
+    public string? PrimaryMonitorMix { get; init; }
+
     /// <summary>
-    /// Which monitor mix feeds an output, by output name; an output absent
-    /// here is fed by the first monitor mix.
+    /// Explicit mix feeds by output name; an output absent here uses PrimaryMonitorMix.
     /// </summary>
     public IReadOnlyDictionary<string, string> MonitorFeeds { get; init; } = new Dictionary<string, string>();
 

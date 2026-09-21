@@ -871,11 +871,14 @@ public sealed partial class MainViewModel : ViewModelBase
         // summed: "Monitor A+B" for headphones that want the desktop from A
         // and a separately processed mic from B.
         if (monitorMixes.Count > 1)
-            monitorMixes.Add(new MixOption(string.Join("+", monitorMixes.Select(m => m.Id)), SummedName(monitorMixes.Select(m => m.Name))));
+        {
+            var summed = monitorMixes.OrderBy(m => m.Id, StringComparer.Ordinal).ToArray();
+            monitorMixes.Add(new MixOption(string.Join("+", summed.Select(m => m.Id)), SummedName(summed.Select(m => m.Name))));
+        }
         monitorMixes.AddRange(allMixes.Where(m => (m!["kind"]?.GetValue<string>() ?? "monitor") != "monitor")
             .Select(m => new MixOption(m!["id"]!.GetValue<string>(), m["name"]?.GetValue<string>() ?? m["id"]!.GetValue<string>())));
         var feeds = mixer?["monitorFeeds"] as JsonObject;
-        string primaryMonitor = monitorMixes.FirstOrDefault()?.Id ?? "monitor";
+        string primaryMonitor = mixer?["primaryMonitorMix"]?.GetValue<string>() ?? monitorMixes.FirstOrDefault()?.Id ?? "monitor";
         foreach (MonitorOutputItem item in MonitorOutputs)
             item.SyncFeed(monitorMixes, feeds?[item.Name]?.GetValue<string>() ?? primaryMonitor);
         Raise(nameof(MonitorSummary));

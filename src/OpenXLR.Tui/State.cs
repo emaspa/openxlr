@@ -127,6 +127,7 @@ internal sealed record MixerSnapshot
     public List<ChannelEntry> Shown => _shown ??= [.. Channels.Where(channel => channel.Present)];
     public List<string> MonitorOutputs { get; init; } = [];
     public Dictionary<string, string> MonitorFeeds { get; init; } = [];
+    public string? PrimaryMonitorMix { get; init; }
     public double? OutputVolume { get; init; }
     public bool AuxPortEnabled { get; init; }
     public int LowCutHz { get; init; }

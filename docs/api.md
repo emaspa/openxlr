@@ -95,7 +95,7 @@ written above it; false on every other model), `lowImpedance`,
 `mixer`, `devices`, `profiles`, `activeProfile`, `recallOnConnect` and
 `detected` (`usbId`, `name`, `active` for every attached interface). The
 mixer state carries `mixes`, `channels`, `monitorOutput` (the first selected
-output), `monitorOutputs`, `monitorFeeds`, `outputVolume`,
+output), `monitorOutputs`, `monitorFeeds`, `primaryMonitorMix`, `outputVolume`,
 `auxPortEnabled`, `lowCutHz`, `softClipGuard`, `softClipGuardAvailable`,
 `softClipGuardError`, `inserts` (chains by insert key, `xlr1`, `xlr2` or
 `mix:<id>`; each entry carries `insert`, `error`, `meters`,
@@ -144,7 +144,7 @@ that final acknowledgement (or an `error` without a request id):
 | `setMixVolume` / `setMixMuted` | `mix`, `value` | mix masters; monitor volume range 0 to 1.5, other mixes 0 to 1; values outside the range are clamped |
 | `setMonitorOutputs` | `devices[]` | every sink the monitor mixes feed; a newly listed output is fed by the first monitor mix |
 | `setMonitorOutput` | `device` | a single monitor sink; `null` disconnects the route |
-| `setMonitorFeed` | `device`, `mix` | what feeds one selected output: any existing mix id, including `stream`, `chat`, `auxout` and custom virtual microphones, or distinct ids joined with `+` to sum them. The Pro's own jacks follow one feed together. The state's `monitorFeeds` lists exceptions from the first monitor mix in layout order. Unknown or repeated mix ids and unselected outputs are rejected. Deleting the last included mix returns that output to the first monitor mix; deliberately silent matrix outputs stay silent |
+| `setMonitorFeed` | `device`, `mix` | what feeds one selected output: any existing mix id, including `stream`, `chat`, `auxout` and custom virtual microphones, or distinct ids joined with `+` to sum them. The Pro's own jacks follow one feed together. The state's `monitorFeeds` lists exceptions from `primaryMonitorMix`, the first monitor mix in routing order. Unknown or repeated mix ids and unselected outputs are rejected. Deleting the last included mix returns that output to the first monitor mix |
 | `setAuxPortEnabled` | `value` | send the Aux mix to the USB Aux port |
 | `setOutputVolume` | `value` | volume of the selected monitor devices, 0 to 1.5; the range the devices themselves take, so a desktop level above unity can be held and written back unchanged. Values outside it are clamped, and the state reports what reached the devices. With no output selected the command succeeds and changes nothing |
 | `listPlugins` | none | the installed LV2, CLAP and VST3 plugins, answered with a `plugins` message |
@@ -190,8 +190,9 @@ levels must be finite numbers.` without one.
 
 An output's feed names one mix or several joined with `+`, every one at
 unity; a blend at other levels is a mix of its own. An absent entry in
-`monitorFeeds` selects the first monitor mix. The per-route levels of
-0.1.40 and 0.1.41 (`outputRoutes`, `setOutputRoute`) are gone: a saved
+`monitorFeeds` selects `primaryMonitorMix`, independent of the displayed mix
+order; it is null if there is no monitor mix. Older daemons omit that field;
+their first monitor mix is the default. The per-route levels of 0.1.40 and 0.1.41 (`outputRoutes`, `setOutputRoute`) are gone: a saved
 list is ignored and the command is unknown.
 
 `setEnforcedDefaults` accepts `sink: "@monitor"` to follow the first selected

@@ -192,3 +192,7 @@ metadata. This is global layout configuration, not part of an audio profile.
 Saving a failed edit restores the previous presentation. No PipeWire nodes
 are rebuilt by these edits. `setLayoutOrder` changes routing order for editable items; the window calls it
 when **Use displayed order for routing** is chosen. `setDisplayOrder` overrides its visual order for all items.
+
+The live state names the default output feed in `primaryMonitorMix`. This is
+the first monitor mix in routing order, even if display ordering puts another
+mix first. It is derived state, not an additional saved routing preference.

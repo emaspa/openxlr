@@ -2099,6 +2099,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 MonitorOutput = _monitorOutputs.FirstOrDefault(),
                 MonitorOutputs = [.. _monitorOutputs],
                 MonitorFeeds = new Dictionary<string, string>(_monitorFeeds),
+                PrimaryMonitorMix = PrimaryMonitorLocked()?.Id,
                 OutputVolume = _outputVolume,
                 LowCutHz = _lowCutHz,
                 SoftClipGuard = _softClipGuard,

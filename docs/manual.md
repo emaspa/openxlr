@@ -1884,3 +1884,9 @@ or unavailable on the active device, the window shows an available channel;
 with no available channels it shows none. Turning Compact off restores the
 full layout. The compact preference and selected channel are local window
 preferences in `ui.json`.
+
+Changing the displayed mix order does not change an output's feed. The window,
+terminal and Omarchy bar keep showing its actual default mix even when another
+monitor mix is displayed first. Stream Deck feed keys also use that default.
+The combined Monitor A+B feed stays one choice, and a Deck key advances past
+it even when the monitor mixes are displayed in a different order.

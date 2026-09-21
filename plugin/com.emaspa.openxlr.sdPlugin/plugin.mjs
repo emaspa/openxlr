@@ -469,18 +469,21 @@ function toggleValue(target, inst) {
 
 // An output's feed as the daemon stores it: any mix id, or ids
 // joined with '+' when the output hears them summed.
-const feedOf = (sink) => mixer()?.monitorFeeds?.[sink] ?? "monitor";
+const feedOf = (sink) => mixer()?.monitorFeeds?.[sink] ?? mixer()?.primaryMonitorMix ?? "monitor";
 const FEED_LETTER = { monitor: "A", monitor2: "B" };
 const feedLetters = (feed) => feed.split("+").map((id) => FEED_LETTER[id] ?? mixName(mixer(), id)).join("+");
 const feedLabel = (feed) => feed === "" ? "Silent" : feed.split("+").every(id => Object.hasOwn(FEED_LETTER, id))
   ? `Monitor ${feedLetters(feed)}` : feed.split("+").map(id => mixName(mixer(), id)).join(" + ");
-// Keep A, B, A+B first, then include every other live mix.
+// Cycle monitor mixes, their sum, then every other live mix.
 const nextFeed = (feed) => {
   const mixes = mixer()?.mixes ?? [];
   const monitors = mixes.filter(m => (m.kind ?? "monitor") === "monitor").map(m => m.id);
   const choices = [...monitors, ...(monitors.length > 1 ? [monitors.join("+")] : []),
     ...mixes.filter(m => (m.kind ?? "monitor") !== "monitor").map(m => m.id)];
-  return choices.length ? choices[(choices.indexOf(feed) + 1) % choices.length] : "monitor";
+  // Summing is commutative; display order may differ from the daemon's order.
+  const key = feed.split("+").sort().join("+");
+  const at = choices.findIndex(choice => choice.split("+").sort().join("+") === key);
+  return choices.length ? choices[(at + 1) % choices.length] : "monitor";
 };
 // The mixes the monitor dial's press mutes: what the first selected
 // monitor output hears.

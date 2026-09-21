@@ -144,6 +144,32 @@ public sealed class LayoutAppearanceTests
         }
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("stream")]
+    [InlineData("monitor+monitor2")]
+    public async Task ReorderingMixPresentationDoesNotChangeTheDisplayedDefaultOutputFeed(string? explicitFeed)
+    {
+        using var mixer = new Mixer();
+        SetField(mixer, "_built", true);
+        try
+        {
+            var config = MixerConfig.Default();
+            mixer.SetDisplayOrder(config.Channels.Select(c => c.Id).ToArray(),
+                config.Mixes.Reverse().Select(m => m.Id).ToArray(), _ => null);
+            var state = JsonSerializer.SerializeToNode(mixer.Snapshot(), new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+            if (explicitFeed is not null) state["monitorFeeds"]!["headset"] = explicitFeed;
+            await using var client = new DaemonClient();
+            var vm = new MainViewModel(client);
+            var devices = JsonNode.Parse("""[{"name":"headset","description":"Headset","kind":0,"isOwn":false}]""");
+            typeof(MainViewModel).GetMethod("ApplyDevices", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(vm, [devices, state]);
+            Assert.Equal(explicitFeed ?? mixer.JackMonitorMix, Assert.Single(vm.MonitorOutputs).Feed!.Id);
+            Assert.Single(vm.MonitorOutputs[0].Feeds, f => f.Id.Contains('+'));
+            Assert.Equal(mixer.JackMonitorMix, state["primaryMonitorMix"]?.GetValue<string>());
+        }
+        finally { SetField(mixer, "_built", false); }
+    }
+
     [Fact]
     public void InvalidSavedPresentationCannotSuppressHealthyEntries()
     {

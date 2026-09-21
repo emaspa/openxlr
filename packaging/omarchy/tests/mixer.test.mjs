@@ -184,6 +184,15 @@ test('monitor labels describe default feeds, sums, silent routes and custom name
   assert.deepEqual(plain(mixer.monitorFeeds({ mixes: [] })), []);
 });
 
+test('default monitor labels use routing identity instead of display order', () => {
+  const reordered = { ...state.mixer, primaryMonitorMix: 'monitor',
+    mixes: [{ id: 'monitor2', name: 'Monitor B', kind: 'monitor' }, ...state.mixer.mixes] };
+  assert.deepEqual(plain(mixer.monitorFeeds(reordered)), [
+    { output: 'headset', ids: ['monitor'], name: 'Monitor A' },
+    { output: 'speakers', ids: ['monitor', 'stream'], name: 'Monitor A + Stream' }
+  ]);
+});
+
 test('output labels use the documented device description and tolerate state transitions', () => {
   const node = 'alsa_output.usb-Elgato_Systems_Elgato_XLR_Dock.serial.analog-stereo';
   const snapshot = { devices: [{ name: node, description: 'Elgato XLR Dock', kind: 0 }] };
