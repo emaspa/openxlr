@@ -165,7 +165,7 @@ public sealed class NativeLv2HostTests
         Assert.False(insert.NativeEditorAvailable);
 
         insert.ApplyFromDaemon(definition, error: null, nativeHostRunning: true);
-        Assert.False(insert.NativeEditorAvailable); // A live-process flag does not opt an old insert in.
+        Assert.True(insert.NativeEditorAvailable); // The actual host owns the editor, including a fallback.
         definition["nativeHost"] = true;
         insert.ApplyFromDaemon(definition, error: null, nativeHostRunning: true);
         Assert.True(insert.NativeEditorAvailable);
