@@ -86,6 +86,7 @@ public sealed record Command
     [JsonPropertyName("path")] public string? Path { get; init; }
 
     /// <summary>Native-editor compatibility rules identify a plugin by format and stable id.</summary>
+    /// <summary>Plugin format, or for createMix: virtualMic (default) or monitor.</summary>
     [JsonPropertyName("kind")] public string? Kind { get; init; }
     [JsonPropertyName("plugin")] public string? Plugin { get; init; }
     /// <summary>True blocks the editor, false allows it, null follows the release default.</summary>

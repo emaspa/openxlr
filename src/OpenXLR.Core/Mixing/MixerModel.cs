@@ -77,6 +77,9 @@ public enum MixKind
 
 public sealed record MixDefinition(string Id, string Name, MixKind Kind)
 {
+    /// <summary>User mixes can be edited; the two built-in monitors and Aux stay structural.</summary>
+    public bool IsEditable => Kind == MixKind.VirtualMic || Kind == MixKind.Monitor && Id is not ("monitor" or "monitor2");
+
     public double Volume { get; init; } = 1.0;
     public bool Muted { get; init; }
 
@@ -190,7 +193,8 @@ public sealed record MixerState
 }
 
 /// <param name="Kind">"monitor", "virtualMic" or "auxPort", so clients can tell monitor mixes apart.</param>
-public sealed record MixStatus(string Id, string Name, double Volume, bool Muted, string Kind = "monitor");
+/// <param name="Editable">A user mix that can be renamed, reordered and removed.</param>
+public sealed record MixStatus(string Id, string Name, double Volume, bool Muted, string Kind = "monitor", bool Editable = false);
 
 /// <param name="Present">
 /// False when the active device has no jack behind this channel, so a client

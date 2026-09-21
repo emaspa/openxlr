@@ -55,6 +55,27 @@ public sealed class MixerLayoutSettingsTests
     }
 
     [Fact]
+    public void MixedKindsRestoreWithLegacyDefaultsAndSafeNewSends()
+    {
+        var settings = JsonSerializer.Deserialize<MixerSettings>("""
+            {"UserMixes":[{"Id":"old","Name":"Old"},
+              {"Id":"phones","Name":"Phones","Kind":"monitor"},
+              {"Id":"phones","Name":"Duplicate","Kind":"virtualMic"},
+              {"Id":"invalid","Name":"Invalid","Kind":"auxPort"},
+              {"Id":"null-kind","Name":"Invalid","Kind":null},
+              {"Id":"monitor","Name":"Structural","Kind":"monitor"}]}
+            """)!;
+        var config = MixerConfig.FromSettings(settings);
+        Assert.Equal(["monitor", "monitor2", "old", "phones", "auxout"], config.Mixes.Select(m => m.Id));
+        Assert.Equal(MixKind.VirtualMic, config.Mixes[2].Kind);
+        Assert.Equal(MixKind.Monitor, config.Mixes[3].Kind);
+        Assert.All(config.Channels, c => { Assert.Contains("phones", c.MutedIn); Assert.Contains("old", c.MutedIn); });
+        var bounded = MixerConfig.FromSettings(settings with { UserMixes = Enumerable.Range(0, 30)
+            .Select(i => new UserMixDefinition($"mix{i}", "Mix") { Kind = i % 2 == 0 ? "monitor" : "virtualMic" }).ToList() });
+        Assert.Equal(MixerConfig.MaxUserMixes, bounded.Mixes.Count(m => m.IsEditable));
+    }
+
+    [Fact]
     public void GraphSizeIsBoundedAndEmptyApplicationsHaveSafeFallback()
     {
         var config = MixerConfig.FromSettings(new MixerSettings
@@ -63,7 +84,7 @@ public sealed class MixerLayoutSettingsTests
             UserMixes = Enumerable.Range(0, 100).Select(i => new UserMixDefinition($"m{i}", "M")).ToList(),
         });
         Assert.Equal(MixerConfig.MaxApplicationChannels, config.Channels.Count(c => c.InputPair is null));
-        Assert.Equal(MixerConfig.MaxVirtualMixes, config.Mixes.Count(m => m.Kind == MixKind.VirtualMic));
+        Assert.Equal(MixerConfig.MaxUserMixes, config.Mixes.Count(m => m.Kind == MixKind.VirtualMic));
         var empty = MixerConfig.FromSettings(new MixerSettings { UserChannels = [], UserMixes = [] });
         Assert.Equal("system", Assert.Single(empty.Channels, c => c.InputPair is null).Id);
         Assert.DoesNotContain(empty.Mixes, m => m.Kind == MixKind.VirtualMic);

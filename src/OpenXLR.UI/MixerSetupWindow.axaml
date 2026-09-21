@@ -92,15 +92,21 @@
 
       <Border Grid.Column="2" Classes="card">
         <DockPanel>
-          <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,8,Auto" Margin="0,10,0,0">
-            <TextBox Name="MixName" PlaceholderText="New virtual microphone, e.g. Recording" MaxLength="60"
+          <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,10,0,0">
+            <TextBox Name="MixName" PlaceholderText="New mix, e.g. Recording or Headphones" MaxLength="60"
                      KeyDown="OnMixNameKey"/>
-            <Button Grid.Column="2" Content="Add microphone" Padding="12,4"
-                    IsEnabled="{Binding CanEditLayout}" Click="OnAddMix"/>
-          </Grid>
+            <WrapPanel>
+              <ComboBox Name="NewMixKind" SelectedIndex="0" AutomationProperties.Name="Mix type" Margin="0,0,8,4">
+                <ComboBoxItem Content="Virtual microphone"/>
+                <ComboBoxItem Content="Monitor mix"/>
+              </ComboBox>
+              <Button Name="AddMix" Content="Add mix" Padding="12,4"
+                      IsEnabled="{Binding CanEditLayout}" Click="OnAddMix"/>
+            </WrapPanel>
+          </StackPanel>
           <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
             <TextBlock Text="MIXES" Classes="h"/>
-            <TextBlock Text="Each virtual microphone has its own master, sends and inserts. A new one receives nothing until you open a send. Monitor A, Monitor B and Aux stay where they are."
+            <TextBlock Text="Each mix has its own master, sends and inserts. A monitor mix feeds your outputs without publishing a virtual microphone. New sends start muted. Monitor A, Monitor B and Aux stay structural."
                        FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
           </StackPanel>
           <ScrollViewer VerticalScrollBarVisibility="Auto">

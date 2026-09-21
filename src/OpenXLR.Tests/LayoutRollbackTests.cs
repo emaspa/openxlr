@@ -32,7 +32,7 @@ public sealed class LayoutRollbackTests
             {
                 Assert.Throws<IOException>(() =>
                 {
-                    if (removeMix) mixer.DeleteVirtualMix("chat", Persist);
+                    if (removeMix) mixer.DeleteMix("chat", Persist);
                     else mixer.DeleteApplicationChannel("game", Persist);
                 });
                 Assert.Equal(new[] { "game|chat", "music|monitor" }, pending.Order());

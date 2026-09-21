@@ -5,13 +5,16 @@ Stop the daemon before editing this file manually: while running, its normal
 settings saves overwrite the file with the live configuration.
 
 `userChannels` is an ordered list of application and capture channels and
-`userMixes` an ordered list of virtual microphones. Each entry has a stable
+`userMixes` an ordered list of user mixes. A mix may set `kind` to
+`monitor` or `virtualMic`; absent `kind` means `virtualMic` for old files.
+Other kinds are ignored. Each entry has a stable
 `id` and a display `name`. For example:
 
 ```json
 {
   "userChannels": [{"id": "podcast", "name": "Interview"}],
-  "userMixes": [{"id": "recording", "name": "Recording"}]
+  "userMixes": [{"id": "recording", "name": "Recording"},
+                {"id": "headphones", "name": "Headphones", "kind": "monitor"}]
 }
 ```
 
@@ -19,8 +22,7 @@ These are fields in the existing settings object; retain its other fields when
 editing. Missing or null lists keep the legacy defaults. A single invalid entry
 is dropped and logged with its path, and the rest of the file still applies; a
 file that cannot be parsed at all is copied to `mixer.json.corrupt` before the
-next save replaces it. An empty mix list removes the editable virtual
-microphones. An empty application list falls back to System so incoming
+next save replaces it. An empty mix list removes all user mixes. An empty application list falls back to System so incoming
 applications have a destination.
 
 Hardware inputs, Monitor A (`monitor`), Monitor B (`monitor2`) and Aux
@@ -29,7 +31,7 @@ Invalid or duplicate entries are ignored; ids compare without regard to case,
 and an entry that repeats a structural id is dropped. IDs contain at most 36
 lowercase ASCII letters, digits, underscores or hyphens, beginning with a
 letter. Names contain 1 to 60 printable characters and are trimmed. At most
-32 editable channels and 16 virtual microphones are restored.
+32 editable channels and 16 user mixes in total are restored.
 
 Node names derive from IDs, not labels. The list order survives a settings
 save and restart. Removed application destinations fall back to the first
@@ -93,24 +95,27 @@ debounced, retried behaviour.
   into its sink at that moment move to the first remaining application
   channel; then its sink is unloaded, and a capture channel's link to its
   source with it. The last application channel stays.
-- `createMix {name}` adds a virtual microphone. The channel sinks feed the
-  mix sinks by name pattern, so every channel grows a send into the new mix
-  by itself, muted before the capture device is published. If a channel's
-  send has not appeared within three seconds the mix is removed again and
+- `createMix {name, kind?}` adds a virtual microphone by default. With
+  `kind: "monitor"` it adds an output mix without a post sink or virtual
+  microphone. Its master uses the existing desktop volume and mute controls,
+  including the 150% ceiling. The channel sinks feed the mix sinks by name pattern, so every channel grows a send into the new mix
+  by itself, muted before the optional capture device is published. If a
+  channel's send has not appeared within three seconds the mix is removed again and
   the command fails, for the same reason.
-- `renameMix {mix, name}` changes the name in OpenXLR only. Reloading the
-  capture device would drop every app recording from it onto another
-  source, so its PipeWire description keeps the old name until the daemon
-  restarts; the state carries `renamedSinceStart` and the window shows a
+- `renameMix {mix, name}` changes the name in OpenXLR only. The mix or
+  capture device stays in place so clients using it are not interrupted;
+  its PipeWire description keeps the old name until the daemon restarts; the state carries `renamedSinceStart` and the window shows a
   restart hint.
-- `deleteMix {mix}` removes the virtual microphone, its sends, inserts and
-  capture device. Anything recording from it loses the device.
+- `deleteMix {mix}` removes a user mix and its sends and inserts. For a
+  virtual microphone it also removes the capture device; its recorders lose
+  that device.
   Outputs listening to that mix keep the other mixes in their feed, or return
   to the first monitor mix if none remain. An enforced default source
-  that was this microphone is cleared. All of that is part of the saved
-  deletion and rolls back with it when saving fails.
+  that was this microphone is cleared. An enforced default sink that was
+  the deleted mix is cleared too, leaving the desktop to choose a default. All of that is part
+  of the saved deletion and rolls back with it when saving fails.
 - `setLayoutOrder {channels, mixes}` reorders the editable ids. Supply every
-  application and capture channel id and every virtual-microphone id exactly
+  application and capture channel id and every user-mix id exactly
   once; hardware inputs, Monitor A/B and Aux keep their positions. No node
   changes. Open windows apply the published order to channel tiles, mix
   controls and send rows while retaining the existing controls and their
