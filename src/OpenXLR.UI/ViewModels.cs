@@ -802,8 +802,18 @@ public sealed partial class MainViewModel : ViewModelBase
     /// <summary>Write the firmware defaults back to an interface without settings memory.</summary>
     public void ResetDevice() => _ = _client.ResetDeviceAsync();
 
-    public void SaveProfile(string name) => _ = _client.SaveProfileAsync(name);
-    public void LoadProfile(string name) => _ = _client.LoadProfileAsync(name);
+    public void SaveProfile(string name)
+    {
+        SliderSync.FlushPending();
+        _ = _client.SaveProfileAsync(name);
+    }
+
+    public void LoadProfile(string name)
+    {
+        SliderSync.FlushPending();
+        SliderSync.ReleaseTouchGuards();
+        _ = _client.LoadProfileAsync(name);
+    }
     public void DeleteProfile(string name) => _ = _client.DeleteProfileAsync(name);
 
     /// <summary>Raised after a daemon state push has been applied (UI thread).</summary>
@@ -1537,6 +1547,20 @@ internal static class SliderSync
         Touched.Remove(key);
     }
 
+    /// <summary>Send earlier edits before a snapshot or recall on the same connection.</summary>
+    public static void FlushPending()
+    {
+        foreach (string key in System.Linq.Enumerable.ToList(Pending.Keys)) Flush(key);
+    }
+
+    public static void Flush(string key)
+    {
+        if (Pending.Remove(key, out Action? send)) send();
+    }
+
+    /// <summary>A recalled state must replace values touched before the recall.</summary>
+    public static void ReleaseTouchGuards() => Touched.Clear();
+
     public static bool RecentlyTouched(string key)
         => Touched.TryGetValue(key, out long t) && Environment.TickCount64 - t < 800;
 
@@ -1552,10 +1576,7 @@ internal static class SliderSync
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(80) };
         timer.Tick += (_, _) =>
         {
-            foreach (string key in System.Linq.Enumerable.ToList(Pending.Keys))
-            {
-                if (Pending.Remove(key, out Action? send)) send();
-            }
+            FlushPending();
             if (Pending.Count == 0) timer.Stop();
         };
         return timer;
