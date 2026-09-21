@@ -318,6 +318,9 @@ public sealed class WindowLayoutTests
                 var options = new OptionsWindow { DataContext = optionsVm };
                 windows.Add(options);
                 options.Show();
+                var apiToggle = options.FindControl<CheckBox>("HttpApiEnabled");
+                Assert.NotNull(apiToggle);
+                Assert.Equal(optionsVm.HttpApiEnabled, apiToggle.IsChecked);
                 Layout(options, 980, 800);
                 // The cards grow as features land, and the window sizes itself
                 // to them. On a tall screen that produced a window the height

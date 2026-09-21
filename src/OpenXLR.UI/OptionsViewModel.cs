@@ -42,7 +42,9 @@ public sealed class OptionsViewModel : ViewModelBase
         _startupError = RepairNote(StartupIntegration.LastRepair);
         // No saved choice means the daemon runs whatever its unit asked for,
         // which for every shipped unit is the submixer on.
-        _submixer = DaemonPrefs.Load().Submixer ?? true;
+        var daemon = DaemonPrefs.Load();
+        _submixer = daemon.Submixer ?? true;
+        _httpApiEnabled = daemon.HttpApiEnabled;
 
         BuildChoices();
         BuildSkinChoices();
@@ -349,6 +351,30 @@ public sealed class OptionsViewModel : ViewModelBase
         }
     }
 
+    private bool _httpApiEnabled;
+    public bool HttpApiEnabled
+    {
+        get => _httpApiEnabled;
+        set
+        {
+            if (_httpApiEnabled == value) return;
+            try { (DaemonPrefs.Load() with { HttpApiEnabled = value }).Save(); }
+            catch (Exception ex)
+            {
+                HttpApiNote = $"Could not save the setting: {ex.Message}";
+                Raise(nameof(HttpApiEnabled));
+                return;
+            }
+            Set(ref _httpApiEnabled, value);
+            HttpApiNote = StartupIntegration.RestartDaemon()
+                ? "API setting saved and the audio service restarted."
+                : "Saved. Restart the audio service to apply the API setting.";
+        }
+    }
+
+    private string? _httpApiNote;
+    public string? HttpApiNote { get => _httpApiNote; private set => Set(ref _httpApiNote, value); }
+
     // --- submixer on/off (daemon-side setting, applied by restarting it) ---
 
     private bool _submixer;
@@ -360,10 +386,12 @@ public sealed class OptionsViewModel : ViewModelBase
             if (!Set(ref _submixer, value)) return;
             try
             {
-                new DaemonPrefs { Submixer = value }.Save();
+                (DaemonPrefs.Load() with { Submixer = value }).Save();
             }
             catch (Exception ex)
             {
+                _submixer = !value;
+                Raise(nameof(Submixer));
                 SubmixerNote = $"Could not save the setting: {ex.Message}";
                 return;
             }

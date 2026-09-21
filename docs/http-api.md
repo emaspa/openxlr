@@ -17,9 +17,36 @@ query strings are not accepted. Keep the token out of logs and bug reports.
 | `GET /healthz` | Unauthenticated process liveness only, not hardware readiness |
 | `GET /api/v1` | Version and endpoint discovery |
 | `GET /api/v1/state` | Combined state message |
+| `GET /api/v1/devices` | Connected device, capabilities, detected interfaces and audio nodes |
+| `GET /api/v1/profiles` | Saved names, last recalled profile and connect-time choice |
+| `GET /api/v1/mixer` | Current mixer state |
+| `GET /api/v1/channels`, `/channels/{id}` | All channel states or one exact channel id |
+| `GET /api/v1/mixes`, `/mixes/{id}` | All mix states or one exact mix id |
+| `GET /api/v1/inserts`, `/inserts/{id}` | Chains by channel/mix id or one chain |
+| `GET /api/v1/plugin-setup` | v1 result containing pluginSetup |
+| `GET /api/v1/plugin-diagnostics` | v1 result containing pluginDiagnostics |
+| `GET /api/v1/diagnostics` | v1 result containing diagnostics |
+| `GET /api/v1/editor-rules` | v1 result containing nativeEditorRules |
 | `GET /api/v1/plugins` | v1 result containing a plugins message |
 | `POST /api/v1/commands` | Execute one existing cmd object |
 | `WS /api/v1/events` | Same authenticated protocol as /ws |
+
+**Options**, **Local API**, **Enable local HTTP API** saves `httpApiEnabled` in
+`daemon.json` (default true for existing installations) and restarts the audio
+service. This briefly interrupts audio and disconnects all clients. If the
+restart fails, the window says the choice is saved but still needs a restart.
+Disabling blocks every `/api/v1` resource, command and event connection with
+503 after the restart. `/ws` stays available to the window, terminal and Deck;
+`/healthz` still reports process liveness. This switch controls the public HTTP
+transport, not all authenticated local control of the daemon.
+
+Resource reads use the same snapshot as `/state`; separate requests may observe
+different moments. Channel and mix ids are exact and case-sensitive. An absent
+mixer returns 503; an unknown id returns 404 when the mixer is available. An
+existing empty chain returns `[]`; a chain absent from the snapshot returns 404.
+The new read endpoints never create or rebuild a graph. Plugin and diagnostic
+reads reuse existing commands and return the same v1 result envelope as
+`/plugins`. Mutations remain in `/commands`, with one validation and dispatch path.
 
 Both WebSocket paths require the existing first-message authentication:
 `{"cmd":"auth","token":"..."}`. They send no state before authentication.
@@ -45,10 +72,10 @@ the connection; it may already have executed.
 
 Error status codes: 400 a body that is not valid UTF-8, or a plain request
 on the events route without a WebSocket upgrade; 401 missing/wrong token;
-403 foreign Origin; 408 body-read deadline; 413 body over 64 KiB; 415 wrong
-Content-Type; 429 budget exhausted or another HTTP mutation in flight. Chunked bodies have the same 64 KiB cap and
-five-second deadline. One HTTP command runs at a time, with no waiting queue.
-The HTTP command budget is one bucket shared by every HTTP caller, the size
+403 foreign Origin; 404 unknown resource id; 408 body-read deadline; 413 body over 64 KiB; 415 wrong
+Content-Type; 429 budget exhausted or another HTTP command-backed request in flight; 503 API disabled or mixer unavailable. Chunked bodies have the same 64 KiB cap and
+five-second deadline. One HTTP command or command-backed read runs at a time, with no waiting queue. Snapshot reads can continue during a command.
+The HTTP request budget covers authenticated reads and writes in one bucket shared by every HTTP caller, the size
 of a socket's own (bursts of 300, a sustained 100 per second).
 All authenticated HTTP responses use `Cache-Control: no-store`.
 

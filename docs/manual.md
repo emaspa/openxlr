@@ -1865,3 +1865,12 @@ it. The usual revision needs no note. The rarer one is named in the
 Options connection note, and so is a dock that answers on neither
 address. Such a dock still connects, so save diagnostics from Options
 and open an issue with them.
+
+## Local API switch
+
+In **Options**, **Local API**, **Enable local HTTP API** controls third-party
+HTTP integrations. It starts enabled. Changing it saves the preference and
+restarts the audio service, briefly interrupting audio. If restarting fails,
+restart the daemon manually to apply the saved choice. The window, terminal
+and OpenDeck continue to use their own authenticated connection when the HTTP
+API is disabled. See [HTTP API](http-api.md) for the resource endpoints.

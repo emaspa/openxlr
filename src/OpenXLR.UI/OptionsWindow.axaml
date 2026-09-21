@@ -80,6 +80,18 @@
 
     <Border Classes="card">
       <StackPanel Spacing="6">
+        <TextBlock Text="LOCAL API" Classes="h"/>
+        <CheckBox Name="HttpApiEnabled" Content="Enable local HTTP API"
+                  IsChecked="{Binding HttpApiEnabled, Mode=TwoWay}"/>
+        <TextBlock Text="Allows authenticated local integrations. The mixer window, terminal and OpenDeck remain available when this is off. Changing this restarts the audio service and briefly interrupts audio."
+                   Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
+        <TextBlock Text="{Binding HttpApiNote}" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"
+                   IsVisible="{Binding HttpApiNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+      </StackPanel>
+    </Border>
+
+    <Border Classes="card">
+      <StackPanel Spacing="6">
         <TextBlock Text="SYSTEM DEFAULT DEVICES" Classes="h"/>
         <TextBlock Text="When set, OpenXLR holds these as the system defaults and reverts any outside change, like Wave Link does. Applications that follow the system default will use them. Choose Follow MONITOR output to use keyboard volume keys and the desktop volume slider for the selected monitor device."
                    FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>

@@ -43,8 +43,10 @@ public sealed class HttpApiTests
     public void JsonContentTypeIsRequired(string? type, bool accepted)
         => Assert.Equal(accepted, ApiEndpoints.IsJson(type));
 
-    [Fact]
-    public async Task RealHttpRequestsEnforceAuthenticationOriginAndCommandLimits()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task RealHttpRequestsEnforceAuthenticationOriginAndCommandLimits(bool enabled)
     {
         var builder = WebApplication.CreateBuilder();
         builder.Logging.ClearProviders();
@@ -65,7 +67,8 @@ public sealed class HttpApiTests
         string token;
         try { ApiToken.Initialize(); token = ApiToken.Current!; }
         finally { Environment.SetEnvironmentVariable("XDG_RUNTIME_DIR", previousRuntime); try { Directory.Delete(runtimeDir, recursive: true); } catch (IOException) { } }
-        ApiEndpoints.Map(app);
+        ApiEndpoints.Map(app, enabled);
+        app.MapGet("/ws", () => "internal client endpoint remains available");
         await app.StartAsync();
         try
         {
@@ -74,7 +77,7 @@ public sealed class HttpApiTests
             using var http = new HttpClient { BaseAddress = new Uri(address) };
             using var denied = await http.GetAsync("/api/v1");
             Assert.Equal(HttpStatusCode.Unauthorized, denied.StatusCode);
-            foreach (string path in new[] { "/api/v1/state", "/API/V1/state", "/api/v1/state/", "/api/v1/plugins" })
+            foreach (string path in new[] { "/api/v1/state", "/API/V1/state", "/api/v1/state/", "/api/v1/plugins", "/api/v1/devices", "/api/v1/mixer", "/api/v1/channels/music", "/api/v1/plugin-setup" })
             {
                 using var protectedRequest = await http.GetAsync(path);
                 Assert.Equal(HttpStatusCode.Unauthorized, protectedRequest.StatusCode);
@@ -85,12 +88,37 @@ public sealed class HttpApiTests
             using var health = await http.GetAsync("/healthz");
             Assert.Equal(HttpStatusCode.OK, health.StatusCode);
             using var noUpgrade = await http.GetAsync("/api/v1/events");
-            Assert.Equal(HttpStatusCode.BadRequest, noUpgrade.StatusCode);
+            Assert.Equal(enabled ? HttpStatusCode.BadRequest : HttpStatusCode.ServiceUnavailable, noUpgrade.StatusCode);
             http.DefaultRequestHeaders.Add("Origin", "https://foreign.example");
             using var foreignEvents = await http.GetAsync("/api/v1/events");
             Assert.Equal(HttpStatusCode.Forbidden, foreignEvents.StatusCode);
             http.DefaultRequestHeaders.Remove("Origin");
             http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            if (!enabled)
+            {
+                foreach (string path in new[] { "/api/v1", "/API/V1/state/", "/api/v1/devices", "/api/v1/channels/music", "/api/v1/events", "/api/v1/plugin-setup" })
+                {
+                    using var off = await http.GetAsync(path);
+                    Assert.Equal(HttpStatusCode.ServiceUnavailable, off.StatusCode);
+                    Assert.True(off.Headers.CacheControl?.NoStore);
+                }
+                using var commandOff = await http.PostAsync("/api/v1/commands", new StringContent("{\"cmd\":\"getState\"}", Encoding.UTF8, "application/json"));
+                Assert.Equal(HttpStatusCode.ServiceUnavailable, commandOff.StatusCode);
+                using var internalClient = await http.GetAsync("/ws");
+                Assert.Equal(HttpStatusCode.OK, internalClient.StatusCode);
+                return;
+            }
+            foreach (string path in new[] { "devices", "profiles", "diagnostics", "editor-rules", "plugin-diagnostics" })
+            {
+                using var resource = await http.GetAsync("/api/v1/" + path);
+                Assert.Equal(HttpStatusCode.OK, resource.StatusCode);
+                Assert.True(resource.Headers.CacheControl?.NoStore);
+            }
+            foreach (string path in new[] { "mixer", "channels", "channels/missing", "mixes", "inserts" })
+            {
+                using var resource = await http.GetAsync("/api/v1/" + path);
+                Assert.Equal(HttpStatusCode.ServiceUnavailable, resource.StatusCode);
+            }
             using var accepted = await http.GetAsync("/api/v1");
             Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
             http.DefaultRequestHeaders.Add("Origin", "https://foreign.example");
