@@ -39,7 +39,9 @@ public sealed class XlrDockMk2BankTests
         Assert.True(device.Connected);
         Assert.All(usb.Calls, call => Assert.Equal(0xC1, call.Type));
         Assert.Equal(new ushort[] { 4, 5, 1 }, usb.Calls.Where(c => c.Bank == bank).Select(c => c.Block));
-        Assert.Contains($"0x{bank:x4}", device.ConnectionNote);
+        // The ordinary bank is not worth a note; the other one names itself.
+        if (bank == 0x0103) Assert.Null(device.ConnectionNote);
+        else Assert.Contains($"0x{bank:x4}", device.ConnectionNote);
         usb.Calls.Clear();
         device.ReadState();
         device.SetGainDb(30);
@@ -108,16 +110,35 @@ public sealed class XlrDockMk2BankTests
     }
 
     [Fact]
-    public void BothBanksFailWithoutAnyWritesAndTheHandleIsClosed()
+    public void BothBanksFailingKeepsThePreferredBankOpenWithoutAnyWrites()
     {
         var usb = new Usb { Reply = (_, _) => -9 };
         using var device = new XlrDockMk2Device(usb);
-        var error = Assert.Throws<InvalidOperationException>(device.Connect);
-        Assert.Contains("0x0103", error.Message);
-        Assert.Contains("0x0203", error.Message);
-        Assert.False(device.Connected);
+        device.Connect();
+        // A third variant has to reach the block dump to be understood, so
+        // the device stays open and says so instead of being refused.
+        Assert.True(device.Connected);
+        Assert.Contains("0x0103", device.ConnectionNote);
+        Assert.Contains("0x0203", device.ConnectionNote);
         Assert.All(usb.Calls, c => Assert.Equal(0xC1, c.Type));
         Assert.Equal(2, usb.Calls.Count);
+        usb.Calls.Clear();
+        Assert.Throws<InvalidOperationException>(device.ReadState);
+        Assert.All(usb.Calls, c => Assert.Equal(0x0103, c.Bank));
+    }
+
+    // The reader tolerates a block shorter than the capture as long as every
+    // offset it indexes is there. Detection must not turn such a device away.
+    [Fact]
+    public void AShortButUsableBlockStillConnectsOnTheBankThatAnswers()
+    {
+        var usb = new Usb { Reply = (b, bank) => bank == 0x0203 ? -9 : b == 4 ? 11 : null };
+        using var device = new XlrDockMk2Device(usb);
+        device.Connect();
+        Assert.True(device.Connected);
+        usb.Calls.Clear();
+        Assert.Equal(0, device.ReadState().GainDb);
+        Assert.All(usb.Calls, c => Assert.Equal(0x0103, c.Bank));
     }
 
     [Fact]

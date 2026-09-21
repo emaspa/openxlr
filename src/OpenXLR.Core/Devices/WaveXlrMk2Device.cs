@@ -22,7 +22,8 @@ namespace OpenXLR.Core.Devices;
 /// matched, and await the same verification.
 ///
 /// The XLR Dock MK.2 (<see cref="XlrDockMk2Device"/>) presents the same USB
-/// descriptor layout (five interfaces, vendor interface 3 without endpoints)
+/// descriptor layout (five interfaces, vendor interface 3 whose alternate
+/// setting 0 has no endpoints; we never leave that setting)
 /// and is driven through this class at its own product id.
 /// </summary>
 public class WaveXlrMk2Device : IAudioDevice
@@ -120,13 +121,20 @@ public class WaveXlrMk2Device : IAudioDevice
             try
             {
                 if (_alternateVIndex is not ushort alternate) return;
-                if (!ProbeBank())
+                if (ProbeBank()) return;
+                _vIndex = alternate;
+                if (ProbeBank())
                 {
-                    _vIndex = alternate;
-                    if (!ProbeBank())
-                        throw new InvalidOperationException($"{Info.Model}: neither USB control bank 0x{_preferredVIndex:x4} nor 0x{alternate:x4} returned the expected settings, headphones and crossfade blocks.");
+                    ConnectionNote = $"USB control bank 0x{alternate:x4} selected: 0x{_preferredVIndex:x4} did not answer the expected blocks.";
+                    return;
                 }
-                ConnectionNote = $"USB control bank 0x{_vIndex:x4} detected.";
+                // Neither bank answered the three blocks the way both known
+                // variants do. Stay open on the preferred bank rather than
+                // refuse the device: the ordinary reads then report what the
+                // firmware really does and diagnostics can dump the blocks,
+                // which is what a third variant needs to be understood.
+                _vIndex = _preferredVIndex;
+                ConnectionNote = $"neither USB control bank 0x{_preferredVIndex:x4} nor 0x{alternate:x4} answered the expected settings, headphones and crossfade blocks; using 0x{_preferredVIndex:x4}. Collect diagnostics for a device report.";
             }
             catch
             {
@@ -137,9 +145,11 @@ public class WaveXlrMk2Device : IAudioDevice
         }
     }
 
-    // A successful settings read alone is not enough to authorize writes.
-    // Check all three known block lengths; stalls and incomplete banks may
-    // select the alternative, while disconnects and timeouts fail normally.
+    // A successful settings read alone is not enough to authorize writes, so
+    // all three blocks have to answer in full. A filled read is evidence that
+    // the bank is the right one, not proof: a longer block truncated to the
+    // requested length answers the same way. Stalls and short answers move on
+    // to the alternative, while disconnects and timeouts fail normally.
     private bool ProbeBank()
     {
         foreach ((ushort block, int length) in new[]

@@ -1853,7 +1853,10 @@ and the checks still needed in a running Omarchy shell.
 
 ### XLR Dock MK.2 control bank
 
-OpenXLR detects the two reported USB control banks of the XLR Dock MK.2
-when it connects. Options shows the selected bank in the connection note.
-Detection does not change microphone settings. If neither bank answers,
-the error names both banks; collect diagnostics for a device report.
+Two revisions of the XLR Dock MK.2 are in the field, and they answer
+their settings on different USB addresses. OpenXLR works out which one
+it has every time it connects, and changes no microphone setting doing
+it. The usual revision needs no note. The rarer one is named in the
+Options connection note, and so is a dock that answers on neither
+address. Such a dock still connects, so save diagnostics from Options
+and open an issue with them.

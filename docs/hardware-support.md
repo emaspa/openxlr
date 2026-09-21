@@ -159,7 +159,11 @@ platform (80 dB gain, phantom, ClipGuard 2.0, onboard expander, voice
 tune, compressor, EQ). Its `lsusb -v` dump
 ([issue #1](https://github.com/emaspa/openxlr/issues/1)) shows the same
 five interfaces as the Wave XLR MK.2, including the vendor-specific
-interface 3 that carries the control protocol. Run against one on
+interface 3 that carries the control protocol. Interface 3 has two
+alternate settings. Setting 0 has no endpoints, every control transfer
+below goes to it, and OpenXLR never leaves it. Setting 1 adds an
+interrupt IN endpoint of 104 bytes and an interrupt OUT endpoint of 204
+bytes, which no one here has looked at. Run against one on
 2026-09-05: the blocks have the MK.2 layout (0x0004 input settings,
 38 bytes; 0x0005 headphones, 2 bytes; 0x0001 crossfade, 6 bytes) but
 the firmware serves them at `wIndex 0x0103`, the Pro's bank, and stalls
@@ -170,12 +174,21 @@ The September 20 Omarchy diagnostics confirm repeated settings-block
 stalls while ordinary PipeWire audio remains available. They do not
 contain successful alternate-bank reads, so that part remains owner-reported.
 
-The backend probes `0x0103` first, then `0x0203` only if a block stalls
-or has an unexpected length. Detection writes nothing and accepts a bank
-only after all three blocks return 38, 2 and 6 bytes. Other USB errors
-keep their normal failure handling. The selected bank is shown in the
-connection note, stays fixed until disconnect and is detected again on
-reconnect. Both banks failing closes the handle without writing. Automated
+Nothing in the descriptors tells the two revisions apart. Both report
+`bcdDevice 2.10`, the rest of the descriptor matches, and neither the
+interface numbers nor the strings map to the high byte of `wIndex`, so
+the backend has to ask the device. It probes `0x0103` first, then
+`0x0203` only if a block stalls or answers short. Detection writes
+nothing and accepts a bank only after all three blocks fill a 38, 2 and
+6 byte read. That is evidence, not proof. A longer block truncated to
+the requested length answers the same way.
+
+Other USB errors keep their normal failure handling. The selected bank
+stays fixed until disconnect, and the backend detects it again on
+reconnect. The connection note names the alternate bank, and names both
+banks when neither answers; the ordinary bank adds no note. A dock that
+answers on neither bank stays open on `0x0103`, so the reads report what
+the firmware does and diagnostics can still dump the blocks. Automated
 transport tests cover both variants; the automatic probe still needs an
 owner run on each physical variant.
 There is no commit block (0x0003 stalls) and writes take effect at
