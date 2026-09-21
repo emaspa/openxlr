@@ -4,7 +4,7 @@
 // and dials stay in sync with the UI (and with the hardware) for free.
 
 import process from "node:process";
-import { randomUUID } from "node:crypto";
+import { KeyCommands } from "./key-commands.mjs";
 import { channelName, mixName, mixShortName, layoutChoices, controllableOutputs, outputKey } from "./layout-choices.mjs";
 import fs from "node:fs";
 import os from "node:os";
@@ -55,25 +55,8 @@ let catalog = new Map();  // LV2 plugin URI -> PluginInfo (names and ranges of t
 let reconnectTimer = null;
 let reconnectDelayMs = 500;
 let connectionGeneration = 0;
-const pendingKeys = new Map();
-
-function finishKey(requestId, failed) {
-  const pending = pendingKeys.get(requestId);
-  if (!pending) return;
-  clearTimeout(pending.timer);
-  pendingKeys.delete(requestId);
-  send({event: failed ? "showAlert" : "showOk", context: pending.context});
-}
-
-function keyCommand(context, payload) {
-  if (pendingKeys.size >= 64) { send({event:"showAlert", context}); return; }
-  if ([...pendingKeys.values()].some(p => p.context === context)) return;
-  const requestId = randomUUID();
-  const timer = setTimeout(() => finishKey(requestId, true), 8000);
-  timer.unref();
-  pendingKeys.set(requestId, {context, timer});
-  if (!cmd({...payload, requestId})) finishKey(requestId, true);
-}
+const keyCommands = new KeyCommands(payload => cmd(payload), (context, failed) =>
+  send({event: failed ? "showAlert" : "showOk", context}));
 
 function scheduleDaemonReconnect(generation) {
   if (generation !== connectionGeneration || reconnectTimer) return;
@@ -115,14 +98,15 @@ function connectDaemon() {
       catalog = new Map((m.plugins ?? []).map((p) => [p.plugin, p]));
       refreshAll();
     }
-    else if (m.type === "commandResult") finishKey(m.requestId, !!m.error);
+    else if (m.type === "commandResult") keyCommands.finish(m.requestId, !!m.error);
     else if (m.type === "error") console.error("OpenXLR daemon:", m.message);
   };
   socket.onclose = (e) => {
     if (daemon !== socket) return;
     if (e && e.code === 1008) console.error("OpenXLR daemon refused the plugin:", e.reason);
-    for (const id of pendingKeys.keys()) finishKey(id, true);
-    daemonUp = false; daemonState = null; refreshAll();
+    daemonUp = false; daemonState = null;
+    keyCommands.disconnect();
+    refreshAll();
     scheduleDaemonReconnect(generation);
   };
   socket.onerror = () => { /* onclose follows */ };
@@ -294,6 +278,7 @@ host.onmessage = (e) => {
   const inst = instances.get(m.context);
   switch (m.event) {
     case "willAppear":
+      keyCommands.clear(m.context);
       instances.set(m.context, {
         action: m.action,
         settings: m.payload?.settings ?? {},
@@ -302,10 +287,12 @@ host.onmessage = (e) => {
       refresh(m.context);
       break;
     case "willDisappear":
+      keyCommands.clear(m.context);
       instances.delete(m.context);
       emptyTitle.delete(m.context);
       break;
     case "didReceiveSettings":
+      keyCommands.clear(m.context);
       if (inst) { inst.settings = m.payload?.settings ?? {}; refresh(m.context); }
       break;
     case "keyDown":
@@ -701,9 +688,9 @@ function onKeyDown(context, inst) {
     const payload = output.kind === "main" ? {cmd:"setMainOutput",device:output.device}
       : output.kind === "mute" ? {cmd:"toggleOutputMute",device:output.device}
       : {cmd:"adjustOutputVolume",device:output.device,value:output.kind === "up" ? .05 : -.05};
-    keyCommand(context, payload);
+    keyCommands.enqueue(context, payload);
   }
-  else if (t.startsWith("focus:")) keyCommand(context, { cmd: "routeFocusedApp", channel: t.slice(6) });
+  else if (t.startsWith("focus:")) keyCommands.enqueue(context, { cmd: "routeFocusedApp", channel: t.slice(6) });
   else if (t.startsWith("insert|")) {
     const [, ch, id] = t.split("|");
     const ins = resolveInsert(ch, id, metaOf(inst, t));
