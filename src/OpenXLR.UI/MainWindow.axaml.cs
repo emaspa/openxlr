@@ -16,23 +16,32 @@ public partial class MainWindow : Window
     private readonly DaemonClient _client;
     private readonly MainViewModel _vm;
     private readonly DesktopKeys _desktopKeys;
+    private readonly PlasmaVolumeRange? _volumeRange;
     private TrayIcon? _tray;
     private bool _reallyExit;
     private bool _hideToTrayPending;
     private readonly CancellationTokenSource _lifetime = new();
     private bool _automaticUpdateCheckStarted;
 
-    public MainWindow() : this(new DaemonClient()) { }
+    public MainWindow() : this(new DaemonClient(), syncDesktopVolume: true) { }
 
     /// <summary>
     /// For the window tests, which point the client at a port nothing serves
     /// so a developer's running daemon is not part of the test.
     /// </summary>
-    internal MainWindow(DaemonClient client)
+    internal MainWindow(DaemonClient client, bool syncDesktopVolume = false)
     {
         _client = client;
         InitializeComponent();
         _vm = new MainViewModel(_client);
+        if (syncDesktopVolume && PlasmaVolumeRange.IsPlasma)
+        {
+            _volumeRange = new PlasmaVolumeRange(_vm.ApplyDesktopVolumeBoost,
+                error => _vm.VolumeRangeError = error, action => Dispatcher.UIThread.Post(action));
+            _vm.DesktopVolumeBoostRequested += _volumeRange.Set;
+            _volumeRange.Start();
+            Activated += (_, _) => _volumeRange.Refresh();
+        }
         _desktopKeys = new DesktopKeys(_client);
         _ = _desktopKeys.StartAsync();
         DataContext = _vm;
@@ -91,6 +100,11 @@ public partial class MainWindow : Window
             _lifetime.Cancel();
             _tray?.Dispose();
             _desktopKeys.Dispose();
+            if (_volumeRange is not null)
+            {
+                _vm.DesktopVolumeBoostRequested -= _volumeRange.Set;
+                await _volumeRange.DisposeAsync();
+            }
             await _client.DisposeAsync();
             _lifetime.Dispose();
             // A window that started hidden is not the lifetime's MainWindow,

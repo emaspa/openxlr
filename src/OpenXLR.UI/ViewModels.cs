@@ -43,6 +43,7 @@ public sealed partial class MainViewModel : ViewModelBase
     {
         _client = client;
         OutputVolumeRange = new VolumeRangeViewModel(() => OutputVolume = Math.Min(OutputVolume, 1));
+        OutputVolumeRange.Changed += RequestDesktopVolumeBoost;
         Inserts = new InsertsViewModel(client, "xlr1", 1, "XLR 1");
         Inserts2 = new InsertsViewModel(client, "xlr2", 1, "XLR 2");
         _client.StateReceived += node => Dispatcher.UIThread.Post(() => Apply(node));
@@ -519,6 +520,34 @@ public sealed partial class MainViewModel : ViewModelBase
 
 
     public VolumeRangeViewModel OutputVolumeRange { get; }
+    internal event Action<bool>? DesktopVolumeBoostRequested;
+    private bool? _desktopVolumeBoost;
+    private string? _volumeRangeError;
+    public string? VolumeRangeError { get => _volumeRangeError; internal set { if (Set(ref _volumeRangeError, value)) Raise(nameof(HasVolumeRangeError)); } }
+    public bool HasVolumeRangeError => !string.IsNullOrEmpty(VolumeRangeError);
+
+    internal void ApplyDesktopVolumeBoost(bool boost)
+    {
+        _desktopVolumeBoost = boost;
+        OutputVolumeRange.Apply(boost);
+        foreach (var mix in Mixes.Where(m => m.IsMonitor)) mix.VolumeRange.Apply(boost);
+    }
+
+    private void RequestDesktopVolumeBoost(bool boost)
+    {
+        if (DesktopVolumeBoostRequested is null) return; // Other desktops retain per-control ranges.
+        ApplyDesktopVolumeBoost(boost);
+        DesktopVolumeBoostRequested.Invoke(boost);
+    }
+
+    private MixViewModel CreateMix(JsonNode node)
+    {
+        var mix = new MixViewModel(_client, node["id"]!.GetValue<string>(), node["name"]!.GetValue<string>())
+            { Kind = node["kind"]?.GetValue<string>() ?? "monitor" };
+        if (mix.IsMonitor && _desktopVolumeBoost is bool boost) mix.VolumeRange.Apply(boost);
+        mix.VolumeRange.Changed += boost => { if (mix.IsMonitor) RequestDesktopVolumeBoost(boost); };
+        return mix;
+    }
 
     private double _outputVolume;
     public double OutputVolume
@@ -1018,8 +1047,7 @@ public sealed partial class MainViewModel : ViewModelBase
         {
             SyncList(Mixes, mixes, m => m["id"]!.GetValue<string>(),
                 (m, vm) => vm.ApplyFromDaemon(m),
-                m => new MixViewModel(_client, m["id"]!.GetValue<string>(), m["name"]!.GetValue<string>())
-                    { Kind = m["kind"]?.GetValue<string>() ?? "monitor" });
+                CreateMix);
             bool auxOn = mixer["auxPortEnabled"]?.GetValue<bool>() ?? true;
             foreach (MixViewModel mv in Mixes.Where(mv => mv.IsAuxPort)) mv.ApplyAuxPort(auxOn);
             // Aux can feed a selected output even without a USB Aux port.
