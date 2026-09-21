@@ -182,6 +182,10 @@ are written with one feed.
 `outputRoutes`, the per-route level list that 0.1.40 and 0.1.41 wrote, is
 ignored on read, in this file and in profiles.
 
+If a channel or mix deletion cannot be saved, its previous routing settings
+and any pending volume or mute writes are restored together. The normal
+reconciliation keeps retrying those writes when PipeWire becomes available.
+
 ### Channel insert paths
 
 All channel ids are valid insert keys. Software and external-capture channels
