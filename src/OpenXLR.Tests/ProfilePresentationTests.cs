@@ -61,18 +61,31 @@ public sealed class ProfilePresentationTests
 
     [Fact]
     public void EmptyAppearanceClearsAndDeletedTargetsAreNotResurrected()
-    {
-        using var mixer = new Mixer();
-        typeof(Mixer).GetField("_built", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(mixer, true);
-        try
+        => InFakeMixer(mixer =>
         {
             mixer.ApplyScene(new() { Appearance = new() { ["channel:gone"] = new("♫"), ["channel:music"] = new("◆") } });
             Assert.Equal("channel:music", Assert.Single(mixer.ExportSettings().Appearance).Key);
             mixer.ApplyScene(new() { Appearance = [] });
             Assert.Empty(mixer.ExportSettings().Appearance);
-        }
-        finally { typeof(Mixer).GetField("_built", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(mixer, false); }
-    }
+        });
+
+    [Fact]
+    public void ProfileRecallsAppearanceWithoutChangingRoutingAndLegacyScenesPreserveIt()
+        => InFakeMixer(mixer =>
+        {
+            var config = MixerConfig.Default();
+            mixer.SetDisplayOrder(config.Channels.Reverse().Select(c => c.Id).ToArray(),
+                config.Mixes.Reverse().Select(m => m.Id).ToArray(), _ => null);
+            mixer.SetLayoutAppearance("channel:game", new("♫", "#123456", true), _ => null);
+            string expected = JsonSerializer.Serialize(mixer.ExportSettings().Appearance);
+            var scene = mixer.ExportScene();
+            mixer.SetLayoutAppearance("channel:game", new("◆"), _ => null);
+            mixer.ApplyScene(scene);
+            Assert.Equal(expected, JsonSerializer.Serialize(mixer.ExportSettings().Appearance));
+            mixer.ApplyScene(new());
+            Assert.Equal(expected, JsonSerializer.Serialize(mixer.ExportSettings().Appearance));
+            Assert.Equal(config.Channels.Where(c => c.InputPair is null).Select(c => c.Id), mixer.ExportSettings().UserChannels!.Select(c => c.Id));
+        });
 
     [Fact]
     public void RecallPersistsOnlyPresentationAndDoesNotReplayAfterManualEditsOrRestart()
@@ -148,6 +161,40 @@ public sealed class ProfilePresentationTests
 
     private static void Apply(MainViewModel vm, JsonNode? state) => typeof(MainViewModel)
         .GetMethod("ApplyProfilePresentation", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(vm, [state]);
+
+    private static void InFakeMixer(Action<Mixer> run)
+    {
+        string directory = Directory.CreateTempSubdirectory("openxlr-presentation-helpers-").FullName;
+        string? oldPath = Environment.GetEnvironmentVariable("PATH");
+        try
+        {
+            ExecutableScript.Write(Path.Combine(directory, "pactl"), """
+                case "$1" in
+                  set-sink-volume|set-sink-mute) exit 0 ;;
+                  *) exit 99 ;;
+                esac
+                """);
+            ExecutableScript.Write(Path.Combine(directory, "pw-dump"), "printf '[]\n'\n");
+            ExecutableScript.Write(Path.Combine(directory, "pw-link"), """
+                case "$1" in
+                  -o|-i) exit 0 ;;
+                  *) exit 99 ;;
+                esac
+                """);
+            // Never reach the desktop's helpers, whether installed or not.
+            Environment.SetEnvironmentVariable("PATH", directory);
+            using var mixer = new Mixer();
+            var built = typeof(Mixer).GetField("_built", BindingFlags.NonPublic | BindingFlags.Instance)!;
+            built.SetValue(mixer, true);
+            try { run(mixer); }
+            finally { built.SetValue(mixer, false); }
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PATH", oldPath);
+            Directory.Delete(directory, true);
+        }
+    }
 
     private static void InConfig(Action run)
     {
