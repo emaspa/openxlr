@@ -213,7 +213,8 @@ public sealed partial class Mixer
         lock (_gate)
         {
             if (!_built) throw new InvalidOperationException("mixer is not built");
-            EnsurePulseHeadroomLocked(newStreams: _config.Channels.Count, newNodes: 4);
+            EnsurePulseHeadroomLocked(newStreams: _config.Channels.Count,
+                newNodes: _compensateMixLatency && _config.Mixes.Any(m => MixLatencyLocked(m) > 0) ? 6 : 4);
             string id = MixerConfig.NewId(name, "mix", _config.Mixes.Select(m => m.Id));
             var mix = new MixDefinition(id, name, MixKind.VirtualMic);
             MixerConfig previous = _config;
@@ -237,6 +238,7 @@ public sealed partial class Mixer
                 _postModules[id] = _pw.CreateNullSink(mix.PostSinkName, $"OpenXLR {name} (post)");
                 _virtualMicModules[id] = _pw.CreateVirtualMic(mix.VirtualMicName, $"{mix.PostSinkName}.monitor", $"OpenXLR {name}");
                 WireMixChainLocked(mix);
+                UpdateMixLatencyLocked();
                 PersistLocked(persist);
             }
             catch (Exception editError)
@@ -510,6 +512,7 @@ public sealed partial class Mixer
     /// <summary>Take down one mix's insert chain and the links that read the mix.</summary>
     private void RemoveMixChainLocked(string key)
     {
+        RemoveMixDelayLocked(key["mix:".Length..]);
         if (_mixTaps.Remove(key, out PortLink? tap)) _pw.Unlink(tap);
         if (_mixPostLinks.Remove(key, out PortLink? post)) _pw.Unlink(post);
         if (_chains.Remove(key, out FilterHandle? chain)) _pw.StopFilter(chain);

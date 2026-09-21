@@ -45,6 +45,7 @@
           <TextBlock Text="{Binding Format}" Foreground="{DynamicResource Ox.Text.Secondary}" FontSize="10" FontWeight="SemiBold"/>
         </Border>
       </Grid>
+      <TextBlock Text="{Binding LatencyText}" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
       <!-- Actions get their own row and wrap instead of competing with the title. -->
       <WrapPanel Name="PluginActions">
         <Button Content="Plugin UI" Padding="12,4" Margin="0,0,6,6" Click="OnNativeEditor"

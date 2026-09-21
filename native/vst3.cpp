@@ -545,8 +545,8 @@ class ComponentHandler final : public IComponentHandler,
   tresult PLUGIN_API performEdit(ParamID id, ParamValue normalized) override;
   tresult PLUGIN_API endEdit(ParamID) override { return kResultOk; }
   tresult PLUGIN_API restartComponent(int32 flags) override {
-    if (flags & (RestartFlags::kReloadComponent | RestartFlags::kIoChanged |
-                 RestartFlags::kLatencyChanged))
+    // Latency is read on the main-thread tick; it does not require reloading DSP.
+    if (flags & (RestartFlags::kReloadComponent | RestartFlags::kIoChanged))
       v_->restart_requested = true;
     if (flags & RestartFlags::kParamValuesChanged)
       v_->values_changed = true;
@@ -1271,6 +1271,11 @@ void vst3_editor_resized(Host *h, unsigned width, unsigned height) {
   v->view->onSize(&rect);
 }
 
+static uint32_t vst3_latency(Host *h) {
+  auto *v = static_cast<Vst3 *>(host_impl(h));
+  return v->processor ? v->processor->getLatencySamples() : UINT32_MAX;
+}
+
 }  // namespace
 
 extern "C" const Backend vst3_backend = {
@@ -1289,6 +1294,7 @@ extern "C" const Backend vst3_backend = {
     vst3_editor_constrain,
     vst3_main_thread,
     vst3_unload,
+    vst3_latency,
     true,
 };
 

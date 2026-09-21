@@ -19,6 +19,7 @@ public sealed class PipeWireAdapter
     private const string ClipGuardPluginFile = "hard_limiter_1413.so";
 
     private readonly Func<DspFeatureAvailability>? _clipGuardAvailabilityOverride;
+    private readonly Func<(int Used, int Limit)?>? _pulseFileUsageOverride;
     private readonly Action? _progress;
     private readonly List<uint> _modules = [];
     private readonly List<Process> _loopbacks = [];
@@ -26,6 +27,11 @@ public sealed class PipeWireAdapter
     private readonly HashSet<NativePluginHost> _nativeHosts = [];
     private readonly WineSession _wine;
     private PipeWireGraph? _graph;
+    internal bool MeasurePluginLatency { get; set; }
+    private bool NeedsLatencyHost(InsertDefinition insert) => MeasurePluginLatency && insert.Kind == "lv2"
+        && PluginCatalog.Find(insert) is { ReportsLatency: not false } info
+        && NativePluginHost.HostInstalled && NativePluginHost.SupportsFeatures(info.RequiredFeatures);
+
 
     /// <summary>Use a registry subscription for this adapter until the returned lease is disposed.</summary>
     public IDisposable WatchGraph(Action<string>? note = null)
@@ -70,6 +76,12 @@ public sealed class PipeWireAdapter
     internal PipeWireAdapter(Func<DspFeatureAvailability> clipGuardAvailabilityOverride)
     {
         _clipGuardAvailabilityOverride = clipGuardAvailabilityOverride;
+        _wine = new WineSession();
+    }
+
+    internal PipeWireAdapter(Func<(int Used, int Limit)?> pulseFileUsageOverride)
+    {
+        _pulseFileUsageOverride = pulseFileUsageOverride;
         _wine = new WineSession();
     }
 
@@ -453,6 +465,7 @@ public sealed class PipeWireAdapter
     /// </summary>
     public (int Used, int Limit)? PulseFileUsage()
     {
+        if (_pulseFileUsageOverride is not null) return _pulseFileUsageOverride();
         try
         {
             // Our own session's server: the one running as our user. On a
@@ -692,7 +705,7 @@ public sealed class PipeWireAdapter
     private FilterHandle CreateFilterChain(string sinkName, string srcName, string description, int channels,
         int lowCutHz, bool clipGuard, IReadOnlyList<InsertDefinition>? inserts)
     {
-        if (inserts?.Any(i => !i.Bypass && i.RunsNatively) == true)
+        if (inserts?.Any(i => !i.Bypass && (i.RunsNatively || NeedsLatencyHost(i))) == true)
             return CreateHostedChain(sinkName, srcName, description, channels, lowCutHz, clipGuard, inserts);
         if (clipGuard)
         {
@@ -743,6 +756,11 @@ public sealed class PipeWireAdapter
             $"playback.props = {{ node.name = {srcName} media.class = Audio/Source " +
             $"audio.channels = {channels} audio.position = {position} node.suspend-on-idle = false " +
             "priority.session = 100 } }";
+        return StartFilterChain(sinkName, srcName, spa);
+    }
+
+    private FilterHandle StartFilterChain(string sinkName, string srcName, string spa)
+    {
         var psi = new ProcessStartInfo("pw-cli")
         {
             RedirectStandardOutput = true,
@@ -780,6 +798,29 @@ public sealed class PipeWireAdapter
         return handle;
     }
 
+    /// <summary>Two bounded delay lines after a mix, with controls updated without rebuilding plugins.</summary>
+    internal FilterHandle CreateMixDelay(string id)
+    {
+        string sink = $"OpenXLR_delay_{id}_in", source = $"OpenXLR_delay_{id}_out";
+        string spa = $"{{ node.description = \"OpenXLR mix latency alignment\" " +
+            "filter.graph = { nodes = [ " +
+            "{ type = builtin name = left label = delay config = { max-delay = 2.0 } control = { \"Delay (s)\" = 0.0 } } " +
+            "{ type = builtin name = right label = delay config = { max-delay = 2.0 } control = { \"Delay (s)\" = 0.0 } } ] " +
+            "inputs = [ \"left:In\" \"right:In\" ] outputs = [ \"left:Out\" \"right:Out\" ] } " +
+            $"capture.props = {{ node.name = {sink} media.class = Audio/Sink audio.channels = 2 audio.position = [ FL FR ] node.suspend-on-idle = false node.hidden = true }} " +
+            $"playback.props = {{ node.name = {source} media.class = Audio/Source audio.channels = 2 audio.position = [ FL FR ] node.suspend-on-idle = false node.hidden = true }} }}";
+        return StartFilterChain(sink, source, spa);
+    }
+
+    internal void SetMixDelay(FilterHandle filter, double milliseconds)
+    {
+        if (!double.IsFinite(milliseconds) || milliseconds is < 0 or > MixLatency.MaxMilliseconds)
+            throw new ArgumentOutOfRangeException(nameof(milliseconds));
+        int id = FindNodeId(filter.SinkName) ?? throw new InvalidOperationException("The latency filter is unavailable.");
+        string value = (milliseconds / 1000).ToString("R", System.Globalization.CultureInfo.InvariantCulture);
+        Run("pw-cli", "set-param", id.ToString(), "Props", $"{{ params = [ \"left:Delay (s)\" {value} \"right:Delay (s)\" {value} ] }}");
+    }
+
     /// <summary>Splice native editors into the chain, retaining filter-chain for other plugins.</summary>
     private FilterHandle CreateHostedChain(string sinkName, string sourceName, string description, int channels,
         int lowCutHz, bool clipGuard, IReadOnlyList<InsertDefinition> inserts)
@@ -803,7 +844,7 @@ public sealed class PipeWireAdapter
                         $"{(string.IsNullOrWhiteSpace(insert.Label) ? insert.Plugin : insert.Label)} is unavailable or requires unsupported host features.");
                 string node = $"{sinkName}_stage_{insertStages.Count}";
                 FilterHandle stage;
-                if (insert.RunsNatively)
+                if (insert.RunsNatively || NeedsLatencyHost(insert))
                 {
                     if (!NativePluginHost.HostInstalled)
                         throw new InvalidOperationException("The native plugin host is not installed.");
@@ -1235,6 +1276,8 @@ public sealed class PipeWireAdapter
 
             string? name = props.TryGetProperty("node.name", out JsonElement n) ? n.GetString() : null;
             if (name is null) continue;
+
+            if (name.StartsWith("OpenXLR_delay_", StringComparison.Ordinal)) continue;
             string mc = props.TryGetProperty("media.class", out JsonElement m) ? m.GetString() ?? "" : "";
 
             bool isSink = mc == "Audio/Sink";

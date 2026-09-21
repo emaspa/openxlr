@@ -53,6 +53,7 @@ struct Clap {
   clap_host_t host;
   const clap_plugin_params_t *params;
   const clap_plugin_gui_t *gui;
+  const clap_plugin_latency_t *latency;
   const clap_plugin_timer_support_t *timer_support;
   const clap_plugin_posix_fd_support_t *fd_support;
   Param *records;
@@ -291,8 +292,17 @@ static void ports_rescan(const clap_host_t *host, uint32_t flags) {}
 static const clap_host_audio_ports_t audio_ports_extension = {
     ports_rescan_supported, ports_rescan};
 
+// CLAP only changes latency during activation. The tick reports the value
+// once audio runs, so a notification does not rebuild a working instance.
+static void latency_changed(const clap_host_t *host) {
+  of(host)->h->latency_reported = false;
+}
+static const clap_host_latency_t latency_extension = {latency_changed};
+
 static const void *host_get_extension(const clap_host_t *host,
                                       const char *id) {
+  if (!strcmp(id, CLAP_EXT_LATENCY))
+    return &latency_extension;
   if (!strcmp(id, CLAP_EXT_LOG))
     return &log_extension;
   if (!strcmp(id, CLAP_EXT_THREAD_CHECK))
@@ -524,6 +534,7 @@ static bool clap_load(Host *h, char **arguments) {
   if (!clap_map_ports(c, h, ports, true) || !clap_map_ports(c, h, ports, false))
     return false;
   c->params = c->plugin->get_extension(c->plugin, CLAP_EXT_PARAMS);
+  c->latency = c->plugin->get_extension(c->plugin, CLAP_EXT_LATENCY);
   c->gui = c->plugin->get_extension(c->plugin, CLAP_EXT_GUI);
   c->timer_support =
       c->plugin->get_extension(c->plugin, CLAP_EXT_TIMER_SUPPORT);
@@ -729,6 +740,12 @@ static void clap_editor_lost(Host *h) {
 
 static bool clap_editor_idle(Host *h) { return ((Clap *)h->impl)->gui_closed; }
 
+static uint32_t clap_latency(Host *h) {
+  Clap *c = h->impl;
+  if (!c->activated) return UINT32_MAX;
+  return c->latency ? c->latency->get(c->plugin) : 0;
+}
+
 const Backend clap_backend = {
     .name = "CLAP",
     .argument_count = 2,
@@ -744,6 +761,7 @@ const Backend clap_backend = {
     .editor_resized = NULL,
     .main_thread = clap_main_thread,
     .unload = clap_unload,
+    .latency = clap_latency,
     .editor_coordinate_nudge = true,
 };
 

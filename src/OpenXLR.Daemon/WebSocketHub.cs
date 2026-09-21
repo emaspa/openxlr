@@ -345,6 +345,7 @@ public sealed class WebSocketHub
             case "setMonitorFeed":
             case "setOutputVolume":
             case "setEnforcedDefaults":
+            case "setMixLatencyCompensation":
             case "setAuxPortEnabled":
             case "setLowCutHz":
             case "setSoftClipGuard":
