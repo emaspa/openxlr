@@ -79,6 +79,18 @@ public sealed class PlasmaVolumeRangeTests
     }
 
     [Fact]
+    public async Task AnIdleRangeDoesNotLaunchMoreHelpers()
+    {
+        await using var test = new Helpers();
+        test.Range.Start();
+        await test.WaitFor(false);
+        int reads = File.ReadAllLines(test.PathOf("reads")).Length;
+        await Task.Delay(250);
+        Assert.Equal(reads, File.ReadAllLines(test.PathOf("reads")).Length);
+        Assert.False(File.Exists(test.PathOf("writes")));
+    }
+
+    [Fact]
     public async Task AnOldReadCannotOverwriteANewerRequestAndRapidChangesCoalesce()
     {
         await using var test = new Helpers();
@@ -110,6 +122,55 @@ public sealed class PlasmaVolumeRangeTests
         test.Range.Set(true);
         await test.WaitFor(true);
         await Wait(() => test.Errors.Last() is null);
+    }
+
+    [Fact]
+    public async Task ARefreshDuringAFailedWriteDoesNotHideTheSaveError()
+    {
+        await using var test = new Helpers();
+        test.Range.Start();
+        await test.WaitFor(false);
+        File.WriteAllText(test.PathOf("fail-write"), "");
+        File.WriteAllText(test.PathOf("hold-write"), "");
+        test.Range.Set(true);
+        await Wait(() => File.Exists(test.PathOf("writing")));
+        // Activation or a file event can arrive before the helper reports failure.
+        test.Range.Refresh();
+        File.Delete(test.PathOf("hold-write"));
+        await Wait(() => test.Errors.Any(e => e is not null));
+        Assert.False(test.Values.Last());
+        Assert.NotNull(test.Errors.Last());
+        int reports = test.Errors.Count;
+        test.Range.Refresh();
+        await Wait(() => test.Errors.Count > reports);
+        Assert.NotNull(test.Errors.Last());
+        test.Replace("true");
+        await test.WaitFor(true);
+        await Wait(() => test.Errors.Last() is null);
+    }
+
+    [Fact]
+    public async Task ADelayedUiKeepsOnlyOnePendingPublication()
+    {
+        var callbacks = new ConcurrentQueue<Action>();
+        await using var test = new Helpers(callbacks.Enqueue);
+        test.Range.Start();
+        for (int i = 1; i <= 25; i++)
+        {
+            int count = i;
+            await Wait(() => File.Exists(test.PathOf("reads")) && File.ReadAllLines(test.PathOf("reads")).Length >= count);
+            test.Range.Refresh();
+        }
+        Assert.Single(callbacks);
+        test.Range.Set(true);
+        await Wait(() =>
+        {
+            Assert.InRange(callbacks.Count, 0, 1);
+            while (callbacks.TryDequeue(out var callback)) callback();
+            return test.Values.TryPeek(out _) && test.Values.Last();
+        });
+        Assert.DoesNotContain(false, test.Values);
+        Assert.All(test.Errors, error => Assert.Null(error));
     }
 
     [Theory]
@@ -193,12 +254,15 @@ public sealed class PlasmaVolumeRangeTests
                 value=false
                 if [ -f "$dir/plasmaparc" ]; then value=$(/bin/cat "$dir/plasmaparc"); fi
                 /usr/bin/touch "$dir/reading"
+                printf 'read\n' >> "$dir/reads"
                 while [ -f "$dir/hold" ]; do /bin/sleep 0.01; done
                 printf '%s\n' "$value"
                 """);
             ExecutableScript.Write(PathOf("kwriteconfig6"), """
                 dir=${0%/*}
                 printf '%s\n' "$*" >> "$dir/writes"
+                /usr/bin/touch "$dir/writing"
+                while [ -f "$dir/hold-write" ]; do /bin/sleep 0.01; done
                 if [ -f "$dir/fail-write" ]; then exit 2; fi
                 if [ -f "$dir/ignore-write" ]; then exit 0; fi
                 for value in "$@"; do :; done

@@ -389,7 +389,9 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   stopping at 100%. On Plasma 6, these buttons and the desktop's Raise maximum
   volume setting share one range. Config changes are watched without polling;
   KDE's configuration helpers preserve desktop defaults and notify the applet
-  when OpenXLR changes the preference. Percentages stay absolute when the
+  when OpenXLR changes the preference. While the window is busy, only the newest
+  range update waits for it, so old settings do not accumulate or replay.
+  Percentages stay absolute when the
   scale changes; disabling boost lowers only levels above 100%. Other desktops
   keep per-control range selection.
 

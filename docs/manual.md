@@ -218,7 +218,9 @@ affects only the display; the daemon continues processing audio.
    KDE, and is not stored in an OpenXLR profile. Other desktops keep the local
    per-control boost buttons. Plasma synchronization needs `kreadconfig6` and
    `kwriteconfig6`; a missing helper or failed preference write is shown below
-   the monitor slider, with local controls still available. A boosted desktop
+   the monitor slider, with local controls still available. A failed save stays
+   visible through routine refreshes until the desktop accepts the requested
+   range or a later save succeeds. A boosted desktop
    value automatically enables the expanded range so opening the window
    cannot turn the volume down. Changing the first selected device
    adopts its current volume. Relinking the same device, including after a

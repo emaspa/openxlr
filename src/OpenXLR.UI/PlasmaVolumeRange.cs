@@ -20,6 +20,11 @@ internal sealed class PlasmaVolumeRange(Action<bool> apply, Action<string?> repo
     private bool? _pendingWrite;
     private long _revision;
     private Task _worker = Task.CompletedTask;
+    private (long Revision, bool? Boost, string? Error)? _publication;
+    private bool _publicationQueued;
+    // Only the serialized worker accesses the last failed write.
+    private bool? _failedWrite;
+    private string? _writeError;
 
     internal static bool IsPlasma => (Environment.GetEnvironmentVariable("XDG_CURRENT_DESKTOP") ?? "")
         .Split(':').Contains("KDE", StringComparer.OrdinalIgnoreCase);
@@ -80,6 +85,8 @@ internal sealed class PlasmaVolumeRange(Action<bool> apply, Action<string?> repo
             {
                 if (write.HasValue)
                 {
+                    _failedWrite = null;
+                    _writeError = null;
                     var result = await ProcessRunner.RunAsync("kwriteconfig6",
                         ["--file", "plasmaparc", "--group", "General", "--key", "RaiseMaximumVolume",
                          "--type", "bool", "--notify", write.Value ? "true" : "false"],
@@ -89,7 +96,8 @@ internal sealed class PlasmaVolumeRange(Action<bool> apply, Action<string?> repo
                 bool boost = await ReadAsync(_lifetime.Token);
                 if (write.HasValue && boost != write.Value)
                     throw new IOException("The desktop did not keep the requested volume range.");
-                Publish(revision, () => { apply(boost); report(null); });
+                if (_failedWrite == boost) { _failedWrite = null; _writeError = null; }
+                Publish(revision, boost, _writeError);
             }
             catch (Exception ex)
             {
@@ -101,11 +109,9 @@ internal sealed class PlasmaVolumeRange(Action<bool> apply, Action<string?> repo
                     try { actual = await ReadAsync(_lifetime.Token); }
                     catch (Exception) { /* keep the read/write error below */ }
                 }
-                Publish(revision, () =>
-                {
-                    if (actual.HasValue) apply(actual.Value);
-                    report($"Cannot synchronize Plasma's volume range: {ex.Message}");
-                });
+                string error = $"Cannot synchronize Plasma's volume range: {ex.Message}";
+                if (write.HasValue) { _failedWrite = write; _writeError = error; }
+                Publish(revision, actual, error);
             }
             lock (_gate)
             {
@@ -121,14 +127,30 @@ internal sealed class PlasmaVolumeRange(Action<bool> apply, Action<string?> repo
         if (_disposed) _lifetime.Dispose();
     }
 
-    private void Publish(long revision, Action action) => dispatch(() =>
+    private void Publish(long revision, bool? boost, string? error)
     {
         lock (_gate)
         {
-            if (_disposed || revision != _revision) return;
-            action();
+            if (_disposed) return;
+            _publication = (revision, boost, error);
+            if (_publicationQueued) return;
+            _publicationQueued = true;
         }
-    });
+        dispatch(Drain);
+    }
+
+    private void Drain()
+    {
+        lock (_gate)
+        {
+            var latest = _publication;
+            _publication = null;
+            _publicationQueued = false;
+            if (_disposed || latest is not { } update || update.Revision != _revision) return;
+            if (update.Boost.HasValue) apply(update.Boost.Value);
+            report(update.Error);
+        }
+    }
 
     private static async Task<bool> ReadAsync(CancellationToken cancel)
     {
@@ -158,6 +180,7 @@ internal sealed class PlasmaVolumeRange(Action<bool> apply, Action<string?> repo
         {
             if (_disposed) return;
             _disposed = true;
+            _publication = null;
             _lifetime.Cancel();
             if (!_running) _lifetime.Dispose();
         }
