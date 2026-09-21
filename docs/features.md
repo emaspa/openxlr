@@ -456,3 +456,7 @@ identity comes from KDE Plasma's KWin; on other desktops the routing key
 reports that it cannot identify the application. See
 [Desktop keys](manual.md#desktop-keys) and
 [Output keys](manual.md#output-keys).
+
+Plugin controls display reported algorithmic latency. Optional mix-insert
+alignment delays faster mixes to the slowest valid report, with a two-second
+limit and explicit unavailable status. It defaults to off; see the manual.

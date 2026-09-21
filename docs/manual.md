@@ -1865,3 +1865,33 @@ it. The usual revision needs no note. The rarer one is named in the
 Options connection note, and so is a dock that answers on neither
 address. Such a dock still connects, so save diagnostics from Options
 and open an issue with them.
+
+### Plugin latency
+
+A plugin's OpenXLR controls show its reported processing latency in milliseconds.
+"Unavailable" means no valid live measurement, not zero delay. Native LV2, CLAP
+and VST3 report their running instance's value. An LV2 plugin in the PipeWire
+filter-chain reports zero only when its metadata declares no latency port.
+
+In Options, Audio, **Compensate plugin latency across mixes** is off by default.
+Loading its saved setting uses the same host selection and graph update as
+changing the option while running.
+Turn it on when parallel mixes need their plugin processing aligned. Faster mix
+outputs are delayed to match the slowest mix's inserts, including feeds to
+virtual microphones and monitoring outputs. This can increase monitoring delay.
+Enabling or disabling it rebuilds the paths and briefly interrupts audio. It
+uses the native host for LV2 latency measurement where supported, without
+changing the plugin's saved editor switch. Alignment waits until every mix's
+report is valid; Options shows when reports are unavailable or a delay fails.
+
+The limit is two seconds. Delays update without restarting plugins when their
+reported latency changes. Bypass removes that insert's latency. A mix gets an
+extra delay stage only while it needs a positive correction. With no reported
+plugin latency, enabling the option adds no delay stages. Stages are hidden
+from device choices and removed when no longer needed. The setting survives
+restart, but profile changes do not toggle it.
+
+This aligns mix-insert algorithmic delay, not the device's round-trip latency,
+the hardware direct-monitor path, PipeWire resampling offsets, or different
+microphones' input chains. An intentional echo is an effect, not processing
+latency, unless the plugin explicitly reports it as latency.

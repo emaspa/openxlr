@@ -98,6 +98,8 @@ typedef struct {
   bool activated;
   Port *ports;
   uint32_t count;
+  uint32_t latency_index;
+  bool reports_latency;
   char *uris[MAX_URIS];
   _Atomic uint32_t uri_count;
   LV2_URID_Map map;
@@ -252,6 +254,8 @@ static bool lv2_load(Host *h, char **arguments) {
   if (!supported)
     return false;
   l->count = lilv_plugin_get_num_ports(l->plugin);
+  l->reports_latency = lilv_plugin_has_latency(l->plugin);
+  l->latency_index = l->reports_latency ? lilv_plugin_get_latency_port_index(l->plugin) : 0;
   if (!l->count || l->count > MAX_PORTS)
     return false;
 
@@ -595,6 +599,18 @@ static bool lv2_editor_idle(Host *h) {
   return l->idle && l->idle->idle(l->ui);
 }
 
+static uint32_t lv2_latency(Host *h) {
+  Lv2 *l = h->impl;
+  if (!l->reports_latency) return 0;
+  uint32_t index = l->latency_index;
+  if (index >= l->count || !l->ports[index].ctl || !l->ports[index].ctl->output)
+    return UINT32_MAX;
+  float value = atomic_load(&l->ports[index].ctl->observed);
+  // Check in double: UINT32_MAX rounds up when represented as a float.
+  return isfinite(value) && value >= 0 && (double)value < UINT32_MAX
+      ? (uint32_t)ceil((double)value) : UINT32_MAX;
+}
+
 const Backend lv2_backend = {
     .name = "LV2",
     .argument_count = 1,
@@ -610,4 +626,5 @@ const Backend lv2_backend = {
     .editor_resized = lv2_editor_resized,
     .main_thread = NULL,
     .unload = lv2_unload,
+    .latency = lv2_latency,
 };
