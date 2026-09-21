@@ -16,7 +16,6 @@ public sealed record UiSettings
 {
     /// <summary>Last applied daemon recall, preserved across reconnects and window restarts.</summary>
     public string? AppliedPresentation { get; init; }
-    public IReadOnlyList<string> SectionOrder { get; init; } = [];
     public bool CompactMixer { get; init; }
     public string? CompactChannel { get; init; }
     public bool StartDaemonAtLogin { get; init; }
@@ -38,6 +37,8 @@ public sealed record UiSettings
     public string? AutostartExecutable { get; init; }
     /// <summary>Names of the main window's tiles the user collapsed (INPUTS, HEADPHONES, ...).</summary>
     public IReadOnlyList<string> CollapsedSections { get; init; } = [];
+    /// <summary>Display order of the main window's tiles, independent of skins and audio routing.</summary>
+    public IReadOnlyList<string> SectionOrder { get; init; } = [];
     /// <summary>
     /// The appearance the window wears, by skin id; null is the one the
     /// application ships with. Profiles may recall this choice; changing
@@ -86,6 +87,7 @@ public sealed record UiSettings
         try { SaveChecked(); }
         catch (Exception) { /* best effort */ }
     }
+
 }
 
 /// <summary>

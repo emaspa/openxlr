@@ -197,8 +197,8 @@ and applies it only once, including across window restarts. A fresh explicit or
 on-connect recall gets a new ID even for the same profile. Failed recalls do not
 publish new presentation. Unknown section IDs are retained but not displayed;
 unavailable skins use the window's default. These choices affect no startup,
-update or security preferences. The current window uses compact view, skin and
-collapsed sections; `sectionOrder` is also retained for windows with tile ordering.
+update or security preferences. The window recalls compact view, skin, collapsed sections and section order.
+An active drag is cancelled before the recalled order is applied.
 The mixer scene separately stores `appearance` as described in
 [mixer presentation](mixer-layout.md#presentation).
 

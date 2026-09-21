@@ -1,5 +1,4 @@
 using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Text.Json.Nodes;
 using Avalonia;
 using Avalonia.Automation;
@@ -219,50 +218,7 @@ public sealed class ToolTipInputTests
         return false;
     }
 
-    /// <summary>
-    /// Pointer events from the X server through XTEST, on a connection of this
-    /// thread's own, so they reach whichever native window is in front.
-    /// </summary>
-    private sealed class XPointer : IDisposable
-    {
-        [DllImport("libX11.so.6")] private static extern IntPtr XOpenDisplay(IntPtr name);
-        [DllImport("libX11.so.6")] private static extern int XCloseDisplay(IntPtr display);
-        [DllImport("libX11.so.6")] private static extern int XFlush(IntPtr display);
-        [DllImport("libXtst.so.6")] private static extern int XTestFakeMotionEvent(
-            IntPtr display, int screen, int x, int y, ulong delay);
-        [DllImport("libXtst.so.6")] private static extern int XTestFakeButtonEvent(
-            IntPtr display, uint button, int press, ulong delay);
 
-        private IntPtr _display;
-
-        public XPointer()
-        {
-            _display = XOpenDisplay(IntPtr.Zero);
-            Assert.True(_display != IntPtr.Zero, "The test needs an X display to move a pointer on.");
-        }
-
-        public void MoveTo(int x, int y)
-        {
-            XTestFakeMotionEvent(_display, -1, x, y, 0);
-            XFlush(_display);
-        }
-
-        public void Click()
-        {
-            XTestFakeButtonEvent(_display, 1, 1, 0);
-            XFlush(_display);
-            Thread.Sleep(60);
-            XTestFakeButtonEvent(_display, 1, 0, 0);
-            XFlush(_display);
-        }
-
-        public void Dispose()
-        {
-            if (_display == IntPtr.Zero) return;
-            XCloseDisplay(_display);
-            _display = IntPtr.Zero;
-        }
-    }
 }
 
 public sealed class ToolTipFactAttribute : FactAttribute
