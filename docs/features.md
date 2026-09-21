@@ -456,3 +456,11 @@ identity comes from KDE Plasma's KWin; on other desktops the routing key
 reports that it cannot identify the application. See
 [Desktop keys](manual.md#desktop-keys) and
 [Output keys](manual.md#output-keys).
+
+### Effect chains and comparison
+
+Copy individual effects or complete chains between compatible channels, rename
+instances, save reusable named chain presets and store A/B snapshots for live
+comparison. Snapshots preserve exposed parameters, order, bypass and host choices;
+they do not contain plugin-private binary state or external samples. Replacing
+a chain can briefly interrupt audio. A/B snapshots clear on reconnect.

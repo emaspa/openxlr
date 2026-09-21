@@ -8,16 +8,22 @@
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource Ox.Window.Background}">
 
-  <DockPanel Margin="16">
+  <DockPanel Margin="16" IsEnabled="{Binding CanEditEffects}">
     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,0,0,10">
       <StackPanel>
         <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource Ox.Text.Primary}"
                    TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Title}"/>
         <TextBlock Text="{Binding ChainHint}" Classes="h" FontSize="11" TextWrapping="Wrap"/>
       </StackPanel>
-      <Button Grid.Column="1" Content="Add plugin" Padding="12,4" VerticalAlignment="Top" Click="OnAddInsert"/>
+      <StackPanel Grid.Column="1" Spacing="6">
+        <Button Content="Add plugin" Padding="12,4" Click="OnAddInsert"/>
+        <Button Content="Chains and A/B" Padding="12,4" Click="OnWorkflow"/>
+      </StackPanel>
     </Grid>
     <Button DockPanel.Dock="Bottom" Content="Close" HorizontalAlignment="Right" Padding="18,6" Margin="0,10,0,0" Click="OnClose"/>
+    <TextBlock DockPanel.Dock="Top" Text="{Binding WorkflowError}" TextWrapping="Wrap"
+               Foreground="{DynamicResource Ox.Text.Warning}"
+               IsVisible="{Binding WorkflowError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
     <TextBlock DockPanel.Dock="Top" Text="No inserts yet." Classes="h" IsVisible="{Binding !HasItems}"/>
     <ScrollViewer VerticalScrollBarVisibility="Auto" AllowAutoHide="False">
       <ItemsControl ItemsSource="{Binding Items}" Margin="0,0,10,0">
@@ -35,6 +41,8 @@
                 <TextBlock Text="{Binding Error}" Foreground="{DynamicResource Ox.Text.Warning}" FontSize="11"
                            TextWrapping="Wrap" IsVisible="{Binding HasError}"/>
                 <WrapPanel>
+                  <Button Content="Copy" Click="OnCopyInsert" Margin="0,0,6,0" Padding="8,3" MinHeight="0" FontSize="11"/>
+                  <Button Content="Rename" Click="OnRenameInsert" Margin="0,0,6,0" Padding="8,3" MinHeight="0" FontSize="11"/>
                   <Button Content="Controls" Padding="8,3" MinHeight="0" FontSize="11" Margin="0,0,6,0" Click="OnInsertControls"/>
                   <ToggleButton Content="Bypass" IsChecked="{Binding Bypass, Mode=TwoWay}"
                                 Padding="8,3" MinHeight="0" FontSize="11" Margin="0,0,6,0"/>
