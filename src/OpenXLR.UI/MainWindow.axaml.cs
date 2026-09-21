@@ -41,6 +41,7 @@ public partial class MainWindow : Window
         SetupTray();
         RestoreSectionState();
         _vm.PresentationRecalled += OnPresentationRecalled;
+        SetupReordering();
         Opened += async (_, _) =>
         {
             if (_automaticUpdateCheckStarted) return;

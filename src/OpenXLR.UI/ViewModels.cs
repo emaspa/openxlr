@@ -574,6 +574,16 @@ public sealed partial class MainViewModel : ViewModelBase
     public Task<string?> MoveChannel(string id, int delta) => Reorder(id, delta, isMix: false);
     public Task<string?> MoveMix(string id, int delta) => Reorder(id, delta, isMix: true);
 
+    internal Task<string?> PlaceDisplayItem(string source, string target, bool after, bool isMix)
+    {
+        string[] channels = Channels.Select(c => c.Id).ToArray();
+        string[] mixes = Mixes.Select(m => m.Id).ToArray();
+        string[] current = isMix ? mixes : channels;
+        string[] ordered = DisplayOrder.Place(current, source, target, after);
+        if (current.SequenceEqual(ordered)) return Task.FromResult<string?>(null);
+        return Edit(_client.SetDisplayOrderAsync(isMix ? channels : ordered, isMix ? ordered : mixes));
+    }
+
     public Task<string?> UseDisplayOrderForRouting()
         => Edit(_client.SetLayoutOrderAsync(
             Channels.Where(c => c.IsEditable).Select(c => c.Id).ToArray(),

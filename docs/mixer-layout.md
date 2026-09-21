@@ -202,3 +202,12 @@ current presentation; `{}` clears it. Entries for deleted channels or mixes
 are dropped when recalling. Malformed entries reject the whole profile before
 hardware or mixer settings change. Presentation ordering never changes the
 routing order of channels and mixes.
+
+The window's Arrange handles use `setDisplayOrder` for channels and mixes,
+with both complete ID lists from the latest state. Hidden channels remain in
+the lists. The drag inserts the source before or after its destination; it
+does not exchange the two items or reorder intervening items. No optimistic
+order is applied before the daemon's state and acknowledgement arrive.
+The five window sections use a separate `sectionOrder` preference in
+`ui.json` and in the profile's `presentation.sectionOrder`; it is independent
+of routing and skin resources.

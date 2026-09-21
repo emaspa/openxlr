@@ -51,6 +51,7 @@ python3 tools/test-monitor-volume.py  # private PipeWire server and session bus;
 xvfb-run -a make -C native test-editor  # also needs Xvfb and xauth
 OPENXLR_TEST_DESKTOP=1 xvfb-run -a dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~TrayWindowTests
 OPENXLR_TEST_LAYOUT=1 xvfb-run -a -s '-screen 0 2560x1440x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~WindowLayoutTests
+OPENXLR_TEST_ORDER=1 xvfb-run -a -s '-screen 0 2560x1440x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~WindowOrderTests
 OPENXLR_TEST_TOOLTIP=1 xvfb-run -a -s '-screen 0 1600x1000x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~ToolTipInputTests
 OPENXLR_TEST_SKIN=1 xvfb-run -a -s '-screen 0 2560x1440x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~SkinWindowTests
 ```
@@ -88,6 +89,11 @@ windows and mixer widths from 640 to 2400 logical pixels. Set
 `OPENXLR_LAYOUT_ARTIFACTS` to a directory to save rendered previews. Set
 `OPENXLR_LAYOUT_FONT` to an installed font family, such as `DejaVu Sans`, to
 check wrapping with different font metrics.
+
+The window-order test runs separately with `OPENXLR_TEST_ORDER=1`. It uses
+XTEST pointer and keyboard events with a private daemon connection to check
+dragging, cancellation, scrolling, save failures, reopening and skin changes.
+It needs `libXtst`, like the tooltip test.
 
 The tooltip test runs in its own process too. It drives a real pointer
 through the X server's XTEST extension, so it needs `libXtst`, and it
