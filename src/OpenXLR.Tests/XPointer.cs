@@ -30,9 +30,9 @@ internal sealed class XPointer : IDisposable
         XFlush(_display);
     }
 
-    public void SetButton(bool pressed)
+    public void SetButton(bool pressed, uint button = 1)
     {
-        XTestFakeButtonEvent(_display, 1, pressed ? 1 : 0, 0);
+        XTestFakeButtonEvent(_display, button, pressed ? 1 : 0, 0);
         XFlush(_display);
     }
 

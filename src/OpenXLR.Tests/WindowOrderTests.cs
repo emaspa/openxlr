@@ -108,9 +108,62 @@ public sealed class WindowOrderTests
             Assert.Equal(Ui(Order), Ui(() => UiSettings.Load().SectionOrder));
             Assert.All(Sections, id => Assert.False(Ui(() => main!.FindControl<Expander>(id)!.IsExpanded)));
 
+            // A stationary drag must not continually rewrite the target's
+            // content and styles on every autoscroll timer tick.
+            Move(Center(Handle("InputsTile"))); pointer.SetButton(true);
+            Move(Center(Handle("SubmixerTile")));
+            Button destination = Handle("SubmixerTile");
+            Wait(() => Ui(() => destination.Classes.Contains("reorderTarget")));
+            int targetChanges = 0;
+            void ContentChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+            {
+                if (e.Property == ContentControl.ContentProperty) Interlocked.Increment(ref targetChanges);
+            }
+            void ClassesChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+                => Interlocked.Increment(ref targetChanges);
+            Ui(() =>
+            {
+                destination.PropertyChanged += ContentChanged;
+                destination.Classes.CollectionChanged += ClassesChanged;
+                return true;
+            });
+            try
+            {
+                Thread.Sleep(250);
+                Assert.Equal(0, Volatile.Read(ref targetChanges));
+                Move(Ui(() =>
+                {
+                    var card = (Border)main!.FindControl<Expander>("SubmixerTile")!.Parent!;
+                    return card.PointToScreen(new Point(20, card.Bounds.Height * .75));
+                }));
+                Wait(() => Ui(() => Equals(destination.Content, "↓")));
+                Move(Center(destination));
+                Wait(() => Ui(() => Equals(destination.Content, "↑")));
+                Move(Center(Handle("InputsTile")));
+                Wait(() => Ui(() => !destination.Classes.Contains("reorderTarget")));
+                Assert.Equal("↕", Ui(() => destination.Content));
+            }
+            finally
+            {
+                Ui(() =>
+                {
+                    destination.PropertyChanged -= ContentChanged;
+                    destination.Classes.CollectionChanged -= ClassesChanged;
+                    return true;
+                });
+                pointer.Key(0xff1b); pointer.SetButton(false);
+            }
+
             // A click on the grip, a cancelled drag, and release outside the
             // window must not toggle, save, or reorder the tile.
             string[] before = Ui(Order);
+            Move(Center(Handle("InputsTile"))); pointer.SetButton(true);
+            Move(Center(Handle("SubmixerTile")));
+            pointer.SetButton(true, 3); Thread.Sleep(80);
+            pointer.SetButton(false, 3); Thread.Sleep(80);
+            Assert.Equal(before, Ui(Order)); // only releasing the left button can finish the drag
+            Assert.True(Ui(() => destination.Classes.Contains("reorderTarget")));
+            pointer.Key(0xff1b); pointer.SetButton(false); Thread.Sleep(80);
             Click(Handle("InputsTile"));
             Assert.False(Ui(() => main!.FindControl<Expander>("InputsTile")!.IsExpanded));
             Drag("InputsTile", "SubmixerTile", false, cancel: true);
@@ -206,6 +259,7 @@ public sealed class WindowOrderTests
         }
         finally
         {
+            pointer.SetButton(false, 3);
             pointer.SetButton(false);
             Ui(() => { main?.Close(); quit.Cancel(); return true; });
             thread.Join(TimeSpan.FromSeconds(15));

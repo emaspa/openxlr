@@ -93,6 +93,9 @@ check wrapping with different font metrics.
 The window-order test runs separately with `OPENXLR_TEST_ORDER=1`. It uses
 XTEST pointer and keyboard events with a private daemon connection to check
 dragging, cancellation, scrolling, save failures, reopening and skin changes.
+It also checks that a stationary drag leaves target styling unchanged,
+that crossing a tile's midpoint updates the arrow, and that an extra mouse
+button does not prematurely complete a drag.
 It needs `libXtst`, like the tooltip test.
 
 The tooltip test runs in its own process too. It drives a real pointer

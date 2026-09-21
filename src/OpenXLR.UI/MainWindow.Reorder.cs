@@ -134,8 +134,8 @@ public partial class MainWindow
 
     private void UpdateDropTarget()
     {
-        ClearDropTarget();
-        if (_dragHandle is not { } source || !CanReorder(source) || !source.IsEffectivelyVisible) return;
+        if (_dragHandle is not { } source || !CanReorder(source) || !source.IsEffectivelyVisible)
+        { ClearDropTarget(); return; }
         foreach (Button target in _dragTargets)
         {
             if (ReferenceEquals(source, target) || !target.IsEffectivelyVisible || TopLevel.GetTopLevel(target) != this
@@ -147,12 +147,21 @@ public partial class MainWindow
                 if (ancestor.TranslatePoint(default, this) is { } clip)
                     visible = visible.Intersect(new Rect(clip, ancestor.Bounds.Size));
             if (!visible.Contains(_dragPoint)) continue;
-            _dropHandle = target;
-            _dropAfter = Group(source) == 0 ? _dragPoint.Y > bounds.Center.Y : _dragPoint.X > bounds.Center.X;
-            target.Classes.Add("reorderTarget");
+            bool after = Group(source) == 0 ? _dragPoint.Y > bounds.Center.Y : _dragPoint.X > bounds.Center.X;
+            // Timer ticks and pointer moves often keep the same destination.
+            // Do not invalidate its styling and content unless it changes.
+            if (ReferenceEquals(_dropHandle, target) && _dropAfter == after) return;
+            if (!ReferenceEquals(_dropHandle, target))
+            {
+                ClearDropTarget();
+                _dropHandle = target;
+                target.Classes.Add("reorderTarget");
+            }
+            _dropAfter = after;
             target.Content = Group(source) == 0 ? (_dropAfter ? "↓" : "↑") : (_dropAfter ? "→" : "←");
-            break;
+            return;
         }
+        ClearDropTarget();
     }
 
     private void ClearDropTarget()
