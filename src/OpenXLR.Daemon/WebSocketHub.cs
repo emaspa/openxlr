@@ -308,6 +308,13 @@ public sealed class WebSocketHub
             case "syncWindowsPlugins":
                 await ReplyOperationAsync(await Task.Run(() => InstallPlugin(installer => installer.SyncWindows(InsertPluginPaths()))));
                 break;
+            case "addPluginSearchPath":
+            case "removePluginSearchPath":
+                if (!OpenXLR.Core.Mixing.PluginSearchPaths.Valid(cmd.Kind, cmd.Path))
+                { error = "invalid plugin format or search path"; break; }
+                await ReplyOperationAsync(await Task.Run(() => InstallPlugin(_ =>
+                    OpenXLR.Core.Mixing.PluginSearchPaths.Change(cmd.Kind!, cmd.Path!, cmd.Cmd == "addPluginSearchPath"))));
+                break;
             case "rescanPlugins":
                 await ReplyOperationAsync(await Task.Run(() => InstallPlugin(_ => new OpenXLR.Core.Mixing.InstallOutcome(true, "", []))));
                 break;
@@ -529,7 +536,7 @@ public sealed class WebSocketHub
             OpenXLR.Core.Mixing.InstallOutcome outcome;
             try { outcome = step(new OpenXLR.Core.Mixing.PluginInstaller()); }
             catch (Exception ex) { outcome = new(false, ex.Message, []); }
-            OpenXLR.Core.Mixing.PluginCatalog.Refresh();
+            if (outcome.RefreshCatalogue) OpenXLR.Core.Mixing.PluginCatalog.Refresh();
             // What this install brought: plugins not listed before, and when
             // the install landed somewhere, only those found there, so
             // plugins that arrived by other means are not credited to it.

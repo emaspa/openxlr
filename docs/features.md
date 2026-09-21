@@ -456,3 +456,6 @@ identity comes from KDE Plasma's KWin; on other desktops the routing key
 reports that it cannot identify the application. See
 [Desktop keys](manual.md#desktop-keys) and
 [Output keys](manual.md#output-keys).
+
+The plugin manager combines effective LV2, CLAP and VST3 search paths, extra
+folders, all-format rescanning and the existing Windows-plugin controls.

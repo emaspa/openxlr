@@ -1860,3 +1860,46 @@ it. The usual revision needs no note. The rarer one is named in the
 Options connection note, and so is a dock that answers on neither
 address. Such a dock still connects, so save diagnostics from Options
 and open an issue with them.
+
+## Plugin manager
+
+Open **Options**, **Plugins**, **Plugin manager** to see all three native
+plugin formats' search paths and manage Windows plugins in the same window.
+The path list distinguishes added paths from defaults or environment settings
+and marks directories that are missing or inaccessible.
+
+Choose LV2, CLAP or VST3 and **Add search folder** to scan plugins in place.
+No copy or installation is made. **Remove added path** stops searching that
+extra location without deleting its files. Paths from environment variables
+and standard locations cannot be removed here. A path may still be searched
+if a default or environment setting includes it. The manager allows 32 extra
+paths across all formats. Paths must be absolute directories, not the filesystem
+root, and cannot contain colons or control characters.
+
+**Rescan all plugins** refreshes every format and retries failed bundles using
+the existing scanner and cache. Windows **Rescan** also synchronizes yabridge.
+The current insert hosts are not restarted by a rescan. If a removed path was
+a plugin's only location, that plugin cannot be loaded again until the path is
+restored. Search paths are saved privately in `plugin-paths.json`; environment
+variables keep their existing precedence. The LV2 loading rules below apply to additional folders.
+
+If the saved path file is corrupt, normal paths remain usable and the manager
+shows a warning. An added path that can no longer be resolved, such as a symbolic
+link loop, is ignored without hiding healthy added paths. Repair the path or the
+saved file before editing paths so a partial read cannot overwrite your
+configuration. Scanning reports failed bundles as before.
+
+When `LV2_PATH` is unset, lilv keeps its own compiled-in default paths,
+including distribution-specific paths. The manager lists explicit and added
+LV2 paths only; it cannot enumerate lilv's built-in search list. Additional
+folders are discovered for the catalogue, but loading a plugin from one of
+these folders requires including it in the daemon's `LV2_PATH`. If that variable
+is already set, additional folders are appended for discovery and live hosts.
+
+Use a dedicated plugin folder. System trees such as `/usr` and `/proc` are
+refused, symbolic-link aliases are recognized, and overlapping search folders
+cannot be added. Recursive CLAP/VST3 discovery stops after 16,384 entries per
+root and reports the limit; choose a narrower folder if that happens.
+
+If the daemon disconnects while the plugin picker is open, its choices and
+selection clear until the new connection supplies the catalogue.
