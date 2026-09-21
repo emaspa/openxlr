@@ -270,6 +270,16 @@ public sealed class WindowLayoutTests
                 }
                 Capture(chain, "chain-440");
 
+                var soundCheck = new SoundCheckWindow { DataContext = vm.Inserts.SoundCheck };
+                windows.Add(soundCheck);
+                soundCheck.Show();
+                Layout(soundCheck, soundCheck.MinWidth, soundCheck.MinHeight);
+                var soundActions = soundCheck.GetVisualDescendants().OfType<WrapPanel>().Single();
+                AssertNoOverlap(soundActions.Children.ToArray());
+                foreach (var action in soundActions.Children) AssertInside(action, soundActions);
+                Assert.True(soundCheck.GetVisualDescendants().OfType<ScrollViewer>().Single().Bounds.Height > 50);
+                Capture(soundCheck, "sound-check-minimum");
+
                 vm.Inputs.Add(new AudioDeviceItem("test_source", "Second microphone", false));
                 vm.Inputs.Add(new AudioDeviceItem("OpenXLR_stream", "Own mix", true));
                 var setup = new MixerSetupWindow { DataContext = vm };
@@ -495,6 +505,7 @@ public sealed class WindowLayoutTests
                     Capture(folders, "plugin-folders-" + width);
                 }
                 AssertLiveLayoutOrder(main, vm);
+                SoundCheckWindowTests.CheckPendingClose();
             }
             catch (Exception ex) { failure = ex; }
             finally
