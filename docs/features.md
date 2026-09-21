@@ -456,3 +456,10 @@ identity comes from KDE Plasma's KWin; on other desktops the routing key
 reports that it cannot identify the application. See
 [Desktop keys](manual.md#desktop-keys) and
 [Output keys](manual.md#output-keys).
+
+### Momentary effect keys
+
+Effect and whole-chain keys can activate processing only while held. Overlapping
+holds restore the original bypass states after the last release. Lost releases
+expire after five seconds plus graph reconciliation; manual edits and profile
+recall take precedence. Temporary held states are not saved in profiles.
