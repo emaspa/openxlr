@@ -11,6 +11,20 @@
        caps come from the application's Ox.* appearance tokens (App.axaml and
        Skinning/SkinTokens.cs). What is left here is this window's own layout. -->
   <Window.Styles>
+    <Style Selector="Button.reorderHandle">
+      <Setter Property="IsVisible" Value="False"/>
+      <Setter Property="Padding" Value="4,1"/>
+      <Setter Property="MinHeight" Value="24"/>
+      <Setter Property="FontSize" Value="{DynamicResource Ox.Label.FontSize}"/>
+      <Setter Property="Cursor" Value="SizeAll"/>
+    </Style>
+    <Style Selector="Window.arranging Button.reorderHandle">
+      <Setter Property="IsVisible" Value="True"/>
+    </Style>
+    <Style Selector="Button.reorderTarget">
+      <Setter Property="Foreground" Value="{DynamicResource Ox.Accent}"/>
+      <Setter Property="Background" Value="{DynamicResource Ox.Control.BackgroundPointerOver}"/>
+    </Style>
     <Style Selector="TextBlock.layoutAccent">
       <Setter Property="Foreground" Value="{ReflectionBinding Appearance.Accent}"/>
     </Style>
@@ -228,10 +242,23 @@
       </DockPanel>
     </Border>
 
+    <WrapPanel Margin="0,0,0,8">
+      <ToggleButton Name="ArrangeButton" Content="Arrange" Click="OnArrange"
+                    FontSize="{DynamicResource Ox.Label.FontSize}"
+                    ToolTip.Tip="Reorder sections, channels and mixes using drag handles or arrow keys"/>
+      <Button Name="ResetSectionsButton" Content="Reset sections" Click="OnResetSections"
+              IsVisible="False" Margin="8,0,0,0" FontSize="{DynamicResource Ox.Label.FontSize}"/>
+    </WrapPanel>
+    <TextBlock Name="ArrangementNote" Classes="note" TextWrapping="Wrap" IsVisible="False" Margin="0,0,0,8"/>
+    <StackPanel Name="SectionCards" Spacing="8">
     <!-- device controls -->
-    <Border Classes="card" Margin="0,0,0,8">
+    <Border Classes="card">
       <Expander Name="InputsTile" Classes="section" Theme="{StaticResource TileExpanderTheme}" IsExpanded="True">
-        <Expander.Header><TextBlock Text="INPUTS" Classes="h"/></Expander.Header>
+        <Expander.Header><StackPanel Orientation="Horizontal" Spacing="6">
+          <Button Classes="ghost reorderHandle" Content="↕" Tag="InputsTile" AutomationProperties.Name="Move inputs"
+                  ToolTip.Tip="Drag to another section; arrow keys move one position"/>
+          <TextBlock Text="INPUTS" Classes="h" VerticalAlignment="Center"/>
+        </StackPanel></Expander.Header>
       <StackPanel Classes="dev" Spacing="4">
 
         <!-- XLR 1 -->
@@ -409,9 +436,13 @@
     </Border>
 
     <!-- headphone outputs (jack 1 on the front of the unit, jack 2 on the back) -->
-    <Border Classes="card" Margin="0,0,0,8">
+    <Border Classes="card">
       <Expander Name="HeadphonesTile" Classes="section" Theme="{StaticResource TileExpanderTheme}" IsExpanded="True">
-        <Expander.Header><TextBlock Text="HEADPHONES" Classes="h"/></Expander.Header>
+        <Expander.Header><StackPanel Orientation="Horizontal" Spacing="6">
+          <Button Classes="ghost reorderHandle" Content="↕" Tag="HeadphonesTile" AutomationProperties.Name="Move headphones"
+                  ToolTip.Tip="Drag to another section; arrow keys move one position"/>
+          <TextBlock Text="HEADPHONES" Classes="h" VerticalAlignment="Center"/>
+        </StackPanel></Expander.Header>
       <StackPanel Classes="dev" Spacing="4">
         <Grid ColumnDefinitions="90,*,64,20,90,*,64">
           <TextBlock Text="Phones 1" Classes="h" VerticalAlignment="Center" ToolTip.Tip="Front jack"/>
@@ -445,10 +476,12 @@
     </Border>
 
     <!-- monitor destination: the device you hear the Monitor mix on -->
-    <Border Classes="card" Margin="0,0,0,8" IsVisible="{Binding HasMixer}">
+    <Border Classes="card" IsVisible="{Binding HasMixer}">
       <Expander Name="MonitorTile" Classes="section" Theme="{StaticResource TileExpanderTheme}" IsExpanded="True">
         <Expander.Header>
           <StackPanel Orientation="Horizontal" Spacing="6">
+            <Button Classes="ghost reorderHandle" Content="↕" Tag="MonitorTile" AutomationProperties.Name="Move monitor"
+                    ToolTip.Tip="Drag to another section; arrow keys move one position"/>
             <TextBlock Text="MONITOR" Classes="h" VerticalAlignment="Center"/>
             <ToggleButton Name="OutputBoost" Content="150%" IsChecked="{Binding OutputVolumeRange.Boost, Mode=TwoWay}"
                           Padding="8,1" FontSize="{DynamicResource Ox.Label.FontSize}" MinHeight="0" VerticalAlignment="Center"
@@ -498,10 +531,12 @@
     </Border>
 
     <!-- running applications and the channel each is routed to -->
-    <Border Classes="card" Margin="0,0,0,8" IsVisible="{Binding HasMixer}">
+    <Border Classes="card" IsVisible="{Binding HasMixer}">
       <Expander Name="ApplicationsTile" Classes="section" Theme="{StaticResource TileExpanderTheme}" IsExpanded="True">
         <Expander.Header>
           <StackPanel Orientation="Horizontal" Spacing="10">
+            <Button Classes="ghost reorderHandle" Content="↕" Tag="ApplicationsTile" AutomationProperties.Name="Move applications"
+                    ToolTip.Tip="Drag to another section; arrow keys move one position"/>
             <TextBlock Text="APPLICATIONS" Classes="h" VerticalAlignment="Center"/>
             <Button Name="ManageApps" Content="Manage" Padding="8,1" FontSize="11" MinHeight="0" VerticalAlignment="Center"
                     IsEnabled="{Binding HasApps}" Click="OnManageApps"/>
@@ -534,6 +569,8 @@
       <Expander Name="SubmixerTile" Classes="section" Theme="{StaticResource TileExpanderTheme}" IsExpanded="True">
         <Expander.Header>
           <StackPanel Orientation="Horizontal" Spacing="10">
+            <Button Classes="ghost reorderHandle" Content="↕" Tag="SubmixerTile" AutomationProperties.Name="Move submixer"
+                    ToolTip.Tip="Drag to another section; arrow keys move one position"/>
             <TextBlock Text="SUBMIXER" Classes="h" VerticalAlignment="Center"/>
             <Button Content="Edit layout" Padding="8,1" FontSize="11" MinHeight="0" VerticalAlignment="Center"
                     IsVisible="{Binding HasMixer}" IsEnabled="{Binding CanEditLayout}" Click="OnEditLayout"
@@ -563,6 +600,9 @@
               <Border Classes="tile" Padding="10" Margin="0,0,8,8" Width="232"
                       IsVisible="{Binding Visible}">
                 <StackPanel Spacing="6">
+                    <Button Classes="ghost reorderHandle" Content="↔" Tag="{Binding}" HorizontalAlignment="Left"
+                            AutomationProperties.Name="{Binding Name, StringFormat='Move {0}'}"
+                            ToolTip.Tip="Drag to another tile in this row; arrow keys move one position"/>
                   <TextBlock Text="{Binding Appearance.Icon}" Classes.layoutAccent="{Binding Appearance.HasColour}" IsVisible="{Binding Appearance.Icon, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                   <Grid ColumnDefinitions="*,Auto">
                     <TextBlock Text="{Binding Name}" Classes.layoutAccent="{Binding Appearance.HasColour}" Classes="strip"
@@ -636,6 +676,9 @@
                 <Border Classes="tile" Padding="10" Margin="0,0,8,0" Width="132"
                         IsVisible="{Binding DisplayVisible}">
                   <StackPanel Spacing="8">
+                    <Button Classes="ghost reorderHandle" Content="↔" Tag="{Binding}" HorizontalAlignment="Left"
+                            AutomationProperties.Name="{Binding Name, StringFormat='Move {0}'}"
+                            ToolTip.Tip="Drag to another tile in this row; arrow keys move one position"/>
                     <TextBlock Text="{Binding Appearance.Icon}" Classes.layoutAccent="{Binding Appearance.HasColour}" HorizontalAlignment="Center" IsVisible="{Binding Appearance.Icon, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                     <TextBlock Text="{Binding Name}" Classes.layoutAccent="{Binding Appearance.HasColour}" Classes="strip" HorizontalAlignment="Center"/>
                     <!-- stereo level meter (L over R), dB scale -->
@@ -670,6 +713,7 @@
       </DockPanel>
       </Expander>
     </Border>
+    </StackPanel>
   </StackPanel>
   </ScrollViewer>
 </Window>

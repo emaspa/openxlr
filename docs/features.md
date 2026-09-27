@@ -462,3 +462,11 @@ order, channel hiding without routing changes, and a compact selected-channel
 view. Profiles recall this presentation and, when saved from the window,
 its skin and compact view. Stream Deck keys follow the same icons and colours. See
 [mixer presentation](manual.md#mixer-presentation).
+
+
+### Arrange the mixer window
+
+An Arrange mode adds drag handles and keyboard ordering to the window's
+sections, channels and mix tiles. Section order is saved locally and can be
+reset independently; channel and mix order use the existing display-order
+command. Skin changes retain the arrangement and audio routing is unchanged.

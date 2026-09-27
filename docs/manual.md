@@ -1897,7 +1897,7 @@ monitor mix is displayed first. Stream Deck feed keys also use that default.
 The combined Monitor A+B feed stays one choice, and a Deck key advances past
 it even when the monitor mixes are displayed in a different order.
 
-Profiles saved from the window also recall its skin, collapsed sections,
+Profiles saved from the window also recall its skin, section order, collapsed sections,
 compact view and selected compact channel. Channel and mix icons, colours,
 hidden channels and display order are saved in the mixer scene. Older profiles
 that have no presentation leave it unchanged. A missing skin uses the shipped
@@ -1905,3 +1905,34 @@ default; a missing compact channel falls back to an available channel without
 forgetting the saved selection. Startup, tray, update and security preferences
 remain local. A recall is applied once, including after reconnecting to the
 daemon; subsequent manual edits remain until another profile is loaded.
+Loading a profile cancels a drag in progress before restoring its order.
+
+### Arranging the window
+
+Turn on **Arrange** above the window's sections to show drag handles. Drag
+Inputs, Headphones, Monitor, Applications or Submixer above or below another
+section. The header and service notices stay at the top. Drag a channel or
+mix handle to the left or right side of another tile in the same row. The
+arrow on the destination handle shows which side will receive it. Sections,
+channels and mixes are separate groups; a channel cannot become a section.
+
+Only handles start a move. Faders, buttons and the expand/collapse header
+keep their normal actions. Focus a handle and use an arrow key to move it
+one visible position, or press Escape to cancel a drag. Holding a dragged
+handle near the window or channel viewport edge scrolls that viewport.
+Releasing outside a matching tile leaves the order unchanged. **Reset
+sections** restores the five sections' original order; channel and mix
+order are unaffected. Arrange mode starts off when the window opens.
+
+Section order is saved in `ui.json`, alongside collapsed sections, and
+in profiles saved from the window. It survives a restart and skin changes. Skins still supply the
+same appearance resources to the existing controls. A save failure leaves
+the previous order in place and displays an error. Missing sections in an
+older saved order are appended; unknown or repeated entries are ignored.
+
+Channels and mixes reuse the layout's saved display order. Their moves wait
+for the daemon's confirmation, preserve hidden channels and keep routing
+priority and audio connections unchanged. Only visible strips are drop
+targets. Compact mode has a single channel, so switch it off or use Edit
+layout to change channel order. While a move is awaiting confirmation,
+another move is not accepted; failed requests display an error.
