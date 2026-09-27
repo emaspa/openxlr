@@ -28,6 +28,9 @@ public static class CommandValidation
     {
         switch (cmd.Cmd)
         {
+            case "addPluginSearchPath":
+            case "removePluginSearchPath":
+                return PluginSearchPaths.Valid(cmd.Kind, cmd.Path) ? null : "invalid plugin format or search path";
             case "getNativeEditorRules":
                 return null;
             case "setNativeEditorRule":

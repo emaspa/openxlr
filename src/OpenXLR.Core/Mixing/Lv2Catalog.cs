@@ -61,6 +61,8 @@ public static class Lv2Catalog
     /// </summary>
     internal static IReadOnlyList<PluginInfo> ScanNow(string? lv2Path = null)
     {
+        bool includeAdditional = lv2Path is null;
+        lv2Path ??= PluginSearchPaths.Lv2Override();
         var result = new List<PluginInfo>();
         IntPtr world;
         try { world = Lilv.lilv_world_new(); }
@@ -75,6 +77,14 @@ public static class Lv2Catalog
                 Lilv.lilv_node_free(pathNode);
             }
             Lilv.lilv_world_load_all(world);
+            if (includeAdditional && lv2Path is null)
+                foreach (string directory in PluginSearchPaths.Additional("lv2"))
+                    foreach (string bundle in HostScan.FindBundles(directory, ".lv2", directoryBundles: true))
+                    {
+                        IntPtr uri = Lilv.lilv_new_file_uri(world, null, bundle.TrimEnd('/') + "/");
+                        try { Lilv.lilv_world_load_bundle(world, uri); }
+                        finally { Lilv.lilv_node_free(uri); }
+                    }
             IntPtr controlPort = Lilv.lilv_new_uri(world, "http://lv2plug.in/ns/lv2core#ControlPort");
             IntPtr audioPort = Lilv.lilv_new_uri(world, "http://lv2plug.in/ns/lv2core#AudioPort");
             IntPtr inputPort = Lilv.lilv_new_uri(world, "http://lv2plug.in/ns/lv2core#InputPort");
@@ -322,6 +332,9 @@ public static class Lv2Catalog
         [DllImport(Lib)] public static extern IntPtr lilv_world_new();
         [DllImport(Lib)] public static extern void lilv_world_free(IntPtr world);
         [DllImport(Lib)] public static extern void lilv_world_load_all(IntPtr world);
+        [DllImport(Lib)] public static extern void lilv_world_load_bundle(IntPtr world, IntPtr uri);
+        [DllImport(Lib)] public static extern IntPtr lilv_new_file_uri(IntPtr world,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string? host, [MarshalAs(UnmanagedType.LPUTF8Str)] string path);
         [DllImport(Lib)] public static extern IntPtr lilv_world_get_all_plugins(IntPtr world);
         [DllImport(Lib)] public static extern IntPtr lilv_world_find_nodes(IntPtr world, IntPtr subject, IntPtr predicate, IntPtr obj);
         [DllImport(Lib)] public static extern IntPtr lilv_new_uri(IntPtr world, [MarshalAs(UnmanagedType.LPUTF8Str)] string uri);

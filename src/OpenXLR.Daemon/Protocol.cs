@@ -108,6 +108,8 @@ public sealed record NativeEditorRulesChangedMessage
 public sealed record PluginSetupMessage(PluginSetup Setup)
 {
     [JsonPropertyName("type")] public string Type => "pluginSetup";
+    [JsonPropertyName("searchDirectories")] public IReadOnlyList<PluginSearchDirectory> SearchDirectories => Setup.SearchDirectories;
+    [JsonPropertyName("searchPathWarning")] public string? SearchPathWarning => Setup.SearchPathWarning;
     [JsonPropertyName("hostInstalled")] public bool HostInstalled => Setup.HostInstalled;
     [JsonPropertyName("lv2Directory")] public string Lv2Directory => Setup.Lv2Directory;
     [JsonPropertyName("clapDirectory")] public string ClapDirectory => Setup.ClapDirectory;

@@ -35,8 +35,8 @@ public static class ClapCatalog
     }
 
     private static IReadOnlyList<string> WithManagedPath(IEnumerable<string> paths)
-        => ManagedYabridge.Discover() is null ? [.. paths]
-            : [Path.Combine(ManagedYabridge.PluginHome, "clap"), .. paths];
+        => PluginSearchPaths.Include("clap", ManagedYabridge.Discover() is null ? paths
+            : [Path.Combine(ManagedYabridge.PluginHome, "clap"), .. paths]);
 
     internal static IReadOnlyList<PluginInfo> ScanNow(IEnumerable<string>? directories = null, bool retryFailures = false)
         => HostScan.Run("clap", "scan-clap", directories ?? SearchPath(),
@@ -83,8 +83,8 @@ public static class Vst3Catalog
     }
 
     private static IReadOnlyList<string> WithManagedPath(IEnumerable<string> paths)
-        => ManagedYabridge.Discover() is null ? [.. paths]
-            : [Path.Combine(ManagedYabridge.PluginHome, "vst3"), .. paths];
+        => PluginSearchPaths.Include("vst3", ManagedYabridge.Discover() is null ? paths
+            : [Path.Combine(ManagedYabridge.PluginHome, "vst3"), .. paths]);
 
     /// <summary>Bundles at any depth, since yabridge keeps its own directory under ~/.vst3, never descending into one.</summary>
     internal static IEnumerable<string> Bundles(string directory)
@@ -118,8 +118,9 @@ internal static class HostScan
     /// </param>
     internal static IEnumerable<string> FindBundles(string directory, string extension,
         bool directoryBundles, StringComparison comparison = StringComparison.Ordinal,
-        Action<string, Exception>? unreadable = null)
+        Action<string, Exception>? unreadable = null, int entryLimit = 16384)
     {
+        int entries = 0;
         var found = new List<string>();
         var pending = new Stack<string>([directory]);
         var visited = new HashSet<string>(StringComparer.Ordinal);
@@ -132,6 +133,11 @@ internal static class HostScan
                 // Enumeration itself is lazy and can fail during MoveNext.
                 foreach (string entry in Directory.EnumerateFileSystemEntries(current))
                 {
+                    if (++entries > entryLimit)
+                    {
+                        unreadable?.Invoke(current, new IOException($"Plugin directory exceeds the {entryLimit} entry search limit; choose a narrower directory."));
+                        return found;
+                    }
                     bool isDirectory = Directory.Exists(entry);
                     if (entry.EndsWith(extension, comparison) && (directoryBundles || !isDirectory)) found.Add(entry);
                     else if (isDirectory) pending.Push(entry);

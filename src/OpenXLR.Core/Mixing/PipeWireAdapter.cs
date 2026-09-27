@@ -752,6 +752,7 @@ public sealed class PipeWireAdapter
         psi.ArgumentList.Add("load-module");
         psi.ArgumentList.Add("libpipewire-module-filter-chain");
         psi.ArgumentList.Add(spa);
+        PluginSearchPaths.ApplyLv2(psi);
         var p = Process.Start(psi) ?? throw new InvalidOperationException("failed to start pw-cli");
         // pw-cli -m intentionally lives for the module's lifetime. Drain both
         // pipes continuously: leaving redirected output unread can fill the OS

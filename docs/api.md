@@ -495,3 +495,31 @@ dial rings and the keys agree; on a monitor mix sink it goes through the
 existing mix setter, so state and graph updates follow the same path as the
 mixer mute control; on any other output it uses pipewire-pulse's atomic
 toggle. The daemon pushes state whenever a sink's volume or mute changes.
+
+### Plugin search paths
+
+`getPluginSetup` includes `searchDirectories`, a list of `{kind, path, custom,
+exists}` entries for LV2, CLAP and VST3, and optional `searchPathWarning`.
+Default and environment paths remain active; `custom` marks additions in
+`plugin-paths.json`. Missing paths remain visible and removable. Existence is
+a directory check, not a guarantee that every bundle can be read or loaded.
+When `LV2_PATH` is unset, lilv's compiled defaults remain active and are not
+listed; additional LV2 paths extend catalogue discovery only. Set `LV2_PATH`
+explicitly to make custom LV2 directories available to live hosts. An explicit
+value is applied to both discovery and child hosts even without added paths.
+
+`addPluginSearchPath {kind, path}` and `removePluginSearchPath {kind, path}`
+accept `kind` equal to `lv2`, `clap` or `vst3` and an absolute directory path,
+at most 4096 characters, without colons or control characters. The filesystem
+root and broad system directories are refused. Paths are resolved through
+symbolic links; a parent or child of a known search directory is refused.
+Add requires an existing directory; removal works offline.
+At most 32 additions across all formats are stored. Changes are saved atomically
+before the existing catalogue refresh runs, under the installation lock.
+An already registered addition or absent removal succeeds without rescanning.
+Recursive discovery stops after 16,384 entries per root and reports that limit.
+Both commands return the existing `pluginInstall` result and correlated error
+handling. A failed save leaves the old paths intact; a corrupt configuration
+must be repaired before editing it. Unresolvable saved entries are ignored with
+`searchPathWarning`; healthy entries remain available and edits are refused until
+the saved paths can be read completely. No plugin file is removed.

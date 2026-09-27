@@ -30,6 +30,7 @@ public sealed class InsertsViewModel : ViewModelBase
     private readonly int _channels;
     private bool _applying;
     private bool _pluginsRequested;
+    private int _catalogGeneration;
 
     /// <param name="channel">Insert key: "xlr1", "xlr2", or "mix:&lt;id&gt;".</param>
     /// <param name="channels">1 for the mono mic path, 2 for a stereo mix.</param>
@@ -95,16 +96,28 @@ public sealed class InsertsViewModel : ViewModelBase
         => _catalogTask ??= client.RequestPluginsAsync(TimeSpan.FromSeconds(20));
 
     /// <summary>Fetch the catalog once per connection (lilv's scan can take a moment).</summary>
-    public async void EnsurePluginsLoaded()
+    public void EnsurePluginsLoaded() => _ = LoadPluginsAsync();
+
+    internal async Task LoadPluginsAsync()
     {
         if (_pluginsRequested) return;
         _pluginsRequested = true;
         Note = "Scanning plugins…";
-        JsonNode? plugins = await CatalogAsync(_client);
-        Dispatcher.UIThread.Post(() =>
+        int generation = ++_catalogGeneration;
+        Task<JsonNode?> request = CatalogAsync(_client);
+        JsonNode? plugins = await request.ConfigureAwait(false);
+        await Dispatcher.UIThread.InvokeAsync(() =>
         {
+            if (generation != _catalogGeneration) return;
             PluginChoices.Clear();
-            if (plugins is not JsonArray arr) { Note = "Plugin list unavailable"; _pluginsRequested = false; _catalogTask = null; return; }
+            SelectedPlugin = null;
+            if (plugins is not JsonArray arr)
+            {
+                Note = "Plugin list unavailable";
+                _pluginsRequested = false;
+                if (ReferenceEquals(_catalogTask, request)) _catalogTask = null;
+                return;
+            }
             foreach (JsonNode? p in arr)
             {
                 if (p is null) continue;
@@ -120,7 +133,7 @@ public sealed class InsertsViewModel : ViewModelBase
                     p["kind"]?.GetValue<string>() ?? "lv2",
                     p["nativeUiBlocked"]?.GetValue<bool>() == true));
             }
-            foreach (InsertViewModel insert in Items) insert.RefreshNativeFlags();
+            foreach (InsertViewModel insert in Items) insert.RefreshCatalogue();
             string width = _channels == 1 ? "mono" : "stereo";
             Note = PluginChoices.Count == 0
                 ? $"No {width} plugins found. Install some, or add one with the buttons below"
@@ -144,7 +157,15 @@ public sealed class InsertsViewModel : ViewModelBase
         return channels == 1 ? ins == 1 && outs == 1 : ins >= 2 && outs >= 2;
     }
 
-    public void ResetForNewConnection() { _pluginsRequested = false; _catalogTask = null; }
+    public void ResetForNewConnection()
+    {
+        _catalogGeneration++;
+        _pluginsRequested = false;
+        _catalogTask = null;
+        PluginChoices.Clear();
+        SelectedPlugin = null;
+        Note = null;
+    }
 
     /// <summary>
     /// After a plugin was installed: every chain fetches the catalogue
@@ -159,9 +180,6 @@ public sealed class InsertsViewModel : ViewModelBase
     public void Refetch() { _pluginsRequested = false; EnsurePluginsLoaded(); }
 
     internal DaemonClient Client => _client;
-
-    /// <summary>Whether the catalog has arrived for this chain.</summary>
-    public bool CatalogReady => PluginChoices.Count > 0;
 
     /// <summary>Apply the daemon's view of this channel's chain.</summary>
     public void Apply(JsonNode? chain)
@@ -313,7 +331,11 @@ public sealed class InsertViewModel : ViewModelBase
         : "Open this plugin's controls";
 
     /// <summary>Everything the row and the controls window derive from the host state.</summary>
-    internal void RefreshNativeFlags() => RaiseNativeFlags();
+    internal void RefreshCatalogue()
+    {
+        RaiseNativeFlags();
+        if (_paramsRequested) BuildParams();
+    }
 
     private void RaiseNativeFlags()
     {
@@ -386,17 +408,14 @@ public sealed class InsertViewModel : ViewModelBase
     /// opening). If the catalog is not here yet, ask for it and build as
     /// soon as it lands.
     /// </summary>
+    private bool _paramsRequested;
     public void EnsureParams()
     {
-        if (Params.Count > 0) return;
-        if (_owner.CatalogReady) { BuildParams(); return; }
-        void OnCatalog(object? s, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        if (!_paramsRequested)
         {
-            if (!_owner.CatalogReady || Params.Count > 0) return;
-            _owner.PluginChoices.CollectionChanged -= OnCatalog;
+            _paramsRequested = true;
             BuildParams();
         }
-        _owner.PluginChoices.CollectionChanged += OnCatalog;
         _owner.EnsurePluginsLoaded();
     }
 
@@ -477,7 +496,8 @@ public sealed class InsertViewModel : ViewModelBase
 
     private void BuildParams()
     {
-        RaiseNativeFlags();
+        Params.Clear();
+        Groups.Clear();
         if (_owner.ParamsFor(Plugin) is not JsonArray arr) return;
         foreach (JsonNode? p in arr)
         {

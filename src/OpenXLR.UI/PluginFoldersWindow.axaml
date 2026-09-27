@@ -3,12 +3,30 @@
         xmlns:vm="using:OpenXLR.UI"
         x:Class="OpenXLR.UI.PluginFoldersWindow"
         x:DataType="vm:OptionsViewModel"
-        Title="Windows plugins" Width="760" Height="820" MinWidth="480" MinHeight="380"
+        Title="Plugin manager" Width="760" Height="820" MinWidth="480" MinHeight="380"
         WindowStartupLocation="CenterOwner" Background="{DynamicResource Ox.Window.Background}">
   <Grid Margin="18" RowDefinitions="*,12,Auto">
     <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
       <StackPanel Spacing="8" Margin="0,0,12,0">
+        <TextBlock Text="Plugin search paths" Classes="h"/>
+        <TextBlock Text="Default and environment paths stay active. Add a directory to scan plugins in place. Removing a path keeps its files; an insert needs another search path to find it on its next load." Classes="hint" TextWrapping="Wrap"/>
+        <TextBlock Text="{Binding SearchPathWarning}" Classes="hint" TextWrapping="Wrap"
+                   IsVisible="{Binding SearchPathWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+        <ListBox Name="SearchDirectoryList" ItemsSource="{Binding SearchDirectories}" Height="190" SelectionChanged="OnSearchPathSelected">
+          <ListBox.ItemTemplate><DataTemplate x:DataType="vm:PluginSearchDirectoryItem">
+            <TextBlock Text="{Binding Label}" TextWrapping="Wrap"/>
+          </DataTemplate></ListBox.ItemTemplate>
+        </ListBox>
+        <WrapPanel>
+          <ComboBox Name="SearchFormat" Margin="0,0,8,4" MinWidth="90"/>
+          <Button Name="AddSearchPath" Content="Add search folder" Margin="0,0,8,4" Click="OnAddSearchPath"/>
+          <Button Name="RemoveSearchPath" Content="Remove added path" Margin="0,0,8,4" Click="OnRemoveSearchPath" IsEnabled="False"/>
+          <Button Name="RescanAll" Content="Rescan all plugins" Margin="0,0,8,4" Click="OnRescanAll"/>
+        </WrapPanel>
+        <TextBlock Text="{Binding SkippedPlugins}" Classes="hint" TextWrapping="Wrap"/>
+        <TextBlock Text="Rescan retries failed bundles and refreshes every format. It does not restart running insert chains." Classes="hint" TextWrapping="Wrap"/>
         <TextBlock Text="Windows VST3 and CLAP plugins" FontSize="17" FontWeight="SemiBold"/>
+        <TextBlock Text="{Binding WindowsPlugins}" Classes="hint" TextWrapping="Wrap"/>
         <TextBlock Text="Choose a folder, then select an individual plugin below."
                    FontSize="12" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
         <TextBlock Text="{Binding WindowsImportNote}" IsVisible="{Binding WindowsImportNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
