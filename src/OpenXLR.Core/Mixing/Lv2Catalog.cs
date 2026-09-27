@@ -61,6 +61,7 @@ public static class Lv2Catalog
     /// </summary>
     internal static IReadOnlyList<PluginInfo> ScanNow(string? lv2Path = null)
     {
+        lv2Path ??= Environment.GetEnvironmentVariable("LV2_PATH") is { Length: > 0 } configured ? configured : null;
         var result = new List<PluginInfo>();
         IntPtr world;
         try { world = Lilv.lilv_world_new(); }
@@ -268,6 +269,7 @@ public static class Lv2Catalog
         IReadOnlyList<string>? uiFeatures = X11UiRequiredFeatures(world, plugin);
         return new PluginInfo("lv2", uri, name, category, audioIns, audioOuts, inSym, outSym, pars, features, inSyms, outSyms)
         {
+            ReportsLatency = Lilv.lilv_plugin_has_latency(plugin),
             UnsupportedFeatures = UnsupportedFeatures(features),
             HasNativeUi = uiFeatures is not null,
             NativeUiRequiredFeatures = uiFeatures ?? [],
@@ -343,6 +345,7 @@ public static class Lv2Catalog
         [DllImport(Lib)] public static extern IntPtr lilv_plugin_get_name(IntPtr plugin);
         [DllImport(Lib)] public static extern IntPtr lilv_plugin_get_class(IntPtr plugin);
         [DllImport(Lib)] public static extern IntPtr lilv_plugin_class_get_label(IntPtr cls);
+        [DllImport(Lib)] [return: MarshalAs(UnmanagedType.I1)] public static extern bool lilv_plugin_has_latency(IntPtr plugin);
         [DllImport(Lib)] public static extern uint lilv_plugin_get_num_ports(IntPtr plugin);
         [DllImport(Lib)] public static extern IntPtr lilv_plugin_get_port_by_index(IntPtr plugin, uint index);
         [DllImport(Lib)] public static extern void lilv_plugin_get_port_ranges_float(IntPtr plugin, float[] mins, float[] maxs, float[] defs);

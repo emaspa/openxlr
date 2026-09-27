@@ -28,6 +28,9 @@ public static class CommandValidation
     {
         switch (cmd.Cmd)
         {
+            case "setMixLatencyCompensation":
+                return cmd.Value.ValueKind is JsonValueKind.True or JsonValueKind.False
+                    ? null : "setMixLatencyCompensation: value must be a boolean";
             case "getNativeEditorRules":
                 return null;
             case "setNativeEditorRule":

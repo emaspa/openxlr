@@ -149,7 +149,25 @@ static void run(Host *h, Clap *c, uint32_t frames) {
   }
 }
 
+static uint32_t test_latency(const clap_plugin_t *plugin) { return 512; }
+static void latency_reports(void) {
+  Host host = {0};
+  Clap clap = {.h = &host};
+  host.impl = &clap;
+  assert(clap_latency(&host) == UINT32_MAX);
+  clap.activated = true;
+  assert(clap_latency(&host) == 0);
+  const clap_plugin_latency_t ext = {.get = test_latency};
+  clap.latency = &ext;
+  assert(clap_latency(&host) == 512);
+  host.latency_reported = true;
+  clap.host.host_data = &clap;
+  latency_changed(&clap.host);
+  assert(!host.latency_reported);
+}
+
 int main(void) {
+  latency_reports();
   Host h = {.rate = 48000, .channels = 2};
 
   // 1. main stereo in + stereo sidechain in, one stereo out.

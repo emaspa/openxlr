@@ -42,6 +42,7 @@ public sealed record InsertStatus(InsertDefinition Insert, string? Error,
     IReadOnlyDictionary<string, double>? Meters = null,
     bool NativeHostRunning = false)
 {
+    public double? LatencyMilliseconds { get; init; }
     public bool NativeUiBlocked { get; init; }
     public string? NativeUiBlockReason { get; init; }
 }
@@ -73,6 +74,9 @@ public sealed record PluginInfo(
     /// rest and the daemon refuses them, instead of failing at graph build.
     /// </summary>
     public IReadOnlyList<string> UnsupportedFeatures { get; init; } = [];
+
+    /// <summary>LV2 metadata declares a latency output; null for older or other catalogues.</summary>
+    public bool? ReportsLatency { get; init; }
 
     public bool Supported => UnsupportedFeatures.Count == 0;
     public bool HasNativeUi { get; init; }

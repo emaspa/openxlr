@@ -67,6 +67,11 @@
         <CheckBox Content="Enable software mixer"
                   IsChecked="{Binding Submixer, Mode=TwoWay}"
                   ToolTip.Tip="Off: OpenXLR controls the hardware only and leaves the sound card in its stock PipeWire layout (the UCM profile where one exists)."/>
+        <CheckBox Content="Compensate plugin latency across mixes" IsChecked="{Binding Main.CompensateMixLatency, Mode=TwoWay}"/>
+        <TextBlock Text="Delays faster mixes to match the slowest insert chain (up to two seconds). Changing this rebuilds the plugin paths and briefly interrupts audio. Off by default."
+                   Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
+        <TextBlock Text="{Binding Main.MixLatencyError}" Foreground="{DynamicResource Ox.Text.Warning}" TextWrapping="Wrap"
+                   IsVisible="{Binding Main.MixLatencyError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
         <StackPanel Name="SoftwareMixerNotes" Spacing="6">
           <TextBlock Text="Application channels, mixes, virtual microphones and inserts."
                      FontSize="11" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>

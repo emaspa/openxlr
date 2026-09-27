@@ -440,6 +440,10 @@ public sealed class MixerService : IHostedService, IDisposable
                     });
                     Changed?.Invoke();
                     return null;
+                case "setMixLatencyCompensation":
+                    _saves.RunSaved(() => _mixer.SetMixLatencyCompensation(cmd.Value.GetBoolean(), settings => settings.Save()));
+                    Changed?.Invoke();
+                    return null;
                 case "setLevel":
                     if (cmd.Channel is null || cmd.Mix is null) return "setLevel: need 'channel' and 'mix'";
                     _mixer.SetLevel(cmd.Channel, cmd.Mix, cmd.Value.GetDouble());
