@@ -851,6 +851,18 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         }
     }
 
+    /// <summary>A display-only edit; the running plugin and its ports are kept.</summary>
+    public void RenameInsert(string channel, string insertId, string name)
+    {
+        lock (_gate)
+        {
+            if (!_inserts.TryGetValue(channel, out var inserts)) throw new ArgumentException("Unknown insert chain.");
+            int index = inserts.FindIndex(i => i.Id == insertId);
+            if (index < 0) throw new ArgumentException("Unknown insert.");
+            inserts[index] = inserts[index] with { Label = name };
+        }
+    }
+
     private void RewireInsertKeyLocked(string key) => RewireInsertKeysLocked([key]);
 
     private void RewireInsertKeysLocked(IReadOnlyList<string> keys, bool endWine = true)

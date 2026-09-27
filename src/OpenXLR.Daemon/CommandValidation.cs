@@ -122,6 +122,12 @@ public static class CommandValidation
             case "setEnforcedDefaults":
                 if (TooLong(cmd.Sink, MaxText) || TooLong(cmd.Source, MaxText)) return "setEnforcedDefaults: device name too long";
                 return null;
+
+            case "renameInsert":
+                if (cmd.Channel is null || cmd.InsertId is null || !layout.IsInsertKey(cmd.Channel)
+                    || layout.InsertInChain(cmd.Channel, cmd.InsertId) is null) return "renameInsert: select an existing insert";
+                return string.IsNullOrWhiteSpace(cmd.Name) || cmd.Name.Length > MaxText || cmd.Name.Any(char.IsControl)
+                    ? "renameInsert: name must be 1 to 256 characters without control characters" : null;
             case "setInserts":
                 if (cmd.Channel is null || cmd.Inserts is null) return "setInserts: need 'channel' and 'inserts'";
                 if (!layout.IsInsertKey(cmd.Channel)) return $"setInserts: '{Short(cmd.Channel)}' has no insert chain";
