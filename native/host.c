@@ -817,6 +817,8 @@ static void *monitor_audio(void *data) {
 // --- main -------------------------------------------------------------------
 
 static const Backend *backend_named(const char *name) {
+  if (!strcmp(name, "soundcheck"))
+    return &sound_check_backend;
   if (!strcmp(name, "lv2"))
     return &lv2_backend;
   if (!strcmp(name, "clap"))

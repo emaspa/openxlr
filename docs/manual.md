@@ -1865,3 +1865,32 @@ it. The usual revision needs no note. The rarer one is named in the
 Options connection note, and so is a dock that answers on neither
 address. Such a dock still connects, so save diagnostics from Options
 and open an issue with them.
+
+## Sound Check
+
+Open **Inserts** on XLR 1 or XLR 2, then **Sound Check**. Press **Record** and
+speak for up to ten seconds. **Loop sample** repeatedly sends that dry sample
+through the current software processing and effect chain, so you can adjust
+processing without speaking again. At least a tenth of a second is required.
+The interface's hardware gain and processing are already in the sample;
+changing those while looping cannot change the recorded signal.
+
+**Hear live mic** returns to the microphone but keeps the sample. **Record**
+replaces it. **Stop and discard** or closing the window returns to the live
+microphone and releases the sample. Effect edits remain. A loop can include a
+small transition at its boundary; record with a quiet beginning and end.
+
+One microphone session can run at a time. Sound Check needs the bundled native
+host. Audio stays in memory, never in a recording file or profile. The session
+ends on device changes, audio-helper failure, daemon restart or after ten
+minutes. If the UI loses its connection, closing it cannot deliver a stop;
+reconnect and stop the session, or it will end at that limit. The loop follows
+the normal microphone routing, including any live call or recording using it.
+
+Sound Check ignores command replies from an earlier daemon connection. Closing
+its window disables further actions while the stop command is pending, so a
+new recording cannot be queued behind that stop.
+
+A stopped session shows its reason on the affected microphone only.
+**Stop and discard** dismisses the message. Rebuilding the audio graph also
+stops the session and restores live microphone routing.

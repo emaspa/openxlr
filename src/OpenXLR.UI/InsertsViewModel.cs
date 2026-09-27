@@ -39,10 +39,13 @@ public sealed class InsertsViewModel : ViewModelBase
         _channel = channel;
         _channels = channels;
         Title = title ?? channel;
+        SoundCheck = new SoundCheckViewModel(client, channel);
     }
 
     /// <summary>What the chain belongs to, for window titles ("XLR 1", "Stream mix").</summary>
     public string Title { get; }
+    public bool CanSoundCheck => _channel is "xlr1" or "xlr2";
+    public SoundCheckViewModel SoundCheck { get; }
 
     public Task ShowNativeEditorAsync(InsertViewModel insert)
         => _client.ShowInsertUiAsync(_channel, insert.Id);

@@ -1,0 +1,27 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:OpenXLR.UI"
+        x:Class="OpenXLR.UI.SoundCheckWindow" x:DataType="vm:SoundCheckViewModel"
+        Title="Sound Check" Width="520" Height="360" MinWidth="360" MinHeight="280"
+        WindowStartupLocation="CenterOwner" Background="{DynamicResource Ox.Window.Background}">
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Margin="16" Spacing="12">
+      <TextBlock Text="Sound Check" Classes="h"/>
+      <TextBlock Text="Record up to ten seconds of your microphone, then loop it through the current effects. Adjust controls or compare chain presets while listening."
+                 Foreground="{DynamicResource Ox.Text.Primary}" TextWrapping="Wrap"/>
+      <TextBlock Text="The recording stays in memory. It is captured before software effects, but after the interface's gain and hardware processing."
+                 Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
+      <TextBlock Name="SoundCheckStatus" Text="{Binding Status}" TextWrapping="Wrap" Foreground="{DynamicResource Ox.Text.Primary}"/>
+      <WrapPanel>
+        <Button Content="Record" IsEnabled="{Binding CanRecord}" Click="OnRecord" Margin="0,0,8,8"/>
+        <Button Content="Loop sample" IsEnabled="{Binding CanLoop}" Click="OnLoop" Margin="0,0,8,8"/>
+        <Button Content="Hear live mic" IsEnabled="{Binding CanStop}" Click="OnLive" Margin="0,0,8,8"/>
+        <Button Content="Stop and discard" IsEnabled="{Binding CanStop}" Click="OnStop" Margin="0,0,8,8"/>
+      </WrapPanel>
+      <TextBlock Text="Stop or close this window to restore the microphone and discard the sample. The session also ends on device loss, daemon restart or after ten minutes. Your effect edits are kept."
+                 Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
+      <TextBlock Text="{Binding Error}" TextWrapping="Wrap" Foreground="{DynamicResource Ox.Text.Warning}"
+                 IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+    </StackPanel>
+  </ScrollViewer>
+</Window>

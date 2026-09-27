@@ -218,6 +218,10 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 d => d.Name.Contains(_inputHint, StringComparison.OrdinalIgnoreCase))?.Name)
             ?? sources.FirstOrDefault(
                 d => d.Name.Contains("Wave_XLR", StringComparison.OrdinalIgnoreCase))?.Name;
+        if (_soundCheck is not null && _soundCheckDevice != nextInput)
+        {
+            StopSoundCheckLocked(restore: false, error: "Sound Check stopped because the input device changed.");
+        }
         if (nextInput is null)
         {
             foreach (PortLink feed in _inputFeeds.Values) _pw.Unlink(feed);
@@ -253,6 +257,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         {
             foreach (ChannelDefinition ch in _config.Channels.Where(c => c.InputPair is not null))
             {
+                string source = _soundCheckChannel == ch.Id && _soundCheck is not null ? _soundCheck.SourceName : nextInput;
+                int pair = _soundCheckChannel == ch.Id ? 0 : ch.InputPair!.Value;
                 // The soft low cut and ClipGuard belong to the first XLR
                 // channel only; inserts can sit on either mono XLR channel.
                 bool lc = ch.InputPair == 0 && _lowCutHz > 0 && _lowCutApplicable;
@@ -283,7 +289,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                                 nextFeeds[ch.Id] = existingFeed;
                             else
                             {
-                                PortLink plain = _pw.RouteInputToChannel(nextInput, ch.SinkName, ch.InputPair!.Value);
+                                PortLink plain = _pw.RouteInputToChannel(source, ch.SinkName, pair);
                                 // No such capture pair on this device (see below): silent channel.
                                 if (plain.Pairs.Count == 0) continue;
                                 nextFeeds[ch.Id] = plain;
@@ -293,7 +299,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                         chain = _pw.CreateMicFilter(chainId + "_builtin", lc ? _lowCutHz : 0, cg);
                     }
 
-                    PortLink into = _pw.RouteInputToChannel(nextInput, chain.SinkName, ch.InputPair!.Value);
+                    PortLink into = _pw.RouteInputToChannel(source, chain.SinkName, pair);
                     if (into.Pairs.Count == 0)
                     {
                         // The device has no capture pair at this offset (a
@@ -325,7 +331,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                     nextFeeds[ch.Id] = directFeed;
                     continue;
                 }
-                PortLink feed = _pw.RouteInputToChannel(nextInput, ch.SinkName, ch.InputPair!.Value);
+                PortLink feed = _pw.RouteInputToChannel(source, ch.SinkName, pair);
                 // The default config always defines XLR 1, XLR 2 and Aux In
                 // (pairs 0, 1, 2); a device with fewer capture pairs has no
                 // ports at the higher offsets and RouteInputToChannel makes
@@ -411,8 +417,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     {
         lock (_gate)
         {
-            if (!_built || _chains.Count == 0) return false;
-            bool changed = false;
+            if (!_built) return false;
+            bool changed = EnsureSoundCheckLocked();
             // Mix chains heal individually; input chains re-wire the whole input path.
             foreach (MixDefinition mix in _config.Mixes)
             {
@@ -2100,6 +2106,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 SoftClipGuard = _softClipGuard,
                 SoftClipGuardAvailable = clipGuard.Available,
                 SoftClipGuardError = clipGuard.Error,
+                SoundCheck = SoundCheckSnapshotLocked(),
                 Inserts = InsertStatusLocked(),
                 EnforcedDefaultSink = _enforcedSink,
                 EnforcedDefaultSource = _enforcedSource,
@@ -2242,6 +2249,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
 
     private void TearDownLocked()
     {
+        if (_soundCheck is not null)
+            StopSoundCheckLocked(restore: false, error: "Sound Check stopped because the audio graph was rebuilt.");
         _meters.Dispose();
         _meters = new MeterReader();   // Dispose is terminal; a rebuild needs a fresh reader
         foreach (PortLink route in _monitorRoutes.Values) _pw.Unlink(route);
