@@ -609,6 +609,23 @@ public sealed class TuiViewTests
     }
 
     [Fact]
+    public void TheOutputFeedUsesTheDeclaredPrimaryMixAfterDisplayReordering()
+    {
+        (App app, List<string> sent) = Ready(tab: 3);
+        var state = System.Text.Json.Nodes.JsonNode.Parse(StateJson)!;
+        state["mixer"]!["primaryMonitorMix"] = "monitor";
+        state["mixer"]!["monitorFeeds"] = new System.Text.Json.Nodes.JsonObject();
+        state["mixer"]!["mixes"]!.AsArray().Insert(0, System.Text.Json.Nodes.JsonNode.Parse(
+            """{"id":"monitor2","name":"Monitor B","kind":"monitor"}"""));
+        app.Link.Receive(state.ToJsonString());
+        app.Draw(new Screen(140, 36));
+        Assert.Empty(sent);
+        app.Handle(new KeyPress(Key.Down));
+        app.Handle(new KeyPress(Key.Right));
+        Assert.Equal("stream", Text(Command(sent), "mix"));
+    }
+
+    [Fact]
     public void TheOutputVolumeIsTheOneTheSelectedSinksShare()
     {
         (App app, List<string> sent) = Ready(tab: 3);

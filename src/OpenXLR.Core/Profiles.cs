@@ -13,6 +13,8 @@ namespace OpenXLR.Core;
 /// </summary>
 public sealed record MixerScene
 {
+    /// <summary>Null preserves presentation from older profiles; an empty map restores defaults.</summary>
+    public Dictionary<string, LayoutAppearance>? Appearance { get; init; }
     public Dictionary<string, double> MixVolumes { get; init; } = [];
     public List<string> MixMuted { get; init; } = [];
     /// <summary>"channel|mix" to level.</summary>
@@ -43,6 +45,8 @@ public sealed record MixerScene
 /// </summary>
 public sealed record Profile
 {
+    /// <summary>Window presentation supplied by the UI; absent in older profiles.</summary>
+    public WindowPresentation? Presentation { get; init; }
     public DeviceState? Device { get; init; }
     public MixerScene? Mixer { get; init; }
 }
@@ -134,6 +138,7 @@ public static class ProfileStore
         try
         {
             Profile? profile = JsonSerializer.Deserialize<Profile>(File.ReadAllText(path), Json);
+            profile?.Presentation?.Validate();
             if (profile?.Mixer is { } scene) SavedMixerValidation.Validate(scene);
             if (profile?.Device is { } device) DeviceStateStore.Validate(device);
             return profile;

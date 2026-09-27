@@ -59,6 +59,16 @@ public static class CommandValidation
                 if (TooLong(cmd.Mix, 36) || !layout.HasVirtualMix(cmd.Mix))
                     return $"{cmd.Cmd}: '{Short(cmd.Mix)}' is not a virtual microphone";
                 return cmd.Cmd == "renameMix" && BadName(cmd.Name) ? "renameMix: name must contain 1 to 60 printable characters" : null;
+            case "setLayoutAppearance":
+                if ((cmd.Channel is null) == (cmd.Mix is null)) return "setLayoutAppearance: specify one channel or mix";
+                if (cmd.Channel is not null && !layout.HasChannel(cmd.Channel) || cmd.Mix is not null && !layout.HasMix(cmd.Mix))
+                    return "setLayoutAppearance: unknown layout item";
+                return LayoutAppearance.IsValid(cmd.Appearance) && (cmd.Mix is null || !cmd.Appearance!.Hidden) ? null : "setLayoutAppearance: invalid icon, colour or order";
+            case "setDisplayOrder":
+                if (cmd.Channels is null || cmd.Mixes is null || cmd.Channels.Count > LayoutAppearance.MaxEntries ||
+                    cmd.Mixes.Count > LayoutAppearance.MaxEntries || cmd.Channels.Concat(cmd.Mixes).Any(id => id is null || id.Length is 0 or > 36))
+                    return "setDisplayOrder: need bounded channel and mix ID lists";
+                return null;
             case "setLayoutOrder":
                 if (cmd.Channels is null || cmd.Mixes is null) return "setLayoutOrder: need 'channels' and 'mixes'";
                 if (cmd.Channels.Count > MixerConfig.MaxApplicationChannels || cmd.Mixes.Count > MixerConfig.MaxVirtualMixes)

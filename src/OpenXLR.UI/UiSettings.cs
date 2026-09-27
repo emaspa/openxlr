@@ -14,6 +14,11 @@ namespace OpenXLR.UI;
 /// </summary>
 public sealed record UiSettings
 {
+    /// <summary>Last applied daemon recall, preserved across reconnects and window restarts.</summary>
+    public string? AppliedPresentation { get; init; }
+    public IReadOnlyList<string> SectionOrder { get; init; } = [];
+    public bool CompactMixer { get; init; }
+    public string? CompactChannel { get; init; }
     public bool StartDaemonAtLogin { get; init; }
     public bool OpenWindowAtLogin { get; init; }
     public bool MinimizeToTray { get; init; }
@@ -35,9 +40,8 @@ public sealed record UiSettings
     public IReadOnlyList<string> CollapsedSections { get; init; } = [];
     /// <summary>
     /// The appearance the window wears, by skin id; null is the one the
-    /// application ships with. It lives here and nowhere else: the mixer
-    /// layout, the daemon's preferences and the audio profiles know nothing
-    /// about it, so changing appearance cannot disturb what is playing.
+    /// application ships with. Profiles may recall this choice; changing
+    /// appearance itself cannot disturb what is playing.
     /// </summary>
     public string? Skin { get; init; }
 
@@ -62,9 +66,24 @@ public sealed record UiSettings
         return new UiSettings();
     }
 
+    public WindowPresentation ExportPresentation() => new()
+    {
+        CompactMixer = CompactMixer, CompactChannel = CompactChannel, Skin = Skin,
+        CollapsedSections = (CollapsedSections ?? []).ToArray(), SectionOrder = (SectionOrder ?? []).ToArray(),
+    };
+
+    internal UiSettings WithPresentation(WindowPresentation value, string revision) => this with
+    {
+        CompactMixer = value.CompactMixer, CompactChannel = value.CompactChannel, Skin = value.Skin,
+        CollapsedSections = value.CollapsedSections.ToArray(), SectionOrder = value.SectionOrder.ToArray(),
+        AppliedPresentation = revision,
+    };
+
+    internal void SaveChecked() => OpenXlrPaths.WriteAtomicJson(FilePath, this, Json);
+
     public void Save()
     {
-        try { OpenXlrPaths.WriteAtomicJson(FilePath, this, Json); }
+        try { SaveChecked(); }
         catch (Exception) { /* best effort */ }
     }
 }

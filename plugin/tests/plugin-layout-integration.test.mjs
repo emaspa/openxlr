@@ -31,6 +31,14 @@ test("plugin publishes layout updates and keeps monitor feed commands intact", a
       monitorOutputs:["qa-output"], monitorFeeds:{}, inserts:{}
     }};
     daemon.receive(state);
+    state.mixer.channels[0].mutedIn = [];
+    state.mixer.channels[0].appearance = {icon:"♫",colour:"#1234AB",hidden:true};
+    host.receive({event:"willAppear",context:"appearance-key",action:"com.emaspa.openxlr.toggle",payload:{settings:{target:"sendmute:system:monitor"}}});
+    daemon.receive(state);
+    const appearanceImage = host.messages.filter(m => m.event === "setImage" && m.context === "appearance-key").at(-1).payload.image;
+    const appearanceSvg = Buffer.from(appearanceImage.split(",")[1], "base64").toString();
+    assert.ok(appearanceSvg.includes("♫"));
+    assert.ok(appearanceSvg.includes("#1234AB"));
     host.receive({event:"sendToPlugin",context:"qa",payload:{request:"layout"}});
     assert.ok(host.messages.at(-1).payload.levelGroups.flatMap(g => g.items)
       .some(item => item.target === "send:system:monitor2"));
@@ -44,6 +52,11 @@ test("plugin publishes layout updates and keeps monitor feed commands intact", a
     host.receive({event:"willAppear",context:"feed-key",action:"com.emaspa.openxlr.toggle",payload:{settings:{target:"feed:qa-output"}}});
     host.receive({event:"keyDown",context:"feed-key"});
     assert.deepEqual(daemon.messages.at(-1), {cmd:"setMonitorFeed",device:"qa-output",mix:"monitor2"});
+    state.mixer.primaryMonitorMix = "monitor2";
+    daemon.receive(state);
+    host.receive({event:"keyDown",context:"feed-key"});
+    assert.deepEqual(daemon.messages.at(-1), {cmd:"setMonitorFeed",device:"qa-output",mix:"monitor+monitor2"});
+    delete state.mixer.primaryMonitorMix;
     state.mixer.monitorFeeds["qa-output"] = "monitor2";
     state.mixer.channels[0].name = "Renamed Desktop";
     daemon.receive(state);
@@ -58,6 +71,11 @@ test("plugin publishes layout updates and keeps monitor feed commands intact", a
       host.receive({event:"keyDown",context:"feed-key"});
       assert.deepEqual(daemon.messages.at(-1), {cmd:"setMonitorFeed",device:"qa-output",mix:next});
     }
+    [state.mixer.mixes[0], state.mixer.mixes[1]] = [state.mixer.mixes[1], state.mixer.mixes[0]];
+    state.mixer.monitorFeeds["qa-output"] = "monitor+monitor2";
+    daemon.receive(state);
+    host.receive({event:"keyDown",context:"feed-key"});
+    assert.deepEqual(daemon.messages.at(-1), {cmd:"setMonitorFeed",device:"qa-output",mix:"stream"});
     host.receive({event:"propertyInspectorDidDisappear",context:"qa"});
     const count = host.messages.filter(m => m.event === "sendToPropertyInspector").length;
     state.mixer.channels[0].name = "Another name";

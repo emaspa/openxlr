@@ -105,7 +105,8 @@ lands in Voice Chat. An app you move to another channel is remembered
 
 **Profiles** are named scenes: the interface's hardware settings plus
 the whole submixer (sends, masters, monitor outputs, aux state, insert
-chains). They are saved per interface. Application routing and the
+chains), channel and mix presentation, and the window's skin, collapsed
+sections and compact view. They are saved per interface. Application routing and the
 system default devices are not part of a profile, so recalling one
 does not rewire the desktop.
 
@@ -1865,3 +1866,42 @@ it. The usual revision needs no note. The rarer one is named in the
 Options connection note, and so is a dock that answers on neither
 address. Such a dock still connects, so save diagnostics from Options
 and open an issue with them.
+
+## Mixer presentation
+
+Use **Edit layout**, **Appearance** to select an icon and an optional `#RRGGBB`
+colour for any channel or mix. Clear the colour to follow the current skin.
+The channel's **Hide** option removes its full-size strip, not its sends,
+meters, application assignments or audio connections. Hidden channels remain
+in Edit layout, application choices and Stream Deck actions.
+
+The up and down buttons move any display item, including hardware channels,
+Monitor A, Monitor B and Aux. Routing priority, the first default application
+channel and stable IDs do not change. To also change routing priority, choose
+**Use displayed order for routing**: the first application channel becomes the
+fallback for unassigned apps, and editable channels and virtual microphones
+are saved in the displayed order. Icons and colours reach the corresponding
+Stream Deck keys; an explicit icon chosen on a key takes precedence. Mute and
+offline indicators retain their status colours.
+
+**Compact** above the mixer shows one selected channel. Its selector includes
+hidden channels, so they can still be adjusted. If a selected channel is removed
+or unavailable on the active device, the window shows an available channel;
+with no available channels it shows none. Turning Compact off restores the
+full layout. The compact preference and selected channel are local window
+preferences in `ui.json`.
+
+Changing the displayed mix order does not change an output's feed. The window,
+terminal and Omarchy bar keep showing its actual default mix even when another
+monitor mix is displayed first. Stream Deck feed keys also use that default.
+The combined Monitor A+B feed stays one choice, and a Deck key advances past
+it even when the monitor mixes are displayed in a different order.
+
+Profiles saved from the window also recall its skin, collapsed sections,
+compact view and selected compact channel. Channel and mix icons, colours,
+hidden channels and display order are saved in the mixer scene. Older profiles
+that have no presentation leave it unchanged. A missing skin uses the shipped
+default; a missing compact channel falls back to an available channel without
+forgetting the saved selection. Startup, tray, update and security preferences
+remain local. A recall is applied once, including after reconnecting to the
+daemon; subsequent manual edits remain until another profile is loaded.

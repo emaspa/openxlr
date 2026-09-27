@@ -72,10 +72,11 @@ function shownChannels(channels) {
 function monitorFeeds(mixer) {
     var mixes = mixer.mixes || [];
     var first = mixes.filter(function (mix) { return mix.kind === "monitor"; })[0];
+    var primary = mixer.primaryMonitorMix || (first ? first.id : "");
     var outputs = mixer.monitorOutputs || (mixer.monitorOutput ? [mixer.monitorOutput] : []);
     return outputs.map(function (output) {
         var feeds = mixer.monitorFeeds || {};
-        var feed = Object.prototype.hasOwnProperty.call(feeds, output) ? feeds[output] : (first ? first.id : "");
+        var feed = Object.prototype.hasOwnProperty.call(feeds, output) ? feeds[output] : primary;
         var names = String(feed || "").split("+").filter(Boolean).map(function (id) {
             var mix = mixes.filter(function (entry) { return entry.id === id; })[0];
             return mix ? mix.name : id;

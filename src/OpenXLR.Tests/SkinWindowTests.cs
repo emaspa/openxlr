@@ -51,7 +51,44 @@ public sealed class SkinWindowTests
             ThePluginBypassKeyIsLegibleInBothAppearances();
             TheOptionsColumnsCarryABalancedShareOfTheCards(options);
             TheWindowActuallyRepaintsWhenTheSkinChanges(main);
+            ProfileRecallReportsAnInvalidInstalledSkin(main);
         });
+    }
+
+    private static void ProfileRecallReportsAnInvalidInstalledSkin(MainWindow main)
+    {
+        string data = Directory.CreateTempSubdirectory("openxlr-profile-skin-").FullName;
+        string? oldHome = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
+        string? oldDirs = Environment.GetEnvironmentVariable("XDG_DATA_DIRS");
+        UiSettings previous = UiSettings.Load();
+        var skin = SkinService.Current;
+        try
+        {
+            Environment.SetEnvironmentVariable("XDG_DATA_HOME", data);
+            Environment.SetEnvironmentVariable("XDG_DATA_DIRS", Path.Combine(data, "none"));
+            string folder = Path.Combine(SkinCatalog.UserSkinDir, "badprofile");
+            Directory.CreateDirectory(folder);
+            File.WriteAllText(Path.Combine(folder, "skin.json"), """
+                {"schema":1,"name":"Broken profile skin","tokens":{"Ox.Text.Primary":"not a colour"}}
+                """);
+            var recall = new JsonObject { ["revision"] = Guid.NewGuid().ToString("N"),
+                ["settings"] = new JsonObject { ["skin"] = "badprofile" } };
+            var vm = (MainViewModel)typeof(MainWindow).GetField("_vm", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(main)!;
+            typeof(MainViewModel).GetMethod("ApplyProfilePresentation", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .Invoke(vm, [recall]);
+            Pump(main);
+            Assert.NotEmpty(SkinService.Errors);
+            Assert.Contains("Profile skin 'badprofile':", vm.Status);
+            Assert.Contains("Ox.Text.Primary", vm.Status);
+        }
+        finally
+        {
+            previous.SaveChecked();
+            SkinService.Apply(skin);
+            Environment.SetEnvironmentVariable("XDG_DATA_HOME", oldHome);
+            Environment.SetEnvironmentVariable("XDG_DATA_DIRS", oldDirs);
+            Directory.Delete(data, true);
+        }
     }
 
     private static void SkinsReachOpenWindowsAndTheDefaultComesBackExactly(

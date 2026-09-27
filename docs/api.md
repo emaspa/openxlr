@@ -95,7 +95,7 @@ written above it; false on every other model), `lowImpedance`,
 `mixer`, `devices`, `profiles`, `activeProfile`, `recallOnConnect` and
 `detected` (`usbId`, `name`, `active` for every attached interface). The
 mixer state carries `mixes`, `channels`, `monitorOutput` (the first selected
-output), `monitorOutputs`, `monitorFeeds`, `outputVolume`,
+output), `monitorOutputs`, `monitorFeeds`, `primaryMonitorMix`, `outputVolume`,
 `auxPortEnabled`, `lowCutHz`, `softClipGuard`, `softClipGuardAvailable`,
 `softClipGuardError`, `inserts` (chains by insert key, `xlr1`, `xlr2` or
 `mix:<id>`; each entry carries `insert`, `error`, `meters`,
@@ -113,7 +113,7 @@ changing the other channel or later valid frames. This protects metering and
 its JSON messages; it does not modify the audio signal sent to outputs.
 
 Commands are single JSON objects with a `cmd` field. The layout commands
-(`createChannel` through `setLayoutOrder` below) succeed only after the
+(`createChannel` through `setDisplayOrder` below) succeed only after the
 new layout is written to `mixer.json`; a failed write restores the previous
 layout and answers with an error. Any command may carry a `requestId` of up to 64 characters; the
 daemon then answers with a `commandResult {requestId, error}` message after
@@ -138,11 +138,13 @@ that final acknowledgement (or an `error` without a request id):
 | `renameMix` | `mix`, `name` | rename a virtual microphone in OpenXLR; the PipeWire device keeps its old description until the daemon restarts (reloading it would throw recording apps off), and the mixer state's `renamedSinceStart` says so |
 | `deleteMix` | `mix` | remove a virtual microphone with its sends, inserts and capture device |
 | `setLayoutOrder` | `channels[]`, `mixes[]` | complete ordered lists of editable-channel and virtual-microphone ids; structural nodes stay fixed |
+| `setLayoutAppearance` | exactly one of `channel`, `mix`; `appearance {icon, colour, hidden}` | update presentation only; icon is empty or one of ● ♪ ♫ ✦ ◆ ▶ ◉, colour is null or #RRGGBB, hidden applies to channels only; omitted appearance fields reset to defaults; existing order is retained |
+| `setDisplayOrder` | `channels[]`, `mixes[]` | complete ordered lists including structural IDs; changes display order without changing routing priority |
 | `setChannelMuted` | `channel`, `mix`, `value` | one send mute |
 | `setMixVolume` / `setMixMuted` | `mix`, `value` | mix masters; monitor volume range 0 to 1.5, other mixes 0 to 1; values outside the range are clamped |
 | `setMonitorOutputs` | `devices[]` | every sink the monitor mixes feed; a newly listed output is fed by the first monitor mix |
 | `setMonitorOutput` | `device` | a single monitor sink; `null` disconnects the route |
-| `setMonitorFeed` | `device`, `mix` | what feeds one selected output: any existing mix id, including `stream`, `chat`, `auxout` and custom virtual microphones, or distinct ids joined with `+` to sum them. The Pro's own jacks follow one feed together. The state's `monitorFeeds` lists exceptions from the first monitor mix in layout order. Unknown or repeated mix ids and unselected outputs are rejected. Deleting the last included mix returns that output to the first monitor mix; deliberately silent matrix outputs stay silent |
+| `setMonitorFeed` | `device`, `mix` | what feeds one selected output: any existing mix id, including `stream`, `chat`, `auxout` and custom virtual microphones, or distinct ids joined with `+` to sum them. The Pro's own jacks follow one feed together. The state's `monitorFeeds` lists exceptions from `primaryMonitorMix`, the first monitor mix in routing order. Unknown or repeated mix ids and unselected outputs are rejected. Deleting the last included mix returns that output to the first monitor mix |
 | `setAuxPortEnabled` | `value` | send the Aux mix to the USB Aux port |
 | `setOutputVolume` | `value` | volume of the selected monitor devices, 0 to 1.5; the range the devices themselves take, so a desktop level above unity can be held and written back unchanged. Values outside it are clamped, and the state reports what reached the devices. With no output selected the command succeeds and changes nothing |
 | `listPlugins` | none | the installed LV2, CLAP and VST3 plugins, answered with a `plugins` message |
@@ -179,6 +181,27 @@ that final acknowledgement (or an `error` without a request id):
 | `resetDevice` | none | write the recorded defaults back to a device using connect-time restoration and forget its last settings (an error until the daemon has seen the device connect after a power cycle once); on the Wave XLR Pro, which keeps its own settings, write OpenXLR's baseline instead: gain 30 dB on both inputs, every processing stage and phantom off, headphones and aux level at half, the crossfade fully on PC, routing untouched, refused while the gain lock is on. The capabilities say `builtInDefaults` when a model has a baseline |
 | `getDiagnostics` | none | vendor block dump for bug reports |
 
+`saveProfile` accepts an optional `presentation` object containing
+`compactMixer` (boolean), `compactChannel` (nullable ID, at most 36 characters),
+`skin` (nullable ID, at most 64 characters), `collapsedSections` and
+`sectionOrder` (distinct lists of at most 16 nonempty IDs, at most 64 characters
+each). Identifiers cannot contain control characters. An empty object restores
+default presentation. Omission preserves presentation already saved in that
+profile, allowing older clients to update audio without discarding it.
+
+A successful profile recall publishes `state.profilePresentation` as
+`{ "revision": "<32-character recall ID>", "settings": { ... } }`, or null for
+a profile without window choices. This remains in state so a disconnected
+window can catch up. The window persists the revision together with the choices
+and applies it only once, including across window restarts. A fresh explicit or
+on-connect recall gets a new ID even for the same profile. Failed recalls do not
+publish new presentation. Unknown section IDs are retained but not displayed;
+unavailable skins use the window's default. These choices affect no startup,
+update or security preferences. The current window uses compact view, skin and
+collapsed sections; `sectionOrder` is also retained for windows with tile ordering.
+The mixer scene separately stores `appearance` as described in
+[mixer presentation](mixer-layout.md#presentation).
+
 When `loadProfile` writes the device settings but the mixer settings fail, the
 error says the device settings were applied and gives the mixer error. A
 profile file that fails validation, or that cannot be parsed, is refused
@@ -188,8 +211,9 @@ levels must be finite numbers.` without one.
 
 An output's feed names one mix or several joined with `+`, every one at
 unity; a blend at other levels is a mix of its own. An absent entry in
-`monitorFeeds` selects the first monitor mix. The per-route levels of
-0.1.40 and 0.1.41 (`outputRoutes`, `setOutputRoute`) are gone: a saved
+`monitorFeeds` selects `primaryMonitorMix`, independent of the displayed mix
+order; it is null if there is no monitor mix. Older daemons omit that field;
+their first monitor mix is the default. The per-route levels of 0.1.40 and 0.1.41 (`outputRoutes`, `setOutputRoute`) are gone: a saved
 list is ignored and the command is unknown.
 
 `setEnforcedDefaults` accepts `sink: "@monitor"` to follow the first selected
@@ -495,3 +519,7 @@ dial rings and the keys agree; on a monitor mix sink it goes through the
 existing mix setter, so state and graph updates follow the same path as the
 mixer mute control; on any other output it uses pipewire-pulse's atomic
 toggle. The daemon pushes state whenever a sink's volume or mute changes.
+
+Mixer channel and mix state entries carry `appearance {icon, colour, hidden, order}`.
+Older clients may ignore it. Display order is reflected in the state arrays;
+channel levels, routing IDs and mix kinds retain their existing meaning.

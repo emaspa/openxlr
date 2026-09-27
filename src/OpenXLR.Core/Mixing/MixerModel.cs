@@ -140,9 +140,11 @@ public sealed record MixerState
     /// <summary>node.names of every sink the monitor mixes feed.</summary>
     public IReadOnlyList<string> MonitorOutputs { get; init; } = [];
 
+    /// <summary>The default output feed, independent of the displayed mix order.</summary>
+    public string? PrimaryMonitorMix { get; init; }
+
     /// <summary>
-    /// Which monitor mix feeds an output, by output name; an output absent
-    /// here is fed by the first monitor mix.
+    /// Explicit mix feeds by output name; an output absent here uses PrimaryMonitorMix.
     /// </summary>
     public IReadOnlyDictionary<string, string> MonitorFeeds { get; init; } = new Dictionary<string, string>();
 
@@ -190,7 +192,10 @@ public sealed record MixerState
 }
 
 /// <param name="Kind">"monitor", "virtualMic" or "auxPort", so clients can tell monitor mixes apart.</param>
-public sealed record MixStatus(string Id, string Name, double Volume, bool Muted, string Kind = "monitor");
+public sealed record MixStatus(string Id, string Name, double Volume, bool Muted, string Kind = "monitor")
+{
+    public LayoutAppearance Appearance { get; init; } = LayoutAppearance.Default;
+}
 
 /// <param name="Present">
 /// False when the active device has no jack behind this channel, so a client
@@ -201,7 +206,10 @@ public sealed record ChannelStatus(string Id, string Name,
     IReadOnlyDictionary<string, double> Levels,
     IReadOnlyList<string> MutedIn,
     bool Hardware = false, string? CaptureSource = null, int CapturePair = 0, bool CaptureConnected = false,
-    bool Present = true);
+    bool Present = true)
+{
+    public LayoutAppearance Appearance { get; init; } = LayoutAppearance.Default;
+}
 
 
 /// <summary>

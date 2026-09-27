@@ -31,6 +31,9 @@ mix-to-output feed commands, which accept any existing mix or a sum of distinct
 mix ids. For example,
 `{"cmd":"setMonitorFeed","device":"alsa_output.headset","feed":"monitor+chat"}`
 makes an already selected headset hear Monitor A and Chat summed.
+`setLayoutAppearance` and `setDisplayOrder` also use this endpoint. Their
+changes are acknowledged only after the layout settings are saved; rejected
+appearance values or incomplete ID lists return an error without changing audio.
 Both transports share the dispatcher,
 validation and broadcasts. HTTP returns
 `{"apiVersion":"1","ok":true,"messages":[]}` after a successful mutation.
