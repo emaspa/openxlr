@@ -58,6 +58,13 @@ test("plugin publishes layout updates and keeps monitor feed commands intact", a
       host.receive({event:"keyDown",context:"feed-key"});
       assert.deepEqual(daemon.messages.at(-1), {cmd:"setMonitorFeed",device:"qa-output",mix:next});
     }
+    state.mixer.mixes.push({id:"headphones",name:"Headphones",kind:"monitor"});
+    for (const [current, next] of [["monitor2", "monitor+monitor2"], ["auxout", "headphones"], ["headphones", "monitor"]]) {
+      state.mixer.monitorFeeds["qa-output"] = current;
+      daemon.receive(state);
+      host.receive({event:"keyDown",context:"feed-key"});
+      assert.deepEqual(daemon.messages.at(-1), {cmd:"setMonitorFeed",device:"qa-output",mix:next});
+    }
     host.receive({event:"propertyInspectorDidDisappear",context:"qa"});
     const count = host.messages.filter(m => m.event === "sendToPropertyInspector").length;
     state.mixer.channels[0].name = "Another name";

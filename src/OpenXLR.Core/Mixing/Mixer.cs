@@ -546,7 +546,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     public bool HasMix(string id) { lock (_gate) return _config.Mixes.Any(m => m.Id == id); }
     public bool HasApplicationChannel(string id) { lock (_gate) return _config.Channels.Any(c => c.Id == id && c.IsApplication); }
     public bool HasEditableChannel(string id) { lock (_gate) return _config.Channels.Any(c => c.Id == id && c.InputPair is null); }
-    public bool HasVirtualMix(string id) { lock (_gate) return _config.Mixes.Any(m => m.Id == id && m.Kind == MixKind.VirtualMic); }
+    public bool HasEditableMix(string id) { lock (_gate) return _config.Mixes.Any(m => m.Id == id && m.IsEditable); }
     public bool IsMonitorFeed(string feed) { lock (_gate) return NormalizeFeedLocked(feed) is not null; }
 
     /// <summary>
@@ -1047,8 +1047,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             {
                 UserChannels = [.. _config.Channels.Where(c => c.InputPair is null)
                     .Select(c => new UserChannelDefinition(c.Id, c.Name, c.CaptureSource, c.CapturePair))],
-                UserMixes = [.. _config.Mixes.Where(m => m.Kind == MixKind.VirtualMic)
-                    .Select(m => new UserMixDefinition(m.Id, m.Name))],
+                UserMixes = [.. _config.Mixes.Where(m => m.IsEditable)
+                    .Select(m => new UserMixDefinition(m.Id, m.Name) { Kind = KindName(m.Kind) })],
                 MixVolumes = new Dictionary<string, double>(_mixVolume),
                 MixMuted = [.. _mixMuted],
                 Levels = new Dictionary<string, double>(_levels),
@@ -2084,7 +2084,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 Mixes = [.. _config.Mixes.Select(m => new MixStatus(
                     m.Id, m.Name,
                     _mixVolume.GetValueOrDefault(m.Id, 1.0),
-                    _mixMuted.Contains(m.Id), KindName(m.Kind)))],
+                    _mixMuted.Contains(m.Id), KindName(m.Kind), m.IsEditable))],
                 Channels = [.. _config.Channels.Select(c => new ChannelStatus(
                     c.Id, c.Name,
                     _config.Mixes.ToDictionary(m => m.Id, m => _levels.GetValueOrDefault(Cell(c.Id, m.Id), 0.0)),

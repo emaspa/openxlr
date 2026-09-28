@@ -1138,6 +1138,15 @@ list, turns another PipeWire capture source into a channel
 ([Additional capture inputs](#capture-inputs)). The hardware inputs,
 Monitor A, Monitor B and Aux are listed but fixed.
 
+Under MIXES, enter a name and choose **Monitor mix** to make a separate
+blend for headphones, speakers or another output. Choose it beside that
+output in the MONITOR device picker, then open the channel sends you need.
+Its master follows Linux volume and mute controls and supports the same 150%
+boost as Monitor A/B. It creates no extra virtual microphone. Choose
+**Virtual microphone** instead when a recorder or calling app needs a source.
+Both kinds share the limit of 16 user mixes, including Stream and Chat.
+The existing Monitor A+B choice continues to include only those two mixes.
+
 Reordering updates the open window as soon as the daemon publishes the saved
 layout, including changes made through the API. Channel tiles, mix controls
 and each channel's send rows follow the same order without resetting their
@@ -1151,12 +1160,15 @@ levels or mute state.
   Apps playing into it keep playing after a short gap; nothing else is
   touched.
 - Renaming a mix changes the name in OpenXLR and on the Stream Deck right
-  away. Other applications keep listing the old microphone name until the
+  away. Other applications keep listing the old device name until the
   daemon restarts, because reloading the device would throw them off it.
   The window shows a restart hint; restart when nothing is recording.
 - Deleting a channel moves its apps to the first remaining application
-  channel. Deleting a mix removes its virtual microphone, and anything
-  recording from it loses the device.
+  channel. Deleting a mix also removes its virtual microphone when it has one;
+  anything recording from it loses the device. Outputs that followed only
+  a deleted mix return to Monitor A, while summed feeds keep their other mixes.
+  If its sink was enforced as the system default, enforcement is cleared
+  and the desktop chooses a remaining default device.
 
 Every change is saved before the editor confirms it. Once the daemon has
 finished its final save during shutdown or restart, late layout changes are
@@ -1742,7 +1754,7 @@ Eight sections are reachable with `1` to `8`, Tab and Shift+Tab:
 
 | Section | What is on it |
 |---|---|
-| 1 Mixer | channel sends, mix masters, stereo meters and level history; channel and virtual microphone creation, renaming, removal and ordering |
+| 1 Mixer | channel sends, mix masters, stereo meters and level history; channel and user mix creation, renaming, removal and ordering |
 | 2 Matrix | the whole submixer as one grid: every channel's send into every mix, the mix masters and their meters across the top, a meter beside each channel. With height to spare a channel's meter is stereo: its name and its sends sit on a row of their own, the left bar on the row above and the right bar on the row below, so the name is centred between its two bars and each bar is centred on its letter. Where only two rows a channel fit, the name sits beside the left bar. Either way a blank row follows each channel, so its right bar never touches the next channel's left one. A short terminal keeps one row a channel and one summed bar. An XLR input is mono, so it carries one bar rather than a pair of the same reading |
 | 3 Inputs | hardware controls in grouped cards with gain arcs on a wide terminal, or a scrolling list in a small one; gain, mute, low cut, expander, voice tune and its strength, phantom power, ClipGuard and the compressor for each XLR input; software processing, headphones, direct monitor blend, hardware output routing and USB Aux return |
 | 4 Outputs | selected monitor sinks and their feeds, shared output volume, each sink's volume and mute, and the system default sink and source |
@@ -1767,8 +1779,9 @@ Controls below the visible hardware cards appear as the selection moves.
 | Mixer | Home, End | choose the masters or the last channel |
 | Mixer | Space | mute or unmute the selected master or send |
 | Mixer | `-`, `+`, `[`, `]` | lower or raise the level by five points, or by one point |
+| Mixer | `M` | add a monitor mix |
 | Mixer | `r`, `n`, `N`, `c`, `d` | rename, add an application channel, add a virtual microphone, add a capture input, or delete |
-| Mixer | Ctrl+Left/Right | reorder the selected channel or virtual microphone |
+| Mixer | Ctrl+Left/Right | reorder the selected channel or user mix |
 | Matrix | Up/Down, Left/Right, Home, End | move through the grid; Home is the masters row |
 | Matrix | Space, `-`, `+`, `[`, `]` | mute the cell, or change its level by five points or by one |
 | Lists | Up/Down, PageUp/PageDown | move between controls |

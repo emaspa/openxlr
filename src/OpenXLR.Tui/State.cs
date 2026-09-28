@@ -11,6 +11,8 @@ internal sealed record MixEntry
     public double Volume { get; init; } = 1;
     public bool Muted { get; init; }
     public string Kind { get; init; } = "virtualMic";
+    public bool? Editable { get; init; }
+    public bool IsEditable => Editable ?? Kind == "virtualMic";
 
     /// <summary>A monitor mix goes to 150%, everything else to 100%.</summary>
     public double Ceiling => Kind == "monitor" ? 1.5 : 1.0;

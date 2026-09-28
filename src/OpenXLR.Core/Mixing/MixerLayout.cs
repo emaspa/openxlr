@@ -4,19 +4,19 @@ public sealed partial record MixerConfig
 {
     // Bound graph growth even for hand-edited settings files.
     public const int MaxApplicationChannels = 32;
-    public const int MaxVirtualMixes = 16;
+    public const int MaxUserMixes = 16;
 
     /// <summary>Reorder editable nodes only; every existing ID must occur exactly once.</summary>
     public MixerConfig WithOrder(IReadOnlyList<string> channels, IReadOnlyList<string> mixes)
     {
         var apps = Channels.Where(c => c.InputPair is null).ToDictionary(c => c.Id);
-        var virtualMics = Mixes.Where(m => m.Kind == MixKind.VirtualMic).ToDictionary(m => m.Id);
+        var editable = Mixes.Where(m => m.IsEditable).ToDictionary(m => m.Id);
         Check(channels, apps.Keys, MaxApplicationChannels, "channels");
-        Check(mixes, virtualMics.Keys, MaxVirtualMixes, "mixes");
+        Check(mixes, editable.Keys, MaxUserMixes, "mixes");
         return this with
         {
             Channels = [.. Channels.Where(c => c.InputPair is not null), .. channels.Select(id => apps[id])],
-            Mixes = [.. Mixes.Where(m => m.Kind == MixKind.Monitor), .. mixes.Select(id => virtualMics[id]),
+            Mixes = [.. Mixes.Where(m => m.Kind == MixKind.Monitor && !m.IsEditable), .. mixes.Select(id => editable[id]),
                 .. Mixes.Where(m => m.Kind == MixKind.AuxPort)],
         };
 
@@ -37,11 +37,11 @@ public sealed partial record MixerConfig
         return this with { Channels = [.. Channels.Select(c => ReferenceEquals(c, channel) ? c with { Name = name } : c)] };
     }
 
-    /// <summary>The virtual microphone with one display name changed; everything else identical.</summary>
+    /// <summary>The user mix with one display name changed; everything else identical.</summary>
     public MixerConfig WithMixName(string id, string name)
     {
-        MixDefinition mix = Mixes.FirstOrDefault(m => m.Id == id && m.Kind == MixKind.VirtualMic)
-            ?? throw new InvalidOperationException($"'{id}' is not a virtual microphone");
+        MixDefinition mix = Mixes.FirstOrDefault(m => m.Id == id && m.IsEditable)
+            ?? throw new InvalidOperationException($"'{id}' is not an editable mix");
         return this with { Mixes = [.. Mixes.Select(m => ReferenceEquals(m, mix) ? m with { Name = name } : m)] };
     }
 
@@ -55,11 +55,11 @@ public sealed partial record MixerConfig
         return this with { Channels = [.. Channels.Where(c => c.Id != id)] };
     }
 
-    /// <summary>Without one virtual microphone; the per-channel sends into it go with it.</summary>
+    /// <summary>Without one user mix; the per-channel sends into it go with it.</summary>
     public MixerConfig WithoutMix(string id)
     {
-        if (!Mixes.Any(m => m.Id == id && m.Kind == MixKind.VirtualMic))
-            throw new InvalidOperationException($"'{id}' is not a virtual microphone");
+        if (!Mixes.Any(m => m.Id == id && m.IsEditable))
+            throw new InvalidOperationException($"'{id}' is not an editable mix");
         return this with
         {
             Mixes = [.. Mixes.Where(m => m.Id != id)],
@@ -72,15 +72,15 @@ public sealed partial record MixerConfig
     }
 
     /// <summary>
-    /// With a new virtual microphone after the existing ones, ahead of Aux.
+    /// With a new user mix after the existing ones, ahead of Aux.
     /// Every channel gets a muted full-level send into it, so nothing reaches
-    /// the new microphone until the user opens a send.
+    /// the new mix until the user opens a send.
     /// </summary>
     public MixerConfig WithMix(MixDefinition mix)
     {
-        if (mix.Kind != MixKind.VirtualMic) throw new InvalidOperationException("only virtual microphones can be added");
-        if (Mixes.Count(m => m.Kind == MixKind.VirtualMic) >= MaxVirtualMixes)
-            throw new InvalidOperationException("virtual microphone limit reached");
+        if (!mix.IsEditable) throw new InvalidOperationException("only user monitor mixes and virtual microphones can be added");
+        if (Mixes.Count(m => m.IsEditable) >= MaxUserMixes)
+            throw new InvalidOperationException("user mix limit reached");
         if (Mixes.Any(m => m.Id.Equals(mix.Id, StringComparison.OrdinalIgnoreCase)))
             throw new InvalidOperationException($"mix '{mix.Id}' already exists");
         return this with
@@ -126,11 +126,12 @@ public sealed partial record MixerConfig
     public static MixerConfig FromSettings(MixerSettings? settings)
     {
         MixerConfig defaults = Default();
-        var structuralMixes = defaults.Mixes.Where(m => m.Kind != MixKind.VirtualMic).ToList();
+        var structuralMixes = defaults.Mixes.Where(m => !m.IsEditable).ToList();
         var hardware = defaults.Channels.Where(c => c.InputPair is not null).ToList();
-        var mixEntries = settings?.UserMixes is null
-            ? defaults.Mixes.Where(m => m.Kind == MixKind.VirtualMic).Select(m => ((string?)m.Id, (string?)m.Name))
-            : settings.UserMixes.Select(m => (m?.Id, m?.Name));
+        var userMixes = (settings?.UserMixes ?? defaults.Mixes.Where(m => m.IsEditable)
+            .Select(m => new UserMixDefinition(m.Id, m.Name)).ToList())
+            .Where(m => m is not null && m.Kind is "monitor" or "virtualMic").ToList();
+        var mixEntries = userMixes.Select(m => ((string?)m.Id, (string?)m.Name));
         var userChannels = (settings?.UserChannels ?? defaults.Channels.Where(c => c.IsApplication)
             .Select(c => new UserChannelDefinition(c.Id, c.Name)).ToList())
             .Where(c => c is not null && (c.CaptureSource is null ? c.CapturePair == 0
@@ -138,8 +139,10 @@ public sealed partial record MixerConfig
         var channelEntries = userChannels.Select(c => ((string?)c.Id, (string?)c.Name));
 
         var mixes = structuralMixes.Where(m => m.Kind == MixKind.Monitor).ToList();
-        mixes.AddRange(ValidEntries(mixEntries, structuralMixes.Select(m => m.Id), MaxVirtualMixes)
-            .Select(m => new MixDefinition(m.Id, m.Name, MixKind.VirtualMic)));
+        mixes.AddRange(ValidEntries(mixEntries, structuralMixes.Select(m => m.Id), MaxUserMixes)
+            .Select(m => new MixDefinition(m.Id, m.Name,
+                userMixes.First(saved => saved.Id == m.Id && saved.Name?.Trim() == m.Name).Kind == "monitor"
+                    ? MixKind.Monitor : MixKind.VirtualMic)));
         mixes.AddRange(structuralMixes.Where(m => m.Kind == MixKind.AuxPort));
 
         var apps = ValidEntries(channelEntries, hardware.Select(c => c.Id).Append(StreamMatcher.Ignore), MaxApplicationChannels).ToList();
@@ -175,7 +178,8 @@ public sealed partial record MixerConfig
             {
                 bool feedback = channel.Id == "aux" && mix.Kind == MixKind.AuxPort;
                 levels[mix.Id] = feedback ? 0 : channel.Levels.GetValueOrDefault(mix.Id, 1);
-                if (feedback || channel.MutedIn.Contains(mix.Id)) muted.Add(mix.Id);
+                if (feedback || channel.MutedIn.Contains(mix.Id) ||
+                    !defaults.Mixes.Any(m => m.Id == mix.Id) && !channel.Levels.ContainsKey(mix.Id)) muted.Add(mix.Id);
             }
             return channel with { Levels = levels, MutedIn = muted };
         }

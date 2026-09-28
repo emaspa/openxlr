@@ -362,8 +362,8 @@ public sealed class DaemonClient : IAsyncDisposable
         => EditLayoutAsync(new() { ["cmd"] = "renameChannel", ["channel"] = channel, ["name"] = name });
     public Task<string?> DeleteChannelAsync(string channel)
         => EditLayoutAsync(new() { ["cmd"] = "deleteChannel", ["channel"] = channel });
-    public Task<string?> CreateMixAsync(string name)
-        => EditLayoutAsync(new() { ["cmd"] = "createMix", ["name"] = name });
+    public Task<string?> CreateMixAsync(string name, string kind = "virtualMic")
+        => EditLayoutAsync(new() { ["cmd"] = "createMix", ["name"] = name, ["kind"] = kind });
     public Task<string?> RenameMixAsync(string mix, string name)
         => EditLayoutAsync(new() { ["cmd"] = "renameMix", ["mix"] = mix, ["name"] = name });
     public Task<string?> DeleteMixAsync(string mix)

@@ -562,7 +562,7 @@ public sealed partial class MainViewModel : ViewModelBase
     public Task<string?> CreateChannel(string name) => Edit(_client.CreateChannelAsync(name));
     public Task<string?> RenameChannel(string id, string name) => Edit(_client.RenameChannelAsync(id, name));
     public Task<string?> DeleteChannel(string id) => Edit(_client.DeleteChannelAsync(id));
-    public Task<string?> CreateMix(string name) => Edit(_client.CreateMixAsync(name));
+    public Task<string?> CreateMix(string name, string kind = "virtualMic") => Edit(_client.CreateMixAsync(name, kind));
     public Task<string?> RenameMix(string id, string name) => Edit(_client.RenameMixAsync(id, name));
     public Task<string?> DeleteMix(string id) => Edit(_client.DeleteMixAsync(id));
 
@@ -866,14 +866,14 @@ public sealed partial class MainViewModel : ViewModelBase
         foreach (MonitorOutputItem item in MonitorOutputs) item.Sync(current.Contains(item.Name));
 
         var allMixes = (mixer?["mixes"] as JsonArray)?.Where(m => m is not null).ToList() ?? [];
-        var monitorMixes = allMixes.Where(m => (m!["kind"]?.GetValue<string>() ?? "monitor") == "monitor")
+        var monitorMixes = allMixes.Where(m => m!["id"]?.GetValue<string>() is "monitor" or "monitor2")
             .Select(m => new MixOption(m!["id"]!.GetValue<string>(), m["name"]?.GetValue<string>() ?? m["id"]!.GetValue<string>())).ToList();
-        // With two or more monitor mixes an output can also hear them all,
+        // An output can also hear the two built-in monitor mixes,
         // summed: "Monitor A+B" for headphones that want the desktop from A
         // and a separately processed mic from B.
         if (monitorMixes.Count > 1)
             monitorMixes.Add(new MixOption(string.Join("+", monitorMixes.Select(m => m.Id)), SummedName(monitorMixes.Select(m => m.Name))));
-        monitorMixes.AddRange(allMixes.Where(m => (m!["kind"]?.GetValue<string>() ?? "monitor") != "monitor")
+        monitorMixes.AddRange(allMixes.Where(m => m!["id"]?.GetValue<string>() is not ("monitor" or "monitor2"))
             .Select(m => new MixOption(m!["id"]!.GetValue<string>(), m["name"]?.GetValue<string>() ?? m["id"]!.GetValue<string>())));
         var feeds = mixer?["monitorFeeds"] as JsonObject;
         string primaryMonitor = monitorMixes.FirstOrDefault()?.Id ?? "monitor";
@@ -1299,8 +1299,9 @@ public sealed class MixViewModel : ViewModelBase, IHasId
     /// <summary>Display name; the daemon renames virtual microphones live.</summary>
     public string Name { get => _name; set => Set(ref _name, value); }
 
-    /// <summary>Editable: a virtual microphone. Monitors and Aux are structural.</summary>
-    public bool IsEditable => Kind == "virtualMic";
+    private bool? _editable;
+    /// <summary>The daemon owns editability; older daemons only allow virtual microphones.</summary>
+    public bool IsEditable => _editable ?? Kind == "virtualMic";
 
     /// <summary>What a structural mix is, for the layout editor.</summary>
     public string KindLabel => Kind switch { "monitor" => "monitor mix", "auxPort" => "USB Aux port", _ => "" };
@@ -1363,6 +1364,8 @@ public sealed class MixViewModel : ViewModelBase, IHasId
 
     public void ApplyFromDaemon(JsonNode n)
     {
+        bool? editable = n["editable"]?.GetValue<bool>();
+        if (_editable != editable) { _editable = editable; Raise(nameof(IsEditable)); }
         _applying = true;
         try
         {

@@ -432,9 +432,9 @@ public sealed class MixerService : IHostedService, IDisposable
                             case "createChannel": _mixer.CreateApplicationChannel(cmd.Name!, save); break;
                             case "renameChannel": _mixer.RenameApplicationChannel(cmd.Channel!, cmd.Name!, save); break;
                             case "deleteChannel": _mixer.DeleteApplicationChannel(cmd.Channel!, save); break;
-                            case "createMix": _mixer.CreateVirtualMix(cmd.Name!, save); break;
-                            case "renameMix": _mixer.RenameVirtualMix(cmd.Mix!, cmd.Name!, save); break;
-                            case "deleteMix": _mixer.DeleteVirtualMix(cmd.Mix!, save); break;
+                            case "createMix": _mixer.CreateMix(cmd.Name!, save, cmd.Kind == "monitor" ? MixKind.Monitor : MixKind.VirtualMic); break;
+                            case "renameMix": _mixer.RenameMix(cmd.Mix!, cmd.Name!, save); break;
+                            case "deleteMix": _mixer.DeleteMix(cmd.Mix!, save); break;
                             default: _mixer.SetLayoutOrder(cmd.Channels!, cmd.Mixes!, save); break;
                         }
                     });
