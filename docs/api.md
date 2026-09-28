@@ -495,3 +495,8 @@ dial rings and the keys agree; on a monitor mix sink it goes through the
 existing mix setter, so state and graph updates follow the same path as the
 mixer mute control; on any other output it uses pipewire-pulse's atomic
 toggle. The daemon pushes state whenever a sink's volume or mute changes.
+
+The HTTP transport can be disabled with `httpApiEnabled` in `daemon.json`
+(default true), applied on daemon restart. This does not disable `/ws` or
+change its commands. The Options switch saves and restarts the service.
+[HTTP resource reads](http-api.md) use this same state and dispatcher.

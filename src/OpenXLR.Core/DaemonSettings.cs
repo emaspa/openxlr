@@ -12,10 +12,13 @@ namespace OpenXLR.Core;
 /// OPENXLR_BUILD_MIXER=1). With the submixer off, OpenXLR drives the
 /// hardware only and leaves the card in its stock PipeWire layout (the UCM
 /// split, where one exists).
+/// HttpApiEnabled gates /api/v1, including events, without disabling /ws
+/// for the window, terminal and Deck. Existing installations default to on.
 /// </summary>
 public sealed record DaemonSettings
 {
     public bool? Submixer { get; init; }
+    public bool HttpApiEnabled { get; init; } = true;
 
     private static readonly JsonSerializerOptions Json = new()
     {

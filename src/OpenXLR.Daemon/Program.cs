@@ -63,7 +63,7 @@ app.Services.GetRequiredService<WebSocketHub>();   // construct so it subscribes
 ApiToken.PublishWhenListening(app.Lifetime, app.Logger);
 
 app.UseWebSockets();
-ApiEndpoints.Map(app);
+ApiEndpoints.Map(app, OpenXLR.Core.DaemonSettings.Load().HttpApiEnabled);
 
 app.Map("/ws", async (HttpContext ctx, WebSocketHub hub) =>
 {

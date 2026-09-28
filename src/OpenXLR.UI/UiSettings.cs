@@ -78,6 +78,7 @@ public sealed record UiSettings
 public sealed record DaemonPrefs
 {
     public bool? Submixer { get; init; }
+    public bool HttpApiEnabled { get; init; } = true;
 
     private static readonly JsonSerializerOptions Json = new()
     {

@@ -456,3 +456,7 @@ identity comes from KDE Plasma's KWin; on other desktops the routing key
 reports that it cannot identify the application. See
 [Desktop keys](manual.md#desktop-keys) and
 [Output keys](manual.md#output-keys).
+
+The local HTTP API exposes device, profile, mixer, channel, mix, insert and
+plugin diagnostic resources. Its Options switch persists across restarts;
+turning it off leaves the window, terminal and Deck usable.

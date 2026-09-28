@@ -36,6 +36,12 @@
           },
           "403": {
             "description": "Foreign Origin"
+          },
+          "503": {
+            "description": "API disabled or mixer unavailable"
+          },
+          "429": {
+            "description": "Request budget or command slot exhausted"
           }
         }
       }
@@ -51,6 +57,12 @@
           },
           "403": {
             "description": "Foreign Origin"
+          },
+          "503": {
+            "description": "API disabled or mixer unavailable"
+          },
+          "429": {
+            "description": "Request budget or command slot exhausted"
           }
         }
       }
@@ -66,6 +78,12 @@
           },
           "403": {
             "description": "Foreign Origin"
+          },
+          "503": {
+            "description": "API disabled or mixer unavailable"
+          },
+          "429": {
+            "description": "Request budget or command slot exhausted"
           }
         }
       }
@@ -129,7 +147,10 @@
             "description": "UTF-8 application/json required"
           },
           "429": {
-            "description": "Budget exhausted or command in flight"
+            "description": "Request budget or command slot exhausted"
+          },
+          "503": {
+            "description": "API disabled or mixer unavailable"
           }
         }
       }
@@ -146,9 +167,330 @@
           },
           "403": {
             "description": "Foreign Origin"
+          },
+          "503": {
+            "description": "API disabled or mixer unavailable"
+          },
+          "429": {
+            "description": "Request budget or command slot exhausted"
           }
         },
         "security": []
+      }
+    },
+    "/api/v1/devices": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Connected device, capabilities, detected interfaces and audio nodes"
+          },
+          "401": {
+            "description": "Credential required"
+          },
+          "403": {
+            "description": "Foreign Origin"
+          },
+          "429": {
+            "description": "Request budget or command slot exhausted"
+          },
+          "503": {
+            "description": "API disabled or mixer unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/profiles": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Saved names, active profile and recall-on-connect"
+          },
+          "401": {
+            "description": "Credential required"
+          },
+          "403": {
+            "description": "Foreign Origin"
+          },
+          "429": {
+            "description": "Request budget or command slot exhausted"
+          },
+          "503": {
+            "description": "API disabled or mixer unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/mixer": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Mixer state"
+          },
+          "401": {
+            "description": "Credential required"
+          },
+          "403": {
+            "description": "Foreign Origin"
+          },
+          "429": {
+            "description": "Request budget or command slot exhausted"
+          },
+          "503": {
+            "description": "API disabled or mixer unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/channels": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Channel states"
+          },
+          "401": {
+            "description": "Credential required"
+          },
+          "403": {
+            "description": "Foreign Origin"
+          },
+          "429": {
+            "description": "Request budget or command slot exhausted"
+          },
+          "503": {
+            "description": "API disabled or mixer unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/channels/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact case-sensitive snapshot id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Channel states"
+          },
+          "401": {
+            "description": "Credential required"
+          },
+          "403": {
+            "description": "Foreign Origin"
+          },
+          "429": {
+            "description": "Request budget or command slot exhausted"
+          },
+          "503": {
+            "description": "API disabled or mixer unavailable"
+          },
+          "404": {
+            "description": "Unknown id"
+          }
+        }
+      }
+    },
+    "/api/v1/mixes": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Mix states"
+          },
+          "401": {
+            "description": "Credential required"
+          },
+          "403": {
+            "description": "Foreign Origin"
+          },
+          "429": {
+            "description": "Request budget or command slot exhausted"
+          },
+          "503": {
+            "description": "API disabled or mixer unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/mixes/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact case-sensitive snapshot id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mix states"
+          },
+          "401": {
+            "description": "Credential required"
+          },
+          "403": {
+            "description": "Foreign Origin"
+          },
+          "429": {
+            "description": "Request budget or command slot exhausted"
+          },
+          "503": {
+            "description": "API disabled or mixer unavailable"
+          },
+          "404": {
+            "description": "Unknown id"
+          }
+        }
+      }
+    },
+    "/api/v1/inserts": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Insert chains by id"
+          },
+          "401": {
+            "description": "Credential required"
+          },
+          "403": {
+            "description": "Foreign Origin"
+          },
+          "429": {
+            "description": "Request budget or command slot exhausted"
+          },
+          "503": {
+            "description": "API disabled or mixer unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/inserts/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact case-sensitive snapshot id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Insert chains by id"
+          },
+          "401": {
+            "description": "Credential required"
+          },
+          "403": {
+            "description": "Foreign Origin"
+          },
+          "429": {
+            "description": "Request budget or command slot exhausted"
+          },
+          "503": {
+            "description": "API disabled or mixer unavailable"
+          },
+          "404": {
+            "description": "Unknown id"
+          }
+        }
+      }
+    },
+    "/api/v1/plugin-setup": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "v1 result containing pluginSetup"
+          },
+          "401": {
+            "description": "Credential required"
+          },
+          "403": {
+            "description": "Foreign Origin"
+          },
+          "429": {
+            "description": "Request budget or command slot exhausted"
+          },
+          "503": {
+            "description": "API disabled or mixer unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/plugin-diagnostics": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "v1 result containing pluginDiagnostics"
+          },
+          "401": {
+            "description": "Credential required"
+          },
+          "403": {
+            "description": "Foreign Origin"
+          },
+          "429": {
+            "description": "Request budget or command slot exhausted"
+          },
+          "503": {
+            "description": "API disabled or mixer unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/diagnostics": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "v1 result containing diagnostics"
+          },
+          "401": {
+            "description": "Credential required"
+          },
+          "403": {
+            "description": "Foreign Origin"
+          },
+          "429": {
+            "description": "Request budget or command slot exhausted"
+          },
+          "503": {
+            "description": "API disabled or mixer unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/editor-rules": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "v1 result containing nativeEditorRules"
+          },
+          "401": {
+            "description": "Credential required"
+          },
+          "403": {
+            "description": "Foreign Origin"
+          },
+          "429": {
+            "description": "Request budget or command slot exhausted"
+          },
+          "503": {
+            "description": "API disabled or mixer unavailable"
+          }
+        }
       }
     }
   },

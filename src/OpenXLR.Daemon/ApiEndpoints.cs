@@ -33,15 +33,32 @@ internal static class ApiEndpoints
         return new UTF8Encoding(false, true).GetString(content.ToArray());
     }
 
+    // Reuse the snapshot's types and stable ids; no second mixer or command model.
+    internal static IResult MixerResource(OpenXLR.Core.Mixing.MixerState? mixer, string resource, string? id = null)
+    {
+        if (mixer is null) return Results.StatusCode(503);
+        object? value = resource switch
+        {
+            "mixer" => mixer,
+            "channels" => id is null ? mixer.Channels : mixer.Channels.FirstOrDefault(c => c.Id == id),
+            "mixes" => id is null ? mixer.Mixes : mixer.Mixes.FirstOrDefault(m => m.Id == id),
+            "inserts" => id is null ? mixer.Inserts : mixer.Inserts.GetValueOrDefault(id),
+            _ => null,
+        };
+        return value is null ? Results.NotFound() : Results.Json(value);
+    }
+
     /// <summary>
     /// The token is read per request: the daemon publishes it only once the
     /// port is bound (see ApiToken), which is after these endpoints are
     /// mapped, and a restart rotates it.
     /// </summary>
-    internal static void Map(WebApplication app)
+    internal static void Map(WebApplication app, bool enabled = true)
     {
         // Bind access control to the resolved endpoints, not a request-path
         // exception. Events use first-frame authentication in WebSocketHub.
+        var budget = new CommandBudget();
+        var commandGate = new SemaphoreSlim(1, 1);
         var api = app.MapGroup("/api/v1").AddEndpointFilter(async (invocation, next) =>
         {
             HttpContext context = invocation.HttpContext;
@@ -53,23 +70,54 @@ internal static class ApiEndpoints
                 context.Response.Headers.WWWAuthenticate = "Bearer";
                 return Results.StatusCode(401);
             }
+            if (!enabled) return Results.StatusCode(503);
+            lock (budget) if (!budget.TryTake()) return Results.StatusCode(429);
             return await next(invocation);
         });
 
         app.MapGet("/healthz", () => Results.Json(new { status = "alive" }));
         api.MapGet("", () => Results.Json(new { apiVersion = "1", state = "/api/v1/state",
-            plugins = "/api/v1/plugins", commands = "/api/v1/commands", events = "/api/v1/events" }));
+            devices = "/api/v1/devices", profiles = "/api/v1/profiles", mixer = "/api/v1/mixer",
+            channels = "/api/v1/channels", mixes = "/api/v1/mixes", inserts = "/api/v1/inserts",
+            plugins = "/api/v1/plugins", pluginSetup = "/api/v1/plugin-setup",
+            pluginDiagnostics = "/api/v1/plugin-diagnostics", diagnostics = "/api/v1/diagnostics",
+            editorRules = "/api/v1/editor-rules", commands = "/api/v1/commands", events = "/api/v1/events" }));
         api.MapGet("/state", (WebSocketHub hub) => Results.Json(hub.Snapshot()));
-        api.MapGet("/plugins", async (WebSocketHub hub) =>
-            Results.Json(await hub.ExecuteForApiAsync("{\"cmd\":\"listPlugins\"}")));
-        var budget = new CommandBudget();
-        var commandGate = new SemaphoreSlim(1, 1);
+        api.MapGet("/devices", (WebSocketHub hub) =>
+        {
+            var state = hub.Snapshot();
+            return Results.Json(new { state.Connected, state.Device, state.Capabilities, state.Detected, state.Devices });
+        });
+        api.MapGet("/profiles", (WebSocketHub hub) =>
+        {
+            var state = hub.Snapshot();
+            return Results.Json(new { state.Profiles, state.ActiveProfile, state.RecallOnConnect });
+        });
+        api.MapGet("/mixer", (WebSocketHub hub) => MixerResource(hub.Snapshot().Mixer, "mixer"));
+        foreach (string resource in new[] { "channels", "mixes", "inserts" })
+        {
+            api.MapGet("/" + resource, (WebSocketHub hub) => MixerResource(hub.Snapshot().Mixer, resource));
+            api.MapGet("/" + resource + "/{id}", (string id, WebSocketHub hub) => MixerResource(hub.Snapshot().Mixer, resource, id));
+        }
+        foreach (var (path, command) in new[] { ("plugins", "listPlugins"), ("plugin-setup", "getPluginSetup"),
+            ("plugin-diagnostics", "getPluginDiagnostics"), ("diagnostics", "getDiagnostics"), ("editor-rules", "getNativeEditorRules") })
+        {
+            api.MapGet("/" + path, async (HttpContext context, WebSocketHub hub) =>
+            {
+                if (!await commandGate.WaitAsync(0, context.RequestAborted)) return Results.StatusCode(429);
+                try
+                {
+                    var result = await hub.ExecuteForApiAsync(JsonSerializer.Serialize(new { cmd = command }));
+                    return Results.Json(result, statusCode: result.Ok ? 200 : 400);
+                }
+                finally { commandGate.Release(); }
+            });
+        }
         api.MapPost("/commands", async (HttpContext context, WebSocketHub hub) =>
         {
             if (!IsJson(context.Request.ContentType)) return Results.StatusCode(415);
             if (context.Request.ContentLength > MaxCommandBytes) return Results.StatusCode(413);
-            lock (budget) if (!budget.TryTake()) return Results.StatusCode(429);
-            // One in-flight HTTP mutation, without an unbounded command queue.
+            // One in-flight HTTP command, without an unbounded command queue.
             if (!await commandGate.WaitAsync(0, context.RequestAborted)) return Results.StatusCode(429);
             try
             {
@@ -90,6 +138,7 @@ internal static class ApiEndpoints
             context.Response.Headers.CacheControl = "no-store";
             if (!LoopbackOrigin.IsAllowed(context.Request.Headers.Origin))
             { context.Response.StatusCode = 403; return; }
+            if (!enabled) { context.Response.StatusCode = 503; return; }
             if (!context.WebSockets.IsWebSocketRequest) { context.Response.StatusCode = 400; return; }
             using var socket = await context.WebSockets.AcceptWebSocketAsync(new WebSocketAcceptContext
             {

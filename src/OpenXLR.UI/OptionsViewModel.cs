@@ -42,7 +42,9 @@ public sealed class OptionsViewModel : ViewModelBase
         _startupError = RepairNote(StartupIntegration.LastRepair);
         // No saved choice means the daemon runs whatever its unit asked for,
         // which for every shipped unit is the submixer on.
-        _submixer = DaemonPrefs.Load().Submixer ?? true;
+        var daemon = DaemonPrefs.Load();
+        _submixer = daemon.Submixer ?? true;
+        _httpApiEnabled = daemon.HttpApiEnabled;
 
         BuildChoices();
         BuildSkinChoices();
@@ -349,6 +351,29 @@ public sealed class OptionsViewModel : ViewModelBase
         }
     }
 
+    private bool _httpApiEnabled;
+    public bool HttpApiEnabled
+    {
+        get => _httpApiEnabled;
+        set
+        {
+            if (_httpApiEnabled == value) return;
+            if (!_main.DaemonRestart.CanRestart) { Raise(nameof(HttpApiEnabled)); return; }
+            try { (DaemonPrefs.Load() with { HttpApiEnabled = value }).Save(); }
+            catch (Exception ex)
+            {
+                HttpApiNote = $"Could not save the setting: {ex.Message}";
+                Raise(nameof(HttpApiEnabled));
+                return;
+            }
+            Set(ref _httpApiEnabled, value);
+            _ = RestartForSettingAsync(api: true);
+        }
+    }
+
+    private string? _httpApiNote;
+    public string? HttpApiNote { get => _httpApiNote; private set => Set(ref _httpApiNote, value); }
+
     // --- submixer on/off (daemon-side setting, applied by restarting it) ---
 
     private bool _submixer;
@@ -357,20 +382,20 @@ public sealed class OptionsViewModel : ViewModelBase
         get => _submixer;
         set
         {
+            if (!_main.DaemonRestart.CanRestart) { Raise(nameof(Submixer)); return; }
             if (!Set(ref _submixer, value)) return;
             try
             {
-                new DaemonPrefs { Submixer = value }.Save();
+                (DaemonPrefs.Load() with { Submixer = value }).Save();
             }
             catch (Exception ex)
             {
+                _submixer = !value;
+                Raise(nameof(Submixer));
                 SubmixerNote = $"Could not save the setting: {ex.Message}";
                 return;
             }
-            SubmixerNote = StartupIntegration.RestartDaemon()
-                ? (value ? "Daemon restarted with the submixer on."
-                         : "Daemon restarted in hardware-control mode; the sound card keeps its stock layout and inserts are not loaded.")
-                : "Saved. Restart the daemon to apply (systemctl --user restart openxlr-daemon).";
+            _ = RestartForSettingAsync(api: false);
         }
     }
 
@@ -379,6 +404,20 @@ public sealed class OptionsViewModel : ViewModelBase
     {
         get => _submixerNote;
         private set => Set(ref _submixerNote, value);
+    }
+
+    private async System.Threading.Tasks.Task RestartForSettingAsync(bool api)
+    {
+        SetNote("Saved. Restarting the audio service...");
+        bool restarted = await _main.DaemonRestart.RestartAsync();
+        SetNote(restarted ? "Setting saved and the audio service restarted."
+            : "Saved. Restart the audio service to apply the setting.");
+
+        void SetNote(string note)
+        {
+            if (api) HttpApiNote = note;
+            else SubmixerNote = note;
+        }
     }
 
     // Start from the file so fields owned elsewhere (the main window's
