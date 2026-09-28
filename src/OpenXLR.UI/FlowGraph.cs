@@ -43,10 +43,7 @@ internal sealed record FlowGraph(IReadOnlyList<FlowNode> Nodes, IReadOnlyList<Fl
                 .Select(a => ($"app:{a.Identity}", a.Label, a.Active ? "Software" : a.StatusText,
                     FlowIcon.Application, a.Active)));
 
-            string processing = channel.Id switch
-            {
-                "xlr1" => Inserts(vm.Inserts), "xlr2" => Inserts(vm.Inserts2), _ => "",
-            };
+            string processing = Inserts(channel.Inserts);
             if (channel.Id == "xlr1")
             {
                 var stages = new List<string>();

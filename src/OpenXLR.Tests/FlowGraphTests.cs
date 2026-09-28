@@ -118,8 +118,8 @@ public sealed class FlowGraphTests
     {
         await using var client = new DaemonClient();
         var vm = new MainViewModel(client);
-        vm.Channels.Add(new(client, "xlr1", "Microphone", ["stream"]) { IsHardware = true });
-        vm.Channels.Add(new(client, "xlr2", "Second microphone", ["stream"]) { IsHardware = true });
+        vm.Channels.Add(new(client, "xlr1", "Microphone", ["stream"], vm.Inserts) { IsHardware = true });
+        vm.Channels.Add(new(client, "xlr2", "Second microphone", ["stream"], vm.Inserts2) { IsHardware = true });
         vm.Mixes.Add(new(client, "stream", "Stream") { Kind = "virtualMic" });
         vm.Inserts.Apply(System.Text.Json.Nodes.JsonNode.Parse("""
             [{"insert":{"id":"eq","plugin":"urn:eq","label":"EQ"}},

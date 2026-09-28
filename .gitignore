@@ -40,3 +40,4 @@ vendor/
 # local agent state and generated knowledge graph
 .claude/
 graphify-out/
+native/tests/gain.lv2/gain.so

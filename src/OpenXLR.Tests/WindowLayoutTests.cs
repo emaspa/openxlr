@@ -495,6 +495,7 @@ public sealed class WindowLayoutTests
                     Capture(folders, "plugin-folders-" + width);
                 }
                 AssertLiveLayoutOrder(main, vm);
+                ChannelWindowLifetimeTests.CheckRemoval(main, vm.Inserts.Client);
             }
             catch (Exception ex) { failure = ex; }
             finally
