@@ -67,6 +67,23 @@ The desktop keys tests in the main suite start a private session bus with
 a check that asks a running KDE Plasma session for its focused process; it
 routes no audio and is not part of CI.
 
+`python3 tools/test-plasma-volume.py` runs a separate virtual KWin Wayland
+session with private configuration, runtime sockets and D-Bus. It needs KWin,
+XWayland, Plasma 6's volume QML module, Qt 6 Quick Controls and Test, and the
+`kreadconfig6` and `kwriteconfig6` helpers. Set `OPENXLR_TEST_QML_RUNNER` if
+Qt 6's `qmltestrunner` is outside the usual system paths. Build Release first.
+Repeat with `AVALONIA_GLOBAL_SCALE_FACTOR=1.5` to check scaled controls.
+
+The check uses the actual Plasma `GlobalConfig` object and a Wayland checkbox
+with the same binding as Plasma's volume settings. It drives the real OpenXLR
+window through the shipped XWayland backend, checks both directions, preserves
+67% across range changes, clamps boosted levels to 100%, keeps independent
+monitor levels and follows changes while hidden and after restoring the window.
+A loopback fake daemon captures the commands; it does not control host audio.
+This complements the private PipeWire audio tests, not a physical-device or
+full Plasma-shell acceptance. The runner checks that the test actually ran,
+prints compositor and QML diagnostics and terminates its private session.
+
 The idle graph allocation check measures reads on a dedicated warmed thread,
 so test-runner diagnostic allocations are outside the measured interval. It
 still requires zero bytes and the same cached snapshot across 10,000 reads.

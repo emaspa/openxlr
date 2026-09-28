@@ -14,10 +14,20 @@ public sealed class VolumeRangeViewModel(Action limitToUnity) : ViewModelBase
         get => _boost;
         set
         {
-            if (!Set(ref _boost, value)) return;
-            if (!value) limitToUnity();
-            Raise(nameof(Maximum));
+            if (_boost == value) return;
+            Apply(value);
+            Changed?.Invoke(value);
         }
+    }
+
+    internal event Action<bool>? Changed;
+
+    // Desktop readback updates the range without writing the preference back.
+    internal void Apply(bool boost)
+    {
+        if (!Set(ref _boost, boost, nameof(Boost))) return;
+        if (!boost) limitToUnity();
+        Raise(nameof(Maximum));
     }
 
     public double Maximum => Boost ? 1.5 : 1;
