@@ -1676,6 +1676,15 @@ default and mixer routing intact. Unplugged named outputs report an error;
 their bindings remain saved for reconnection. At most 16 output-selection
 shortcuts and 32 focused-channel shortcuts are retained.
 
+OpenDeck output volume and mute keys retain rapid presses while the previous
+command is being acknowledged, with up to eight waiting presses per key and
+64 outstanding presses across all keys. Their order is preserved across
+keys, including when volume hits 0 or 150%. Overload shows an alert. An error,
+a timeout or a disconnect discards the waiting presses rather than applying
+a delayed burst; changing a key's settings or removing it also cancels its
+waiting actions. Focus-routing and system-output selection keys report busy
+instead of delaying an action whose target may have changed.
+
 For OpenDeck, use the Toggle inspector's **System output controls** and
 **Enforced system output** groups. Volume up and down keys are momentary:
 they acknowledge the press and show no state. The mute key lights red while

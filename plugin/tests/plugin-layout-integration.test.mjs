@@ -78,6 +78,26 @@ test("plugin publishes layout updates and keeps monitor feed commands intact", a
       daemon.receive({type:"commandResult",requestId});
       assert.ok(host.messages.some(m => m.event === "showOk" && m.context === "output-key"));
     }
+    host.receive({event:"willAppear",context:"rapid-key",action:"com.emaspa.openxlr.toggle",payload:{settings:{target:"outputdown:qa-output"}}});
+    const rapidStart = daemon.messages.length;
+    for (let i = 0; i < 3; i++) host.receive({event:"keyDown",context:"rapid-key"});
+    assert.equal(daemon.messages.length, rapidStart + 1);
+    for (let i = 0; i < 3; i++) {
+      assert.equal(daemon.messages.length, rapidStart + i + 1, "each acknowledged volume step must send the next queued press");
+      const step = daemon.messages.at(-1);
+      assert.deepEqual({...step, requestId:undefined}, {cmd:"adjustOutputVolume",device:"qa-output",value:-.05,requestId:undefined});
+      daemon.receive({type:"commandResult",requestId:step.requestId});
+    }
+    host.receive({event:"keyDown",context:"rapid-key"});
+    host.receive({event:"keyDown",context:"rapid-key"});
+    const oldStep = daemon.messages.at(-1);
+    host.receive({event:"didReceiveSettings",context:"rapid-key",payload:{settings:{target:"outputup:qa-output"}}});
+    const reboundStart = daemon.messages.length;
+    daemon.receive({type:"commandResult",requestId:oldStep.requestId});
+    assert.equal(daemon.messages.length, reboundStart, "a changed target must discard queued actions");
+    host.receive({event:"keyDown",context:"rapid-key"});
+    assert.equal(daemon.messages.at(-1).value, .05);
+    host.receive({event:"willDisappear",context:"rapid-key"});
     host.receive({event:"willAppear",context:"missing-output",action:"com.emaspa.openxlr.toggle",payload:{settings:{target:"outputmute:gone"}}});
     const beforeMissing = daemon.messages.length;
     host.receive({event:"keyDown",context:"missing-output"});

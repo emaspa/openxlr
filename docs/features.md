@@ -456,3 +456,8 @@ identity comes from KDE Plasma's KWin; on other desktops the routing key
 reports that it cannot identify the application. See
 [Desktop keys](manual.md#desktop-keys) and
 [Output keys](manual.md#output-keys).
+
+OpenDeck output volume and mute keys keep a bounded queue of rapid presses
+and discard waiting actions on errors, disconnects or changed bindings.
+Focus-routing and output-selection keys are not deferred. See the
+[output key controls](manual.md#output-volume-mute-and-system-output-keys).
