@@ -13,6 +13,9 @@ namespace OpenXLR.Core.Mixing;
 /// </summary>
 public sealed record MixerSettings
 {
+    /// <summary>Channel groups with independent send selection in each mix.</summary>
+    public List<ExclusiveGroupDefinition> ExclusiveGroups { get; init; } = [];
+
     /// <summary>Ordered application channels; null preserves the legacy defaults.</summary>
     public List<UserChannelDefinition>? UserChannels { get; init; }
 

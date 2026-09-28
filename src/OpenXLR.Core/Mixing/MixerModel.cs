@@ -15,6 +15,7 @@ public sealed partial record MixerConfig
 {
     public required IReadOnlyList<MixDefinition> Mixes { get; init; }
     public required IReadOnlyList<ChannelDefinition> Channels { get; init; }
+    public IReadOnlyList<ExclusiveGroupDefinition> ExclusiveGroups { get; init; } = [];
 
     /// <summary>
     /// The layout carried over from the user's Wave Link setup: three mixes
@@ -133,6 +134,7 @@ public sealed record MixerState
 {
     public required IReadOnlyList<MixStatus> Mixes { get; init; }
     public required IReadOnlyList<ChannelStatus> Channels { get; init; }
+    public IReadOnlyList<ExclusiveGroupDefinition> ExclusiveGroups { get; init; } = [];
 
     /// <summary>First selected monitor output, or null (legacy single view).</summary>
     public string? MonitorOutput { get; init; }
@@ -201,7 +203,7 @@ public sealed record ChannelStatus(string Id, string Name,
     IReadOnlyDictionary<string, double> Levels,
     IReadOnlyList<string> MutedIn,
     bool Hardware = false, string? CaptureSource = null, int CapturePair = 0, bool CaptureConnected = false,
-    bool Present = true);
+    bool Present = true, string? ExclusiveGroup = null);
 
 
 /// <summary>

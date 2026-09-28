@@ -1865,3 +1865,28 @@ it. The usual revision needs no note. The rarer one is named in the
 Options connection note, and so is a dock that answers on neither
 address. Such a dock still connects, so save diagnostics from Options
 and open an issue with them.
+
+## Exclusive input selection per mix
+
+Open **Edit layout → Exclusive groups**, name a group and select its
+channels, such as a broadcast microphone and a headset. In the submixer,
+opening one member's send closes the other members in that same mix.
+Monitor A can use the broadcast microphone while Stream uses the headset.
+The send levels stay where you set them. You can also mute all members.
+
+A new or edited group with several open members starts silent in those
+mixes; choose the wanted send after saving. Profiles store groups and
+selection. Older profiles preserve current groups, and conflicting recalled
+sends close together. Deleting a group keeps its current mutes.
+
+The INPUTS section's device mute is still global. Use the submixer send
+buttons for group selection. In the terminal mixer, Space on a grouped
+microphone controls its selected mix's send; the Inputs tab still provides
+the device mute. An XLR 1 in a group uses the software monitor path at the
+interface's jacks, which adds the normal PipeWire processing latency.
+
+OpenDeck/Stream Deck's toggle action offers **Exclusive group: name**,
+with a **Next member** choice for each mix. The key shows the active member,
+or None, and repeated presses cycle in member order. Deleted groups become
+unavailable rather than falling back to another group. If PipeWire cannot
+confirm a peer's mute, OpenXLR keeps the new member silent until recovery.

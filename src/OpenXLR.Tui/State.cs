@@ -34,6 +34,7 @@ internal sealed record ChannelEntry
     /// sending the strip so its levels survive a device change.
     /// </summary>
     public bool Present { get; init; } = true;
+    public string? ExclusiveGroup { get; init; }
 
     /// <summary>
     /// True for the XLR microphone inputs, which are mono. The daemon still

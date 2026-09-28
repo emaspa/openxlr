@@ -356,6 +356,10 @@ public sealed class DaemonClient : IAsyncDisposable
         => EditLayoutAsync(new() { ["cmd"] = "setMainOutput", ["device"] = device });
     public Task<string?> RouteFocusedAppAsync(string channel)
         => EditLayoutAsync(new() { ["cmd"] = "routeFocusedApp", ["channel"] = channel });
+    public Task<string?> SetExclusiveGroupAsync(string? group, string name, IReadOnlyList<string> channels)
+        => EditLayoutAsync(new() { ["cmd"] = "setExclusiveGroup", ["group"] = group!, ["name"] = name, ["channels"] = channels });
+    public Task<string?> DeleteExclusiveGroupAsync(string group)
+        => EditLayoutAsync(new() { ["cmd"] = "deleteExclusiveGroup", ["group"] = group });
     public Task<string?> CreateChannelAsync(string name)
         => EditLayoutAsync(new() { ["cmd"] = "createChannel", ["name"] = name });
     public Task<string?> RenameChannelAsync(string channel, string name)

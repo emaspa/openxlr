@@ -147,3 +147,11 @@ sink that mix.
 that output. `@monitor` follows the selected monitor output. Limits, rejected
 targets and linked-monitor behavior match the [WebSocket contract](api.md).
 These commands require the daemon but do not require a running UI or KDE.
+
+Exclusive channel groups use the same command endpoint and authentication:
+`{"cmd":"cycleExclusiveGroup","group":"microphones","mix":"monitor"}`
+advances one group's selection in Monitor A. `setExclusiveGroup` and
+`deleteExclusiveGroup` persist membership before replying. The state response
+includes `mixer.exclusiveGroups` and per-channel `exclusiveGroup` IDs; the
+existing send mutes represent each mix's selection. See [commands and group
+semantics](api.md#exclusive-channel-groups).

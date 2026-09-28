@@ -45,6 +45,19 @@ internal static class SavedMixerValidation
 
     internal static void Validate(MixerScene scene)
     {
+        if (scene.ExclusiveGroups is { } groups)
+        {
+            Require(groups.Count <= ExclusiveGroupsModel.MaxGroups, TooMany, "exclusiveGroups");
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            var channels = new HashSet<string>(StringComparer.Ordinal);
+            foreach (ExclusiveGroupDefinition group in groups)
+            {
+                string? error = ExclusiveGroupsModel.Validate(group);
+                Require(error is null, error ?? "invalid group", "exclusiveGroups");
+                Require(ids.Add(group.Id), "duplicate group ID", "exclusiveGroups");
+                Require(group.Channels.All(channels.Add), "overlapping groups", "exclusiveGroups");
+            }
+        }
         Levels(scene.MixVolumes, "mixVolumes");
         Levels(scene.Levels, "levels");
         Names(scene.MixMuted, "mixMuted");

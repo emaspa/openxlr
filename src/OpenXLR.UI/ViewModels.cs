@@ -559,6 +559,10 @@ public sealed partial class MainViewModel : ViewModelBase
 
     public Task<string?> CreateCaptureChannel(string name, string source, int pair)
         => Edit(_client.CreateCaptureChannelAsync(name, source, pair));
+    public IReadOnlyList<ExclusiveGroupItem> ExclusiveGroups { get; private set; } = [];
+    public Task<string?> SetExclusiveGroup(string? group, string name, IReadOnlyList<string> channels)
+        => Edit(_client.SetExclusiveGroupAsync(group, name, channels));
+    public Task<string?> DeleteExclusiveGroup(string group) => Edit(_client.DeleteExclusiveGroupAsync(group));
     public Task<string?> CreateChannel(string name) => Edit(_client.CreateChannelAsync(name));
     public Task<string?> RenameChannel(string id, string name) => Edit(_client.RenameChannelAsync(id, name));
     public Task<string?> DeleteChannel(string id) => Edit(_client.DeleteChannelAsync(id));
@@ -1001,6 +1005,9 @@ public sealed partial class MainViewModel : ViewModelBase
 
     private void ApplyMixer(JsonNode? mixer)
     {
+        ExclusiveGroups = (mixer?["exclusiveGroups"] as JsonArray)?.OfType<JsonObject>()
+            .Select(g => new ExclusiveGroupItem(g["id"]!.GetValue<string>(), g["name"]!.GetValue<string>(),
+                g["channels"]!.AsArray().Select(ch => ch!.GetValue<string>()).ToArray())).ToArray() ?? [];
         if (mixer is null) { HasMixer = false; RenamedSinceStart = false; LayoutWarning = ""; return; }
         HasMixer = true;
         RenamedSinceStart = mixer["renamedSinceStart"]?.GetValue<bool>() ?? false;

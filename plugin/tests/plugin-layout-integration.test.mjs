@@ -58,6 +58,22 @@ test("plugin publishes layout updates and keeps monitor feed commands intact", a
       host.receive({event:"keyDown",context:"feed-key"});
       assert.deepEqual(daemon.messages.at(-1), {cmd:"setMonitorFeed",device:"qa-output",mix:next});
     }
+    state.mixer.channels.push({id:"mic2",name:"Second mic",mutedIn:["monitor"]});
+    state.mixer.exclusiveGroups = [{id:"mics",name:"Microphones",channels:["system","mic2"]}];
+    daemon.receive(state);
+    host.receive({event:"willAppear",context:"group-key",action:"com.emaspa.openxlr.toggle",payload:{settings:{target:"group:mics:monitor"}}});
+    const beforeCycles = daemon.messages.length;
+    for (let i = 0; i < 7; i++) host.receive({event:"keyDown",context:"group-key"});
+    assert.equal(daemon.messages.length - beforeCycles, 7, "rapid presses must not depend on a state acknowledgement");
+    assert.deepEqual(daemon.messages.at(-1), {cmd:"cycleExclusiveGroup",group:"mics",mix:"monitor"});
+    const groupsUpdate = host.messages.filter(m => m.event === "sendToPropertyInspector" && m.context === "qa").at(-1);
+    assert.ok(groupsUpdate.payload.toggleGroups.flatMap(g => g.items).some(item => item.target === "group:mics:monitor"));
+    state.mixer.exclusiveGroups = [];
+    daemon.receive(state);
+    const beforeDeleted = daemon.messages.length;
+    host.receive({event:"keyDown",context:"group-key"});
+    assert.equal(daemon.messages.length, beforeDeleted);
+    assert.ok(host.messages.some(m => m.event === "showAlert" && m.context === "group-key"));
     host.receive({event:"propertyInspectorDidDisappear",context:"qa"});
     const count = host.messages.filter(m => m.event === "sendToPropertyInspector").length;
     state.mixer.channels[0].name = "Another name";

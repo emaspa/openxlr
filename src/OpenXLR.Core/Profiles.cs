@@ -13,6 +13,9 @@ namespace OpenXLR.Core;
 /// </summary>
 public sealed record MixerScene
 {
+    /// <summary>Null preserves groups in older profiles; an empty list removes them.</summary>
+    public List<ExclusiveGroupDefinition>? ExclusiveGroups { get; init; }
+
     public Dictionary<string, double> MixVolumes { get; init; } = [];
     public List<string> MixMuted { get; init; } = [];
     /// <summary>"channel|mix" to level.</summary>

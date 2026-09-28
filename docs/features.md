@@ -456,3 +456,12 @@ identity comes from KDE Plasma's KWin; on other desktops the routing key
 reports that it cannot identify the application. See
 [Desktop keys](manual.md#desktop-keys) and
 [Output keys](manual.md#output-keys).
+
+### Exclusive channel groups
+
+Group input, application or external capture channels and choose one member
+independently in each mix through the existing send mute buttons. Membership
+and selections persist and travel in profiles. The layout editor manages
+groups, and OpenDeck/Stream Deck keys cycle members in a chosen mix. No new
+audio nodes or gain stages are involved. See the [manual](manual.md#exclusive-input-selection-per-mix)
+for silent conflict handling and software monitoring of grouped microphones.

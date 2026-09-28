@@ -148,7 +148,7 @@ public sealed class MixerService : IHostedService, IDisposable
         // With a summed feed (A+B) the mic rides the hardware path as soon as
         // any of the summed mixes carries it.
         string jackFeed = _mixer.JackMonitorMix ?? "monitor";
-        bool micDirect = jacksOnly && _mixer.IsMonitorOnlyFeed(jackFeed) && OpenXLR.Core.Mixing.MonitorFeed.Parts(jackFeed)
+        bool micDirect = !_mixer.IsChannelGrouped("xlr1") && jacksOnly && _mixer.IsMonitorOnlyFeed(jackFeed) && OpenXLR.Core.Mixing.MonitorFeed.Parts(jackFeed)
             .Any(m => !_mixer.IsChannelMutedIn("xlr1", m));
         _mixer.SetHardwareMicMonitor(micDirect);
         if (anyJack && _devices.EnsureHeadphoneMix(monitorReturn: true, micDirect: micDirect) && _mixer.Built)
@@ -412,6 +412,8 @@ public sealed class MixerService : IHostedService, IDisposable
         {
             switch (cmd.Cmd)
             {
+                case "setExclusiveGroup":
+                case "deleteExclusiveGroup":
                 case "createCaptureChannel":
                 case "createChannel":
                 case "renameChannel":
@@ -428,6 +430,8 @@ public sealed class MixerService : IHostedService, IDisposable
                         Func<MixerSettings, string?> save = settings => settings.Save();
                         switch (cmd.Cmd)
                         {
+                            case "setExclusiveGroup": _mixer.SetExclusiveGroup(cmd.Group, cmd.Name!, cmd.Channels!, save); break;
+                            case "deleteExclusiveGroup": _mixer.DeleteExclusiveGroup(cmd.Group!, save); break;
                             case "createCaptureChannel": _mixer.CreateCaptureChannel(cmd.Name!, cmd.Source!, cmd.CapturePair, save); break;
                             case "createChannel": _mixer.CreateApplicationChannel(cmd.Name!, save); break;
                             case "renameChannel": _mixer.RenameApplicationChannel(cmd.Channel!, cmd.Name!, save); break;
@@ -438,8 +442,13 @@ public sealed class MixerService : IHostedService, IDisposable
                             default: _mixer.SetLayoutOrder(cmd.Channels!, cmd.Mixes!, save); break;
                         }
                     });
+                    SyncOutputSelectors();
                     Changed?.Invoke();
                     return null;
+                case "cycleExclusiveGroup":
+                    _mixer.CycleExclusiveGroup(cmd.Group!, cmd.Mix!);
+                    SyncOutputSelectors();
+                    break;
                 case "setLevel":
                     if (cmd.Channel is null || cmd.Mix is null) return "setLevel: need 'channel' and 'mix'";
                     _mixer.SetLevel(cmd.Channel, cmd.Mix, cmd.Value.GetDouble());
