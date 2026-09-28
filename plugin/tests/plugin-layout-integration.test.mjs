@@ -31,6 +31,35 @@ test("plugin publishes layout updates and keeps monitor feed commands intact", a
       monitorOutputs:["qa-output"], monitorFeeds:{}, inserts:{}
     }};
     daemon.receive(state);
+    state.mixer.inserts = {xlr1:[{insert:{id:"effect",plugin:"urn:test",label:"Test",bypass:true}}]};
+    daemon.receive(state);
+    for (const target of ["insert|xlr1|effect", "inschain|xlr1"]) {
+      const settings = {target,momentary:true};
+      host.receive({event:"willAppear",context:"held",action:"com.emaspa.openxlr.toggle",payload:{settings}});
+      for (const release of ["keyUp", "willDisappear", "didReceiveSettings"]) {
+        const before = daemon.messages.length;
+        host.receive({event:"keyDown",context:"held"});
+        host.receive({event:"keyDown",context:"held"});
+        assert.equal(daemon.messages.length, before + 1);
+        const begin = daemon.messages.at(-1);
+        assert.equal(begin.cmd, "holdInsert");
+        assert.equal(begin.action, "begin");
+        assert.equal(begin.channel, "xlr1");
+        assert.equal(begin.insertId, target.startsWith("insert|") ? "effect" : undefined);
+        host.receive({event:release,context:"held",payload:{settings}});
+        assert.equal(daemon.messages.at(-1).action, "end");
+        assert.equal(daemon.messages.at(-1).holdId, begin.holdId);
+        host.receive({event:"keyUp",context:"held"});
+        assert.equal(daemon.messages.length, before + 2);
+        host.receive({event:"willAppear",context:"held",action:"com.emaspa.openxlr.toggle",payload:{settings}});
+      }
+    }
+    host.receive({event:"willAppear",context:"normal",action:"com.emaspa.openxlr.toggle",payload:{settings:{target:"insert|xlr1|effect",momentary:false}}});
+    host.receive({event:"keyDown",context:"normal"});
+    assert.equal(daemon.messages.at(-1).cmd, "setInsertBypass");
+    const afterNormal = daemon.messages.length;
+    host.receive({event:"keyUp",context:"normal"});
+    assert.equal(daemon.messages.length, afterNormal);
     host.receive({event:"sendToPlugin",context:"qa",payload:{request:"layout"}});
     assert.ok(host.messages.at(-1).payload.levelGroups.flatMap(g => g.items)
       .some(item => item.target === "send:system:monitor2"));

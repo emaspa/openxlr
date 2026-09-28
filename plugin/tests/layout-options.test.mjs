@@ -87,3 +87,26 @@ test("a removed output dial target is kept as an unavailable choice", () => {
   assert.equal(select.value, "output:");
   assert.equal(document.getElementById("unavailable-layout-target"), undefined);
 });
+
+
+test("momentary checkbox loads and saves a boolean without losing target metadata", () => {
+  const script = readFileSync(new URL("../com.emaspa.openxlr.sdPlugin/propertyInspector/pi.js", import.meta.url), "utf8");
+  const markup = readFileSync(new URL("../com.emaspa.openxlr.sdPlugin/propertyInspector/toggle.html", import.meta.url), "utf8");
+  assert.match(markup, /id="momentary" type="checkbox"/);
+  for (const enabled of [true, false]) {
+    const sent = [], sockets = [];
+    const target = {value:"",selectedOptions:[{dataset:{meta:JSON.stringify({plugin:"urn:test",index:0})}}],addEventListener:() => {}};
+    const checkbox = {checked:false,addEventListener:(_, fn) => checkbox.change = fn};
+    class Socket { constructor() { sockets.push(this); } send(text) { sent.push(JSON.parse(text)); } }
+    const context = vm.createContext({window:{},WebSocket:Socket,document:{getElementById:id => ({target,momentary:checkbox})[id]}});
+    vm.runInContext(script, context);
+    context.window.connectOpenActionSocket(1, "pi", "register", "{}", JSON.stringify({context:"key",payload:{settings:{target:"insert|xlr1|effect",momentary:enabled}}}));
+    sockets[0].onopen();
+    assert.equal(checkbox.checked, enabled);
+    checkbox.checked = !enabled; checkbox.change();
+    assert.equal(sent.at(-1).event, "setSettings");
+    assert.equal(sent.at(-1).payload.momentary, !enabled);
+    assert.equal(sent.at(-1).payload.target, "insert|xlr1|effect");
+    assert.deepEqual(sent.at(-1).payload.meta["insert|xlr1|effect"], {plugin:"urn:test",index:0});
+  }
+});

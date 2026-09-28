@@ -311,6 +311,13 @@ public sealed class WebSocketHub
             case "rescanPlugins":
                 await ReplyOperationAsync(await Task.Run(() => InstallPlugin(_ => new OpenXLR.Core.Mixing.InstallOutcome(true, "", []))));
                 break;
+            case "holdInsert" when cmd.Action != "begin":
+                // Renewing or releasing existing effects must remain available
+                // while an unrelated plugin installation holds the gate.
+                error = _mixer.Apply(cmd);
+                stateOnError = true;
+                break;
+            case "holdInsert":
             case "setInserts":
                 // A folder cannot be removed between checking its users and
                 // creating an insert from it on another client.

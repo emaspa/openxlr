@@ -411,8 +411,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     {
         lock (_gate)
         {
-            if (!_built || _chains.Count == 0) return false;
-            bool changed = false;
+            if (!_built) return false;
+            bool changed = ApplyHoldChangesLocked(_insertHolds.Expire());
+            if (_chains.Count == 0) return changed;
             // Mix chains heal individually; input chains re-wire the whole input path.
             foreach (MixDefinition mix in _config.Mixes)
             {
@@ -764,6 +765,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     {
         lock (_gate)
         {
+            ApplyHoldChangesLocked(_insertHolds.Cancel(channel), rewire: false);
             // A CLAP or VST3 plugin only ever runs in the native host, so its record
             // says so whatever a client sent; the window then shows it without a switch.
             _inserts[channel] = [.. inserts.Select(i => i with
@@ -845,7 +847,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         {
             if (!_inserts.TryGetValue(channel, out List<InsertDefinition>? list)) return;
             int idx = list.FindIndex(i => i.Id == insertId);
-            if (idx < 0 || list[idx].Bypass == bypass) return;
+            if (idx < 0) return;
+            bool cancelled = ApplyHoldChangesLocked(_insertHolds.Cancel(channel), rewire: false);
+            if (list[idx].Bypass == bypass && !cancelled) return;
             list[idx] = list[idx] with { Bypass = bypass };
             if (_built) RewireInsertKeyLocked(channel);
         }
@@ -1075,7 +1079,14 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// gains a key mid-write. That throws inside a timer callback, which ends
     /// the daemon.
     /// </summary>
-    private Dictionary<string, List<InsertDefinition>> CopyInsertsLocked() => CopyInserts(_inserts);
+    private Dictionary<string, List<InsertDefinition>> CopyInsertsLocked()
+    {
+        var copy = CopyInserts(_inserts);
+        foreach (var (chain, inserts) in copy)
+            for (int i = 0; i < inserts.Count; i++)
+                inserts[i] = inserts[i] with { Bypass = _insertHolds.SavedBypass(chain, inserts[i].Id, inserts[i].Bypass) };
+        return copy;
+    }
 
     /// <inheritdoc cref="CopyInsertsLocked"/>
     internal static Dictionary<string, List<InsertDefinition>> CopyInserts(
@@ -1156,6 +1167,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                     (s.MonitorOutput?.EndsWith("#usbaux", StringComparison.Ordinal) ?? false));
             WireAuxRouteLocked();
 
+            // Keep the running bypass values until recalled chains are compared
+            // and replaced. Only chains absent from the recall need restoration.
             bool rewireInputs = false;
             bool rewireMixes = false;
             if (s.LowCutHz is 80 or 120 && _lowCutHz != s.LowCutHz)
@@ -1182,6 +1195,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 rewireInputs = true;
                 rewireMixes = true;
             }
+            var held = _insertHolds.Cancel();
+            ApplyHoldChangesLocked(held.Where(change => !s.Inserts.ContainsKey(change.Chain)).ToArray());
             if (rewireInputs) WireInputFeedsLocked();
             if (rewireMixes)
                 foreach (MixDefinition mix in _config.Mixes) WireMixChainLocked(mix);
@@ -1249,6 +1264,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             _auxPortEnabled = s.AuxPortEnabled;
             WireAuxRouteLocked();
 
+            // Keep the running bypass values until recalled chains are compared
+            // and replaced. Only chains absent from the recall need restoration.
             bool rewireInputs = false;
             bool rewireMixes = false;
             if (s.LowCutHz is int hz && hz is 0 or 80 or 120 && _lowCutHz != hz)
@@ -1272,6 +1289,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 rewireInputs = true;
                 rewireMixes = true;
             }
+            var held = _insertHolds.Cancel();
+            if (s.Inserts is null) ApplyHoldChangesLocked(held);
             if (rewireInputs) WireInputFeedsLocked();
             if (rewireMixes)
                 foreach (MixDefinition mix in _config.Mixes) WireMixChainLocked(mix);
@@ -2242,6 +2261,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
 
     private void TearDownLocked()
     {
+        ApplyHoldChangesLocked(_insertHolds.Cancel(), rewire: false);
         _meters.Dispose();
         _meters = new MeterReader();   // Dispose is terminal; a rebuild needs a fresh reader
         foreach (PortLink route in _monitorRoutes.Values) _pw.Unlink(route);

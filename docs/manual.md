@@ -1865,3 +1865,21 @@ it. The usual revision needs no note. The rarer one is named in the
 Options connection note, and so is a dock that answers on neither
 address. Such a dock still connects, so save diagnostics from Options
 and open an issue with them.
+
+## Momentary effect keys
+
+For an OpenDeck/Stream Deck effect or whole-chain key, enable **Keep effect
+active while held** in its settings. Pressing enables the selected effects;
+releasing restores their previous bypass states. An effect that was already
+active stays active. Two keys holding the same effect keep it active until the
+last one is released. Other key actions keep their normal behavior.
+
+Changing a key's settings or removing it releases its hold. If the Deck plugin
+or connection disappears without a key-up event, the daemon restores the
+previous states after five seconds plus its normal sweep and graph-rewire time.
+It never replays a held key after reconnecting. Manual bypass, chain replacement
+and profile recall take precedence over an old key release. Recalling an older
+profile without effect settings restores the pre-hold bypass state. A partial
+settings update does the same for chains it does not replace. Held states are
+not saved in settings or profiles. Loading and bypassing effects can still
+cause the same short audio gap as the existing insert controls.
