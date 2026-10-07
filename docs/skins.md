@@ -32,9 +32,15 @@ remain the window's; the terminal sizes these drawings to its cells. A
 meter is a solid bar in eighth blocks whichever appearance is named, and
 its colour blends from `Ox.Meter.Fill` through `Ox.Meter.Warning` to
 `Ox.Meter.Hot` along the scale, anchored at the warning and hot levels.
-Malformed terminal palette fields keep their default while valid fields still
-apply. Names use the same bounded, control-free text in the skin picker and
-the loaded palette.
+The terminal requires `schema: 1`, as do the window and Deck. A missing,
+invalid or newer schema leaves the whole terminal palette at its defaults.
+Within a supported document, malformed terminal palette fields keep their
+default while valid fields still apply. Names use the same bounded,
+control-free text in the skin picker and the loaded palette.
+The terminal checks the 256 KiB document limit each time it reads a file,
+including after the picker has listed it. A file that exceeds the limit or
+grows during that read keeps the default palette; repairing it allows the
+next load to use it again.
 
 The choice is saved in
 `~/.config/openxlr/ui.json` as `"skin": "<id>"` and nowhere else: it is not
@@ -46,6 +52,11 @@ the error. Fix the permissions or file problem, then select the skin again.
 An existing preference file must be a readable JSON object. A skin choice
 refuses malformed or non-object data without replacing it. Unknown fields,
 including settings from independent window features, survive skin changes.
+If the terminal cannot read `ui.json`, it uses the default appearance.
+A malformed document, including duplicate keys or a value other than a
+JSON object, is left untouched when saving a terminal skin choice. Repair
+the file before saving a new choice; settings unrelated to the skin are
+preserved in a valid object.
 
 If a skin ever makes something unreadable, start the window once with
 
@@ -57,6 +68,42 @@ which ignores the saved choice for that run and leaves it saved, so you
 can pick another one from Options. Options says when a run was started
 that way. Any id works there, not only `default`, which is the quickest
 way to try a skin without selecting it.
+
+## Stream Deck colours
+
+The OpenDeck plugin uses the same saved skin for key surfaces, lettering,
+indicators, dial icons and needles, and meter colours and thresholds. Built-in
+palettes travel with the plugin; regenerate `skin-palettes.json` with
+`python3 tools/deck-skins.py` after changing embedded skins or colour defaults.
+CI checks the generated table and tests its defaults against `SkinTokens`.
+
+The window publishes its realised palette to the private
+`~/.config/openxlr/deck-palette.json` when it applies a skin. This also carries
+the effective light or dark colours without a second desktop-theme connection
+in the plugin. The file is an atomic, schema-1 object containing `skin`, the window process `pid` and
+`tokens`, with only the twelve colour and meter values the keys need. It does
+not change `ui.json` or audio profiles. A write failure appears in the skin's
+errors and leaves the plugin's file-based fallback available.
+
+Without a matching palette from a running window, the plugin reads the saved `skin` from
+`ui.json` and the selected package from the usual XDG skin roots, user first,
+then system, then the embedded palette. Unknown ids and invalid documents fall
+back to Material. `OPENXLR_SKIN` in the plugin's own environment overrides the
+saved choice and the published palette for that run. Empty variables are unset.
+File events follow atomic saves and newly created or removed skin folders;
+unchanged colours cause no redraw. Meter updates perform no filesystem work.
+
+The Deck preserves its owned glyphs and key geometry. Gradients on surfaces
+use their first stop; images and control templates stay in the window. Hex
+RGB and alpha-first ARGB colours are accepted, as are black, white,
+transparent, red, green, blue, yellow, gray and grey. Other named colours use
+the token default unless the window publishes their resolved colour. Only
+entries declared in the named-colour table qualify; inherited JavaScript
+properties such as `constructor` or `__proto__` are not colours, including
+when used as gradient stops. Meter
+and LED colours are flat; invalid or crossed meter thresholds use the defaults.
+Documents are limited to 256 KiB and must be regular files. Up to 32 XDG data
+roots are considered. No document can supply SVG, code or an asset URL.
 
 ## Getting started
 

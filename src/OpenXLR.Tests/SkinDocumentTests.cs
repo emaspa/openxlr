@@ -16,6 +16,24 @@ namespace OpenXLR.Tests;
 /// </summary>
 public sealed class SkinDocumentTests
 {
+    [Fact]
+    public void GeneratedDeckDefaultsMatchTheWindowAndEveryShippedSkinIsIncluded()
+    {
+        using JsonDocument file = JsonDocument.Parse(File.ReadAllText(Path.Combine(Root,
+            "plugin", "com.emaspa.openxlr.sdPlugin", "skin-palettes.json")));
+        JsonElement defaults = file.RootElement.GetProperty("default");
+        Assert.Equal(DeckPalette.Names.Order(), defaults.EnumerateObject().Select(p => p.Name).Order());
+        foreach (JsonProperty value in defaults.EnumerateObject())
+        {
+            object? expected = SkinTokens.Find(value.Name)!.Default;
+            if (expected is ISolidColorBrush brush)
+                Assert.Equal(brush.Color, Color.Parse(value.Value.GetString()!));
+            else Assert.Equal((double)expected!, value.Value.GetDouble());
+        }
+        foreach (SkinEntry skin in SkinCatalog.BuiltIn())
+            Assert.True(file.RootElement.TryGetProperty(skin.Id, out _), skin.Id);
+    }
+
     /// <summary>One row of a token table: token, kind, default, range, what it paints.</summary>
     private sealed record Row(string Token, string Kind, string Default, string Range, string Text);
 

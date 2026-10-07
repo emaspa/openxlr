@@ -144,6 +144,7 @@ public static class SkinService
         }
 
         ApplyControls(entry.Package, application, resources, errors);
+        DeckPalette.Publish(entry.Id, resources, errors);
 
         Images.AddRange(realizer.Bitmaps);
         foreach (IDisposable image in previous) image.Dispose();

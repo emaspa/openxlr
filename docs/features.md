@@ -266,6 +266,12 @@ recalling one does not rewire the desktop.
 
 ## OpenDeck plugin
 
+OpenDeck keys and dials follow the window's saved skin: surfaces, lettering,
+status lights, icons, needles and meters share its colours. Changes arrive
+through file events without an audio command or a polling timer. Built-in
+palettes also work when the window is closed. See [skins.md](skins.md) for
+custom-skin limits and the realised palette file.
+
 `plugin/com.emaspa.openxlr.sdPlugin` is an
 [OpenDeck](https://github.com/nekename/OpenDeck) plugin with two
 actions, Dial and Toggle (key). Both are clients of the daemon's

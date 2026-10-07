@@ -183,7 +183,7 @@ public sealed class PluginInstaller
     {
         try
         {
-            using FileStream stream = File.OpenRead(path);
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 1);
             Span<byte> head = stackalloc byte[4];
             int read = stream.Read(head);
             if (read >= 4 && head[0] == 0x7f && head[1] == (byte)'E' && head[2] == (byte)'L' && head[3] == (byte)'F') return Binary.Elf;

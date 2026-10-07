@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import { channelName, mixName, mixShortName, layoutChoices, controllableOutputs, outputKey } from "./layout-choices.mjs";
 import fs from "node:fs";
 import os from "node:os";
+import { SkinPalette } from "./skin-palette.mjs";
 
 // ---------- launch arguments ----------
 const arg = (name) => {
@@ -304,6 +305,8 @@ host.onmessage = (e) => {
     case "willDisappear":
       instances.delete(m.context);
       emptyTitle.delete(m.context);
+      lastMeter.delete(m.context);
+      marquee.delete(m.context);
       break;
     case "didReceiveSettings":
       if (inst) { inst.settings = m.payload?.settings ?? {}; refresh(m.context); }
@@ -854,9 +857,9 @@ function onDialPress(context, inst) {
 // Visual language borrowed from Wave Link's deck plugin (all artwork is
 // ours): a full-bleed colored frame that reads state at a glance (red =
 // muted, light = engaged), an inner dark card, and a white glyph. Words
-// (48V, EXP, ...) ride the deck's own title renderer via setTitle.
+// The skin supplies the surface, lettering, indicator and meter colours.
 
-// Centered glyphs in a 144x144 viewBox, drawn in white.
+// Centered glyphs in a 144x144 viewBox, coloured when they are drawn.
 const GLYPHS = {
   mic: `<rect x="58" y="30" width="28" height="48" rx="14" fill="currentColor"/>
         <path d="M46 62 a26 26 0 0 0 52 0" stroke="currentColor" stroke-width="7" fill="none" stroke-linecap="round"/>
@@ -938,13 +941,10 @@ function sevenSegText(text, x, y, h, color) {
 }
 
 function keySvg(on, muteLike, known, glyphName, badge, label, offColor = null) {
-  // The keys speak the touch strips' hardware language: the same faceplate
-  // material (the strip tiles' #383838 with the side-lit gradient and #505050
-  // border), a machined round button cap like the dial knob, a status LED,
-  // and for the low cut an inset LED display window. offColor lights the
-  // OFF state too (an insert's bypass shows red, like the UI's LED).
-  const accent = !known ? null : on ? (muteLike ? "#FF3C4E" : "#3ecf7a") : offColor;
-  const ink = !known ? "#6a7080" : accent ?? "#d2d6de";
+  // The skin colours the owned faceplate, cap and glyph. An insert's bypass
+  // uses the alert colour, and a mute keeps its visible slash and status lamp.
+  const accent = !known ? null : on ? (muteLike ? skinPalette.colours["Ox.Led.Alert"] : skinPalette.colours["Ox.Led.On"]) : offColor;
+  const ink = !known ? skinPalette.colours["Ox.Text.Muted"] : accent ?? skinPalette.colours["Ox.Text.Primary"];
   const lines = label ? label.split("\n").slice(0, 2) : [];
 
   // Button cap (glyph keys) or LED display window (badge keys) or lamp only.
@@ -954,38 +954,37 @@ function keySvg(on, muteLike, known, glyphName, badge, label, offColor = null) {
     const glyph = GLYPHS[glyphName].replaceAll("currentColor", ink);
     face = `
       <circle cx="72" cy="${capY}" r="38" fill="none" stroke="#000" stroke-opacity="0.4" stroke-width="6"/>
-      <circle cx="72" cy="${capY}" r="34" fill="url(#cap)" stroke="#5a5f68" stroke-width="4"/>
+      <circle cx="72" cy="${capY}" r="34" fill="${skinPalette.colours["Ox.Card.Background"]}" stroke="${skinPalette.colours["Ox.Text.Muted"]}" stroke-width="4"/>
       ${accent ? `<circle cx="72" cy="${capY}" r="37" fill="none" stroke="${accent}" stroke-width="6" opacity="0.6" filter="url(#bloom)"/>` : ""}
       <g transform="translate(72 ${capY}) scale(0.62) translate(-72 -72)">${glyph}</g>`;
   } else if (badge) {
     face = `
-      <rect x="24" y="${capY - 30}" width="96" height="60" rx="8" fill="#0c0e11" stroke="#000" stroke-opacity="0.5" stroke-width="5"/>
+      <rect x="24" y="${capY - 30}" width="96" height="60" rx="8" fill="${skinPalette.colours["Ox.Meter.Track"]}" stroke="#000" stroke-opacity="0.5" stroke-width="5"/>
       ${accent ? `<g filter="url(#bloom)" opacity="0.65">${sevenSegText(badge, 72, capY - 19, 38, accent)}</g>` : ""}
-      ${sevenSegText(badge, 72, capY - 19, 38, known ? (accent ?? "#7d8494") : "#4a4f5c")}`;
+      ${sevenSegText(badge, 72, capY - 19, 38, known ? (accent ?? skinPalette.colours["Ox.Text.Muted"]) : skinPalette.colours["Ox.Led.Off"])}`;
   } else {
-    const lamp = !known ? "#4a4f5c" : accent ?? "#2c2f36";
+    const lamp = !known ? skinPalette.colours["Ox.Led.Off"] : accent ?? skinPalette.colours["Ox.Text.Muted"];
     face = `
       <circle cx="72" cy="${capY}" r="38" fill="none" stroke="#000" stroke-opacity="0.4" stroke-width="6"/>
-      <circle cx="72" cy="${capY}" r="34" fill="url(#cap)" stroke="#5a5f68" stroke-width="4"/>
+      <circle cx="72" cy="${capY}" r="34" fill="${skinPalette.colours["Ox.Card.Background"]}" stroke="${skinPalette.colours["Ox.Text.Muted"]}" stroke-width="4"/>
       ${accent ? `<circle cx="72" cy="${capY}" r="15" fill="${lamp}" filter="url(#bloom)" opacity="0.8"/>` : ""}
-      <circle cx="72" cy="${capY}" r="12" fill="${lamp}" stroke="#15161a" stroke-width="4"/>`;
+      <circle cx="72" cy="${capY}" r="12" fill="${lamp}" stroke="${skinPalette.colours["Ox.Card.Background"]}" stroke-width="4"/>`;
   }
 
   const slash = muteLike && on
-    ? `<line x1="${72 - 26}" y1="${capY + 26}" x2="${72 + 26}" y2="${capY - 26}" stroke="#FF3C4E" stroke-width="8" stroke-linecap="round"/>`
+    ? `<line x1="${72 - 26}" y1="${capY + 26}" x2="${72 + 26}" y2="${capY - 26}" stroke="${skinPalette.colours["Ox.Led.Alert"]}" stroke-width="8" stroke-linecap="round"/>`
     : "";
 
   // Status LED lamp in the top-right corner, like a channel strip indicator.
-  const led = glyphName || !badge ? "" : "";
   const lampDot = glyphName
-    ? `<circle cx="120" cy="24" r="8" fill="${!known ? "#4a4f5c" : accent ?? "#2c2f36"}" stroke="#15161a" stroke-width="3"/>` +
+    ? `<circle cx="120" cy="24" r="8" fill="${!known ? skinPalette.colours["Ox.Led.Off"] : accent ?? skinPalette.colours["Ox.Text.Muted"]}" stroke="${skinPalette.colours["Ox.Card.Background"]}" stroke-width="3"/>` +
       (accent ? `<circle cx="120" cy="24" r="11" fill="${accent}" opacity="0.5" filter="url(#soft)"/>` : "")
     : "";
 
   const labelSvg = lines.map((line, i) => {
     const size = line.length > 11 ? 19 : line.length > 8 ? 22 : 26;
     const y = lines.length === 1 ? 126 : 106 + i * 24;
-    return `<text x="72" y="${y}" text-anchor="middle" fill="#e8ebf2" ` +
+    return `<text x="72" y="${y}" text-anchor="middle" fill="${skinPalette.colours["Ox.Text.Primary"]}" ` +
       `stroke="#000" stroke-width="4" paint-order="stroke" stroke-linejoin="round" ` +
       `font-family="Inter, Noto Sans, DejaVu Sans, sans-serif" font-size="${size}" font-weight="700">` +
       escXml(line) + `</text>`;
@@ -997,11 +996,6 @@ function keySvg(on, muteLike, known, glyphName, badge, label, offColor = null) {
         <linearGradient id="side" x1="138" y1="72" x2="6" y2="72" gradientUnits="userSpaceOnUse">
           <stop stop-opacity="0"/><stop offset="1" stop-opacity="0.2"/>
         </linearGradient>
-        <radialGradient id="cap" cx="0.5" cy="0.3" r="0.9">
-          <stop offset="0" stop-color="#4a4a4a"/>
-          <stop offset="0.7" stop-color="#404040"/>
-          <stop offset="1" stop-color="#333333"/>
-        </radialGradient>
         <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
           <feGaussianBlur stdDeviation="3"/>
         </filter>
@@ -1009,17 +1003,17 @@ function keySvg(on, muteLike, known, glyphName, badge, label, offColor = null) {
           <feGaussianBlur stdDeviation="4.5"/>
         </filter>
       </defs>
-      <rect x="6" y="6" width="132" height="132" rx="14" fill="#383838"/>
+      <rect x="6" y="6" width="132" height="132" rx="14" fill="${skinPalette.colours["Ox.Card.Background"]}"/>
       <rect x="6" y="6" width="132" height="132" rx="14" fill="url(#side)"/>
-      <rect x="9" y="9" width="126" height="126" rx="12" fill="none" stroke="#50555e" stroke-width="4"/>
-      ${face}${slash}${led}${lampDot}${labelSvg}
+      <rect x="9" y="9" width="126" height="126" rx="12" fill="none" stroke="${skinPalette.colours["Ox.Text.Muted"]}" stroke-width="4"/>
+      ${face}${slash}${lampDot}${labelSvg}
     </svg>`).toString("base64");
 }
 
-// 24x24 white icons for the dial layout's corner slot.
+// 24x24 icons for the dial layout's corner slot.
 function dialIcon(t) {
   const inner = (name) => GLYPHS[name]
-    ? `<g transform="scale(0.1667)">${GLYPHS[name].replaceAll("currentColor", "#ffffff")}</g>` : "";
+    ? `<g transform="scale(0.1667)">${GLYPHS[name].replaceAll("currentColor", skinPalette.colours["Ox.Text.Primary"])}</g>` : "";
   let name = "knob";
   if (t?.startsWith("send:")) name = "fader";
   else if (t?.startsWith("mixvol:")) name = "speaker";
@@ -1039,7 +1033,7 @@ function needleSvg(pct, maxPct = 100) {
   return "data:image/svg+xml;base64," + Buffer.from(
     `<svg xmlns="http://www.w3.org/2000/svg" width="130" height="52" viewBox="0 0 130 52">
       <g transform="rotate(${angle}, 65, 61)">
-        <rect x="63.5" y="30" width="3" height="16" rx="1.5" fill="#fff"/>
+        <rect x="63.5" y="30" width="3" height="16" rx="1.5" fill="${skinPalette.colours["Ox.Text.Primary"]}"/>
       </g>
     </svg>`).toString("base64");
 }
@@ -1067,11 +1061,13 @@ function meterKeyFor(t) {
 
 function meterSvg(level) {
   const w = Math.round(Math.max(0, Math.min(1, level)) * 130);
-  const hot = level > 0.92;
+  const colour = level >= skinPalette.colours["Ox.Meter.HotLevel"] ? skinPalette.colours["Ox.Meter.Hot"]
+    : level >= skinPalette.colours["Ox.Meter.WarningLevel"] ? skinPalette.colours["Ox.Meter.Warning"]
+    : skinPalette.colours["Ox.Meter.Fill"];
   return "data:image/svg+xml;base64," + Buffer.from(
     `<svg xmlns="http://www.w3.org/2000/svg" width="130" height="6" viewBox="0 0 130 6">
-      <rect width="130" height="6" rx="3" fill="#252525"/>
-      ${w > 0 ? `<rect width="${w}" height="6" rx="3" fill="${hot ? "#FF3C4E" : "#3ecf7a"}"/>` : ""}
+      <rect width="130" height="6" rx="3" fill="${skinPalette.colours["Ox.Meter.Track"]}"/>
+      ${w > 0 ? `<rect width="${w}" height="6" rx="3" fill="${colour}"/>` : ""}
     </svg>`).toString("base64");
 }
 
@@ -1086,7 +1082,8 @@ function refreshMeters() {
     if (!key || !(key in meterLevels)) continue;
     const lr = meterLevels[key];
     const level = Math.max(lr[0] ?? 0, lr[1] ?? 0);
-    const bucket = Math.round(level * 65);
+    const zone = level >= skinPalette.colours["Ox.Meter.HotLevel"] ? 2 : level >= skinPalette.colours["Ox.Meter.WarningLevel"] ? 1 : 0;
+    const bucket = Math.round(level * 65) * 3 + zone;
     if (lastMeter.get(context) === bucket) continue;
     lastMeter.set(context, bucket);
     send({ event: "setFeedback", context, payload: { meter: meterSvg(level) } });
@@ -1104,7 +1101,7 @@ const escXml = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const textW = (t) => Math.round(t.length * CHAR_W);
 
 function titleSvg(pinText, scroll, offsetPx) {
-  const attrs = 'y="17" font-family="sans-serif" font-size="14.5" font-weight="700" fill="#ffffff"';
+  const attrs = `y="17" font-family="sans-serif" font-size="14.5" font-weight="700" fill="${skinPalette.colours["Ox.Text.Primary"]}"`;
   const pinW = textW(pinText);
   const scrollW = textW(scroll);
   const avail = TITLE_W - pinW;
@@ -1160,8 +1157,9 @@ function refresh(context) {
     // The user can pick a glyph per key (a monitor output may be headphones
     // rather than speakers); "auto" or unset keeps the target's default.
     const iconChoice = inst.settings.icon;
-    const glyphName = iconChoice && GLYPHS[iconChoice] ? iconChoice : glyphFor(t);
-    const offColor = isInsertTarget(t) ? "#FF3C4E" : null;   // bypassed = red, as in the UI
+    const hasIcon = typeof iconChoice === "string" && Object.hasOwn(GLYPHS, iconChoice);
+    const glyphName = hasIcon ? iconChoice : glyphFor(t);
+    const offColor = isInsertTarget(t) ? skinPalette.colours["Ox.Led.Alert"] : null;   // bypassed = red, as in the UI
     send({ event: "setImage", context,
            payload: { image: keySvg(v === true, isMuteLike(t), v !== null && daemonUp, glyphName, badge, label, offColor) } });
   } else if (inst.action === "com.emaspa.openxlr.dial") {
@@ -1182,4 +1180,9 @@ function refresh(context) {
 
 function refreshAll() { for (const context of instances.keys()) refresh(context); }
 
+const skinPalette = new SkinPalette(() => {
+  lastMeter.clear();
+  refreshAll();
+  refreshMeters();
+});
 connectDaemon();

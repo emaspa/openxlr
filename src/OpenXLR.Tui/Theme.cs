@@ -104,7 +104,10 @@ internal sealed class Theme
         catch (JsonException) { return theme; }
         using var parsed = document;
         JsonElement root = document.RootElement;
-        if (root.ValueKind != JsonValueKind.Object) return theme;
+        if (root.ValueKind != JsonValueKind.Object
+            || !root.TryGetProperty("schema", out JsonElement schema)
+            || schema.ValueKind != JsonValueKind.Number
+            || !schema.TryGetInt32(out int version) || version != 1) return theme;
 
         if (root.TryGetProperty("controls", out JsonElement controls) && controls.ValueKind == JsonValueKind.Object)
         {
@@ -297,7 +300,27 @@ internal static class SkinCatalog
 
     private static string? ReadFile(string path)
     {
-        try { return File.ReadAllText(path); }
+        try
+        {
+            // The catalogue holds a reader, not a snapshot. Bound the opened
+            // file again and refuse growth while reading instead of allocating
+            // for whatever replaced it since the catalogue was built.
+            using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 1);
+            long length = file.Length;
+            if (length > MaxFileBytes) return null;
+            byte[] bytes = new byte[(int)length + 1];
+            int count = 0;
+            while (count < bytes.Length)
+            {
+                int read = file.Read(bytes, count, bytes.Length - count);
+                if (read == 0) break;
+                count += read;
+            }
+            if (count > length) return null;
+            using var content = new MemoryStream(bytes, 0, count, writable: false);
+            using var reader = new StreamReader(content);
+            return reader.ReadToEnd();
+        }
         catch (IOException) { return null; }
         catch (UnauthorizedAccessException) { return null; }
     }
@@ -367,6 +390,8 @@ internal static class UiSettingsFile
         catch (IOException) { return null; }
         catch (JsonException) { return null; }
         catch (InvalidOperationException) { return null; }
+        catch (ArgumentException) { return null; } // duplicate JSON object keys
+        catch (UnauthorizedAccessException) { return null; }
     }
 
     /// <summary>Writes the chosen skin back, keeping every other property the file holds.</summary>
@@ -374,15 +399,20 @@ internal static class UiSettingsFile
     {
         try
         {
-            JsonObject root = File.Exists(Path) && JsonNode.Parse(File.ReadAllText(Path)) is JsonObject existing
-                ? existing
-                : new JsonObject();
+            JsonObject root;
+            if (File.Exists(Path))
+            {
+                if (JsonNode.Parse(File.ReadAllText(Path)) is not JsonObject existing) return false;
+                root = existing;
+            }
+            else root = new JsonObject();
             root["skin"] = id;
             OpenXlrPaths.WriteAtomic(Path, root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
             return true;
         }
         catch (IOException) { return false; }
         catch (JsonException) { return false; }
+        catch (ArgumentException) { return false; } // leave duplicate-key documents untouched
         catch (UnauthorizedAccessException) { return false; }
     }
 }

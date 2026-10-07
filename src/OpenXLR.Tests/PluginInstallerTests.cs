@@ -87,6 +87,41 @@ public sealed class PluginInstallerTests : IDisposable
         Assert.Equal(PluginItemKind.Unknown, PluginInstaller.Inspect(empty).Kind);
     }
 
+    [Theory]
+    [InlineData("", PluginItemKind.Unknown)]
+    [InlineData("4D", PluginItemKind.Unknown)]
+    [InlineData("4D5A", PluginItemKind.WindowsPlugin)]
+    [InlineData("7F45", PluginItemKind.Unknown)]
+    [InlineData("7F454C", PluginItemKind.Unknown)]
+    [InlineData("7F454C46", PluginItemKind.ClapBundle)]
+    public void ShortBinaryHeadersKeepTheirFormatDetection(string hex, PluginItemKind expected)
+        => Assert.Equal(expected, PluginInstaller.Inspect(File_("short.clap", Convert.FromHexString(hex))).Kind);
+
+    [Fact]
+    public void InspectingAHeaderDoesNotAllocateAKilobyteBufferPerFile()
+    {
+        string file = File_("small.clap", Elf);
+        long allocated = 0;
+        Exception? failure = null;
+        var probe = new Thread(() =>
+        {
+            try
+            {
+                for (int i = 0; i < 100; i++) _ = PluginInstaller.Inspect(file);
+                long before = GC.GetAllocatedBytesForCurrentThread();
+                for (int i = 0; i < 1000; i++) _ = PluginInstaller.Inspect(file);
+                allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            }
+            catch (Exception ex) { failure = ex; }
+        }) { IsBackground = true };
+        probe.Start();
+        Assert.True(probe.Join(TimeSpan.FromSeconds(10)), "Header allocation probe did not finish.");
+        Assert.Null(failure);
+        // Leave room for path and result objects, but not a 4 KiB stream
+        // buffer when the entire read is a four-byte stack span.
+        Assert.InRange(allocated, 1, 1000 * 1024);
+    }
+
     [Fact]
     public void AFolderPickIsEverythingInstallableInside()
     {

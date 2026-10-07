@@ -86,6 +86,11 @@ shutdown cancellation can reach the receive guard before the send pump aborts
 the socket. A receive-entry handshake tests that close path without depending
 on which worker wins the race.
 
+The plugin header allocation check also uses a dedicated warmed thread.
+It permits path and result objects, but not a stream buffer of a kilobyte
+or more for each four-byte header read. Separate format cases cover empty
+and truncated headers, the two-byte Windows signature and the ELF signature.
+
 The private PipeWire runner also checks profile startup ordering. To exercise
 ClipGuard with recorded test audio, low cut and a native LSP gate, run
 `OPENXLR_TEST_DSP=1 python3 tools/test-monitor-volume.py` after a native-enabled

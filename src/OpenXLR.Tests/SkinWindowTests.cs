@@ -194,6 +194,13 @@ public sealed class SkinWindowTests
                 TextBlock label = main.GetVisualDescendants().OfType<TextBlock>()
                     .First(t => t.Classes.Contains("title"));
                 Assert.Equal(Color.Parse("#e6e9f0"), ((ISolidColorBrush)label.Foreground!).Color);
+                JsonObject shared = (JsonObject)JsonNode.Parse(File.ReadAllText(
+                    OpenXLR.UI.OpenXlrPaths.ConfigFile("deck-palette.json")))!;
+                Assert.Equal("bad", shared["skin"]!.GetValue<string>());
+                Assert.Equal(((ISolidColorBrush)card.Background!).Color,
+                    Color.Parse(shared["tokens"]!["Ox.Card.Background"]!.GetValue<string>()));
+                Assert.Equal(((ISolidColorBrush)label.Foreground!).Color,
+                    Color.Parse(shared["tokens"]!["Ox.Text.Primary"]!.GetValue<string>()));
                 LevelMeter meter = main.GetVisualDescendants().OfType<LevelMeter>().First();
                 Assert.Equal(4, meter.Bounds.Height);
                 Assert.Equal(MeterPresentation.Continuous, meter.Presentation);

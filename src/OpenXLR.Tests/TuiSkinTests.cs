@@ -34,6 +34,33 @@ public sealed class TuiSkinTests : IDisposable
     private static string Doc(string tokens, string name = "Test") =>
         "{\"schema\":1,\"name\":\"" + name + "\",\"tokens\":{" + tokens + "}}";
 
+    [Theory]
+    [InlineData("2")]
+    [InlineData("0")]
+    [InlineData("-1")]
+    [InlineData("\"1\"")]
+    [InlineData("true")]
+    [InlineData("null")]
+    [InlineData("1.5")]
+    [InlineData("2147483648")]
+    [InlineData("{}")]
+    [InlineData("[]")]
+    public void UnsupportedSchemasDoNotApplyNamesControlsOrColours(string schema)
+    {
+        string document = "{\"schema\":" + schema + ",\"name\":\"Future skin\",\"controls\":{\"fader\":\"console\"},\"tokens\":{\"Ox.Card.Background\":\"#123456\"}}";
+        Theme theme = Theme.FromJson(document, "future", "Future");
+        Assert.Equal("Future", theme.Name);
+        Assert.Equal(Theme.Material.Card, theme.Card);
+        Assert.False(theme.ConsoleFaders);
+    }
+
+    [Fact]
+    public void ADocumentWithoutASchemaDoesNotApplyItsTokens()
+    {
+        Theme theme = Theme.FromJson("""{"tokens":{"Ox.Card.Background":"#123456"}}""", "missing", "Missing");
+        Assert.Equal(Theme.Material.Card, theme.Card);
+    }
+
     // --- colours ---
 
     [Theory]
@@ -124,7 +151,7 @@ public sealed class TuiSkinTests : IDisposable
     [InlineData("{}")]
     public void AWrongNameTypeDoesNotStopHealthyTokensFromLoading(string name)
     {
-        Theme theme = Theme.FromJson("{\"name\":" + name + ",\"tokens\":{\"Ox.Card.Background\":\"#123456\"}}", "mine", "Mine");
+        Theme theme = Theme.FromJson("{\"schema\":1,\"name\":" + name + ",\"tokens\":{\"Ox.Card.Background\":\"#123456\"}}", "mine", "Mine");
         Assert.Equal("Mine", theme.Name);
         Assert.Equal(Rgb.Parse("#123456"), theme.Card);
     }
@@ -161,7 +188,7 @@ public sealed class TuiSkinTests : IDisposable
     public void DuplicateFieldsUseTheLastValueWithoutBreakingTheCatalogue()
     {
         Skin("home", "duplicate", """
-            {"name":"Old","name":"New","tokens":{"Ox.Card.Background":"#ffffff","Ox.Card.Background":"#123456"}}
+            {"schema":1,"name":"Old","name":"New","tokens":{"Ox.Card.Background":"#ffffff","Ox.Card.Background":"#123456"}}
             """);
         Environment.SetEnvironmentVariable("XDG_DATA_HOME", Path.Combine(_root, "home"));
         Environment.SetEnvironmentVariable("XDG_DATA_DIRS", Path.Combine(_root, "empty"));
@@ -174,7 +201,7 @@ public sealed class TuiSkinTests : IDisposable
     public void LoadedNamesKeepTheCatalogueLengthAndControlBounds()
     {
         string name = "\u001b" + new string('x', 500) + "\n";
-        string json = System.Text.Json.JsonSerializer.Serialize(new { name });
+        string json = System.Text.Json.JsonSerializer.Serialize(new { schema = 1, name });
         Theme theme = Theme.FromJson(json, "mine", "Mine");
         Assert.Equal(new string('x', 400), theme.Name);
     }
@@ -260,6 +287,43 @@ public sealed class TuiSkinTests : IDisposable
     }
 
     [Fact]
+    public void ACataloguedDocumentCannotGrowPastTheReadLimitAndCanBeRepaired()
+    {
+        string folder = Skin("home", "changing", Doc("", "Changing"));
+        Environment.SetEnvironmentVariable("XDG_DATA_HOME", Path.Combine(_root, "home"));
+        Environment.SetEnvironmentVariable("XDG_DATA_DIRS", Path.Combine(_root, "empty"));
+        Tui.SkinEntry entry = Assert.Single(SkinCatalog.Scan(), skin => skin.Id == "changing");
+        string file = Path.Combine(folder, "skin.json");
+        string valid = Doc("\"Ox.Card.Background\":\"#123456\"", "Repaired");
+        File.WriteAllText(file, valid + new string(' ', 256 * 1024));
+        Assert.Null(entry.Read());
+
+        File.WriteAllText(file, valid);
+        Assert.Equal(valid, entry.Read());
+        Assert.Equal(Rgb.Parse("#123456"), SkinCatalog.Load("changing").Card);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ADocumentAtTheByteLimitKeepsItsEncodingAndPalette(bool unicode)
+    {
+        string folder = Skin("home", "boundary", "");
+        var encoding = unicode ? System.Text.Encoding.Unicode : System.Text.Encoding.UTF8;
+        string valid = Doc("\"Ox.Card.Background\":\"#123456\"", "Grün");
+        int padding = (256 * 1024 - encoding.GetPreamble().Length - encoding.GetByteCount(valid))
+            / encoding.GetByteCount(" ");
+        File.WriteAllText(Path.Combine(folder, "skin.json"), valid + new string(' ', padding), encoding);
+        Assert.Equal(256 * 1024, new FileInfo(Path.Combine(folder, "skin.json")).Length);
+        Environment.SetEnvironmentVariable("XDG_DATA_HOME", Path.Combine(_root, "home"));
+        Environment.SetEnvironmentVariable("XDG_DATA_DIRS", Path.Combine(_root, "empty"));
+
+        Theme theme = SkinCatalog.Load("boundary");
+        Assert.Equal("Grün", theme.Name);
+        Assert.Equal(Rgb.Parse("#123456"), theme.Card);
+    }
+
+    [Fact]
     public void ASkinThatIsNotThereLeavesTheShippedAppearanceOn()
     {
         Environment.SetEnvironmentVariable("XDG_DATA_HOME", Path.Combine(_root, "home"));
@@ -301,7 +365,58 @@ public sealed class TuiSkinTests : IDisposable
         Assert.Equal("nord", UiSettingsFile.ReadSkin());
     }
 
+    [Theory]
+    [InlineData("{\"skin\":\"nord\",\"skin\":\"gruvbox\"}")]
+    [InlineData("{\"skin\":\"nord\",\"startDaemonAtLogin\":true,\"startDaemonAtLogin\":false}")]
+    [InlineData("null")]
+    [InlineData("false")]
+    [InlineData("42")]
+    [InlineData("\"nord\"")]
+    [InlineData("[]")]
+    [InlineData("{broken")]
+    public void MalformedSavedDocumentsCannotCrashStartupOrBeOverwritten(string document)
+    {
+        string config = Path.Combine(_root, "duplicates-config");
+        Directory.CreateDirectory(Path.Combine(config, "openxlr"));
+        Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", config);
+        string file = Path.Combine(config, "openxlr", "ui.json");
+        File.WriteAllText(file, document);
+
+        Assert.Null(UiSettingsFile.ReadSkin());
+        Assert.False(UiSettingsFile.WriteSkin("opendeck"));
+        Assert.Equal(document, File.ReadAllText(file));
+
+        File.WriteAllText(file, """{"skin":"nord","startDaemonAtLogin":true}""");
+        Assert.Equal("nord", UiSettingsFile.ReadSkin());
+        Assert.True(UiSettingsFile.WriteSkin("opendeck"));
+        Assert.Equal("opendeck", UiSettingsFile.ReadSkin());
+        Assert.Contains("startDaemonAtLogin", File.ReadAllText(file), StringComparison.Ordinal);
+    }
+
     // --- the skins this repository ships ---
+
+    [Fact]
+    public void AnUnreadableSavedChoiceFallsBackAndCanBeReadAfterRepair()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        string config = Path.Combine(_root, "unreadable-config");
+        Directory.CreateDirectory(Path.Combine(config, "openxlr"));
+        Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", config);
+        string file = Path.Combine(config, "openxlr", "ui.json");
+        File.WriteAllText(file, """{"skin":"nord","startDaemonAtLogin":true}""");
+        File.SetUnixFileMode(file, UnixFileMode.None);
+        try
+        {
+            Assert.Throws<UnauthorizedAccessException>(() => File.ReadAllText(file));
+            Assert.Null(UiSettingsFile.ReadSkin());
+        }
+        finally
+        {
+            File.SetUnixFileMode(file, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+        Assert.Equal("nord", UiSettingsFile.ReadSkin());
+        Assert.Contains("startDaemonAtLogin", File.ReadAllText(file), StringComparison.Ordinal);
+    }
 
     [Fact]
     public void TheShippedSkinsReadIntoAPaletteThatIsNotTheDefaultOne()
@@ -329,14 +444,14 @@ public sealed class TuiSkinTests : IDisposable
     public void ControlAppearancesAreReadEvenWithoutAnyColourOverrides()
     {
         Theme theme = Theme.FromJson("""
-            {"controls":{"meter":"segmented","fader":"console","button":"cap","mute":"cap","led":"lamp"}}
+            {"schema":1,"controls":{"meter":"segmented","fader":"console","button":"cap","mute":"cap","led":"lamp"}}
             """, "console", "Console");
         Assert.True(theme.ConsoleFaders);
         Assert.True(theme.CapKeys);
         Assert.True(theme.CapMutes);
         Assert.True(theme.LampLeds);
         Assert.False(Theme.Material.ConsoleFaders);
-        Theme unknown = Theme.FromJson("""{"controls":{"meter":17,"fader":"future"},"tokens":{}}""", "x", "X");
+        Theme unknown = Theme.FromJson("""{"schema":1,"controls":{"meter":17,"fader":"future"},"tokens":{}}""", "x", "X");
         Assert.False(unknown.ConsoleFaders);
         Assert.False(unknown.CapKeys);
     }

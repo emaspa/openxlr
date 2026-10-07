@@ -48,6 +48,7 @@ jobs:
 
       - name: Validate Stream Deck/OpenDeck plugin
         run: |
+          python3 tools/deck-skins.py --check
           node --check plugin/com.emaspa.openxlr.sdPlugin/plugin.mjs
           python3 -m json.tool plugin/com.emaspa.openxlr.sdPlugin/manifest.json >/dev/null
           python3 tools/check-openapi.py docs/openapi-v1.json

@@ -1,5 +1,7 @@
 using Avalonia;
 using Avalonia.Media;
+using Avalonia.Media.Immutable;
+using System.Text.Json;
 using OpenXLR.UI;
 using OpenXLR.UI.Skinning;
 
@@ -43,6 +45,52 @@ public sealed class SkinPackageTests : IDisposable
     private static string Tok(string name, string json) => $"\"{name}\": {json}";
 
     // --- the shipped packages ---
+
+    [Fact]
+    public void DeckPalettePublishesRealisedValuesPrivatelyAndReportsWriteFailure()
+    {
+        Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", _root);
+        var resources = new Avalonia.Controls.ResourceDictionary
+        {
+            ["Ox.Card.Background"] = new ImmutableSolidColorBrush(Color.Parse("#fffaff")),
+            ["Ox.Text.Primary"] = new ImmutableSolidColorBrush(Color.Parse("#010203")),
+            ["Ox.Meter.HotLevel"] = 0.8,
+            ["Ox.Meter.Track"] = new LinearGradientBrush
+            {
+                GradientStops = new GradientStops
+                {
+                    new GradientStop(Color.Parse("#020304"), 0),
+                    new GradientStop(Color.Parse("#050607"), 1),
+                },
+            },
+        };
+        var errors = new List<string>();
+        DeckPalette.Publish("default", resources, errors);
+        Assert.Empty(errors);
+        string file = Path.Combine(_root, "openxlr", "deck-palette.json");
+        using (JsonDocument json = JsonDocument.Parse(File.ReadAllText(file)))
+        {
+            Assert.Equal(1, json.RootElement.GetProperty("schema").GetInt32());
+            Assert.Equal("default", json.RootElement.GetProperty("skin").GetString());
+            Assert.Equal(Environment.ProcessId, json.RootElement.GetProperty("pid").GetInt32());
+            JsonElement tokens = json.RootElement.GetProperty("tokens");
+            Assert.Equal(Color.Parse("#fffaff"), Color.Parse(tokens.GetProperty("Ox.Card.Background").GetString()!));
+            Assert.Equal(0.8, tokens.GetProperty("Ox.Meter.HotLevel").GetDouble());
+            Assert.Equal(Color.Parse("#020304"), Color.Parse(tokens.GetProperty("Ox.Meter.Track").GetString()!));
+            Assert.Equal(DeckPalette.Names.Length, tokens.EnumerateObject().Count());
+        }
+        if (!OperatingSystem.IsWindows())
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(file));
+        Assert.False(File.Exists(Path.Combine(_root, "openxlr", "ui.json")));
+
+        string blocked = Path.Combine(_root, "blocked");
+        File.WriteAllText(blocked, "keep");
+        Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", blocked);
+        DeckPalette.Publish("default", resources, errors);
+        Assert.Single(errors);
+        Assert.StartsWith("Stream Deck palette:", errors[0], StringComparison.Ordinal);
+        Assert.Equal("keep", File.ReadAllText(blocked));
+    }
 
     [Fact]
     public void BuiltInSkinsReadWithoutComplaint()

@@ -5,7 +5,7 @@ namespace OpenXLR.Tests;
 public sealed class TuiMeterTests
 {
     private static Theme Zones() => Theme.FromJson("""
-        {"tokens":{"Ox.Meter.Fill":"#00ff00","Ox.Meter.Warning":"#ffff00","Ox.Meter.Hot":"#ff0000"}}
+        {"schema":1,"tokens":{"Ox.Meter.Fill":"#00ff00","Ox.Meter.Warning":"#ffff00","Ox.Meter.Hot":"#ff0000"}}
         """, "test", "Test");
 
     [Fact]
@@ -178,7 +178,7 @@ public sealed class TuiMeterTests
     public void ALampSitsOnTheMiddleOfTheLineWhicheverFaceItWears()
     {
         Screen screen = new(4, 2);
-        Theme lamp = Theme.FromJson("""{"controls":{"led":"lamp"}}""", "lamp", "Lamp");
+        Theme lamp = Theme.FromJson("""{"schema":1,"controls":{"led":"lamp"}}""", "lamp", "Lamp");
         Widgets.Lamp(screen, 0, 0, on: true, lamp, lamp.Card);
         Widgets.Lamp(screen, 1, 0, on: true, Theme.Material, Theme.Material.Card);
 
