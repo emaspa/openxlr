@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, development]
+    branches: [main]
   pull_request:
 
 # Actions are pinned to commit SHAs (the tag is in the comment) so a moved
