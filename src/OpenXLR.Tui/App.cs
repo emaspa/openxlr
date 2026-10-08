@@ -332,7 +332,7 @@ internal sealed class App
             "          Left/Right mix; PgUp/PgDn jump ten channels.",
             "          Space mute; -/+ five points; [/] one point.",
             "          r rename; n new channel; N new mic; c capture input.",
-            "          d delete; Ctrl+Left/Right reorder channel or mic.",
+            "          M monitor mix; d delete; Ctrl+Left/Right reorder.",
             "Matrix    Up/Down channel; Left/Right mix; Space mute; -/+ [/] level.",
             "Inputs    Up/Down control; Left/Right or -/+ level; [/] fine.",
             "          Ctrl+Left/Right fine; Space toggle; Home/End limits.",

@@ -102,22 +102,24 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
 - Mixes: Monitor A (what you hear), Monitor B (a second selection for
   outputs that should hear something else), the virtual microphones
   (Stream and Chat by default, published as capture devices selectable
-  in OBS or Discord like a microphone), and Aux (what a second computer
-  on the USB Aux port receives)
+  in OBS or Discord like a microphone), monitor mixes you add for another
+  output (a blend for headphones or speakers that publishes no
+  microphone), and Aux (what a second computer on the USB Aux port
+  receives)
 - Per-channel, per-mix send levels and mutes; per-mix masters
-- Bidirectional Linux volume and mute controls for Monitor A and Monitor B,
+- Bidirectional Linux volume and mute controls for every monitor mix,
   with an explicit 150% boost button for monitor masters and output volume
 - An editable layout: Edit layout in the SUBMIXER card adds, renames,
-  reorders and removes application channels and virtual microphones
-  while audio plays, as does the API, with stable ids so profiles and
-  Stream Deck keys survive a rename. Every change is saved before it is
+  reorders and removes application channels, virtual microphones and
+  monitor mixes while audio plays, as does the API, with stable ids so
+  profiles and Stream Deck keys survive a rename. Every change is saved before it is
   confirmed
 - Any mix feeds any selected output, hardware outputs included: the
   picker beside each output names Monitor A/B, Stream, Chat, Aux or a
-  custom virtual microphone, and the API names a sum of mixes, each a
-  direct port link at unity so a summed feed costs no node. Outputs that
-  share a hardware bus follow one feed, and mix inserts sit upstream so
-  every output hears the processed mix. Profiles recall the feeds. A
+  monitor mix or virtual microphone you added, and the API names a sum of
+  mixes, each a direct port link at unity so a summed feed costs no
+  node. Outputs that share a hardware bus follow one feed, and mix
+  inserts sit upstream so every output hears the processed mix. Profiles recall the feeds. A
   headset with a game sink and a chat sink hears two selections, and
   one pair of headphones can hear the desktop from A with a separately
   processed mic from B; a blend at other levels is a mix of its own
