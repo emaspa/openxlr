@@ -149,9 +149,8 @@ locked restore and tests. Do not disable locked mode to make an update pass.
 
 ## Pull requests
 
-CI and CodeQL run for pull requests and for direct pushes to `main` and
-`development`, so changes integrated directly into development get the same
-checks as a pull request.
+CI and CodeQL run for pull requests and for every pushed branch, so a
+branch gets the same checks before its pull request exists.
 
 - **Branch from `main`** and keep one topic per pull request. Split an
   independent part out into its own request when you can; small ones
