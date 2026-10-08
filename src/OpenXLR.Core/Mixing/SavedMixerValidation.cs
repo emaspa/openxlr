@@ -32,6 +32,7 @@ internal static class SavedMixerValidation
         {
             UserChannels = settings.UserChannels is null ? null : Entries(settings.UserChannels, "userChannels", notes),
             UserMixes = settings.UserMixes is null ? null : UserMixes(settings.UserMixes, notes),
+            ExclusiveGroups = Groups(settings.ExclusiveGroups, notes),
             MixVolumes = Levels(settings.MixVolumes, "mixVolumes", notes),
             MixMuted = Entries(settings.MixMuted, "mixMuted", notes),
             Levels = Levels(settings.Levels, "levels", notes),
@@ -76,6 +77,18 @@ internal static class SavedMixerValidation
         int count = kept.Count;
         kept.RemoveAll(mix => !mix.HasUserKind);
         if (kept.Count != count) notes.Add("userMixes: unknown kind");
+        return kept;
+    }
+
+    private static List<ExclusiveGroupDefinition> Groups(List<ExclusiveGroupDefinition>? groups, List<string> notes)
+    {
+        if (groups is null) { notes.Add($"exclusiveGroups: {NullEntry}"); return []; }
+        var kept = new List<ExclusiveGroupDefinition>();
+        foreach (ExclusiveGroupDefinition group in groups)
+        {
+            if (ExclusiveGroupsModel.Validate(group) is { } error) notes.Add($"exclusiveGroups: {error}");
+            else kept.Add(group);
+        }
         return kept;
     }
 

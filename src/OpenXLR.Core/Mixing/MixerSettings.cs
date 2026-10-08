@@ -19,6 +19,9 @@ public sealed record MixerSettings
     /// <summary>Ordered user mixes; null preserves Stream and Chat.</summary>
     public List<UserMixDefinition>? UserMixes { get; init; }
 
+    /// <summary>Exclusive channel groups, each a named list of channel ids.</summary>
+    public List<ExclusiveGroupDefinition> ExclusiveGroups { get; init; } = [];
+
     /// <summary>
     /// The saved settings with the monitor selection replaced by an
     /// environment or command-line override, when one is given. Both the

@@ -148,9 +148,9 @@ public sealed class MixerService : IHostedService, IDisposable
         // With a summed feed (A+B) the mic rides the hardware path as soon as
         // any of the summed mixes carries it.
         string jackFeed = _mixer.JackMonitorMix ?? "monitor";
-        bool micDirect = jacksOnly && _mixer.IsMonitorOnlyFeed(jackFeed) && OpenXLR.Core.Mixing.MonitorFeed.Parts(jackFeed)
-            .Any(m => !_mixer.IsChannelMutedIn("xlr1", m));
-        _mixer.SetHardwareMicMonitor(micDirect);
+        // The mixer refuses the path while XLR 1 is in an exclusive group.
+        bool micDirect = _mixer.SetHardwareMicMonitor(jacksOnly && _mixer.IsMonitorOnlyFeed(jackFeed)
+            && OpenXLR.Core.Mixing.MonitorFeed.Parts(jackFeed).Any(m => !_mixer.IsChannelMutedIn("xlr1", m)));
         if (anyJack && _devices.EnsureHeadphoneMix(monitorReturn: true, micDirect: micDirect) && _mixer.Built)
             _mixer.BounceMonitorHardwareOutput();
     }
@@ -441,6 +441,8 @@ public sealed class MixerService : IHostedService, IDisposable
                 case "renameMix":
                 case "deleteMix":
                 case "setLayoutOrder":
+                case "setExclusiveGroup":
+                case "deleteExclusiveGroup":
                     // Layout commands save synchronously, under the same gate
                     // as the debounced fader saves, and succeed only once the
                     // new layout is on disk.
@@ -456,11 +458,19 @@ public sealed class MixerService : IHostedService, IDisposable
                             case "createMix": _mixer.CreateMix(cmd.Name!, save, cmd.Kind == "monitor" ? MixKind.Monitor : MixKind.VirtualMic); break;
                             case "renameMix": _mixer.RenameMix(cmd.Mix!, cmd.Name!, save); break;
                             case "deleteMix": _mixer.DeleteMix(cmd.Mix!, save); break;
+                            case "setExclusiveGroup": _mixer.SetExclusiveGroup(cmd.Group, cmd.Name!, cmd.Channels!, save); break;
+                            case "deleteExclusiveGroup": _mixer.DeleteExclusiveGroup(cmd.Group!, save); break;
                             default: _mixer.SetLayoutOrder(cmd.Channels!, cmd.Mixes!, save); break;
                         }
                     });
+                    if (cmd.Cmd is "setExclusiveGroup" or "deleteExclusiveGroup")
+                        SyncOutputSelectors();   // grouping XLR 1 takes it off the Pro's hardware mic path
                     Changed?.Invoke();
                     return null;
+                case "cycleExclusiveGroup":
+                    _mixer.CycleExclusiveGroup(cmd.Group!);
+                    SyncOutputSelectors();   // the XLR 1 mute may move the Pro's hardware mic path
+                    break;
                 case "setLevel":
                     if (cmd.Channel is null || cmd.Mix is null) return "setLevel: need 'channel' and 'mix'";
                     _mixer.SetLevel(cmd.Channel, cmd.Mix, cmd.Value.GetDouble());

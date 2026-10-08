@@ -40,7 +40,10 @@ public sealed record Command
     /// <summary>Mixer commands: which mix.</summary>
     [JsonPropertyName("mix")] public string? Mix { get; init; }
 
-    /// <summary>setLayoutOrder: complete ordered lists of editable stable IDs.</summary>
+    /// <summary>Exclusive group commands: the group's stable id.</summary>
+    [JsonPropertyName("group")] public string? Group { get; init; }
+
+    /// <summary>setLayoutOrder: complete ordered lists of editable stable IDs; setExclusiveGroup: the members.</summary>
     [JsonPropertyName("channels")] public List<string>? Channels { get; init; }
     [JsonPropertyName("mixes")] public List<string>? Mixes { get; init; }
 

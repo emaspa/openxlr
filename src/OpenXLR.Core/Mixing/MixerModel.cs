@@ -15,6 +15,8 @@ public sealed partial record MixerConfig
 {
     public required IReadOnlyList<MixDefinition> Mixes { get; init; }
     public required IReadOnlyList<ChannelDefinition> Channels { get; init; }
+    /// <summary>Exclusive channel groups; a channel is in one group at most.</summary>
+    public IReadOnlyList<ExclusiveGroupDefinition> ExclusiveGroups { get; init; } = [];
 
     /// <summary>
     /// The layout carried over from the user's Wave Link setup: three mixes
@@ -136,6 +138,7 @@ public sealed record MixerState
 {
     public required IReadOnlyList<MixStatus> Mixes { get; init; }
     public required IReadOnlyList<ChannelStatus> Channels { get; init; }
+    public IReadOnlyList<ExclusiveGroupDefinition> ExclusiveGroups { get; init; } = [];
 
     /// <summary>First selected monitor output, or null (legacy single view).</summary>
     public string? MonitorOutput { get; init; }
@@ -201,11 +204,12 @@ public sealed record MixStatus(string Id, string Name, double Volume, bool Muted
 /// can leave it out rather than offering a strip that can never carry audio.
 /// True for every channel while no device is connected.
 /// </param>
+/// <param name="ExclusiveGroup">The id of the exclusive group the channel is in, or null.</param>
 public sealed record ChannelStatus(string Id, string Name,
     IReadOnlyDictionary<string, double> Levels,
     IReadOnlyList<string> MutedIn,
     bool Hardware = false, string? CaptureSource = null, int CapturePair = 0, bool CaptureConnected = false,
-    bool Present = true);
+    bool Present = true, string? ExclusiveGroup = null);
 
 
 /// <summary>

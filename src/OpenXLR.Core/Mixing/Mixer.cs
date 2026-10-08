@@ -167,7 +167,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             DiscoverLegsLocked();
 
             // Push initial fader values.
-            foreach (MixDefinition mix in config.Mixes) ReapplyMixLocked(mix.Id);
+            NormalizeExclusiveGroupsLocked();
+            ReapplyMixesLocked(config.Mixes);
 
             // Publish non-monitor mixes as selectable capture devices. Each
             // reads a post sink fed from the mix (directly, or through the
@@ -1090,6 +1091,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         {
             return new MixerSettings
             {
+                ExclusiveGroups = ExclusiveGroupsModel.Copy(_config.ExclusiveGroups),
                 UserChannels = [.. _config.Channels.Where(c => c.InputPair is null)
                     .Select(c => new UserChannelDefinition(c.Id, c.Name, c.CaptureSource, c.CapturePair))],
                 UserMixes = [.. _config.Mixes.Where(m => m.IsEditable)
@@ -1164,6 +1166,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             foreach ((string cell, double lvl) in s.Levels)
                 if (_cells.Contains(cell)) _levels[cell] = Math.Clamp(lvl, 0, 1);
             RecallMutes(_muted, _cells, s.Levels.Keys, s.ChannelMuted);
+            NormalizeExclusiveGroupsLocked();
 
             foreach ((string identity, string channelId) in StreamMatcher.MigrateOverrides(s.AppOverrides))
                 Matcher.SetOverride(identity, _config.ResolveApplicationChannel(channelId));
@@ -1183,7 +1186,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
 
             static string Sanitize(string v) => v.EndsWith(" (deleted)", StringComparison.Ordinal) ? v[..^10] : v;
 
-            foreach (MixDefinition mix in _config.Mixes) ReapplyMixLocked(mix.Id);
+            ReapplyMixesLocked(_config.Mixes);
 
             IReadOnlyList<string> savedOutputs = s.MonitorOutputs is { Count: > 0 }
                 ? s.MonitorOutputs
@@ -1276,8 +1279,11 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             foreach ((string cell, double lvl) in s.Levels)
                 if (_cells.Contains(cell)) _levels[cell] = Math.Clamp(lvl, 0, 1);
             RecallMutes(_muted, _cells, s.Levels.Keys, s.ChannelMuted);
+            // A profile carries mutes, not groups: one that opens two members
+            // of a group closes that group.
+            NormalizeExclusiveGroupsLocked();
 
-            foreach (MixDefinition mix in _config.Mixes) ReapplyMixLocked(mix.Id);
+            ReapplyMixesLocked(_config.Mixes);
 
             // An empty list is a real scene choice: disconnect every monitor
             // route. Null belongs to an older profile that did not store this
@@ -1577,15 +1583,20 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// <summary>
     /// The Pro's hardware mic path is carrying XLR 1 to the headphone jacks
     /// (or not); the software send for that cell is muted in the graph
-    /// while it does, and restored when it stops.
+    /// while it does, and restored when it stops. Returns whether the path
+    /// is used: never while XLR 1 is in an exclusive group, because the
+    /// group mutes its members through their sends, and the device's direct
+    /// path would keep the microphone in the jacks after the group closed it.
     /// </summary>
-    public void SetHardwareMicMonitor(bool on)
+    public bool SetHardwareMicMonitor(bool on)
     {
         lock (_gate)
         {
-            if (_hardwareMicMonitor == on) return;
+            on &= GroupForChannelLocked("xlr1") is null;
+            if (_hardwareMicMonitor == on) return on;
             _hardwareMicMonitor = on;
             RefreshHardwareMicCellsLocked();
+            return on;
         }
     }
 
@@ -1853,13 +1864,17 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         }
     }
 
-    /// <summary>Mute/unmute one channel within one mix only.</summary>
+    /// <summary>
+    /// Mute/unmute one channel within one mix only. Unmuting a member of an
+    /// exclusive group first mutes the other members in every mix.
+    /// </summary>
     public void SetChannelMuted(string channelId, string mixId, bool muted)
     {
         lock (_gate)
         {
             string cell = Cell(channelId, mixId);
             if (!_cells.Contains(cell)) return;
+            if (!muted) CloseExclusivePeersLocked(channelId);
             if (muted) _muted.Add(cell); else _muted.Remove(cell);
             ApplyCellLocked(channelId, mixId);
         }
@@ -2149,6 +2164,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             DspFeatureAvailability clipGuard = _pw.GetSoftwareClipGuardAvailability();
             return new MixerState
             {
+                ExclusiveGroups = ExclusiveGroupsModel.Copy(_config.ExclusiveGroups),
                 Mixes = [.. _config.Mixes.Select(m => new MixStatus(
                     m.Id, m.Name,
                     _mixVolume.GetValueOrDefault(m.Id, 1.0),
@@ -2158,7 +2174,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                     _config.Mixes.ToDictionary(m => m.Id, m => _levels.GetValueOrDefault(Cell(c.Id, m.Id), 0.0)),
                     [.. _config.Mixes.Where(m => _muted.Contains(Cell(c.Id, m.Id))).Select(m => m.Id)],
                     c.InputPair is not null, c.CaptureSource, c.CapturePair, _captureFeeds.ContainsKey(c.Id),
-                    ChannelPresentLocked(c)))],
+                    ChannelPresentLocked(c), GroupForChannelLocked(c.Id)?.Id))],
                 RenamedSinceStart = _renamedSinceBuild,
                 MonitorOutput = _monitorOutputs.FirstOrDefault(),
                 MonitorOutputs = [.. _monitorOutputs],
@@ -2191,7 +2207,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         string cell = Cell(channelId, mixId);
         bool monitor = MonitorMixLocked(mixId) is not null;
         double level = _levels.GetValueOrDefault(cell, 0.0) * (monitor ? 1 : _mixVolume.GetValueOrDefault(mixId, 1.0));
-        bool muted = _muted.Contains(cell) || (!monitor && _mixMuted.Contains(mixId));
+        bool waiting = !_muted.Contains(cell) && ExclusivePeerPendingLocked(channelId);
+        bool muted = waiting || _muted.Contains(cell) || (!monitor && _mixMuted.Contains(mixId));
         if (_hardwareMicMonitor && monitor && channelId == "xlr1" && MonitorFeed.Includes(JackFeedLocked(), mixId))
             muted = true;   // the hardware direct path carries it to the jacks
 
@@ -2208,7 +2225,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         {
             _pw.SetSinkInputVolume(idx, level);
             _pw.SetSinkInputMuted(idx, muted);
-            _pendingCells.Remove(cell);
+            Settle(cell);
         }
         catch (InvalidOperationException)
         {
@@ -2216,10 +2233,16 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             DiscoverLegsLocked();
             if (_legIndex.TryGetValue(cell, out idx))
             {
-                try { _pw.SetSinkInputVolume(idx, level); _pw.SetSinkInputMuted(idx, muted); _pendingCells.Remove(cell); }
+                try { _pw.SetSinkInputVolume(idx, level); _pw.SetSinkInputMuted(idx, muted); Settle(cell); }
                 catch (InvalidOperationException) { MarkCellPendingLocked(cell); }
             }
             else MarkCellPendingLocked(cell);
+        }
+
+        // A member held silent behind a peer's pending mute is tried again.
+        void Settle(string cell)
+        {
+            if (waiting) MarkCellPendingLocked(cell); else _pendingCells.Remove(cell);
         }
     }
 
@@ -2297,16 +2320,10 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     private double MixVolumeMaximumLocked(string mixId)
         => MonitorMixLocked(mixId) is not null ? PipeWireAdapter.MaxSinkVolume : 1;
 
-    private void ReapplyMixLocked(string mixId)
-    {
-        if (MonitorMixLocked(mixId) is { } monitor)
-        {
-            _pw.SetSinkVolume(monitor.SinkName, _mixVolume.GetValueOrDefault(mixId, 1));
-            _pw.SetSinkMuted(monitor.SinkName, _mixMuted.Contains(mixId));
-        }
-        foreach (ChannelDefinition ch in _config.Channels)
-            ApplyCellLocked(ch.Id, mixId);
-    }
+    private void ReapplyMixLocked(string mixId) => ReapplyCellsLocked([mixId], masters: true);
+
+    private void ReapplyMixesLocked(IEnumerable<MixDefinition> mixes)
+        => ReapplyCellsLocked([.. mixes.Select(m => m.Id)], masters: true);
 
     private void TearDownLocked()
     {

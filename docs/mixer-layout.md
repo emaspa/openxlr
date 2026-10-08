@@ -65,6 +65,7 @@ every save. Every field is optional on read; an absent one is empty or off.
 | `lowCutHz` | the software low cut, 0, 80 or 120 |
 | `softClipGuard` | the software ClipGuard |
 | `inserts` | insert chains by `xlr1`, `xlr2` or `mix:<id>` |
+| `exclusiveGroups` | exclusive channel groups, see [Exclusive groups](#exclusive-groups) |
 
 A null field or a null entry inside one is dropped and logged; so is a
 non-finite number in `mixVolumes`, `levels` or an insert's `params`. A
@@ -123,6 +124,10 @@ debounced, retried behaviour.
   sink that was this mix, is cleared, and the desktop chooses the default.
   All of that is part of the saved deletion and rolls back with it when
   saving fails.
+- `setExclusiveGroup {group?, name, channels}` creates an exclusive group
+  when `group` is absent, or replaces the name and members of a known one.
+  `deleteExclusiveGroup {group}` removes one and leaves every send's mute
+  as it is. See [Exclusive groups](#exclusive-groups).
 - `setLayoutOrder {channels, mixes}` reorders the editable ids. Supply every
   application and capture channel id and every user mix id exactly
   once; hardware inputs, Monitor A/B and Aux keep their positions. No node
@@ -182,6 +187,42 @@ of the interface selected for hardware controls. Hardware controls and the
 built-in input DSP still belong to the selected Wave interface. Capture inputs
 can feed mix insert chains; per-input insert hosting remains limited to the
 existing XLR channels.
+
+## Exclusive groups
+
+An exclusive group is a named list of channels of which only one is heard.
+`exclusiveGroups` holds them:
+
+```json
+"exclusiveGroups": [
+  {"id": "microphones", "name": "Microphones", "channels": ["xlr1", "headset"]}
+]
+```
+
+A member is open while any of its sends is unmuted. Unmuting a member's send
+in any mix mutes every send of the other members, in every mix, before the
+new send opens; send levels do not change. If one of those mutes cannot be
+written yet, the new send stays silent until it has been. Muting the open
+member leaves the whole group muted.
+
+A group has 2 to 36 distinct members, any channels, hardware inputs
+included, and a channel is in one group at most. At most 16 groups are
+restored. The id follows the channel id rules and is generated from the
+name the same way, with `group` as the fallback word; the member order is
+the order `cycleExclusiveGroup` steps through. An entry that breaks these
+rules is dropped and logged, a member whose channel no longer exists is
+removed, and a group left with fewer than two members is removed too.
+Deleting a channel takes it out of its group the same way.
+
+The daemon never picks a member for you. If more than one member is open
+when a group is saved, when the settings file is read or when a profile is
+recalled, it mutes every member of that group. Profiles store the send
+mutes and not the groups, so a profile recalls into the groups that exist.
+
+On a Wave XLR Pro, XLR 1 in a group does not use the interface's
+zero-latency path to the headphone jacks. That path bypasses the mixer, so
+the group could not mute it; the microphone reaches the jacks through its
+Monitor send instead, with the latency of the PipeWire graph.
 
 ## Output feeds
 
