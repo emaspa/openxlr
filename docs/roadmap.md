@@ -103,7 +103,7 @@ few releases, and they get to settle in users' hands first.
   microphone keeps its old device name in other apps until the daemon
   restarts, since reloading the device would drop the apps recording
   from it.
-- [ ] Per-mix customization: icon, colour and order per mix and channel,
+- [x] Per-mix customization: icon, colour and order per mix and channel,
   hide a channel without deleting its routing, a compact layout that
   keeps one selected channel visible. Icons and colours also reach the
   Stream Deck keys.
@@ -165,7 +165,7 @@ a skin overlays values on top of them.
 - [x] The Stream Deck plugin reading the same tokens for its key art. The
   plugin colours its keys, dials and meters from the saved skin, using the
   palette the window publishes while it runs.
-- [ ] Layout density: a compact mode for small screens and a large mode
+- [x] Layout density: a compact mode for small screens and a large mode
   for touch.
 - [ ] Localization infrastructure and the first translations.
 
@@ -209,7 +209,7 @@ while fixes to existing hosts remain part of normal maintenance.
   Wine editor input fix, private wrappers and controller settings, system
   bridge fallback, and binary/source package artifacts. The separate CI
   workflow does not publish them to release or distribution repositories.
-- [ ] Presets: per-plugin and whole-chain, with export and import; copy a
+- [x] Presets: per-plugin and whole-chain, with export and import; copy a
   chain between channels; A/B comparison.
 - [x] Plugin latency reported per insert and compensated across mixes.
 - [x] Sound Check: record a short microphone sample, loop it through the
