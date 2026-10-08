@@ -9,7 +9,7 @@ CFLAGS += -std=c11 $(WARN)
 CXXFLAGS += -std=c++17 $(WARN) -fno-exceptions -fno-rtti
 LDLIBS += $(shell pkg-config --libs $(PKGS)) -ldl -lm -pthread
 
-OBJECTS = host.o lv2.o clap.o vst3.o
+OBJECTS = host.o lv2.o clap.o vst3.o sound-check.o
 HEADERS = host.h icon.h $(wildcard clap/include/clap/*.h clap/include/clap/*/*.h) \
           $(wildcard vst3/pluginterfaces/*/*.h)
 
@@ -96,3 +96,20 @@ test-vst3: tests/vst3
 
 clean:
 	rm -f openxlr-lv2-host $(OBJECTS) tests/editor tests/editor.o tests/audio tests/audio.o tests/clap tests/clap.o tests/lifecycle tests/lifecycle.o tests/lv2 tests/lv2.o tests/latency.lv2/latency.so tests/vst3 tests/vst3.o tests/host.o tests/scan-plugin.so
+
+# Sound Check: the loop backend, driven directly with deterministic samples
+# and no audio server.
+tests/sound-check.o: tests/sound-check.c sound-check.c host.c $(HEADERS)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
+tests/sound-check: tests/sound-check.o lv2.o clap.o vst3.o
+	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+.PHONY: test-sound-check clean-sound-check
+test: test-sound-check
+test-sound-check: tests/sound-check
+	./tests/sound-check
+
+clean: clean-sound-check
+clean-sound-check:
+	rm -f tests/sound-check tests/sound-check.o
