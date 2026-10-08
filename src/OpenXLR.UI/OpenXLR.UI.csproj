@@ -11,14 +11,20 @@
     <!-- Shared with the daemon (see the file): XDG paths and private atomic writes. -->
     <Compile Include="../OpenXLR.Core/OpenXlrPaths.cs" Link="OpenXlrPaths.cs" />
     <Compile Include="../OpenXLR.Core/ProcessRunner.cs" Link="ProcessRunner.cs" />
+    <!-- Shared with the terminal mixer: the saved Material mode. -->
+    <Compile Include="../OpenXLR.Core/AppearanceModes.cs" Link="AppearanceModes.cs" />
   </ItemGroup>
 
   <ItemGroup>
-    <AvaloniaResource Include="Assets/**" Exclude="Assets/Skins/**"/>
+    <AvaloniaResource Include="Assets/**" Exclude="Assets/Skins/**;Assets/Appearance/**"/>
     <!-- The skins the application ships with. They are read through the
          assembly's own manifest rather than through the asset loader, so the
          same code path works in a test with no rendering platform, and every
          packaging channel carries them without a rule of its own. -->
+    <!-- Material's light palette: skin data in the same format, not a skin of
+         its own, so it is not listed in the picker. The terminal mixer reads
+         the same file. -->
+    <EmbeddedResource Include="Assets/Appearance/material-light.json" LogicalName="OpenXLR.UI.Assets.Appearance.material-light.json"/>
     <EmbeddedResource Include="Assets/Skins/*/skin.json" LogicalName="OpenXLR.UI.Assets.Skins.$([System.String]::Copy('%(RecursiveDir)').TrimEnd('/')).skin.json"/>
   </ItemGroup>
 

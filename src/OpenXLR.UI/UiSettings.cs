@@ -43,6 +43,14 @@ public sealed record UiSettings
     public string? Skin { get; init; }
 
     /// <summary>
+    /// Material's mode: <c>system</c> follows the desktop's light or dark
+    /// preference, <c>light</c> and <c>dark</c> hold one. Other skins carry
+    /// their own colours and ignore it. Like the skin, it lives here alone.
+    /// </summary>
+    [JsonConverter(typeof(LocalAppearanceModeConverter))]
+    public string AppearanceMode { get; init; } = AppearanceModes.System;
+
+    /// <summary>
     /// Keys this version does not know, such as a setting written by a newer
     /// window or by the terminal mixer. They are written back unchanged, so a
     /// save from here never erases them.

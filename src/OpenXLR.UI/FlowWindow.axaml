@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="OpenXLR.UI.FlowWindow"
         Title="OpenXLR · Audio flow" SizeToContent="WidthAndHeight" MinWidth="900" MinHeight="500"
-        WindowStartupLocation="CenterOwner" RequestedThemeVariant="Dark"
+        WindowStartupLocation="CenterOwner"
         Background="{DynamicResource Ox.Flow.Background}">
   <!-- The graph's colours are the application's Ox.Flow.* tokens. The cards
        and the routes are built in code, which reads the same tokens and

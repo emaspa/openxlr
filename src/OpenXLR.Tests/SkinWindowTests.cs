@@ -52,6 +52,7 @@ public sealed class SkinWindowTests
             ThePluginBypassKeyIsLegibleInBothAppearances();
             TheOptionsColumnsCarryABalancedShareOfTheCards(options);
             TheWindowActuallyRepaintsWhenTheSkinChanges(main);
+            AppearanceModeWindowTests.Check(main, options, flow);
         });
     }
 

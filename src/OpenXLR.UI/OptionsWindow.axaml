@@ -216,6 +216,20 @@
           <Button Grid.Column="2" Content="Reload" Margin="8,0,0,0" Padding="14,5" Click="OnReloadSkins"
                   ToolTip.Tip="Read the skin folders again, for a skin added or edited since"/>
         </Grid>
+        <Grid ColumnDefinitions="110,*">
+          <TextBlock Text="Mode" Classes="h" VerticalAlignment="Center"/>
+          <ComboBox Name="AppearanceModePicker" Grid.Column="1" HorizontalAlignment="Stretch"
+                    ItemsSource="{Binding AppearanceModeChoices}"
+                    SelectedItem="{Binding SelectedAppearanceMode, Mode=TwoWay}"
+                    IsEnabled="{Binding CanChooseAppearanceMode}" AutomationProperties.Name="Appearance mode">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:AppearanceModeChoice">
+                <TextBlock Text="{Binding Label}"/>
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+        </Grid>
+        <TextBlock Text="{Binding AppearanceModeNote}" FontSize="11" Classes="hint" TextWrapping="Wrap"/>
         <TextBlock Text="{Binding SkinNote}" FontSize="11" Classes="hint" TextWrapping="Wrap"
                    IsVisible="{Binding SkinNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
         <TextBlock Text="{Binding SkinFolderHint}" FontSize="11" Classes="note" TextWrapping="Wrap"/>
