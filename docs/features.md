@@ -203,6 +203,12 @@ scans CLAP/VST3 bundles in separate processes and caches their descriptions
 until the bundle or the helper itself changes, so an updated helper reads
 every installed bundle once.
 
+Each insert's controls show the latency its plugin reports, or that it gave
+none. Optional latency compensation, off by default, delays the faster mixes
+so they line up with the mix whose inserts take longest, up to two seconds;
+a plugin with no figure counts as zero. Turning it on or off rebuilds every
+chain. See [plugin latency](manual.md#plugin-latency).
+
 Chains and exposed parameter values are saved with the mixer and profiles.
 Opaque plugin state, loaded sample files and plugin preset data are not
 persisted by OpenXLR. A plugin may save its own preferences separately.

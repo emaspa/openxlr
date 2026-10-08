@@ -28,6 +28,19 @@ public sealed class PipeWireAdapter
     private readonly Action<string>? _note;
     private PipeWireGraph? _graph;
 
+    /// <summary>
+    /// Latency compensation is on: an LV2 insert that declares a latency port
+    /// runs in the native host, which reads the figure, when the host is
+    /// installed and carries the plugin. Without the host it stays in the
+    /// filter chain and gives no figure.
+    /// </summary>
+    internal bool MeasurePluginLatency { get; set; }
+
+    private bool NeedsLatencyHost(InsertDefinition insert) => MeasurePluginLatency && insert.Kind == "lv2"
+        && NativePluginHost.HostInstalled
+        && PluginCatalog.Find(insert) is { ReportsLatency: true } info
+        && NativePluginHost.SupportsFeatures(info.RequiredFeatures);
+
     /// <summary>Use a registry subscription for this adapter until the returned lease is disposed.</summary>
     public IDisposable WatchGraph(Action<string>? note = null)
     {
@@ -697,7 +710,7 @@ public sealed class PipeWireAdapter
     private FilterHandle CreateFilterChain(string sinkName, string srcName, string description, int channels,
         int lowCutHz, bool clipGuard, IReadOnlyList<InsertDefinition>? inserts)
     {
-        if (inserts?.Any(i => !i.Bypass && i.RunsNatively) == true)
+        if (inserts?.Any(i => !i.Bypass && (i.RunsNatively || NeedsLatencyHost(i))) == true)
             return CreateHostedChain(sinkName, srcName, description, channels, lowCutHz, clipGuard, inserts);
         if (clipGuard)
         {
@@ -851,6 +864,35 @@ public sealed class PipeWireAdapter
     }
 
     /// <summary>
+    /// A stereo delay after a mix, for latency compensation: one builtin
+    /// delay line per side, up to the compensation limit, starting at zero.
+    /// Its nodes are hidden from the desktop's device lists.
+    /// </summary>
+    internal FilterHandle CreateMixDelay(string id)
+    {
+        string sink = $"OpenXLR_delay_{id}_in", source = $"OpenXLR_delay_{id}_out";
+        string max = (MixLatency.MaxMilliseconds / 1000).ToString("R", System.Globalization.CultureInfo.InvariantCulture);
+        string spa = "{ node.description = \"OpenXLR mix latency delay\" " +
+            "filter.graph = { nodes = [ " +
+            $"{{ type = builtin name = left label = delay config = {{ max-delay = {max} }} control = {{ \"Delay (s)\" = 0.0 }} }} " +
+            $"{{ type = builtin name = right label = delay config = {{ max-delay = {max} }} control = {{ \"Delay (s)\" = 0.0 }} }} ] " +
+            "inputs = [ \"left:In\" \"right:In\" ] outputs = [ \"left:Out\" \"right:Out\" ] } " +
+            $"capture.props = {{ node.name = {sink} media.class = Audio/Sink audio.channels = 2 audio.position = [ FL FR ] node.suspend-on-idle = false node.hidden = true }} " +
+            $"playback.props = {{ node.name = {source} media.class = Audio/Source audio.channels = 2 audio.position = [ FL FR ] node.suspend-on-idle = false node.hidden = true }} }}";
+        return StartFilterChain(sink, source, spa);
+    }
+
+    /// <summary>Set both sides of a mix delay, live, without rebuilding anything.</summary>
+    internal void SetMixDelay(FilterHandle filter, double milliseconds)
+    {
+        if (!double.IsFinite(milliseconds) || milliseconds is < 0 or > MixLatency.MaxMilliseconds)
+            throw new ArgumentOutOfRangeException(nameof(milliseconds));
+        int id = FindNodeId(filter.SinkName) ?? throw new InvalidOperationException("The mix delay is not in the graph.");
+        string value = (milliseconds / 1000).ToString("R", System.Globalization.CultureInfo.InvariantCulture);
+        Run("pw-cli", "set-param", id.ToString(), "Props", $"{{ params = [ \"left:Delay (s)\" {value} \"right:Delay (s)\" {value} ] }}");
+    }
+
+    /// <summary>
     /// Splice native editors into the chain, retaining filter-chain for other
     /// plugins. <paramref name="fallback"/> names an LV2 insert PipeWire's
     /// filter chain refused, run in the native host whatever its saved choice,
@@ -880,7 +922,7 @@ public sealed class PipeWireAdapter
                         $"{InsertName(insert)} is unavailable or requires unsupported host features.");
                 string node = $"{sinkName}_stage_{insertStages.Count}";
                 FilterHandle stage;
-                if (insert.RunsNatively || refused is not null)
+                if (insert.RunsNatively || refused is not null || NeedsLatencyHost(insert))
                 {
                     if (!NativePluginHost.HostInstalled)
                         throw new InvalidOperationException("The native plugin host is not installed.");

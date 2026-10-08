@@ -107,10 +107,11 @@ written above it; false on every other model), `lowImpedance`,
 mixer state carries `mixes`, `channels`, `monitorOutput` (the first selected
 output), `monitorOutputs`, `monitorFeeds`, `outputVolume`,
 `auxPortEnabled`, `lowCutHz`, `softClipGuard`, `softClipGuardAvailable`,
-`softClipGuardError`, `inserts` (chains by insert key, `xlr1`, `xlr2` or
-`mix:<id>`; each entry carries `insert`, `error`, `meters`,
-`nativeHostRunning`, `nativeUiBlocked`, `nativeUiBlockReason` and
-`filterChainError`),
+`softClipGuardError`, `compensateMixLatency`, `mixDelayMilliseconds`,
+`mixLatencyError` (see [plugin latency](#plugin-latency)), `inserts`
+(chains by insert key, `xlr1`, `xlr2` or `mix:<id>`; each entry carries
+`insert`, `error`, `meters`, `nativeHostRunning`, `nativeUiBlocked`,
+`nativeUiBlockReason`, `filterChainError` and `latencyMilliseconds`),
 `exclusiveGroups` (`id`, `name`, `channels`; see
 [exclusive groups](mixer-layout.md#exclusive-groups)), `enforcedDefaultSink`, `enforcedDefaultSource`, `streams` (`id`, `serial`,
 `label`, `identity`, `channelId`, `active`, `running`), `renamedSinceStart`
@@ -141,6 +142,7 @@ that final acknowledgement (or an `error` without a request id):
 | `set` | `control`, `value` | hardware control (`gain`, `mute`, `lowCut`, `expander`, `voiceTune`, `voiceTuneStrength`, `phantom`, `clipGuard`, `compressor`, their `…2` variants for XLR 2, `hpVolumeDb`, `hp2VolumeDb`, `lowImpedance`, `crossfade`, `auxLevelDb`, `auxLevelLock`, `outHp1`, `outHp2`, `outUsbAux`, `outLineOut`) and the software `gainLock`. A control the active device's capabilities do not advertise is refused with an error, as is an XLR Dock control the card lacks while the USB handle is closed |
 | `setLowCutHz` | `value` | software low cut: 0, 80, or 120 |
 | `setSoftClipGuard` | `value` | software ClipGuard (post-ADC limiter at -3 dB); enabling is rejected if `swh-plugins` is unavailable, without replacing or disconnecting the live microphone route |
+| `setMixLatencyCompensation` | `value` | boolean; delay the other mixes to line up with the mix whose inserts take longest (see [plugin latency](#plugin-latency)). Off by default. Either way every insert chain is rebuilt, which briefly interrupts audio |
 | `setLevel` | `channel`, `mix`, `value` | one send fader |
 | `createCaptureChannel` | `name`, `source`, optional `capturePair` | add an external PipeWire capture input, muted in every mix; exact source name of up to 256 characters, zero-based stereo pair 0 to 31 (default 0). A source named `OpenXLR...` or ending in `.monitor` is refused. See [capture inputs](mixer-layout.md#capture-inputs) |
 | `createChannel` | `name` | add an application channel, muted in every mix, without touching existing nodes; its generated stable id is in the next state. Undone with an error when its sends have not appeared within 3 s |
@@ -349,6 +351,41 @@ The OpenDeck plugin in `plugin/`, the terminal mixer
 (`packaging/omarchy/openxlr.mixer/DaemonLink.qml`) are clients of this
 API; the command handler is `WebSocketHub.cs` and the message shapes are
 in `Protocol.cs`, both under `src/OpenXLR.Daemon/`.
+
+### Plugin latency
+
+Each insert's status carries `latencyMilliseconds`, the processing latency
+the plugin reports: zero for a bypassed insert, and absent (null over HTTP)
+when the plugin gives no figure. A plugin in the native host reports what
+the helper last read from it; there is no figure before the helper's first
+report, which comes once audio has run. An LV2 plugin in the PipeWire filter
+chain cannot report, so it reads zero when its metadata declares no latency
+port and has no figure otherwise.
+
+`setMixLatencyCompensation` turns compensation on or off. It is a mixer
+setting, saved in `mixer.json` and not part of a profile. With it on, an LV2
+insert whose plugin declares a latency port runs in the native host when the
+helper is installed and supports the plugin, so its figure can be read; its
+`nativeHost` field is not changed. Turning it on or off rebuilds every insert
+chain, on the inputs and on the mixes.
+
+With compensation on, each mix's total is the sum of its inserts' figures,
+and every mix is delayed by its distance from the slowest. An insert with no
+figure counts as zero, and compensation never waits for one. That covers an LV2
+plugin with a latency port when the native host is not installed or cannot
+carry it, a CLAP or VST3 plugin that reports nothing, and any plugin until its
+helper's first report. Clients show such an insert's latency as unknown.
+The delay is a stereo stage after the mix's inserts, which every consumer
+of the mix reads; it exists only while the mix needs a delay above zero, and
+follows a changed figure without restarting any plugin. Input inserts sit
+before the mixes, so they reach every mix alike and are not compensated.
+
+`mixDelayMilliseconds` holds the delay each mix has now, by mix id; a mix
+with none is absent. A mix total above 2000 ms delays no mix, and
+`mixLatencyError` says so; it also reports a delay stage that could not be
+built or set. A stage that keeps failing is left off after three failures
+in five minutes, until the mix no longer needs a delay or compensation is
+turned off and on again.
 
 ## Configuration files
 

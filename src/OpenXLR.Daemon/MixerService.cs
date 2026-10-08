@@ -543,6 +543,9 @@ public sealed class MixerService : IHostedService, IDisposable
                 case "renameInsert":
                     _mixer.RenameInsert(cmd.Channel!, cmd.InsertId!, cmd.Name!);   // checked by CommandValidation
                     break;
+                case "setMixLatencyCompensation":
+                    _mixer.SetMixLatencyCompensation(cmd.Value.GetBoolean());
+                    break;
                 case "setInserts":
                     _mixer.SetInserts(cmd.Channel!, cmd.Inserts!);   // both checked by CommandValidation
                     break;

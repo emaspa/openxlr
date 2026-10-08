@@ -418,6 +418,35 @@ A plugin that is not installed, or cannot run at the chain's width, is
 refused and the chain stays as it was. The file format and limits are in
 [effect-presets.md](effect-presets.md).
 
+<a name="plugin-latency"></a>
+**Plugin latency.** Some plugins delay the audio they process, a limiter
+that looks ahead or a linear-phase equaliser for instance, and report by
+how much. The controls window shows the figure under the plugin's name.
+"Latency: unknown" means the plugin gave no figure. That happens when it
+runs in the PipeWire filter chain, which cannot read one, when the plugin
+reports nothing, and until its host first reports, once audio has run
+through it.
+
+When a mix's plugins delay it, that mix arrives later than the others. In
+Options, AUDIO, **Compensate plugin latency across mixes** delays every
+other mix by the difference, so they line up with the slowest, for example
+a recording mix and the stream mix that carries the same voice. It is off by
+default. It makes the faster mixes later, monitoring included, so leave it
+off unless the mixes have to line up. Turning it on or off rebuilds every
+plugin chain and briefly interrupts audio.
+
+With it on, an LV2 plugin that declares a latency port runs in the native
+host when that is installed, so its figure can be read; its Native host
+switch stays as you set it. A plugin with an unknown latency counts as
+zero, so the other mixes are aligned without it instead of waiting for a
+figure. The delays follow a plugin whose latency changes, and a
+bypassed plugin counts as zero, without restarting any plugin. If a mix's
+plugins add up to more than two seconds no mix is delayed, and Options says
+why. Plugins on XLR 1 and XLR 2 reach every mix alike and are not part of the
+alignment. Compensation does not cover the device's own latency or the
+hardware's direct monitoring. The setting is saved with the mixer and stays
+as it is when a profile is loaded.
+
 <a name="native-editor-compatibility"></a>
 **Native editor compatibility.** Open Options, PLUGINS, then "Native editors"
 to choose plugins that should use OpenXLR's generated controls instead of their

@@ -73,8 +73,8 @@ jobs:
       - name: Desktop monitor volume controls
         run: python3 tools/test-monitor-volume.py
 
-      - name: Software ClipGuard audio with a native LV2 insert
-        run: OPENXLR_TEST_DSP=1 OPENXLR_TEST_FILTER=FullyQualifiedName~DspAudioIntegrationTests LV2_PATH=/usr/lib/lv2 python3 tools/test-monitor-volume.py
+      - name: Software ClipGuard audio and plugin latency with native LV2 inserts
+        run: OPENXLR_TEST_DSP=1 OPENXLR_TEST_FILTER="FullyQualifiedName~DspAudioIntegrationTests|FullyQualifiedName~PluginLatencyIntegrationTests" LV2_PATH="/usr/lib/lv2:$PWD/native/tests" python3 tools/test-monitor-volume.py
 
       - name: Tray window lifecycle
         run: OPENXLR_TEST_DESKTOP=1 xvfb-run -a dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~TrayWindowTests

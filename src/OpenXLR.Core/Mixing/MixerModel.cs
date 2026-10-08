@@ -170,6 +170,15 @@ public sealed record MixerState
     /// <summary>Actionable dependency/load error when software ClipGuard is unavailable.</summary>
     public string? SoftClipGuardError { get; init; }
 
+    /// <summary>Whether mixes are delayed to line up with the slowest mix's inserts.</summary>
+    public bool CompensateMixLatency { get; init; }
+
+    /// <summary>The delay each mix is given now, by mix id; a mix with none is absent.</summary>
+    public IReadOnlyDictionary<string, double> MixDelayMilliseconds { get; init; } = new Dictionary<string, double>();
+
+    /// <summary>Why the mixes are not aligned as planned, or null.</summary>
+    public string? MixLatencyError { get; init; }
+
     /// <summary>Plugin insert chains by channel id, with live load status.</summary>
     public IReadOnlyDictionary<string, IReadOnlyList<InsertStatus>> Inserts { get; init; }
         = new Dictionary<string, IReadOnlyList<InsertStatus>>();

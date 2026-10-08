@@ -37,6 +37,9 @@ public static class CommandValidation
                 return CheckEditorRule(cmd);
             case "setPluginWineTrace":
                 return CheckPluginWineTrace(cmd);
+            case "setMixLatencyCompensation":
+                return cmd.Value.ValueKind is JsonValueKind.True or JsonValueKind.False
+                    ? null : "setMixLatencyCompensation: value must be a boolean";
             case "addWindowsPluginFolder":
             case "removeWindowsPluginFolder":
             case "getWindowsPluginFiles":

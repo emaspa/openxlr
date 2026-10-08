@@ -401,6 +401,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
 
     private void RemoveMixChainsLocked()
     {
+        RemoveMixDelaysLocked();
         foreach (PortLink link in _mixTaps.Values) _pw.Unlink(link);
         foreach (PortLink link in _mixPostLinks.Values) _pw.Unlink(link);
         _mixTaps.Clear();
@@ -434,7 +435,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     {
         lock (_gate)
         {
-            if (!_built || _chains.Count == 0) return false;
+            if (!_built || (_chains.Count == 0 && _mixDelays.Count == 0 && _latencyReports.Count == 0)) return false;
             bool changed = false;
             // Mix chains heal individually; input chains re-wire the whole input path.
             foreach (MixDefinition mix in _config.Mixes)
@@ -452,6 +453,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             bool inputBroken = _chains.Where(e => !e.Key.StartsWith("mix:", StringComparison.Ordinal)).Any(e => !e.Value.IsAlive)
                 || _chainOuts.Values.Any(l => _pw.EnsureLinks(l) == LinkHealth.Broken);
             if (inputBroken) { WireInputFeedsLocked(); changed = true; }
+            changed |= UpdateMixLatencyLocked();
             // A heal can retire the last bridged plugin without any command
             // being given: a chain the restart policy has given up on is left
             // off, and the helper that held Wine up goes with it. No rewire
@@ -638,9 +640,13 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
 
     private static string MixKey(MixDefinition mix) => $"mix:{mix.Id}";
 
-    /// <summary>Where a mix's consumers should read from: its insert chain when one runs, else its own monitor.</summary>
+    /// <summary>
+    /// Where a mix's consumers should read from: its latency delay when it
+    /// has one, else its insert chain when one runs, else its own monitor.
+    /// </summary>
     private (string Node, string Prefix) MixTapLocked(MixDefinition mix)
-        => _chains.TryGetValue(MixKey(mix), out FilterHandle? chain) ? (chain.SourceName, "capture") : (mix.SinkName, "monitor");
+        => _mixDelays.TryGetValue(mix.Id, out FilterHandle? delay) ? (delay.SourceName, "capture")
+        : _chains.TryGetValue(MixKey(mix), out FilterHandle? chain) ? (chain.SourceName, "capture") : (mix.SinkName, "monitor");
 
     /// <summary>
     /// (Re)build one mix's insert chain and re-point everything that reads
@@ -651,7 +657,6 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     {
         string key = MixKey(mix);
         if (_mixTaps.Remove(key, out PortLink? tap)) _pw.Unlink(tap);
-        if (_mixPostLinks.Remove(key, out PortLink? post)) _pw.Unlink(post);
         if (_chains.Remove(key, out FilterHandle? old)) _pw.StopFilter(old);
         _insertErrors.Remove(key);
 
@@ -671,6 +676,19 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 _insertErrors[key] = ex.Message;   // the mix keeps flowing without its inserts
             }
         }
+        RewireMixConsumersLocked(mix);
+    }
+
+    /// <summary>
+    /// Re-point what reads a mix at its current tap, rebuilding its latency
+    /// delay on the way. The plugins keep running, so a delay can come and
+    /// go without resetting them.
+    /// </summary>
+    private void RewireMixConsumersLocked(MixDefinition mix)
+    {
+        string key = MixKey(mix);
+        if (_mixPostLinks.Remove(key, out PortLink? post)) _pw.Unlink(post);
+        WireMixDelayLocked(mix);
         (string node, string prefix) = MixTapLocked(mix);
         switch (mix.Kind)
         {
@@ -995,7 +1013,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                     : !i.Bypass && _insertErrors.TryGetValue(channel, out string? err) ? err
                     : host?.EditorStalled == true ? "the plugin's editor stopped answering; its controls are frozen while audio keeps playing"
                     : null, host?.Meters, host?.IsRunning == true)
-                { FilterChainError = stage?.FilterChainError };
+                { FilterChainError = stage?.FilterChainError, LatencyMilliseconds = InsertLatencyLocked(channel, i) };
             })];
         }
         return result;
@@ -1109,6 +1127,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 AuxPortEnabled = _auxPortEnabled,
                 LowCutHz = _lowCutHz,
                 SoftClipGuard = _softClipGuard,
+                CompensateMixLatency = _compensateMixLatency,
                 Inserts = CopyInsertsLocked(),
             };
         }
@@ -1230,9 +1249,19 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 rewireInputs = true;
                 rewireMixes = true;
             }
+            if (s.CompensateMixLatency != _compensateMixLatency)
+            {
+                // The same chains the live switch rebuilds, so a plugin runs
+                // in the same host after a restart as before it.
+                _compensateMixLatency = s.CompensateMixLatency;
+                _pw.MeasurePluginLatency = s.CompensateMixLatency;
+                rewireInputs = true;
+                rewireMixes = true;
+            }
             if (rewireInputs) WireInputFeedsLocked();
             if (rewireMixes)
                 foreach (MixDefinition mix in _config.Mixes) WireMixChainLocked(mix);
+            UpdateMixLatencyLocked();
         }
     }
 
@@ -2184,6 +2213,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 SoftClipGuard = _softClipGuard,
                 SoftClipGuardAvailable = clipGuard.Available,
                 SoftClipGuardError = clipGuard.Error,
+                CompensateMixLatency = _compensateMixLatency,
+                MixDelayMilliseconds = new Dictionary<string, double>(_mixDelayValues),
+                MixLatencyError = _mixLatencyError,
                 Inserts = InsertStatusLocked(),
                 EnforcedDefaultSink = _enforcedSink,
                 EnforcedDefaultSource = _enforcedSource,

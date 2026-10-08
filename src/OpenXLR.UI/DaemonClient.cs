@@ -446,6 +446,10 @@ public sealed class DaemonClient : IAsyncDisposable
     public Task SetSoftClipGuardAsync(bool on)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setSoftClipGuard", ["value"] = on });
 
+    /// <summary>Delay faster mixes to line up with the slowest mix's inserts, or stop.</summary>
+    public Task SetMixLatencyCompensationAsync(bool on)
+        => SendAsync(new Dictionary<string, object> { ["cmd"] = "setMixLatencyCompensation", ["value"] = on });
+
     /// <summary>Replace a channel's plugin insert chain (ordered).</summary>
     public Task SetInsertsAsync(string channel, IReadOnlyList<object> inserts)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setInserts", ["channel"] = channel, ["inserts"] = inserts });

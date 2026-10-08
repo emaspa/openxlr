@@ -42,6 +42,8 @@ public sealed record InsertStatus(InsertDefinition Insert, string? Error,
     IReadOnlyDictionary<string, double>? Meters = null,
     bool NativeHostRunning = false)
 {
+    /// <summary>The plugin's processing latency in milliseconds, zero when bypassed, null when it gives no figure.</summary>
+    public double? LatencyMilliseconds { get; init; }
     public bool NativeUiBlocked { get; init; }
     public string? NativeUiBlockReason { get; init; }
     /// <summary>
@@ -78,6 +80,10 @@ public sealed record PluginInfo(
     /// rest and the daemon refuses them, instead of failing at graph build.
     /// </summary>
     public IReadOnlyList<string> UnsupportedFeatures { get; init; } = [];
+
+    /// <summary>LV2: the plugin declares a latency port. Null for the other formats.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool? ReportsLatency { get; init; }
 
     public bool Supported => UnsupportedFeatures.Count == 0;
     public bool HasNativeUi { get; init; }
