@@ -5,7 +5,7 @@
 
 import process from "node:process";
 import { KeyCommands } from "./key-commands.mjs";
-import { channelName, mixName, mixShortName, layoutChoices, controllableOutputs, outputKey } from "./layout-choices.mjs";
+import { channelName, mixName, mixShortName, layoutChoices, controllableOutputs, outputKey, targetAppearance, openGroupMember } from "./layout-choices.mjs";
 import fs from "node:fs";
 import os from "node:os";
 import { SkinPalette } from "./skin-palette.mjs";
@@ -464,10 +464,7 @@ function toggleValue(target, inst) {
 
 // An exclusive group and the member that is unmuted in some mix, or null.
 const groupOf = (id) => mixer()?.exclusiveGroups?.find((g) => g.id === id) ?? null;
-const groupOpenMember = (group) => group.channels.find((id) => {
-  const ch = chOf(id);
-  return ch && Object.keys(ch.levels ?? {}).some((m) => !ch.mutedIn?.includes(m));
-}) ?? null;
+const groupOpenMember = (group) => openGroupMember(mixer(), group);
 
 // An output's feed as the daemon stores it: any mix id, or ids
 // joined with '+' when the output hears them summed.
@@ -945,17 +942,22 @@ function sevenSegText(text, x, y, h, color) {
   return out;
 }
 
-function keySvg(on, muteLike, known, glyphName, badge, label, offColor = null) {
+function keySvg(on, muteLike, known, glyphName, badge, label, offColor = null, appearance = {}) {
   // The skin colours the owned faceplate, cap and glyph. An insert's bypass
   // uses the alert colour, and a mute keeps its visible slash and status lamp.
+  // A channel's or mix's own icon and colour from the layout editor replace
+  // the glyph and tint the label and border while the daemon is reachable.
   const accent = !known ? null : on ? (muteLike ? skinPalette.colours["Ox.Led.Alert"] : skinPalette.colours["Ox.Led.On"]) : offColor;
   const ink = !known ? skinPalette.colours["Ox.Text.Muted"] : accent ?? skinPalette.colours["Ox.Text.Primary"];
   const lines = label ? label.split("\n").slice(0, 2) : [];
 
   // Button cap (glyph keys) or LED display window (badge keys) or lamp only.
   const capY = lines.length ? 52 : 66;
+  const tint = known ? appearance.colour ?? null : null;
   let face;
-  if (glyphName) {
+  if (appearance.icon) {
+    face = `<text x="72" y="${capY + 15}" text-anchor="middle" font-family="sans-serif" font-size="48" fill="${tint ?? ink}">${escXml(appearance.icon)}</text>`;
+  } else if (glyphName) {
     const glyph = GLYPHS[glyphName].replaceAll("currentColor", ink);
     face = `
       <circle cx="72" cy="${capY}" r="38" fill="none" stroke="#000" stroke-opacity="0.4" stroke-width="6"/>
@@ -989,7 +991,7 @@ function keySvg(on, muteLike, known, glyphName, badge, label, offColor = null) {
   const labelSvg = lines.map((line, i) => {
     const size = line.length > 11 ? 19 : line.length > 8 ? 22 : 26;
     const y = lines.length === 1 ? 126 : 106 + i * 24;
-    return `<text x="72" y="${y}" text-anchor="middle" fill="${skinPalette.colours["Ox.Text.Primary"]}" ` +
+    return `<text x="72" y="${y}" text-anchor="middle" fill="${tint ?? skinPalette.colours["Ox.Text.Primary"]}" ` +
       `stroke="#000" stroke-width="4" paint-order="stroke" stroke-linejoin="round" ` +
       `font-family="Inter, Noto Sans, DejaVu Sans, sans-serif" font-size="${size}" font-weight="700">` +
       escXml(line) + `</text>`;
@@ -1010,15 +1012,17 @@ function keySvg(on, muteLike, known, glyphName, badge, label, offColor = null) {
       </defs>
       <rect x="6" y="6" width="132" height="132" rx="14" fill="${skinPalette.colours["Ox.Card.Background"]}"/>
       <rect x="6" y="6" width="132" height="132" rx="14" fill="url(#side)"/>
-      <rect x="9" y="9" width="126" height="126" rx="12" fill="none" stroke="${skinPalette.colours["Ox.Text.Muted"]}" stroke-width="4"/>
+      <rect x="9" y="9" width="126" height="126" rx="12" fill="none" stroke="${tint ?? skinPalette.colours["Ox.Text.Muted"]}" stroke-width="4"/>
       ${face}${slash}${lampDot}${labelSvg}
     </svg>`).toString("base64");
 }
 
 // 24x24 icons for the dial layout's corner slot.
 function dialIcon(t) {
+  const appearance = targetAppearance(mixer(), t);
+  const ink = appearance.colour ?? skinPalette.colours["Ox.Text.Primary"];
   const inner = (name) => GLYPHS[name]
-    ? `<g transform="scale(0.1667)">${GLYPHS[name].replaceAll("currentColor", skinPalette.colours["Ox.Text.Primary"])}</g>` : "";
+    ? `<g transform="scale(0.1667)">${GLYPHS[name].replaceAll("currentColor", ink)}</g>` : "";
   let name = "knob";
   if (t?.startsWith("send:")) name = "fader";
   else if (t?.startsWith("mixvol:")) name = "speaker";
@@ -1027,7 +1031,9 @@ function dialIcon(t) {
   else if (t === "hp" || t === "hp2") name = "headphones";
   else if (t === "crossfade") name = "xfade";
   return "data:image/svg+xml;base64," + Buffer.from(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">${inner(name)}</svg>`
+    `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">${appearance.icon
+      ? `<text x="12" y="19" text-anchor="middle" font-family="sans-serif" font-size="21" fill="${ink}">${escXml(appearance.icon)}</text>`
+      : inner(name)}</svg>`
   ).toString("base64");
 }
 
@@ -1165,8 +1171,10 @@ function refresh(context) {
     const hasIcon = typeof iconChoice === "string" && Object.hasOwn(GLYPHS, iconChoice);
     const glyphName = hasIcon ? iconChoice : glyphFor(t);
     const offColor = isInsertTarget(t) ? skinPalette.colours["Ox.Led.Alert"] : null;   // bypassed = red, as in the UI
+    // A glyph picked on the key itself wins over the channel's icon.
+    const appearance = { ...targetAppearance(mixer(), t), ...(hasIcon ? { icon: "" } : {}) };
     send({ event: "setImage", context,
-           payload: { image: keySvg(v === true, isMuteLike(t), v !== null && daemonUp, glyphName, badge, label, offColor) } });
+           payload: { image: keySvg(v === true, isMuteLike(t), v !== null && daemonUp, glyphName, badge, label, offColor, appearance) } });
   } else if (inst.action === "com.emaspa.openxlr.dial") {
     const d = dialValue(t, inst);
     const isDb = t === "gain" || t === "gain2";

@@ -92,6 +92,15 @@ public static class CommandValidation
             case "deleteExclusiveGroup":
             case "cycleExclusiveGroup":
                 return ExclusiveGroupsModel.ValidId(cmd.Group) ? null : $"{cmd.Cmd}: need a valid 'group'";
+            case "setLayoutAppearance":
+                if ((cmd.Channel is null) == (cmd.Mix is null)) return "setLayoutAppearance: need exactly one of 'channel' and 'mix'";
+                if (cmd.Channel is not null && (TooLong(cmd.Channel, 36) || !layout.HasChannel(cmd.Channel)))
+                    return $"setLayoutAppearance: unknown channel '{Short(cmd.Channel)}'";
+                if (cmd.Mix is not null && (TooLong(cmd.Mix, 36) || !layout.HasMix(cmd.Mix)))
+                    return $"setLayoutAppearance: unknown mix '{Short(cmd.Mix)}'";
+                if (!LayoutAppearance.IsValid(cmd.Appearance))
+                    return "setLayoutAppearance: need 'appearance' with an empty or listed icon and a null or #RRGGBB colour";
+                return cmd.Mix is not null && cmd.Appearance!.Hidden ? "setLayoutAppearance: a mix cannot be hidden" : null;
             case "setLevel":
             case "setChannelMuted":
                 if (cmd.Channel is not null && !layout.HasChannel(cmd.Channel)) return $"{cmd.Cmd}: unknown channel '{Short(cmd.Channel)}'";

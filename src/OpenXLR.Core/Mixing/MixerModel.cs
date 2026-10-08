@@ -209,7 +209,7 @@ public sealed record MixerState
 
 /// <param name="Kind">"monitor", "virtualMic" or "auxPort", so clients can tell monitor mixes apart.</param>
 /// <param name="Editable">A user mix that can be renamed, reordered and removed.</param>
-public sealed record MixStatus(string Id, string Name, double Volume, bool Muted, string Kind = "monitor", bool Editable = false);
+public sealed partial record MixStatus(string Id, string Name, double Volume, bool Muted, string Kind = "monitor", bool Editable = false);
 
 /// <param name="Present">
 /// False when the active device has no jack behind this channel, so a client
@@ -217,7 +217,7 @@ public sealed record MixStatus(string Id, string Name, double Volume, bool Muted
 /// True for every channel while no device is connected.
 /// </param>
 /// <param name="ExclusiveGroup">The id of the exclusive group the channel is in, or null.</param>
-public sealed record ChannelStatus(string Id, string Name,
+public sealed partial record ChannelStatus(string Id, string Name,
     IReadOnlyDictionary<string, double> Levels,
     IReadOnlyList<string> MutedIn,
     bool Hardware = false, string? CaptureSource = null, int CapturePair = 0, bool CaptureConnected = false,

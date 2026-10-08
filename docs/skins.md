@@ -466,6 +466,12 @@ without a row here fails the build.
 | `Ox.Link.Foreground` | brush | #5ba8f5 |  | a link |
 | `Ox.Link.ForegroundPointerOver` | brush | #8cc4ff |  | a link under the pointer |
 
+A colour given to one channel or mix in the layout editor paints that
+item's name and icon in place of `Ox.Text.Primary`, in the window, the
+terminal mixer and on Stream Deck keys, whatever the skin. It is part of
+the mixer layout, not of a skin
+([Saved mixer layout](mixer-layout.md#appearance)).
+
 ### Typography
 
 | Token | Kind | Default | Range | What it sets |

@@ -3,9 +3,27 @@ using System.Text.Json.Serialization;
 
 namespace OpenXLR.Tui;
 
+/// <summary>
+/// A channel's or mix's icon, colour and hidden flag from the layout editor.
+/// Presentation only; the strip's sends and routing do not depend on it.
+/// </summary>
+internal sealed record AppearanceEntry
+{
+    public string Icon { get; init; } = string.Empty;
+    public string? Colour { get; init; }
+    public bool Hidden { get; init; }
+
+    /// <summary>The colour to draw the name in, or null for the theme's.</summary>
+    public Rgb? Accent => Rgb.TryParse(Colour);
+
+    /// <summary>The name with the icon in front of it, when there is one.</summary>
+    public string Label(string name) => Icon.Length > 0 ? $"{Icon} {name}" : name;
+}
+
 /// <summary>One mix master: a monitor mix, a virtual microphone or the Aux port.</summary>
 internal sealed record MixEntry
 {
+    public AppearanceEntry Appearance { get; init; } = new();
     public string Id { get; init; } = string.Empty;
     public string Name { get; init; } = string.Empty;
     public double Volume { get; init; } = 1;
@@ -21,6 +39,7 @@ internal sealed record MixEntry
 /// <summary>One channel strip and its send into every mix.</summary>
 internal sealed record ChannelEntry
 {
+    public AppearanceEntry Appearance { get; init; } = new();
     public string Id { get; init; } = string.Empty;
     public string Name { get; init; } = string.Empty;
     public Dictionary<string, double> Levels { get; init; } = [];
@@ -127,6 +146,16 @@ internal sealed record MixerSnapshot
     /// </summary>
     [JsonIgnore]
     public List<ChannelEntry> Shown => _shown ??= [.. Channels.Where(channel => channel.Present)];
+
+    private List<ChannelEntry>? _strips;
+
+    /// <summary>
+    /// The channels the mixer tab draws a strip for: the shown ones less
+    /// those hidden in the layout editor. The matrix still lists a hidden
+    /// channel, so its sends stay within reach.
+    /// </summary>
+    [JsonIgnore]
+    public List<ChannelEntry> Strips => _strips ??= [.. Shown.Where(channel => !channel.Appearance.Hidden)];
     public List<string> MonitorOutputs { get; init; } = [];
     public Dictionary<string, string> MonitorFeeds { get; init; } = [];
     public double? OutputVolume { get; init; }

@@ -10,6 +10,13 @@
   <!-- The window's ground, its cards, its labels, its meters and its fader
        caps come from the application's Ox.* appearance tokens (App.axaml and
        Skinning/SkinTokens.cs). What is left here is this window's own layout. -->
+  <Window.Styles>
+    <!-- A colour chosen for one channel or mix in the layout editor is that
+         item's own data, not a skin value; without one the skin's applies. -->
+    <Style Selector="TextBlock.layoutAccent">
+      <Setter Property="Foreground" Value="{ReflectionBinding Appearance.Accent}"/>
+    </Style>
+  </Window.Styles>
   <Window.Resources>
     <ControlTheme x:Key="TileExpanderTheme" TargetType="Expander">
       <Setter Property="HorizontalAlignment" Value="Stretch"/>
@@ -583,10 +590,12 @@
               <Border Classes="tile" Padding="10" Margin="0,0,8,8" Width="{DynamicResource Ox.Mixer.MixWidth}"
                       IsVisible="{Binding Visible}">
                 <StackPanel Spacing="6">
-                  <Grid ColumnDefinitions="*,Auto">
-                    <TextBlock Text="{Binding Name}" Classes="strip"
+                  <Grid ColumnDefinitions="Auto,*,Auto">
+                    <TextBlock Text="{Binding Appearance.Icon}" Classes="strip" Classes.layoutAccent="{Binding Appearance.HasColour}"
+                               IsVisible="{Binding Appearance.HasIcon}" Margin="0,0,6,0"/>
+                    <TextBlock Grid.Column="1" Text="{Binding Name}" Classes="strip" Classes.layoutAccent="{Binding Appearance.HasColour}"
                                TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" Margin="0,0,8,0"/>
-                    <TextBlock Grid.Column="1" Text="{Binding VolumeText}" Classes="val"/>
+                    <TextBlock Grid.Column="2" Text="{Binding VolumeText}" Classes="val"/>
                   </Grid>
                   <StackPanel Spacing="1">
                     <skin:LevelMeter Level="{Binding MeterL}" AutomationProperties.Name="Left level"/>
@@ -653,9 +662,12 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:ChannelViewModel">
                 <Border Classes="tile" Padding="10" Margin="0,0,8,0" Width="{DynamicResource Ox.Mixer.ChannelWidth}"
-                        IsVisible="{Binding Visible}">
+                        IsVisible="{Binding DisplayVisible}">
                   <StackPanel Spacing="8">
-                    <TextBlock Text="{Binding Name}" Classes="strip" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding Appearance.Icon}" Classes="strip" Classes.layoutAccent="{Binding Appearance.HasColour}"
+                               HorizontalAlignment="Center" IsVisible="{Binding Appearance.HasIcon}"/>
+                    <TextBlock Text="{Binding Name}" Classes="strip" Classes.layoutAccent="{Binding Appearance.HasColour}"
+                               HorizontalAlignment="Center"/>
                     <!-- stereo level meter (L over R), dB scale -->
                     <StackPanel Spacing="1">
                       <skin:LevelMeter Level="{Binding MeterL}" AutomationProperties.Name="Left level"/>

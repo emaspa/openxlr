@@ -42,6 +42,7 @@ internal static class SavedMixerValidation
             AppOverrides = Mapping(settings.AppOverrides, "appOverrides", notes),
             KnownApps = Apps(settings.KnownApps, notes),
             Inserts = Inserts(settings.Inserts, notes),
+            Appearance = Appearance(settings.Appearance, notes),
         };
     }
 
@@ -68,6 +69,15 @@ internal static class SavedMixerValidation
         if (entries is null) { notes.Add($"{field}: {NullEntry}"); return []; }
         var kept = entries.Where(entry => entry is not null).ToList();
         if (kept.Count != entries.Count) notes.Add($"{field}: {NullEntry}");
+        return kept;
+    }
+
+    private static Dictionary<string, LayoutAppearance> Appearance(Dictionary<string, LayoutAppearance>? values, List<string> notes)
+    {
+        if (values is null) { notes.Add($"appearance: {NullEntry}"); return []; }
+        var kept = values.Where(p => LayoutAppearance.IsValidEntry(p.Key, p.Value))
+            .Take(LayoutAppearance.MaxEntries).ToDictionary();
+        if (kept.Count != values.Count) notes.Add("appearance: invalid entry");
         return kept;
     }
 

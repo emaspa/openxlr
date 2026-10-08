@@ -326,6 +326,7 @@ public sealed class WindowLayoutTests
                 Capture(captureDialog, "capture-input-360");
                 captureDialog.Close();
                 AssertInside(setup.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "ExclusiveGroupsButton"), setup);
+                CheckAppearanceDialog(setup, windows);
                 setup.Close();
 
                 var groupsVm = new MainViewModel(new DaemonClient());
@@ -569,6 +570,7 @@ public sealed class WindowLayoutTests
                 EffectWorkflowWindowTests.CheckControlOwnership(main, vm.Inserts.Client);
                 PluginCatalogueUiTests.CheckStaleReplies();
                 SoundCheckWindowTests.CheckPendingClose();
+                AssertLayoutAppearance(main, vm);
             }
             catch (Exception ex) { failure = ex; }
             finally
@@ -607,6 +609,59 @@ public sealed class WindowLayoutTests
             .OrderBy(b => b.TranslatePoint(default, main)!.Value.Y)
             .ThenBy(b => b.TranslatePoint(default, main)!.Value.X).ToArray();
         Assert.Equal(["monitor", "chat", "stream"], mixes.Select(b => ((MixViewModel)b.DataContext!).Id));
+    }
+
+    /// <summary>A hidden channel loses its strip, and a chosen colour reaches the name over the skin's.</summary>
+    private static void AssertLayoutAppearance(MainWindow main, MainViewModel model)
+    {
+        typeof(MainViewModel).GetMethod("ApplyMixer", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(model, [JsonNode.Parse("""
+            {"mixes":[{"id":"monitor","name":"Monitor A","appearance":{"icon":"◆","colour":"#12ABCD"}}],
+             "channels":[{"id":"game","name":"Game","levels":{"monitor":1},"appearance":{"hidden":true}},
+                         {"id":"music","name":"Music","levels":{"monitor":1},"appearance":{"icon":"♫","colour":"#ABC123"}}]}
+            """)]);
+        Layout(main, 1040, 900);
+        var strips = main.GetVisualDescendants().OfType<Border>()
+            .Where(b => b.DataContext is ChannelViewModel && b.Width == 132).ToArray();
+        Assert.False(strips.Single(b => ((ChannelViewModel)b.DataContext!).Id == "game").IsVisible);
+        Border music = strips.Single(b => ((ChannelViewModel)b.DataContext!).Id == "music");
+        Assert.True(music.IsVisible);
+        foreach (string text in new[] { "♫", "Music" })
+        {
+            TextBlock label = music.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Text == text);
+            Assert.True(label.IsVisible);
+            Assert.Equal(Avalonia.Media.Color.Parse("#ABC123"), ((Avalonia.Media.ISolidColorBrush)label.Foreground!).Color);
+        }
+        Border mix = main.GetVisualDescendants().OfType<Border>().Single(b => b.DataContext is MixViewModel { Id: "monitor" } && b.Width == 232);
+        TextBlock mixName = mix.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Text == "Monitor A");
+        Assert.Equal(Avalonia.Media.Color.Parse("#12ABCD"), ((Avalonia.Media.ISolidColorBrush)mixName.Foreground!).Color);
+        Capture(main, "layout-appearance-1040");
+    }
+
+    /// <summary>The layout editor's appearance dialog offers the hidden flag for a channel only.</summary>
+    private static void CheckAppearanceDialog(MixerSetupWindow setup, List<Window> windows)
+    {
+        var client = new DaemonClient();
+        foreach (object item in new object[] { new ChannelViewModel(client, "game", "Game", []), new MixViewModel(client, "stream", "Stream") })
+        {
+            typeof(MixerSetupWindow).GetMethod("OnAppearance", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(setup, [new Button { DataContext = item }, new Avalonia.Interactivity.RoutedEventArgs()]);
+            Dispatcher.UIThread.RunJobs();
+            var dialog = Assert.Single(setup.OwnedWindows);
+            windows.Add(dialog);
+            Layout(dialog, 440, 360);
+            Control Named(string name) => dialog.GetVisualDescendants().OfType<Control>().Single(c => c.Name == name);
+            Assert.Equal(LayoutAppearanceViewModel.Icons.Length, ((ComboBox)Named("AppearanceIcon")).ItemCount);
+            Assert.Equal(item is ChannelViewModel, dialog.GetVisualDescendants().OfType<CheckBox>().Any(c => c.Name == "AppearanceHidden" && c.IsVisible));
+            ((TextBox)Named("AppearanceColour")).Text = "red";
+            Named("AppearanceSave").RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(dialog.IsVisible);   // a colour that is not #RRGGBB is not sent
+            foreach (var button in dialog.GetVisualDescendants().OfType<Button>().Where(b => b.IsVisible))
+                AssertInside(button, dialog);
+            Capture(dialog, "layout-appearance-dialog-" + (item is ChannelViewModel ? "channel" : "mix"));
+            dialog.Close();
+            Dispatcher.UIThread.RunJobs();
+        }
     }
 
     private static void AddInsert(InsertsViewModel owner)

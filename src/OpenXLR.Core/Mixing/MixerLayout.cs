@@ -113,11 +113,21 @@ public sealed partial record MixerConfig
         return id;
     }
 
+    /// <summary>
+    /// Where an application goes when its channel no longer exists: System,
+    /// or when System was deleted, the application channel whose id sorts
+    /// first. Never a position in the layout order, so reordering channels
+    /// changes nothing about routing.
+    /// </summary>
+    public ChannelDefinition? FallbackApplicationChannel
+        => Channels.FirstOrDefault(c => c.IsApplication && c.Id == "system")
+            ?? Channels.Where(c => c.IsApplication).MinBy(c => c.Id, StringComparer.Ordinal);
+
     /// <summary>Keep obsolete app rules out of hardware inputs after a layout change.</summary>
     public string ResolveApplicationChannel(string requested)
         => requested == StreamMatcher.Ignore ? requested
             : (Channels.FirstOrDefault(c => c.IsApplication && c.Id == requested)
-                ?? Channels.FirstOrDefault(c => c.IsApplication))?.Id ?? StreamMatcher.Ignore;
+                ?? FallbackApplicationChannel)?.Id ?? StreamMatcher.Ignore;
 
     /// <summary>
     /// Restore ordered user nodes without replacing hardware or monitor buses.

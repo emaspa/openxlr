@@ -1140,6 +1140,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 SoftClipGuard = _softClipGuard,
                 CompensateMixLatency = _compensateMixLatency,
                 Inserts = CopyInsertsLocked(),
+                Appearance = ExportAppearanceLocked(),
             };
         }
     }
@@ -1188,6 +1189,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         lock (_gate)
         {
             if (!_built) return;
+            RestoreAppearanceLocked(s.Appearance);
 
             foreach ((string mixId, double vol) in s.MixVolumes)
                 if (_mixVolume.ContainsKey(mixId)) _mixVolume[mixId] = Math.Clamp(vol, 0, MixVolumeMaximumLocked(mixId));
@@ -2008,7 +2010,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                     continue;
                 }
                 ChannelDefinition? ch = _config.Channels.FirstOrDefault(c => c.Id == channelId && c.IsApplication)
-                                        ?? _config.Channels.FirstOrDefault(c => c.IsApplication);
+                                        ?? _config.FallbackApplicationChannel;
                 if (ch is null) continue;
 
                 try
@@ -2204,7 +2206,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         lock (_gate)
         {
             DspFeatureAvailability clipGuard = _pw.GetSoftwareClipGuardAvailability();
-            return new MixerState
+            return WithAppearanceLocked(new MixerState
             {
                 ExclusiveGroups = ExclusiveGroupsModel.Copy(_config.ExclusiveGroups),
                 Mixes = [.. _config.Mixes.Select(m => new MixStatus(
@@ -2236,7 +2238,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 AuxPortEnabled = _auxPortEnabled,
                 Streams = [.. _apps.Values
                     .OrderByDescending(a => a.Active).ThenBy(a => a.Label, StringComparer.OrdinalIgnoreCase)],
-            };
+            });
         }
     }
 

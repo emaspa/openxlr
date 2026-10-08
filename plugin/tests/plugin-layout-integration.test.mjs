@@ -33,6 +33,21 @@ test("plugin publishes layout updates and keeps monitor feed commands intact", a
       monitorOutputs:["qa-output"], monitorFeeds:{}, inserts:{}
     }};
     daemon.receive(state);
+    const keyImage = (context) => {
+      const image = host.messages.filter(m => m.event === "setImage" && m.context === context).at(-1).payload.image;
+      return Buffer.from(image.split(",")[1], "base64").toString();
+    };
+    host.receive({event:"willAppear",context:"appearance-key",action:"com.emaspa.openxlr.toggle",payload:{settings:{target:"sendmute:system:monitor"}}});
+    host.receive({event:"willAppear",context:"own-glyph-key",action:"com.emaspa.openxlr.toggle",payload:{settings:{target:"sendmute:system:monitor",icon:"headphones"}}});
+    state.mixer.channels[0].mutedIn = [];
+    state.mixer.channels[0].appearance = {icon:"♫",colour:"#1234AB",hidden:true};
+    daemon.receive(state);
+    assert.ok(keyImage("appearance-key").includes(">♫</text>"));
+    assert.ok(keyImage("appearance-key").includes("#1234AB"));
+    assert.ok(!keyImage("own-glyph-key").includes("♫"));
+    delete state.mixer.channels[0].appearance;
+    daemon.receive(state);
+    assert.ok(!keyImage("appearance-key").includes("#1234AB"));
     host.receive({event:"sendToPlugin",context:"qa",payload:{request:"layout"}});
     assert.ok(host.messages.at(-1).payload.levelGroups.flatMap(g => g.items)
       .some(item => item.target === "send:system:monitor2"));
