@@ -1278,6 +1278,34 @@ Ids are generated from names and never change afterwards, so profiles
 and Stream Deck keys survive a rename. The layout file is described in
 [mixer-layout.md](mixer-layout.md).
 
+<a name="exclusive-groups"></a>
+#### Exclusive groups
+
+An exclusive group is a set of channels of which only one is heard, such
+as a broadcast microphone and a headset, or a capture card that serves two
+consoles. To make one, click Exclusive groups at the bottom of the layout
+editor, name the group, tick at least two channels and save. Pick an
+existing group in the list to rename it, change its members or delete it.
+A channel belongs to one group at most.
+
+Once a group exists, unmuting a member's send in any mix mutes the other
+members in every mix, so switching from the microphone to the headset is
+one click on the headset's send. Levels stay where you set them. Muting
+the member you are using leaves the whole group muted. If more than one
+member is unmuted when you save the group or recall a profile, every
+member is muted and you unmute the one you want. Deleting a group leaves
+the mutes as they are.
+
+A Stream Deck key can switch the group ([section 4](#stream-deck)).
+
+On a Wave XLR Pro, putting XLR 1 in a group turns off the interface's
+zero-latency path from the microphone to the headphone jacks, because
+that path bypasses the mixer and the group could not mute it. The
+microphone then reaches the jacks through its Monitor A send, with the
+latency of the PipeWire graph. Take XLR 1 out of the group to get the
+direct path back. The microphone's hardware mute is separate from the
+group and mutes it everywhere, as before.
+
 <a name="plugin-editors"></a>
 ### 3.13 Open a plugin's own editor
 
@@ -1391,7 +1419,12 @@ an output's feed (cycling Monitor A, Monitor B, Monitor A+B and the remaining mi
 when not on A),
 the bypass of one insert or of a whole chain, a desktop output's mute or
 its selection as the enforced system default, the routing of the focused
-application, or a profile to recall.
+application, a profile to recall, or the next member of an
+[exclusive group](#exclusive-groups). A group key shows the group's name
+and the member that is heard, or None; a press unmutes the next member in
+the mixes the current one was heard in and mutes the current one. With
+every member muted the key shows an alert, because there is nothing to
+hand over; unmute a member first.
 The key's LED is green for an engaged feature, red for a mute, and grey
 when the daemon is offline or the target does not exist on the
 connected interface. A key's icon can be chosen in its settings, and a

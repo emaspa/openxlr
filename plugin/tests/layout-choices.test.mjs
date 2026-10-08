@@ -82,3 +82,10 @@ test("output dials list the system default then every controllable sink, after t
   assert.equal(outputKey("output:headset:analog"), null);
   assert.equal(outputKey("output:"), null);
 });
+
+test("exclusive groups offer one next-member key each", () => {
+  assert.equal(layoutChoices(mixer).toggleGroups.find(g => g.id === "layout-exclusive-groups"), undefined);
+  const grouped = { ...mixer, exclusiveGroups: [{ id: "mics", name: "Microphones", channels: ["xlr1", "alerts-new"] }] };
+  assert.deepEqual(layoutChoices(grouped).toggleGroups.find(g => g.id === "layout-exclusive-groups").items,
+    [{ target: "group:mics", label: "Microphones: next member" }]);
+});

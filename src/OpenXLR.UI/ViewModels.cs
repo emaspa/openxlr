@@ -602,6 +602,12 @@ public sealed partial class MainViewModel : ViewModelBase
     public Task<string?> RenameMix(string id, string name) => Edit(_client.RenameMixAsync(id, name));
     public Task<string?> DeleteMix(string id) => Edit(_client.DeleteMixAsync(id));
 
+    /// <summary>The exclusive groups in the last state, for the groups editor.</summary>
+    public IReadOnlyList<ExclusiveGroupItem> ExclusiveGroups { get; private set; } = [];
+    public Task<string?> SetExclusiveGroup(string? id, string name, IReadOnlyList<string> channels)
+        => Edit(_client.SetExclusiveGroupAsync(id, name, channels));
+    public Task<string?> DeleteExclusiveGroup(string id) => Edit(_client.DeleteExclusiveGroupAsync(id));
+
     /// <summary>Move one editable channel or mix one step; the whole order is sent.</summary>
     public Task<string?> MoveChannel(string id, int delta) => Reorder(id, delta, isMix: false);
     public Task<string?> MoveMix(string id, int delta) => Reorder(id, delta, isMix: true);
@@ -1037,8 +1043,12 @@ public sealed partial class MainViewModel : ViewModelBase
 
     private void ApplyMixer(JsonNode? mixer)
     {
-        if (mixer is null) { HasMixer = false; RenamedSinceStart = false; LayoutWarning = ""; return; }
+        if (mixer is null) { HasMixer = false; RenamedSinceStart = false; LayoutWarning = ""; ExclusiveGroups = []; return; }
         HasMixer = true;
+        ExclusiveGroups = [.. (mixer["exclusiveGroups"] as JsonArray ?? []).OfType<JsonObject>()
+            .Where(g => g["id"] is JsonValue && g["name"] is JsonValue && g["channels"] is JsonArray)
+            .Select(g => new ExclusiveGroupItem(g["id"]!.GetValue<string>(), g["name"]!.GetValue<string>(),
+                [.. g["channels"]!.AsArray().OfType<JsonValue>().Select(ch => ch.GetValue<string>())]))];
         RenamedSinceStart = mixer["renamedSinceStart"]?.GetValue<bool>() ?? false;
         LayoutWarning = mixer["layoutWarning"]?.GetValue<string>() ?? "";
         SoftLowCutHz = mixer["lowCutHz"]?.GetValue<int>() ?? 0;

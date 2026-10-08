@@ -107,7 +107,7 @@ few releases, and they get to settle in users' hands first.
   hide a channel without deleting its routing, a compact layout that
   keeps one selected channel visible. Icons and colours also reach the
   Stream Deck keys.
-- [ ] Exclusive channel groups: several input channels marked as one
+- [x] Exclusive channel groups: several input channels marked as one
   group, where unmuting a member mutes the rest. A desk with a broadcast
   microphone and a headset, or a capture card switched between two
   consoles, is one key or one click instead of two. The group is layout

@@ -120,6 +120,35 @@ test("plugin publishes layout updates and keeps monitor feed commands intact", a
     assert.equal(daemon.messages.length, beforeMissing);
     assert.ok(host.messages.some(m => m.event === "showAlert" && m.context === "missing-output"));
 
+    // An exclusive group key names the member that is heard and asks the
+    // daemon for the next one; a deleted group disables it.
+    state.mixer.channels.push({id:"headset",name:"Headset",levels:{monitor:1,monitor2:1},mutedIn:["monitor"]});
+    state.mixer.channels[0].mutedIn = ["monitor", "monitor2"];
+    state.mixer.exclusiveGroups = [{id:"mics",name:"Microphones",channels:["system","headset"]}];
+    daemon.receive(state);
+    host.receive({event:"sendToPlugin",context:"qa",payload:{request:"layout"}});
+    assert.ok(host.messages.at(-1).payload.toggleGroups.flatMap(g => g.items)
+      .some(item => item.target === "group:mics" && item.label === "Microphones: next member"));
+    host.receive({event:"willAppear",context:"group-key",action:"com.emaspa.openxlr.toggle",payload:{settings:{target:"group:mics"}}});
+    host.receive({event:"titleParametersDidChange",context:"group-key",payload:{title:""}});
+    const face = host.messages.filter(m => m.event === "setImage" && m.context === "group-key").at(-1);
+    assert.match(Buffer.from(face.payload.image.split(",")[1], "base64").toString(), />Headset</);
+    host.receive({event:"keyDown",context:"group-key"});
+    const {requestId: cycleId, ...cycle} = daemon.messages.at(-1);
+    assert.deepEqual(cycle, {cmd:"cycleExclusiveGroup",group:"mics"});
+    daemon.receive({type:"commandResult",requestId:cycleId});
+    assert.ok(host.messages.some(m => m.event === "showOk" && m.context === "group-key"));
+    state.mixer.exclusiveGroups = [];
+    daemon.receive(state);
+    const beforeDeleted = daemon.messages.length;
+    host.receive({event:"keyDown",context:"group-key"});
+    assert.equal(daemon.messages.length, beforeDeleted);
+    assert.ok(host.messages.some(m => m.event === "showAlert" && m.context === "group-key"));
+    state.mixer.channels.pop();
+    delete state.mixer.exclusiveGroups;
+    delete state.mixer.channels[0].mutedIn;
+    daemon.receive(state);
+
     // A desktop boost must not jump back to 100% on the first dial tick.
     state.mixer.mixes = [
       {id:"monitor",name:"Monitor A",kind:"monitor",volume:1.5},
