@@ -1,0 +1,73 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:OpenXLR.UI.Localization" xmlns:vm="using:OpenXLR.UI"
+        x:Class="OpenXLR.UI.WaveInterfacesWindow" x:DataType="vm:MainViewModel"
+        Title="{loc:Text Key=AdditionalInterfaces}" Width="680" Height="620" MinWidth="480" MinHeight="360"
+        WindowStartupLocation="CenterOwner" Background="{DynamicResource Ox.Window.Background}">
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Margin="16" Spacing="12">
+      <TextBlock Classes="hint" TextWrapping="Wrap" Text="{loc:Text Key=AdditionalInterfacesHint}"/>
+      <ItemsControl ItemsSource="{Binding WaveInterfaces}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:WaveInterfaceViewModel">
+            <Border Classes="card" Padding="12" Margin="0,0,0,10">
+              <StackPanel Spacing="8">
+                <TextBlock Classes="body" Text="{Binding Name}" TextWrapping="Wrap"/>
+                <TextBlock Classes="hint" Text="{loc:Text Key=PrimaryInterface}" IsVisible="{Binding Active}"/>
+                <CheckBox IsChecked="{Binding Enabled, Mode=TwoWay}" IsEnabled="{Binding CanEnable}" IsVisible="{Binding !Active}">
+                  <TextBlock Text="{loc:Text Key=DriveAsAdditionalInterface}" TextWrapping="Wrap"/>
+                </CheckBox>
+                <StackPanel IsEnabled="{Binding CanControl}" IsVisible="{Binding Connected}" Spacing="6">
+                  <Grid ColumnDefinitions="*,64" IsVisible="{Binding HasGain}">
+                    <Slider IsEnabled="{Binding CanAdjustGain}" Minimum="0" Maximum="80" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding Gain, Mode=TwoWay}"
+                            AutomationProperties.Name="{loc:Text Key=InterfaceGain}"/>
+                    <TextBlock Classes="val" Grid.Column="1" Text="{Binding GainText}"/>
+                  </Grid>
+                  <WrapPanel ItemSpacing="8" LineSpacing="4">
+                    <ToggleButton Content="{loc:Text Key=Mute}" IsChecked="{Binding Mute, Mode=TwoWay}" IsVisible="{Binding HasMute}"/>
+                    <ToggleButton Content="{loc:Text Key=LowCut}" IsChecked="{Binding LowCut, Mode=TwoWay}" IsVisible="{Binding HasLowCut}"/>
+                    <ToggleButton Content="{loc:Text Key=ClipGuard}" IsChecked="{Binding ClipGuard, Mode=TwoWay}" IsVisible="{Binding HasClipGuard}"/>
+                    <ToggleButton Content="{loc:Text Key=Phantom}" IsChecked="{Binding Phantom, Mode=TwoWay}" IsVisible="{Binding HasPhantom}"/>
+                    <TextBlock Classes="hint" Text="{loc:Text Key=PhantomPowerSettling}" IsVisible="{Binding PhantomSettling}" VerticalAlignment="Center"/>
+                  </WrapPanel>
+                  <StackPanel IsVisible="{Binding HasSecondInput}" Spacing="6">
+                    <Grid ColumnDefinitions="*,64">
+                      <Slider IsEnabled="{Binding CanAdjustGain}" Minimum="0" Maximum="80" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding Gain2, Mode=TwoWay}"
+                              AutomationProperties.Name="{loc:Text Key=InterfaceGainInput2}"/>
+                      <TextBlock Classes="val" Grid.Column="1" Text="{Binding Gain2Text}"/>
+                    </Grid>
+                    <WrapPanel ItemSpacing="8" LineSpacing="4">
+                      <ToggleButton Content="{loc:Text Key=MuteInput2}" IsChecked="{Binding Mute2, Mode=TwoWay}"/>
+                      <ToggleButton Content="{loc:Text Key=Phantom}" IsChecked="{Binding Phantom2, Mode=TwoWay}" IsVisible="{Binding HasPhantom}"/>
+                      <ToggleButton Content="{loc:Text Key=LowCut}" IsChecked="{Binding LowCut2, Mode=TwoWay}" IsVisible="{Binding HasLowCut}"/>
+                      <ToggleButton Content="{loc:Text Key=ClipGuard}" IsChecked="{Binding ClipGuard2, Mode=TwoWay}" IsVisible="{Binding HasClipGuard}"/>
+                    </WrapPanel>
+                  </StackPanel>
+                  <TextBlock Classes="h" Text="{loc:Text Key=InterfaceCaptureSource}"/>
+                  <ComboBox AutomationProperties.Name="{loc:Text Key=InterfaceCaptureSource}" ItemsSource="{Binding Sources}" SelectedItem="{Binding Source, Mode=TwoWay}"
+                            HorizontalAlignment="Stretch" PlaceholderText="{loc:Text Key=InterfaceSourcePlaceholder}">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="vm:AudioDeviceItem">
+                        <TextBlock Classes="body" Text="{Binding Label}" TextTrimming="CharacterEllipsis"/>
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                  <TextBlock Classes="h" Text="{loc:Text Key=InterfaceMicrophone}" IsVisible="{Binding HasSecondInput}"/>
+                  <NumericUpDown AutomationProperties.Name="{loc:Text Key=InterfaceMicrophone}" Minimum="1" Maximum="{Binding MaximumInput}" Increment="1" FormatString="0"
+                                 Value="{Binding InputNumber, Mode=TwoWay}" IsVisible="{Binding HasSecondInput}" HorizontalAlignment="Left"/>
+                  <TextBlock Classes="h" Text="{loc:Text Key=InterfaceChannelName}"/>
+                  <TextBox Text="{Binding ChannelName, Mode=TwoWay}" MaxLength="60" AutomationProperties.Name="{loc:Text Key=InterfaceChannelName}"
+                           PlaceholderText="{loc:Text Key=InterfaceChannelNamePlaceholder}"/>
+                  <Button Content="{loc:Text Key=AddInputChannel}" Click="OnAddInput" HorizontalAlignment="Left"/>
+                </StackPanel>
+                <TextBlock Text="{Binding Warning}" TextWrapping="Wrap" Foreground="{DynamicResource Ox.Text.Warning}"
+                           IsVisible="{Binding Warning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                <TextBlock Text="{Binding Error}" TextWrapping="Wrap" Foreground="{DynamicResource Ox.Text.Warning}"
+                           IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+  </ScrollViewer>
+</Window>

@@ -147,6 +147,11 @@ public partial class OptionsWindow : Window
         }
     }
 
+    private void OnWaveInterfaces(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is OptionsViewModel vm) new WaveInterfacesWindow(vm.Main).Show(this);
+    }
+
     private async void OnResetDevice(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not OptionsViewModel vm) return;

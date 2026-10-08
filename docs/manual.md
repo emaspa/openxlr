@@ -1681,7 +1681,11 @@ Restart OpenDeck after installing or updating the plugin.
   picker; the mixer's input channels follow the chosen one. Switching
   releases the interface you leave before the chosen one is opened, and
   on an interface whose last settings OpenXLR remembers it saves a
-  change made just before the switch instead of losing it.
+  change made just before the switch instead of losing it. Two units of
+  one model are listed with their USB port. While the chosen unit is
+  unplugged the others are left alone, and with several attached and none
+  driven the XLR strips stay silent until you pick one
+  ([Multiple Wave interfaces](wave-interfaces.md)).
 
 <a name="dock-silent"></a>
 ### 5.2 Microphone silent on the XLR Dock or the original Wave XLR
@@ -1914,6 +1918,8 @@ Review plugin names, paths and scanner output before sharing the archive.
 | `~/.config/openxlr/devices/<vid-pid>/defaults.json` | the firmware defaults of such an interface, recorded after a power cycle, written back by "Reset device to defaults" (the Pro has no such file: its reset writes OpenXLR's baseline) |
 | `~/.config/openxlr/daemon.json` | the submixer on/off preference and the added plugin folders |
 | `~/.config/openxlr/gainlock.json` | which devices have the gain lock set |
+| `~/.config/openxlr/wave-interfaces.json` | the units driven as additional interfaces, by instance id ([Multiple Wave interfaces](wave-interfaces.md)) |
+| `~/.config/openxlr/devices/<vid-pid>@<hash>/last-state.json` | the last settings of an additional interface that keeps none on board |
 | `~/.config/openxlr/native-editors.json` | your native editor overrides ([section 3.5](#native-editor-compatibility)) |
 | `~/.config/openxlr/desktop-keys.json` | desktop shortcut bindings, written by the window ([Desktop keys](#desktop-keys)) |
 | `~/.config/openxlr/bridge/yabridgectl/config.toml` | companion bridge folder registry, separate from the system bridge |
@@ -1989,10 +1995,14 @@ with its saved faders when the same source returns. A different source or
 pair needs a new capture channel. Profile recall changes its sends, not its
 source binding. Application routing never targets capture inputs.
 
-Several Wave interfaces can supply capture audio at once. The active-device
-picker still chooses the single interface whose hardware controls OpenXLR
-shows. The software input effects and XLR inserts retain their existing scope;
-additional capture inputs can use the effects on the mixes they feed.
+Several Wave interfaces can supply capture audio at once. The header picker
+chooses the primary interface, whose controls the main window shows and whose
+microphone feeds the XLR strips. Options, INTERFACE, **Additional
+interfaces** drives up to four more units with their own gain, mute and
+phantom power, and adds each one's microphone as a capture channel; see
+[Multiple Wave interfaces](wave-interfaces.md). The software input effects
+and XLR inserts stay on the primary's strips; additional capture inputs can
+use the effects on the mixes they feed.
 
 <a name="desktop-keys"></a>
 ## Desktop keys and focused application routing

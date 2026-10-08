@@ -314,6 +314,10 @@ silence after a playback stream opened first would need a copy of
   replugging the dock)
 - Multi-device switching: a header picker chooses which interface
   OpenXLR drives; the mixer's input channels follow it
+- More than one unit at once, two of one model included: up to four
+  additional interfaces next to the primary. Run only with simulated
+  units so far; [wave-interfaces.md](wave-interfaces.md#what-still-needs-hardware)
+  lists what an owner of two units checks
 - On switch, the hardware channels' monitor sends come up muted, so the
   newly patched mic does not reach the speakers until unmuted
 - OpenDeck plugin: every switch, mute, and level on a Stream Deck, with
@@ -377,3 +381,29 @@ diagnostics archive:
 9. Play through the microphone's own sink before anything records from
    it, then record: sound, or the silence that would call for a
    capture-hold rule.
+
+An owner of two supported units confirms driving them together with the
+following, each result with the diagnostics archive:
+
+1. Plug both in. The header picker lists both, two of one model with
+   their USB ports. Note each unit's `id` in the state's
+   `waveInterfaces`, unplug one, plug it into another port: a unit with
+   a serial keeps its id.
+2. Pick each in turn as the primary: XLR 1 carries that unit's
+   microphone, never the other's, and the daemon log names no fallback
+   to the model name. If it does, include the `pactl list short sources`
+   output; it shows how udev spelled the serial.
+3. Enable the other unit under Options, INTERFACE, Additional
+   interfaces. Its gain, mute and phantom power move that unit only, and
+   the primary's controls move the primary only.
+4. Add its microphone with Add input channel: the new channel carries
+   that unit's microphone. On a Pro, microphone 2 carries the second
+   input.
+5. With two XLR Docks, collect diagnostics with each dock as the
+   primary in turn: the `paths` line names a different ALSA card each
+   time, and gain, mute and headphone volume on one dock leave the
+   other's alone.
+6. With a Wave XLR Pro among them, its card is in the pro-audio profile
+   whether it is primary or additional, the other card's profile is
+   unchanged, and Headphones 1, Headphones 2 and Line Out switch that
+   Pro's outputs.

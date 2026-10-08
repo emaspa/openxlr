@@ -421,6 +421,14 @@ public sealed class SkinWindowTests
     {
         var vm = (MainViewModel)main.DataContext!;
         var client = new DaemonClient();
+        vm.ApplyWaveInterfaces(JsonNode.Parse("""
+            [{"id":"0fd9:00b4@0123456789abcdef","name":"Elgato Wave XLR Pro (1-2)","active":false,"enabled":true,"connected":true,
+              "captureHint":"Wave_XLR_Pro_A1-","captureModelHint":"","warning":"A unit warning",
+              "capabilities":{"gain":true,"mute":true,"phantom":true,"lowCut":true,"clipGuard":true,"xlrInputs":2},
+              "state":{"gainDb":30,"gain2Db":20}},
+             {"id":"0fd9:007d@fedcba9876543210","name":"Elgato Wave XLR (1-3)","active":true,"enabled":false,"connected":true,
+              "captureHint":"Wave_XLR_B2-","captureModelHint":"","capabilities":{"gain":true},"state":{"gainDb":30}}]
+            """));
         (string name, Window window)[] windows =
         [
             ("about", new AboutWindow()),
@@ -436,6 +444,7 @@ public sealed class SkinWindowTests
             ("plugin-folders", new PluginFoldersWindow()),
             ("sound-check", new SoundCheckWindow { DataContext = vm.Inserts.SoundCheck }),
             ("updates", new UpdatesWindow { DataContext = vm.Updates }),
+            ("wave-interfaces", new WaveInterfacesWindow(vm)),
         ];
         try
         {
@@ -462,6 +471,7 @@ public sealed class SkinWindowTests
             foreach ((_, Window window) in windows)
                 try { window.Close(); } catch (Exception) { }
             SkinService.Apply(new SkinEntry(SkinPackage.Default, []));
+            vm.ApplyWaveInterfaces(null);
             client.DisposeAsync().AsTask().GetAwaiter().GetResult();
         }
     }

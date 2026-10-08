@@ -41,6 +41,9 @@
   <data name="AddFolder" xml:space="preserve">
     <value>Add folder</value>
   </data>
+  <data name="AddInputChannel" xml:space="preserve">
+    <value>Add input channel</value>
+  </data>
   <data name="AddingFolder" xml:space="preserve">
     <value>Adding folder…</value>
   </data>
@@ -73,6 +76,12 @@
   </data>
   <data name="AddWindowsPluginFolder" xml:space="preserve">
     <value>Add a Windows plugin folder</value>
+  </data>
+  <data name="AdditionalInterfaces" xml:space="preserve">
+    <value>Additional interfaces</value>
+  </data>
+  <data name="AdditionalInterfacesHint" xml:space="preserve">
+    <value>The primary interface feeds XLR 1 and the hardware strips. Enable up to four more units here to control them alongside it, then add each microphone as a capture channel.</value>
   </data>
   <data name="AffectsSystemYabridge" xml:space="preserve">
     <value>This also affects other applications using system yabridge.</value>
@@ -221,8 +230,14 @@
   <data name="CaptureConnectedPair" xml:space="preserve">
     <value>Connected · pair {0}</value>
   </data>
+  <data name="CaptureConnectedPort" xml:space="preserve">
+    <value>Connected · port {0}</value>
+  </data>
   <data name="CaptureOfflinePair" xml:space="preserve">
     <value>Offline · pair {0}</value>
+  </data>
+  <data name="CaptureOfflinePort" xml:space="preserve">
+    <value>Offline · port {0}</value>
   </data>
   <data name="CapturePairNumber" xml:space="preserve">
     <value>Pair {0}</value>
@@ -293,6 +308,9 @@
   </data>
   <data name="ChooseAPreset" xml:space="preserve">
     <value>Choose a preset</value>
+  </data>
+  <data name="ChooseInterfaceSourceFirst" xml:space="preserve">
+    <value>Choose the interface's capture source first.</value>
   </data>
   <data name="ChoosePresetForEffect" xml:space="preserve">
     <value>Choose a preset for this effect on an active channel.</value>
@@ -597,6 +615,9 @@
   <data name="DragToAnotherSectionArrowKeysMove" xml:space="preserve">
     <value>Drag to another section; arrow keys move it one place</value>
   </data>
+  <data name="DriveAsAdditionalInterface" xml:space="preserve">
+    <value>Drive as an additional interface</value>
+  </data>
   <data name="EachMixHasItsOwnMasterSends" xml:space="preserve">
     <value>Each mix has its own master, sends and inserts. A monitor mix feeds your outputs without publishing a virtual microphone. New sends start muted. Monitor A, Monitor B and Aux stay where they are.</value>
   </data>
@@ -849,8 +870,35 @@
   <data name="INTERFACE" xml:space="preserve">
     <value>INTERFACE</value>
   </data>
+  <data name="InterfaceCaptureSource" xml:space="preserve">
+    <value>Capture source</value>
+  </data>
+  <data name="InterfaceChannelName" xml:space="preserve">
+    <value>Channel name</value>
+  </data>
+  <data name="InterfaceChannelNamePlaceholder" xml:space="preserve">
+    <value>Interface name and input number</value>
+  </data>
   <data name="InterfaceConnection" xml:space="preserve">
     <value>Interface connection</value>
+  </data>
+  <data name="InterfaceGain" xml:space="preserve">
+    <value>Gain</value>
+  </data>
+  <data name="InterfaceGainInput2" xml:space="preserve">
+    <value>Gain, input 2</value>
+  </data>
+  <data name="InterfaceInputChannelName" xml:space="preserve">
+    <value>{0} input {1}</value>
+  </data>
+  <data name="InterfaceMicrophone" xml:space="preserve">
+    <value>Microphone</value>
+  </data>
+  <data name="InterfaceNotConnected" xml:space="preserve">
+    <value>The interface is not connected.</value>
+  </data>
+  <data name="InterfaceSourcePlaceholder" xml:space="preserve">
+    <value>Choose the interface's source</value>
   </data>
   <data name="InvalidPresetName" xml:space="preserve">
     <value>Invalid effect preset name.</value>
@@ -1046,6 +1094,9 @@
   </data>
   <data name="Mute" xml:space="preserve">
     <value>Mute</value>
+  </data>
+  <data name="MuteInput2" xml:space="preserve">
+    <value>Mute input 2</value>
   </data>
   <data name="MutedInactive" xml:space="preserve">
     <value>Muted / inactive</value>
@@ -1266,6 +1317,9 @@
   <data name="Phantom" xml:space="preserve">
     <value>Phantom</value>
   </data>
+  <data name="PhantomPowerSettling" xml:space="preserve">
+    <value>Phantom power is settling</value>
+  </data>
   <data name="Phones1" xml:space="preserve">
     <value>Phones 1</value>
   </data>
@@ -1406,6 +1460,9 @@
   </data>
   <data name="PresetsTitle" xml:space="preserve">
     <value>{0} presets</value>
+  </data>
+  <data name="PrimaryInterface" xml:space="preserve">
+    <value>Primary interface</value>
   </data>
   <data name="ProfileName" xml:space="preserve">
     <value>profile name</value>
