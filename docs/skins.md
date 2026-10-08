@@ -678,7 +678,7 @@ other windows and the plugins' own editors keep their sizes.
 | `Ox.Mixer.ControlMinSize` | number | framework | 0 to 64 | the smallest width and height of a mixer button, dropdown, check box, text box, slider and fader cap |
 | `Ox.Mixer.SliderMinHeight` | number | framework | 0 to 96 | the smallest height of a mixer slider |
 | `Ox.Mixer.DeviceSliderHeight` | number | 30 | 30 to 96 | the height of a slider in the interface's control rows |
-| `Ox.Mixer.SmallControlMinSize` | number | 0 | 0 to 64 | the smallest size of the compact controls: the interface rows' buttons and sliders, the tile headers and their buttons, the gain lock, the inserts buttons and a send's mute |
+| `Ox.Mixer.SmallControlMinSize` | number | 0 | 0 to 64 | the smallest size of the compact controls: the interface rows' buttons and sliders, the tile headers and their buttons, the Arrange buttons and drag handles, the gain lock, the inserts buttons and a send's mute |
 | `Ox.Mixer.InsertControlMinSize` | number | 24 | 16 to 64 | the smallest width and height of an insert row's own process, bypass and controls buttons |
 | `Ox.Mixer.ChannelWidth` | number | 132 | 132 to 400 | the width of a submixer channel strip |
 | `Ox.Mixer.MixWidth` | number | 232 | 232 to 500 | the width of a mix master tile |

@@ -52,6 +52,7 @@ public partial class MainWindow : Window
         Skinning.SkinService.Changed += UpdateControlSizing;
         SetupTray();
         RestoreSectionState();
+        SetupReordering();
         Opened += async (_, _) =>
         {
             if (_automaticUpdateCheckStarted) return;

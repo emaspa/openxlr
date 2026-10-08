@@ -624,6 +624,24 @@ public sealed partial class MainViewModel : ViewModelBase
     public Task<string?> MoveChannel(string id, int delta) => Reorder(id, delta, isMix: false);
     public Task<string?> MoveMix(string id, int delta) => Reorder(id, delta, isMix: true);
 
+    /// <summary>
+    /// Put one editable channel or mix before or after another, as a drag in
+    /// the window does, and send the whole order with <c>setLayoutOrder</c>.
+    /// Hidden channels keep their place in the list.
+    /// </summary>
+    public Task<string?> PlaceInLayoutOrder(string source, string target, bool after, bool isMix)
+    {
+        List<string> channels = [.. Channels.Where(c => c.IsEditable).Select(c => c.Id)];
+        List<string> mixes = [.. Mixes.Where(m => m.IsEditable).Select(m => m.Id)];
+        List<string> list = isMix ? mixes : channels;
+        if (source == target || !list.Contains(source) || !list.Contains(target)) return Task.FromResult<string?>(null);
+        List<string> before = [.. list];
+        list.Remove(source);
+        list.Insert(list.IndexOf(target) + (after ? 1 : 0), source);
+        if (list.SequenceEqual(before)) return Task.FromResult<string?>(null);
+        return Edit(_client.SetLayoutOrderAsync(channels, mixes));
+    }
+
     private Task<string?> Reorder(string id, int delta, bool isMix)
     {
         List<string> channels = [.. Channels.Where(c => c.IsEditable).Select(c => c.Id)];

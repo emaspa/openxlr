@@ -1251,6 +1251,31 @@ The window also remembers which of its sections (INPUTS, HEADPHONES,
 MONITOR, APPLICATIONS, SUBMIXER) you collapsed with the chevron in
 their header, across restarts.
 
+<a name="arrange"></a>
+**Arrange**, above the sections, shows a drag handle in each section's
+header and on each channel and mix tile you can move. Drag a section's
+handle onto another section: the arrow on the other handle shows whether
+it lands above or below. Drag a channel's or mix's handle onto another
+tile in its row, left or right of it. Only the handles start a move;
+faders, buttons and the chevron work as usual. Focus a handle and press an
+arrow key to move it one place, or press Escape to cancel a drag. Holding
+a handle near the edge of the window or of the channel row scrolls it, and
+letting go anywhere but on a tile of the same kind changes nothing.
+
+The section order is a window preference, saved in `ui.json` like the
+collapsed sections, and **Reset sections** puts the five back in their
+usual order. If `ui.json` cannot be written, the new order stays until the
+window closes and the note under Arrange says why.
+
+Channel and mix tiles follow the mixer layout's one order, the same one
+the layout editor's arrows and the terminal mixer change. A drop sends
+the new order to the daemon, and the tiles move when it has saved it; a
+failed save leaves them where they were and the note shows the error.
+Hardware inputs, Monitor A, Monitor B and Aux keep their place and have no
+handle. A hidden channel keeps its place in the order. Moving tiles
+changes no routing; [Edit the mixer layout](#layout) says where an app
+goes when its channel is deleted, which never depends on the order.
+
 <a name="skins"></a>
 ### 3.10 Change how the window looks
 

@@ -163,7 +163,10 @@ debounced, retried behaviour.
   once; hardware inputs, Monitor A/B and Aux keep their positions. No node
   changes. Open windows apply the published order to channel tiles, mix
   controls and send rows while retaining the existing controls and their
-  values.
+  values. The layout editor's arrows, a tile dragged in the window's
+  Arrange mode and Ctrl+Left/Right in the terminal mixer all send this
+  command with both complete lists; a drag places the item before or
+  after the tile it was dropped on.
 - `setLayoutAppearance {channel | mix, appearance}` replaces one item's
   `icon`, `colour` and `hidden` as described under [Appearance](#appearance),
   hardware inputs and Monitor A/B and Aux included. No node changes.

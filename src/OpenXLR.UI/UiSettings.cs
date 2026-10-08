@@ -35,6 +35,12 @@ public sealed record UiSettings
     /// <summary>Names of the main window's tiles the user collapsed (INPUTS, HEADPHONES, ...).</summary>
     public IReadOnlyList<string> CollapsedSections { get; init; } = [];
     /// <summary>
+    /// The order of the main window's five sections, by tile name. Missing
+    /// sections follow in their usual order and unknown names are ignored.
+    /// A window preference only: audio and profiles do not depend on it.
+    /// </summary>
+    public IReadOnlyList<string> SectionOrder { get; init; } = [];
+    /// <summary>
     /// The appearance the window wears, by skin id; null is the one the
     /// application ships with. It lives here and nowhere else: the mixer
     /// layout, the daemon's preferences and the audio profiles know nothing
@@ -91,7 +97,7 @@ public sealed record UiSettings
         if (settings is null) return new UiSettings();
         // "collapsedSections": null is valid JSON for a list the window
         // enumerates, so it reads as an empty list rather than failing later.
-        return settings.CollapsedSections is null ? settings with { CollapsedSections = [] } : settings;
+        return settings with { CollapsedSections = settings.CollapsedSections ?? [], SectionOrder = settings.SectionOrder ?? [] };
     }
 
     /// <summary>
