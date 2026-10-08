@@ -109,7 +109,8 @@ output), `monitorOutputs`, `monitorFeeds`, `outputVolume`,
 `auxPortEnabled`, `lowCutHz`, `softClipGuard`, `softClipGuardAvailable`,
 `softClipGuardError`, `inserts` (chains by insert key, `xlr1`, `xlr2` or
 `mix:<id>`; each entry carries `insert`, `error`, `meters`,
-`nativeHostRunning`, `nativeUiBlocked` and `nativeUiBlockReason`),
+`nativeHostRunning`, `nativeUiBlocked`, `nativeUiBlockReason` and
+`filterChainError`),
 `enforcedDefaultSink`, `enforcedDefaultSource`, `streams` (`id`, `serial`,
 `label`, `identity`, `channelId`, `active`, `running`), `renamedSinceStart`
 and `layoutWarning`. A `devices` entry carries `name`, `description`, `kind`
@@ -323,6 +324,18 @@ helper for that insert. Missing or false keeps LV2 in PipeWire filter-chain, eve
 when the helper is installed. Unsupported native selections are rejected.
 Changing this choice via `setInserts` rebuilds the chain and can interrupt audio.
 Only exposed parameter values are persisted, not opaque plugin state or presets.
+
+When PipeWire's filter chain refuses to load an LV2 insert and the helper is
+installed, the daemon runs that insert in the helper instead. Each insert is
+decided on its own. The daemon rebuilds a refused chain of several inserts with
+one filter-chain stage per insert, and only a stage PipeWire refuses again moves.
+Such an insert reports `nativeHostRunning: true` while its `insert.nativeHost`
+stays false, and `filterChainError` carries the reason PipeWire gave; the field
+is null for every insert running in the host it was saved to. Clients follow
+`nativeHostRunning` to offer the plugin's editor. The saved choice is not
+changed, so the next build of the chain tries the filter chain again. When the
+helper is missing, or cannot run the plugin either, the insert's `error` carries
+the filter chain's reason, followed by the helper's when it was tried.
 
 The OpenDeck plugin in `plugin/`, the terminal mixer
 (`src/OpenXLR.Tui/DaemonLink.cs`) and the Omarchy plugin

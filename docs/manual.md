@@ -1254,6 +1254,19 @@ A CLAP or VST3 plugin has no shared chain to go back to, so it always runs
 this way: its row shows no switch, and the cog opens its editor whenever
 the plugin is running.
 
+Some PipeWire packages are built without the filter chain's LV2 loader,
+and the filter chain can also refuse a single plugin. When it refuses an
+LV2 insert and the host process is installed, OpenXLR runs that insert in
+the host process instead and leaves its "Native host" switch as you set
+it. In a chain of several plugins each one is tried on its own, so only
+the ones PipeWire refuses move. If the plugin has an editor the host can
+open, "Plugin UI" opens it. The next time the chain is built, after a
+change to it or a daemon restart, the shared chain is tried again.
+PipeWire's reason goes to the daemon's log and into the insert's
+`filterChainError` in saved diagnostics. A source build without the
+native flag has no host process to fall back to, and the insert shows
+PipeWire's refusal instead.
+
 Dragging an editor's border respects the plugin's minimum and maximum
 dimensions, so shrinking an LSP editor stops before its controls are cut
 off. A VST3 editor also decides whether its border can be resized. TDR Nova

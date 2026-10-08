@@ -44,6 +44,11 @@ public sealed record InsertStatus(InsertDefinition Insert, string? Error,
 {
     public bool NativeUiBlocked { get; init; }
     public string? NativeUiBlockReason { get; init; }
+    /// <summary>
+    /// Why PipeWire's filter chain refused this LV2 insert while the native
+    /// host runs it instead; null when it runs in the host it was saved to.
+    /// </summary>
+    public string? FilterChainError { get; init; }
 }
 
 /// <summary>A control port of a plugin, enough to build a sensible slider.</summary>

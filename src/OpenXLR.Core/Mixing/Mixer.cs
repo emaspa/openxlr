@@ -974,13 +974,15 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         {
             result[channel] = [.. list.Select(i =>
             {
-                NativePluginHost? host = _chains.GetValueOrDefault(channel)?.InsertStages
-                    .FirstOrDefault(stage => stage.Id == i.Id).Stage?.NativeHost;
+                FilterHandle? stage = _chains.GetValueOrDefault(channel)?.InsertStages
+                    .FirstOrDefault(s => s.Id == i.Id).Stage;
+                NativePluginHost? host = stage?.NativeHost;
                 return new InsertStatus(i,
                     PluginCatalog.Find(i) is null ? "plugin not installed"
                     : !i.Bypass && _insertErrors.TryGetValue(channel, out string? err) ? err
                     : host?.EditorStalled == true ? "the plugin's editor stopped answering; its controls are frozen while audio keeps playing"
-                    : null, host?.Meters, host?.IsRunning == true);
+                    : null, host?.Meters, host?.IsRunning == true)
+                { FilterChainError = stage?.FilterChainError };
             })];
         }
         return result;
