@@ -284,6 +284,7 @@
 
     <WrapPanel Margin="0,0,0,8">
       <ToggleButton Name="ArrangeButton" Content="Arrange" Click="OnArrange" Padding="8,1" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                    IsVisible="{Binding !IsMiniView}"
                     FontSize="{DynamicResource Ox.Label.FontSize}"
                     ToolTip.Tip="Show handles to move sections, channels and mixes by dragging or with the arrow keys"/>
       <Button Name="ResetSectionsButton" Content="Reset sections" Click="OnResetSections" Padding="8,1" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
@@ -296,7 +297,7 @@
     <!-- the five sections, in the order saved in ui.json -->
     <StackPanel Name="SectionCards" Spacing="8">
     <!-- device controls -->
-    <Border Classes="card">
+    <Border Classes="card" IsVisible="{Binding ShowDetailedSections}">
       <Expander Name="InputsTile" Classes="section" Theme="{StaticResource TileExpanderTheme}" IsExpanded="True">
         <Expander.Header><StackPanel Orientation="Horizontal" Spacing="6">
           <Button Classes="ghost reorderHandle" Content="↕" Tag="InputsTile" AutomationProperties.Name="Move inputs"
@@ -480,7 +481,7 @@
     </Border>
 
     <!-- headphone outputs (jack 1 on the front of the unit, jack 2 on the back) -->
-    <Border Classes="card">
+    <Border Classes="card" IsVisible="{Binding ShowDetailedSections}">
       <Expander Name="HeadphonesTile" Classes="section" Theme="{StaticResource TileExpanderTheme}" IsExpanded="True">
         <Expander.Header><StackPanel Orientation="Horizontal" Spacing="6">
           <Button Classes="ghost reorderHandle" Content="↕" Tag="HeadphonesTile" AutomationProperties.Name="Move headphones"
@@ -577,7 +578,7 @@
     </Border>
 
     <!-- running applications and the channel each is routed to -->
-    <Border Classes="card" IsVisible="{Binding HasMixer}">
+    <Border Classes="card" IsVisible="{Binding ShowApplications}">
       <Expander Name="ApplicationsTile" Classes="section" Theme="{StaticResource TileExpanderTheme}" IsExpanded="True">
         <Expander.Header>
           <StackPanel Orientation="Horizontal" Spacing="10">
@@ -627,6 +628,25 @@
         <TextBlock DockPanel.Dock="Top" Text="{Binding MixerPlaceholder}" TextWrapping="Wrap"
                    Classes="note" IsVisible="{Binding !HasMixer}"/>
 
+        <!-- the compact and mini views' choices; the view itself is chosen in Options -->
+        <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,8" IsVisible="{Binding ShowChannelSelector}">
+          <WrapPanel>
+            <ComboBox Name="CompactChannelPicker" ItemsSource="{Binding Channels}" Margin="0,0,8,4"
+                      SelectedItem="{Binding SelectedCompactChannel, Mode=TwoWay}" MinWidth="150" MaxWidth="300"
+                      AutomationProperties.Name="Channel shown" ToolTip.Tip="The channel this view shows. Hidden channels can be chosen here.">
+              <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:ChannelViewModel"><TextBlock Text="{Binding Name}"/></DataTemplate></ComboBox.ItemTemplate>
+            </ComboBox>
+            <ComboBox Name="CompactMixPicker" ItemsSource="{Binding Mixes}" Margin="0,0,8,4"
+                      SelectedItem="{Binding SelectedCompactMix, Mode=TwoWay}" MinWidth="150" MaxWidth="300"
+                      IsVisible="{Binding ShowMixSelector}" AutomationProperties.Name="Mix shown"
+                      ToolTip.Tip="The mix this view shows: its master and the channel's send into it">
+              <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:MixViewModel"><TextBlock Text="{Binding Name}"/></DataTemplate></ComboBox.ItemTemplate>
+            </ComboBox>
+          </WrapPanel>
+          <TextBlock Text="{Binding ViewPreferenceError}" Classes="warn" TextWrapping="Wrap"
+                     IsVisible="{Binding ViewPreferenceError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+        </StackPanel>
+
         <!-- master row -->
         <ItemsControl DockPanel.Dock="Bottom" ItemsSource="{Binding Mixes}" IsVisible="{Binding HasMixer}"
                       Margin="0,10,0,0">
@@ -636,7 +656,7 @@
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:MixViewModel">
               <Border Classes="tile" Padding="10" Margin="0,0,8,8" Width="{DynamicResource Ox.Mixer.MixWidth}"
-                      IsVisible="{Binding Visible}">
+                      IsVisible="{Binding DisplayVisible}">
                 <StackPanel Spacing="6">
                   <Button Classes="ghost reorderHandle" Classes.fixedPlace="{Binding !IsEditable}" Content="↔" Tag="{Binding}"
                           HorizontalAlignment="Left" AutomationProperties.Name="{Binding Name, StringFormat='Move {0}'}"
@@ -730,7 +750,7 @@
                     <ItemsControl ItemsSource="{Binding Sends}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:SendViewModel">
-                          <StackPanel Margin="0,0,0,8" Spacing="1" IsVisible="{Binding Visible}">
+                          <StackPanel Margin="0,0,0,8" Spacing="1" IsVisible="{Binding DisplayVisible}">
                             <Grid ColumnDefinitions="*,Auto">
                               <TextBlock Text="{Binding MixName}" Classes="h" FontSize="11"/>
                               <TextBlock Grid.Column="1" Text="{Binding LevelText}" Classes="val" FontSize="11"/>

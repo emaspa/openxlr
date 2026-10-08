@@ -1276,6 +1276,27 @@ handle. A hidden channel keeps its place in the order. Moving tiles
 changes no routing; [Edit the mixer layout](#layout) says where an app
 goes when its channel is deleted, which never depends on the order.
 
+<a name="mixer-view"></a>
+Options, APPEARANCE, **Mixer view** chooses how the SUBMIXER card is drawn:
+
+- **Full mixer** shows every channel strip the interface can feed, less
+  the hidden ones, and every mix.
+- **Compact** shows one channel strip with all its sends. Pick the channel
+  in the box above the strips; hidden channels are in that list too, so a
+  hidden channel can still be adjusted here.
+- **Mini** shows that channel's send into one mix, with that mix's master
+  below it. A second box picks the mix. INPUTS, HEADPHONES and APPLICATIONS
+  are set aside and Arrange is off, so the window fits a narrow column with
+  MONITOR's output volume above the strip.
+
+The view, the channel and the mix are saved in `ui.json`. When the chosen
+channel or mix is gone, after a layout change or with an interface that
+has no jack behind it, the view shows the first available one and goes
+back to your choice when it returns. If `ui.json` cannot be written, the
+choice stays until the window closes and a line says why: in Options for
+the view, above the strips for the channel and the mix. None of this
+changes a level, a mute or a route.
+
 <a name="skins"></a>
 ### 3.10 Change how the window looks
 

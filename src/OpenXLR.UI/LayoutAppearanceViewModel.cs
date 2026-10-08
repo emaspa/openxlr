@@ -1,4 +1,3 @@
-using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using Avalonia.Media;
@@ -49,14 +48,4 @@ public sealed partial class MainViewModel
     public Task<string?> SetLayoutAppearance(string id, bool mix, string icon, string? colour, bool hidden)
         => Edit(_client.SetLayoutAppearanceAsync(id, mix, icon, colour, hidden));
 
-    /// <summary>
-    /// Which channel strips the mixer draws: those the device can feed,
-    /// less the ones hidden in the layout editor. A hidden channel keeps
-    /// its sends, its meter and its applications.
-    /// </summary>
-    private void RefreshChannelPresentation()
-    {
-        foreach (ChannelViewModel channel in Channels)
-            channel.DisplayVisible = channel.Visible && !channel.Appearance.Hidden;
-    }
 }

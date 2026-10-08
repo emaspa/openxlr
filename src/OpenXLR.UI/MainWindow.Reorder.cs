@@ -43,6 +43,26 @@ public partial class MainWindow
         _dragScroll.Tick += (_, _) => ScrollReorder();
         Deactivated += (_, _) => CancelReorder();
         Closed += (_, _) => CancelReorder();
+        DataContextChanged += (_, _) => WatchMixerView();
+        WatchMixerView();
+    }
+
+    private MainViewModel? _watchedView;
+
+    /// <summary>The mini view sets most sections aside, so it ends Arrange mode.</summary>
+    private void WatchMixerView()
+    {
+        if (_watchedView is not null) _watchedView.PropertyChanged -= OnMixerViewChanged;
+        _watchedView = DataContext as MainViewModel;
+        if (_watchedView is not null) _watchedView.PropertyChanged += OnMixerViewChanged;
+    }
+
+    private void OnMixerViewChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(MainViewModel.IsMiniView) || _watchedView?.IsMiniView != true
+            || ArrangeButton.IsChecked != true) return;
+        ArrangeButton.IsChecked = false;
+        OnArrange(this, new RoutedEventArgs());
     }
 
     private void OnArrange(object? sender, RoutedEventArgs e)
