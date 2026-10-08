@@ -49,10 +49,10 @@ public sealed partial class Mixer
     public void CreateApplicationChannel(string name, Func<MixerSettings, string?> persist)
         => CreateUserChannel(name, null, 0, persist);
 
-    public void CreateCaptureChannel(string name, string source, int pair, Func<MixerSettings, string?> persist)
-        => CreateUserChannel(name, source, pair, persist);
+    public void CreateCaptureChannel(string name, string source, int pair, Func<MixerSettings, string?> persist, int? monoChannel = null)
+        => CreateUserChannel(name, source, pair, persist, monoChannel);
 
-    private void CreateUserChannel(string name, string? source, int pair, Func<MixerSettings, string?> persist)
+    private void CreateUserChannel(string name, string? source, int pair, Func<MixerSettings, string?> persist, int? monoChannel = null)
     {
         ArgumentNullException.ThrowIfNull(persist);
         name = CleanName(name);
@@ -61,7 +61,7 @@ public sealed partial class Mixer
             if (!_built) throw new InvalidOperationException("mixer is not built");
             if (_config.Channels.Count(c => c.InputPair is null) >= MixerConfig.MaxApplicationChannels)
                 throw new InvalidOperationException("application channel limit reached");
-            if (source is not null && (!CaptureBinding.IsValid(source, pair)
+            if (source is not null && (!CaptureBinding.IsValid(source, pair, monoChannel)
                 || !_pw.ListDevices().Any(d => d.Name == source && d.Kind == AudioNodeKind.Source && !d.IsOwn)))
                 throw new InvalidOperationException("select an available external capture source and a pair from 0 to 31");
             EnsurePulseHeadroomLocked(newStreams: _config.Mixes.Count, newNodes: 2);
@@ -70,6 +70,7 @@ public sealed partial class Mixer
             {
                 CaptureSource = source,
                 CapturePair = pair,
+                CaptureMonoChannel = monoChannel,
                 Levels = _config.Mixes.ToDictionary(m => m.Id, _ => 1.0),
                 MutedIn = _config.Mixes.Select(m => m.Id).ToHashSet(),
             };

@@ -175,7 +175,7 @@ public sealed record MixerSettings
 /// <summary>A remembered application: identity, display label, channel.</summary>
 public sealed record SavedApp(string Identity, string Label, string ChannelId);
 
-public sealed record UserChannelDefinition(string Id, string Name, string? CaptureSource = null, int CapturePair = 0);
+public sealed record UserChannelDefinition(string Id, string Name, string? CaptureSource = null, int CapturePair = 0, int? CaptureMonoChannel = null);
 public sealed record UserMixDefinition(string Id, string Name)
 {
     /// <summary>"monitor" or "virtualMic"; absent in older settings, which contain only virtual microphones.</summary>

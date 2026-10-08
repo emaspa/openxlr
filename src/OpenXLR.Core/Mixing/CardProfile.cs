@@ -17,15 +17,23 @@ namespace OpenXLR.Core.Mixing;
 public static class CardProfile
 {
     /// <summary>
-    /// If the card whose device.name contains <paramref name="nameFragment"/>
+    /// If the one card whose device.name contains <paramref name="nameFragment"/>
     /// is in a UCM profile and offers pro-audio, switch it there. Returns
     /// the card's active profile name (null when the card is not in the
     /// PipeWire graph yet, which at boot can lag the USB device by seconds)
     /// and the previous profile name when a switch happened.
     /// </summary>
     public static (string? Active, string? Parked) EnsureProAudio(string nameFragment)
+        => EnsureProAudio([nameFragment], out _);
+
+    /// <summary>
+    /// The same, trying each fragment in turn until one names a card.
+    /// <paramref name="matched"/> is the fragment that found it, which the
+    /// caller hands back to <see cref="SetProfile"/> on restore.
+    /// </summary>
+    public static (string? Active, string? Parked) EnsureProAudio(IReadOnlyList<string> fragments, out string? matched)
     {
-        var card = FindCard(nameFragment);
+        var card = FindCard(fragments, out matched);
         if (card is null) return (null, null);
         (uint id, string active, Dictionary<string, int> profiles) = card.Value;
         if (active is not ("HiFi" or "Direct")) return (active, null);   // not UCM-split; leave alone
@@ -37,19 +45,27 @@ public static class CardProfile
     /// <summary>Set the card back to a named profile (best effort).</summary>
     public static void SetProfile(string nameFragment, string profileName)
     {
-        var card = FindCard(nameFragment);
+        var card = FindCard([nameFragment], out _);
         if (card is null) return;
         (uint id, _, Dictionary<string, int> profiles) = card.Value;
         if (profiles.TryGetValue(profileName, out int index))
             Run("wpctl", "set-profile", id.ToString(), index.ToString());
     }
 
-    private static (uint Id, string Active, Dictionary<string, int> Profiles)? FindCard(string nameFragment)
+    /// <summary>
+    /// The card the first fragment that names any card names. Two cards
+    /// under one fragment are two units of one model that cannot be told
+    /// apart, and neither is touched; a broader fragment would only match
+    /// more of them.
+    /// </summary>
+    private static (uint Id, string Active, Dictionary<string, int> Profiles)? FindCard(IReadOnlyList<string> fragments, out string? matched)
     {
+        matched = null;
         byte[] dump;
         try { dump = Run("pw-dump"); }
         catch (Exception) { return null; }
         using JsonDocument doc = PipeWireSnapshot.Parse(dump);
+        var cards = new List<(string Name, JsonElement Card, JsonElement Info)>();
         foreach (JsonElement o in doc.RootElement.EnumerateArray())
         {
             if (o.ValueKind != JsonValueKind.Object || !o.TryGetProperty("type", out JsonElement type)
@@ -58,8 +74,17 @@ public static class CardProfile
                 || !info.TryGetProperty("props", out JsonElement props) || props.ValueKind != JsonValueKind.Object) continue;
             string name = props.TryGetProperty("device.name", out JsonElement n)
                 ? n.GetString() ?? "" : "";
-            if (!name.Contains(nameFragment, StringComparison.Ordinal)) continue;
-            if (!info.TryGetProperty("params", out JsonElement pars)) continue;
+            cards.Add((name, o, info));
+        }
+        foreach (string fragment in fragments)
+        {
+            if (fragment.Length == 0) continue;
+            var found = cards.Where(c => c.Name.Contains(fragment, StringComparison.OrdinalIgnoreCase)).Take(2).ToList();
+            if (found.Count == 0) continue;
+            if (found.Count > 1) return null;
+            matched = fragment;
+            (_, JsonElement card, JsonElement info) = found[0];
+            if (!info.TryGetProperty("params", out JsonElement pars)) return null;
 
             var profiles = new Dictionary<string, int>();
             if (pars.TryGetProperty("EnumProfile", out JsonElement list))
@@ -73,7 +98,7 @@ public static class CardProfile
                     if (p.TryGetProperty("name", out JsonElement an))
                         active = an.GetString() ?? "";
 
-            return (o.GetProperty("id").GetUInt32(), active, profiles);
+            return (card.GetProperty("id").GetUInt32(), active, profiles);
         }
         return null;
     }

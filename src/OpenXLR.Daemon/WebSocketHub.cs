@@ -21,6 +21,7 @@ public sealed class WebSocketHub
     };
 
     private readonly DeviceManager _devices;
+    private readonly WaveInterfaces? _waveInterfaces;
     private readonly MixerService _mixer;
     private readonly ILogger<WebSocketHub> _log;
     private readonly ConcurrentDictionary<Guid, Client> _clients = new();
@@ -32,9 +33,10 @@ public sealed class WebSocketHub
     private readonly StateBroadcastQueue _stateBroadcasts;
 
     public WebSocketHub(DeviceManager devices, MixerService mixer, ILogger<WebSocketHub> log,
-        IHostApplicationLifetime lifetime)
+        IHostApplicationLifetime lifetime, WaveInterfaces? waveInterfaces = null)
     {
         _devices = devices;
+        _waveInterfaces = waveInterfaces;
         _mixer = mixer;
         _log = log;
         _stopping = lifetime.ApplicationStopping;
@@ -54,6 +56,7 @@ public sealed class WebSocketHub
             }
         };
         _mixer.Changed += _stateBroadcasts.Signal;
+        if (_waveInterfaces is not null) _waveInterfaces.Changed += _stateBroadcasts.Signal;
         _ = _stateBroadcasts.RunAsync(_stopping);
         _mixer.MetersUpdated += () =>
         {
@@ -94,13 +97,14 @@ public sealed class WebSocketHub
         return state with
         {
             DaemonVersion = OpenXLR.Daemon.DaemonVersion.Current,
-            Warning = string.Join(" ", new[] { _devices.Warning, _mixer.PersistenceWarning, profileWarning }.Where(w => w is not null)) is { Length: > 0 } w ? w : null,
+            Warning = string.Join(" ", new[] { _devices.Warning, _waveInterfaces?.Warning, _mixer.InputWarning, _mixer.PersistenceWarning, profileWarning }.Where(w => w is not null)) is { Length: > 0 } w ? w : null,
             ActiveProfile = deviceId is not null && _activeProfile.TryGetValue(deviceId, out string? ap) ? ap : null,
             Mixer = _mixer.Snapshot(),
             Devices = _mixer.Devices(),
             Profiles = profiles,
             RecallOnConnect = recall,
             Detected = [.. _devices.Detected().Select(d => new DetectedDevice(d.UsbId, d.Name, d.Active))],
+            WaveInterfaces = _waveInterfaces?.Snapshot(),
         };
     }
 
@@ -396,6 +400,26 @@ public sealed class WebSocketHub
             case "setActiveDevice":
                 error = cmd.Device is null ? "setActiveDevice: missing 'device'" : _devices.SetActiveDevice(cmd.Device);
                 break;
+            case "setWaveInterfaceEnabled":
+            {
+                error = CommandValidation.CheckWave(cmd) ?? (_waveInterfaces is null ? "additional interfaces are not available" : null);
+                if (error is not null) break;
+                bool enable = cmd.Value.GetBoolean();
+                IReadOnlyList<string> sources = enable ? [] : _waveInterfaces!.OwnSourceFragments(cmd.Device!);
+                error = _waveInterfaces!.SetEnabled(cmd.Device!, enable);
+                // A unit no longer driven takes the capture channels made from
+                // its own nodes with it, through the deleteChannel path.
+                if (error is null && sources.Count > 0 && _mixer.Snapshot() is { } mixer)
+                    foreach (string channel in WaveInterfaces.CaptureChannelsFrom(mixer.Channels, sources))
+                        if ((error = _mixer.Apply(new Command { Cmd = "deleteChannel", Channel = channel })) is not null) break;
+                stateOnError = true;
+                if (error is null) Broadcast(Snapshot());
+                break;
+            }
+            case "setWaveControl":
+                error = CommandValidation.CheckWave(cmd)
+                    ?? (_waveInterfaces is null ? "additional interfaces are not available" : _waveInterfaces.Apply(cmd.Device!, cmd.Control!, cmd.Value));
+                break;
             case "saveProfile":
             case "loadProfile":
             case "deleteProfile":
@@ -459,6 +483,7 @@ public sealed class WebSocketHub
                 if (devErr is null) _devices.MarkRestored();
             }) || _stopping.IsCancellationRequested || _devices.CurrentConnection != connection)
             return devErr ?? "the active device changed during profile recall";
+        devErr ??= p.AdditionalDevices is { } additional ? _waveInterfaces?.ApplyProfile(additional) : null;
         string? mixErr = p.Mixer is null || !_mixer.SubmixerEnabled ? null : _mixer.ApplyScene(p.Mixer);
         if (devErr is null && mixErr is null) _activeProfile[connection.DeviceId] = name;
         return devErr ?? (mixErr is not null && p.Device is not null
@@ -632,6 +657,7 @@ public sealed class WebSocketHub
                     OpenXLR.Core.ProfileStore.Save(devId, name, new OpenXLR.Core.Profile
                     {
                         Device = _devices.Snapshot().State,
+                        AdditionalDevices = _waveInterfaces?.CaptureProfile() is { Count: > 0 } additional ? additional : null,
                         Mixer = _mixer.ExportScene(),
                     });
                     _activeProfile[devId] = name;

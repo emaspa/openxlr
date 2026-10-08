@@ -169,7 +169,9 @@ synchronization.
 Capture channels use the same command endpoint:
 `{"cmd":"createCaptureChannel","name":"Headset mic","source":"alsa_input.usb-headset","capturePair":0}`.
 The source must be present. Success is returned after the layout is saved.
-State channel entries expose `captureSource`, `capturePair` and `captureConnected`;
+`captureMonoChannel` (0 to 63, with `capturePair` 0) takes one port of the
+source for both sides.
+State channel entries expose `captureSource`, `capturePair`, `captureMonoChannel` and `captureConnected`;
 a disconnected source retains its binding and reconnects when it returns.
 
 `{"cmd":"routeFocusedApp","channel":"music"}` uses the same focused-application

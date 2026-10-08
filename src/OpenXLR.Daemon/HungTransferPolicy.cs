@@ -9,35 +9,36 @@ namespace OpenXLR.Daemon;
 /// state. Unplugging the device and plugging it back in (its firmware
 /// restarts) or restarting the daemon gives it a fresh count. Nothing
 /// leaks meanwhile: each hang costs the USB helper process, which is
-/// killed and started again.
+/// killed and started again. Units are counted by instance id, so one
+/// faulty unit does not set aside another unit of the same model.
 /// </summary>
 public sealed class HungTransferPolicy
 {
     public const int Limit = 3;
 
-    private readonly Dictionary<ushort, int> _hung = [];
-    private readonly HashSet<ushort> _setAside = [];
+    private readonly Dictionary<string, int> _hung = [];
+    private readonly HashSet<string> _setAside = [];
 
     /// <summary>Record a hung transfer; true when this one crossed the limit.</summary>
-    public bool NoteHung(ushort productId)
+    public bool NoteHung(string instanceId)
     {
-        int n = _hung.GetValueOrDefault(productId) + 1;
-        _hung[productId] = n;
+        int n = _hung.GetValueOrDefault(instanceId) + 1;
+        _hung[instanceId] = n;
         if (n < Limit) return false;
-        _setAside.Add(productId);
+        _setAside.Add(instanceId);
         return true;
     }
 
-    public int HungCount(ushort productId) => _hung.GetValueOrDefault(productId);
+    public int HungCount(string instanceId) => _hung.GetValueOrDefault(instanceId);
 
-    public bool IsSetAside(ushort productId) => _setAside.Contains(productId);
+    public bool IsSetAside(string instanceId) => _setAside.Contains(instanceId);
 
     /// <summary>The device left the bus and came back: its firmware restarted, so it gets a fresh count.</summary>
-    public void Returned(ushort productId)
+    public void Returned(string instanceId)
     {
-        _hung.Remove(productId);
-        _setAside.Remove(productId);
+        _hung.Remove(instanceId);
+        _setAside.Remove(instanceId);
     }
 
-    public IEnumerable<ushort> SetAside => _setAside;
+    public IEnumerable<string> SetAside => _setAside;
 }

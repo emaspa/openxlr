@@ -73,6 +73,64 @@ public sealed class CardProfileTests : IDisposable
         Assert.Empty(Writes());
     }
 
+    [Fact]
+    public void TwoCardsUnderOneFragmentAreNeitherParkedNorRestored()
+    {
+        Dump($"[{Card(7, "HiFi")},{Card(9, "HiFi").Replace(Fragment, Fragment.ToLowerInvariant())}]");
+        Assert.Equal((null, null), CardProfile.EnsureProAudio(Fragment));
+        CardProfile.SetProfile(Fragment, "HiFi");
+        Assert.Empty(Writes());
+        Assert.Equal((null, null), CardProfile.EnsureProAudio(""));
+    }
+
+    [Fact]
+    public void TheSerialSeparatorSelectsOnlyTheExactCard()
+    {
+        Dump($"[{Card(7, "HiFi").Replace(Fragment, Fragment + "_unitA")},{Card(9, "HiFi").Replace(Fragment, Fragment + "_unitAB")}]");
+        Assert.Equal(("HiFi", "HiFi"), CardProfile.EnsureProAudio([Fragment + "_unitA-", Fragment], out string? matched));
+        Assert.Equal(Fragment + "_unitA-", matched);
+        Assert.Equal(["set-profile 7 3"], Writes());
+    }
+
+    [Fact]
+    public void ASerialSpelledDifferentlyByUdevFindsTheLoneCardByItsModel()
+    {
+        Dump($"[{Card(7, "HiFi").Replace(Fragment, Fragment + "_unit_A")}]");
+        Assert.Equal(("HiFi", "HiFi"), CardProfile.EnsureProAudio([Fragment + "_unitA-", Fragment], out string? matched));
+        Assert.Equal(Fragment, matched);
+        Assert.Equal(["set-profile 7 3"], Writes());
+    }
+
+    [Fact]
+    public void ASerialSpelledDifferentlyWithTwoCardsOfTheModelTouchesNeither()
+    {
+        Dump($"[{Card(7, "HiFi").Replace(Fragment, Fragment + "_unit_A")},{Card(9, "HiFi").Replace(Fragment, Fragment + "_unit_B")}]");
+        Assert.Equal((null, null), CardProfile.EnsureProAudio([Fragment + "_unitA-", Fragment], out string? matched));
+        Assert.Null(matched);
+        Assert.Empty(Writes());
+    }
+
+    [Fact]
+    public void HardwareOutputsAreOnlyAliasedOnTheOneMatchingCard()
+    {
+        Dump($$$"""
+            [{"id":7,"type":"PipeWire:Interface:Node","info":{"props":{
+              "node.name":"alsa_output.usb-{{{Fragment}}}_unitA-00.pro-output-0","media.class":"Audio/Sink","device.api":"alsa"} } },
+             {"id":9,"type":"PipeWire:Interface:Node","info":{"props":{
+              "node.name":"alsa_output.usb-{{{Fragment}}}_unitAB-00.pro-output-0","media.class":"Audio/Sink","device.api":"alsa"} } }]
+            """);
+        var adapter = new PipeWireAdapter();
+        var ambiguous = adapter.ListDevices(exposeHardwareMonitorOutputs: true, hardwareSinkHint: Fragment);
+        Assert.Equal(2, ambiguous.Count);
+        Assert.DoesNotContain(ambiguous, node => node.Name.Contains('#'));
+        var exact = adapter.ListDevices(true, [Fragment + "_unitA-", Fragment]);
+        Assert.Equal(4, exact.Count);
+        Assert.Contains(exact, node => node.Name.EndsWith("_unitA-00.pro-output-0#hp1", StringComparison.Ordinal));
+        Assert.Contains(exact, node => node.Name.EndsWith("_unitAB-00.pro-output-0", StringComparison.Ordinal));
+        Assert.DoesNotContain(exact, node => node.Name.Contains("unitAB-00.pro-output-0#", StringComparison.Ordinal));
+        Assert.Equal(2, adapter.ListDevices(true, [Fragment + "_absent-"]).Count);
+    }
+
     private static string Card(int id, string active, int pro = 3, int hifi = 2) => $$"""
         {"id":{{id}},"type":"PipeWire:Interface:Device","info":{
           "props":{"device.name":"alsa_card.usb-Elgato_Wave_XLR_Pro-00"},

@@ -24,6 +24,27 @@ public sealed class CaptureInputTests
         Assert.DoesNotContain(config.Channels, c => c.Id == "bad");
     }
 
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(64)]
+    public void InvalidMonoPortsCannotBecomeCaptureBindings(int port)
+    {
+        Assert.False(CaptureBinding.IsValid("mic", 0, port));
+        using var mixer = new Mixer();
+        Assert.NotNull(CommandValidation.Check(new Command { Cmd = "createCaptureChannel", Name = "Mic", Source = "mic", CaptureMonoChannel = port }, mixer, _ => null));
+        Assert.DoesNotContain(MixerConfig.FromSettings(new() { UserChannels = [new("bad", "Bad", "mic", 0, port)] }).Channels, c => c.Id == "bad");
+    }
+
+    [Fact]
+    public void AMonoPortNeedsACaptureSourceAndTheFirstPair()
+    {
+        Assert.True(CaptureBinding.IsValid("mic", 0, 63));
+        Assert.False(CaptureBinding.IsValid("mic", 1, 2));
+        var config = MixerConfig.FromSettings(new() { UserChannels = [new("bad", "Bad", null, 0, 1), new("mono", "Mono", "mic", 0, 2)] });
+        Assert.DoesNotContain(config.Channels, c => c.Id == "bad");
+        Assert.Equal(2, config.Channels.Single(c => c.Id == "mono").CaptureMonoChannel);
+    }
+
     [Fact]
     public void CaptureLayoutKeepsStableIdentityAndAlwaysLeavesAnApplicationDestination()
     {

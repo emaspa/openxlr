@@ -118,7 +118,7 @@ public sealed class Wave3Device : IAudioDevice
     /// <summary>Tests substitute the transport.</summary>
     internal Wave3Device(IUsbTransport usb) => _usb = usb;
 
-    public DeviceInfo Info { get; } = new("Elgato", "Wave:3", VendorId, ProductId);
+    public DeviceInfo Info { get; } = UsbTransport.WithLocation(new("Elgato", "Wave:3", VendorId, ProductId));
 
     public DeviceCapabilities Capabilities { get; } = new()
     {

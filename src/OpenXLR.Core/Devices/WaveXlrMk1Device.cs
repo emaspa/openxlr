@@ -185,7 +185,7 @@ public sealed class WaveXlrMk1Device : Mk1ClassProtocolDevice
     protected override int ConfigLen => 34;
     protected override bool HasLowZ => true;
 
-    public override DeviceInfo Info { get; } = new("Elgato", "Wave XLR", VendorId, ProductId);
+    public override DeviceInfo Info { get; } = UsbTransport.WithLocation(new("Elgato", "Wave XLR", VendorId, ProductId));
 
     public override DeviceCapabilities Capabilities { get; } = new()
     {

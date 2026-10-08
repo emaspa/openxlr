@@ -8,17 +8,17 @@ public sealed class HungTransferPolicyTests
     public void ThreeHangsSetADeviceAsideAndAReplugGivesItAFreshCount()
     {
         var policy = new HungTransferPolicy();
-        Assert.False(policy.NoteHung(0x007d));
-        Assert.False(policy.NoteHung(0x007d));
-        Assert.False(policy.IsSetAside(0x007d));
-        Assert.True(policy.NoteHung(0x007d));
-        Assert.True(policy.IsSetAside(0x007d));
-        Assert.Equal([0x007d], policy.SetAside);
-        Assert.False(policy.IsSetAside(0x00b4));   // another model is not affected
+        Assert.False(policy.NoteHung("0fd9:007d@a"));
+        Assert.False(policy.NoteHung("0fd9:007d@a"));
+        Assert.False(policy.IsSetAside("0fd9:007d@a"));
+        Assert.True(policy.NoteHung("0fd9:007d@a"));
+        Assert.True(policy.IsSetAside("0fd9:007d@a"));
+        Assert.Equal(["0fd9:007d@a"], policy.SetAside);
+        Assert.False(policy.IsSetAside("0fd9:007d@b"));   // another unit of the model is not affected
 
-        policy.Returned(0x007d);
-        Assert.False(policy.IsSetAside(0x007d));
-        Assert.Equal(0, policy.HungCount(0x007d));
-        Assert.False(policy.NoteHung(0x007d));     // counting starts over
+        policy.Returned("0fd9:007d@a");
+        Assert.False(policy.IsSetAside("0fd9:007d@a"));
+        Assert.Equal(0, policy.HungCount("0fd9:007d@a"));
+        Assert.False(policy.NoteHung("0fd9:007d@a"));     // counting starts over
     }
 }

@@ -32,7 +32,19 @@ public static class DeviceRegistry
     ];
 
     /// <summary>Every supported device currently attached, in the table's order.</summary>
-    public static IReadOnlyList<IAudioDevice> DetectAll() => Match(EnumerateUsbIds());
+    public static IReadOnlyList<IAudioDevice> DetectAll()
+    {
+        var attached = EnumerateUsbLocations().ToArray();
+        var duplicateSerials = attached.Where(a => !string.IsNullOrEmpty(a.Location.Serial))
+            .GroupBy(a => (a.Vid, a.Pid, a.Location.Serial)).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet();
+        attached = [.. attached.Select(a => duplicateSerials.Contains((a.Vid, a.Pid, a.Location.Serial))
+            ? (a.Vid, a.Pid, a.Location with { Serial = null }) : a)];
+        var result = new List<IAudioDevice>();
+        foreach (var (key, make) in Factories)
+            foreach (var unit in attached.Where(a => a.Vid == key.Vid && a.Pid == key.Pid))
+                result.Add(UsbTransport.At(unit.Location, make));
+        return result;
+    }
 
     /// <summary>The backends for these attached ids, in the table's order, one per attached unit.</summary>
     internal static IReadOnlyList<IAudioDevice> Match(IEnumerable<(ushort Vid, ushort Pid)> attached)
@@ -58,27 +70,29 @@ public static class DeviceRegistry
         return all[0];
     }
 
-    private static IEnumerable<(ushort Vid, ushort Pid)> EnumerateUsbIds()
+    private static IEnumerable<(ushort Vid, ushort Pid, UsbLocation Location)> EnumerateUsbLocations()
     {
-        string root = "/sys/bus/usb/devices";
+        const string root = "/sys/bus/usb/devices";
         if (!Directory.Exists(root)) yield break;
-        foreach (string dir in Directory.EnumerateDirectories(root))
+        foreach (string dir in Directory.EnumerateDirectories(root).Order(StringComparer.Ordinal))
         {
-            string vidPath = Path.Combine(dir, "idVendor");
-            string pidPath = Path.Combine(dir, "idProduct");
-            if (!File.Exists(vidPath) || !File.Exists(pidPath)) continue;
-
             ushort vid, pid;
+            byte bus, address;
+            string? serial;
             try
             {
-                vid = Convert.ToUInt16(File.ReadAllText(vidPath).Trim(), 16);
-                pid = Convert.ToUInt16(File.ReadAllText(pidPath).Trim(), 16);
+                vid = Convert.ToUInt16(File.ReadAllText(Path.Combine(dir, "idVendor")).Trim(), 16);
+                pid = Convert.ToUInt16(File.ReadAllText(Path.Combine(dir, "idProduct")).Trim(), 16);
+                if (!Factories.Any(f => f.Key == new Key(vid, pid))) continue;
+                bus = byte.Parse(File.ReadAllText(Path.Combine(dir, "busnum")).Trim(), System.Globalization.CultureInfo.InvariantCulture);
+                address = byte.Parse(File.ReadAllText(Path.Combine(dir, "devnum")).Trim(), System.Globalization.CultureInfo.InvariantCulture);
+                string path = Path.Combine(dir, "serial");
+                serial = File.Exists(path) ? File.ReadAllText(path).Trim() : null;
+                if (serial is { Length: > 128 } || serial?.Any(char.IsControl) == true) serial = null;
             }
-            catch (Exception ex) when (ex is FormatException or OverflowException or IOException)
-            {
-                continue;
-            }
-            yield return (vid, pid);
+            catch (Exception ex) when (ex is FormatException or OverflowException or IOException or UnauthorizedAccessException) { continue; }
+            if (bus == 0 || address == 0) continue;
+            yield return (vid, pid, new UsbLocation(bus, address, Path.GetFileName(dir), serial));
         }
     }
 }

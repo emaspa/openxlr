@@ -82,7 +82,7 @@ public class WaveXlrMk2Device : IAudioDevice
         _preferredVIndex = _vIndex = vIndex;
         _alternateVIndex = alternateVIndex;
         _usb = usb ?? UsbTransport.Create();
-        Info = new DeviceInfo("Elgato", model, VendorId, productId);
+        Info = UsbTransport.WithLocation(new DeviceInfo("Elgato", model, VendorId, productId));
         Capabilities = new DeviceCapabilities
         {
             Gain = true,
