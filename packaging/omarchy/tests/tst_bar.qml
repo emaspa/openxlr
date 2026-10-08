@@ -114,16 +114,16 @@ TestCase {
             "mix:monitor": [0.2, 0.7]
         };
         wait(0);
-        for (var name of ["input-xlr1", "feed"]) {
-            var readout = findChild(bar, name);
-            var label = findChild(readout, "label");
-            var meter = findChild(readout, "meter");
+        for (const name of ["input-xlr1", "feed"]) {
+            const readout = findChild(bar, name);
+            const label = findChild(readout, "label");
+            const meter = findChild(readout, "meter");
             verify(Math.abs(label.y + label.height / 2 - meter.y - meter.height / 2) <= 1);
             compare(label.font.pixelSize, Commons.Style.font.body);
             compare(meter.pixelSize, label.font.pixelSize);
             compare(label.font.bold, false);
             compare(meter.meterPalette, null);
-            for (var child of meter.children) {
+            for (const child of meter.children) {
                 if (!("glyph" in child))
                     continue;
                 compare(child.verticalAlignment, Text.AlignVCenter);

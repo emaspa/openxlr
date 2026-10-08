@@ -63,17 +63,17 @@ TestCase {
         var palette = Skins.palettes["tokyo-night"];
         var drawn = cells(meter);
         verify(drawn.length > 0);
-        for (var cell of drawn) {
-            var expected = cell.position >= palette.hotLevel ? palette.hot : cell.position >= palette.warningLevel ? palette.warning : palette.fill;
+        for (const cell of drawn) {
+            const expected = cell.position >= palette.hotLevel ? palette.hot : cell.position >= palette.warningLevel ? palette.warning : palette.fill;
             compare(String(cell.color), expected);
         }
         // Reducing the reading changes which cells are lit, not their zones.
         fakeLink.levels = {
             "ch:music": [0.75, 0.25]
         };
-        for (var cell of drawn) {
-            var lit = cell.glyph !== "│";
-            var expected = !lit ? palette.track : cell.position >= palette.hotLevel ? palette.hot : cell.position >= palette.warningLevel ? palette.warning : palette.fill;
+        for (const cell of drawn) {
+            const lit = cell.glyph !== "│";
+            const expected = !lit ? palette.track : cell.position >= palette.hotLevel ? palette.hot : cell.position >= palette.warningLevel ? palette.warning : palette.fill;
             compare(String(cell.color), expected);
         }
     }

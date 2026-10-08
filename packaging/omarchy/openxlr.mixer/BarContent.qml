@@ -106,7 +106,7 @@ Item {
                     // Read the frame directly: a levelsChanged handler can run
                     // before this delegate's level binding has reevaluated.
                     if (Mixer.pair(root.link.levels, "ch:" + modelData, true)[0] > 0) {
-                        var seen = {};
+                        const seen = {};
                         seen[modelData] = Date.now();
                         lastActive = seen;
                         release.interval = Mixer.inputHoldMs;

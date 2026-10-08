@@ -37,7 +37,7 @@ TestCase {
     }
     function entries(count: int): var {
         var result = [];
-        for (var i = 0; i < count; ++i)
+        for (let i = 0; i < count; ++i)
             result.push({
                 id: "ch" + i,
                 name: "Channel " + i,
@@ -56,8 +56,8 @@ TestCase {
     }
     function strips(item: var): var {
         var result = [];
-        for (var i = 0; i < item.children.length; ++i) {
-            var child = item.children[i];
+        for (let i = 0; i < item.children.length; ++i) {
+            const child = item.children[i];
             if ("entry" in child && "master" in child)
                 result.push(child);
             else
@@ -67,8 +67,8 @@ TestCase {
     }
     function assertWholeStrips(): void {
         var items = strips(bank);
-        for (var i = 0; i < items.length; ++i) {
-            var x = items[i].mapToItem(bank, 0, 0).x;
+        for (let i = 0; i < items.length; ++i) {
+            const x = items[i].mapToItem(bank, 0, 0).x;
             if (x < bank.width && x + items[i].width > 0)
                 verify(x >= 0 && x + items[i].width <= bank.width, items[i].entry.name + " is clipped at " + bank.width + " px");
         }
@@ -106,8 +106,8 @@ TestCase {
         do {
             wait(0);
             assertWholeStrips();
-            var items = strips(bank);
-            for (var i = 0; i < items.length; ++i)
+            const items = strips(bank);
+            for (let i = 0; i < items.length; ++i)
                 seen.push(items[i].entry.id);
             if (!next.enabled)
                 break;
