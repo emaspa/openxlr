@@ -42,6 +42,7 @@ public sealed partial class MainViewModel : ViewModelBase
     public MainViewModel(DaemonClient client)
     {
         _client = client;
+        LoadMixerView();
         OutputVolumeRange = new VolumeRangeViewModel(() => OutputVolume = Math.Min(OutputVolume, 1));
         OutputVolumeRange.Changed += RequestDesktopVolumeBoost;
         Inserts = new InsertsViewModel(client, "xlr1", 1, "XLR 1");
@@ -587,7 +588,7 @@ public sealed partial class MainViewModel : ViewModelBase
     public string OutputVolumeText => $"{_outputVolume * 100:0}%";
 
     private bool _hasMixer;
-    public bool HasMixer { get => _hasMixer; private set { if (Set(ref _hasMixer, value)) { Raise(nameof(MixerPlaceholder)); Raise(nameof(CanEditLayout)); } } }
+    public bool HasMixer { get => _hasMixer; private set { if (Set(ref _hasMixer, value)) { Raise(nameof(MixerPlaceholder)); Raise(nameof(CanEditLayout)); Raise(nameof(ShowApplications)); } } }
 
     /// <summary>The layout editor needs a live daemon with a built graph.</summary>
     public bool CanEditLayout => DaemonConnected && HasMixer;
@@ -1364,6 +1365,10 @@ public sealed class MonitorOutputItem : ViewModelBase
 public sealed class MixViewModel : ViewModelBase, IHasId
 {
     public LayoutAppearanceViewModel Appearance { get; } = new();
+
+    private bool _displayVisible = true;
+    /// <summary>The submixer draws this mix's master; see MainViewModel.RefreshChannelPresentation.</summary>
+    public bool DisplayVisible { get => _displayVisible; set => Set(ref _displayVisible, value); }
     private readonly DaemonClient _client;
     private bool _applying;
 
@@ -1580,6 +1585,10 @@ public sealed class SendViewModel : ViewModelBase
 
     private bool _visible = true;
     public bool Visible { get => _visible; set => Set(ref _visible, value); }
+
+    private bool _displayVisible = true;
+    /// <summary>The strip draws this send row; see MainViewModel.RefreshChannelPresentation.</summary>
+    public bool DisplayVisible { get => _displayVisible; set => Set(ref _displayVisible, value); }
 
     private double _level;
     public double Level

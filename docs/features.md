@@ -125,6 +125,10 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
   five sections and the channel and mix tiles. Section order is a window
   preference; tile order is the layout's one order. See
   [Arrange](manual.md#arrange)
+- A compact view with one chosen channel strip, and a mini view with that
+  channel's send into one chosen mix, its master and the monitor volume,
+  for a narrow window. Chosen in Options and kept in `ui.json`; hidden
+  channels can be picked there. See [Mixer view](manual.md#mixer-view)
 - Any mix feeds any selected output, hardware outputs included: the
   picker beside each output names Monitor A/B, Stream, Chat, Aux or a
   monitor mix or virtual microphone you added, and the API names a sum of

@@ -249,6 +249,20 @@
           </ComboBox>
         </Grid>
         <TextBlock Text="Touch gives the mixer's buttons, faders and lists larger targets for a touch screen, with wider channel strips." FontSize="11" Classes="hint" TextWrapping="Wrap"/>
+        <Grid ColumnDefinitions="110,*">
+          <TextBlock Text="Mixer view" Classes="h" VerticalAlignment="Center"/>
+          <ComboBox Name="MixerViewPicker" Grid.Column="1" HorizontalAlignment="Stretch"
+                    ItemsSource="{Binding MixerViewChoices}"
+                    SelectedItem="{Binding SelectedMixerView, Mode=TwoWay}" AutomationProperties.Name="Mixer view">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:MixerViewChoice">
+                <TextBlock Text="{Binding Label}"/>
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+        </Grid>
+        <TextBlock Text="Compact shows one channel strip with every send. Mini shows that channel's send into one mix with the mix's master and sets INPUTS, HEADPHONES and APPLICATIONS aside. Pick the channel and mix above the submixer. Levels and routing do not change."
+                   FontSize="11" Classes="hint" TextWrapping="Wrap"/>
         <TextBlock Text="{Binding SkinNote}" FontSize="11" Classes="hint" TextWrapping="Wrap"
                    IsVisible="{Binding SkinNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
         <TextBlock Text="{Binding SkinFolderHint}" FontSize="11" Classes="note" TextWrapping="Wrap"/>

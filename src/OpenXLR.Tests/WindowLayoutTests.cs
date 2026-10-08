@@ -571,6 +571,7 @@ public sealed class WindowLayoutTests
                 PluginCatalogueUiTests.CheckStaleReplies();
                 SoundCheckWindowTests.CheckPendingClose();
                 AssertLayoutAppearance(main, vm);
+                MixerViewWindowTests.Check();
                 // The arrange check opens its own window, with a real pointer
                 // on it; nothing else may sit in front.
                 foreach (var window in windows) window.Hide();
@@ -679,7 +680,7 @@ public sealed class WindowLayoutTests
             """));
     }
 
-    private static void Layout(Window window, double width, double height)
+    internal static void Layout(Window window, double width, double height)
     {
         // Resize the native surface, then let its size notification run.
         window.PlatformImpl!.GetType().GetMethod("Resize", [typeof(Size), typeof(WindowResizeReason)])!
@@ -696,7 +697,7 @@ public sealed class WindowLayoutTests
     /// window itself. Height is only checked against an immediate parent: a
     /// scrolled page is taller than its window on purpose.
     /// </summary>
-    private static void AssertInside(Control child, Visual ancestor)
+    internal static void AssertInside(Control child, Visual ancestor)
     {
         Assert.True(child.Bounds.Width > 0, $"{child.GetType().Name} has no width.");
         var origin = child.TranslatePoint(default, ancestor)!.Value;
@@ -721,7 +722,7 @@ public sealed class WindowLayoutTests
             }
     }
 
-    private static void Capture(Window window, string name)
+    internal static void Capture(Window window, string name)
     {
         if (Environment.GetEnvironmentVariable("OPENXLR_LAYOUT_ARTIFACTS") is not { Length: > 0 } directory) return;
         Directory.CreateDirectory(directory);

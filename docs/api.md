@@ -429,7 +429,9 @@ All under `~/.config/openxlr/` (or `$XDG_CONFIG_HOME/openxlr/`):
   `setNativeEditorRule` with null `blocked` to follow release defaults again.
 - `ui.json`: window preferences (tray, start minimized, autostart
   toggles, the chosen skin, collapsed sections and `sectionOrder`, the
-  order of the five sections)
+  order of the five sections, and the submixer view: `mixerView`
+  (`compact`, `mini`, or absent for the full mixer), `compactChannel`
+  and `compactMix`)
 - `effect-chain-presets.json`: the window's saved effect presets, 0600.
   Written by the UI only; the daemon never reads it. Format in
   [effect-presets.md](effect-presets.md).

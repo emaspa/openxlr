@@ -41,6 +41,16 @@ public sealed record UiSettings
     /// </summary>
     public IReadOnlyList<string> SectionOrder { get; init; } = [];
     /// <summary>
+    /// How the submixer is drawn: absent or <c>full</c> for every strip,
+    /// <c>compact</c> for one chosen channel, <c>mini</c> for one channel's
+    /// send into one chosen mix with the other sections out of the way.
+    /// </summary>
+    public string? MixerView { get; init; }
+    /// <summary>The channel the compact and mini views show, by id.</summary>
+    public string? CompactChannel { get; init; }
+    /// <summary>The mix the mini view shows, by id.</summary>
+    public string? CompactMix { get; init; }
+    /// <summary>
     /// The appearance the window wears, by skin id; null is the one the
     /// application ships with. It lives here and nowhere else: the mixer
     /// layout, the daemon's preferences and the audio profiles know nothing
