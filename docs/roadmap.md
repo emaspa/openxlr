@@ -147,9 +147,10 @@ a skin overlays values on top of them.
   dial art, and one for each of the eleven Omarchy palettes.
   Skins are data: no markup, no code, no path outside their own folder, no
   network. [skins.md](skins.md) is the contract.
-- [ ] System, light and dark appearance, following the desktop by default.
-  The token set is the groundwork; what remains is a second set of values
-  for a light ground and following the desktop's preference.
+- [x] System, light and dark appearance, following the desktop by default.
+  Material has a light palette beside its dark one, chosen by a mode in
+  Options; System follows the desktop's preference through the settings
+  portal, in the window and in the terminal mixer.
 - [x] A terminal mixer, `openxlr-tui`, for a desk without a desktop
   session and for a tiling setup where a window is the odd one out. It
   speaks the same WebSocket the window does and draws the same skins,

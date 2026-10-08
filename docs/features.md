@@ -467,6 +467,8 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   console fader is the framework's slider with OpenXLR's drawing over it,
   and a plugin's own editor window is drawn by the plugin and is not
   skinned. [skins.md](skins.md) is the contract
+- Material in System, Light or Dark mode: System follows the desktop's light
+  or dark preference, in the window and in the terminal mixer
 - One window per user: a second launch brings the running window to the
   front, out of the tray if it is hidden there, and exits
 - Tray icon, start-minimized option, daemon and window autostart from

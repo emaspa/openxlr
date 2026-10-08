@@ -44,10 +44,20 @@ internal sealed class App
     private string _promptText = string.Empty;
     private Action<string>? _promptDone;
 
-    public App(DaemonLink link, Theme theme)
+    private Theme _chosenTheme;
+    private bool _skinOverride;
+    private int _systemScheme;
+
+    /// <param name="theme">The skin chosen for this run, saved or given at launch.</param>
+    /// <param name="appearanceMode">Material's saved mode.</param>
+    /// <param name="skinOverride">True when <c>--skin</c> or <c>OPENXLR_SKIN</c> chose the skin, which holds Material dark.</param>
+    public App(DaemonLink link, Theme theme, string appearanceMode = AppearanceModes.System, bool skinOverride = false)
     {
         Link = link;
-        Theme = theme;
+        Theme = _chosenTheme = theme;
+        AppearanceMode = AppearanceModes.Normalize(appearanceMode);
+        _skinOverride = skinOverride;
+        ApplyAppearance();
         _views =
         [
             new MixerView(), new MatrixView(), new InputsView(), new OutputsView(), new AppsView(),
@@ -57,7 +67,14 @@ internal sealed class App
 
     public DaemonLink Link { get; }
 
+    /// <summary>The palette being drawn with: the chosen skin, or Material's light palette in its place.</summary>
     public Theme Theme { get; private set; }
+
+    /// <summary>Material's mode: system, light or dark.</summary>
+    public string AppearanceMode { get; private set; }
+
+    /// <summary>True while the palette depends on the desktop's preference, so the portal is worth watching.</summary>
+    public bool FollowsSystem => !_skinOverride && _chosenTheme.Id == "default" && AppearanceMode == AppearanceModes.System;
 
     public bool Running { get; private set; } = true;
 
@@ -87,10 +104,35 @@ internal sealed class App
         _promptDone = done;
     }
 
+    /// <summary>Wear a skin chosen in Options; it replaces a launch override.</summary>
     public void UseTheme(Theme theme)
     {
-        Theme = theme;
+        _chosenTheme = theme;
+        _skinOverride = false;
+        ApplyAppearance();
     }
+
+    /// <summary>Use Material's mode chosen in Options; it replaces a launch override.</summary>
+    public void UseAppearance(string mode)
+    {
+        AppearanceMode = AppearanceModes.Normalize(mode);
+        _skinOverride = false;
+        ApplyAppearance();
+    }
+
+    /// <summary>The desktop's color-scheme as the portal reports it: 0 none, 1 dark, 2 light.</summary>
+    public void UseSystemScheme(int scheme)
+    {
+        if (_systemScheme == scheme) return;
+        _systemScheme = scheme;
+        ApplyAppearance();
+    }
+
+    private void ApplyAppearance() =>
+        Theme = !_skinOverride && _chosenTheme.Id == "default"
+                && (AppearanceMode == AppearanceModes.Light || FollowsSystem && _systemScheme == 2)
+            ? Theme.MaterialLight
+            : _chosenTheme;
 
     public void ShowTab(int index)
     {

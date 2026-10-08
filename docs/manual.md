@@ -1155,8 +1155,8 @@ their header, across restarts.
 Options, APPEARANCE picks a skin. OpenXLR ships thirteen, all built into
 the application, so a package brings them with it:
 
-- **Material**, the default, which is what the window has always looked
-  like;
+- **Material**, the default, in a dark palette, which is what the window
+  has always looked like, and a light one;
 - **Deck**, which dresses the window in the visual language of the
   OpenDeck keys and the Wave interfaces: near-black faceplates, black keys
   whose lettering is backlit green when a control is on and red when
@@ -1172,6 +1172,16 @@ The choice takes effect at once. Windows that are already open repaint;
 audio, the mixer, the routing and the layout are untouched, and nothing is
 restarted. The choice is saved in `~/.config/openxlr/ui.json` and is not
 part of a profile or of the mixer layout.
+
+Below the skin, **Mode** picks Material's palette: **System**, **Light** or
+**Dark**. System, the default, follows the desktop's light or dark
+preference through the desktop portal and repaints the open windows when
+the desktop switches; a desktop that states no preference gets the dark
+palette. On a desktop that prefers light, Material therefore opens light
+unless you choose Dark. Other skins keep their own colours in every mode,
+so a window wearing Deck or an Omarchy palette looks as it did, and Mode is
+greyed out while one of them is chosen. The mode is saved in `ui.json`
+beside the skin.
 
 OpenDeck keys and dials take their colours from the chosen skin and
 repaint when it changes. While the window runs they use the colours it
@@ -1198,7 +1208,8 @@ If a skin makes something unreadable, start the window once with
 OPENXLR_SKIN=default openxlr
 ```
 
-which ignores the saved choice for that run and lets you pick another one.
+which ignores the saved choice for that run, wears dark Material whatever
+the mode says, and lets you pick another one.
 
 <a name="upgrade"></a>
 ### 3.11 Upgrade
@@ -1711,7 +1722,7 @@ Review plugin names, paths and scanner output before sharing the archive.
 | `~/.config/openxlr/desktop-keys.json` | desktop shortcut bindings, written by the window ([Desktop keys](#desktop-keys)) |
 | `~/.config/openxlr/bridge/yabridgectl/config.toml` | companion bridge folder registry, separate from the system bridge |
 | `~/.local/share/openxlr/yabridge/{vst3,clap,vst2}` | companion-generated wrappers; OpenXLR loads VST3 and CLAP only |
-| `~/.config/openxlr/ui.json` | window preferences, the chosen skin included ([section 3.10](#skins)) |
+| `~/.config/openxlr/ui.json` | window preferences, the chosen skin and Material's mode included ([section 3.10](#skins)) |
 | `~/.local/share/openxlr/skins/<id>/skin.json` | a skin you installed; system skins come from `$XDG_DATA_DIRS` ([skins.md](skins.md)) |
 | `openxlr-daemon.service` (systemd user unit) | the daemon; `journalctl --user -u openxlr-daemon` for its log |
 | `/usr/lib/systemd/user/pipewire-pulse.service.d/openxlr.conf` | installed by the packages: raises pipewire-pulse's open-file limit ([section 5.8](#open-files)) |
@@ -2001,8 +2012,14 @@ The terminal mixer wears the same skins as the window. It reads the same
 files, in the same order, and the choice in Options is the same choice, so
 picking Gruvbox in one picks it in the other ([skins.md](skins.md)).
 If the saved choice cannot be read, the terminal mixer uses Material for
-that run and leaves the file as it is.
-`--skin <id>` uses one appearance for this run without saving it, and
+that run and leaves the file as it is. Material's mode is shared too:
+**Material mode** on the Options tab changes it with Left and Right, and in
+System the terminal follows the desktop's preference through the portal
+with `gdbus`, staying dark when there is no session bus or no `gdbus`.
+A skin or mode chosen there applies for the run even when `ui.json` cannot
+be written, and the bottom line says the saved choice could not be written.
+`--skin <id>` uses one appearance for this run without saving it, with
+Material held dark, and
 `--list-skins` prints what this machine has. Deck and the Omarchy skins get
 console fader caps, bracketed keys and lamps; flat skins get plain ones.
 The terminal reads these choices from `controls` and derives its surfaces

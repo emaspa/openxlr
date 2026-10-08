@@ -689,7 +689,7 @@ public sealed class SkinPackageTests : IDisposable
         // Twelve appearances times every pair: a failure names all of them, so
         // a skin is fixed in one pass rather than one colour per test run.
         var thin = new List<string>();
-        foreach (SkinEntry entry in new[] { new SkinEntry(SkinPackage.Default, []) }
+        foreach (SkinEntry entry in new[] { new SkinEntry(SkinPackage.Default, []), SkinService.MaterialLight }
                      .Concat(SkinCatalog.BuiltIn()))
         {
             foreach (string surface in new[] { "Ox.Window.Background", "Ox.Card.Background", "Ox.Tile.Background" })
@@ -711,6 +711,25 @@ public sealed class SkinPackageTests : IDisposable
                     thin.Add($"{entry.Id}: {led} does not stand out on a strip");
         }
         Assert.True(thin.Count == 0, string.Join("\n", thin));
+    }
+
+    /// <summary>
+    /// Material's light palette is new, so unlike the dark default it draws
+    /// its meter zones: each one stands out on the track behind it and the
+    /// three are told apart. An alert does not read as a warning either.
+    /// </summary>
+    [Fact]
+    public void MaterialLightKeepsItsMeterZonesAndAlertsApart()
+    {
+        SkinEntry light = SkinService.MaterialLight;
+        Color fill = Colours(light, "Ox.Meter.Fill")[0];
+        Color warning = Colours(light, "Ox.Meter.Warning")[0];
+        Color hot = Colours(light, "Ox.Meter.Hot")[0];
+        Assert.Equal(3, new[] { fill, warning, hot }.Distinct().Count());
+        foreach (string zone in new[] { "Ox.Meter.Fill", "Ox.Meter.Warning", "Ox.Meter.Hot" })
+            Assert.True(Worst(Colours(light, zone), Colours(light, "Ox.Meter.Track")) >= 3.0,
+                $"{zone} does not stand out on the meter track");
+        Assert.NotEqual(Colours(light, "Ox.Text.Warning")[0], Colours(light, "Ox.Text.Alert")[0]);
     }
 
     /// <summary>
