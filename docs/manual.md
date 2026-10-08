@@ -1352,7 +1352,8 @@ mixes on the right, each with move up and down, Rename and Delete, and a
 box at the bottom to add one. Add capture input, above the channel
 list, turns another PipeWire capture source into a channel
 ([Additional capture inputs](#capture-inputs)). The hardware inputs,
-Monitor A, Monitor B and Aux are listed but fixed.
+Monitor A, Monitor B and Aux are listed in fixed places; only their
+appearance can change.
 
 Under MIXES, enter a name, pick **Virtual microphone** or **Monitor mix**
 and press Add mix. A virtual microphone is a source a recorder or a call
@@ -1368,7 +1369,27 @@ those two mixes; a sum with a monitor mix you added goes through the API.
 Reordering updates the open window as soon as the daemon publishes the saved
 layout, including changes made through the API. Channel tiles, mix controls
 and each channel's send rows follow the same order without resetting their
-levels or mute state.
+levels or mute state. The order decides only where things are drawn. An app
+whose channel is deleted, or whose remembered channel no longer exists,
+goes to System; if you deleted System, it goes to the application channel
+whose id comes first alphabetically.
+
+**Appearance**, under each channel and mix name in the layout editor, gives
+that item an icon (● ♪ ♫ ✦ ◆ ▶ ◉ or none) and a colour typed as `#RRGGBB`.
+Leave the colour empty to keep the skin's colours. The window draws the icon
+above a channel's name and before a mix's, both in that colour. The terminal
+mixer puts the icon before the name on its strip, in the same colour. Stream
+Deck keys and dials whose target is that channel or mix show the icon in
+place of their glyph and the colour on the label and border, unless the key
+has its own icon chosen in its settings. Mute and offline indicators keep
+their usual colours.
+For a channel, **Hide this channel's strip in the mixer** removes its tile
+from the SUBMIXER card and its strip from the terminal mixer's Mixer
+section. Nothing about its audio changes: its sends, meter, applications
+and routing stay as they were, it stays in the layout editor, the app
+pickers and the Matrix section, and Stream Deck keys keep controlling it.
+The editor marks it "hidden in the mixer". A mix cannot be hidden.
+Appearance is part of the layout, saved with it, and not part of a profile.
 
 - A new channel appears as a playback device at once and starts muted in
   every mix, so route an app to it and open the sends you want.
@@ -1382,9 +1403,10 @@ levels or mute state.
   away. Other applications keep listing the old device name until the
   daemon restarts, because reloading the device would throw them off it.
   The window shows a restart hint; restart when nothing is recording.
-- Deleting a channel moves its apps to the first remaining application
-  channel. Deleting a virtual microphone removes the device, and anything
-  recording from it loses it. Outputs that followed only the deleted mix
+- Deleting a channel moves its apps to System, or to the application
+  channel whose id comes first when System is gone. Deleting a virtual
+  microphone removes the device, and anything recording from it loses it.
+  Outputs that followed only the deleted mix
   return to Monitor A, while summed feeds keep their other mixes. If the
   mix was the enforced system default output or input, that choice is
   cleared and the desktop picks the default.
@@ -1553,7 +1575,11 @@ The key's LED is green for an engaged feature, red for a mute, and grey
 when the daemon is offline or the target does not exist on the
 connected interface. A key's icon can be chosen in its settings, and a
 title typed there replaces the built-in label. An icon name the plugin does
-not know shows the target's default icon.
+not know shows the target's default icon. A key or dial whose target is a
+channel or a mix with an icon or colour from the layout editor
+([Appearance](#layout)) shows that icon and colour unless the key has its
+own icon chosen. An exclusive group key shows those of the member that is
+heard.
 
 **Dial** (an encoder) changes a level: the monitor output volume, a
 gain, a headphone volume, the aux level, the crossfade, a mix master, a
@@ -2078,7 +2104,7 @@ Controls below the visible hardware cards appear as the selection moves.
 | Mixer | `-`, `+`, `[`, `]` | lower or raise the level by five points, or by one point |
 | Mixer | `M` | add a monitor mix |
 | Mixer | `r`, `n`, `N`, `c`, `d` | rename, add an application channel, add a virtual microphone, add a capture input, or delete |
-| Mixer | Ctrl+Left/Right | reorder the selected channel or user mix |
+| Mixer | Ctrl+Left/Right | move the selected channel or user mix one strip along; a channel steps past hidden channels to the next strip shown |
 | Matrix | Up/Down, Left/Right, Home, End | move through the grid; Home is the masters row |
 | Matrix | Space, `-`, `+`, `[`, `]` | mute the cell, or change its level by five points or by one |
 | Lists | Up/Down, PageUp/PageDown | move between controls |

@@ -113,7 +113,14 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
   reorders and removes application channels, virtual microphones and
   monitor mixes while audio plays, as does the API, with stable ids so
   profiles and Stream Deck keys survive a rename. Every change is saved before it is
-  confirmed
+  confirmed. The order is only where things are drawn: an app whose
+  channel is deleted goes to System, or to the first application channel
+  by id when System is gone
+- An icon and a colour for any channel or mix, and a hidden flag that
+  leaves a channel's strip out of the mixer while its audio, sends and
+  apps carry on. The window, the terminal mixer and the Stream Deck keys
+  show the same icon and colour. See
+  [Edit the mixer layout](manual.md#layout)
 - Any mix feeds any selected output, hardware outputs included: the
   picker beside each output names Monitor A/B, Stream, Chat, Aux or a
   monitor mix or virtual microphone you added, and the API names a sum of
@@ -344,7 +351,10 @@ an output's feed through Monitor A, Monitor B and Monitor A+B, an
 output's volume in 5% steps and its mute (red while muted), the enforced
 system output, routing the focused application to a channel, and the
 next member of an exclusive group. Each key
-can pick its icon, and a typed title replaces the built-in label.
+can pick its icon, and a typed title replaces the built-in label. A key or
+dial on a channel or mix shows the icon and colour that channel or mix was
+given in the layout editor, unless the key has its own icon; a group key
+shows its heard member's.
 
 ![Keys](plugin-keys.png)
 

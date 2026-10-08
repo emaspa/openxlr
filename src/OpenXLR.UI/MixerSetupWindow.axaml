@@ -58,7 +58,7 @@
           </Grid>
           <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
             <TextBlock Text="CHANNELS" Classes="h"/>
-            <TextBlock Text="A new channel starts muted in every mix. Hardware inputs stay where they are."
+            <TextBlock Text="A new channel starts muted in every mix. Hardware inputs stay where they are. Apps whose channel is deleted go to System."
                        FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
           </StackPanel>
           <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -74,6 +74,10 @@
                         <TextBlock Text="{Binding CaptureLabel}" Foreground="{DynamicResource Ox.Text.Secondary}"
                                    TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding CaptureSource}"
                                    IsVisible="{Binding CaptureSource, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                        <TextBlock Text="hidden in the mixer" Foreground="{DynamicResource Ox.Text.Muted}" FontSize="10"
+                                   IsVisible="{Binding Appearance.Hidden}"/>
+                        <Button Content="Appearance" Classes="small" HorizontalAlignment="Left" Margin="0,4,0,0"
+                                Click="OnAppearance" ToolTip.Tip="Icon, colour and whether the strip shows in the mixer"/>
                       </StackPanel>
                       <TextBlock Grid.Column="1" Text="hardware input" Foreground="{DynamicResource Ox.Text.Muted}" FontSize="11"
                                  VerticalAlignment="Center" IsVisible="{Binding IsHardware}"/>
@@ -123,6 +127,8 @@
                       <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="{Binding Name}" Foreground="{DynamicResource Ox.Text.Primary}" FontWeight="SemiBold"/>
                         <TextBlock Text="{Binding Id}" Foreground="{DynamicResource Ox.Text.Muted}" FontFamily="monospace" FontSize="10"/>
+                        <Button Content="Appearance" Classes="small" HorizontalAlignment="Left" Margin="0,4,0,0"
+                                Click="OnAppearance" ToolTip.Tip="Icon and colour"/>
                       </StackPanel>
                       <TextBlock Grid.Column="1" Text="{Binding KindLabel}" Foreground="{DynamicResource Ox.Text.Muted}" FontSize="11"
                                  VerticalAlignment="Center" IsVisible="{Binding !IsEditable}"/>

@@ -444,6 +444,7 @@ public sealed class MixerService : IHostedService, IDisposable
                 case "setLayoutOrder":
                 case "setExclusiveGroup":
                 case "deleteExclusiveGroup":
+                case "setLayoutAppearance":
                     // Layout commands save synchronously, under the same gate
                     // as the debounced fader saves, and succeed only once the
                     // new layout is on disk.
@@ -461,6 +462,9 @@ public sealed class MixerService : IHostedService, IDisposable
                             case "deleteMix": _mixer.DeleteMix(cmd.Mix!, save); break;
                             case "setExclusiveGroup": _mixer.SetExclusiveGroup(cmd.Group, cmd.Name!, cmd.Channels!, save); break;
                             case "deleteExclusiveGroup": _mixer.DeleteExclusiveGroup(cmd.Group!, save); break;
+                            case "setLayoutAppearance":
+                                _mixer.SetLayoutAppearance(cmd.Channel is null ? "mix:" + cmd.Mix : "channel:" + cmd.Channel, cmd.Appearance!, save);
+                                break;
                             default: _mixer.SetLayoutOrder(cmd.Channels!, cmd.Mixes!, save); break;
                         }
                     });

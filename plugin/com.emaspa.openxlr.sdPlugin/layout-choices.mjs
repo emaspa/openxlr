@@ -105,3 +105,37 @@ export function layoutChoices(mixer, devices = []) {
   });
   return { toggleGroups, levelGroups };
 }
+
+// The member of an exclusive group heard in some mix, by channel id, or null.
+export function openGroupMember(mixer, group) {
+  return group?.channels?.find((id) => {
+    const ch = mixer?.channels?.find((c) => c.id === id);
+    return ch && Object.keys(ch.levels ?? {}).some((m) => !ch.mutedIn?.includes(m));
+  }) ?? null;
+}
+
+// The icon and colour a channel or mix was given in the layout editor, for
+// the key or dial whose target names it; a group key takes its open member's. Only a listed icon and a #RRGGBB
+// colour come through, so state can never put markup or an attribute into
+// the key's SVG.
+const APPEARANCE_ICONS = ["●", "♪", "♫", "✦", "◆", "▶", "◉"];
+
+export function targetAppearance(mixer, target) {
+  if (typeof target !== "string") return { icon: "", colour: null };
+  let item;
+  if (/^(mixmute|mixvol):/.test(target)) item = mixer?.mixes?.find(m => m.id === target.split(":")[1]);
+  else if (/^(sendmute|send|focus):/.test(target)) item = mixer?.channels?.find(c => c.id === target.split(":")[1]);
+  else if (target.startsWith("group:")) {
+    const open = openGroupMember(mixer, mixer?.exclusiveGroups?.find(g => g.id === target.slice(6)));
+    item = open === null ? undefined : mixer?.channels?.find(c => c.id === open);
+  }
+  else if (/^(insert|inschain|insparam)\|/.test(target)) {
+    const key = target.split("|")[1] ?? "";
+    item = key.startsWith("mix:") ? mixer?.mixes?.find(m => m.id === key.slice(4)) : mixer?.channels?.find(c => c.id === key);
+  }
+  const value = item?.appearance;
+  return {
+    icon: APPEARANCE_ICONS.includes(value?.icon) ? value.icon : "",
+    colour: typeof value?.colour === "string" && /^#[0-9a-f]{6}$/i.test(value.colour) ? value.colour : null,
+  };
+}

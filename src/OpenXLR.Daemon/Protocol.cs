@@ -47,6 +47,9 @@ public sealed record Command
     [JsonPropertyName("channels")] public List<string>? Channels { get; init; }
     [JsonPropertyName("mixes")] public List<string>? Mixes { get; init; }
 
+    /// <summary>setLayoutAppearance: the channel's or mix's icon, colour and hidden flag.</summary>
+    [JsonPropertyName("appearance")] public LayoutAppearance? Appearance { get; init; }
+
     /// <summary>"assignStream": the PipeWire stream (sink-input) id to route.</summary>
     [JsonPropertyName("streamId")] public int? StreamId { get; init; }
 

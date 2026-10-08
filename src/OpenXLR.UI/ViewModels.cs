@@ -1118,6 +1118,7 @@ public sealed partial class MainViewModel : ViewModelBase
                 foreach (SendViewModel send in c.Sends.Where(s => s.MixId == "auxout"))
                     send.Visible = !DeviceConnected || CapOutputRouting || auxAudible;
             }
+            RefreshChannelPresentation();
         }
     }
 
@@ -1344,6 +1345,7 @@ public sealed class MonitorOutputItem : ViewModelBase
 /// <summary>A mix (monitor/stream/chat): master level and mute.</summary>
 public sealed class MixViewModel : ViewModelBase, IHasId
 {
+    public LayoutAppearanceViewModel Appearance { get; } = new();
     private readonly DaemonClient _client;
     private bool _applying;
 
@@ -1425,6 +1427,7 @@ public sealed class MixViewModel : ViewModelBase, IHasId
 
     public void ApplyFromDaemon(JsonNode n)
     {
+        Appearance.Apply(n["appearance"]);
         bool? editable = n["editable"]?.GetValue<bool>();
         if (_editable != editable) { _editable = editable; Raise(nameof(IsEditable)); }
         _applying = true;
@@ -1450,6 +1453,8 @@ public sealed class MixViewModel : ViewModelBase, IHasId
 /// <summary>A channel with one send (level + mute) per mix.</summary>
 public sealed class ChannelViewModel : ViewModelBase, IHasId
 {
+    public LayoutAppearanceViewModel Appearance { get; } = new();
+
     public ChannelViewModel(DaemonClient client, string id, string name, IReadOnlyList<string> mixIds)
     {
         _client = client; Id = id; _name = name;
@@ -1500,7 +1505,12 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
     }
 
     private bool _visible = true;
+    /// <summary>The active device can feed this channel.</summary>
     public bool Visible { get => _visible; set => Set(ref _visible, value); }
+
+    private bool _displayVisible = true;
+    /// <summary>The mixer draws this channel's strip; see MainViewModel.RefreshChannelPresentation.</summary>
+    public bool DisplayVisible { get => _displayVisible; set => Set(ref _displayVisible, value); }
 
     private double _meterL;
     public double MeterL { get => _meterL; set => Set(ref _meterL, Math.Min(value, 1.0)); }
@@ -1509,6 +1519,7 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
 
     public void ApplyFromDaemon(JsonNode n)
     {
+        Appearance.Apply(n["appearance"]);
         if (n["name"]?.GetValue<string>() is { Length: > 0 } name) Name = name;
         IsHardware = n["hardware"]?.GetValue<bool>() ?? false;
         Present = n["present"]?.GetValue<bool>() ?? true;

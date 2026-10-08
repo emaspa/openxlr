@@ -39,9 +39,38 @@ saved send levels starts with every send muted, as a mix created while the
 daemon runs does.
 
 Node names derive from IDs, not labels. The list order survives a settings
-save and restart. Removed application destinations fall back to the first
-application channel, never a hardware input; ignored applications stay ignored.
-Existing monitor-feed settings and profile semantics are unchanged.
+save and restart. Clients draw the channels and mixes in this order, and the
+order decides nothing else. An application whose channel no longer exists
+goes to the fallback application channel: `system`, or when `system` has
+been deleted, the application channel whose id sorts first. The fallback is
+never a hardware input or a capture channel and never depends on the list
+order, so reordering moves no application. Ignored applications stay
+ignored. Existing monitor-feed settings and profile semantics are unchanged.
+
+## Appearance
+
+`appearance` maps `channel:<id>` or `mix:<id>` to how that item is drawn:
+
+```json
+{
+  "appearance": {
+    "channel:music": {"icon": "♫", "colour": "#2E9BFF", "hidden": false},
+    "channel:sfx": {"icon": "", "hidden": true},
+    "mix:stream": {"icon": "◆", "colour": "#FF7A00"}
+  }
+}
+```
+
+`icon` is empty or one of ● ♪ ♫ ✦ ◆ ▶ ◉. `colour` is `#RRGGBB`; absent or
+null keeps the skin's colours. `hidden` leaves a channel's strip out of the
+window's and the terminal mixer's full mixer; the channel keeps its sends,
+meter, applications and audio, and stays in the layout editor, the
+application pickers and the Stream Deck targets. A mix cannot be hidden.
+An entry for an id the layout does not hold, a key of more than 44
+characters, or a value outside these rules is dropped and logged. An entry
+equal to the default is not written. Deleting a channel or a mix deletes
+its entry. Appearance belongs to the layout, so profiles neither save nor
+recall it.
 
 ## Other fields
 
@@ -98,9 +127,10 @@ debounced, retried behaviour.
   A capture channel's sink is hidden, so its name changes without a reload.
 - `deleteChannel {channel}` removes an application or capture channel. Apps
   routed to it, remembered assignments included, and whatever is playing
-  into its sink at that moment move to the first remaining application
-  channel; then its sink is unloaded, and a capture channel's link to its
-  source with it. The last application channel stays.
+  into its sink at that moment move to the fallback application channel
+  (`system`, or the remaining application channel whose id sorts first);
+  then its sink is unloaded, and a capture channel's link to its source
+  with it. The last application channel stays.
 - `createMix {name, kind?}` adds a user mix after the existing ones, ahead
   of Aux. Without `kind`, or with `kind: "virtualMic"`, it is a virtual
   microphone. With `kind: "monitor"` it is a monitor mix: one sink and no
@@ -134,6 +164,9 @@ debounced, retried behaviour.
   changes. Open windows apply the published order to channel tiles, mix
   controls and send rows while retaining the existing controls and their
   values.
+- `setLayoutAppearance {channel | mix, appearance}` replaces one item's
+  `icon`, `colour` and `hidden` as described under [Appearance](#appearance),
+  hardware inputs and Monitor A/B and Aux included. No node changes.
 
 Every added channel or mix costs pipewire-pulse a few dozen open files;
 the daemon refuses an addition the server has no room for, and the packages

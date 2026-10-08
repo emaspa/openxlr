@@ -138,10 +138,11 @@ public sealed partial class Mixer
     }
 
     /// <summary>
-    /// Remove an application channel. Apps routed to it move to the first
-    /// remaining application channel, remembered assignments included; the
-    /// removal is saved, then the channel's sink is unloaded. The last
-    /// application channel cannot go: new streams need a destination.
+    /// Remove an application channel. Apps routed to it move to
+    /// <see cref="MixerConfig.FallbackApplicationChannel"/>, remembered
+    /// assignments included; the removal is saved, then the channel's sink
+    /// is unloaded. The last application channel cannot go: new streams
+    /// need a destination.
     /// </summary>
     public void DeleteApplicationChannel(string id, Func<MixerSettings, string?> persist)
     {
@@ -151,7 +152,7 @@ public sealed partial class Mixer
             if (!_built) throw new InvalidOperationException("mixer is not built");
             MixerConfig previous = _config;
             MixerConfig next = _config.WithoutChannel(id);
-            ChannelDefinition fallback = next.Channels.First(c => c.IsApplication);
+            ChannelDefinition fallback = next.FallbackApplicationChannel!;
 
             var movedOverrides = Matcher.Overrides.Where(kv => kv.Value == id).Select(kv => kv.Key).ToList();
             var movedApps = _apps.Where(kv => kv.Value.ChannelId == id).ToDictionary(kv => kv.Key, kv => kv.Value);
@@ -184,6 +185,7 @@ public sealed partial class Mixer
                 try { _pw.MoveStreamToSink(serial, fallback.SinkName); }
                 catch (InvalidOperationException) { /* the stream ended meanwhile */ }
             }
+            _appearance.Remove("channel:" + id);
             _meters.Remove($"ch:{id}");
             RemoveCaptureFeedLocked(id);
             _inserts.Remove(id);
@@ -335,6 +337,7 @@ public sealed partial class Mixer
             if (previousFeeds.Values.Any(feed => MonitorFeed.Includes(feed, id)))
                 SetMonitorOutputsLocked([.. _monitorOutputs]);
             RemoveMixChainLocked(key);
+            _appearance.Remove("mix:" + id);
             _meters.Remove($"mix:{id}");
             var errors = new List<string>();
             foreach (var modules in new[] { _virtualMicModules, _postModules, _mixModules })

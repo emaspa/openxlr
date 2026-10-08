@@ -93,6 +93,12 @@ public sealed record MixerSettings
     public string? EnforcedDefaultSink { get; init; }
     public string? EnforcedDefaultSource { get; init; }
 
+    /// <summary>
+    /// Icon, colour and hidden flag by <c>channel:&lt;id&gt;</c> or
+    /// <c>mix:&lt;id&gt;</c>. Part of the layout, not of a profile.
+    /// </summary>
+    public Dictionary<string, LayoutAppearance> Appearance { get; init; } = [];
+
     private static readonly JsonSerializerOptions Json = new()
     {
         WriteIndented = true,

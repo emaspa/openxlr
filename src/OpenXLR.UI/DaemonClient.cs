@@ -383,6 +383,9 @@ public sealed class DaemonClient : IAsyncDisposable
     }
     public Task<string?> DeleteExclusiveGroupAsync(string group)
         => EditLayoutAsync(new() { ["cmd"] = "deleteExclusiveGroup", ["group"] = group });
+    public Task<string?> SetLayoutAppearanceAsync(string id, bool mix, string icon, string? colour, bool hidden)
+        => EditLayoutAsync(new() { ["cmd"] = "setLayoutAppearance", [mix ? "mix" : "channel"] = id,
+            ["appearance"] = new { icon, colour, hidden } });
 
     /// <summary>
     /// Send a layout command and wait for its commandResult. The daemon

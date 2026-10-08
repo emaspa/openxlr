@@ -124,7 +124,7 @@ public partial class MixerSetupWindow : Window
     {
         if (Item<ChannelViewModel>(sender) is not { } channel || Vm is not { } vm) return;
         if (await Confirm($"Delete channel '{channel.Name}'?",
-                channel.IsApplication ? "Programs routed to it move to the first remaining application channel. Its playback device disappears from the desktop."
+                channel.IsApplication ? $"Programs routed to it move to {FallbackAfterDeleting(vm, channel)}. Its playback device disappears from the desktop."
                     : "The capture input and its sends are removed. The source device remains available to other applications."))
             await Run(vm.DeleteChannel(channel.Id));
     }
@@ -138,6 +138,75 @@ public partial class MixerSetupWindow : Window
                     : "Its virtual microphone disappears; anything recording from it loses the device. Its sends and inserts go with it."))
             await Run(vm.DeleteMix(mix.Id));
     }
+
+    /// <summary>The channel the daemon moves a deleted channel's programs to: System, else the first by id.</summary>
+    private static string FallbackAfterDeleting(MainViewModel vm, ChannelViewModel deleted)
+    {
+        var rest = vm.Channels.Where(c => c.IsApplication && c.Id != deleted.Id).ToList();
+        ChannelViewModel? fallback = rest.FirstOrDefault(c => c.Id == "system") ?? rest.MinBy(c => c.Id, StringComparer.Ordinal);
+        return fallback?.Name ?? "another application channel";
+    }
+
+    private async void OnAppearance(object? sender, RoutedEventArgs e)
+    {
+        if (Vm is not { } vm) return;
+        ChannelViewModel? channel = Item<ChannelViewModel>(sender);
+        MixViewModel? mix = Item<MixViewModel>(sender);
+        LayoutAppearanceViewModel? appearance = channel?.Appearance ?? mix?.Appearance;
+        if (appearance is null) return;
+        string name = channel?.Name ?? mix!.Name;
+        var icon = new ComboBox { Name = "AppearanceIcon", ItemsSource = LayoutAppearanceViewModel.Icons,
+            SelectedItem = appearance.Icon, MinWidth = 120 };
+        var colour = new TextBox { Name = "AppearanceColour", Text = appearance.Colour ?? "", MaxLength = 7,
+            PlaceholderText = "#RRGGBB, or empty for the skin's colours" };
+        var hidden = new CheckBox { Name = "AppearanceHidden", IsChecked = appearance.Hidden, IsVisible = channel is not null,
+            Content = "Hide this channel's strip in the mixer. Its audio, sends and apps stay as they are." };
+        var save = new Button { Name = "AppearanceSave", Content = "Save", IsDefault = true };
+        var cancel = new Button { Content = "Cancel", IsCancel = true };
+        var note = new TextBlock { TextWrapping = TextWrapping.Wrap, Classes = { "hint" } };
+        var dialog = new Window
+        {
+            Title = $"Appearance of {name}", Width = 440, SizeToContent = SizeToContent.Height,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner, CanResize = false, Classes = { "dialog" },
+            Content = new StackPanel
+            {
+                Margin = new Avalonia.Thickness(18), Spacing = 10,
+                Children =
+                {
+                    new TextBlock { Text = "Icon" }, icon,
+                    new TextBlock { Text = "Colour" }, colour,
+                    hidden,
+                    new TextBlock { TextWrapping = TextWrapping.Wrap, Classes = { "hint" },
+                        Text = "The window, the terminal mixer and Stream Deck keys show the icon and colour. Routing and levels do not change." },
+                    note,
+                    new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 8,
+                        HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right, Children = { cancel, save } },
+                },
+            },
+        };
+        save.Click += async (_, _) =>
+        {
+            string? chosen = string.IsNullOrWhiteSpace(colour.Text) ? null : colour.Text.Trim();
+            if (chosen is not null && !IsHexColour(chosen))
+            {
+                note.Text = "Enter a colour as # followed by six hexadecimal digits, or leave it empty.";
+                return;
+            }
+            save.IsEnabled = false;
+            try
+            {
+                string? error = await vm.SetLayoutAppearance(channel?.Id ?? mix!.Id, mix is not null,
+                    icon.SelectedItem as string ?? "", chosen, channel is not null && hidden.IsChecked == true);
+                if (error is null) dialog.Close(); else note.Text = error;
+            }
+            finally { save.IsEnabled = true; }
+        };
+        cancel.Click += (_, _) => dialog.Close();
+        await dialog.ShowDialog(this);
+    }
+
+    private static bool IsHexColour(string text) =>
+        text.Length == 7 && text[0] == '#' && text.AsSpan(1).IndexOfAnyExcept("0123456789abcdefABCDEF") < 0;
 
     private static T? Item<T>(object? sender) where T : class => (sender as Control)?.DataContext as T;
 

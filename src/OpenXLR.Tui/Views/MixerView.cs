@@ -26,7 +26,7 @@ internal sealed class MixerView : View
         }
 
         List<MixEntry> mixes = state.Mixer.Mixes;
-        List<ChannelEntry> channels = state.Mixer.Shown;
+        List<ChannelEntry> channels = state.Mixer.Strips;
         _row = Math.Clamp(_row, 0, channels.Count);
         _column = Math.Clamp(_column, 0, mixes.Count - 1);
         MixEntry selectedMix = mixes[_column];
@@ -62,18 +62,18 @@ internal sealed class MixerView : View
             // its send into the chosen mix shows as a word where the level goes.
             string? hardwareMute = HardwareMute(channel);
             bool keyMuted = hardwareMute is null ? channel.IsMuted(selectedMix.Id) : state.Flag(hardwareMute);
-            DrawStrip(screen, strip, app, channel.Name, kind, channel.Level(selectedMix.Id), 1,
+            DrawStrip(screen, strip, app, channel.Appearance.Label(channel.Name), kind, channel.Level(selectedMix.Id), 1,
                 keyMuted, app.Link.StereoMeter("ch", channel.Id), _row == index + 1, false,
                 sendMuted: hardwareMute is not null && channel.IsMuted(selectedMix.Id), mono: channel.Mono,
-                last: i == channelCount - 1);
+                last: i == channelCount - 1, accent: channel.Appearance.Accent);
         }
         for (int i = 0; i < masterCount; i++)
         {
             MixEntry mix = mixes[_mixScroll + i];
             string kind = mix.Kind == "monitor" ? "MON" : mix.Kind == "virtualMic" ? "MIC" : "AUX";
-            DrawStrip(screen, Slot(masterBank, i, masterCount), app, mix.Name, kind, mix.Volume, mix.Ceiling,
+            DrawStrip(screen, Slot(masterBank, i, masterCount), app, mix.Appearance.Label(mix.Name), kind, mix.Volume, mix.Ceiling,
                 mix.Muted, app.Link.StereoMeter("mix", mix.Id), _row == 0 && _column == _mixScroll + i, true,
-                last: i == masterCount - 1);
+                last: i == masterCount - 1, accent: mix.Appearance.Accent);
         }
         if (channelCount == 0)
             screen.Text(channelBank.X + 2, bankY + 2, "No channels", theme.TextSecondary, theme.Card,
@@ -124,7 +124,7 @@ internal sealed class MixerView : View
 
     private static void DrawStrip(Screen screen, Rect area, App app, string name, string kind,
         double value, double ceiling, bool muted, MeterReading meter, bool focused, bool master,
-        bool sendMuted = false, bool mono = false, bool last = false)
+        bool sendMuted = false, bool mono = false, bool last = false, Rgb? accent = null)
     {
         Theme theme = app.Theme;
         Rgb back = focused ? theme.SelectedFace : master ? theme.Tile : theme.Card;
@@ -145,9 +145,12 @@ internal sealed class MixerView : View
         }
         Rgb plate = focused ? theme.Selection : back;
         screen.Fill(area.X, area.Y, area.Width - 1, 2, plate);
-        Widgets.Center(screen, area.X, area.Y, area.Width - 1, first, theme.TextPrimary, plate, true);
+        // A colour chosen in the layout editor is the strip's own; the
+        // theme's text colour stands in when there is none.
+        Rgb ink = accent ?? theme.TextPrimary;
+        Widgets.Center(screen, area.X, area.Y, area.Width - 1, first, ink, plate, true);
         Widgets.Center(screen, area.X, area.Y + 1, area.Width - 1, second.Length > 0 ? second : kind,
-            second.Length > 0 ? theme.TextPrimary : theme.TextMuted, plate);
+            second.Length > 0 ? ink : theme.TextMuted, plate);
         if (sendMuted)
             Widgets.Center(screen, area.X, area.Y + 2, area.Width - 1, "muted", theme.MuteBackChecked, back, true);
         else
@@ -234,7 +237,7 @@ internal sealed class MixerView : View
         Snapshot? state = State(app);
         if (state is null) return false;
         List<MixEntry> mixes = state.Mixer.Mixes;
-        List<ChannelEntry> channels = state.Mixer.Shown;
+        List<ChannelEntry> channels = state.Mixer.Strips;
         if (mixes.Count == 0) return false;
 
         _row = Math.Clamp(_row, 0, channels.Count);
@@ -339,21 +342,28 @@ internal sealed class MixerView : View
         });
     }
 
-    /// <summary>Moves the selected channel or user mix in the saved order.</summary>
+    /// <summary>
+    /// Moves the selected channel or user mix in the saved order, which is
+    /// the order every client draws. A channel passes the next strip this
+    /// tab shows, so it moves on screen even with a hidden channel between.
+    /// </summary>
     private void Reorder(App app, Snapshot state, int by)
     {
         List<string> channels = state.Mixer.Channels.Where(entry => !entry.Hardware).Select(entry => entry.Id).ToList();
         List<string> mixes = state.Mixer.Mixes.Where(entry => entry.IsEditable).Select(entry => entry.Id).ToList();
 
-        if (_row > 0 && _row <= state.Mixer.Shown.Count)
+        if (_row > 0 && _row <= state.Mixer.Strips.Count)
         {
-            ChannelEntry channel = state.Mixer.Shown[_row - 1];
+            ChannelEntry channel = state.Mixer.Strips[_row - 1];
             int at = channels.IndexOf(channel.Id);
             if (at < 0) { app.Say("A hardware channel keeps its place"); return; }
-            int to = Math.Clamp(at + by, 0, channels.Count - 1);
-            if (to == at) return;
+            var drawn = state.Mixer.Strips.Select(entry => entry.Id).ToHashSet();
+            int to = at + by;
+            while (to >= 0 && to < channels.Count && !drawn.Contains(channels[to])) to += by;
+            if (to < 0 || to >= channels.Count) return;
             channels.RemoveAt(at);
             channels.Insert(to, channel.Id);
+            _row += by;
         }
         else
         {

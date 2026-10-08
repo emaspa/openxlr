@@ -363,6 +363,7 @@ public sealed class WebSocketHub
             case "setExclusiveGroup":
             case "deleteExclusiveGroup":
             case "cycleExclusiveGroup":
+            case "setLayoutAppearance":
             case "setLevel":
             case "setChannelMuted":
             case "setMixVolume":

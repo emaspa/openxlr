@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { channelName, layoutChoices, mixName, controllableOutputs, outputKey } from "../com.emaspa.openxlr.sdPlugin/layout-choices.mjs";
+import { channelName, layoutChoices, mixName, controllableOutputs, outputKey, targetAppearance } from "../com.emaspa.openxlr.sdPlugin/layout-choices.mjs";
 
 const mixer = {
   mixes: [
@@ -88,4 +88,31 @@ test("exclusive groups offer one next-member key each", () => {
   const grouped = { ...mixer, exclusiveGroups: [{ id: "mics", name: "Microphones", channels: ["xlr1", "alerts-new"] }] };
   assert.deepEqual(layoutChoices(grouped).toggleGroups.find(g => g.id === "layout-exclusive-groups").items,
     [{ target: "group:mics", label: "Microphones: next member" }]);
+});
+
+test("a key's appearance follows its stable target and admits only listed icons and #RRGGBB colours", () => {
+  const state = {
+    channels: [{id: "music", appearance: {icon: "♫", colour: "#12abEF", hidden: true}}],
+    mixes: [{id: "stream", appearance: {icon: "◆", colour: "#ABC123"}}],
+  };
+  for (const target of ["focus:music", "sendmute:music:stream", "send:music:stream", "insert|music|id"])
+    assert.deepEqual(targetAppearance(state, target), {icon: "♫", colour: "#12abEF"});
+  for (const target of ["mixmute:stream", "mixvol:stream", "inschain|mix:stream", "insparam|mix:stream|id|0"])
+    assert.deepEqual(targetAppearance(state, target), {icon: "◆", colour: "#ABC123"});
+  state.channels[0].appearance = {icon: '<image href="file:///etc/passwd"/>', colour: '#fff" onload="alert(1)'};
+  assert.deepEqual(targetAppearance(state, "focus:music"), {icon: "", colour: null});
+  assert.deepEqual(targetAppearance(state, "focus:gone"), {icon: "", colour: null});
+  assert.deepEqual(targetAppearance(state, "gain"), {icon: "", colour: null});
+  assert.deepEqual(targetAppearance(null, undefined), {icon: "", colour: null});
+
+  // A group key wears the look of the member that is heard.
+  state.channels = [
+    {id: "mic", levels: {stream: 1}, mutedIn: ["stream"], appearance: {icon: "●", colour: "#111111"}},
+    {id: "headset", levels: {stream: 1}, mutedIn: [], appearance: {icon: "▶", colour: "#222222"}},
+  ];
+  state.exclusiveGroups = [{id: "voices", name: "Voices", channels: ["mic", "headset"]}];
+  assert.deepEqual(targetAppearance(state, "group:voices"), {icon: "▶", colour: "#222222"});
+  state.channels[1].mutedIn = ["stream"];
+  assert.deepEqual(targetAppearance(state, "group:voices"), {icon: "", colour: null});
+  assert.deepEqual(targetAppearance(state, "group:gone"), {icon: "", colour: null});
 });
