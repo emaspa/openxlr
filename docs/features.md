@@ -183,6 +183,15 @@ Chains and exposed parameter values are saved with the mixer and profiles.
 Opaque plugin state, loaded sample files and plugin preset data are not
 persisted by OpenXLR. A plugin may save its own preferences separately.
 
+The chain window copies effects from one chain to another, input or mix,
+and renames an effect without restarting it. Two states of a chain can be
+stored as A and B and switched to compare them by ear. Whole chains and
+single effects save as named presets of their control values. A preset
+loads on any chain whose width its plugins support, and exports to a file
+for another machine.
+See [effect presets](effect-presets.md) and the
+[manual](manual.md#effect-presets).
+
 "Install file" and "Install folder" accept extracted Linux plugins or
 Windows plugin folders. Linux bundles are copied into `~/.lv2`, `~/.clap`
 or `~/.vst3`. Windows installers must run in Wine first; OpenXLR bridges

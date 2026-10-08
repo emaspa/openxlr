@@ -350,13 +350,46 @@ channel, with its level and lock in the INPUTS card.
    (red light); the arrows reorder the chain; the cross removes it. The
    strip keeps the short form: bypass and the cog that opens the controls.
 4. Chains and exposed parameter values are saved with the mixer and
-   profiles. OpenXLR does not yet save opaque plugin state, sample-file
-   selections or plugin presets.
+   profiles. OpenXLR does not save opaque plugin state, sample-file
+   selections or a plugin's own presets. OpenXLR's presets of control
+   values are described below.
 
 The generated controls cover the parameters the daemon read from the
 plugin. A plugin's own editor can be opened as well, with the native
 host described in [section 3.13](#plugin-editors). CLAP and VST3 plugins
 appear in the same picker and always run in that host. VST2 plugins cannot be loaded.
+
+<a name="effect-presets"></a>
+**Copy, compare and save effects.** Each effect in the chain window has
+**Copy** and **Rename**. Rename changes the name the effect shows; the
+plugin keeps running and its settings are kept. **Presets and A/B** opens
+the chain's own window:
+
+- **Copy chain** copies every effect. **Paste effects** adds what was
+  copied after the effects already in this chain, and **Replace chain**
+  puts it in their place. A copy can be pasted on any chain, an input or a
+  mix, as long as each plugin can run at that chain's width; it lasts until
+  OpenXLR closes.
+- **Store A** and **Store B** keep the chain as it is now. **Hear A** and
+  **Hear B** put that state back, so two settings can be compared by ear.
+  An edit after hearing a slot is not kept in it until you store the slot
+  again. Both slots are forgotten when the window loses the daemon.
+- Type a name and **Save current chain** to keep a preset. **Load preset**
+  replaces this chain with the selected preset; a preset saved from one
+  chain loads on any other.
+  **Import preset** and **Export preset** move one preset in or out as a
+  file; importing only adds it to the list.
+
+The controls window of an effect has **Presets** too, for presets of that
+one plugin: loading one changes only that effect and leaves the rest of
+the chain as it is. Both windows share one list.
+
+Hearing a slot or loading a preset rebuilds the chain, so audio through it
+stops for a moment. A preset holds the order, names, bypass, host choice
+and control values; plugin-private state and sample files are not in it.
+A plugin that is not installed, or cannot run at the chain's width, is
+refused and the chain stays as it was. The file format and limits are in
+[effect-presets.md](effect-presets.md).
 
 <a name="native-editor-compatibility"></a>
 **Native editor compatibility.** Open Options, PLUGINS, then "Native editors"

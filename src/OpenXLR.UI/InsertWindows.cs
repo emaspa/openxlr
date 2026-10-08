@@ -10,16 +10,24 @@ namespace OpenXLR.UI;
 /// </summary>
 public static class InsertWindows
 {
-    private static readonly Dictionary<string, InsertControlsWindow> Controls = new();
+    // Keyed by the insert itself: a slot id can come back holding another
+    // plugin, and two chains can hold the same id.
+    private static readonly Dictionary<InsertViewModel, InsertControlsWindow> Controls = new();
     private static readonly Dictionary<string, MixInsertsWindow> Chains = new();
 
     public static void OpenControls(Window owner, InsertViewModel insert)
     {
-        if (Controls.TryGetValue(insert.Id, out InsertControlsWindow? open)) { open.Activate(); return; }
+        if (Controls.TryGetValue(insert, out InsertControlsWindow? open)) { open.Activate(); return; }
         var w = new InsertControlsWindow { DataContext = insert };
-        w.Closed += (_, _) => Controls.Remove(insert.Id);
-        Controls[insert.Id] = w;
+        w.Closed += (_, _) => Controls.Remove(insert);
+        Controls[insert] = w;
         w.Show(owner);
+    }
+
+    /// <summary>Close the controls of an insert that left its chain.</summary>
+    internal static void CloseControls(InsertViewModel insert)
+    {
+        if (Controls.TryGetValue(insert, out InsertControlsWindow? window)) window.Close();
     }
 
     public static void OpenChain(Window owner, InsertsViewModel chain, string key)

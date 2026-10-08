@@ -530,6 +530,9 @@ public sealed class MixerService : IHostedService, IDisposable
                 case "setSoftClipGuard":
                     _mixer.SetSoftClipGuard(cmd.Value.GetBoolean());
                     break;
+                case "renameInsert":
+                    _mixer.RenameInsert(cmd.Channel!, cmd.InsertId!, cmd.Name!);   // checked by CommandValidation
+                    break;
                 case "setInserts":
                     _mixer.SetInserts(cmd.Channel!, cmd.Inserts!);   // both checked by CommandValidation
                     break;

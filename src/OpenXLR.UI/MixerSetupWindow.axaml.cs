@@ -148,50 +148,8 @@ public partial class MixerSetupWindow : Window
         finally { IsEnabled = true; }
     }
 
-    private async Task<string?> PromptName(string title, string current, string hint)
-    {
-        var input = new TextBox { Text = current, MinWidth = 340, MaxLength = 60 };
-        var ok = new Button { Content = "Rename", IsDefault = true };
-        var cancel = new Button { Content = "Cancel", IsCancel = true };
-        string? result = null;
-        var dialog = new Window
-        {
-            Title = title,
-            SizeToContent = SizeToContent.WidthAndHeight,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            CanResize = false,
-            Classes = { "dialog" },
-            Content = new StackPanel
-            {
-                Margin = new Avalonia.Thickness(18),
-                Spacing = 12,
-                Children =
-                {
-                    input,
-                    new TextBlock { Text = hint, TextWrapping = TextWrapping.Wrap, MaxWidth = 380, FontSize = 11,
-                        Classes = { "hint" } },
-                    new StackPanel
-                    {
-                        Orientation = Avalonia.Layout.Orientation.Horizontal,
-                        Spacing = 8,
-                        HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-                        Children = { cancel, ok },
-                    },
-                },
-            },
-        };
-        ok.Click += (_, _) =>
-        {
-            string clean = input.Text?.Trim() ?? "";
-            if (clean.Length == 0) return;
-            result = clean;
-            dialog.Close();
-        };
-        cancel.Click += (_, _) => dialog.Close();
-        dialog.Opened += (_, _) => { input.Focus(); input.SelectAll(); };
-        await dialog.ShowDialog(this);
-        return result;
-    }
+    private Task<string?> PromptName(string title, string current, string hint)
+        => Dialogs.NameAsync(this, title, current, hint, 60);
 
     private async Task<bool> Confirm(string title, string message)
     {

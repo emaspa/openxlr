@@ -71,6 +71,7 @@ public sealed class WindowLayoutTests
                 main.DataContext = null;
                 main.DataContext = vm;
                 main.Show();
+                PluginPresetWindowTests.Check(main);
 
                 // The window must still allow its existing narrow size.
                 Assert.InRange(main.MinWidth, 0, MaximumAllowedMinimumWidth);
@@ -224,10 +225,10 @@ public sealed class WindowLayoutTests
                     Assert.True(title.TranslatePoint(default, controls)!.Value.Y + title.Bounds.Height <=
                                 actions.TranslatePoint(default, controls)!.Value.Y);
                     var buttons = actions.Children.Where(c => c.IsVisible).ToArray();
-                    Assert.Equal(5, buttons.Length);
+                    Assert.Equal(6, buttons.Length);
                     Assert.Single(controls.GetVisualDescendants().OfType<Slider>());
-                    // In one row the five actions need about 454 px, so at 420
-                    // they have to wrap rather than run off the window.
+                    // In one row the six actions need more than 420 px, so
+                    // there they have to wrap rather than run off the window.
                     foreach (var button in buttons)
                     {
                         Assert.True(button.Bounds.Width > 20);
@@ -270,7 +271,20 @@ public sealed class WindowLayoutTests
                         AssertInside(button, chain);
                     }
                 }
+                AssertInside(chain.FindControl<Button>("EffectWorkflow")!, chain);
                 Capture(chain, "chain-440");
+
+                var workflow = new EffectWorkflowWindow { DataContext = vm.Inserts };
+                windows.Add(workflow);
+                workflow.Show();
+                Layout(workflow, workflow.MinWidth, workflow.MinHeight);
+                foreach (var actions in workflow.GetVisualDescendants().OfType<WrapPanel>())
+                {
+                    AssertNoOverlap(actions.Children.ToArray());
+                    foreach (var action in actions.Children) AssertInside(action, actions);
+                }
+                Assert.True(((ScrollViewer)workflow.Content!).Bounds.Height > 50);
+                Capture(workflow, "effect-workflow-minimum");
 
                 vm.Inputs.Add(new AudioDeviceItem("test_source", "Second microphone", false));
                 vm.Inputs.Add(new AudioDeviceItem("OpenXLR_stream", "Own mix", true));
@@ -497,6 +511,7 @@ public sealed class WindowLayoutTests
                     Capture(folders, "plugin-folders-" + width);
                 }
                 AssertLiveLayoutOrder(main, vm);
+                EffectWorkflowWindowTests.CheckControlOwnership(main, vm.Inserts.Client);
             }
             catch (Exception ex) { failure = ex; }
             finally

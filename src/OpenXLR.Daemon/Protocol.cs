@@ -76,7 +76,7 @@ public sealed record Command
     /// <summary>"setInserts": the channel's whole insert chain, in order.</summary>
     [JsonPropertyName("inserts")] public List<InsertDefinition>? Inserts { get; init; }
 
-    /// <summary>"setInsertParam" / "setInsertBypass": which insert.</summary>
+    /// <summary>"setInsertParam" / "setInsertBypass" / "renameInsert": which insert.</summary>
     [JsonPropertyName("insertId")] public string? InsertId { get; init; }
 
     /// <summary>"setInsertParam": the control port symbol.</summary>
