@@ -159,12 +159,11 @@
     </Style>
   </Window.Styles>
 
-  <!-- MaxWidth keeps sliders and dropdowns a sane length on an ultrawide or when
-       maximized; without it a fader stretches across the whole screen. Below it
-       the cards follow the available width. Every card sizes to its content;
-       the page scrolls when the window is shorter. -->
+  <!-- The cards follow the window width, so a wide window shows more strips
+       and tiles before anything scrolls. Every card sizes to its content; the
+       page scrolls when the window is shorter. -->
   <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-  <StackPanel Name="MixerContent" Margin="16" MaxWidth="1300" HorizontalAlignment="Stretch">
+  <StackPanel Name="MixerContent" Margin="16" HorizontalAlignment="Stretch">
 
     <!-- header -->
     <Border Classes="card" Margin="0,0,0,8">

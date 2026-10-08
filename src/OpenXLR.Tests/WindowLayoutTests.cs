@@ -17,9 +17,6 @@ public sealed class WindowLayoutTests
     /// </summary>
     private const double MaximumAllowedMinimumWidth = 660;
 
-    /// <summary>Faders and dropdowns stop growing here, however wide the screen is.</summary>
-    private const double ContentCap = 1300;
-
     [LayoutFact]
     public void NarrowPluginWindowsKeepActionsSeparateAndMixerFillsWideWindows()
     {
@@ -123,11 +120,9 @@ public sealed class WindowLayoutTests
                     var content = main.FindControl<StackPanel>("MixerContent")!;
                     string where = $"Requested {width}, window {main.Width}/{main.Bounds.Width}, "
                         + $"client {main.ClientSize.Width}, content {content.Bounds.Width}";
-                    // Below the cap the cards follow the window; above it they
-                    // stop, so a fader does not stretch across an ultrawide.
-                    Assert.True(content.Bounds.Width <= ContentCap, where);
-                    if (width <= ContentCap) Assert.InRange(content.Bounds.Width, width - 72, width - 16);
-                    else Assert.InRange(content.Bounds.Width, ContentCap / 2, ContentCap);
+                    // The cards follow the window at every width, so a wide
+                    // window shows more strips before anything scrolls.
+                    Assert.InRange(content.Bounds.Width, width - 72, width - 16);
 
                     // Every input toggle keeps a usable width and stays in the window.
                     foreach (var row in new[] { main.FindControl<WrapPanel>("InputControls")!, main.FindControl<WrapPanel>("Input2Controls")! })

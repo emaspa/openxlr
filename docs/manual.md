@@ -122,9 +122,8 @@ on the original Wave XLR. See [hardware support](hardware-support.md).
 <a name="tasks"></a>
 ## 3. Tasks
 
-The mixer cards follow the window width, up to a limit of 1300 logical
-pixels, so faders and dropdowns keep a usable length on a maximized
-ultrawide instead of stretching across the screen. The window has no
+The mixer cards follow the window width, so a wider window shows more
+submixer strips and mix tiles before they scroll. The window has no
 minimum width of its own: it squeezes down to about 640 pixels. Header
 actions and input toggles wrap when needed so their labels stay readable.
 Long interface names are shortened with an ellipsis and shown in full in
