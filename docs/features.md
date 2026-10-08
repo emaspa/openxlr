@@ -64,8 +64,8 @@ source. The daemon finds the capture node, the Pro's card profile and its
 outputs by the unit's serial, then by its model while no other attached unit
 shares the name. With one interface attached, any Wave XLR source still feeds
 the strips, driven or not. A name that matches two cards is used for neither.
-Each XLR Dock drives the ALSA card at its own USB address. Nobody has run two
-units together yet; see [Multiple Wave interfaces](wave-interfaces.md).
+Each XLR Dock drives the ALSA card at its own USB address. A Wave XLR Pro with
+an XLR Dock beside it has run this way; two units of one model have not. See [Multiple Wave interfaces](wave-interfaces.md).
 
 ## Software controls
 

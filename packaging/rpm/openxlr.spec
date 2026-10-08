@@ -5,7 +5,7 @@
 %global _build_id_links none
 
 Name:           openxlr
-Version: 0.1.47
+Version: 0.1.48
 Release:        1%{?dist}
 Summary:        Control suite and PipeWire submixer for Elgato XLR interfaces
 License:        GPL-3.0-only
@@ -162,6 +162,16 @@ MSG
 %{_datadir}/openxlr/
 
 %changelog
+* Thu Oct 08 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.48-1
+- Devices: more than one Wave interface at a time. Every unit is listed by its USB instance, and up to four units beside the primary can be driven as additional interfaces from Options, each with its own controls and remembered settings and a capture channel from its source. Run with a Wave XLR Pro and an XLR Dock.
+- Mixer: monitor mixes you add without a virtual microphone, exclusive channel groups, an icon, a colour and a hidden flag for every channel and mix, drag handles to arrange sections and tiles, and compact and mini views of the submixer.
+- Plugins: Sound Check loops a recorded sample of XLR 1 or XLR 2 through its live effects; effect chains can be copied, compared A/B and saved as presets; plugin search folders and a rescan from one window; optional latency compensation across mixes; an LV2 insert the filter chain refuses runs in the native host, with its editor.
+- Window: system, light and dark appearance for Material, Touch sizing for the mixer controls, the 150% buttons follow Plasma's Raise maximum volume, the mixer cards follow the window width, every window string comes from one English catalogue, and unknown keys in ui.json are kept.
+- Daemon: the state, channels, mixes, inserts, plugins and diagnostics are readable over the HTTP API; switching the active device releases the old one and saves its settings; routes left incomplete are repaired; slow clients stay in step after state changes.
+- OpenDeck plugin: monitor mixes and exclusive groups from the keys, dial titles separate from key titles, rapid output key presses kept in order, and the Deck follows the window's palette.
+- Terminal mixer: follows Material's appearance mode and keeps starting when the saved appearance or a skin is unreadable.
+- Project: CI and CodeQL run on every pushed branch; the Omarchy QML check passes with Qt 6.12.
+
 * Fri Oct 02 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.47-1
 - Plugin inserts: a VST3 plugin that reports a latency change after it starts now runs. The host took the report as a request for a fresh process, so a plugin that sizes its lookahead on activation, as many denoisers and FFT plugins do, was restarted three times and then switched off. Reported and diagnosed by @onlykshitij (#205).
 - Plugin inserts: a plugin host that stops after it has started says why. Its last message is written to the daemon's log each time the chain stops and is shown on the insert after the "kept failing" reason. With OPENXLR_HOST_TRACE set on the service, the host's trace lines reach the log, up to 64 for each host process.

@@ -117,15 +117,18 @@ choice of additional units are not part of a profile.
 
 ## What still needs hardware
 
-No one has run two units together. These behaviours rest on the code and on
-tests with simulated units and a private PipeWire server:
+A Wave XLR Pro as the primary with an XLR Dock as an additional interface has
+run on real hardware: the dock was listed by its instance id, driven with its
+settings restored and its source preselected, and a capture channel was added
+from it and removed again when it was disabled. The rest rests on the code and
+on tests with simulated units and a private PipeWire server:
 
 - Two Wave XLRs, two MK.2s or two XLR Docks: each opens at its own address,
   the instance ids stay put across replugs, and the daemon finds the
   primary's capture node by serial.
 - Two XLR Docks: each dock drives the ALSA card at its own USB bus and
   device number for gain, mute and headphone volume.
-- A Wave XLR Pro with another unit: its card's profile switch and its
+- A Wave XLR Pro with a second Pro or a Wave XLR: its card's profile switch and its
   physical outputs stay on its own card, as primary and as additional.
 - The serial in a node name as udev spells it, for every model, and the
   fallback to the model name when it differs.
