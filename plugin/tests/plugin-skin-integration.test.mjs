@@ -35,12 +35,17 @@ test('live palettes repaint key art, dial text, needles and stationary meters wi
     await import('../com.emaspa.openxlr.sdPlugin/plugin.mjs');
     const daemon = sockets.find(s => s.url.includes(':37890/')), host = sockets.find(s => s !== daemon);
     daemon.onopen();
-    daemon.receive({type:'state', profiles:[], devices:[], mixer:{channels:[], mixes:[{id:'monitor',name:'Monitor A',kind:'monitor',volume:.5,muted:false}],monitorOutputs:[],inserts:{}}});
+    daemon.receive({type:'state', profiles:[], devices:[], mixer:{channels:[], mixes:[{id:'monitor',name:'Monitor A',kind:'monitor',volume:.5,muted:false}],monitorOutputs:[],
+      inserts:{'mix:monitor':[{id:'eq',name:'Equalizer',bypass:true}]}}});
     host.receive({event:'willAppear',context:'key',action:'com.emaspa.openxlr.toggle',payload:{settings:{target:'mixmute:monitor'}}});
+    host.receive({event:'willAppear',context:'bypass',action:'com.emaspa.openxlr.toggle',payload:{settings:{target:'inschain|mix:monitor'}}});
     host.receive({event:'willAppear',context:'dial',action:'com.emaspa.openxlr.dial',payload:{settings:{target:'mixvol:monitor'}}});
     const meters = {type:'meters',levels:{'mix:monitor':[.902,.902]}};
     daemon.receive(meters);
     const images = () => host.messages.filter(m => m.event === 'setImage');
+    const bypassArt = () => svg(images().filter(m => m.context === 'bypass').at(-1).payload.image);
+    // Without a published palette a bypassed insert lights in the default alert colour.
+    assert.ok(bypassArt().includes('#ff3c4e'));
     const meterImages = () => host.messages.filter(m => m.event === 'setFeedback' && m.payload.meter);
     const commandCount = daemon.messages.length;
     const before = images().length;
@@ -49,8 +54,10 @@ test('live palettes repaint key art, dial text, needles and stationary meters wi
     const save = () => { fs.writeFileSync(path.join(directory, 'pending'), JSON.stringify({schema:1,pid:process.pid,skin:'default',tokens:palette})); fs.renameSync(path.join(directory, 'pending'),path.join(directory, 'deck-palette.json')); };
     save();
     await until(() => images().length > before);
-    const art = svg(images().at(-1).payload.image);
+    const art = svg(images().filter(m => m.context === 'key').at(-1).payload.image);
     assert.ok(art.includes('#fafafa')); assert.ok(art.includes('#010203')); assert.ok(!art.includes('skinPalette'));
+    await until(() => bypassArt().includes('#ff0000'));
+    assert.ok(!bypassArt().includes('#ff3c4e'), 'the bypass colour follows the palette');
     assert.ok(svg(meterImages().at(-1).payload.meter).includes('#aabb22'));
     const feedback = host.messages.filter(m => m.event === 'setFeedback' && m.payload.needle).at(-1).payload;
     for (const field of ['title', 'icon', 'needle']) assert.ok(svg(feedback[field]).includes('#010203'), field);
