@@ -18,8 +18,14 @@
        the bottom. The scroll view is the floor under that, and the code
        behind caps the height to the screen the window opens on. -->
   <DockPanel Margin="14">
-    <Button DockPanel.Dock="Bottom" Content="Close" HorizontalAlignment="Right"
-            Padding="18,6" Margin="0,10,0,0" Click="OnClose"/>
+    <!-- The one status line for preference files: outside the scroll view,
+         so a save that failed is seen whichever card the change came from. -->
+    <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,10,Auto" Margin="0,10,0,0">
+      <TextBlock Name="PreferenceError" Text="{Binding PreferenceError}" FontSize="11" Classes="warn"
+                 TextWrapping="Wrap" VerticalAlignment="Center"
+                 IsVisible="{Binding PreferenceError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+      <Button Grid.Column="2" Content="Close" Padding="18,6" Click="OnClose"/>
+    </Grid>
     <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
       <Grid ColumnDefinitions="*,10,*">
         <StackPanel Spacing="8">

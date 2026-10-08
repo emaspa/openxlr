@@ -33,7 +33,7 @@ public sealed class OptionsViewModel : ViewModelBase
         _client = client;
         _main = main;
 
-        UiSettings s = UiSettings.Load();
+        UiSettings s = UiSettings.Load(out _preferenceError);
         _startDaemonAtLogin = s.StartDaemonAtLogin;
         _openWindowAtLogin = s.OpenWindowAtLogin;
         _minimizeToTray = s.MinimizeToTray;
@@ -42,7 +42,8 @@ public sealed class OptionsViewModel : ViewModelBase
         _startupError = RepairNote(StartupIntegration.LastRepair);
         // No saved choice means the daemon runs whatever its unit asked for,
         // which for every shipped unit is the submixer on.
-        _submixer = DaemonPrefs.Load().Submixer ?? true;
+        _submixer = DaemonPrefs.Load(out string? daemonProblem).Submixer ?? true;
+        _preferenceError ??= daemonProblem;
 
         BuildChoices();
         BuildSkinChoices();
@@ -358,13 +359,10 @@ public sealed class OptionsViewModel : ViewModelBase
         set
         {
             if (!Set(ref _submixer, value)) return;
-            try
+            // Start from the file so keys this version does not know survive.
+            if (Report((DaemonPrefs.Load() with { Submixer = value }).Save()))
             {
-                new DaemonPrefs { Submixer = value }.Save();
-            }
-            catch (Exception ex)
-            {
-                SubmixerNote = $"Could not save the setting: {ex.Message}";
+                SubmixerNote = null;
                 return;
             }
             SubmixerNote = StartupIntegration.RestartDaemon()
@@ -382,15 +380,33 @@ public sealed class OptionsViewModel : ViewModelBase
     }
 
     // Start from the file so fields owned elsewhere (the main window's
-    // collapsed tiles) survive a save from here.
-    private void Persist() => (UiSettings.Load() with
+    // collapsed tiles, keys a newer version wrote) survive a save from here.
+    private void Persist() => Report((UiSettings.Load() with
     {
         StartDaemonAtLogin = _startDaemonAtLogin,
         OpenWindowAtLogin = _openWindowAtLogin,
         MinimizeToTray = _minimizeToTray,
         StartMinimized = _startMinimized,
         CheckForUpdates = _checkForUpdates,
-    }).Save();
+    }).Save());
+
+    // --- preference files ---
+
+    private string? _preferenceError;
+    /// <summary>
+    /// Why the last preference change could not be saved, or why ui.json or
+    /// daemon.json could not be read when this window opened; null when all
+    /// is well. A change that fails to save is not undone. One line for every
+    /// setting, replaced by the next save and cleared by a good one.
+    /// </summary>
+    public string? PreferenceError { get => _preferenceError; private set => Set(ref _preferenceError, value); }
+
+    /// <summary>Show the outcome of a save; true when it failed.</summary>
+    private bool Report(string? saveError)
+    {
+        PreferenceError = saveError;
+        return saveError is not null;
+    }
 
     // --- enforced system defaults ---
 
@@ -430,7 +446,8 @@ public sealed class OptionsViewModel : ViewModelBase
         set
         {
             if (!Set(ref _selectedSkin, value) || _applying || value is null) return;
-            ReportSkin(Skinning.SkinService.Choose(value.Id));
+            ReportSkin(Skinning.SkinService.Choose(value.Id, out string? saveError));
+            Report(saveError);
         }
     }
 

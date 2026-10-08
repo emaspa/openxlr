@@ -17,6 +17,10 @@ public sealed record DaemonSettings
 {
     public bool? Submixer { get; init; }
 
+    /// <summary>Keys this version does not know, written back unchanged by a save.</summary>
+    [System.Text.Json.Serialization.JsonExtensionData]
+    public Dictionary<string, JsonElement>? UnknownKeys { get; init; }
+
     private static readonly JsonSerializerOptions Json = new()
     {
         WriteIndented = true,

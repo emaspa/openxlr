@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace OpenXLR.UI;
 
@@ -41,32 +42,49 @@ public sealed record UiSettings
     /// </summary>
     public string? Skin { get; init; }
 
+    /// <summary>
+    /// Keys this version does not know, such as a setting written by a newer
+    /// window or by the terminal mixer. They are written back unchanged, so a
+    /// save from here never erases them.
+    /// </summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? UnknownKeys { get; init; }
+
     private static readonly JsonSerializerOptions Json = new()
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        // A key given twice has no single meaning; the file is the user's to settle.
+        AllowDuplicateProperties = false,
     };
 
     public static string ConfigDir => OpenXlrPaths.ConfigDir;
 
     private static string FilePath => Path.Combine(ConfigDir, "ui.json");
 
-    public static UiSettings Load()
+    /// <summary>The saved preferences, or the defaults when the file is missing or cannot be read.</summary>
+    public static UiSettings Load() => Load(out _);
+
+    /// <summary>
+    /// The saved preferences, or the defaults with the reason the file could
+    /// not be read. A file that cannot be read is never written over: see
+    /// <see cref="Save"/>.
+    /// </summary>
+    public static UiSettings Load(out string? problem)
     {
-        try
-        {
-            if (File.Exists(FilePath))
-                return JsonSerializer.Deserialize<UiSettings>(File.ReadAllText(FilePath), Json) ?? new UiSettings();
-        }
-        catch (Exception) { /* corrupt file must not stop the app */ }
-        return new UiSettings();
+        UiSettings? settings = PreferenceFile.Read<UiSettings>(FilePath, Json, out problem);
+        if (settings is null) return new UiSettings();
+        // "collapsedSections": null is valid JSON for a list the window
+        // enumerates, so it reads as an empty list rather than failing later.
+        return settings.CollapsedSections is null ? settings with { CollapsedSections = [] } : settings;
     }
 
-    public void Save()
-    {
-        try { OpenXlrPaths.WriteAtomicJson(FilePath, this, Json); }
-        catch (Exception) { /* best effort */ }
-    }
+    /// <summary>
+    /// Write the preferences. Null when they were written; otherwise why not,
+    /// in words for the window's status line. A ui.json that cannot be read is
+    /// left as it is, so a hand edit with a typo can still be repaired.
+    /// </summary>
+    public string? Save() => PreferenceFile.Write(FilePath, this, Json);
 }
 
 /// <summary>
@@ -79,26 +97,73 @@ public sealed record DaemonPrefs
 {
     public bool? Submixer { get; init; }
 
+    /// <summary>Keys this version does not know, written back unchanged.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? UnknownKeys { get; init; }
+
     private static readonly JsonSerializerOptions Json = new()
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        // A key given twice has no single meaning; the file is the user's to settle.
+        AllowDuplicateProperties = false,
     };
 
     private static string FilePath => Path.Combine(UiSettings.ConfigDir, "daemon.json");
 
-    public static DaemonPrefs Load()
+    /// <summary>The saved preferences, or unset ones when the file is missing or cannot be read.</summary>
+    public static DaemonPrefs Load() => Load(out _);
+
+    /// <summary>The saved preferences, or unset ones with the reason the file could not be read.</summary>
+    public static DaemonPrefs Load(out string? problem)
+        => PreferenceFile.Read<DaemonPrefs>(FilePath, Json, out problem) ?? new DaemonPrefs();
+
+    /// <summary>Write the preferences; null when written, otherwise why not. An unreadable file is left as it is.</summary>
+    public string? Save() => PreferenceFile.Write(FilePath, this, Json);
+}
+
+/// <summary>
+/// Reading and writing the window's preference files. Every save is a load,
+/// a change and a write, so a write after a failed load would put the
+/// defaults over whatever the file held. The write therefore checks the file
+/// first and leaves one it cannot read alone.
+/// </summary>
+internal static class PreferenceFile
+{
+    /// <summary>The file's contents; null with no problem when it is missing, null with the reason when it cannot be read.</summary>
+    internal static T? Read<T>(string path, JsonSerializerOptions json, out string? problem) where T : class
     {
+        problem = null;
         try
         {
-            if (File.Exists(FilePath))
-                return JsonSerializer.Deserialize<DaemonPrefs>(File.ReadAllText(FilePath), Json) ?? new DaemonPrefs();
+            if (!File.Exists(path)) return null;
+            return JsonSerializer.Deserialize<T>(File.ReadAllText(path), json)
+                ?? throw new JsonException("The file holds null instead of a JSON object.");
         }
-        catch (Exception) { /* corrupt file: behave as unset */ }
-        return new DaemonPrefs();
+        catch (Exception ex)
+        {
+            // Whatever the reason, a file that cannot be read must not stop the window.
+            problem = $"{Path.GetFileName(path)} could not be read and was left as it is. "
+                + $"Fix or remove it to save preferences again. {ex.Message}";
+            return null;
+        }
     }
 
-    public void Save() => OpenXlrPaths.WriteAtomicJson(FilePath, this, Json);
+    /// <summary>Write the value unless the file on disk cannot be read; null when written, otherwise why not.</summary>
+    internal static string? Write<T>(string path, T value, JsonSerializerOptions json) where T : class
+    {
+        Read<T>(path, json, out string? problem);
+        if (problem is not null) return problem;
+        try
+        {
+            OpenXlrPaths.WriteAtomicJson(path, value, json);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            return $"Could not save {Path.GetFileName(path)}. {ex.Message}";
+        }
+    }
 }
 
 /// <summary>

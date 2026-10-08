@@ -51,7 +51,9 @@ If the terminal cannot read `ui.json`, it uses the default appearance.
 A malformed document, including duplicate keys or a value other than a
 JSON object, is left untouched when saving a terminal skin choice. Repair
 the file before saving a new choice; settings unrelated to the skin are
-preserved in a valid object.
+preserved in a valid object. The window does the same. It wears the chosen
+skin for that run, leaves a `ui.json` it cannot read untouched, and says on
+the line at the bottom of Options why the choice was not saved.
 
 If a skin ever makes something unreadable, start the window once with
 
