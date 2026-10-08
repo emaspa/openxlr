@@ -1214,6 +1214,18 @@ and Stream Deck keys survive a rename. The layout file is described in
 [mixer-layout.md](mixer-layout.md).
 
 <a name="plugin-editors"></a>
+### Mixer presentation
+
+Use **Edit layout**, **Appearance** to select an icon and an optional `#RRGGBB`
+colour for any channel or mix. Clear the colour to follow the current skin.
+The channel's **Hide** option removes its full-size strip, not its sends,
+meters, application assignments or audio connections. Hidden channels remain
+in Edit layout, application choices and Stream Deck actions.
+
+Icons and colours reach the corresponding Stream Deck keys; an explicit icon
+chosen on a key takes precedence. Mute and offline indicators retain their
+status colours. The layout editor uses the existing saved layout order.
+
 ### 3.13 Open a plugin's own editor
 
 The controls window is generated from the plugin's parameters and works

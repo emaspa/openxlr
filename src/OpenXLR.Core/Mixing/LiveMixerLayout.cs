@@ -151,7 +151,7 @@ public sealed partial class Mixer
             if (!_built) throw new InvalidOperationException("mixer is not built");
             MixerConfig previous = _config;
             MixerConfig next = _config.WithoutChannel(id);
-            ChannelDefinition fallback = next.Channels.First(c => c.IsApplication);
+            ChannelDefinition fallback = next.Channels.Single(c => c.Id == next.ResolveApplicationChannel(id));
 
             var movedOverrides = Matcher.Overrides.Where(kv => kv.Value == id).Select(kv => kv.Key).ToList();
             var movedApps = _apps.Where(kv => kv.Value.ChannelId == id).ToDictionary(kv => kv.Key, kv => kv.Value);
@@ -184,6 +184,7 @@ public sealed partial class Mixer
                 try { _pw.MoveStreamToSink(serial, fallback.SinkName); }
                 catch (InvalidOperationException) { /* the stream ended meanwhile */ }
             }
+            _appearance.Remove("channel:" + id);
             _meters.Remove($"ch:{id}");
             RemoveCaptureFeedLocked(id);
             _inserts.Remove(id);
@@ -324,6 +325,7 @@ public sealed partial class Mixer
                 throw;
             }
 
+            _appearance.Remove("mix:" + id);
             if (previousFeeds.Values.Any(feed => MonitorFeed.Includes(feed, id)))
                 SetMonitorOutputsLocked([.. _monitorOutputs]);
             RemoveMixChainLocked(key);

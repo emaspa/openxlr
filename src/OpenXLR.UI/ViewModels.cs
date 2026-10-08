@@ -42,6 +42,8 @@ public sealed partial class MainViewModel : ViewModelBase
     public MainViewModel(DaemonClient client)
     {
         _client = client;
+        UiSettings settings = UiSettings.Load();
+        MinimizeToTray = settings.MinimizeToTray;
         OutputVolumeRange = new VolumeRangeViewModel(() => OutputVolume = Math.Min(OutputVolume, 1));
         Inserts = new InsertsViewModel(client, "xlr1", 1, "XLR 1");
         Inserts2 = new InsertsViewModel(client, "xlr2", 1, "XLR 2");
@@ -515,7 +517,7 @@ public sealed partial class MainViewModel : ViewModelBase
     public string? EnforcedDefaultSource { get; private set; }
 
     /// <summary>Mirrors the ui.json preference; MainWindow consults it on close.</summary>
-    public bool MinimizeToTray { get; set; } = UiSettings.Load().MinimizeToTray;
+    public bool MinimizeToTray { get; set; }
 
 
     public VolumeRangeViewModel OutputVolumeRange { get; }
@@ -1058,6 +1060,7 @@ public sealed partial class MainViewModel : ViewModelBase
                     send.Visible = !DeviceConnected || CapOutputRouting || auxAudible;
             }
         }
+        RefreshChannelPresentation();
     }
 
     /// <summary>Follow daemon order while retaining existing objects and their bindings.</summary>
@@ -1283,6 +1286,7 @@ public sealed class MonitorOutputItem : ViewModelBase
 /// <summary>A mix (monitor/stream/chat): master level and mute.</summary>
 public sealed class MixViewModel : ViewModelBase, IHasId
 {
+    public LayoutAppearanceViewModel Appearance { get; } = new();
     private readonly DaemonClient _client;
     private bool _applying;
 
@@ -1363,6 +1367,7 @@ public sealed class MixViewModel : ViewModelBase, IHasId
 
     public void ApplyFromDaemon(JsonNode n)
     {
+        Appearance.Apply(n["appearance"]);
         _applying = true;
         try
         {
@@ -1386,6 +1391,7 @@ public sealed class MixViewModel : ViewModelBase, IHasId
 /// <summary>A channel with one send (level + mute) per mix.</summary>
 public sealed class ChannelViewModel : ViewModelBase, IHasId
 {
+    public LayoutAppearanceViewModel Appearance { get; } = new();
     public ChannelViewModel(DaemonClient client, string id, string name, IReadOnlyList<string> mixIds)
     {
         _client = client; Id = id; _name = name;
@@ -1435,6 +1441,9 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
         }
     }
 
+    private bool _displayVisible = true;
+    public bool DisplayVisible { get => _displayVisible; set => Set(ref _displayVisible, value); }
+
     private bool _visible = true;
     public bool Visible { get => _visible; set => Set(ref _visible, value); }
 
@@ -1445,6 +1454,7 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
 
     public void ApplyFromDaemon(JsonNode n)
     {
+        Appearance.Apply(n["appearance"]);
         if (n["name"]?.GetValue<string>() is { Length: > 0 } name) Name = name;
         IsHardware = n["hardware"]?.GetValue<bool>() ?? false;
         Present = n["present"]?.GetValue<bool>() ?? true;

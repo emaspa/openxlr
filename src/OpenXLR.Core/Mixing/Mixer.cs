@@ -1058,6 +1058,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         {
             return new MixerSettings
             {
+                Appearance = ExportAppearanceLocked(),
                 UserChannels = [.. _config.Channels.Where(c => c.InputPair is null)
                     .Select(c => new UserChannelDefinition(c.Id, c.Name, c.CaptureSource, c.CapturePair))],
                 UserMixes = [.. _config.Mixes.Where(m => m.Kind == MixKind.VirtualMic)
@@ -1124,6 +1125,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         lock (_gate)
         {
             if (!_built) return;
+
+            _appearance = (s.Appearance ?? []).Where(p => AppearanceTargetExists(p.Key) && LayoutAppearance.IsValid(p.Value))
+                .Take(LayoutAppearance.MaxEntries).ToDictionary();
 
             foreach ((string mixId, double vol) in s.MixVolumes)
                 if (_mixVolume.ContainsKey(mixId)) _mixVolume[mixId] = Math.Clamp(vol, 0, MixVolumeMaximumLocked(mixId));
@@ -1904,8 +1908,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                     changed = true;
                     continue;
                 }
-                ChannelDefinition? ch = _config.Channels.FirstOrDefault(c => c.Id == channelId && c.IsApplication)
-                                        ?? _config.Channels.FirstOrDefault(c => c.IsApplication);
+                ChannelDefinition? ch = _config.Channels.FirstOrDefault(c => c.Id == channelId && c.IsApplication);
                 if (ch is null) continue;
 
                 try
@@ -2106,13 +2109,13 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 Mixes = [.. _config.Mixes.Select(m => new MixStatus(
                     m.Id, m.Name,
                     _mixVolume.GetValueOrDefault(m.Id, 1.0),
-                    _mixMuted.Contains(m.Id), KindName(m.Kind)))],
+                    _mixMuted.Contains(m.Id), KindName(m.Kind)) { Appearance = Appearance("mix:" + m.Id) })],
                 Channels = [.. _config.Channels.Select(c => new ChannelStatus(
                     c.Id, c.Name,
                     _config.Mixes.ToDictionary(m => m.Id, m => _levels.GetValueOrDefault(Cell(c.Id, m.Id), 0.0)),
                     [.. _config.Mixes.Where(m => _muted.Contains(Cell(c.Id, m.Id))).Select(m => m.Id)],
                     c.InputPair is not null, c.CaptureSource, c.CapturePair, _captureFeeds.ContainsKey(c.Id),
-                    ChannelPresentLocked(c)))],
+                    ChannelPresentLocked(c)) { Appearance = Appearance("channel:" + c.Id) })],
                 RenamedSinceStart = _renamedSinceBuild,
                 MonitorOutput = _monitorOutputs.FirstOrDefault(),
                 MonitorOutputs = [.. _monitorOutputs],

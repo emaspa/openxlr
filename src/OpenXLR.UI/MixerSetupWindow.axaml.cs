@@ -132,6 +132,39 @@ public partial class MixerSetupWindow : Window
             await Run(vm.DeleteMix(mix.Id));
     }
 
+    private async void OnAppearance(object? sender, RoutedEventArgs e)
+    {
+        if (Vm is not { } vm) return;
+        var channel = Item<ChannelViewModel>(sender);
+        var mix = Item<MixViewModel>(sender);
+        var appearance = channel?.Appearance ?? mix?.Appearance;
+        if (appearance is null) return;
+        var icon = new ComboBox { ItemsSource = LayoutAppearanceViewModel.Icons, SelectedItem = appearance.Icon };
+        var colour = new TextBox { Text = appearance.Colour ?? "", PlaceholderText = "#RRGGBB, blank uses the skin", MaxLength = 7 };
+        var hidden = new CheckBox { Content = "Hide channel in the full mixer (audio keeps playing)", IsChecked = appearance.Hidden, IsVisible = channel is not null };
+        var save = new Button { Content = "Save", IsDefault = true };
+        var note = new TextBlock { TextWrapping = TextWrapping.Wrap, Classes = { "hint" } };
+        var dialog = new Window
+        {
+            Title = "Mixer appearance", Width = 430, Height = 330, MinWidth = 350, MinHeight = 300,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner, Classes = { "dialog" },
+            Content = new ScrollViewer { Content = new StackPanel { Margin = new Avalonia.Thickness(18), Spacing = 12,
+                Children = { new TextBlock { Text = "Icon" }, icon, new TextBlock { Text = "Colour" }, colour, hidden, note, save } } },
+        };
+        save.Click += async (_, _) =>
+        {
+            save.IsEnabled = false;
+            try
+            {
+                string? error = await vm.SetLayoutAppearance(channel?.Id ?? mix!.Id, mix is not null,
+                    icon.SelectedItem as string ?? "", string.IsNullOrWhiteSpace(colour.Text) ? null : colour.Text.Trim(), hidden.IsChecked == true);
+                if (error is null) dialog.Close(); else note.Text = error;
+            }
+            finally { save.IsEnabled = true; }
+        };
+        await dialog.ShowDialog(this);
+    }
+
     private static T? Item<T>(object? sender) where T : class => (sender as Control)?.DataContext as T;
 
     /// <summary>Run one edit with the window locked, and surface its error here as well as in the status line.</summary>

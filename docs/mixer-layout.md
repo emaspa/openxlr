@@ -185,3 +185,15 @@ ignored on read, in this file and in profiles.
 If a channel or mix deletion cannot be saved, its previous routing settings
 and any pending volume or mute writes are restored together. The normal
 reconciliation keeps retrying those writes when PipeWire becomes available.
+
+## Mixer presentation
+
+Display metadata lives in the `appearance` map in `mixer.json`, keyed by
+`channel:<id>` or `mix:<id>`, with `icon`, `colour` and `hidden`. Missing entries
+use the current skin and visible channels. Deleted items lose their metadata.
+A failed save restores the previous values. These edits do not rebuild audio
+nodes. `setLayoutOrder` remains the only saved channel and mix order.
+
+A missing application channel falls back to the application channel with the
+first stable id in ordinal order. Reordering the layout does not change that
+fallback. Hardware and capture inputs are never fallback destinations.

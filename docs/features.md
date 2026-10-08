@@ -141,6 +141,12 @@ Channels appear as playback devices in the desktop's audio applet, and
 the virtual microphones (Stream and Chat by default) as recording
 devices; the hardware input channels are hidden from it.
 
+### Mixer presentation
+
+Mixer presentation supports per-channel and per-mix icons and colours, and
+channel hiding without deleting routing. Stream Deck keys follow the same
+icons and colours. See [mixer presentation](manual.md#mixer-presentation).
+
 ### External capture channels
 
 Additional microphones, headsets, capture cards and other attached Wave

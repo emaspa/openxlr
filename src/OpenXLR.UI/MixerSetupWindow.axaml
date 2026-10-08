@@ -66,6 +66,7 @@
                     <Grid ColumnDefinitions="*,Auto,4,Auto,8,Auto,4,Auto">
                       <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="{Binding Name}" Foreground="{DynamicResource Ox.Text.Primary}" FontWeight="SemiBold"/>
+                        <Button Content="Appearance" Classes="small" HorizontalAlignment="Left" Click="OnAppearance"/>
                         <TextBlock Text="{Binding Id}" Foreground="{DynamicResource Ox.Text.Muted}" FontFamily="monospace" FontSize="10"/>
                         <TextBlock Text="{Binding CaptureLabel}" Foreground="{DynamicResource Ox.Text.Secondary}"
                                    TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding CaptureSource}"
@@ -112,6 +113,7 @@
                     <Grid ColumnDefinitions="*,Auto,4,Auto,8,Auto,4,Auto">
                       <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="{Binding Name}" Foreground="{DynamicResource Ox.Text.Primary}" FontWeight="SemiBold"/>
+                        <Button Content="Appearance" Classes="small" HorizontalAlignment="Left" Click="OnAppearance"/>
                         <TextBlock Text="{Binding Id}" Foreground="{DynamicResource Ox.Text.Muted}" FontFamily="monospace" FontSize="10"/>
                       </StackPanel>
                       <TextBlock Grid.Column="1" Text="{Binding KindLabel}" Foreground="{DynamicResource Ox.Text.Muted}" FontSize="11"

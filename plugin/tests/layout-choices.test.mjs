@@ -82,3 +82,16 @@ test("output dials list the system default then every controllable sink, after t
   assert.equal(outputKey("output:headset:analog"), null);
   assert.equal(outputKey("output:"), null);
 });
+
+test("layout appearance follows stable key targets and rejects SVG attributes", async () => {
+  const {targetAppearance} = await import("../com.emaspa.openxlr.sdPlugin/layout-choices.mjs");
+  const state = { channels:[{id:"music",appearance:{icon:"♫",colour:"#12abEF",hidden:true}}],
+    mixes:[{id:"stream",appearance:{icon:"◆",colour:"#ABC123"}}] };
+  for (const target of ["focus:music", "sendmute:music:stream", "send:music:stream", "insert|music|id"])
+    assert.deepEqual(targetAppearance(state,target), {icon:"♫",colour:"#12abEF"});
+  for (const target of ["mixmute:stream", "mixvol:stream", "inschain|mix:stream"])
+    assert.deepEqual(targetAppearance(state,target), {icon:"◆",colour:"#ABC123"});
+  state.channels[0].appearance = {icon:'<image href="file:///etc/passwd"/>',colour:'#fff" onload="alert(1)'};
+  assert.deepEqual(targetAppearance(state,"focus:music"),{icon:"",colour:null});
+  assert.deepEqual(targetAppearance(state,"focus:gone"),{icon:"",colour:null});
+});

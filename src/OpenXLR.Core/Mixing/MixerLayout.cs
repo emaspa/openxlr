@@ -116,7 +116,7 @@ public sealed partial record MixerConfig
     public string ResolveApplicationChannel(string requested)
         => requested == StreamMatcher.Ignore ? requested
             : (Channels.FirstOrDefault(c => c.IsApplication && c.Id == requested)
-                ?? Channels.FirstOrDefault(c => c.IsApplication))?.Id ?? StreamMatcher.Ignore;
+                ?? Channels.Where(c => c.IsApplication).OrderBy(c => c.Id, StringComparer.Ordinal).FirstOrDefault())?.Id ?? StreamMatcher.Ignore;
 
     /// <summary>
     /// Restore ordered user nodes without replacing hardware or monitor buses.
