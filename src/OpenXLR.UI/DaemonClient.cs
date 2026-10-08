@@ -1,3 +1,4 @@
+using OpenXLR.UI.Localization;
 using System;
 using System.Collections.Generic;
 using System.Net.WebSockets;
@@ -255,7 +256,7 @@ public sealed class DaemonClient : IAsyncDisposable
                     _queries.Clear();
                     _queriesById.Clear();
                     _lastReply.Clear();
-                    foreach (var edit in _edits.Values) edit.TrySetResult("Connection lost. Check the layout before retrying.");
+                    foreach (var edit in _edits.Values) edit.TrySetResult(Localizer.Text("ConnectionLostCheckLayout"));
                     _edits.Clear();
                 }
                 ConnectionChanged?.Invoke(false);
@@ -278,7 +279,7 @@ public sealed class DaemonClient : IAsyncDisposable
                 if (res.MessageType == WebSocketMessageType.Close)
                 {
                     if (res.CloseStatus == WebSocketCloseStatus.PolicyViolation && res.CloseStatusDescription is { Length: > 0 } why)
-                        ErrorReceived?.Invoke($"daemon refused this window: {why}");
+                        ErrorReceived?.Invoke(Localizer.Format("DaemonRefusedWindow", why));
                     return;
                 }
                 if (res.MessageType != WebSocketMessageType.Text || ms.Length + res.Count > MaxMessageBytes)
@@ -293,7 +294,7 @@ public sealed class DaemonClient : IAsyncDisposable
             if (node is not JsonObject) continue;
 
             string? type = node["type"]?.GetValue<string>();
-            if (type == "error") ErrorReceived?.Invoke(node["message"]?.GetValue<string>() ?? "unknown error");
+            if (type == "error") ErrorReceived?.Invoke(node["message"]?.GetValue<string>() ?? Localizer.Text("UnknownError"));
             else if (type == "state") { LastStateJson = text; StateReceived?.Invoke(node); }
             else if (type == "diagnostics") StoreReply(type, node);
             else if (type == "plugins") StoreReply(type, node["plugins"]);
@@ -398,16 +399,16 @@ public sealed class DaemonClient : IAsyncDisposable
         var waiter = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
         lock (_lifecycle)
         {
-            if (_disposed) return "Daemon disconnected; no change was sent.";
+            if (_disposed) return Localizer.Text("DaemonDisconnectedNoChange");
             _edits[requestId] = waiter;
         }
         payload["requestId"] = requestId;
         try
         {
-            if (!await SendAsync(payload, reportErrors: false)) return "Daemon disconnected; no change was sent.";
+            if (!await SendAsync(payload, reportErrors: false)) return Localizer.Text("DaemonDisconnectedNoChange");
             return await waiter.Task.WaitAsync(TimeSpan.FromSeconds(30));
         }
-        catch (TimeoutException) { return "No answer from the daemon. Check the layout before retrying."; }
+        catch (TimeoutException) { return Localizer.Text("NoAnswerCheckLayout"); }
         finally { lock (_lifecycle) _edits.Remove(requestId); }
     }
 
@@ -500,7 +501,7 @@ public sealed class DaemonClient : IAsyncDisposable
         }
         if (s is null || s.State != WebSocketState.Open)
         {
-            if (reportErrors) ErrorReceived?.Invoke("Daemon disconnected; no change was sent.");
+            if (reportErrors) ErrorReceived?.Invoke(Localizer.Text("DaemonDisconnectedNoChange"));
             return false;
         }
         byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(payload, Json);
@@ -516,7 +517,7 @@ public sealed class DaemonClient : IAsyncDisposable
         }
         catch (Exception ex) when (ex is WebSocketException or OperationCanceledException or ObjectDisposedException)
         {
-            if (reportErrors) ErrorReceived?.Invoke("Connection lost; the change could not be confirmed.");
+            if (reportErrors) ErrorReceived?.Invoke(Localizer.Text("ConnectionLostUnconfirmed"));
             return false;
         }
         finally { if (acquired) _sendLock.Release(); }

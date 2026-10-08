@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using Avalonia;
 using Avalonia.Media;
+using OpenXLR.UI.Localization;
 using OpenXLR.UI.Skinning;
 
 namespace OpenXLR.Tests;
@@ -16,6 +17,25 @@ namespace OpenXLR.Tests;
 /// </summary>
 public sealed class SkinDocumentTests
 {
+    /// <summary>
+    /// The application's resources hold the skin tokens. Window text is read
+    /// from its catalogue straight into the control, so a catalogue entry can
+    /// never take the place of a token, whatever its key.
+    /// </summary>
+    [Fact]
+    public void WindowTextStaysOutOfTheResourcesTheSkinTokensOwn()
+    {
+        var english = Localizer.Resources.GetResourceSet(CultureInfo.InvariantCulture, true, false)!
+            .Cast<System.Collections.DictionaryEntry>().Select(e => (string)e.Key).ToArray();
+        Assert.NotEmpty(english);
+        foreach (string key in english)
+        {
+            Assert.False(SkinTokens.Exists(key), key);
+            Assert.False(key.StartsWith("Ox.", StringComparison.Ordinal), key);
+            Assert.Equal(Localizer.Text(key), new TextExtension { Key = key }.ProvideValue(null!));
+        }
+    }
+
     [Fact]
     public void GeneratedDeckDefaultsMatchTheWindowAndEveryShippedSkinIsIncluded()
     {

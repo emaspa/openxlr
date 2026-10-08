@@ -1,3 +1,4 @@
+using OpenXLR.UI.Localization;
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -13,8 +14,13 @@ public sealed record NativeEditorRuleRow(string Kind, string Plugin, string Name
     bool DefaultBlocked, bool? Override, bool Blocked)
 {
     public string Label => $"{Name} ({Kind.ToUpperInvariant()})";
-    public string Summary => (Blocked ? "OpenXLR controls" : "Native editor allowed")
-        + (Override is null ? " · Release default" : " · Your override");
+    public string Summary => (Blocked, Override is null) switch
+    {
+        (true, true) => Localizer.Text("RuleControlsReleaseDefault"),
+        (true, false) => Localizer.Text("RuleControlsYourOverride"),
+        (false, true) => Localizer.Text("RuleEditorReleaseDefault"),
+        (false, false) => Localizer.Text("RuleEditorYourOverride"),
+    };
 }
 
 public sealed record NativeEditorPluginChoice(string Kind, string Plugin, string Name)
@@ -74,7 +80,7 @@ public partial class NativeEditorRulesWindow : Window
         else
         {
             _hasError = true;
-            Status.Text = "Disconnected from the daemon. Rules will refresh when it reconnects.";
+            Status.Text = Localizer.Text("RulesDisconnected");
             UpdateButtons();
         }
     });
@@ -108,7 +114,7 @@ public partial class NativeEditorRulesWindow : Window
                 .OrderBy(p => p["name"]?.GetValue<string>(), StringComparer.OrdinalIgnoreCase))
                 _plugins.Add(new(p["kind"]?.GetValue<string>() ?? "lv2", p["plugin"]!.GetValue<string>(),
                     p["name"]?.GetValue<string>() ?? p["plugin"]!.GetValue<string>()));
-            if (catalogue is null && !_hasError) Status.Text = "The plugin list is unavailable. Existing rules can still be edited.";
+            if (catalogue is null && !_hasError) Status.Text = Localizer.Text("RulesPluginListUnavailable");
         }
         catch (Exception ex)
         {
@@ -122,7 +128,7 @@ public partial class NativeEditorRulesWindow : Window
         var selected = Selected;
         _rules.Clear();
         _hasError = reply is null || reply["error"]?.GetValue<string>() is { Length: > 0 };
-        Status.Text = reply is null ? "The daemon did not return editor rules. Update or restart it if needed."
+        Status.Text = reply is null ? Localizer.Text("RulesNoAnswer")
             : reply["error"]?.GetValue<string>() ?? "";
         foreach (JsonNode row in (reply?["rules"] as JsonArray ?? []).OfType<JsonNode>())
             _rules.Add(new(row["kind"]!.GetValue<string>(), row["plugin"]!.GetValue<string>(),
@@ -146,8 +152,8 @@ public partial class NativeEditorRulesWindow : Window
             && !_rules.Any(r => r.Kind == choice.Kind && r.Plugin == choice.Plugin && r.Blocked);
         RuleDetail.Text = Selected is { } rule
             ? rule.Reason + "\n" + rule.Kind.ToUpperInvariant() + " · " + rule.Plugin
-                + "\nRelease default: " + (rule.DefaultBlocked ? "OpenXLR controls" : "native editor allowed")
-            : "Select a rule to change it, or find a plugin below to add one.";
+                + "\n" + (rule.DefaultBlocked ? Localizer.Text("ReleaseDefaultControls") : Localizer.Text("ReleaseDefaultEditor"))
+            : Localizer.Text("SelectARule");
     }
 
     private void OnRuleSelected(object? sender, SelectionChangedEventArgs e) => UpdateButtons();
@@ -187,8 +193,8 @@ public partial class NativeEditorRulesWindow : Window
     private async void OnAllowSelected(object? sender, RoutedEventArgs e)
     {
         if (Selected is not { } rule) return;
-        if (!await Dialogs.ConfirmAsync(this, "Allow this native editor?",
-            $"Allow {rule.Name} to open its own editor again? If the compatibility issue remains, its window may freeze or its plugin process may crash. Your choice will override release defaults.", "Allow editor")) return;
+        if (!await Dialogs.ConfirmAsync(this, Localizer.Text("AllowNativeEditorTitle"),
+            Localizer.Format("AllowNativeEditorDetail", rule.Name), Localizer.Text("AllowEditor"))) return;
         await SetRuleAsync(rule.Kind, rule.Plugin, rule.Name, false);
     }
 

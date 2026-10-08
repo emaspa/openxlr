@@ -1,7 +1,8 @@
 <Window xmlns="https://github.com/avaloniaui"
+        xmlns:loc="using:OpenXLR.UI.Localization"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="OpenXLR.UI.AboutWindow"
-        Title="About OpenXLR" Width="460" SizeToContent="Height"
+        Title="{loc:Text Key=AboutOpenXLR}" Width="460" SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource Ox.Window.Background}" CanResize="False">
 
@@ -37,13 +38,13 @@
     </StackPanel>
 
     <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Ox.Text.Detail}" FontSize="13"
-               Text="Open-source control suite for Elgato XLR interfaces on Linux (Wave XLR Pro, XLR Dock, XLR Dock MK.2, Wave XLR, Wave XLR MK.2): hardware control over reverse-engineered protocols, a Wave Link style PipeWire submixer with per-application channels and virtual microphones, multi-output monitoring, a dedicated mix for a second computer on the USB Aux port, and an OpenDeck plugin for Stream Deck control."/>
+               Text="{loc:Text Key=OpenSourceControlSuiteForElgatoXLRInterfaces}"/>
 
     <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Ox.Text.Muted}" FontSize="11"
-               Text="Not affiliated with or endorsed by Elgato. Built by protocol analysis on the author's own hardware, with credit to the openwave project for the Wave XLR dialect."/>
+               Text="{loc:Text Key=NotAffiliatedWithOrEndorsedByElgatoBuilt}"/>
 
     <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Ox.Text.Detail}" FontSize="12"
-               Text="Thanks to everyone who contributed code, tested on their own interfaces or did the earlier protocol work this project builds on."/>
+               Text="{loc:Text Key=ThanksToEveryoneWhoContributedCodeTestedOn}"/>
 
     <StackPanel Spacing="2" Margin="0,4,0,0">
       <Button Classes="link" Click="OnRepo">
@@ -55,29 +56,29 @@
       <Button Classes="link" Click="OnCredits">
         <StackPanel Orientation="Horizontal" Spacing="8">
           <Path Data="{StaticResource GitHubMark}" Fill="{DynamicResource Ox.Link.Foreground}" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"/>
-          <TextBlock Text="Contributors and credits" VerticalAlignment="Center"/>
+          <TextBlock Text="{loc:Text Key=ContributorsAndCredits}" VerticalAlignment="Center"/>
         </StackPanel>
       </Button>
       <Button Classes="link" Click="OnDiscord">
         <StackPanel Orientation="Horizontal" Spacing="8">
           <Path Data="{StaticResource DiscordMark}" Fill="{DynamicResource Ox.Link.Foreground}" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"/>
-          <TextBlock Text="Discord community" VerticalAlignment="Center"/>
+          <TextBlock Text="{loc:Text Key=DiscordCommunity}" VerticalAlignment="Center"/>
         </StackPanel>
       </Button>
       <Button Classes="link" Click="OnReddit">
         <StackPanel Orientation="Horizontal" Spacing="8">
           <Path Data="{StaticResource RedditMark}" Fill="{DynamicResource Ox.Link.Foreground}" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"/>
-          <TextBlock Text="r/OpenXLR on Reddit" VerticalAlignment="Center"/>
+          <TextBlock Text="{loc:Text Key=ROpenXLROnReddit}" VerticalAlignment="Center"/>
         </StackPanel>
       </Button>
       <Button Classes="link" Click="OnCoffee">
         <StackPanel Orientation="Horizontal" Spacing="8">
           <Path Data="{StaticResource CoffeeMark}" Fill="{DynamicResource Ox.Link.Foreground}" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"/>
-          <TextBlock Text="Buy me a coffee" VerticalAlignment="Center"/>
+          <TextBlock Text="{loc:Text Key=BuyMeACoffee}" VerticalAlignment="Center"/>
         </StackPanel>
       </Button>
     </StackPanel>
 
-    <Button Content="Close" HorizontalAlignment="Right" Padding="18,6" Margin="0,4,0,4" Click="OnClose"/>
+    <Button Content="{loc:Text Key=Close}" HorizontalAlignment="Right" Padding="18,6" Margin="0,4,0,4" Click="OnClose"/>
   </StackPanel>
 </Window>

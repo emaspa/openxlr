@@ -1,3 +1,4 @@
+using OpenXLR.UI.Localization;
 using System;
 using System.IO;
 using System.Linq;
@@ -32,7 +33,7 @@ public sealed class PluginPresetViewModel(InsertViewModel target) : ViewModelBas
 
     internal void Save()
     {
-        if (!target.Owner.Items.Contains(target)) { Fail("The effect is no longer in its chain."); return; }
+        if (!target.Owner.Items.Contains(target)) { Fail(Localizer.Text("EffectNoLongerInChain")); return; }
         try { EffectChainPresets.Save(Name, target.Owner.CaptureChain(target)); Refresh(); }
         catch (Exception ex) when (EffectPresetFiles.IsFailure(ex)) { Fail(ex.Message); }
     }
@@ -46,7 +47,7 @@ public sealed class PluginPresetViewModel(InsertViewModel target) : ViewModelBas
 
     /// <summary>The selected saved preset, or else this effect's live settings under the typed name.</summary>
     internal EffectChainPreset Export()
-        => Selected ?? new(string.IsNullOrWhiteSpace(Name) ? "Current effect" : Name.Trim(), target.Owner.CaptureChain(target));
+        => Selected ?? new(string.IsNullOrWhiteSpace(Name) ? Localizer.Text("CurrentEffect") : Name.Trim(), target.Owner.CaptureChain(target));
 
     /// <summary>Decode a preset file and save it when it holds this plugin. The live chain is not touched.</summary>
     internal async Task ImportAsync(Stream input, CancellationToken cancellationToken)
@@ -54,7 +55,7 @@ public sealed class PluginPresetViewModel(InsertViewModel target) : ViewModelBas
         try
         {
             var preset = await EffectPresetFiles.DecodeAsync(input, cancellationToken);
-            if (!Fits(preset)) throw new InvalidDataException("This preset belongs to a different effect.");
+            if (!Fits(preset)) throw new InvalidDataException(Localizer.Text("PresetForDifferentEffect"));
             EffectChainPresets.Save(preset.Name, preset.Chain);
             Refresh();
         }
@@ -106,7 +107,7 @@ public partial class PluginPresetWindow : Window
     {
         if (_busy) return;
         if (Model is { Selected: { } preset } model
-            && await Dialogs.ConfirmAsync(this, "Delete preset", $"Delete the saved preset '{preset.Name}'?", "Delete") && !_closed)
+            && await Dialogs.ConfirmAsync(this, Localizer.Text("DeletePreset"), Localizer.Format("DeleteEffectPresetDetail", preset.Name), Localizer.Text("Delete")) && !_closed)
             model.Delete(preset);
     }
 
@@ -133,7 +134,7 @@ public partial class PluginPresetWindow : Window
         _busy = true;
         controls.IsEnabled = false;
         try { await action(); }
-        catch (OperationCanceledException) { if (!_closed) Model?.Fail("The preset file operation timed out."); }
+        catch (OperationCanceledException) { if (!_closed) Model?.Fail(Localizer.Text("PresetFileTimedOut")); }
         catch (Exception ex) when (EffectPresetFiles.IsFailure(ex)) { if (!_closed) Model?.Fail(ex.Message); }
         finally { _busy = false; controls.IsEnabled = true; }
     }

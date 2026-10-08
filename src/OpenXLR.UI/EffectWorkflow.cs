@@ -1,3 +1,4 @@
+using OpenXLR.UI.Localization;
 using System;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -38,7 +39,7 @@ public sealed partial class InsertsViewModel
     }
     public async Task PasteEffectsAsync(bool replace)
     {
-        if (_clipboard is null) { WorkflowError = "Copy an effect or chain in OpenXLR first."; return; }
+        if (_clipboard is null) { WorkflowError = Localizer.Text("CopyFirst"); return; }
         var data = _clipboard.Copy(freshIds: true);
         if (!replace)
         {
@@ -52,13 +53,13 @@ public sealed partial class InsertsViewModel
     {
         if (!CanEditEffects) return;
         if (b) _comparisonB = CaptureChain().Copy(); else _comparisonA = CaptureChain().Copy();
-        Comparison = b ? "Stored B" : "Stored A";
+        Comparison = b ? Localizer.Text("StoredB") : Localizer.Text("StoredA");
     }
     public async Task HearComparisonAsync(bool b)
     {
         if (!CanEditEffects) return;
         var snapshot = b ? _comparisonB : _comparisonA;
-        if (snapshot is null) { WorkflowError = b ? "Store B first." : "Store A first."; return; }
+        if (snapshot is null) { WorkflowError = b ? Localizer.Text("StoreBFirst") : Localizer.Text("StoreAFirst"); return; }
         int epoch = _connectionEpoch, revision = _effectEditRevision;
         _pendingComparison = snapshot.Copy();
         try
@@ -66,7 +67,7 @@ public sealed partial class InsertsViewModel
             if (await ApplyEffectsAsync(snapshot.Copy()) && epoch == _connectionEpoch && revision == _effectEditRevision)
             {
                 _hearing = snapshot.Copy();
-                Comparison = b ? "Hearing B" : "Hearing A";
+                Comparison = b ? Localizer.Text("HearingB") : Localizer.Text("HearingA");
             }
         }
         finally { if (epoch == _connectionEpoch) _pendingComparison = null; }
@@ -127,7 +128,7 @@ public sealed partial class InsertsViewModel
             || data.Inserts[0]?["plugin"]?.GetValue<string>() != target.Plugin
             || data.Inserts[0]?["kind"]?.GetValue<string>() != target.Kind)
         {
-            WorkflowError = "Choose a preset for this effect on an active channel.";
+            WorkflowError = Localizer.Text("ChoosePresetForEffect");
             return false;
         }
         var current = CaptureChain();

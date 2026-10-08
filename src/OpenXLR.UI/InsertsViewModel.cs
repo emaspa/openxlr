@@ -1,3 +1,4 @@
+using OpenXLR.UI.Localization;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -55,13 +56,13 @@ public sealed partial class InsertsViewModel : ViewModelBase
 
     /// <summary>Chain window subtitle: where these plugins sit in the path.</summary>
     public string ChainHint => _channels == 1
-        ? "Plugins, in order, before this input reaches the mixes"
-        : "Stereo plugins, in order, before this mix reaches its outputs";
+        ? Localizer.Text("InputChainHint")
+        : Localizer.Text("MixChainHint");
 
     /// <summary>Picker header: which plugins fit this chain.</summary>
     public string PickerHint => _channels == 1
-        ? "Plugins that can run mono on the mic path"
-        : "Plugins that fit a stereo mix (two inputs, two outputs)";
+        ? Localizer.Text("MonoPickerHint")
+        : Localizer.Text("StereoPickerHint");
 
     public ObservableCollection<InsertViewModel> Items { get; } = [];
     public ObservableCollection<PluginChoice> PluginChoices { get; } = [];
@@ -71,13 +72,13 @@ public sealed partial class InsertsViewModel : ViewModelBase
     /// <summary>One-line state for the strip: count, or a hint when empty.</summary>
     public string Summary => Items.Count switch
     {
-        0 => "none",
-        1 => "1 plugin",
-        int n => $"{n} plugins in chain",
+        0 => Localizer.Text("InsertsNone"),
+        1 => Localizer.Text("OnePlugin"),
+        int n => Localizer.Format("PluginsInChain", n),
     };
 
     /// <summary>Label for a compact button that opens the chain window.</summary>
-    public string ButtonText => Items.Count == 0 ? "Inserts" : $"Inserts ({Items.Count})";
+    public string ButtonText => Items.Count == 0 ? Localizer.Text("Inserts") : Localizer.Format("InsertsCount", Items.Count);
 
     private PluginChoice? _selectedPlugin;
     public PluginChoice? SelectedPlugin
@@ -107,7 +108,7 @@ public sealed partial class InsertsViewModel : ViewModelBase
     {
         if (_pluginsRequested) return;
         _pluginsRequested = true;
-        Note = "Scanning plugins…";
+        Note = Localizer.Text("ScanningPlugins");
         int generation = ++_catalogGeneration;
         Task<JsonNode?> request = CatalogAsync(_client);
         JsonNode? plugins = await request.ConfigureAwait(false);
@@ -118,7 +119,7 @@ public sealed partial class InsertsViewModel : ViewModelBase
             SelectedPlugin = null;
             if (plugins is not JsonArray arr)
             {
-                Note = "Plugin list unavailable";
+                Note = Localizer.Text("PluginListUnavailableShort");
                 _pluginsRequested = false;
                 if (ReferenceEquals(_catalogTask, request)) _catalogTask = null;
                 return;
@@ -139,10 +140,11 @@ public sealed partial class InsertsViewModel : ViewModelBase
                     p["nativeUiBlocked"]?.GetValue<bool>() == true));
             }
             foreach (InsertViewModel insert in Items) insert.RefreshCatalogue();
-            string width = _channels == 1 ? "mono" : "stereo";
+            bool mono = _channels == 1;
             Note = PluginChoices.Count == 0
-                ? $"No {width} plugins found. Install some, or add one with the buttons below"
-                : $"{PluginChoices.Count} {width} plugins available";
+                ? (mono ? Localizer.Text("NoMonoPlugins") : Localizer.Text("NoStereoPlugins"))
+                : mono ? Localizer.Format("MonoPluginsAvailable", PluginChoices.Count)
+                : Localizer.Format("StereoPluginsAvailable", PluginChoices.Count);
         });
     }
 
@@ -331,8 +333,8 @@ public sealed class InsertViewModel : ViewModelBase
     }
 
     public string LatencyText => LatencyMilliseconds is double ms
-        ? $"Latency: {ms.ToString("0.##", System.Globalization.CultureInfo.CurrentCulture)} ms"
-        : "Latency: unknown. Latency compensation counts it as zero.";
+        ? Localizer.Format("LatencyMilliseconds", ms)
+        : Localizer.Text("LatencyUnknown");
 
     /// <summary>The channel chain this insert belongs to (row buttons route through it).</summary>
     public InsertsViewModel Owner => _owner;
@@ -351,7 +353,7 @@ public sealed class InsertViewModel : ViewModelBase
     private string? _nativeUiBlockReason;
     public bool NativeUiBlocked => _nativeUiBlocked || _owner.PluginChoices.Any(p => p.Kind == Kind && p.Uri == Plugin && p.NativeUiBlocked);
     public string? NativeUiBlockReason => NativeUiBlocked
-        ? _nativeUiBlockReason ?? "This native editor is disabled in Options. Use the OpenXLR controls."
+        ? _nativeUiBlockReason ?? Localizer.Text("NativeEditorDisabled")
         : null;
 
     /// <summary>
@@ -369,8 +371,8 @@ public sealed class InsertViewModel : ViewModelBase
 
     /// <summary>What the cog will open, which depends on what is running.</summary>
     public string ControlsHint => NativeEditorAvailable
-        ? "Open this plugin's own editor"
-        : "Open this plugin's controls";
+        ? Localizer.Text("OpenPluginOwnEditor")
+        : Localizer.Text("OpenThisPluginSControls");
 
     /// <summary>Everything the row and the controls window derive from the host state.</summary>
     internal void RefreshCatalogue()
@@ -431,7 +433,7 @@ public sealed class InsertViewModel : ViewModelBase
         private set { if (Set(ref _nativeHostRunning, value)) RaiseNativeFlags(); }
     }
 
-    public string StateText => HasError ? "problem" : Bypass ? "bypassed" : "active";
+    public string StateText => HasError ? Localizer.Text("InsertStateProblem") : Bypass ? Localizer.Text("InsertStateBypassed") : Localizer.Text("InsertStateActive");
 
     /// <summary>Green LED: in the chain and processing. Red otherwise (bypassed or failed).</summary>
     public bool IsActive => !Bypass && !HasError;
@@ -498,8 +500,18 @@ public sealed class InsertViewModel : ViewModelBase
         }
         foreach (string g in GroupOrder)
             if (buckets.TryGetValue(g, out List<InsertParamViewModel>? l))
-                Groups.Add(new InsertParamGroup(g, true, l));
+                Groups.Add(new InsertParamGroup(GroupLabel(g), true, l));
     }
+
+    private static string GroupLabel(string group) => group switch
+    {
+        "Levels" => Localizer.Text("ParameterGroupLevels"),
+        "Dynamics" => Localizer.Text("ParameterGroupDynamics"),
+        "Sidechain" => Localizer.Text("ParameterGroupSidechain"),
+        "Filter" => Localizer.Text("ParameterGroupFilter"),
+        "Display" => Localizer.Text("ParameterGroupDisplay"),
+        _ => Localizer.Text("ParameterGroupGeneral"),
+    };
 
     public void ApplyFromDaemon(JsonNode ins, string? error, bool nativeHostRunning,
         bool nativeUiBlocked = false, string? nativeUiBlockReason = null)
@@ -662,7 +674,7 @@ public sealed class InsertParamViewModel : ViewModelBase
         set => Value = value ? 1 : 0;
     }
 
-    public string ValueText => Toggled ? (On ? "on" : "off")
+    public string ValueText => Toggled ? (On ? Localizer.Text("ParamOn") : Localizer.Text("ParamOff"))
         : Integer ? ((int)Math.Round(_value)).ToString()
         : Math.Abs(_value) >= 100 ? _value.ToString("0")
         : Math.Abs(_value) >= 10 ? _value.ToString("0.0")

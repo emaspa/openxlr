@@ -9,6 +9,8 @@ public partial class App : Application
 {
     public override void Initialize()
     {
+        // The language is chosen before any markup reads its text.
+        Localization.Localizer.Initialize();
         AvaloniaXamlLoader.Load(this);
         // The appearance is in the resources before anything can be built, so
         // no window is ever drawn unskinned and repainted a moment later.

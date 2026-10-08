@@ -1,3 +1,4 @@
+using OpenXLR.UI.Localization;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 
@@ -42,8 +43,8 @@ public partial class MixInsertsWindow : Window
     private async void OnRenameInsert(object? sender, RoutedEventArgs e)
     {
         if ((sender as Control)?.DataContext is not InsertViewModel insert) return;
-        string? name = await Dialogs.NameAsync(this, $"Rename effect '{insert.Label}'", insert.Label,
-            "Only the name changes. The plugin, its settings and the audio keep running.", 256);
+        string? name = await Dialogs.NameAsync(this, Localizer.Format("RenameEffectTitle", insert.Label), insert.Label,
+            Localizer.Text("RenameEffectHint"), 256);
         if (name is not null && name != insert.Label) await insert.Owner.RenameEffectAsync(insert, name);
     }
 

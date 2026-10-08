@@ -511,6 +511,10 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
 - Touch sizing for the mixer window: larger buttons, faders and list rows,
   wider channel strips and mix tiles, chosen in Options and kept in
   `ui.json` beside the skin, over whichever skin is worn
+- A translatable window: every string it shows comes from one catalogue,
+  and it ships in English. Languages come from contributors
+  ([localization.md](localization.md)); a language chosen in Options
+  applies the next time the window starts
 - One window per user: a second launch brings the running window to the
   front, out of the tray if it is hidden there, and exits
 - Tray icon, start-minimized option, daemon and window autostart from

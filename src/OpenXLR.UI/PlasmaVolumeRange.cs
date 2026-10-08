@@ -1,3 +1,4 @@
+using OpenXLR.UI.Localization;
 using System;
 using System.IO;
 using System.Linq;
@@ -54,7 +55,7 @@ internal sealed class PlasmaVolumeRange(Action<bool> apply, Action<string?> repo
         {
             _watcher?.Dispose();
             _watcher = null;
-            Publish(null, 0, $"Cannot follow Plasma's volume range: {ex.Message}");
+            Publish(null, 0, Localizer.Format("CannotFollowPlasmaRange", ex.Message));
         }
         Refresh();
     }
@@ -98,18 +99,18 @@ internal sealed class PlasmaVolumeRange(Action<bool> apply, Action<string?> repo
                     var result = await ProcessRunner.RunAsync("kwriteconfig6",
                         ["--file", ConfigFile, "--group", Group, "--key", Key, "--type", "bool", "--notify", requested ? "true" : "false"],
                         HelperTimeout, stdoutCap: 4096, stderrCap: 4096, cancel: _lifetime.Token);
-                    if (!result.Ok) error = "Cannot change Plasma's volume range: the desktop preference could not be saved.";
+                    if (!result.Ok) error = Localizer.Text("CannotChangePlasmaRangeSave");
                 }
                 catch (Exception ex)
                 {
-                    error = $"Cannot change Plasma's volume range: {ex.Message}";
+                    error = Localizer.Format("CannotChangePlasmaRange", ex.Message);
                 }
             }
             try
             {
                 bool boost = await ReadAsync(_lifetime.Token);
                 if (error is null && write.HasValue && boost != write.Value)
-                    error = "Cannot change Plasma's volume range: the desktop did not keep it.";
+                    error = Localizer.Text("CannotChangePlasmaRangeKept");
                 // A write reports its own outcome. A plain read clears only a
                 // read error, so a refresh cannot hide a failed save.
                 Publish(boost, revision, error, statusChanged: write.HasValue || _readError);
@@ -120,7 +121,7 @@ internal sealed class PlasmaVolumeRange(Action<bool> apply, Action<string?> repo
                 // Missing helpers, a malformed preference or shutdown. The
                 // window's own controls stay usable; the error is shown once.
                 if (!_lifetime.IsCancellationRequested)
-                    Publish(null, revision, error ?? $"Cannot read Plasma's volume range: {ex.Message}");
+                    Publish(null, revision, error ?? Localizer.Format("CannotReadPlasmaRange", ex.Message));
                 _readError = error is null;
             }
             lock (_gate)
@@ -176,12 +177,12 @@ internal sealed class PlasmaVolumeRange(Action<bool> apply, Action<string?> repo
         var result = await ProcessRunner.RunAsync("kreadconfig6",
             ["--file", ConfigFile, "--group", Group, "--key", Key, "--default", "false"],
             HelperTimeout, stdoutCap: 4096, stderrCap: 4096, cancel: cancel);
-        if (!result.Ok) throw new IOException("The desktop preference could not be read.");
+        if (!result.Ok) throw new IOException(Localizer.Text("DesktopPreferenceUnreadable"));
         return result.StdoutText.Trim().ToLowerInvariant() switch
         {
             "true" or "yes" or "on" or "1" => true,
             "false" or "no" or "off" or "0" => false,
-            _ => throw new IOException("The desktop returned an invalid volume range."),
+            _ => throw new IOException(Localizer.Text("DesktopInvalidVolumeRange")),
         };
     }
 

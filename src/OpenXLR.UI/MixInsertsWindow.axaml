@@ -1,10 +1,11 @@
 <Window xmlns="https://github.com/avaloniaui"
+        xmlns:loc="using:OpenXLR.UI.Localization"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:OpenXLR.UI"
         xmlns:skin="using:OpenXLR.UI.Skinning"
         x:Class="OpenXLR.UI.MixInsertsWindow"
         x:DataType="vm:InsertsViewModel"
-        Title="{Binding Title, StringFormat='{}{0} inserts'}" Width="560" Height="360" MinWidth="440" MinHeight="220"
+        Title="{Binding Title, StringFormat={loc:Text Key=InsertsTitle}}" Width="560" Height="360" MinWidth="440" MinHeight="220"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource Ox.Window.Background}">
 
@@ -17,17 +18,17 @@
         <TextBlock Text="{Binding ChainHint}" Classes="h" FontSize="11" TextWrapping="Wrap"/>
       </StackPanel>
       <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Top">
-        <Button Content="Add plugin" Padding="12,4" HorizontalAlignment="Stretch" Click="OnAddInsert"/>
-        <Button Name="EffectWorkflow" Content="Presets and A/B" Padding="12,4" HorizontalAlignment="Stretch" Click="OnWorkflow"
-                ToolTip.Tip="Copy and paste effects, compare two settings, and save or load presets"/>
+        <Button Content="{loc:Text Key=AddPlugin}" Padding="12,4" HorizontalAlignment="Stretch" Click="OnAddInsert"/>
+        <Button Name="EffectWorkflow" Content="{loc:Text Key=PresetsAndAB}" Padding="12,4" HorizontalAlignment="Stretch" Click="OnWorkflow"
+                ToolTip.Tip="{loc:Text Key=CopyAndPasteEffectsCompareTwoSettings}"/>
       </StackPanel>
     </Grid>
-    <Button DockPanel.Dock="Bottom" Content="Close" HorizontalAlignment="Right" Padding="18,6" Margin="0,10,0,0" Click="OnClose"/>
+    <Button DockPanel.Dock="Bottom" Content="{loc:Text Key=Close}" HorizontalAlignment="Right" Padding="18,6" Margin="0,10,0,0" Click="OnClose"/>
     <TextBlock DockPanel.Dock="Top" Text="{Binding WorkflowError}" TextWrapping="Wrap" Margin="0,0,0,8"
                Foreground="{DynamicResource Ox.Text.Warning}"
                IsVisible="{Binding WorkflowError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-    <Button DockPanel.Dock="Top" Content="Sound Check" IsVisible="{Binding CanSoundCheck}" HorizontalAlignment="Left" Margin="0,0,0,8" Click="OnSoundCheck"/>
-    <TextBlock DockPanel.Dock="Top" Text="No inserts yet." Classes="h" IsVisible="{Binding !HasItems}"/>
+    <Button DockPanel.Dock="Top" Content="{loc:Text Key=SoundCheck}" IsVisible="{Binding CanSoundCheck}" HorizontalAlignment="Left" Margin="0,0,0,8" Click="OnSoundCheck"/>
+    <TextBlock DockPanel.Dock="Top" Text="{loc:Text Key=NoInsertsYet}" Classes="h" IsVisible="{Binding !HasItems}"/>
     <ScrollViewer VerticalScrollBarVisibility="Auto" AllowAutoHide="False">
       <ItemsControl ItemsSource="{Binding Items}" Margin="0,0,10,0">
         <ItemsControl.ItemTemplate>
@@ -36,7 +37,7 @@
               <StackPanel Spacing="8">
                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
                   <skin:StatusLed IsOn="{Binding IsActive}" Kind="Insert"
-                                  AutomationProperties.Name="Plugin state"/>
+                                  AutomationProperties.Name="{loc:Text Key=PluginState}"/>
                   <TextBlock Grid.Column="1" Text="{Binding Label}" Classes="insertName" Foreground="{DynamicResource Ox.Text.Primary}" FontSize="12"
                              TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
                   <TextBlock Grid.Column="2" Text="{Binding StateText}" Classes="h" FontSize="11"/>
@@ -44,19 +45,19 @@
                 <TextBlock Text="{Binding Error}" Foreground="{DynamicResource Ox.Text.Warning}" FontSize="11"
                            TextWrapping="Wrap" IsVisible="{Binding HasError}"/>
                 <WrapPanel>
-                  <Button Content="Controls" Padding="8,3" MinHeight="0" FontSize="11" Margin="0,0,6,0" Click="OnInsertControls"/>
-                  <Button Content="Copy" Padding="8,3" MinHeight="0" FontSize="{DynamicResource Ox.Label.FontSize}" Margin="0,0,6,0"
-                          Click="OnCopyInsert" ToolTip.Tip="Copy this effect, to paste on any chain from Presets and A/B"/>
-                  <Button Content="Rename" Padding="8,3" MinHeight="0" FontSize="{DynamicResource Ox.Label.FontSize}" Margin="0,0,6,0"
-                          Click="OnRenameInsert" ToolTip.Tip="Change the name this effect shows; the plugin keeps running"/>
-                  <ToggleButton Content="Bypass" IsChecked="{Binding Bypass, Mode=TwoWay}"
+                  <Button Content="{loc:Text Key=Controls}" Padding="8,3" MinHeight="0" FontSize="11" Margin="0,0,6,0" Click="OnInsertControls"/>
+                  <Button Content="{loc:Text Key=Copy}" Padding="8,3" MinHeight="0" FontSize="{DynamicResource Ox.Label.FontSize}" Margin="0,0,6,0"
+                          Click="OnCopyInsert" ToolTip.Tip="{loc:Text Key=CopyThisEffectToPasteOnAny}"/>
+                  <Button Content="{loc:Text Key=Rename}" Padding="8,3" MinHeight="0" FontSize="{DynamicResource Ox.Label.FontSize}" Margin="0,0,6,0"
+                          Click="OnRenameInsert" ToolTip.Tip="{loc:Text Key=ChangeTheNameThisEffectShowsThe}"/>
+                  <ToggleButton Content="{loc:Text Key=Bypass}" IsChecked="{Binding Bypass, Mode=TwoWay}"
                                 Padding="8,3" MinHeight="0" FontSize="11" Margin="0,0,6,0"/>
                   <Button Content="▲" Padding="6,3" MinHeight="0" FontSize="10" Margin="0,0,4,0" Click="OnInsertUp"
-                          AutomationProperties.Name="Move plugin up" ToolTip.Tip="Move up"/>
+                          AutomationProperties.Name="{loc:Text Key=MovePluginUp}" ToolTip.Tip="{loc:Text Key=MoveUp}"/>
                   <Button Content="▼" Padding="6,3" MinHeight="0" FontSize="10" Margin="0,0,6,0" Click="OnInsertDown"
-                          AutomationProperties.Name="Move plugin down" ToolTip.Tip="Move down"/>
+                          AutomationProperties.Name="{loc:Text Key=MovePluginDown}" ToolTip.Tip="{loc:Text Key=MoveDown}"/>
                   <Button Content="✕" Classes="danger" Padding="6,3" MinHeight="0" FontSize="10" Click="OnInsertRemove"
-                          AutomationProperties.Name="Remove plugin" ToolTip.Tip="Remove plugin"/>
+                          AutomationProperties.Name="{loc:Text Key=RemovePlugin}" ToolTip.Tip="{loc:Text Key=RemovePlugin}"/>
                 </WrapPanel>
               </StackPanel>
             </Border>

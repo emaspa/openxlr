@@ -1370,6 +1370,18 @@ OPENXLR_SKIN=default openxlr
 which ignores the saved choice for that run, wears dark Material whatever
 the mode says, and lets you pick another one.
 
+<a name="language"></a>
+Options, APPEARANCE, **Language** picks the window's language. **System
+language**, the default, follows the desktop's message language
+(`LANGUAGE`, `LC_ALL`, `LC_MESSAGES`, then `LANG`) and falls back to
+English. The window reads its text when it starts, so a change applies the
+next time it opens. The choice is saved in `ui.json` as `language`; if it
+cannot be saved, Options says why on the line at its foot. OpenXLR ships in
+English, and each further language is added by a contributor who speaks it;
+[localization.md](localization.md) says how. Names you give channels, mixes
+and profiles, text from plugins and messages from the daemon are shown as
+they are.
+
 <a name="upgrade"></a>
 ### 3.11 Upgrade
 
@@ -1907,7 +1919,7 @@ Review plugin names, paths and scanner output before sharing the archive.
 | `~/.config/openxlr/desktop-keys.json` | desktop shortcut bindings, written by the window ([Desktop keys](#desktop-keys)) |
 | `~/.config/openxlr/bridge/yabridgectl/config.toml` | companion bridge folder registry, separate from the system bridge |
 | `~/.local/share/openxlr/yabridge/{vst3,clap,vst2}` | companion-generated wrappers; OpenXLR loads VST3 and CLAP only |
-| `~/.config/openxlr/ui.json` | window preferences, the chosen skin and Material's mode included ([section 3.10](#skins)) |
+| `~/.config/openxlr/ui.json` | window preferences, the chosen skin, Material's mode and the language included ([section 3.10](#skins)) |
 | `~/.local/share/openxlr/skins/<id>/skin.json` | a skin you installed; system skins come from `$XDG_DATA_DIRS` ([skins.md](skins.md)) |
 | `openxlr-daemon.service` (systemd user unit) | the daemon; `journalctl --user -u openxlr-daemon` for its log |
 | `/usr/lib/systemd/user/pipewire-pulse.service.d/openxlr.conf` | installed by the packages: raises pipewire-pulse's open-file limit ([section 5.8](#open-files)) |

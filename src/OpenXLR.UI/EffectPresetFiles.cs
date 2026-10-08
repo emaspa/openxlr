@@ -1,3 +1,4 @@
+using OpenXLR.UI.Localization;
 using System;
 using System.IO;
 using System.Text.Json;
@@ -14,7 +15,7 @@ internal static class EffectPresetFiles
     internal const int MaximumBytes = 8 * 1024 * 1024;
     internal static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
-    private static readonly FilePickerFileType Type = new("OpenXLR effect presets") { Patterns = ["*.openxlr-effects.json", "*.json"] };
+    private static readonly FilePickerFileType Type = new(Localizer.Text("EffectPresetFileType")) { Patterns = ["*.openxlr-effects.json", "*.json"] };
 
     /// <summary>The failures a preset file or the preset store can report; each becomes the window's error line.</summary>
     internal static bool IsFailure(Exception ex)
@@ -22,10 +23,10 @@ internal static class EffectPresetFiles
 
     internal static byte[] Encode(EffectChainPreset preset)
     {
-        if (!EffectChainPresets.ValidName(preset.Name)) throw new InvalidDataException("Invalid effect preset name.");
+        if (!EffectChainPresets.ValidName(preset.Name)) throw new InvalidDataException(Localizer.Text("InvalidPresetName"));
         preset.Chain.Validate();
         byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(preset, Json);
-        if (bytes.Length > MaximumBytes) throw new InvalidDataException("Effect presets are limited to 8 MiB.");
+        if (bytes.Length > MaximumBytes) throw new InvalidDataException(Localizer.Text("PresetsLimitedTo8MiB"));
         return bytes;
     }
 
@@ -36,13 +37,13 @@ internal static class EffectPresetFiles
         int count;
         while ((count = await input.ReadAsync(buffer, cancellationToken)) > 0)
         {
-            if (output.Length + count > MaximumBytes) throw new InvalidDataException("Effect presets are limited to 8 MiB.");
+            if (output.Length + count > MaximumBytes) throw new InvalidDataException(Localizer.Text("PresetsLimitedTo8MiB"));
             await output.WriteAsync(buffer.AsMemory(0, count), cancellationToken);
         }
         var preset = EffectChainPresets.Parse<EffectChainPreset>(output.GetBuffer().AsMemory(0, (int)output.Length), Json)
-            ?? throw new InvalidDataException("The effect preset is empty.");
+            ?? throw new InvalidDataException(Localizer.Text("PresetEmpty"));
         if (!EffectChainPresets.ValidName(preset.Name) || preset.Chain is null)
-            throw new InvalidDataException("Invalid effect preset name or chain.");
+            throw new InvalidDataException(Localizer.Text("InvalidPresetNameOrChain"));
         preset.Chain.Validate();
         return preset with { Chain = preset.Chain.Copy() };
     }
@@ -52,7 +53,7 @@ internal static class EffectPresetFiles
     {
         var files = await owner.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Import effect preset", AllowMultiple = false, FileTypeFilter = [Type],
+            Title = Localizer.Text("ImportEffectPreset"), AllowMultiple = false, FileTypeFilter = [Type],
         });
         return files.Count == 0 ? null : await files[0].OpenReadAsync();
     }
@@ -62,7 +63,7 @@ internal static class EffectPresetFiles
         byte[] bytes = Encode(preset);
         var file = await owner.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Export effect preset", SuggestedFileName = "OpenXLR.openxlr-effects.json", FileTypeChoices = [Type], ShowOverwritePrompt = true,
+            Title = Localizer.Text("ExportEffectPreset"), SuggestedFileName = "OpenXLR.openxlr-effects.json", FileTypeChoices = [Type], ShowOverwritePrompt = true,
         });
         if (file is null) return;
         cancellationToken.ThrowIfCancellationRequested();

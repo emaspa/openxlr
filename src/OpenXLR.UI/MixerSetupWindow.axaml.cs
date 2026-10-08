@@ -1,3 +1,4 @@
+using OpenXLR.UI.Localization;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -35,21 +36,21 @@ public partial class MixerSetupWindow : Window
     private async void OnAddCapture(object? sender, RoutedEventArgs e)
     {
         if (Vm is not { } vm) return;
-        var name = new TextBox { Name = "CaptureName", MaxLength = 60, PlaceholderText = "Channel name" };
-        var source = new ComboBox { Name = "CaptureSource", PlaceholderText = "Capture source", ItemsSource = vm.Inputs.Where(d => !d.IsOwn).ToArray(),
+        var name = new TextBox { Name = "CaptureName", MaxLength = 60, PlaceholderText = Localizer.Text("ChannelNamePlaceholder") };
+        var source = new ComboBox { Name = "CaptureSource", PlaceholderText = Localizer.Text("CaptureSourcePlaceholder"), ItemsSource = vm.Inputs.Where(d => !d.IsOwn).ToArray(),
             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch };
-        var pair = new ComboBox { Name = "CapturePair", ItemsSource = Enumerable.Range(1, 32).Select(n => $"Pair {n}").ToArray(), SelectedIndex = 0 };
-        var add = new Button { Name = "CreateCapture", Content = "Add input", IsDefault = true };
-        var cancel = new Button { Content = "Cancel", IsCancel = true };
+        var pair = new ComboBox { Name = "CapturePair", ItemsSource = Enumerable.Range(1, 32).Select(n => Localizer.Format("CapturePairNumber", n)).ToArray(), SelectedIndex = 0 };
+        var add = new Button { Name = "CreateCapture", Content = Localizer.Text("AddInput"), IsDefault = true };
+        var cancel = new Button { Content = Localizer.Text("Cancel"), IsCancel = true };
         var dialog = new Window
         {
-            Title = "Add capture input", Width = 480, Height = 340, MinWidth = 360, MinHeight = 320,
+            Title = Localizer.Text("AddCaptureInput"), Width = 480, Height = 340, MinWidth = 360, MinHeight = 320,
             WindowStartupLocation = WindowStartupLocation.CenterOwner, Classes = { "dialog" },
             Content = new ScrollViewer { Content = new StackPanel
             {
                 Margin = new Avalonia.Thickness(18), Spacing = 12,
                 Children = { name, source, pair,
-                    new TextBlock { Text = "Choose a microphone, capture card or another Wave interface. Pair 1 also works for mono sources. The new input starts muted in every mix and stays silent while its source is offline.", TextWrapping = TextWrapping.Wrap, Classes = { "hint" } },
+                    new TextBlock { Text = Localizer.Text("AddCaptureInputHint"), TextWrapping = TextWrapping.Wrap, Classes = { "hint" } },
                     new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 8, Children = { cancel, add } } },
             } },
         };
@@ -106,36 +107,36 @@ public partial class MixerSetupWindow : Window
     private async void OnRenameChannel(object? sender, RoutedEventArgs e)
     {
         if (Item<ChannelViewModel>(sender) is not { } channel || Vm is not { } vm) return;
-        string? name = await PromptName($"Rename channel '{channel.Name}'", channel.Name,
-            channel.IsApplication ? "Programs playing into this channel keep playing; the playback device shows the new name right away."
-                : "The capture source and the channel's routing stay unchanged.");
+        string? name = await PromptName(Localizer.Format("RenameChannelTitle", channel.Name), channel.Name,
+            channel.IsApplication ? Localizer.Text("RenameAppChannelHint")
+                : Localizer.Text("RenameCaptureChannelHint"));
         if (name is not null && name != channel.Name) await Run(vm.RenameChannel(channel.Id, name));
     }
 
     private async void OnRenameMix(object? sender, RoutedEventArgs e)
     {
         if (Item<MixViewModel>(sender) is not { } mix || Vm is not { } vm) return;
-        string? name = await PromptName($"Rename mix '{mix.Name}'", mix.Name,
-            "OpenXLR shows the new name at once. Other applications keep listing the old device name until the daemon restarts, so clients using it are not interrupted.");
+        string? name = await PromptName(Localizer.Format("RenameMixTitle", mix.Name), mix.Name,
+            Localizer.Text("RenameMixHint"));
         if (name is not null && name != mix.Name) await Run(vm.RenameMix(mix.Id, name));
     }
 
     private async void OnDeleteChannel(object? sender, RoutedEventArgs e)
     {
         if (Item<ChannelViewModel>(sender) is not { } channel || Vm is not { } vm) return;
-        if (await Confirm($"Delete channel '{channel.Name}'?",
-                channel.IsApplication ? $"Programs routed to it move to {FallbackAfterDeleting(vm, channel)}. Its playback device disappears from the desktop."
-                    : "The capture input and its sends are removed. The source device remains available to other applications."))
+        if (await Confirm(Localizer.Format("DeleteChannelTitle", channel.Name),
+                channel.IsApplication ? Localizer.Format("DeleteAppChannelDetail", FallbackAfterDeleting(vm, channel))
+                    : Localizer.Text("DeleteCaptureChannelDetail")))
             await Run(vm.DeleteChannel(channel.Id));
     }
 
     private async void OnDeleteMix(object? sender, RoutedEventArgs e)
     {
         if (Item<MixViewModel>(sender) is not { } mix || Vm is not { } vm) return;
-        if (await Confirm($"Delete mix '{mix.Name}'?",
+        if (await Confirm(Localizer.Format("DeleteMixTitle", mix.Name),
                 mix.IsMonitor
-                    ? "Its sends and inserts are removed. Outputs following only this mix return to Monitor A; summed feeds keep their other mixes. If this mix is the enforced system default, that setting is cleared."
-                    : "Its virtual microphone disappears; anything recording from it loses the device. Its sends and inserts go with it."))
+                    ? Localizer.Text("DeleteMonitorMixDetail")
+                    : Localizer.Text("DeleteVirtualMicDetail")))
             await Run(vm.DeleteMix(mix.Id));
     }
 
@@ -144,7 +145,7 @@ public partial class MixerSetupWindow : Window
     {
         var rest = vm.Channels.Where(c => c.IsApplication && c.Id != deleted.Id).ToList();
         ChannelViewModel? fallback = rest.FirstOrDefault(c => c.Id == "system") ?? rest.MinBy(c => c.Id, StringComparer.Ordinal);
-        return fallback?.Name ?? "another application channel";
+        return fallback?.Name ?? Localizer.Text("AnotherApplicationChannel");
     }
 
     private async void OnAppearance(object? sender, RoutedEventArgs e)
@@ -158,26 +159,26 @@ public partial class MixerSetupWindow : Window
         var icon = new ComboBox { Name = "AppearanceIcon", ItemsSource = LayoutAppearanceViewModel.Icons,
             SelectedItem = appearance.Icon, MinWidth = 120 };
         var colour = new TextBox { Name = "AppearanceColour", Text = appearance.Colour ?? "", MaxLength = 7,
-            PlaceholderText = "#RRGGBB, or empty for the skin's colours" };
+            PlaceholderText = Localizer.Text("ColourPlaceholder") };
         var hidden = new CheckBox { Name = "AppearanceHidden", IsChecked = appearance.Hidden, IsVisible = channel is not null,
-            Content = "Hide this channel's strip in the mixer. Its audio, sends and apps stay as they are." };
-        var save = new Button { Name = "AppearanceSave", Content = "Save", IsDefault = true };
-        var cancel = new Button { Content = "Cancel", IsCancel = true };
+            Content = Localizer.Text("HideChannelStrip") };
+        var save = new Button { Name = "AppearanceSave", Content = Localizer.Text("Save"), IsDefault = true };
+        var cancel = new Button { Content = Localizer.Text("Cancel"), IsCancel = true };
         var note = new TextBlock { TextWrapping = TextWrapping.Wrap, Classes = { "hint" } };
         var dialog = new Window
         {
-            Title = $"Appearance of {name}", Width = 440, SizeToContent = SizeToContent.Height,
+            Title = Localizer.Format("AppearanceOfTitle", name), Width = 440, SizeToContent = SizeToContent.Height,
             WindowStartupLocation = WindowStartupLocation.CenterOwner, CanResize = false, Classes = { "dialog" },
             Content = new StackPanel
             {
                 Margin = new Avalonia.Thickness(18), Spacing = 10,
                 Children =
                 {
-                    new TextBlock { Text = "Icon" }, icon,
-                    new TextBlock { Text = "Colour" }, colour,
+                    new TextBlock { Text = Localizer.Text("Icon") }, icon,
+                    new TextBlock { Text = Localizer.Text("Colour") }, colour,
                     hidden,
                     new TextBlock { TextWrapping = TextWrapping.Wrap, Classes = { "hint" },
-                        Text = "The window, the terminal mixer and Stream Deck keys show the icon and colour. Routing and levels do not change." },
+                        Text = Localizer.Text("AppearanceDialogHint") },
                     note,
                     new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 8,
                         HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right, Children = { cancel, save } },
@@ -189,7 +190,7 @@ public partial class MixerSetupWindow : Window
             string? chosen = string.IsNullOrWhiteSpace(colour.Text) ? null : colour.Text.Trim();
             if (chosen is not null && !IsHexColour(chosen))
             {
-                note.Text = "Enter a colour as # followed by six hexadecimal digits, or leave it empty.";
+                note.Text = Localizer.Text("ColourFormatHint");
                 return;
             }
             save.IsEnabled = false;
@@ -229,8 +230,8 @@ public partial class MixerSetupWindow : Window
 
     private async Task<bool> Confirm(string title, string message)
     {
-        var yes = new Button { Content = "Delete", Classes = { "danger" } };
-        var no = new Button { Content = "Cancel", IsCancel = true };
+        var yes = new Button { Content = Localizer.Text("Delete"), Classes = { "danger" } };
+        var no = new Button { Content = Localizer.Text("Cancel"), IsCancel = true };
         var done = new TaskCompletionSource<bool>();
         var dialog = new Window
         {

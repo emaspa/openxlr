@@ -1,3 +1,4 @@
+using OpenXLR.UI.Localization;
 using System;
 using System.Diagnostics;
 using System.Collections.Generic;
@@ -72,6 +73,14 @@ public sealed record UiSettings
     /// </summary>
     [JsonConverter(typeof(LocalTouchControlsConverter))]
     public bool TouchControls { get; init; }
+
+    /// <summary>
+    /// The window's language, by catalogue tag such as <c>en</c>; null
+    /// follows the desktop's message language. Read once at startup, so a
+    /// change applies the next time the window starts. Like the skin, it
+    /// lives here alone.
+    /// </summary>
+    public string? Language { get; init; }
 
     /// <summary>
     /// Keys this version does not know, such as a setting written by a newer
@@ -169,13 +178,12 @@ internal static class PreferenceFile
         {
             if (!File.Exists(path)) return null;
             return JsonSerializer.Deserialize<T>(File.ReadAllText(path), json)
-                ?? throw new JsonException("The file holds null instead of a JSON object.");
+                ?? throw new JsonException(Localizer.Text("PreferenceFileHoldsNull"));
         }
         catch (Exception ex)
         {
             // Whatever the reason, a file that cannot be read must not stop the window.
-            problem = $"{Path.GetFileName(path)} could not be read and was left as it is. "
-                + $"Fix or remove it to save preferences again. {ex.Message}";
+            problem = Localizer.Format("PreferenceFileUnreadable", Path.GetFileName(path), ex.Message);
             return null;
         }
     }
@@ -192,7 +200,7 @@ internal static class PreferenceFile
         }
         catch (Exception ex)
         {
-            return $"Could not save {Path.GetFileName(path)}. {ex.Message}";
+            return Localizer.Format("PreferenceFileNotSaved", Path.GetFileName(path), ex.Message);
         }
     }
 }

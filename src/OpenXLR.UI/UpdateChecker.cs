@@ -1,3 +1,4 @@
+using OpenXLR.UI.Localization;
 using System;
 using System.IO;
 using System.Net.Http;
@@ -62,12 +63,12 @@ public sealed class UpdateChecker
         string tag = String(root, "tag_name");
         bool released = !Flag(root, "draft") && !Flag(root, "prerelease");
         if (!released || !Newer(tag, installedVersion))
-            return new(false, tag, "OpenXLR is up to date",
-                $"Installed version: {installedVersion}. Latest stable release: {tag}.", null);
+            return new(false, tag, Localizer.Text("UpToDate"),
+                Localizer.Format("InstalledAndLatest", installedVersion, tag), null);
 
         string details = String(root, "body");
-        if (details.Length > 12000) details = details[..12000] + "\n… Open GitHub for the complete notes.";
-        return new(true, tag, $"New OpenXLR release {tag}", details,
+        if (details.Length > 12000) details = details[..12000] + "\n" + Localizer.Text("ReleaseNotesTruncated");
+        return new(true, tag, Localizer.Format("NewRelease", tag), details,
             $"https://github.com/emaspa/openxlr/releases/tag/{Uri.EscapeDataString(tag)}");
     }
 
@@ -111,9 +112,9 @@ public sealed class UpdatesViewModel : ViewModelBase
     public bool Available { get => _available; private set => Set(ref _available, value); }
     private bool _bannerVisible;
     public bool BannerVisible { get => _bannerVisible; private set => Set(ref _bannerVisible, value); }
-    private string _title = "Updates have not been checked";
+    private string _title = Localizer.Text("UpdatesNotChecked");
     public string Title { get => _title; private set => Set(ref _title, value); }
-    private string _details = "No network request is made unless you check manually or opt in below.";
+    private string _details = Localizer.Text("NoNetworkRequest");
     public string Details { get => _details; private set => Set(ref _details, value); }
     private string? _url;
     public string? Url { get => _url; private set => Set(ref _url, value); }
@@ -145,8 +146,8 @@ public sealed class UpdatesViewModel : ViewModelBase
             Available = false;
             BannerVisible = false;
             Url = null;
-            Title = "Update check unavailable";
-            Details = "Audio is unaffected. Retry later or open the release page manually.";
+            Title = Localizer.Text("UpdateCheckUnavailable");
+            Details = Localizer.Text("UpdateCheckUnavailableDetail");
         }
         finally
         {

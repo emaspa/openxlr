@@ -1,3 +1,4 @@
+using OpenXLR.UI.Localization;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -26,7 +27,7 @@ internal sealed record FlowGraph(IReadOnlyList<FlowNode> Nodes, IReadOnlyList<Fl
         var routes = new List<FlowRoute>();
         double y = Top;
         static string Inserts(InsertsViewModel inserts) => string.Join("\n", inserts.Items.Select(i =>
-            i.Label + (i.HasError ? " (problem)" : i.Bypass ? " (bypassed)" : "")));
+            i.HasError ? Localizer.Format("FlowInsertProblem", i.Label) : i.Bypass ? Localizer.Format("FlowInsertBypassed", i.Label) : i.Label));
 
         foreach (ChannelViewModel channel in vm.Channels)
         {
@@ -34,13 +35,13 @@ internal sealed record FlowGraph(IReadOnlyList<FlowNode> Nodes, IReadOnlyList<Fl
             if (channel.Id is "xlr1" or "xlr2" or "aux")
                 sources.Add(($"hw:{channel.Id}", channel.Id switch
                 {
-                    "xlr1" => "XLR 1 jack", "xlr2" => "XLR 2 jack", _ => "Line In / USB Aux",
-                }, "Hardware", FlowIcon.Microphone, true));
+                    "xlr1" => Localizer.Text("Xlr1Jack"), "xlr2" => Localizer.Text("Xlr2Jack"), _ => Localizer.Text("LineInUsbAux"),
+                }, Localizer.Text("FlowHardware"), FlowIcon.Microphone, true));
             if (channel.CaptureSource is { } capture)
                 sources.Add(($"capture:{channel.Id}", capture, channel.CaptureLabel,
                     FlowIcon.Microphone, channel.CaptureConnected));
             sources.AddRange(vm.ActiveApps.Where(a => a.ChannelId == channel.Id)
-                .Select(a => ($"app:{a.Identity}", a.Label, a.Active ? "Software" : a.StatusText,
+                .Select(a => ($"app:{a.Identity}", a.Label, a.Active ? Localizer.Text("FlowSoftware") : a.StatusText,
                     FlowIcon.Application, a.Active)));
 
             string processing = channel.Id switch
@@ -50,14 +51,14 @@ internal sealed record FlowGraph(IReadOnlyList<FlowNode> Nodes, IReadOnlyList<Fl
             if (channel.Id == "xlr1")
             {
                 var stages = new List<string>();
-                if (vm.ShowSoftLowCut && vm.SoftLowCutOn) stages.Add($"Low cut {vm.SoftLowCutHz} Hz");
+                if (vm.ShowSoftLowCut && vm.SoftLowCutOn) stages.Add(Localizer.Format("FlowLowCut", vm.SoftLowCutHz));
                 if (vm.ShowSoftClipGuard && vm.SoftClipGuard)
-                    stages.Add("ClipGuard" + (vm.SoftClipGuardAvailable ? "" : " (unavailable)"));
+                    stages.Add(vm.SoftClipGuardAvailable ? "ClipGuard" : Localizer.Format("OutputUnavailable", "ClipGuard"));
                 if (processing.Length > 0) stages.Add(processing);
                 processing = string.Join("\n", stages);
             }
             var node = new FlowNode($"ch:{channel.Id}", channel.Name,
-                channel.IsHardware ? "Hardware channel" : channel.IsApplication ? "Application channel" : "Capture channel",
+                channel.IsHardware ? Localizer.Text("HardwareChannel") : channel.IsApplication ? Localizer.Text("ApplicationChannel") : Localizer.Text("CaptureChannel"),
                 FlowStage.Channel, FlowIcon.Channel, y, Processing: processing);
             double laneHeight = Math.Max(node.Height, sources.Count * (58 + Gap) - Gap);
             node = node with { Y = y + (laneHeight - node.Height) / 2 };
@@ -78,7 +79,7 @@ internal sealed record FlowGraph(IReadOnlyList<FlowNode> Nodes, IReadOnlyList<Fl
         foreach (AppStreamViewModel app in vm.ActiveApps.Where(a => vm.Channels.All(c => c.Id != a.ChannelId)))
         {
             nodes.Add(new FlowNode($"app:{app.Identity}", app.Label,
-                app.ChannelId == AppStreamViewModel.Ignore ? "Desktop routing" : "Channel unavailable",
+                app.ChannelId == AppStreamViewModel.Ignore ? Localizer.Text("DesktopRouting") : Localizer.Text("ChannelUnavailable"),
                 FlowStage.Input, FlowIcon.Application, y, app.Active));
             y += 58 + Gap;
         }
@@ -88,7 +89,7 @@ internal sealed record FlowGraph(IReadOnlyList<FlowNode> Nodes, IReadOnlyList<Fl
         {
             bool active = !mix.Muted && mix.Volume > 0.001;
             var node = new FlowNode($"mix:{mix.Id}", mix.Name,
-                mix.Muted ? "Muted" : $"Vol {mix.VolumeText}", FlowStage.Mix,
+                mix.Muted ? Localizer.Text("FlowMuted") : Localizer.Format("FlowVolume", mix.VolumeText), FlowStage.Mix,
                 mix.Kind == "monitor" ? FlowIcon.Headphones : FlowIcon.Mix, y,
                 active, Inserts(mix.Inserts));
             nodes.Add(node);
@@ -106,15 +107,15 @@ internal sealed record FlowGraph(IReadOnlyList<FlowNode> Nodes, IReadOnlyList<Fl
             y += 58 + Gap;
         }
         foreach (MonitorOutputItem output in vm.MonitorOutputs.Where(o => o.IsSelected))
-            Output($"out:{output.Name}", output.Label, output.Feed?.Name ?? "Monitor output",
+            Output($"out:{output.Name}", output.Label, output.Feed?.Name ?? Localizer.Text("MonitorOutput"),
                 (output.Feed?.Id ?? vm.Mixes.FirstOrDefault(m => m.Kind == "monitor")?.Id ?? "monitor")
                     .Split('+', StringSplitOptions.RemoveEmptyEntries), true, FlowIcon.Speaker);
         foreach (MixViewModel mix in vm.Mixes)
         {
             if (mix.Kind == "virtualMic")
-                Output($"vm:{mix.Id}", $"OpenXLR {mix.Name}", "Virtual microphone", [mix.Id], true, FlowIcon.Microphone);
+                Output($"vm:{mix.Id}", $"OpenXLR {mix.Name}", Localizer.Text("VirtualMicrophone"), [mix.Id], true, FlowIcon.Microphone);
             else if (mix.IsAuxPort)
-                Output("aux:port", "USB Aux port", mix.AuxPortEnabled ? "Second computer" : "Off",
+                Output("aux:port", Localizer.Text("UsbAuxPortKind"), mix.AuxPortEnabled ? Localizer.Text("SecondComputer") : Localizer.Text("FlowOff"),
                     [mix.Id], mix.AuxPortEnabled, FlowIcon.Speaker);
         }
         return new FlowGraph(nodes, routes);

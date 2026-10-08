@@ -1,3 +1,4 @@
+using OpenXLR.UI.Localization;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -20,8 +21,8 @@ namespace OpenXLR.UI;
 /// </summary>
 public partial class MainWindow
 {
-    private const string ArrangeHint =
-        "Drag a handle onto another section or tile, or focus it and use the arrow keys. Escape cancels a drag.";
+    private static readonly string ArrangeHint =
+        Localizer.Text("DragAHandleOntoAnotherSectionOr");
     private Button? _dragHandle;
     private Button? _dropHandle;
     private Button[] _dragTargets = [];
@@ -120,7 +121,7 @@ public partial class MainWindow
     {
         ApplySectionOrder(order);
         string? error = (UiSettings.Load() with { SectionOrder = [.. order] }).Save();
-        ReportArrangement(error is null ? null : $"The section order applies until the window closes but could not be saved: {error}");
+        ReportArrangement(error is null ? null : Localizer.Format("SectionOrderNotSaved", error));
     }
 
     private static Button? Handle(object? source) => source is Visual visual

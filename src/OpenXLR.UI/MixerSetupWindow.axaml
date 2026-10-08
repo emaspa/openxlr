@@ -1,9 +1,10 @@
 <Window xmlns="https://github.com/avaloniaui"
+        xmlns:loc="using:OpenXLR.UI.Localization"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:OpenXLR.UI"
         x:Class="OpenXLR.UI.MixerSetupWindow"
         x:DataType="vm:MainViewModel"
-        Title="OpenXLR Mixer layout" Width="760" Height="640" MinWidth="600" MinHeight="460"
+        Title="{loc:Text Key=OpenXLRMixerLayout}" Width="760" Height="640" MinWidth="600" MinHeight="460"
         WindowStartupLocation="CenterOwner" Background="{DynamicResource Ox.Window.Background}">
   <Window.Styles>
     <Style Selector="Border.card">
@@ -18,47 +19,47 @@
 
   <DockPanel Margin="16">
     <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12" Spacing="4">
-      <TextBlock Text="Mixer layout" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource Ox.Text.Primary}"/>
-      <TextBlock Text="Application channels are the playback devices you route programs into. Virtual microphones are the recording devices OBS, Discord and other apps pick up. Every change is saved before it is confirmed, and audio on the other channels keeps flowing."
+      <TextBlock Text="{loc:Text Key=MixerLayout}" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource Ox.Text.Primary}"/>
+      <TextBlock Text="{loc:Text Key=ApplicationChannelsAreThePlaybackDevicesYouRoute}"
                  FontSize="11" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
       <TextBlock Name="Note" FontSize="11" Foreground="{DynamicResource Ox.Text.Alert}" TextWrapping="Wrap"
                  IsVisible="False"/>
       <!-- the daemon's own notes for this window: the open-file limit, and a mix renamed since start -->
       <DockPanel IsVisible="{Binding LayoutWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-        <Button DockPanel.Dock="Right" Content="Manual" Padding="10,3" FontSize="12" VerticalAlignment="Center"
-                Click="OnFileLimitManual" ToolTip.Tip="Open the manual section on the pipewire-pulse open-file limit"/>
+        <Button DockPanel.Dock="Right" Content="{loc:Text Key=Manual}" Padding="10,3" FontSize="12" VerticalAlignment="Center"
+                Click="OnFileLimitManual" ToolTip.Tip="{loc:Text Key=OpenTheManualSectionOnThePipewirePulse}"/>
         <TextBlock Text="{Binding LayoutWarning}" FontSize="11" Foreground="{DynamicResource Ox.Text.Alert}" TextWrapping="Wrap"
                    VerticalAlignment="Center" Margin="0,0,12,0"/>
       </DockPanel>
       <DockPanel IsVisible="{Binding RenamedSinceStart}">
-        <Button DockPanel.Dock="Right" Content="Restart daemon" Padding="10,3" FontSize="12"
+        <Button DockPanel.Dock="Right" Content="{loc:Text Key=RestartDaemon}" Padding="10,3" FontSize="12"
                 IsEnabled="{Binding DaemonRestart.CanRestart}" VerticalAlignment="Center"
                 Click="OnRestartDaemon" ToolTip.Tip="systemctl --user restart openxlr-daemon"/>
-        <TextBlock Text="A renamed virtual microphone keeps its old name in other applications until the daemon restarts. Restart when nothing is recording from it."
+        <TextBlock Text="{loc:Text Key=ARenamedVirtualMicrophoneKeepsItsOldName}"
                    FontSize="11" Foreground="{DynamicResource Ox.Text.Alert}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0"/>
       </DockPanel>
     </StackPanel>
     <DockPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
-      <Button DockPanel.Dock="Right" Content="Close" Padding="18,6" Click="OnClose"/>
-      <Button Name="ExclusiveGroupsButton" Content="Exclusive groups" HorizontalAlignment="Left"
+      <Button DockPanel.Dock="Right" Content="{loc:Text Key=Close}" Padding="18,6" Click="OnClose"/>
+      <Button Name="ExclusiveGroupsButton" Content="{loc:Text Key=ExclusiveGroups}" HorizontalAlignment="Left"
               IsEnabled="{Binding CanEditLayout}" Click="OnExclusiveGroups"
-              ToolTip.Tip="Channels of which only one is heard at a time"/>
+              ToolTip.Tip="{loc:Text Key=ChannelsOfWhichOnlyOneIsHeard}"/>
     </DockPanel>
 
     <Grid ColumnDefinitions="*,12,*">
       <Border Classes="card">
         <DockPanel>
-          <Button DockPanel.Dock="Bottom" Content="Add capture input" Margin="0,8,0,0"
+          <Button DockPanel.Dock="Bottom" Content="{loc:Text Key=AddCaptureInput}" Margin="0,8,0,0"
                   HorizontalAlignment="Left" IsEnabled="{Binding CanEditLayout}" Click="OnAddCapture"/>
           <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,8,Auto" Margin="0,10,0,0">
-            <TextBox Name="ChannelName" PlaceholderText="New channel, e.g. Podcast" MaxLength="60"
+            <TextBox Name="ChannelName" PlaceholderText="{loc:Text Key=NewChannelEGPodcast}" MaxLength="60"
                      KeyDown="OnChannelNameKey"/>
-            <Button Grid.Column="2" Content="Add channel" Padding="12,4"
+            <Button Grid.Column="2" Content="{loc:Text Key=AddChannel}" Padding="12,4"
                     IsEnabled="{Binding CanEditLayout}" Click="OnAddChannel"/>
           </Grid>
           <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-            <TextBlock Text="CHANNELS" Classes="h"/>
-            <TextBlock Text="A new channel starts muted in every mix. Hardware inputs stay where they are. Apps whose channel is deleted go to System."
+            <TextBlock Text="{loc:Text Key=CHANNELS}" Classes="h"/>
+            <TextBlock Text="{loc:Text Key=ANewChannelStartsMutedInEvery}"
                        FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
           </StackPanel>
           <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -74,20 +75,20 @@
                         <TextBlock Text="{Binding CaptureLabel}" Foreground="{DynamicResource Ox.Text.Secondary}"
                                    TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding CaptureSource}"
                                    IsVisible="{Binding CaptureSource, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                        <TextBlock Text="hidden in the mixer" Foreground="{DynamicResource Ox.Text.Muted}" FontSize="10"
+                        <TextBlock Text="{loc:Text Key=HiddenInTheMixer}" Foreground="{DynamicResource Ox.Text.Muted}" FontSize="10"
                                    IsVisible="{Binding Appearance.Hidden}"/>
-                        <Button Content="Appearance" Classes="small" HorizontalAlignment="Left" Margin="0,4,0,0"
-                                Click="OnAppearance" ToolTip.Tip="Icon, colour and whether the strip shows in the mixer"/>
+                        <Button Content="{loc:Text Key=MixerAppearance}" Classes="small" HorizontalAlignment="Left" Margin="0,4,0,0"
+                                Click="OnAppearance" ToolTip.Tip="{loc:Text Key=IconColourAndWhetherTheStripShows}"/>
                       </StackPanel>
-                      <TextBlock Grid.Column="1" Text="hardware input" Foreground="{DynamicResource Ox.Text.Muted}" FontSize="11"
+                      <TextBlock Grid.Column="1" Text="{loc:Text Key=HardwareInput}" Foreground="{DynamicResource Ox.Text.Muted}" FontSize="11"
                                  VerticalAlignment="Center" IsVisible="{Binding IsHardware}"/>
-                      <Button Grid.Column="1" Content="▲" Classes="small" ToolTip.Tip="Move up"
+                      <Button Grid.Column="1" Content="▲" Classes="small" ToolTip.Tip="{loc:Text Key=MoveUp}"
                               IsVisible="{Binding IsEditable}" Click="OnChannelUp"/>
-                      <Button Grid.Column="3" Content="▼" Classes="small" ToolTip.Tip="Move down"
+                      <Button Grid.Column="3" Content="▼" Classes="small" ToolTip.Tip="{loc:Text Key=MoveDown}"
                               IsVisible="{Binding IsEditable}" Click="OnChannelDown"/>
-                      <Button Grid.Column="5" Content="Rename" Classes="small"
+                      <Button Grid.Column="5" Content="{loc:Text Key=Rename}" Classes="small"
                               IsVisible="{Binding IsEditable}" Click="OnRenameChannel"/>
-                      <Button Grid.Column="7" Content="Delete" Classes="small danger"
+                      <Button Grid.Column="7" Content="{loc:Text Key=Delete}" Classes="small danger"
                               IsVisible="{Binding IsEditable}" Click="OnDeleteChannel"/>
                     </Grid>
                   </Border>
@@ -101,20 +102,20 @@
       <Border Grid.Column="2" Classes="card">
         <DockPanel>
           <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,10,0,0">
-            <TextBox Name="MixName" PlaceholderText="New mix, e.g. Recording or Headphones" MaxLength="60"
+            <TextBox Name="MixName" PlaceholderText="{loc:Text Key=NewMixEGRecordingOrHeadphones}" MaxLength="60"
                      KeyDown="OnMixNameKey"/>
             <WrapPanel>
-              <ComboBox Name="NewMixKind" SelectedIndex="0" AutomationProperties.Name="Mix type" Margin="0,0,8,4">
-                <ComboBoxItem Content="Virtual microphone"/>
-                <ComboBoxItem Content="Monitor mix"/>
+              <ComboBox Name="NewMixKind" SelectedIndex="0" AutomationProperties.Name="{loc:Text Key=MixType}" Margin="0,0,8,4">
+                <ComboBoxItem Content="{loc:Text Key=VirtualMicrophone}"/>
+                <ComboBoxItem Content="{loc:Text Key=MonitorMix}"/>
               </ComboBox>
-              <Button Name="AddMix" Content="Add mix" Padding="12,4"
+              <Button Name="AddMix" Content="{loc:Text Key=AddMix}" Padding="12,4"
                       IsEnabled="{Binding CanEditLayout}" Click="OnAddMix"/>
             </WrapPanel>
           </StackPanel>
           <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-            <TextBlock Text="MIXES" Classes="h"/>
-            <TextBlock Text="Each mix has its own master, sends and inserts. A monitor mix feeds your outputs without publishing a virtual microphone. New sends start muted. Monitor A, Monitor B and Aux stay where they are."
+            <TextBlock Text="{loc:Text Key=MIXES}" Classes="h"/>
+            <TextBlock Text="{loc:Text Key=EachMixHasItsOwnMasterSends}"
                        FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
           </StackPanel>
           <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -127,18 +128,18 @@
                       <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="{Binding Name}" Foreground="{DynamicResource Ox.Text.Primary}" FontWeight="SemiBold"/>
                         <TextBlock Text="{Binding Id}" Foreground="{DynamicResource Ox.Text.Muted}" FontFamily="monospace" FontSize="10"/>
-                        <Button Content="Appearance" Classes="small" HorizontalAlignment="Left" Margin="0,4,0,0"
-                                Click="OnAppearance" ToolTip.Tip="Icon and colour"/>
+                        <Button Content="{loc:Text Key=MixerAppearance}" Classes="small" HorizontalAlignment="Left" Margin="0,4,0,0"
+                                Click="OnAppearance" ToolTip.Tip="{loc:Text Key=IconAndColour}"/>
                       </StackPanel>
                       <TextBlock Grid.Column="1" Text="{Binding KindLabel}" Foreground="{DynamicResource Ox.Text.Muted}" FontSize="11"
                                  VerticalAlignment="Center" IsVisible="{Binding !IsEditable}"/>
-                      <Button Grid.Column="1" Content="▲" Classes="small" ToolTip.Tip="Move up"
+                      <Button Grid.Column="1" Content="▲" Classes="small" ToolTip.Tip="{loc:Text Key=MoveUp}"
                               IsVisible="{Binding IsEditable}" Click="OnMixUp"/>
-                      <Button Grid.Column="3" Content="▼" Classes="small" ToolTip.Tip="Move down"
+                      <Button Grid.Column="3" Content="▼" Classes="small" ToolTip.Tip="{loc:Text Key=MoveDown}"
                               IsVisible="{Binding IsEditable}" Click="OnMixDown"/>
-                      <Button Grid.Column="5" Content="Rename" Classes="small"
+                      <Button Grid.Column="5" Content="{loc:Text Key=Rename}" Classes="small"
                               IsVisible="{Binding IsEditable}" Click="OnRenameMix"/>
-                      <Button Grid.Column="7" Content="Delete" Classes="small danger"
+                      <Button Grid.Column="7" Content="{loc:Text Key=Delete}" Classes="small danger"
                               IsVisible="{Binding IsEditable}" Click="OnDeleteMix"/>
                     </Grid>
                   </Border>

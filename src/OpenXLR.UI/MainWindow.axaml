@@ -1,4 +1,5 @@
 <Window xmlns="https://github.com/avaloniaui"
+        xmlns:loc="using:OpenXLR.UI.Localization"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:OpenXLR.UI"
         xmlns:skin="using:OpenXLR.UI.Skinning"
@@ -170,19 +171,19 @@
       <Grid Name="WindowHeader" ColumnDefinitions="Auto,8,Auto,*" RowDefinitions="Auto,Auto">
         <Button Name="OptionsButton" Grid.RowSpan="2" Content="⚙" FontSize="18" Padding="8,4"
                 VerticalAlignment="Center" Classes="ghost"
-                Click="OnOptions" ToolTip.Tip="Options"/>
+                Click="OnOptions" ToolTip.Tip="{loc:Text Key=Options}"/>
         <TextBlock Grid.Column="2" Text="OpenXLR" Classes="title" VerticalAlignment="Center"/>
         <Grid Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2" ColumnDefinitions="Auto,*"
               ColumnSpacing="6" Margin="0,2,0,0">
             <skin:StatusLed IsOn="{Binding DeviceConnected}"
-                            AutomationProperties.Name="Interface connection"/>
+                            AutomationProperties.Name="{loc:Text Key=InterfaceConnection}"/>
             <TextBlock Name="DeviceStatus" Grid.Column="1" Text="{Binding StatusLine}" Classes="h"
                        VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding StatusLine}"
                        IsVisible="{Binding !HasMultipleDevices}"/>
             <DropDownButton Name="DevicePicker" Grid.Column="1" Content="{Binding ActiveDeviceName}" FontSize="11" Padding="6,1"
                             MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center" HorizontalAlignment="Left" Classes="ghost"
                             IsVisible="{Binding HasMultipleDevices}"
-                            ToolTip.Tip="{Binding ActiveDeviceName, StringFormat='{}{0}&#x0a;Select the interface OpenXLR drives'}">
+                            ToolTip.Tip="{Binding ActiveDeviceName, StringFormat={loc:Text Key=SelectInterfaceTip}}">
               <DropDownButton.ContentTemplate>
                 <DataTemplate x:DataType="x:String">
                   <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis"/>
@@ -205,14 +206,14 @@
         </Grid>
         <WrapPanel Name="HeaderActions" Grid.Column="3" ItemSpacing="8" LineSpacing="4" Margin="8,0,0,0"
                    HorizontalAlignment="Right" ItemsAlignment="End" VerticalAlignment="Center">
-          <DropDownButton Content="Profiles" Padding="10,3" FontSize="12" Classes="ghost"
-                          ToolTip.Tip="Save and recall complete scenes: hardware DSP plus the whole submix">
+          <DropDownButton Content="{loc:Text Key=Profiles}" Padding="10,3" FontSize="12" Classes="ghost"
+                          ToolTip.Tip="{loc:Text Key=SaveAndRecallCompleteScenesHardwareDSPPlus}">
             <DropDownButton.Flyout>
               <Flyout Placement="BottomEdgeAlignedRight">
                 <StackPanel MinWidth="240" Spacing="6">
                   <Grid ColumnDefinitions="*,Auto">
-                    <TextBox Name="ProfileNameBox" PlaceholderText="profile name" FontSize="12"/>
-                    <Button Grid.Column="1" Content="Save" Margin="6,0,0,0" FontSize="12"
+                    <TextBox Name="ProfileNameBox" PlaceholderText="{loc:Text Key=ProfileName}" FontSize="12"/>
+                    <Button Grid.Column="1" Content="{loc:Text Key=Save}" Margin="6,0,0,0" FontSize="12"
                             Click="OnProfileSave"/>
                   </Grid>
                   <ItemsControl ItemsSource="{Binding Profiles}">
@@ -222,19 +223,19 @@
                           <Button Content="{Binding}" HorizontalAlignment="Stretch"
                                   HorizontalContentAlignment="Left" FontSize="12"
                                   Classes="ghost" Click="OnProfileLoad"
-                                  ToolTip.Tip="Load this profile"/>
+                                  ToolTip.Tip="{loc:Text Key=LoadThisProfile}"/>
                           <Button Grid.Column="1" Content="&#x2715;" FontSize="11" Padding="6,3"
                                   Classes="ghost" Click="OnProfileDelete"
-                                  Tag="{Binding}" ToolTip.Tip="Delete this profile"/>
+                                  Tag="{Binding}" ToolTip.Tip="{loc:Text Key=DeleteThisProfile}"/>
                         </Grid>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
-                  <TextBlock Text="no profiles saved yet" Classes="h" FontSize="11"
+                  <TextBlock Text="{loc:Text Key=NoProfilesSavedYet}" Classes="h" FontSize="11"
                              IsVisible="{Binding !Profiles.Count}"/>
                   <Grid ColumnDefinitions="Auto,*" Margin="0,4,0,0" IsVisible="{Binding !!Profiles.Count}"
-                        ToolTip.Tip="Recalled when the interface connects: daemon start, a replug or power cycle, or switching to it">
-                    <TextBlock Text="On connect" Classes="h" FontSize="11" VerticalAlignment="Center"/>
+                        ToolTip.Tip="{loc:Text Key=RecalledWhenTheInterfaceConnectsDaemonStartA}">
+                    <TextBlock Text="{loc:Text Key=OnConnect}" Classes="h" FontSize="11" VerticalAlignment="Center"/>
                     <ComboBox Grid.Column="1" Margin="8,0,0,0" FontSize="12" HorizontalAlignment="Stretch"
                               ItemsSource="{Binding RecallChoices}"
                               SelectedItem="{Binding RecallOnConnectChoice}"/>
@@ -243,14 +244,14 @@
               </Flyout>
             </DropDownButton.Flyout>
           </DropDownButton>
-          <Button Content="Flow" Padding="10,3" FontSize="12" Classes="ghost"
-                  Click="OnFlow" ToolTip.Tip="Show the live audio routing graph"/>
-          <Button Content="Restart daemon" Padding="10,3" FontSize="12" Classes="ghost"
+          <Button Content="{loc:Text Key=Flow}" Padding="10,3" FontSize="12" Classes="ghost"
+                  Click="OnFlow" ToolTip.Tip="{loc:Text Key=ShowTheLiveAudioRoutingGraph}"/>
+          <Button Content="{loc:Text Key=RestartDaemon}" Padding="10,3" FontSize="12" Classes="ghost"
                   IsEnabled="{Binding DaemonRestart.CanRestart}" Click="OnRestartDaemon"
-                  ToolTip.Tip="Restart the OpenXLR user service. Audio will be interrupted briefly."/>
+                  ToolTip.Tip="{loc:Text Key=RestartTheOpenXLRUserServiceAudioWillBe}"/>
           <TextBlock Name="HeaderVersion" Text="v0.0.0" Classes="h" VerticalAlignment="Center"/>
-          <Button Content="Desktop keys" Padding="10,3" FontSize="{DynamicResource Ox.Label.FontSize}" Classes="ghost" Click="OnDesktopKeys"/>
-          <Button Content="About" Padding="10,3" FontSize="12" Classes="ghost"
+          <Button Content="{loc:Text Key=DesktopKeys}" Padding="10,3" FontSize="{DynamicResource Ox.Label.FontSize}" Classes="ghost" Click="OnDesktopKeys"/>
+          <Button Content="{loc:Text Key=About}" Padding="10,3" FontSize="12" Classes="ghost"
                   Click="OnAbout"/>
         </WrapPanel>
       </Grid>
@@ -265,15 +266,15 @@
       <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
         <TextBlock Text="{Binding Updates.Title}" Classes="info"
                    TextWrapping="Wrap" VerticalAlignment="Center"/>
-        <Button Grid.Column="1" Content="View changes" Click="OnUpdates"/>
-        <Button Grid.Column="2" Content="Dismiss" Click="OnDismissUpdate" Classes="ghost"/>
+        <Button Grid.Column="1" Content="{loc:Text Key=ViewChanges}" Click="OnUpdates"/>
+        <Button Grid.Column="2" Content="{loc:Text Key=Dismiss}" Click="OnDismissUpdate" Classes="ghost"/>
       </Grid>
     </Border>
 
     <!-- a daemon left running across an upgrade offers the old version's controls -->
     <Border Classes="card" Margin="0,0,0,8" IsVisible="{Binding DaemonVersionMismatch}">
       <DockPanel>
-        <Button DockPanel.Dock="Right" Content="Restart daemon" Padding="10,3" FontSize="12"
+        <Button DockPanel.Dock="Right" Content="{loc:Text Key=RestartDaemon}" Padding="10,3" FontSize="12"
                 IsEnabled="{Binding DaemonRestart.CanRestart}"
                 VerticalAlignment="Center" Click="OnRestartDaemon"
                 ToolTip.Tip="systemctl --user restart openxlr-daemon"/>
@@ -283,16 +284,16 @@
     </Border>
 
     <WrapPanel Margin="0,0,0,8">
-      <ToggleButton Name="ArrangeButton" Content="Arrange" Click="OnArrange" Padding="8,1" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+      <ToggleButton Name="ArrangeButton" Content="{loc:Text Key=Arrange}" Click="OnArrange" Padding="8,1" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                     IsVisible="{Binding !IsMiniView}"
                     FontSize="{DynamicResource Ox.Label.FontSize}"
-                    ToolTip.Tip="Show handles to move sections, channels and mixes by dragging or with the arrow keys"/>
-      <Button Name="ResetSectionsButton" Content="Reset sections" Click="OnResetSections" Padding="8,1" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                    ToolTip.Tip="{loc:Text Key=ShowHandlesToMoveSectionsChannelsAnd}"/>
+      <Button Name="ResetSectionsButton" Content="{loc:Text Key=ResetSections}" Click="OnResetSections" Padding="8,1" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
               IsVisible="False" Margin="8,0,0,0" FontSize="{DynamicResource Ox.Label.FontSize}"
-              ToolTip.Tip="Put the five sections back in their original order"/>
+              ToolTip.Tip="{loc:Text Key=PutTheFiveSectionsBackInTheir}"/>
     </WrapPanel>
     <TextBlock Name="ArrangementNote" Classes="note" TextWrapping="Wrap" IsVisible="False" Margin="0,0,0,8"
-               Text="Drag a handle onto another section or tile, or focus it and use the arrow keys. Escape cancels a drag."/>
+               Text="{loc:Text Key=DragAHandleOntoAnotherSectionOr}"/>
 
     <!-- the five sections, in the order saved in ui.json -->
     <StackPanel Name="SectionCards" Spacing="8">
@@ -300,45 +301,45 @@
     <Border Classes="card" IsVisible="{Binding ShowDetailedSections}">
       <Expander Name="InputsTile" Classes="section" Theme="{StaticResource TileExpanderTheme}" IsExpanded="True">
         <Expander.Header><StackPanel Orientation="Horizontal" Spacing="6">
-          <Button Classes="ghost reorderHandle" Content="↕" Tag="InputsTile" AutomationProperties.Name="Move inputs"
-          ToolTip.Tip="Drag to another section; arrow keys move it one place"/>
-          <TextBlock Text="INPUTS" Classes="h" VerticalAlignment="Center"/>
+          <Button Classes="ghost reorderHandle" Content="↕" Tag="InputsTile" AutomationProperties.Name="{loc:Text Key=MoveInputs}"
+          ToolTip.Tip="{loc:Text Key=DragToAnotherSectionArrowKeysMove}"/>
+          <TextBlock Text="{loc:Text Key=INPUTS}" Classes="h" VerticalAlignment="Center"/>
         </StackPanel></Expander.Header>
       <StackPanel Classes="dev" Spacing="4">
 
         <!-- XLR 1 -->
         <Grid ColumnDefinitions="90,*,64,Auto">
-          <TextBlock Text="XLR 1 gain" Classes="h" VerticalAlignment="Center"/>
+          <TextBlock Text="{loc:Text Key=XLR1Gain}" Classes="h" VerticalAlignment="Center"/>
           <Slider Grid.Column="1" Minimum="0" Maximum="80" TickFrequency="1" IsSnapToTickEnabled="True"
                   Value="{Binding GainDb, Mode=TwoWay}" IsEnabled="{Binding !GainLocked}"/>
           <TextBlock Grid.Column="2" Text="{Binding GainText}" Classes="val" VerticalAlignment="Center"
                      HorizontalAlignment="Right"/>
-          <ToggleButton Grid.Column="3" Content="Lock" Classes="mute" FontSize="11" Padding="8,2"
+          <ToggleButton Grid.Column="3" Content="{loc:Text Key=Lock}" Classes="mute" FontSize="11" Padding="8,2"
                         Margin="6,0,0,0" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowGainLock}"
                         IsChecked="{Binding GainLocked, Mode=TwoWay}" VerticalAlignment="Center"
-                        ToolTip.Tip="Gain lock: the daemon rejects every gain change while set"/>
+                        ToolTip.Tip="{loc:Text Key=GainLockTheDaemonRejectsEveryGainChange}"/>
         </Grid>
         <WrapPanel Name="InputControls" ItemSpacing="6" LineSpacing="4">
           <ToggleButton Content="{Binding MuteLabel}" Classes="mute" IsChecked="{Binding Mute, Mode=TwoWay}"
                         IsEnabled="{Binding !PhantomSettling}"
-                        ToolTip.Tip="The device mutes this input for about 13 seconds around every 48V change and unmutes it itself"/>
-          <ToggleButton Content="Low Cut"    IsChecked="{Binding LowCut, Mode=TwoWay}"     IsVisible="{Binding CapLowCut}"/>
+                        ToolTip.Tip="{loc:Text Key=TheDeviceMutesThisInputForAbout13}"/>
+          <ToggleButton Content="{loc:Text Key=LowCut}"    IsChecked="{Binding LowCut, Mode=TwoWay}"     IsVisible="{Binding CapLowCut}"/>
           <ToggleButton Content="{Binding SoftLowCutText}" IsVisible="{Binding ShowSoftLowCut}"
                         IsChecked="{Binding SoftLowCutOn, Mode=OneWay}" Click="OnCycleSoftLowCut"
-                        ToolTip.Tip="Host-side low cut for this device (its DSP lives in software); cycles Off, 80 Hz, 120 Hz"/>
-          <ToggleButton Content="ClipGuard" IsVisible="{Binding ShowSoftClipGuard}"
+                        ToolTip.Tip="{loc:Text Key=HostSideLowCutForThisDeviceIts}"/>
+          <ToggleButton Content="{loc:Text Key=ClipGuard}" IsVisible="{Binding ShowSoftClipGuard}"
                         IsChecked="{Binding SoftClipGuard, Mode=TwoWay}"
                         IsEnabled="{Binding SoftClipGuardAvailable}"
                         ToolTip.Tip="{Binding SoftClipGuardTip}"/>
-          <ToggleButton Content="Expander"   IsChecked="{Binding Expander, Mode=TwoWay}"   IsVisible="{Binding CapExpander}"/>
-          <ToggleButton Content="Voice Tune" IsChecked="{Binding VoiceTune, Mode=TwoWay}"  IsVisible="{Binding CapVoiceTune}"/>
-          <ToggleButton Content="Phantom"  IsChecked="{Binding Phantom, Mode=TwoWay}"    IsVisible="{Binding CapPhantom}"/>
-          <ToggleButton Content="ClipGuard" IsChecked="{Binding ClipGuard, Mode=TwoWay}" IsVisible="{Binding CapClipGuard}"/>
-          <ToggleButton Content="Compressor" IsChecked="{Binding Compressor, Mode=TwoWay}"
+          <ToggleButton Content="{loc:Text Key=Expander}"   IsChecked="{Binding Expander, Mode=TwoWay}"   IsVisible="{Binding CapExpander}"/>
+          <ToggleButton Content="{loc:Text Key=VoiceTune}" IsChecked="{Binding VoiceTune, Mode=TwoWay}"  IsVisible="{Binding CapVoiceTune}"/>
+          <ToggleButton Content="{loc:Text Key=Phantom}"  IsChecked="{Binding Phantom, Mode=TwoWay}"    IsVisible="{Binding CapPhantom}"/>
+          <ToggleButton Content="{loc:Text Key=ClipGuard}" IsChecked="{Binding ClipGuard, Mode=TwoWay}" IsVisible="{Binding CapClipGuard}"/>
+          <ToggleButton Content="{loc:Text Key=Compressor}" IsChecked="{Binding Compressor, Mode=TwoWay}"
                         IsVisible="{Binding CapCompressor}"/>
         </WrapPanel>
         <Grid ColumnDefinitions="90,*,64" IsVisible="{Binding VoiceTune}">
-          <TextBlock Text="VT strength" Classes="h" VerticalAlignment="Center"/>
+          <TextBlock Text="{loc:Text Key=VTStrength}" Classes="h" VerticalAlignment="Center"/>
           <Slider Grid.Column="1" Minimum="0" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True"
                   Value="{Binding VoiceTuneStrength, Mode=TwoWay}"/>
           <TextBlock Grid.Column="2" Text="{Binding VoiceTuneStrengthText}" Classes="val"
@@ -351,10 +352,10 @@
              in their own window. -->
         <StackPanel Spacing="4" Margin="0,4,0,0" IsVisible="{Binding HasMixer}">
           <Grid ColumnDefinitions="90,*,Auto">
-            <TextBlock Text="Inserts" Classes="h" VerticalAlignment="Center"
-                       ToolTip.Tip="Plugins processing XLR 1 before it reaches the mixes"/>
+            <TextBlock Text="{loc:Text Key=Inserts}" Classes="h" VerticalAlignment="Center"
+                       ToolTip.Tip="{loc:Text Key=PluginsProcessingXLR1BeforeItReachesThe}"/>
             <Button Grid.Column="2" Content="{Binding Inserts.ButtonText}" Padding="12,3" FontSize="12" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
-                    Click="OnXlrInserts" ToolTip.Tip="Plugins processing XLR 1 before it reaches the mixes"/>
+                    Click="OnXlrInserts" ToolTip.Tip="{loc:Text Key=PluginsProcessingXLR1BeforeItReachesThe}"/>
           </Grid>
           <!-- the chain at a glance: LED, name, bypass, controls; adding,
                ordering and removing live in the chain window -->
@@ -363,7 +364,7 @@
               <DataTemplate x:DataType="vm:InsertViewModel">
                 <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="0,0,0,3">
                   <skin:StatusLed IsOn="{Binding IsActive}" Kind="Insert" Margin="0,0,8,0"
-                                  AutomationProperties.Name="Plugin state"/>
+                                  AutomationProperties.Name="{loc:Text Key=PluginState}"/>
                   <Grid Grid.Column="1" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"
                         ColumnSpacing="8" VerticalAlignment="Center" ClipToBounds="True">
                     <TextBlock Text="{Binding Label}" Classes="insertName body" FontSize="12"
@@ -372,20 +373,20 @@
                     <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Error}" Classes="warn"
                                FontSize="11" TextWrapping="Wrap" IsVisible="{Binding HasError}"/>
                   </Grid>
-                  <ToggleButton Grid.Column="2" Content="N" Classes="insertmini"
+                  <ToggleButton Grid.Column="2" Content="{loc:Text Key=NativeHostLetter}" Classes="insertmini"
                                 IsChecked="{Binding NativeHost, Mode=TwoWay}"
                                 IsVisible="{Binding CanChooseNativeHost}"
                                 IsEnabled="{Binding CanTurnNativeHostOn}"
                                 Margin="4,0,0,0"
-                                AutomationProperties.Name="Run this plugin in its own process"
-                                ToolTip.Tip="Run this plugin in its own process, which is what lets its own editor open. Switching rebuilds the chain and interrupts audio for a moment."/>
-                  <ToggleButton Grid.Column="3" Content="B" Classes="insertmini bypass"
+                                AutomationProperties.Name="{loc:Text Key=RunThisPluginInItsOwnProcess}"
+                                ToolTip.Tip="{loc:Text Key=RunThisPluginInItsOwnProcessWhich}"/>
+                  <ToggleButton Grid.Column="3" Content="{loc:Text Key=BypassLetter}" Classes="insertmini bypass"
                                 IsChecked="{Binding Bypass, Mode=TwoWay}"
                                 Margin="4,0,2,0"
-                                AutomationProperties.Name="Bypass this plugin"
-                                ToolTip.Tip="Bypass"/>
+                                AutomationProperties.Name="{loc:Text Key=BypassThisPlugin}"
+                                ToolTip.Tip="{loc:Text Key=Bypass}"/>
                   <Button Grid.Column="4" Content="⚙" Classes="insertmini"
-                          AutomationProperties.Name="Open this plugin's controls"
+                          AutomationProperties.Name="{loc:Text Key=OpenThisPluginSControls}"
                           Click="OnInsertControls" ToolTip.Tip="{Binding ControlsHint}"/>
                 </Grid>
               </DataTemplate>
@@ -395,7 +396,7 @@
 
         <!-- XLR 2 -->
         <Grid ColumnDefinitions="90,*,64" Margin="0,2,0,0" IsVisible="{Binding HasXlr2}">
-          <TextBlock Text="XLR 2 gain" Classes="h" VerticalAlignment="Center"/>
+          <TextBlock Text="{loc:Text Key=XLR2Gain}" Classes="h" VerticalAlignment="Center"/>
           <Slider Grid.Column="1" Minimum="0" Maximum="80" TickFrequency="1" IsSnapToTickEnabled="True"
                   Value="{Binding Gain2Db, Mode=TwoWay}" IsEnabled="{Binding !GainLocked}"/>
           <TextBlock Grid.Column="2" Text="{Binding Gain2Text}" Classes="val" VerticalAlignment="Center"
@@ -404,22 +405,22 @@
         <WrapPanel Name="Input2Controls" ItemSpacing="6" LineSpacing="4" IsVisible="{Binding HasXlr2}">
           <ToggleButton Content="{Binding Mute2Label}" Classes="mute" IsChecked="{Binding Mute2, Mode=TwoWay}"
                         IsEnabled="{Binding !PhantomSettling2}"
-                        ToolTip.Tip="The device mutes this input for about 13 seconds around every 48V change and unmutes it itself"/>
-          <ToggleButton Content="Low Cut"    IsChecked="{Binding LowCut2, Mode=TwoWay}"/>
-          <ToggleButton Content="Expander"   IsChecked="{Binding Expander2, Mode=TwoWay}"/>
-          <ToggleButton Content="Voice Tune" IsChecked="{Binding VoiceTune2, Mode=TwoWay}"/>
-          <ToggleButton Content="Phantom"  IsChecked="{Binding Phantom2, Mode=TwoWay}"/>
-          <ToggleButton Content="ClipGuard" IsChecked="{Binding ClipGuard2, Mode=TwoWay}"/>
-          <ToggleButton Content="Compressor" IsChecked="{Binding Compressor2, Mode=TwoWay}"/>
+                        ToolTip.Tip="{loc:Text Key=TheDeviceMutesThisInputForAbout13}"/>
+          <ToggleButton Content="{loc:Text Key=LowCut}"    IsChecked="{Binding LowCut2, Mode=TwoWay}"/>
+          <ToggleButton Content="{loc:Text Key=Expander}"   IsChecked="{Binding Expander2, Mode=TwoWay}"/>
+          <ToggleButton Content="{loc:Text Key=VoiceTune}" IsChecked="{Binding VoiceTune2, Mode=TwoWay}"/>
+          <ToggleButton Content="{loc:Text Key=Phantom}"  IsChecked="{Binding Phantom2, Mode=TwoWay}"/>
+          <ToggleButton Content="{loc:Text Key=ClipGuard}" IsChecked="{Binding ClipGuard2, Mode=TwoWay}"/>
+          <ToggleButton Content="{loc:Text Key=Compressor}" IsChecked="{Binding Compressor2, Mode=TwoWay}"/>
         </WrapPanel>
         <!-- XLR 2 plugin inserts: same chain concept, its own mono filter-chain -->
         <StackPanel IsVisible="{Binding HasXlr2}">
         <StackPanel Spacing="4" Margin="0,4,0,0" IsVisible="{Binding HasMixer}">
           <Grid ColumnDefinitions="90,*,Auto">
-            <TextBlock Text="Inserts" Classes="h" VerticalAlignment="Center"
-                       ToolTip.Tip="Plugins processing XLR 2 before it reaches the mixes"/>
+            <TextBlock Text="{loc:Text Key=Inserts}" Classes="h" VerticalAlignment="Center"
+                       ToolTip.Tip="{loc:Text Key=PluginsProcessingXLR2BeforeItReachesThe}"/>
             <Button Grid.Column="2" Content="{Binding Inserts2.ButtonText}" Padding="12,3" FontSize="12" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
-                    Tag="xlr2" Click="OnXlrInserts" ToolTip.Tip="Plugins processing XLR 2 before it reaches the mixes"/>
+                    Tag="xlr2" Click="OnXlrInserts" ToolTip.Tip="{loc:Text Key=PluginsProcessingXLR2BeforeItReachesThe}"/>
           </Grid>
           <!-- the chain at a glance: LED, name, bypass, controls; adding,
                ordering and removing live in the chain window -->
@@ -428,7 +429,7 @@
               <DataTemplate x:DataType="vm:InsertViewModel">
                 <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="0,0,0,3">
                   <skin:StatusLed IsOn="{Binding IsActive}" Kind="Insert" Margin="0,0,8,0"
-                                  AutomationProperties.Name="Plugin state"/>
+                                  AutomationProperties.Name="{loc:Text Key=PluginState}"/>
                   <Grid Grid.Column="1" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"
                         ColumnSpacing="8" VerticalAlignment="Center" ClipToBounds="True">
                     <TextBlock Text="{Binding Label}" Classes="insertName body" FontSize="12"
@@ -437,20 +438,20 @@
                     <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Error}" Classes="warn"
                                FontSize="11" TextWrapping="Wrap" IsVisible="{Binding HasError}"/>
                   </Grid>
-                  <ToggleButton Grid.Column="2" Content="N" Classes="insertmini"
+                  <ToggleButton Grid.Column="2" Content="{loc:Text Key=NativeHostLetter}" Classes="insertmini"
                                 IsChecked="{Binding NativeHost, Mode=TwoWay}"
                                 IsVisible="{Binding CanChooseNativeHost}"
                                 IsEnabled="{Binding CanTurnNativeHostOn}"
                                 Margin="4,0,0,0"
-                                AutomationProperties.Name="Run this plugin in its own process"
-                                ToolTip.Tip="Run this plugin in its own process, which is what lets its own editor open. Switching rebuilds the chain and interrupts audio for a moment."/>
-                  <ToggleButton Grid.Column="3" Content="B" Classes="insertmini bypass"
+                                AutomationProperties.Name="{loc:Text Key=RunThisPluginInItsOwnProcess}"
+                                ToolTip.Tip="{loc:Text Key=RunThisPluginInItsOwnProcessWhich}"/>
+                  <ToggleButton Grid.Column="3" Content="{loc:Text Key=BypassLetter}" Classes="insertmini bypass"
                                 IsChecked="{Binding Bypass, Mode=TwoWay}"
                                 Margin="4,0,2,0"
-                                AutomationProperties.Name="Bypass this plugin"
-                                ToolTip.Tip="Bypass"/>
+                                AutomationProperties.Name="{loc:Text Key=BypassThisPlugin}"
+                                ToolTip.Tip="{loc:Text Key=Bypass}"/>
                   <Button Grid.Column="4" Content="⚙" Classes="insertmini"
-                          AutomationProperties.Name="Open this plugin's controls"
+                          AutomationProperties.Name="{loc:Text Key=OpenThisPluginSControls}"
                           Click="OnInsertControls" ToolTip.Tip="{Binding ControlsHint}"/>
                 </Grid>
               </DataTemplate>
@@ -460,7 +461,7 @@
         </StackPanel>
 
         <Grid ColumnDefinitions="90,*,64" IsVisible="{Binding VoiceTune2}">
-          <TextBlock Text="VT strength" Classes="h" VerticalAlignment="Center"/>
+          <TextBlock Text="{loc:Text Key=VTStrength}" Classes="h" VerticalAlignment="Center"/>
           <Slider Grid.Column="1" Minimum="0" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True"
                   Value="{Binding VoiceTuneStrength2, Mode=TwoWay}"/>
           <TextBlock Grid.Column="2" Text="{Binding VoiceTuneStrength2Text}" Classes="val"
@@ -469,12 +470,12 @@
 
         <!-- USB Aux input stage -->
         <Grid ColumnDefinitions="90,*,64,20,110" Margin="0,2,0,0" IsVisible="{Binding CapAuxInput}">
-          <TextBlock Text="USB Aux in" Classes="h" VerticalAlignment="Center"/>
+          <TextBlock Text="{loc:Text Key=USBAuxIn}" Classes="h" VerticalAlignment="Center"/>
           <Slider Grid.Column="1" Minimum="-60" Maximum="0"
                   Value="{Binding AuxLevelDb, Mode=TwoWay}"/>
           <TextBlock Grid.Column="2" Text="{Binding AuxLevelText}" Classes="val" VerticalAlignment="Center"
                      HorizontalAlignment="Right"/>
-          <ToggleButton Grid.Column="4" Content="Level Lock" IsChecked="{Binding AuxLevelLock, Mode=TwoWay}"/>
+          <ToggleButton Grid.Column="4" Content="{loc:Text Key=LevelLock}" IsChecked="{Binding AuxLevelLock, Mode=TwoWay}"/>
         </Grid>
       </StackPanel>
       </Expander>
@@ -484,18 +485,18 @@
     <Border Classes="card" IsVisible="{Binding ShowDetailedSections}">
       <Expander Name="HeadphonesTile" Classes="section" Theme="{StaticResource TileExpanderTheme}" IsExpanded="True">
         <Expander.Header><StackPanel Orientation="Horizontal" Spacing="6">
-          <Button Classes="ghost reorderHandle" Content="↕" Tag="HeadphonesTile" AutomationProperties.Name="Move headphones"
-          ToolTip.Tip="Drag to another section; arrow keys move it one place"/>
-          <TextBlock Text="HEADPHONES" Classes="h" VerticalAlignment="Center"/>
+          <Button Classes="ghost reorderHandle" Content="↕" Tag="HeadphonesTile" AutomationProperties.Name="{loc:Text Key=MoveHeadphones}"
+          ToolTip.Tip="{loc:Text Key=DragToAnotherSectionArrowKeysMove}"/>
+          <TextBlock Text="{loc:Text Key=HEADPHONES}" Classes="h" VerticalAlignment="Center"/>
         </StackPanel></Expander.Header>
       <StackPanel Classes="dev" Spacing="4">
         <Grid ColumnDefinitions="90,*,64,20,90,*,64">
-          <TextBlock Text="Phones 1" Classes="h" VerticalAlignment="Center" ToolTip.Tip="Front jack"/>
+          <TextBlock Text="{loc:Text Key=Phones1}" Classes="h" VerticalAlignment="Center" ToolTip.Tip="{loc:Text Key=FrontJack}"/>
           <Slider Grid.Column="1" Minimum="0" Maximum="100"
                   Value="{Binding HpPercent, Mode=TwoWay}"/>
           <TextBlock Grid.Column="2" Text="{Binding HpText}" Classes="val" VerticalAlignment="Center"
                      HorizontalAlignment="Right"/>
-          <TextBlock Grid.Column="4" Text="Phones 2" Classes="h" VerticalAlignment="Center" ToolTip.Tip="Rear jack"
+          <TextBlock Grid.Column="4" Text="{loc:Text Key=Phones2}" Classes="h" VerticalAlignment="Center" ToolTip.Tip="{loc:Text Key=RearJack}"
                      IsVisible="{Binding HasHp2}"/>
           <Slider Grid.Column="5" Minimum="0" Maximum="100"
                   Value="{Binding Hp2Percent, Mode=TwoWay}" IsVisible="{Binding HasHp2}"/>
@@ -505,15 +506,15 @@
         <!-- hardware zero-latency blend between mic direct and PC playback;
              the value column fits the widest readout, "mic +100" -->
         <Grid ColumnDefinitions="90,*,74" IsVisible="{Binding CapCrossfade}">
-          <TextBlock Text="Mic ↔ PC" Classes="h" VerticalAlignment="Center"
-                     ToolTip.Tip="Direct-monitor blend: left = only your mic, right = only PC audio"/>
+          <TextBlock Text="{loc:Text Key=MicPC}" Classes="h" VerticalAlignment="Center"
+                     ToolTip.Tip="{loc:Text Key=DirectMonitorBlendLeftOnlyYourMicRight}"/>
           <Slider Grid.Column="1" Minimum="0" Maximum="200" TickFrequency="1" IsSnapToTickEnabled="True"
                   Value="{Binding Crossfade, Mode=TwoWay}"/>
           <TextBlock Grid.Column="2" Text="{Binding CrossfadeText}" Classes="val"
                      VerticalAlignment="Center" HorizontalAlignment="Right"/>
         </Grid>
         <UniformGrid Columns="7">
-          <ToggleButton Content="Low Imp." IsChecked="{Binding LowImpedance, Mode=TwoWay}" Margin="0,0,6,0"
+          <ToggleButton Content="{loc:Text Key=LowImp}" IsChecked="{Binding LowImpedance, Mode=TwoWay}" Margin="0,0,6,0"
                         IsVisible="{Binding CapLowImpedance}"/>
         </UniformGrid>
       </StackPanel>
@@ -525,19 +526,19 @@
       <Expander Name="MonitorTile" Classes="section" Theme="{StaticResource TileExpanderTheme}" IsExpanded="True">
         <Expander.Header>
           <StackPanel Orientation="Horizontal" Spacing="6">
-            <Button Classes="ghost reorderHandle" Content="↕" Tag="MonitorTile" AutomationProperties.Name="Move monitor"
-                    ToolTip.Tip="Drag to another section; arrow keys move it one place"/>
-            <TextBlock Text="MONITOR" Classes="h" VerticalAlignment="Center"/>
+            <Button Classes="ghost reorderHandle" Content="↕" Tag="MonitorTile" AutomationProperties.Name="{loc:Text Key=MoveMonitor}"
+                    ToolTip.Tip="{loc:Text Key=DragToAnotherSectionArrowKeysMove}"/>
+            <TextBlock Text="{loc:Text Key=MONITOR}" Classes="h" VerticalAlignment="Center"/>
             <ToggleButton Name="OutputBoost" Content="150%" IsChecked="{Binding OutputVolumeRange.Boost, Mode=TwoWay}"
                           Padding="8,1" FontSize="{DynamicResource Ox.Label.FontSize}" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
-                          ToolTip.Tip="Allow output volume above 100%, up to 150%. Turning this off returns a boosted output to 100%. On KDE Plasma this is the desktop's Raise maximum volume setting, shared by every monitor control."/>
+                          ToolTip.Tip="{loc:Text Key=AllowOutputVolumeAbove100UpTo}"/>
             <TextBlock Text="&#x24D8;" Classes="h" FontSize="12" VerticalAlignment="Center" Margin="0,-1,0,0" Cursor="Help"
-                       ToolTip.Tip="Tick the outputs you want to hear. Choose a mix beside each output. The Wave XLR Pro's own outputs (Headphones 1/2, USB Aux, Line Out) switch the hardware when ticked and share one feed. The USB Aux port is fed by the dedicated Aux mix in the submixer instead. XLR 1, XLR 2 and Line In feed their channels automatically. System default devices for apps are set in Options."/>
+                       ToolTip.Tip="{loc:Text Key=TickTheOutputsYouWantToHearChoose}"/>
           </StackPanel>
         </Expander.Header>
       <StackPanel Classes="dev" Spacing="4">
         <Grid ColumnDefinitions="90,*,20,90,*,64">
-          <TextBlock Text="Devices" Classes="h" VerticalAlignment="Center"/>
+          <TextBlock Text="{loc:Text Key=Devices}" Classes="h" VerticalAlignment="Center"/>
           <DropDownButton Grid.Column="1" HorizontalAlignment="Stretch"
                           HorizontalContentAlignment="Left"
                           Content="{Binding MonitorSummary}">
@@ -557,7 +558,7 @@
                         <ComboBox Grid.Column="1" ItemsSource="{Binding Feeds}" SelectedItem="{Binding Feed}"
                                   FontSize="11" HorizontalAlignment="Stretch" Margin="8,0,0,0" VerticalAlignment="Center"
                                   IsVisible="{Binding IsSelected}"
-                                  ToolTip.Tip="Which mix this output hears."/>
+                                  ToolTip.Tip="{loc:Text Key=WhichMixThisOutputHears}"/>
                       </Grid>
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
@@ -566,7 +567,7 @@
             </DropDownButton.Flyout>
           </DropDownButton>
 
-          <TextBlock Grid.Column="3" Text="Volume" Classes="h" VerticalAlignment="Center"/>
+          <TextBlock Grid.Column="3" Text="{loc:Text Key=Volume}" Classes="h" VerticalAlignment="Center"/>
           <Slider Name="OutputVolumeSlider" Grid.Column="4" Minimum="0" Maximum="{Binding OutputVolumeRange.Maximum}" Value="{Binding OutputVolume, Mode=TwoWay}"/>
           <TextBlock Grid.Column="5" Text="{Binding OutputVolumeText}" Classes="val"
                      VerticalAlignment="Center" HorizontalAlignment="Right"/>
@@ -582,10 +583,10 @@
       <Expander Name="ApplicationsTile" Classes="section" Theme="{StaticResource TileExpanderTheme}" IsExpanded="True">
         <Expander.Header>
           <StackPanel Orientation="Horizontal" Spacing="10">
-            <Button Classes="ghost reorderHandle" Content="↕" Tag="ApplicationsTile" AutomationProperties.Name="Move applications"
-                    ToolTip.Tip="Drag to another section; arrow keys move it one place"/>
-            <TextBlock Text="APPLICATIONS" Classes="h" VerticalAlignment="Center"/>
-            <Button Name="ManageApps" Content="Manage" Padding="8,1" FontSize="11" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
+            <Button Classes="ghost reorderHandle" Content="↕" Tag="ApplicationsTile" AutomationProperties.Name="{loc:Text Key=MoveApplications}"
+                    ToolTip.Tip="{loc:Text Key=DragToAnotherSectionArrowKeysMove}"/>
+            <TextBlock Text="{loc:Text Key=APPLICATIONS}" Classes="h" VerticalAlignment="Center"/>
+            <Button Name="ManageApps" Content="{loc:Text Key=Manage}" Padding="8,1" FontSize="11" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
                     IsEnabled="{Binding HasApps}" Click="OnManageApps"/>
           </StackPanel>
         </Expander.Header>
@@ -598,7 +599,7 @@
               <Border Classes="tile" Padding="8,6" Margin="0,0,4,8">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <skin:StatusLed IsOn="{Binding Active}"
-                                  AutomationProperties.Name="Stream state"
+                                  AutomationProperties.Name="{loc:Text Key=StreamState}"
                                   ToolTip.Tip="{Binding StatusText}"/>
                   <TextBlock Text="{Binding Label}" Classes="body" VerticalAlignment="Center"/>
                   <ComboBox ItemsSource="{Binding Channels}" MinWidth="110"
@@ -616,12 +617,12 @@
       <Expander Name="SubmixerTile" Classes="section" Theme="{StaticResource TileExpanderTheme}" IsExpanded="True">
         <Expander.Header>
           <StackPanel Orientation="Horizontal" Spacing="10">
-            <Button Classes="ghost reorderHandle" Content="↕" Tag="SubmixerTile" AutomationProperties.Name="Move submixer"
-                    ToolTip.Tip="Drag to another section; arrow keys move it one place"/>
-            <TextBlock Text="SUBMIXER" Classes="h" VerticalAlignment="Center"/>
-            <Button Content="Edit layout" Padding="8,1" FontSize="11" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
+            <Button Classes="ghost reorderHandle" Content="↕" Tag="SubmixerTile" AutomationProperties.Name="{loc:Text Key=MoveSubmixer}"
+                    ToolTip.Tip="{loc:Text Key=DragToAnotherSectionArrowKeysMove}"/>
+            <TextBlock Text="{loc:Text Key=SUBMIXER}" Classes="h" VerticalAlignment="Center"/>
+            <Button Content="{loc:Text Key=EditLayout}" Padding="8,1" FontSize="11" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
                     IsVisible="{Binding HasMixer}" IsEnabled="{Binding CanEditLayout}" Click="OnEditLayout"
-                    ToolTip.Tip="Add, rename, reorder and remove application channels and virtual microphones while audio plays"/>
+                    ToolTip.Tip="{loc:Text Key=AddRenameReorderAndRemoveApplicationChannelsAnd}"/>
           </StackPanel>
         </Expander.Header>
       <DockPanel>
@@ -633,13 +634,13 @@
           <WrapPanel>
             <ComboBox Name="CompactChannelPicker" ItemsSource="{Binding Channels}" Margin="0,0,8,4"
                       SelectedItem="{Binding SelectedCompactChannel, Mode=TwoWay}" MinWidth="150" MaxWidth="300"
-                      AutomationProperties.Name="Channel shown" ToolTip.Tip="The channel this view shows. Hidden channels can be chosen here.">
+                      AutomationProperties.Name="{loc:Text Key=ChannelShown}" ToolTip.Tip="{loc:Text Key=TheChannelThisViewShowsHiddenChannels}">
               <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:ChannelViewModel"><TextBlock Text="{Binding Name}"/></DataTemplate></ComboBox.ItemTemplate>
             </ComboBox>
             <ComboBox Name="CompactMixPicker" ItemsSource="{Binding Mixes}" Margin="0,0,8,4"
                       SelectedItem="{Binding SelectedCompactMix, Mode=TwoWay}" MinWidth="150" MaxWidth="300"
-                      IsVisible="{Binding ShowMixSelector}" AutomationProperties.Name="Mix shown"
-                      ToolTip.Tip="The mix this view shows: its master and the channel's send into it">
+                      IsVisible="{Binding ShowMixSelector}" AutomationProperties.Name="{loc:Text Key=MixShown}"
+                      ToolTip.Tip="{loc:Text Key=TheMixThisViewShowsItsMaster}">
               <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:MixViewModel"><TextBlock Text="{Binding Name}"/></DataTemplate></ComboBox.ItemTemplate>
             </ComboBox>
           </WrapPanel>
@@ -659,8 +660,8 @@
                       IsVisible="{Binding DisplayVisible}">
                 <StackPanel Spacing="6">
                   <Button Classes="ghost reorderHandle" Classes.fixedPlace="{Binding !IsEditable}" Content="↔" Tag="{Binding}"
-                          HorizontalAlignment="Left" AutomationProperties.Name="{Binding Name, StringFormat='Move {0}'}"
-                          ToolTip.Tip="Drag onto another mix you added; arrow keys move it one place"/>
+                          HorizontalAlignment="Left" AutomationProperties.Name="{Binding Name, StringFormat={loc:Text Key=MoveItem}}"
+                          ToolTip.Tip="{loc:Text Key=DragOntoAnotherMixYouAddedArrow}"/>
                   <Grid ColumnDefinitions="Auto,*,Auto">
                     <TextBlock Text="{Binding Appearance.Icon}" Classes="strip" Classes.layoutAccent="{Binding Appearance.HasColour}"
                                IsVisible="{Binding Appearance.HasIcon}" Margin="0,0,6,0"/>
@@ -669,19 +670,19 @@
                     <TextBlock Grid.Column="2" Text="{Binding VolumeText}" Classes="val"/>
                   </Grid>
                   <StackPanel Spacing="1">
-                    <skin:LevelMeter Level="{Binding MeterL}" AutomationProperties.Name="Left level"/>
-                    <skin:LevelMeter Level="{Binding MeterR}" AutomationProperties.Name="Right level"/>
+                    <skin:LevelMeter Level="{Binding MeterL}" AutomationProperties.Name="{loc:Text Key=LeftLevel}"/>
+                    <skin:LevelMeter Level="{Binding MeterR}" AutomationProperties.Name="{loc:Text Key=RightLevel}"/>
                   </StackPanel>
                   <Slider Minimum="0" Maximum="{Binding VolumeRange.Maximum}" Value="{Binding Volume, Mode=TwoWay}"/>
                   <Grid ColumnDefinitions="*,Auto">
-                    <ToggleButton Content="Mute" Classes="mute" IsChecked="{Binding Muted, Mode=TwoWay}"/>
+                    <ToggleButton Content="{loc:Text Key=Mute}" Classes="mute" IsChecked="{Binding Muted, Mode=TwoWay}"/>
                     <ToggleButton Grid.Column="1" Content="150%" IsChecked="{Binding VolumeRange.Boost, Mode=TwoWay}"
                                   IsVisible="{Binding IsMonitor}" Margin="6,0,0,0"
-                                  ToolTip.Tip="Allow this monitor mix above 100%, up to 150%. Turning this off returns a boosted mix to 100%. On KDE Plasma this is the desktop's Raise maximum volume setting, shared by every monitor control."/>
+                                  ToolTip.Tip="{loc:Text Key=AllowThisMonitorMixAbove100Up}"/>
                   </Grid>
                   <Button Content="{Binding Inserts.ButtonText}" HorizontalAlignment="Stretch"
                           HorizontalContentAlignment="Center" Padding="8,4" FontSize="12" Click="OnMixInserts"
-                          ToolTip.Tip="Stereo plugins processing this mix before it reaches its outputs"/>
+                          ToolTip.Tip="{loc:Text Key=StereoPluginsProcessingThisMixBeforeItReaches}"/>
                   <!-- the chain at a glance: LED, name, bypass, controls; adding,
                        ordering and removing live in the chain window -->
                   <ItemsControl ItemsSource="{Binding Inserts.Items}" IsVisible="{Binding Inserts.HasItems}">
@@ -689,32 +690,32 @@
                       <DataTemplate x:DataType="vm:InsertViewModel">
                         <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="0,2,0,0">
                           <skin:StatusLed IsOn="{Binding IsActive}" Kind="Insert" Margin="0,0,6,0"
-                                          AutomationProperties.Name="Plugin state"/>
+                                          AutomationProperties.Name="{loc:Text Key=PluginState}"/>
                           <TextBlock Grid.Column="1" Text="{Binding Label}" Classes="insertName body"
                                      FontSize="11" VerticalAlignment="Center"
                                      TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
-                          <ToggleButton Grid.Column="2" Content="N" Classes="insertmini"
+                          <ToggleButton Grid.Column="2" Content="{loc:Text Key=NativeHostLetter}" Classes="insertmini"
                                         IsChecked="{Binding NativeHost, Mode=TwoWay}"
                                         IsVisible="{Binding CanChooseNativeHost}"
                                         IsEnabled="{Binding CanTurnNativeHostOn}"
                                         Margin="4,0,0,0" HorizontalAlignment="Right"
-                                        AutomationProperties.Name="Run this plugin in its own process"
-                                        ToolTip.Tip="Run this plugin in its own process, which is what lets its own editor open. Switching rebuilds the chain and interrupts audio for a moment."/>
-                          <ToggleButton Grid.Column="3" Content="B" Classes="insertmini bypass"
+                                        AutomationProperties.Name="{loc:Text Key=RunThisPluginInItsOwnProcess}"
+                                        ToolTip.Tip="{loc:Text Key=RunThisPluginInItsOwnProcessWhich}"/>
+                          <ToggleButton Grid.Column="3" Content="{loc:Text Key=BypassLetter}" Classes="insertmini bypass"
                                         IsChecked="{Binding Bypass, Mode=TwoWay}"
                                         Margin="4,0,2,0" HorizontalAlignment="Right"
-                                        AutomationProperties.Name="Bypass this plugin"
-                                        ToolTip.Tip="Bypass"/>
+                                        AutomationProperties.Name="{loc:Text Key=BypassThisPlugin}"
+                                        ToolTip.Tip="{loc:Text Key=Bypass}"/>
                           <Button Grid.Column="4" Content="⚙" Classes="insertmini"
-                                  AutomationProperties.Name="Open this plugin's controls"
+                                  AutomationProperties.Name="{loc:Text Key=OpenThisPluginSControls}"
                                   Click="OnInsertControls" ToolTip.Tip="{Binding ControlsHint}"/>
                         </Grid>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
-                  <ToggleButton Content="To USB Aux port" IsChecked="{Binding AuxPortEnabled, Mode=TwoWay}"
+                  <ToggleButton Content="{loc:Text Key=ToUSBAuxPort}" IsChecked="{Binding AuxPortEnabled, Mode=TwoWay}"
                                 IsVisible="{Binding ShowAuxPortToggle}"
-                                ToolTip.Tip="Send this mix to the second computer on the USB Aux port. Enabling briefly interrupts the interface's audio while its stream restarts."/>
+                                ToolTip.Tip="{loc:Text Key=SendThisMixToTheSecondComputerOn}"/>
                 </StackPanel>
               </Border>
             </DataTemplate>
@@ -736,16 +737,16 @@
                         IsVisible="{Binding DisplayVisible}">
                   <StackPanel Spacing="8">
                     <Button Classes="ghost reorderHandle" Classes.fixedPlace="{Binding !IsEditable}" Content="↔" Tag="{Binding}"
-                            HorizontalAlignment="Left" AutomationProperties.Name="{Binding Name, StringFormat='Move {0}'}"
-                            ToolTip.Tip="Drag onto another channel you can edit; arrow keys move it one place"/>
+                            HorizontalAlignment="Left" AutomationProperties.Name="{Binding Name, StringFormat={loc:Text Key=MoveItem}}"
+                            ToolTip.Tip="{loc:Text Key=DragOntoAnotherChannelYouCanEdit}"/>
                     <TextBlock Text="{Binding Appearance.Icon}" Classes="strip" Classes.layoutAccent="{Binding Appearance.HasColour}"
                                HorizontalAlignment="Center" IsVisible="{Binding Appearance.HasIcon}"/>
                     <TextBlock Text="{Binding Name}" Classes="strip" Classes.layoutAccent="{Binding Appearance.HasColour}"
                                HorizontalAlignment="Center"/>
                     <!-- stereo level meter (L over R), dB scale -->
                     <StackPanel Spacing="1">
-                      <skin:LevelMeter Level="{Binding MeterL}" AutomationProperties.Name="Left level"/>
-                      <skin:LevelMeter Level="{Binding MeterR}" AutomationProperties.Name="Right level"/>
+                      <skin:LevelMeter Level="{Binding MeterL}" AutomationProperties.Name="{loc:Text Key=LeftLevel}"/>
+                      <skin:LevelMeter Level="{Binding MeterR}" AutomationProperties.Name="{loc:Text Key=RightLevel}"/>
                     </StackPanel>
                     <ItemsControl ItemsSource="{Binding Sends}">
                       <ItemsControl.ItemTemplate>

@@ -1,3 +1,4 @@
+using OpenXLR.UI.Localization;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -94,9 +95,9 @@ public partial class FlowWindow : Window
 
     private void UpdateHint()
     {
-        FlowHint.Text = _vm is { DaemonConnected: false } ? "Daemon disconnected. Waiting for live routing."
-            : _vm is { HasMixer: false } ? "Turn on the submixer in Options to see audio flow."
-            : "Click any element to trace its signal path";
+        FlowHint.Text = _vm is { DaemonConnected: false } ? Localizer.Text("FlowDaemonDisconnected")
+            : _vm is { HasMixer: false } ? Localizer.Text("FlowSubmixerOff")
+            : Localizer.Text("ClickAnyElementToTraceItsSignalPath");
     }
 
     private void ConstrainToScreen()
@@ -135,10 +136,10 @@ public partial class FlowWindow : Window
 
         foreach ((FlowStage stage, string title, FlowIcon icon) in new[]
         {
-            (FlowStage.Input, "INPUTS", FlowIcon.Microphone),
-            (FlowStage.Channel, "CHANNELS", FlowIcon.Channel),
-            (FlowStage.Mix, "MIXES", FlowIcon.Mix),
-            (FlowStage.Output, "OUTPUTS", FlowIcon.Speaker),
+            (FlowStage.Input, Localizer.Text("INPUTS"), FlowIcon.Microphone),
+            (FlowStage.Channel, Localizer.Text("CHANNELS"), FlowIcon.Channel),
+            (FlowStage.Mix, Localizer.Text("MIXES"), FlowIcon.Mix),
+            (FlowStage.Output, Localizer.Text("OUTPUTS"), FlowIcon.Speaker),
         })
         {
             var label = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
@@ -193,7 +194,7 @@ public partial class FlowWindow : Window
             card.Classes.Add("flowNode");
             AutomationProperties.SetName(card, $"{node.Label}, {node.Detail}");
             ToolTip.SetTip(card, node.Label + "\n" + node.Detail + (node.Processing.Length == 0 ? ""
-                : (node.Stage == FlowStage.Channel ? "\nInput processing:\n" : "\nMix processing:\n") + node.Processing));
+                : "\n" + (node.Stage == FlowStage.Channel ? Localizer.Text("FlowInputProcessing") : Localizer.Text("FlowMixProcessing")) + "\n" + node.Processing));
             card.Click += (_, _) => Select(_selected == node.Key ? null : node.Key);
             _cards.Add(node.Key, card);
             Place(card, positions[node.Key].X, node.Y);
