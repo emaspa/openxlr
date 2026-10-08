@@ -17,9 +17,38 @@ query strings are not accepted. Keep the token out of logs and bug reports.
 | `GET /healthz` | Unauthenticated process liveness only, not hardware readiness |
 | `GET /api/v1` | Version and endpoint discovery |
 | `GET /api/v1/state` | Combined state message |
+| `GET /api/v1/devices` | `connected`, `device`, `capabilities`, `detected` and `devices` from the state |
+| `GET /api/v1/profiles` | `profiles`, `activeProfile` and `recallOnConnect` from the state |
+| `GET /api/v1/mixer` | The state's `mixer` |
+| `GET /api/v1/channels`, `/channels/{id}` | Every channel, or the one with that id |
+| `GET /api/v1/mixes`, `/mixes/{id}` | Every mix, or the one with that id |
+| `GET /api/v1/inserts`, `/inserts/{id}` | Every insert chain by key, or one chain |
 | `GET /api/v1/plugins` | v1 result containing a plugins message |
+| `GET /api/v1/plugin-setup` | v1 result containing a pluginSetup message |
+| `GET /api/v1/plugin-diagnostics` | v1 result containing a pluginDiagnostics message |
+| `GET /api/v1/diagnostics` | v1 result containing a diagnostics message |
+| `GET /api/v1/editor-rules` | v1 result containing a nativeEditorRules message |
 | `POST /api/v1/commands` | Execute one existing cmd object |
 | `WS /api/v1/events` | Same authenticated protocol as /ws |
+
+The device, profile and mixer resources are parts of the same snapshot
+`/state` returns, with the same field names; two requests may see two
+different moments. Channel and mix ids are exact and case-sensitive. Insert
+chains are keyed as in the state: an XLR input channel id or `mix:<id>`, so
+`/api/v1/inserts/mix:monitor` reads Monitor A's chain. While the mixer is off
+every mixer resource answers 503; with the mixer running an unknown id
+answers 404, and so does a channel without a chain. A chain the state holds
+with no inserts in it reads as `[]`. A profile directory that cannot be read
+leaves `profiles` empty and is reported in the state's `warning`.
+These reads never build, rebuild or save anything.
+
+`plugins`, `plugin-setup`, `plugin-diagnostics`, `diagnostics` and
+`editor-rules` run the existing `listPlugins`, `getPluginSetup`,
+`getPluginDiagnostics`, `getDiagnostics` and `getNativeEditorRules` commands
+and return the same v1 result as `POST /api/v1/commands` would. Some of them
+scan plugins or start helpers, so they share the one HTTP command slot: while
+a command or another of these reads is in flight they answer 429.
+Changes still go through `/commands`.
 
 Both WebSocket paths require the existing first-message authentication:
 `{"cmd":"auth","token":"..."}`. They send no state before authentication.
@@ -50,11 +79,15 @@ unavailable profile metadata uses the empty/null values documented in
 
 Error status codes: 400 a body that is not valid UTF-8, or a plain request
 on the events route without a WebSocket upgrade; 401 missing/wrong token;
-403 foreign Origin; 408 body-read deadline; 413 body over 64 KiB; 415 wrong
-Content-Type; 429 budget exhausted or another HTTP mutation in flight. Chunked bodies have the same 64 KiB cap and
-five-second deadline. One HTTP command runs at a time, with no waiting queue.
-The HTTP command budget is one bucket shared by every HTTP caller, the size
-of a socket's own (bursts of 300, a sustained 100 per second).
+403 foreign Origin; 404 unknown resource id; 408 body-read deadline; 413
+body over 64 KiB; 415 wrong Content-Type; 429 budget exhausted, or another
+HTTP command or command-backed read in flight; 503 mixer resource while the
+mixer is off. Chunked bodies have the same 64 KiB cap and five-second
+deadline. One HTTP command or command-backed read runs at a time, with no
+waiting queue; snapshot reads answer while a command runs. Every
+authenticated HTTP request, read or write, takes from one budget shared by
+every HTTP caller, the size of a socket's own (bursts of 300, a sustained
+100 per second).
 All authenticated HTTP responses use `Cache-Control: no-store`.
 
 For a read-only check from a shell in the daemon's user session:

@@ -36,6 +36,9 @@
           },
           "403": {
             "description": "Foreign Origin"
+          },
+          "429": {
+            "description": "Request budget exhausted"
           }
         }
       }
@@ -51,6 +54,234 @@
           },
           "403": {
             "description": "Foreign Origin"
+          },
+          "429": {
+            "description": "Request budget exhausted"
+          }
+        }
+      }
+    },
+    "/api/v1/devices": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "connected, device, capabilities, detected and devices from the state"
+          },
+          "401": {
+            "description": "Credential required"
+          },
+          "403": {
+            "description": "Foreign Origin"
+          },
+          "429": {
+            "description": "Request budget exhausted"
+          }
+        }
+      }
+    },
+    "/api/v1/profiles": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "profiles, activeProfile and recallOnConnect from the state"
+          },
+          "401": {
+            "description": "Credential required"
+          },
+          "403": {
+            "description": "Foreign Origin"
+          },
+          "429": {
+            "description": "Request budget exhausted"
+          }
+        }
+      }
+    },
+    "/api/v1/mixer": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "The state's mixer"
+          },
+          "401": {
+            "description": "Credential required"
+          },
+          "403": {
+            "description": "Foreign Origin"
+          },
+          "429": {
+            "description": "Request budget exhausted"
+          },
+          "503": {
+            "description": "Mixer off"
+          }
+        }
+      }
+    },
+    "/api/v1/channels": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Every channel"
+          },
+          "401": {
+            "description": "Credential required"
+          },
+          "403": {
+            "description": "Foreign Origin"
+          },
+          "429": {
+            "description": "Request budget exhausted"
+          },
+          "503": {
+            "description": "Mixer off"
+          }
+        }
+      }
+    },
+    "/api/v1/channels/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact, case-sensitive channel id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One channel"
+          },
+          "401": {
+            "description": "Credential required"
+          },
+          "403": {
+            "description": "Foreign Origin"
+          },
+          "429": {
+            "description": "Request budget exhausted"
+          },
+          "503": {
+            "description": "Mixer off"
+          },
+          "404": {
+            "description": "No such id"
+          }
+        }
+      }
+    },
+    "/api/v1/mixes": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Every mix"
+          },
+          "401": {
+            "description": "Credential required"
+          },
+          "403": {
+            "description": "Foreign Origin"
+          },
+          "429": {
+            "description": "Request budget exhausted"
+          },
+          "503": {
+            "description": "Mixer off"
+          }
+        }
+      }
+    },
+    "/api/v1/mixes/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact, case-sensitive mix id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One mix"
+          },
+          "401": {
+            "description": "Credential required"
+          },
+          "403": {
+            "description": "Foreign Origin"
+          },
+          "429": {
+            "description": "Request budget exhausted"
+          },
+          "503": {
+            "description": "Mixer off"
+          },
+          "404": {
+            "description": "No such id"
+          }
+        }
+      }
+    },
+    "/api/v1/inserts": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Insert chains by key"
+          },
+          "401": {
+            "description": "Credential required"
+          },
+          "403": {
+            "description": "Foreign Origin"
+          },
+          "429": {
+            "description": "Request budget exhausted"
+          },
+          "503": {
+            "description": "Mixer off"
+          }
+        }
+      }
+    },
+    "/api/v1/inserts/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Chain key as in the state: an XLR input channel id or mix:<id>"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One insert chain"
+          },
+          "401": {
+            "description": "Credential required"
+          },
+          "403": {
+            "description": "Foreign Origin"
+          },
+          "429": {
+            "description": "Request budget exhausted"
+          },
+          "503": {
+            "description": "Mixer off"
+          },
+          "404": {
+            "description": "No such id"
           }
         }
       }
@@ -59,13 +290,173 @@
       "get": {
         "responses": {
           "200": {
-            "description": "v1 result containing plugins message"
+            "description": "v1 result containing plugins message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
           },
           "401": {
             "description": "Credential required"
           },
           "403": {
             "description": "Foreign Origin"
+          },
+          "400": {
+            "description": "Rejected command",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Request budget exhausted, or an HTTP command or command-backed read in flight"
+          }
+        }
+      }
+    },
+    "/api/v1/plugin-setup": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "v1 result containing a pluginSetup message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Rejected command",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credential required"
+          },
+          "403": {
+            "description": "Foreign Origin"
+          },
+          "429": {
+            "description": "Request budget exhausted, or an HTTP command or command-backed read in flight"
+          }
+        }
+      }
+    },
+    "/api/v1/plugin-diagnostics": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "v1 result containing a pluginDiagnostics message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Rejected command",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credential required"
+          },
+          "403": {
+            "description": "Foreign Origin"
+          },
+          "429": {
+            "description": "Request budget exhausted, or an HTTP command or command-backed read in flight"
+          }
+        }
+      }
+    },
+    "/api/v1/diagnostics": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "v1 result containing a diagnostics message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Rejected command",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credential required"
+          },
+          "403": {
+            "description": "Foreign Origin"
+          },
+          "429": {
+            "description": "Request budget exhausted, or an HTTP command or command-backed read in flight"
+          }
+        }
+      }
+    },
+    "/api/v1/editor-rules": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "v1 result containing a nativeEditorRules message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Rejected command",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credential required"
+          },
+          "403": {
+            "description": "Foreign Origin"
+          },
+          "429": {
+            "description": "Request budget exhausted, or an HTTP command or command-backed read in flight"
           }
         }
       }
@@ -129,7 +520,7 @@
             "description": "UTF-8 application/json required"
           },
           "429": {
-            "description": "Budget exhausted or command in flight"
+            "description": "Request budget exhausted, or an HTTP command or command-backed read in flight"
           }
         }
       }

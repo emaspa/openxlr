@@ -399,7 +399,9 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   before any state is sent or command executed; clients are rate-limited
   and browser pages from other origins are refused; see
   [api.md](api.md). The same commands are served over HTTP at `/api/v1`
-  with an OpenAPI document ([http-api.md](http-api.md))
+  with an OpenAPI document ([http-api.md](http-api.md)), next to read
+  resources for devices, profiles, the mixer, single channels, mixes and
+  insert chains, plugin setup and diagnostics
 - The daemon follows the PipeWire graph through one `pw-dump --monitor`
   subscription and keeps an incremental snapshot keyed by object id, so
   the one-second sweep reads memory instead of launching a dump. A
