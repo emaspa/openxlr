@@ -47,7 +47,15 @@
         </Border>
       </Grid>
       <TextBlock Name="PluginLatency" Text="{Binding LatencyText}" Classes="hint" TextWrapping="Wrap"/>
-      <!-- Actions get their own row and wrap instead of competing with the title. -->
+    </StackPanel>
+    <Button DockPanel.Dock="Bottom" Content="{loc:Text Key=Close}" HorizontalAlignment="Right" Padding="18,6" Margin="0,10,0,0" Click="OnClose"/>
+    <!-- AllowAutoHide off: the scrollbar reserves its own column instead
+         of floating over the value readouts -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto" AllowAutoHide="False">
+      <StackPanel>
+      <!-- Actions get their own row and wrap instead of competing with the
+           title. They scroll with the controls, so longer or taller captions
+           cannot squeeze the parameters out at minimum height. -->
       <WrapPanel Name="PluginActions">
         <Button Content="{loc:Text Key=PluginUI}" Padding="12,4" Margin="0,0,6,6" Click="OnNativeEditor"
                 IsVisible="{Binding NativeEditorSupported}" IsEnabled="{Binding NativeEditorAvailable}"
@@ -65,12 +73,6 @@
         <Button Content="{loc:Text Key=Manual}" Padding="10,4" Margin="0,0,6,6" Click="OnEditorManual"
                 IsVisible="{Binding CanChooseNativeHost}" ToolTip.Tip="{loc:Text Key=OpenTheManualSectionOnPluginEditors}"/>
       </WrapPanel>
-    </StackPanel>
-    <Button DockPanel.Dock="Bottom" Content="{loc:Text Key=Close}" HorizontalAlignment="Right" Padding="18,6" Margin="0,10,0,0" Click="OnClose"/>
-    <!-- AllowAutoHide off: the scrollbar reserves its own column instead
-         of floating over the value readouts -->
-    <ScrollViewer VerticalScrollBarVisibility="Auto" AllowAutoHide="False">
-      <StackPanel>
       <TextBlock Text="{Binding NativeUiBlockReason}" Foreground="{DynamicResource Ox.Text.Secondary}" FontSize="11" TextWrapping="Wrap"
                  Margin="0,0,0,8" IsVisible="{Binding NativeUiBlocked}"/>
       <TextBlock Text="{Binding Error}" Foreground="{DynamicResource Ox.Text.Warning}" FontSize="11" TextWrapping="Wrap"

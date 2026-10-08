@@ -31,6 +31,15 @@
             <Setter Property="ToolTip.VerticalOffset" Value="0"/>
         </Style>
 
+        <!-- A text aligns by its own script: a channel or application named in
+             Arabic or Hebrew, or a right-to-left translation, starts at the
+             right, and everything else at the left as before. The layout
+             itself stays left to right, since channel order and the left and
+             right of audio do not change with the language. -->
+        <Style Selector="TextBlock">
+            <Setter Property="TextAlignment" Value="DetectFromContent"/>
+        </Style>
+
         <!-- The appearance every window shares. The values are the Ox.* tokens
              the skin service writes into the application's resources, read with
              DynamicResource so a skin change repaints windows that are already

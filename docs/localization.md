@@ -126,3 +126,12 @@ The window chooses its language once, when it starts:
 A change in Options applies the next time the window starts. Only the
 catalogue changes: numbers, dates and the values the window sends to the
 daemon keep the format they had.
+
+## Scripts and layout
+
+Text aligns by its own script: a right-to-left caption, or a channel named
+in Arabic or Hebrew, starts at the right edge. The window's layout stays
+left to right, since channel order and the left and right of audio do not
+change with the language. The window draws with the Inter font and takes
+other scripts from the desktop's fonts, so a language in another script
+needs a font for it installed, such as Noto.
