@@ -1362,7 +1362,10 @@ Restart OpenDeck after installing or updating the plugin.
   queries. A failed query leaves that default unknown and the daemon still
   starts; select your preferred desktop default afterwards.
 - With more than one supported interface attached, the header shows a
-  picker; the mixer's input channels follow the chosen one.
+  picker; the mixer's input channels follow the chosen one. Switching
+  releases the interface you leave before the chosen one is opened, and
+  on an interface whose last settings OpenXLR remembers it saves a
+  change made just before the switch instead of losing it.
 
 <a name="dock-silent"></a>
 ### 5.2 Microphone silent on the XLR Dock or the original Wave XLR
