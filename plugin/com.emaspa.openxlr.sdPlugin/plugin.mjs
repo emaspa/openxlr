@@ -1083,7 +1083,7 @@ function refreshMeters() {
 // per-character average, then enforced by the renderer). A send dial
 // pins the channel name and scrolls the mix name in the space that
 // remains; other long titles scroll whole.
-const TITLE_W = 158, TITLE_H = 24, CHAR_W = 8.1, GAP_PX = 20, STEP_PX = 7;
+const TITLE_W = 154, TITLE_H = 24, CHAR_W = 8.1, GAP_PX = 20, STEP_PX = 7;
 const escXml = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const textW = (t) => Math.round(t.length * CHAR_W);
 
@@ -1159,7 +1159,7 @@ function refresh(context) {
           icon: dialIcon(t),
           needle: needleSvg(d.pct, d.maxPct),
           muteOverlay: { enabled: d.muted } }
-      : { title: "OpenXLR", value: daemonUp ? "set up" : "offline",
+      : { title: marqueeTitle(context, "", "OpenXLR"), value: daemonUp ? "set up" : "offline",
           unit: { enabled: false }, icon: dialIcon(null),
           needle: needleSvg(0), muteOverlay: { enabled: false } } });
   }

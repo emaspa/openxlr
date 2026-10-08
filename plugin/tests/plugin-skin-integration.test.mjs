@@ -83,6 +83,15 @@ test('live palettes repaint key art, dial text, needles and stationary meters wi
       m.event === 'setFeedback' ? ['title','icon','needle','meter'].filter(k => typeof m.payload[k] === 'string' && m.payload[k].startsWith('data:')).map(k => svg(m.payload[k])) : []);
     const parsed = spawnSync('python3', ['-c','import json,sys,xml.etree.ElementTree as E; [E.fromstring(s) for s in json.load(sys.stdin)]'], {input:JSON.stringify(decoded)});
     assert.equal(parsed.status, 0, parsed.stderr.toString());
+    // The title is a pixmap field, so a dial with no usable target still sends an image.
+    host.receive({event:'willAppear',context:'unset',action:'com.emaspa.openxlr.dial',payload:{settings:{}}});
+    const fallback = host.messages.filter(m => m.event === 'setFeedback' && m.context === 'unset').at(-1).payload;
+    assert.ok(fallback.title.startsWith('data:image/svg+xml;base64,'));
+    assert.ok(svg(fallback.title).includes('OpenXLR'));
+    const layout = JSON.parse(fs.readFileSync(new URL('../com.emaspa.openxlr.sdPlugin/layouts/dial.json', import.meta.url), 'utf8'));
+    const [, , width, height] = layout.items.find(item => item.key === 'title').rect;
+    assert.ok(svg(fallback.title).includes(`width="${width}" height="${height}"`));
+    assert.ok(svg(feedback.title).includes(`width="${width}" height="${height}"`));
   } finally {
     for (const i of intervals) clearInterval(i);
     for (const w of watchers) w.close();

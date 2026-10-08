@@ -4,7 +4,7 @@
     { "key": "backgroundDial", "type": "pixmap", "rect": [4, 4, 192, 92], "zOrder": 1,
       "value": "./imgs/dialBackground.svg" },
     { "key": "icon", "type": "pixmap", "rect": [16, 12, 24, 24], "zOrder": 10 },
-    { "key": "title", "type": "pixmap", "rect": [38, 12, 158, 24], "zOrder": 10 },
+    { "key": "title", "type": "pixmap", "rect": [42, 12, 154, 24], "zOrder": 10 },
     { "key": "dial", "type": "pixmap", "rect": [16, 44, 130, 52], "zOrder": 20,
       "value": "./imgs/dial.svg" },
     { "key": "needle", "type": "pixmap", "rect": [16, 44, 130, 52], "zOrder": 21 },
