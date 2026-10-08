@@ -179,6 +179,9 @@ public sealed record MixerState
     /// <summary>Why the mixes are not aligned as planned, or null.</summary>
     public string? MixLatencyError { get; init; }
 
+    /// <summary>The running Sound Check session, or idle. Never saved.</summary>
+    public SoundCheckState SoundCheck { get; init; } = new(null, "idle", 0);
+
     /// <summary>Plugin insert chains by channel id, with live load status.</summary>
     public IReadOnlyDictionary<string, IReadOnlyList<InsertStatus>> Inserts { get; init; }
         = new Dictionary<string, IReadOnlyList<InsertStatus>>();

@@ -26,6 +26,7 @@
     <TextBlock DockPanel.Dock="Top" Text="{Binding WorkflowError}" TextWrapping="Wrap" Margin="0,0,0,8"
                Foreground="{DynamicResource Ox.Text.Warning}"
                IsVisible="{Binding WorkflowError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+    <Button DockPanel.Dock="Top" Content="Sound Check" IsVisible="{Binding CanSoundCheck}" HorizontalAlignment="Left" Margin="0,0,0,8" Click="OnSoundCheck"/>
     <TextBlock DockPanel.Dock="Top" Text="No inserts yet." Classes="h" IsVisible="{Binding !HasItems}"/>
     <ScrollViewer VerticalScrollBarVisibility="Auto" AllowAutoHide="False">
       <ItemsControl ItemsSource="{Binding Items}" Margin="0,0,10,0">

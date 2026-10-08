@@ -70,6 +70,11 @@ CLAP plugin and five per VST3 audio class, plus four per module. It needs
 Python 3 and a compiler with C++20 support for the fixture, but no Wine,
 display or installed plugin. The normal host build still uses C++17.
 
+`make -C native test-sound-check` drives the Sound Check backend with fixed
+samples: live passthrough, recording, replay, a new recording replacing the
+old one, the ten-second bound in samples and in time, and that only the audio
+thread reports the mode. It needs no PipeWire, display or plugin.
+
 `python3 native/tests/lsp-editor.py` is an opt-in desktop regression using
 an isolated LSP Gate Mono LV2 instance. It needs python-xlib, the installed
 plugin, a running PipeWire server and a display large enough for the tested
@@ -230,6 +235,21 @@ gates it to 0.000 after a few cycles, and the de-esser's first band on a
 ratio at 1 takes it from 0.234 to 0.034; the same runs at `--channels 2`
 give the same figures. A stereo-only plugin asked the same way, Dragonfly
 Plate Reverb, is listed with `widths` of 2 alone.
+
+## Sound Check
+
+`openxlr-lv2-host soundcheck NODE 1 RATE` runs the Sound Check loop instead
+of a plugin, with the same ports, pipe and supervision as an insert. It is
+mono only and allocates ten seconds of samples at the graph rate when it
+starts; the audio callback does not allocate, lock or touch files. The
+`command` control selects live (0), record (1) or loop (2), and the output
+meters `frames` (samples recorded) and `mode` (what the last cycle did)
+report back. The audio thread is the only writer of the samples and of both
+meters. It sets `command` back to live when the buffer is full; the main
+thread does the same when a recording request has gone ten seconds without
+a cycle serving it, so a suspended input cannot start recording long after
+the request. The test programs that compile `host.c` into themselves do not
+link `sound-check.o`; to them `soundcheck` is an unknown backend.
 
 ## Scope
 

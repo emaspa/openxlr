@@ -447,6 +447,37 @@ alignment. Compensation does not cover the device's own latency or the
 hardware's direct monitoring. The setting is saved with the mixer and stays
 as it is when a profile is loaded.
 
+<a name="sound-check"></a>
+**Sound Check.** In the XLR 1 or XLR 2 chain window, press "Sound Check".
+Press **Record** and speak; recording stops by itself after ten seconds.
+**Loop sample** then plays that take into the channel over and over in
+place of your microphone, through the low cut, ClipGuard and every insert
+as they are set, so you can change controls, bypass plugins or reorder the
+chain and hear the result on the same words. The loop needs at least a
+tenth of a second recorded. The interface's own gain and processing are
+already in the take; changing those while it loops changes nothing.
+
+- **Hear live mic** goes back to the microphone and keeps the take, so
+  **Loop sample** can play it again. **Record** replaces it.
+- **Stop and discard**, or closing the window, returns the microphone and
+  throws the take away. Your effect settings stay as you left them.
+- The loop goes everywhere the channel goes, the virtual microphones
+  included, so mute the channel in a call or a recording you are not
+  testing on.
+- Sound Check runs on one microphone at a time. Stop it on one before
+  starting it on the other.
+- The take stays in memory and is never written to a file or a profile.
+  A session ends by itself when the interface changes, when its audio path
+  is lost, when the mixer is rebuilt and after ten minutes; the window then
+  says why, and **Stop and discard** clears the message.
+- On a Wave XLR Pro with the headphone jacks following a monitor mix, the
+  interface's zero-latency microphone path is switched off while XLR 1 is
+  under Sound Check, so you hear the loop and not your voice.
+- Sound Check needs the native plugin host the packages include. A source
+  build without `-p:EnableNativeLv2Host=true` refuses it with that reason.
+- A loop can click at the point where it starts over; record with a short
+  silence at each end.
+
 <a name="native-editor-compatibility"></a>
 **Native editor compatibility.** Open Options, PLUGINS, then "Native editors"
 to choose plugins that should use OpenXLR's generated controls instead of their

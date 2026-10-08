@@ -79,6 +79,9 @@ public sealed record Command
     /// <summary>"setInserts": the channel's whole insert chain, in order.</summary>
     [JsonPropertyName("inserts")] public List<InsertDefinition>? Inserts { get; init; }
 
+    /// <summary>"soundCheck": record, loop, live or stop.</summary>
+    [JsonPropertyName("action")] public string? Action { get; init; }
+
     /// <summary>"setInsertParam" / "setInsertBypass" / "renameInsert": which insert.</summary>
     [JsonPropertyName("insertId")] public string? InsertId { get; init; }
 

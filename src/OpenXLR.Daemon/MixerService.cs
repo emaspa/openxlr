@@ -148,7 +148,8 @@ public sealed class MixerService : IHostedService, IDisposable
         // With a summed feed (A+B) the mic rides the hardware path as soon as
         // any of the summed mixes carries it.
         string jackFeed = _mixer.JackMonitorMix ?? "monitor";
-        // The mixer refuses the path while XLR 1 is in an exclusive group.
+        // The mixer refuses the path while XLR 1 is in an exclusive group or
+        // under Sound Check.
         bool micDirect = _mixer.SetHardwareMicMonitor(jacksOnly && _mixer.IsMonitorOnlyFeed(jackFeed)
             && OpenXLR.Core.Mixing.MonitorFeed.Parts(jackFeed).Any(m => !_mixer.IsChannelMutedIn("xlr1", m)));
         if (anyJack && _devices.EnsureHeadphoneMix(monitorReturn: true, micDirect: micDirect) && _mixer.Built)
@@ -546,6 +547,11 @@ public sealed class MixerService : IHostedService, IDisposable
                 case "setMixLatencyCompensation":
                     _mixer.SetMixLatencyCompensation(cmd.Value.GetBoolean());
                     break;
+                case "soundCheck":
+                    _mixer.SoundCheck(cmd.Channel!, cmd.Action!);   // both checked by CommandValidation
+                    SyncOutputSelectors();   // a loop on XLR 1 takes the Pro's hardware mic path off
+                    Changed?.Invoke();
+                    return null;   // a session is never saved
                 case "setInserts":
                     _mixer.SetInserts(cmd.Channel!, cmd.Inserts!);   // both checked by CommandValidation
                     break;
