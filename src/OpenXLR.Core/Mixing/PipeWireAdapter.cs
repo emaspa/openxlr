@@ -1093,15 +1093,22 @@ public sealed class PipeWireAdapter
             return i < 0 ? "" : port[(i + 1)..];
         }
         var pairs = new List<(string From, string To)>();
+        bool complete = true;
         for (int i = 0; i < ins.Count && (outs.Count > 0); i++)
         {
             string to = ins[i];
             string from = outs.FirstOrDefault(o => Chan(o) != "" && Chan(o) == Chan(to))
                 ?? outs[Math.Min(i, outs.Count - 1)];
             try { Run("pw-link", from, to); pairs.Add((from, to)); }
-            catch (InvalidOperationException) { /* racing a disappearing port */ }
+            // The pair is already connected, for instance the surviving side
+            // of a route being repaired: it belongs to this route as well.
+            catch (InvalidOperationException ex) when (ex.Message.Contains("File exists", StringComparison.Ordinal))
+            { pairs.Add((from, to)); }
+            // A port that vanished or refused the link leaves the route short;
+            // the sweep sees Complete false and builds it again.
+            catch (InvalidOperationException) { complete = false; }
         }
-        return new PortLink(pairs);
+        return new PortLink(pairs) { Complete = complete };
     }
 
     /// <summary>
@@ -1135,13 +1142,18 @@ public sealed class PipeWireAdapter
     /// died (a USB device re-enumerating destroys its node and every link on
     /// it, while the new node usually keeps the same port names). Returns
     /// Broken when a port is gone entirely, meaning the route needs a fresh
-    /// port discovery instead.
+    /// port discovery instead, and for a route that came up with a pair
+    /// missing, which the caller rebuilds the same way. A pair the registry
+    /// already shows connected costs no helper call.
     /// </summary>
     public LinkHealth EnsureLinks(PortLink link)
     {
+        if (!link.Complete) return LinkHealth.Broken;
         var health = LinkHealth.Healthy;
+        HashSet<(string From, string To)> known = GraphLinks();
         foreach ((string from, string to) in link.Pairs)
         {
+            if (known.Contains((from, to))) continue;
             try
             {
                 Run("pw-link", from, to);
@@ -1154,6 +1166,69 @@ public sealed class PipeWireAdapter
             }
         }
         return health;
+    }
+
+    // The link index is rebuilt only when the graph snapshot it came from
+    // was replaced, so a quiet graph answers every route check from memory.
+    private JsonElement[]? _linkObjects;
+    private HashSet<(string From, string To)> _graphLinks = [];
+
+    /// <summary>Every port link in the graph as (output port, input port) names, the form pw-link prints.</summary>
+    private HashSet<(string From, string To)> GraphLinks()
+    {
+        lock (DumpGate)
+        {
+            JsonElement[] objects;
+            // Without a graph the check falls back to asking pw-link per pair.
+            try { objects = GraphObjects(); }
+            catch (Exception ex) when (ex is InvalidOperationException or IOException) { return []; }
+            if (ReferenceEquals(objects, _linkObjects)) return _graphLinks;
+            _graphLinks = ParseGraphLinks(objects);
+            _linkObjects = objects;
+            return _graphLinks;
+        }
+    }
+
+    internal static HashSet<(string From, string To)> ParseGraphLinks(IEnumerable<JsonElement> objects)
+    {
+        var nodes = new Dictionary<int, string>();
+        var ports = new Dictionary<int, (int Node, string Name)>();
+        var links = new List<(int From, int To)>();
+        foreach (JsonElement entry in objects)
+        {
+            if (entry.ValueKind != JsonValueKind.Object
+                || !entry.TryGetProperty("id", out JsonElement id) || !TryInt(id, out int number)
+                || !entry.TryGetProperty("type", out JsonElement type) || type.ValueKind != JsonValueKind.String
+                || !entry.TryGetProperty("info", out JsonElement info) || info.ValueKind != JsonValueKind.Object) continue;
+            string? kind = type.GetString();
+            if (kind == "PipeWire:Interface:Link")
+            {
+                if (info.TryGetProperty("output-port-id", out JsonElement from) && TryInt(from, out int source)
+                    && info.TryGetProperty("input-port-id", out JsonElement to) && TryInt(to, out int target))
+                    links.Add((source, target));
+                continue;
+            }
+            if (!info.TryGetProperty("props", out JsonElement props) || props.ValueKind != JsonValueKind.Object) continue;
+            if (kind == "PipeWire:Interface:Node" && props.TryGetProperty("node.name", out JsonElement name)
+                && name.ValueKind == JsonValueKind.String)
+                nodes[number] = name.GetString()!;
+            else if (kind == "PipeWire:Interface:Port" && props.TryGetProperty("node.id", out JsonElement node)
+                && int.TryParse(node.ToString(), out int owner)
+                && props.TryGetProperty("port.name", out JsonElement port) && port.ValueKind == JsonValueKind.String)
+                ports[number] = (owner, port.GetString()!);
+        }
+        var result = new HashSet<(string From, string To)>();
+        foreach ((int from, int to) in links)
+            if (ports.TryGetValue(from, out var source) && ports.TryGetValue(to, out var target)
+                && nodes.TryGetValue(source.Node, out string? sourceName) && nodes.TryGetValue(target.Node, out string? targetName))
+                result.Add(($"{sourceName}:{source.Name}", $"{targetName}:{target.Name}"));
+        return result;
+
+        static bool TryInt(JsonElement value, out int number)
+        {
+            number = 0;
+            return value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out number);
+        }
     }
 
     /// <summary>Remove a set of port links made by <see cref="LinkNodes"/>.</summary>
@@ -1657,7 +1732,11 @@ public sealed record FilterHandle(string Id, string SinkName, string SourceName,
 public sealed record DspFeatureAvailability(bool Available, string? Error);
 
 /// <summary>A set of direct port links between two nodes.</summary>
-public sealed record PortLink(IReadOnlyList<(string From, string To)> Pairs);
+public sealed record PortLink(IReadOnlyList<(string From, string To)> Pairs)
+{
+    /// <summary>False when a discovered pair could not be linked while the route was made.</summary>
+    internal bool Complete { get; init; } = true;
+}
 
 /// <summary>Outcome of verifying a <see cref="PortLink"/>'s pairs.</summary>
 public enum LinkHealth { Healthy, Relinked, Broken }
