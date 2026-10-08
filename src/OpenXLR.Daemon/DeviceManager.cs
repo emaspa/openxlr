@@ -70,11 +70,13 @@ public sealed class DeviceManager : BackgroundService
             _preferredPid = pid;
             if (_device is not null && _device.Info.ProductId != pid)
             {
-                try { _device.Disconnect(); } catch { /* releasing anyway */ }
-                _device = null;
-                _last = null;
+                // Settings still waiting for the debounce belong to the old
+                // device; write them before its snapshot goes. Drop disposes
+                // the transport even when disconnect fails, so its USB
+                // helper does not outlive the switch, and reports the handoff.
+                FlushLastState(force: true);
+                Drop();
                 RestoreCardProfile();   // the parked UCM split comes back with the device released
-                RaiseFromLocked();   // show the handoff instead of stale state
             }
         }
         return null;
