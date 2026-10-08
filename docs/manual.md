@@ -41,9 +41,8 @@ happen on your system:
   If you set defaults in Options ([section 3.7](#default-devices)), those are held instead.
 - On the Wave XLR Pro the daemon parks the card on its pro-audio
   profile while it runs, so the raw multichannel device is available to
-  the mixer, and restores the previous profile when it stops. A reconnect
-  during profile discovery uses the card's current profiles; a disconnected
-  card is left alone.
+  the mixer, and restores the previous profile when it stops. If the
+  card is unplugged in the meantime, the daemon leaves it alone.
 
 The window's header shows the connected interface with a green dot.
 "No device" means the daemon cannot open the interface: replug it once
@@ -365,9 +364,8 @@ to choose plugins that should use OpenXLR's generated controls instead of their
 own editor. The release list includes Elgato De-Esser because its
 native editor freezes under Wine, and Elgato Noise Removal because closing
 or reopening its native editor can crash the plugin host.
-An open compatibility list refreshes after a daemon reconnect. Edits remain
-disabled while disconnected, and rule changes received during a refresh are
-loaded once the current request finishes.
+An open compatibility list refreshes when the daemon reconnects and
+cannot be edited while it is disconnected.
 
 - Find an installed plugin and press "Use OpenXLR controls" to add a block.
 - Select a blocked entry and choose "Allow native editor" to try its own
@@ -422,14 +420,12 @@ known. Updating OpenXLR reads every one of them again once, because the
 new version may see them differently, which makes the first scan after
 an update as slow as the first ever.
 
-Linux installation refuses named pipes, sockets and device files
-before reading a plugin binary or copying a resource, including a link
-to a special file. A new folder selection containing such a plugin is
-refused before installation. Listings of already registered Windows
-folders skip unreadable or special plugin entries and keep the valid ones.
-Ordinary empty resource files and symbolic links remain supported. Install only bundles
-you trust and do not modify the source while it is being installed; file
-inspection does not sandbox plugin code or concurrent changes.
+Installing refuses a plugin that is or contains a named pipe, socket or
+device file, or a link to one; empty files and ordinary symbolic links are
+fine. A registered Windows folder lists its valid plugins and skips
+unreadable entries and entries like these. Installing checks files but does
+not sandbox the plugin, so install only bundles you trust and leave the
+source alone until it has finished.
 
 CLAP and VST3 discovery follows linked folders, but visits each resolved
 directory only once per search root. Links back to a parent or another alias
@@ -442,7 +438,10 @@ so undamaged descriptions and records of failed scans remain usable. Cached
 descriptions must use the filename assigned to their bundle and must not be
 symbolic links; cache cleanup does not follow index paths to other files. A
 description larger than the live scanner's 64 MiB output limit is ignored and
-scanned again.
+scanned again. Pointing a linked folder at a different build of a plugin
+also scans it again. A bundle with a folder link that loops back on itself,
+or with a very large number of files, still loads, but OpenXLR scans it every
+time instead of caching it.
 
 <a name="windows-plugins"></a>
 **Windows VST3 and CLAP plugins.** They run through
@@ -483,9 +482,8 @@ Without the companion, a distribution yabridge works only with Wine older
 than 9.22. From 9.22 an embedded plugin window never learns where it is,
 so every click lands as far from the pointer as the window is from the
 corner of the screen, and the plugin ignores the mouse entirely. Options
-says so when it sees that pair of versions. An unreadable or out-of-range
-Wine version number leaves the setup information available but cannot
-establish that this editor compatibility warning applies.
+says so when it sees that pair of versions. If it cannot read the Wine
+version, the rest of the setup still shows, without this warning.
 
 The companion keeps those wrappers in
 `~/.local/share/openxlr/yabridge/{vst3,clap}` and its directory registry in
@@ -957,10 +955,9 @@ instead of saving the device's boot values over them.
 If a profile's device settings apply but its mixer settings fail, the error
 says so and gives the mixer failure.
 
-If the profile folder or its recall marker cannot be read, the window still
-receives device and mixer state and shows a warning. Only unavailable profile
-choices are left empty. Repairing the file or its permissions clears the
-warning on the next state update; the daemon does not need a restart.
+If the profile files cannot be read, the window keeps showing the device
+and the mixer, with a warning and no profiles to choose. Once the files are
+readable again the warning clears, without restarting the daemon.
 
 Loading a named profile, by clicking it or on connect, restores its saved
 gain even when the gain lock is on. The lock remains on and still blocks
@@ -1007,12 +1004,8 @@ SYSTEM DEFAULT DEVICES, choose the output and input OpenXLR should
 hold; it re-asserts them once a second and reverts any outside change.
 "(don't enforce)" leaves the system alone.
 
-On shutdown, OpenXLR stops scheduling routing repairs and waits for any
-running repair or meter callback before saving settings and removing the
-graph. Repairs stop between phases and default-device helper calls; a helper
-already running retains its existing timeout. Stopping the daemon therefore
-cannot leave a late repair behind that changes the desktop's default output
-after it has exited.
+Stopping the daemon waits for a repair in progress to stop, so nothing
+changes the desktop's default devices after the daemon has exited.
 
 <a name="hardware-only"></a>
 ### 3.8 Hardware control only
@@ -1069,8 +1062,8 @@ Under WINDOW:
   hide the current window or enable autostart. "Tray only" starts with no
   window at all; the tray icon shows it the first time you click it. For
   a tray icon at login, enable "Start the OpenXLR app" and choose "Tray
-  only". The tray icon is registered even before the mixer window has
-  been shown and stays registered while the window is hidden.
+  only". The tray icon is there from the start, whether or not the window
+  has been shown.
 - "When closing" chooses "Keep running in tray" or "Quit app" and takes
   effect immediately. Keeping the app in the tray hides the window
   instead of quitting; the tray icon's "Show mixer" menu item restores it,
@@ -1118,15 +1111,10 @@ audio, the mixer, the routing and the layout are untouched, and nothing is
 restarted. The choice is saved in `~/.config/openxlr/ui.json` and is not
 part of a profile or of the mixer layout.
 
-OpenDeck keys and dials follow the appearance selected in OpenXLR. Their
-colours update while the plugin is running, including a stationary meter;
-key artwork and user titles remain under their existing controls. The window
-shares the colours it actually applied, including the active light or dark
-palette. Without the window, the plugin uses the saved skin and its built-in
-palette or installed skin file. See [skins.md](skins.md) for details.
-
-OpenDeck uses the target's default glyph when a saved icon name is unknown
-or has the wrong type. Supported icon selections remain available.
+OpenDeck keys and dials take their colours from the chosen skin and
+repaint when it changes. While the window runs they use the colours it
+applied, light or dark; without it the plugin reads the saved skin itself
+([skins.md](skins.md#stream-deck-colours)).
 
 Anything wrong with a skin is listed under the picker, not in the mixer
 window. A skin that sets only part of the appearance keeps the default for
@@ -1297,12 +1285,6 @@ The scan diagnostics include the missing link target when available.
 An ordinary missing plugin path or dangling bundle link is reported
 separately. Updating or restoring a linked source causes it to be scanned
 again even when the generated Linux wrapper did not change.
-Switching a linked search folder or a linked folder inside a bundle to a
-different plugin build also invalidates its cached description and any
-previous scan failure, even when the files have the same sizes and times.
-Cache inspection rejects directory link cycles and stops after 100,000
-directory entries per bundle, counting linked aliases too. These bundles
-can still be scanned and loaded, but their scan result is not cached.
 
 <a name="stream-deck"></a>
 ## 4. Stream Deck (OpenDeck)
@@ -1323,7 +1305,8 @@ application, or a profile to recall.
 The key's LED is green for an engaged feature, red for a mute, and grey
 when the daemon is offline or the target does not exist on the
 connected interface. A key's icon can be chosen in its settings, and a
-title typed there replaces the built-in label.
+title typed there replaces the built-in label. An icon name the plugin does
+not know shows the target's default icon.
 
 **Dial** (an encoder) changes a level: the monitor output volume, a
 gain, a headphone volume, the aux level, the crossfade, a mix master, a
@@ -1469,9 +1452,9 @@ exact transfer, and that is what makes the report actionable.
 
 The USB deadline covers both sending a request and receiving its reply, so
 a helper that stops reading commands cannot block a large transfer indefinitely.
-Malformed replies, including inconsistent transfer counts or payload lengths,
-are refused before decoding settings and discard the helper. The next
-connection starts a fresh process instead of reusing a broken protocol stream.
+OpenXLR refuses a malformed reply before reading any setting from it and
+discards the helper; the next connection starts a fresh process instead of
+reusing a broken protocol stream.
 
 <a name="open-files"></a>
 ### 5.8 Channels or mixes vanish after adding one
@@ -1867,9 +1850,8 @@ and persistence as the window.
 The terminal mixer wears the same skins as the window. It reads the same
 files, in the same order, and the choice in Options is the same choice, so
 picking Gruvbox in one picks it in the other ([skins.md](skins.md)).
-An unreadable saved choice leaves Material in use for this run without
-rewriting the file. Repairing its permissions makes the choice available
-on the next start.
+If the saved choice cannot be read, the terminal mixer uses Material for
+that run and leaves the file as it is.
 `--skin <id>` uses one appearance for this run without saving it, and
 `--list-skins` prints what this machine has. Deck and the Omarchy skins get
 console fader caps, bracketed keys and lamps; flat skins get plain ones.
