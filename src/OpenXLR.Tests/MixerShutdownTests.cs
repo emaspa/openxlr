@@ -95,7 +95,33 @@ public sealed class MixerShutdownTests
     }
 
     [Fact]
-    public async Task ShutdownAlsoJoinsAnIndependentDefaultRepairBeforeTearingDown()
+    public async Task ShutdownWaitsForADefaultWriteInProgressBeforeTearingDown()
+    {
+        using var fixture = new Fixture();
+        fixture.SetBuilt(true);
+        fixture.Mixer.SetEnforcedDefaults("wanted-output", null);
+        fixture.Write("different");
+        fixture.Write("pause-write");
+        Task<bool> repair = Task.Run(() => fixture.Mixer.EnforceDefaults());
+        try
+        {
+            Assert.True(SpinWait.SpinUntil(() => fixture.Exists("entered"), TimeSpan.FromSeconds(3)));
+            Task stop = Task.Run(() => fixture.Service.StopAsync(CancellationToken.None));
+            // The write holds the mixer, so teardown cannot run underneath it.
+            Assert.False(SpinWait.SpinUntil(() => stop.IsCompleted, TimeSpan.FromMilliseconds(300)));
+            Assert.True(fixture.Mixer.Built);
+            fixture.Write("release");
+            Assert.True(await repair.WaitAsync(TimeSpan.FromSeconds(3)));
+            await stop.WaitAsync(TimeSpan.FromSeconds(3));
+            Assert.False(fixture.Mixer.Built);
+            Assert.Equal(["set-default-sink wanted-output"], fixture.Read("writes"));
+            Assert.False(fixture.Mixer.EnforceDefaults());
+        }
+        finally { fixture.Write("release"); await repair.WaitAsync(TimeSpan.FromSeconds(3)); }
+    }
+
+    [Fact]
+    public async Task ADefaultCheckStillReadingNeitherHoldsTheMixerNorWritesAfterTeardown()
     {
         using var fixture = new Fixture();
         fixture.SetBuilt(true);
@@ -105,16 +131,31 @@ public sealed class MixerShutdownTests
         try
         {
             Assert.True(SpinWait.SpinUntil(() => fixture.Exists("entered"), TimeSpan.FromSeconds(3)));
-            var stopping = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            Task stop = Task.Run(async () => { stopping.TrySetResult(); await fixture.Service.StopAsync(CancellationToken.None); });
-            await stopping.Task.WaitAsync(TimeSpan.FromSeconds(3));
-            Assert.False(repair.IsCompleted);
-            fixture.Write("release");
-            Assert.True(await repair.WaitAsync(TimeSpan.FromSeconds(3)));
-            await stop.WaitAsync(TimeSpan.FromSeconds(3));
+            // The read runs without the mixer lock: shutdown tears down while it waits.
+            await fixture.Service.StopAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(3));
             Assert.False(fixture.Mixer.Built);
-            Assert.Equal(["set-default-sink wanted-output"], fixture.Read("writes"));
-            Assert.False(fixture.Mixer.EnforceDefaults());
+            fixture.Write("release");
+            Assert.False(await repair.WaitAsync(TimeSpan.FromSeconds(3)));
+            Assert.False(fixture.Exists("writes"));
+        }
+        finally { fixture.Write("release"); await repair.WaitAsync(TimeSpan.FromSeconds(3)); }
+    }
+
+    [Fact]
+    public async Task ADefaultCheckSkipsItsWriteWhenTheChoiceChangedWhileItRead()
+    {
+        using var fixture = new Fixture();
+        fixture.SetBuilt(true);
+        fixture.Mixer.SetEnforcedDefaults("wanted-output", null);
+        fixture.Write("pause");
+        Task<bool> repair = Task.Run(() => fixture.Mixer.EnforceDefaults());
+        try
+        {
+            Assert.True(SpinWait.SpinUntil(() => fixture.Exists("entered"), TimeSpan.FromSeconds(3)));
+            fixture.Mixer.SetEnforcedDefaults(null, null);
+            fixture.Write("release");
+            Assert.False(await repair.WaitAsync(TimeSpan.FromSeconds(3)));
+            Assert.False(fixture.Exists("writes"));
         }
         finally { fixture.Write("release"); await repair.WaitAsync(TimeSpan.FromSeconds(3)); }
     }
@@ -152,7 +193,12 @@ public sealed class MixerShutdownTests
                     if [ -e "$dir/different" ]; then echo other-input
                     else echo wanted-input
                     fi ;;
-                  set-default-sink|set-default-source) echo "$*" >> "$dir/writes" ;;
+                  set-default-sink|set-default-source)
+                    if [ -e "$dir/pause-write" ]; then
+                      : > "$dir/entered"
+                      while [ ! -e "$dir/release" ]; do /bin/sleep .01; done
+                    fi
+                    echo "$*" >> "$dir/writes" ;;
                   *) exit 1 ;;
                 esac
                 """);
