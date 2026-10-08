@@ -406,7 +406,10 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   disconnect discards the whole snapshot before ids can be reused and
   reconnects with a delay growing from 250 ms to 5 s; until it is back, a
   one-shot `pw-dump` serves the sweep, so routing, default enforcement
-  and route repair keep working
+  and route repair keep working. Route repair checks each link against
+  that snapshot and runs `pw-link` only for a link that is missing; a
+  monitor, microphone or USB Aux route that came up with a side missing
+  is linked again rather than kept as healthy
 - The daemon rebuilds its graph after a pipewire-pulse restart, and
   refuses to grow the layout when pipewire-pulse has no open-file
   headroom left; the packages raise that limit with a systemd drop-in.

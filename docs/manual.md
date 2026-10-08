@@ -164,6 +164,12 @@ affects only the display; the daemon continues processing audio.
    on: your speakers, a headset, or several at once. On the Wave XLR
    Pro its own outputs (Headphones 1, Headphones 2, Line Out) appear
    here too; ticking one switches the hardware's output routing.
+   A ticked device that comes up with one side of its stereo feed
+   missing, or that goes away and comes back, is linked again on the
+   next sweep (about one second). A mono device needs only its one
+   channel. The microphone channels recover the same way when the
+   interface returns, and a microphone feed missing one side keeps its
+   working side while the other is repaired.
 2. Next to a ticked device, the feed picker says which mix it
    hears. Leave it on Monitor A, or choose Monitor B for an output that
    should hear a different selection: a headset whose game side and
@@ -327,7 +333,9 @@ assignments remain readable and editable.
    microphone and the game, without the second computer's own chat.
 3. Tick "To USB Aux port" on the Aux mix. The interface's audio stream
    restarts once, which interrupts playback for a moment; the device
-   only picks up the new routing at stream start.
+   only picks up the new routing at stream start. If the Pro is
+   replugged, or the link to the port comes up incomplete, the next
+   sweep links the Aux mix to the port again.
 
 The USB Aux *input* (what the second computer sends back) is the Aux In
 channel, with its level and lock in the INPUTS card.
