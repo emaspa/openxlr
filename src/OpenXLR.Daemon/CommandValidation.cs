@@ -28,6 +28,9 @@ public static class CommandValidation
     {
         switch (cmd.Cmd)
         {
+            case "addPluginSearchPath":
+            case "removePluginSearchPath":
+                return CheckPluginSearchPath(cmd);
             case "getNativeEditorRules":
                 return null;
             case "setNativeEditorRule":
@@ -215,6 +218,10 @@ public static class CommandValidation
     internal static string? CheckPluginWineTrace(Command cmd)
         => cmd.Value.ValueKind is JsonValueKind.True or JsonValueKind.False
             ? null : "setPluginWineTrace: value must be a boolean";
+
+    internal static string? CheckPluginSearchPath(Command cmd)
+        => PluginSearchPaths.Valid(cmd.Kind, cmd.Path) ? null
+            : $"{cmd.Cmd}: kind must be lv2, clap or vst3 and path an absolute folder of at most 4096 characters, without a colon or control character";
 
     internal static string? CheckPluginPath(Command cmd)
         => string.IsNullOrWhiteSpace(cmd.Path) || cmd.Path.Length > 4096

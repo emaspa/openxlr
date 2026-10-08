@@ -149,6 +149,11 @@ public sealed class OptionsViewModel : ViewModelBase
         await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => ApplyPluginSetup(setup));
     }
 
+    /// <summary>Every directory the plugin formats search, from the last setup reply.</summary>
+    public System.Collections.ObjectModel.ObservableCollection<PluginSearchDirectoryItem> SearchDirectories { get; } = [];
+    private string? _searchPathWarning;
+    public string? SearchPathWarning { get => _searchPathWarning; private set => Set(ref _searchPathWarning, value); }
+
     internal void ApplyPluginSetup(System.Text.Json.Nodes.JsonNode? setup)
     {
         // Only the reply sets the value. Raise even when it stayed the same,
@@ -158,6 +163,11 @@ public sealed class OptionsViewModel : ViewModelBase
         Raise(nameof(CanSetPluginWineTrace));
         PluginWineTraceStatus = _pluginWineTrace is null
             ? "Wine trace unavailable. The daemon must be connected and support this switch." : null;
+        SearchDirectories.Clear();
+        SearchPathWarning = setup?["searchPathWarning"]?.GetValue<string>();
+        foreach (var item in setup?["searchDirectories"] as System.Text.Json.Nodes.JsonArray ?? [])
+            if (item?["kind"]?.GetValue<string>() is { } kind && item["path"]?.GetValue<string>() is { } path)
+                SearchDirectories.Add(new(kind, path, item["custom"]?.GetValue<bool>() == true, item["exists"]?.GetValue<bool>() == true));
         SkippedPluginDetails.Clear();
         int? skipped = setup?["skippedFailedCount"]?.GetValue<int>();
         SkippedPlugins = skipped is null ? "Skipped bundles: unavailable" : $"Skipped after a failed scan: {skipped}";
@@ -514,4 +524,10 @@ public sealed class OptionsViewModel : ViewModelBase
         foreach (AudioDeviceItem d in _main.Inputs)
             InputChoices.Add(new DeviceChoice(d.Name, d.Label));
     }
+}
+
+/// <summary>One directory a plugin format searches, as the plugin manager lists it.</summary>
+public sealed record PluginSearchDirectoryItem(string Kind, string Path, bool Custom, bool Exists)
+{
+    public string Detail => $"{Kind.ToUpperInvariant()}, {(Custom ? "added" : "standard or from the environment")}{(Exists ? "" : ", missing or unreadable")}";
 }

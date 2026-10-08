@@ -93,7 +93,8 @@ SUPPORT, Collect diagnostics).
   `openxlr-yabridge` package supplies a tested bridge with the Wine editor
   input fix and private wrappers.
 - **Plugin installation and management** from Options: import extracted files
-  or bundles, rescan, and manage Windows plugin folders and individual plugins.
+  or bundles, add plugin folders to search in place, rescan, and manage Windows
+  plugin folders and individual plugins.
   Single Windows-plugin imports do not register neighbouring plugins.
   Disable or re-enable plugins, remove their uses from current chains,
   delete standalone plugins, or open Wine's uninstaller for installed packages.

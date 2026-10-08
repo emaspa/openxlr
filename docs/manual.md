@@ -476,11 +476,52 @@ first. Plugins installed by
 other means, or copied into `/usr/lib/clap`, `/usr/lib/vst3` or
 `/usr/lib/lv2` by a package, appear after "Rescan" in Options or a daemon
 restart (`LV2_PATH`, `CLAP_PATH` and `VST3_PATH` override the places
-searched). What a CLAP or VST3 bundle said about itself is remembered
+searched; the plugin manager below adds folders of your own). What a CLAP or VST3 bundle said about itself is remembered
 until the bundle changes, so a rescan costs nothing for plugins already
 known. Updating OpenXLR reads every one of them again once, because the
 new version may see them differently, which makes the first scan after
 an update as slow as the first ever.
+
+<a name="plugin-search-folders"></a>
+**Plugin folders.** To use plugins where they already are, without copying
+them, open Options, PLUGINS, "Plugin manager". Its top list shows every
+folder searched for LV2, CLAP and VST3 plugins: the standard ones, those
+`LV2_PATH`, `CLAP_PATH` and `VST3_PATH` name, and the ones you added.
+A folder that is missing or unreadable says so.
+
+- Choose LV2, CLAP or VST3 and press "Add plugin folder". OpenXLR searches
+  that folder from then on and reads the catalogues again, so its plugins
+  are in the picker when it finishes. The list is kept in
+  `~/.config/openxlr/daemon.json` and survives a restart.
+- Select an added folder and press "Remove added folder" to stop searching
+  it. Its files stay where they are. An insert that used one of its plugins
+  keeps running, and fails on its next load unless the plugin is found
+  elsewhere. Standard and environment folders cannot be removed here.
+- "Rescan all plugins" reads every format again and retries bundles that
+  failed before, like "Rescan" in Options.
+
+A folder must be absolute, without a colon, and cannot be the filesystem
+root, `/usr`, `/home`, your home folder itself or a system tree such as
+`/proc`. One inside or around a folder already searched is refused, and
+symbolic-link aliases count as the same folder. Up to 32 folders can be
+added across the three formats. A CLAP or VST3 folder is searched to any
+depth, up to 16,384 entries; a bigger one is reported and the search
+stops there, so choose a narrower folder.
+
+For LV2, OpenXLR hands the same search path to the catalogue, the PipeWire
+filter-chain and the native host, so a plugin the picker lists from an added
+folder also loads. Once an LV2 folder is added, that path is `LV2_PATH`
+when the daemon has one, otherwise `~/.lv2`, `/usr/local/lib/lv2`,
+`/usr/lib/lv2`, their `lib64` and Debian multiarch counterparts and the Nix
+profile folders, whichever exist, followed by the added folders. With no
+LV2 folder added, every LV2 host uses lilv's own default.
+
+A saved folder that can no longer be resolved, such as a symbolic link that
+now points at itself, is skipped with a warning in the manager; the other
+folders keep working and the entry stays saved until you fix or remove it.
+If the daemon cannot save the list, or `daemon.json` cannot be read, the
+manager says so and nothing changes; an unreadable file is left for you to
+repair.
 
 Installing refuses a plugin that is or contains a named pipe, socket or
 device file, or a link to one; empty files and ordinary symbolic links are
@@ -602,8 +643,9 @@ and the plugin is in the picker with a VST3 or CLAP badge. Nothing else
 has to be restarted.
 
 <a name="plugin-folders"></a>
-**Managing Windows plugin folders.** Open Options, PLUGINS, then "Manage Windows
-plugins" to see the folders registered with the selected yabridge provider.
+**Managing Windows plugin folders.** Open Options, PLUGINS, then "Plugin
+manager". Its lower half lists the folders registered with the selected
+yabridge provider.
 
 - "Add folder" registers a folder holding Windows VST3 or CLAP plugins,
   syncs it and refreshes the catalogue. The original files stay in that
@@ -688,8 +730,8 @@ Wine prefix and neighbouring files. Selecting an ordinary folder or using
 VST2 `.dll` files are left out because OpenXLR cannot load VST2.
 
 Older folder registrations are not silently removed. If an earlier
-single-file import registered Downloads, remove that entry with "Manage Windows
-plugins" and import the plugins you want individually. Remove affected
+single-file import registered Downloads, remove that entry in the "Plugin
+manager" and import the plugins you want individually. Remove affected
 inserts first if the manager asks you to. Removing a folder refreshes the
 catalogue and the open plugin pickers.
 
@@ -1672,7 +1714,7 @@ Review plugin names, paths and scanner output before sharing the archive.
 | `$XDG_RUNTIME_DIR/openxlr/daemon.lock` | held by the running daemon; a second daemon started for the same user stops at once instead of waiting for the port |
 | `~/.config/openxlr/devices/<vid-pid>/last-state.json` | the settings restored on connect when `retainsSettings` is false |
 | `~/.config/openxlr/devices/<vid-pid>/defaults.json` | the firmware defaults of such an interface, recorded after a power cycle, written back by "Reset device to defaults" (the Pro has no such file: its reset writes OpenXLR's baseline) |
-| `~/.config/openxlr/daemon.json` | the submixer on/off preference |
+| `~/.config/openxlr/daemon.json` | the submixer on/off preference and the added plugin folders |
 | `~/.config/openxlr/gainlock.json` | which devices have the gain lock set |
 | `~/.config/openxlr/native-editors.json` | your native editor overrides ([section 3.5](#native-editor-compatibility)) |
 | `~/.config/openxlr/desktop-keys.json` | desktop shortcut bindings, written by the window ([Desktop keys](#desktop-keys)) |

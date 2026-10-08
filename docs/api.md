@@ -77,12 +77,12 @@ Messages from the daemon, each a JSON object with a `type` field:
 | `diagnostics` | in answer to `getDiagnostics` | `blocks`, mapping vendor block names to hex strings or read errors. An XLR Dock adds `paths`, the card number and the path each of its gain, mute and headphone controls takes (`Alsa` through the card's mixer, `Block` through the dock's config block when the card lacks the control, `None` when the USB handle is closed too, so the control is unavailable), and `alsa`, the values read through the card. `usbFault` carries the last USB fault of this run and `error` a dump that failed |
 | `meters` | 15 Hz while the mixer is built | live stereo levels per channel and mix |
 | `plugins` | in answer to `listPlugins` | the installed LV2, CLAP and VST3 plugins with their controls, within the message size limit above and always including the plugins the saved chains use; `supported` is false, with `unsupportedFeatures` listed, for a plugin that needs a host feature the PipeWire chain lacks. `audioIns` and `audioOuts` are the plugin's own port counts, or for VST3 its main buses' default width; a VST3 entry also carries `widths`, the chain widths in channels (1 and 2 are the ones the host carries) its main buses accepted when the helper asked the way the host asks at load, so a plugin that reports 2 and lists 1 in `widths` can be inserted on a mono input. An entry without `widths` (LV2, CLAP, or a description an older helper wrote) fits a mono input with one port each way and a stereo mix with two or more |
-| `pluginSetup` | in answer to `getPluginSetup` or `setPluginWineTrace` | where installs go (`lv2Directory`, `clapDirectory`, `vst3Directory`), `hostInstalled`, `wineTrace` (deep tracing enabled in the running daemon), `yabridge` (its version, or null when not installed), `wine`, `windowsDirectories` (the folders yabridge bridges) and `wineFolders` (Wine's own plugin folders that hold a plugin and are not bridged yet, offered as one press since a file dialog hides them), `memoryLockLimitBytes` (the running daemon's soft limit in bytes; -1 means unlimited, null means unknown) and `memoryLockNote` (recovery advice when Windows plugin support is available and the limit is below 256 MiB, otherwise null) |
+| `pluginSetup` | in answer to `getPluginSetup` or `setPluginWineTrace` | where installs go (`lv2Directory`, `clapDirectory`, `vst3Directory`), `hostInstalled`, `wineTrace` (deep tracing enabled in the running daemon), `yabridge` (its version, or null when not installed), `wine`, `windowsDirectories` (the folders yabridge bridges) and `wineFolders` (Wine's own plugin folders that hold a plugin and are not bridged yet, offered as one press since a file dialog hides them), `memoryLockLimitBytes` (the running daemon's soft limit in bytes; -1 means unlimited, null means unknown) and `memoryLockNote` (recovery advice when Windows plugin support is available and the limit is below 256 MiB, otherwise null), `searchDirectories` (every folder searched, see [Plugin search paths](#plugin-search-paths)) and `searchPathWarning` |
 | `windowsPluginFiles` | in answer to `getWindowsPluginFiles` | `ok`, `message` and `plugins`; each plugin file carries `path`, `name`, `format`, `enabled`, `canDelete`, `winePrefix` and `inUse`. Excluded files remain listed |
 | `nativeEditorRules` | in answer to `getNativeEditorRules` or `setNativeEditorRule` | `rules` with `kind`, `plugin`, `name`, `reason`, `defaultBlocked`, `override` and effective `blocked`; `error` describes a refused change or unreadable configuration |
 | `nativeEditorRulesChanged` | after a successful rule change | notification to refresh the catalogue and editor availability; no plugin rescan is needed |
 | `pluginDiagnostics` | in answer to `getPluginDiagnostics` | `discovery`: daemon host/controller paths, Wine prefix, architecture, effective search paths, bounded `yabridgectl status` output and latest completed CLAP/VST3 scan reports. A scan entry that failed carries `logId`, the name of the file holding that attempt's bounded scanner output, or `logNote` saying why there is none; both are absent from an entry that did not fail and from one an older daemon recorded. `scanLogs` gives the `directory` those files are in and the bounds they are kept under (`stderrCapBytes`, `traceStderrCapBytes`, `traceCaptureBytes`, `stdoutCapBytes`, `maxFiles`, `maxTotalBytes`). Reading the reply or the directory scans nothing and starts no process |
-| `pluginInstall` | in answer to `installPlugin`, `addWindowsPluginFolder`, `removeWindowsPluginFolder`, `removeWindowsPluginInserts`, `setWindowsPluginEnabled`, `deleteWindowsPlugin`, `syncWindowsPlugins` and `rescanPlugins` | `ok`, `message` (a sentence or two for the user, ending with the bundles the scan that followed could not read, up to three by name and the rest as a count), `installed` (the bundles or folders put in place), `added` (plugins in the catalogue that were not before) and `total` |
+| `pluginInstall` | in answer to `installPlugin`, `addPluginSearchPath`, `removePluginSearchPath`, `addWindowsPluginFolder`, `removeWindowsPluginFolder`, `removeWindowsPluginInserts`, `setWindowsPluginEnabled`, `deleteWindowsPlugin`, `syncWindowsPlugins` and `rescanPlugins` | `ok`, `message` (a sentence or two for the user, ending with the bundles the scan that followed could not read, up to three by name and the rest as a count), `installed` (the bundles or folders put in place), `added` (plugins in the catalogue that were not before) and `total` |
 | `error` | when a command without a `requestId` is rejected | `message`; for the mixer commands a `state` follows, so an optimistic edit can be reverted |
 | `commandResult` | in answer to a command that carried a `requestId` | `requestId`, `error` (null on success); preceded by the state the result refers to |
 
@@ -169,6 +169,8 @@ that final acknowledgement (or an `error` without a request id):
 | `deleteWindowsPlugin` | `path` | permanently delete one standalone plugin file or bundle and its wrappers, then refresh the catalogue. Refused for unregistered, Wine-installed, symbolic-link or in-use sources; answered with `pluginInstall`. Clients must confirm deletion with the user first |
 | `syncWindowsPlugins` | none | run yabridge's sync over the folders it knows, clean missing-source wrappers belonging to those folders unless inserts still use them, then read the catalogues again; answered with `pluginInstall` |
 | `rescanPlugins` | none | read the plugin directories again, for plugins installed by other means; answered with `pluginInstall` |
+| `addPluginSearchPath` | `kind`, `path` | add an existing folder to the `lv2`, `clap` or `vst3` search path without copying anything, save the list in `daemon.json` and read the catalogues again; answered with `pluginInstall`. See [Plugin search paths](#plugin-search-paths) |
+| `removePluginSearchPath` | `kind`, `path` | stop searching an added folder, keeping its files, and read the catalogues again; works for a folder that no longer exists; answered with `pluginInstall` |
 | `setInserts` | `channel`, `inserts[]` | replace a chain; `channel` is `xlr1`, `xlr2` or `mix:<id>`, each insert is `{id, kind, plugin, label?, bypass?, params?}` where `kind` is `"lv2"` with the plugin URI, `"clap"` with the plugin's id, or `"vst3"` with the class id as 32 hex digits; a CLAP or VST3 insert always runs in the native host, so its `nativeHost` reads true whatever was sent. An insert being added is refused when its plugin cannot run at the chain's width (one channel on an input, two on a mix, by `widths` or the port counts as `plugins` describes them); an insert already in the chain, the same plugin under the same id, is left to the chain builder, so one can always be removed; an id kept while its `kind` or `plugin` changes counts as an addition |
 | `setInsertBypass` | `channel`, `insertId`, `value` | bypass one insert |
 | `setInsertParam` | `channel`, `insertId`, `symbol`, `value` | one plugin control, by the catalogue's `symbol` (LV2 port symbol or decimal CLAP/VST3 parameter id); use catalogue ranges and scale points. Refused when the insert is not in the chain or the catalogue does not declare the symbol for its plugin |
@@ -367,10 +369,13 @@ All under `~/.config/openxlr/` (or `$XDG_CONFIG_HOME/openxlr/`):
 - `$XDG_RUNTIME_DIR/openxlr/daemon.lock`: held by the running daemon for
   the life of the process; a second daemon for the same user finds it
   held and exits with code 75 at once
-- `daemon.json`: the daemon's own preferences, read once at start.
+- `daemon.json`: the daemon's own preferences.
   `submixer` (true/false/absent) turns the submixer on or off; absent
-  means the unit's environment decides (`OPENXLR_BUILD_MIXER`). Written
-  by the UI's Options window.
+  means the unit's environment decides (`OPENXLR_BUILD_MIXER`). It is read
+  once at start and written by the UI's Options window.
+  `pluginFolders` is the list of `{kind, path}` folders added with
+  `addPluginSearchPath`, written by the daemon and read at each scan and
+  each LV2 host start. Each writer keeps the keys it does not own.
 - `bridge/yabridgectl/config.toml`: the managed companion's folder registry,
   separate from the system yabridgectl configuration. Private wrappers live
   under `$XDG_DATA_HOME/openxlr/yabridge` (default `~/.local/share/openxlr/yabridge`).
@@ -384,14 +389,47 @@ All under `~/.config/openxlr/` (or `$XDG_CONFIG_HOME/openxlr/`):
   Written by the UI only; the daemon never reads it. Format in
   [effect-presets.md](effect-presets.md).
 
+## Plugin search paths
+
+`pluginSetup.searchDirectories` lists `{kind, path, custom, exists}` for
+every folder searched: `kind` is `lv2`, `clap` or `vst3`, `custom` marks a
+folder added with `addPluginSearchPath`, and `exists` is a directory check
+made when the reply was built, not a promise that every bundle in it loads.
+The LV2 entries are `LV2_PATH`, or the standard directories that exist, then
+the added folders. `searchPathWarning` is null, or a sentence saying how many
+saved folders were skipped because they are invalid or no longer resolve.
+Skipped entries stay saved.
+
+`addPluginSearchPath` and `removePluginSearchPath` take `kind` and an
+absolute `path` of at most 4096 characters without a colon or control
+character; other values are refused before the command runs. The path is
+resolved through symbolic links. Adding refuses the filesystem root, broad
+system directories, the home folder itself, a folder that does not exist, one
+inside or around a folder the format already searches, and a 33rd folder.
+Adding a folder already in the list, or removing one that is not, answers
+`ok: true` without a rescan. The list is saved as `pluginFolders` in
+`daemon.json` through the same atomic write as the daemon's other settings;
+if that write fails, or `daemon.json` exists and cannot be read (it is then
+left as it is), the answer is `ok: false` with the reason, and nothing is
+rescanned. CLAP and VST3 folders are walked to any depth, up to 16,384
+entries per folder; past that the walk stops and the scan reports the folder.
+
+Once an LV2 folder is added, the daemon passes one `LV2_PATH` to the lilv
+scan, to every PipeWire filter-chain it loads and to the native host. That
+path is the daemon's own `LV2_PATH` or the standard directories, then the
+added folders.
+With none added, all three keep the daemon's environment and lilv's default.
+
 ## Plugin discovery diagnostics
 
 `getPluginDiagnostics` reads the daemon's environment, not the UI's shell.
 `discovery` includes `controller`, `wineExecutable`, `winePrefix`,
 `sourceCommit` for a managed bridge, `hostExecutable`, `hostInstalled`,
 `processArchitecture`, `searchPaths` and `scans`. `searchPaths.lv2Override`
-is the explicit `LV2_PATH` or null for lilv defaults; `clap` and `vst3`
-contain up to 64 effective search directories, including private wrappers.
+is the `LV2_PATH` LV2 hosts are given (the daemon's own, or the standard
+directories plus added plugin folders) or null for lilv defaults; `clap` and
+`vst3` contain up to 64 effective search directories, including private
+wrappers and added plugin folders.
 
 Both `pluginSetup` and `discovery` include `memoryLockHardLimitBytes`, the
 daemon's hard memory-lock limit. The existing `memoryLockLimitBytes` stays

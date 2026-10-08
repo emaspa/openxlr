@@ -803,16 +803,7 @@ public sealed class PipeWireAdapter
     /// <summary>Load a filter-chain module from its SPA description and wait for both halves.</summary>
     private FilterHandle StartFilterChain(string sinkName, string srcName, string spa)
     {
-        var psi = new ProcessStartInfo("pw-cli")
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-        };
-        psi.ArgumentList.Add("-m");
-        psi.ArgumentList.Add("load-module");
-        psi.ArgumentList.Add("libpipewire-module-filter-chain");
-        psi.ArgumentList.Add(spa);
-        var p = Process.Start(psi) ?? throw new InvalidOperationException("failed to start pw-cli");
+        var p = Process.Start(FilterChainProcess(spa)) ?? throw new InvalidOperationException("failed to start pw-cli");
         // pw-cli -m intentionally lives for the module's lifetime. Drain both
         // pipes continuously: leaving redirected output unread can fill the OS
         // pipe and freeze the holder process (and every graph operation waiting
@@ -838,6 +829,25 @@ public sealed class PipeWireAdapter
                 (detail.Length == 0 ? "" : $": {detail}"));
         }
         return handle;
+    }
+
+    /// <summary>
+    /// The pw-cli process that holds a filter-chain module. The module loads
+    /// LV2 plugins inside it, so it gets the LV2_PATH the catalogue was read with.
+    /// </summary>
+    internal static ProcessStartInfo FilterChainProcess(string spa)
+    {
+        var psi = new ProcessStartInfo("pw-cli")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        psi.ArgumentList.Add("-m");
+        psi.ArgumentList.Add("load-module");
+        psi.ArgumentList.Add("libpipewire-module-filter-chain");
+        psi.ArgumentList.Add(spa);
+        PluginSearchPaths.ApplyLv2(psi);
+        return psi;
     }
 
     /// <summary>

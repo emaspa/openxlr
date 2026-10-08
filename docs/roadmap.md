@@ -218,7 +218,7 @@ while fixes to existing hosts remain part of normal maintenance.
   installs, syncs or rescans or when the bundle, the helper or the bridge
   changes. Skipped bundles and folders the scan could not read are named
   in Options, and a failed scan keeps the phase it reached in its log.
-- [ ] Plugin manager: search paths and rescan in one place.
+- [x] Plugin manager: search paths and rescan in one place.
 
 ## Next: daemon and integrations
 

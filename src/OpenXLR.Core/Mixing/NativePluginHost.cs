@@ -194,6 +194,7 @@ internal sealed class NativePluginHost : IDisposable
         foreach ((string name, string value) in SessionDisplay())
             start.Environment[name] = value;
         new PluginHostEnvironment(ManagedYabridge.Discover()).Apply(start);
+        PluginSearchPaths.ApplyLv2(start);
         Process = Process.Start(start) ?? throw new InvalidOperationException("Could not start the native LV2 host.");
         _outputReader = ReadOutputAsync();
         _errorReader = ReadErrorsAsync();
