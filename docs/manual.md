@@ -1635,6 +1635,17 @@ Reading a rejected file never rewrites it. Missing optional fields in older
 files keep their legacy meaning, and an unavailable plugin can still be
 remembered for later use.
 
+The window's preference files, `ui.json` and `daemon.json`, follow the same
+rule. When the window saves one, it keeps the keys it does not know, such as a
+setting written by a newer OpenXLR. A list written as `null` reads as an empty
+list. The window leaves a file in place when it cannot read or parse it, or
+when the file gives a key twice. It then runs with default preferences and
+saves nothing over the file until you fix or remove it. Changes made in the
+meantime are not saved, though one that takes effect at once, such as the
+skin, still applies for that run. The line beside **Close** at the bottom of
+Options names the file and the reason. It appears when Options opens and after
+a change that could not be saved, and the next successful save clears it.
+
 Configuration paths honor `XDG_CONFIG_HOME`; the private wrapper root honors
 `XDG_DATA_HOME`. Without `XDG_RUNTIME_DIR`, runtime files use the private
 OpenXLR configuration directory.

@@ -201,12 +201,13 @@ public static class SkinService
     /// Save this skin as the one to wear and put it on. The choice lives in
     /// ui.json alone: it is not part of the mixer layout, the daemon's
     /// preferences or any audio profile, so switching appearance never touches
-    /// what is playing.
+    /// what is playing. The skin goes on even when the choice cannot be
+    /// saved; <paramref name="saveError"/> then says why.
     /// </summary>
-    public static IReadOnlyList<string> Choose(string id)
+    public static IReadOnlyList<string> Choose(string id, out string? saveError)
     {
         SkinEntry entry = SkinCatalog.Find(id) ?? new SkinEntry(SkinPackage.Default, []);
-        (UiSettings.Load() with { Skin = entry.Id == SkinPackage.DefaultId ? null : entry.Id }).Save();
+        saveError = (UiSettings.Load() with { Skin = entry.Id == SkinPackage.DefaultId ? null : entry.Id }).Save();
         return Apply(entry);
     }
 
