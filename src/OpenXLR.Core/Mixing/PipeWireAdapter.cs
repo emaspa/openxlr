@@ -748,6 +748,61 @@ public sealed class PipeWireAdapter
             $"playback.props = {{ node.name = {srcName} media.class = Audio/Source " +
             $"audio.channels = {channels} audio.position = {position} node.suspend-on-idle = false " +
             "priority.session = 100 } }";
+        try { return StartFilterChain(sinkName, srcName, spa); }
+        catch (InvalidOperationException failure) when (NativeFallbackFor(inserts, channels) is { } active)
+        {
+            return CreateFallbackChain(sinkName, srcName, description, channels, lowCutHz, clipGuard, active, failure);
+        }
+    }
+
+    /// <summary>
+    /// The active inserts of a filter chain PipeWire refused, when the native
+    /// host can take them over: the helper is installed, every active insert
+    /// is a known LV2 plugin of the chain's width, and at least one of them
+    /// needs nothing the helper lacks. Null otherwise, and the refusal stands.
+    /// </summary>
+    private static IReadOnlyList<InsertDefinition>? NativeFallbackFor(IReadOnlyList<InsertDefinition>? inserts, int channels)
+    {
+        var active = inserts?.Where(i => !i.Bypass).ToArray() ?? [];
+        if (active.Length == 0 || !NativePluginHost.HostInstalled) return null;
+        var plugins = active.Select(i => i.Kind == "lv2" ? PluginCatalog.Find(i) : null).ToArray();
+        if (plugins.Any(p => p is null || p.InputSymbols.Count < channels || p.OutputSymbols.Count < channels)) return null;
+        return plugins.Any(p => NativePluginHost.SupportsFeatures(p!.RequiredFeatures)) ? active : null;
+    }
+
+    /// <summary>
+    /// Rebuild a chain PipeWire's filter chain refused, deciding each insert
+    /// on its own. A lone insert moves to the native host. Several inserts
+    /// each get their own filter-chain stage first, so only a stage PipeWire
+    /// refuses in turn moves to the native host. The saved host choice is
+    /// not changed: the next build tries the filter chain again.
+    /// </summary>
+    private FilterHandle CreateFallbackChain(string sinkName, string srcName, string description, int channels,
+        int lowCutHz, bool clipGuard, IReadOnlyList<InsertDefinition> active, InvalidOperationException failure)
+    {
+        InsertDefinition? lone = active.Count == 1 ? active[0] : null;
+        if (lone is not null && !NativePluginHost.SupportsFeatures(PluginCatalog.Find(lone)!.RequiredFeatures))
+            throw failure;
+        try
+        {
+            var chain = CreateHostedChain(sinkName, srcName, description, channels, lowCutHz, clipGuard, active,
+                lone is null ? null : (lone.Id, failure.Message));
+            if (lone is not null)
+                Note($"PipeWire's filter chain could not load {InsertName(lone)}, so the native host runs it. {failure.Message}");
+            return chain;
+        }
+        catch (Exception fallback)
+        {
+            throw new InvalidOperationException($"{failure.Message} Retrying with the native host failed: {fallback.Message}", fallback);
+        }
+    }
+
+    private static string InsertName(InsertDefinition insert)
+        => string.IsNullOrWhiteSpace(insert.Label) ? insert.Plugin : insert.Label;
+
+    /// <summary>Load a filter-chain module from its SPA description and wait for both halves.</summary>
+    private FilterHandle StartFilterChain(string sinkName, string srcName, string spa)
+    {
         var psi = new ProcessStartInfo("pw-cli")
         {
             RedirectStandardOutput = true,
@@ -785,9 +840,15 @@ public sealed class PipeWireAdapter
         return handle;
     }
 
-    /// <summary>Splice native editors into the chain, retaining filter-chain for other plugins.</summary>
+    /// <summary>
+    /// Splice native editors into the chain, retaining filter-chain for other
+    /// plugins. <paramref name="fallback"/> names an LV2 insert PipeWire's
+    /// filter chain refused, run in the native host whatever its saved choice,
+    /// with the refusal kept on its stage for the insert's status.
+    /// </summary>
     private FilterHandle CreateHostedChain(string sinkName, string sourceName, string description, int channels,
-        int lowCutHz, bool clipGuard, IReadOnlyList<InsertDefinition> inserts)
+        int lowCutHz, bool clipGuard, IReadOnlyList<InsertDefinition> inserts,
+        (string Id, string Reason)? fallback = null)
     {
         var stages = new List<FilterHandle>();
         var insertStages = new List<(string Id, FilterHandle Stage)>();
@@ -800,15 +861,16 @@ public sealed class PipeWireAdapter
             foreach (InsertDefinition insert in inserts.Where(i => !i.Bypass))
             {
                 PluginInfo? info = PluginCatalog.Find(insert);
+                string? refused = fallback is { } f && f.Id == insert.Id && insert.Kind == "lv2" ? f.Reason : null;
                 // The plugin is named because this error is reported on every
                 // insert in the chain: without the name, the one that failed
                 // cannot be told from the ones that were behind it.
-                if (info is null || !info.Supported)
+                if (info is null || (refused is null ? !info.Supported : !NativePluginHost.SupportsFeatures(info.RequiredFeatures)))
                     throw new InvalidOperationException(
-                        $"{(string.IsNullOrWhiteSpace(insert.Label) ? insert.Plugin : insert.Label)} is unavailable or requires unsupported host features.");
+                        $"{InsertName(insert)} is unavailable or requires unsupported host features.");
                 string node = $"{sinkName}_stage_{insertStages.Count}";
                 FilterHandle stage;
-                if (insert.RunsNatively)
+                if (insert.RunsNatively || refused is not null)
                 {
                     if (!NativePluginHost.HostInstalled)
                         throw new InvalidOperationException("The native plugin host is not installed.");
@@ -819,7 +881,7 @@ public sealed class PipeWireAdapter
                     // Wine starts behind a bridged plugin and outlives this
                     // helper, so from here on it is this daemon's to end.
                     if (host.Bridged) _wine.HelperStarted();
-                    stage = new(node, node, node, host.Process) { NativeHost = host };
+                    stage = new(node, node, node, host.Process) { NativeHost = host, FilterChainError = refused };
                     stages.Add(stage);
                     if (!WaitForPorts(node, "playback", false, TimeSpan.FromSeconds(3), host.Process)
                         || !WaitForPorts(node, "capture", true, TimeSpan.FromSeconds(3), host.Process))
@@ -830,7 +892,11 @@ public sealed class PipeWireAdapter
                     stage = CreateFilterChain(node + "_in", node + "_out", description, channels, 0, false, [insert]);
                     stages.Add(stage);
                 }
-                insertStages.Add((insert.Id, stage));
+                // A filter-chain stage PipeWire refused comes back as a
+                // hosted chain of its own. Index the host inside it, so
+                // status, the editor and live controls reach the instance
+                // that runs.
+                insertStages.Add((insert.Id, stage.InsertStages.FirstOrDefault(s => s.Id == insert.Id).Stage ?? stage));
             }
             for (int i = 1; i < stages.Count; i++)
                 if (LinkNodes(stages[i - 1].SourceName, "capture", stages[i].SinkName, "playback").Pairs.Count < channels)
@@ -1717,6 +1783,11 @@ public sealed record FilterHandle(string Id, string SinkName, string SourceName,
     internal NativePluginHost? NativeHost { get; init; }
     internal IReadOnlyList<FilterHandle> Stages { get; init; } = [];
     internal IReadOnlyList<(string Id, FilterHandle Stage)> InsertStages { get; init; } = [];
+    /// <summary>
+    /// Why PipeWire's filter chain refused the LV2 insert this native stage
+    /// runs in its place; null for a stage that runs where it was saved to.
+    /// </summary>
+    internal string? FilterChainError { get; init; }
     internal bool IsAlive => Stages.Count > 0 ? Stages.All(stage => stage.IsAlive)
         : NativeHost?.IsHealthy ?? !Process.HasExited;
     /// <summary>

@@ -167,7 +167,7 @@ that the chosen backend cannot run. VST2 is not supported.
 
 | Format | Processing host | Discovery |
 |---|---|---|
-| LV2 | PipeWire filter-chain by default; optional native host per insert | lilv, standard LV2 directories or `LV2_PATH` |
+| LV2 | PipeWire filter-chain by default; optional native host per insert, which also takes over an insert the filter chain refuses | lilv, standard LV2 directories or `LV2_PATH` |
 | CLAP | native host, one process per insert | standard CLAP directories or `CLAP_PATH` |
 | VST3 | native host, one process per insert | standard VST3 directories or `VST3_PATH` |
 | Windows VST3 / CLAP | yabridge and Wine behind the native host | bridge-generated Linux wrappers |
@@ -177,9 +177,13 @@ controls. Native plugin editors open on the instance processing the audio.
 For LV2, enabling "Native host" moves only that insert out of filter-chain
 and briefly interrupts its chain. CLAP and VST3 always use that host.
 Packages include the helper; source builds need
-`-p:EnableNativeLv2Host=true`. The helper scans CLAP/VST3 bundles in separate
-processes and caches their descriptions until the bundle or the helper itself
-changes, so an updated helper reads every installed bundle once.
+`-p:EnableNativeLv2Host=true`. When PipeWire's filter chain refuses an LV2
+insert, for example on a PipeWire built without its LV2 loader, the helper
+runs that insert instead, one insert at a time, and its saved choice stays
+as it was. Without the helper the insert shows the refusal. The helper
+scans CLAP/VST3 bundles in separate processes and caches their descriptions
+until the bundle or the helper itself changes, so an updated helper reads
+every installed bundle once.
 
 Chains and exposed parameter values are saved with the mixer and profiles.
 Opaque plugin state, loaded sample files and plugin preset data are not
