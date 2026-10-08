@@ -36,6 +36,47 @@ public sealed class NativeHostProtocolTests
     }
 
     [Fact]
+    public void ALatencyReportReplacesTheLastOne()
+    {
+        using var host = Start("""
+            import sys
+            print('ready')
+            count = 0
+            for line in sys.stdin:
+                if line.strip() == 'show':
+                    count += 1
+                    if count == 2: print('latency 480 48000')
+                    if count == 3: print('latency 960 48000')
+                    if count == 4: print('latency 960 44100')
+                    if count == 5: print('latency 0 48000')
+                    if count == 6: print('latency 4294967295 48000')
+                    print('ui opened')
+            """);
+        host.ShowUi(); Assert.Null(host.LatencyMilliseconds);
+        host.ShowUi(); Assert.Equal(10, host.LatencyMilliseconds);
+        host.ShowUi(); Assert.Equal(20, host.LatencyMilliseconds);
+        host.ShowUi(); Assert.Null(host.LatencyMilliseconds);
+        host.ShowUi(); Assert.Equal(0, host.LatencyMilliseconds);
+        host.ShowUi(); Assert.Null(host.LatencyMilliseconds);
+    }
+
+    [Theory]
+    [InlineData("latency 512 48000", 512)]
+    [InlineData("latency 0 48000", 0)]
+    [InlineData("latency 4294967294 48000", 4294967294)]
+    [InlineData("latency 4294967295 48000", -1)]
+    [InlineData("latency 4294967296 48000", -1)]
+    [InlineData("latency 512 44100", -1)]
+    [InlineData("latency -1 48000", -1)]
+    [InlineData("latency +512 48000", -1)]
+    [InlineData("latency 512.5 48000", -1)]
+    [InlineData("latency 512", -1)]
+    [InlineData("latency 512 48000 extra", -1)]
+    [InlineData("latency  512 48000", -1)]
+    public void ALatencyLineIsReadOnlyWhenWholeAndAtTheHelpersRate(string line, long expected)
+        => Assert.Equal(expected, NativePluginHost.ParseLatency(line, 48000));
+
+    [Fact]
     public void APartialProtocolLineHasAFixedBoundAndRecoversAtTheNextNewline()
     {
         var line = new System.Text.StringBuilder();

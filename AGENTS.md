@@ -52,7 +52,7 @@ QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner -input packaging/omarch
 node --test packaging/omarchy/tests/*.test.mjs
 shellcheck --severity=error packaging/omarchy/openxlr-omarchy-enable
 make -C native  # C/C++, PipeWire, lilv, LV2 and X11 development headers
-make -C native test-audio test-clap test-vst3 test-scan  # audio bounds, stall detection, CLAP bus layouts, VST3 parameter and stream checks, scan phase markers
+make -C native test-audio test-clap test-lv2 test-vst3 test-scan  # audio bounds, stall detection, CLAP bus layouts, latency reports, VST3 parameter and stream checks, scan phase markers
 dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~Lv2BundleTests  # run with lilv installed, even if the earlier suite ran without it
 python3 tools/test-monitor-volume.py  # private PipeWire server and session bus; pipewire-pulse, wireplumber, pactl, dbus-daemon
 xvfb-run -a make -C native test-editor  # also needs Xvfb and xauth

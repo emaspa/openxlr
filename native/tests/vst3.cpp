@@ -101,10 +101,76 @@ static void restart() {
   assert(v.restart_requested);
 }
 
+// A processor that only answers the latency question, counting each time it
+// is asked.
+class LatencyProcessor final : public IAudioProcessor {
+ public:
+  uint32 samples = 0;
+  int asked = 0;
+  tresult PLUGIN_API queryInterface(const TUID, void **obj) override {
+    *obj = nullptr;
+    return kNoInterface;
+  }
+  HOST_OWNED_REFCOUNT()
+  tresult PLUGIN_API setBusArrangements(SpeakerArrangement *, int32,
+                                        SpeakerArrangement *, int32) override {
+    return kResultOk;
+  }
+  tresult PLUGIN_API getBusArrangement(BusDirection, int32,
+                                       SpeakerArrangement &) override {
+    return kResultOk;
+  }
+  tresult PLUGIN_API canProcessSampleSize(int32) override { return kResultOk; }
+  uint32 PLUGIN_API getLatencySamples() override {
+    ++asked;
+    return samples;
+  }
+  tresult PLUGIN_API setupProcessing(ProcessSetup &) override { return kResultOk; }
+  tresult PLUGIN_API setProcessing(TBool) override { return kResultOk; }
+  tresult PLUGIN_API process(ProcessData &) override { return kResultOk; }
+  uint32 PLUGIN_API getTailSamples() override { return 0; }
+};
+
+// The tick asks for the latency every cycle once audio runs. The plugin is
+// asked once at activation and again only after it signals kLatencyChanged.
+static void latency() {
+  Vst3 v;
+  LatencyProcessor processor;
+  ComponentHandler handler(&v);
+  v.processor = &processor;
+  assert(held_latency(&v) == std::numeric_limits<uint32_t>::max());
+  assert(processor.asked == 0);
+
+  processor.samples = 256;
+  v.active = true;
+  read_latency(&v);
+  assert(processor.asked == 1);
+  for (int tick = 0; tick < 100; ++tick)
+    assert(held_latency(&v) == 256);
+  assert(processor.asked == 1);
+
+  // A new figure the plugin has not announced is not looked for.
+  processor.samples = 512;
+  assert(held_latency(&v) == 256 && processor.asked == 1);
+
+  assert(handler.restartComponent(RestartFlags::kLatencyChanged) == kResultOk);
+  assert(!v.restart_requested);
+  assert(held_latency(&v) == 512 && processor.asked == 2);
+  assert(held_latency(&v) == 512 && processor.asked == 2);
+
+  // A notification during activation is answered by activation's own read.
+  assert(handler.restartComponent(RestartFlags::kLatencyChanged) == kResultOk);
+  processor.samples = 64;
+  read_latency(&v);
+  assert(held_latency(&v) == 64 && processor.asked == 3);
+  puts("PASS: VST3 latency is read at activation and after kLatencyChanged only");
+}
+
 int main(int argc, char **argv) {
   if (argc == 1 || !strcmp(argv[1], "parameters")) parameters();
   if (argc == 1 || !strcmp(argv[1], "stream")) stream();
   if (argc == 1 || !strcmp(argv[1], "attributes")) attributes();
   if (argc == 1 || !strcmp(argv[1], "restart")) restart();
+  if (argc == 1 || !strcmp(argv[1], "latency")) latency();
   puts("VST3 host bounds passed");
 }

@@ -42,6 +42,16 @@ tests/clap.o: tests/clap.c host.c clap.c $(HEADERS)
 tests/clap: tests/clap.o lv2.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
+# This one compiles lv2.c into itself, and loads the latency fixture.
+tests/lv2.o: tests/lv2.c host.c lv2.c $(HEADERS)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
+tests/lv2: tests/lv2.o clap.o vst3.o
+	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+tests/latency.lv2/latency.so: tests/latency.lv2/latency.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -shared -fPIC $< -o $@ -lm
+
 # The C++ test includes vst3.cpp to exercise host-owned SDK objects.
 tests/vst3.o: tests/vst3.cpp vst3.cpp $(HEADERS)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
@@ -59,9 +69,9 @@ tests/lifecycle.o: tests/lifecycle.c host.c $(HEADERS)
 tests/lifecycle: tests/lifecycle.o lv2.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
-.PHONY: test test-editor test-audio test-clap test-vst3 test-scan clean
+.PHONY: test test-editor test-audio test-clap test-lv2 test-vst3 test-scan clean
 # The editor tests need a display; the others need nothing.
-test: test-audio test-clap test-vst3 test-scan test-editor
+test: test-audio test-clap test-lv2 test-vst3 test-scan test-editor
 
 tests/scan-plugin.so: tests/scan-plugin.cpp $(HEADERS)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -std=c++20 -shared -fPIC $< -o $@
@@ -78,8 +88,11 @@ test-audio: tests/audio
 test-clap: tests/clap
 	./tests/clap
 
+test-lv2: tests/lv2 tests/latency.lv2/latency.so
+	./tests/lv2
+
 test-vst3: tests/vst3
 	./tests/vst3
 
 clean:
-	rm -f openxlr-lv2-host $(OBJECTS) tests/editor tests/editor.o tests/audio tests/audio.o tests/clap tests/clap.o tests/lifecycle tests/lifecycle.o tests/vst3 tests/vst3.o tests/host.o tests/scan-plugin.so
+	rm -f openxlr-lv2-host $(OBJECTS) tests/editor tests/editor.o tests/audio tests/audio.o tests/clap tests/clap.o tests/lifecycle tests/lifecycle.o tests/lv2 tests/lv2.o tests/latency.lv2/latency.so tests/vst3 tests/vst3.o tests/host.o tests/scan-plugin.so

@@ -736,6 +736,21 @@ static void read_commands(void *data, int fd, uint32_t mask) {
 
 // --- the main-thread tick ---------------------------------------------------
 
+// Tell the daemon the plugin's latency once audio runs, and again whenever
+// the figure changes. A plugin may settle its latency on its first cycles,
+// so nothing is said before one has completed.
+static bool report_latency(Host *h) {
+  if (!h->backend->latency || atomic_load(&h->audio_left) == 0)
+    return false;
+  uint32_t latency = h->backend->latency(h);
+  if (h->latency_reported && latency == h->reported_latency)
+    return false;
+  printf("latency %u %u\n", latency, h->rate);
+  h->reported_latency = latency;
+  h->latency_reported = true;
+  return true;
+}
+
 static void tick(void *data, uint64_t expirations) {
   Host *h = data;
   // Editor progress is separate from audio progress. A blocked editor must
@@ -769,6 +784,7 @@ static void tick(void *data, uint64_t expirations) {
   }
   if (h->backend->main_thread)
     h->backend->main_thread(h);
+  report_latency(h);
   if (h->editor_open)
     pump_editor(h, true);
 }

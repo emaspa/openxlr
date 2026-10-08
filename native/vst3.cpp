@@ -523,6 +523,10 @@ struct Vst3 {
   Timer timers[MAX_TIMERS];
   Fd fds[MAX_FDS];
   std::atomic<bool> restart_requested{false}, values_changed{false};
+  // The plugin's latency, read at activation and again only after the
+  // plugin signals kLatencyChanged, so the tick never asks it in between.
+  uint32 latency = 0;
+  std::atomic<bool> latency_changed{false};
 };
 
 // Where the plugin's editor reports its edits, on the main thread.
@@ -547,13 +551,16 @@ class ComponentHandler final : public IComponentHandler,
   tresult PLUGIN_API restartComponent(int32 flags) override {
     if (trace_enabled)
       fprintf(stderr, "trace: restartComponent flags %#x\n", (unsigned)flags);
-    // A latency change needs no reload: the host does no delay compensation,
-    // so the new figure changes nothing it does. Plugins that size their
-    // lookahead on activation report one every time they start.
+    // A latency change needs no reload: the figure is asked for again on
+    // the next tick and reported, and the processor keeps running. Plugins
+    // that size their lookahead on activation report one every time they
+    // start.
     if (flags & (RestartFlags::kReloadComponent | RestartFlags::kIoChanged))
       v_->restart_requested = true;
     if (flags & RestartFlags::kParamValuesChanged)
       v_->values_changed = true;
+    if (flags & RestartFlags::kLatencyChanged)
+      v_->latency_changed = true;
     return kResultOk;
   }
   tresult PLUGIN_API setDirty(TBool) override { return kResultOk; }
@@ -996,6 +1003,24 @@ bool vst3_load(Host *h, char **arguments) {
   return true;
 }
 
+// Ask the plugin for its latency, on the main thread with setup done, as
+// getLatencySamples requires. The flag is cleared first, so a notification
+// that arrives during the call is answered on the next tick, not lost.
+void read_latency(Vst3 *v) {
+  v->latency_changed = false;
+  v->latency = v->processor->getLatencySamples();
+}
+
+// The tick's question, every tick once audio runs: the figure held since
+// activation, asked for again only after the plugin signalled a change.
+uint32_t held_latency(Vst3 *v) {
+  if (!v->active)
+    return UINT32_MAX;
+  if (v->latency_changed.load())
+    read_latency(v);
+  return v->latency;
+}
+
 bool vst3_activate(Host *h) {
   Vst3 *v = of(h);
   ProcessSetup setup;
@@ -1012,6 +1037,7 @@ bool vst3_activate(Host *h) {
     return false;
   }
   v->active = true;
+  read_latency(v);
   if (trace_enabled) {
     for (BusDirection direction : {kInput, kOutput})
       for (int32 i = 0; i < v->component->getBusCount(kAudio, direction); ++i) {
@@ -1023,7 +1049,7 @@ bool vst3_activate(Host *h) {
                 direction == kInput ? "in" : "out", i, info.channelCount, info.busType, info.flags,
                 (unsigned long long)arrangement, i == (direction == kInput ? v->main_in : v->main_out));
       }
-    fprintf(stderr, "trace: latency %u, tail %u\n", v->processor->getLatencySamples(), v->processor->getTailSamples());
+    fprintf(stderr, "trace: latency %u, tail %u\n", v->latency, v->processor->getTailSamples());
   }
   // Processing is switched on here, on the main thread after activation, as
   // hosts do in practice: a plugin may allocate in it, and its answer is not
@@ -1275,6 +1301,8 @@ void vst3_editor_resized(Host *h, unsigned width, unsigned height) {
   v->view->onSize(&rect);
 }
 
+uint32_t vst3_latency(Host *h) { return held_latency(of(h)); }
+
 }  // namespace
 
 extern "C" const Backend vst3_backend = {
@@ -1293,6 +1321,7 @@ extern "C" const Backend vst3_backend = {
     vst3_editor_constrain,
     vst3_main_thread,
     vst3_unload,
+    vst3_latency,
     true,
 };
 

@@ -42,10 +42,21 @@ anything is written, and a plugin stuck inside one process call is told
 apart from a node that has no work. `make -C native test-clap` checks the
 CLAP port layout against fake plugins that declare more buses than the
 chain uses, and that the scanner and the loader agree about which layouts
-can be carried. Neither needs PipeWire, a display or an installed plugin.
+can be carried. It also checks that a CLAP plugin's latency is read after
+activation and again only after the plugin says it changed, and that the
+host reports it once and then once per change. Neither needs PipeWire, a
+display or an installed plugin.
+
+`make -C native test-lv2` loads the fixture in `tests/latency.lv2`, a stereo
+delay whose latency port follows its delay control, through lilv and the LV2
+backend, and checks that its latency is reported once audio has run and again
+when the delay changes. It builds the fixture itself and needs lilv, but no
+PipeWire, display or installed plugin.
 
 `make -C native test-vst3` checks VST3 parameter queue indices, attribute
-identifiers and buffers, and the component-state memory stream. Invalid
+identifiers and buffers, the component-state memory stream, and that the
+plugin is asked for its latency at activation and after `kLatencyChanged`
+only, however often the host reads the figure. Invalid
 lengths, seek modes and arithmetic overflow are rejected without changing
 stream contents. Reads at or beyond EOF return zero bytes; a later write
 fills the skipped bytes with zeroes. Empty binary attributes are supported.
@@ -77,6 +88,15 @@ is not treated as an open window. It creates no audio links.
 - The pipe carries parameter values, status and editor requests in both
   directions, never audio. Exposed parameter changes are saved with the mixer;
   opaque plugin state and plugin presets are not persisted.
+- The helper reports the plugin's algorithmic latency as
+  `latency SAMPLES RATE` once audio has run, and again whenever the figure
+  changes. `SAMPLES` is 4294967295 while the plugin has no figure to give.
+  LV2 reads the plugin's latency port, which the plugin writes on every run.
+  CLAP and VST3 ask the plugin on the main thread after activation and again
+  only after it says the figure changed (CLAP's latency `changed` callback,
+  VST3's `kLatencyChanged`), so the per-tick check costs no call into the
+  plugin. Nothing is added to the audio callback. The daemon keeps the last
+  report and ignores one made at a rate other than the helper's own.
 - The daemon owns the process. Closing its stdin ends the helper, which is
   why it watches that pipe rather than using PDEATHSIG, whose Linux semantics
   follow the thread that spawned it.
@@ -111,9 +131,12 @@ can still interrupt that insert's chain.
   or bypassing the chain starts it over. The last line the helper wrote to
   stderr goes to the daemon's log at each death and is shown with that
   reason, so a helper that gives up says why in its final line.
-- A VST3 plugin that reports a latency change keeps running. The host does
-  no delay compensation, so only a reload or a changed bus layout
-  (`kReloadComponent`, `kIoChanged`) ends the process for a fresh one.
+- A VST3 plugin that reports a latency change keeps running: the host asks
+  for the new figure and reports it, without reactivating the plugin, so a
+  plugin that only settles a new figure on reactivation goes on reporting
+  the old one. Only a
+  reload or a changed bus layout (`kReloadComponent`, `kIoChanged`) ends the
+  process for a fresh one.
 
 ## Session environment
 
