@@ -558,6 +558,48 @@
         "Ox.Flow.NodeHoverBorderBrush": {
           "$ref": "#/$defs/brush",
           "description": "that node's outline"
+        },
+        "Ox.Mixer.ControlMinSize": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 64,
+          "description": "the smallest width and height of a mixer button, dropdown, check box, text box, slider and fader cap"
+        },
+        "Ox.Mixer.SliderMinHeight": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 96,
+          "description": "the smallest height of a mixer slider"
+        },
+        "Ox.Mixer.DeviceSliderHeight": {
+          "type": "number",
+          "minimum": 30,
+          "maximum": 96,
+          "description": "the height of a slider in the interface's control rows"
+        },
+        "Ox.Mixer.SmallControlMinSize": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 64,
+          "description": "the smallest size of the compact controls: the interface rows' buttons and sliders, the tile headers and their buttons, the gain lock, the inserts buttons and a send's mute"
+        },
+        "Ox.Mixer.InsertControlMinSize": {
+          "type": "number",
+          "minimum": 16,
+          "maximum": 64,
+          "description": "the smallest width and height of an insert row's own process, bypass and controls buttons"
+        },
+        "Ox.Mixer.ChannelWidth": {
+          "type": "number",
+          "minimum": 132,
+          "maximum": 400,
+          "description": "the width of a submixer channel strip"
+        },
+        "Ox.Mixer.MixWidth": {
+          "type": "number",
+          "minimum": 232,
+          "maximum": 500,
+          "description": "the width of a mix master tile"
         }
       }
     }

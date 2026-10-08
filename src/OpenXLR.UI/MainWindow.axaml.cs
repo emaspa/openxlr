@@ -48,6 +48,8 @@ public partial class MainWindow : Window
         DataContext = _vm;
         _client.Start();          // connects, and keeps retrying if the daemon isn't up yet
         HeaderVersion.Text = $"v{AppVersion.Current}";
+        UpdateControlSizing();
+        Skinning.SkinService.Changed += UpdateControlSizing;
         SetupTray();
         RestoreSectionState();
         Opened += async (_, _) =>
@@ -96,6 +98,7 @@ public partial class MainWindow : Window
         };
         Closed += async (_, _) =>
         {
+            Skinning.SkinService.Changed -= UpdateControlSizing;
             _reallyExit = true;
             _hideToTrayPending = false;
             _lifetime.Cancel();
@@ -284,6 +287,9 @@ public partial class MainWindow : Window
 
     private async void OnRestartDaemon(object? sender, RoutedEventArgs e)
         => await _vm.DaemonRestart.RestartAsync();
+
+    /// <summary>Touch sizing, or a skin's own control minimum, enlarges the targets.</summary>
+    private void UpdateControlSizing() => Classes.Set("large-targets", Skinning.SkinService.LargeTargets);
 
     // ---- collapsed tiles, remembered in ui.json ----
     private static readonly string[] SectionTiles =

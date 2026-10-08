@@ -51,6 +51,13 @@ public sealed record UiSettings
     public string AppearanceMode { get; init; } = AppearanceModes.System;
 
     /// <summary>
+    /// Touch sizing for the main mixer's controls; false is Standard. Like the
+    /// skin, it lives here alone.
+    /// </summary>
+    [JsonConverter(typeof(LocalTouchControlsConverter))]
+    public bool TouchControls { get; init; }
+
+    /// <summary>
     /// Keys this version does not know, such as a setting written by a newer
     /// window or by the terminal mixer. They are written back unchanged, so a
     /// save from here never erases them.

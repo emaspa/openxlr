@@ -96,6 +96,23 @@ public static class SkinService
     /// <summary>True when the launch override decided the appearance, so Options can say so.</summary>
     public static bool Overridden { get; private set; }
 
+    /// <summary>
+    /// True while the mixer wears Touch sizing: the sizing tokens are raised
+    /// to <see cref="SkinTokens.TouchMinimums"/>, and a skin value above a
+    /// floor is kept.
+    /// </summary>
+    public static bool TouchControls { get; private set; }
+
+    /// <summary>
+    /// True when the main window's controls take enlarged targets: under Touch
+    /// sizing, or when the skin in force sets its own control minimum.
+    /// </summary>
+    public static bool LargeTargets => TouchControls
+        || _palette.Tokens.GetValueOrDefault("Ox.Mixer.ControlMinSize") is SkinNumber { Value: > 0 };
+
+    /// <summary>The token values in force: the skin, or Material's light palette in its place.</summary>
+    private static SkinPackage _palette = SkinPackage.Default;
+
     /// <summary>Raised on the UI thread after a skin is applied, for what resources cannot reach.</summary>
     public static event Action? Changed;
 
@@ -126,6 +143,7 @@ public static class SkinService
     public static void Initialize()
     {
         UiSettings settings = UiSettings.Load();
+        TouchControls = settings.TouchControls;
         string? id = Environment.GetEnvironmentVariable(OverrideVariable);
         Overridden = id is { Length: > 0 };
         if (!Overridden) id = settings.Skin;
@@ -198,6 +216,7 @@ public static class SkinService
             palette = MaterialLight.Package;
             errors.AddRange(MaterialLight.Errors);
         }
+        _palette = palette;
 
         var realizer = new Realizer(palette, errors);
         IResourceDictionary resources = application.Resources;
@@ -208,6 +227,7 @@ public static class SkinService
             // A value the realizer refused falls back to the default, so one
             // bad image never leaves a hole in the window.
             realized ??= token.Default;
+            realized = Sized(token.Name, realized);
 
             if (IsLive(token))
             {
@@ -302,6 +322,57 @@ public static class SkinService
         saveError = (UiSettings.Load() with { AppearanceMode = mode }).Save();
         Overridden = false;
         return ApplyMode(mode, Current);
+    }
+
+    /// <summary>
+    /// Save the mixer's control sizing and put it on. Like the skin, it lives
+    /// in ui.json alone and goes on even when it cannot be saved;
+    /// <paramref name="saveError"/> then says why.
+    /// </summary>
+    public static void ChooseControlSizing(bool touch, out string? saveError)
+    {
+        saveError = (UiSettings.Load() with { TouchControls = touch }).Save();
+        ApplyControlSizing(touch);
+    }
+
+    /// <summary>
+    /// Wear Standard or Touch sizing without saving it. Only the sizing
+    /// resources are written again; colours, images and the controls stay
+    /// the objects they were.
+    /// </summary>
+    internal static void ApplyControlSizing(bool touch)
+    {
+        TouchControls = touch;
+        if (Application.Current is { } application)
+            foreach (SkinToken token in SkinTokens.All)
+            {
+                if (!SkinTokens.TouchMinimums.ContainsKey(token.Name)) continue;
+                object? value = _palette.Tokens.GetValueOrDefault(token.Name) is SkinNumber number
+                    ? number.Value : token.Default;
+                value = Sized(token.Name, value);
+                if (value is null) application.Resources.Remove(token.Name);
+                else application.Resources[token.Name] = value;
+            }
+        Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// A sizing token's value with the Touch floor under it. A slider is also
+    /// kept at least as tall as the control minimum and the fader cap the
+    /// skin draws, so an enlarged cap is never clipped by its own row.
+    /// </summary>
+    private static object? Sized(string name, object? value)
+    {
+        if (!SkinTokens.TouchMinimums.TryGetValue(name, out double floor)) return value;
+        double minimum = TouchControls ? floor : 0;
+        if (name is "Ox.Mixer.SliderMinHeight" or "Ox.Mixer.DeviceSliderHeight")
+        {
+            if (_palette.Tokens.GetValueOrDefault("Ox.Mixer.ControlMinSize") is SkinNumber control)
+                minimum = Math.Max(minimum, control.Value);
+            if (minimum > 0 && _palette.Tokens.GetValueOrDefault("Ox.Fader.Thumb.Height") is SkinNumber thumb)
+                minimum = Math.Max(minimum, thumb.Value);
+        }
+        return minimum > 0 ? Math.Max(value is double size ? size : 0, minimum) : value;
     }
 
     /// <summary>Read the skin folders again and put the current choice back on.</summary>

@@ -13,6 +13,9 @@ public sealed record SkinChoice(string Id, string Label);
 /// <summary>One of Material's modes in the appearance picker; the id is what ui.json keeps.</summary>
 public sealed record AppearanceModeChoice(string Id, string Label);
 
+/// <summary>Standard or Touch sizing for the mixer's controls; ui.json keeps the flag.</summary>
+public sealed record ControlSizingChoice(bool Touch, string Label);
+
 /// <summary>
 /// Backs the Options window. Startup toggles apply immediately to the system
 /// (systemd unit, autostart entry) and persist in ui.json; the enforced-default
@@ -55,6 +58,7 @@ public sealed class OptionsViewModel : ViewModelBase
         {
             SelectedSkin = SkinChoices.FirstOrDefault(c => c.Id == Skinning.SkinService.Current.Id) ?? SkinChoices[0];
             SelectedAppearanceMode = AppearanceModeChoices.First(c => c.Id == Skinning.SkinService.Mode);
+            SelectedControlSizing = ControlSizingChoices.First(c => c.Touch == Skinning.SkinService.TouchControls);
             EnforcedOutput = OutputChoices.FirstOrDefault(c => c.Name == main.EnforcedDefaultSink) ?? OutputChoices[0];
             EnforcedInput = InputChoices.FirstOrDefault(c => c.Name == main.EnforcedDefaultSource) ?? InputChoices[0];
         }
@@ -485,6 +489,29 @@ public sealed class OptionsViewModel : ViewModelBase
         {
             if (!Set(ref _selectedAppearanceMode, value) || _applying || value is null) return;
             ReportSkin(Skinning.SkinService.ChooseMode(value.Id, out string? saveError));
+            Report(saveError);
+        }
+    }
+
+    public System.Collections.Generic.IReadOnlyList<ControlSizingChoice> ControlSizingChoices { get; } =
+    [
+        new(false, "Standard"),
+        new(true, "Touch"),
+    ];
+
+    private ControlSizingChoice? _selectedControlSizing;
+    /// <summary>
+    /// Standard or Touch sizing for the main mixer. Choosing one saves it in
+    /// ui.json and puts it on at once, whatever skin is worn; a save that
+    /// fails leaves it on for this run and says why on the preference line.
+    /// </summary>
+    public ControlSizingChoice? SelectedControlSizing
+    {
+        get => _selectedControlSizing;
+        set
+        {
+            if (!Set(ref _selectedControlSizing, value) || _applying || value is null) return;
+            Skinning.SkinService.ChooseControlSizing(value.Touch, out string? saveError);
             Report(saveError);
         }
     }

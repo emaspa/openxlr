@@ -84,6 +84,24 @@ public static class SkinTokens
     private static SkinToken Family(string name, string? value, params SkinBridge[] bridges) =>
         new(name, SkinTokenKind.FontFamily, value is null ? null : new FontFamily(value), bridges);
 
+    /// <summary>The smallest target Touch sizing gives a mixer control, in device-independent units.</summary>
+    public const double TouchTarget = 44;
+
+    /// <summary>
+    /// The floors Touch sizing puts under the mixer sizing tokens. A skin value
+    /// above a floor is kept; Standard sizing applies no floor at all.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, double> TouchMinimums = new Dictionary<string, double>
+    {
+        ["Ox.Mixer.ControlMinSize"] = TouchTarget,
+        ["Ox.Mixer.SliderMinHeight"] = TouchTarget,
+        ["Ox.Mixer.DeviceSliderHeight"] = TouchTarget,
+        ["Ox.Mixer.SmallControlMinSize"] = TouchTarget,
+        ["Ox.Mixer.InsertControlMinSize"] = TouchTarget,
+        ["Ox.Mixer.ChannelWidth"] = 180,
+        ["Ox.Mixer.MixWidth"] = 280,
+    };
+
     /// <summary>Corner radii and border widths are bounded so a skin cannot swallow a control.</summary>
     public const double MaxCornerRadius = 48;
     public const double MaxThickness = 16;
@@ -310,6 +328,15 @@ public static class SkinTokens
         Brush("Ox.Flow.Muted", "#757d75"),
         Brush("Ox.Flow.NodeHoverBackground", "#414541"),
         Brush("Ox.Flow.NodeHoverBorderBrush", "#717971"),
+
+        // Mixer control sizing. Touch sizing raises these to TouchMinimums.
+        Number("Ox.Mixer.ControlMinSize", null, 0, 64),
+        Number("Ox.Mixer.SliderMinHeight", null, 0, 96),
+        Number("Ox.Mixer.DeviceSliderHeight", 30, 30, 96),
+        Number("Ox.Mixer.SmallControlMinSize", 0, 0, 64),
+        Number("Ox.Mixer.InsertControlMinSize", 24, 16, 64),
+        Number("Ox.Mixer.ChannelWidth", 132, 132, 400),
+        Number("Ox.Mixer.MixWidth", 232, 232, 500),
     ];
 
     private static readonly Dictionary<string, SkinToken> ByName =
