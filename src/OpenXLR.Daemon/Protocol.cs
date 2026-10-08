@@ -85,7 +85,11 @@ public sealed record Command
     /// <summary>Plugin installs and folder management: the file or directory the user picked, absolute.</summary>
     [JsonPropertyName("path")] public string? Path { get; init; }
 
-    /// <summary>Native-editor compatibility rules identify a plugin by format and stable id.</summary>
+    /// <summary>
+    /// Plugin format: native-editor compatibility rules identify a plugin by
+    /// format and stable id. For createMix, the mix kind: virtualMic (the
+    /// default) or monitor.
+    /// </summary>
     [JsonPropertyName("kind")] public string? Kind { get; init; }
     [JsonPropertyName("plugin")] public string? Plugin { get; init; }
     /// <summary>True blocks the editor, false allows it, null follows the release default.</summary>

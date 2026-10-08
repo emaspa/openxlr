@@ -11,10 +11,12 @@ public sealed class LiveLayoutEditingTests
 {
     private static string[] AppIds(MixerConfig c) => [.. c.Channels.Where(ch => ch.InputPair is null).Select(ch => ch.Id)];
 
-    [Fact]
-    public void NewMixSitsBeforeAuxWithMutedSendsOnEveryChannel()
+    [Theory]
+    [InlineData(MixKind.VirtualMic)]
+    [InlineData(MixKind.Monitor)]
+    public void NewMixSitsBeforeAuxWithMutedSendsOnEveryChannel(MixKind kind)
     {
-        var config = MixerConfig.Default().WithMix(new MixDefinition("podcast", "Podcast", MixKind.VirtualMic));
+        var config = MixerConfig.Default().WithMix(new MixDefinition("podcast", "Podcast", kind));
         Assert.Equal(["monitor", "monitor2", "stream", "chat", "podcast", "auxout"], config.Mixes.Select(m => m.Id));
         foreach (ChannelDefinition ch in config.Channels)
         {
@@ -22,16 +24,40 @@ public sealed class LiveLayoutEditingTests
             Assert.Contains("podcast", ch.MutedIn);
         }
         Assert.Throws<InvalidOperationException>(() => config.WithMix(new MixDefinition("Podcast", "Again", MixKind.VirtualMic)));
-        Assert.Throws<InvalidOperationException>(() => config.WithMix(new MixDefinition("m3", "Monitor C", MixKind.Monitor)));
+        Assert.Throws<InvalidOperationException>(() => config.WithMix(new MixDefinition("other-aux", "Other Aux", MixKind.AuxPort)));
     }
 
-    [Fact]
-    public void MixLimitHoldsForCreation()
+    [Theory]
+    [InlineData(MixKind.VirtualMic)]
+    [InlineData(MixKind.Monitor)]
+    public void MixLimitHoldsForCreation(MixKind kind)
     {
         var config = MixerConfig.Default();
-        for (int i = config.Mixes.Count(m => m.Kind == MixKind.VirtualMic); i < MixerConfig.MaxVirtualMixes; i++)
-            config = config.WithMix(new MixDefinition($"m{i}", $"Mix {i}", MixKind.VirtualMic));
+        for (int i = config.Mixes.Count(m => m.Kind == MixKind.VirtualMic); i < MixerConfig.MaxUserMixes; i++)
+            config = config.WithMix(new MixDefinition($"m{i}", $"Mix {i}", kind));
         Assert.Throws<InvalidOperationException>(() => config.WithMix(new MixDefinition("one-more", "One more", MixKind.VirtualMic)));
+    }
+
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData("virtualMic", true)]
+    [InlineData("monitor", true)]
+    [InlineData("auxPort", false)]
+    [InlineData("Monitor", false)]
+    [InlineData("", false)]
+    public void MixCreationValidatesItsKind(string? kind, bool valid)
+        => Assert.Equal(valid, Check(new Command { Cmd = "createMix", Name = "Headphones", Kind = kind }) is null);
+
+    [Fact]
+    public void UserMonitorsCanBeRenamedReorderedAndRemovedWithoutMovingStructuralMixes()
+    {
+        var config = MixerConfig.Default().WithMix(new("headset", "Headset", MixKind.Monitor));
+        config = config.WithMixName("headset", "Headphones").WithOrder(AppIds(config), ["headset", "chat", "stream"]);
+        Assert.Equal(["monitor", "monitor2", "headset", "chat", "stream", "auxout"], config.Mixes.Select(m => m.Id));
+        Assert.Equal("Headphones", config.Mixes[2].Name);
+        Assert.Equal(MixKind.Monitor, config.Mixes[2].Kind);
+        Assert.Throws<InvalidOperationException>(() => config.WithOrder(AppIds(config), ["monitor", "headset", "chat", "stream"]));
+        Assert.DoesNotContain(config.WithoutMix("headset").Channels, c => c.Levels.ContainsKey("headset"));
     }
 
     [Fact]
@@ -85,7 +111,7 @@ public sealed class LiveLayoutEditingTests
         public bool HasChannel(string id) => id is "xlr1" or "game" or "music";
         public bool HasMix(string id) => id is "monitor" or "stream" or "auxout";
         public bool HasApplicationChannel(string id) => id is "game" or "music";
-        public bool HasVirtualMix(string id) => id == "stream";
+        public bool HasEditableMix(string id) => id == "stream";
         public bool IsMonitorFeed(string feed) => feed == "monitor";
         public bool IsMonitorOutput(string device) => false;
         public bool IsInsertKey(string key) => false;
