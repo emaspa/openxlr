@@ -99,8 +99,8 @@ modules or custom drivers:
 - A native insert runs in an `openxlr-lv2-host` process with a PipeWire
   filter node. LV2 chooses this per insert; CLAP and VST3 always use it.
   Stages can mix native and filter-chain backends, linked in signal order.
-  The command pipe carries parameter values, status and editor requests,
-  never audio. Exposed parameters are persisted; opaque plugin state and
+  The command pipe carries parameter values, status, the plugin's reported
+  latency and editor requests, never audio. Exposed parameters are persisted; opaque plugin state and
   presets are not. See [native/README.md](../native/README.md) for editor
   recovery, size constraints and LSP renderer defaults.
 - Direct port links (`pw-link`) wire hardware inputs, chains, mixes and

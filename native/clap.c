@@ -53,6 +53,7 @@ struct Clap {
   clap_host_t host;
   const clap_plugin_params_t *params;
   const clap_plugin_gui_t *gui;
+  const clap_plugin_latency_t *latency;
   const clap_plugin_timer_support_t *timer_support;
   const clap_plugin_posix_fd_support_t *fd_support;
   Param *records;
@@ -60,6 +61,10 @@ struct Clap {
   bool activated, gui_created, gui_closed;
   _Atomic bool processing;  // start_processing has run, on the audio thread
   _Atomic bool callback_requested, flush_requested;
+  // The plugin's latency, read once after activation and again only after
+  // the plugin says it changed.
+  uint32_t latency_samples;
+  _Atomic bool latency_changed;
   Timer timers[MAX_TIMERS];
   Fd fds[MAX_FDS];
   int64_t steady;
@@ -291,8 +296,19 @@ static void ports_rescan(const clap_host_t *host, uint32_t flags) {}
 static const clap_host_audio_ports_t audio_ports_extension = {
     ports_rescan_supported, ports_rescan};
 
+// CLAP lets a plugin change its latency only while it is being activated;
+// an active plugin asks for a restart instead. The figure is read again on
+// the next tick rather than here, inside the plugin's own activate call.
+static void latency_changed(const clap_host_t *host) {
+  atomic_store(&of(host)->latency_changed, true);
+}
+
+static const clap_host_latency_t latency_extension = {latency_changed};
+
 static const void *host_get_extension(const clap_host_t *host,
                                       const char *id) {
+  if (!strcmp(id, CLAP_EXT_LATENCY))
+    return &latency_extension;
   if (!strcmp(id, CLAP_EXT_LOG))
     return &log_extension;
   if (!strcmp(id, CLAP_EXT_THREAD_CHECK))
@@ -524,6 +540,7 @@ static bool clap_load(Host *h, char **arguments) {
   if (!clap_map_ports(c, h, ports, true) || !clap_map_ports(c, h, ports, false))
     return false;
   c->params = c->plugin->get_extension(c->plugin, CLAP_EXT_PARAMS);
+  c->latency = c->plugin->get_extension(c->plugin, CLAP_EXT_LATENCY);
   c->gui = c->plugin->get_extension(c->plugin, CLAP_EXT_GUI);
   c->timer_support =
       c->plugin->get_extension(c->plugin, CLAP_EXT_TIMER_SUPPORT);
@@ -566,6 +583,8 @@ static bool clap_activate(Host *h) {
     return false;
   }
   c->activated = true;
+  atomic_store(&c->latency_changed, false);
+  c->latency_samples = c->latency ? c->latency->get(c->plugin) : 0;
   return true;
 }
 
@@ -729,6 +748,15 @@ static void clap_editor_lost(Host *h) {
 
 static bool clap_editor_idle(Host *h) { return ((Clap *)h->impl)->gui_closed; }
 
+static uint32_t clap_latency(Host *h) {
+  Clap *c = h->impl;
+  if (!c->activated)
+    return UINT32_MAX;
+  if (atomic_exchange(&c->latency_changed, false))
+    c->latency_samples = c->latency ? c->latency->get(c->plugin) : 0;
+  return c->latency_samples;
+}
+
 const Backend clap_backend = {
     .name = "CLAP",
     .argument_count = 2,
@@ -744,6 +772,7 @@ const Backend clap_backend = {
     .editor_resized = NULL,
     .main_thread = clap_main_thread,
     .unload = clap_unload,
+    .latency = clap_latency,
     .editor_coordinate_nudge = true,
 };
 

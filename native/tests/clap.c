@@ -149,7 +149,52 @@ static void run(Host *h, Clap *c, uint32_t frames) {
   }
 }
 
+// A plugin's latency, and how often the host asks for it.
+static uint32_t fake_latency_samples;
+static unsigned latency_asked;
+static uint32_t fake_latency(const clap_plugin_t *p) {
+  ++latency_asked;
+  return fake_latency_samples;
+}
+static const clap_plugin_latency_t latency_ext = {fake_latency};
+
+// The tick asks for the latency every cycle once audio runs; the plugin is
+// asked after activation and again only after it says the figure changed.
+// What the daemon reads is one line at the start and one per change.
+static void latency_reports(void) {
+  Host h = {.rate = 48000, .channels = 2, .backend = &clap_backend};
+  Clap *c = fresh(&h);
+  c->host.host_data = c;
+  assert(clap_latency(&h) == UINT32_MAX);
+  assert(clap_activate(&h));
+  assert(clap_latency(&h) == 0);
+  clap_deactivate(&h);
+
+  c->latency = &latency_ext;
+  fake_latency_samples = 256;
+  latency_asked = 0;
+  assert(clap_activate(&h) && latency_asked == 1);
+  assert(!report_latency(&h));  // nothing before the first audio cycle
+  atomic_store(&h.audio_left, 1);
+  assert(report_latency(&h) && h.reported_latency == 256);
+  for (int tick = 0; tick < 100; ++tick)
+    assert(!report_latency(&h));
+  assert(latency_asked == 1);
+
+  fake_latency_samples = 512;
+  assert(!report_latency(&h) && latency_asked == 1);
+  latency_changed(&c->host);
+  assert(report_latency(&h) && h.reported_latency == 512 && latency_asked == 2);
+  assert(!report_latency(&h) && latency_asked == 2);
+  clap_deactivate(&h);
+  assert(clap_latency(&h) == UINT32_MAX);
+  assert(report_latency(&h) && h.reported_latency == UINT32_MAX);
+  release(c);
+  puts("PASS: CLAP latency is read at activation and reported once per change");
+}
+
 int main(void) {
+  latency_reports();
   Host h = {.rate = 48000, .channels = 2};
 
   // 1. main stereo in + stereo sidechain in, one stereo out.

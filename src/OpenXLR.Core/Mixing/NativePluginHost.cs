@@ -34,6 +34,17 @@ internal sealed class NativePluginHost : IDisposable
     private int _disposed;
     private long _lastHeartbeat = Stopwatch.GetTimestamp();
     private long _lastUiHeartbeat = Stopwatch.GetTimestamp();
+    private readonly int _sampleRate;
+    private long _latencySamples = -1;
+
+    /// <summary>
+    /// The plugin's algorithmic latency as the helper last reported it, or
+    /// null before the first report and while the plugin has none to give.
+    /// The helper reports once audio runs and again whenever the figure
+    /// changes.
+    /// </summary>
+    public double? LatencyMilliseconds => Interlocked.Read(ref _latencySamples) is >= 0 and var samples
+        ? samples * 1000.0 / _sampleRate : null;
 
     public Process Process { get; }
 
@@ -160,6 +171,7 @@ internal sealed class NativePluginHost : IDisposable
         _note = note;
         _node = node;
         _meterSymbols = meterSymbols;
+        _sampleRate = sampleRate;
         Bridged = WineSession.Bridged(bundle);
         if (!File.Exists(executable))
             throw new InvalidOperationException(
@@ -256,6 +268,8 @@ internal sealed class NativePluginHost : IDisposable
         if (line == "ready") _ready.TrySetResult();
         else if (line == "heartbeat") Interlocked.Exchange(ref _lastHeartbeat, Stopwatch.GetTimestamp());
         else if (line == "ui-heartbeat") Interlocked.Exchange(ref _lastUiHeartbeat, Stopwatch.GetTimestamp());
+        else if (line.StartsWith("latency ", StringComparison.Ordinal))
+            Interlocked.Exchange(ref _latencySamples, ParseLatency(line, _sampleRate));
         else if (line.StartsWith("ui ", StringComparison.Ordinal))
             Volatile.Read(ref _uiReply)?.TrySetResult(line == "ui opened" ? null : line[3..]);
         else
@@ -268,6 +282,20 @@ internal sealed class NativePluginHost : IDisposable
             else if (parts[0] == "meter" && (_meterSymbols is null || _meterSymbols.Contains(parts[1])))
                 StoreValue(_meters, parts[1], value);
         }
+    }
+
+    /// <summary>
+    /// The samples in a <c>latency SAMPLES RATE</c> line, or -1 for a figure
+    /// the helper does not have (UINT32_MAX), a malformed line, or one
+    /// measured at a rate other than the one this helper was started at.
+    /// </summary>
+    internal static long ParseLatency(string line, int sampleRate)
+    {
+        string[] parts = line.Split(' ');
+        return parts.Length == 3 && parts[0] == "latency" && sampleRate > 0
+            && int.TryParse(parts[2], NumberStyles.None, CultureInfo.InvariantCulture, out int rate) && rate == sampleRate
+            && uint.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out uint samples) && samples < uint.MaxValue
+            ? samples : -1;
     }
 
     private static void StoreValue(ConcurrentDictionary<string, double> values, string symbol, double value)
