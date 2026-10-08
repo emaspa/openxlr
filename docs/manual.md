@@ -411,7 +411,9 @@ can go afterwards. Installing over a plugin that is already there builds the new
 copy beside it and swaps the two only once the copy is complete, so a
 download that turns out to be unreadable, or a disk that fills up, costs
 the update and not the plugin you had. Existing files beside the plugin,
-including backups, are left alone. An archive has to be extracted
+including backups, are left alone; only a half-made or replaced copy that
+an interrupted install left there is removed by the next install, so it is
+not scanned as a second plugin. An archive has to be extracted
 first. Plugins installed by
 other means, or copied into `/usr/lib/clap`, `/usr/lib/vst3` or
 `/usr/lib/lv2` by a package, appear after "Rescan" in Options or a daemon

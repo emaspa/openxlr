@@ -388,12 +388,13 @@ public sealed class PluginInstaller
         // unreadable file or a full disk costs the update, not the plugin.
         // Fixed suffixes can belong to someone else's backup or interrupted
         // work. Each operation owns only its two unique sibling paths.
-        string temporary = Path.Combine(directory, ".openxlr-" + Guid.NewGuid().ToString("N"));
+        string temporary = Path.Combine(directory, StagingPrefix + Guid.NewGuid().ToString("N"));
         string staged = temporary + ".new";
         string retired = temporary + ".old";
         try
         {
             Directory.CreateDirectory(directory);
+            RemoveLeftovers(directory);
             if (linkSource)
             {
                 if (Directory.Exists(source)) Directory.CreateSymbolicLink(staged, Path.GetFullPath(source));
@@ -422,6 +423,43 @@ public sealed class PluginInstaller
             try { Remove(staged); } catch (Exception) { /* the note already says the install failed */ }
             notes.Add($"Could not copy {name} to {Shorten(directory)}: {ex.Message}");
         }
+    }
+
+    private const string StagingPrefix = ".openxlr-";
+
+    /// <summary>
+    /// Remove the staging and retired copies an earlier install left behind
+    /// when it was interrupted, or when its retired copy could not be deleted.
+    /// lilv loads any directory holding a manifest.ttl, so a retired LV2
+    /// bundle left in place is scanned as a second copy of the plugin. Only
+    /// names this installer creates are touched; installs are serialised by
+    /// the daemon, so none of them belongs to an install still running.
+    /// </summary>
+    private static void RemoveLeftovers(string directory)
+    {
+        IEnumerable<string> entries;
+        try { entries = Directory.EnumerateFileSystemEntries(directory, StagingPrefix + "*").ToList(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return; }
+        foreach (string entry in entries)
+        {
+            if (!IsStagingName(Path.GetFileName(entry))) continue;
+            try
+            {
+                // A Wine plugin is staged as a link: remove the link, never what it points at.
+                if (new FileInfo(entry).LinkTarget is not null) File.Delete(entry);
+                else Remove(entry);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* tried again on the next install */ }
+        }
+    }
+
+    /// <summary>True for exactly the names <see cref="Copy"/> stages and retires under: .openxlr-, 32 hex digits, .new or .old.</summary>
+    private static bool IsStagingName(string name)
+    {
+        const int digits = 32;
+        if (name.Length != StagingPrefix.Length + digits + 4 || !name.StartsWith(StagingPrefix, StringComparison.Ordinal)) return false;
+        if (!name.EndsWith(".new", StringComparison.Ordinal) && !name.EndsWith(".old", StringComparison.Ordinal)) return false;
+        return name.AsSpan(StagingPrefix.Length, digits).IndexOfAnyExcept("0123456789abcdef") < 0;
     }
 
     /// <summary>Delete a path whether it is a bundle directory or a single file.</summary>

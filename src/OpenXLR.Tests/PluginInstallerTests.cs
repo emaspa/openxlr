@@ -255,6 +255,75 @@ public sealed class PluginInstallerTests : IDisposable
     }
 
     [Fact]
+    public void AnInstallRemovesTheStagingCopiesAnInterruptedOneLeftBehind()
+    {
+        // lilv loads any directory holding a manifest.ttl, so a retired bundle
+        // left in ~/.lv2 would be scanned as a second copy of the plugin.
+        Directory.CreateDirectory(_lv2);
+        string id = Guid.NewGuid().ToString("N");
+        string retired = Path.Combine(_lv2, $".openxlr-{id}.old");
+        string staged = Path.Combine(_lv2, $".openxlr-{Guid.NewGuid():N}.new");
+        Directory.CreateDirectory(retired);
+        File.WriteAllText(Path.Combine(retired, "manifest.ttl"), "@prefix lv2: <http://lv2plug.in/ns/lv2core#> .");
+        Directory.CreateDirectory(staged);
+        File.WriteAllText(Path.Combine(staged, "plugin.so"), "half");
+        // Names that only resemble ours belong to someone else and stay.
+        string[] kept =
+        [
+            $".openxlr-{id.ToUpperInvariant()}.old",
+            $".openxlr-{id}.old.bak",
+            $".openxlr-{id}",
+            $".openxlr-{id[..31]}.new",
+            ".openxlr-backup.old",
+            "gate.lv2.openxlr-old",
+        ];
+        foreach (string name in kept) File.WriteAllText(Path.Combine(_lv2, name), "user file");
+
+        InstallOutcome outcome = Installer().Install(Lv2("gate.lv2"));
+
+        Assert.True(outcome.Ok, outcome.Message);
+        Assert.False(Directory.Exists(retired));
+        Assert.False(Directory.Exists(staged));
+        foreach (string name in kept) Assert.Equal("user file", File.ReadAllText(Path.Combine(_lv2, name)));
+        Assert.Equal([.. kept.Append("gate.lv2").Order(StringComparer.Ordinal)],
+            Directory.GetFileSystemEntries(_lv2).Select(Path.GetFileName).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void ALeftoverStagingLinkIsRemovedWithoutTouchingItsTarget()
+    {
+        // A plugin inside a Wine prefix is staged as a link to it.
+        string target = Path.Combine(_picked, "prefix", "Comp.vst3");
+        Directory.CreateDirectory(target);
+        File.WriteAllText(Path.Combine(target, "plugin.dll"), "prefix file");
+        Directory.CreateDirectory(_clap);
+        string link = Path.Combine(_clap, $".openxlr-{Guid.NewGuid():N}.new");
+        Directory.CreateSymbolicLink(link, target);
+
+        InstallOutcome outcome = Installer().Install(File_("Hall.clap", Elf));
+
+        Assert.True(outcome.Ok, outcome.Message);
+        Assert.Null(new FileInfo(link).LinkTarget);
+        Assert.False(Directory.Exists(link));
+        Assert.Equal("prefix file", File.ReadAllText(Path.Combine(target, "plugin.dll")));
+    }
+
+    [Fact]
+    public void ReplacingAPluginLeavesNoStagingCopyBehind()
+    {
+        PluginInstaller installer = Installer();
+        string source = Lv2("gate.lv2");
+        Assert.True(installer.Install(source).Ok);
+        File.WriteAllText(Path.Combine(source, "manifest.ttl"), "@prefix lv2: <http://lv2plug.in/ns/lv2core#> . # 2");
+
+        InstallOutcome outcome = installer.Install(source);
+
+        Assert.True(outcome.Ok, outcome.Message);
+        Assert.Equal(["gate.lv2"], Directory.GetFileSystemEntries(_lv2).Select(Path.GetFileName));
+        Assert.EndsWith("# 2", File.ReadAllText(Path.Combine(_lv2, "gate.lv2", "manifest.ttl")));
+    }
+
+    [Fact]
     [System.Runtime.Versioning.SupportedOSPlatform("linux")]   // file modes are a Unix matter; the daemon only runs there
     public void AFailedReplacementLeavesTheInstalledPluginWhereItWas()
     {
