@@ -1979,8 +1979,14 @@ The terminal mixer wears the same skins as the window. It reads the same
 files, in the same order, and the choice in Options is the same choice, so
 picking Gruvbox in one picks it in the other ([skins.md](skins.md)).
 If the saved choice cannot be read, the terminal mixer uses Material for
-that run and leaves the file as it is.
-`--skin <id>` uses one appearance for this run without saving it, and
+that run and leaves the file as it is. Material's mode is shared too:
+**Material mode** on the Options tab changes it with Left and Right, and in
+System the terminal follows the desktop's preference through the portal
+with `gdbus`, staying dark when there is no session bus or no `gdbus`.
+A skin or mode chosen there applies for the run even when `ui.json` cannot
+be written, and the bottom line says the saved choice could not be written.
+`--skin <id>` uses one appearance for this run without saving it, with
+Material held dark, and
 `--list-skins` prints what this machine has. Deck and the Omarchy skins get
 console fader caps, bracketed keys and lamps; flat skins get plain ones.
 The terminal reads these choices from `controls` and derives its surfaces

@@ -17,6 +17,21 @@ internal sealed class Theme
     /// <summary>The shipped appearance, which is the window's own defaults (SkinTokens.cs).</summary>
     public static Theme Material { get; } = new();
 
+    /// <summary>
+    /// Material on a light ground, read from the window's own palette file so
+    /// the two clients never keep separate copies of the colours. It keeps
+    /// Material's id: it is the same skin in another mode.
+    /// </summary>
+    public static Theme MaterialLight { get; } = ReadMaterialLight();
+
+    private static Theme ReadMaterialLight()
+    {
+        using Stream? stream = typeof(Theme).Assembly.GetManifestResourceStream("OpenXLR.Tui.MaterialLight.json");
+        if (stream is null) return Material;
+        using StreamReader reader = new(stream);
+        return FromJson(reader.ReadToEnd(), "default", "Material");
+    }
+
     public string Id { get; private set; } = "default";
 
     public string Name { get; private set; } = "Material";
@@ -370,22 +385,31 @@ internal static class SkinCatalog
 }
 
 /// <summary>
-/// The one setting the terminal mixer keeps, which is the skin, held in the
-/// same <c>ui.json</c> the window uses so choosing an appearance in either one
-/// is the same choice. Every other setting in that file is left untouched.
+/// The two settings the terminal mixer keeps, the skin and Material's mode,
+/// held in the same <c>ui.json</c> the window uses so choosing an appearance
+/// in either one is the same choice. Every other setting in that file is left
+/// untouched, and a file that cannot be read is never written over.
 /// </summary>
 internal static class UiSettingsFile
 {
     private static string Path => OpenXlrPaths.ConfigFile("ui.json");
 
-    public static string? ReadSkin()
+    public static string? ReadSkin() => ReadString("skin");
+
+    /// <summary>The saved mode; missing, unknown or unreadable is <c>system</c>.</summary>
+    public static string ReadAppearanceMode() => AppearanceModes.Normalize(ReadString("appearanceMode"));
+
+    /// <summary>Writes the chosen skin back, keeping every other property the file holds.</summary>
+    public static bool WriteSkin(string id) => Write("skin", id);
+
+    /// <summary>Writes the chosen mode back, keeping every other property the file holds.</summary>
+    public static bool WriteAppearanceMode(string mode) => AppearanceModes.IsValid(mode) && Write("appearanceMode", mode);
+
+    private static string? ReadString(string key)
     {
         try
         {
-            if (!File.Exists(Path)) return null;
-            return JsonNode.Parse(File.ReadAllText(Path)) is JsonObject root
-                ? root["skin"]?.GetValue<string>()
-                : null;
+            return Read()[key] is JsonValue value && value.TryGetValue(out string? text) ? text : null;
         }
         catch (IOException) { return null; }
         catch (JsonException) { return null; }
@@ -394,25 +418,27 @@ internal static class UiSettingsFile
         catch (UnauthorizedAccessException) { return null; }
     }
 
-    /// <summary>Writes the chosen skin back, keeping every other property the file holds.</summary>
-    public static bool WriteSkin(string id)
+    private static bool Write(string key, string value)
     {
         try
         {
-            JsonObject root;
-            if (File.Exists(Path))
-            {
-                if (JsonNode.Parse(File.ReadAllText(Path)) is not JsonObject existing) return false;
-                root = existing;
-            }
-            else root = new JsonObject();
-            root["skin"] = id;
+            JsonObject root = Read();
+            root[key] = value;
             OpenXlrPaths.WriteAtomic(Path, root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
             return true;
         }
         catch (IOException) { return false; }
         catch (JsonException) { return false; }
+        catch (InvalidOperationException) { return false; }
         catch (ArgumentException) { return false; } // leave duplicate-key documents untouched
         catch (UnauthorizedAccessException) { return false; }
+    }
+
+    /// <summary>The file as an object, empty when it does not exist; anything but an object throws.</summary>
+    private static JsonObject Read()
+    {
+        if (!File.Exists(Path)) return new JsonObject();
+        return JsonNode.Parse(File.ReadAllText(Path)) as JsonObject
+            ?? throw new JsonException("ui.json does not hold a JSON object.");
     }
 }

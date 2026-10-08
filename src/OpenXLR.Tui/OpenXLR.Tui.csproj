@@ -12,18 +12,23 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Shared with the daemon and the window (see the file): XDG paths and
-         private atomic writes. The terminal mixer has no reference to Core for
+    <!-- Shared with the daemon and the window (see the files): XDG paths,
+         private atomic writes, bounded helper processes and the saved
+         Material mode. The terminal mixer has no reference to Core for
          the same reason the window has none: it speaks to the daemon over the
          documented socket and needs nothing else from it. -->
     <Compile Include="../OpenXLR.Core/OpenXlrPaths.cs" Link="OpenXlrPaths.cs" />
+    <Compile Include="../OpenXLR.Core/ProcessRunner.cs" Link="ProcessRunner.cs" />
+    <Compile Include="../OpenXLR.Core/AppearanceModes.cs" Link="AppearanceModes.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- The skins the application ships with, read from the window's assets so
-         the terminal and the window always offer the same two appearances. A
+         the terminal and the window always offer the same appearances. A
          skin is data, so both read the same file rather than each keeping a
-         copy. -->
+         copy. Material's light palette comes from the same place. -->
+    <EmbeddedResource Include="../OpenXLR.UI/Assets/Appearance/material-light.json"
+                      LogicalName="OpenXLR.Tui.MaterialLight.json" />
     <EmbeddedResource Include="../OpenXLR.UI/Assets/Skins/*/skin.json"
                       LogicalName="OpenXLR.Tui.Skins.$([System.String]::Copy('%(RecursiveDir)').TrimEnd('/')).skin.json" />
   </ItemGroup>

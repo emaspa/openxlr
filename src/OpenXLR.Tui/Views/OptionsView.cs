@@ -4,16 +4,18 @@ namespace OpenXLR.Tui;
 /// The appearance and what the terminal knows about the connection. The skin
 /// list is the same one the window shows, read from the same folders, and the
 /// choice is written back to the same file, so picking Gruvbox here is
-/// picking it in the window too.
+/// picking it in the window too. Material's mode is the same shared choice.
 /// </summary>
 internal sealed class OptionsView : View
 {
+    private static readonly string[] Modes = [AppearanceModes.System, AppearanceModes.Light, AppearanceModes.Dark];
+    private static readonly string[] ModeNames = ["System", "Light", "Dark"];
     private readonly RowList _list = new();
     private IReadOnlyList<SkinEntry> _skins = SkinCatalog.Scan();
 
     public override string Title => "Options";
 
-    public override string Keys => "Enter use skin  R reload skins";
+    public override string Keys => "Left/Right mode  Enter use skin  R reload skins";
 
     public override void Draw(Screen screen, Rect area, App app)
     {
@@ -33,7 +35,20 @@ internal sealed class OptionsView : View
 
     private List<Row> Build(App app)
     {
-        List<Row> rows = [new HeadingRow("Appearance")];
+        List<Row> rows =
+        [
+            new HeadingRow("Appearance"),
+            new ChoiceRow("Material mode", ModeNames, Array.IndexOf(Modes, app.AppearanceMode), index =>
+            {
+                app.UseAppearance(Modes[index]);
+                string chosen = $"Material mode {ModeNames[index]}";
+                if (!UiSettingsFile.WriteAppearanceMode(Modes[index]))
+                    app.Say($"{chosen} is on for this run, the saved choice could not be written");
+                else if (app.Theme.Id != "default")
+                    app.Say($"{chosen} is saved; it applies when Material is the skin");
+                else app.Say($"{chosen} is the appearance here and in the window");
+            }),
+        ];
         foreach (SkinEntry skin in _skins) rows.Add(new SkinRow(skin, app));
 
         rows.Add(new HeadingRow("Daemon"));

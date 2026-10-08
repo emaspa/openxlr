@@ -8,6 +8,8 @@ using System.Threading.Tasks;
 
 #if OPENXLR_UI
 namespace OpenXLR.UI;
+#elif OPENXLR_TUI
+namespace OpenXLR.Tui;
 #else
 namespace OpenXLR.Core;
 #endif
@@ -22,7 +24,7 @@ namespace OpenXLR.Core;
 /// pipe, or the pipe itself failed. <paramref name="Cancelled"/> is the
 /// caller's own token ending the run.
 /// </summary>
-#if OPENXLR_UI
+#if OPENXLR_UI || OPENXLR_TUI
 internal sealed record ProcessResult(int ExitCode, byte[] Stdout, string Stderr, bool TimedOut, bool Truncated,
     bool Incomplete = false, bool Cancelled = false)
 #else
@@ -43,9 +45,9 @@ public sealed record ProcessResult(int ExitCode, byte[] Stdout, string Stderr, b
 /// killed when either limit is reached, so a runaway helper or a
 /// pathological PipeWire graph cannot grow the daemon's heap or park a
 /// thread. Compiled into the daemon through OpenXLR.Core and into the
-/// window as a linked source file.
+/// window and the terminal mixer as a linked source file.
 /// </summary>
-#if OPENXLR_UI
+#if OPENXLR_UI || OPENXLR_TUI
 internal static class ProcessRunner
 #else
 public static class ProcessRunner

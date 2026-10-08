@@ -34,8 +34,11 @@ public sealed class AppearanceModeTests : IDisposable
     [InlineData("light", "light")]
     [InlineData("dark", "dark")]
     [InlineData("system", "system")]
-    public void OnlyTheThreeModesAreKeptAndAnythingElseFollowsTheDesktop(string? input, string expected)
-        => Assert.Equal(expected, Modes.Normalize(input));
+    public void BothClientsReadTheSameModesAndFollowTheDesktopOtherwise(string? input, string expected)
+    {
+        Assert.Equal(expected, Modes.Normalize(input));
+        Assert.Equal(expected, OpenXLR.Tui.AppearanceModes.Normalize(input));
+    }
 
     [Theory]
     [InlineData("42")]

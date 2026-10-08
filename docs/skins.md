@@ -98,6 +98,14 @@ wrong type reads as System and leaves the rest of the file's preferences
 alone. A choice goes on at once even when it cannot be saved, and Options
 says why on its preference line.
 
+The terminal mixer reads the same key and offers the same three modes as
+**Material mode** on its Options tab, changed with Left and Right. In System
+it reads the portal's `color-scheme` with `gdbus` and watches it for
+changes, only while Material is the skin and System is the mode. Without a
+session bus or without `gdbus` it stays dark. `--skin` and `OPENXLR_SKIN`
+hold their skin, and dark Material, until a skin or mode is chosen in
+Options.
+
 ## Stream Deck colours
 
 The OpenDeck plugin uses the same saved skin for key surfaces, lettering,
