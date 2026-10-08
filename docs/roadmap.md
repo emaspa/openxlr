@@ -161,8 +161,9 @@ a skin overlays values on top of them.
   profiles and appearance. A compact layout fits 80x24. It draws its own
   cells in true colour rather than taking a widget toolkit, so it adds no
   dependency to any package.
-- [ ] The Stream Deck plugin reading the same tokens for its key art. The
-  plugin draws its own images today and is unaffected by the window's skin.
+- [x] The Stream Deck plugin reading the same tokens for its key art. The
+  plugin colours its keys, dials and meters from the saved skin, using the
+  palette the window publishes while it runs.
 - [ ] Layout density: a compact mode for small screens and a large mode
   for touch.
 - [ ] Localization infrastructure and the first translations.
