@@ -222,6 +222,14 @@ for another machine.
 See [effect presets](effect-presets.md) and the
 [manual](manual.md#effect-presets).
 
+Sound Check, on XLR 1 and XLR 2, records up to ten seconds from the
+microphone and loops that dry take through the channel's software
+processing and insert chain in place of the live input, so the effects can
+be tuned while the same words repeat. The sample stays in the native
+helper's memory and is discarded on stop; a session ends by itself on a
+device change, a lost audio path or after ten minutes. It needs the native
+plugin host. See [Sound Check](manual.md#sound-check).
+
 "Install file" and "Install folder" accept extracted Linux plugins or
 Windows plugin folders. Linux bundles are copied into `~/.lv2`, `~/.clap`
 or `~/.vst3`. Windows installers must run in Wine first; OpenXLR bridges

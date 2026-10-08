@@ -384,6 +384,7 @@ public sealed class WebSocketHub
             case "setLowCutHz":
             case "setSoftClipGuard":
             case "setMixLatencyCompensation":
+            case "soundCheck":
             case "setInsertBypass":
             case "setInsertParam":
             case "renameInsert":

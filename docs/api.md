@@ -112,6 +112,7 @@ output), `monitorOutputs`, `monitorFeeds`, `outputVolume`,
 (chains by insert key, `xlr1`, `xlr2` or `mix:<id>`; each entry carries
 `insert`, `error`, `meters`, `nativeHostRunning`, `nativeUiBlocked`,
 `nativeUiBlockReason`, `filterChainError` and `latencyMilliseconds`),
+`soundCheck` (see [Sound Check](#sound-check)),
 `exclusiveGroups` (`id`, `name`, `channels`; see
 [exclusive groups](mixer-layout.md#exclusive-groups)), `enforcedDefaultSink`, `enforcedDefaultSource`, `streams` (`id`, `serial`,
 `label`, `identity`, `channelId`, `active`, `running`), `renamedSinceStart`
@@ -184,6 +185,7 @@ that final acknowledgement (or an `error` without a request id):
 | `getNativeEditorRules` | none | read release defaults and explicit user overrides for native editor compatibility |
 | `setNativeEditorRule` | `kind`, `plugin`, `name?`, `blocked?` | set `blocked:true` to use OpenXLR controls, `false` to allow the native editor, or null/absent to remove the override and follow release defaults. Saved atomically before success; answered with `nativeEditorRules` |
 | `showInsertUi` | `channel`, `insertId` | open an enabled insert's native editor when the optional host is installed and the editor policy allows it; a blocked editor is refused without changing the audio instance |
+| `soundCheck` | `channel`, `action` | Sound Check on `xlr1` or `xlr2`; no other channel takes it. `record` starts a session if none runs and records up to ten seconds, replacing an earlier sample; `loop` plays the sample into the channel in place of the microphone and needs at least a tenth of a second recorded; `live` goes back to the microphone and keeps the sample; `stop` ends the session and discards the sample. One session at a time: `record`, `loop` and `live` for the other channel are refused, and its `stop` does nothing. Every action but `stop` is refused at once when the native plugin host is not installed. Never saved. See [Sound Check](#sound-check) |
 | `adjustOutputVolume` | optional `device`, `value` | change a PipeWire output by desktop percentage points (`0.05` is 5%). Finite steps from -0.5 to 0.5, final volume clamped to 0 through 1.5. Omit `device` for the current desktop default |
 | `setOutputDeviceVolume` | optional `device`, `value` | set a PipeWire output's desktop volume; `value` finite, 0 to 1.5 on the desktop scale (1.0 is 100%), rejected outside that range. A monitor mix sink is set through its mix master; a selected monitor output follows the linked monitor-volume behaviour. Omit `device` for the current desktop default; device names are accepted and rejected as for `adjustOutputVolume` |
 | `toggleOutputMute` | optional `device` | toggle an output's mute; omit `device` for the current desktop default. On one of the selected monitor outputs it toggles the mute of the mixes feeding that output (what pressing a Deck dial on the monitor does), so the mixer window, dial rings and keys agree; on a monitor mix sink it toggles that mix; on any other output it toggles the sink's mute at the audio server |
@@ -586,6 +588,31 @@ daemon connection is down. Such a query returns null at once and retains no
 pending reply slot. Queries already sent keep their request identity until
 the acknowledgement or disconnect, so a late reply cannot answer a newer
 query.
+
+### Sound Check
+
+`mixer.soundCheck` is `{channel, mode, seconds, error}`. `channel` is the
+microphone channel of the session, null when there is none. `mode` is what
+the helper last did: `recording`, `looping` or `live`, and `idle` without a
+session. `seconds` is the length recorded, 0 to 10, and the daemon pushes
+state as it grows. `error` says why a session ended by itself.
+
+The sample is taken from the interface's capture pair, after the hardware
+gain and processing, and enters the channel ahead of the software low cut,
+ClipGuard and the inserts, so every change to those is heard on the next
+pass. What the channel sends, the loop included, goes wherever the channel
+goes: the monitor mixes and the virtual microphones alike. The sample lives
+in the helper's memory and is never written to disk, `mixer.json` or a
+profile. While a session runs on XLR 1, the Wave XLR Pro's zero-latency
+hardware microphone path is off, so jacks fed by a monitor mix hear the loop
+through the software send rather than the live microphone.
+
+A session ends by itself when the input device changes, when the helper or
+its input link goes away, when the audio graph is rebuilt, or ten minutes
+after it started. The microphone is then wired back, and the state keeps
+`channel` with `mode` `idle` and the reason in `error`, so a client shows it
+on that microphone only, until a `stop` for that channel clears it or a new
+`record` replaces it.
 
 ### Output key targets
 

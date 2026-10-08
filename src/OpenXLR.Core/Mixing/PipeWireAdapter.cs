@@ -697,6 +697,39 @@ public sealed class PipeWireAdapter
         IReadOnlyList<InsertDefinition>? inserts = null)
         => CreateFilterChain($"OpenXLR_lc_{id}_in", $"OpenXLR_lc_{id}_out", "OpenXLR Mic Filter", 1, lowCutHz, clipGuard, inserts);
 
+    /// <summary>
+    /// The Sound Check loop for one microphone channel: the native helper's
+    /// mono "soundcheck" backend, one input and one output, under a fixed
+    /// node name. Refused at once when the helper is not installed, since a
+    /// build without it has nothing that could answer.
+    /// </summary>
+    internal FilterHandle CreateSoundCheck(string id, out int rate, string? executable = null)
+    {
+        executable ??= NativePluginHost.Executable;
+        if (!File.Exists(executable)) throw new InvalidOperationException(Mixer.SoundCheckNeedsHost);
+        rate = ParseGraphSampleRate(Run("pw-metadata", "-n", "settings"));
+        string node = "OpenXLR_soundcheck_" + id;
+        NativePluginHost host;
+        try
+        {
+            host = new NativePluginHost(new() { Id = id, Kind = "soundcheck", Plugin = "soundcheck" },
+                node, 1, rate, executable, [], meterSymbols: new HashSet<string>(StringComparer.Ordinal) { "frames", "mode" });
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new InvalidOperationException($"Sound Check could not start the native plugin host. {ex.Message}", ex);
+        }
+        _nativeHosts.Add(host);
+        var filter = new FilterHandle(node, node, node, host.Process) { NativeHost = host };
+        if (!WaitForPorts(node, "playback", false, TimeSpan.FromSeconds(3), host.Process)
+            || !WaitForPorts(node, "capture", true, TimeSpan.FromSeconds(3), host.Process))
+        {
+            StopFilter(filter);
+            throw new InvalidOperationException("Sound Check audio ports did not appear.");
+        }
+        return filter;
+    }
+
     /// <summary>A stereo insert chain for a mix, spliced between the mix and its consumers.</summary>
     public FilterHandle CreateMixChain(string id, string description, IReadOnlyList<InsertDefinition> inserts)
         => CreateFilterChain($"OpenXLR_ins_{id}_in", $"OpenXLR_ins_{id}_out", description, 2, 0, false, inserts);

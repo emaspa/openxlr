@@ -274,6 +274,10 @@ public sealed class WindowLayoutTests
                     }
                 }
                 AssertInside(chain.FindControl<Button>("EffectWorkflow")!, chain);
+                var soundCheckButton = chain.GetVisualDescendants().OfType<Button>()
+                    .Single(b => b.Content as string == "Sound Check");
+                Assert.True(soundCheckButton.IsVisible);
+                AssertInside(soundCheckButton, chain);
                 Capture(chain, "chain-440");
 
                 var workflow = new EffectWorkflowWindow { DataContext = vm.Inserts };
@@ -287,6 +291,16 @@ public sealed class WindowLayoutTests
                 }
                 Assert.True(((ScrollViewer)workflow.Content!).Bounds.Height > 50);
                 Capture(workflow, "effect-workflow-minimum");
+
+                var soundCheck = new SoundCheckWindow { DataContext = vm.Inserts.SoundCheck };
+                windows.Add(soundCheck);
+                soundCheck.Show();
+                Layout(soundCheck, soundCheck.MinWidth, soundCheck.MinHeight);
+                var soundActions = soundCheck.GetVisualDescendants().OfType<WrapPanel>().Single();
+                AssertNoOverlap(soundActions.Children.ToArray());
+                foreach (var action in soundActions.Children) AssertInside(action, soundActions);
+                Assert.True(soundCheck.GetVisualDescendants().OfType<ScrollViewer>().Single().Bounds.Height > 50);
+                Capture(soundCheck, "sound-check-minimum");
 
                 vm.Inputs.Add(new AudioDeviceItem("test_source", "Second microphone", false));
                 vm.Inputs.Add(new AudioDeviceItem("OpenXLR_stream", "Own mix", true));
@@ -554,6 +568,7 @@ public sealed class WindowLayoutTests
                 AssertLiveLayoutOrder(main, vm);
                 EffectWorkflowWindowTests.CheckControlOwnership(main, vm.Inserts.Client);
                 PluginCatalogueUiTests.CheckStaleReplies();
+                SoundCheckWindowTests.CheckPendingClose();
             }
             catch (Exception ex) { failure = ex; }
             finally

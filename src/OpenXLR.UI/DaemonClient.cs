@@ -450,6 +450,10 @@ public sealed class DaemonClient : IAsyncDisposable
     public Task SetMixLatencyCompensationAsync(bool on)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setMixLatencyCompensation", ["value"] = on });
 
+    /// <summary>Sound Check on a microphone channel: record, loop, live or stop.</summary>
+    public Task<string?> SoundCheckAsync(string channel, string action)
+        => EditLayoutAsync(new() { ["cmd"] = "soundCheck", ["channel"] = channel, ["action"] = action });
+
     /// <summary>Replace a channel's plugin insert chain (ordered).</summary>
     public Task SetInsertsAsync(string channel, IReadOnlyList<object> inserts)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setInserts", ["channel"] = channel, ["inserts"] = inserts });
