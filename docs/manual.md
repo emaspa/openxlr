@@ -1744,6 +1744,16 @@ the GlobalShortcuts portal, but do not need KDE's focused-window integration.
 Desktop shortcuts are explicitly selected in the portal; existing media-key
 bindings are not replaced automatically.
 
+OpenDeck output volume and mute keys keep rapid presses and apply them in the
+order they were pressed, across keys, so a burst at 0 or 150% ends where the
+presses say. Each press waits for the previous one to be acknowledged. Up to
+eight presses wait per key and 64 across all keys; a press beyond that shows
+an alert. An error, a timeout or a disconnect discards the waiting presses
+instead of applying a late burst, and changing a key's settings or removing
+it drops that key's waiting presses. Focus-routing and output-selection keys
+do not wait behind the volume and mute presses: they are sent at once, and a
+second press on the same key while its first is unanswered is ignored.
+
 PC shortcut presses are processed in order, including quick volume repeats.
 Up to 16 presses can wait behind the active command. If that queue fills,
 Desktop keys reports that the additional press was not queued. Disabling or
