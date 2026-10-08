@@ -581,7 +581,7 @@
           "type": "number",
           "minimum": 0,
           "maximum": 64,
-          "description": "the smallest size of the compact controls: the interface rows' buttons and sliders, the tile headers and their buttons, the gain lock, the inserts buttons and a send's mute"
+          "description": "the smallest size of the compact controls: the interface rows' buttons and sliders, the tile headers and their buttons, the Arrange buttons and drag handles, the gain lock, the inserts buttons and a send's mute"
         },
         "Ox.Mixer.InsertControlMinSize": {
           "type": "number",

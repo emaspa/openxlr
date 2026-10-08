@@ -103,7 +103,9 @@ configuration, runtime and session-bus settings. It checks narrow plugin
 windows and mixer widths from 640 to 2400 logical pixels. Set
 `OPENXLR_LAYOUT_ARTIFACTS` to a directory to save rendered previews. Set
 `OPENXLR_LAYOUT_FONT` to an installed font family, such as `DejaVu Sans`, to
-check wrapping with different font metrics.
+check wrapping with different font metrics. The same run checks Arrange mode
+with a real pointer and keyboard through XTEST, so it needs `libXtst` like
+the tooltip test.
 
 The tooltip test runs in its own process too. It drives a real pointer
 through the X server's XTEST extension, so it needs `libXtst`, and it

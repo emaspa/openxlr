@@ -121,6 +121,10 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
   apps carry on. The window, the terminal mixer and the Stream Deck keys
   show the same icon and colour. See
   [Edit the mixer layout](manual.md#layout)
+- Arrange mode in the window: drag handles, or the arrow keys, move the
+  five sections and the channel and mix tiles. Section order is a window
+  preference; tile order is the layout's one order. See
+  [Arrange](manual.md#arrange)
 - Any mix feeds any selected output, hardware outputs included: the
   picker beside each output names Monitor A/B, Stream, Chat, Aux or a
   monitor mix or virtual microphone you added, and the API names a sum of

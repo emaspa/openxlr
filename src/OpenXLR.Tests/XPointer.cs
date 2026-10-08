@@ -16,6 +16,10 @@ internal sealed class XPointer : IDisposable
     [DllImport("libXtst.so.6")] private static extern int XTestFakeButtonEvent(
         IntPtr display, uint button, int press, ulong delay);
 
+    /// <summary>X keysyms the window tests press.</summary>
+    public const ulong Escape = 0xff1b;
+    public const ulong Down = 0xff54;
+
     private IntPtr _display;
 
     public XPointer()

@@ -571,6 +571,10 @@ public sealed class WindowLayoutTests
                 PluginCatalogueUiTests.CheckStaleReplies();
                 SoundCheckWindowTests.CheckPendingClose();
                 AssertLayoutAppearance(main, vm);
+                // The arrange check opens its own window, with a real pointer
+                // on it; nothing else may sit in front.
+                foreach (var window in windows) window.Hide();
+                WindowOrderTests.Check();
             }
             catch (Exception ex) { failure = ex; }
             finally
@@ -584,7 +588,7 @@ public sealed class WindowLayoutTests
             }
         }) { IsBackground = true };
         thread.Start();
-        Assert.True(thread.Join(TimeSpan.FromSeconds(45)), "Window layout hung.");
+        Assert.True(thread.Join(TimeSpan.FromSeconds(150)), "Window layout hung.");
         if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
     }
 
