@@ -14,6 +14,8 @@ open `main`, so they can describe changes newer than the installed release.
 - [Skins](skins.md): the window's appearance values, where skins live and
   the rules one is read under, with a [JSON schema](skin.schema.json) and an
   [example skin](examples/skins/example/skin.json) to start from.
+- [Effect presets](effect-presets.md): copied effects, A/B comparison and
+  saved presets, with the preset file format and its limits.
 - [Hardware support](hardware-support.md): mapped controls, verification
   records and unmapped hardware features.
 - [Omarchy shell plugin](omarchy.md): the bar plugin, its enable command,

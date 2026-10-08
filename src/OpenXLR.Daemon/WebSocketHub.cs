@@ -375,6 +375,7 @@ public sealed class WebSocketHub
             case "setSoftClipGuard":
             case "setInsertBypass":
             case "setInsertParam":
+            case "renameInsert":
             case "showInsertUi":
                 error = _mixer.Apply(cmd);                     // broadcasts on success
                 stateOnError = true;

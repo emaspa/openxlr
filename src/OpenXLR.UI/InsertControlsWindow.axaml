@@ -52,6 +52,8 @@
                 ToolTip.Tip="Open this plugin's own editor on the live audio instance"/>
         <Button Content="Defaults" Padding="12,4" Margin="0,0,6,6" Click="OnDefaults"
                 ToolTip.Tip="Put every control back to the plugin's own defaults"/>
+        <Button Name="PluginPresets" Content="Presets" Padding="12,4" Margin="0,0,6,6" Click="OnPluginPresets"
+                ToolTip.Tip="Save, load, import and export presets for this plugin"/>
         <ToggleButton Content="Bypass" IsChecked="{Binding Bypass, Mode=TwoWay}" Padding="12,4" Margin="0,0,6,6"/>
         <Button Name="ManageNativeEditors" Content="Native editors" Padding="12,4" Margin="0,0,6,6" Click="OnNativeEditorRules"
                 IsVisible="{Binding NativeUiBlocked}" ToolTip.Tip="Manage this plugin's native editor compatibility rule"/>

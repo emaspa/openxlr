@@ -172,6 +172,7 @@ that final acknowledgement (or an `error` without a request id):
 | `setInserts` | `channel`, `inserts[]` | replace a chain; `channel` is `xlr1`, `xlr2` or `mix:<id>`, each insert is `{id, kind, plugin, label?, bypass?, params?}` where `kind` is `"lv2"` with the plugin URI, `"clap"` with the plugin's id, or `"vst3"` with the class id as 32 hex digits; a CLAP or VST3 insert always runs in the native host, so its `nativeHost` reads true whatever was sent. An insert being added is refused when its plugin cannot run at the chain's width (one channel on an input, two on a mix, by `widths` or the port counts as `plugins` describes them); an insert already in the chain, the same plugin under the same id, is left to the chain builder, so one can always be removed; an id kept while its `kind` or `plugin` changes counts as an addition |
 | `setInsertBypass` | `channel`, `insertId`, `value` | bypass one insert |
 | `setInsertParam` | `channel`, `insertId`, `symbol`, `value` | one plugin control, by the catalogue's `symbol` (LV2 port symbol or decimal CLAP/VST3 parameter id); use catalogue ranges and scale points. Refused when the insert is not in the chain or the catalogue does not declare the symbol for its plugin |
+| `renameInsert` | `channel`, `insertId`, `name` | change one insert's label; `name` is 1 to 256 characters with no control characters. The running plugin, its parameters and the audio path stay as they are. Refused when the insert is not in the chain |
 | `getNativeEditorRules` | none | read release defaults and explicit user overrides for native editor compatibility |
 | `setNativeEditorRule` | `kind`, `plugin`, `name?`, `blocked?` | set `blocked:true` to use OpenXLR controls, `false` to allow the native editor, or null/absent to remove the override and follow release defaults. Saved atomically before success; answered with `nativeEditorRules` |
 | `showInsertUi` | `channel`, `insertId` | open an enabled insert's native editor when the optional host is installed and the editor policy allows it; a blocked editor is refused without changing the audio instance |
@@ -379,6 +380,9 @@ All under `~/.config/openxlr/` (or `$XDG_CONFIG_HOME/openxlr/`):
   `setNativeEditorRule` with null `blocked` to follow release defaults again.
 - `ui.json`: window preferences (tray, start minimized, autostart
   toggles, the chosen skin)
+- `effect-chain-presets.json`: the window's saved effect presets, 0600.
+  Written by the UI only; the daemon never reads it. Format in
+  [effect-presets.md](effect-presets.md).
 
 ## Plugin discovery diagnostics
 

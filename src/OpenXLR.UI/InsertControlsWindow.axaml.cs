@@ -15,6 +15,17 @@ public partial class InsertControlsWindow : Window
         Opened += (_, _) => (DataContext as InsertViewModel)?.EnsureParams();
     }
 
+    private PluginPresetWindow? _presets;
+
+    private void OnPluginPresets(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not InsertViewModel insert) return;
+        if (_presets is not null) { _presets.Activate(); return; }
+        _presets = new PluginPresetWindow(insert);
+        _presets.Closed += (_, _) => _presets = null;
+        _presets.Show(this);
+    }
+
     private void OnDefaults(object? sender, RoutedEventArgs e) => (DataContext as InsertViewModel)?.ResetToDefaults();
 
     private async void OnNativeEditor(object? sender, RoutedEventArgs e)

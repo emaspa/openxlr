@@ -427,6 +427,8 @@ public sealed class SkinWindowTests
             ("mix-inserts", new MixInsertsWindow { DataContext = vm.Mixes[0].Inserts }),
             ("insert-controls", new InsertControlsWindow { DataContext = vm.Inserts.Items[0] }),
             ("plugin-picker", new PluginPickerWindow { DataContext = vm.Inserts }),
+            ("plugin-presets", new PluginPresetWindow(vm.Inserts.Items[0])),
+            ("effect-workflow", new EffectWorkflowWindow { DataContext = vm.Inserts }),
             ("native-editors", new NativeEditorRulesWindow()),
             ("plugin-folders", new PluginFoldersWindow()),
             ("updates", new UpdatesWindow { DataContext = vm.Updates }),
