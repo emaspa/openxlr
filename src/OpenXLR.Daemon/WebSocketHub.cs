@@ -383,6 +383,7 @@ public sealed class WebSocketHub
             case "setAuxPortEnabled":
             case "setLowCutHz":
             case "setSoftClipGuard":
+            case "setMixLatencyCompensation":
             case "setInsertBypass":
             case "setInsertParam":
             case "renameInsert":

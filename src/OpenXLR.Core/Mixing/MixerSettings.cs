@@ -65,6 +65,9 @@ public sealed record MixerSettings
     /// <summary>Software ClipGuard (post-ADC hard limiter) on the first XLR channel.</summary>
     public bool SoftClipGuard { get; init; }
 
+    /// <summary>Delay faster mixes to line up with the slowest mix's inserts. Off unless chosen; not part of a profile.</summary>
+    public bool CompensateMixLatency { get; init; }
+
     /// <summary>Plugin insert chains by channel id.</summary>
     public Dictionary<string, List<InsertDefinition>> Inserts { get; init; } = [];
 

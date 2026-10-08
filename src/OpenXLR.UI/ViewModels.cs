@@ -211,6 +211,17 @@ public sealed partial class MainViewModel : ViewModelBase
         ? "Host-side ClipGuard: a post-ADC hard limiter at -3 dB; it cannot repair clipping in the analog preamp or ADC"
         : SoftClipGuardError ?? "Software ClipGuard is unavailable";
 
+    // Latency compensation across mixes, a mixer setting the daemon saves.
+    private bool _compensateMixLatency;
+    public bool CompensateMixLatency
+    {
+        get => _compensateMixLatency;
+        set { if (Set(ref _compensateMixLatency, value) && !_applying) _ = _client.SetMixLatencyCompensationAsync(value); }
+    }
+
+    private string? _mixLatencyError;
+    public string? MixLatencyError { get => _mixLatencyError; private set => Set(ref _mixLatencyError, value); }
+
     // Software low cut (host-side high-pass) for devices without the
     // hardware filter; state lives in the mixer, not the device.
     private int _softLowCutHz;
@@ -1055,6 +1066,8 @@ public sealed partial class MainViewModel : ViewModelBase
         SoftClipGuardAvailable = mixer["softClipGuardAvailable"]?.GetValue<bool>() ?? false;
         SoftClipGuardError = mixer["softClipGuardError"]?.GetValue<string>();
         SoftClipGuard = mixer["softClipGuard"]?.GetValue<bool>() ?? false;
+        CompensateMixLatency = mixer["compensateMixLatency"]?.GetValue<bool>() ?? false;
+        MixLatencyError = mixer["mixLatencyError"]?.GetValue<string>();
         Inserts.Apply(mixer["inserts"]?["xlr1"]);
         Inserts2.Apply(mixer["inserts"]?["xlr2"]);
         bool auxAudible = mixer["monitorFeeds"] is JsonObject monitorFeeds && monitorFeeds.Any(

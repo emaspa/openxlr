@@ -211,7 +211,7 @@ while fixes to existing hosts remain part of normal maintenance.
   workflow does not publish them to release or distribution repositories.
 - [ ] Presets: per-plugin and whole-chain, with export and import; copy a
   chain between channels; A/B comparison.
-- [ ] Plugin latency reported per insert and compensated across mixes.
+- [x] Plugin latency reported per insert and compensated across mixes.
 - [ ] Sound Check: record a short microphone sample, loop it through the
   live chain, compare presets while listening.
 - [x] A bundle that hangs or fails the scanner is remembered and passed

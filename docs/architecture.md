@@ -103,6 +103,11 @@ modules or custom drivers:
   latency and editor requests, never audio. Exposed parameters are persisted; opaque plugin state and
   presets are not. See [native/README.md](../native/README.md) for editor
   recovery, size constraints and LSP renderer defaults.
+- With latency compensation on, a mix that needs a delay gets a stereo
+  filter-chain of two builtin delay lines (`OpenXLR_delay_<mix>_in` and
+  `_out`) after its inserts, and its consumers read that. The delay is set
+  with `pw-cli set-param`, so a changed figure moves it without touching the
+  plugins. See [plugin latency](api.md#plugin-latency).
 - Direct port links (`pw-link`) wire hardware inputs, chains, mixes and
   outputs, so the output device clocks the chain. Hardware inputs are
   wired by capture-channel pair (XLR 1 = pair 0, XLR 2 = pair 1, Line
