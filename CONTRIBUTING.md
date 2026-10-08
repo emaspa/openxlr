@@ -71,25 +71,10 @@ The idle graph allocation check measures reads on a dedicated warmed thread,
 so test-runner diagnostic allocations are outside the measured interval. It
 still requires zero bytes and the same cached snapshot across 10,000 reads.
 
-Plugin-host diagnostics arrive through an asynchronous stderr reader. A
-fixture waiting for the host process to exit must also wait for its expected
-terminal diagnostic, within a deadline. Process exit alone does not join
-that reader, and the production accessor intentionally bounds its wait.
-
-Default-device defense tests use zero-delay passes and a helper handshake to
-check retries and cancellation without depending on the test runner's timer
-scheduling. Their bounded completion waits allow a busy worker pool; the
-production retry delays and helper timeouts stay unchanged.
-
-Socket fixtures used by the hub must support both abort and a normal close:
-shutdown cancellation can reach the receive guard before the send pump aborts
-the socket. A receive-entry handshake tests that close path without depending
-on which worker wins the race.
-
-The plugin header allocation check also uses a dedicated warmed thread.
-It permits path and result objects, but not a stream buffer of a kilobyte
-or more for each four-byte header read. Separate format cases cover empty
-and truncated headers, the two-byte Windows signature and the ELF signature.
+Tests of retries, cancellation and shutdown wait on a handshake with a
+deadline, not on timer scheduling or on which thread wins a race. A test
+that waits for a helper process to exit also waits for the output it
+expects, since exit alone does not mean its output has been read.
 
 The private PipeWire runner also checks profile startup ordering. To exercise
 ClipGuard with recorded test audio, low cut and a native LSP gate, run
