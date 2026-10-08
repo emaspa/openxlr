@@ -1,3 +1,4 @@
+using OpenXLR.UI.Localization;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -144,9 +145,9 @@ public partial class MainWindow : Window
         try
         {
             var menu = new NativeMenu();
-            var show = new NativeMenuItem("Show mixer");
+            var show = new NativeMenuItem(Localizer.Text("ShowMixer"));
             show.Click += (_, _) => Dispatcher.UIThread.Post(ShowMixer);
-            var quit = new NativeMenuItem("Quit OpenXLR");
+            var quit = new NativeMenuItem(Localizer.Text("QuitOpenXLR"));
             quit.Click += (_, _) => Dispatcher.UIThread.Post(Quit);
             menu.Items.Add(show);
             menu.Items.Add(new NativeMenuItemSeparator());
@@ -208,16 +209,15 @@ public partial class MainWindow : Window
         string name = ProfileNameBox.Text?.Trim() ?? "";
         if (name.Length == 0) return;
         bool exists = _vm.Profiles.Any(p => string.Equals(p, name, StringComparison.OrdinalIgnoreCase));
-        if (exists && !await ConfirmAsync("Overwrite profile?",
-                $"A profile named \"{name}\" already exists for this device.\n" +
-                "Saving will replace it with the current scene."))
+        if (exists && !await ConfirmAsync(Localizer.Text("OverwriteProfileTitle"),
+                Localizer.Format("ProfileOverwriteMessage", name)))
             return;
         _vm.SaveProfile(name);
         ProfileNameBox.Text = "";
     }
 
-    private Task<bool> ConfirmAsync(string title, string message, string yesLabel = "Overwrite")
-        => Dialogs.ConfirmAsync(this, title, message, yesLabel);
+    private Task<bool> ConfirmAsync(string title, string message, string? yesLabel = null)
+        => Dialogs.ConfirmAsync(this, title, message, yesLabel ?? Localizer.Text("Overwrite"));
 
     private void OnProfileLoad(object? sender, RoutedEventArgs e)
     {

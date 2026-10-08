@@ -1,9 +1,10 @@
 <Window xmlns="https://github.com/avaloniaui"
+        xmlns:loc="using:OpenXLR.UI.Localization"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:OpenXLR.UI"
         x:Class="OpenXLR.UI.PluginPickerWindow"
         x:DataType="vm:InsertsViewModel"
-        Title="Add plugin insert" Width="560" Height="520" MinWidth="420" MinHeight="360"
+        Title="{loc:Text Key=AddPluginInsert}" Width="560" Height="520" MinWidth="420" MinHeight="360"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource Ox.Window.Background}">
 
@@ -11,13 +12,13 @@
     <TextBlock DockPanel.Dock="Top" Text="{Binding PickerHint}" Classes="h" Margin="0,0,0,8"/>
     <!-- the search, and one button per format: none pressed shows every plugin -->
     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,8,Auto,4,Auto,4,Auto" Margin="0,0,0,8">
-      <TextBox Name="Filter" PlaceholderText="Search by name or category"/>
+      <TextBox Name="Filter" PlaceholderText="{loc:Text Key=SearchByNameOrCategory}"/>
       <ToggleButton Grid.Column="2" Name="OnlyLv2" Content="LV2" Padding="12,4" VerticalAlignment="Stretch"
-                    IsCheckedChanged="OnFormatToggled" ToolTip.Tip="Show LV2 plugins"/>
+                    IsCheckedChanged="OnFormatToggled" ToolTip.Tip="{loc:Text Key=ShowLV2Plugins}"/>
       <ToggleButton Grid.Column="4" Name="OnlyClap" Content="CLAP" Padding="12,4" VerticalAlignment="Stretch"
-                    IsCheckedChanged="OnFormatToggled" ToolTip.Tip="Show CLAP plugins"/>
+                    IsCheckedChanged="OnFormatToggled" ToolTip.Tip="{loc:Text Key=ShowCLAPPlugins}"/>
       <ToggleButton Grid.Column="6" Name="OnlyVst3" Content="VST3" Padding="12,4" VerticalAlignment="Stretch"
-                    IsCheckedChanged="OnFormatToggled" ToolTip.Tip="Show VST3 plugins"/>
+                    IsCheckedChanged="OnFormatToggled" ToolTip.Tip="{loc:Text Key=ShowVST3Plugins}"/>
     </Grid>
     <TextBlock DockPanel.Dock="Top" Text="{Binding Note}" Classes="h" FontSize="11" Margin="0,0,0,6"/>
     <!-- installing: a file (.clap, .vst3, a Windows plugin) or a folder (a .vst3
@@ -26,12 +27,12 @@
       <TextBlock Name="InstallStatus" Classes="h" FontSize="11" TextWrapping="Wrap"
                  IsVisible="{Binding #InstallStatus.Text, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
       <Grid ColumnDefinitions="Auto,6,Auto,*,Auto,8,Auto">
-        <Button Name="InstallFile" Content="Install file" Padding="12,6" Click="OnInstallFile"
-                ToolTip.Tip="Install a .clap or .vst3 file, or a Windows plugin through yabridge"/>
-        <Button Grid.Column="2" Name="InstallFolder" Content="Install folder" Padding="12,6" Click="OnInstallFolder"
-                ToolTip.Tip="Install a .vst3 or .lv2 bundle, or every plugin in a folder"/>
-        <Button Grid.Column="4" Name="AddButton" Content="Add" Padding="18,6" IsEnabled="False" Click="OnAdd"/>
-        <Button Grid.Column="6" Content="Cancel" Padding="18,6" Click="OnCancel"/>
+        <Button Name="InstallFile" Content="{loc:Text Key=InstallFile}" Padding="12,6" Click="OnInstallFile"
+                ToolTip.Tip="{loc:Text Key=InstallAClapOrVst3FileOrA}"/>
+        <Button Grid.Column="2" Name="InstallFolder" Content="{loc:Text Key=InstallFolder}" Padding="12,6" Click="OnInstallFolder"
+                ToolTip.Tip="{loc:Text Key=InstallAVst3OrLv2BundleOrEvery}"/>
+        <Button Grid.Column="4" Name="AddButton" Content="{loc:Text Key=Add}" Padding="18,6" IsEnabled="False" Click="OnAdd"/>
+        <Button Grid.Column="6" Content="{loc:Text Key=Cancel}" Padding="18,6" Click="OnCancel"/>
       </Grid>
     </StackPanel>
     <ListBox Name="List" Background="{DynamicResource Ox.Card.Background}" CornerRadius="8" Padding="4"

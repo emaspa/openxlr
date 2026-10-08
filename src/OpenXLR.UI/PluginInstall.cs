@@ -1,3 +1,4 @@
+using OpenXLR.UI.Localization;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -33,12 +34,12 @@ public static class PluginInstall
         IStorageFolder? start = await owner.StorageProvider.TryGetWellKnownFolderAsync(WellKnownFolder.Downloads);
         IReadOnlyList<IStorageFile> files = await owner.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Install plugin files",
+            Title = Localizer.Text("InstallPluginFiles"),
             AllowMultiple = true,
             SuggestedStartLocation = start,
             FileTypeFilter =
             [
-                new FilePickerFileType("Plugins") { Patterns = ["*.clap", "*.vst3", "*.dll"] },
+                new FilePickerFileType(Localizer.Text("PluginFileType")) { Patterns = ["*.clap", "*.vst3", "*.dll"] },
                 FilePickerFileTypes.All,
             ],
         });
@@ -47,12 +48,12 @@ public static class PluginInstall
 
     /// <summary>Let the user pick a folder: a .vst3 or .lv2 bundle, or a folder holding plugins.</summary>
     public static async Task<IReadOnlyList<string>> PickFolderAsync(Window owner,
-        string title = "Install a plugin folder", bool allowMultiple = true)
+        string? title = null, bool allowMultiple = true)
     {
         IStorageFolder? start = await owner.StorageProvider.TryGetWellKnownFolderAsync(WellKnownFolder.Downloads);
         IReadOnlyList<IStorageFolder> folders = await owner.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
-            Title = title,
+            Title = title ?? Localizer.Text("InstallAPluginFolder"),
             AllowMultiple = allowMultiple,
             SuggestedStartLocation = start,
         });
@@ -76,7 +77,7 @@ public static class PluginInstall
         foreach (string path in paths)
         {
             JsonNode? reply = await client.InstallPluginAsync(path, InstallTimeout);
-            if (reply is null) { lines.Add($"No answer from the daemon for {System.IO.Path.GetFileName(path.TrimEnd('/'))}."); continue; }
+            if (reply is null) { lines.Add(Localizer.Format("NoAnswerForPath", System.IO.Path.GetFileName(path.TrimEnd('/')))); continue; }
             lines.Add(reply["message"]?.GetValue<string>() ?? "");
             added += reply["added"]?.GetValue<int>() ?? 0;
         }
@@ -87,19 +88,19 @@ public static class PluginInstall
     /// <summary>Report the outcome of a sync or rescan the same way.</summary>
     public static string Describe(JsonNode? reply, string what)
     {
-        if (reply is null) return $"No answer from the daemon; {what} may still be running.";
+        if (reply is null) return Localizer.Format("NoAnswerMayStillRun", what);
         Reload();
         int added = reply["added"]?.GetValue<int>() ?? 0;
         int total = reply["total"]?.GetValue<int>() ?? 0;
         string message = reply["message"]?.GetValue<string>() ?? "";
-        string gained = added switch { 0 => $"{total} plugins in the catalogue, nothing new.", 1 => "1 plugin new in the catalogue.", _ => $"{added} plugins new in the catalogue." };
+        string gained = added switch { 0 => Localizer.Format("CatalogueNothingNew", total), 1 => Localizer.Text("CatalogueOneNew"), _ => Localizer.Format("CatalogueNew", added) };
         return message.Length == 0 ? gained : $"{message} {gained}";
     }
 
     private static string Summarise(List<string> lines, int added)
     {
         string text = string.Join(" ", lines.Where(l => l.Length > 0));
-        if (added > 0) text += added == 1 ? " 1 plugin new in the picker." : $" {added} plugins new in the picker.";
+        if (added > 0) text += " " + (added == 1 ? Localizer.Text("PickerOneNew") : Localizer.Format("PickerNew", added));
         return text.Trim();
     }
 

@@ -1,3 +1,4 @@
+using OpenXLR.UI.Localization;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,7 +17,7 @@ internal sealed class DesktopKeys(DaemonClient client) : IDisposable
     private IDisposable? _activated, _closed;
     private int _invoking;
     private readonly Queue<(KeyAction Action, Func<bool> IsActive)> _pending = new();
-    internal string Status { get; private set; } = "Desktop keys are disabled.";
+    internal string Status { get; private set; } = Localizer.Text("DesktopKeysDisabled");
     internal event Action? Changed;
 
     internal Task StartAsync() => ConfigureAsync(DesktopKeySettings.Load(), save: false);
@@ -29,7 +30,7 @@ internal sealed class DesktopKeys(DaemonClient client) : IDisposable
             // A configuration can sit in the desktop's permission dialog for
             // a while. Queue this one behind it rather than dropping it: the
             // window's Apply stays disabled until it has run.
-            SetStatus("Waiting for the previous configuration to finish...");
+            SetStatus(Localizer.Text("DesktopKeysWaiting"));
             try { await _configure.WaitAsync(_lifetime.Token); }
             catch (OperationCanceledException) { return; }
         }
@@ -40,9 +41,9 @@ internal sealed class DesktopKeys(DaemonClient client) : IDisposable
             if (save) settings.Save(); // a failed save leaves the running session alone
             replacing = true;
             Stop();
-            if (!settings.Enabled) { SetStatus("Desktop keys are disabled."); return; }
-            SetStatus("Connecting to the desktop...");
-            var connection = new DBusConnection(Environment.GetEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS") ?? DBusAddress.Session ?? throw new InvalidOperationException("No session bus is available."));
+            if (!settings.Enabled) { SetStatus(Localizer.Text("DesktopKeysDisabled")); return; }
+            SetStatus(Localizer.Text("DesktopKeysConnecting"));
+            var connection = new DBusConnection(Environment.GetEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS") ?? DBusAddress.Session ?? throw new InvalidOperationException(Localizer.Text("NoSessionBus")));
             _connection = connection;
             await connection.ConnectAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(3), _lifetime.Token);
             _ = ObserveConnectionAsync(connection);
@@ -52,7 +53,7 @@ internal sealed class DesktopKeys(DaemonClient client) : IDisposable
             var actions = Actions(settings);
             if (actions.Count == 0)
             {
-                SetStatus("OpenDeck focus routing is enabled. Select channels below to assign PC shortcuts.");
+                SetStatus(Localizer.Text("DesktopKeysFocusOnly"));
                 return;
             }
             var created = await bus.Request("CreateSession", "a{sv}", token => (ref MessageWriter w) =>
@@ -70,7 +71,7 @@ internal sealed class DesktopKeys(DaemonClient client) : IDisposable
                     if (notification.IsCompletion)
                     {
                         Interlocked.Exchange(ref active, -1);
-                        SetStatus("Desktop connection lost. Open Desktop keys and apply to reconnect.");
+                        SetStatus(Localizer.Text("DesktopConnectionLost"));
                         return;
                     }
                     var (activeSession, id) = notification.Value;
@@ -82,7 +83,7 @@ internal sealed class DesktopKeys(DaemonClient client) : IDisposable
                 static (_, _) => true, _ =>
                 {
                     Interlocked.Exchange(ref active, -1);
-                    if (IsCurrent()) SetStatus("Shortcut session closed. Open Desktop keys and apply to reconnect.");
+                    if (IsCurrent()) SetStatus(Localizer.Text("ShortcutSessionClosed"));
                 }, emitOnCapturedContext: false, flags: ObserverFlags.EmitOnConnectionClosed | ObserverFlags.EmitOnReaderFailed);
             await bus.Request("BindShortcuts", "oa(sa{sv})sa{sv}", token => (ref MessageWriter w) =>
             {
@@ -98,13 +99,13 @@ internal sealed class DesktopKeys(DaemonClient client) : IDisposable
                 w.WriteDictionary(new Dictionary<string, VariantValue> { ["handle_token"] = token });
             }, _lifetime.Token);
             if (Interlocked.CompareExchange(ref active, 1, 0) != 0)
-                throw new InvalidOperationException("The desktop closed the shortcut session while it was being configured.");
-            SetStatus("Desktop keys are active. Keep OpenXLR running, including in the tray.");
+                throw new InvalidOperationException(Localizer.Text("ShortcutSessionClosedWhileConfiguring"));
+            SetStatus(Localizer.Text("DesktopKeysActive"));
         }
         catch (Exception ex)
         {
             if (replacing) Stop();
-            SetStatus("Desktop keys: " + ex.Message);
+            SetStatus(Localizer.Format("DesktopKeysError", ex.Message));
         }
         finally { _configure.Release(); }
     }
@@ -114,15 +115,15 @@ internal sealed class DesktopKeys(DaemonClient client) : IDisposable
     {
         var actions = new Dictionary<string, KeyAction>(StringComparer.Ordinal);
         foreach (string channel in settings.FocusChannels)
-            actions["focus_" + channel] = new("Route focused app to " + channel, () => client.RouteFocusedAppAsync(channel));
+            actions["focus_" + channel] = new(Localizer.Format("KeyRouteFocusedApp", channel), () => client.RouteFocusedAppAsync(channel));
         if (settings.OutputControls)
         {
-            actions["output_up"] = new("Output volume up 5%", () => client.AdjustOutputVolumeAsync(settings.OutputDevice, .05));
-            actions["output_down"] = new("Output volume down 5%", () => client.AdjustOutputVolumeAsync(settings.OutputDevice, -.05));
-            actions["output_mute"] = new("Toggle output mute", () => client.ToggleOutputMuteAsync(settings.OutputDevice));
+            actions["output_up"] = new(Localizer.Text("KeyOutputVolumeUp"), () => client.AdjustOutputVolumeAsync(settings.OutputDevice, .05));
+            actions["output_down"] = new(Localizer.Text("KeyOutputVolumeDown"), () => client.AdjustOutputVolumeAsync(settings.OutputDevice, -.05));
+            actions["output_mute"] = new(Localizer.Text("KeyToggleOutputMute"), () => client.ToggleOutputMuteAsync(settings.OutputDevice));
         }
         foreach (string output in settings.MainOutputs)
-            actions[DesktopKeySettings.MainKey(output)] = new("Set system output to " + output, () => client.SetMainOutputAsync(output));
+            actions[DesktopKeySettings.MainKey(output)] = new(Localizer.Format("KeySetSystemOutput", output), () => client.SetMainOutputAsync(output));
         return actions;
     }
 
@@ -130,7 +131,7 @@ internal sealed class DesktopKeys(DaemonClient client) : IDisposable
     {
         await connection.DisconnectedAsync().ConfigureAwait(false);
         if (ReferenceEquals(_connection, connection) && !_lifetime.IsCancellationRequested)
-            SetStatus("Desktop connection lost. Open Desktop keys and apply to reconnect.");
+            SetStatus(Localizer.Text("DesktopConnectionLost"));
     }
 
     private async Task InvokeAsync(KeyAction action, Func<bool> isActive)
@@ -149,7 +150,7 @@ internal sealed class DesktopKeys(DaemonClient client) : IDisposable
         }
         if (full)
         {
-            if (isActive()) SetStatus("Desktop key queue is full; this press was not queued. Wait for the daemon before retrying.");
+            if (isActive()) SetStatus(Localizer.Text("DesktopKeyQueueFull"));
             return;
         }
         // One consumer preserves output-switch/volume order without losing
@@ -165,7 +166,7 @@ internal sealed class DesktopKeys(DaemonClient client) : IDisposable
             try
             {
                 string? error = await action.Invoke();
-                if (isActive()) SetStatus(error ?? "Completed: " + action.Description + ".");
+                if (isActive()) SetStatus(error ?? Localizer.Format("DesktopKeyCompleted", action.Description));
             }
             catch (Exception ex) { if (isActive()) SetStatus(ex.Message); }
         }

@@ -1,19 +1,20 @@
-<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:loc="using:OpenXLR.UI.Localization" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:OpenXLR.UI" x:Class="OpenXLR.UI.UpdatesWindow" x:DataType="vm:UpdatesViewModel"
-        Title="OpenXLR updates" Width="660" Height="520" MinWidth="420" MinHeight="300"
+        Title="{loc:Text Key=OpenXLRUpdates}" Width="660" Height="520" MinWidth="420" MinHeight="300"
         WindowStartupLocation="CenterOwner" Background="{DynamicResource Ox.Window.Background}">
   <Grid Margin="18" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="12">
     <TextBlock Text="{Binding Title}" FontSize="19" FontWeight="SemiBold"
                Foreground="{DynamicResource Ox.Text.Primary}" TextWrapping="Wrap"/>
-    <TextBlock Grid.Row="1" Text="Release notes are plain text. OpenXLR never installs an update automatically."
+    <TextBlock Grid.Row="1" Text="{loc:Text Key=ReleaseNotesArePlainTextOpenXLRNeverInstalls}"
                Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
     <ScrollViewer Grid.Row="2">
       <SelectableTextBlock Text="{Binding Details}" TextWrapping="Wrap" Foreground="{DynamicResource Ox.Text.Detail}"/>
     </ScrollViewer>
     <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-      <Button Content="Check again" Click="OnCheck" IsEnabled="{Binding !Busy}"/>
-      <Button Content="Open on GitHub" Click="OnOpen" IsVisible="{Binding Available}"/>
-      <Button Content="Close" Click="OnClose"/>
+      <Button Content="{loc:Text Key=CheckAgain}" Click="OnCheck" IsEnabled="{Binding !Busy}"/>
+      <Button Content="{loc:Text Key=OpenOnGitHub}" Click="OnOpen" IsVisible="{Binding Available}"/>
+      <Button Content="{loc:Text Key=Close}" Click="OnClose"/>
     </StackPanel>
   </Grid>
 </Window>

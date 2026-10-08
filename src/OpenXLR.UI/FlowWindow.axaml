@@ -1,7 +1,8 @@
 <Window xmlns="https://github.com/avaloniaui"
+        xmlns:loc="using:OpenXLR.UI.Localization"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="OpenXLR.UI.FlowWindow"
-        Title="OpenXLR · Audio flow" SizeToContent="WidthAndHeight" MinWidth="900" MinHeight="500"
+        Title="{loc:Text Key=OpenXLRAudioFlow}" SizeToContent="WidthAndHeight" MinWidth="900" MinHeight="500"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource Ox.Flow.Background}">
   <!-- The graph's colours are the application's Ox.Flow.* tokens. The cards
@@ -24,10 +25,10 @@
   <Grid RowDefinitions="Auto,*,Auto" Margin="28,24,28,18">
     <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,20">
       <StackPanel Spacing="5">
-        <TextBlock Text="Audio flow" FontSize="24" FontWeight="SemiBold" Foreground="{DynamicResource Ox.Flow.Text}"/>
-        <TextBlock Name="FlowHint" Text="Click any element to trace its signal path" FontSize="12" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
+        <TextBlock Text="{loc:Text Key=AudioFlow}" FontSize="24" FontWeight="SemiBold" Foreground="{DynamicResource Ox.Flow.Text}"/>
+        <TextBlock Name="FlowHint" Text="{loc:Text Key=ClickAnyElementToTraceItsSignalPath}" FontSize="12" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
       </StackPanel>
-      <Button Name="ClearSelection" Grid.Column="1" Content="×  Clear selection" Click="OnClearSelection"
+      <Button Name="ClearSelection" Grid.Column="1" Content="{loc:Text Key=ClearSelection}" Click="OnClearSelection"
               VerticalAlignment="Center" FontSize="12" Background="{DynamicResource Ox.Flow.Card}" Foreground="{DynamicResource Ox.Flow.Text}"
               CornerRadius="4" Padding="12,7" IsEnabled="False"/>
     </Grid>
@@ -37,23 +38,23 @@
     <WrapPanel Grid.Row="2" Margin="0,18,0,0">
       <StackPanel Orientation="Horizontal" Spacing="7" Margin="0,0,22,8">
         <Path Width="20" Height="3" Data="M0,1 L20,1" Stroke="{DynamicResource Ox.Flow.Input}" StrokeThickness="2"/>
-        <TextBlock Text="Input to channel" FontSize="11" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
+        <TextBlock Text="{loc:Text Key=InputToChannel}" FontSize="11" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
       </StackPanel>
       <StackPanel Orientation="Horizontal" Spacing="7" Margin="0,0,22,8">
         <Path Width="20" Height="3" Data="M0,1 L20,1" Stroke="{DynamicResource Ox.Flow.Channel}" StrokeThickness="2"/>
-        <TextBlock Text="Channel to mix" FontSize="11" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
+        <TextBlock Text="{loc:Text Key=ChannelToMix}" FontSize="11" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
       </StackPanel>
       <StackPanel Orientation="Horizontal" Spacing="7" Margin="0,0,22,8">
         <Path Width="20" Height="3" Data="M0,1 L20,1" Stroke="{DynamicResource Ox.Flow.Output}" StrokeThickness="2"/>
-        <TextBlock Text="Mix to output" FontSize="11" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
+        <TextBlock Text="{loc:Text Key=MixToOutput}" FontSize="11" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
       </StackPanel>
       <StackPanel Orientation="Horizontal" Spacing="7" Margin="0,0,22,8">
         <Path Width="20" Height="3" Data="M0,1 L20,1" Stroke="{DynamicResource Ox.Flow.Muted}" StrokeThickness="2" StrokeDashArray="3,3"/>
-        <TextBlock Text="Muted / inactive" FontSize="11" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
+        <TextBlock Text="{loc:Text Key=MutedInactive}" FontSize="11" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
       </StackPanel>
       <StackPanel Orientation="Horizontal" Spacing="7" Margin="0,0,22,8">
         <Path Width="20" Height="3" Data="M0,1 L20,1" Stroke="{DynamicResource Ox.Flow.Muted}" StrokeThickness="2" Opacity="0.3"/>
-        <TextBlock Text="Not in path" FontSize="11" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
+        <TextBlock Text="{loc:Text Key=NotInPath}" FontSize="11" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
       </StackPanel>
     </WrapPanel>
   </Grid>

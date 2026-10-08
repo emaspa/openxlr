@@ -1,3 +1,4 @@
+using OpenXLR.UI.Localization;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -19,34 +20,34 @@ public sealed record EffectChainData(int Version, int Channels, JsonArray Insert
     public void Validate()
     {
         if (Inserts is { Count: > 16 })
-            throw new InvalidDataException("A chain can contain at most 16 effects. Remove effects or replace the chain before pasting.");
+            throw new InvalidDataException(Localizer.Text("ChainTooLong"));
         if (Version != 1 || Channels is not (1 or 2) || Inserts is null)
-            throw new InvalidDataException("Unsupported effect chain version, width or size.");
+            throw new InvalidDataException(Localizer.Text("ChainUnsupported"));
         var ids = new HashSet<string>(StringComparer.Ordinal);
         foreach (var node in Inserts)
         {
-            if (node is not JsonObject insert) throw new InvalidDataException("An effect definition is missing.");
+            if (node is not JsonObject insert) throw new InvalidDataException(Localizer.Text("EffectDefinitionMissing"));
             string id = Text(insert, "id", 64), kind = Text(insert, "kind", 4);
             if (!id.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_') || !ids.Add(id)
-                || kind is not ("lv2" or "clap" or "vst3")) throw new InvalidDataException("An effect id or format is invalid.");
+                || kind is not ("lv2" or "clap" or "vst3")) throw new InvalidDataException(Localizer.Text("EffectIdInvalid"));
             _ = Text(insert, "plugin", 512);
             if (insert["label"] is not null) _ = Text(insert, "label", 256, empty: true);
             foreach (string field in new[] { "bypass", "nativeHost" })
                 if (insert[field] is not null && (insert[field] is not JsonValue value || !value.TryGetValue<bool>(out _)))
-                    throw new InvalidDataException("An effect switch is invalid.");
+                    throw new InvalidDataException(Localizer.Text("EffectSwitchInvalid"));
             if (insert["params"] is not JsonObject parameters || parameters.Count > 256)
-                throw new InvalidDataException("An effect has invalid parameters.");
+                throw new InvalidDataException(Localizer.Text("EffectParametersInvalid"));
             foreach (var (symbol, value) in parameters)
                 if (symbol.Length is 0 or > 256 || symbol.Any(c => char.IsControl(c) || char.IsWhiteSpace(c))
                     || value is not JsonValue number || !number.TryGetValue<double>(out double n) || !double.IsFinite(n))
-                    throw new InvalidDataException("An effect parameter is invalid.");
+                    throw new InvalidDataException(Localizer.Text("EffectParameterInvalid"));
         }
     }
     private static string Text(JsonObject insert, string field, int limit, bool empty = false)
     {
         if (insert[field] is not JsonValue value || !value.TryGetValue<string>(out string? text)
             || text.Length > limit || (!empty && string.IsNullOrWhiteSpace(text)) || text.Any(char.IsControl))
-            throw new InvalidDataException($"Invalid effect {field}.");
+            throw new InvalidDataException(Localizer.Format("EffectFieldInvalid", field));
         return text;
     }
 }
@@ -69,18 +70,18 @@ public static class EffectChainPresets
         {
             if (!File.Exists(FilePath)) return [];
             using var file = File.OpenRead(FilePath);
-            if (file.Length > MaxFileBytes) throw new InvalidDataException("The effect preset file is too large.");
+            if (file.Length > MaxFileBytes) throw new InvalidDataException(Localizer.Text("PresetFileTooLarge"));
             byte[] bytes = new byte[checked((int)file.Length)];
             file.ReadExactly(bytes);
-            if (file.ReadByte() != -1) throw new IOException("The effect preset file changed while reading.");
+            if (file.ReadByte() != -1) throw new IOException(Localizer.Text("PresetFileChanged"));
             var presets = Parse<List<EffectChainPreset>>(bytes, Json)
-                ?? throw new InvalidDataException("The effect preset file is empty.");
-            if (presets.Count > 64) throw new InvalidDataException("At most 64 effect presets are supported.");
+                ?? throw new InvalidDataException(Localizer.Text("PresetFileEmpty"));
+            if (presets.Count > 64) throw new InvalidDataException(Localizer.Text("PresetFileTooMany"));
             var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var preset in presets)
             {
                 if (preset is null || !ValidName(preset.Name) || !names.Add(preset.Name) || preset.Chain is null)
-                    throw new InvalidDataException("The effect preset file contains an invalid entry.");
+                    throw new InvalidDataException(Localizer.Text("PresetFileInvalidEntry"));
                 preset.Chain.Validate();
             }
             return presets;
@@ -89,14 +90,14 @@ public static class EffectChainPresets
     public static void Save(string name, EffectChainData chain)
     {
         name = name.Trim();
-        if (!ValidName(name)) throw new InvalidDataException("Use a preset name of 1 to 80 characters without control characters.");
+        if (!ValidName(name)) throw new InvalidDataException(Localizer.Text("PresetNameRule"));
         chain.Validate();
         lock (Gate)
         {
             var presets = Read().ToList();
             if (presets.Any(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)))
-                throw new InvalidDataException("That preset name already exists. Choose a new name or delete the old preset.");
-            if (presets.Count >= 64) throw new InvalidDataException("The limit of 64 presets has been reached.");
+                throw new InvalidDataException(Localizer.Text("PresetNameExists"));
+            if (presets.Count >= 64) throw new InvalidDataException(Localizer.Text("PresetLimitReached"));
             presets.Add(new(name, chain.Copy()));
             Write(presets);
         }
@@ -121,7 +122,7 @@ public static class EffectChainPresets
     private static void Write(IReadOnlyList<EffectChainPreset> presets)
     {
         string text = JsonSerializer.Serialize(presets, Json);
-        if (System.Text.Encoding.UTF8.GetByteCount(text) > MaxFileBytes) throw new InvalidDataException("The effect preset file would exceed 8 MiB.");
+        if (System.Text.Encoding.UTF8.GetByteCount(text) > MaxFileBytes) throw new InvalidDataException(Localizer.Text("PresetFileWouldExceed"));
         OpenXlrPaths.WriteAtomic(FilePath, text);
     }
 }

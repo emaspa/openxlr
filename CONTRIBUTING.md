@@ -16,6 +16,10 @@ or in a GitHub issue.
 - **Bugs with a way to reproduce them.** The archive again, plus what
   you did and what you expected. The daemon's journal is
   `journalctl --user -u openxlr-daemon`.
+- **A translation of the window.** The window ships in English and reads
+  every string from one catalogue; a language is a copy of it with the
+  values translated. [docs/localization.md](docs/localization.md) has the
+  steps. Only translate a language you read and write well.
 - **Code.** The [roadmap](docs/roadmap.md) is the priority list. Right
   now mixer stability and the mixer's presentation (per-mix
   customization) come before plugin-host expansion; a pull request in
@@ -226,6 +230,11 @@ brief an agent should read before working on the tree.
   holds the three together. A control appearance a skin can choose is an
   entry in `src/OpenXLR.UI/Skinning/SkinControls.cs` and a control theme
   in `Skinning/Controls.axaml`.
+- Text the window shows is an entry in
+  `src/OpenXLR.UI/Localization/Strings.resx`, read by its literal key with
+  `{loc:Text Key=...}` in markup or `Localizer.Text` and `Localizer.Format`
+  in code; `LocalizationTests` holds the catalogue and the sources together.
+  [docs/localization.md](docs/localization.md) has the details.
 - Prose in docs, comments and messages: plain sentences, no em dashes.
 
 ## License

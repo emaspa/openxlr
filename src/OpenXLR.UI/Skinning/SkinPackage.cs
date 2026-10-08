@@ -1,3 +1,4 @@
+using OpenXLR.UI.Localization;
 using System;
 using System.Collections.Generic;
 using Avalonia;
@@ -73,7 +74,7 @@ public sealed record SkinPackage(
     public static SkinPackage Default { get; } = new(
         // The id stays "default" forever: it is what ui.json holds and what
         // OPENXLR_SKIN=default asks for. Only the name a user reads changes.
-        DefaultId, "Material", "The appearance the application ships with.", "OpenXLR",
+        DefaultId, "Material", Localizer.Text("MaterialDescription"), "OpenXLR",
         SkinFormat.Schema, SkinOrigin.BuiltIn, null,
         new Dictionary<string, SkinValue>(StringComparer.Ordinal),
         new Dictionary<string, string>(StringComparer.Ordinal));
@@ -81,9 +82,9 @@ public sealed record SkinPackage(
     /// <summary>A one-line origin for the picker.</summary>
     public string OriginLabel => Origin switch
     {
-        SkinOrigin.BuiltIn => "built in",
-        SkinOrigin.User => "installed for you",
-        _ => "installed on this system",
+        SkinOrigin.BuiltIn => Localizer.Text("SkinBuiltIn"),
+        SkinOrigin.User => Localizer.Text("SkinInstalledForYou"),
+        _ => Localizer.Text("SkinInstalledOnSystem"),
     };
 }
 

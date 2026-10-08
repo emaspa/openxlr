@@ -1,3 +1,4 @@
+using OpenXLR.UI.Localization;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Media;
@@ -11,8 +12,8 @@ internal static class Dialogs
     public static async Task<string?> NameAsync(Window owner, string title, string current, string hint, int maxLength)
     {
         var input = new TextBox { Text = current, MinWidth = 340, MaxLength = maxLength };
-        var ok = new Button { Content = "Rename", IsDefault = true };
-        var cancel = new Button { Content = "Cancel", IsCancel = true };
+        var ok = new Button { Content = Localizer.Text("Rename"), IsDefault = true };
+        var cancel = new Button { Content = Localizer.Text("Cancel"), IsCancel = true };
         string? result = null;
         var dialog = new Window
         {
@@ -57,7 +58,7 @@ internal static class Dialogs
     public static async Task<bool> ConfirmAsync(Window owner, string title, string message, string yesLabel)
     {
         var yes = new Button { Content = yesLabel, Classes = { "danger" } };
-        var no = new Button { Content = "Cancel", IsCancel = true };
+        var no = new Button { Content = Localizer.Text("Cancel"), IsCancel = true };
         var dialog = new Window
         {
             Title = title,

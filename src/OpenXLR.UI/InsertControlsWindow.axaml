@@ -1,4 +1,5 @@
 <Window xmlns="https://github.com/avaloniaui"
+        xmlns:loc="using:OpenXLR.UI.Localization"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:OpenXLR.UI"
         xmlns:skin="using:OpenXLR.UI.Skinning"
@@ -33,7 +34,7 @@
     <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,12">
       <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
         <skin:StatusLed IsOn="{Binding IsActive}" Kind="Insert"
-                        AutomationProperties.Name="Plugin state"/>
+                        AutomationProperties.Name="{loc:Text Key=PluginState}"/>
         <TextBlock Grid.Column="1" Name="PluginTitle" Text="{Binding Label}" FontSize="16" FontWeight="Bold"
                    Foreground="{DynamicResource Ox.Text.Primary}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
         <TextBlock Grid.Column="2" Text="{Binding StateText}" Classes="h" VerticalAlignment="Center"/>
@@ -48,24 +49,24 @@
       <TextBlock Name="PluginLatency" Text="{Binding LatencyText}" Classes="hint" TextWrapping="Wrap"/>
       <!-- Actions get their own row and wrap instead of competing with the title. -->
       <WrapPanel Name="PluginActions">
-        <Button Content="Plugin UI" Padding="12,4" Margin="0,0,6,6" Click="OnNativeEditor"
+        <Button Content="{loc:Text Key=PluginUI}" Padding="12,4" Margin="0,0,6,6" Click="OnNativeEditor"
                 IsVisible="{Binding NativeEditorSupported}" IsEnabled="{Binding NativeEditorAvailable}"
-                ToolTip.Tip="Open this plugin's own editor on the live audio instance"/>
-        <Button Content="Defaults" Padding="12,4" Margin="0,0,6,6" Click="OnDefaults"
-                ToolTip.Tip="Put every control back to the plugin's own defaults"/>
-        <Button Name="PluginPresets" Content="Presets" Padding="12,4" Margin="0,0,6,6" Click="OnPluginPresets"
-                ToolTip.Tip="Save, load, import and export presets for this plugin"/>
-        <ToggleButton Content="Bypass" IsChecked="{Binding Bypass, Mode=TwoWay}" Padding="12,4" Margin="0,0,6,6"/>
-        <Button Name="ManageNativeEditors" Content="Native editors" Padding="12,4" Margin="0,0,6,6" Click="OnNativeEditorRules"
-                IsVisible="{Binding NativeUiBlocked}" ToolTip.Tip="Manage this plugin's native editor compatibility rule"/>
-        <ToggleButton Content="Native host" IsChecked="{Binding NativeHost, Mode=TwoWay}" Padding="12,4" Margin="0,0,6,6"
+                ToolTip.Tip="{loc:Text Key=OpenThisPluginSOwnEditorOnThe}"/>
+        <Button Content="{loc:Text Key=Defaults}" Padding="12,4" Margin="0,0,6,6" Click="OnDefaults"
+                ToolTip.Tip="{loc:Text Key=PutEveryControlBackToThePluginS}"/>
+        <Button Name="PluginPresets" Content="{loc:Text Key=Presets}" Padding="12,4" Margin="0,0,6,6" Click="OnPluginPresets"
+                ToolTip.Tip="{loc:Text Key=SaveLoadImportAndExportPresetsFor}"/>
+        <ToggleButton Content="{loc:Text Key=Bypass}" IsChecked="{Binding Bypass, Mode=TwoWay}" Padding="12,4" Margin="0,0,6,6"/>
+        <Button Name="ManageNativeEditors" Content="{loc:Text Key=NativeEditors}" Padding="12,4" Margin="0,0,6,6" Click="OnNativeEditorRules"
+                IsVisible="{Binding NativeUiBlocked}" ToolTip.Tip="{loc:Text Key=ManageThisPluginSNativeEditorCompatibilityRule}"/>
+        <ToggleButton Content="{loc:Text Key=NativeHost}" IsChecked="{Binding NativeHost, Mode=TwoWay}" Padding="12,4" Margin="0,0,6,6"
                       IsVisible="{Binding CanChooseNativeHost}"
-                      ToolTip.Tip="Run this insert in its own process, which is what lets its own editor open. Switching rebuilds the chain and interrupts audio for a moment."/>
-        <Button Content="Manual" Padding="10,4" Margin="0,0,6,6" Click="OnEditorManual"
-                IsVisible="{Binding CanChooseNativeHost}" ToolTip.Tip="Open the manual section on plugin editors"/>
+                      ToolTip.Tip="{loc:Text Key=RunThisInsertInItsOwnProcessWhich}"/>
+        <Button Content="{loc:Text Key=Manual}" Padding="10,4" Margin="0,0,6,6" Click="OnEditorManual"
+                IsVisible="{Binding CanChooseNativeHost}" ToolTip.Tip="{loc:Text Key=OpenTheManualSectionOnPluginEditors}"/>
       </WrapPanel>
     </StackPanel>
-    <Button DockPanel.Dock="Bottom" Content="Close" HorizontalAlignment="Right" Padding="18,6" Margin="0,10,0,0" Click="OnClose"/>
+    <Button DockPanel.Dock="Bottom" Content="{loc:Text Key=Close}" HorizontalAlignment="Right" Padding="18,6" Margin="0,10,0,0" Click="OnClose"/>
     <!-- AllowAutoHide off: the scrollbar reserves its own column instead
          of floating over the value readouts -->
     <ScrollViewer VerticalScrollBarVisibility="Auto" AllowAutoHide="False">

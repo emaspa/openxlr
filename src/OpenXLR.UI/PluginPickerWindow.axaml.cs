@@ -1,3 +1,4 @@
+using OpenXLR.UI.Localization;
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
@@ -88,7 +89,7 @@ public partial class PluginPickerWindow : Window
     {
         if (paths.Count == 0 || DataContext is not InsertsViewModel vm) return;
         InstallFile.IsEnabled = InstallFolder.IsEnabled = false;
-        InstallStatus.Text = "Installing…";
+        InstallStatus.Text = Localizer.Text("Installing");
         try { InstallStatus.Text = await PluginInstall.InstallAsync(vm.Client, paths); }
         catch (Exception ex) { InstallStatus.Text = ex.Message; }
         finally { InstallFile.IsEnabled = InstallFolder.IsEnabled = true; }

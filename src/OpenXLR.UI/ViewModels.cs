@@ -1,3 +1,4 @@
+using OpenXLR.UI.Localization;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -54,7 +55,7 @@ public sealed partial class MainViewModel : ViewModelBase
             if (up) DaemonRestart.ConnectionRestored();
             if (!up)
             {
-                DeviceConnected = false; Status = "daemon not running";
+                DeviceConnected = false; Status = Localizer.Text("StatusDaemonNotRunning");
                 Inserts.ResetForNewConnection(); Inserts2.ResetForNewConnection();
                 Inserts.SoundCheck.Reset(); Inserts2.SoundCheck.Reset();
                 foreach (MixViewModel mv in Mixes) mv.Inserts.ResetForNewConnection();
@@ -80,8 +81,8 @@ public sealed partial class MainViewModel : ViewModelBase
 
     /// <summary>What the empty SUBMIXER tile says: the two reasons differ.</summary>
     public string MixerPlaceholder => !DaemonConnected
-        ? "Daemon not running."
-        : "Submixer is off. Turn it on in Options for per-app channels, mixes, virtual microphones and inserts; OpenXLR is controlling the hardware only.";
+        ? Localizer.Text("DaemonNotRunningSentence")
+        : Localizer.Text("SubmixerIsOffTurnItOnInOptions");
 
     private bool _deviceConnected;
     public bool DeviceConnected { get => _deviceConnected; private set { if (Set(ref _deviceConnected, value)) Raise(nameof(StatusLine)); } }
@@ -89,12 +90,12 @@ public sealed partial class MainViewModel : ViewModelBase
     private string _deviceName = "none";
     public string DeviceName { get => _deviceName; private set { if (Set(ref _deviceName, value)) Raise(nameof(StatusLine)); } }
 
-    private string _status = "connecting…";
+    private string _status = Localizer.Text("Connecting");
     public string Status { get => _status; private set { if (Set(ref _status, value)) Raise(nameof(StatusLine)); } }
 
-    public string StatusLine => !DaemonConnected ? "Daemon not running"
+    public string StatusLine => !DaemonConnected ? Localizer.Text("DaemonNotRunning")
         : DeviceConnected ? DeviceName
-        : "No device";
+        : Localizer.Text("NoDevice");
 
     // --- hardware controls ---
 
@@ -166,8 +167,8 @@ public sealed partial class MainViewModel : ViewModelBase
 
     /// <summary>What the reset button does on this device, for its tooltip and confirmation.</summary>
     public string ResetDescription => CapRetainsSettings
-        ? "Write OpenXLR's baseline to the interface: gain 30 dB on both inputs, every processing stage and phantom power off, headphones and aux level at half, the crossfade fully on PC. Output routing stays. Saved profiles stay."
-        : "The interface goes back to the settings its firmware starts with, and the settings OpenXLR restores when it connects are forgotten. Saved profiles stay.";
+        ? Localizer.Text("ResetToBaselineDescription")
+        : Localizer.Text("ResetToFirmwareDescription");
 
     private bool _showResetDefaults;
     public bool ShowResetDefaults { get => _showResetDefaults; private set => Set(ref _showResetDefaults, value); }
@@ -210,8 +211,8 @@ public sealed partial class MainViewModel : ViewModelBase
     }
 
     public string SoftClipGuardTip => SoftClipGuardAvailable
-        ? "Host-side ClipGuard: a post-ADC hard limiter at -3 dB; it cannot repair clipping in the analog preamp or ADC"
-        : SoftClipGuardError ?? "Software ClipGuard is unavailable";
+        ? Localizer.Text("SoftClipGuardTip")
+        : SoftClipGuardError ?? Localizer.Text("SoftClipGuardUnavailable");
 
     // Latency compensation across mixes, a mixer setting the daemon saves.
     private bool _compensateMixLatency;
@@ -239,7 +240,7 @@ public sealed partial class MainViewModel : ViewModelBase
             }
         }
     }
-    public string SoftLowCutText => _softLowCutHz == 0 ? "Low Cut Off" : $"Low Cut {_softLowCutHz}";
+    public string SoftLowCutText => _softLowCutHz == 0 ? Localizer.Text("LowCutOff") : Localizer.Format("LowCutFrequency", _softLowCutHz);
 
     private bool _showSoftLowCut;
     public bool ShowSoftLowCut { get => _showSoftLowCut; private set => Set(ref _showSoftLowCut, value); }
@@ -312,8 +313,8 @@ public sealed partial class MainViewModel : ViewModelBase
             Raise(nameof(CrossfadeText));
         }
     }
-    public string CrossfadeText => _crossfade == 100 ? "centre"
-        : _crossfade < 100 ? $"mic +{100 - _crossfade}" : $"pc +{_crossfade - 100}";
+    public string CrossfadeText => _crossfade == 100 ? Localizer.Text("CrossfadeCentre")
+        : _crossfade < 100 ? Localizer.Format("CrossfadeMic", 100 - _crossfade) : Localizer.Format("CrossfadePc", _crossfade - 100);
 
     private bool _lowImpedance;
     public bool LowImpedance { get => _lowImpedance; set { if (Set(ref _lowImpedance, value) && !_applying) _ = _client.SetControlAsync("lowImpedance", value); } }
@@ -429,8 +430,8 @@ public sealed partial class MainViewModel : ViewModelBase
     public int PhantomSettleSeconds2 { get => _phantomSettleSeconds2; set { if (Set(ref _phantomSettleSeconds2, value)) Raise(nameof(Mute2Label)); } }
 
     // The mute button counts the hold down while the firmware settles 48V.
-    public string MuteLabel => PhantomSettling ? $"48V {PhantomSettleSeconds}s" : "Mute";
-    public string Mute2Label => PhantomSettling2 ? $"48V {PhantomSettleSeconds2}s" : "Mute";
+    public string MuteLabel => PhantomSettling ? $"48V {PhantomSettleSeconds}s" : Localizer.Text("Mute");
+    public string Mute2Label => PhantomSettling2 ? $"48V {PhantomSettleSeconds2}s" : Localizer.Text("Mute");
 
     private bool _clipGuard;
     public bool ClipGuard { get => _clipGuard; set { if (Set(ref _clipGuard, value) && !_applying) _ = _client.SetControlAsync("clipGuard", value); } }
@@ -510,9 +511,9 @@ public sealed partial class MainViewModel : ViewModelBase
         get
         {
             var picked = MonitorOutputs.Where(o => o.IsSelected).Select(o => o.Label).ToList();
-            return picked.Count == 0 ? "not routed"
+            return picked.Count == 0 ? Localizer.Text("MonitorNotRouted")
                  : picked.Count <= 2 ? string.Join(" + ", picked)
-                 : $"{picked[0]} + {picked.Count - 1} more";
+                 : Localizer.Format("MonitorOutputsMore", picked[0], picked.Count - 1);
         }
     }
 
@@ -684,8 +685,9 @@ public sealed partial class MainViewModel : ViewModelBase
     public bool DaemonVersionMismatch => DaemonConnected && (DaemonVersion ?? "") != AppVersion.Current;
 
     public string DaemonVersionNote =>
-        $"The daemon is {(DaemonVersion is null ? "an older version" : "v" + DaemonVersion)}; this window is v{AppVersion.Current}. " +
-        "Restart the daemon to run the installed version.";
+        DaemonVersion is null
+            ? Localizer.Format("DaemonOlderVersionNote", AppVersion.Current)
+            : Localizer.Format("DaemonVersionNote", DaemonVersion, AppVersion.Current);
 
     private string _daemonWarning = "";
     /// <summary>A condition the daemon wants the user to see (settings not being saved), or empty.</summary>
@@ -777,7 +779,7 @@ public sealed partial class MainViewModel : ViewModelBase
             ShowResetDefaults = DeviceConnected && (!CapRetainsSettings || CapBuiltInDefaults);
             Raise(nameof(ResetDescription));
             Raise(nameof(ShowInterfaceCard));
-            Status = DeviceConnected ? "ready" : "no device";
+            Status = DeviceConnected ? Localizer.Text("StatusReady") : Localizer.Text("StatusNoDevice");
         }
         finally { _applying = false; }
         StateApplied?.Invoke();
@@ -813,7 +815,7 @@ public sealed partial class MainViewModel : ViewModelBase
             foreach (DetectedDeviceItem d in items) DetectedDevices.Add(d);
         }
         HasMultipleDevices = items.Count > 1;
-        ActiveDeviceName = DetectedDevices.FirstOrDefault(d => d.Active)?.Name ?? "select device";
+        ActiveDeviceName = DetectedDevices.FirstOrDefault(d => d.Active)?.Name ?? Localizer.Text("SelectDevice");
     }
 
     /// <summary>Saved profile names from the daemon, newest list wins.</summary>
@@ -1024,7 +1026,7 @@ public sealed partial class MainViewModel : ViewModelBase
         }
         // Apps route to application channels only; "not managed" leaves them to the desktop.
         List<ChannelChoice> choices = [.. Channels.Where(c => c.IsApplication).Select(c => new ChannelChoice(c.Id, c.Name)),
-            new ChannelChoice(AppStreamViewModel.Ignore, "Not managed")];
+            new ChannelChoice(AppStreamViewModel.Ignore, Localizer.Text("NotManaged"))];
         // Update in place so an open dropdown is not closed by a state push.
         var byIdentity = Apps.ToDictionary(a => a.Identity, StringComparer.OrdinalIgnoreCase);
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -1265,7 +1267,7 @@ public sealed class AppStreamViewModel : ViewModelBase
     }
 
     /// <summary>"playing" / "running" / "not running", for the manage dialog.</summary>
-    public string StatusText => Active ? "playing" : Running ? "running" : "not running";
+    public string StatusText => Active ? Localizer.Text("Playing") : Running ? Localizer.Text("Running") : Localizer.Text("NotRunning");
 
     public void Forget() => _ = _client.ForgetAppAsync(Identity);
 }
@@ -1279,7 +1281,7 @@ public sealed record ChannelChoice(string Id, string Name)
 /// <summary>One selectable sink or source. Own nodes are OpenXLR's own.</summary>
 public sealed record AudioDeviceItem(string Name, string Description, bool IsOwn, bool IsPhysical = false)
 {
-    public string Label => IsOwn ? $"{Description} (OpenXLR)" : Description;
+    public string Label => IsOwn ? Localizer.Format("OwnDeviceLabel", Description) : Description;
 }
 
 /// <summary>
@@ -1376,7 +1378,7 @@ public sealed class MixViewModel : ViewModelBase, IHasId
     {
         _client = client; Id = id; _name = name;
         VolumeRange = new VolumeRangeViewModel(() => Volume = Math.Min(Volume, 1));
-        Inserts = new InsertsViewModel(client, $"mix:{id}", channels: 2, title: $"{name} mix");
+        Inserts = new InsertsViewModel(client, $"mix:{id}", channels: 2, title: Localizer.Format("MixInsertsTitle", name));
     }
 
     public string Id { get; }
@@ -1390,7 +1392,7 @@ public sealed class MixViewModel : ViewModelBase, IHasId
     public bool IsEditable => _editable ?? Kind == "virtualMic";
 
     /// <summary>What a structural mix is, for the layout editor.</summary>
-    public string KindLabel => Kind switch { "monitor" => "monitor mix", "auxPort" => "USB Aux port", _ => "" };
+    public string KindLabel => Kind switch { "monitor" => Localizer.Text("MonitorMixKind"), "auxPort" => Localizer.Text("UsbAuxPortKind"), _ => "" };
 
     /// <summary>This mix's stereo plugin insert chain.</summary>
     public InsertsViewModel Inserts { get; }
@@ -1548,7 +1550,9 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
         Present = n["present"]?.GetValue<bool>() ?? true;
         CaptureSource = n["captureSource"]?.GetValue<string>();
         CaptureConnected = n["captureConnected"]?.GetValue<bool>() ?? false;
-        CaptureLabel = CaptureSource is null ? "" : $"{(CaptureConnected ? "Connected" : "Offline")} · pair {(n["capturePair"]?.GetValue<int>() ?? 0) + 1}";
+        CaptureLabel = CaptureSource is null ? "" : CaptureConnected
+            ? Localizer.Format("CaptureConnectedPair", (n["capturePair"]?.GetValue<int>() ?? 0) + 1)
+            : Localizer.Format("CaptureOfflinePair", (n["capturePair"]?.GetValue<int>() ?? 0) + 1);
         var muted = new HashSet<string>();
         if (n["mutedIn"] is JsonArray arr)
             foreach (JsonNode? m in arr) if (m is not null) muted.Add(m.GetValue<string>());

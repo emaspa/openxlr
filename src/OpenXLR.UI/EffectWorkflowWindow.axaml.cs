@@ -1,3 +1,4 @@
+using OpenXLR.UI.Localization;
 using System;
 using System.Threading;
 using Avalonia.Controls;
@@ -33,7 +34,7 @@ public partial class EffectWorkflowWindow : Window
     private async void OnDelete(object? sender, RoutedEventArgs e)
     {
         if (Chain is { SelectedPreset: { } preset } chain
-            && await Dialogs.ConfirmAsync(this, "Delete preset", $"Delete the saved preset '{preset.Name}'? The live chain is kept.", "Delete")
+            && await Dialogs.ConfirmAsync(this, Localizer.Text("DeletePreset"), Localizer.Format("DeleteChainPresetDetail", preset.Name), Localizer.Text("Delete"))
             && !_closed && ReferenceEquals(chain.SelectedPreset, preset))
             chain.DeletePreset();
     }
@@ -50,7 +51,7 @@ public partial class EffectWorkflowWindow : Window
             limit.CancelAfter(EffectPresetFiles.Timeout);
             await chain.ImportPresetAsync(input, limit.Token);
         }
-        catch (OperationCanceledException) { if (!_closed) chain.ReportWorkflowError("The preset import timed out."); }
+        catch (OperationCanceledException) { if (!_closed) chain.ReportWorkflowError(Localizer.Text("PresetImportTimedOut")); }
         catch (Exception ex) when (EffectPresetFiles.IsFailure(ex)) { if (!_closed) chain.ReportWorkflowError(ex.Message); }
         finally { _filesBusy = false; }
     }
@@ -63,11 +64,11 @@ public partial class EffectWorkflowWindow : Window
         {
             // The selected saved preset, or else the live chain under the typed name.
             var preset = chain.SelectedPreset ?? new EffectChainPreset(
-                string.IsNullOrWhiteSpace(chain.PresetName) ? "Current chain" : chain.PresetName.Trim(), chain.CaptureChain());
+                string.IsNullOrWhiteSpace(chain.PresetName) ? Localizer.Text("CurrentChain") : chain.PresetName.Trim(), chain.CaptureChain());
             await EffectPresetFiles.ExportAsync(this, preset, _lifetime.Token);
             if (!_closed) chain.ReportWorkflowError(null);
         }
-        catch (OperationCanceledException) { if (!_closed) chain.ReportWorkflowError("The preset export timed out."); }
+        catch (OperationCanceledException) { if (!_closed) chain.ReportWorkflowError(Localizer.Text("PresetExportTimedOut")); }
         catch (Exception ex) when (EffectPresetFiles.IsFailure(ex)) { if (!_closed) chain.ReportWorkflowError(ex.Message); }
         finally { _filesBusy = false; }
     }

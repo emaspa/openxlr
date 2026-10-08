@@ -1,3 +1,4 @@
+using OpenXLR.UI.Localization;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 
@@ -20,10 +21,10 @@ public sealed class SoundCheckViewModel(DaemonClient client, string channel) : V
     public bool CanStop => !_busy && (_active || Error is not null);
     public string Status => _mode switch
     {
-        "recording" => $"Recording: {_seconds:0.0} / 10 seconds",
-        "looping" => $"Looping {_seconds:0.0} seconds through the live chain",
-        "live" when _active => $"Live microphone. {_seconds:0.0} seconds ready to loop",
-        _ => "Live microphone. No sample recorded",
+        "recording" => Localizer.Format("SoundCheckRecording", _seconds),
+        "looping" => Localizer.Format("SoundCheckLooping", _seconds),
+        "live" when _active => Localizer.Format("SoundCheckReady", _seconds),
+        _ => Localizer.Text("SoundCheckEmpty"),
     };
     public string? Error { get => _error; private set => Set(ref _error, value); }
 

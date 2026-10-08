@@ -1,3 +1,4 @@
+using OpenXLR.UI.Localization;
 using System;
 using System.Threading.Tasks;
 
@@ -36,16 +37,16 @@ public sealed class DaemonRestartViewModel : ViewModelBase
         if (_busy) return;
         _busy = true;
         Raise(nameof(CanRestart));
-        Status = "Restarting daemon...";
+        Status = Localizer.Text("RestartingDaemon");
         try
         {
             Status = await _restart()
-                ? "Service restarted. Waiting for the daemon connection."
-                : "Restart failed. Check the user service logs; a manually started daemon must be restarted by hand.";
+                ? Localizer.Text("ServiceRestartedWaiting")
+                : Localizer.Text("RestartFailedManualDaemon");
         }
         catch (Exception)
         {
-            Status = "Restart failed. Check the user service logs.";
+            Status = Localizer.Text("RestartFailed");
         }
         finally
         {

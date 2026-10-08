@@ -1,3 +1,4 @@
+using OpenXLR.UI.Localization;
 using System;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
@@ -50,20 +51,20 @@ public partial class OptionsWindow : Window
     private async System.Threading.Tasks.Task InstallPluginsAsync(System.Collections.Generic.IReadOnlyList<string> paths)
     {
         if (paths.Count == 0 || DataContext is not OptionsViewModel vm) return;
-        await PluginStepAsync(() => PluginInstall.InstallAsync(vm.Client, paths), "Installing…", vm);
+        await PluginStepAsync(() => PluginInstall.InstallAsync(vm.Client, paths), Localizer.Text("Installing"), vm);
     }
 
     private async void OnBridgeWinePlugins(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not OptionsViewModel vm || vm.WineFolders.Count == 0) return;
-        await PluginStepAsync(() => PluginInstall.InstallAsync(vm.Client, vm.WineFolders), "Bridging Wine's plugins…", vm);
+        await PluginStepAsync(() => PluginInstall.InstallAsync(vm.Client, vm.WineFolders), Localizer.Text("BridgingWinePlugins"), vm);
     }
 
     private async void OnSyncWindowsPlugins(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not OptionsViewModel vm) return;
         await PluginStepAsync(async () => PluginInstall.Describe(
-            await vm.Client.SyncWindowsPluginsAsync(TimeSpan.FromMinutes(4)), "the sync"), "Bridging Windows plugins…", vm);
+            await vm.Client.SyncWindowsPluginsAsync(TimeSpan.FromMinutes(4)), Localizer.Text("TheSync")), Localizer.Text("BridgingWindowsPlugins"), vm);
     }
 
     private async void OnNativeEditorRules(object? sender, RoutedEventArgs e)
@@ -82,7 +83,7 @@ public partial class OptionsWindow : Window
     {
         if (DataContext is not OptionsViewModel vm) return;
         await PluginStepAsync(async () => PluginInstall.Describe(
-            await vm.Client.RescanPluginsAsync(TimeSpan.FromMinutes(4)), "the scan"), "Scanning…", vm);
+            await vm.Client.RescanPluginsAsync(TimeSpan.FromMinutes(4)), Localizer.Text("TheScan")), Localizer.Text("Scanning"), vm);
     }
 
     private async void OnPluginWineTrace(object? sender, RoutedEventArgs e)
@@ -130,15 +131,15 @@ public partial class OptionsWindow : Window
         if (DataContext is not OptionsViewModel vm) return;
         var button = sender as Button;
         if (button is not null) button.IsEnabled = false;
-        DiagStatus.Text = "collecting…";
+        DiagStatus.Text = Localizer.Text("Collecting");
         try
         {
             string path = await Diagnostics.CollectAsync(vm.Client);
-            DiagStatus.Text = $"saved to {path}";
+            DiagStatus.Text = Localizer.Format("DiagnosticsSavedTo", path);
         }
         catch (Exception ex)
         {
-            DiagStatus.Text = $"failed: {ex.Message}";
+            DiagStatus.Text = Localizer.Format("DiagnosticsFailed", ex.Message);
         }
         finally
         {
@@ -149,7 +150,7 @@ public partial class OptionsWindow : Window
     private async void OnResetDevice(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not OptionsViewModel vm) return;
-        if (await Dialogs.ConfirmAsync(this, "Reset device to defaults?", vm.Main.ResetDescription, "Reset"))
+        if (await Dialogs.ConfirmAsync(this, Localizer.Text("ResetDeviceTitle"), vm.Main.ResetDescription, Localizer.Text("Reset")))
             vm.Main.ResetDevice();
     }
 

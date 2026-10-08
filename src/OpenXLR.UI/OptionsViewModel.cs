@@ -1,3 +1,4 @@
+using OpenXLR.UI.Localization;
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -61,6 +62,7 @@ public sealed class OptionsViewModel : ViewModelBase
             SelectedAppearanceMode = AppearanceModeChoices.First(c => c.Id == Skinning.SkinService.Mode);
             SelectedControlSizing = ControlSizingChoices.First(c => c.Touch == Skinning.SkinService.TouchControls);
             SelectedMixerView = MixerViewChoices.First(c => c.Id == main.MixerView);
+            SelectedLanguage = LanguageChoices.FirstOrDefault(c => c.Id is not null && c.Id == s.Language) ?? LanguageChoices[0];
             EnforcedOutput = OutputChoices.FirstOrDefault(c => c.Name == main.EnforcedDefaultSink) ?? OutputChoices[0];
             EnforcedInput = InputChoices.FirstOrDefault(c => c.Name == main.EnforcedDefaultSource) ?? InputChoices[0];
         }
@@ -70,11 +72,11 @@ public sealed class OptionsViewModel : ViewModelBase
 
     // --- plugins ---
 
-    private string _pluginDirectories = "Plugins are looked for in the home and system plugin directories.";
+    private string _pluginDirectories = Localizer.Text("PluginDirectoriesDefault");
     /// <summary>Where installs go, once the daemon has said.</summary>
     public string PluginDirectories { get => _pluginDirectories; private set => Set(ref _pluginDirectories, value); }
 
-    private string _windowsPlugins = "Windows plugins: checking for yabridge…";
+    private string _windowsPlugins = Localizer.Text("WindowsPluginsChecking");
     /// <summary>yabridge and Wine as found, and how many folders are bridged.</summary>
     public string WindowsPlugins { get => _windowsPlugins; private set => Set(ref _windowsPlugins, value); }
 
@@ -96,7 +98,7 @@ public sealed class OptionsViewModel : ViewModelBase
     /// <summary>Wine's own plugin folders waiting to be bridged, absolute.</summary>
     public System.Collections.Generic.IReadOnlyList<string> WineFolders { get; private set; } = [];
 
-    private string _bridgeWineLabel = "Bridge Wine's plugins";
+    private string _bridgeWineLabel = Localizer.Text("BridgeWinePlugins");
     /// <summary>What the button offers, named after what it will bridge.</summary>
     public string BridgeWineLabel { get => _bridgeWineLabel; private set => Set(ref _bridgeWineLabel, value); }
 
@@ -110,7 +112,7 @@ public sealed class OptionsViewModel : ViewModelBase
     public string? MemoryLockNote { get => _memoryLockNote; private set { if (Set(ref _memoryLockNote, value)) Raise(nameof(HasMemoryLockNote)); } }
     public bool HasMemoryLockNote => !string.IsNullOrEmpty(_memoryLockNote);
 
-    private string _skippedPlugins = "Skipped bundles: checking…";
+    private string _skippedPlugins = Localizer.Text("SkippedBundlesChecking");
     public string SkippedPlugins { get => _skippedPlugins; private set => Set(ref _skippedPlugins, value); }
     public ObservableCollection<string> SkippedPluginDetails { get; } = [];
 
@@ -131,7 +133,7 @@ public sealed class OptionsViewModel : ViewModelBase
     public bool? PluginWineTrace => _pluginWineTrace;
     private bool _settingPluginWineTrace;
     public bool CanSetPluginWineTrace => _pluginWineTrace is not null && !_settingPluginWineTrace;
-    private string? _pluginWineTraceStatus = "Wine trace: checking the daemon…";
+    private string? _pluginWineTraceStatus = Localizer.Text("WineTraceChecking");
     public string? PluginWineTraceStatus { get => _pluginWineTraceStatus; private set => Set(ref _pluginWineTraceStatus, value); }
 
     public async System.Threading.Tasks.Task SetPluginWineTraceAsync(bool enabled)
@@ -139,7 +141,7 @@ public sealed class OptionsViewModel : ViewModelBase
         if (!CanSetPluginWineTrace) return;
         _settingPluginWineTrace = true;
         Raise(nameof(CanSetPluginWineTrace));
-        PluginWineTraceStatus = "Updating Wine trace…";
+        PluginWineTraceStatus = Localizer.Text("WineTraceUpdating");
         try
         {
             var setup = await _client.SetPluginWineTraceAsync(enabled, TimeSpan.FromSeconds(30));
@@ -172,7 +174,7 @@ public sealed class OptionsViewModel : ViewModelBase
         Raise(nameof(PluginWineTrace));
         Raise(nameof(CanSetPluginWineTrace));
         PluginWineTraceStatus = _pluginWineTrace is null
-            ? "Wine trace unavailable. The daemon must be connected and support this switch." : null;
+            ? Localizer.Text("WineTraceUnavailable") : null;
         SearchDirectories.Clear();
         SearchPathWarning = setup?["searchPathWarning"]?.GetValue<string>();
         foreach (var item in setup?["searchDirectories"] as System.Text.Json.Nodes.JsonArray ?? [])
@@ -180,22 +182,22 @@ public sealed class OptionsViewModel : ViewModelBase
                 SearchDirectories.Add(new(kind, path, item["custom"]?.GetValue<bool>() == true, item["exists"]?.GetValue<bool>() == true));
         SkippedPluginDetails.Clear();
         int? skipped = setup?["skippedFailedCount"]?.GetValue<int>();
-        SkippedPlugins = skipped is null ? "Skipped bundles: unavailable" : $"Skipped after a failed scan: {skipped}";
+        SkippedPlugins = skipped is null ? Localizer.Text("SkippedBundlesUnavailable") : Localizer.Format("SkippedBundlesAfterFailedScan", skipped);
         foreach (var bundle in setup?["skippedFailedBundles"] as System.Text.Json.Nodes.JsonArray ?? [])
         {
             string? when = bundle?["failedAt"]?.GetValue<string>();
             string time = DateTimeOffset.TryParse(when, out var failedAt)
-                ? failedAt.ToLocalTime().ToString("g") : "time not recorded";
+                ? failedAt.ToLocalTime().ToString("g") : Localizer.Text("TimeNotRecorded");
             SkippedPluginDetails.Add($"{bundle?["path"]?.GetValue<string>()}\n{bundle?["reason"]?.GetValue<string>()}, {time}");
         }
         if (skipped > SkippedPluginDetails.Count)
-            SkippedPluginDetails.Add($"{skipped - SkippedPluginDetails.Count} more bundles omitted from this list.");
+            SkippedPluginDetails.Add(Localizer.Format("MoreBundlesOmitted", skipped - SkippedPluginDetails.Count));
         HasSkippedPlugins = SkippedPluginDetails.Count > 0;
         if (setup is null)
         {
             WindowsEditorNote = null;
             MemoryLockNote = null;
-            WindowsPlugins = "Windows plugins: the daemon did not answer.";
+            WindowsPlugins = Localizer.Text("WindowsPluginsNoAnswer");
             CanSyncWindows = false;
             CanManageWindows = false;
             return;
@@ -204,8 +206,8 @@ public sealed class OptionsViewModel : ViewModelBase
         string clap = setup["clapDirectory"]?.GetValue<string>() ?? "~/.clap";
         string vst3 = setup["vst3Directory"]?.GetValue<string>() ?? "~/.vst3";
         bool host = setup["hostInstalled"]?.GetValue<bool>() ?? true;
-        PluginDirectories = $"Plugins are looked for in {lv2}, {clap} and {vst3} and the system plugin directories."
-            + (host ? "" : " The native plugin host is not installed beside the daemon, so CLAP and VST3 plugins cannot run.");
+        PluginDirectories = Localizer.Format("PluginDirectoriesFound", lv2, clap, vst3)
+            + (host ? "" : " " + Localizer.Text("NativeHostMissing"));
         WindowsEditorNote = setup["windowsEditorNote"]?.GetValue<string>();
         MemoryLockNote = setup["memoryLockNote"]?.GetValue<string>();
         string? yabridge = setup["yabridge"]?.GetValue<string>();
@@ -213,9 +215,9 @@ public sealed class OptionsViewModel : ViewModelBase
         int folders = (setup["windowsDirectories"] as System.Text.Json.Nodes.JsonArray)?.Count ?? 0;
         WindowsPlugins = WindowsLine(yabridge, wine, folders, setup["bridgeProvider"]?.GetValue<string>() == "openxlr");
         if (setup["windowsPluginDirectory"]?.GetValue<string>() is { } managedDirectory)
-            PluginDirectories += $" OpenXLR's Windows plugin wrappers are in {managedDirectory}.";
+            PluginDirectories += " " + Localizer.Format("WindowsPluginWrappersIn", managedDirectory);
         WindowsImportNote = setup["windowsImportDirectory"]?.GetValue<string>() is { } imports
-            ? $"Single-plugin imports are kept in {imports}." : null;
+            ? Localizer.Format("SinglePluginImportsIn", imports) : null;
         CanSyncWindows = yabridge is not null && wine;
         CanManageWindows = yabridge is not null;
         SystemBridge = yabridge is not null && setup["bridgeProvider"]?.GetValue<string>() != "openxlr";
@@ -228,19 +230,19 @@ public sealed class OptionsViewModel : ViewModelBase
             .Select(f => f?.GetValue<string>()).OfType<string>()];
         CanBridgeWine = WineFolders.Count > 0;
         BridgeWineLabel = WineFolders.Count > 1
-            ? $"Bridge Wine's {WineFolders.Count} plugin folders"
-            : "Bridge Wine's plugins";
+            ? Localizer.Format("BridgeWinePluginFolders", WineFolders.Count)
+            : Localizer.Text("BridgeWinePlugins");
     }
 
     /// <summary>One line on Windows plugins, from what the daemon found.</summary>
     internal static string WindowsLine(string? yabridge, bool wine, int folders, bool managed = false)
     {
-        if (yabridge is null && !wine) return "Windows plugins: yabridge and Wine are not installed. Install the optional openxlr-yabridge package and Wine, then install a Windows VST3 or CLAP plugin here.";
-        if (yabridge is null) return "Windows plugins: Wine is installed, yabridge is not. Install the optional openxlr-yabridge package, then install a Windows VST3 or CLAP plugin here.";
-        string bridge = managed ? $"OpenXLR bridge {yabridge} (64-bit)" : $"yabridge {yabridge}";
-        if (!wine) return $"Windows plugins: {bridge} is installed, Wine is not. Install Wine from your distribution.";
-        string bridged = folders switch { 0 => "no folder bridged yet", 1 => "1 folder bridged", _ => $"{folders} folders bridged" };
-        return $"Windows plugins: {bridge} and Wine are installed, {bridged}. Run a plugin's installer with Wine, then install the folder it created.";
+        if (yabridge is null && !wine) return Localizer.Text("WindowsPluginsNothingInstalled");
+        if (yabridge is null) return Localizer.Text("WindowsPluginsNoYabridge");
+        string bridge = managed ? Localizer.Format("OpenXlrBridgeVersion", yabridge) : $"yabridge {yabridge}";
+        if (!wine) return Localizer.Format("WindowsPluginsNoWine", bridge);
+        string bridged = folders switch { 0 => Localizer.Text("NoFolderBridged"), 1 => Localizer.Text("OneFolderBridged"), _ => Localizer.Format("FoldersBridged", folders) };
+        return Localizer.Format("WindowsPluginsReady", bridge, bridged);
     }
 
     // --- startup behaviour ---
@@ -262,8 +264,8 @@ public sealed class OptionsViewModel : ViewModelBase
             if (!StartupIntegration.SetDaemonAtLogin(value))
             {
                 StartupError = value
-                    ? "Could not start the audio service at login. Check that OpenXLR is installed and that systemd user services work here (systemctl --user status)."
-                    : "Could not stop the audio service from starting at login. Check that systemd user services work here (systemctl --user status).";
+                    ? Localizer.Text("CouldNotEnableDaemonAtLogin")
+                    : Localizer.Text("CouldNotDisableDaemonAtLogin");
                 Reject(ref _startDaemonAtLogin, value, nameof(StartDaemonAtLogin));
                 return;
             }
@@ -284,7 +286,7 @@ public sealed class OptionsViewModel : ViewModelBase
             if (_openWindowAtLogin == value) return;
             if (!StartupIntegration.SetWindowAtLogin(value))
             {
-                StartupError = "Could not update mixer autostart. Check that OpenXLR is installed, the autostart folder is writable, and the entry there is not a symbolic link.";
+                StartupError = Localizer.Text("CouldNotUpdateAutostart");
                 Reject(ref _openWindowAtLogin, value, nameof(OpenWindowAtLogin));
                 return;
             }
@@ -318,18 +320,18 @@ public sealed class OptionsViewModel : ViewModelBase
     internal static string? RepairNote(StartupIntegration.AutostartRepair repair) => repair switch
     {
         StartupIntegration.AutostartRepair.RemovedOutside =>
-            "The mixer autostart entry was removed outside OpenXLR, so it was left removed. Turn this option off and on again to create it.",
+            Localizer.Text("AutostartRemovedOutside"),
         StartupIntegration.AutostartRepair.Failed =>
-            "Could not repair the mixer autostart entry. Check that OpenXLR is installed, the autostart folder is writable, and the entry there is not a symbolic link.",
+            Localizer.Text("CouldNotRepairAutostart"),
         _ => null,
     };
 
     public string StartupHint => (StartDaemonAtLogin, OpenWindowAtLogin) switch
     {
-        (true, true) => "Audio and the app will start when you sign in.",
-        (false, true) => "The app will start at login. Start the audio service separately to use it.",
-        (true, false) => "Audio will start at login without the app or tray icon.",
-        _ => "Neither audio nor the app will start at login.",
+        (true, true) => Localizer.Text("StartupAudioAndApp"),
+        (false, true) => Localizer.Text("StartupAppOnly"),
+        (true, false) => Localizer.Text("StartupAudioOnly"),
+        _ => Localizer.Text("StartupNothing"),
     };
 
     // The selectors keep the existing saved booleans, including their defaults.
@@ -386,9 +388,9 @@ public sealed class OptionsViewModel : ViewModelBase
                 return;
             }
             SubmixerNote = StartupIntegration.RestartDaemon()
-                ? (value ? "Daemon restarted with the submixer on."
-                         : "Daemon restarted in hardware-control mode; the sound card keeps its stock layout and inserts are not loaded.")
-                : "Saved. Restart the daemon to apply (systemctl --user restart openxlr-daemon).";
+                ? (value ? Localizer.Text("DaemonRestartedSubmixerOn")
+                         : Localizer.Text("DaemonRestartedHardwareOnly"))
+                : Localizer.Text("SavedRestartDaemonToApply");
         }
     }
 
@@ -473,9 +475,9 @@ public sealed class OptionsViewModel : ViewModelBase
 
     public System.Collections.Generic.IReadOnlyList<AppearanceModeChoice> AppearanceModeChoices { get; } =
     [
-        new(AppearanceModes.System, "System"),
-        new(AppearanceModes.Light, "Light"),
-        new(AppearanceModes.Dark, "Dark"),
+        new(AppearanceModes.System, Localizer.Text("AppearanceSystem")),
+        new(AppearanceModes.Light, Localizer.Text("AppearanceLight")),
+        new(AppearanceModes.Dark, Localizer.Text("AppearanceDark")),
     ];
 
     private AppearanceModeChoice? _selectedAppearanceMode;
@@ -497,8 +499,8 @@ public sealed class OptionsViewModel : ViewModelBase
 
     public System.Collections.Generic.IReadOnlyList<ControlSizingChoice> ControlSizingChoices { get; } =
     [
-        new(false, "Standard"),
-        new(true, "Touch"),
+        new(false, Localizer.Text("SizingStandard")),
+        new(true, Localizer.Text("SizingTouch")),
     ];
 
     private ControlSizingChoice? _selectedControlSizing;
@@ -520,9 +522,9 @@ public sealed class OptionsViewModel : ViewModelBase
 
     public System.Collections.Generic.IReadOnlyList<MixerViewChoice> MixerViewChoices { get; } =
     [
-        new(MainViewModel.FullView, "Full mixer"),
-        new(MainViewModel.CompactView, "Compact: one channel"),
-        new(MainViewModel.MiniView, "Mini: one channel into one mix"),
+        new(MainViewModel.FullView, Localizer.Text("MixerViewFull")),
+        new(MainViewModel.CompactView, Localizer.Text("MixerViewCompact")),
+        new(MainViewModel.MiniView, Localizer.Text("MixerViewMini")),
     ];
 
     private MixerViewChoice? _selectedMixerView;
@@ -541,14 +543,37 @@ public sealed class OptionsViewModel : ViewModelBase
         }
     }
 
+    /// <summary>Follow the desktop, then every language the window ships, each named in itself.</summary>
+    public System.Collections.Generic.IReadOnlyList<LanguageChoice> LanguageChoices { get; } =
+    [
+        new(null, Localizer.Text("SystemLanguage")),
+        .. Localizer.Languages,
+    ];
+
+    private LanguageChoice? _selectedLanguage;
+    /// <summary>
+    /// The window's language. Choosing one saves it in ui.json; the window
+    /// reads its text once, so the language changes the next time it starts.
+    /// A save that fails says why on the preference line.
+    /// </summary>
+    public LanguageChoice? SelectedLanguage
+    {
+        get => _selectedLanguage;
+        set
+        {
+            if (!Set(ref _selectedLanguage, value) || _applying || value is null) return;
+            Report((UiSettings.Load() with { Language = value.Id }).Save());
+        }
+    }
+
     /// <summary>The mode only means something while Material is worn and the launch did not force it.</summary>
     public bool CanChooseAppearanceMode => Skinning.SkinService.CanChooseMode;
 
     /// <summary>What the mode does with the skin that is on.</summary>
     public string AppearanceModeNote => Skinning.SkinService.Overridden
-        ? "The launch chose this appearance; choose a skin to use the mode again."
-        : CanChooseAppearanceMode ? "System follows the desktop's light or dark preference."
-        : "This skin has its own colours. The mode applies to Material.";
+        ? Localizer.Text("AppearanceModeOverridden")
+        : CanChooseAppearanceMode ? Localizer.Text("AppearanceModeSystemNote")
+        : Localizer.Text("AppearanceModeOtherSkin");
 
     private string _skinNote = "";
     /// <summary>What the chosen skin says about itself, and where it came from.</summary>
@@ -566,9 +591,7 @@ public sealed class OptionsViewModel : ViewModelBase
 
     /// <summary>Where a downloaded skin folder goes, spelled out for the user.</summary>
     public string SkinFolderHint =>
-        $"Skins are folders holding a skin.json, read from {Skinning.SkinCatalog.UserSkinDir} "
-        + "and from the system data directories. Start OpenXLR with OPENXLR_SKIN=default to "
-        + "get the shipped appearance back without opening this window.";
+        Localizer.Format("SkinFolderHint", Skinning.SkinCatalog.UserSkinDir);
 
     /// <summary>Read the skin folders again, keeping the current choice if it is still there.</summary>
     public void ReloadSkins()
@@ -585,17 +608,17 @@ public sealed class OptionsViewModel : ViewModelBase
     {
         SkinChoices.Clear();
         foreach (Skinning.SkinEntry entry in Skinning.SkinCatalog.Discover())
-            SkinChoices.Add(new SkinChoice(entry.Id, $"{entry.Name} ({entry.Package.OriginLabel})"));
+            SkinChoices.Add(new SkinChoice(entry.Id, Localizer.Format("SkinChoiceLabel", entry.Name, entry.Package.OriginLabel)));
     }
 
     private void ReportSkin(System.Collections.Generic.IReadOnlyList<string> errors)
     {
         Skinning.SkinPackage package = Skinning.SkinService.Current.Package;
         string note = package.Description ?? "";
-        if (package.Author is { Length: > 0 } author) note = note.Length == 0 ? $"By {author}." : $"{note} By {author}.";
+        if (package.Author is { Length: > 0 } author) note = note.Length == 0 ? Localizer.Format("SkinByAuthor", author) : Localizer.Format("SkinNoteByAuthor", note, author);
         if (Skinning.SkinService.Overridden)
             note = (note.Length == 0 ? "" : note + " ")
-                + $"This run was started with {Skinning.SkinService.OverrideVariable} set, so the launch chose it.";
+                + Localizer.Format("SkinChosenByLaunch", Skinning.SkinService.OverrideVariable);
         SkinNote = note;
         Raise(nameof(CanChooseAppearanceMode));
         Raise(nameof(AppearanceModeNote));
@@ -604,14 +627,14 @@ public sealed class OptionsViewModel : ViewModelBase
 
     private void BuildChoices()
     {
-        OutputChoices.Add(new DeviceChoice(null, "(don't enforce)"));
-        OutputChoices.Add(new DeviceChoice("@monitor", "Follow MONITOR output (system volume controls)"));
+        OutputChoices.Add(new DeviceChoice(null, Localizer.Text("DontEnforce")));
+        OutputChoices.Add(new DeviceChoice("@monitor", Localizer.Text("FollowMonitorOutput")));
         // "#phones" entries are channel-pair routing targets, not real sinks a
         // system default can point to.
         foreach (AudioDeviceItem d in _main.Outputs.Where(d => !d.Name.Contains("#phones", StringComparison.Ordinal)))
             OutputChoices.Add(new DeviceChoice(d.Name, d.Label));
 
-        InputChoices.Add(new DeviceChoice(null, "(don't enforce)"));
+        InputChoices.Add(new DeviceChoice(null, Localizer.Text("DontEnforce")));
         foreach (AudioDeviceItem d in _main.Inputs)
             InputChoices.Add(new DeviceChoice(d.Name, d.Label));
     }
@@ -620,5 +643,11 @@ public sealed class OptionsViewModel : ViewModelBase
 /// <summary>One directory a plugin format searches, as the plugin manager lists it.</summary>
 public sealed record PluginSearchDirectoryItem(string Kind, string Path, bool Custom, bool Exists)
 {
-    public string Detail => $"{Kind.ToUpperInvariant()}, {(Custom ? "added" : "standard or from the environment")}{(Exists ? "" : ", missing or unreadable")}";
+    public string Detail => (Custom, Exists) switch
+    {
+        (true, true) => Localizer.Format("SearchDirectoryAdded", Kind.ToUpperInvariant()),
+        (true, false) => Localizer.Format("SearchDirectoryAddedMissing", Kind.ToUpperInvariant()),
+        (false, true) => Localizer.Format("SearchDirectoryStandard", Kind.ToUpperInvariant()),
+        (false, false) => Localizer.Format("SearchDirectoryStandardMissing", Kind.ToUpperInvariant()),
+    };
 }

@@ -1,3 +1,4 @@
+using OpenXLR.UI.Localization;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -23,7 +24,7 @@ public sealed class ExclusiveGroupsWindow : Window
 {
     public ExclusiveGroupsWindow(MainViewModel vm)
     {
-        Title = "Exclusive channel groups";
+        Title = Localizer.Text("ExclusiveChannelGroups");
         Width = 500;
         Height = 600;
         MinWidth = 360;
@@ -34,9 +35,9 @@ public sealed class ExclusiveGroupsWindow : Window
         var groups = new ComboBox
         {
             Name = "Groups", HorizontalAlignment = HorizontalAlignment.Stretch,
-            ItemsSource = new[] { new ExclusiveGroupItem(null, "New group", []) }.Concat(vm.ExclusiveGroups).ToArray(),
+            ItemsSource = new[] { new ExclusiveGroupItem(null, Localizer.Text("NewGroup"), []) }.Concat(vm.ExclusiveGroups).ToArray(),
         };
-        var name = new TextBox { Name = "GroupName", MaxLength = 60, PlaceholderText = "Group name, e.g. Microphones" };
+        var name = new TextBox { Name = "GroupName", MaxLength = 60, PlaceholderText = Localizer.Text("GroupNamePlaceholder") };
         CheckBox[] members = [.. vm.Channels.Select(ch => new CheckBox
         {
             Name = "Member_" + ch.Id, Tag = ch.Id,
@@ -45,9 +46,9 @@ public sealed class ExclusiveGroupsWindow : Window
         var choices = new StackPanel { Spacing = 4 };
         foreach (CheckBox member in members) choices.Children.Add(member);
         var error = new TextBlock { Name = "GroupError", TextWrapping = TextWrapping.Wrap, Classes = { "hint" } };
-        var save = new Button { Name = "SaveGroup", Content = "Save group", IsDefault = true };
-        var delete = new Button { Name = "DeleteGroup", Content = "Delete group" };
-        var close = new Button { Content = "Close", IsCancel = true };
+        var save = new Button { Name = "SaveGroup", Content = Localizer.Text("SaveGroup"), IsDefault = true };
+        var delete = new Button { Name = "DeleteGroup", Content = Localizer.Text("DeleteGroup") };
+        var close = new Button { Content = Localizer.Text("Close"), IsCancel = true };
         var buttons = new WrapPanel { Orientation = Orientation.Horizontal };
         foreach (Button button in new[] { save, delete, close })
         {
@@ -59,10 +60,10 @@ public sealed class ExclusiveGroupsWindow : Window
             Margin = new Thickness(18), Spacing = 12,
             Children =
             {
-                new TextBlock { Text = "Only one channel of a group is heard. Unmuting a member in any mix mutes the other members in every mix; their levels stay where they are.", TextWrapping = TextWrapping.Wrap, Classes = { "hint" } },
+                new TextBlock { Text = Localizer.Text("ExclusiveGroupsIntro"), TextWrapping = TextWrapping.Wrap, Classes = { "hint" } },
                 groups, name, choices,
-                new TextBlock { Text = "Choose at least two channels. A channel belongs to one group at most. If more than one member is unmuted when you save, every member is muted and you unmute the one you want. Deleting a group leaves the mutes as they are.", TextWrapping = TextWrapping.Wrap, Classes = { "hint" } },
-                new TextBlock { Text = "On a Wave XLR Pro, XLR 1 in a group reaches the headphone jacks through the mixer instead of the interface's zero-latency path.", TextWrapping = TextWrapping.Wrap, Classes = { "hint" } },
+                new TextBlock { Text = Localizer.Text("ExclusiveGroupsRules"), TextWrapping = TextWrapping.Wrap, Classes = { "hint" } },
+                new TextBlock { Text = Localizer.Text("ExclusiveGroupsProNote"), TextWrapping = TextWrapping.Wrap, Classes = { "hint" } },
                 error, buttons,
             },
         };
@@ -86,7 +87,7 @@ public sealed class ExclusiveGroupsWindow : Window
             string[] selected = [.. members.Where(c => c.IsChecked == true).Select(c => (string)c.Tag!)];
             if (!remove && (string.IsNullOrWhiteSpace(name.Text) || selected.Length < 2))
             {
-                error.Text = "Enter a name and choose at least two channels.";
+                error.Text = Localizer.Text("ExclusiveGroupsInvalid");
                 return;
             }
             pending = true;
