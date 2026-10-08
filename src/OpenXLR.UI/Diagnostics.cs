@@ -89,10 +89,13 @@ public static class Diagnostics
         }
     }
 
-    /// <summary>Keep concurrent collections separate and remove incomplete output on failure.</summary>
+    /// <summary>
+    /// Write the archive as a new private file and remove it again if the
+    /// write fails. An existing file of the same name is refused untouched.
+    /// </summary>
     internal static async Task<string> WriteArchiveAsync(string work, string destination, string stamp)
     {
-        string outPath = Path.Combine(destination, $"openxlr-diagnostics-{stamp}-{Guid.NewGuid():N}.tar.gz");
+        string outPath = Path.Combine(destination, $"openxlr-diagnostics-{stamp}.tar.gz");
         bool created = false;
         try
         {
