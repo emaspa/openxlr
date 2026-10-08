@@ -394,7 +394,9 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   A `150%` button next to MONITOR and next to each monitor mix opens a boost
   range above unity; a boosted value arriving from the desktop opens it on its
   own, so the window and the OpenDeck dials show the boosted level instead of
-  stopping at 100%.
+  stopping at 100%. On KDE Plasma 6 these buttons share one range with the
+  desktop's Raise maximum volume setting and follow it in both directions.
+  Other desktops keep a range per control.
 
 - The control API validates every command before the mixer sees it and
   answers with an error instead of ignoring it. A private token is required

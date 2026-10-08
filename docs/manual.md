@@ -231,6 +231,23 @@ affects only the display; the daemon continues processing audio.
    Existing fixed default-device choices remain available; a virtual channel
    such as OpenXLR System is a routing destination, not a monitor volume
    control.
+
+   On KDE Plasma 6 the **150%** buttons follow **Raise maximum volume** in
+   the desktop's audio settings. The MONITOR button and the button on each
+   monitor mix share that one setting. Pressing any of them changes it in
+   Plasma and on every other monitor button, and changing it in Plasma
+   changes all of them in OpenXLR. A boosted level arriving from the desktop
+   turns the setting on as well. Turning the range on keeps the current
+   percentage, so 67% stays 67% on the longer scale. Turning it off lowers
+   the MONITOR output and any monitor mix above 100% to 100%. Levels at or
+   below 100% stay where they are, and Stream, Chat and channel sends are
+   never touched. Plasma stores the preference, so an OpenXLR profile does
+   not save it. Following it needs KDE's `kreadconfig6` and `kwriteconfig6`.
+   When Plasma does not take a change, because a helper is missing or an
+   administrator locked the setting, a line below the MONITOR slider says
+   so and the buttons show the range Plasma holds. Without `kreadconfig6`
+   the buttons work inside OpenXLR alone. On other desktops this does
+   nothing, and each **150%** button keeps its own range.
 5. The HEADPHONES card holds the interface's own headphone volume,
    low-impedance mode, and on the Pro the Mic ↔ PC crossfade, which is
    the zero-latency direct monitor inside the device: left is only your
