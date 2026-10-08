@@ -235,6 +235,20 @@
           </ComboBox>
         </Grid>
         <TextBlock Text="{Binding AppearanceModeNote}" FontSize="11" Classes="hint" TextWrapping="Wrap"/>
+        <Grid ColumnDefinitions="110,*">
+          <TextBlock Text="Controls" Classes="h" VerticalAlignment="Center"/>
+          <ComboBox Name="ControlSizingPicker" Grid.Column="1" HorizontalAlignment="Stretch"
+                    ItemsSource="{Binding ControlSizingChoices}"
+                    SelectedItem="{Binding SelectedControlSizing, Mode=TwoWay}"
+                    AutomationProperties.Name="Mixer control size">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:ControlSizingChoice">
+                <TextBlock Text="{Binding Label}"/>
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+        </Grid>
+        <TextBlock Text="Touch gives the mixer's buttons, faders and lists larger targets for a touch screen, with wider channel strips." FontSize="11" Classes="hint" TextWrapping="Wrap"/>
         <TextBlock Text="{Binding SkinNote}" FontSize="11" Classes="hint" TextWrapping="Wrap"
                    IsVisible="{Binding SkinNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
         <TextBlock Text="{Binding SkinFolderHint}" FontSize="11" Classes="note" TextWrapping="Wrap"/>

@@ -482,6 +482,9 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   skinned. [skins.md](skins.md) is the contract
 - Material in System, Light or Dark mode: System follows the desktop's light
   or dark preference, in the window and in the terminal mixer
+- Touch sizing for the mixer window: larger buttons, faders and list rows,
+  wider channel strips and mix tiles, chosen in Options and kept in
+  `ui.json` beside the skin, over whichever skin is worn
 - One window per user: a second launch brings the running window to the
   front, out of the tray if it is hidden there, and exits
 - Tray icon, start-minimized option, daemon and window autostart from

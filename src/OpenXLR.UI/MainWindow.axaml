@@ -48,6 +48,31 @@
   </Window.Resources>
 
   <Window.Styles>
+    <!-- Control sizing. Every size here is a skin token, raised by Touch
+         sizing; in Standard with no skin value the framework's own size
+         stays. These come first, so the class styles below still win. -->
+    <Style Selector="Button, ToggleButton, DropDownButton, ComboBox, ComboBoxItem, CheckBox, TextBox, Slider">
+      <Setter Property="MinHeight" Value="{DynamicResource Ox.Mixer.ControlMinSize}"/>
+      <Setter Property="MinWidth" Value="{DynamicResource Ox.Mixer.ControlMinSize}"/>
+    </Style>
+    <Style Selector="Window.large-targets Button, Window.large-targets ToggleButton, Window.large-targets DropDownButton">
+      <Setter Property="MinHeight" Value="{DynamicResource Ox.Mixer.ControlMinSize}"/>
+      <Setter Property="MinWidth" Value="{DynamicResource Ox.Mixer.ControlMinSize}"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Slider">
+      <Setter Property="MinHeight" Value="{DynamicResource Ox.Mixer.SliderMinHeight}"/>
+    </Style>
+    <!-- Fluent's horizontal template reserves two spacer rows around its
+         track. Enlarged targets span those rows instead of being clipped. -->
+    <Style Selector="Window.large-targets Slider /template/ Track#PART_Track">
+      <Setter Property="Grid.Row" Value="0"/>
+      <Setter Property="Grid.RowSpan" Value="3"/>
+    </Style>
+    <Style Selector="Slider /template/ Thumb">
+      <Setter Property="MinHeight" Value="{DynamicResource Ox.Mixer.ControlMinSize}"/>
+      <Setter Property="MinWidth" Value="{DynamicResource Ox.Mixer.ControlMinSize}"/>
+    </Style>
     <Style Selector="Border.card">
       <Setter Property="Padding" Value="12,9"/>
     </Style>
@@ -55,14 +80,14 @@
          theme default so the fixed cards stay small (the submixer keeps its
          own sizing) -->
     <Style Selector="StackPanel.dev Slider">
-      <Setter Property="MinHeight" Value="0"/>
-      <Setter Property="Height" Value="30"/>
+      <Setter Property="MinHeight" Value="{DynamicResource Ox.Mixer.SmallControlMinSize}"/>
+      <Setter Property="Height" Value="{DynamicResource Ox.Mixer.DeviceSliderHeight}"/>
       <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
     <Style Selector="StackPanel.dev ToggleButton">
       <Setter Property="Padding" Value="6,3"/>
       <Setter Property="FontSize" Value="12"/>
-      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="MinHeight" Value="{DynamicResource Ox.Mixer.SmallControlMinSize}"/>
     </Style>
     <!-- collapsible tiles: a flat expander whose header looks like the old card title -->
     <Style Selector="Expander.section">
@@ -71,7 +96,7 @@
       <Setter Property="BorderThickness" Value="0"/>
       <Setter Property="BorderBrush" Value="Transparent"/>
       <Setter Property="Padding" Value="0"/>
-      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="MinHeight" Value="{DynamicResource Ox.Mixer.SmallControlMinSize}"/>
       <Setter Property="CornerRadius" Value="0"/>
       <Setter Property="HorizontalAlignment" Value="Stretch"/>
       <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -84,20 +109,20 @@
     </Style>
     <!-- the small controls on an insert row: N (own process), B (bypass) and
          the cog that opens the plugin's controls. They stay narrow enough for
-         the row but keep a 24 by 24 target so they are easy to hit and their
-         letter is readable. -->
+         the row but keep at least the skin's insert target size, so they are
+         easy to hit and their letter is readable. -->
     <Style Selector="ToggleButton.insertmini">
       <Setter Property="Padding" Value="6,2"/>
-      <Setter Property="MinWidth" Value="24"/>
-      <Setter Property="MinHeight" Value="24"/>
+      <Setter Property="MinWidth" Value="{DynamicResource Ox.Mixer.InsertControlMinSize}"/>
+      <Setter Property="MinHeight" Value="{DynamicResource Ox.Mixer.InsertControlMinSize}"/>
       <Setter Property="FontSize" Value="12"/>
       <Setter Property="VerticalAlignment" Value="Center"/>
       <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>
     <Style Selector="Button.insertmini">
       <Setter Property="Padding" Value="6,2"/>
-      <Setter Property="MinWidth" Value="24"/>
-      <Setter Property="MinHeight" Value="24"/>
+      <Setter Property="MinWidth" Value="{DynamicResource Ox.Mixer.InsertControlMinSize}"/>
+      <Setter Property="MinHeight" Value="{DynamicResource Ox.Mixer.InsertControlMinSize}"/>
       <Setter Property="FontSize" Value="12"/>
       <Setter Property="VerticalAlignment" Value="Center"/>
       <Setter Property="VerticalContentAlignment" Value="Center"/>
@@ -127,7 +152,7 @@
                        VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding StatusLine}"
                        IsVisible="{Binding !HasMultipleDevices}"/>
             <DropDownButton Name="DevicePicker" Grid.Column="1" Content="{Binding ActiveDeviceName}" FontSize="11" Padding="6,1"
-                            MinHeight="0" VerticalAlignment="Center" HorizontalAlignment="Left" Classes="ghost"
+                            MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center" HorizontalAlignment="Left" Classes="ghost"
                             IsVisible="{Binding HasMultipleDevices}"
                             ToolTip.Tip="{Binding ActiveDeviceName, StringFormat='{}{0}&#x0a;Select the interface OpenXLR drives'}">
               <DropDownButton.ContentTemplate>
@@ -243,7 +268,7 @@
           <TextBlock Grid.Column="2" Text="{Binding GainText}" Classes="val" VerticalAlignment="Center"
                      HorizontalAlignment="Right"/>
           <ToggleButton Grid.Column="3" Content="Lock" Classes="mute" FontSize="11" Padding="8,2"
-                        Margin="6,0,0,0" MinWidth="0" IsVisible="{Binding ShowGainLock}"
+                        Margin="6,0,0,0" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowGainLock}"
                         IsChecked="{Binding GainLocked, Mode=TwoWay}" VerticalAlignment="Center"
                         ToolTip.Tip="Gain lock: the daemon rejects every gain change while set"/>
         </Grid>
@@ -282,7 +307,7 @@
           <Grid ColumnDefinitions="90,*,Auto">
             <TextBlock Text="Inserts" Classes="h" VerticalAlignment="Center"
                        ToolTip.Tip="Plugins processing XLR 1 before it reaches the mixes"/>
-            <Button Grid.Column="2" Content="{Binding Inserts.ButtonText}" Padding="12,3" FontSize="12" MinHeight="0"
+            <Button Grid.Column="2" Content="{Binding Inserts.ButtonText}" Padding="12,3" FontSize="12" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                     Click="OnXlrInserts" ToolTip.Tip="Plugins processing XLR 1 before it reaches the mixes"/>
           </Grid>
           <!-- the chain at a glance: LED, name, bypass, controls; adding,
@@ -347,7 +372,7 @@
           <Grid ColumnDefinitions="90,*,Auto">
             <TextBlock Text="Inserts" Classes="h" VerticalAlignment="Center"
                        ToolTip.Tip="Plugins processing XLR 2 before it reaches the mixes"/>
-            <Button Grid.Column="2" Content="{Binding Inserts2.ButtonText}" Padding="12,3" FontSize="12" MinHeight="0"
+            <Button Grid.Column="2" Content="{Binding Inserts2.ButtonText}" Padding="12,3" FontSize="12" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                     Tag="xlr2" Click="OnXlrInserts" ToolTip.Tip="Plugins processing XLR 2 before it reaches the mixes"/>
           </Grid>
           <!-- the chain at a glance: LED, name, bypass, controls; adding,
@@ -452,7 +477,7 @@
           <StackPanel Orientation="Horizontal" Spacing="6">
             <TextBlock Text="MONITOR" Classes="h" VerticalAlignment="Center"/>
             <ToggleButton Name="OutputBoost" Content="150%" IsChecked="{Binding OutputVolumeRange.Boost, Mode=TwoWay}"
-                          Padding="8,1" FontSize="{DynamicResource Ox.Label.FontSize}" MinHeight="0" VerticalAlignment="Center"
+                          Padding="8,1" FontSize="{DynamicResource Ox.Label.FontSize}" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
                           ToolTip.Tip="Allow output volume above 100%, up to 150%. Turning this off returns a boosted output to 100%. On KDE Plasma this is the desktop's Raise maximum volume setting, shared by every monitor control."/>
             <TextBlock Text="&#x24D8;" Classes="h" FontSize="12" VerticalAlignment="Center" Margin="0,-1,0,0" Cursor="Help"
                        ToolTip.Tip="Tick the outputs you want to hear. Choose a mix beside each output. The Wave XLR Pro's own outputs (Headphones 1/2, USB Aux, Line Out) switch the hardware when ticked and share one feed. The USB Aux port is fed by the dedicated Aux mix in the submixer instead. XLR 1, XLR 2 and Line In feed their channels automatically. System default devices for apps are set in Options."/>
@@ -506,7 +531,7 @@
         <Expander.Header>
           <StackPanel Orientation="Horizontal" Spacing="10">
             <TextBlock Text="APPLICATIONS" Classes="h" VerticalAlignment="Center"/>
-            <Button Name="ManageApps" Content="Manage" Padding="8,1" FontSize="11" MinHeight="0" VerticalAlignment="Center"
+            <Button Name="ManageApps" Content="Manage" Padding="8,1" FontSize="11" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
                     IsEnabled="{Binding HasApps}" Click="OnManageApps"/>
           </StackPanel>
         </Expander.Header>
@@ -538,7 +563,7 @@
         <Expander.Header>
           <StackPanel Orientation="Horizontal" Spacing="10">
             <TextBlock Text="SUBMIXER" Classes="h" VerticalAlignment="Center"/>
-            <Button Content="Edit layout" Padding="8,1" FontSize="11" MinHeight="0" VerticalAlignment="Center"
+            <Button Content="Edit layout" Padding="8,1" FontSize="11" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
                     IsVisible="{Binding HasMixer}" IsEnabled="{Binding CanEditLayout}" Click="OnEditLayout"
                     ToolTip.Tip="Add, rename, reorder and remove application channels and virtual microphones while audio plays"/>
           </StackPanel>
@@ -555,7 +580,7 @@
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:MixViewModel">
-              <Border Classes="tile" Padding="10" Margin="0,0,8,8" Width="232"
+              <Border Classes="tile" Padding="10" Margin="0,0,8,8" Width="{DynamicResource Ox.Mixer.MixWidth}"
                       IsVisible="{Binding Visible}">
                 <StackPanel Spacing="6">
                   <Grid ColumnDefinitions="*,Auto">
@@ -627,7 +652,7 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:ChannelViewModel">
-                <Border Classes="tile" Padding="10" Margin="0,0,8,0" Width="132"
+                <Border Classes="tile" Padding="10" Margin="0,0,8,0" Width="{DynamicResource Ox.Mixer.ChannelWidth}"
                         IsVisible="{Binding Visible}">
                   <StackPanel Spacing="8">
                     <TextBlock Text="{Binding Name}" Classes="strip" HorizontalAlignment="Center"/>
@@ -648,7 +673,7 @@
                               <Slider Minimum="0" Maximum="1" Value="{Binding Level, Mode=TwoWay}"
                                       VerticalAlignment="Center"/>
                               <ToggleButton Grid.Column="1" Classes="mute mutemini" IsChecked="{Binding Muted, Mode=TwoWay}"
-                                            Padding="7,2" FontSize="11" MinWidth="0" VerticalAlignment="Center"/>
+                                            Padding="7,2" FontSize="11" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"/>
                             </Grid>
                           </StackPanel>
                         </DataTemplate>

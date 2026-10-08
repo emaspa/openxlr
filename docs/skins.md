@@ -656,6 +656,27 @@ skin that only recolours the cards leaves buttons exactly as they are.
 | `Ox.Flow.NodeHoverBackground` | brush | #414541 |  | a node under the pointer |
 | `Ox.Flow.NodeHoverBorderBrush` | brush | #717971 |  | that node's outline |
 
+### Mixer control sizing
+
+These size the main mixer's controls and strips. Options offers two
+sizings, saved in `ui.json` as `"touchControls"`: Standard wears the values
+below, and Touch raises the five control minimums to 44 units, a channel
+strip to 180 and a mix tile to 280. A skin value larger than that is kept in
+both. While Touch is on, or while a skin sets `Ox.Mixer.ControlMinSize`, a
+slider is also made at least as tall as the control minimum and the
+`Ox.Fader.Thumb.Height` cap, so an enlarged cap stays inside its row. The
+other windows and the plugins' own editors keep their sizes.
+
+| Token | Kind | Default | Range | What it paints |
+|---|---|---|---|---|
+| `Ox.Mixer.ControlMinSize` | number | framework | 0 to 64 | the smallest width and height of a mixer button, dropdown, check box, text box, slider and fader cap |
+| `Ox.Mixer.SliderMinHeight` | number | framework | 0 to 96 | the smallest height of a mixer slider |
+| `Ox.Mixer.DeviceSliderHeight` | number | 30 | 30 to 96 | the height of a slider in the interface's control rows |
+| `Ox.Mixer.SmallControlMinSize` | number | 0 | 0 to 64 | the smallest size of the compact controls: the interface rows' buttons and sliders, the tile headers and their buttons, the gain lock, the inserts buttons and a send's mute |
+| `Ox.Mixer.InsertControlMinSize` | number | 24 | 16 to 64 | the smallest width and height of an insert row's own process, bypass and controls buttons |
+| `Ox.Mixer.ChannelWidth` | number | 132 | 132 to 400 | the width of a submixer channel strip |
+| `Ox.Mixer.MixWidth` | number | 232 | 232 to 500 | the width of a mix master tile |
+
 ## Images
 
 An image comes from the skin's own folder:

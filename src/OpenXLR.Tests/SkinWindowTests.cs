@@ -53,6 +53,7 @@ public sealed class SkinWindowTests
             TheOptionsColumnsCarryABalancedShareOfTheCards(options);
             TheWindowActuallyRepaintsWhenTheSkinChanges(main);
             AppearanceModeWindowTests.Check(main, options, flow);
+            TouchControlsWindowTests.Check(main, options, flow);
         });
     }
 
@@ -953,15 +954,27 @@ public sealed class SkinWindowTests
         var action = Rectangular(main).OfType<Button>()
             .First(b => b is not ToggleButton and not DropDownButton && b.IsEffectivelyEnabled);
         int clicks = 0;
-        action.Click += (_, _) => clicks++;
-        action.Focus();
-        Pump(main);
-        Assert.True(action.IsFocused, "a key no longer takes focus");
-        action.RaiseEvent(new KeyEventArgs
-            { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Enter, KeyModifiers = KeyModifiers.None });
-        Pump(main);
-        Assert.Equal(1, clicks);
-        action.Click -= (_, _) => clicks++;
+        void OnClick(object? sender, RoutedEventArgs args) => clicks++;
+        Window[] before = main.OwnedWindows.ToArray();
+        action.Click += OnClick;
+        try
+        {
+            action.Focus();
+            Pump(main);
+            Assert.True(action.IsFocused, "a key no longer takes focus");
+            action.RaiseEvent(new KeyEventArgs
+                { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Enter, KeyModifiers = KeyModifiers.None });
+            Pump(main);
+            Assert.Equal(1, clicks);
+        }
+        finally
+        {
+            action.Click -= OnClick;
+            // The real action may open a dialog. Close the ones this probe
+            // opened, so the X server input later in the run reaches the mixer.
+            foreach (Window window in main.OwnedWindows.Except(before).ToArray()) window.Close();
+            Pump(main);
+        }
 
         // A toggle still toggles, and its lettering still follows the state.
         var toggle = Rectangular(main).OfType<ToggleButton>()

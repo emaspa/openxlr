@@ -1254,6 +1254,17 @@ so a window wearing Deck or an Omarchy palette looks as it did, and Mode is
 greyed out while one of them is chosen. The mode is saved in `ui.json`
 beside the skin.
 
+**Controls** picks **Standard** or **Touch** sizing for the mixer window.
+Touch is meant for a touch screen. Buttons, dropdowns, check boxes and fader
+caps get targets at least 44 units square, every slider row is tall enough
+to hold its cap, the rows of an open list grow to match, and channel strips
+and mix tiles widen to 180 and 280 units. It works with every skin, and a
+skin that already draws larger controls keeps them. Switching leaves levels
+and routing alone, and the other windows keep their size. The choice goes on
+at once, is saved in `ui.json` as `touchControls`, and is not part of a
+profile. If it cannot be saved, it is still worn for the run and Options
+says why on the line at its foot.
+
 OpenDeck keys and dials take their colours from the chosen skin and
 repaint when it changes. While the window runs they use the colours it
 applied, light or dark; without it the plugin reads the saved skin itself
