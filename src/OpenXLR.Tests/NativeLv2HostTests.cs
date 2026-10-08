@@ -149,6 +149,9 @@ public sealed class NativeLv2HostTests
         string json = JsonSerializer.Serialize(status, new JsonSerializerOptions(JsonSerializerDefaults.Web));
         Assert.Contains("\"gain_reduction\":3", json);
         Assert.Contains("\"nativeHostRunning\":true", json);
+        Assert.Contains("\"filterChainError\":null", json);
+        json = JsonSerializer.Serialize(status with { FilterChainError = "no LV2 loader" }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        Assert.Contains("\"filterChainError\":\"no LV2 loader\"", json);
     }
 
     [Fact]
@@ -165,7 +168,7 @@ public sealed class NativeLv2HostTests
         Assert.False(insert.NativeEditorAvailable);
 
         insert.ApplyFromDaemon(definition, error: null, nativeHostRunning: true);
-        Assert.False(insert.NativeEditorAvailable); // A live-process flag does not opt an old insert in.
+        Assert.True(insert.NativeEditorAvailable); // The editor follows the running host, a fallback included.
         definition["nativeHost"] = true;
         insert.ApplyFromDaemon(definition, error: null, nativeHostRunning: true);
         Assert.True(insert.NativeEditorAvailable);

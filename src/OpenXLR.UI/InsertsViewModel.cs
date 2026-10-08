@@ -299,7 +299,12 @@ public sealed class InsertViewModel : ViewModelBase
         ? _nativeUiBlockReason ?? "This native editor is disabled in Options. Use the OpenXLR controls."
         : null;
 
-    public bool NativeEditorAvailable => !NativeUiBlocked && NativeHostInstalled && NativeHost && !Bypass && !HasError && NativeHostRunning;
+    /// <summary>
+    /// The editor follows the host that runs the insert, which is the native
+    /// host for a saved choice and for an LV2 insert PipeWire's filter chain
+    /// refused.
+    /// </summary>
+    public bool NativeEditorAvailable => !NativeUiBlocked && NativeHostInstalled && !Bypass && !HasError && NativeHostRunning;
 
     /// <summary>
     /// The switch can be turned on only where the helper is installed. It
