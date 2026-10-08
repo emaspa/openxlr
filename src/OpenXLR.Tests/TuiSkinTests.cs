@@ -398,7 +398,8 @@ public sealed class TuiSkinTests : IDisposable
     [Fact]
     public void AnUnreadableSavedChoiceFallsBackAndCanBeReadAfterRepair()
     {
-        if (OperatingSystem.IsWindows()) return;
+        // Root reads a file with no permission bits anyway.
+        if (OperatingSystem.IsWindows() || Environment.IsPrivilegedProcess) return;
         string config = Path.Combine(_root, "unreadable-config");
         Directory.CreateDirectory(Path.Combine(config, "openxlr"));
         Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", config);
