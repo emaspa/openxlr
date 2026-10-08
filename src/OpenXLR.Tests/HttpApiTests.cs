@@ -2,12 +2,15 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OpenXLR.Core;
+using OpenXLR.Core.Mixing;
 using OpenXLR.Daemon;
 
 namespace OpenXLR.Tests;
@@ -44,6 +47,37 @@ public sealed class HttpApiTests
         => Assert.Equal(accepted, ApiEndpoints.IsJson(type));
 
     [Fact]
+    public void MixerResourcesReadTheSnapshotByExactId()
+    {
+        var mixer = new MixerState
+        {
+            Channels = [new("music", "Music", new Dictionary<string, double>(), [])],
+            Mixes = [new("monitor", "Monitor A", 1, false)],
+            Inserts = new Dictionary<string, IReadOnlyList<InsertStatus>>
+            {
+                ["xlr1"] = [new InsertStatus(new InsertDefinition { Id = "gate", Kind = "lv2", Plugin = "urn:test" }, null)],
+                ["mix:monitor"] = [],
+            },
+        };
+        object? Read(IResult result)
+        {
+            Assert.Null((result as IStatusCodeHttpResult)?.StatusCode);
+            return Assert.IsAssignableFrom<IValueHttpResult>(result).Value;
+        }
+        Assert.Same(mixer, Read(ApiEndpoints.MixerResource(mixer, m => m)));
+        Assert.Equal("Music", Assert.IsType<ChannelStatus>(Read(ApiEndpoints.MixerResource(mixer,
+            m => m.Channels.FirstOrDefault(c => c.Id == "music")))).Name);
+        Assert.IsType<NotFound>(ApiEndpoints.MixerResource(mixer, m => m.Channels.FirstOrDefault(c => c.Id == "Music")));
+        Assert.Equal("gate", Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<InsertStatus>>(
+            Read(ApiEndpoints.MixerResource(mixer, m => m.Inserts.GetValueOrDefault("xlr1"))))).Insert.Id);
+        // A chain the snapshot holds with nothing in it is a list, not a miss.
+        Assert.Empty(Assert.IsAssignableFrom<IReadOnlyList<InsertStatus>>(
+            Read(ApiEndpoints.MixerResource(mixer, m => m.Inserts.GetValueOrDefault("mix:monitor")))));
+        Assert.IsType<NotFound>(ApiEndpoints.MixerResource(mixer, m => m.Inserts.GetValueOrDefault("xlr2")));
+        Assert.Equal(503, Assert.IsType<StatusCodeHttpResult>(ApiEndpoints.MixerResource(null, m => m)).StatusCode);
+    }
+
+    [Fact]
     public async Task RealHttpRequestsEnforceAuthenticationOriginAndCommandLimits()
     {
         var builder = WebApplication.CreateBuilder();
@@ -57,6 +91,13 @@ public sealed class HttpApiTests
         builder.Services.AddSingleton(new OpenXLR.Core.Mixing.NativeEditorPolicy(Path.Combine(policyDirectory, "rules.json")));
         await using var app = builder.Build();
         app.UseWebSockets();
+        TaskCompletionSource? commandReading = null;
+        app.Use(async (context, next) =>
+        {
+            if (context.Request.Headers.ContainsKey("X-Test-Observe-Body") && commandReading is { } reading)
+                context.Request.Body = new ObservedReadStream(context.Request.Body, reading);
+            await next(context);
+        });
         // The endpoints read the daemon's live token per request; publish one
         // into a scratch runtime directory the way the daemon does at start.
         string runtimeDir = Path.Combine(Path.GetTempPath(), "openxlr-test-" + Guid.NewGuid().ToString("N"));
@@ -74,7 +115,8 @@ public sealed class HttpApiTests
             using var http = new HttpClient { BaseAddress = new Uri(address) };
             using var denied = await http.GetAsync("/api/v1");
             Assert.Equal(HttpStatusCode.Unauthorized, denied.StatusCode);
-            foreach (string path in new[] { "/api/v1/state", "/API/V1/state", "/api/v1/state/", "/api/v1/plugins" })
+            foreach (string path in new[] { "/api/v1/state", "/API/V1/state", "/api/v1/state/", "/api/v1/plugins",
+                "/api/v1/devices", "/api/v1/mixer", "/api/v1/channels/music", "/api/v1/plugin-setup" })
             {
                 using var protectedRequest = await http.GetAsync(path);
                 Assert.Equal(HttpStatusCode.Unauthorized, protectedRequest.StatusCode);
@@ -91,6 +133,20 @@ public sealed class HttpApiTests
             Assert.Equal(HttpStatusCode.Forbidden, foreignEvents.StatusCode);
             http.DefaultRequestHeaders.Remove("Origin");
             http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            foreach (string path in new[] { "devices", "profiles", "diagnostics", "editor-rules", "plugin-diagnostics" })
+            {
+                using var resource = await http.GetAsync("/api/v1/" + path);
+                Assert.Equal(HttpStatusCode.OK, resource.StatusCode);
+                Assert.True(resource.Headers.CacheControl?.NoStore);
+            }
+            using (var devices = System.Text.Json.JsonDocument.Parse(await http.GetStringAsync("/api/v1/devices")))
+                Assert.False(devices.RootElement.GetProperty("connected").GetBoolean());
+            // No hosted service runs here, so there is no mixer to read.
+            foreach (string path in new[] { "mixer", "channels", "channels/missing", "mixes", "inserts" })
+            {
+                using var resource = await http.GetAsync("/api/v1/" + path);
+                Assert.Equal(HttpStatusCode.ServiceUnavailable, resource.StatusCode);
+            }
             using var accepted = await http.GetAsync("/api/v1");
             Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
             http.DefaultRequestHeaders.Add("Origin", "https://foreign.example");
@@ -161,11 +217,102 @@ public sealed class HttpApiTests
             Assert.True(hostEnvironment.TryGetProperty("loaderEnvironment", out _));
             Assert.True(discovery.GetProperty("discovery").TryGetProperty("skippedFailedCount", out _));
             Assert.True(discovery.GetProperty("discovery").TryGetProperty("skippedFailedBundles", out _));
+
+            // A slow streamed command holds the command slot: a command-backed
+            // read is refused rather than queued, a snapshot read still answers.
+            using var body = new PausedCommandContent();
+            commandReading = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var pendingRequest = new HttpRequestMessage(HttpMethod.Post, "/api/v1/commands") { Content = body };
+            pendingRequest.Headers.Add("X-Test-Observe-Body", "true");
+            Task<HttpResponseMessage> pending = http.SendAsync(pendingRequest);
+            HttpStatusCode completedStatus = default;
+            try
+            {
+                await commandReading.Task.WaitAsync(TimeSpan.FromSeconds(3));
+                using var busy = await http.GetAsync("/api/v1/diagnostics");
+                Assert.Equal(HttpStatusCode.TooManyRequests, busy.StatusCode);
+                using var snapshot = await http.GetAsync("/api/v1/state");
+                Assert.Equal(HttpStatusCode.OK, snapshot.StatusCode);
+                using var concurrent = await http.PostAsync("/api/v1/commands",
+                    new StringContent("{\"cmd\":\"getState\"}", Encoding.UTF8, "application/json"));
+                Assert.Equal(HttpStatusCode.TooManyRequests, concurrent.StatusCode);
+            }
+            finally
+            {
+                body.Release();
+                using var completed = await pending;
+                completedStatus = completed.StatusCode;
+            }
+            Assert.Equal(HttpStatusCode.OK, completedStatus);
+            using var afterCommand = await http.GetAsync("/api/v1/diagnostics");
+            Assert.Equal(HttpStatusCode.OK, afterCommand.StatusCode);
+
+            // A command whose caller goes away releases the slot.
+            using var abortedBody = new PausedCommandContent();
+            using var cancel = new CancellationTokenSource();
+            commandReading = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var abortedRequest = new HttpRequestMessage(HttpMethod.Post, "/api/v1/commands") { Content = abortedBody };
+            abortedRequest.Headers.Add("X-Test-Observe-Body", "true");
+            Task<HttpResponseMessage> aborted = http.SendAsync(abortedRequest, cancel.Token);
+            try
+            {
+                await commandReading.Task.WaitAsync(TimeSpan.FromSeconds(3));
+            }
+            finally
+            {
+                cancel.Cancel();
+                abortedBody.Release();
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => aborted.WaitAsync(TimeSpan.FromSeconds(3)));
+            }
+            using var recovered = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            while (true)
+            {
+                using var retry = await http.GetAsync("/api/v1/diagnostics", recovered.Token);
+                if (retry.StatusCode == HttpStatusCode.OK) break;
+                Assert.Equal(HttpStatusCode.TooManyRequests, retry.StatusCode);
+                await Task.Delay(10, recovered.Token);
+            }
         }
         finally
         {
             await app.StopAsync();
             if (Directory.Exists(policyDirectory)) Directory.Delete(policyDirectory, recursive: true);
+        }
+    }
+
+    // Signals once the endpoint holds the command slot and starts reading the
+    // body. Polling a command-backed read instead could take the slot first.
+    private sealed class ObservedReadStream(Stream inner, TaskCompletionSource reading) : Stream
+    {
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken stop = default)
+        {
+            reading.TrySetResult();
+            return inner.ReadAsync(buffer, stop);
+        }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override void Flush() => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    private sealed class PausedCommandContent : HttpContent
+    {
+        private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public PausedCommandContent() => Headers.ContentType = new MediaTypeHeaderValue("application/json");
+        public void Release() => _release.TrySetResult();
+        protected override bool TryComputeLength(out long length) { length = 0; return false; }
+        protected override async Task SerializeToStreamAsync(Stream stream, TransportContext? context)
+        {
+            await stream.WriteAsync(Encoding.UTF8.GetBytes("{"));
+            await stream.FlushAsync();
+            await _release.Task;
+            await stream.WriteAsync(Encoding.UTF8.GetBytes("\"cmd\":\"getDiagnostics\"}"));
         }
     }
 }

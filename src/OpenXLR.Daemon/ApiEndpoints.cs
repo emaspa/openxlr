@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text;
 using OpenXLR.Core;
+using OpenXLR.Core.Mixing;
 using System.Text.Json;
 
 namespace OpenXLR.Daemon;
@@ -34,6 +35,17 @@ internal static class ApiEndpoints
     }
 
     /// <summary>
+    /// A mixer read from the same snapshot <c>/state</c> serves, with its
+    /// records and ids as they are: 503 while there is no mixer, 404 when the
+    /// selector finds nothing in the one there is.
+    /// </summary>
+    internal static IResult MixerResource(MixerState? mixer, Func<MixerState, object?> select)
+    {
+        if (mixer is null) return Results.StatusCode(503);
+        return select(mixer) is { } value ? Results.Json(value) : Results.NotFound();
+    }
+
+    /// <summary>
     /// The token is read per request: the daemon publishes it only once the
     /// port is bound (see ApiToken), which is after these endpoints are
     /// mapped, and a restart rotates it.
@@ -42,6 +54,10 @@ internal static class ApiEndpoints
     {
         // Bind access control to the resolved endpoints, not a request-path
         // exception. Events use first-frame authentication in WebSocketHub.
+        // One budget covers every authenticated request, reads included.
+        var budget = new CommandBudget();
+        // One command at a time, shared by the command-backed reads.
+        var commandGate = new SemaphoreSlim(1, 1);
         var api = app.MapGroup("/api/v1").AddEndpointFilter(async (invocation, next) =>
         {
             HttpContext context = invocation.HttpContext;
@@ -53,23 +69,62 @@ internal static class ApiEndpoints
                 context.Response.Headers.WWWAuthenticate = "Bearer";
                 return Results.StatusCode(401);
             }
+            lock (budget) if (!budget.TryTake()) return Results.StatusCode(429);
             return await next(invocation);
         });
 
         app.MapGet("/healthz", () => Results.Json(new { status = "alive" }));
         api.MapGet("", () => Results.Json(new { apiVersion = "1", state = "/api/v1/state",
-            plugins = "/api/v1/plugins", commands = "/api/v1/commands", events = "/api/v1/events" }));
+            devices = "/api/v1/devices", profiles = "/api/v1/profiles", mixer = "/api/v1/mixer",
+            channels = "/api/v1/channels", mixes = "/api/v1/mixes", inserts = "/api/v1/inserts",
+            plugins = "/api/v1/plugins", pluginSetup = "/api/v1/plugin-setup",
+            pluginDiagnostics = "/api/v1/plugin-diagnostics", diagnostics = "/api/v1/diagnostics",
+            editorRules = "/api/v1/editor-rules", commands = "/api/v1/commands", events = "/api/v1/events" }));
         api.MapGet("/state", (WebSocketHub hub) => Results.Json(hub.Snapshot()));
-        api.MapGet("/plugins", async (WebSocketHub hub) =>
-            Results.Json(await hub.ExecuteForApiAsync("{\"cmd\":\"listPlugins\"}")));
-        var budget = new CommandBudget();
-        var commandGate = new SemaphoreSlim(1, 1);
+        api.MapGet("/devices", (WebSocketHub hub) =>
+        {
+            StateMessage state = hub.Snapshot();
+            return Results.Json(new { state.Connected, state.Device, state.Capabilities, state.Detected, state.Devices });
+        });
+        api.MapGet("/profiles", (WebSocketHub hub) =>
+        {
+            StateMessage state = hub.Snapshot();
+            return Results.Json(new { state.Profiles, state.ActiveProfile, state.RecallOnConnect });
+        });
+        // Reads only: these never build, rebuild or save anything.
+        api.MapGet("/mixer", (WebSocketHub hub) => MixerResource(hub.Snapshot().Mixer, m => m));
+        api.MapGet("/channels", (WebSocketHub hub) => MixerResource(hub.Snapshot().Mixer, m => m.Channels));
+        api.MapGet("/channels/{id}", (string id, WebSocketHub hub) =>
+            MixerResource(hub.Snapshot().Mixer, m => m.Channels.FirstOrDefault(c => c.Id == id)));
+        api.MapGet("/mixes", (WebSocketHub hub) => MixerResource(hub.Snapshot().Mixer, m => m.Mixes));
+        api.MapGet("/mixes/{id}", (string id, WebSocketHub hub) =>
+            MixerResource(hub.Snapshot().Mixer, m => m.Mixes.FirstOrDefault(x => x.Id == id)));
+        api.MapGet("/inserts", (WebSocketHub hub) => MixerResource(hub.Snapshot().Mixer, m => m.Inserts));
+        api.MapGet("/inserts/{id}", (string id, WebSocketHub hub) =>
+            MixerResource(hub.Snapshot().Mixer, m => m.Inserts.GetValueOrDefault(id)));
+        // Reads answered by an existing command, in the same result envelope
+        // as POST /commands. They take the command slot because some of them
+        // scan plugins or start helpers.
+        foreach ((string path, string command) in new[] { ("plugins", "listPlugins"), ("plugin-setup", "getPluginSetup"),
+            ("plugin-diagnostics", "getPluginDiagnostics"), ("diagnostics", "getDiagnostics"), ("editor-rules", "getNativeEditorRules") })
+        {
+            string text = JsonSerializer.Serialize(new { cmd = command });
+            api.MapGet("/" + path, async (HttpContext context, WebSocketHub hub) =>
+            {
+                if (!await commandGate.WaitAsync(0, context.RequestAborted)) return Results.StatusCode(429);
+                try
+                {
+                    ApiCommandResult result = await hub.ExecuteForApiAsync(text);
+                    return Results.Json(result, statusCode: result.Ok ? 200 : 400);
+                }
+                finally { commandGate.Release(); }
+            });
+        }
         api.MapPost("/commands", async (HttpContext context, WebSocketHub hub) =>
         {
             if (!IsJson(context.Request.ContentType)) return Results.StatusCode(415);
             if (context.Request.ContentLength > MaxCommandBytes) return Results.StatusCode(413);
-            lock (budget) if (!budget.TryTake()) return Results.StatusCode(429);
-            // One in-flight HTTP mutation, without an unbounded command queue.
+            // One in-flight HTTP command, without an unbounded command queue.
             if (!await commandGate.WaitAsync(0, context.RequestAborted)) return Results.StatusCode(429);
             try
             {
