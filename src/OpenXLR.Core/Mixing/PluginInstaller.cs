@@ -40,6 +40,10 @@ public sealed record PluginSetup(
 {
     /// <summary>Wine's version as it reports it, or null when Wine is not installed.</summary>
     public string? WineVersion { get; init; }
+    /// <summary>Every directory each format searches, the added folders marked.</summary>
+    public IReadOnlyList<PluginSearchDirectory> SearchDirectories { get; init; } = [];
+    /// <summary>Saved plugin folders that were skipped because they no longer resolve, or null.</summary>
+    public string? SearchPathWarning { get; init; }
     public bool WineTrace { get; init; }
 
     /// <summary>
@@ -64,7 +68,11 @@ public sealed record PluginSetup(
 /// where the plugins landed, so the caller can tell which of the plugins it
 /// finds afterwards came from this install.
 /// </summary>
-public sealed record InstallOutcome(bool Ok, string Message, IReadOnlyList<string> Installed, IReadOnlyList<string>? Destinations = null);
+public sealed record InstallOutcome(bool Ok, string Message, IReadOnlyList<string> Installed, IReadOnlyList<string>? Destinations = null)
+{
+    /// <summary>Whether the catalogues are read again after this step; off when it changed nothing.</summary>
+    public bool RefreshCatalogue { get; init; } = true;
+}
 
 /// <summary>
 /// Puts a plugin the user picked where the catalogues look. A Linux bundle
@@ -1014,7 +1022,7 @@ public sealed class PluginInstaller
             sourceCommit = _managed?.SourceCommit, status,
             hostExecutable = NativePluginHost.Executable, hostInstalled = _hostInstalled,
             processArchitecture = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),
-            searchPaths = new { lv2Override = Environment.GetEnvironmentVariable("LV2_PATH"), clap = ClapCatalog.SearchPath().Take(64), vst3 = Vst3Catalog.SearchPath().Take(64) },
+            searchPaths = new { lv2Override = PluginSearchPaths.Lv2Path() ?? Environment.GetEnvironmentVariable("LV2_PATH"), clap = ClapCatalog.SearchPath().Take(64), vst3 = Vst3Catalog.SearchPath().Take(64) },
             scans = PluginScanDiagnostics.Snapshot(),
             // Where a failed scan's own output was written, and the bounds it
             // was written under, so a reader knows what is there and what is
@@ -1065,8 +1073,11 @@ public sealed class PluginInstaller
             ? []
             : [.. WinePluginFolders().Where(f => !known.Contains(Path.GetFullPath(f).TrimEnd('/')))];
         var memoryLock = PluginMemoryLock.ReadLimits();
+        _ = PluginSearchPaths.Read(out string? searchWarning);
         return new(_hostInstalled, Shorten(_lv2), Shorten(_clap), Shorten(_vst3), _managed?.Version ?? version, _wine is not null, bridged, wine)
         {
+            SearchDirectories = PluginSearchPaths.Snapshot(),
+            SearchPathWarning = searchWarning,
             MemoryLockLimitBytes = memoryLock.Soft,
             MemoryLockHardLimitBytes = memoryLock.Hard,
             MemoryLockNote = PluginMemoryLock.Note(memoryLock.Soft, memoryLock.Hard, _hostInstalled && _yabridgectl is not null && _wine is not null),

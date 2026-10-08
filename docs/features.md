@@ -178,10 +178,17 @@ that the chosen backend cannot run. VST2 is not supported.
 
 | Format | Processing host | Discovery |
 |---|---|---|
-| LV2 | PipeWire filter-chain by default; optional native host per insert, which also takes over an insert the filter chain refuses | lilv, standard LV2 directories or `LV2_PATH` |
-| CLAP | native host, one process per insert | standard CLAP directories or `CLAP_PATH` |
-| VST3 | native host, one process per insert | standard VST3 directories or `VST3_PATH` |
+| LV2 | PipeWire filter-chain by default; optional native host per insert, which also takes over an insert the filter chain refuses | lilv, standard LV2 directories or `LV2_PATH`, plus added folders |
+| CLAP | native host, one process per insert | standard CLAP directories or `CLAP_PATH`, plus added folders |
+| VST3 | native host, one process per insert | standard VST3 directories or `VST3_PATH`, plus added folders |
 | Windows VST3 / CLAP | yabridge and Wine behind the native host | bridge-generated Linux wrappers |
+
+The plugin manager in Options lists every folder the three formats search
+and takes folders of your own, whose plugins are used where they are,
+without a copy. The list survives a restart. An added LV2 folder is on the
+search path of the filter-chain and the native host as well as the
+catalogue. The same window rescans every format and manages the Windows
+plugin folders. See [Plugin folders](manual.md#plugin-search-folders).
 
 The Inserts row provides bypass, ordering, removal and generated parameter
 controls. Native plugin editors open on the instance processing the audio.

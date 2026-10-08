@@ -57,10 +57,13 @@ public static class Lv2Catalog
     /// <summary>
     /// A fresh scan outside the cached one. With <paramref name="lv2Path"/>
     /// only those directories are read (tests point it at their own
-    /// bundles); otherwise lilv's default search path applies.
+    /// bundles); otherwise the LV2_PATH every LV2 host is given, from
+    /// <see cref="PluginSearchPaths.Lv2Path"/>, or lilv's default when no
+    /// folder was added.
     /// </summary>
     internal static IReadOnlyList<PluginInfo> ScanNow(string? lv2Path = null)
     {
+        lv2Path ??= PluginSearchPaths.Lv2Path();
         var result = new List<PluginInfo>();
         IntPtr world;
         try { world = Lilv.lilv_world_new(); }

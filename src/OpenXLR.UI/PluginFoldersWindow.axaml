@@ -3,12 +3,38 @@
         xmlns:vm="using:OpenXLR.UI"
         x:Class="OpenXLR.UI.PluginFoldersWindow"
         x:DataType="vm:OptionsViewModel"
-        Title="Windows plugins" Width="760" Height="820" MinWidth="480" MinHeight="380"
+        Title="Plugin manager" Width="760" Height="820" MinWidth="480" MinHeight="380"
         WindowStartupLocation="CenterOwner" Background="{DynamicResource Ox.Window.Background}">
   <Grid Margin="18" RowDefinitions="*,12,Auto">
     <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
       <StackPanel Spacing="8" Margin="0,0,12,0">
-        <TextBlock Text="Windows VST3 and CLAP plugins" FontSize="17" FontWeight="SemiBold"/>
+        <TextBlock Text="Plugin folders" Classes="title"/>
+        <TextBlock Text="LV2, CLAP and VST3 plugins are found in the standard folders and in those LV2_PATH, CLAP_PATH or VST3_PATH name. Add a folder to have its plugins found where they are, without copying them. Removing an added folder keeps its files."
+                   Classes="hint" TextWrapping="Wrap"/>
+        <TextBlock Text="{Binding SearchPathWarning}" Classes="warn" TextWrapping="Wrap"
+                   IsVisible="{Binding SearchPathWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+        <ListBox Name="SearchDirectoryList" ItemsSource="{Binding SearchDirectories}" Height="190"
+                 SelectionMode="Single" SelectionChanged="OnSearchPathSelected"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:PluginSearchDirectoryItem">
+              <StackPanel Margin="0,4,12,4">
+                <TextBlock Text="{Binding Path}" Classes="body" TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding Detail}" Classes="hint"/>
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+        <WrapPanel Orientation="Horizontal">
+          <ComboBox Name="SearchFormat" Margin="0,0,8,4" MinWidth="90"/>
+          <Button Name="AddSearchPath" Content="Add plugin folder" Padding="14,5" Margin="0,0,8,4" Click="OnAddSearchPath"/>
+          <Button Name="RemoveSearchPath" Content="Remove added folder" Padding="14,5" Margin="0,0,8,4" Click="OnRemoveSearchPath" IsEnabled="False"/>
+          <Button Name="RescanAll" Content="Rescan all plugins" Padding="14,5" Margin="0,0,0,4" Click="OnRescanAll"/>
+        </WrapPanel>
+        <TextBlock Text="A rescan reads every format again and retries bundles that failed before. Running inserts keep going; one whose plugin is gone fails on its next load."
+                   Classes="hint" TextWrapping="Wrap"/>
+        <TextBlock Text="Windows VST3 and CLAP plugins" Classes="title" Margin="0,12,0,0"/>
+        <TextBlock Text="{Binding WindowsPlugins}" Classes="hint" TextWrapping="Wrap"/>
         <TextBlock Text="Choose a folder, then select an individual plugin below."
                    FontSize="12" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
         <TextBlock Text="{Binding WindowsImportNote}" IsVisible="{Binding WindowsImportNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
