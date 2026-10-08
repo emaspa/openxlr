@@ -370,6 +370,15 @@ public sealed class DaemonClient : IAsyncDisposable
         => EditLayoutAsync(new() { ["cmd"] = "deleteMix", ["mix"] = mix });
     public Task<string?> SetLayoutOrderAsync(IReadOnlyList<string> channels, IReadOnlyList<string> mixes)
         => EditLayoutAsync(new() { ["cmd"] = "setLayoutOrder", ["channels"] = channels, ["mixes"] = mixes });
+    /// <summary>Create an exclusive group (<paramref name="group"/> null) or replace a known one.</summary>
+    public Task<string?> SetExclusiveGroupAsync(string? group, string name, IReadOnlyList<string> channels)
+    {
+        var payload = new Dictionary<string, object> { ["cmd"] = "setExclusiveGroup", ["name"] = name, ["channels"] = channels };
+        if (group is not null) payload["group"] = group;
+        return EditLayoutAsync(payload);
+    }
+    public Task<string?> DeleteExclusiveGroupAsync(string group)
+        => EditLayoutAsync(new() { ["cmd"] = "deleteExclusiveGroup", ["group"] = group });
 
     /// <summary>
     /// Send a layout command and wait for its commandResult. The daemon

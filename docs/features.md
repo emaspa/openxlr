@@ -136,8 +136,8 @@ that mix carries the Monitor stream (a unit set up by Wave Link on
 Windows may not), and when a jack is the only monitor output the
 microphone's zero-latency hardware path into the jacks follows XLR 1's
 send in the Monitor mix: unmuted, you hear yourself with no delay;
-muted, you do not. With another device in the monitor set the software
-send carries the microphone to everything instead.
+muted, you do not. With another device in the monitor set, or with XLR 1
+in an exclusive group, the software send carries the microphone instead.
 
 Channels appear as playback devices in the desktop's audio applet, and
 the virtual microphones (Stream and Chat by default) as recording
@@ -154,6 +154,17 @@ the source or the pair is absent the channel stays silent and no other
 microphone takes its place; the sweep links it again when the ports
 return. A mono source is linked to both sides of the channel. See
 [Additional capture inputs](manual.md#capture-inputs).
+
+### Exclusive channel groups
+
+A group marks several channels of which only one is heard, such as a
+broadcast microphone and a headset. Unmuting a member's send in any mix
+mutes the other members in every mix, so switching is one click; levels
+stay as set. Groups are part of the saved layout, edited from the layout
+editor or the API, and a Stream Deck key hands a group to its next
+member. On a Wave XLR Pro, XLR 1 in a group gives up the zero-latency
+hardware path to the jacks, because the group mutes through the mixer.
+See [Exclusive groups](manual.md#exclusive-groups).
 
 ## Inserts
 
@@ -310,7 +321,8 @@ hardware switch and mute is a key target, plus the software low cut
 lock, switching the monitor output to a specific device, and cycling
 an output's feed through Monitor A, Monitor B and Monitor A+B, an
 output's volume in 5% steps and its mute (red while muted), the enforced
-system output, and routing the focused application to a channel. Each key
+system output, routing the focused application to a channel, and the
+next member of an exclusive group. Each key
 can pick its icon, and a typed title replaces the built-in label.
 
 ![Keys](plugin-keys.png)

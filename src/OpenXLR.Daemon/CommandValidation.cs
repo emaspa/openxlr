@@ -69,6 +69,15 @@ public static class CommandValidation
                 if (cmd.Channels.Concat(cmd.Mixes).Any(id => id is null || id.Length is 0 or > 36))
                     return "setLayoutOrder: invalid ID";
                 return null; // The mixer validates exact membership under its state lock.
+            case "setExclusiveGroup":
+                if (cmd.Group is not null && !ExclusiveGroupsModel.ValidId(cmd.Group)) return "setExclusiveGroup: invalid group id";
+                if (ExclusiveGroupsModel.Validate(new(cmd.Group ?? "new", cmd.Name!, cmd.Channels!)) is { } bad)
+                    return $"setExclusiveGroup: {bad}";
+                return cmd.Channels!.FirstOrDefault(ch => !layout.HasChannel(ch)) is { } unknown
+                    ? $"setExclusiveGroup: unknown channel '{unknown}'" : null;
+            case "deleteExclusiveGroup":
+            case "cycleExclusiveGroup":
+                return ExclusiveGroupsModel.ValidId(cmd.Group) ? null : $"{cmd.Cmd}: need a valid 'group'";
             case "setLevel":
             case "setChannelMuted":
                 if (cmd.Channel is not null && !layout.HasChannel(cmd.Channel)) return $"{cmd.Cmd}: unknown channel '{Short(cmd.Channel)}'";

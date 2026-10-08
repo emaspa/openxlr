@@ -20,6 +20,11 @@ public partial class MixerSetupWindow : Window
 
     private MainViewModel? Vm => DataContext as MainViewModel;
 
+    private async void OnExclusiveGroups(object? sender, RoutedEventArgs e)
+    {
+        if (Vm is { } vm) await new ExclusiveGroupsWindow(vm).ShowDialog(this);
+    }
+
     private async void OnAddChannel(object? sender, RoutedEventArgs e)
     {
         string name = ChannelName.Text?.Trim() ?? "";

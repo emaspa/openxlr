@@ -353,6 +353,9 @@ public sealed class WebSocketHub
             case "renameMix":
             case "deleteMix":
             case "setLayoutOrder":
+            case "setExclusiveGroup":
+            case "deleteExclusiveGroup":
+            case "cycleExclusiveGroup":
             case "setLevel":
             case "setChannelMuted":
             case "setMixVolume":
