@@ -10,7 +10,7 @@ namespace OpenXLR.UI;
 
 /// <summary>
 /// The layout editor: add, rename, reorder and delete application channels
-/// and virtual microphones. Every action waits for the daemon's answer, which
+/// and user mixes. Every action waits for the daemon's answer, which
 /// arrives after the new layout is saved; the lists update from the state
 /// push that precedes it, so nothing here is optimistic.
 /// </summary>
@@ -65,7 +65,7 @@ public partial class MixerSetupWindow : Window
     {
         string name = MixName.Text?.Trim() ?? "";
         if (name.Length == 0 || Vm is not { } vm) return;
-        if (await Run(vm.CreateMix(name))) MixName.Text = "";
+        if (await Run(vm.CreateMix(name, NewMixKind.SelectedIndex == 1 ? "monitor" : "virtualMic"))) MixName.Text = "";
     }
 
     private void OnChannelNameKey(object? sender, KeyEventArgs e)
@@ -111,7 +111,7 @@ public partial class MixerSetupWindow : Window
     {
         if (Item<MixViewModel>(sender) is not { } mix || Vm is not { } vm) return;
         string? name = await PromptName($"Rename mix '{mix.Name}'", mix.Name,
-            "OpenXLR shows the new name at once. Other applications keep listing the old microphone name until the daemon restarts, so nothing that is recording from it is interrupted.");
+            "OpenXLR shows the new name at once. Other applications keep listing the old device name until the daemon restarts, so clients using it are not interrupted.");
         if (name is not null && name != mix.Name) await Run(vm.RenameMix(mix.Id, name));
     }
 
@@ -128,7 +128,9 @@ public partial class MixerSetupWindow : Window
     {
         if (Item<MixViewModel>(sender) is not { } mix || Vm is not { } vm) return;
         if (await Confirm($"Delete mix '{mix.Name}'?",
-                "Its virtual microphone disappears; anything recording from it loses the device. Its sends and inserts go with it."))
+                mix.IsMonitor
+                    ? "Its sends and inserts are removed. Outputs following only this mix return to Monitor A; summed feeds keep their other mixes. If this mix is the enforced system default, that setting is cleared."
+                    : "Its virtual microphone disappears; anything recording from it loses the device. Its sends and inserts go with it."))
             await Run(vm.DeleteMix(mix.Id));
     }
 

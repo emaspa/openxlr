@@ -20,8 +20,9 @@ internal static class SavedMixerValidation
 {
     /// <summary>
     /// The settings with malformed entries removed: null list entries, null
-    /// dictionary values, non-finite levels, and apps or inserts missing a
-    /// required field. <paramref name="dropped"/> names each removal.
+    /// dictionary values, non-finite levels, user mixes of an unknown kind,
+    /// and apps or inserts missing a required field.
+    /// <paramref name="dropped"/> names each removal.
     /// </summary>
     internal static MixerSettings Sanitize(MixerSettings settings, out IReadOnlyList<string> dropped)
     {
@@ -30,7 +31,7 @@ internal static class SavedMixerValidation
         return settings with
         {
             UserChannels = settings.UserChannels is null ? null : Entries(settings.UserChannels, "userChannels", notes),
-            UserMixes = settings.UserMixes is null ? null : Entries(settings.UserMixes, "userMixes", notes),
+            UserMixes = settings.UserMixes is null ? null : UserMixes(settings.UserMixes, notes),
             MixVolumes = Levels(settings.MixVolumes, "mixVolumes", notes),
             MixMuted = Entries(settings.MixMuted, "mixMuted", notes),
             Levels = Levels(settings.Levels, "levels", notes),
@@ -66,6 +67,15 @@ internal static class SavedMixerValidation
         if (entries is null) { notes.Add($"{field}: {NullEntry}"); return []; }
         var kept = entries.Where(entry => entry is not null).ToList();
         if (kept.Count != entries.Count) notes.Add($"{field}: {NullEntry}");
+        return kept;
+    }
+
+    private static List<UserMixDefinition> UserMixes(List<UserMixDefinition> entries, List<string> notes)
+    {
+        var kept = Entries(entries, "userMixes", notes);
+        int count = kept.Count;
+        kept.RemoveAll(mix => !mix.HasUserKind);
+        if (kept.Count != count) notes.Add("userMixes: unknown kind");
         return kept;
     }
 

@@ -48,6 +48,7 @@ public sealed class WindowLayoutTests
                 Dispatcher.UIThread.RunJobs();
                 ProfileSliderWindowTests.Check();
                 EditorRulesReconnectWindowTests.Check();
+                UserMonitorWindowTests.Check();
                 var vm = new MainViewModel(new DaemonClient());
                 main.DataContext = vm;
                 typeof(MainViewModel).GetMethod("ApplyMixer", BindingFlags.Instance | BindingFlags.NonPublic)!

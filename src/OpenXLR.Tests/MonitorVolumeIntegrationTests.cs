@@ -41,6 +41,56 @@ public sealed partial class MonitorVolumeIntegrationTests
     }
 
     [MonitorPipeWireFact]
+    public void UserMonitorLifecycleKeepsOnlyOneSinkAndRollsBackFailedSaves()
+    {
+        var pw = new PipeWireAdapter();
+        using var registry = pw.WatchGraph();
+        using var mixer = new Mixer(pw);
+        mixer.Build(MonitorConfig());
+        pw.CreateNullSink("test_user_monitor_output", "Output");
+        mixer.SetMonitorOutputs(["test_user_monitor_output"]);
+        Assert.Throws<IOException>(() => mixer.CreateMix("Rejected", _ => "disk full", MixKind.Monitor));
+        Assert.False(mixer.HasMix("rejected"));
+        Assert.True(SpinWait.SpinUntil(() => !pw.OwnSinkLevels().Any(n => n.Name.Contains("rejected", StringComparison.Ordinal)), TimeSpan.FromSeconds(3)));
+        MixerSettings? saved = null;
+        mixer.CreateMix("Headphones", s => { saved = s; return null; }, MixKind.Monitor);
+        Assert.Equal("monitor", saved!.UserMixes!.Single(m => m.Id == "headphones").Kind);
+        var added = mixer.Snapshot().Mixes.Single(m => m.Id == "headphones");
+        Assert.True(added.Editable);
+        Assert.False(mixer.Snapshot().Mixes.Single(m => m.Id == "monitor").Editable);
+        Assert.All(mixer.Snapshot().Channels, c => Assert.Contains("headphones", c.MutedIn));
+        Assert.True(SpinWait.SpinUntil(() => pw.OwnSinkLevels().Any(n => n.Name == "OpenXLR_mix_headphones"), TimeSpan.FromSeconds(3)));
+        Assert.Single(pw.OwnSinkLevels(), n => n.Name.Contains("headphones", StringComparison.Ordinal));
+        Assert.DoesNotContain(pw.ListDevices(), d => d.Kind == AudioNodeKind.Source && d.Name == "OpenXLR_headphones");
+        mixer.SetMixVolume("headphones", 1.5);
+        Assert.Equal(1.5, pw.GetSinkVolume("OpenXLR_mix_headphones"));
+        pw.SetSinkVolume("OpenXLR_mix_headphones", .4);
+        mixer.SyncMonitorVolumes();
+        Assert.Equal(.4, mixer.Snapshot().Mixes.Single(m => m.Id == "headphones").Volume);
+        Assert.Null(mixer.SetMonitorFeed("test_user_monitor_output", "headphones+monitor"));
+        Assert.Throws<IOException>(() => mixer.RenameMix("headphones", "Rejected", _ => "disk full"));
+        Assert.Equal("Headphones", mixer.Snapshot().Mixes.Single(m => m.Id == "headphones").Name);
+        mixer.RenameMix("headphones", "Phones", _ => null);
+        mixer.SetEnforcedDefaults("OpenXLR_mix_headphones", null);
+        Assert.Throws<IOException>(() => mixer.DeleteMix("headphones", _ => "disk full"));
+        Assert.True(mixer.HasMix("headphones"));
+        Assert.Equal("OpenXLR_mix_headphones", mixer.EnforcedDefaults.Sink);
+        Assert.Equal("monitor+headphones", mixer.MonitorFeedOf("test_user_monitor_output"));
+        saved = mixer.ExportSettings();
+        mixer.Build(MixerConfig.FromSettings(saved));
+        mixer.ApplySettings(saved);
+        Assert.Equal("monitor", mixer.Snapshot().Mixes.Single(m => m.Id == "headphones").Kind);
+        Assert.Equal(.4, pw.GetSinkVolume("OpenXLR_mix_headphones"));
+        Assert.DoesNotContain(pw.ListDevices(), d => d.Kind == AudioNodeKind.Source && d.Name == "OpenXLR_headphones");
+        mixer.DeleteMix("headphones", _ => null);
+        Assert.False(mixer.HasMix("headphones"));
+        Assert.Null(mixer.EnforcedDefaults.Sink);
+        Assert.Null(mixer.ExportSettings().EnforcedDefaultSink);
+        Assert.Equal("monitor", mixer.MonitorFeedOf("test_user_monitor_output"));
+        Assert.DoesNotContain(mixer.ExportSettings().UserMixes!, m => m.Id == "headphones");
+    }
+
+    [MonitorPipeWireFact]
     public void AnyMixFeedsSurviveRecallAndDeletionCannotLeaveAStaleRoute()
     {
         var pw = new PipeWireAdapter();
@@ -58,21 +108,21 @@ public sealed partial class MonitorVolumeIntegrationTests
             mixer.ApplyScene(scene);
             Assert.Equal("monitor+chat", mixer.MonitorFeedOf("test_feeds_output"));
 
-            Assert.Throws<IOException>(() => mixer.DeleteVirtualMix("chat", _ => "disk full"));
+            Assert.Throws<IOException>(() => mixer.DeleteMix("chat", _ => "disk full"));
             Assert.True(mixer.HasMix("chat"));
             Assert.Equal("monitor+chat", mixer.MonitorFeedOf("test_feeds_output"));
             AssertIncoming("OpenXLR_mix_monitor", "OpenXLR_mix_chat");
 
             MixerSettings? saved = null;
-            mixer.DeleteVirtualMix("chat", settings => { saved = settings; return null; });
+            mixer.DeleteMix("chat", settings => { saved = settings; return null; });
             Assert.False(mixer.HasMix("chat"));
             Assert.DoesNotContain(saved!.MonitorFeeds.Values, feed => MonitorFeed.Includes(feed, "chat"));
             Assert.Equal("monitor", mixer.MonitorFeedOf("test_feeds_output"));
             AssertIncoming("OpenXLR_mix_monitor");
-            mixer.CreateVirtualMix("Podcast", _ => null);
+            mixer.CreateMix("Podcast", _ => null);
             Assert.Null(mixer.SetMonitorFeed("test_feeds_output", "podcast"));
             AssertIncoming("OpenXLR_mix_podcast");
-            mixer.DeleteVirtualMix("podcast", _ => null);
+            mixer.DeleteMix("podcast", _ => null);
             Assert.False(mixer.ExportSettings().MonitorFeeds.ContainsKey("test_feeds_output"));
             AssertIncoming("OpenXLR_mix_monitor");
 
@@ -447,6 +497,16 @@ public sealed partial class MonitorVolumeIntegrationTests
                 (feed.Split('+').Contains("auxout") ? 0.1 * Math.Pow(0.3, 3) : 0);
             Capture(expected, direct);
         }
+
+        mixer.CreateMix("Headphones", _ => null, MixKind.Monitor);
+        Assert.Null(mixer.SetMonitorFeed("test_master_output", "headphones"));
+        Capture(0, false); // the new send starts muted even while an app is playing
+        mixer.SetLevel("test", "headphones", .6);
+        mixer.SetChannelMuted("test", "headphones", false);
+        mixer.SetMixVolume("headphones", 1.5);
+        Capture(.1 * Math.Pow(.6 * 1.5, 3), false);
+        mixer.SetMixMuted("headphones", true);
+        Capture(0, false);
 
         mixer.SetMixVolume("monitor", 1);
         mixer.SetMixMuted("monitor", false);

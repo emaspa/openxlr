@@ -53,6 +53,25 @@ public sealed class SavedMixerValidationTests
         });
     }
 
+    [Fact]
+    public void SettingsDropUserMixesOfAnUnknownKind()
+    {
+        InConfig(root =>
+        {
+            string path = Path.Combine(root, "mixer.json");
+            File.WriteAllText(path, """
+                {"userMixes":[{"id":"phones","name":"Phones","kind":"monitor"},
+                  {"id":"old","name":"Old"},
+                  {"id":"port","name":"Port","kind":"auxPort"},
+                  {"id":"none","name":"None","kind":null}]}
+                """);
+            MixerSettings loaded = Assert.IsType<MixerSettings>(MixerSettings.Load(path, out string? warning));
+            Assert.Contains("userMixes: unknown kind", warning);
+            Assert.Equal(["phones", "old"], loaded.UserMixes!.Select(m => m.Id));
+            Assert.Equal(["monitor", "virtualMic"], loaded.UserMixes!.Select(m => m.Kind));
+        });
+    }
+
     [Theory]
     [InlineData("{\"inserts\":null}", "inserts")]
     [InlineData("{\"monitorOutputs\":null}", "monitorOutputs")]
