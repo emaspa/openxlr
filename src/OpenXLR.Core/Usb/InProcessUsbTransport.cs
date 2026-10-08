@@ -13,7 +13,12 @@ public sealed class InProcessUsbTransport : IUsbTransport
 
     public bool IsOpen => _handle != IntPtr.Zero;
 
-    public bool Open(ushort vendorId, ushort productId)
+    private readonly UsbLocation? _location;
+    public InProcessUsbTransport(UsbLocation? location = null) => _location = location;
+    public bool Open(ushort vendorId, ushort productId) => OpenAt(vendorId, productId, _location);
+    public bool Open(ushort vendorId, ushort productId, byte bus, byte address)
+        => OpenAt(vendorId, productId, new UsbLocation(bus, address, "", null));
+    private bool OpenAt(ushort vendorId, ushort productId, UsbLocation? location)
     {
         if (_ctx == IntPtr.Zero)
         {
@@ -21,7 +26,8 @@ public sealed class InProcessUsbTransport : IUsbTransport
             if (rc != 0) throw new InvalidOperationException($"libusb_init failed: {LibUsb.StrError(rc)}");
         }
         Close();
-        _handle = LibUsb.libusb_open_device_with_vid_pid(_ctx, vendorId, productId);
+        _handle = location is null ? LibUsb.libusb_open_device_with_vid_pid(_ctx, vendorId, productId)
+            : LibUsb.OpenAt(_ctx, vendorId, productId, location.Bus, location.Address);
         if (_handle == IntPtr.Zero) return false;
         int claim = LibUsb.libusb_claim_interface(_handle, LibUsb.VendorInterface);
         if (claim != 0)

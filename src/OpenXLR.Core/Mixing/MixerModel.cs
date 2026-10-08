@@ -127,6 +127,8 @@ public sealed record ChannelDefinition(string Id, string Name)
     /// <summary>Explicit capture node name for a user input, independent of the active Wave interface.</summary>
     public string? CaptureSource { get; init; }
     public int CapturePair { get; init; }
+    /// <summary>One zero-based port of the source, fed to both sides of the channel; null takes the pair.</summary>
+    public int? CaptureMonoChannel { get; init; }
     public bool IsApplication => InputPair is null && CaptureSource is null;
 
     /// <summary>PipeWire node name of the channel sink.</summary>
@@ -221,7 +223,11 @@ public sealed partial record ChannelStatus(string Id, string Name,
     IReadOnlyDictionary<string, double> Levels,
     IReadOnlyList<string> MutedIn,
     bool Hardware = false, string? CaptureSource = null, int CapturePair = 0, bool CaptureConnected = false,
-    bool Present = true, string? ExclusiveGroup = null);
+    bool Present = true, string? ExclusiveGroup = null)
+{
+    /// <summary>The single source port a capture channel takes, or null when it takes a pair.</summary>
+    public int? CaptureMonoChannel { get; init; }
+}
 
 
 /// <summary>

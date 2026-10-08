@@ -55,8 +55,9 @@ public sealed record Command
 
     /// <summary>
     /// "setMonitorOutput": PipeWire node.name (null disconnects);
-    /// "setMonitorFeed": the selected output whose feed changes (with "mix"); or
-    /// "setActiveDevice": the interface's vvvv:pppp id.
+    /// "setMonitorFeed": the selected output whose feed changes (with "mix");
+    /// "setActiveDevice": the interface's instance id or vvvv:pppp model id; or
+    /// "setWaveInterfaceEnabled" / "setWaveControl": an instance id from waveInterfaces.
     /// </summary>
     [JsonPropertyName("device")] public string? Device { get; init; }
 
@@ -74,6 +75,8 @@ public sealed record Command
     [JsonPropertyName("source")] public string? Source { get; init; }
     /// <summary>Zero-based stereo pair for createCaptureChannel, default 0.</summary>
     [JsonPropertyName("capturePair")] public int CapturePair { get; init; }
+    /// <summary>Optional zero-based mono port for createCaptureChannel, fed to both sides; requires pair 0.</summary>
+    [JsonPropertyName("captureMonoChannel")] public int? CaptureMonoChannel { get; init; }
 
     /// <summary>"saveProfile" / "loadProfile" / "deleteProfile": the profile name;
     /// "setRecallOnConnect": the profile to recall on connect, empty to clear.</summary>
@@ -200,6 +203,8 @@ public sealed record StateMessage
     [JsonPropertyName("warning")] public string? Warning { get; init; }
     [JsonPropertyName("connected")] public bool Connected { get; init; }
     [JsonPropertyName("device")] public DeviceDescriptor? Device { get; init; }
+    /// <summary>Every attached unit and every remembered additional one, with its role and state.</summary>
+    [JsonPropertyName("waveInterfaces")] public IReadOnlyList<WaveInterfaceState>? WaveInterfaces { get; init; }
     [JsonPropertyName("capabilities")] public DeviceCapabilities? Capabilities { get; init; }
     [JsonPropertyName("state")] public DeviceState? State { get; init; }
     /// <summary>Submixer state; null until the mixer graph is built.</summary>

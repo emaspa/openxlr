@@ -44,6 +44,8 @@ public sealed record MixerScene
 public sealed record Profile
 {
     public DeviceState? Device { get; init; }
+    /// <summary>Hardware states of additional interfaces by instance id; recall never enables a unit.</summary>
+    public Dictionary<string, DeviceState>? AdditionalDevices { get; init; }
     public MixerScene? Mixer { get; init; }
 }
 
@@ -136,6 +138,12 @@ public static class ProfileStore
             Profile? profile = JsonSerializer.Deserialize<Profile>(File.ReadAllText(path), Json);
             if (profile?.Mixer is { } scene) SavedMixerValidation.Validate(scene);
             if (profile?.Device is { } device) DeviceStateStore.Validate(device);
+            if (profile?.AdditionalDevices is { } additional)
+            {
+                if (additional.Count > 4 || additional.Any(pair => !UsbLocation.IsInstanceId(pair.Key) || pair.Value is null))
+                    throw new JsonException("Invalid additional device snapshots.");
+                foreach (DeviceState state in additional.Values) DeviceStateStore.Validate(state);
+            }
             return profile;
         }
         catch (FileNotFoundException) { return null; }

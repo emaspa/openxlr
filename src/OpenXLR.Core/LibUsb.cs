@@ -30,6 +30,40 @@ internal static class LibUsb
     internal static extern IntPtr libusb_open_device_with_vid_pid(
         IntPtr ctx, ushort vendorId, ushort productId);
 
+    [DllImport(Lib)] private static extern nint libusb_get_device_list(IntPtr ctx, out IntPtr list);
+    [DllImport(Lib)] private static extern void libusb_free_device_list(IntPtr list, int unref);
+    [DllImport(Lib)] private static extern byte libusb_get_bus_number(IntPtr device);
+    [DllImport(Lib)] private static extern byte libusb_get_device_address(IntPtr device);
+    [DllImport(Lib)] private static extern int libusb_get_device_descriptor(IntPtr device, out Descriptor descriptor);
+    [DllImport(Lib)] private static extern int libusb_open(IntPtr device, out IntPtr handle);
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Descriptor
+    {
+        public byte Length, Type;
+        public ushort UsbVersion;
+        public byte Class, Subclass, Protocol, PacketSize;
+        public ushort Vendor, Product, DeviceVersion;
+        public byte Manufacturer, ProductName, Serial, Configurations;
+    }
+    internal static IntPtr OpenAt(IntPtr ctx, ushort vendor, ushort product, byte bus, byte address)
+    {
+        nint count = libusb_get_device_list(ctx, out IntPtr list);
+        if (count < 0) return IntPtr.Zero;
+        try
+        {
+            for (nint i = 0; i < count; i++)
+            {
+                IntPtr device = Marshal.ReadIntPtr(list, checked((int)i * IntPtr.Size));
+                if (libusb_get_bus_number(device) != bus || libusb_get_device_address(device) != address) continue;
+                if (libusb_get_device_descriptor(device, out Descriptor descriptor) != 0
+                    || descriptor.Vendor != vendor || descriptor.Product != product) return IntPtr.Zero;
+                return libusb_open(device, out IntPtr handle) == 0 ? handle : IntPtr.Zero;
+            }
+            return IntPtr.Zero;
+        }
+        finally { libusb_free_device_list(list, 1); }
+    }
+
     [DllImport(Lib)] internal static extern void libusb_close(IntPtr devHandle);
 
     [DllImport(Lib)] internal static extern int libusb_claim_interface(IntPtr devHandle, int interfaceNumber);

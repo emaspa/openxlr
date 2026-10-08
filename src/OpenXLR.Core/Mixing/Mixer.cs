@@ -211,14 +211,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             .Where(d => d.Kind == AudioNodeKind.Source && !d.IsOwn)
             .OrderBy(d => d.Name.Contains(".HiFi__", StringComparison.Ordinal) ? 1 : 0)
             .ToList();
-        // Prefer the interface the daemon actively drives (the hint), so a
-        // device switch moves the channel feeds with it; fall back to any
-        // Wave XLR so the mixer still works when no device is connected.
         string? previousInput = _inputDevice;
-        string? nextInput = (_inputHint is null ? null : sources.FirstOrDefault(
-                d => d.Name.Contains(_inputHint, StringComparison.OrdinalIgnoreCase))?.Name)
-            ?? sources.FirstOrDefault(
-                d => d.Name.Contains("Wave_XLR", StringComparison.OrdinalIgnoreCase))?.Name;
+        string? nextInput = ResolveInputLocked(sources);
         // The sample belongs to the microphone it was recorded from.
         if (_soundCheck is not null && _soundCheckDevice != nextInput)
             StopSoundCheckLocked(restore: false, error: "Sound Check stopped because the input device changed.");
@@ -493,8 +487,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         if (aux is null) return;
         // The raw sink is hidden from pickers, so derive it from any Pro
         // pseudo-output's bare name.
-        string? proSink = _pw.ListDevices(
-                exposeHardwareMonitorOutputs: true, hardwareSinkHint: _inputHint)
+        string? proSink = _pw.ListDevices(true, _inputHints)
             .Where(d => d.Kind == AudioNodeKind.Sink &&
                         d.Name.Contains("Wave_XLR", StringComparison.OrdinalIgnoreCase))
             .Select(d => { int m = d.Name.IndexOf('#'); return m < 0 ? d.Name : d.Name[..m]; })
@@ -565,7 +558,46 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         }
     }
 
-    private string? _inputHint;
+    private IReadOnlyList<string> _inputHints = [];   // the driven interface's name fragments, most specific first
+    private bool _inputModelFallback = true;          // at most one interface attached: any Wave XLR source may feed the channels
+    private string? _inputWarning;
+    private string? _inputFallbackNoted;              // the source last reported as found by a later fragment
+
+    /// <summary>Why the hardware input channels are silent although a source is present, or null.</summary>
+    public string? InputWarning { get { lock (_gate) return _inputWarning; } }
+
+    /// <summary>Receives a line when the input source was found by a later fragment rather than the unit's serial.</summary>
+    public Action<string>? InputNote { get; set; }
+
+    /// <summary>
+    /// The capture node that feeds the hardware input channels, or null.
+    /// The driven interface is preferred, so a device switch moves the feeds
+    /// with it: its serial fragment first, then its model fragment, for a
+    /// model whose serial udev spells differently. While at most one
+    /// supported interface is attached, any Wave XLR source comes last, so a
+    /// fresh install without the udev rule, a failed claim or a unit set
+    /// aside after hangs keeps the microphone working. With more than one
+    /// attached, only the driven unit's own source feeds the channels, and a
+    /// fragment that names the nodes of two cards feeds nothing: it would be
+    /// a guess between two microphones.
+    /// </summary>
+    private string? ResolveInputLocked(IReadOnlyList<AudioNode> sources)
+    {
+        IReadOnlyList<string> fragments = _inputModelFallback ? [.. _inputHints, "Wave_XLR"] : _inputHints;
+        List<AudioNode> picked = InterfaceNodes.Pick(sources, fragments, out string? matched, out bool ambiguous);
+        _inputWarning = ambiguous
+            ? "More than one capture source matches the active interface, so the XLR channels stay silent. Pick the interface in the header, or add its source as a capture channel."
+            : _inputHints.Count == 0 && !_inputModelFallback
+                ? "More than one interface is attached and none is driven, so the XLR channels stay silent. Pick one in the header."
+                : null;
+        if (picked.Count == 0) return null;
+        string source = picked[0].Name;
+        bool byModel = _inputHints.Count > 0 && matched != _inputHints[0];
+        if (byModel && _inputFallbackNoted != source)
+            InputNote?.Invoke($"no capture source carries {_inputHints[0]}; using {source}, found by {matched}");
+        _inputFallbackNoted = byModel ? source : null;
+        return source;
+    }
     private bool _hardwareOutputRouting;
     private int _lowCutHz;                 // 0 = off; software low cut on the first XLR channel
     // Filter-chains by insert key. Input keys ("xlr1", "xlr2") hold a mono
@@ -1067,14 +1099,26 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// <summary>
     /// Name fragment of the interface whose capture should feed the input
     /// channels (the daemon's active device). A change re-wires the feeds.
+    /// Any Wave XLR source feeds them when the hint finds nothing.
     /// </summary>
     public void SetInputDeviceHint(string? hint, bool hardwareOutputRouting = false)
+        => SetInputDeviceHint(hint is null ? [] : [hint], hardwareOutputRouting, modelFallback: true);
+
+    /// <summary>
+    /// The driven interface's name fragments, most specific first, or none
+    /// when no interface is driven. <paramref name="modelFallback"/> says
+    /// whether any Wave XLR source may feed the channels when the fragments
+    /// find nothing: true while at most one supported interface is attached.
+    /// </summary>
+    public void SetInputDeviceHint(IReadOnlyList<string> hints, bool hardwareOutputRouting, bool modelFallback)
     {
         lock (_gate)
         {
-            if (_inputHint == hint && _hardwareOutputRouting == hardwareOutputRouting) return;
+            if (_inputHints.SequenceEqual(hints, StringComparer.Ordinal) && _inputModelFallback == modelFallback
+                && _hardwareOutputRouting == hardwareOutputRouting) return;
             bool routingChanged = _hardwareOutputRouting != hardwareOutputRouting;
-            _inputHint = hint;
+            _inputHints = [.. hints];
+            _inputModelFallback = modelFallback;
             _hardwareOutputRouting = hardwareOutputRouting;
             if (_built)
             {
@@ -1108,7 +1152,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
 
     /// <summary>Every sink and source the user can pick, real or virtual.</summary>
     public IReadOnlyList<AudioNode> ListDevices()
-        => _pw.ListDevices(_hardwareOutputRouting, _inputHint);
+        => _pw.ListDevices(_hardwareOutputRouting, _inputHints);
 
     /// <summary>Close and reopen an output device's stream (see adapter).</summary>
     public void BounceOutput(string sinkName) => _pw.BounceSink(sinkName);
@@ -1122,7 +1166,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             {
                 ExclusiveGroups = ExclusiveGroupsModel.Copy(_config.ExclusiveGroups),
                 UserChannels = [.. _config.Channels.Where(c => c.InputPair is null)
-                    .Select(c => new UserChannelDefinition(c.Id, c.Name, c.CaptureSource, c.CapturePair))],
+                    .Select(c => new UserChannelDefinition(c.Id, c.Name, c.CaptureSource, c.CapturePair, c.CaptureMonoChannel))],
                 UserMixes = [.. _config.Mixes.Where(m => m.IsEditable)
                     .Select(m => new UserMixDefinition(m.Id, m.Name) { Kind = KindName(m.Kind) })],
                 MixVolumes = new Dictionary<string, double>(_mixVolume),
@@ -2218,7 +2262,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                     _config.Mixes.ToDictionary(m => m.Id, m => _levels.GetValueOrDefault(Cell(c.Id, m.Id), 0.0)),
                     [.. _config.Mixes.Where(m => _muted.Contains(Cell(c.Id, m.Id))).Select(m => m.Id)],
                     c.InputPair is not null, c.CaptureSource, c.CapturePair, _captureFeeds.ContainsKey(c.Id),
-                    ChannelPresentLocked(c), GroupForChannelLocked(c.Id)?.Id))],
+                    ChannelPresentLocked(c), GroupForChannelLocked(c.Id)?.Id) { CaptureMonoChannel = c.CaptureMonoChannel })],
                 RenamedSinceStart = _renamedSinceBuild,
                 MonitorOutput = _monitorOutputs.FirstOrDefault(),
                 MonitorOutputs = [.. _monitorOutputs],
@@ -2391,6 +2435,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         RemoveInputChainsLocked();
         RemoveMixChainsLocked();
         _inputDevice = null;
+        _inputWarning = null;
         _pw.TearDown();     // unloads modules in reverse order: combines, then mixes
         _combineModules.Clear();
         _mixModules.Clear();

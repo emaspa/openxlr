@@ -52,6 +52,21 @@ write it for the dock. The dock has no onboard voice-processing DSP;
 Wave Link runs those effects host-side, and on Linux the submixer
 provides them (below).
 
+### More than one interface
+
+Every attached unit has an instance id from its USB serial, or its USB port
+when it has no serial, and is opened at its exact USB address, so two units
+of one model are two devices. The header picker chooses the primary, whose
+microphone feeds the hardware strips. Up to four more units can be driven as
+additional interfaces, each with its own device manager, controls and
+remembered settings, and each feeding a capture channel from one port of its
+source. The daemon finds the capture node, the Pro's card profile and its
+outputs by the unit's serial, then by its model while no other attached unit
+shares the name. With one interface attached, any Wave XLR source still feeds
+the strips, driven or not. A name that matches two cards is used for neither.
+Each XLR Dock drives the ALSA card at its own USB address. Nobody has run two
+units together yet; see [Multiple Wave interfaces](wave-interfaces.md).
+
 ## Software controls
 
 When the backend has no mapped hardware control, OpenXLR provides:
@@ -162,7 +177,8 @@ devices; the hardware input channels are hidden from it.
 
 Additional microphones, headsets, capture cards and other attached Wave
 interfaces feed their own channels from their PipeWire sources. Pick the
-source and a stereo pair in the layout editor; the channel then has the
+source and a stereo pair in the layout editor, or one port of it through the
+API and the additional interfaces window; the channel then has the
 same sends, mutes, meters and profile entries as any other. The binding
 names the source node, never a registry id, so it survives a replug. While
 the source or the pair is absent the channel stays silent and no other

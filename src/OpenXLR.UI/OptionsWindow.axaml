@@ -133,6 +133,8 @@
         <TextBlock Text="{Binding Main.ResetDescription}" IsVisible="{Binding Main.ShowResetDefaults}"
                    FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
         <Button Content="{loc:Text Key=ResetDeviceToDefaults}" Padding="14,5" HorizontalAlignment="Left" Click="OnResetDevice" IsVisible="{Binding Main.ShowResetDefaults}"/>
+        <Button Name="AdditionalInterfaces" Content="{loc:Text Key=AdditionalInterfaces}" Padding="14,5" HorizontalAlignment="Left" Click="OnWaveInterfaces"
+                IsVisible="{Binding Main.ShowWaveInterfaces}"/>
       </StackPanel>
     </Border>
 

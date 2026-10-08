@@ -145,8 +145,8 @@ public sealed partial record MixerConfig
         var mixEntries = userMixes.Select(m => ((string?)m.Id, (string?)m.Name));
         var userChannels = (settings?.UserChannels ?? defaults.Channels.Where(c => c.IsApplication)
             .Select(c => new UserChannelDefinition(c.Id, c.Name)).ToList())
-            .Where(c => c is not null && (c.CaptureSource is null ? c.CapturePair == 0
-                : CaptureBinding.IsValid(c.CaptureSource, c.CapturePair))).ToList();
+            .Where(c => c is not null && (c.CaptureSource is null ? c.CapturePair == 0 && c.CaptureMonoChannel is null
+                : CaptureBinding.IsValid(c.CaptureSource, c.CapturePair, c.CaptureMonoChannel))).ToList();
         var channelEntries = userChannels.Select(c => ((string?)c.Id, (string?)c.Name));
 
         var mixes = structuralMixes.Where(m => m.Kind == MixKind.Monitor).ToList();
@@ -174,7 +174,7 @@ public sealed partial record MixerConfig
         {
             UserChannelDefinition? saved = SavedChannel(c);
             return Normalize(saved?.CaptureSource is { } source
-                ? new ChannelDefinition(c.Id, c.Name) { CaptureSource = source, CapturePair = saved.CapturePair,
+                ? new ChannelDefinition(c.Id, c.Name) { CaptureSource = source, CapturePair = saved.CapturePair, CaptureMonoChannel = saved.CaptureMonoChannel,
                     MutedIn = mixes.Select(m => m.Id).ToHashSet() }
                 : (defaults.Channels.FirstOrDefault(d => d.Id == c.Id) ?? new ChannelDefinition(c.Id, c.Name))
                     with { Name = c.Name });

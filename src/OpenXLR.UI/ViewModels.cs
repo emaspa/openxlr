@@ -56,6 +56,7 @@ public sealed partial class MainViewModel : ViewModelBase
             if (!up)
             {
                 DeviceConnected = false; Status = Localizer.Text("StatusDaemonNotRunning");
+                ResetWaveInterfaces();
                 Inserts.ResetForNewConnection(); Inserts2.ResetForNewConnection();
                 Inserts.SoundCheck.Reset(); Inserts2.SoundCheck.Reset();
                 foreach (MixViewModel mv in Mixes) mv.Inserts.ResetForNewConnection();
@@ -177,7 +178,7 @@ public sealed partial class MainViewModel : ViewModelBase
     // (an XLR Dock taking a control through its config block), or empty.
     private string _deviceNote = "";
     public string DeviceNote { get => _deviceNote; private set { if (Set(ref _deviceNote, value)) Raise(nameof(ShowInterfaceCard)); } }
-    public bool ShowInterfaceCard => ShowResetDefaults || DeviceNote.Length > 0;
+    public bool ShowInterfaceCard => ShowResetDefaults || DeviceNote.Length > 0 || ShowWaveInterfaces;
 
     // The daemon-side gain lock cannot stop a physical dial, so it only
     // shows for devices without one.
@@ -771,6 +772,7 @@ public sealed partial class MainViewModel : ViewModelBase
             ApplyProfiles(node["profiles"]);
             ApplyRecallOnConnect(node["recallOnConnect"]);
             ApplyDevices(node["devices"], node["mixer"]);
+            ApplyWaveInterfaces(node["waveInterfaces"]);
             ApplyMixer(node["mixer"]);
             ApplyStreams(node["mixer"]);
             ShowSoftLowCut = DeviceConnected && !CapLowCut && HasMixer;
@@ -1550,9 +1552,11 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
         Present = n["present"]?.GetValue<bool>() ?? true;
         CaptureSource = n["captureSource"]?.GetValue<string>();
         CaptureConnected = n["captureConnected"]?.GetValue<bool>() ?? false;
-        CaptureLabel = CaptureSource is null ? "" : CaptureConnected
-            ? Localizer.Format("CaptureConnectedPair", (n["capturePair"]?.GetValue<int>() ?? 0) + 1)
-            : Localizer.Format("CaptureOfflinePair", (n["capturePair"]?.GetValue<int>() ?? 0) + 1);
+        int capturePair = (n["capturePair"]?.GetValue<int>() ?? 0) + 1;
+        CaptureLabel = CaptureSource is null ? ""
+            : n["captureMonoChannel"]?.GetValue<int>() is int port
+                ? CaptureConnected ? Localizer.Format("CaptureConnectedPort", port + 1) : Localizer.Format("CaptureOfflinePort", port + 1)
+                : CaptureConnected ? Localizer.Format("CaptureConnectedPair", capturePair) : Localizer.Format("CaptureOfflinePair", capturePair);
         var muted = new HashSet<string>();
         if (n["mutedIn"] is JsonArray arr)
             foreach (JsonNode? m in arr) if (m is not null) muted.Add(m.GetValue<string>());

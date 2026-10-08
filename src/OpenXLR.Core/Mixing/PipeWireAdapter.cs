@@ -1199,8 +1199,9 @@ public sealed class PipeWireAdapter
     /// are the standard PipeWire answer for this exact routing.
     /// </summary>
     public PortLink LinkNodes(string fromNode, string fromPortPrefix, string toNode, string toPortPrefix,
-        int toPairOffset = 0, int fromPairOffset = 0)
+        int toPairOffset = 0, int fromPairOffset = 0, int? fromChannel = null)
     {
+        if (fromChannel is < 0 or >= 64) throw new ArgumentOutOfRangeException(nameof(fromChannel));
         // Port names vary by device (FL/FR on most nodes, AUX0/AUX1 on
         // multichannel interfaces like the Wave XLR Pro), so discover the real
         // ports rather than assuming, then pair them in order. A mono source
@@ -1210,7 +1211,10 @@ public sealed class PipeWireAdapter
         // must not yield duplicate pairs, so identical names collapse first.
         List<string> outs = [.. ListPorts(fromNode, fromPortPrefix, output: true).Distinct()];
         List<string> ins = [.. ListPorts(toNode, toPortPrefix, output: false).Distinct()];
-        if (fromPairOffset > 0)
+        // One selected port of a multichannel source feeds both sides like a
+        // mono source; a source without that port feeds nothing.
+        if (fromChannel is { } selected) outs = [.. outs.Skip(selected).Take(1)];
+        else if (fromPairOffset > 0)
         {
             // A source without that pair feeds nothing. Falling back to the
             // first pair here used to duplicate a mono capture into every
@@ -1455,6 +1459,15 @@ public sealed class PipeWireAdapter
     /// </summary>
     public IReadOnlyList<AudioNode> ListDevices(
         bool exposeHardwareMonitorOutputs = false, string? hardwareSinkHint = null)
+        => ListDevices(exposeHardwareMonitorOutputs, hardwareSinkHint is null ? [] : [hardwareSinkHint]);
+
+    /// <summary>
+    /// The same, with the hardware outputs found by the first of
+    /// <paramref name="hardwareSinkHints"/> that names a sink. A hint that
+    /// names sinks of two cards exposes no hardware outputs: aliasing the
+    /// wrong unit's jacks would switch the other unit's selectors.
+    /// </summary>
+    public IReadOnlyList<AudioNode> ListDevices(bool exposeHardwareMonitorOutputs, IReadOnlyList<string> hardwareSinkHints)
     {
         var found = new List<AudioNode>();
         foreach (JsonElement o in GraphObjects())
@@ -1492,12 +1505,13 @@ public sealed class PipeWireAdapter
         // Each output is advertised as its own pseudo-sink; the daemon flips
         // the matching hardware selector when one is chosen as the monitor.
         // Headphones jack 1 is on the front of the unit, jack 2 on the back.
-        AudioNode? pro = exposeHardwareMonitorOutputs
-            ? found.FirstOrDefault(n =>
-                n.Kind == AudioNodeKind.Sink &&
-                (hardwareSinkHint is null ||
-                 n.Name.Contains(hardwareSinkHint, StringComparison.OrdinalIgnoreCase)))
-            : null;
+        AudioNode? pro = null;
+        if (exposeHardwareMonitorOutputs)
+        {
+            IEnumerable<AudioNode> sinks = found.Where(n => n.Kind == AudioNodeKind.Sink);
+            pro = hardwareSinkHints.Count == 0 ? sinks.FirstOrDefault()
+                : InterfaceNodes.Pick(sinks, hardwareSinkHints, out _, out _).FirstOrDefault();
+        }
         if (pro is not null)
         {
             found.Add(new AudioNode($"{pro.Name}#hp1", "Headphones 1 (front)",

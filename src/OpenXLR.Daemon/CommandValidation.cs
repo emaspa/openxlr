@@ -12,6 +12,18 @@ namespace OpenXLR.Daemon;
 /// </summary>
 public static class CommandValidation
 {
+    /// <summary>The additional-interface commands: an instance id, and a boolean or a finite number.</summary>
+    internal static string? CheckWave(Command cmd)
+    {
+        if (!WaveInterfaces.ValidId(cmd.Device)) return $"{cmd.Cmd}: need a Wave interface instance id from waveInterfaces";
+        if (cmd.Cmd == "setWaveInterfaceEnabled")
+            return cmd.Value.ValueKind is JsonValueKind.True or JsonValueKind.False ? null : "setWaveInterfaceEnabled: value must be a boolean";
+        if (cmd.Control is not { Length: > 0 and <= 64 } || cmd.Control.Any(char.IsControl)) return "setWaveControl: need 'control'";
+        return cmd.Value.ValueKind is JsonValueKind.True or JsonValueKind.False
+            || (cmd.Value.ValueKind == JsonValueKind.Number && cmd.Value.TryGetDouble(out double value) && double.IsFinite(value))
+            ? null : "setWaveControl: value must be a boolean or a finite number";
+    }
+
     public const int MaxText = 256;          // identities, labels, device names, symbols
     public const int MaxUri = 512;
     public const int MaxDevices = 16;
@@ -39,6 +51,9 @@ public static class CommandValidation
                 // the helper's state; anything else needs the helper.
                 return cmd.Action != "stop" && !(nativeHostInstalled ?? PluginCatalog.HostInstalled)
                     ? Mixer.SoundCheckNeedsHost : null;
+            case "setWaveInterfaceEnabled":
+            case "setWaveControl":
+                return CheckWave(cmd);
             case "getNativeEditorRules":
                 return null;
             case "setNativeEditorRule":
@@ -57,7 +72,8 @@ public static class CommandValidation
                 return CheckPluginPath(cmd);
             case "createCaptureChannel":
                 if (BadName(cmd.Name)) return "createCaptureChannel: name must contain 1 to 60 printable characters";
-                return CaptureBinding.IsValid(cmd.Source, cmd.CapturePair) ? null : "createCaptureChannel: need an external source and a pair from 0 to 31";
+                return CaptureBinding.IsValid(cmd.Source, cmd.CapturePair, cmd.CaptureMonoChannel) ? null
+                    : "createCaptureChannel: need an external source, a pair from 0 to 31, and with pair 0 an optional mono port from 0 to 63";
             case "createMix":
                 if (cmd.Kind is not (null or "virtualMic" or "monitor"))
                     return "createMix: kind must be virtualMic or monitor";

@@ -14,6 +14,9 @@ public interface IUsbTransport : IDisposable
     /// <summary>Open the device with these ids; false when absent or not permitted.</summary>
     bool Open(ushort vendorId, ushort productId);
 
+    /// <summary>Open an exact address; unsupported transports refuse rather than opening another unit.</summary>
+    bool Open(ushort vendorId, ushort productId, byte bus, byte address) { Close(); return false; }
+
     void Close();
 
     /// <summary>
@@ -35,8 +38,17 @@ public static class UsbTransport
     /// stuck thread and the device handle with it. OPENXLR_USB_INPROCESS=1
     /// keeps libusb in the daemon, for debugging.
     /// </summary>
+    private static readonly System.Threading.AsyncLocal<UsbLocation?> Target = new();
+    internal static T At<T>(UsbLocation location, Func<T> create)
+    {
+        UsbLocation? previous = Target.Value;
+        try { Target.Value = location; return create(); }
+        finally { Target.Value = previous; }
+    }
+    internal static OpenXLR.Core.Devices.DeviceInfo WithLocation(OpenXLR.Core.Devices.DeviceInfo info)
+        => info with { Location = Target.Value };
     public static IUsbTransport Create()
         => Environment.GetEnvironmentVariable("OPENXLR_USB_INPROCESS") is "1" or "true"
-            ? new InProcessUsbTransport()
-            : new HelperUsbTransport();
+            ? new InProcessUsbTransport(Target.Value)
+            : new HelperUsbTransport(Target.Value);
 }

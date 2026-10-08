@@ -67,7 +67,7 @@ public sealed class MixerService : IHostedService, IDisposable
         _lifetime = lifetime;
         EditorPolicy = editorPolicy ?? new NativeEditorPolicy();
         _pipeWire = new PipeWireAdapter(_progress.Mark, note => _log.LogInformation("{msg}", note));
-        _mixer = new(_pipeWire);
+        _mixer = new(_pipeWire) { InputNote = note => _log.LogWarning("hardware input: {note}", note) };
         _saves = new SettingsSaver(
             () => _mixer.ExportSettings().Save(),
             error =>
@@ -243,6 +243,7 @@ public sealed class MixerService : IHostedService, IDisposable
             MixerSettings? saved = MixerSettings.Load(MixerSettings.DefaultPath, out string? settingsWarning);
             if (settingsWarning is not null)
                 _log.LogWarning("mixer settings: {warning}{fallback}", settingsWarning, saved is null ? "; starting with defaults" : "");
+            UpdateInputDeviceHint();
             _mixer.Build(MixerConfig.FromSettings(saved), output);
 
             // Restore the user's saved levels, mutes, device picks, and per-app
@@ -293,6 +294,13 @@ public sealed class MixerService : IHostedService, IDisposable
         return Task.CompletedTask;
     }
 
+    // Channel feeds follow the actively driven interface; the node name
+    // contains the model, and the serial, as udev spells them.
+    private void UpdateInputDeviceHint() => _mixer.SetInputDeviceHint(
+        _devices.ActiveNodeNameFragments,
+        _devices.ActiveCapabilities?.OutputRouting ?? false,
+        modelFallback: _devices.AttachedCount <= 1);
+
     internal void SweepOnce()
     {
         if (_stopping.IsCancellationRequested || Interlocked.CompareExchange(ref _sweepRunning, 1, 0) != 0) return;
@@ -302,11 +310,7 @@ public sealed class MixerService : IHostedService, IDisposable
             stop.ThrowIfCancellationRequested();
             if (GraphLost()) return;
             stop.ThrowIfCancellationRequested();
-            // Channel feeds follow the actively driven interface; the
-            // node name contains the model as udev spells it.
-            _mixer.SetInputDeviceHint(
-                _devices.ActiveInfo?.NodeNameFragment,
-                _devices.ActiveCapabilities?.OutputRouting ?? false);
+            UpdateInputDeviceHint();
             stop.ThrowIfCancellationRequested();
             // Which input jacks the device actually has, so a client
             // does not offer a strip the hardware cannot feed.
@@ -453,7 +457,7 @@ public sealed class MixerService : IHostedService, IDisposable
                         Func<MixerSettings, string?> save = settings => settings.Save();
                         switch (cmd.Cmd)
                         {
-                            case "createCaptureChannel": _mixer.CreateCaptureChannel(cmd.Name!, cmd.Source!, cmd.CapturePair, save); break;
+                            case "createCaptureChannel": _mixer.CreateCaptureChannel(cmd.Name!, cmd.Source!, cmd.CapturePair, save, cmd.CaptureMonoChannel); break;
                             case "createChannel": _mixer.CreateApplicationChannel(cmd.Name!, save); break;
                             case "renameChannel": _mixer.RenameApplicationChannel(cmd.Channel!, cmd.Name!, save); break;
                             case "deleteChannel": _mixer.DeleteApplicationChannel(cmd.Channel!, save); break;
@@ -625,6 +629,9 @@ public sealed class MixerService : IHostedService, IDisposable
 
     private int _sweepCount;
     private string? _resourceWarning;
+
+    /// <summary>Why the hardware input channels are silent although a source is present, or null.</summary>
+    public string? InputWarning => _mixer.InputWarning;
 
     /// <summary>pipewire-pulse close to its open-file limit, or null.</summary>
     public string? ResourceWarning => Volatile.Read(ref _resourceWarning);

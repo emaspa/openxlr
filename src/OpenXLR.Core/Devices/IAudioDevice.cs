@@ -80,6 +80,16 @@ public interface IAudioDevice : IDisposable
 /// <summary>Stable identity of a device model.</summary>
 public sealed record DeviceInfo(string Vendor, string Model, ushort VendorId, ushort ProductId)
 {
+    /// <summary>Where this unit sits on the bus; null for a backend built without one.</summary>
+    public UsbLocation? Location { get; init; }
+
+    /// <summary>
+    /// One physical unit: the model id plus a hash of its serial, or of its
+    /// USB port when it has no unique serial. Without a location it is the
+    /// model id alone.
+    /// </summary>
+    public string InstanceId => $"{VendorId:x4}:{ProductId:x4}" + (Location is { } location ? "@" + location.Key : "");
+
     public string DisplayName => $"{Vendor} {Model}";
 
     /// <summary>
@@ -91,7 +101,35 @@ public sealed record DeviceInfo(string Vendor, string Model, ushort VendorId, us
     /// alsa_input.usb-Elgato_Systems_Elgato_Wave_3_...). The daemon finds the
     /// capture node and the card by this fragment.
     /// </summary>
-    public string NodeNameFragment => Model.Replace(' ', '_').Replace(':', '_');
+    public string ModelNameFragment => Model.Replace(' ', '_').Replace(':', '_');
+
+    /// <summary>
+    /// The model fragment with this unit's serial and the separator ALSA
+    /// writes after it, so a serial that extends another unit's serial cannot
+    /// match. The model fragment alone when the unit has no usable serial.
+    /// </summary>
+    public string NodeNameFragment => ModelNameFragment
+        + (Location?.Serial is { Length: > 0 } serial && serial.All(c => char.IsAsciiLetterOrDigit(c) || c == '_') ? "_" + serial + "-" : "");
+
+    /// <summary>
+    /// The fragments to look for, most specific first. udev builds the serial
+    /// part of a node name from the descriptor itself, sysfs gives it to us
+    /// separately, and a model whose two spellings differ would leave the
+    /// serial fragment matching nothing, so the model fragment comes second.
+    /// </summary>
+    public IReadOnlyList<string> NodeNameFragments => NodeNameFragment == ModelNameFragment
+        ? [ModelNameFragment] : [NodeNameFragment, ModelNameFragment];
+
+    /// <summary>
+    /// <see cref="NodeNameFragments"/> while these units are attached. The
+    /// model fragment is left out while another unit's model would match it
+    /// too ("Wave_XLR" is inside "Wave_XLR_Pro"): with this unit's node gone
+    /// for a moment, it would find the other unit's node instead.
+    /// </summary>
+    public IReadOnlyList<string> FragmentsAmong(IEnumerable<DeviceInfo> attached)
+        => attached.Any(other => other.InstanceId != InstanceId
+                && other.ModelNameFragment.Contains(ModelNameFragment, StringComparison.OrdinalIgnoreCase))
+            ? [NodeNameFragment] : NodeNameFragments;
 }
 
 /// <summary>Flags for which controls a device exposes, so the UI/plugin adapt per model.</summary>

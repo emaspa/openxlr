@@ -24,8 +24,8 @@ public sealed class HelperUsbTransport : IUsbTransport
     private bool _open;
 
     /// <summary>The daemon binary in helper mode.</summary>
-    public HelperUsbTransport()
-        : this(Environment.ProcessPath ?? throw new InvalidOperationException("no process path for the USB helper"), ["--usb-helper"]) { }
+    public HelperUsbTransport(UsbLocation? location = null)
+        : this(Environment.ProcessPath ?? throw new InvalidOperationException("no process path for the USB helper"), ["--usb-helper"]) { _location = location; }
 
     /// <summary>Any program that speaks <see cref="UsbHelperProtocol"/>; tests use this.</summary>
     public HelperUsbTransport(string exe, IReadOnlyList<string> args)
@@ -36,12 +36,14 @@ public sealed class HelperUsbTransport : IUsbTransport
 
     public bool IsOpen { get { lock (_gate) return _open && _helper is { HasExited: false }; } }
 
+    private readonly UsbLocation? _location;
+
     public bool Open(ushort vendorId, ushort productId)
     {
         lock (_gate)
         {
             EnsureHelper();
-            byte[] reply = Exchange(UsbHelperProtocol.Open(vendorId, productId), OpenDeadline,
+            byte[] reply = Exchange(UsbHelperProtocol.Open(vendorId, productId, _location), OpenDeadline,
                 () => new InvalidOperationException("the USB helper did not answer an open request in time"));
             _open = BinaryPrimitives.ReadInt32LittleEndian(reply) == 0;
             // A helper with nothing open is a process for nothing; the device

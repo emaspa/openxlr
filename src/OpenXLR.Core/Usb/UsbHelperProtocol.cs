@@ -20,12 +20,13 @@ public static class UsbHelperProtocol
 
     public static byte[] Ping() => [OpPing];
 
-    public static byte[] Open(ushort vid, ushort pid)
+    public static byte[] Open(ushort vid, ushort pid, UsbLocation? location = null)
     {
-        var f = new byte[5];
+        var f = new byte[location is null ? 5 : 7];
         f[0] = OpOpen;
         BinaryPrimitives.WriteUInt16LittleEndian(f.AsSpan(1), vid);
         BinaryPrimitives.WriteUInt16LittleEndian(f.AsSpan(3), pid);
+        if (location is not null) { f[5] = location.Bus; f[6] = location.Address; }
         return f;
     }
 
@@ -104,8 +105,15 @@ public static class UsbHelperProtocol
                         reply = Reply(0);
                         break;
                     case OpOpen:
-                        reply = Reply(backend.Open(BinaryPrimitives.ReadUInt16LittleEndian(req.AsSpan(1)),
-                            BinaryPrimitives.ReadUInt16LittleEndian(req.AsSpan(3))) ? 0 : NotOpened);
+                        // Extended or malformed opens cannot leave a previous
+                        // unit active after a refused exact-address selection.
+                        if (req.Length != 5) backend.Close();
+                        if (req.Length is not (5 or 7)) { reply = Reply(-1002); break; }
+                        ushort vendor = BinaryPrimitives.ReadUInt16LittleEndian(req.AsSpan(1));
+                        ushort product = BinaryPrimitives.ReadUInt16LittleEndian(req.AsSpan(3));
+                        bool opened = req.Length == 5 ? backend.Open(vendor, product)
+                            : req[5] != 0 && req[6] != 0 && backend.Open(vendor, product, req[5], req[6]);
+                        reply = Reply(opened ? 0 : NotOpened);
                         break;
                     case OpClose:
                         backend.Close();

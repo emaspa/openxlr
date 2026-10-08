@@ -187,11 +187,14 @@ at startup.
 
 ## Capture inputs
 
-`createCaptureChannel {name, source, capturePair}` adds a channel from an
-external PipeWire capture source. `source` is its exact `node.name`, at most
-256 printable characters. `capturePair` is a zero-based stereo pair from 0 to
-31 and defaults to 0. Mono sources feed both sides. A missing pair stays
-silent. The source must be present when creating the channel. OpenXLR's own
+`createCaptureChannel {name, source, capturePair, captureMonoChannel}` adds
+a channel from an external PipeWire capture source. `source` is its exact
+`node.name`, at most 256 printable characters. `capturePair` is a zero-based
+stereo pair from 0 to 31 and defaults to 0. Mono sources feed both sides.
+Optional `captureMonoChannel`, 0 to 63 and only with pair 0, takes that one
+port of a multichannel source and feeds it to both sides; the third port is
+the Wave XLR Pro's second microphone. A missing pair or port stays silent.
+The source must be present when creating the channel. OpenXLR's own
 devices and sink monitor sources are not capture inputs, to avoid direct
 feedback: a name starting with `OpenXLR` or ending in `.monitor` is refused.
 
@@ -205,8 +208,10 @@ same id and display name.
 
 Bindings are stored in `userChannels`, for example
 `{"id":"second-mic","name":"Second microphone","captureSource":"alsa_input.usb-headset","capturePair":0}`.
-An entry without `captureSource` is an application channel, as in older files;
-one that carries a `capturePair` other than 0 without a source is dropped.
+An entry may also carry `captureMonoChannel`. An entry without
+`captureSource` is an application channel, as in older files; one that
+carries a `capturePair` other than 0 or a `captureMonoChannel` without a
+source is dropped.
 Invalid capture bindings are discarded, not converted into application channels.
 The binding belongs to the layout, not a profile. Rename, reorder and delete
 use the existing channel commands. Renaming leaves the capture graph running.

@@ -15,7 +15,7 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
     public const ushort VendorId = 0x0FD9;
     public const ushort ProductId = 0x00B4;
 
-    public DeviceInfo Info { get; } = new("Elgato", "Wave XLR Pro", VendorId, ProductId);
+    public DeviceInfo Info { get; } = UsbTransport.WithLocation(new("Elgato", "Wave XLR Pro", VendorId, ProductId));
 
     public DeviceCapabilities Capabilities { get; } = new()
     {
