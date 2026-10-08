@@ -6,30 +6,33 @@ namespace OpenXLR.Tests;
 public sealed class DiagnosticsTests
 {
     [Fact]
-    public async Task SimultaneousArchivesHaveDistinctPrivateCompleteFiles()
+    public async Task ArchiveIsNamedByTimestampAndPrivate()
     {
-        string root = Directory.CreateTempSubdirectory("openxlr-diag-collision-").FullName;
+        string root = Directory.CreateTempSubdirectory("openxlr-diag-archive-").FullName;
         try
         {
             string work = Directory.CreateDirectory(Path.Combine(root, "work")).FullName;
             string output = Directory.CreateDirectory(Path.Combine(root, "output")).FullName;
             File.WriteAllText(Path.Combine(work, "meta.txt"), "diagnostic content");
-            string[] archives = await Task.WhenAll(Enumerable.Range(0, 4)
-                .Select(_ => Diagnostics.WriteArchiveAsync(work, output, "20261005-120000")));
-            Assert.Equal(4, archives.Distinct().Count());
-            foreach (string archive in archives)
+            string archive = await Diagnostics.WriteArchiveAsync(work, output, "20261005-120000");
+            Assert.Equal(Path.Combine(output, "openxlr-diagnostics-20261005-120000.tar.gz"), archive);
+            if (OperatingSystem.IsLinux())
+                Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(archive));
+            using (var file = File.OpenRead(archive))
+            using (var gzip = new System.IO.Compression.GZipStream(file, System.IO.Compression.CompressionMode.Decompress))
+            using (var tar = new System.Formats.Tar.TarReader(gzip))
             {
-                if (OperatingSystem.IsLinux())
-                    Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(archive));
-                using var file = File.OpenRead(archive);
-                using var gzip = new System.IO.Compression.GZipStream(file, System.IO.Compression.CompressionMode.Decompress);
-                using var tar = new System.Formats.Tar.TarReader(gzip);
                 var entry = tar.GetNextEntry();
                 Assert.NotNull(entry);
                 Assert.Equal("meta.txt", entry.Name.TrimStart('.', '/'));
                 Assert.Equal("diagnostic content", new StreamReader(entry.DataStream!).ReadToEnd());
                 Assert.Null(tar.GetNextEntry());
             }
+
+            // A second collection in the same second is refused and leaves the first archive alone.
+            long length = new FileInfo(archive).Length;
+            await Assert.ThrowsAsync<IOException>(() => Diagnostics.WriteArchiveAsync(work, output, "20261005-120000"));
+            Assert.Equal(length, new FileInfo(archive).Length);
         }
         finally { Directory.Delete(root, true); }
     }

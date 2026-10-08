@@ -359,7 +359,7 @@ first.
 ## Reporting problems
 
 Open Options, then SUPPORT, then Collect diagnostics. It writes
-`~/openxlr-diagnostics-<timestamp>-<id>.tar.gz` with the app and device
+`~/openxlr-diagnostics-<timestamp>.tar.gz` with the app and device
 state, a raw vendor-block dump, the PipeWire graph, daemon logs and
 configs. Nothing gets uploaded; attach the archive to an issue, or to a
 post in the Discord support forum, yourself.
