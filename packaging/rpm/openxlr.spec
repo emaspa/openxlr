@@ -5,7 +5,7 @@
 %global _build_id_links none
 
 Name:           openxlr
-Version: 0.1.48
+Version: 0.1.49
 Release:        1%{?dist}
 Summary:        Control suite and PipeWire submixer for Elgato XLR interfaces
 License:        GPL-3.0-only
@@ -162,6 +162,11 @@ MSG
 %{_datadir}/openxlr/
 
 %changelog
+* Fri Oct 09 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.49-1
+- Devices: the Wave:3 (0fd9:0070) is supported in beta. One user's quick test on their own unit found the microphone and saw gain, mute, headphone volume and the monitor balance answer; ClipGuard and the monitor balance direction are unchecked.
+- Devices: the Wave:3's mute and headphone level are kept in step with the desktop's sound settings in both directions, and its gain is passed to them; Options shows its firmware version. Neither has run on a Wave:3 yet.
+- Window, terminal mixer and OpenDeck plugin: gain controls stop at the connected device's highest gain, 80 dB on the Wave XLR Pro and the MK.2 family, 75 dB on the Wave XLR and the first XLR Dock, 40 dB on the Wave:3, published as capabilities.gainMaxDb.
+
 * Thu Oct 08 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.1.48-1
 - Devices: more than one Wave interface at a time. Every unit is listed by its USB instance, and up to four units beside the primary can be driven as additional interfaces from Options, each with its own controls and remembered settings and a capture channel from its source. Run with a Wave XLR Pro and an XLR Dock.
 - Mixer: monitor mixes you add without a virtual microphone, exclusive channel groups, an icon, a colour and a hidden flag for every channel and mix, drag handles to arrange sections and tiles, and compact and mini views of the submixer.

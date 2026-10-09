@@ -13,12 +13,15 @@ behaviour verified on hardware before it ships. The project is small on
 purpose. It prefers one small, idiomatic change over a framework, and a
 feature that is measured over one that is described.
 
-## Where it stands (0.1.48)
+## Where it stands (0.1.49)
 
-This is what 0.1.48 ships. A checked item is in the released packages.
+This is what 0.1.49 ships. A checked item is in the released packages.
 
 - [x] Wave XLR Pro, XLR Dock (MK.1 and MK.2 modules), Wave XLR, Wave XLR
   MK.2: hardware controls, verified by owners of each device.
+- [x] Wave:3, in beta: gain, mute, headphone volume and the monitor
+  balance from one user's quick test, the rest coded from public
+  research ([hardware-support.md](hardware-support.md)).
 - [x] Submixer: hardware and application channels, the monitor mixes
   (Monitor A, Monitor B), virtual microphones (Stream and Chat by
   default) and Aux; an editable layout (channels and microphones added,
