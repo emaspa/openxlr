@@ -299,6 +299,19 @@ test("plugin publishes layout updates and keeps monitor feed commands intact", a
     host.receive({event:"dialRotate",context:"output-dial",payload:{ticks:1}});
     assert.equal(daemon.messages.length, beforeLegacyDial);
 
+    // The gain dial stops at the device's highest gain, 40 dB on the Wave:3,
+    // and draws its needle against that range.
+    state.capabilities = {gain:true, mute:true, gainMaxDb:40};
+    state.state = {gainDb:38, mute:false};
+    daemon.receive(state);
+    dialTarget("gain-dial", "gain");
+    assert.equal(feedbackOf("gain-dial").value, "38");
+    host.receive({event:"dialRotate",context:"gain-dial",payload:{ticks:5}});
+    assert.deepEqual(daemon.messages.at(-1), {cmd:"set",control:"gain",value:40});
+    delete state.capabilities;
+    delete state.state;
+    daemon.receive(state);
+
     // The monitor dial's press mutes what the first monitor output hears.
     dialTarget("monitor-dial", "outputVolume");
     assert.equal(feedbackOf("monitor-dial").muteOverlay.enabled, false);

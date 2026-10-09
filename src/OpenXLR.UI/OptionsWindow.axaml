@@ -128,6 +128,8 @@
     <Border Classes="card" IsVisible="{Binding Main.ShowInterfaceCard}">
       <StackPanel Spacing="6">
         <TextBlock Text="{loc:Text Key=INTERFACE}" Classes="h"/>
+        <TextBlock Text="{Binding Main.FirmwareText}" IsVisible="{Binding Main.FirmwareText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                   FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
         <TextBlock Text="{Binding Main.DeviceNote}" IsVisible="{Binding Main.DeviceNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                    FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
         <TextBlock Text="{Binding Main.ResetDescription}" IsVisible="{Binding Main.ShowResetDefaults}"

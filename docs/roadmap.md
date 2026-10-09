@@ -314,7 +314,7 @@ while fixes to existing hosts remain part of normal maintenance.
 - [ ] UCM profile for the Pro upstreamed to alsa-ucm-conf once a second
   owner confirms the split.
 - [ ] Wave:3 (`0fd9:0070`), the USB condenser microphone rather than an
-  XLR interface, waiting on an owner. A backend exists, `Wave3Device`,
+  XLR interface, in beta and waiting on an owner for the full checks. A backend exists, `Wave3Device`,
   one class and one registry line, with gain, mute, ClipGuard, headphone
   volume and the direct monitor balance as the crossfade; the low cut is
   the submixer's by design, as no implementation that runs on the
@@ -326,14 +326,14 @@ while fixes to existing hosts remain part of normal maintenance.
   (openwave, which runs on the hardware, wave3-research and LibreWave)
   with each fact's source named in the code. The bytes the sources
   dispute and no setter owns are retransmitted with the values read,
-  never changed. None of it has been run on a Wave:3: nobody on the
-  project owns one, and this project does not call a device supported
-  that it has not driven, so [hardware-support.md](hardware-support.md)
-  records every control as coded, with the checks an owner runs to move
-  them, and the README's supported list leaves it out. A Wave:3 owner
-  willing to run those checks and confirm each control unblocks it.
-  Anyone who wants the microphone working today should look at
-  [openwave](https://github.com/rikkichy/openwave), which supports it.
+  never changed. In 0.1.49 it is in beta: one user's quick test found the
+  microphone and saw gain, mute, headphone volume and the monitor
+  balance answer, and the README lists it as beta.
+  [hardware-support.md](hardware-support.md) records those four as
+  tested briefly and the rest as coded, with the checks an owner runs to
+  move them. The desktop volume sync and the firmware line came after
+  that test. A Wave:3 owner willing to run the full checklist takes it
+  out of beta.
 
 ## How a change lands
 

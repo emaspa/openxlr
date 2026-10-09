@@ -12,7 +12,7 @@ the checks that still need an owner.
 | Wave XLR | `0fd9:007d` | core controls verified on hardware by community testers on two units (0.1.13) |
 | Wave XLR MK.2 | `0fd9:00b6` | exposed controls verified on hardware by a community tester |
 | XLR Dock MK.2 | `0fd9:00c7` | MK.2 backend with bank detection; exposed controls verified on the original 0x0103 unit |
-| Wave:3 | `0fd9:0070` | coded from public protocol research; not run on a Wave:3 by anyone on the project, every control waits on an owner |
+| Wave:3 | `0fd9:0070` | beta: coded from public protocol research; detection, gain, mute, headphone volume and the monitor balance worked in one user's quick test |
 
 ## USB access
 
@@ -214,14 +214,19 @@ Every exposed control listed above was confirmed on the dock on
 2026-09-05, the DSP ones by ear through the monitor mix and phantom with a condenser microphone.
 Hardware EQ is not mapped. Blocks 0x0002 and 0x0006 exist and are not decoded.
 
-## Wave:3 (0fd9:0070), coded and unverified
+## Wave:3 (0fd9:0070), beta
 
 The USB condenser microphone with a headphone jack, not an XLR
-interface. Nobody on the project owns one, so nothing in this section
-has been run on a Wave:3 from here. The backend,
+interface. Nobody on the project owns one. The backend,
 `src/OpenXLR.Core/Devices/Wave3Device.cs`, takes every protocol fact
-from three public sources and names the source on each line. Every
-control below is coded, none verified.
+from three public sources and names the source on each line. One user
+ran a quick test on their own unit before 0.1.49: OpenXLR found the
+microphone, and gain, mute, headphone volume and the monitor balance
+answered from the window. That is what "tested briefly" means in the
+table below. Nothing was measured, the test came before the desktop
+volume sync and the firmware line were added, and every other control
+is coded only, so the Wave:3 is in beta until an owner runs the full
+checklist at the end of this page.
 
 - [rikkichy/openwave](https://github.com/rikkichy/openwave/blob/main/docs/protocol.md):
   an implementation that runs on the hardware and has users. Where it
@@ -264,17 +269,34 @@ grid would swallow the Stream Deck's five-unit crossfade ticks.
 
 | Control | State | Notes |
 |---|---|---|
-| Gain 0 to 40 dB | coded | Q8.8 word at 0. openwave reads and writes it there; wave3-research logged the same word following the dial in each of its modes and says host writes are ignored. The backend trusts the word while the dial is on gain, where both agree, remembers it, and reports that while the dial is elsewhere; until the dial has been on gain once since the connect, it reports the word as openwave does |
-| Mute | coded | byte 4; the capacitive mute pad toggles the same byte in wave3-research's log |
+| Gain 0 to 40 dB | tested briefly | Q8.8 word at 0. openwave reads and writes it there; wave3-research logged the same word following the dial in each of its modes and says host writes are ignored. The backend trusts the word while the dial is on gain, where both agree, remembers it, and reports that while the dial is elsewhere; until the dial has been on gain once since the connect, it reports the word as openwave does |
+| Mute | tested briefly | byte 4; the capacitive mute pad toggles the same byte in wave3-research's log |
 | ClipGuard | coded | byte 5; taken as hardware, so the software limiter is not offered |
-| Headphone volume -60 to 0 dB | coded | signed Q8.8 word at 7, written truncated toward zero as openwave does ("matching the firmware setter's int()") |
-| Direct monitor balance, as the crossfade | coded | Q8.8 percent at 10, half a percent per crossfade unit, shown as the Mic and PC crossfade (0 to 200). 0 is taken as microphone only and 100 as PC only; none of the sources states the direction |
+| Headphone volume -60 to 0 dB | tested briefly | signed Q8.8 word at 7, written truncated toward zero as openwave does ("matching the firmware setter's int()"). openwave lets the word go down to -128 dB; the kernel's control and wave3-research's class range stop at -60, and so does the backend |
+| Direct monitor balance, as the crossfade | tested briefly | Q8.8 percent at 10, half a percent per crossfade unit, shown as the Mic and PC crossfade (0 to 200). 0 is taken as microphone only and 100 as PC only; none of the sources states the direction, and the quick test did not settle it |
 | Headphone mute | read | byte 9, in the state as `hpMute`. wave3-research saw the firmware assert it when the level reaches its floor; a level written above the floor releases it, so the jack cannot stay silent with nothing in OpenXLR to release it. No control sets it |
 | Low cut | software | the submixer's high-pass, by design; byte 6 is carried as read |
 | Gain lock | software | the daemon's own lock, kept off the window because of the dial, as on every device with one; byte 15 is carried as read |
 | Dial target | read | byte 12: 1 gain, 2 headphones, 3 monitor mix; named in the diagnostics dump, with where the reported gain came from |
 | Mute ring colour, LED brightness | unmapped | wave3-research's bytes 10, 11, 13 and 15; carried as read where no setter owns them |
-| Device info block (0x000A) | read | 51 bytes as wave3-research read it (openwave asks for 64 and places the serial elsewhere); the diagnostics exporter masks the serial wherever it lands |
+| Desktop volume controls | coded | the kernel's 'Mic Capture Volume', 'Mic Capture Switch' and 'PCM Playback Volume' kept in step with the block, as openwave does on the hardware; see below |
+| Firmware version | read | bytes 21 to 23 of the device info block, openwave's offsets; shown in Options under INTERFACE and in the state's `device.firmware` |
+| Device info block (0x000A) | read | 64 bytes, the length openwave requires before it drives a unit (wave3-research read 51); the diagnostics exporter masks the serial wherever it lands |
+
+The microphone's ALSA card carries the three controls that a desktop's
+sound settings and WirePlumber's restore at login act on. The kernel
+caches those values and never reads them back from the device, so the
+backend treats the config block as the one source of truth and keeps the
+card in step with it, as openwave does. When the block changes (the dial,
+the mute pad, a write from OpenXLR), the next poll writes the new value
+to the card. Every half second the backend also reads the card's mute
+and headphone level, and writes a change something else made there into
+the block. The gain only goes from the block to the card, because
+wave3-research found the firmware ignores a gain written through the
+class control; a card gain that differs from the block is a stale cache.
+Without its card the microphone is still driven, Options says the
+desktop's controls are not kept in step, and the diagnostics dump gives
+the reason on its `alsa` line.
 
 The one input strip is the capsule; it carries the XLR 1 name the mixer
 gives its first hardware input. The Wave:3 has no XLR jack, no phantom
@@ -341,7 +363,7 @@ hardware-save action with an ordered Wave Link capture. The
 [USB capture guide](usb-capture.md) explains the process in about 15
 minutes, no programming needed.
 
-A Wave:3 owner moves that section from coded to verified with the
+A Wave:3 owner moves that section from beta to verified with the
 following, in the order that risks least, each result with the
 diagnostics archive:
 
@@ -381,6 +403,12 @@ diagnostics archive:
 9. Play through the microphone's own sink before anything records from
    it, then record: sound, or the silence that would call for a
    capture-hold rule.
+10. Change the microphone's output volume and mute its input in the
+    desktop's sound settings: within a second the headphones and the
+    mute ring follow, and so does the window. Then turn the dial in
+    headphone mode: the desktop's slider follows.
+11. Options, under INTERFACE, shows a firmware version. Say whether it
+    matches the one Wave Link shows for the microphone.
 
 An owner of two supported units confirms driving them together with the
 following, each result with the diagnostics archive:

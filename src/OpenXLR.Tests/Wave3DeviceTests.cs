@@ -94,6 +94,7 @@ public sealed class Wave3DeviceTests
         var usb = new FakeUsb { Config = block ?? Block() };
         var dev = new Wave3Device(usb);
         dev.Connect();
+        usb.Transfers.Clear();   // the device info read at connect
         return (dev, usb);
     }
 
@@ -115,6 +116,7 @@ public sealed class Wave3DeviceTests
             PhysicalControls = true,
             XlrInputs = 1,
             HpOutputs = 1,
+            GainMaxDb = 40,
             RetainsSettings = true,
         }, dev.Capabilities);
     }
@@ -499,5 +501,261 @@ public sealed class Wave3DeviceTests
 
         usb.DevInfo = new byte[40];   // shorter than asked: shown at its own length
         Assert.Equal(80, dev.DumpBlocks()["devinfo"].Length);
+    }
+
+    [Fact]
+    public void ConnectReadsTheFirmwareVersionFromTheDeviceInfo()
+    {
+        var info = new byte[64];
+        info[21] = 1; info[22] = 2; info[23] = 2;
+        var usb = new FakeUsb { DevInfo = info };
+        var dev = new Wave3Device(usb);
+        dev.Connect();
+        Assert.Equal("1.2.2", dev.Firmware);
+        Assert.Equal("1.2.2", dev.DumpBlocks()["firmware"]);
+        Assert.Contains(((byte)0xA1, (byte)0x85, (ushort)0x000A), usb.Transfers);
+
+        dev.Disconnect();
+        Assert.Null(dev.Firmware);
+        usb.DevInfo = new byte[23];   // too short to hold the version
+        dev.Connect();
+        Assert.Null(dev.Firmware);
+        usb.DevInfo = null;           // no answer at all: still connected, version unknown
+        dev.Disconnect();
+        dev.Connect();
+        Assert.True(dev.Connected);
+        Assert.Null(dev.Firmware);
+        Assert.Equal("not read", dev.DumpBlocks()["firmware"]);
+    }
+
+    /// <summary>The kernel's three controls for the Wave:3 behind a fake amixer, in its own units.</summary>
+    private sealed class FakeCard
+    {
+        public int Gain { get; set; } = 24;
+        public string Capture { get; set; } = "on";
+        public int Hp { get; set; } = 102;
+        public List<(string Name, string Value)> Sets { get; } = [];
+        public int Reads { get; private set; }
+        public string? Fail { get; set; }
+
+        public ProcessResult Run(IReadOnlyList<string> args)
+        {
+            Assert.Equal(["-c", "3"], args.Take(2));
+            if (Fail is not null) return new ProcessResult(1, [], Fail, false, false);
+            switch (args[2])
+            {
+                case "contents":
+                    Reads++;
+                    // Laid out as amixer prints it (wave3-research's dump of a unit).
+                    string text = $"""
+                        numid=3,iface=MIXER,name='PCM Playback Switch'
+                          ; type=BOOLEAN,access=rw------,values=1
+                          : values=on
+                        numid=4,iface=MIXER,name='PCM Playback Volume'
+                          ; type=INTEGER,access=rw---R--,values=2,min=0,max=120,step=0
+                          : values={Hp},{Hp}
+                          | dBminmax-min=-60.00dB,max=0.00dB
+                        numid=5,iface=MIXER,name='Mic Capture Switch'
+                          ; type=BOOLEAN,access=rw------,values=1
+                          : values={Capture}
+                        numid=6,iface=MIXER,name='Mic Capture Volume'
+                          ; type=INTEGER,access=rw---R--,values=1,min=0,max=80,step=0
+                          : values={Gain}
+                          | dBminmax-min=0.00dB,max=40.00dB
+
+                        """;
+                    return new ProcessResult(0, System.Text.Encoding.UTF8.GetBytes(text), "", false, false);
+                case "cset":
+                    Assert.Equal(5, args.Count);
+                    string name = args[3]["name=".Length..];
+                    Sets.Add((name, args[4]));
+                    switch (name)
+                    {
+                        case "Mic Capture Volume": Gain = int.Parse(args[4]); break;
+                        case "Mic Capture Switch": Capture = args[4]; break;
+                        case "PCM Playback Volume": Hp = int.Parse(args[4]); break;
+                        default: Assert.Fail($"unexpected control {name}"); break;
+                    }
+                    return new ProcessResult(0, [], "", false, false);
+                default:
+                    Assert.Fail($"unexpected amixer {string.Join(' ', args)}");
+                    return null!;
+            }
+        }
+    }
+
+    private sealed class Clock
+    {
+        public DateTime Now { get; set; } = new(2026, 10, 9, 12, 0, 0, DateTimeKind.Utc);
+    }
+
+    private static (Wave3Device Device, FakeUsb Usb, FakeCard Card, Clock Clock) Mirrored(byte[]? block = null)
+    {
+        var usb = new FakeUsb { Config = block ?? Block(gainDb: 20, mute: false, hpDb: -12.5) };
+        var card = new FakeCard();
+        var clock = new Clock();
+        var dev = new Wave3Device(usb, card.Run, () => 3, () => clock.Now);
+        dev.Connect();
+        return (dev, usb, card, clock);
+    }
+
+    [Fact]
+    public void TheFirstPollGivesTheCardWhatTheBlockHolds()
+    {
+        (Wave3Device dev, FakeUsb usb, FakeCard card, _) = Mirrored();
+        Assert.Null(dev.ConnectionNote);
+        DeviceState s = dev.ReadState();
+        Assert.Equal(20, s.GainDb);
+        Assert.Equal([("Mic Capture Volume", "40"), ("Mic Capture Switch", "on"), ("PCM Playback Volume", "95")], card.Sets);
+        Assert.Equal(0, card.Reads);   // the card's cached values are not taken over the block's
+        Assert.Empty(usb.Writes);
+
+        // Nothing changed: nothing is written either way.
+        card.Sets.Clear();
+        dev.ReadState();
+        Assert.Empty(card.Sets);
+        Assert.Empty(usb.Writes);
+    }
+
+    [Fact]
+    public void AChangeOnTheMicrophoneReachesTheCard()
+    {
+        (Wave3Device dev, FakeUsb usb, FakeCard card, _) = Mirrored();
+        dev.ReadState();
+        card.Sets.Clear();
+
+        usb.Config[4] = 1;                                                  // the mute pad
+        BinaryPrimitives.WriteInt16LittleEndian(usb.Config.AsSpan(0), 30 * 256);   // the dial, on gain
+        dev.ReadState();
+        Assert.Equal([("Mic Capture Volume", "60"), ("Mic Capture Switch", "off")], card.Sets);
+        Assert.Empty(usb.Writes);
+
+        // A write from OpenXLR goes the same way on the next poll.
+        card.Sets.Clear();
+        dev.SetHpVolumeDb(-20);
+        dev.ReadState();
+        Assert.Equal([("PCM Playback Volume", "80")], card.Sets);
+        Assert.Single(usb.Writes);
+    }
+
+    [Fact]
+    public void AChangeOnTheCardReachesTheMicrophoneEveryHalfSecond()
+    {
+        (Wave3Device dev, FakeUsb usb, FakeCard card, Clock clock) = Mirrored();
+        dev.ReadState();
+        card.Sets.Clear();
+
+        // The desktop's volume control lowers the headphones and mutes the mic.
+        card.Hp = 100;
+        card.Capture = "off";
+        clock.Now += TimeSpan.FromMilliseconds(200);
+        dev.ReadState();
+        Assert.Empty(usb.Writes);      // not read again yet
+
+        clock.Now += TimeSpan.FromMilliseconds(300);
+        DeviceState s = dev.ReadState();
+        Assert.Equal(1, card.Reads);
+        Assert.Single(usb.Writes);
+        Assert.Equal(-10 * 256, Word(usb, 7));
+        Assert.Equal(1, usb.Config[4]);
+        Assert.Equal((-10.0, true), (s.HpVolumeDb, s.Mute));
+        Assert.Empty(card.Sets);       // the card already holds what it set
+
+        // The next read finds the two agreeing and writes nothing.
+        clock.Now += TimeSpan.FromSeconds(1);
+        dev.ReadState();
+        Assert.Single(usb.Writes);
+        Assert.Empty(card.Sets);
+    }
+
+    [Fact]
+    public void TheCardsGainIsNeverTakenBack()
+    {
+        // The firmware ignores a gain written through the class control
+        // (wave3-research), so the card's gain is only ever a stale cache.
+        (Wave3Device dev, FakeUsb usb, FakeCard card, Clock clock) = Mirrored();
+        dev.ReadState();
+        card.Gain = 10;
+        clock.Now += TimeSpan.FromSeconds(1);
+        Assert.Equal(20, dev.ReadState().GainDb);
+        Assert.Empty(usb.Writes);
+    }
+
+    [Fact]
+    public void TheMicrophoneWinsWhenBothChangeInOneStep()
+    {
+        (Wave3Device dev, FakeUsb usb, FakeCard card, Clock clock) = Mirrored();
+        dev.ReadState();
+        card.Sets.Clear();
+        card.Hp = 100;
+        BinaryPrimitives.WriteInt16LittleEndian(usb.Config.AsSpan(7), -30 * 256);
+        clock.Now += TimeSpan.FromSeconds(1);
+        Assert.Equal(-30, dev.ReadState().HpVolumeDb);
+        Assert.Equal([("PCM Playback Volume", "60")], card.Sets);
+        Assert.Empty(usb.Writes);
+    }
+
+    [Fact]
+    public void TheGainGivenToTheCardFollowsTheDialOnlyOnGain()
+    {
+        (Wave3Device dev, FakeUsb usb, FakeCard card, _) = Mirrored();
+        dev.ReadState();
+        card.Sets.Clear();
+        usb.Config[12] = Wave3Device.DialMonitorMix;
+        BinaryPrimitives.WriteInt16LittleEndian(usb.Config.AsSpan(0), 75 * 256);   // the dial's value, in one reading
+        dev.ReadState();
+        Assert.Empty(card.Sets);
+    }
+
+    [Fact]
+    public void AnAmixerFailureLeavesTheMicrophoneWorkingAndIsRetried()
+    {
+        (Wave3Device dev, FakeUsb usb, FakeCard card, _) = Mirrored();
+        card.Fail = "amixer: Control hw:3 open error: No such device";
+        Assert.Equal(20, dev.ReadState().GainDb);
+        Assert.Contains("No such device", dev.DumpBlocks()["alsa"]);
+        Assert.Empty(card.Sets);
+
+        card.Fail = null;
+        dev.ReadState();
+        Assert.Equal(3, card.Sets.Count);
+        Assert.StartsWith("card=3 given=gain=40 capture=on hp=95", dev.DumpBlocks()["alsa"]);
+        Assert.Empty(usb.Writes);
+    }
+
+    [Fact]
+    public void WithoutItsCardTheMicrophoneIsDrivenAndTheNoteSaysSo()
+    {
+        var usb = new FakeUsb { Config = Block() };
+        var card = new FakeCard();
+        var dev = new Wave3Device(usb, card.Run, () => throw new InvalidOperationException("Wave:3 present on USB but its ALSA card was not found"));
+        dev.Connect();
+        Assert.True(dev.Connected);
+        Assert.Contains("ALSA card was not found", dev.ConnectionNote);
+        Assert.Contains("not kept in step", dev.ConnectionNote);
+        Assert.Equal(20, dev.ReadState().GainDb);
+        Assert.Empty(card.Sets);
+        Assert.Equal(0, card.Reads);
+        Assert.StartsWith("not mirrored:", dev.DumpBlocks()["alsa"]);
+    }
+
+    [Fact]
+    public void TheCardIsFoundByTheUnitsBus()
+    {
+        string root = Directory.CreateTempSubdirectory("openxlr-wave3-cards").FullName;
+        try
+        {
+            foreach ((int card, string id, string bus) in new[] { (1, "0fd9:00a6", "001/004"), (2, "0fd9:0070", "001/009"), (4, "0fd9:0070", "003/002") })
+            {
+                Directory.CreateDirectory(Path.Combine(root, $"card{card}"));
+                File.WriteAllText(Path.Combine(root, $"card{card}", "usbid"), id + "\n");
+                File.WriteAllText(Path.Combine(root, $"card{card}", "usbbus"), bus + "\n");
+            }
+            Assert.Equal(4, AlsaCards.Find(root, new UsbLocation(3, 2, "3-1", null), "0fd9:0070", "Wave:3"));
+            Assert.Equal(2, AlsaCards.Find(root, new UsbLocation(1, 9, "1-2", null), "0fd9:0070", "Wave:3"));
+            var ex = Assert.Throws<InvalidOperationException>(() => AlsaCards.Find(root, null, "0fd9:0070", "Wave:3"));
+            Assert.Contains("Several Wave:3s", ex.Message);
+        }
+        finally { Directory.Delete(root, true); }
     }
 }

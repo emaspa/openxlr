@@ -18,7 +18,7 @@
                 </CheckBox>
                 <StackPanel IsEnabled="{Binding CanControl}" IsVisible="{Binding Connected}" Spacing="6">
                   <Grid ColumnDefinitions="*,64" IsVisible="{Binding HasGain}">
-                    <Slider IsEnabled="{Binding CanAdjustGain}" Minimum="0" Maximum="80" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding Gain, Mode=TwoWay}"
+                    <Slider IsEnabled="{Binding CanAdjustGain}" Minimum="0" Maximum="{Binding GainMaxDb}" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding Gain, Mode=TwoWay}"
                             AutomationProperties.Name="{loc:Text Key=InterfaceGain}"/>
                     <TextBlock Classes="val" Grid.Column="1" Text="{Binding GainText}"/>
                   </Grid>
@@ -31,7 +31,7 @@
                   </WrapPanel>
                   <StackPanel IsVisible="{Binding HasSecondInput}" Spacing="6">
                     <Grid ColumnDefinitions="*,64">
-                      <Slider IsEnabled="{Binding CanAdjustGain}" Minimum="0" Maximum="80" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding Gain2, Mode=TwoWay}"
+                      <Slider IsEnabled="{Binding CanAdjustGain}" Minimum="0" Maximum="{Binding GainMaxDb}" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding Gain2, Mode=TwoWay}"
                               AutomationProperties.Name="{loc:Text Key=InterfaceGainInput2}"/>
                       <TextBlock Classes="val" Grid.Column="1" Text="{Binding Gain2Text}"/>
                     </Grid>

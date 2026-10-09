@@ -48,6 +48,18 @@ The window's header shows the connected interface with a green dot.
 "No device" means the daemon cannot open the interface: replug it once
 after installing so the udev rule applies ([section 5.1](#no-device)).
 
+Gain controls in the window, the terminal mixer and the Stream Deck dials
+cover the connected interface's own range: 0 to 80 dB on the Wave XLR Pro
+and the MK.2 family, 0 to 75 dB on the original Wave XLR and the first
+XLR Dock, 0 to 40 dB on the Wave:3. Options shows the firmware version
+under INTERFACE on an interface that reports one, today only the Wave:3.
+On the Wave:3 the desktop's sound settings and OpenXLR also share the
+microphone mute and the headphone level, so a change in either shows in
+the other within a second. Wave:3 support is in beta: it is written from
+public protocol research, and one user's quick test covered detection,
+gain, mute, headphone volume and the monitor balance
+([hardware support](hardware-support.md)).
+
 If you only want hardware control and no mixer, turn off "Enable software
 mixer" in Options, AUDIO ([section 3.8](#hardware-only)). The daemon restarts in hardware-control mode
 and the `OpenXLR …` devices disappear.

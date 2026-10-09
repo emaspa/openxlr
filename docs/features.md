@@ -22,9 +22,13 @@ volume, low impedance, crossfade.
 
 Wave XLR: gain, mute, headphone volume, low impedance, phantom power.
 
-Wave:3: gain, mute, ClipGuard, headphone volume and the direct monitor
-balance, shown as the crossfade; the low cut is the submixer's, by
-design. Written from public protocol research and not yet run on the
+Wave:3: gain (0 to 40 dB), mute, ClipGuard, headphone volume and the
+direct monitor balance, shown as the crossfade; the low cut is the
+submixer's, by design. The desktop's volume controls follow the
+microphone's mute and headphone level and can set them, and Options
+shows the firmware version. Beta: written from public protocol research,
+with detection, gain, mute, headphone volume and the monitor balance
+working in one user's quick test, and not yet checked in full on the
 microphone by anyone on the project, so with another supported
 interface attached the daemon drives that one and the Wave:3 only when
 picked from the header. [hardware-support.md](hardware-support.md)

@@ -73,6 +73,7 @@ public sealed class XlrDockDevice : IAudioDevice
         LowImpedance = true,
         XlrInputs = 1,
         HpOutputs = 1,
+        GainMaxDb = 75,
         RetainsSettings = false,
     };
 
@@ -115,43 +116,11 @@ public sealed class XlrDockDevice : IAudioDevice
     /// <summary>Release the USB transport and its helper process.</summary>
     public void Dispose() => _usb.Dispose();
 
-    private static ProcessResult RunAmixer(IReadOnlyList<string> args)
-        => ProcessRunner.Run("amixer", args, TimeSpan.FromSeconds(2), stdoutCap: 1024 * 1024, stderrCap: 64 * 1024);
+    private static ProcessResult RunAmixer(IReadOnlyList<string> args) => AlsaCards.RunAmixer(args);
 
-    /// <summary>
-    /// The ALSA card of this dock. Every dock has the same USB id, so with two
-    /// attached the first card with that id can be the other unit, and gain,
-    /// mute and headphone volume would land on it while the USB controls reach
-    /// this one. A card's usbbus file names the bus and device number it sits
-    /// on, the pair the USB handle is opened at. A lone dock card is used even
-    /// when that file does not match, as before more than one unit was driven.
-    /// </summary>
+    /// <summary>The ALSA card of this dock; see <see cref="AlsaCards.Find"/>.</summary>
     internal static int FindCard(string root, UsbLocation? location)
-    {
-        string? want = location is null ? null : $"{location.Bus:D3}/{location.Address:D3}";
-        var docks = new List<(int Card, string? Bus)>();
-        foreach (string dir in Directory.EnumerateDirectories(root).Order(StringComparer.Ordinal))
-        {
-            string name = Path.GetFileName(dir);
-            if (!name.StartsWith("card", StringComparison.Ordinal)
-                || !int.TryParse(name.AsSpan(4), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int n))
-                continue;
-            try
-            {
-                string usbid = Path.Combine(dir, "usbid");
-                if (!File.Exists(usbid) || File.ReadAllText(usbid).Trim() != "0fd9:00a6") continue;
-                string usbbus = Path.Combine(dir, "usbbus");
-                docks.Add((n, File.Exists(usbbus) ? File.ReadAllText(usbbus).Trim() : null));
-            }
-            catch (IOException) { /* card went away mid-scan */ }
-            catch (UnauthorizedAccessException) { }
-        }
-        if (want is not null && docks.Where(d => d.Bus == want).Select(d => d.Card).ToList() is [int exact]) return exact;
-        if (docks.Count == 1) return docks[0].Card;
-        throw new InvalidOperationException(docks.Count == 0
-            ? "XLR Dock present on USB but its ALSA card was not found"
-            : "Several XLR Docks are attached and this dock's ALSA card could not be told apart from the others");
-    }
+        => AlsaCards.Find(root, location, "0fd9:00a6", "XLR Dock");
 
     public void Connect()
     {

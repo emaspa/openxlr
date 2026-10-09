@@ -1,13 +1,16 @@
 using System.Buffers.Binary;
+using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace OpenXLR.Core.Devices;
 
 /// <summary>
 /// The Elgato Wave:3 (0fd9:0070): a USB condenser microphone with a headphone
 /// jack, not an XLR interface. Nobody on this project owns one. Every protocol
-/// fact below comes from public work on other people's units, each line names
-/// its source, and none of it has been run against a Wave:3 from here;
-/// docs/hardware-support.md records every control as coded, not verified.
+/// fact below comes from public work on other people's units and each line
+/// names its source. One user's quick test found the unit and saw gain, mute,
+/// headphone volume and the monitor balance answer; docs/hardware-support.md
+/// records that as beta and the rest as coded.
 ///
 /// Sources, by the tag used below:
 ///   OW   rikkichy/openwave, crates/openwave-core/src/profiles.rs and
@@ -68,6 +71,19 @@ namespace OpenXLR.Core.Devices;
 /// read. No value is snapped to a grid: OW writes arbitrary raw values on the
 /// hardware, so the firmware does not need one, and a grid would swallow the
 /// Stream Deck's five-unit crossfade ticks.
+///
+/// The kernel's ALSA card carries the same three controls ('Mic Capture
+/// Volume' 0..80 for 0..40 dB, 'Mic Capture Switch', 'PCM Playback Volume'
+/// 0..120 for -60..0 dB; W3R's amixer dump), and the desktop's volume
+/// controls and WirePlumber's restore at login act on those. The kernel
+/// caches feature unit values and never re-reads them, so the block is the
+/// one source of truth and the card is kept in step with it, as OW does on
+/// the hardware: every change seen in the block (the dial, the mute pad, a
+/// write from OpenXLR) is written to the card, and every half second the
+/// card's mute and headphone level are read back, and a change made there by
+/// something else is written into the block. The gain is never read back: W3R
+/// found the firmware ignores a gain written through the class control, so a
+/// card value that differs from the block is a stale cache, not a request.
 /// </summary>
 public sealed class Wave3Device : IAudioDevice
 {
@@ -83,10 +99,17 @@ public sealed class Wave3Device : IAudioDevice
     private const ushort BlockConfig = 0x0000;
     private const ushort BlockDevInfo = 0x000A;
     internal const int ConfigLen = 16;
-    // W3R read 51 bytes of device info, the MK.1's length; OW asks for 64 and
-    // places the firmware version and the serial further in. 51 is what a
-    // unit is known to have answered; the dump shows whatever comes back.
-    private const int DevInfoLen = 51;
+    // W3R read 51 bytes of device info, the MK.1's length; OW asks for 64,
+    // requires exactly 64 back before it will drive a unit, and has users, so
+    // a Wave:3 answers 64. The firmware version is the three bytes at 21
+    // (OW's profile, shown in its window); the dump shows whatever comes back.
+    internal const int DevInfoLen = 64;
+    internal const int OffFirmware = 21;
+
+    private const string GainCtl = "Mic Capture Volume";
+    private const string MuteCtl = "Mic Capture Switch";
+    private const string HpCtl = "PCM Playback Volume";
+    private static readonly TimeSpan AlsaReadInterval = TimeSpan.FromMilliseconds(500);
 
     internal const int OffGain = 0;
     internal const int OffMute = 4;
@@ -100,25 +123,59 @@ public sealed class Wave3Device : IAudioDevice
     internal const byte DialHeadphones = 2;
     internal const byte DialMonitorMix = 3;
 
-    // OW's caps (0x2800 and 0x6400), LW's ranges and W3R's UAC ranges (0 to
-    // 40 dB, -60 to 0 dB) agree on the limits.
+    // The gain: OW's cap (0x2800), LW's range and W3R's UAC range agree on 0
+    // to 40 dB. The headphone level: OW clamps to -128 dB for every device
+    // in the MK.1 dialect, the Wave:3 included, while the kernel's control
+    // and W3R's UAC range stop at -60 dB. -60 is kept, the floor every path
+    // to the level shares; whether the block takes a word below it is for a
+    // unit to show.
     internal const int GainMinDb = 0, GainMaxDb = 40;
     internal const double HpMinDb = -60, HpMaxDb = 0;
 
     private readonly object _lock = new();
     private readonly IUsbTransport _usb;
+    private readonly Func<IReadOnlyList<string>, ProcessResult>? _amixer;
+    private readonly Func<int>? _findCard;
+    private readonly Func<DateTime> _now;
 
     // The gain last read while the dial was on gain, when every source reads
     // the word at 0 as the gain; null until the dial has been there once
     // since the connect.
     private int? _gainDb;
 
-    public Wave3Device() : this(UsbTransport.Create()) { }
+    // The ALSA card kept in step with the block, -1 without one; the values
+    // the card was last given or last read at, null until the first poll
+    // after a connect; when the card was last read; the last mirror failure.
+    private int _card = -1;
+    private AlsaValues? _mirrored;
+    private DateTime _alsaReadAt;
+    private string? _mirrorError;
 
-    /// <summary>Tests substitute the transport.</summary>
-    internal Wave3Device(IUsbTransport usb) => _usb = usb;
+    /// <summary>
+    /// The three controls in the card's own units: half-dB steps from 0, and
+    /// the microphone muted. -1 and null for one the card has not been given.
+    /// </summary>
+    internal readonly record struct AlsaValues(int Gain, bool? Mute, int Hp);
+
+    public Wave3Device() : this(UsbTransport.Create(), AlsaCards.RunAmixer, null) { }
+
+    /// <summary>Tests substitute the transport; without amixer the card is left alone.</summary>
+    internal Wave3Device(IUsbTransport usb) : this(usb, null, null) { }
+
+    /// <summary>Tests substitute the transport, amixer, the card lookup and the clock.</summary>
+    internal Wave3Device(IUsbTransport usb, Func<IReadOnlyList<string>, ProcessResult>? amixer, Func<int>? findCard, Func<DateTime>? now = null)
+    {
+        _usb = usb;
+        _amixer = amixer;
+        _findCard = amixer is null ? null : findCard ?? (() => AlsaCards.Find("/proc/asound", Info.Location, "0fd9:0070", Info.Model));
+        _now = now ?? (() => DateTime.UtcNow);
+    }
 
     public DeviceInfo Info { get; } = UsbTransport.WithLocation(new("Elgato", "Wave:3", VendorId, ProductId));
+
+    public string? ConnectionNote { get; private set; }
+
+    public string? Firmware { get; private set; }
 
     public DeviceCapabilities Capabilities { get; } = new()
     {
@@ -133,6 +190,7 @@ public sealed class Wave3Device : IAudioDevice
         PhysicalControls = true,
         XlrInputs = 1,   // the capsule feeds the one input strip
         HpOutputs = 1,
+        GainMaxDb = GainMaxDb,
         // Whether the unit keeps its settings over a power cycle is stated
         // by none of the sources. True means the daemon writes nothing at
         // connect that the user did not ask for; a replug on real hardware
@@ -149,6 +207,25 @@ public sealed class Wave3Device : IAudioDevice
     {
         if (!_usb.Open(VendorId, ProductId))
             throw new InvalidOperationException($"{Info.Model} present but could not be opened (udev rule?)");
+        lock (_lock)
+        {
+            var info = new byte[DevInfoLen];
+            int n = Transfer(RtRead, ReqRead, BlockDevInfo, info, DevInfoLen);
+            Firmware = DecodeFirmware(info.AsSpan(0, Math.Max(n, 0)));
+            _card = -1;
+            _mirrored = null;
+            _mirrorError = null;
+            ConnectionNote = null;
+            if (_findCard is null) return;
+            // A unit without its card still works from OpenXLR; only the
+            // desktop's controls fall out of step, and the note says so.
+            try { _card = _findCard(); }
+            catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
+            {
+                _mirrorError = ex.Message;
+                ConnectionNote = $"{ex.Message}; the desktop's volume controls are not kept in step with the microphone";
+            }
+        }
     }
 
     public void Disconnect()
@@ -157,8 +234,15 @@ public sealed class Wave3Device : IAudioDevice
         {
             _usb.Close();
             _gainDb = null;   // a replug may change what the dial was on
+            _card = -1;
+            _mirrored = null;
+            Firmware = null;
         }
     }
+
+    /// <summary>The firmware version from the device info block (OW's offsets), or null when the answer is too short to hold it.</summary>
+    internal static string? DecodeFirmware(ReadOnlySpan<byte> info)
+        => info.Length > OffFirmware + 2 ? $"{info[OffFirmware]}.{info[OffFirmware + 1]}.{info[OffFirmware + 2]}" : null;
 
     /// <summary>
     /// All control transfers go through here. A transfer that never returns
@@ -191,11 +275,16 @@ public sealed class Wave3Device : IAudioDevice
         {
             byte[] cfg = ReadConfigLocked();
             edit(cfg);
-            int n = Transfer(RtWrite, ReqWrite, BlockConfig, cfg, ConfigLen);
-            if (n < 0) throw new InvalidOperationException($"write config block: {LibUsb.StrError(n)}");
-            if (n != ConfigLen)
-                throw new InvalidOperationException($"write config block: accepted {n} bytes, expected {ConfigLen}");
+            WriteConfigLocked(cfg);
         }
+    }
+
+    private void WriteConfigLocked(byte[] cfg)
+    {
+        int n = Transfer(RtWrite, ReqWrite, BlockConfig, cfg, ConfigLen);
+        if (n < 0) throw new InvalidOperationException($"write config block: {LibUsb.StrError(n)}");
+        if (n != ConfigLen)
+            throw new InvalidOperationException($"write config block: accepted {n} bytes, expected {ConfigLen}");
     }
 
     /// <summary>
@@ -212,8 +301,105 @@ public sealed class Wave3Device : IAudioDevice
         {
             byte[] c = ReadConfigLocked();
             if (DialOnGain(c)) _gainDb = GainFromWord(c);
+            if (_card >= 0) MirrorLocked(c);
             return Decode(c, _gainDb);
         }
+    }
+
+    /// <summary>
+    /// One step of keeping the card in step with the block (see the class
+    /// summary). A control the block changed is written to the card, which
+    /// wins over a read of the card in the same step; otherwise, once the
+    /// read is due, a mute or headphone level the card holds that differs
+    /// from what it was last given is written into <paramref name="c"/> and
+    /// the device. An amixer failure leaves that control to the next step and
+    /// is kept for the diagnostics dump; a failed block write throws, as any
+    /// block write does.
+    /// </summary>
+    private void MirrorLocked(byte[] c)
+    {
+        // Right after a connect the card is given all three, and a control
+        // the card failed to take is given again: the block holds what the
+        // unit is doing, the card only what the kernel cached.
+        DateTime now = _now();
+        if (_mirrored is null) _alsaReadAt = now;
+        AlsaValues seen = _mirrored ?? new(-1, null, -1);
+        AlsaValues block = ToAlsa(c, seen);
+        AlsaValues next = seen;
+        bool gainOut = block.Gain != seen.Gain, muteOut = block.Mute != seen.Mute, hpOut = block.Hp != seen.Hp;
+        if (gainOut && TryAlsa(() => Cset(GainCtl, block.Gain.ToString(CultureInfo.InvariantCulture)))) next = next with { Gain = block.Gain };
+        if (muteOut && TryAlsa(() => Cset(MuteCtl, block.Mute == true ? "off" : "on"))) next = next with { Mute = block.Mute };
+        if (hpOut && TryAlsa(() => Cset(HpCtl, block.Hp.ToString(CultureInfo.InvariantCulture)))) next = next with { Hp = block.Hp };
+
+        if ((!muteOut || !hpOut) && now - _alsaReadAt >= AlsaReadInterval)
+        {
+            _alsaReadAt = now;
+            Dictionary<string, string>? card = null;
+            if (TryAlsa(() => card = ParseContents(Amixer("contents"))))
+            {
+                bool edited = false;
+                if (!muteOut && card!.TryGetValue(MuteCtl, out string? sw) && sw is "on" or "off" && (sw == "off") != seen.Mute)
+                {
+                    c[OffMute] = sw == "off" ? (byte)1 : (byte)0;
+                    next = next with { Mute = sw == "off" };
+                    edited = true;
+                }
+                if (!hpOut && card!.TryGetValue(HpCtl, out string? hp)
+                    && int.TryParse(hp.Split(',')[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out int level)
+                    && level is >= 0 and <= 120 && level != seen.Hp)
+                {
+                    WriteHp(c, HpToWord(level / 2.0 + HpMinDb));
+                    next = next with { Hp = level };
+                    edited = true;
+                }
+                if (edited) WriteConfigLocked(c);
+            }
+        }
+        _mirrored = next;
+    }
+
+    /// <summary>
+    /// The block's three controls in the card's units. The gain follows the
+    /// word only where <see cref="ReadState"/> trusts it, and otherwise
+    /// stays at what the card was given.
+    /// </summary>
+    internal AlsaValues ToAlsa(ReadOnlySpan<byte> c, AlsaValues seen)
+    {
+        int gain = DialOnGain(c) || (_gainDb is null && seen.Gain < 0)
+            ? (int)Math.Round(Math.Clamp(FromQ88(c[OffGain..]), GainMinDb, GainMaxDb) * 2, MidpointRounding.AwayFromZero)
+            : seen.Gain >= 0 ? seen.Gain : _gainDb!.Value * 2;
+        int hp = (int)Math.Round((Math.Clamp(FromQ88(c[OffHpVol..]), HpMinDb, HpMaxDb) - HpMinDb) * 2, MidpointRounding.AwayFromZero);
+        return new(gain, c[OffMute] != 0, hp);
+    }
+
+    private bool TryAlsa(Action action)
+    {
+        try { action(); return true; }
+        catch (Exception ex) when (ex is InvalidOperationException or TimeoutException)
+        {
+            _mirrorError = ex.Message;
+            return false;
+        }
+    }
+
+    private string Amixer(params string[] args)
+    {
+        ProcessResult r = _amixer!(["-c", _card.ToString(CultureInfo.InvariantCulture), .. args]);
+        if (r.TimedOut) throw new TimeoutException($"amixer {string.Join(' ', args)} timed out");
+        if (r.ExitCode != 0) throw new InvalidOperationException($"amixer {string.Join(' ', args)}: {r.Stderr.Trim()}");
+        return r.StdoutText;
+    }
+
+    private void Cset(string name, string value) => Amixer("cset", $"name={name}", value);
+
+    private static readonly Regex ContentsEntry = new(@"name='(?<name>[^']+)'[^\n]*\n(?:[ \t]+;[^\n]*\n)?[ \t]+: values=(?<values>[^\n]+)", RegexOptions.Compiled);
+
+    /// <summary>`amixer contents` as control name to its values field.</summary>
+    internal static Dictionary<string, string> ParseContents(string contents)
+    {
+        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (Match m in ContentsEntry.Matches(contents)) values[m.Groups["name"].Value] = m.Groups["values"].Value.Trim();
+        return values;
     }
 
     internal static bool DialOnGain(ReadOnlySpan<byte> c) => c[OffDialTarget] == DialGain;
@@ -268,15 +454,17 @@ public sealed class Wave3Device : IAudioDevice
     public void SetHpVolumeDb(double db)
     {
         short word = HpToWord(db);
-        Modify(c =>
-        {
-            BinaryPrimitives.WriteInt16LittleEndian(c.AsSpan(OffHpVol), word);
-            // W3R saw the firmware assert the headphone mute when the level
-            // reaches the floor. A level above it is a request to hear
-            // something, so the mute goes with it rather than leaving the
-            // jack silent with nothing in OpenXLR to release it.
-            if (word > HpMinDb * 256) c[OffHpMute] = 0;
-        });
+        Modify(c => WriteHp(c, word));
+    }
+
+    private static void WriteHp(byte[] c, short word)
+    {
+        BinaryPrimitives.WriteInt16LittleEndian(c.AsSpan(OffHpVol), word);
+        // W3R saw the firmware assert the headphone mute when the level
+        // reaches the floor. A level above it is a request to hear
+        // something, so the mute goes with it rather than leaving the
+        // jack silent with nothing in OpenXLR to release it.
+        if (word > HpMinDb * 256) c[OffHpMute] = 0;
     }
 
     public void SetCrossfade(int value)
@@ -321,6 +509,11 @@ public sealed class Wave3Device : IAudioDevice
                 }
                 catch (Exception ex) { blocks[name] = $"error: {ex.Message}"; }
             }
+            blocks["alsa"] = _card < 0
+                ? (_mirrorError is string why ? $"not mirrored: {why}" : "not mirrored")
+                : $"card={_card} given={(_mirrored is AlsaValues m ? $"gain={m.Gain} capture={(m.Mute is bool muted ? (muted ? "off" : "on") : "?")} hp={m.Hp}" : "nothing yet")}"
+                    + (_mirrorError is string error ? $" last error: {error}" : "");
+            blocks["firmware"] = Firmware ?? "not read";
             blocks["gain"] = _gainDb is int g
                 ? $"{g} dB, last read with the dial on gain"
                 : "not read with the dial on gain yet; the word at 0 is reported as is";
