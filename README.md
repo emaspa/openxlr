@@ -47,6 +47,7 @@ the author's own hardware.
 | Wave XLR | 0fd9:007d | gain, mute, headphone volume and low impedance verified by community testers; phantom power implemented, awaiting an OpenXLR hardware check |
 | Wave XLR MK.2 | 0fd9:00b6 | gain, mute, phantom power, DSP, ClipGuard, compressor, headphone volume, crossfade; verified on hardware by a community tester |
 | XLR Dock MK.2 (Stream Deck+ module) | 0fd9:00c7 | same exposed controls as the Wave XLR MK.2, verified on hardware |
+| Wave:3 (beta) | 0fd9:0070 | gain, mute, headphone volume and monitor balance worked in one user's quick test; ClipGuard and the desktop volume sync are untested |
 
 The UI shows the controls OpenXLR exposes for the connected device, and a picker
 in the header switches between several attached interfaces. The

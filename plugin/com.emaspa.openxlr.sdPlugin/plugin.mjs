@@ -365,6 +365,11 @@ const dev = () => daemonState?.state ?? null;
 const mixer = () => daemonState?.mixer ?? null;
 const mixOf = (id) => mixer()?.mixes?.find((x) => x.id === id);
 const chOf = (id) => mixer()?.channels?.find((x) => x.id === id);
+// The device's highest gain (40 dB on the Wave:3); 80 from a daemon that does not say.
+const gainMaxDb = () => {
+  const max = daemonState?.capabilities?.gainMaxDb;
+  return Number.isInteger(max) && max > 0 ? max : 80;
+};
 
 function deviceTargetSupported(target) {
   const c = daemonState?.capabilities;
@@ -665,7 +670,7 @@ function dialValue(target, inst) {
       if (reported == null) return null;
       const db = dialNow(target, reported);
       return { label: target === "gain" ? "XLR 1 gain" : "XLR 2 gain",
-               pct: Math.round((db / 80) * 100), text: muted ? "MUTED" : `${db} dB`, muted };
+               pct: Math.round((db / gainMaxDb()) * 100), text: muted ? "MUTED" : `${db} dB`, muted };
     }
     case "hp": case "hp2": {
       if (!deviceTargetSupported(target)) return null;
@@ -788,7 +793,7 @@ function onDialRotate(context, inst, ticks) {
   } else if (t === "gain" || t === "gain2") {
     const db = t === "gain" ? dev()?.gainDb : dev()?.gain2Db;
     if (db == null) return;
-    const value = clamp(dialNow(t, db) + ticks, 0, 80);
+    const value = clamp(dialNow(t, db) + ticks, 0, gainMaxDb());
     dialTurn(t, value, () => cmd({ cmd: "set", control: t, value }));
   } else if (t === "hp" || t === "hp2") {
     const db = t === "hp" ? dev()?.hpVolumeDb : dev()?.hp2VolumeDb;

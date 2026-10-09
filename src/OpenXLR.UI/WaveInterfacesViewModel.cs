@@ -50,6 +50,7 @@ public sealed class WaveInterfaceViewModel(DaemonClient client, MainViewModel ma
     public bool CanEnable => !_retired && !Active && !_busy;
     public bool CanControl => !_retired && Connected && !_busy;
     public bool HasGain { get; private set; }
+    public int GainMaxDb { get; private set; } = 80;
     public bool HasMute { get; private set; }
     public bool HasPhantom { get; private set; }
     public bool HasLowCut { get; private set; }
@@ -188,6 +189,7 @@ public sealed class WaveInterfaceViewModel(DaemonClient client, MainViewModel ma
             HasLowCut = capabilities?["lowCut"]?.GetValue<bool>() ?? false;
             HasClipGuard = capabilities?["clipGuard"]?.GetValue<bool>() ?? false;
             HasSecondInput = (capabilities?["xlrInputs"]?.GetValue<int>() ?? 1) > 1;
+            GainMaxDb = capabilities?["gainMaxDb"]?.GetValue<int>() ?? 80;
             JsonNode? state = value["state"];
             if (!SliderSync.RecentlyTouched($"wave:{Id}:gain")) Gain = state?["gainDb"]?.GetValue<int>() ?? 0;
             if (!SliderSync.RecentlyTouched($"wave:{Id}:gain2")) Gain2 = state?["gain2Db"]?.GetValue<int>() ?? 0;

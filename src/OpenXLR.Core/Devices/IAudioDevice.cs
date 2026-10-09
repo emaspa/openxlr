@@ -25,6 +25,9 @@ public interface IAudioDevice : IDisposable
     /// </summary>
     string? ConnectionNote => null;
 
+    /// <summary>The unit's firmware version as it reports it, or null where it is not read. Read after <see cref="Connect"/>.</summary>
+    string? Firmware => null;
+
     void Connect();
     void Disconnect();
 
@@ -152,6 +155,12 @@ public sealed record DeviceCapabilities
 
     /// <summary>A controllable auxiliary input stage (level + lock).</summary>
     public bool AuxInput { get; init; }
+
+    /// <summary>
+    /// The highest gain the device takes, in dB; the lowest is 0. Each input
+    /// has the same range. Clients size their gain controls to it.
+    /// </summary>
+    public int GainMaxDb { get; init; } = 80;
 
     /// <summary>Number of XLR inputs the device has (the Pro has two).</summary>
     public int XlrInputs { get; init; } = 1;

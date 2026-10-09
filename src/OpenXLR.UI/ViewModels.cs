@@ -107,6 +107,10 @@ public sealed partial class MainViewModel : ViewModelBase
         set { if (Set(ref _gainLocked, value) && !_applying) _ = _client.SetControlAsync("gainLock", value); }
     }
 
+    private int _gainMaxDb = 80;
+    /// <summary>The top of the gain sliders: the device's highest gain.</summary>
+    public int GainMaxDb { get => _gainMaxDb; private set => Set(ref _gainMaxDb, value); }
+
     private int _gainDb;
     public int GainDb
     {
@@ -178,7 +182,15 @@ public sealed partial class MainViewModel : ViewModelBase
     // (an XLR Dock taking a control through its config block), or empty.
     private string _deviceNote = "";
     public string DeviceNote { get => _deviceNote; private set { if (Set(ref _deviceNote, value)) Raise(nameof(ShowInterfaceCard)); } }
-    public bool ShowInterfaceCard => ShowResetDefaults || DeviceNote.Length > 0 || ShowWaveInterfaces;
+    // The firmware version the unit reports, or empty where the daemon does not read it.
+    private string _deviceFirmware = "";
+    public string DeviceFirmware
+    {
+        get => _deviceFirmware;
+        private set { if (Set(ref _deviceFirmware, value)) { Raise(nameof(FirmwareText)); Raise(nameof(ShowInterfaceCard)); } }
+    }
+    public string FirmwareText => DeviceFirmware.Length > 0 ? Localizer.Format("DeviceFirmware", DeviceFirmware) : "";
+    public bool ShowInterfaceCard => ShowResetDefaults || DeviceNote.Length > 0 || DeviceFirmware.Length > 0 || ShowWaveInterfaces;
 
     // The daemon-side gain lock cannot stop a physical dial, so it only
     // shows for devices without one.
@@ -708,14 +720,18 @@ public sealed partial class MainViewModel : ViewModelBase
             {
                 DeviceName = $"{dev["vendor"]?.GetValue<string>()} {dev["model"]?.GetValue<string>()}".Trim();
                 DeviceNote = dev["note"]?.GetValue<string>() ?? "";
+                DeviceFirmware = dev["firmware"]?.GetValue<string>() ?? "";
             }
-            else DeviceNote = "";
+            else { DeviceNote = ""; DeviceFirmware = ""; }
 
             if (node["capabilities"] is JsonNode caps)
             {
                 bool Cap(string k) => caps[k]?.GetValue<bool>() ?? false;
                 HasXlr2 = (caps["xlrInputs"]?.GetValue<int>() ?? 1) > 1;
                 HasHp2 = (caps["hpOutputs"]?.GetValue<int>() ?? 1) > 1;
+                // Before the state below, so a slider the new range shortens
+                // is coerced while the state is being applied and sends nothing.
+                GainMaxDb = caps["gainMaxDb"]?.GetValue<int>() ?? 80;
                 CapLowCut = Cap("lowCut");
                 CapExpander = Cap("expander");
                 CapVoiceTune = Cap("voiceTune");

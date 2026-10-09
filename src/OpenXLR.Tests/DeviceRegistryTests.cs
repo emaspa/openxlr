@@ -4,7 +4,7 @@ namespace OpenXLR.Tests;
 
 /// <summary>
 /// The registry's table order is the daemon's preference when nothing is
-/// chosen, so the Wave:3, not yet run on the device, comes after every
+/// chosen, so the Wave:3, in beta after one user's quick test, comes after every
 /// interface verified on hardware. Devices are constructed, never opened.
 /// </summary>
 public sealed class DeviceRegistryTests

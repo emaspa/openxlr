@@ -197,6 +197,7 @@ public sealed class WaveXlrMk1Device : Mk1ClassProtocolDevice
         Phantom = true,
         XlrInputs = 1,
         HpOutputs = 1,
+        GainMaxDb = 75,
         RetainsSettings = false,
     };
 }

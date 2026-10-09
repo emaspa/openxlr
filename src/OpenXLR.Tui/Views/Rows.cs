@@ -60,6 +60,8 @@ internal sealed class NumberRow(
 
     public bool Integer { get; init; }
 
+    public double Maximum => maximum;
+
     private bool UseLog => Logarithmic && minimum > 0 && maximum > minimum;
 
     private double Fraction => maximum <= minimum ? 0 : UseLog
@@ -221,7 +223,7 @@ internal sealed class RowList
                 screen.Fill(box.X + 1, y, box.Width - 2, 5, back);
                 gain.DrawDial(screen, box.X + 3, y, theme, back, first == _index);
                 screen.Text(box.X + 19, y + 1, "GAIN", theme.TextSecondary, back);
-                screen.Text(box.X + 19, y + 3, gain.Note ?? (first == _index ? "- / +" : "0 to 80 dB"),
+                screen.Text(box.X + 19, y + 3, gain.Note ?? (first == _index ? "- / +" : $"0 to {gain.Maximum:0} dB"),
                     first == _index ? theme.Accent : theme.TextMuted, back, maxWidth: box.Width - 21);
                 y += 5;
                 first++;

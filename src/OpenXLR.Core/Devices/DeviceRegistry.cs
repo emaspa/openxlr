@@ -26,7 +26,7 @@ public static class DeviceRegistry
         (new Key(XlrDockDevice.VendorId, XlrDockDevice.ProductId), () => new XlrDockDevice()),
         (new Key(WaveXlrMk2Device.VendorId, WaveXlrMk2Device.ProductId), () => new WaveXlrMk2Device()),
         (new Key(XlrDockMk2Device.VendorId, XlrDockMk2Device.ProductId), () => new XlrDockMk2Device()),
-        (new Key(Wave3Device.VendorId, Wave3Device.ProductId), () => new Wave3Device()),   // last: not yet run on the device
+        (new Key(Wave3Device.VendorId, Wave3Device.ProductId), () => new Wave3Device()),   // last: beta, one quick test on a user's unit
         // Add more brands/models here, e.g.:
         // (new Key(0x1220, 0x8fe0), () => new GoXlrDevice()),
     ];

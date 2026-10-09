@@ -309,7 +309,7 @@
         <!-- XLR 1 -->
         <Grid ColumnDefinitions="90,*,64,Auto">
           <TextBlock Text="{loc:Text Key=XLR1Gain}" Classes="h" VerticalAlignment="Center"/>
-          <Slider Grid.Column="1" Minimum="0" Maximum="80" TickFrequency="1" IsSnapToTickEnabled="True"
+          <Slider Grid.Column="1" Minimum="0" Maximum="{Binding GainMaxDb}" TickFrequency="1" IsSnapToTickEnabled="True"
                   Value="{Binding GainDb, Mode=TwoWay}" IsEnabled="{Binding !GainLocked}"/>
           <TextBlock Grid.Column="2" Text="{Binding GainText}" Classes="val" VerticalAlignment="Center"
                      HorizontalAlignment="Right"/>
@@ -396,7 +396,7 @@
         <!-- XLR 2 -->
         <Grid ColumnDefinitions="90,*,64" Margin="0,2,0,0" IsVisible="{Binding HasXlr2}">
           <TextBlock Text="{loc:Text Key=XLR2Gain}" Classes="h" VerticalAlignment="Center"/>
-          <Slider Grid.Column="1" Minimum="0" Maximum="80" TickFrequency="1" IsSnapToTickEnabled="True"
+          <Slider Grid.Column="1" Minimum="0" Maximum="{Binding GainMaxDb}" TickFrequency="1" IsSnapToTickEnabled="True"
                   Value="{Binding Gain2Db, Mode=TwoWay}" IsEnabled="{Binding !GainLocked}"/>
           <TextBlock Grid.Column="2" Text="{Binding Gain2Text}" Classes="val" VerticalAlignment="Center"
                      HorizontalAlignment="Right"/>

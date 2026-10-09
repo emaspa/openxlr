@@ -867,6 +867,9 @@
   <data name="InstallPluginFiles" xml:space="preserve">
     <value>Install plugin files</value>
   </data>
+  <data name="DeviceFirmware" xml:space="preserve">
+    <value>Firmware {0}</value>
+  </data>
   <data name="INTERFACE" xml:space="preserve">
     <value>INTERFACE</value>
   </data>

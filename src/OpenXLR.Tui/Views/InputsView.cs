@@ -36,12 +36,13 @@ internal sealed class InputsView : View
         List<Row> rows = [];
         DaemonLink link = app.Link;
         int inputs = Math.Max(1, state.Count("xlrInputs"));
+        int gainMax = state.Count("gainMaxDb") is int max and > 0 ? max : 80;
 
         for (int input = 1; input <= inputs; input++)
         {
             string suffix = input == 1 ? string.Empty : input.ToString();
             rows.Add(new HeadingRow($"XLR {input}"));
-            rows.Add(new NumberRow($"Gain", state.Number($"gain{suffix}Db"), 0, 80, 1,
+            rows.Add(new NumberRow($"Gain", state.Number($"gain{suffix}Db"), 0, gainMax, 1,
                 value => $"{value:0} dB", value => Set(link, $"gain{suffix}", (int)Math.Round(value)))
             { Enabled = state.Can("gain"), FineStep = 1, Note = state.Flag("gainLocked") ? "locked" : null });
             rows.Add(new ToggleRow("Mute", state.Flag($"mute{suffix}"),

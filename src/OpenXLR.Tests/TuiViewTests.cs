@@ -566,6 +566,29 @@ public sealed class TuiViewTests
     }
 
     [Fact]
+    public void TheGainStopsAtTheDevicesHighestGain()
+    {
+        // The Wave:3 takes 40 dB at most; the row is that long, not 80.
+        DaemonLink link = new();
+        List<string> sent = [];
+        link.Sent += json => sent.Add(json);
+        System.Text.Json.Nodes.JsonNode root = System.Text.Json.Nodes.JsonNode.Parse(StateJson)!;
+        root["capabilities"]!["gainMaxDb"] = 40;
+        root["capabilities"]!["xlrInputs"] = 1;
+        root["state"]!["gainDb"] = 39;
+        link.Receive(root.ToJsonString());
+        App app = new(link, Theme.Material);
+        app.ShowTab(2);
+        app.Draw(new Screen(140, 36));
+        app.Handle(new KeyPress(Key.Right));
+        app.Handle(new KeyPress(Key.Right));
+
+        Assert.NotEmpty(sent);
+        Assert.All(sent, json => Assert.True(JsonDocument.Parse(json).RootElement.GetProperty("value").GetInt32() <= 40));
+        Assert.Equal(40, JsonDocument.Parse(sent[^1]).RootElement.GetProperty("value").GetInt32());
+    }
+
+    [Fact]
     public void TheSecondInputSetsItsOwnControls()
     {
         (App app, List<string> sent) = Ready(tab: 2);
