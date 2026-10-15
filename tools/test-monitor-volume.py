@@ -6,6 +6,7 @@ other than the default output can be tested with `--artifacts-path <dir>`.
 OPENXLR_TEST_FILTER selects a focused regression instead of the full audio suite.
 """
 import os
+import json
 from pathlib import Path
 import subprocess
 import sys
@@ -37,6 +38,17 @@ def main():
                         if process.poll() is not None or time.monotonic() > deadline:
                             raise RuntimeError(command + " did not create its socket")
                         time.sleep(0.05)
+                # Internal filters must ignore stale desktop volume and mute.
+                # Seed the private session manager with values from an older build.
+                state = Path(env["XDG_STATE_HOME"], "wireplumber", "stream-properties")
+                state.parent.mkdir(parents=True, exist_ok=True)
+                values = json.dumps({"volume": 0.125, "mute": True, "channelVolumes": [0.125]})
+                lines = ["[stream-properties]"]
+                for description in ("OpenXLR Mic Filter", "OpenXLR mix latency delay"):
+                    for kind, suffix in (("Sink", "input"), ("Source", "output")):
+                        name = (description + " " + suffix).replace(" ", r"\s")
+                        lines.append(f"Audio/{kind}:media.name:{name}={values}")
+                state.write_text("\n".join(lines) + "\n")
                 help_text = subprocess.check_output(["wireplumber", "--help"], text=True)
                 if "--profile" in help_text:
                     policies = [["--profile", "policy"]]
@@ -54,7 +66,7 @@ def main():
                     processes.append(subprocess.Popen(["wireplumber", *policy], env=env, stdout=log, stderr=log))
                 subprocess.run(["dotnet", "test", "src/OpenXLR.Tests/OpenXLR.Tests.csproj",
                                 "-c", "Release", "--no-build", "--filter",
-                                os.environ.get("OPENXLR_TEST_FILTER", "FullyQualifiedName~MonitorVolumeIntegrationTests|FullyQualifiedName~ProfileStartupTests|FullyQualifiedName~DspAudioIntegrationTests|FullyQualifiedName~MixDelayIntegrationTests|FullyQualifiedName~PluginLatencyIntegrationTests|FullyQualifiedName~SoundCheckIntegrationTests"), *sys.argv[1:]],
+                                os.environ.get("OPENXLR_TEST_FILTER", "FullyQualifiedName~MonitorVolumeIntegrationTests|FullyQualifiedName~FilterStateIntegrationTests|FullyQualifiedName~ProfileStartupTests|FullyQualifiedName~DspAudioIntegrationTests|FullyQualifiedName~MixDelayIntegrationTests|FullyQualifiedName~PluginLatencyIntegrationTests|FullyQualifiedName~SoundCheckIntegrationTests"), *sys.argv[1:]],
                                env=env, check=True, timeout=180,
                                cwd=Path(__file__).resolve().parent.parent)
             except Exception:

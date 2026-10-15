@@ -17,6 +17,8 @@ namespace OpenXLR.Core.Mixing;
 public sealed class PipeWireAdapter
 {
     private const string ClipGuardPluginFile = "hard_limiter_1413.so";
+    // Intermediate DSP nodes are not independent desktop volume controls.
+    private const string InternalFilterNodeState = "node.hidden = true state.restore-props = false";
 
     private readonly Func<DspFeatureAvailability>? _clipGuardAvailabilityOverride;
     private readonly Action? _progress;
@@ -790,10 +792,10 @@ public sealed class PipeWireAdapter
             $"inputs = [ {inputs} ] outputs = [ {outputs} ] }} " +
             $"capture.props = {{ node.name = {sinkName} media.class = Audio/Sink " +
             $"audio.channels = {channels} audio.position = {position} node.suspend-on-idle = false " +
-            "priority.session = 100 } " +
+            $"priority.session = 100 {InternalFilterNodeState} }} " +
             $"playback.props = {{ node.name = {srcName} media.class = Audio/Source " +
             $"audio.channels = {channels} audio.position = {position} node.suspend-on-idle = false " +
-            "priority.session = 100 } }";
+            $"priority.session = 100 {InternalFilterNodeState} }} }}";
         try { return StartFilterChain(sinkName, srcName, spa); }
         catch (InvalidOperationException failure) when (NativeFallbackFor(inserts, channels) is { } active)
         {
@@ -910,8 +912,8 @@ public sealed class PipeWireAdapter
             $"{{ type = builtin name = left label = delay config = {{ max-delay = {max} }} control = {{ \"Delay (s)\" = 0.0 }} }} " +
             $"{{ type = builtin name = right label = delay config = {{ max-delay = {max} }} control = {{ \"Delay (s)\" = 0.0 }} }} ] " +
             "inputs = [ \"left:In\" \"right:In\" ] outputs = [ \"left:Out\" \"right:Out\" ] } " +
-            $"capture.props = {{ node.name = {sink} media.class = Audio/Sink audio.channels = 2 audio.position = [ FL FR ] node.suspend-on-idle = false node.hidden = true }} " +
-            $"playback.props = {{ node.name = {source} media.class = Audio/Source audio.channels = 2 audio.position = [ FL FR ] node.suspend-on-idle = false node.hidden = true }} }}";
+            $"capture.props = {{ node.name = {sink} media.class = Audio/Sink audio.channels = 2 audio.position = [ FL FR ] node.suspend-on-idle = false {InternalFilterNodeState} }} " +
+            $"playback.props = {{ node.name = {source} media.class = Audio/Source audio.channels = 2 audio.position = [ FL FR ] node.suspend-on-idle = false {InternalFilterNodeState} }} }}";
         return StartFilterChain(sink, source, spa);
     }
 

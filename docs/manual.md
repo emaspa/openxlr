@@ -128,6 +128,10 @@ does not rewire the desktop.
 chain on each XLR input, a stereo chain on each mix. On the first XLR Dock
 and original Wave XLR, OpenXLR also offers software low cut and limiting
 on XLR 1 because their backends do not expose those hardware controls.
+Intermediate DSP and mix-delay nodes are hidden from desktop device pickers
+and ignore saved desktop volume and mute. Use the channel sends, mix
+masters and physical output controls for level and mute changes. Rebuilding a chain starts these
+internal stages at unity and unmuted.
 Unmapped processing previously enabled in Wave Link may still be active
 on the original Wave XLR. See [hardware support](hardware-support.md).
 
