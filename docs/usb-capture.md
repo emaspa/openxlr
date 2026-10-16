@@ -1,5 +1,9 @@
 # Capturing USB traffic for testers
 
+For the Wave FX EQ and the Pro's remaining onboard effects, use the
+[hardware effects capture guide](hardware-effects-capture.md). The steps
+below target the original Wave XLR instead.
+
 This guide is for owners of the original Wave XLR (`0fd9:007d`) who want
 to help map the rest of its protocol. No programming needed, only
 Wireshark and about 15 minutes.

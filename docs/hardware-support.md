@@ -56,6 +56,8 @@ Elgato's [Pro feature guide](https://www.elgato.com/us/en/explorer/products/wave
 distinguishes those onboard effects from VST processing on the computer.
 OpenXLR exposes Voice Tune and the other DSP controls listed above; its
 plugin inserts run in the Linux audio graph.
+The [hardware effects capture guide](hardware-effects-capture.md) lists
+the per-model captures needed to map the remaining onboard controls.
 
 ## XLR Dock (0fd9:00a6)
 
