@@ -177,6 +177,13 @@ Channels appear as playback devices in the desktop's audio applet, and
 the virtual microphones (Stream and Chat by default) as recording
 devices; the hardware input channels are hidden from it.
 
+### Precise faders
+
+Mixer faders use one-percentage-point steps, arrow keys and ten-point page
+steps. Shift-drag reduces pointer sensitivity tenfold for short faders.
+Device controls step in their displayed units; plugin parameter steps are
+unchanged.
+
 ### External capture channels
 
 Additional microphones, headsets, capture cards and other attached Wave

@@ -154,6 +154,18 @@ for, so a tooltip near an edge of the screen never ends up over the
 button and never takes the click meant for it.
 
 <a name="mic-to-call"></a>
+### Precise fader adjustments
+
+Mixer and device faders move in their displayed units: one percentage point
+for sends, mix masters and monitor volume, one unit for hardware controls.
+Focus a fader and use the arrow keys for one step, or Page Up and Page Down
+for ten. Hold Shift before dragging for one tenth of the normal sensitivity,
+so a short fader can still reach an exact value. Release the pointer to end
+fine dragging. The 150% range keeps the same one-percentage-point steps.
+
+Incoming device or profile values retain their precision until you adjust
+them. Plugin parameter controls keep the steps supplied by their plugin.
+
 ### 3.1 Send your microphone to a call or a recording
 
 1. In the SUBMIXER card, make sure XLR 1 is unmuted in the Stream and

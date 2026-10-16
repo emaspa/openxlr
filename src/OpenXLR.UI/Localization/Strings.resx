@@ -699,6 +699,9 @@
   <data name="ExportPreset" xml:space="preserve">
     <value>Export preset</value>
   </data>
+  <data name="FaderPrecisionHint" xml:space="preserve">
+    <value>Hold Shift while dragging for finer control. Arrow keys change one step; Page Up and Page Down change ten.</value>
+  </data>
   <data name="FindAnInstalledPlugin" xml:space="preserve">
     <value>Find an installed plugin…</value>
   </data>

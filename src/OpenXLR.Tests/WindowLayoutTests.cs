@@ -567,6 +567,7 @@ public sealed class WindowLayoutTests
                 AssertLiveLayoutOrder(main, vm);
                 EffectWorkflowWindowTests.CheckControlOwnership(main, vm.Inserts.Client);
                 PluginCatalogueUiTests.CheckStaleReplies();
+                FaderInputWindowTests.Check(main);
                 SoundCheckWindowTests.CheckPendingClose();
                 AssertLayoutAppearance(main, vm);
                 MixerViewWindowTests.Check();

@@ -306,7 +306,7 @@
         <!-- XLR 1 -->
         <Grid ColumnDefinitions="90,*,64,Auto">
           <TextBlock Text="{loc:Text Key=XLR1Gain}" Classes="h" VerticalAlignment="Center"/>
-          <Slider Grid.Column="1" Minimum="0" Maximum="{Binding GainMaxDb}" TickFrequency="1" IsSnapToTickEnabled="True"
+          <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="{Binding GainMaxDb}"
                   Value="{Binding GainDb, Mode=TwoWay}" IsEnabled="{Binding !GainLocked}"/>
           <TextBlock Grid.Column="2" Text="{Binding GainText}" Classes="val" VerticalAlignment="Center"
                      HorizontalAlignment="Right"/>
@@ -336,7 +336,7 @@
         </WrapPanel>
         <Grid ColumnDefinitions="90,*,64" IsVisible="{Binding VoiceTune}">
           <TextBlock Text="{loc:Text Key=VTStrength}" Classes="h" VerticalAlignment="Center"/>
-          <Slider Grid.Column="1" Minimum="0" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True"
+          <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="100"
                   Value="{Binding VoiceTuneStrength, Mode=TwoWay}"/>
           <TextBlock Grid.Column="2" Text="{Binding VoiceTuneStrengthText}" Classes="val"
                      VerticalAlignment="Center" HorizontalAlignment="Right"/>
@@ -393,7 +393,7 @@
         <!-- XLR 2 -->
         <Grid ColumnDefinitions="90,*,64" Margin="0,2,0,0" IsVisible="{Binding HasXlr2}">
           <TextBlock Text="{loc:Text Key=XLR2Gain}" Classes="h" VerticalAlignment="Center"/>
-          <Slider Grid.Column="1" Minimum="0" Maximum="{Binding GainMaxDb}" TickFrequency="1" IsSnapToTickEnabled="True"
+          <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="{Binding GainMaxDb}"
                   Value="{Binding Gain2Db, Mode=TwoWay}" IsEnabled="{Binding !GainLocked}"/>
           <TextBlock Grid.Column="2" Text="{Binding Gain2Text}" Classes="val" VerticalAlignment="Center"
                      HorizontalAlignment="Right"/>
@@ -458,7 +458,7 @@
 
         <Grid ColumnDefinitions="90,*,64" IsVisible="{Binding VoiceTune2}">
           <TextBlock Text="{loc:Text Key=VTStrength}" Classes="h" VerticalAlignment="Center"/>
-          <Slider Grid.Column="1" Minimum="0" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True"
+          <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="100"
                   Value="{Binding VoiceTuneStrength2, Mode=TwoWay}"/>
           <TextBlock Grid.Column="2" Text="{Binding VoiceTuneStrength2Text}" Classes="val"
                      VerticalAlignment="Center" HorizontalAlignment="Right"/>
@@ -467,7 +467,7 @@
         <!-- USB Aux input stage -->
         <Grid ColumnDefinitions="90,*,64,20,110" Margin="0,2,0,0" IsVisible="{Binding CapAuxInput}">
           <TextBlock Text="{loc:Text Key=USBAuxIn}" Classes="h" VerticalAlignment="Center"/>
-          <Slider Grid.Column="1" Minimum="-60" Maximum="0"
+          <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="-60" Maximum="0"
                   Value="{Binding AuxLevelDb, Mode=TwoWay}"/>
           <TextBlock Grid.Column="2" Text="{Binding AuxLevelText}" Classes="val" VerticalAlignment="Center"
                      HorizontalAlignment="Right"/>
@@ -488,13 +488,13 @@
       <StackPanel Classes="dev" Spacing="4">
         <Grid ColumnDefinitions="90,*,64,20,90,*,64">
           <TextBlock Text="{loc:Text Key=Phones1}" Classes="h" VerticalAlignment="Center" ToolTip.Tip="{loc:Text Key=FrontJack}"/>
-          <Slider Grid.Column="1" Minimum="0" Maximum="100"
+          <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="100"
                   Value="{Binding HpPercent, Mode=TwoWay}"/>
           <TextBlock Grid.Column="2" Text="{Binding HpText}" Classes="val" VerticalAlignment="Center"
                      HorizontalAlignment="Right"/>
           <TextBlock Grid.Column="4" Text="{loc:Text Key=Phones2}" Classes="h" VerticalAlignment="Center" ToolTip.Tip="{loc:Text Key=RearJack}"
                      IsVisible="{Binding HasHp2}"/>
-          <Slider Grid.Column="5" Minimum="0" Maximum="100"
+          <Slider vm:FaderInput.Step="1" Grid.Column="5" Minimum="0" Maximum="100"
                   Value="{Binding Hp2Percent, Mode=TwoWay}" IsVisible="{Binding HasHp2}"/>
           <TextBlock Grid.Column="6" Text="{Binding Hp2Text}" Classes="val" VerticalAlignment="Center"
                      HorizontalAlignment="Right" IsVisible="{Binding HasHp2}"/>
@@ -504,7 +504,7 @@
         <Grid ColumnDefinitions="90,*,74" IsVisible="{Binding CapCrossfade}">
           <TextBlock Text="{loc:Text Key=MicPC}" Classes="h" VerticalAlignment="Center"
                      ToolTip.Tip="{loc:Text Key=DirectMonitorBlendLeftOnlyYourMicRight}"/>
-          <Slider Grid.Column="1" Minimum="0" Maximum="200" TickFrequency="1" IsSnapToTickEnabled="True"
+          <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="200"
                   Value="{Binding Crossfade, Mode=TwoWay}"/>
           <TextBlock x:Name="CrossfadeValue" Grid.Column="2" Text="{Binding CrossfadeText}" Classes="val"
                      VerticalAlignment="Center" HorizontalAlignment="Right"/>
@@ -564,7 +564,7 @@
           </DropDownButton>
 
           <TextBlock Grid.Column="3" Text="{loc:Text Key=Volume}" Classes="h" VerticalAlignment="Center"/>
-          <Slider Name="OutputVolumeSlider" Grid.Column="4" Minimum="0" Maximum="{Binding OutputVolumeRange.Maximum}" Value="{Binding OutputVolume, Mode=TwoWay}"/>
+          <Slider vm:FaderInput.Step="0.01" Name="OutputVolumeSlider" Grid.Column="4" Minimum="0" Maximum="{Binding OutputVolumeRange.Maximum}" Value="{Binding OutputVolume, Mode=TwoWay}"/>
           <TextBlock Grid.Column="5" Text="{Binding OutputVolumeText}" Classes="val"
                      VerticalAlignment="Center" HorizontalAlignment="Right"/>
         </Grid>
@@ -669,7 +669,7 @@
                     <skin:LevelMeter Level="{Binding MeterL}" AutomationProperties.Name="{loc:Text Key=LeftLevel}"/>
                     <skin:LevelMeter Level="{Binding MeterR}" AutomationProperties.Name="{loc:Text Key=RightLevel}"/>
                   </StackPanel>
-                  <Slider Minimum="0" Maximum="{Binding VolumeRange.Maximum}" Value="{Binding Volume, Mode=TwoWay}"/>
+                  <Slider vm:FaderInput.Step="0.01" Minimum="0" Maximum="{Binding VolumeRange.Maximum}" Value="{Binding Volume, Mode=TwoWay}"/>
                   <Grid ColumnDefinitions="*,Auto">
                     <ToggleButton Content="{loc:Text Key=Mute}" Classes="mute" IsChecked="{Binding Muted, Mode=TwoWay}"/>
                     <ToggleButton Grid.Column="1" Content="150%" IsChecked="{Binding VolumeRange.Boost, Mode=TwoWay}"
@@ -753,7 +753,7 @@
                               <TextBlock Grid.Column="1" Text="{Binding LevelText}" Classes="val" FontSize="11"/>
                             </Grid>
                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-                              <Slider Minimum="0" Maximum="1" Value="{Binding Level, Mode=TwoWay}"
+                              <Slider vm:FaderInput.Step="0.01" Minimum="0" Maximum="1" Value="{Binding Level, Mode=TwoWay}"
                                       VerticalAlignment="Center"/>
                               <ToggleButton Grid.Column="1" Classes="mute mutemini" IsChecked="{Binding Muted, Mode=TwoWay}"
                                             Padding="7,2" FontSize="11" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"/>

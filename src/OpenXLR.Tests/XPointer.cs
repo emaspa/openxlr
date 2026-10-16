@@ -57,9 +57,14 @@ internal sealed class XPointer : IDisposable
 
     public void Key(ulong keysym)
     {
+        SetKey(keysym, true);
+        SetKey(keysym, false);
+    }
+
+    public void SetKey(ulong keysym, bool pressed)
+    {
         byte key = XKeysymToKeycode(_display, keysym);
-        XTestFakeKeyEvent(_display, key, 1, 0);
-        XTestFakeKeyEvent(_display, key, 0, 0);
+        XTestFakeKeyEvent(_display, key, pressed ? 1 : 0, 0);
         XFlush(_display);
     }
 

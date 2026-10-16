@@ -697,6 +697,9 @@
   <data name="ExportPreset" xml:space="preserve">
     <value>Voreinstellung exportieren</value>
   </data>
+  <data name="FaderPrecisionHint" xml:space="preserve">
+    <value>Halte beim Ziehen die Umschalttaste für feinere Schritte. Pfeiltasten ändern um einen Schritt, Bild auf und Bild ab um zehn.</value>
+  </data>
   <data name="FindAnInstalledPlugin" xml:space="preserve">
     <value>Installiertes Plugin suchen…</value>
   </data>
