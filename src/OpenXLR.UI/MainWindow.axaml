@@ -644,9 +644,13 @@
                      IsVisible="{Binding ViewPreferenceError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
         </StackPanel>
 
-        <!-- master row -->
-        <ItemsControl DockPanel.Dock="Bottom" ItemsSource="{Binding Mixes}" IsVisible="{Binding HasMixer}"
-                      Margin="0,10,0,0">
+        <TextBlock Name="InputChannelHeading" DockPanel.Dock="Top" Text="{loc:Text Key=InputChannelsHeading}"
+                   Classes="h" Margin="0,0,0,8" IsVisible="{Binding HasMixer}"/>
+
+        <!-- Mix masters control the outgoing mixes, separate from the channel sends. -->
+        <StackPanel DockPanel.Dock="Bottom" IsVisible="{Binding HasMixer}" Margin="0,10,0,0" Spacing="8">
+        <TextBlock Name="OutputMixHeading" Text="{loc:Text Key=OutputMixesHeading}" Classes="h"/>
+        <ItemsControl ItemsSource="{Binding Mixes}">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
@@ -717,6 +721,7 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
+        </StackPanel>
 
         <!-- channel strips: one column per channel, one fader per mix -->
         <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"

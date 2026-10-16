@@ -145,6 +145,15 @@ public sealed class WindowLayoutTests
                         AssertNoOverlap(((Grid)name.Parent!).Children.Where(c => c.IsVisible).ToArray());
                     }
 
+                    var inputHeading = main.FindControl<TextBlock>("InputChannelHeading")!;
+                    var outputHeading = main.FindControl<TextBlock>("OutputMixHeading")!;
+                    Assert.Equal(Localizer.Text("InputChannelsHeading"), inputHeading.Text);
+                    Assert.Equal(Localizer.Text("OutputMixesHeading"), outputHeading.Text);
+                    AssertInside(inputHeading, main);
+                    AssertInside(outputHeading, main);
+                    Assert.True(inputHeading.TranslatePoint(default, main)!.Value.Y
+                        < outputHeading.TranslatePoint(default, main)!.Value.Y);
+
                     var masters = main.GetVisualDescendants().OfType<Border>()
                         .Where(b => b.DataContext is MixViewModel && b.Width == 232).ToArray();
                     Assert.Equal(8, masters.Length);

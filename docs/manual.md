@@ -109,6 +109,15 @@ SUBMIXER card shows them as a grid, channels down, mixes across. Each
 mix also has a **master** level and mute. A typical setup keeps Music
 loud in Monitor A and lower in Stream, and out of Chat entirely.
 
+### Submixer categories
+
+The SUBMIXER separates **INPUT CHANNELS**, the channel strips and their sends,
+from **OUTPUT MIXES**, the master volumes and effects of the resulting mixes.
+Application audio and external capture sources are input channels too. Output
+mixes include monitor mixes and virtual microphones; they are not a list of
+physical output devices. The MONITOR section still chooses the physical
+outputs that receive these mixes.
+
 **Application routing**: when an app starts playing, the daemon reads
 its name from PipeWire and picks a channel by rules: browsers to
 Browser; Spotify, YouTube Music and media players to Music; Discord,

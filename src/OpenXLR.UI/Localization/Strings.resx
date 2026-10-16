@@ -822,6 +822,9 @@
   <data name="InputChainHint" xml:space="preserve">
     <value>Plugins, in order, before this input reaches the mixes</value>
   </data>
+  <data name="InputChannelsHeading" xml:space="preserve">
+    <value>INPUT CHANNELS</value>
+  </data>
   <data name="INPUTS" xml:space="preserve">
     <value>INPUTS</value>
   </data>
@@ -1280,6 +1283,9 @@
   </data>
   <data name="Options" xml:space="preserve">
     <value>Options</value>
+  </data>
+  <data name="OutputMixesHeading" xml:space="preserve">
+    <value>OUTPUT MIXES</value>
   </data>
   <data name="OUTPUTS" xml:space="preserve">
     <value>OUTPUTS</value>

@@ -107,6 +107,9 @@ does not reach the speakers until unmuted.
 
 ## Submixer
 
+Input channels and output mixes have separate headings in the submixer, so
+channel sends and mix master controls can be distinguished at a glance.
+
 The **Flow** window shows inputs, channels, mixes and outputs in four columns.
 Click a card to trace its signal path, with colours for each routing stage and
 unrelated routes dimmed. Processing stays inside the channel and mix cards;
