@@ -68,6 +68,9 @@ so a 1 kHz sine summed from Monitor A and B reads below the expected level
 although each leg's gain is right. With DC the sum does not depend on that
 delay. The test measures the settled part of the capture and the peak of
 the whole capture; it does not measure frequency response.
+The private audio runner allows five minutes for the full test process,
+including startup. Individual test deadlines and audio assertions remain
+in force; the suite limit bounds a hung run before its servers are stopped.
 Sound Check waits for captured samples to settle within a deadline after a
 filter change, rather than assuming a fixed startup time for the stream.
 
