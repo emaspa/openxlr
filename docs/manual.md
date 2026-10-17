@@ -153,7 +153,6 @@ pointer, and flips to whichever side of that control the screen has room
 for, so a tooltip near an edge of the screen never ends up over the
 button and never takes the click meant for it.
 
-<a name="mic-to-call"></a>
 ### Precise fader adjustments
 
 Mixer and device faders move in their displayed units: one percentage point
@@ -169,6 +168,7 @@ one-percentage-point steps. Additional touch contacts do not take over a drag.
 Incoming device or profile values retain their precision until you adjust
 them. Plugin parameter controls keep the steps supplied by their plugin.
 
+<a name="mic-to-call"></a>
 ### 3.1 Send your microphone to a call or a recording
 
 1. In the SUBMIXER card, make sure XLR 1 is unmuted in the Stream and
