@@ -59,6 +59,9 @@ internal static class FaderInputWindowTests
                     parent.Children.RemoveAt(index);
                     parent.Children.Insert(index, s);
                 });
+                var vm = (MainViewModel)main.DataContext!;
+                Drag(slider, input, fine: true, cancel: _ => vm.OutputVolumeRange.Apply(false));
+                Drag(slider, input, fine: true, cancel: _ => vm.OutputVolumeRange.Apply(true));
                 Assert.InRange(Drag(slider, input, fine: true), .51, .59);
             }
         }
@@ -82,10 +85,10 @@ internal static class FaderInputWindowTests
             Pump();
             if (cancel is not null)
             {
-                double stopped = slider.Value;
                 cancel(slider);
                 Pump();
-                input.MoveTo(point.X + 90, point.Y);
+                double stopped = slider.Value;
+                input.MoveTo(point.X + 120, point.Y);
                 Pump();
                 Assert.Equal(stopped, slider.Value);
             }

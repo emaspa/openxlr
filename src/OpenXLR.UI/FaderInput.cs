@@ -66,7 +66,10 @@ public sealed class FaderInput : AvaloniaObject
             slider.DetachedFromVisualTree += (_, _) => End();
             slider.PropertyChanged += (_, e) =>
             {
-                if (e.Property == InputElement.IsEffectivelyEnabledProperty && !slider.IsEffectivelyEnabled) End();
+                // A new device or desktop boost setting changes the drag's
+                // scale. Do not continue from its old value and geometry.
+                if (e.Property == RangeBase.MinimumProperty || e.Property == RangeBase.MaximumProperty
+                    || e.Property == InputElement.IsEffectivelyEnabledProperty && !slider.IsEffectivelyEnabled) End();
             };
         }
 
