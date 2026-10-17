@@ -46,12 +46,26 @@ internal static class FaderInputWindowTests
                 Assert.InRange(fine, .51, .59);
                 Assert.True(normal - .5 > (fine - .5) * 5, $"Normal {normal}, fine {fine}.");
                 Assert.Equal(Math.Round(fine * 100), fine * 100, 8);
+                Drag(slider, input, fine: true, cancel: s =>
+                {
+                    s.IsEnabled = false;
+                    Pump();
+                    s.IsEnabled = true;
+                });
+                Drag(slider, input, fine: true, cancel: s =>
+                {
+                    var parent = (Panel)s.Parent!;
+                    int index = parent.Children.IndexOf(s);
+                    parent.Children.RemoveAt(index);
+                    parent.Children.Insert(index, s);
+                });
+                Assert.InRange(Drag(slider, input, fine: true), .51, .59);
             }
         }
         finally { SkinService.Apply(saved); }
     }
 
-    private static double Drag(Slider slider, XPointer input, bool fine)
+    private static double Drag(Slider slider, XPointer input, bool fine, Action<Slider>? cancel = null)
     {
         slider.Value = .5;
         Pump();
@@ -66,6 +80,15 @@ internal static class FaderInputWindowTests
             Pump();
             input.MoveTo(point.X + 60, point.Y);
             Pump();
+            if (cancel is not null)
+            {
+                double stopped = slider.Value;
+                cancel(slider);
+                Pump();
+                input.MoveTo(point.X + 90, point.Y);
+                Pump();
+                Assert.Equal(stopped, slider.Value);
+            }
         }
         finally
         {

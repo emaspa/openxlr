@@ -161,7 +161,8 @@ for sends, mix masters and monitor volume, one unit for hardware controls.
 Focus a fader and use the arrow keys for one step, or Page Up and Page Down
 for ten. Hold Shift before dragging for one tenth of the normal sensitivity,
 so a short fader can still reach an exact value. Release the pointer to end
-fine dragging. The 150% range keeps the same one-percentage-point steps.
+fine dragging. Locking a control also ends its active drag. The 150% range
+keeps the same one-percentage-point steps.
 
 Incoming device or profile values retain their precision until you adjust
 them. Plugin parameter controls keep the steps supplied by their plugin.
