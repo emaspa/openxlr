@@ -53,6 +53,7 @@ public sealed class FaderInput : AvaloniaObject
     {
         private readonly Slider _slider;
         private IPointer? _pointer;
+        private Visual[] _ancestors = [];
         private Point _origin;
         private double _value, _span;
 
@@ -62,19 +63,29 @@ public sealed class FaderInput : AvaloniaObject
             slider.AddHandler(InputElement.PointerPressedEvent, Pressed, RoutingStrategies.Tunnel);
             slider.AddHandler(InputElement.PointerMovedEvent, Moved, RoutingStrategies.Tunnel);
             slider.AddHandler(InputElement.PointerReleasedEvent, Released, RoutingStrategies.Tunnel);
-            slider.PointerCaptureLost += (_, _) => _pointer = null;
+            slider.PointerCaptureLost += (_, e) =>
+            {
+                if (e.Pointer == _pointer) End(release: false);
+            };
             slider.DetachedFromVisualTree += (_, _) => End();
             slider.PropertyChanged += (_, e) =>
             {
                 // A new device or desktop boost setting changes the drag's
                 // scale. Do not continue from its old value and geometry.
                 if (e.Property == RangeBase.MinimumProperty || e.Property == RangeBase.MaximumProperty
+                    || e.Property == Visual.IsVisibleProperty && !slider.IsVisible
                     || e.Property == InputElement.IsEffectivelyEnabledProperty && !slider.IsEffectivelyEnabled) End();
             };
         }
 
         private void Pressed(object? sender, PointerPressedEventArgs e)
         {
+            if (_pointer is not null)
+            {
+                e.PreventGestureRecognition();
+                e.Handled = true;
+                return;
+            }
             if (GetStep(_slider) <= 0 || (e.KeyModifiers & KeyModifiers.Shift) == 0
                 || !e.GetCurrentPoint(_slider).Properties.IsLeftButtonPressed) return;
             var track = _slider.GetVisualDescendants().OfType<Track>().FirstOrDefault();
@@ -85,8 +96,13 @@ public sealed class FaderInput : AvaloniaObject
             _origin = e.GetPosition(_slider);
             _value = _slider.Value;
             _pointer = e.Pointer;
+            // Effective visibility has no public change event. Observe only
+            // this active drag's parents, including a hidden window or tile.
+            _ancestors = _slider.GetVisualAncestors().ToArray();
+            foreach (Visual ancestor in _ancestors) ancestor.PropertyChanged += OnAncestorChanged;
             _slider.Focus();
             e.Pointer.Capture(_slider);
+            e.PreventGestureRecognition();
             e.Handled = true;
         }
 
@@ -109,11 +125,18 @@ public sealed class FaderInput : AvaloniaObject
             e.Handled = true;
         }
 
-        private void End()
+        private void OnAncestorChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+        {
+            if (e.Property == Visual.IsVisibleProperty && !e.GetNewValue<bool>()) End();
+        }
+
+        private void End(bool release = true)
         {
             IPointer? pointer = _pointer;
             _pointer = null;
-            pointer?.Capture(null);
+            foreach (Visual ancestor in _ancestors) ancestor.PropertyChanged -= OnAncestorChanged;
+            _ancestors = [];
+            if (release) pointer?.Capture(null);
         }
     }
 }
