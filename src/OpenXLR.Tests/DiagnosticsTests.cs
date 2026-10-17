@@ -208,8 +208,10 @@ public sealed class DiagnosticsTests
         Directory.CreateDirectory(output);
         try
         {
+            string original = $"bundle: {home}/.vst3/Kotelnikov.vst3\ntoken: hunter2-not-a-real-token\n" +
+                "{\"API_KEY\":\"quoted-test-credential\"}\n" + marker + "\n";
             await File.WriteAllTextAsync(Path.Combine(logs, "vst3-aaaabbbbccccdddd.log"),
-                $"bundle: {home}/.vst3/Kotelnikov.vst3\ntoken: hunter2-not-a-real-token\n{marker}\n");
+                original);
             await File.WriteAllTextAsync(Path.Combine(root, "outside.txt"), "SECRET-OUTSIDE-THE-DIRECTORY");
             File.CreateSymbolicLink(Path.Combine(logs, "vst3-1111222233334444.log"), Path.Combine(root, "outside.txt"));
             await File.WriteAllTextAsync(Path.Combine(logs, "bad name.log"), "SHOULD-NOT-APPEAR");
@@ -264,7 +266,10 @@ public sealed class DiagnosticsTests
             Assert.DoesNotContain(home, kept);
             Assert.Contains("bundle: <redacted>/.vst3/Kotelnikov.vst3", kept);
             Assert.DoesNotContain("hunter2", kept);
+            Assert.DoesNotContain("quoted-test-credential", kept);
             Assert.Contains("token: <redacted>", kept);
+            Assert.Contains("\"API_KEY\":<redacted>", kept);
+            Assert.Equal(original, await File.ReadAllTextAsync(Path.Combine(logs, "vst3-aaaabbbbccccdddd.log")));
 
             // A link is never followed, and a name the store could not have
             // written is never copied, whatever it points at.
@@ -318,8 +323,43 @@ public sealed class DiagnosticsTests
     [InlineData("Authorization: Bearer eyJhbGciOi", "Authorization: <redacted>")]
     [InlineData("password = swordfish", "password = <redacted>")]
     [InlineData("no credentials here", "no credentials here")]
+    [InlineData("{\"token\":\"abc123\",\"mode\":\"ok\"}", "{\"token\":<redacted>,\"mode\":\"ok\"}")]
+    [InlineData("password=\"first\\\" second\" mode=ok", "password=<redacted> mode=ok")]
+    [InlineData("'secret': 'first\\' second' mode=ok", "'secret': <redacted> mode=ok")]
+    [InlineData("password=\"first second\\", "password=<redacted>")]
+    [InlineData("password=first\\ second mode=ok", "password=<redacted> mode=ok")]
     public void RedactSecretValues_MasksCredentialShapedFields(string input, string expected)
         => Assert.Equal(expected, Diagnostics.RedactSecretValues(input));
+
+    [Fact]
+    public void RedactSecretValues_DoesNotLeaveTheTailOfAnOversizedCredential()
+    {
+        string redacted = Diagnostics.RedactSecretValues("token=" + new string('x', 8192) + "\nmode=ok");
+        Assert.True(redacted == "token=<redacted>\nmode=ok", "The entire credential must be removed, including bytes after the old 4096-character limit.");
+    }
+
+    [Fact]
+    public void RedactSecretValues_ProtocolFieldsDoNotDependOnTheDesktopCulture()
+    {
+        var previous = System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.GetCultureInfo("tr-TR");
+            Assert.Equal("API_KEY=<redacted>\nAUTHORIZATION: <redacted>",
+                Diagnostics.RedactSecretValues("API_KEY=private-key\nAUTHORIZATION: BASIC private-credential"));
+        }
+        finally { System.Globalization.CultureInfo.CurrentCulture = previous; }
+    }
+
+    [Fact]
+    public void RedactSecretValues_TimeoutOmitsTheWholeLogInsteadOfPublishingCredentials()
+    {
+        string input = "token" + new string(' ', 4 * 1024 * 1024) + ": private-test-credential";
+        string redacted = Diagnostics.RedactSecretValues(input, TimeSpan.FromMilliseconds(1));
+        Assert.False(ReferenceEquals(input, redacted), "The timeout returned the original text with its private credential intact.");
+        Assert.True(redacted == "[diagnostic text omitted: credential redaction timed out]",
+            "The timeout must omit the diagnostic text instead of keeping an unredacted or partially redacted log.");
+    }
 
     [Fact]
     public void Redact_RemovesCommonIdentityAndSerialFields()

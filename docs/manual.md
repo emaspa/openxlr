@@ -1893,6 +1893,12 @@ created as a new private file; an existing file or symbolic link at its
 path is refused without overwriting its contents. A collection that
 fails part way removes its incomplete archive.
 
+Saved plugin scan logs also have credential-shaped values such as passwords
+and API tokens masked, including quoted fields, escaped values and long or
+truncated credentials. If this masking exceeds its time limit, the archive
+contains an omission notice in place of that log's text, never its
+unredacted contents. The original log on disk is kept.
+
 For a Windows plugin missing from the picker, collect diagnostics after the
 scan finishes and name the plugin and intended insert slot in the report.
 The archive adds:

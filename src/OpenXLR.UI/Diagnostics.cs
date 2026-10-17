@@ -289,20 +289,29 @@ public static class Diagnostics
     /// shape, because a scanner's output is whatever a plugin decided to
     /// print and nobody enumerated what a bridge might echo.
     /// </summary>
-    internal static string RedactSecretValues(string text)
+    internal static string RedactSecretValues(string text, TimeSpan? timeout = null)
     {
         try
         {
             // A name, then an explicit assignment, then one value. The
             // assignment is what makes it a field rather than the same word in
             // a sentence, and a scheme in front of the value ("Bearer x") is
-            // part of the value, not the end of the match.
+            // part of the value, not the end of the match. Logs can quote
+            // field names and escape quotes or spaces inside a value. A
+            // truncated quoted value is masked through the end of its line.
             return Regex.Replace(text,
-                "\\b(token|password|passphrase|secret|api[-_]?key|apikey|authorization)\\b(\\s*[:=]\\s*)" +
-                "(?:(?:Bearer|Basic|Token|Digest)\\s+)?(?:\"[^\"\\n]{1,4096}\"|'[^'\\n]{1,4096}'|[^\\s,;)}\\]]{1,4096})",
-                "$1$2<redacted>", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5));
+                """\b(token|password|passphrase|secret|api[-_]?key|apikey|authorization)\b(["']?\s*[:=]\s*)""" +
+                """(?:(?:Bearer|Basic|Token|Digest)\s+)?(?:"(?:\\[^\r\n]|[^"\\\r\n])*\\?"?""" +
+                """|'(?:\\[^\r\n]|[^'\\\r\n])*\\?'?""" +
+                """|(?:\\[^\r\n]|[^\s\\,;)}\]])*\\?)""",
+                "$1$2<redacted>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.NonBacktracking,
+                timeout ?? TimeSpan.FromSeconds(5));
         }
-        catch (RegexMatchTimeoutException) { return text; }
+        catch (RegexMatchTimeoutException)
+        {
+            // A scan log is private until the whole redaction succeeds.
+            return "[diagnostic text omitted: credential redaction timed out]";
+        }
     }
 
     private static void RedactJson(JsonNode node, string[] secrets)
