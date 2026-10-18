@@ -1837,7 +1837,7 @@ Von OpenXLR gesteuertes Interface wählen</value>
     <value>für dich installiert</value>
   </data>
   <data name="SkinInstalledOnSystem" xml:space="preserve">
-    <value>Auf diesem System installiert</value>
+    <value>auf diesem System installiert</value>
   </data>
   <data name="SkinNoteByAuthor" xml:space="preserve">
     <value>{0} Von {1}.</value>
@@ -2129,5 +2129,8 @@ Von OpenXLR gesteuertes Interface wählen</value>
   </data>
   <data name="Xlr2Jack" xml:space="preserve">
     <value>XLR-2-Buchse</value>
+  </data>
+  <data name="StartupDoctorHint" xml:space="preserve">
+    <value>Führe openxlr doctor aus, um den betroffenen Pfad und einen Reparaturbefehl zu sehen.</value>
   </data>
 </root>

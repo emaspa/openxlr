@@ -148,7 +148,7 @@ public sealed class LocalizationTests
             Assert.Equal(Formats(english), Formats(text));
             Assert.Equal(english.Count(c => c == '\n'), text.Count(c => c == '\n'));
             Assert.DoesNotMatch("[\\u2018\\u2019\\u201C\\u201D\\u2013\\u2014]", text);
-            foreach (Match command in Regex.Matches(english, @"OPENXLR_[A-Z_]+=[a-z]+|systemctl --user (?:status|restart openxlr-daemon)|(?:LV2|CLAP|VST3)_PATH"))
+            foreach (Match command in Regex.Matches(english, @"OPENXLR_[A-Z_]+=[a-z]+|openxlr doctor|systemctl --user (?:status|restart openxlr-daemon)|(?:LV2|CLAP|VST3)_PATH"))
                 Assert.Contains(command.Value, text);
         }
     }
