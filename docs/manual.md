@@ -1192,6 +1192,10 @@ stay). The defaults are recorded the first time the interface connects
 after a power cycle, so the button asks for one replug on a fresh
 install.
 
+Saved hardware snapshots under `~/.config/openxlr/devices` must be regular
+JSON files no larger than 64 KiB. An unreadable snapshot is not applied:
+restoring last settings logs the problem, while Reset reports it.
+
 The Wave XLR Pro keeps its settings in its own memory, so there is no
 clean state to record and whatever is set on Linux is what Wave Link
 finds on Windows, and the other way round. For it the same button

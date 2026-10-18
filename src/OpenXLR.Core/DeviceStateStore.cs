@@ -15,6 +15,7 @@ namespace OpenXLR.Core;
 /// </summary>
 public static class DeviceStateStore
 {
+    private const int MaxStateBytes = 64 * 1024;
     private static readonly JsonSerializerOptions Json = new()
     {
         WriteIndented = true,
@@ -61,7 +62,7 @@ public static class DeviceStateStore
     {
         try
         {
-            DeviceState? state = JsonSerializer.Deserialize<DeviceState>(File.ReadAllText(path), Json);
+            DeviceState? state = JsonSerializer.Deserialize<DeviceState>(RegularFile.ReadText(path, MaxStateBytes), Json);
             if (state is not null) Validate(state);
             return state;
         }
