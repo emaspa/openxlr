@@ -679,12 +679,6 @@ static void clap_process_audio(Host *h, uint32_t frames, float *const *in,
   if (status == CLAP_PROCESS_ERROR)
     for (unsigned i = 0; i < h->channels; ++i)
       memset(out[i], 0, frames * sizeof(float));
-  for (uint32_t i = 0; i < c->record_count; ++i)
-    if (c->records[i].ctl->output) {
-      double value;
-      if (c->params->get_value(c->plugin, c->records[i].id, &value))
-        atomic_store(&c->records[i].ctl->observed, (float)value);
-    }
 }
 
 // --- main thread ------------------------------------------------------------
@@ -705,6 +699,14 @@ static void clap_main_thread(Host *h) {
     c->in_count = 0;
     c->params->flush(c->plugin, &c->in_list, &c->out_list);
   }
+  // CLAP get_value is main-thread only. Read-only meters still refresh
+  // with the host's status tick, without calling plugin queries from audio.
+  for (uint32_t i = 0; i < c->record_count; ++i)
+    if (c->records[i].ctl->output) {
+      double value;
+      if (c->params->get_value(c->plugin, c->records[i].id, &value))
+        atomic_store(&c->records[i].ctl->observed, (float)value);
+    }
 }
 
 // --- the editor -------------------------------------------------------------

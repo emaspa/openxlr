@@ -149,6 +149,55 @@ static void run(Host *h, Clap *c, uint32_t frames) {
   }
 }
 
+static pthread_t parameter_thread;
+static unsigned readonly_reads, writable_reads;
+static bool parameter_wrong_thread;
+static bool read_parameter(const clap_plugin_t *plugin, clap_id id, double *value) {
+  parameter_wrong_thread |= !pthread_equal(pthread_self(), parameter_thread);
+  if (id == 10) ++readonly_reads;
+  else ++writable_reads;
+  *value = 0.75;
+  return true;
+}
+static const clap_plugin_params_t parameter_ext = {.get_value = read_parameter};
+
+static void *run_parameter_audio(void *data) {
+  Host *h = data;
+  run(h, h->impl, 16);
+  return NULL;
+}
+
+static void readonly_parameters_use_main_thread(void) {
+  parameter_thread = pthread_self();
+  readonly_reads = writable_reads = 0;
+  parameter_wrong_thread = false;
+  Host h = {.rate = 48000, .channels = 2, .main_thread = parameter_thread};
+  Clap *c = fresh(&h);
+  in_side = (Side){.count = 1, .channels = {2}, .main = 0, .flag_main = true};
+  out_side = in_side;
+  assert(clap_map_ports(c, &h, &ap_ext, true));
+  assert(clap_map_ports(c, &h, &ap_ext, false));
+  Param records[2] = {{.id = 10}, {.id = 11}};
+  records[0].ctl = host_add_control(&h, "meter", 0, 1, 0.1f, true, &records[0]);
+  records[1].ctl = host_add_control(&h, "gain", 0, 1, 0.5f, false, &records[1]);
+  assert(records[0].ctl && records[1].ctl);
+  c->records = records;
+  c->record_count = 2;
+  c->params = &parameter_ext;
+  pthread_t audio;
+  assert(pthread_create(&audio, NULL, run_parameter_audio, &h) == 0);
+  assert(pthread_join(audio, NULL) == 0);
+  assert(readonly_reads == 0 && writable_reads == 0);
+  assert(!parameter_wrong_thread);
+  assert(atomic_load(&records[0].ctl->observed) == 0.1f);
+  clap_main_thread(&h);
+  assert(readonly_reads == 1 && writable_reads == 0);
+  assert(!parameter_wrong_thread);
+  assert(atomic_load(&records[0].ctl->observed) == 0.75f);
+  release(c);
+  puts("PASS: CLAP read-only parameters are polled on the main thread only");
+}
+
 // A plugin's latency, and how often the host asks for it.
 static uint32_t fake_latency_samples;
 static unsigned latency_asked;
@@ -194,6 +243,7 @@ static void latency_reports(void) {
 }
 
 int main(void) {
+  readonly_parameters_use_main_thread();
   latency_reports();
   Host h = {.rate = 48000, .channels = 2};
 

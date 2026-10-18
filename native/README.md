@@ -93,6 +93,9 @@ is not treated as an open window. It creates no audio links.
 - The pipe carries parameter values, status and editor requests in both
   directions, never audio. Exposed parameter changes are saved with the mixer;
   opaque plugin state and plugin presets are not persisted.
+- CLAP read-only parameters are queried on the host's main thread with each
+  status tick. Parameter-change events still arrive through processing or
+  flushing; the audio callback never calls the main-thread-only `get_value`.
 - The helper reports the plugin's algorithmic latency as
   `latency SAMPLES RATE` once audio has run, and again whenever the figure
   changes. `SAMPLES` is 4294967295 while the plugin has no figure to give.
