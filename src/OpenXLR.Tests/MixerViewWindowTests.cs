@@ -1,9 +1,11 @@
 using System.Reflection;
 using System.Text.Json.Nodes;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.VisualTree;
 using OpenXLR.UI;
+using OpenXLR.UI.Skinning;
 using static OpenXLR.Tests.WindowLayoutTests;
 
 namespace OpenXLR.Tests;
@@ -18,6 +20,8 @@ internal static class MixerViewWindowTests
     {
         string dir = Directory.CreateTempSubdirectory("openxlr-view-window-").FullName;
         string? config = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
+        SkinEntry skin = SkinService.Current;
+        bool touch = SkinService.TouchControls;
         MainWindow? window = null;
         try
         {
@@ -30,6 +34,11 @@ internal static class MixerViewWindowTests
                  "channels":[{"id":"music","name":"Music with a long display name","levels":{"monitor":0.5,"monitor2":0.7,"chat":0.4}},
                              {"id":"game","name":"Game","levels":{"monitor":1,"monitor2":1,"chat":1},"appearance":{"hidden":true}}]}
                 """)]);
+            string outputName = string.Concat(Enumerable.Repeat("Long headphone and speaker name ", 8));
+            SliderSync.ReleaseTouchGuards();
+            typeof(MainViewModel).GetMethod("ApplyDevices", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(model,
+                [new JsonArray(new JsonObject { ["name"] = "headphones", ["description"] = outputName, ["kind"] = "Sink" }),
+                 JsonNode.Parse("""{"monitorOutputs":["headphones"],"outputVolume":0.42}""")]);
             window.Show();
             Layout(window, 1040, 900);
             Assert.False(Picker(window, "CompactChannelPicker").IsEffectivelyVisible);
@@ -60,23 +69,64 @@ internal static class MixerViewWindowTests
             foreach (Control control in window.GetVisualDescendants().OfType<Control>()
                          .Where(c => c.IsEffectivelyVisible && c is ComboBox or Slider))
                 AssertInside(control, window);
+            CheckMonitorControls(window, stacked: true);
             Capture(window, "mini-460");
+            foreach (string id in new[] { SkinPackage.DefaultId, "opendeck" })
+            {
+                SkinService.Apply(SkinCatalog.Find(id)!);
+                foreach (bool enlarged in new[] { false, true })
+                {
+                    SkinService.ApplyControlSizing(enlarged);
+                    foreach (double width in new[] { 360d, 460, 640, 1040, 460 })
+                    {
+                        Layout(window, width, 640);
+                        CheckMonitorControls(window, stacked: width < 600);
+                    }
+                    Capture(window, $"mini-monitor-{id}-{enlarged}");
+                }
+            }
+            SkinService.ApplyControlSizing(touch);
+            SkinService.Apply(skin);
 
             Assert.Null(model.ChooseMixerView(MainViewModel.FullView));
             Layout(window, 1040, 900);
             Assert.True(window.FindControl<Expander>("InputsTile")!.IsEffectivelyVisible);
             Assert.Equal(["music"], Tiles<ChannelViewModel>(window, 132).Select(t => t.Id));   // game stays hidden
             Assert.Equal(3, Tiles<MixViewModel>(window, 232).Length);
+            CheckMonitorControls(window, stacked: false);
         }
         finally
         {
             window?.Close();
+            SliderSync.ReleaseTouchGuards();
+            SkinService.ApplyControlSizing(touch);
+            SkinService.Apply(skin);
             Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", config);
             Directory.Delete(dir, true);
         }
     }
 
     private static ComboBox Picker(Window window, string name) => window.FindControl<ComboBox>(name)!;
+
+    private static void CheckMonitorControls(Window window, bool stacked)
+    {
+        var monitor = window.FindControl<Expander>("MonitorTile")!;
+        var picker = Assert.Single(monitor.GetVisualDescendants().OfType<DropDownButton>());
+        var slider = window.FindControl<Slider>("OutputVolumeSlider")!;
+        Assert.True(slider.Bounds.Width >= 140, $"The monitor slider has only {slider.Bounds.Width:F1}px.");
+        double minimum = stacked ? 180 : 140;
+        Assert.True(picker.Bounds.Width >= minimum, $"The monitor picker has only {picker.Bounds.Width:F1}px.");
+        Assert.Equal(stacked, slider.TranslatePoint(default, monitor)!.Value.Y
+            >= picker.TranslatePoint(default, monitor)!.Value.Y + picker.Bounds.Height);
+        AssertInside(picker, window);
+        AssertInside(slider, window);
+        var model = (MainViewModel)window.DataContext!;
+        Assert.Equal(model.MonitorSummary, ToolTip.GetTip(picker));
+        Assert.Contains(picker.GetVisualDescendants().OfType<TextBlock>(),
+            t => t.Text == model.MonitorSummary && t.TextLayout.TextLines.Any(l => l.HasCollapsed));
+        Assert.Equal(0.42, slider.Value);
+        Assert.Equal(0.42, model.OutputVolume);
+    }
 
     private static T[] Tiles<T>(Window window, double width) where T : class => [.. window.GetVisualDescendants().OfType<Border>()
         .Where(b => b.DataContext is T && b.Width == width && b.IsEffectivelyVisible).Select(b => (T)b.DataContext!)];

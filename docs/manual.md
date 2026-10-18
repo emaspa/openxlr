@@ -1336,6 +1336,10 @@ Options, APPEARANCE, **Mixer view** chooses how the SUBMIXER card is drawn:
   are set aside and Arrange is off, so the window fits a narrow column with
   MONITOR's output volume above the strip.
 
+In a narrow window, MONITOR puts the device picker above the volume row
+so both remain usable. Long device names shorten with an ellipsis; hover
+over the picker to read its full summary.
+
 The view, the channel and the mix are saved in `ui.json`. When the chosen
 channel or mix is gone, after a layout change or with an interface that
 has no jack behind it, the view shows the first available one and goes

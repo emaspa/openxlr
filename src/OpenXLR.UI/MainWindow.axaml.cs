@@ -23,6 +23,7 @@ public partial class MainWindow : Window
     private bool _hideToTrayPending;
     private readonly CancellationTokenSource _lifetime = new();
     private bool _automaticUpdateCheckStarted;
+    private bool? _monitorStacked;
 
     public MainWindow() : this(new DaemonClient(), syncDesktopVolume: true) { }
 
@@ -139,6 +140,25 @@ public partial class MainWindow : Window
         _hideToTrayPending = false;
         _reallyExit = true;
         Close();
+    }
+
+    private void OnMonitorSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        // Two rows leave room for both the device name and a usable fader
+        // when the window or the skin's card padding narrows this area.
+        bool stacked = e.NewSize.Width < 560;
+        if (_monitorStacked == stacked) return;
+        _monitorStacked = stacked;
+        MonitorControls.ColumnDefinitions = new(stacked ? "90,*,64" : "90,*,20,90,*,64");
+        MonitorControls.RowDefinitions = new(stacked ? "Auto,Auto" : "Auto");
+        MonitorControls.RowSpacing = stacked ? 6 : 0;
+        Grid.SetColumnSpan(MonitorDestination, stacked ? 2 : 1);
+        Grid.SetColumn(MonitorVolumeLabel, stacked ? 0 : 3);
+        Grid.SetRow(MonitorVolumeLabel, stacked ? 1 : 0);
+        Grid.SetColumn(OutputVolumeSlider, stacked ? 1 : 4);
+        Grid.SetRow(OutputVolumeSlider, stacked ? 1 : 0);
+        Grid.SetColumn(MonitorVolumeReadout, stacked ? 2 : 5);
+        Grid.SetRow(MonitorVolumeReadout, stacked ? 1 : 0);
     }
 
     private void SetupTray()

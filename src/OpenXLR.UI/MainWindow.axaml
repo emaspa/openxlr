@@ -428,11 +428,16 @@
           </StackPanel>
         </Expander.Header>
       <StackPanel Classes="dev" Spacing="4">
-        <Grid ColumnDefinitions="90,*,20,90,*,64">
+        <Grid Name="MonitorControls" ColumnDefinitions="90,*,20,90,*,64" SizeChanged="OnMonitorSizeChanged">
           <TextBlock Text="{loc:Text Key=Devices}" Classes="h" VerticalAlignment="Center"/>
-          <DropDownButton Grid.Column="1" HorizontalAlignment="Stretch"
+          <DropDownButton Name="MonitorDestination" Grid.Column="1" HorizontalAlignment="Stretch"
                           HorizontalContentAlignment="Left"
-                          Content="{Binding MonitorSummary}">
+                          Content="{Binding MonitorSummary}" ToolTip.Tip="{Binding MonitorSummary}">
+            <DropDownButton.ContentTemplate>
+              <DataTemplate x:DataType="x:String">
+                <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis"/>
+              </DataTemplate>
+            </DropDownButton.ContentTemplate>
             <DropDownButton.Flyout>
               <Flyout Placement="BottomEdgeAlignedLeft">
                 <ItemsControl ItemsSource="{Binding MonitorOutputs}" Width="400">
@@ -458,9 +463,9 @@
             </DropDownButton.Flyout>
           </DropDownButton>
 
-          <TextBlock Grid.Column="3" Text="{loc:Text Key=Volume}" Classes="h" VerticalAlignment="Center"/>
+          <TextBlock Name="MonitorVolumeLabel" Grid.Column="3" Text="{loc:Text Key=Volume}" Classes="h" VerticalAlignment="Center"/>
           <Slider vm:FaderInput.Step="0.01" Name="OutputVolumeSlider" Grid.Column="4" Minimum="0" Maximum="{Binding OutputVolumeRange.Maximum}" Value="{Binding OutputVolume, Mode=TwoWay}"/>
-          <TextBlock Grid.Column="5" Text="{Binding OutputVolumeText}" Classes="val"
+          <TextBlock Name="MonitorVolumeReadout" Grid.Column="5" Text="{Binding OutputVolumeText}" Classes="val"
                      VerticalAlignment="Center" HorizontalAlignment="Right"/>
         </Grid>
         <TextBlock Text="{Binding VolumeRangeError}" IsVisible="{Binding HasVolumeRangeError}"
