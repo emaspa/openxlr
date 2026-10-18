@@ -112,17 +112,22 @@ public sealed class PluginSearchPathTests : IDisposable
         Assert.Contains("3 saved plugin folders", warning);
     }
 
-    [Fact]
-    public void AnUnreadableSettingsFileIsReportedAndNotWrittenOver()
+    [Theory]
+    [InlineData("{\"submixer\": fals")]
+    [InlineData("{\"submixer\":true,\"submixer\":false}")]
+    [InlineData("{\"futureChoice\":1,\"futureChoice\":2}")]
+    [InlineData("{\"pluginFolders\":[],\"pluginFolders\":[]}")]
+    [InlineData("{\"pluginFolders\":[{\"kind\":\"clap\",\"path\":\"/a\",\"path\":\"/b\"}]}")]
+    public void AnUnreadableSettingsFileIsReportedAndNotWrittenOver(string text)
     {
         Directory.CreateDirectory(OpenXlrPaths.ConfigDir);
-        File.WriteAllText(SettingsFile, "{\"submixer\": fals");
+        File.WriteAllText(SettingsFile, text);
         Assert.Empty(PluginSearchPaths.Read(out string? warning));
         Assert.Contains("daemon.json cannot be read", warning);
         var outcome = PluginSearchPaths.Change("clap", _directory, true);
         Assert.False(outcome.Ok);
         Assert.False(outcome.RefreshCatalogue);
-        Assert.Equal("{\"submixer\": fals", File.ReadAllText(SettingsFile));
+        Assert.Equal(text, File.ReadAllText(SettingsFile));
     }
 
     [Fact]

@@ -2075,6 +2075,10 @@ skin, still applies for that run. The line beside **Close** at the bottom of
 Options names the file and the reason. It appears when Options opens and after
 a change that could not be saved, and the next successful save clears it.
 
+The daemon also rejects duplicate keys in `daemon.json`. The plugin manager
+reports that file as unreadable and leaves it for you to repair instead of
+choosing one of the conflicting values and saving over it.
+
 Configuration paths honor `XDG_CONFIG_HOME`; the private wrapper root honors
 `XDG_DATA_HOME`. Without `XDG_RUNTIME_DIR`, runtime files use the private
 OpenXLR configuration directory.

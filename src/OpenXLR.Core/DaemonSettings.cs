@@ -31,6 +31,7 @@ public sealed record DaemonSettings
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        AllowDuplicateProperties = false,
     };
 
     public static string ConfigDir => OpenXlrPaths.ConfigDir;
