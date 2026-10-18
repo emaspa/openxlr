@@ -403,6 +403,8 @@ public sealed class WindowLayoutTests
                 Assert.True(cards.VerticalScrollBarVisibility == Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
                     "the capped page must be able to show a scrollbar");
                 Layout(options, 980, 800);
+                MainWindowLabelTests.CheckFixedColumnLabels(options, Localizer.Text("DefaultInput"),
+                    Localizer.Text("DefaultOutput"), Localizer.Text("MixerView"));
                 Assert.Equal(Localizer.Text("DesktopKeys"), options.FindControl<Button>("DesktopKeysButton")!.Content);
                 var launch = options.FindControl<ComboBox>("LaunchBehavior")!;
                 var close = options.FindControl<ComboBox>("CloseBehavior")!;

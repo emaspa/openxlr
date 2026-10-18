@@ -62,7 +62,9 @@ public sealed class OptionsViewModel : ViewModelBase
             SelectedAppearanceMode = AppearanceModeChoices.First(c => c.Id == Skinning.SkinService.Mode);
             SelectedControlSizing = ControlSizingChoices.First(c => c.Touch == Skinning.SkinService.TouchControls);
             SelectedMixerView = MixerViewChoices.First(c => c.Id == main.MixerView);
-            SelectedLanguage = LanguageChoices.FirstOrDefault(c => c.Id is not null && c.Id == s.Language) ?? LanguageChoices[0];
+            string? language = string.IsNullOrWhiteSpace(s.Language) || s.Language == "system" ? null
+                : Localizer.Resolve(s.Language, _ => null, [.. Localizer.Languages.Select(c => c.Id!)]);
+            SelectedLanguage = LanguageChoices.FirstOrDefault(c => c.Id == language) ?? LanguageChoices[0];
             EnforcedOutput = OutputChoices.FirstOrDefault(c => c.Name == main.EnforcedDefaultSink) ?? OutputChoices[0];
             EnforcedInput = InputChoices.FirstOrDefault(c => c.Name == main.EnforcedDefaultSource) ?? InputChoices[0];
         }

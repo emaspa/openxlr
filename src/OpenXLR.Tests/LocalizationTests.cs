@@ -135,13 +135,16 @@ public sealed class LocalizationTests
         Assert.Equal("Close", new TextExtension { Key = "Close" }.ProvideValue(null!));
     }
 
-    [Fact]
-    public void GermanUsesItsCatalogueAndRetainsFormatsLineBreaksAndCommands()
+    [Theory]
+    [InlineData("de", "Deutsch", "de-AT", "Schließen")]
+    [InlineData("es", "Español", "es-MX", "Cerrar")]
+    public void TranslationsUseTheirCatalogueAndRetainFormatsLineBreaksAndCommands(
+        string language, string label, string regional, string close)
     {
-        Assert.Equal("Deutsch", Localizer.Languages.Single(c => c.Id == "de").Label);
-        Assert.Equal("Schließen", Localizer.Get("Close", CultureInfo.GetCultureInfo("de")));
-        Assert.Equal("Schließen", Localizer.Get("Close", CultureInfo.GetCultureInfo("de-AT")));
-        foreach ((string key, string text) in Read("Strings.de.resx"))
+        Assert.Equal(label, Localizer.Languages.Single(c => c.Id == language).Label);
+        Assert.Equal(close, Localizer.Get("Close", CultureInfo.GetCultureInfo(language)));
+        Assert.Equal(close, Localizer.Get("Close", CultureInfo.GetCultureInfo(regional)));
+        foreach ((string key, string text) in Read($"Strings.{language}.resx"))
         {
             string english = English[key];
             static string[] Formats(string value) => [.. Regex.Matches(value, @"\{[^{}]+\}").Select(m => m.Value).Order(StringComparer.Ordinal)];
@@ -151,6 +154,26 @@ public sealed class LocalizationTests
             foreach (Match command in Regex.Matches(english, @"OPENXLR_[A-Z_]+=[a-z]+|systemctl --user (?:status|restart openxlr-daemon)|(?:LV2|CLAP|VST3)_PATH"))
                 Assert.Contains(command.Value, text);
         }
+    }
+
+    [Theory]
+    [InlineData(null, "LANG=es_ES.UTF-8", "es")]
+    [InlineData(null, "LANG=es_MX.UTF-8", "es")]
+    [InlineData(null, "LANG=es_AR.UTF-8", "es")]
+    [InlineData(null, "LANG=en_US.UTF-8 LANGUAGE=fr:es_MX", "es")]
+    [InlineData(null, "LANG=en_US.UTF-8 LANGUAGE=es--ES:es", "es")]
+    [InlineData(null, "LANG=es_MX.UTF-8 LC_MESSAGES=C.UTF-8", "en")]
+    [InlineData(null, "LANG=POSIX LANGUAGE=es", "en")]
+    [InlineData("es-ES", "LANG=en_US.UTF-8", "es")]
+    [InlineData("es-419", "LANG=en_US.UTF-8", "es")]
+    [InlineData("system", "LANG=es_MX.UTF-8", "es")]
+    [InlineData("en", "LANG=es_ES.UTF-8", "en")]
+    public void SpanishIsChosenFromTheSavedChoiceOrDesktop(string? saved, string environment, string expected)
+    {
+        Dictionary<string, string> variables = environment.Split(' ')
+            .Select(v => v.Split('=', 2)).ToDictionary(v => v[0], v => v[1]);
+        Assert.Equal(expected, Localizer.Resolve(saved, n => variables.GetValueOrDefault(n),
+            [.. Localizer.Languages.Select(c => c.Id!)]));
     }
 
     [Theory]
@@ -262,7 +285,8 @@ public sealed class LanguageSettingsTests : IDisposable
         File.WriteAllText(UiJson, """{ "skin": "nord", "futureChoice": 3 }""");
         OptionsViewModel options = Options();
         Assert.Null(options.SelectedLanguage!.Id);
-        Assert.Equal(["System language", "English", "Deutsch"], options.LanguageChoices.Select(c => c.Label));
+        Assert.Equal([Localizer.Text("SystemLanguage"), "English", "Deutsch", "Español"],
+            options.LanguageChoices.Select(c => c.Label));
 
         options.SelectedLanguage = options.LanguageChoices.Single(c => c.Id == "en");
 
@@ -280,6 +304,23 @@ public sealed class LanguageSettingsTests : IDisposable
     }
 
     [Fact]
+    public void TheSpanishChoiceIsSavedForNextStartupWithoutChangingTheCurrentRun()
+    {
+        CultureInfo culture = CultureInfo.CurrentCulture;
+        string close = Localizer.Text("Close");
+        OptionsViewModel options = Options();
+        options.SelectedLanguage = options.LanguageChoices.Single(c => c.Id == "es");
+
+        Assert.Null(options.PreferenceError);
+        Assert.Equal("es", UiSettings.Load().Language);
+        Assert.Equal("es", Options().SelectedLanguage!.Id);
+        Assert.Equal("es", Localizer.Resolve(UiSettings.Load().Language, _ => null,
+            [.. Localizer.Languages.Select(c => c.Id!)]));
+        Assert.Equal(close, Localizer.Text("Close"));
+        Assert.Same(culture, CultureInfo.CurrentCulture);
+    }
+
+    [Fact]
     public void AFailedSaveShowsInThePreferenceLine()
     {
         Directory.CreateDirectory(UiJson);
@@ -289,5 +330,25 @@ public sealed class LanguageSettingsTests : IDisposable
 
         Assert.Equal("en", options.SelectedLanguage!.Id);
         Assert.StartsWith("Could not save ui.json.", options.PreferenceError);
+    }
+
+    [Theory]
+    [InlineData("es-MX", "es")]
+    [InlineData("ES-419", "es")]
+    [InlineData("de-AT", "de")]
+    [InlineData("en-GB", "en")]
+    [InlineData("fr", "en")]
+    [InlineData("../es", "en")]
+    [InlineData("system", null)]
+    [InlineData("", null)]
+    [InlineData("  ", null)]
+    [InlineData(null, null)]
+    public void ThePickerShowsTheResolvedSavedLanguageWithoutRewritingIt(string? saved, string? selected)
+    {
+        Assert.Null(new UiSettings { Language = saved }.Save());
+        string before = File.ReadAllText(UiJson);
+
+        Assert.Equal(selected, Options().SelectedLanguage!.Id);
+        Assert.Equal(before, File.ReadAllText(UiJson));
     }
 }

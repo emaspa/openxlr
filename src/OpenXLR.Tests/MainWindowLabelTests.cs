@@ -55,15 +55,17 @@ internal static class MainWindowLabelTests
             }
         }
         finally { vm.Crossfade = blend; Dispatcher.UIThread.RunJobs(); main.UpdateLayout(); }
+        CheckFixedColumnLabels(main, Localizer.Text("XLR1Gain"), Localizer.Text("XLR2Gain"),
+            Localizer.Text("USBAuxIn"), Localizer.Text("Phones1"), Localizer.Text("Phones2"),
+            Localizer.Text("MicPC"), Localizer.Text("Devices"), Localizer.Text("Volume"));
         Assert.Empty(failures);
 
         void CheckText(TextBlock text, double maximumWidth = double.PositiveInfinity)
         {
-            var measured = new FormattedText(text.Text ?? "", CultureInfo.InvariantCulture, text.FlowDirection,
-                new Typeface(text.FontFamily, text.FontStyle, text.FontWeight, text.FontStretch), text.FontSize, text.Foreground);
+            double measured = TextWidth(text);
             double available = Math.Min(text.Bounds.Width, maximumWidth);
-            if (measured.Width > available + 1)
-                failures.Add($"'{text.Text}' needs {measured.Width:F1}px but has {available:F1}px at window width {main.ClientSize.Width}.");
+            if (measured > available + 1)
+                failures.Add($"'{text.Text}' needs {measured:F1}px but has {available:F1}px at window width {main.ClientSize.Width}.");
             Point origin = text.TranslatePoint(default, main)!.Value;
             if (origin.X < 0 || origin.X + text.Bounds.Width > main.ClientSize.Width + 1)
                 failures.Add($"'{text.Text}' leaves the window at width {main.ClientSize.Width}.");
@@ -82,6 +84,23 @@ internal static class MainWindowLabelTests
                 }
         }
     }
+
+    internal static void CheckFixedColumnLabels(Window window, params string[] labels)
+    {
+        foreach (TextBlock text in window.GetVisualDescendants().OfType<TextBlock>()
+            .Where(t => t.IsEffectivelyVisible && labels.Contains(t.Text)))
+        {
+            var grid = Assert.IsType<Grid>(text.Parent);
+            double available = Math.Min(text.Bounds.Width, grid.ColumnDefinitions[Grid.GetColumn(text)].ActualWidth);
+            double measured = TextWidth(text);
+            Assert.True(measured <= available + 1,
+                $"'{text.Text}' needs {measured:F1}px but has {available:F1}px at window width {window.ClientSize.Width}.");
+        }
+    }
+
+    private static double TextWidth(TextBlock text)
+        => new FormattedText(text.Text ?? "", CultureInfo.InvariantCulture, text.FlowDirection,
+            new Typeface(text.FontFamily, text.FontStyle, text.FontWeight, text.FontStretch), text.FontSize, text.Foreground).Width;
 
     internal static void CheckLongDeviceLabels(MainWindow main)
     {

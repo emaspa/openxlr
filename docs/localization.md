@@ -2,8 +2,9 @@
 
 The mixer window can be translated. Every string it shows lives in one
 English catalogue, and a language is a second catalogue with the same keys.
-OpenXLR ships in English and German (Deutsch). Other languages come from
-contributors who read and write them, one pull request per language.
+OpenXLR ships in English, German (Deutsch) and Spanish (Español). Other
+languages come from contributors who read and write them, one pull request
+per language.
 
 ## The catalogue
 
@@ -77,6 +78,7 @@ so a change of meaning gets a new key.
    ```csharp
    new("en", "English"),
    new("de", "Deutsch"),
+   new("es", "Español"),
    ```
 
 4. Build and test:
@@ -128,6 +130,8 @@ The window chooses its language once, when it starts:
 A change in Options applies the next time the window starts. Only the
 catalogue changes: numbers, dates and the values the window sends to the
 daemon keep the format they had.
+The picker shows the resolved language for a saved regional tag without
+rewriting it. The system choice continues to follow the desktop.
 
 ## Scripts and layout
 

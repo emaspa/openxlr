@@ -1453,10 +1453,10 @@ language**, the default, follows the desktop's message language
 English. The window reads its text when it starts, so a change applies the
 next time it opens. The choice is saved in `ui.json` as `language`; if it
 cannot be saved, Options says why on the line at its foot. OpenXLR ships in
-English and German, and each further language is added by a contributor who speaks it;
-[localization.md](localization.md) says how. Names you give channels, mixes
-and profiles, text from plugins and messages from the daemon are shown as
-they are.
+English, German and Spanish, and each further language is added by a
+contributor who speaks it; [localization.md](localization.md) says how.
+Names you give channels, mixes and profiles, text from plugins and
+messages from the daemon are shown as they are.
 
 <a name="upgrade"></a>
 ### 3.11 Upgrade
