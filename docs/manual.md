@@ -396,6 +396,10 @@ assignments remain readable and editable.
    replugged, or the link to the port comes up incomplete, the next
    sweep links the Aux mix to the port again.
 
+If you change the monitor outputs while the hardware stream restarts,
+your latest selection is kept. A restart that finishes after the mixer
+has stopped does not reconnect its outputs.
+
 The USB Aux *input* (what the second computer sends back) is the Aux In
 channel, with its level and lock in the INPUTS card.
 

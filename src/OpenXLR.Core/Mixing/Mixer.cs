@@ -508,12 +508,10 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     public void BounceAuxTarget()
     {
         string? sink;
-        IReadOnlyList<string> monitorSelection;
         lock (_gate)
         {
             sink = _auxTargetSink;
             if (sink is null || !_built) return;
-            monitorSelection = [.. _monitorOutputs];
             foreach (PortLink route in _monitorRoutes.Values) _pw.Unlink(route);
             _monitorRoutes.Clear();
             if (_auxRoute is not null) { _pw.Unlink(_auxRoute); _auxRoute = null; }
@@ -521,7 +519,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         _pw.BounceSink(sink);
         lock (_gate)
         {
-            SetMonitorOutputsLocked(monitorSelection);
+            if (!_built) return;
+            SetMonitorOutputsLocked([.. _monitorOutputs]);
             WireAuxRouteLocked();
         }
     }
@@ -1703,19 +1702,20 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     public void BounceMonitorHardwareOutput()
     {
         string? sink;
-        IReadOnlyList<string> monitorSelection;
         lock (_gate)
         {
             if (!_built) return;
             string? pseudo = _monitorOutputs.FirstOrDefault(o => o.Contains('#'));
             if (pseudo is null) return;
             sink = pseudo[..pseudo.IndexOf('#')];
-            monitorSelection = [.. _monitorOutputs];
             foreach (PortLink route in _monitorRoutes.Values) _pw.Unlink(route);
             _monitorRoutes.Clear();
         }
         _pw.BounceSink(sink);
-        lock (_gate) SetMonitorOutputsLocked(monitorSelection);
+        lock (_gate)
+        {
+            if (_built) SetMonitorOutputsLocked([.. _monitorOutputs]);
+        }
     }
 
     /// <summary>
