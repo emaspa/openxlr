@@ -199,6 +199,36 @@ default input ([section 3.7](#default-devices)) makes every voice app pick it up
 configuration.
 
 <a name="monitor"></a>
+#### Use another microphone as XLR 1
+
+In Options, AUDIO, choose **Choose primary microphone...**. Pick the capture
+source and its microphone port, numbered from 1, then Save. The first port
+is usually right for a USB microphone; a multichannel interface may put the
+microphone on another port. OpenXLR takes one mono port and feeds both sides
+of XLR 1. You keep its sends, software low cut, software ClipGuard, insert
+chain and Sound Check. Set preamp gain and phantom power on the microphone
+or its own interface; OpenXLR does not invent USB controls for other brands.
+
+This enables generic microphone mode. Elgato USB control is released,
+including additional interfaces, and the window hides hardware gain,
+phantom, hardware effects, headphone controls and the other structural
+hardware inputs. Pick an ordinary PipeWire playback device under MONITOR;
+Elgato-specific output selectors and USB Aux routing are unavailable.
+The channel and mix nodes are kept, so application routes stay intact.
+
+Changing the source or port mutes the hardware channels in all monitor mixes.
+Unmute XLR 1 in the desired monitor mix deliberately when you want to hear
+it. If the source is unplugged or its selected port is missing, XLR 1 stays
+silent and a warning names the problem. It reconnects to the same source
+when that source returns, without borrowing another microphone. Changing
+the binding ends Sound Check and discards its sample.
+
+The choice lives in `mixer.json` and survives restart. Generic mode has its
+own mixer-only profiles; they never change the source selection. Interface
+recall on connect is unavailable, since startup already restores the saved
+mixer state. Choose **Automatic Elgato interface** in the same picker to
+resume USB control and the interface's normal input routing.
+
 ### 3.2 Choose what you hear and how loud
 
 The level meters show the newest reading available. If the window is

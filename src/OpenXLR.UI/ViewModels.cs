@@ -55,7 +55,7 @@ public sealed partial class MainViewModel : ViewModelBase
             if (up) DaemonRestart.ConnectionRestored();
             if (!up)
             {
-                DeviceConnected = false; Status = Localizer.Text("StatusDaemonNotRunning");
+                DeviceConnected = false; Raise(nameof(InputConnected)); Status = Localizer.Text("StatusDaemonNotRunning");
                 ResetWaveInterfaces();
                 Inserts.ResetForNewConnection(); Inserts2.ResetForNewConnection();
                 Inserts.SoundCheck.Reset(); Inserts2.SoundCheck.Reset();
@@ -95,8 +95,19 @@ public sealed partial class MainViewModel : ViewModelBase
     public string Status { get => _status; private set { if (Set(ref _status, value)) Raise(nameof(StatusLine)); } }
 
     public string StatusLine => !DaemonConnected ? Localizer.Text("DaemonNotRunning")
+        : GenericMicrophone ? PrimaryInputDescription
         : DeviceConnected ? DeviceName
         : Localizer.Text("NoDevice");
+
+    private bool _genericMicrophone;
+    public bool GenericMicrophone { get => _genericMicrophone; private set => Set(ref _genericMicrophone, value); }
+    public bool InputConnected => DaemonConnected && (GenericMicrophone ? _primaryInputConnected : DeviceConnected);
+    private bool _primaryInputConnected;
+    public string? PrimaryInputSource { get; private set; }
+    public int PrimaryInputChannel { get; private set; }
+    public string PrimaryInputDescription => GenericMicrophone
+        ? Localizer.Format("GenericMicrophoneSelected", Inputs.FirstOrDefault(i => i.Name == PrimaryInputSource)?.Description ?? PrimaryInputSource!, PrimaryInputChannel + 1)
+        : Localizer.Text("PrimaryInputAutomatic");
 
     // --- hardware controls ---
 
@@ -716,6 +727,11 @@ public sealed partial class MainViewModel : ViewModelBase
             DaemonConnected = true;
             DaemonVersion = node["daemonVersion"]?.GetValue<string>();
             DeviceConnected = node["connected"]?.GetValue<bool>() ?? false;
+            PrimaryInputSource = node["mixer"]?["primaryInput"]?["source"]?.GetValue<string>();
+            PrimaryInputChannel = node["mixer"]?["primaryInput"]?["channel"]?.GetValue<int>() ?? 0;
+            GenericMicrophone = PrimaryInputSource is not null;
+            _primaryInputConnected = node["mixer"]?["primaryInputConnected"]?.GetValue<bool>() ?? false;
+            Raise(nameof(InputConnected));
             if (node["device"] is JsonNode dev)
             {
                 DeviceName = $"{dev["vendor"]?.GetValue<string>()} {dev["model"]?.GetValue<string>()}".Trim();
@@ -745,6 +761,14 @@ public sealed partial class MainViewModel : ViewModelBase
                 CapPhysicalControls = Cap("physicalControls");
                 CapRetainsSettings = caps["retainsSettings"]?.GetValue<bool>() ?? true;
                 CapBuiltInDefaults = caps["builtInDefaults"]?.GetValue<bool>() ?? false;
+            }
+
+            if (GenericMicrophone)
+            {
+                HasXlr2 = HasHp2 = false;
+                CapLowCut = CapExpander = CapVoiceTune = CapPhantom = CapClipGuard = CapCompressor = false;
+                CapCrossfade = CapLowImpedance = CapAuxInput = CapOutputRouting = false;
+                CapRetainsSettings = true;
             }
 
             if (node["state"] is JsonNode s)
@@ -791,13 +815,15 @@ public sealed partial class MainViewModel : ViewModelBase
             ApplyWaveInterfaces(node["waveInterfaces"]);
             ApplyMixer(node["mixer"]);
             ApplyStreams(node["mixer"]);
-            ShowSoftLowCut = DeviceConnected && !CapLowCut && HasMixer;
-            ShowSoftClipGuard = DeviceConnected && !CapClipGuard && HasMixer;
+            ShowSoftLowCut = (DeviceConnected || GenericMicrophone) && !CapLowCut && HasMixer;
+            ShowSoftClipGuard = (DeviceConnected || GenericMicrophone) && !CapClipGuard && HasMixer;
             ShowGainLock = DeviceConnected && !CapPhysicalControls;
             ShowResetDefaults = DeviceConnected && (!CapRetainsSettings || CapBuiltInDefaults);
             Raise(nameof(ResetDescription));
             Raise(nameof(ShowInterfaceCard));
-            Status = DeviceConnected ? Localizer.Text("StatusReady") : Localizer.Text("StatusNoDevice");
+            Raise(nameof(PrimaryInputDescription));
+            Raise(nameof(StatusLine));
+            Status = InputConnected ? Localizer.Text("StatusReady") : Localizer.Text("StatusNoDevice");
         }
         finally { _applying = false; }
         StateApplied?.Invoke();
@@ -1133,7 +1159,7 @@ public sealed partial class MainViewModel : ViewModelBase
             // the same rule below, once the channels have synced.
             foreach (MixViewModel mv in Mixes.Where(mv => mv.IsAuxPort))
             {
-                mv.AuxPortAvailable = !DeviceConnected || CapOutputRouting;
+                mv.AuxPortAvailable = !GenericMicrophone && (!DeviceConnected || CapOutputRouting);
                 mv.Visible = mv.AuxPortAvailable || auxAudible;
             }
 

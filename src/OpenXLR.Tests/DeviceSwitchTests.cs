@@ -84,6 +84,48 @@ public sealed class DeviceSwitchTests
         });
     }
 
+    [Fact]
+    public void GenericMicrophoneModeReleasesUsbAndResumesTheChosenDevice()
+    {
+        WithConfigDir(() =>
+        {
+            var wave = new CountingDevice(WaveXlr);
+            using var manager = new DeviceManager(NullLogger<DeviceManager>.Instance,
+                new ConfigurationBuilder().Build(), () => [wave]);
+            manager.SweepOnce();
+            manager.SetHardwareEnabled(false);
+            Assert.False(wave.Connected);
+            Assert.Equal(1, wave.Disposals);
+            Assert.False(manager.HardwareEnabled);
+            for (int i = 0; i < 10; i++) manager.SweepOnce();
+            Assert.False(manager.Snapshot().Connected);
+            Assert.NotNull(manager.SetActiveDevice("0fd9:007d"));
+            using var gain = JsonDocument.Parse("45");
+            Assert.NotNull(manager.Apply("gain", gain.RootElement));
+            Assert.Equal(30, wave.GainDb);
+            manager.SetHardwareEnabled(true);
+            manager.SweepOnce();
+            Assert.True(wave.Connected);
+        });
+    }
+
+    [Fact]
+    public void SavedGenericModeNeverOpensAnElgatoDeviceAtStartup()
+    {
+        WithConfigDir(() =>
+        {
+            Assert.Null(new OpenXLR.Core.Mixing.MixerSettings
+                { PrimaryInput = new("unplugged.microphone", 1) }.Save());
+            var wave = new CountingDevice(WaveXlr);
+            using var manager = new DeviceManager(NullLogger<DeviceManager>.Instance,
+                new ConfigurationBuilder().Build(), () => [wave]);
+            manager.SweepOnce();
+            Assert.False(manager.HardwareEnabled);
+            Assert.False(wave.Connected);
+            Assert.Equal(0, wave.Disposals);
+        });
+    }
+
     private static void WithConfigDir(Action body)
     {
         string dir = Directory.CreateTempSubdirectory("openxlr-switch-").FullName;

@@ -7,12 +7,19 @@ namespace OpenXLR.Tests;
 public sealed partial class MonitorVolumeIntegrationTests
 {
     [MonitorPipeWireFact]
-    public void IncompleteCaptureLinksStayDisconnectedAndRetryBothSides()
+    public void IncompleteCaptureLinksStayDisconnectedAndRetryBothSides() => CheckIncompleteCaptureLinks(primary: false);
+
+    [MonitorPipeWireFact]
+    public void IncompletePrimaryMicrophoneLinksStayDisconnectedAndRetryBothSides() => CheckIncompleteCaptureLinks(primary: true);
+
+    private static void CheckIncompleteCaptureLinks(bool primary)
     {
         var pw = new PipeWireAdapter();
         using var registry = pw.WatchGraph();
         using var mixer = new Mixer(pw);
-        mixer.Build(new MixerConfig { Channels = [new("system", "System")],
+        string channel = primary ? "xlr1" : "partial";
+        mixer.Build(new MixerConfig { Channels = primary
+            ? [new("system", "System"), new("xlr1", "Microphone") { InputPair = 0 }] : [new("system", "System")],
             Mixes = [new("monitor", "Monitor", MixKind.Monitor)] });
         pw.CreateNullSink("test_capture_partial", "Partial test input");
         pw.CreateVirtualMic("test_source_partial", "test_capture_partial.monitor", "Partial source");
@@ -39,19 +46,23 @@ public sealed partial class MonitorVolumeIntegrationTests
             try
             {
                 Environment.SetEnvironmentVariable("PATH", directory + Path.PathSeparator + path);
-                mixer.CreateCaptureChannel("Partial", "test_source_partial", 0, _ => null);
+                if (primary) mixer.SetPrimaryInput(new("test_source_partial"));
+                else mixer.CreateCaptureChannel("Partial", "test_source_partial", 0, _ => null);
             }
             finally { Environment.SetEnvironmentVariable("PATH", path); }
             Assert.True(File.Exists(rejected));
-            Assert.False(mixer.Snapshot().Channels.Single(c => c.Id == "partial").CaptureConnected);
+            Assert.False(Connected());
             Assert.Equal(0, Links());
             Assert.True(SpinWait.SpinUntil(() =>
             {
                 mixer.EnsureInputFeeds();
-                return mixer.Snapshot().Channels.Single(c => c.Id == "partial").CaptureConnected && Links() == 2;
+                return Connected() && Links() == 2;
             }, TimeSpan.FromSeconds(5)));
         }
         finally { Directory.Delete(directory, true); }
+
+        bool Connected() => primary ? mixer.Snapshot().PrimaryInputConnected
+            : mixer.Snapshot().Channels.Single(c => c.Id == "partial").CaptureConnected;
 
         int Links()
         {
@@ -59,7 +70,7 @@ public sealed partial class MonitorVolumeIntegrationTests
             int node = graph.RootElement.EnumerateArray().Single(item =>
                 item.GetProperty("type").GetString() == "PipeWire:Interface:Node"
                 && item.GetProperty("info").GetProperty("props").TryGetProperty("node.name", out var name)
-                && name.GetString() == "OpenXLR_ch_partial").GetProperty("id").GetInt32();
+                && name.GetString() == $"OpenXLR_ch_{channel}").GetProperty("id").GetInt32();
             return graph.RootElement.EnumerateArray().Count(item =>
                 item.GetProperty("type").GetString() == "PipeWire:Interface:Link"
                 && item.GetProperty("info").GetProperty("input-node-id").GetInt32() == node);

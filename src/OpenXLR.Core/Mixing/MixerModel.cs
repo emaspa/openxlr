@@ -138,6 +138,8 @@ public sealed record ChannelDefinition(string Id, string Name)
 /// <summary>Live mixer state pushed to clients.</summary>
 public sealed record MixerState
 {
+    public PrimaryInputBinding? PrimaryInput { get; init; }
+    public bool PrimaryInputConnected { get; init; }
     public required IReadOnlyList<MixStatus> Mixes { get; init; }
     public required IReadOnlyList<ChannelStatus> Channels { get; init; }
     public IReadOnlyList<ExclusiveGroupDefinition> ExclusiveGroups { get; init; } = [];

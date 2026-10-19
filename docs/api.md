@@ -116,7 +116,8 @@ is the unit's instance id, see [additional interface state](#additional-interfac
 and `waveInterfaces`. The
 mixer state carries `mixes`, `channels`, `monitorOutput` (the first selected
 output), `monitorOutputs`, `monitorFeeds`, `outputVolume`,
-`auxPortEnabled`, `lowCutHz`, `softClipGuard`, `softClipGuardAvailable`,
+`primaryInput` (`source`, `channel`, or absent for automatic Elgato input),
+`primaryInputConnected` (the XLR 1 route exists), `auxPortEnabled`, `lowCutHz`, `softClipGuard`, `softClipGuardAvailable`,
 `softClipGuardError`, `compensateMixLatency`, `mixDelayMilliseconds`,
 `mixLatencyError` (see [plugin latency](#plugin-latency)), `inserts`
 (chains by insert key, `xlr1`, `xlr2` or `mix:<id>`; each entry carries
@@ -205,6 +206,7 @@ that final acknowledgement (or an `error` without a request id):
 | `assignApp` | `identity`, `channel`, `label?` | route an app (creates a registry entry if unseen); `channel: "ignore"` stops managing it, its streams go back to the system default output and stay wherever the desktop routes them |
 | `assignStream` | `streamId`, `channel` | route one live stream by its PipeWire id; also remembered for the app; `ignore` works here too |
 | `forgetApp` | `identity` | drop an app and its remembered channel |
+| `setPrimaryInput` | `source?`, `captureMonoChannel?` | select an external PipeWire source for XLR 1 and its zero-based mono port (0 to 63, default 0). Null/absent source restores automatic Elgato input; clearing takes no port. `capturePair` must be 0. Saves before acknowledging, rolls back on failure. An absent source stays selected and silent. Generic mode releases Elgato USB control and mutes hardware channels in monitor mixes on each source or port change. Existing channel ids, software processing and inserts stay unchanged |
 | `setEnforcedDefaults` | `sink`, `source` | system defaults to hold; `sink: "@monitor"` follows the first selected monitor output |
 | `setActiveDevice` | `device` | switch to another attached interface: one unit by its instance id from `detected`, or the first unit of a model by `vvvv:pppp` |
 | `setWaveInterfaceEnabled` | `device`, `value` | drive an attached unit, by its instance id from `waveInterfaces`, as an additional interface (`true`) or stop driving it (`false`); at most four. Refused for a unit that is not attached, and for a Wave XLR Pro whose capture node name another attached unit shares. Enabling creates no mixer channel; disabling an attached unit deletes the capture channels whose source is one of its own nodes, as `deleteChannel` does, found by its `captureHint` and, when not empty, its `captureModelHint`; nothing is deleted while `captureHint` is a model name another attached unit shares. See [additional interface state](#additional-interface-state) |
@@ -414,6 +416,27 @@ built or set. A stage that keeps failing is left off after three failures
 in five minutes, until the mix no longer needs a delay or compensation is
 turned off and on again.
 
+### Generic primary microphone
+
+`setPrimaryInput` binds XLR 1 to one port of an external source by exact node
+name. It rejects OpenXLR nodes, monitor taps, control characters and names
+longer than 256 characters. The source or port may be offline when selected;
+no default source or supported-interface fallback replaces it. A sweep heals
+its route when it returns and pushes source arrivals and losses to clients,
+including when no playback output changed. The selected mono port feeds both sides before the
+existing XLR 1 software DSP and insert chain, and Sound Check records that
+same port. XLR 2 and Aux In report `present: false` in this mode.
+
+`connected`, `device`, `capabilities` and `state` still describe USB hardware,
+so generic mode reports no connected Elgato interface. Use
+`mixer.primaryInputConnected` for the microphone route. `detected` and
+`waveInterfaces` are empty while USB control is paused. Additional-interface
+choices are retained for automatic mode. USB control commands and interface
+recall are unavailable. Save/load/delete profile commands use the separate
+`generic` profile directory and affect only the mixer scene. Startup restores
+`mixer.json`; switching or recalling a profile never replaces the selected
+source or port. Monitoring starts muted after a source or port change.
+
 ### Additional interface state
 
 `waveInterfaces` lists every attached supported unit and every unit enabled
@@ -445,8 +468,10 @@ All under `~/.config/openxlr/` (or `$XDG_CONFIG_HOME/openxlr/`):
 - `mixer.json`: every mixer decision: the layout (`userChannels`,
   `userMixes`, `appearance`, see [mixer-layout.md](mixer-layout.md)), levels, mutes,
   device choices, the app registry, enforced defaults, the software low
-  cut, the insert chains. Written by the daemon.
-- `profiles/<vid-pid>/<name>.json`: the named scenes, one file each
+  cut, the insert chains, and `primaryInput` for a generic primary microphone.
+  The primary source is machine wiring and never part of a profile. Written by the daemon.
+- `profiles/<vid-pid>/<name>.json`: the named scenes, one file each; generic
+  microphone mode uses `profiles/generic/` and saves mixer scenes only
 - `profiles/<vid-pid>/recall-on-connect`: the name of the profile
   recalled when that device connects, when one is chosen
 - `devices/<vid-pid>/last-state.json`: for a device using connect-time

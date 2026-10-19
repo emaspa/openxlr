@@ -81,7 +81,7 @@ public sealed record Command
     [JsonPropertyName("source")] public string? Source { get; init; }
     /// <summary>Zero-based stereo pair for createCaptureChannel, default 0.</summary>
     [JsonPropertyName("capturePair")] public int CapturePair { get; init; }
-    /// <summary>Optional zero-based mono port for createCaptureChannel, fed to both sides; requires pair 0.</summary>
+    /// <summary>Optional zero-based mono port for createCaptureChannel or setPrimaryInput, fed to both sides; requires pair 0.</summary>
     [JsonPropertyName("captureMonoChannel")] public int? CaptureMonoChannel { get; init; }
 
     /// <summary>"saveProfile" / "loadProfile" / "deleteProfile": the profile name;

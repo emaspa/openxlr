@@ -64,6 +64,12 @@ or its own is a window preference in `ui.json` as well, and so is the
 record of which skins' pop-out defaults have applied; neither is part of
 this file or of a profile.
 
+The optional `primaryInput` field in `mixer.json` is machine wiring:
+`{"source":"alsa_input.usb-headset","channel":0}` feeds one zero-based mono
+port to XLR 1 in generic microphone mode. Null or absent keeps automatic
+Elgato input. It does not change channel ids or order and is not exported
+into profiles. See [the API](api.md#generic-primary-microphone).
+
 ## Appearance
 
 `appearance` maps `channel:<id>`, `mix:<id>`, `output:phones1` or

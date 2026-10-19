@@ -2283,4 +2283,9 @@ Select the interface OpenXLR drives</value>
   <data name="Phones2Appearance" xml:space="preserve">
     <value>Phones 2 icon and colour</value>
   </data>
+  <data name="ChoosePrimaryMicrophone" xml:space="preserve"><value>Choose primary microphone...</value></data>
+  <data name="PrimaryInputAutomatic" xml:space="preserve"><value>Automatic Elgato interface</value></data>
+  <data name="GenericMicrophoneSelected" xml:space="preserve"><value>Primary microphone: {0}, port {1}</value></data>
+  <data name="PrimaryMicrophoneHint" xml:space="preserve"><value>Choose a PipeWire capture source for XLR 1. Generic mode releases Elgato USB control and keeps software effects, inserts and Sound Check. Monitoring starts muted after a change. Choose Automatic to return to the Elgato interface.</value></data>
+  <data name="PrimaryMicrophonePort" xml:space="preserve"><value>Microphone port (1 to 64)</value></data>
 </root>

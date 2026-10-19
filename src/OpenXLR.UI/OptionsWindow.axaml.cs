@@ -1,5 +1,6 @@
 using OpenXLR.UI.Localization;
 using System;
+using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 
@@ -48,6 +49,57 @@ public partial class OptionsWindow : Window
     internal OptionsWindow(OptionsViewModel vm, DesktopKeys desktopKeys) : this(vm)
     {
         _desktopKeys = desktopKeys;
+    }
+
+    private async void OnPrimaryMicrophone(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not OptionsViewModel vm) return;
+        var choices = vm.Main.Inputs.Where(i => !i.IsOwn)
+            .Select(i => new DeviceChoice(i.Name, i.Description)).ToList();
+        choices.Insert(0, new(null, Localizer.Text("PrimaryInputAutomatic")));
+        if (vm.Main.PrimaryInputSource is { } missing && !choices.Any(c => c.Name == missing))
+            choices.Add(new(missing, missing));
+        var source = new ComboBox { Name = "PrimaryInputSource", ItemsSource = choices,
+            SelectedItem = choices.First(c => c.Name == vm.Main.PrimaryInputSource),
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch };
+        source.ItemTemplate = new Avalonia.Controls.Templates.FuncDataTemplate<DeviceChoice>((choice, _) =>
+            new TextBlock { Text = choice?.Label, TextTrimming = Avalonia.Media.TextTrimming.CharacterEllipsis });
+        var channel = new NumericUpDown { Name = "PrimaryInputChannel", Minimum = 1, Maximum = 64,
+            Increment = 1, FormatString = "0", Value = vm.Main.PrimaryInputChannel + 1 };
+        Avalonia.Automation.AutomationProperties.SetName(source, Localizer.Text("ChoosePrimaryMicrophone"));
+        Avalonia.Automation.AutomationProperties.SetName(channel, Localizer.Text("PrimaryMicrophonePort"));
+        var save = new Button { Name = "ApplyPrimaryInput", Content = Localizer.Text("Save"), IsDefault = true };
+        var cancel = new Button { Content = Localizer.Text("Cancel"), IsCancel = true };
+        var note = new TextBlock { Name = "PrimaryInputError", TextWrapping = Avalonia.Media.TextWrapping.Wrap, Classes = { "warn" } };
+        var dialog = new Window
+        {
+            Title = Localizer.Text("ChoosePrimaryMicrophone"), Width = 480, Height = 380, MinWidth = 360, MinHeight = 300,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner, Classes = { "dialog" },
+            Content = new ScrollViewer { Content = new StackPanel
+            {
+                Margin = new Avalonia.Thickness(18), Spacing = 10,
+                Children =
+                {
+                    new TextBlock { Text = Localizer.Text("PrimaryMicrophoneHint"), TextWrapping = Avalonia.Media.TextWrapping.Wrap, Classes = { "hint" } },
+                    source, new TextBlock { Text = Localizer.Text("PrimaryMicrophonePort") }, channel, note,
+                    new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 8, Children = { cancel, save } },
+                },
+            } },
+        };
+        void RefreshPort() => channel.IsEnabled = (source.SelectedItem as DeviceChoice)?.Name is not null;
+        source.SelectionChanged += (_, _) => RefreshPort();
+        RefreshPort();
+        save.Click += async (_, _) =>
+        {
+            if (!save.IsEnabled || source.SelectedItem is not DeviceChoice choice
+                || channel.Value is not decimal port || port != decimal.Truncate(port)) return;
+            save.IsEnabled = source.IsEnabled = channel.IsEnabled = false;
+            string? error = await vm.Client.SetPrimaryInputAsync(choice.Name, (int)port - 1);
+            if (error is null) dialog.Close();
+            else { note.Text = error; save.IsEnabled = source.IsEnabled = true; RefreshPort(); }
+        };
+        cancel.Click += (_, _) => dialog.Close();
+        await dialog.ShowDialog(this);
     }
 
     // Plugins: the same install flow as the picker, plus yabridge's sync and a rescan.

@@ -76,7 +76,7 @@ public sealed class WebSocketHub
     internal StateMessage Snapshot()
     {
         StateMessage state = _devices.Snapshot();
-        string? deviceId = state.Device?.UsbId;
+        string? deviceId = _devices.HardwareEnabled ? state.Device?.UsbId : GenericProfileId;
         IReadOnlyList<string> profiles = [];
         string? recall = null;
         string? profileWarning = null;
@@ -103,8 +103,8 @@ public sealed class WebSocketHub
             Devices = _mixer.Devices(),
             Profiles = profiles,
             RecallOnConnect = recall,
-            Detected = [.. _devices.Detected().Select(d => new DetectedDevice(d.UsbId, d.Name, d.Active))],
-            WaveInterfaces = _waveInterfaces?.Snapshot(),
+            Detected = !_devices.HardwareEnabled ? [] : [.. _devices.Detected().Select(d => new DetectedDevice(d.UsbId, d.Name, d.Active))],
+            WaveInterfaces = _devices.HardwareEnabled ? _waveInterfaces?.Snapshot() : [],
         };
     }
 
@@ -347,7 +347,9 @@ public sealed class WebSocketHub
             case "rescanPlugins":
                 await ReplyOperationAsync(await Task.Run(() => InstallPlugin(_ => new OpenXLR.Core.Mixing.InstallOutcome(true, "", []))));
                 break;
+            case "setPrimaryInput":
             case "setInserts":
+                // Profile recall and microphone-mode changes share this gate.
                 // A folder cannot be removed between checking its users and
                 // creating an insert from it on another client.
                 lock (_installGate) error = _mixer.Apply(cmd);
@@ -423,11 +425,11 @@ public sealed class WebSocketHub
             case "saveProfile":
             case "loadProfile":
             case "deleteProfile":
-                error = HandleProfile(cmd);
+                lock (_installGate) error = HandleProfile(cmd);
                 if (error is null) Broadcast(Snapshot());   // list (and loaded state) changed
                 break;
             case "setRecallOnConnect":
-                error = HandleRecallOnConnect(cmd);
+                lock (_installGate) error = HandleRecallOnConnect(cmd);
                 if (error is null) Broadcast(Snapshot());
                 break;
             case "resetDevice":
@@ -458,6 +460,18 @@ public sealed class WebSocketHub
     /// </summary>
     private string? ApplyNamedProfile(string devId, string name)
     {
+        if (devId == GenericProfileId)
+        {
+            lock (_installGate)
+            {
+                if (_devices.HardwareEnabled) return "generic microphone mode ended before profile recall";
+                OpenXLR.Core.Profile? generic = OpenXLR.Core.ProfileStore.Load(devId, name);
+                string? error = generic is null ? $"no profile named '{name}'"
+                    : generic.Mixer is null ? "the profile has no mixer scene" : _mixer.ApplyScene(generic.Mixer);
+                if (error is null) _activeProfile[devId] = name;
+                return error;
+            }
+        }
         if (_devices.CurrentConnection is not { } connection || connection.DeviceId != devId)
             return "the active device changed before profile recall";
         lock (_installGate)
@@ -493,6 +507,7 @@ public sealed class WebSocketHub
     /// <summary>Choose (or with an empty name clear) the profile recalled on connect.</summary>
     private string? HandleRecallOnConnect(Command cmd)
     {
+        if (!_devices.HardwareEnabled) return "Generic microphone mode restores the saved mixer settings at startup; interface recall is disabled.";
         if (ActiveDeviceId() is not string devId) return "setRecallOnConnect: no device connected";
         try
         {
@@ -574,8 +589,9 @@ public sealed class WebSocketHub
         catch (Exception ex) { _log.LogWarning("recall on connect: {msg}", ex.Message); return null; }
     }
 
-    /// <summary>The active device's usb id, or null while disconnected.</summary>
-    private string? ActiveDeviceId() => _devices.Snapshot().Device?.UsbId;
+    private const string GenericProfileId = "generic";
+    /// <summary>The profile namespace: the active USB model, generic mode, or null while disconnected.</summary>
+    private string? ActiveDeviceId() => !_devices.HardwareEnabled ? GenericProfileId : _devices.Snapshot().Device?.UsbId;
 
     /// <summary>
     /// Run one install step, then read the catalogues again and say what

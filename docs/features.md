@@ -238,6 +238,17 @@ steps. Shift-drag reduces pointer sensitivity tenfold for short faders.
 Device controls step in their displayed units; plugin parameter steps are
 unchanged.
 
+### Generic primary microphone
+
+Options can bind XLR 1 to any external PipeWire capture source and one of its
+mono ports, without an Elgato interface. The existing sends, software DSP,
+inserts, Sound Check and meters process that microphone. A missing source
+stays selected and silent until it returns. Source and port changes keep
+channel nodes and application routing, and start monitoring muted.
+Generic mode releases Elgato USB control, hides hardware-only controls and
+keeps separate mixer-only profiles. The saved source is machine wiring,
+independent of profile recall. Automatic mode resumes Elgato control.
+
 ### External capture channels
 
 Additional microphones, headsets, capture cards and other attached Wave

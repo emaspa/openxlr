@@ -112,6 +112,7 @@ public sealed class MixerService : IHostedService, IDisposable
 
     private void SyncOutputSelectors()
     {
+        if (!_devices.HardwareEnabled) { _mixer.SetHardwareMicMonitor(false); return; }
         var suffixes = new HashSet<string>();
         string? anyProOutput = null;
         foreach (string output in _mixer.MonitorOutputs)
@@ -243,6 +244,7 @@ public sealed class MixerService : IHostedService, IDisposable
             MixerSettings? saved = MixerSettings.Load(MixerSettings.DefaultPath, out string? settingsWarning);
             if (settingsWarning is not null)
                 _log.LogWarning("mixer settings: {warning}{fallback}", settingsWarning, saved is null ? "; starting with defaults" : "");
+            _mixer.SetPrimaryInput(saved?.PrimaryInput);
             UpdateInputDeviceHint();
             _mixer.Build(MixerConfig.FromSettings(saved), output);
 
@@ -348,7 +350,7 @@ public sealed class MixerService : IHostedService, IDisposable
             stop.ThrowIfCancellationRequested();
             changed |= _mixer.EnsureFilterRoutes();
             stop.ThrowIfCancellationRequested();
-            changed |= _mixer.EnsureMonitorRoutes() | _mixer.SyncSinkLevels();
+            changed |= _mixer.EnsureMonitorRoutes() | _mixer.SyncDeviceList();
             if (changed) Changed?.Invoke();
             stop.ThrowIfCancellationRequested();
             SyncOutputSelectors();
@@ -438,6 +440,14 @@ public sealed class MixerService : IHostedService, IDisposable
         {
             switch (cmd.Cmd)
             {
+                case "setPrimaryInput":
+                    _saves.RunSaved(() => _mixer.SetPrimaryInput(cmd.Source is null ? null
+                        : new PrimaryInputBinding(cmd.Source, cmd.CaptureMonoChannel ?? 0), settings => settings.Save()));
+                    _devices.SetHardwareEnabled(_mixer.PrimaryInput is null);
+                    UpdateInputDeviceHint();
+                    SyncOutputSelectors();
+                    Changed?.Invoke();
+                    return null;
                 case "createCaptureChannel":
                 case "createChannel":
                 case "renameChannel":

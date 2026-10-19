@@ -74,6 +74,9 @@
         <CheckBox Content="{loc:Text Key=EnableSoftwareMixer}"
                   IsChecked="{Binding Submixer, Mode=TwoWay}"
                   ToolTip.Tip="{loc:Text Key=OffOpenXLRControlsTheHardwareOnlyAndLeaves}"/>
+        <TextBlock Text="{Binding Main.PrimaryInputDescription}" TextWrapping="Wrap" Classes="hint"/>
+        <Button Name="PrimaryMicrophone" Content="{loc:Text Key=ChoosePrimaryMicrophone}"
+                IsEnabled="{Binding Main.HasMixer}" HorizontalAlignment="Left" Click="OnPrimaryMicrophone"/>
         <CheckBox Name="CompensateMixLatency" Content="{loc:Text Key=CompensatePluginLatencyAcrossMixes}"
                   IsChecked="{Binding Main.CompensateMixLatency, Mode=TwoWay}" IsEnabled="{Binding Main.HasMixer}"
                   ToolTip.Tip="{loc:Text Key=DelayTheOtherMixesSoEachLines}"/>

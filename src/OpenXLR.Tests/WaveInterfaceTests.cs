@@ -168,6 +168,33 @@ public sealed class WaveInterfaceTests : IDisposable
     }
 
     [Fact]
+    public async Task GenericModeReleasesAdditionalUnitsWithoutForgettingTheirChoices()
+    {
+        using var a = new FakeDevice("unitA"); using var b = new FakeDevice("unitB");
+        using var primary = Manager(() => [a, b]); primary.SweepOnce();
+        using var interfaces = new WaveInterfaces(primary, NullLogger<DeviceManager>.Instance, Configuration, () => [a.Fork(), b.Fork()]);
+        await interfaces.StartAsync(CancellationToken.None);
+        try
+        {
+            Wait(() => interfaces.Snapshot().Count == 2);
+            Assert.Null(interfaces.SetEnabled(b.Info.InstanceId, true));
+            Wait(() => interfaces.Snapshot().Any(s => s.Id == b.Info.InstanceId && s.Connected));
+            primary.SetHardwareEnabled(false);
+            Assert.False(a.Connected);
+            Assert.False(b.Connected);
+            Assert.Empty(interfaces.CaptureProfile());
+            Assert.NotNull(interfaces.Apply(b.Info.InstanceId, "gain", JsonSerializer.SerializeToElement(52)));
+            Assert.NotNull(interfaces.SetEnabled(b.Info.InstanceId, true));
+            Assert.Contains(interfaces.Snapshot(), s => s.Id == b.Info.InstanceId && s.Enabled);
+            primary.SetHardwareEnabled(true);
+            primary.SweepOnce();
+            Wait(() => interfaces.Snapshot().Any(s => s.Id == b.Info.InstanceId && s.Connected));
+            Assert.True(a.Connected);
+        }
+        finally { await interfaces.StopAsync(CancellationToken.None); primary.SuspendSession(); }
+    }
+
+    [Fact]
     public async Task AdditionalInterfacesStayIsolatedThroughControlsProfilesAndAPrimaryHandoff()
     {
         using var a = new FakeDevice("unitA"); using var b = new FakeDevice("unitB");

@@ -146,6 +146,8 @@ public sealed class MixMatrixViewModel : ViewModelBase, IDisposable
     private void OnMainChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(MainViewModel.HasXlr2)) Sync();
+        if (e.PropertyName == nameof(MainViewModel.GenericMicrophone))
+            foreach (MatrixRowViewModel row in Rows) row.RefreshSpec();
     }
 
     private void OnMixChanged(object? sender, PropertyChangedEventArgs e)
@@ -405,12 +407,7 @@ public sealed class MatrixRowViewModel : ViewModelBase
         Matrix = matrix;
         Channel = channel;
         Kind = InputRackViewModel.KindOf(channel);
-        SkinMatrixPartOptions head = matrix.Options.RowHead;
-        IReadOnlyCollection<string> available = MixMatrixViewModel.RowPartsOf(Kind);
-        string[] parts = [.. head.Shown.Where(p => p != SkinStripParts.Identity && available.Contains(p))];
-        // Under the faders, the meter is the gain fader's track rather than a part of its own.
-        if (matrix.MeterUnderFader && parts.Contains(SkinStripParts.Gain)) parts = [.. parts.Where(p => p != SkinStripParts.Meter)];
-        Spec = new StripSpec(parts, Orientation.Horizontal, null, head.Label, Orientation.Horizontal, false, Orientation.Horizontal);
+        Spec = CreateSpec();
         channel.PropertyChanged += OnChannelChanged;
         channel.Sends.CollectionChanged += OnSendsChanged;
         channel.Appearance.PropertyChanged += OnAppearanceChanged;
@@ -429,7 +426,25 @@ public sealed class MatrixRowViewModel : ViewModelBase
     public MainViewModel Main => Matrix.Main;
 
     /// <summary>The head's source controls beside the name, in the skin's order, less what this kind of channel does not have.</summary>
-    public StripSpec Spec { get; }
+    public StripSpec Spec { get; private set; }
+
+    private StripSpec CreateSpec()
+    {
+        SkinMatrixPartOptions head = Matrix.Options.RowHead;
+        IReadOnlyCollection<string> available = MixMatrixViewModel.RowPartsOf(Kind);
+        string[] parts = [.. head.Shown.Where(p => p != SkinStripParts.Identity && available.Contains(p)
+            && !(Main.GenericMicrophone && Kind == InputStripKind.Xlr1 && p is SkinStripParts.Gain or SkinStripParts.Mute))];
+        // Without hardware gain the standalone meter remains visible, even
+        // when the skin normally draws it under the gain fader.
+        if (Matrix.MeterUnderFader && parts.Contains(SkinStripParts.Gain)) parts = [.. parts.Where(p => p != SkinStripParts.Meter)];
+        return new StripSpec(parts, Orientation.Horizontal, null, head.Label, Orientation.Horizontal, false, Orientation.Horizontal);
+    }
+
+    internal void RefreshSpec()
+    {
+        Spec = CreateSpec();
+        Raise(nameof(Spec));
+    }
 
     /// <summary>One cell per column, in the columns' order.</summary>
     public ObservableCollection<MatrixCellViewModel> Cells { get; } = [];

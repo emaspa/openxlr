@@ -188,7 +188,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
 
             if (monitorOutputSink is not null) SetMonitorOutputsLocked([monitorOutputSink]);
             _ = previousDefaultSource;   // defaults are governed by enforcement only
-            _ = defaultSource;           // input channels are hardware-wired, not selectable
+            _ = defaultSource;           // the system default never overrides an explicit input binding
             WireInputFeedsLocked();
             EnsureCaptureFeedsLocked();
             WireAuxRouteLocked();
@@ -213,6 +213,12 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             .ToList();
         string? previousInput = _inputDevice;
         string? nextInput = ResolveInputLocked(sources);
+        if (nextInput is not null && _primaryInput is { } input && !_pw.HasCaptureChannel(nextInput, input.Channel))
+        {
+            _inputWarning = $"The selected primary microphone port {input.Channel + 1} is unavailable. XLR 1 stays silent until it returns.";
+            nextInput = null;
+        }
+        bool sameInput = previousInput == nextInput && _wiredPrimaryInput == _primaryInput;
         // The sample belongs to the microphone it was recorded from.
         if (_soundCheck is not null && _soundCheckDevice != nextInput)
             StopSoundCheckLocked(restore: false, error: "Sound Check stopped because the input device changed.");
@@ -230,15 +236,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         // (a feedback howl through the speakers), so the hardware channels'
         // monitor sends start muted after a device change and the user
         // unmutes deliberately.
-        if (previousInput is not null && previousInput != nextInput)
-        {
-            foreach (MixDefinition mon in _config.Mixes.Where(m => m.Kind == MixKind.Monitor))
-                foreach (ChannelDefinition hw in _config.Channels.Where(c => c.InputPair is not null))
-                {
-                    _muted.Add(Cell(hw.Id, mon.Id));
-                    ApplyCellLocked(hw.Id, mon.Id);
-                }
-        }
+        if (previousInput is not null && previousInput != nextInput) MuteInputMonitorsLocked();
         // Build the replacement graph under unique node names while the old
         // one is still carrying audio. Only after every required port and link
         // exists do we remove the previous routes. A missing LADSPA/LV2 plugin
@@ -249,18 +247,18 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         long generation = ++_inputChainGeneration;
         try
         {
-            foreach (ChannelDefinition ch in _config.Channels.Where(c => c.InputPair is not null))
+            foreach (ChannelDefinition ch in _config.Channels.Where(c => c.InputPair is not null
+                && (_primaryInput is null || c.Id == "xlr1")))
             {
                 // A channel under Sound Check is fed from the loop helper's
                 // single output instead of its capture pair; everything
                 // downstream, the software DSP and the inserts, stays live.
                 bool looped = _soundCheck is not null && _soundCheckChannel == ch.Id;
                 string source = looped ? _soundCheck!.SourceName : nextInput;
-                int pair = looped ? 0 : ch.InputPair!.Value;
                 // The soft low cut and ClipGuard belong to the first XLR
                 // channel only; inserts can sit on either mono XLR channel.
-                bool lc = ch.InputPair == 0 && _lowCutHz > 0 && _lowCutApplicable;
-                bool cg = ch.InputPair == 0 && _softClipGuard && _clipGuardApplicable;
+                bool lc = ch.InputPair == 0 && _lowCutHz > 0 && (_primaryInput is not null || _lowCutApplicable);
+                bool cg = ch.InputPair == 0 && _softClipGuard && (_primaryInput is not null || _clipGuardApplicable);
                 List<InsertDefinition> inserts = IsInsertChannel(ch.Id) ? InsertsFor(ch.Id) : [];
                 bool anyInsert = inserts.Any(i => !i.Bypass && PluginCatalog.Find(i) is not null);
                 bool givenUp = anyInsert && _restarts.Blocked(ch.Id);
@@ -281,13 +279,13 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                         _insertErrors[ch.Id] = ex.Message;
                         if (!lc && !cg)
                         {
-                            if (previousInput == nextInput && !_chains.ContainsKey(ch.Id)
+                            if (sameInput && !_chains.ContainsKey(ch.Id)
                                 && _inputFeeds.TryGetValue(ch.Id, out PortLink? existingFeed)
                                 && _pw.EnsureLinks(existingFeed) != LinkHealth.Broken)
                                 nextFeeds[ch.Id] = existingFeed;
                             else
                             {
-                                PortLink plain = _pw.RouteInputToChannel(source, ch.SinkName, pair);
+                                PortLink plain = RouteInputLocked(source, ch.SinkName, ch, looped);
                                 // No such capture pair on this device (see below): silent channel.
                                 if (plain.Pairs.Count == 0) continue;
                                 nextFeeds[ch.Id] = plain;
@@ -297,7 +295,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                         chain = _pw.CreateMicFilter(chainId + "_builtin", lc ? _lowCutHz : 0, cg);
                     }
 
-                    PortLink into = _pw.RouteInputToChannel(source, chain.SinkName, pair);
+                    PortLink into = RouteInputLocked(source, chain.SinkName, ch, looped);
                     if (into.Pairs.Count == 0)
                     {
                         // The device has no capture pair at this offset (a
@@ -308,7 +306,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                         continue;
                     }
                     nextChains[ch.Id] = chain;
-                    PortLink onward = _pw.LinkNodes(chain.SourceName, "capture", ch.SinkName, "playback");
+                    PortLink onward = RouteInputLocked(chain.SourceName, ch.SinkName, ch, processed: true);
                     if (onward.Pairs.Count == 0)
                     {
                         nextFeeds[ch.Id] = into;   // rolled back with the rest
@@ -322,14 +320,14 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 // Reuse a healthy direct feed when neither the source nor the
                 // DSP changed. A feed missing a pair is made again; the pair
                 // that survived is kept connected (see UnlinkDiscardedFeed).
-                if (previousInput == nextInput && !_chains.ContainsKey(ch.Id)
+                if (sameInput && !_chains.ContainsKey(ch.Id)
                     && _inputFeeds.TryGetValue(ch.Id, out PortLink? directFeed)
                     && _pw.EnsureLinks(directFeed) != LinkHealth.Broken)
                 {
                     nextFeeds[ch.Id] = directFeed;
                     continue;
                 }
-                PortLink feed = _pw.RouteInputToChannel(source, ch.SinkName, pair);
+                PortLink feed = RouteInputLocked(source, ch.SinkName, ch, looped);
                 // The default config always defines XLR 1, XLR 2 and Aux In
                 // (pairs 0, 1, 2); a device with fewer capture pairs has no
                 // ports at the higher offsets and RouteInputToChannel makes
@@ -366,6 +364,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         foreach ((string key, PortLink link) in nextChainOuts) _chainOuts[key] = link;
         foreach ((string key, FilterHandle chain) in nextChains) _chains[key] = chain;
         _inputDevice = nextInput;
+        _wiredPrimaryInput = _primaryInput;
+        if (_primaryInput is not null && !_inputFeeds.ContainsKey("xlr1"))
+            _inputWarning = "The selected primary microphone could not be linked to XLR 1; retrying.";
 
         // With a chain in the path, a direct input-to-channel link that this
         // daemon does not track (left by an earlier run, or auto-linked by
@@ -482,7 +483,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     {
         if (_auxRoute is not null) { _pw.Unlink(_auxRoute); _auxRoute = null; }
         _auxTargetSink = null;
-        if (!_auxPortEnabled || !_hardwareOutputRouting) return;
+        if (!_auxPortEnabled || !_hardwareOutputRouting || _primaryInput is not null) return;
         MixDefinition? aux = _config.Mixes.FirstOrDefault(m => m.Kind == MixKind.AuxPort);
         if (aux is null) return;
         // The raw sink is hidden from pickers, so derive it from any Pro
@@ -582,6 +583,12 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// </summary>
     private string? ResolveInputLocked(IReadOnlyList<AudioNode> sources)
     {
+        if (_primaryInput is { } input)
+        {
+            bool present = sources.Any(s => s.Name == input.Source);
+            _inputWarning = present ? null : $"The selected primary microphone '{input.Source}' is not connected. XLR 1 stays silent until it returns.";
+            return present ? input.Source : null;
+        }
         IReadOnlyList<string> fragments = _inputModelFallback ? [.. _inputHints, "Wave_XLR"] : _inputHints;
         List<AudioNode> picked = InterfaceNodes.Pick(sources, fragments, out string? matched, out bool ambiguous);
         _inputWarning = ambiguous
@@ -797,7 +804,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         lock (_gate)
         {
             if (_softClipGuard == on) return;
-            if (on && _clipGuardApplicable)
+            if (on && (_primaryInput is not null || _clipGuardApplicable))
             {
                 DspFeatureAvailability support = _pw.GetSoftwareClipGuardAvailability();
                 if (!support.Available) throw new InvalidOperationException(support.Error);
@@ -1091,6 +1098,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// </summary>
     private bool ChannelPresentLocked(ChannelDefinition channel)
     {
+        if (_primaryInput is not null && channel.InputPair is not null) return channel.Id == "xlr1";
         if (channel.NeedsXlrInputs is int needed && _deviceXlrInputs is int jacks && jacks < needed) return false;
         return !channel.NeedsAuxInput || _deviceAuxInput is not false;
     }
@@ -1144,14 +1152,16 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             bool broken = _inputFeeds.Count == 0
                 || _inputFeeds.Values.Any(f => _pw.EnsureLinks(f) == LinkHealth.Broken);
             if (!broken) return captureChanged;
+            bool hadInput = _inputFeeds.Count > 0;
+            string? warning = _inputWarning;
             WireInputFeedsLocked();
-            return captureChanged || _inputFeeds.Count > 0;
+            return captureChanged || hadInput || _inputFeeds.Count > 0 || warning != _inputWarning;
         }
     }
 
     /// <summary>Every sink and source the user can pick, real or virtual.</summary>
     public IReadOnlyList<AudioNode> ListDevices()
-        => _pw.ListDevices(_hardwareOutputRouting, _inputHints);
+        => _pw.ListDevices(_primaryInput is null && _hardwareOutputRouting, _inputHints);
 
     /// <summary>Close and reopen an output device's stream (see adapter).</summary>
     public void BounceOutput(string sinkName) => _pw.BounceSink(sinkName);
@@ -1163,6 +1173,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         {
             return new MixerSettings
             {
+                PrimaryInput = _primaryInput,
                 ExclusiveGroups = ExclusiveGroupsModel.Copy(_config.ExclusiveGroups),
                 UserChannels = [.. _config.Channels.Where(c => c.InputPair is null)
                     .Select(c => new UserChannelDefinition(c.Id, c.Name, c.CaptureSource, c.CapturePair, c.CaptureMonoChannel))],
@@ -1232,6 +1243,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         lock (_gate)
         {
             if (!_built) return;
+            SetPrimaryInput(s.PrimaryInput);
             RestoreAppearanceLocked(s.Appearance);
 
             foreach ((string mixId, double vol) in s.MixVolumes)
@@ -1565,24 +1577,23 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     }
 
     /// <summary>
-    /// True when any output's desktop volume or mute moved since the last
-    /// call. Keys and dials show every output's level, so such a change is
-    /// worth a state push; it is not a setting, so nothing is saved for it.
+    /// True when a selectable source/output changed, or an output's desktop
+    /// volume or mute moved. Pickers and keys need a state push for these;
+    /// they are not mixer settings, so nothing is saved for them.
     /// </summary>
-    public bool SyncSinkLevels()
+    public bool SyncDeviceList()
     {
         lock (_gate)
         {
             if (!_built) return false;
             string levels = string.Join('\n', _pw.ListDevices()
-                .Where(d => d.Kind == AudioNodeKind.Sink)
-                .Select(d => $"{d.Name}\t{d.Volume}\t{d.Muted}"));
-            if (levels == _sinkLevels) return false;
-            _sinkLevels = levels;
+                .Select(d => $"{d.Kind}\t{d.Name}\t{d.Description}\t{d.IsPhysical}\t{d.Volume}\t{d.Muted}"));
+            if (levels == _deviceList) return false;
+            _deviceList = levels;
             return true;
         }
     }
-    private string? _sinkLevels;
+    private string? _deviceList;
 
     /// <summary>Repair internal sinks and read monitor masters from one dump under the mixer lock.</summary>
     public bool SyncOwnSinkLevels(out IReadOnlyList<string> restored)
@@ -1679,7 +1690,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     {
         lock (_gate)
         {
-            on &= GroupForChannelLocked("xlr1") is null && _soundCheckChannel != "xlr1";
+            on &= _primaryInput is null && GroupForChannelLocked("xlr1") is null && _soundCheckChannel != "xlr1";
             if (_hardwareMicMonitor == on) return on;
             _hardwareMicMonitor = on;
             RefreshHardwareMicCellsLocked();
@@ -2252,6 +2263,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             DspFeatureAvailability clipGuard = _pw.GetSoftwareClipGuardAvailability();
             return WithAppearanceLocked(new MixerState
             {
+                PrimaryInputConnected = _inputDevice is not null && _inputFeeds.ContainsKey("xlr1"),
+                PrimaryInput = _primaryInput,
                 ExclusiveGroups = ExclusiveGroupsModel.Copy(_config.ExclusiveGroups),
                 Mixes = [.. _config.Mixes.Select(m => new MixStatus(
                     m.Id, m.Name,

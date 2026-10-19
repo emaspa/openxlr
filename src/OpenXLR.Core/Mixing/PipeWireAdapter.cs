@@ -1435,6 +1435,10 @@ public sealed class PipeWireAdapter
     public PortLink RouteInputToChannel(string sourceName, string channelSink, int sourcePair = 0)
         => LinkNodes(sourceName, "capture", channelSink, "playback", 0, sourcePair);
 
+    /// <summary>Check a generic microphone port before creating any plugin hosts for it.</summary>
+    internal bool HasCaptureChannel(string sourceName, int channel)
+        => ListPorts(sourceName, "", output: true).Distinct().Skip(channel).Any();
+
     /// <summary>Stop one loopback (used when re-pointing a device selection).</summary>
     public void StopLoopback(LoopbackHandle lb)
     {

@@ -79,7 +79,7 @@
               </StackPanel>
               <StackPanel layout:StripPanel.Part="hardware-controls" Classes="dev" Spacing="4">
                 <WrapPanel Name="RackInputControls" ItemSpacing="6" LineSpacing="4">
-                  <ToggleButton Content="{Binding Main.MuteLabel}" Classes="mute" IsChecked="{Binding Main.Mute, Mode=TwoWay}"
+                  <ToggleButton IsVisible="{Binding !Main.GenericMicrophone}" Content="{Binding Main.MuteLabel}" Classes="mute" IsChecked="{Binding Main.Mute, Mode=TwoWay}"
                                 IsEnabled="{Binding !Main.PhantomSettling}"
                                 ToolTip.Tip="{loc:Text Key=TheDeviceMutesThisInputForAbout13}"/>
                   <ToggleButton Content="{loc:Text Key=LowCut}" IsChecked="{Binding Main.LowCut, Mode=TwoWay}" IsVisible="{Binding Main.CapLowCut}"/>

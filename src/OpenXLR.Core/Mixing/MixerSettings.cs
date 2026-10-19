@@ -13,6 +13,9 @@ namespace OpenXLR.Core.Mixing;
 /// </summary>
 public sealed record MixerSettings
 {
+    /// <summary>Generic primary microphone, or null for the supported interface. Machine wiring, never profile state.</summary>
+    public PrimaryInputBinding? PrimaryInput { get; init; }
+
     /// <summary>Ordered application channels; null preserves the legacy defaults.</summary>
     public List<UserChannelDefinition>? UserChannels { get; init; }
 

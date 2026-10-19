@@ -48,6 +48,7 @@ public sealed class WindowLayoutTests
                 ProfileSliderWindowTests.Check();
                 EditorRulesReconnectWindowTests.Check();
                 UserMonitorWindowTests.Check();
+                PrimaryInputWindowTests.Check();
                 VolumeRangeWindowTests.Check();
                 LocalizationRenderingTests.Check();
                 var vm = new MainViewModel(new DaemonClient());

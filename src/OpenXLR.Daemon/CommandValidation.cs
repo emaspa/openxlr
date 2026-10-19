@@ -70,6 +70,11 @@ public static class CommandValidation
             case "setWindowsPluginEnabled":
             case "deleteWindowsPlugin":
                 return CheckPluginPath(cmd);
+            case "setPrimaryInput":
+                return cmd.Source is null
+                    ? cmd.CapturePair == 0 && cmd.CaptureMonoChannel is null ? null : "setPrimaryInput: clearing the source takes no port"
+                    : CaptureBinding.IsValid(cmd.Source, cmd.CapturePair, cmd.CaptureMonoChannel ?? 0) ? null
+                        : "setPrimaryInput: need an external source and a mono port from 0 to 63, with capturePair 0";
             case "createCaptureChannel":
                 if (BadName(cmd.Name)) return "createCaptureChannel: name must contain 1 to 60 printable characters";
                 return CaptureBinding.IsValid(cmd.Source, cmd.CapturePair, cmd.CaptureMonoChannel) ? null

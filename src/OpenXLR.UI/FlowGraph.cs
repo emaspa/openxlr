@@ -31,8 +31,12 @@ internal sealed record FlowGraph(IReadOnlyList<FlowNode> Nodes, IReadOnlyList<Fl
 
         foreach (ChannelViewModel channel in vm.Channels)
         {
+            if (vm.GenericMicrophone && !channel.Present) continue;
             var sources = new List<(string Key, string Label, string Detail, FlowIcon Icon, bool Active)>();
-            if (channel.Id is "xlr1" or "xlr2" or "aux")
+            if (vm.GenericMicrophone && channel.Id == "xlr1")
+                sources.Add(("capture:xlr1", vm.PrimaryInputSource!, vm.PrimaryInputDescription,
+                    FlowIcon.Microphone, vm.InputConnected));
+            else if (channel.Id is "xlr1" or "xlr2" or "aux")
                 sources.Add(($"hw:{channel.Id}", channel.Id switch
                 {
                     "xlr1" => Localizer.Text("Xlr1Jack"), "xlr2" => Localizer.Text("Xlr2Jack"), _ => Localizer.Text("LineInUsbAux"),
@@ -114,7 +118,7 @@ internal sealed record FlowGraph(IReadOnlyList<FlowNode> Nodes, IReadOnlyList<Fl
         {
             if (mix.Kind == "virtualMic")
                 Output($"vm:{mix.Id}", $"OpenXLR {mix.Name}", Localizer.Text("VirtualMicrophone"), [mix.Id], true, FlowIcon.Microphone);
-            else if (mix.IsAuxPort)
+            else if (mix.IsAuxPort && !vm.GenericMicrophone)
                 Output("aux:port", Localizer.Text("UsbAuxPortKind"), mix.AuxPortEnabled ? Localizer.Text("SecondComputer") : Localizer.Text("FlowOff"),
                     [mix.Id], mix.AuxPortEnabled, FlowIcon.Speaker);
         }

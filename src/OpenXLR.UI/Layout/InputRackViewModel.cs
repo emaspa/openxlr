@@ -43,6 +43,7 @@ public sealed class InputRackViewModel : IDisposable
     {
         _main = main;
         _main.Channels.CollectionChanged += OnChannelsChanged;
+        _main.PropertyChanged += OnMainChanged;
         Sync();
     }
 
@@ -84,6 +85,12 @@ public sealed class InputRackViewModel : IDisposable
 
     private void OnChannelsChanged(object? sender, NotifyCollectionChangedEventArgs e) => Sync();
 
+    private void OnMainChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MainViewModel.GenericMicrophone))
+            foreach (InputStripViewModel strip in Strips) strip.RefreshSpec();
+    }
+
     /// <summary>
     /// Follow the channels: keep a channel's strip while it is the same kind,
     /// make a new one when the kind changed, and keep the mixer's order.
@@ -111,6 +118,7 @@ public sealed class InputRackViewModel : IDisposable
     public void Dispose()
     {
         _main.Channels.CollectionChanged -= OnChannelsChanged;
+        _main.PropertyChanged -= OnMainChanged;
         foreach (InputStripViewModel strip in Strips) strip.Detach();
         Strips.Clear();
     }
@@ -127,7 +135,7 @@ public sealed class InputStripViewModel : ViewModelBase
         _rack = rack;
         Channel = channel;
         Kind = kind;
-        Spec = StripSpec.From(rack.Options, Orientation.Vertical, InputRackViewModel.PartsOf(kind), SkinStripParts.Gain);
+        Spec = CreateSpec();
         channel.PropertyChanged += OnChannelChanged;
         channel.Appearance.PropertyChanged += OnAppearanceChanged;
         if (kind == InputStripKind.Xlr2) rack.Main.PropertyChanged += OnMainChanged;
@@ -144,7 +152,17 @@ public sealed class InputStripViewModel : ViewModelBase
     public MainViewModel Main => _rack.Main;
 
     /// <summary>How the strip is drawn: the skin's parts, less the ones this kind of channel does not have.</summary>
-    public StripSpec Spec { get; }
+    public StripSpec Spec { get; private set; }
+
+    private StripSpec CreateSpec() => StripSpec.From(_rack.Options, Orientation.Vertical,
+        [.. InputRackViewModel.PartsOf(Kind).Where(p => !(Main.GenericMicrophone && Kind == InputStripKind.Xlr1 && p == SkinStripParts.Gain))],
+        SkinStripParts.Gain);
+
+    internal void RefreshSpec()
+    {
+        Spec = CreateSpec();
+        Raise(nameof(Spec));
+    }
 
     /// <summary>The input's plugin chain, for the two XLR inputs; null for every other channel.</summary>
     public InsertsViewModel? Inserts => Kind switch

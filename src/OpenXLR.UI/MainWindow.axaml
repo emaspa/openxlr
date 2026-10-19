@@ -111,7 +111,7 @@
         <TextBlock Grid.Column="2" Text="OpenXLR" Classes="title" VerticalAlignment="Center"/>
         <Grid Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2" ColumnDefinitions="Auto,*"
               ColumnSpacing="6" Margin="0,2,0,0">
-            <skin:StatusLed IsOn="{Binding DeviceConnected}"
+            <skin:StatusLed IsOn="{Binding InputConnected}"
                             AutomationProperties.Name="{loc:Text Key=InterfaceConnection}"/>
             <TextBlock Name="DeviceStatus" Grid.Column="1" Text="{Binding StatusLine}" Classes="h"
                        VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding StatusLine}"
@@ -174,7 +174,7 @@
                     <TextBlock Text="{loc:Text Key=OnConnect}" Classes="h" FontSize="11" VerticalAlignment="Center"/>
                     <ComboBox Grid.Column="1" Margin="8,0,0,0" FontSize="12" HorizontalAlignment="Stretch"
                               ItemsSource="{Binding RecallChoices}"
-                              SelectedItem="{Binding RecallOnConnectChoice}"/>
+                              SelectedItem="{Binding RecallOnConnectChoice}" IsEnabled="{Binding !GenericMicrophone}"/>
                   </Grid>
                 </StackPanel>
               </Flyout>
@@ -275,7 +275,7 @@
       <StackPanel Name="HardwarePanel" Classes="dev" Spacing="4">
 
         <!-- XLR 1 -->
-        <Grid ColumnDefinitions="90,*,64,Auto">
+        <Grid ColumnDefinitions="90,*,64,Auto" IsVisible="{Binding !GenericMicrophone}">
           <TextBlock Text="{loc:Text Key=XLR1Gain}" Classes="h" VerticalAlignment="Center"/>
           <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="{Binding GainMaxDb}"
                   Value="{Binding GainDb, Mode=TwoWay}" IsEnabled="{Binding !GainLocked}"/>
@@ -287,7 +287,7 @@
                         ToolTip.Tip="{loc:Text Key=GainLockTheDaemonRejectsEveryGainChange}"/>
         </Grid>
         <WrapPanel Name="InputControls" ItemSpacing="6" LineSpacing="4">
-          <ToggleButton Content="{Binding MuteLabel}" Classes="mute" IsChecked="{Binding Mute, Mode=TwoWay}"
+          <ToggleButton IsVisible="{Binding !GenericMicrophone}" Content="{Binding MuteLabel}" Classes="mute" IsChecked="{Binding Mute, Mode=TwoWay}"
                         IsEnabled="{Binding !PhantomSettling}"
                         ToolTip.Tip="{loc:Text Key=TheDeviceMutesThisInputForAbout13}"/>
           <ToggleButton Content="{loc:Text Key=LowCut}"    IsChecked="{Binding LowCut, Mode=TwoWay}"     IsVisible="{Binding CapLowCut}"/>
@@ -456,6 +456,7 @@
       <Border.IsVisible>
         <MultiBinding Converter="{x:Static BoolConverters.And}">
           <Binding Path="ShowDetailedSections"/>
+          <Binding Path="!GenericMicrophone"/>
           <Binding Path="(layout:RegionHost.Shown)" RelativeSource="{RelativeSource Self}"/>
         </MultiBinding>
       </Border.IsVisible>

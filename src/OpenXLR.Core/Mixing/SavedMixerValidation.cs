@@ -28,8 +28,11 @@ internal static class SavedMixerValidation
     {
         var notes = new List<string>();
         dropped = notes;
+        PrimaryInputBinding? primary = settings.PrimaryInput;
+        if (primary is not null && !primary.IsValid) { notes.Add("primaryInput: invalid binding"); primary = null; }
         return settings with
         {
+            PrimaryInput = primary,
             UserChannels = settings.UserChannels is null ? null : Entries(settings.UserChannels, "userChannels", notes),
             UserMixes = settings.UserMixes is null ? null : UserMixes(settings.UserMixes, notes),
             ExclusiveGroups = Groups(settings.ExclusiveGroups, notes),

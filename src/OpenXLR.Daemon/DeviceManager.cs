@@ -25,6 +25,23 @@ public sealed class DeviceManager : BackgroundService
     // and gain lock are kept under the unit's instance id, not the model's.
     private string? _stateStorageId;
     private volatile bool _suspended;
+    private volatile bool _hardwareEnabled = true;
+
+    /// <summary>Generic microphone mode releases USB control without forgetting the selected interface.</summary>
+    public bool HardwareEnabled => _hardwareEnabled;
+    internal event Action<bool>? HardwareModeChanged;
+
+    internal void SetHardwareEnabled(bool enabled)
+    {
+        lock (_gate)
+        {
+            if (_hardwareEnabled == enabled) return;
+            _hardwareEnabled = enabled;
+            if (!enabled) { FlushLastState(force: true); Drop(); RestoreCardProfile(); }
+        }
+        HardwareModeChanged?.Invoke(enabled);
+        StateChanged?.Invoke(Snapshot());
+    }
 
     /// <summary>
     /// Raised under the device lock just before a unit is opened, with its
@@ -59,6 +76,7 @@ public sealed class DeviceManager : BackgroundService
         bool launchDefault = config.GetValue("mixer", false) ||
                              Environment.GetEnvironmentVariable("OPENXLR_BUILD_MIXER") == "1";
         _submixer = OpenXLR.Core.DaemonSettings.SubmixerEnabled(launchDefault);
+        _hardwareEnabled = OpenXLR.Core.Mixing.MixerSettings.Load()?.PrimaryInput is null;
     }
 
     /// <summary>Every supported interface currently attached, for client pickers.</summary>
@@ -86,6 +104,7 @@ public sealed class DeviceManager : BackgroundService
             return $"setActiveDevice: bad device id '{usbId}'";
         lock (_gate)
         {
+            if (!_hardwareEnabled) return "Elgato hardware control is disabled in generic microphone mode.";
             var target = _detected.FirstOrDefault(d => usbId.Contains('@') ? d.InstanceId == usbId
                 : d.ProductId == pid && (!model.Contains(':') || model.Equals($"{d.VendorId:x4}:{d.ProductId:x4}", StringComparison.OrdinalIgnoreCase)));
             if (target is null)
@@ -296,7 +315,7 @@ public sealed class DeviceManager : BackgroundService
     /// <summary>One pass of the device loop: connect, poll, park the card profile, persist. Tests drive it directly.</summary>
     internal void SweepOnce()
     {
-        if (_suspended) { Progress.Mark(); return; }
+        if (_suspended || !_hardwareEnabled) { Progress.Mark(); return; }
         try
         {
             EnsureConnected();
@@ -399,7 +418,7 @@ public sealed class DeviceManager : BackgroundService
     {
         lock (_gate)
         {
-            if (_suspended) return;
+            if (_suspended || !_hardwareEnabled) return;
             IReadOnlyList<IAudioDevice> all = _detect();
             _detected = [.. all.Select(d => d.Info)];
             foreach (string drivenInstance in _drivenInstances)
@@ -615,6 +634,12 @@ public sealed class DeviceManager : BackgroundService
 
     private void TryParkCardProfile()
     {
+        lock (_gate)
+            if (_hardwareEnabled) TryParkCardProfileLocked();
+    }
+
+    private void TryParkCardProfileLocked()
+    {
         if (_profileChecksLeft <= 0 || DateTime.UtcNow < _profileNextCheck) return;
         IReadOnlyList<string> fragments = _profileCardFragments;
         if (fragments.Count == 0) { _profileChecksLeft = 0; return; }
@@ -660,6 +685,11 @@ public sealed class DeviceManager : BackgroundService
     }
 
     private void RestoreCardProfile()
+    {
+        lock (_gate) RestoreCardProfileLocked();
+    }
+
+    private void RestoreCardProfileLocked()
     {
         _profileChecksLeft = 0;
         if (_profileRestore is null || _profileCardFragment is null) return;

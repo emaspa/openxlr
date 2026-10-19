@@ -170,6 +170,14 @@ monitor output as the system playback device. The response state retains
 that value; see [the command contract](api.md) for resolution and volume
 synchronization.
 
+The primary microphone can use any external capture source through
+`{"cmd":"setPrimaryInput","source":"alsa_input.usb-headset","captureMonoChannel":0}`.
+`{"cmd":"setPrimaryInput","source":null}` restores automatic Elgato control.
+The reply follows the saved change. Read `mixer.primaryInput` and
+`mixer.primaryInputConnected` from `/api/v1/mixer` or `/api/v1/state`.
+See [generic primary microphone](api.md#generic-primary-microphone) for
+USB control, missing-source and profile behaviour.
+
 Capture channels use the same command endpoint:
 `{"cmd":"createCaptureChannel","name":"Headset mic","source":"alsa_input.usb-headset","capturePair":0}`.
 The source must be present. Success is returned after the layout is saved.

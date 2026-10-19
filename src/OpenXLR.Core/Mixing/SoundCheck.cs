@@ -56,7 +56,7 @@ public sealed partial class Mixer
             }
             if (_soundCheckChannel is not null && _soundCheckChannel != channel)
                 throw new InvalidOperationException("Stop Sound Check on the other microphone first.");
-            if (!_built || _inputDevice is null)
+            if (!_built || _inputDevice is null || (_primaryInput is not null && channel != "xlr1"))
                 throw new InvalidOperationException("The microphone is not connected.");
             if (action == "record" && _soundCheck is null)
             {
@@ -65,7 +65,7 @@ public sealed partial class Mixer
                 PortLink? feed = null;
                 try
                 {
-                    feed = _pw.RouteInputToChannel(_inputDevice, filter.SinkName, input.InputPair!.Value);
+                    feed = RouteInputLocked(_inputDevice, filter.SinkName, input);
                     if (feed.Pairs.Count != 1) throw new InvalidOperationException("The microphone's capture port is unavailable.");
                     _soundCheck = filter;
                     _soundCheckInput = feed;

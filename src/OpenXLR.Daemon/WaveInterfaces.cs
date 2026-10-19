@@ -53,6 +53,7 @@ public sealed class WaveInterfaces : BackgroundService
         _detect = detect;
         _primary = primary; _deviceLog = deviceLog; _configuration = configuration;
         _primary.ClaimingDevice += ReservePrimary;
+        _primary.HardwareModeChanged += OnHardwareModeChanged;
         try
         {
             if (File.Exists(PathName))
@@ -72,6 +73,22 @@ public sealed class WaveInterfaces : BackgroundService
     }
 
     internal static bool ValidId(string? id) => UsbLocation.IsInstanceId(id);
+
+    private void OnHardwareModeChanged(bool enabled)
+    {
+        if (enabled) return;
+        var stopped = new List<DeviceManager>();
+        // Join an admission already past its mode check before collecting
+        // sessions, so none can be added after this handoff returns.
+        lock (_sessionsGate)
+            foreach (var pair in _sessions.ToArray())
+                if (_sessions.TryRemove(pair.Key, out var session)) stopped.Add(session);
+        foreach (DeviceManager session in stopped)
+        {
+            session.SuspendSession();
+            _ = StopSessionAsync(session);
+        }
+    }
 
     private void ReservePrimary(string id)
     {
@@ -118,6 +135,7 @@ public sealed class WaveInterfaces : BackgroundService
 
     public string? SetEnabled(string id, bool enabled)
     {
+        if (!_primary.HardwareEnabled) return "Elgato hardware control is disabled in generic microphone mode.";
         if (!ValidId(id)) return "setWaveInterfaceEnabled: not an instance id";
         if (_stopping) return "setWaveInterfaceEnabled: the daemon is stopping";
         lock (_preferencesGate)
@@ -176,6 +194,7 @@ public sealed class WaveInterfaces : BackgroundService
 
     public string? Apply(string id, string control, JsonElement value)
     {
+        if (!_primary.HardwareEnabled) return "Elgato hardware control is disabled in generic microphone mode.";
         if (!ValidId(id)) return "setWaveControl: not an instance id";
         // The primary reserves its unit before opening it. A late command for
         // the unit's additional role must not reopen it or reach another unit.
@@ -233,11 +252,11 @@ public sealed class WaveInterfaces : BackgroundService
                 lock (_preferencesGate) enabled = [.. _enabled];
                 string? reserved = Volatile.Read(ref _reserved) ?? _primary.ActiveInfo?.InstanceId;
                 foreach (var pair in _sessions.ToArray())
-                    if (pair.Key == reserved || !enabled.Contains(pair.Key) || !devices.Any(d => d.Info.InstanceId == pair.Key))
+                    if (!_primary.HardwareEnabled || pair.Key == reserved || !enabled.Contains(pair.Key) || !devices.Any(d => d.Info.InstanceId == pair.Key))
                     {
                         if (_sessions.TryRemove(pair.Key, out var old)) { old.SuspendSession(); await StopSessionAsync(old); }
                     }
-                foreach (var device in devices.Where(d => d.Info.InstanceId != reserved && enabled.Contains(d.Info.InstanceId)))
+                foreach (var device in devices.Where(d => _primary.HardwareEnabled && d.Info.InstanceId != reserved && enabled.Contains(d.Info.InstanceId)))
                 {
                     string id = device.Info.InstanceId;
                     if (_sessions.ContainsKey(id)) continue;
@@ -263,7 +282,7 @@ public sealed class WaveInterfaces : BackgroundService
                     {
                         lock (_preferencesGate)
                         {
-                            added = !_stopping && id != Volatile.Read(ref _reserved) && _enabled.Contains(id) && _sessions.TryAdd(id, session);
+                            added = !_stopping && _primary.HardwareEnabled && id != Volatile.Read(ref _reserved) && _enabled.Contains(id) && _sessions.TryAdd(id, session);
                             if (added) starting = session.StartAsync(stop);
                         }
                     }
@@ -278,6 +297,7 @@ public sealed class WaveInterfaces : BackgroundService
         {
             lock (_sessionsGate) _stopping = true;
             _primary.ClaimingDevice -= ReservePrimary;
+            _primary.HardwareModeChanged -= OnHardwareModeChanged;
             foreach (var pair in _sessions.ToArray())
                 if (_sessions.TryRemove(pair.Key, out var session)) { session.SuspendSession(); await StopSessionAsync(session); }
         }

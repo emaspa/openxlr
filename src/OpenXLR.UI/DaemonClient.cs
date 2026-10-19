@@ -351,6 +351,13 @@ public sealed class DaemonClient : IAsyncDisposable
 
     // --- layout editing: each call resolves to null on success or the daemon's error ---
 
+    public Task<string?> SetPrimaryInputAsync(string? source, int channel = 0)
+    {
+        var payload = new Dictionary<string, object> { ["cmd"] = "setPrimaryInput", ["source"] = source! };
+        if (source is not null) payload["captureMonoChannel"] = channel;
+        return EditLayoutAsync(payload);
+    }
+
     public Task<string?> CreateCaptureChannelAsync(string name, string source, int pair, int? monoChannel = null)
     {
         var payload = new Dictionary<string, object> { ["cmd"] = "createCaptureChannel", ["name"] = name, ["source"] = source, ["capturePair"] = pair };
