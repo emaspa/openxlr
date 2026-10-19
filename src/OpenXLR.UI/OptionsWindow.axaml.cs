@@ -86,17 +86,27 @@ public partial class OptionsWindow : Window
                 },
             } },
         };
-        void RefreshPort() => channel.IsEnabled = (source.SelectedItem as DeviceChoice)?.Name is not null;
-        source.SelectionChanged += (_, _) => RefreshPort();
-        RefreshPort();
+        bool saving = false;
+        void RefreshControls()
+        {
+            bool manual = (source.SelectedItem as DeviceChoice)?.Name is not null;
+            source.IsEnabled = !saving;
+            channel.IsEnabled = !saving && manual;
+            save.IsEnabled = !saving && (!manual || channel.Value is decimal port
+                && port is >= 1 and <= 64 && port == decimal.Truncate(port));
+        }
+        source.SelectionChanged += (_, _) => RefreshControls();
+        channel.PropertyChanged += (_, change) => { if (change.Property == NumericUpDown.ValueProperty) RefreshControls(); };
+        RefreshControls();
         save.Click += async (_, _) =>
         {
-            if (!save.IsEnabled || source.SelectedItem is not DeviceChoice choice
-                || channel.Value is not decimal port || port != decimal.Truncate(port)) return;
-            save.IsEnabled = source.IsEnabled = channel.IsEnabled = false;
-            string? error = await vm.Client.SetPrimaryInputAsync(choice.Name, (int)port - 1);
+            if (!save.IsEnabled || source.SelectedItem is not DeviceChoice choice) return;
+            int port = choice.Name is null ? 0 : (int)channel.Value!.Value - 1;
+            saving = true;
+            RefreshControls();
+            string? error = await vm.Client.SetPrimaryInputAsync(choice.Name, port);
             if (error is null) dialog.Close();
-            else { note.Text = error; save.IsEnabled = source.IsEnabled = true; RefreshPort(); }
+            else { note.Text = error; saving = false; RefreshControls(); }
         };
         cancel.Click += (_, _) => dialog.Close();
         await dialog.ShowDialog(this);

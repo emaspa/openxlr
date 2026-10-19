@@ -112,7 +112,15 @@ public sealed class MixerService : IHostedService, IDisposable
 
     private void SyncOutputSelectors()
     {
-        if (!_devices.HardwareEnabled) { _mixer.SetHardwareMicMonitor(false); return; }
+        if (!_devices.HardwareEnabled || _devices.ActiveCapabilities?.OutputRouting is not true)
+        {
+            // A saved Pro jack is not evidence of a live hardware mic path.
+            // Keep software monitoring while USB control is absent, and
+            // re-arm the Aux stream when the interface can be driven again.
+            _mixer.SetHardwareMicMonitor(false);
+            _prevAuxDesired = false;
+            return;
+        }
         var suffixes = new HashSet<string>();
         string? anyProOutput = null;
         foreach (string output in _mixer.MonitorOutputs)

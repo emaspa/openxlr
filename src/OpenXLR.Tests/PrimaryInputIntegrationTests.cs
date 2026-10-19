@@ -77,6 +77,45 @@ public sealed partial class MonitorVolumeIntegrationTests
     }
 
     [MonitorPipeWireFact]
+    public async Task ReturningToAutomaticModeWithoutUsbControlKeepsSoftwareMonitoring()
+    {
+        var pw = new PipeWireAdapter();
+        using var registry = pw.WatchGraph();
+        pw.CreateNullSink("primary_signal", "Microphone test signal");
+        pw.CreateVirtualMic("primary_source", "primary_signal.monitor", "Generic microphone");
+        pw.CreateVirtualMic("Wave_XLR_primary_fallback", "primary_signal.monitor", "Unclaimed interface");
+        pw.CreateNullSink("soundcheck_output", "Monitor test tap");
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["mixer"] = "true" }).Build();
+        using var devices = new DeviceManager(NullLogger<DeviceManager>.Instance, config, () => []);
+        using var mixer = new MixerService(NullLogger<MixerService>.Instance, config, devices);
+        await mixer.StartAsync(CancellationToken.None);
+        using var stop = new CancellationTokenSource();
+        Task<ProcessResult> generator = PrimarySignal(stop.Token);
+        try
+        {
+            Assert.Null(mixer.Apply(new() { Cmd = "setPrimaryInput", Source = "primary_source" }));
+            // The saved Pro destination survives a temporary switch to a generic microphone.
+            Assert.Null(mixer.Apply(new() { Cmd = "setMonitorOutputs", Devices = ["unplugged_pro#hp1"] }));
+            Assert.Null(mixer.Apply(new() { Cmd = "setPrimaryInput" }));
+            Assert.False(devices.Snapshot().Connected);
+            PrimaryWait(() => { mixer.SweepOnce(); return mixer.Snapshot()!.PrimaryInputConnected; });
+            using var unmuted = JsonDocument.Parse("false");
+            Assert.Null(mixer.Apply(new() { Cmd = "setChannelMuted", Channel = "xlr1", Mix = "monitor", Value = unmuted.RootElement }));
+            // Tap the software send independently of the unavailable physical jack.
+            PortLink tap = pw.LinkNodes("OpenXLR_mix_monitor", "monitor", "soundcheck_output", "playback", fromChannel: 0);
+            try { PrimarySound(.1); }
+            finally { pw.Unlink(tap); }
+        }
+        finally
+        {
+            stop.Cancel(); await generator;
+            await mixer.StopAsync(CancellationToken.None);
+            pw.TearDown();
+            File.Delete(MixerSettings.DefaultPath);
+        }
+    }
+
+    [MonitorPipeWireFact]
     public void NewCaptureSourcesTriggerADeviceListPushWithoutAnOutputChange()
     {
         var pw = new PipeWireAdapter();
@@ -183,6 +222,37 @@ public sealed partial class MonitorVolumeIntegrationTests
         }
     }
 
+    [Fact]
+    public async Task GenericProfileSaveCannotReplaceASceneWhileTheMixerIsOff()
+    {
+        string directory = Directory.CreateTempSubdirectory("openxlr-generic-profile-").FullName;
+        string? previous = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
+        Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", directory);
+        try
+        {
+            new DaemonSettings { Submixer = false }.Save();
+            Assert.Null(new MixerSettings { PrimaryInput = new("unplugged.microphone") }.Save());
+            var scene = new MixerScene { MixVolumes = new() { ["monitor"] = .42 } };
+            ProfileStore.Save("generic", "Existing", new Profile { Mixer = scene });
+            var config = new ConfigurationBuilder().Build();
+            using var devices = new DeviceManager(NullLogger<DeviceManager>.Instance, config, () => []);
+            using var mixer = new MixerService(NullLogger<MixerService>.Instance, config, devices);
+            using var lifetime = new PrimaryTestLifetime();
+            var hub = new WebSocketHub(devices, mixer, NullLogger<WebSocketHub>.Instance, lifetime);
+            await mixer.StartAsync(CancellationToken.None);
+            Assert.False(mixer.Built);
+            Assert.False((await hub.ExecuteForApiAsync("""{"cmd":"saveProfile","name":"Existing"}""")).Ok);
+            Assert.Equal(.42, ProfileStore.Load("generic", "Existing")!.Mixer!.MixVolumes["monitor"]);
+            Assert.False((await hub.ExecuteForApiAsync("""{"cmd":"saveProfile","name":"Empty"}""")).Ok);
+            Assert.Null(ProfileStore.Load("generic", "Empty"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", previous);
+            Directory.Delete(directory, true);
+        }
+    }
+
     private static void PrimaryWait(Func<bool> ready)
         => Assert.True(SpinWait.SpinUntil(ready, TimeSpan.FromSeconds(6)));
 
@@ -197,7 +267,8 @@ public sealed partial class MonitorVolumeIntegrationTests
             import struct, subprocess
             args = ['--format=f32', '--rate=48000', '--channels=2']
             if '--raw' in subprocess.check_output(['pw-cat', '--help'], text=True): args.append('--raw')
-            p = subprocess.Popen(['pw-cat', '--playback', *args, '--target', 'primary_signal', '-'], stdin=subprocess.PIPE)
+            p = subprocess.Popen(['pw-cat', '--playback', *args, '--target', 'primary_signal',
+                '--properties={ node.name = "OpenXLR_primary_fixture" }', '-'], stdin=subprocess.PIPE)
             try: p.communicate(struct.pack('<ff', .1, .4) * (48000 * 60), timeout=65)
             finally:
                 if p.poll() is None: p.kill()

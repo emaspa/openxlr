@@ -670,11 +670,14 @@ public sealed class WebSocketHub
             switch (cmd.Cmd)
             {
                 case "saveProfile":
+                    OpenXLR.Core.MixerScene? scene = _mixer.ExportScene();
+                    if (devId == GenericProfileId && scene is null)
+                        return "saveProfile: the mixer must be running to save a generic microphone profile";
                     OpenXLR.Core.ProfileStore.Save(devId, name, new OpenXLR.Core.Profile
                     {
                         Device = _devices.Snapshot().State,
                         AdditionalDevices = _waveInterfaces?.CaptureProfile() is { Count: > 0 } additional ? additional : null,
-                        Mixer = _mixer.ExportScene(),
+                        Mixer = scene,
                     });
                     _activeProfile[devId] = name;
                     return null;

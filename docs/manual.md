@@ -226,8 +226,14 @@ the binding ends Sound Check and discards its sample.
 The choice lives in `mixer.json` and survives restart. Generic mode has its
 own mixer-only profiles; they never change the source selection. Interface
 recall on connect is unavailable, since startup already restores the saved
-mixer state. Choose **Automatic Elgato interface** in the same picker to
+mixer state. Saving a generic profile requires the software mixer to be
+running, so an empty scene cannot replace a saved profile while it is off.
+Choose **Automatic Elgato interface** in the same picker to
 resume USB control and the interface's normal input routing.
+Automatic input keeps software monitoring while no connected interface can
+provide the Pro's direct hardware path, even if a Pro output remains saved.
+The port field is only required for a generic source; Automatic can be saved
+with it empty.
 
 ### 3.2 Choose what you hear and how loud
 

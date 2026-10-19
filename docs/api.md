@@ -436,6 +436,8 @@ recall are unavailable. Save/load/delete profile commands use the separate
 `generic` profile directory and affect only the mixer scene. Startup restores
 `mixer.json`; switching or recalling a profile never replaces the selected
 source or port. Monitoring starts muted after a source or port change.
+Saving a generic profile requires a running mixer. If it is off or failed to
+start, the command is refused and any existing profile stays untouched.
 
 ### Additional interface state
 

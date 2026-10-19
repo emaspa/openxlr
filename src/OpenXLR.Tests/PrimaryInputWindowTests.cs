@@ -65,8 +65,13 @@ internal static class PrimaryInputWindowTests
             Assert.Equal(2, source.ItemCount); // Automatic and the external source, without our own virtual microphone.
             Assert.False(port.IsEnabled);
             source.SelectedIndex = 1;
+            port.Value = null;
+            Assert.False(save.IsEnabled);
+            port.Value = 1.5m;
+            Assert.False(save.IsEnabled);
             port.Value = 2;
             Assert.True(port.IsEnabled);
+            Assert.True(save.IsEnabled);
             foreach (double width in new[] { 480d, 360d })
             {
                 WindowLayoutTests.Layout(dialog, width, 380);
@@ -93,6 +98,7 @@ internal static class PrimaryInputWindowTests
             CheckInputTemplates(main);
             Open();
             dialog = Assert.Single(options.OwnedWindows);
+            Find<NumericUpDown>(dialog, "PrimaryInputChannel").Value = null;
             Find<ComboBox>(dialog, "PrimaryInputSource").SelectedIndex = 0;
             Find<Button>(dialog, "ApplyPrimaryInput").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             await Until(() => !dialog.IsVisible);
