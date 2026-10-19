@@ -198,7 +198,6 @@ Options has a tip for step 2: enforcing `OpenXLR Chat` as the system
 default input ([section 3.7](#default-devices)) makes every voice app pick it up without
 configuration.
 
-<a name="monitor"></a>
 #### Use another microphone as XLR 1
 
 In Options, AUDIO, choose **Choose primary microphone...**. Pick the capture
@@ -235,6 +234,7 @@ provide the Pro's direct hardware path, even if a Pro output remains saved.
 The port field is only required for a generic source; Automatic can be saved
 with it empty.
 
+<a name="monitor"></a>
 ### 3.2 Choose what you hear and how loud
 
 The level meters show the newest reading available. If the window is
