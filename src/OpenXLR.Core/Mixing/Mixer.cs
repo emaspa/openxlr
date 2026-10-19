@@ -585,9 +585,14 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     {
         if (_primaryInput is { } input)
         {
-            bool present = sources.Any(s => s.Name == input.Source);
-            _inputWarning = present ? null : $"The selected primary microphone '{input.Source}' is not connected. XLR 1 stays silent until it returns.";
-            return present ? input.Source : null;
+            int matches = sources.Count(s => s.Name == input.Source);
+            _inputWarning = matches switch
+            {
+                0 => $"The selected primary microphone '{input.Source}' is not connected. XLR 1 stays silent until it returns.",
+                1 => null,
+                _ => $"The selected primary microphone name '{input.Source}' matches more than one source. XLR 1 stays silent until the name is unique.",
+            };
+            return matches == 1 ? input.Source : null;
         }
         IReadOnlyList<string> fragments = _inputModelFallback ? [.. _inputHints, "Wave_XLR"] : _inputHints;
         List<AudioNode> picked = InterfaceNodes.Pick(sources, fragments, out string? matched, out bool ambiguous);
@@ -1136,9 +1141,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     }
 
     /// <summary>
-    /// Re-wire the hardware input feeds if none are connected (the interface
-    /// was absent at build time or was replugged). Returns true when feeds
-    /// were (re)established.
+    /// Repair primary and external capture feeds after a disconnect or an
+    /// ambiguous source name. Returns true when routes or warnings changed.
     /// </summary>
     public bool EnsureInputFeeds()
     {
@@ -1149,7 +1153,11 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             // No feeds at all (device absent at build), or feeds whose source
             // node has since vanished (a card profile change renames every
             // node under it): both mean re-resolve the input and re-wire.
-            bool broken = _inputFeeds.Count == 0
+            // A second source can acquire the selected name while the old
+            // links remain healthy. Never choose a microphone by accident.
+            bool ambiguousOrMissing = _primaryInput is { } input && _pw.ListDevices()
+                .Count(d => d.Kind == AudioNodeKind.Source && d.Name == input.Source) != 1;
+            bool broken = ambiguousOrMissing || _inputFeeds.Count == 0
                 || _inputFeeds.Values.Any(f => _pw.EnsureLinks(f) == LinkHealth.Broken);
             if (!broken) return captureChanged;
             bool hadInput = _inputFeeds.Count > 0;

@@ -77,6 +77,28 @@ public sealed partial class MonitorVolumeIntegrationTests
     }
 
     [MonitorPipeWireFact]
+    public void DuplicatePrimarySourceNamesStaySilentUntilTheBindingIsUnambiguous()
+    {
+        var pw = new PipeWireAdapter();
+        using var registry = pw.WatchGraph();
+        using var mixer = new Mixer(pw);
+        pw.CreateNullSink("primary_ambiguous_signal", "Microphone ambiguity test");
+        pw.CreateVirtualMic("primary_ambiguous_source", "primary_ambiguous_signal.monitor", "First microphone");
+        mixer.SetPrimaryInput(new("primary_ambiguous_source"));
+        mixer.Build(MixerConfig.Default());
+        PrimaryWait(() => { mixer.EnsureInputFeeds(); return mixer.Snapshot().PrimaryInputConnected; });
+        uint duplicate = pw.CreateVirtualMic("primary_ambiguous_source", "primary_ambiguous_signal.monitor", "Second microphone");
+        PrimaryWait(() => pw.ListDevices().Count(d => d.Name == "primary_ambiguous_source") == 2);
+        PrimaryWait(() => { mixer.EnsureInputFeeds(); return !mixer.Snapshot().PrimaryInputConnected; });
+        Assert.Contains("more than one", mixer.InputWarning!);
+        Assert.Empty(IncomingRouteLinks("OpenXLR_ch_xlr1"));
+        pw.UnloadModule(duplicate);
+        PrimaryWait(() => { mixer.EnsureInputFeeds(); return mixer.Snapshot().PrimaryInputConnected; });
+        Assert.Null(mixer.InputWarning);
+        Assert.Equal(2, IncomingRouteLinks("OpenXLR_ch_xlr1").Length);
+    }
+
+    [MonitorPipeWireFact]
     public async Task ReturningToAutomaticModeWithoutUsbControlKeepsSoftwareMonitoring()
     {
         var pw = new PipeWireAdapter();
@@ -223,14 +245,14 @@ public sealed partial class MonitorVolumeIntegrationTests
     }
 
     [Fact]
-    public async Task GenericProfileSaveCannotReplaceASceneWhileTheMixerIsOff()
+    public async Task GenericProfileSaveCannotReplaceASceneBeforeTheMixerIsReady()
     {
         string directory = Directory.CreateTempSubdirectory("openxlr-generic-profile-").FullName;
         string? previous = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
         Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", directory);
         try
         {
-            new DaemonSettings { Submixer = false }.Save();
+            new DaemonSettings { Submixer = true }.Save();
             Assert.Null(new MixerSettings { PrimaryInput = new("unplugged.microphone") }.Save());
             var scene = new MixerScene { MixVolumes = new() { ["monitor"] = .42 } };
             ProfileStore.Save("generic", "Existing", new Profile { Mixer = scene });
@@ -239,7 +261,7 @@ public sealed partial class MonitorVolumeIntegrationTests
             using var mixer = new MixerService(NullLogger<MixerService>.Instance, config, devices);
             using var lifetime = new PrimaryTestLifetime();
             var hub = new WebSocketHub(devices, mixer, NullLogger<WebSocketHub>.Instance, lifetime);
-            await mixer.StartAsync(CancellationToken.None);
+            Assert.False(devices.HardwareEnabled);
             Assert.False(mixer.Built);
             Assert.False((await hub.ExecuteForApiAsync("""{"cmd":"saveProfile","name":"Existing"}""")).Ok);
             Assert.Equal(.42, ProfileStore.Load("generic", "Existing")!.Mixer!.MixVolumes["monitor"]);

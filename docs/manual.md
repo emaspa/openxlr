@@ -221,6 +221,9 @@ it. If the source is unplugged or its selected port is missing, XLR 1 stays
 silent and a warning names the problem. It reconnects to the same source
 when that source returns, without borrowing another microphone. Changing
 the binding ends Sound Check and discards its sample.
+If two sources have the selected name, OpenXLR disconnects XLR 1 and reports
+the ambiguity. Rename or remove the duplicate so the name identifies one
+microphone before its route resumes.
 
 The choice lives in `mixer.json` and survives restart. Generic mode has its
 own mixer-only profiles; they never change the source selection. Interface
@@ -233,6 +236,8 @@ Automatic input keeps software monitoring while no connected interface can
 provide the Pro's direct hardware path, even if a Pro output remains saved.
 The port field is only required for a generic source; Automatic can be saved
 with it empty.
+Disabling the software mixer restores hardware-only control. The selected
+generic source is remembered and used again when the software mixer is enabled.
 
 <a name="monitor"></a>
 ### 3.2 Choose what you hear and how loud

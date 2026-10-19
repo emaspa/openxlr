@@ -423,7 +423,10 @@ name. It rejects OpenXLR nodes, monitor taps, control characters and names
 longer than 256 characters. The source or port may be offline when selected;
 no default source or supported-interface fallback replaces it. A sweep heals
 its route when it returns and pushes source arrivals and losses to clients,
-including when no playback output changed. The selected mono port feeds both sides before the
+including when no playback output changed. If multiple sources have the
+selected name, the route is removed and a warning is reported, even if it
+was already connected. It resumes only once the name identifies one source.
+The selected mono port feeds both sides before the
 existing XLR 1 software DSP and insert chain, and Sound Check records that
 same port. XLR 2 and Aux In report `present: false` in this mode.
 
@@ -432,12 +435,15 @@ so generic mode reports no connected Elgato interface. Use
 `mixer.primaryInputConnected` for the microphone route. `detected` and
 `waveInterfaces` are empty while USB control is paused. Additional-interface
 choices are retained for automatic mode. USB control commands and interface
-recall are unavailable. Save/load/delete profile commands use the separate
+recall are unavailable while the software mixer runs in generic mode.
+Disabling the software mixer resumes hardware-only control and keeps the
+saved source binding for when the mixer is enabled again.
+Save/load/delete profile commands use the separate
 `generic` profile directory and affect only the mixer scene. Startup restores
 `mixer.json`; switching or recalling a profile never replaces the selected
 source or port. Monitoring starts muted after a source or port change.
-Saving a generic profile requires a running mixer. If it is off or failed to
-start, the command is refused and any existing profile stays untouched.
+Saving a generic profile requires a running mixer. If it is not ready or
+failed to start, the command is refused and any existing profile stays untouched.
 
 ### Additional interface state
 

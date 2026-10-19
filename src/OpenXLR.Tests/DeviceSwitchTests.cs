@@ -109,20 +109,25 @@ public sealed class DeviceSwitchTests
         });
     }
 
-    [Fact]
-    public void SavedGenericModeNeverOpensAnElgatoDeviceAtStartup()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SavedGenericInputPausesUsbOnlyWhileTheSoftwareMixerIsEnabled(bool mixerEnabled)
     {
         WithConfigDir(() =>
         {
+            new DaemonSettings { Submixer = mixerEnabled }.Save();
             Assert.Null(new OpenXLR.Core.Mixing.MixerSettings
                 { PrimaryInput = new("unplugged.microphone", 1) }.Save());
             var wave = new CountingDevice(WaveXlr);
             using var manager = new DeviceManager(NullLogger<DeviceManager>.Instance,
                 new ConfigurationBuilder().Build(), () => [wave]);
             manager.SweepOnce();
-            Assert.False(manager.HardwareEnabled);
-            Assert.False(wave.Connected);
+            Assert.Equal(!mixerEnabled, manager.HardwareEnabled);
+            Assert.Equal(!mixerEnabled, wave.Connected);
             Assert.Equal(0, wave.Disposals);
+            Assert.Equal(new("unplugged.microphone", 1), OpenXLR.Core.Mixing.MixerSettings.Load()!.PrimaryInput);
+            manager.SuspendSession();
         });
     }
 

@@ -76,7 +76,7 @@ public sealed class DeviceManager : BackgroundService
         bool launchDefault = config.GetValue("mixer", false) ||
                              Environment.GetEnvironmentVariable("OPENXLR_BUILD_MIXER") == "1";
         _submixer = OpenXLR.Core.DaemonSettings.SubmixerEnabled(launchDefault);
-        _hardwareEnabled = OpenXLR.Core.Mixing.MixerSettings.Load()?.PrimaryInput is null;
+        _hardwareEnabled = !_submixer || OpenXLR.Core.Mixing.MixerSettings.Load()?.PrimaryInput is null;
     }
 
     /// <summary>Every supported interface currently attached, for client pickers.</summary>
