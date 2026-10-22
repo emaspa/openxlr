@@ -63,6 +63,77 @@ public sealed partial class MonitorVolumeIntegrationTests
     }
 
     [MonitorPipeWireFact]
+    public void DiskRestartReappliesClosedMonitorFeedsAfterANativeOnlyUnmute()
+    {
+        string directory = Directory.CreateTempSubdirectory("openxlr-native-release-restart-").FullName;
+        string path = Path.Combine(directory, "mixer.json");
+        const string output = "native_release_restart_output";
+        var outputs = new PipeWireAdapter();
+        try
+        {
+            outputs.CreateNullSink(output, "Native release restart output");
+            var originalAdapter = new PipeWireAdapter();
+            using (var registry = originalAdapter.WatchGraph())
+            using (var original = new Mixer(originalAdapter))
+            {
+                original.Build(MonitorConfig());
+                original.SetMonitorOutputs([output]);
+                original.SetMixMuted("monitor", true);
+                original.SyncDeviceVolumes();
+                Assert.True(outputs.GetSinkMuted(output));
+
+                outputs.SetSinkMuted(output, false);
+                Assert.True(SpinWait.SpinUntil(() =>
+                {
+                    if (!originalAdapter.ListDevices().Any(d => d.Name == output && d.Muted is false)) return false;
+                    original.SyncOwnSinkLevels(out _);
+                    original.SyncDeviceVolumes();
+                    return !original.MonitorMuted && !outputs.GetSinkMuted(output)
+                        && original.ExportSettings().MixMuted.Contains("monitor");
+                }, TimeSpan.FromSeconds(3)));
+                for (int sweep = 0; sweep < 3; sweep++)
+                {
+                    original.SyncOwnSinkLevels(out _);
+                    original.SyncDeviceVolumes();
+                }
+                Assert.False(outputs.GetSinkMuted(output));
+                Assert.Null(original.ExportSettings().Save(path));
+            }
+
+            MixerSettings saved = Assert.IsType<MixerSettings>(MixerSettings.Load(path, out string? warning));
+            Assert.Null(warning);
+            Assert.False(saved.MonitorMuted);
+            Assert.Equal(["monitor"], saved.MixMuted);
+            Assert.False(saved.MonitorOutputMutes[output]);
+            Assert.False(outputs.GetSinkMuted(output));
+
+            var restoredAdapter = new PipeWireAdapter();
+            using var restoredRegistry = restoredAdapter.WatchGraph();
+            using var restored = new Mixer(restoredAdapter);
+            restored.SetMonitorMuted(saved.MonitorMuted);
+            restored.Build(MixerConfig.FromSettings(saved));
+            restored.ApplySettings(saved);
+            Assert.False(restored.MonitorMuted);
+            Assert.Equal([output], restored.MonitorOutputs);
+            Assert.Equal(["monitor"], restored.ExportSettings().MixMuted);
+            Assert.True(outputs.GetSinkMuted(output));
+            Assert.False(restored.ExportSettings().MonitorOutputMutes[output]);
+            for (int sweep = 0; sweep < 3; sweep++)
+            {
+                restored.SyncOwnSinkLevels(out _);
+                restored.SyncDeviceVolumes();
+            }
+            Assert.False(restored.MonitorMuted);
+            Assert.True(outputs.GetSinkMuted(output));
+
+            restored.SetMixMuted("monitor", false);
+            Assert.False(outputs.GetSinkMuted(output));
+            Assert.DoesNotContain("monitor", restored.ExportSettings().MixMuted);
+        }
+        finally { outputs.TearDown(); Directory.Delete(directory, true); }
+    }
+
+    [MonitorPipeWireFact]
     public void DesktopMuteOnAnApplicationSinkPausesOnlyMonitoringAndTheSecondPressRestoresIt()
     {
         var pw = new PipeWireAdapter();
@@ -190,10 +261,12 @@ public sealed partial class MonitorVolumeIntegrationTests
         }
         mixer.SetMonitorMuted(true);
         CaptureLevel(0, "OpenXLR_ch_test", first);
+        CaptureLevel(0, first, first); // The physical mute also stops playback sent straight to the device.
         SettleSends(mixer);
         CaptureLevel(0.1, "OpenXLR_ch_test", "OpenXLR_post_chat");
         mixer.SetMonitorMuted(false);
         CaptureLevel(0.1, "OpenXLR_ch_test", first);
+        CaptureLevel(0.1, first, first);
     }
 
     [MonitorPipeWireFact]

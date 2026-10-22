@@ -3256,7 +3256,9 @@ mute choice, so changing feeds, removing the output or resuming a later pause
 does not restore its earlier mute. OpenXLR does not guess which of several
 assigned mixes you wanted to open. Explicitly unmuting that monitor in OpenXLR opens both the
 mix and its assigned device. A later explicit OpenXLR mute re-arms native mute
-control.
+control. The native-only release lasts for the current daemon session and device
+instance. Restarting the daemon or reconnecting the device reapplies the saved
+software feed mutes, while retaining the saved native restore baseline.
 
 Native mute flags are observed on the next mixer sweep. A desktop command
 that changes several flags in the same sweep is treated as one press;
