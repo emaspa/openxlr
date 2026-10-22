@@ -301,8 +301,11 @@ the profile warning without restarting the daemon.
 
 An output's feed names one mix or several joined with `+`, every one at
 unity; a blend at other levels is a mix of its own. An absent entry in
-`monitorFeeds` selects `defaultMonitorMix`. The per-route levels of
-0.1.40 and 0.1.41 (`outputRoutes`, `setOutputRoute`) are gone: a saved
+`monitorFeeds` selects `defaultMonitorMix`. Clients use the first reported
+monitor when an older daemon omits `defaultMonitorMix`, or when that field
+does not name an existing monitor. They do not infer a different default
+from the mix ids. The per-route levels of 0.1.40 and 0.1.41
+(`outputRoutes`, `setOutputRoute`) are gone: a saved
 list is ignored and the command is unknown.
 
 `setEnforcedDefaults` accepts `sink: "@monitor"` to follow the first selected

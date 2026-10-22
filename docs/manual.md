@@ -3364,6 +3364,13 @@ Eight sections are reachable with `1` to `8`, Tab and Shift+Tab:
 | 7 Profiles | load, save over, save as, delete and recall on connect; interface selection and recorded device defaults |
 | 8 Options | the skin picker and **Material mode**, the interface and its warning, the layout, connection status, daemon version and fresh state request |
 
+In Outputs, quick Space presses keep the complete selection while the daemon
+acknowledges it. Feed arrows likewise keep each step separately for each output.
+A refused edit returns to the reported setting and shows the error; reconnecting
+discards any unconfirmed choice. The terminal, Stream
+Deck and Omarchy clients use the daemon's reported default monitor mix, or the
+first reported monitor with an older daemon that does not report that field.
+
 The bottom line shows the current section's keys, with help and quit at
 its right end when there is room.
 `F1` or `?` opens a key table. Up and down scroll that table if

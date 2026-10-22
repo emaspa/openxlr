@@ -167,14 +167,15 @@ test("a named icon draws the built-in path, an unknown or empty one the default,
   assert.equal(iconPath("__proto__"), null);
 });
 
-test("default monitor follows the daemon and stays stable after deleting or reordering built-ins", () => {
+test("default monitor follows the explicit daemon default or older daemon layout order", () => {
   const mixes = [{id:"stream",kind:"virtualMic"}, {id:"monitor2",kind:"monitor"}, {id:"aaa",kind:"monitor"}];
   assert.equal(defaultMonitorMix({mixes, defaultMonitorMix:"monitor2"}), "monitor2");
-  assert.equal(defaultMonitorMix({mixes}), "aaa");
+  assert.equal(defaultMonitorMix({mixes:[...mixes].reverse(), defaultMonitorMix:"monitor2"}), "monitor2");
+  assert.equal(defaultMonitorMix({mixes}), "monitor2");
   assert.equal(defaultMonitorMix({mixes:[...mixes].reverse()}), "aaa");
-  assert.equal(defaultMonitorMix({mixes:[...mixes, {id:"monitor",kind:"monitor"}]}), "monitor");
-  assert.equal(defaultMonitorMix({mixes, defaultMonitorMix:"stream"}), "aaa");
-  assert.equal(defaultMonitorMix({mixes:[{id:"monitor2"},{id:"monitor"}]}), "monitor");
+  assert.equal(defaultMonitorMix({mixes:[...mixes, {id:"monitor",kind:"monitor"}]}), "monitor2");
+  assert.equal(defaultMonitorMix({mixes, defaultMonitorMix:"stream"}), "monitor2");
+  assert.equal(defaultMonitorMix({mixes:[{id:"monitor2"},{id:"monitor"}]}), "monitor2");
 });
 
 

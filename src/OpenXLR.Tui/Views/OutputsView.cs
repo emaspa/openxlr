@@ -8,6 +8,90 @@ namespace OpenXLR.Tui;
 internal sealed class OutputsView : View
 {
     private readonly RowList _list = new();
+    private List<string>? _pendingOutputs;
+    private Task<string?>? _selectionRequest;
+    private long _selectionSession;
+    private readonly Dictionary<string, (string Mix, Task<string?> Request, long Session)> _pendingFeeds = [];
+
+    private List<string> SelectedOutputs(App app, Snapshot state)
+    {
+        if (_selectionSession != app.Link.SessionRevision || !app.Link.Connected)
+        {
+            _pendingOutputs = null;
+            _selectionRequest = null;
+        }
+        if (_selectionRequest is { IsCompleted: true } done)
+        {
+            _pendingOutputs = null;
+            _selectionRequest = null;
+            if (done.IsCompletedSuccessfully && done.Result is { Length: > 0 } error) app.Say(error);
+        }
+        // A receive can complete after this frame captured its snapshot.
+        return _pendingOutputs ?? app.Link.State?.Mixer.MonitorOutputs ?? state.Mixer.MonitorOutputs;
+    }
+
+    private void ToggleOutput(App app, Snapshot state, string name)
+    {
+        if (!app.Link.Connected) return;
+        List<string> outputs = [.. SelectedOutputs(app, state)];
+        if (!outputs.Remove(name)) outputs.Add(name);
+        _pendingOutputs = outputs;
+        _selectionSession = app.Link.SessionRevision;
+        // Only the latest request can replace this complete optimistic set.
+        // The daemon sends the authoritative state before its acknowledgement.
+        _selectionRequest = app.Link.Request("setMonitorOutputs", body =>
+            body["devices"] = new System.Text.Json.Nodes.JsonArray(
+                outputs.Select(output => (System.Text.Json.Nodes.JsonNode?)output).ToArray()));
+    }
+
+    private void SyncPendingFeeds(App app, Snapshot state, List<string> selected)
+    {
+        foreach (var (output, pending) in _pendingFeeds.ToArray())
+            if (!app.Link.Connected || pending.Session != app.Link.SessionRevision || !selected.Contains(output)
+                || !state.Mixer.Mixes.Any(mix => mix.Id == pending.Mix)) _pendingFeeds.Remove(output);
+            else if (pending.Request.IsCompleted) _ = Feed(app, state, output);
+    }
+
+    private string Feed(App app, Snapshot state, string output)
+    {
+        if (_pendingFeeds.TryGetValue(output, out var pending))
+        {
+            if (!pending.Request.IsCompleted) return pending.Mix;
+            _pendingFeeds.Remove(output);
+            if (pending.Request.IsCompletedSuccessfully && pending.Request.Result is { Length: > 0 } error) app.Say(error);
+        }
+        state = app.Link.State ?? state;
+        state.Mixer.MonitorFeeds.TryGetValue(output, out string? value);
+        var included = (value?.Split('+', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries) ?? [])
+            .ToHashSet(StringComparer.Ordinal);
+        string feed = string.Join('+', state.Mixer.Mixes.Where(mix => included.Contains(mix.Id)).Select(mix => mix.Id));
+        if (feed.Length > 0) return feed;
+        List<MixEntry> monitors = state.Mixer.Mixes.Where(mix => mix.Kind == "monitor").ToList();
+        return monitors.FirstOrDefault(mix => mix.Id == state.Mixer.DefaultMonitorMix)?.Id
+            ?? monitors.FirstOrDefault()?.Id ?? "monitor";
+    }
+
+    private void CycleFeed(App app, string output, int by)
+    {
+        if (!app.Link.Connected || app.Link.State is not { } state) return;
+        List<string> selected = SelectedOutputs(app, state);
+        SyncPendingFeeds(app, state, selected);
+        if (!selected.Contains(output)) return;
+        string feed = Feed(app, state, output);
+        // A reply may have published a newer layout while resolving the feed.
+        state = app.Link.State ?? state;
+        List<string> ids = state.Mixer.Mixes.Select(mix => mix.Id).ToList();
+        if (ids.Count == 0) return;
+        int at = ids.IndexOf(feed.Split('+')[0]);
+        string next = ids[((at < 0 ? 0 : at) + (by > 0 ? 1 : ids.Count - 1)) % ids.Count];
+        long session = app.Link.SessionRevision;
+        Task<string?> request = app.Link.Request("setMonitorFeed", body =>
+        {
+            body["device"] = output;
+            body["mix"] = next;
+        });
+        _pendingFeeds[output] = (next, request, session);
+    }
 
     public override string Title => "Outputs";
 
@@ -30,12 +114,13 @@ internal sealed class OutputsView : View
         return state is not null && _list.Handle(key, Build(app, state));
     }
 
-    private static List<Row> Build(App app, Snapshot state)
+    private List<Row> Build(App app, Snapshot state)
     {
         DaemonLink link = app.Link;
         List<Row> rows = [];
         List<DeviceEntry> sinks = state.Devices.Where(device => device.IsSink && !device.IsOwn).ToList();
-        List<string> selected = state.Mixer.MonitorOutputs;
+        List<string> selected = SelectedOutputs(app, state);
+        SyncPendingFeeds(app, state, selected);
 
         rows.Add(new HeadingRow("Monitor"));
         rows.Add(new NumberRow("Output volume", state.Mixer.OutputVolume ?? 0, 0, 1.5, 0.05,
@@ -53,13 +138,9 @@ internal sealed class OutputsView : View
         foreach (DeviceEntry sink in sinks)
         {
             bool on = selected.Contains(sink.Name);
-            state.Mixer.MonitorFeeds.TryGetValue(sink.Name, out string? value);
-            var included = (value?.Split('+', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries) ?? [])
-                .ToHashSet(StringComparer.Ordinal);
-            string feed = string.Join('+', state.Mixer.Mixes.Where(mix => included.Contains(mix.Id)).Select(mix => mix.Id));
-            if (feed.Length == 0) feed = state.Mixer.DefaultMonitorMix ?? state.Mixer.Mixes.Where(mix => mix.Kind == "monitor").OrderBy(mix => mix.Id == "monitor" ? 0 : 1)
-                    .ThenBy(mix => mix.Id, StringComparer.Ordinal).FirstOrDefault()?.Id ?? "monitor";
-            rows.Add(new OutputRow(sink, on, feed, state, link, app));
+            string feed = Feed(app, state, sink.Name);
+            rows.Add(new OutputRow(sink, on, feed, state, link, app,
+                () => ToggleOutput(app, state, sink.Name), by => CycleFeed(app, sink.Name, by)));
         }
 
         rows.Add(new HeadingRow("System defaults"));
@@ -97,7 +178,7 @@ internal sealed class OutputsView : View
     /// it the system default.
     /// </summary>
     private sealed class OutputRow(
-        DeviceEntry sink, bool selected, string feed, Snapshot state, DaemonLink link, App app)
+        DeviceEntry sink, bool selected, string feed, Snapshot state, DaemonLink link, App app, Action toggle, Action<int> cycleFeed)
         : Row(Describe(sink))
     {
         public override void DrawValue(Screen screen, int x, int y, int width, Theme theme, Rgb back, bool focused)
@@ -126,23 +207,11 @@ internal sealed class OutputsView : View
             switch (key.Key)
             {
                 case Key.Char when key.Char == ' ':
-                    List<string> outputs = [.. state.Mixer.MonitorOutputs];
-                    if (selected) outputs.Remove(sink.Name); else outputs.Add(sink.Name);
-                    link.Send("setMonitorOutputs", body =>
-                        body["devices"] = new System.Text.Json.Nodes.JsonArray(
-                            outputs.Select(name => (System.Text.Json.Nodes.JsonNode?)name).ToArray()));
+                    toggle();
                     return true;
 
                 case Key.Left or Key.Right when selected:
-                    List<string> ids = state.Mixer.Mixes.Select(mix => mix.Id).ToList();
-                    if (ids.Count == 0) return true;
-                    int at = ids.IndexOf(feed.Split('+')[0]);
-                    int next = ((at < 0 ? 0 : at) + (key.Key == Key.Right ? 1 : ids.Count - 1)) % ids.Count;
-                    link.Send("setMonitorFeed", body =>
-                    {
-                        body["device"] = sink.Name;
-                        body["mix"] = ids[next];
-                    });
+                    cycleFeed(key.Key == Key.Right ? 1 : -1);
                     return true;
 
                 case Key.Enter:

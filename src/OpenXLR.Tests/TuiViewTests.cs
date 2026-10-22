@@ -653,6 +653,311 @@ public sealed class TuiViewTests
     }
 
     [Fact]
+    public void RapidOutputSelectionsKeepEarlierChoicesAcrossDelayedState()
+    {
+        (App app, List<string> sent) = Ready(tab: 3);
+        var state = System.Text.Json.Nodes.JsonNode.Parse(StateJson)!;
+        state["devices"]!.AsArray().Add(new System.Text.Json.Nodes.JsonObject
+        { ["name"] = "alsa_output.speakers", ["description"] = "Speakers", ["kind"] = 0 });
+        state["mixer"]!["monitorOutputs"]!.AsArray().Add("missing");
+        app.Link.Receive(state.ToJsonString());
+        SelectOutputRow(app, "Katana");
+        app.Handle(new KeyPress(Key.Char, ' '));
+        app.Link.Receive(state.ToJsonString()); // The first edit has not been acknowledged.
+        SelectOutputRow(app, "Speakers");
+        app.Handle(new KeyPress(Key.Char, ' '));
+
+        Assert.Equal(2, sent.Count);
+        Assert.Equal(["alsa_output.arctis", "missing", "alsa_output.katana", "alsa_output.speakers"], SelectedOutputs(sent[^1]));
+        app.Draw(new Screen(140, 36));
+        Assert.Equal(2, sent.Count); // Drawing and stale state do not send edits.
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RapidOutputPressesCanUndoASelectionBeforeReadback(bool startDisconnected)
+    {
+        (App app, List<string> sent) = Ready(tab: 3);
+        if (startDisconnected)
+        {
+            var state = System.Text.Json.Nodes.JsonNode.Parse(StateJson)!;
+            state["mixer"]!["monitorOutputs"] = new System.Text.Json.Nodes.JsonArray();
+            app.Link.Receive(state.ToJsonString());
+        }
+        SelectOutputRow(app, "Katana");
+        app.Handle(new KeyPress(Key.Char, ' '));
+        app.Handle(new KeyPress(Key.Char, ' '));
+        Assert.Equal(2, sent.Count);
+        Assert.Equal(startDisconnected ? [] : ["alsa_output.arctis"], SelectedOutputs(sent[^1]));
+    }
+
+    [Fact]
+    public void OnlyTheLatestOutputFailureRollsBackToTheReportedSelection()
+    {
+        (App app, List<string> sent) = Ready(tab: 3);
+        SelectOutputRow(app, "Katana");
+        app.Handle(new KeyPress(Key.Char, ' '));
+        string first = sent[^1];
+        app.Handle(new KeyPress(Key.Char, ' '));
+        string second = sent[^1];
+        OutputReply(app, first, "obsolete failure");
+        app.Draw(new Screen(140, 36));
+        app.Handle(new KeyPress(Key.Char, ' '));
+        Assert.Equal(["alsa_output.arctis", "alsa_output.katana"], SelectedOutputs(sent[^1]));
+        OutputReply(app, second, "also obsolete");
+        OutputReply(app, sent[^1], "selection refused");
+        var screen = new Screen(140, 36);
+        app.Draw(screen);
+        Assert.Contains("selection refused", Frame(screen), StringComparison.Ordinal);
+        app.Handle(new KeyPress(Key.Char, ' '));
+        Assert.Equal(["alsa_output.arctis", "alsa_output.katana"], SelectedOutputs(sent[^1]));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("obsolete selection")]
+    public void OutputSelectionAcknowledgementUsesTheLatestReportedState(string? oldError)
+    {
+        (App app, List<string> sent) = Ready(tab: 3);
+        SelectOutputRow(app, "Katana");
+        app.Handle(new KeyPress(Key.Char, ' '));
+        string old = sent[^1];
+        app.Handle(new KeyPress(Key.Char, ' '));
+        string edit = sent[^1];
+        var state = System.Text.Json.Nodes.JsonNode.Parse(StateJson)!;
+        state["mixer"]!["monitorOutputs"] = new System.Text.Json.Nodes.JsonArray("alsa_output.katana");
+        app.Link.Receive(state.ToJsonString()); // A later profile or another client has changed it.
+        OutputReply(app, edit);
+        app.Draw(new Screen(140, 36));
+        OutputReply(app, old, oldError);
+        var screen = new Screen(140, 36);
+        app.Draw(screen);
+        Assert.DoesNotContain("obsolete selection", Frame(screen), StringComparison.Ordinal);
+        Assert.Equal(2, sent.Count);
+        app.Handle(new KeyPress(Key.Char, ' '));
+        Assert.Empty(SelectedOutputs(sent[^1]));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("refused")]
+    public void AnAcknowledgementBetweenCapturingAFrameAndHandlingItsKeyUsesTheNewState(string? error)
+    {
+        (App app, List<string> sent) = Ready(tab: 3);
+        Snapshot captured = app.Link.State!;
+        SelectOutputRow(app, "Katana");
+        app.Handle(new KeyPress(Key.Char, ' '));
+        var state = System.Text.Json.Nodes.JsonNode.Parse(StateJson)!;
+        state["mixer"]!["monitorOutputs"] = new System.Text.Json.Nodes.JsonArray("alsa_output.arctis", "alsa_output.katana");
+        app.Link.Receive(state.ToJsonString());
+        OutputReply(app, sent[^1], error);
+
+        // The receive task can acknowledge after Build captured the frame's snapshot.
+        typeof(OutputsView).GetMethod("ToggleOutput", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .Invoke(app.Current, [app, captured, "alsa_output.arctis"]);
+
+        Assert.Equal(["alsa_output.katana"], SelectedOutputs(sent[^1]));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AReconnectedOutputSelectionNeverReplaysOldIntentOrErrors(bool drawDisconnected)
+    {
+        (App app, List<string> sent) = Ready(tab: 3);
+        SelectOutputRow(app, "Katana");
+        app.Handle(new KeyPress(Key.Char, ' '));
+        app.Link.EndSession();
+        if (drawDisconnected)
+        {
+            app.Draw(new Screen(140, 36));
+            app.Handle(new KeyPress(Key.Char, ' '));
+            Assert.Single(sent); // Offline presses cannot create intent for a future session.
+        }
+        app.Link.Receive(StateJson); // A reconnect can happen between frames.
+        var screen = new Screen(140, 36);
+        app.Draw(screen);
+        Assert.DoesNotContain("Disconnected from the daemon", Frame(screen), StringComparison.Ordinal);
+        Assert.Single(sent);
+        app.Handle(new KeyPress(Key.Char, ' '));
+        Assert.Equal(["alsa_output.arctis", "alsa_output.katana"], SelectedOutputs(sent[^1]));
+    }
+
+    private static string[] SelectedOutputs(string command)
+    {
+        using JsonDocument json = JsonDocument.Parse(command);
+        return [.. json.RootElement.GetProperty("devices").EnumerateArray().Select(value => value.GetString()!)];
+    }
+
+    private static void OutputReply(App app, string command, string? error = null)
+    {
+        using JsonDocument json = JsonDocument.Parse(command);
+        app.Link.Receive(JsonSerializer.Serialize(new { type = "commandResult", error,
+            requestId = json.RootElement.GetProperty("requestId").GetString() }));
+    }
+
+    [Theory]
+    [InlineData(null, "Studio", "monitor")]
+    [InlineData("removed", "Studio", "monitor")]
+    [InlineData("monitor", "Monitor A", "stream")]
+    public void OutputDefaultsHonorTheReportedMonitorOrOlderDaemonsFirstMonitor(string? reportedDefault, string expectedLabel, string next)
+    {
+        (App app, List<string> sent) = Ready(tab: 3);
+        var state = System.Text.Json.Nodes.JsonNode.Parse(StateJson)!;
+        state["mixer"]!["mixes"]!.AsArray().Insert(0, new System.Text.Json.Nodes.JsonObject
+        { ["id"] = "monitor2", ["name"] = "Studio", ["kind"] = "monitor" });
+        state["mixer"]!["defaultMonitorMix"] = reportedDefault;
+        state["mixer"]!["monitorFeeds"] = new System.Text.Json.Nodes.JsonObject();
+        app.Link.Receive(state.ToJsonString());
+        SelectOutputRow(app, "Arctis Nova Elite");
+        var screen = new Screen(140, 36);
+        app.Draw(screen);
+        Assert.Contains(expectedLabel, Frame(screen), StringComparison.Ordinal);
+        app.Handle(new KeyPress(Key.Right));
+        Assert.Equal(next, Text(Command(sent), "mix"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RapidFeedArrowsRetainEveryStepWhileStateIsDelayed(bool staleState)
+    {
+        (App app, List<string> sent) = Ready(tab: 3);
+        var state = ThreeFeedState();
+        app.Link.Receive(state.ToJsonString());
+        SelectOutputRow(app, "Arctis Nova Elite");
+        app.Handle(new KeyPress(Key.Right));
+        if (staleState) app.Link.Receive(state.ToJsonString());
+        app.Draw(new Screen(140, 36));
+        app.Handle(new KeyPress(Key.Right));
+        app.Handle(new KeyPress(Key.Left));
+
+        Assert.Equal(["stream", "chat", "stream"], sent.Select(json => CommandMix(json)));
+    }
+
+    [Fact]
+    public void PendingOutputFeedsStayIndependentAndOnlyTheirLatestFailureRollsBack()
+    {
+        (App app, List<string> sent) = Ready(tab: 3);
+        var state = ThreeFeedState();
+        state["mixer"]!["monitorOutputs"]!.AsArray().Add("alsa_output.katana");
+        app.Link.Receive(state.ToJsonString());
+        SelectOutputRow(app, "Arctis Nova Elite");
+        app.Handle(new KeyPress(Key.Right));
+        string arctis = sent[^1];
+        SelectOutputRow(app, "Katana");
+        app.Handle(new KeyPress(Key.Right));
+        string first = sent[^1];
+        app.Handle(new KeyPress(Key.Right));
+        string latest = sent[^1];
+        OutputReply(app, arctis, "arctis refused");
+        OutputReply(app, first, "obsolete feed");
+        app.Draw(new Screen(140, 36));
+        app.Handle(new KeyPress(Key.Left));
+        Assert.Equal("stream", CommandMix(sent[^1]));
+        string current = sent[^1];
+        OutputReply(app, latest, "also obsolete");
+        state["mixer"]!["monitorFeeds"]!["alsa_output.katana"] = "stream";
+        app.Link.Receive(state.ToJsonString());
+        OutputReply(app, current, "katana refused");
+        var screen = new Screen(140, 36);
+        app.Draw(screen);
+        Assert.Contains("katana refused", Frame(screen), StringComparison.Ordinal);
+        app.Handle(new KeyPress(Key.Right));
+        Assert.Equal("chat", CommandMix(sent[^1]));
+    }
+
+    [Fact]
+    public void AFeedAcknowledgedDuringAnOldFrameUsesTheNewStateAfterCleanup()
+    {
+        (App app, List<string> sent) = Ready(tab: 3);
+        var state = ThreeFeedState();
+        app.Link.Receive(state.ToJsonString());
+        Snapshot captured = app.Link.State!;
+        SelectOutputRow(app, "Arctis Nova Elite");
+        app.Handle(new KeyPress(Key.Right));
+        state["mixer"]!["monitorFeeds"]!["alsa_output.arctis"] = "chat";
+        app.Link.Receive(state.ToJsonString());
+        OutputReply(app, sent[^1]);
+        app.Draw(new Screen(140, 36)); // Settles and removes the completed pending feed.
+
+        string? feed = (string?)typeof(OutputsView)
+            .GetMethod("Feed", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .Invoke(app.Current, [app, captured, "alsa_output.arctis"]);
+
+        Assert.Equal("chat", feed);
+        app.Handle(new KeyPress(Key.Right));
+        Assert.Equal("monitor", CommandMix(sent[^1]));
+    }
+
+    [Fact]
+    public void AFeedFailureIsReportedEvenWhenItsSelectedOutputUnplugsBeforeTheReply()
+    {
+        (App app, List<string> sent) = Ready(tab: 3);
+        var state = ThreeFeedState();
+        app.Link.Receive(state.ToJsonString());
+        SelectOutputRow(app, "Arctis Nova Elite");
+        app.Handle(new KeyPress(Key.Right));
+        string edit = sent[^1];
+        state["devices"]!.AsArray().RemoveAt(0);
+        app.Link.Receive(state.ToJsonString());
+        OutputReply(app, edit, "feed refused while unplugged");
+        var screen = new Screen(140, 36);
+        app.Draw(screen);
+        Assert.Contains("feed refused while unplugged", Frame(screen), StringComparison.Ordinal);
+        Assert.Single(sent);
+        app.Link.Receive(ThreeFeedState().ToJsonString());
+        app.Handle(new KeyPress(Key.Right));
+        Assert.Equal("stream", CommandMix(sent[^1]));
+    }
+
+    [Theory]
+    [InlineData("deselect")]
+    [InlineData("delete")]
+    [InlineData("reconnect")]
+    public void ObsoleteFeedRequestsCannotCarryAcrossContextChanges(string change)
+    {
+        (App app, List<string> sent) = Ready(tab: 3);
+        var state = ThreeFeedState();
+        app.Link.Receive(state.ToJsonString());
+        SelectOutputRow(app, "Arctis Nova Elite");
+        app.Handle(new KeyPress(Key.Right));
+        string old = sent[^1];
+        if (change == "deselect") state["mixer"]!["monitorOutputs"] = new System.Text.Json.Nodes.JsonArray();
+        if (change == "delete") state["mixer"]!["mixes"]!.AsArray().RemoveAt(1);
+        if (change == "reconnect") app.Link.EndSession();
+        app.Link.Receive(state.ToJsonString());
+        app.Draw(new Screen(140, 36));
+        if (change != "reconnect") OutputReply(app, old, "obsolete feed");
+        var screen = new Screen(140, 36);
+        app.Draw(screen);
+        Assert.DoesNotContain("obsolete feed", Frame(screen), StringComparison.Ordinal);
+        Assert.Single(sent);
+        if (change == "deselect")
+        {
+            state["mixer"]!["monitorOutputs"]!.AsArray().Add("alsa_output.arctis");
+            app.Link.Receive(state.ToJsonString());
+        }
+        app.Handle(new KeyPress(Key.Right));
+        Assert.Equal(change == "delete" ? "chat" : "stream", CommandMix(sent[^1]));
+    }
+
+    private static string? CommandMix(string json)
+    {
+        using JsonDocument command = JsonDocument.Parse(json);
+        return command.RootElement.GetProperty("mix").GetString();
+    }
+
+    private static System.Text.Json.Nodes.JsonNode ThreeFeedState()
+    {
+        var state = System.Text.Json.Nodes.JsonNode.Parse(StateJson)!;
+        state["mixer"]!["mixes"]!.AsArray().Add(new System.Text.Json.Nodes.JsonObject
+        { ["id"] = "chat", ["name"] = "Chat", ["kind"] = "virtualMic" });
+        return state;
+    }
+
+    [Fact]
     public void TheArrowsWalkWhatFeedsASelectedOutput()
     {
         (App app, List<string> sent) = Ready(tab: 3);

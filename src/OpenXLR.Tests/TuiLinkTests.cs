@@ -71,6 +71,38 @@ public sealed class TuiLinkTests : IDisposable
         Assert.Equal(2, connections);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("selection refused")]
+    public async Task AMonitorSelectionRequestCompletesAfterItsAuthoritativeState(string? error)
+    {
+        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var server = await SocketTestServer.Start(async (socket, stop) =>
+        {
+            await SocketTestServer.Receive(socket, stop); // auth
+            await SocketTestServer.Receive(socket, stop); // state request
+            await SocketTestServer.Send(socket, new { type = "state", mixer = new { monitorOutputs = new[] { "old" } } }, stop);
+            var command = await SocketTestServer.Receive(socket, stop);
+            Assert.Equal("setMonitorOutputs", command["cmd"]!.GetValue<string>());
+            Assert.Equal("speakers", command["devices"]![0]!.GetValue<string>());
+            await SocketTestServer.Send(socket, new { type = "state", mixer = new { monitorOutputs = new[] { "reported" } } }, stop);
+            await SocketTestServer.Send(socket, new { type = "commandResult", error,
+                requestId = command["requestId"]!.GetValue<string>() }, stop);
+            await SocketTestServer.Receive(socket, stop);
+        });
+        await using DaemonLink link = new(server.Url);
+        link.Changed += () => { if (link.State?.Mixer.MonitorOutputs.Contains("old") == true) ready.TrySetResult(); };
+        link.Start();
+        await ready.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        string? result = await link.Request("setMonitorOutputs", body =>
+            body["devices"] = new System.Text.Json.Nodes.JsonArray("speakers")).WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(error, result);
+        Assert.Equal(["reported"], link.State!.Mixer.MonitorOutputs);
+        Assert.Null(link.LastError); // The caller owns this acknowledged error.
+    }
+
     [Fact]
     public async Task FragmentedUtf8AndSeparateMessagesKeepTheirContents()
     {

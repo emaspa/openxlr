@@ -28,6 +28,7 @@ internal sealed class DaemonLink : IAsyncDisposable
     private readonly System.Diagnostics.Stopwatch _clock = System.Diagnostics.Stopwatch.StartNew();
     private ClientWebSocket? _socket;
     private Task? _pump;
+    private long _sessionRevision;
     private readonly SemaphoreSlim _sendGate = new(1);
     private readonly ConcurrentDictionary<string, TaskCompletionSource<string?>> _requests = new();
     private readonly Lock _pluginGate = new();
@@ -51,6 +52,9 @@ internal sealed class DaemonLink : IAsyncDisposable
 
     /// <summary>True between a successful authentication and the socket closing.</summary>
     public bool Connected { get; private set; }
+
+    /// <summary>Changes when a connection ends, even if it reconnects before the next frame.</summary>
+    internal long SessionRevision => Interlocked.Read(ref _sessionRevision);
 
     /// <summary>The last error the daemon sent back, shown once and then cleared.</summary>
     public string? LastError { get; private set; }
@@ -149,7 +153,7 @@ internal sealed class DaemonLink : IAsyncDisposable
         }
     }
 
-    /// <summary>Match an editor outcome to its request, never to an unrelated error.</summary>
+    /// <summary>Match a command outcome to its request, never to an unrelated error.</summary>
     public Task<string?> Request(string command, Action<JsonObject> fill)
     {
         string id = Guid.NewGuid().ToString("N");
@@ -163,7 +167,7 @@ internal sealed class DaemonLink : IAsyncDisposable
     private async Task ExpireRequest(string id, TaskCompletionSource<string?> result)
     {
         try { await result.Task.WaitAsync(TimeSpan.FromSeconds(20), _stopping.Token).ConfigureAwait(false); }
-        catch (TimeoutException) { result.TrySetResult("The daemon did not answer the editor request"); }
+        catch (TimeoutException) { result.TrySetResult("The daemon did not answer the request"); }
         catch (OperationCanceledException) { result.TrySetResult("Disconnected from the daemon"); }
         finally { _requests.TryRemove(id, out _); }
     }
@@ -218,6 +222,7 @@ internal sealed class DaemonLink : IAsyncDisposable
     /// <summary>Drop replies and cached descriptions when the socket closes.</summary>
     internal void EndSession()
     {
+        Interlocked.Increment(ref _sessionRevision);
         Connected = false;
         foreach (var request in _requests.Values) request.TrySetResult("Disconnected from the daemon");
         lock (_pluginGate)
