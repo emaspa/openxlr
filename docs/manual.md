@@ -3243,14 +3243,18 @@ until the restoration is confirmed. A refused restoration leaves all remaining
 repairs queued and stops helper calls for that batch, rather than waiting for
 every output to time out. Native output writes also remain pending
 until readback confirms them. OpenXLR does not author a hardware mute before
-it has verified that output's native identity. A failed release after
-removing an output is retried only for that same device instance.
+it has verified that output's native identity. Removing an output keeps its
+native mute while an old monitor connection still refuses to disconnect.
+Once that connection is gone, a failed release is retried only for that same
+device instance.
 Unmuting an output muted before selection leaves it unmuted without starting
 a monitoring pause. Unmuting a native mute authored by the global pause resumes
 monitoring. If every assigned mix was individually muted, desktop unmute only
 opens the native device: it leaves those deliberate mix mutes unchanged and
-does not start a pause. OpenXLR does not guess which of several assigned mixes
-you wanted to open. Explicitly unmuting that monitor in OpenXLR opens both the
+does not start a pause. That accepted unmute also replaces the saved native
+mute choice, so changing feeds, removing the output or resuming a later pause
+does not restore its earlier mute. OpenXLR does not guess which of several
+assigned mixes you wanted to open. Explicitly unmuting that monitor in OpenXLR opens both the
 mix and its assigned device. A later explicit OpenXLR mute re-arms native mute
 control.
 

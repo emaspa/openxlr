@@ -328,6 +328,10 @@ public sealed partial class Mixer
                     _desktopMuteOffsets.Remove(name);
                     _desktopMutePending.Remove(name);
                 }
+                // An unmute seen during a failed identity read belongs to
+                // the original baseline only after that instance is verified.
+                if (known && !replaced && previous!.UnmuteObserved && _monitorOutputMutes.ContainsKey(name))
+                    RememberMonitorOutputMuteLocked(name, false);
                 _outputMutes[name] = new(state.Identity, registryIdentity,
                     known ? previous!.Muted && (replaced || !previous.UnmuteObserved) : state.Muted,
                     Released: known && !replaced && (previous!.Released || previous.UnmuteObserved && !_monitorMuted && _monitorOutputMutes.ContainsKey(name)),
@@ -434,14 +438,15 @@ public sealed partial class Mixer
     private bool AcceptDesktopOutputUnmuteLocked(string name, bool muted)
     {
         if (muted || !_outputMutes[name].Muted || _desktopMuteResets.ContainsKey(name)) return false;
-        if (_monitorOutputMutes.ContainsKey(name) && _monitorMuted)
+        bool owned = _monitorOutputMutes.ContainsKey(name);
+        if (owned)
         {
-            // An unmute of a mute we authored is a resume key. Unlike an
-            // untouched preselection mute, it is not a new baseline alone.
+            // A verified native unmute supersedes the original native mute,
+            // whether monitoring was paused or its feed was individually closed.
             RememberMonitorOutputMuteLocked(name, false);
-            return false;
+            if (_monitorMuted) return false; // An authored pause's unmute is a resume key.
         }
-        _outputMutes[name] = _outputMutes[name] with { Muted = false, UnmuteObserved = false, Released = _monitorOutputMutes.ContainsKey(name), WritePending = false };
+        _outputMutes[name] = _outputMutes[name] with { Muted = false, UnmuteObserved = false, Released = owned, WritePending = false };
         _desktopMuteRetries.Remove(name);
         _desktopMuteOffsets.Remove(name);
         _desktopMutePending.Remove(name);

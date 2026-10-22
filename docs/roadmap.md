@@ -127,8 +127,8 @@ few releases, and they get to settle in users' hands first.
   level on top, the way Wave Link 3 does it, shipped in 0.1.40 and was
   taken out again: it was a second mixing layer over the sends, cost a
   hidden node per route, and a blend at other levels is what a mix is
-  for. What is missing for that is a monitor-kind mix a user can add,
-  one that is not also a microphone.
+  for. Users can add monitor-kind mixes for that blend without exposing
+  another microphone.
 - [x] Any PipeWire capture source as an input channel: a second
   microphone, a capture card or a headset bound by node name and channel
   pair, healed by the sweep when the device returns. A capture channel

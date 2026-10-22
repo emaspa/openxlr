@@ -34,8 +34,23 @@ public sealed partial class Mixer
         // even while a grouped desktop observation defers its native writes.
         if (explicitChange)
             foreach (string name in PhysicalMonitorOutputsLocked())
-                if (_outputMutes.TryGetValue(name, out var previous) && previous.Released)
-                    _outputMutes[name] = previous with { Released = false };
+                if (_outputMutes.TryGetValue(name, out var previous) && (previous.Released || previous.UnmuteObserved))
+                {
+                    _outputMutes[name] = previous with
+                    {
+                        Released = false, UnmuteObserved = false,
+                        WritePending = previous.WritePending || previous.UnmuteObserved,
+                    };
+                    if (previous.UnmuteObserved)
+                    {
+                        // Supersede the unverified edit through the normal
+                        // identity-checked repair instead of a blind toggle.
+                        _desktopMuteResets[name] = (previous.Muted, 0, 0);
+                        _desktopMuteOffsets.Remove(name);
+                        _desktopMutePending.Remove(name);
+                        _desktopMuteRetries.Remove(name);
+                    }
+                }
         if (_readingDesktopMutes) return;
         bool nativeAvailable = true;
         foreach (string name in PhysicalMonitorOutputsLocked())
@@ -101,7 +116,12 @@ public sealed partial class Mixer
     private HashSet<string> RestoreUnselectedMonitorHardwareMutesLocked(IEnumerable<string> removed)
     {
         var pending = removed.Where(n => _monitorOutputMutes.ContainsKey(n)).ToHashSet(StringComparer.Ordinal);
-        var due = pending.Where(n => Clock() >= _desktopMuteResets.GetValueOrDefault(n).RetryAt).ToHashSet(StringComparer.Ordinal);
+        // A refused disconnect can outlive the selection. Keep the native
+        // mute until the last owned route into this output is gone.
+        var due = pending.Where(n => Clock() >= _desktopMuteResets.GetValueOrDefault(n).RetryAt
+            && !_monitorRoutes.Any(route => route.Value.Pairs.Count > 0
+                && (route.Key == n || route.Key == OutputRouteKey(n + "#"))))
+            .ToHashSet(StringComparer.Ordinal);
         if (due.Count == 0) return pending;
         IReadOnlyDictionary<string, (string Identity, bool Muted)> native;
         try { native = _pw.NativeSinkMutes(due); }

@@ -633,6 +633,137 @@ public sealed class MonitorMuteDeferredPulseTests
         Assert.False(fixture.Native("external"));
     }
 
+    [Theory]
+    [InlineData(false, "deselect", false)]
+    [InlineData(true, "deselect", false)]
+    [InlineData(false, "feed", false)]
+    [InlineData(true, "feed", false)]
+    [InlineData(false, "resume-and-feed", false)]
+    [InlineData(true, "resume-and-feed", false)]
+    [InlineData(false, "restart-and-feed", false)]
+    [InlineData(true, "restart-and-feed", false)]
+    [InlineData(false, "deselect", true)]
+    [InlineData(true, "deselect", true)]
+    [InlineData(false, "feed", true)]
+    [InlineData(true, "feed", true)]
+    [InlineData(false, "resume-and-feed", true)]
+    [InlineData(true, "resume-and-feed", true)]
+    [InlineData(false, "restart-and-feed", true)]
+    [InlineData(true, "restart-and-feed", true)]
+    public void AnAcceptedNativeUnmuteReplacesAnOlderOwnedMuteBaseline(bool originallyMuted, string transition, bool deferredIdentity)
+    {
+        using var fixture = new IndependentSinks();
+        fixture.SetNative("external", originallyMuted);
+        fixture.Publish();
+        fixture.Mixer.SetMonitorOutputs(["external"]);
+        fixture.Mixer.SetMixMuted("monitor", true);
+        fixture.Sweep(); // Confirm any authored mute before testing a native edit.
+        Assert.True(fixture.Native("external"));
+
+        fixture.SetNative("external", false);
+        if (deferredIdentity)
+        {
+            fixture.DeferNextPhysicalPulse(identityVerification: true);
+            fixture.Sweep(externalRegistrySerial: 2);
+            Assert.False(fixture.Mixer.MonitorMuted);
+            Assert.Equal(originallyMuted, fixture.Mixer.ExportSettings().MonitorOutputMutes["external"]);
+        }
+        fixture.Sweep(); // The original native and registry generation agree.
+        Assert.False(fixture.Mixer.MonitorMuted);
+        Assert.False(fixture.Native("external"));
+        Assert.Equal(["monitor"], fixture.Mixer.ExportSettings().MixMuted);
+        MixerSettings saved = DiskSettings(fixture.Mixer);
+
+        switch (transition)
+        {
+            case "deselect": fixture.Mixer.SetMonitorOutputs([]); break;
+            case "feed": Assert.Null(fixture.Mixer.SetMonitorFeed("external", "monitor_b")); break;
+            case "resume-and-feed":
+                fixture.Mixer.SetMonitorMuted(true);
+                fixture.Mixer.SetMonitorMuted(false);
+                Assert.True(fixture.Native("external")); // The individual mix mute still closes its feed.
+                Assert.Null(fixture.Mixer.SetMonitorFeed("external", "monitor_b"));
+                break;
+            case "restart-and-feed":
+                using (var restored = new IndependentSinks())
+                {
+                    restored.SetNative("external", false);
+                    restored.Publish();
+                    restored.Mixer.ApplySettings(saved);
+                    Assert.Null(restored.Mixer.SetMonitorFeed("external", "monitor_b"));
+                    Assert.False(restored.Native("external"));
+                    Assert.False(restored.Mixer.MonitorMuted);
+                    Assert.Equal(["monitor"], restored.Mixer.ExportSettings().MixMuted);
+                }
+                break;
+            default: throw new InvalidOperationException("unknown transition");
+        }
+
+        Assert.False(fixture.Native("external"));
+        Assert.False(fixture.Mixer.MonitorMuted);
+        Assert.Equal(["monitor"], fixture.Mixer.ExportSettings().MixMuted);
+        Assert.False(saved.MonitorOutputMutes["external"]);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ADeferredNativeUnmuteDoesNotReplaceAReplacementOutputsOwnedBaseline(bool originallyMuted)
+    {
+        using var fixture = new IndependentSinks();
+        fixture.SetNative("external", originallyMuted);
+        fixture.Publish();
+        fixture.Mixer.SetMonitorOutputs(["external"]);
+        fixture.Mixer.SetMixMuted("monitor", true);
+        fixture.Sweep();
+        fixture.SetNative("external", false);
+        fixture.DeferNextPhysicalPulse(identityVerification: true);
+        fixture.Sweep(externalRegistrySerial: 2);
+        Assert.Equal(originallyMuted, fixture.Mixer.ExportSettings().MonitorOutputMutes["external"]);
+
+        fixture.ReplaceExternal();
+        fixture.Sweep(externalRegistrySerial: 2);
+
+        Assert.False(fixture.Mixer.MonitorMuted);
+        Assert.True(fixture.Native("external")); // The replacement still follows the individually closed feed.
+        Assert.Equal(["monitor"], fixture.Mixer.ExportSettings().MixMuted);
+        Assert.Equal(originallyMuted, fixture.Mixer.ExportSettings().MonitorOutputMutes["external"]);
+        Assert.Null(fixture.Mixer.SetMonitorFeed("external", "monitor_b"));
+        Assert.Equal(originallyMuted, fixture.Native("external"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ANewerExplicitMonitorMuteSupersedesAnUnverifiedNativeUnmute(bool originallyMuted)
+    {
+        using var fixture = new IndependentSinks();
+        fixture.SetNative("external", originallyMuted);
+        fixture.Publish();
+        fixture.Mixer.SetMonitorOutputs(["external"]);
+        fixture.Mixer.SetMixMuted("monitor", true);
+        fixture.Sweep();
+        fixture.SetNative("external", false);
+        fixture.DeferNextPhysicalPulse(identityVerification: true);
+        fixture.Sweep(externalRegistrySerial: 2);
+        Assert.False(fixture.Native("external"));
+
+        fixture.Mixer.SetMixMuted("monitor", true);
+        fixture.Sweep(); // Verify the same native generation before applying the newer mute.
+
+        Assert.True(fixture.Native("external"));
+        Assert.False(fixture.Mixer.MonitorMuted);
+        Assert.Equal(["monitor"], fixture.Mixer.ExportSettings().MixMuted);
+        fixture.Sweep();
+        int before = fixture.Calls.Length;
+        fixture.Sweep();
+        Assert.DoesNotContain("--format=json list sinks", fixture.Calls[before..]);
+        Assert.True(fixture.Native("external"));
+        Assert.False(fixture.Mixer.MonitorMuted);
+        fixture.Mixer.SetMixMuted("monitor", false);
+        Assert.False(fixture.Native("external"));
+    }
+
     [Fact]
     public void APhysicalMuteKeyRearmsAReleasedIndividuallyMutedOutput()
     {
