@@ -214,6 +214,9 @@ internal static partial class SkinLayoutWindowTests
             Assert.Equal(cards, expanders.Select(e => (Border)e.Parent!));
             Assert.Equal(contents, expanders.Select(e => e.Content));
             Assert.All(expanders, e => Assert.Same(model, e.DataContext));
+            CheckSeenMarkerBounds();
+            CheckFirstFoldSave(main, dir);
+            CheckFoldSaveErrors(main, dir);
         }
         finally
         {
@@ -224,6 +227,144 @@ internal static partial class SkinLayoutWindowTests
             Environment.SetEnvironmentVariable("XDG_DATA_HOME", dataHome);
             Environment.SetEnvironmentVariable("XDG_DATA_DIRS", dataDirs);
             Directory.Delete(dir, true);
+        }
+    }
+
+    private static void CheckSeenMarkerBounds()
+    {
+        string path = Path.Combine(UiSettings.ConfigDir, "ui.json");
+        string saved = File.ReadAllText(path);
+        SkinLayoutKey[] Keys(string prefix) => [.. Enumerable.Range(0, UiSettings.MaxSkinArrangements)
+            .Select(i => new SkinLayoutKey { Skin = prefix + i, Version = 1 })];
+        SkinLayoutKey[] newer = Keys("new-");
+        MainWindow? olderWindow = null;
+        try
+        {
+            Assert.Null(new UiSettings { SkinLayoutsSeen = Keys("old-") }.Save());
+            olderWindow = new MainWindow(new DaemonClient("ws://127.0.0.1:1/ws"));
+            olderWindow.Show();
+            // Another window has since filled the bounded store with newer skins.
+            Assert.Null(new UiSettings { SkinLayoutsSeen = newer }.Save());
+            olderWindow.FindControl<Expander>("MonitorTile")!.IsExpanded = false;
+            UiSettings current = UiSettings.Load();
+            Assert.Equal(newer, current.SkinLayoutsSeen);
+            Assert.Contains("MonitorTile", current.CollapsedSections);
+        }
+        finally
+        {
+            olderWindow?.Close();
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            OpenXLR.Core.OpenXlrPaths.WriteAtomic(path, saved);
+        }
+    }
+
+    private static void CheckFirstFoldSave(MainWindow main, string dir)
+    {
+        string path = Path.Combine(UiSettings.ConfigDir, "ui.json");
+        var monitor = main.FindControl<Expander>("MonitorTile")!;
+        monitor.IsExpanded = false;
+        monitor.IsExpanded = true;
+        string saved = File.ReadAllText(path);
+        Assert.DoesNotContain("MonitorTile", UiSettings.Load().CollapsedSections);
+        Write(dir, "atomic-fold", DockSkin);
+        void RepairOnFold(object? sender, AvaloniaPropertyChangedEventArgs e)
+        {
+            if (e.Property != Expander.IsExpandedProperty || monitor.IsExpanded || !Directory.Exists(path)) return;
+            Directory.Delete(path);
+            OpenXLR.Core.OpenXlrPaths.WriteAtomic(path, saved);
+        }
+        // Registered after the window's handler: a separate fold save fails,
+        // then this repair lets the old marker-only save incorrectly succeed.
+        monitor.PropertyChanged += RepairOnFold;
+        try
+        {
+            File.Delete(path);
+            Directory.CreateDirectory(path);
+            Wear("atomic-fold");
+            Assert.False(monitor.IsExpanded);
+            UiSettings restored = UiSettings.Load(out string? error);
+            Assert.Null(error);
+            Assert.True(restored.HasSeenSkinLayout("atomic-fold", 1));
+            Assert.Contains("MonitorTile", restored.CollapsedSections);
+        }
+        finally
+        {
+            monitor.PropertyChanged -= RepairOnFold;
+            if (Directory.Exists(path)) Directory.Delete(path);
+            OpenXLR.Core.OpenXlrPaths.WriteAtomic(path, saved);
+            Wear(SkinPackage.DefaultId);
+            monitor.IsExpanded = true;
+        }
+    }
+
+    private static void CheckFoldSaveErrors(MainWindow main, string dir)
+    {
+        string path = Path.Combine(UiSettings.ConfigDir, "ui.json");
+        string saved = File.ReadAllText(path);
+        const string malformed = "{not valid JSON";
+        var monitor = main.FindControl<Expander>("MonitorTile")!;
+        var note = main.FindControl<TextBlock>("ArrangementNote")!;
+        Write(dir, "unsaved-fold", DockSkin);
+        Arrange(main, false);
+        try
+        {
+            OpenXLR.Core.OpenXlrPaths.WriteAtomic(path, malformed);
+            UiSettings.Load(out string? error);
+            Assert.NotNull(error);
+            monitor.IsExpanded = false;
+            Assert.False(monitor.IsExpanded); // The view still changes for this run.
+            Assert.Equal(malformed, File.ReadAllText(path));
+            Assert.True(note.IsVisible);
+            Assert.Equal(error, note.Text);
+            Layout(main, 640, 900);
+            Capture(main, "skin-layout-fold-save-error-640");
+
+            OpenXLR.Core.OpenXlrPaths.WriteAtomic(path, saved);
+            monitor.IsExpanded = true;
+            Assert.False(note.IsVisible);
+            Assert.DoesNotContain("MonitorTile", UiSettings.Load().CollapsedSections);
+            monitor.IsExpanded = false;
+            Assert.Contains("MonitorTile", UiSettings.Load().CollapsedSections);
+            Assert.False(note.IsVisible);
+
+            // Even an already folded tile must report the skin's failed initial save.
+            OpenXLR.Core.OpenXlrPaths.WriteAtomic(path, malformed);
+            Wear("unsaved-fold");
+            Assert.False(monitor.IsExpanded);
+            Assert.Equal(malformed, File.ReadAllText(path));
+            Assert.True(note.IsVisible);
+            Assert.Equal(error, note.Text);
+            monitor.IsExpanded = true;
+            Wear(SkinPackage.DefaultId);
+            Wear("unsaved-fold");
+            Assert.True(monitor.IsExpanded); // The default is not reapplied within this run.
+            Assert.Equal(malformed, File.ReadAllText(path));
+
+            OpenXLR.Core.OpenXlrPaths.WriteAtomic(path, saved);
+            monitor.IsExpanded = false;
+            Assert.False(note.IsVisible);
+            Assert.Contains("MonitorTile", UiSettings.Load().CollapsedSections);
+            Assert.True(UiSettings.Load().HasSeenSkinLayout("unsaved-fold", 1));
+            monitor.IsExpanded = true;
+            Assert.DoesNotContain("MonitorTile", UiSettings.Load().CollapsedSections);
+            var fresh = new MainWindow(new DaemonClient("ws://127.0.0.1:1/ws"));
+            try
+            {
+                fresh.Show();
+                Layout(fresh, 640, 900);
+                Assert.True(fresh.FindControl<Expander>("MonitorTile")!.IsExpanded);
+                Assert.True(UiSettings.Load().HasSeenSkinLayout("unsaved-fold", 1));
+            }
+            finally
+            {
+                fresh.Close();
+                Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            }
+        }
+        finally
+        {
+            OpenXLR.Core.OpenXlrPaths.WriteAtomic(path, saved);
+            Wear(SkinPackage.DefaultId);
         }
     }
 

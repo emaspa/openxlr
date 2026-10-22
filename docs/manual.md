@@ -1911,8 +1911,10 @@ letting go anywhere but on a tile of the same kind changes nothing.
 
 The section order is a UI preference, saved in `ui.json` like the
 collapsed sections, and **Reset sections** puts the five back in their
-usual order. If `ui.json` cannot be written, the new order stays until the
-UI closes and the note above the sections says why.
+usual order. If `ui.json` cannot be written, the new order and collapsed
+sections stay for that run, and the note above the sections says why.
+The same note explains if a skin's initial collapsed sections cannot be
+remembered. A later successful section save clears it.
 
 A skin can place the header and the sections itself, in rows, columns,
 grids and docked sides ([Layout](skins.md#layout)). Under such a skin a

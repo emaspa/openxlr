@@ -43,6 +43,7 @@ public partial class MainWindow
     private DesktopLayoutHost _layoutHost = null!;
     private IPointer? _lastPointer;
     private HashSet<(string Skin, int Version)> _layoutsSeen = [];
+    private readonly HashSet<(string Skin, int Version)> _unsavedLayoutsSeen = [];
 
     /// <summary>The arrangement the regions stand in now.</summary>
     internal SectionArrangement Arrangement => _arrangement!;
@@ -370,9 +371,16 @@ public partial class MainWindow
         string[] collapsed = [.. SkinLayoutRegions.Sections
             .Where(r => layout.OptionsFor(r).Visibility == SkinRegionVisibility.Collapsed)];
         if (collapsed.Length == 0 || !_layoutsSeen.Add((skin, layout.Version))) return;
-        foreach (string region in collapsed)
-            if (this.FindControl<Expander>(SectionArrangement.TileFor(region)) is { } tile) tile.IsExpanded = false;
-        UiSettings.Load().WithSkinLayoutSeen(skin, layout.Version).Save();
+        _unsavedLayoutsSeen.Add((skin, layout.Version));
+        bool restoring = _restoringSections;
+        _restoringSections = true;
+        try
+        {
+            foreach (string region in collapsed)
+                if (this.FindControl<Expander>(SectionArrangement.TileFor(region)) is { } tile) tile.IsExpanded = false;
+        }
+        finally { _restoringSections = restoring; }
+        SaveSectionState();
     }
 
     /// <summary>The handle in each section's header.</summary>

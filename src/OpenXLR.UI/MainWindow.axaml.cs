@@ -415,6 +415,11 @@ public partial class MainWindow : Window
         List<string> collapsed = [];
         foreach (string name in SectionTiles)
             if (this.FindControl<Expander>(name) is { IsExpanded: false }) collapsed.Add(name);
-        (UiSettings.Load() with { CollapsedSections = collapsed }).Save();
+        UiSettings settings = UiSettings.Load();
+        foreach (var (skin, version) in _unsavedLayoutsSeen)
+            if (!settings.HasSeenSkinLayout(skin, version)) settings = settings.WithSkinLayoutSeen(skin, version);
+        string? error = (settings with { CollapsedSections = collapsed }).Save();
+        if (error is null) _unsavedLayoutsSeen.Clear();
+        ReportArrangement(error);
     }
 }
