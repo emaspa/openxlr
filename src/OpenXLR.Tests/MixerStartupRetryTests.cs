@@ -1,8 +1,10 @@
 using System.Reflection;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using OpenXLR.Core;
+using OpenXLR.Core.Mixing;
 using OpenXLR.Daemon;
 
 namespace OpenXLR.Tests;
@@ -79,6 +81,70 @@ public sealed class MixerStartupRetryTests
         Assert.False(fixture.Service.Built);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RenamingToTheCurrentNameSavesPendingSettings(bool mix)
+    {
+        using var fixture = new Fixture();
+        fixture.Answer();
+        await fixture.Service.StartAsync(CancellationToken.None);
+        try
+        {
+            await fixture.PauseSweeps();
+            fixture.Saver.Schedule();
+            fixture.Saver.Flush();
+            Assert.False(MixerSettings.Load()!.MonitorMuted);
+
+            Assert.Null(fixture.Service.Apply(new Command
+            {
+                Cmd = "setMonitorMuted", Value = JsonSerializer.SerializeToElement(true),
+            }));
+            Assert.True(fixture.Saver.Pending);
+            Assert.Null(fixture.Service.Apply(fixture.UnchangedRename(mix)));
+
+            Assert.True(MixerSettings.Load()!.MonitorMuted);
+            Assert.False(fixture.Saver.Pending);
+            Assert.Null(fixture.Service.PersistenceWarning);
+        }
+        finally { await fixture.Service.StopAsync(CancellationToken.None); }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AnUnchangedRenameCannotClearAFailedPendingSave(bool mix)
+    {
+        using var fixture = new Fixture();
+        fixture.Answer();
+        await fixture.Service.StartAsync(CancellationToken.None);
+        try
+        {
+            await fixture.PauseSweeps();
+            // A directory at the file path refuses writes even when tests
+            // run as root; no permission assumption or timing is needed.
+            Directory.CreateDirectory(MixerSettings.DefaultPath);
+            Assert.Null(fixture.Service.Apply(new Command
+            {
+                Cmd = "setMonitorMuted", Value = JsonSerializer.SerializeToElement(true),
+            }));
+            fixture.Saver.Flush();
+            Assert.True(fixture.Saver.Pending);
+            string warning = Assert.IsType<string>(fixture.Service.PersistenceWarning);
+
+            Assert.NotNull(fixture.Service.Apply(fixture.UnchangedRename(mix)));
+            Assert.True(fixture.Saver.Pending);
+            Assert.Equal(warning, fixture.Service.PersistenceWarning);
+
+            Directory.Delete(MixerSettings.DefaultPath);
+            Assert.Null(fixture.Service.Apply(fixture.UnchangedRename(mix)));
+            Assert.True(MixerSettings.Load()!.MonitorMuted);
+            Assert.False(fixture.Saver.Pending);
+            Assert.Null(fixture.Service.PersistenceWarning);
+        }
+        finally { await fixture.Service.StopAsync(CancellationToken.None); }
+    }
+
     [Fact]
     public async Task TheWindowSaysTheMixerIsWaitingRatherThanOff()
     {
@@ -105,6 +171,26 @@ public sealed class MixerStartupRetryTests
         private readonly string? _oldConfig = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
         private readonly DeviceManager _devices;
         internal MixerService Service { get; }
+        internal SettingsSaver Saver => (SettingsSaver)typeof(MixerService)
+            .GetField("_saves", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(Service)!;
+
+        internal Command UnchangedRename(bool mix)
+        {
+            MixerState state = Service.Snapshot()!;
+            return mix
+                ? new Command { Cmd = "renameMix", Mix = "monitor", Name = state.Mixes.Single(m => m.Id == "monitor").Name }
+                : new Command { Cmd = "renameChannel", Channel = "game", Name = state.Channels.Single(c => c.Id == "game").Name };
+        }
+
+        internal async Task PauseSweeps()
+        {
+            // These tests drive persistence explicitly. The fake graph has
+            // no published sinks, so its periodic lost-graph probe is paused.
+            FieldInfo field = typeof(MixerService).GetField("_streamSweep", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            var timer = (Timer?)field.GetValue(Service);
+            field.SetValue(Service, null);
+            if (timer is not null) await timer.DisposeAsync();
+        }
 
         internal Fixture()
         {

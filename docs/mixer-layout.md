@@ -240,7 +240,8 @@ changes. Each one is then saved before it is acknowledged, with the
 whole settings object, so a fader move pending in the debounced save is
 on disk with it and an earlier save error is cleared; a failed save
 restores the previous layout and reports an error. A rename to the current
-name is acknowledged without a save. Ordinary fader saves keep their
+name also saves the pending settings, without changing any audio node.
+Ordinary fader saves keep their
 debounced, retried behaviour.
 
 - `createChannel {name, icon?}` adds an application channel. Only its sink

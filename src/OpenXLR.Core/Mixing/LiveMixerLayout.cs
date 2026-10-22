@@ -145,7 +145,7 @@ public sealed partial class Mixer
             if (!_built) throw new InvalidOperationException("mixer is not built");
             ChannelDefinition channel = _config.Channels.FirstOrDefault(c => c.Id == id && c.InputPair is null)
                 ?? throw new InvalidOperationException($"'{id}' is not an application channel");
-            if (channel.Name == name) return;
+            if (channel.Name == name) { PersistLocked(persist); return; }
             EnsurePulseHeadroomLocked(newStreams: 0, newNodes: 1);   // the reload frees the old sink first
             MixerConfig previous = _config;
             _config = _config.WithChannelName(id, name);
@@ -351,7 +351,7 @@ public sealed partial class Mixer
             if (!_built) throw new InvalidOperationException("mixer is not built");
             MixDefinition mix = _config.Mixes.FirstOrDefault(m => m.Id == id && m.IsEditable)
                 ?? throw new InvalidOperationException($"'{id}' is not an editable mix");
-            if (mix.Name == name) return;
+            if (mix.Name == name) { PersistLocked(persist); return; }
             MixerConfig previous = _config;
             _config = _config.WithMixName(id, name);
             try { PersistLocked(persist); }
