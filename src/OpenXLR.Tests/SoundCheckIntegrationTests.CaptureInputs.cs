@@ -137,8 +137,11 @@ public sealed partial class SoundCheckIntegrationTests
         pw.UnloadModule(absent);
         CaptureChainFixture.Wait(() =>
         {
+            // The native removal can precede the registry's source removal.
+            if (pw.ListDevices().Any(d => d.Name == "soundcheck_absent")) return false;
             mixer.EnsureInputFeeds();
-            return mixer.Snapshot().Channels.Single(c => c.CaptureSource == "soundcheck_absent").BindingWarning is not null;
+            ChannelStatus channel = mixer.Snapshot().Channels.Single(c => c.CaptureSource == "soundcheck_absent");
+            return !channel.CaptureConnected && channel.BindingWarning is not null;
         });
         ChannelStatus missing = mixer.Snapshot().Channels.Single(c => c.CaptureSource == "soundcheck_absent");
         string error = Assert.Throws<InvalidOperationException>(() => mixer.SoundCheck(missing.Id, "record")).Message;
