@@ -597,9 +597,11 @@ restores the split profile when it stops.
   keeping each browser's saved assignment and showing where it plays
   meanwhile; restarting the browser requires activating tabs again
 
-- The companion follows the browser's language and is packaged for the
-  Chrome Web Store by `tools/browser-extension.py`. Its
-  [privacy policy](browser-privacy.md) lists what it reads and keeps.
+- The companion installs from the Chrome Web Store. The Debian, RPM and
+  Nix packages install its native messaging host and offer the Store
+  listing to Chrome and Chromium; the NixOS module can add it through the
+  browser policy. Its [privacy policy](browser-privacy.md) lists what it
+  reads and keeps.
 
 - Audio clients are detected from their PipeWire client registration
   and playback metadata, falling back to the owning client when fields
