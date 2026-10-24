@@ -56,6 +56,11 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    assertions = [ {
+      assertion = !cfg.chromiumExtension || config.programs.chromium.enable;
+      message = "services.openxlr.chromiumExtension requires programs.chromium.enable = true.";
+    } ];
+
     environment.systemPackages = [ cfg.package ] ++ lib.optional (cfg.yabridgePackage != null) cfg.yabridgePackage;
 
     environment.etc."chromium/native-messaging-hosts/com.emaspa.openxlr.browser.json".source =
