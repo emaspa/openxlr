@@ -20,9 +20,9 @@ with your headset before relying on this for meetings.
 
 Install the companion from the
 [Chrome Web Store](https://chromewebstore.google.com/detail/beeohanoffjpcofbjiiamkdammhcihaf)
-in Chrome, Chromium, Brave or Edge, then pin its action if useful. Until
-the listing is available, use [Load from a checkout](#load-from-a-checkout). Its id is `beeohanoffjpcofbjiiamkdammhcihaf`, the only
-extension the native host accepts. What it reads and where that goes is in
+in Chrome, Chromium, Brave or Edge, then pin its action if useful. Its id
+is `beeohanoffjpcofbjiiamkdammhcihaf`, the only extension the native host
+accepts. What it reads and where that goes is in
 the [privacy policy](browser-privacy.md).
 
 The Debian, RPM and Nix packages offer the Store listing to Chrome and
@@ -34,17 +34,14 @@ enable it. On NixOS, the browser does not read those package directories.
 Set `services.openxlr.chromiumExtension = true` together with
 `programs.chromium.enable = true` to install it through the browser's
 forced install policy, which the user cannot remove, or install it from
-the Store page. An enabled `chromiumExtension` without the browser policy
-is a configuration error rather than a successful but ineffective install.
-Existing `programs.chromium.extensions` entries are kept.
+the Store page. The module refuses `chromiumExtension` without
+`programs.chromium.enable`, and keeps your other
+`programs.chromium.extensions` entries.
 
-A normal package offer does not force installation. If the companion was
-previously removed or its offer declined, a package upgrade does not reset
-that choice. Install it directly from the Store to enable it again. In
-Chrome or Chromium, check `chrome://extensions`; for the NixOS policy,
-check `chrome://policy` and its `ExtensionInstallForcelist` entry.
-Brave and Edge still need the native host described below. An extension
-being installed does not by itself establish the daemon connection.
+If you declined the offer or removed the companion, an upgrade does not
+offer it again; install it from the Store page. The policy install shows
+under `ExtensionInstallForcelist` in `chrome://policy`. Brave and Edge
+need the native host copied by hand, as described below.
 
 ### Native messaging host
 
