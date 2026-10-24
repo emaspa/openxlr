@@ -137,6 +137,67 @@ public sealed class BrowserNativeHostTests
     }
 
     [Fact]
+    public async Task ActivationRequestsReachTheBrowserOnlyForATabItListedOnThatOrigin()
+    {
+        string session = new('a', 32);
+        var registered = new TaskCompletionSource<JsonArray>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var server = await SocketTestServer.Start(async (socket, stop) =>
+        {
+            await SocketTestServer.Receive(socket, stop);
+            await SocketTestServer.Send(socket, State(session), stop);
+            while (!stop.IsCancellationRequested)
+            {
+                JsonNode command = await SocketTestServer.Receive(socket, stop);
+                string cmd = command["cmd"]!.GetValue<string>();
+                if (cmd == "getBrowserSession") await SocketTestServer.Send(socket, new { type = "browserSession", session }, stop);
+                await SocketTestServer.Send(socket, new { type = "commandResult", requestId = command["requestId"]!.GetValue<string>() }, stop);
+                if (cmd != "syncBrowserTabs" || command["tabs"]!.AsArray().Count == 0) continue;
+                registered.TrySetResult(command["tabs"]!.AsArray());
+                // Another tab, another origin, then the listed one.
+                await SocketTestServer.Send(socket, new { type = "browserTabActivation", tabId = 8, site = "https://example.com" }, stop);
+                await SocketTestServer.Send(socket, new { type = "browserTabActivation", tabId = 7, site = "https://other.example" }, stop);
+                await SocketTestServer.Send(socket, new { type = "browserTabActivation", tabId = 7, site = "https://example.com" }, stop);
+            }
+        });
+        var input = new Pipe(); var output = new Pipe();
+        var host = new BrowserNativeHost(new DaemonClient(server.Url), input.Reader.AsStream(), output.Writer.AsStream());
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+        Task running = host.RunAsync(timeout.Token);
+        try
+        {
+            var tab = Tab(); tab["activation"] = "popup";
+            await BrowserNativeHost.WriteFrameAsync(input.Writer.AsStream(), new JsonObject { ["type"] = "tabs", ["tabs"] = new JsonArray(tab) }, timeout.Token);
+            // The browser's stage goes on to the daemon with the tab.
+            Assert.Equal("popup", (await registered.Task.WaitAsync(timeout.Token))[0]!["activation"]!.GetValue<string>());
+            JsonObject message;
+            do message = (await BrowserNativeHost.ReadFrameAsync(output.Reader.AsStream(), timeout.Token))!;
+            while (message["type"]!.GetValue<string>() != "activate");
+            Assert.Equal(["type", "tabId", "site"], message.Select(item => item.Key));
+            Assert.Equal(7, message["tabId"]!.GetValue<int>());
+            Assert.Equal("https://example.com", message["site"]!.GetValue<string>());
+            await input.Writer.CompleteAsync();
+            await running.WaitAsync(TimeSpan.FromSeconds(3));
+        }
+        finally
+        {
+            await timeout.CancelAsync();
+            try { await running; } catch (OperationCanceledException) { }
+            await output.Reader.CompleteAsync();
+        }
+    }
+
+    [Theory]
+    [InlineData("\"capturing\"")]
+    [InlineData("true")]
+    public void AnUnknownActivationStageIsInvalidMetadata(string stage)
+    {
+        var tab = Tab(); tab["activation"] = JsonNode.Parse(stage);
+        Assert.Throws<InvalidDataException>(() => BrowserNativeHost.ReadTabs(new JsonArray(tab)));
+        var none = Tab(); none["activation"] = null;
+        Assert.Null(Assert.Single(BrowserNativeHost.ReadTabs(new JsonArray(none))).Activation);
+    }
+
+    [Fact]
     public async Task InvalidBrowserDataEndsTheHostWithAnExitCodeInsteadOfACrash()
     {
         // The input stays open, as the browser's does, so only the invalid

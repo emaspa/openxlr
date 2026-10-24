@@ -39,6 +39,17 @@ internal static partial class SkinLayoutWindowTests
         Assert.Equal(Localizer.Format("MatrixProcessingName", "XLR 1"), AutomationProperties.GetName(button));
         Assert.Equal(Localizer.Text("MatrixProcessingTip"), ToolTip.GetTip(button));
         Assert.DoesNotContain("fxOn", button.Classes);
+        // Under it the gain, which reads the volume while the volume fader moves.
+        MatrixRowViewModel xlr1 = matrix.Rows.Single(r => r.Channel.Id == "xlr1");
+        TextBlock readout = RowHead(window, "xlr1").GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "MatrixReadout");
+        Assert.True(readout.IsEffectivelyVisible);
+        Assert.Equal(model.GainText, readout.Text);
+        Slider volume = RowHead(window, "xlr1").GetVisualDescendants().OfType<Slider>().Single(s => s.Name == "MatrixVolume");
+        FaderInput.SetIsAdjusting(volume, true);
+        Assert.True(xlr1.VolumeAdjusting);
+        Assert.Equal(xlr1.Channel.VolumeText, readout.Text);
+        FaderInput.SetIsAdjusting(volume, false);
+        Assert.Equal(model.GainText, readout.Text);
         // The interface has phantom power, so its lamp is there, dark.
         Assert.True(Phantom(button).IsEffectivelyVisible);
         Assert.False(Phantom(button).IsOn);
@@ -166,8 +177,22 @@ internal static partial class SkinLayoutWindowTests
     {
         Button? button = head.GetVisualDescendants().OfType<Button>().SingleOrDefault(b => b.Name == "MatrixProcessing" && b.IsEffectivelyVisible);
         Assert.True(model.ShowsProcessing == button is not null, $"{model.Channel.Id}: processing {model.ShowsProcessing}, drawn {button is not null} {where}");
-        if (button is null) return;
         Border name = head.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "MatrixRowName");
+        // The readout under the button: inside the name column and the head, below the button.
+        TextBlock? readout = head.GetVisualDescendants().OfType<TextBlock>().SingleOrDefault(t => t.Name == "MatrixReadout" && t.IsEffectivelyVisible);
+        Assert.True(model.ShowsReadout == readout is not null, $"{model.Channel.Id}: readout {model.ShowsReadout}, drawn {readout is not null} {where}");
+        if (readout is not null)
+        {
+            Assert.Equal(model.Readout, readout.Text);
+            AssertInside(readout, name);
+            Point top = readout.TranslatePoint(default, head)!.Value;
+            Assert.True(top.Y >= -0.5 && top.Y + readout.Bounds.Height <= head.Bounds.Height + 0.5,
+                $"{model.Channel.Id}: the readout runs from {top.Y} to {top.Y + readout.Bounds.Height} in a head {head.Bounds.Height} tall {where}");
+            if (button is not null)
+                Assert.True(top.Y >= button.TranslatePoint(default, head)!.Value.Y + button.Bounds.Height - 0.5,
+                    $"{model.Channel.Id}: the readout at {top.Y} is not under the processing button {where}");
+        }
+        if (button is null) return;
         AssertInside(button, name);
         Point at = button.TranslatePoint(default, head)!.Value;
         Assert.True(at.Y >= -0.5 && at.Y + button.Bounds.Height <= head.Bounds.Height + 0.5,

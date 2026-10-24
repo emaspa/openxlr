@@ -3,6 +3,182 @@
 #include "../vst3.cpp"
 #include <cassert>
 #include <limits>
+#include <cerrno>
+#include <fcntl.h>
+#include <unistd.h>
+
+extern "C" Host *test_host_new(void);
+extern "C" void test_host_free(Host *h);
+
+class Watch final : public Linux::ITimerHandler, public Linux::IEventHandler {
+ public:
+  PlugFrame *frame = nullptr;
+  bool timer = false;
+  unsigned refs = 1, calls = 0;
+  tresult PLUGIN_API queryInterface(const TUID, void **obj) override {
+    *obj = nullptr;
+    return kNoInterface;
+  }
+  uint32 PLUGIN_API addRef() override { return ++refs; }
+  uint32 PLUGIN_API release() override {
+    assert(refs == 2);
+    // A final release may re-enter the host. Its record is already detached.
+    assert((timer ? frame->unregisterTimer(this)
+                  : frame->unregisterEventHandler(this)) == kResultFalse);
+    return --refs;
+  }
+  void PLUGIN_API onTimer() override { ++calls; }
+  void PLUGIN_API onFDIsSet(Linux::FileDescriptor) override { ++calls; }
+};
+
+class TeardownComponent final : public IComponent {
+ public:
+  PlugFrame *frame = nullptr;
+  Watch *timer = nullptr, *fd = nullptr;
+  bool remove_timer = false, remove_fd = false;
+  unsigned terminated = 0;
+  tresult PLUGIN_API queryInterface(const TUID, void **obj) override {
+    *obj = nullptr;
+    return kNoInterface;
+  }
+  HOST_OWNED_REFCOUNT()
+  tresult PLUGIN_API initialize(FUnknown *) override { return kResultOk; }
+  tresult PLUGIN_API terminate() override {
+    ++terminated;
+    if (remove_timer) assert(frame->unregisterTimer(timer) == kResultOk);
+    if (remove_fd) assert(frame->unregisterEventHandler(fd) == kResultOk);
+    // A plugin cannot create new watches while the host is unloading it.
+    assert(frame->registerTimer(timer, 1) == kResultFalse);
+    assert(frame->registerEventHandler(fd, -1) == kResultFalse);
+    return kResultOk;
+  }
+  tresult PLUGIN_API getControllerClassId(TUID) override { return kNotImplemented; }
+  tresult PLUGIN_API setIoMode(IoMode) override { return kResultOk; }
+  int32 PLUGIN_API getBusCount(MediaType, BusDirection) override { return 0; }
+  tresult PLUGIN_API getBusInfo(MediaType, BusDirection, int32, BusInfo &) override { return kNotImplemented; }
+  tresult PLUGIN_API getRoutingInfo(RoutingInfo &, RoutingInfo &) override { return kNotImplemented; }
+  tresult PLUGIN_API activateBus(MediaType, BusDirection, int32, TBool) override { return kResultOk; }
+  tresult PLUGIN_API setActive(TBool) override { return kResultOk; }
+  tresult PLUGIN_API setState(IBStream *) override { return kResultOk; }
+  tresult PLUGIN_API getState(IBStream *) override { return kResultOk; }
+};
+
+class WatchView final : public IPlugView {
+ public:
+  Watch timer, fd;
+  bool detached = false, removed_called = false;
+  unsigned released = 0;
+  tresult PLUGIN_API queryInterface(const TUID, void **obj) override {
+    *obj = nullptr;
+    return kNoInterface;
+  }
+  uint32 PLUGIN_API addRef() override { return 1; }
+  uint32 PLUGIN_API release() override {
+    // The view owns its handlers. Destroying it with registered watches
+    // leaves the next loop dispatch calling a freed member object.
+    assert(detached && timer.refs == 1 && fd.refs == 1);
+    ++released;
+    return 0;
+  }
+  tresult PLUGIN_API isPlatformTypeSupported(FIDString) override { return kResultTrue; }
+  tresult PLUGIN_API attached(void *, FIDString) override { return kResultOk; }
+  tresult PLUGIN_API removed() override { removed_called = true; return kResultOk; }
+  tresult PLUGIN_API onWheel(float) override { return kResultFalse; }
+  tresult PLUGIN_API onKeyDown(char16, int16, int16) override { return kResultFalse; }
+  tresult PLUGIN_API onKeyUp(char16, int16, int16) override { return kResultFalse; }
+  tresult PLUGIN_API getSize(ViewRect *) override { return kResultFalse; }
+  tresult PLUGIN_API onSize(ViewRect *) override { return kResultOk; }
+  tresult PLUGIN_API onFocus(TBool) override { return kResultOk; }
+  tresult PLUGIN_API setFrame(IPlugFrame *frame) override { detached = !frame; return kResultOk; }
+  tresult PLUGIN_API canResize() override { return kResultFalse; }
+  tresult PLUGIN_API checkSizeConstraint(ViewRect *) override { return kResultOk; }
+};
+
+static void editor_watches() {
+  Host *h = test_host_new();
+  auto *v = new Vst3();
+  v->h = h;
+  v->frame = new PlugFrame(v);
+  host_set_impl(h, v);
+  int pipes[2];
+  assert(pipe(pipes) == 0);
+  for (unsigned cycle = 0; cycle < 3; ++cycle) {
+    WatchView view;
+    v->view = &view;
+    view.timer.frame = view.fd.frame = v->frame;
+    view.timer.timer = true;
+    assert(v->frame->registerTimer(&view.timer, 1000) == kResultOk);
+    assert(v->frame->registerEventHandler(&view.fd, pipes[0]) == kResultOk);
+    if (cycle == 1) release_view(v);  // an attachment failed
+    else vst3_editor_close(h);
+    assert(!v->view && view.released == 1);
+    assert(view.removed_called == (cycle != 1));
+    assert(!v->stopping_run_loop);  // reopening can register new watches
+    assert(write(pipes[1], "x", 1) == 1);
+    pw_loop_enter(host_loop(h));
+    assert(pw_loop_iterate(host_loop(h), 0) >= 0);
+    pw_loop_leave(host_loop(h));
+    assert(!view.timer.calls && !view.fd.calls);
+    char byte;
+    assert(read(pipes[0], &byte, 1) == 1);
+  }
+  vst3_unload(h);
+  test_host_free(h);
+  close(pipes[0]);
+  close(pipes[1]);
+}
+
+static void teardown_sources(bool remove_timer, bool remove_fd, bool with_plugin) {
+  Host *h = test_host_new();
+  auto *v = new Vst3();
+  v->h = h;
+  v->frame = new PlugFrame(v);
+  host_set_impl(h, v);
+  Watch timers[2], fds[2];
+  int pipes[2][2], timer_fds[2];
+  for (unsigned i = 0; i < 2; ++i) {
+    timers[i].frame = fds[i].frame = v->frame;
+    timers[i].timer = true;
+    assert(v->frame->registerTimer(&timers[i], 1000) == kResultOk);
+    timer_fds[i] = v->timers[i].source->fd;
+    assert(pipe(pipes[i]) == 0);
+    assert(v->frame->registerEventHandler(&fds[i], pipes[i][0]) == kResultOk);
+    assert(timers[i].refs == 2 && fds[i].refs == 2);
+  }
+  TeardownComponent component;
+  component.frame = v->frame;
+  component.timer = &timers[0];
+  component.fd = &fds[0];
+  component.remove_timer = remove_timer;
+  component.remove_fd = remove_fd;
+  if (with_plugin) v->component = &component;
+  vst3_unload(h);
+  assert(host_impl(h) == nullptr);
+  assert(component.terminated == (with_plugin ? 1u : 0u));
+  for (unsigned i = 0; i < 2; ++i) {
+    assert(timers[i].refs == 1 && fds[i].refs == 1);
+    assert(fcntl(timer_fds[i], F_GETFD) == -1 && errno == EBADF);
+    assert(fcntl(pipes[i][0], F_GETFD) >= 0);
+    assert(write(pipes[i][1], "x", 1) == 1);
+  }
+  // Dispatch after freeing the plugin and its frame must not reach a watch.
+  test_host_free(h);
+  for (unsigned i = 0; i < 2; ++i) {
+    assert(!timers[i].calls && !fds[i].calls);
+    close(pipes[i][0]);
+    close(pipes[i][1]);
+  }
+}
+
+static void teardown() {
+  pw_init(nullptr, nullptr);
+  for (unsigned i = 0; i < 4; ++i)
+    teardown_sources(i & 1, i & 2, true);
+  teardown_sources(false, false, false);
+  editor_watches();
+  pw_deinit();
+  puts("PASS: VST3 teardown unregisters watches once and collects leftovers without closing plugin FDs");
+}
 
 static void parameters() {
   ParameterChanges changes;
@@ -172,5 +348,6 @@ int main(int argc, char **argv) {
   if (argc == 1 || !strcmp(argv[1], "attributes")) attributes();
   if (argc == 1 || !strcmp(argv[1], "restart")) restart();
   if (argc == 1 || !strcmp(argv[1], "latency")) latency();
+  if (argc == 1 || !strcmp(argv[1], "teardown")) teardown();
   puts("VST3 host bounds passed");
 }

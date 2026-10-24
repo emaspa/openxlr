@@ -2766,7 +2766,7 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
     <value>Paspas</value>
   </data>
   <data name="DuckingHint" xml:space="preserve">
-    <value>Pahinayon sa ducking ang gipiling mga channel sa gipiling mga mix samtang kusog ang key microphone. Niining computer kini nagdagan alang sa tanang device, apil ang Wave XLR Pro: sa kaugalingong mix niini mag-duck ang Pro, nga wala pa agi-i sa mga jack.</value>
+    <value>Pahinayon sa ducking ang gipiling mga channel sa gipiling mga mix samtang kusog ang key microphone. Niining computer kini nagdagan, o sa kaugalingong processor sa Wave XLR Pro kung mohaum ang setup sa mahimo sa unit.</value>
   </data>
   <data name="DuckingNotHeld" xml:space="preserve">
     <value>Wala pa tipigi sa unit kining setting; isulat kini pag-usab sa OpenXLR sulod sa pipila ka segundo.</value>
@@ -2877,7 +2877,7 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
     <value>MGA BROWSER TAB</value>
   </data>
   <data name="BrowserTabCaptureHint" xml:space="preserve">
-    <value>I-enable ang audio sa matag tab sa browser extension. Dili ma-enable ang audio sa tab sa pagpili og channel dinhi.</value>
+    <value>Pindota ang I-enable aron i-route ang audio sa usa ka tab, dinhi o sa browser extension. Dili ma-enable ang audio sa tab sa pagpili og channel.</value>
   </data>
   <data name="BrowserTabCaptureState" xml:space="preserve">
     <value>State sa audio sa browser tab</value>
@@ -2901,7 +2901,25 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
     <value>Aktibo ang audio sa tab</value>
   </data>
   <data name="BrowserTabActivationRequired" xml:space="preserve">
-    <value>I-enable ang audio sa tab sa browser extension.</value>
+    <value>Pindota ang I-enable aron i-route ang audio niining tab.</value>
+  </data>
+  <data name="BrowserTabActivate" xml:space="preserve">
+    <value>I-enable</value>
+  </data>
+  <data name="BrowserTabActivateName" xml:space="preserve">
+    <value>I-enable ang browser tab nga {0}</value>
+  </data>
+  <data name="BrowserTabActivateHint" xml:space="preserve">
+    <value>Dad-on sa atubangan kining tab sa browser ug sugdan ang pag-route sa audio niini. Basin pangayoon sa browser nga humanon nimo didto.</value>
+  </data>
+  <data name="BrowserTabActivating" xml:space="preserve">
+    <value>Gisugdan sa browser...</value>
+  </data>
+  <data name="BrowserTabActivatePopup" xml:space="preserve">
+    <value>Humana sa browser: pindota ang Activate this tab sa popup sa OpenXLR.</value>
+  </data>
+  <data name="BrowserTabActivateToolbar" xml:space="preserve">
+    <value>Humana sa browser: niining tab, i-klik ang icon sa OpenXLR sa toolbar o pindota ang shortcut niini, dayon pindota ang Activate this tab.</value>
   </data>
   <data name="BrowserTabUsesDefault" xml:space="preserve">
     <value>Naggamit sa default nga padulngan sa browser</value>

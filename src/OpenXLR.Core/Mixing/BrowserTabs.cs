@@ -10,12 +10,14 @@ public sealed record BrowserTabRegistration
     public string Title { get; init; } = "";
     public bool Capturing { get; init; }
     public string? Error { get; init; }
+    /// <summary>Where an activation OpenXLR asked for stands in the browser; null when none is in progress.</summary>
+    public string? Activation { get; init; }
 }
 
 /// <summary>A connected tab and the output choice the browser companion should apply.</summary>
 public sealed record BrowserTabState(string Session, int Id, string Site, string Title,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] string? ChannelId,
-    bool Remember, bool Capturing, string? Error);
+    bool Remember, bool Capturing, string? Error, string? Activation = null);
 
 public static class BrowserTabRouting
 {
@@ -24,6 +26,14 @@ public static class BrowserTabRouting
 
     /// <summary>The origin as the browser serializes it; see <see cref="BrowserOrigin"/>.</summary>
     public static string? CanonicalSite(string? value) => BrowserOrigin.Canonical(value);
+
+    /// <summary>
+    /// An activation OpenXLR requested: <c>starting</c> while the browser brings
+    /// the tab forward and tries to start it, <c>popup</c> once its popup is
+    /// open on the tab, <c>browser</c> when the user has to invoke the
+    /// extension on the tab first.
+    /// </summary>
+    public static bool ValidActivation(string? activation) => activation is null or "starting" or "popup" or "browser";
 
     public static bool ValidSession(string? session)
         => session is { Length: 32 } && Guid.TryParseExact(session, "N", out _);
@@ -38,6 +48,7 @@ public static class BrowserTabRouting
             if (CanonicalSite(tab.Site) is null) return "syncBrowserTabs: site must be an HTTP or HTTPS origin without credentials, path, query or fragment";
             if (tab.Title is null || tab.Title.Length > MaxTitle || tab.Title.Any(char.IsControl)) return $"syncBrowserTabs: title must have at most {MaxTitle} characters and no controls";
             if (tab.Error is { } error && (error.Length > MaxError || error.Any(char.IsControl))) return $"syncBrowserTabs: error must have at most {MaxError} characters and no controls";
+            if (!ValidActivation(tab.Activation)) return "syncBrowserTabs: activation must be starting, popup, browser or null";
         }
         return null;
     }
@@ -159,6 +170,27 @@ public sealed partial class Mixer
         }
     }
 
+    /// <summary>
+    /// Check that a connected tab can be asked to start routing: tab routing
+    /// is on, the tab still shows the origin the caller saw, it has a channel
+    /// and is neither routed nor already being activated. Throws otherwise.
+    /// </summary>
+    public void CheckBrowserActivation(string session, int tabId, string site)
+    {
+        lock (_gate)
+        {
+            if (!_browserSessions.TryGetValue(session, out Dictionary<int, BrowserTab>? tabs) || !tabs.TryGetValue(tabId, out BrowserTab? tab))
+                throw new InvalidOperationException("activateBrowserTab: the browser tab is no longer connected");
+            if (tab.Metadata.Site != BrowserTabRouting.CanonicalSite(site))
+                throw new InvalidOperationException("activateBrowserTab: the tab changed website; select it again");
+            if (!_preserveBrowserOutputs) throw new InvalidOperationException("activateBrowserTab: enable individual browser tab routing first");
+            if ((tab.Override ? tab.Channel : _browserSiteChannels.GetValueOrDefault(tab.Metadata.Site)) is null)
+                throw new InvalidOperationException("activateBrowserTab: choose a channel for the tab first");
+            if (tab.Metadata.Capturing) throw new InvalidOperationException("activateBrowserTab: the tab is already routed");
+            if (tab.Metadata.Activation is not null) throw new InvalidOperationException("activateBrowserTab: the browser is already activating the tab");
+        }
+    }
+
     public void SetPreserveBrowserOutputs(bool enabled, Func<MixerSettings, string?>? persist = null)
     {
         lock (_gate)
@@ -183,7 +215,8 @@ public sealed partial class Mixer
             .Select(t => new BrowserTabState(s.Key, t.Metadata.Id, t.Metadata.Site,
                 t.Metadata.Capturing || (t.Override ? t.Channel : _browserSiteChannels.GetValueOrDefault(t.Metadata.Site)) is not null ? t.PublishedTitle : "",
                 t.Override ? t.Channel : _browserSiteChannels.GetValueOrDefault(t.Metadata.Site),
-                !t.Override && _browserSiteChannels.ContainsKey(t.Metadata.Site), t.Metadata.Capturing, t.Metadata.Error)))];
+                !t.Override && _browserSiteChannels.ContainsKey(t.Metadata.Site), t.Metadata.Capturing, t.Metadata.Error,
+                t.Metadata.Activation)))];
 
     private void RestoreBrowserSettingsLocked(MixerSettings settings)
     {

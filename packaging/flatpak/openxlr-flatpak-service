@@ -1,0 +1,85 @@
+#!/bin/sh
+# Run the OpenXLR Flatpak's audio daemon as a systemd user service, so the
+# mixer runs without the UI and keeps running when SteamOS or Bazzite
+# switches between Desktop Mode and Game Mode. Run it on the host, outside
+# the sandbox, after quitting OpenXLR:
+#
+#   sh "$(flatpak info --show-location io.github.emaspa.openxlr)/files/share/openxlr/openxlr-flatpak-service"
+#
+# "remove" stops the service and deletes only the files this script wrote.
+set -eu
+
+app=io.github.emaspa.openxlr
+name=openxlr-flatpak.service
+unit="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/$name"
+# The unit runs this copy when it stops, so it works whatever the app's path.
+helper="${XDG_DATA_HOME:-$HOME/.local/share}/openxlr/openxlr-flatpak-service"
+marker='# Written by openxlr-flatpak-service.'
+
+ours() { [ -f "$unit" ] && [ ! -L "$unit" ] && grep -qxF "$marker" "$unit"; }
+
+case "${1:-install}" in
+install)
+    flatpak info "$app" >/dev/null
+    if systemctl --user is-enabled --quiet openxlr-daemon.service 2>/dev/null; then
+        echo "A packaged OpenXLR daemon (openxlr-daemon.service) is enabled; use one or the other." >&2
+        exit 1
+    fi
+    if { [ -e "$unit" ] || [ -L "$unit" ]; } && ! ours; then
+        echo "$unit exists and was not written by this script; it is left alone." >&2
+        exit 1
+    fi
+    flatpak=$(command -v flatpak)
+    mkdir -p "$(dirname "$unit")" "$(dirname "$helper")"
+    cp "$0" "$helper.tmp.$$" && mv -f "$helper.tmp.$$" "$helper"
+    temporary="$unit.tmp.$$"
+    cat >"$temporary" <<EOF
+$marker
+[Unit]
+Description=OpenXLR audio daemon (Flatpak)
+After=pipewire.service pipewire-pulse.service wireplumber.service
+
+[Service]
+ExecStart=$flatpak run --command=/app/lib/openxlr/daemon/OpenXLR.Daemon $app
+ExecStop=/bin/sh $helper stop \$MAINPID
+# Exit code 75 asks for a restart (Restart daemon in the UI), and 73 means
+# the UI's own daemon still holds the lock; both are retried.
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+EOF
+    mv -f "$temporary" "$unit"
+    systemctl --user daemon-reload
+    systemctl --user enable --now "$name"
+    echo "OpenXLR's daemon now runs as $name."
+    ;;
+stop)
+    # flatpak run moves the sandbox into its own app-flatpak-*.scope, out of
+    # the unit's reach. SIGTERM to that scope lets the daemon remove its
+    # audio graph, as it does on Quit; then wait for the instance to end.
+    pid=${2:-}
+    [ -n "$pid" ] || exit 0
+    instance=$(flatpak ps --columns=instance,pid | while read -r i p; do
+        if [ "$p" = "$pid" ]; then echo "$i"; fi
+    done)
+    [ -n "$instance" ] || exit 0
+    systemctl --user kill --signal=TERM "app-flatpak-$app-$instance.scope" || exit 0
+    while flatpak ps --columns=instance | grep -qxF "$instance"; do sleep 0.5; done
+    ;;
+remove)
+    if ! ours; then
+        echo "$unit was not written by this script; nothing removed." >&2
+        exit 1
+    fi
+    systemctl --user disable --now "$name" || true
+    rm -f "$unit" "$helper"
+    systemctl --user daemon-reload
+    echo "Removed $name. The UI starts its own daemon again."
+    ;;
+*)
+    echo "usage: openxlr-flatpak-service [install|remove]" >&2
+    exit 2
+    ;;
+esac

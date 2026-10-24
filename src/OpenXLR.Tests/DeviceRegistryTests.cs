@@ -4,9 +4,9 @@ namespace OpenXLR.Tests;
 
 /// <summary>
 /// The registry's table order is the daemon's preference when nothing is
-/// chosen, so the Wave:3, in beta after one user's quick test, comes after every
-/// interface verified on hardware, and the Wave:1, never run, after it. Devices
-/// are constructed, never opened.
+/// chosen, so the Wave:3, a USB microphone, comes after every XLR interface,
+/// and the Wave:1, which shares its backend, after it. Devices are constructed,
+/// never opened.
 /// </summary>
 public sealed class DeviceRegistryTests
 {
@@ -18,7 +18,7 @@ public sealed class DeviceRegistryTests
     }
 
     [Fact]
-    public void AVerifiedInterfaceComesBeforeTheWave3WhateverTheBusOrder()
+    public void AnXlrInterfaceComesBeforeTheWave3WhateverTheBusOrder()
     {
         Assert.Equal([0x00b4, 0x007d, 0x0070], Pids([(0x0fd9, 0x0070), (0x0fd9, 0x007d), (0x1234, 0x5678), (0x0fd9, 0x00b4)]));
         Assert.Equal([0x00a6, 0x0070], Pids([(0x0fd9, 0x0070), (0x0fd9, 0x00a6)]));

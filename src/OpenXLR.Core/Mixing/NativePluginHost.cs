@@ -314,8 +314,8 @@ internal sealed class NativePluginHost : IDisposable
 
     /// <summary>
     /// Fold one block of helper output into the line being assembled and
-    /// return the last complete line in it, or null when the block held no
-    /// newline. <paramref name="line"/> never grows past
+    /// return the last nonblank complete line in it, or null when there was
+    /// none. <paramref name="line"/> never grows past
     /// <see cref="ErrorLineCap"/> characters, whatever the block contains:
     /// everything past that is dropped where it arrives, so a plugin writing
     /// without newlines cannot make the daemon hold its output.
@@ -332,9 +332,10 @@ internal sealed class NativePluginHost : IDisposable
                 if (line.Length < ErrorLineCap) line.Append(c);
                 continue;
             }
-            complete = line.ToString().TrimEnd('\r');
+            string finished = line.ToString().TrimEnd('\r');
             line.Clear();
-            seen?.Invoke(complete);
+            if (!string.IsNullOrWhiteSpace(finished)) complete = finished;
+            seen?.Invoke(finished);
         }
         return complete;
     }
@@ -359,7 +360,8 @@ internal sealed class NativePluginHost : IDisposable
             while ((read = await Process.StandardError.ReadAsync(block.AsMemory(), _stop.Token).ConfigureAwait(false)) > 0)
                 if (FoldErrorBlock(line, block.AsSpan(0, read), seen) is string complete) _error = complete;
             // A helper that dies mid-sentence still gets to explain itself.
-            if (line.Length > 0) _error = line.ToString();
+            string tail = line.ToString();
+            if (!string.IsNullOrWhiteSpace(tail)) _error = tail;
         }
         catch (Exception ex) when (ex is OperationCanceledException or IOException) { }
     }

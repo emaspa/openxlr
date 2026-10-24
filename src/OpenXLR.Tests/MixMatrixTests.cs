@@ -134,6 +134,49 @@ public sealed class MixMatrixTests
     }
 
     [Fact]
+    public void AMicrophoneRowReadsItsGainAndItsVolumeWhileTheVolumeFaderMoves()
+    {
+        var model = new MainViewModel(new DaemonClient());
+        string State(string xlr1) => $$"""
+            {"channels":[{"id":"xlr1","name":"XLR 1","hardware":true{{xlr1}}},{"id":"game","name":"Game","volume":1}],
+             "mixes":[{"id":"monitor","name":"Monitor A"}]}
+            """;
+        ApplyMixer.Invoke(model, [JsonNode.Parse(State(",\"volume\":0.7"))]);
+        model.RefreshBindings();
+        using var matrix = new MixMatrixViewModel(model);
+        MatrixRowViewModel xlr1 = matrix.Rows.Single(r => r.Channel.Id == "xlr1");
+        var raised = new List<string?>();
+        xlr1.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        // The gain, always, and the row tall enough for the button and the readout.
+        Assert.True(xlr1.ShowsReadout);
+        Assert.True(xlr1.Tall);
+        Assert.Equal(model.GainText, xlr1.Readout);
+        Assert.Equal(model.UnitInput1.GainName, xlr1.ReadoutName);
+        model.GainDb = 31;
+        Assert.Contains(nameof(MatrixRowViewModel.Readout), raised);
+        Assert.Equal("31 dB", xlr1.Readout);
+
+        // The volume while its fader moves, following it, then the gain again.
+        xlr1.VolumeAdjusting = true;
+        Assert.Equal("70%", xlr1.Readout);
+        Assert.Equal(Localizer.Format("ChannelVolumeName", "XLR 1"), xlr1.ReadoutName);
+        raised.Clear();
+        ApplyMixer.Invoke(model, [JsonNode.Parse(State(",\"volume\":0.5"))]);
+        Assert.Contains(nameof(MatrixRowViewModel.Readout), raised);
+        Assert.Equal("50%", xlr1.Readout);
+        xlr1.VolumeAdjusting = false;
+        Assert.Equal("31 dB", xlr1.Readout);
+
+        // Rows without the interface's gain have no readout.
+        Assert.False(matrix.Rows.Single(r => r.Channel.Id == "game").ShowsReadout);
+        ApplyMixer.Invoke(model, [JsonNode.Parse(State(",\"volume\":0.5,\"binding\":{\"kind\":\"source\",\"source\":\"alsa_input.webcam\"}"))]);
+        model.RefreshBindings();
+        Assert.False(xlr1.ShowsReadout);
+        Assert.False(xlr1.Tall);
+    }
+
+    [Fact]
     public void CellsHoldTheChannelsOwnSendsAndColumnsTheMixersOwnMixes()
     {
         var model = new MainViewModel(new DaemonClient());

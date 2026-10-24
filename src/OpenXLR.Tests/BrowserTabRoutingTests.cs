@@ -123,6 +123,50 @@ public sealed class BrowserTabRoutingTests
     }
 
     [Fact]
+    public void ActivationIsCheckedAgainstTheTabAndTheBrowserReportsItsStage()
+    {
+        using var mixer = new Mixer();
+        Guid owner = Guid.NewGuid();
+        string session = mixer.OpenBrowserSession(owner);
+        mixer.SyncBrowserTabs(owner, session, [Tab(1), Tab(2, "https://youtube.com") with { Capturing = true }]);
+        string Refusal(int id, string site = "https://teams.microsoft.com", string? other = null)
+            => Assert.Throws<InvalidOperationException>(() => mixer.CheckBrowserActivation(other ?? session, id, site)).Message;
+        Assert.Contains("enable individual browser tab routing", Refusal(1));
+        mixer.SetPreserveBrowserOutputs(true);
+        Assert.Contains("choose a channel", Refusal(1));
+        mixer.AssignBrowserTab(session, 1, "https://teams.microsoft.com", "voicechat", false, _ => null);
+        mixer.AssignBrowserTab(session, 2, "https://youtube.com", "music", false, _ => null);
+        mixer.CheckBrowserActivation(session, 1, "https://TEAMS.microsoft.com:443/");
+        Assert.Contains("changed website", Refusal(1, "https://youtube.com"));
+        Assert.Contains("already routed", Refusal(2, "https://youtube.com"));
+        Assert.Contains("no longer connected", Refusal(3));
+        Assert.Contains("no longer connected", Refusal(1, other: Guid.NewGuid().ToString("N")));
+
+        // The browser reports the stage in its tab list; the choice survives it.
+        mixer.SyncBrowserTabs(owner, session, [Tab(1) with { Activation = "popup" }, Tab(2, "https://youtube.com") with { Capturing = true }]);
+        BrowserTabState waiting = mixer.BrowserTabs.Single(t => t.Id == 1);
+        Assert.Equal(("popup", "voicechat"), (waiting.Activation, waiting.ChannelId));
+        Assert.Contains("already activating", Refusal(1));
+        mixer.SyncBrowserTabs(owner, session, [Tab(1) with { Capturing = true }, Tab(2, "https://youtube.com") with { Capturing = true }]);
+        Assert.Null(mixer.BrowserTabs.Single(t => t.Id == 1).Activation);
+        Assert.Contains("already routed", Refusal(1));
+    }
+
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData("starting", true)]
+    [InlineData("popup", true)]
+    [InlineData("browser", true)]
+    [InlineData("capturing", false)]
+    [InlineData("", false)]
+    public void OnlyKnownActivationStagesRegister(string? activation, bool valid)
+    {
+        string? problem = BrowserTabRouting.CheckTabs([Tab(1) with { Activation = activation }]);
+        if (valid) Assert.Null(problem);
+        else Assert.Equal("syncBrowserTabs: activation must be starting, popup, browser or null", problem);
+    }
+
+    [Fact]
     public void ProvidersOwnTheirSessionsAndDisconnectDropsOnlyTheirTabs()
     {
         using var mixer = new Mixer();
@@ -289,11 +333,25 @@ public sealed class BrowserTabRoutingTests
     [InlineData("""{"cmd":"assignBrowserTab","session":"00000000000000000000000000000000","tabId":1,"site":"https://teams.microsoft.com","remember":null}""")]
     [InlineData("""{"cmd":"syncBrowserTabs","session":"00000000000000000000000000000000"}""")]
     [InlineData("""{"cmd":"syncBrowserTabs","session":"00000000000000000000000000000000","tabs":[null]}""")]
+    [InlineData("""{"cmd":"syncBrowserTabs","session":"00000000000000000000000000000000","tabs":[{"id":1,"site":"https://example.com","title":"","activation":"capturing"}]}""")]
+    [InlineData("""{"cmd":"activateBrowserTab","session":"bad","tabId":1,"site":"https://example.com"}""")]
+    [InlineData("""{"cmd":"activateBrowserTab","session":"00000000000000000000000000000000","site":"https://example.com"}""")]
+    [InlineData("""{"cmd":"activateBrowserTab","session":"00000000000000000000000000000000","tabId":-1,"site":"https://example.com"}""")]
+    [InlineData("""{"cmd":"activateBrowserTab","session":"00000000000000000000000000000000","tabId":1}""")]
+    [InlineData("""{"cmd":"activateBrowserTab","session":"00000000000000000000000000000000","tabId":1,"site":"https://example.com/private"}""")]
     public void MalformedBrowserCommandsAreRefused(string json)
     {
         using var mixer = new Mixer();
         Command command = JsonSerializer.Deserialize<Command>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
         Assert.NotNull(CommandValidation.Check(command, mixer, _ => null));
+    }
+
+    [Fact]
+    public void AWellFormedActivationPassesValidation()
+    {
+        using var mixer = new Mixer();
+        Assert.Null(CommandValidation.Check(new Command { Cmd = "activateBrowserTab", Session = new string('0', 32), TabId = 1,
+            Site = "https://EXAMPLE.com:443/" }, mixer, _ => null));
     }
 
     [Theory]

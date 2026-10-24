@@ -1907,6 +1907,12 @@ Seleziona l'interfaccia gestita da OpenXLR</value>
   <data name="StartupAudioOnly" xml:space="preserve">
     <value>L'audio si avvierà all'accesso senza l'app né l'icona nel vassoio di sistema.</value>
   </data>
+  <data name="StartupAudioService" xml:space="preserve">
+    <value>L'audio gira come servizio utente fuori dall'app, quindi queste opzioni avviano solo l'app.</value>
+  </data>
+  <data name="StartupAudioInTray" xml:space="preserve">
+    <value>L'audio si avvierà all'accesso con l'app nel vassoio di sistema.</value>
+  </data>
   <data name="StartupNothing" xml:space="preserve">
     <value>All'accesso non si avvieranno né l'audio né l'app.</value>
   </data>
@@ -2432,12 +2438,18 @@ Seleziona l'interfaccia gestita da OpenXLR</value>
 I controlli USB richiedono la regola udev sull'host. Esegui fuori dalla sandbox:
 sudo install -m 644 "$(flatpak info --show-location io.github.emaspa.openxlr)/files/share/openxlr/70-openxlr.rules" /etc/udev/rules.d/70-openxlr.rules
 sudo udevadm control --reload-rules
-Poi ricollega l'interfaccia. Le regole WirePlumber dell'utente hanno effetto dal prossimo accesso.
+Poi ricollega l'interfaccia. Le regole WirePlumber di OpenXLR vanno in ~/.config/wireplumber/wireplumber.conf.d durante la configurazione del primo avvio e hanno effetto dal prossimo accesso.
 
 Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Installa i plugin LV2 dalle estensioni LinuxAudio di Flathub; i plugin dell'host e il bridge Windows non sono inclusi. Consulta docs/flatpak.md per la configurazione e i limiti.</value>
   </data>
   <data name="FlatpakBackgroundUnavailable" xml:space="preserve">
     <value>Il desktop non ha consentito l'attività in background. OpenXLR potrebbe fermarsi quando è nascosto.</value>
+  </data>
+  <data name="FlatpakSetUpButton" xml:space="preserve">
+    <value>Configura</value>
+  </data>
+  <data name="FlatpakRulesFailed" xml:space="preserve">
+    <value>La configurazione di WirePlumber richiede attenzione: {0}</value>
   </data>
   <data name="Eq" xml:space="preserve">
     <value>EQ</value>
@@ -2767,7 +2779,7 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
     <value>Veloce</value>
   </data>
   <data name="DuckingHint" xml:space="preserve">
-    <value>Il ducking abbassa i canali scelti nei mix scelti mentre il microfono chiave è forte. Questo computer lo esegue su ogni dispositivo, Wave XLR Pro incluso: il Pro attenua all'interno del proprio mix, da cui le prese non passano ancora.</value>
+    <value>Il ducking abbassa i canali scelti nei mix scelti mentre il microfono chiave è forte. Lo esegue questo computer, oppure il Wave XLR Pro sul proprio processore quando l'impostazione rientra in ciò che il dispositivo sa fare.</value>
   </data>
   <data name="DuckingNotHeld" xml:space="preserve">
     <value>L'unità non mantiene ancora questa impostazione; OpenXLR la riscrive entro pochi secondi.</value>
@@ -2878,7 +2890,7 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
     <value>SCHEDE DEL BROWSER</value>
   </data>
   <data name="BrowserTabCaptureHint" xml:space="preserve">
-    <value>Attiva l'audio di ogni scheda nell'estensione del browser. Scegliere un canale qui non attiva l'audio della scheda.</value>
+    <value>Premi Attiva per instradare l'audio di una scheda, qui o nell'estensione del browser. Scegliere un canale non attiva l'audio della scheda.</value>
   </data>
   <data name="BrowserTabCaptureState" xml:space="preserve">
     <value>Stato dell'audio della scheda</value>
@@ -2902,7 +2914,25 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
     <value>Audio della scheda attivo</value>
   </data>
   <data name="BrowserTabActivationRequired" xml:space="preserve">
-    <value>Attiva l'audio della scheda nell'estensione del browser.</value>
+    <value>Premi Attiva per instradare l'audio di questa scheda.</value>
+  </data>
+  <data name="BrowserTabActivate" xml:space="preserve">
+    <value>Attiva</value>
+  </data>
+  <data name="BrowserTabActivateName" xml:space="preserve">
+    <value>Attiva la scheda del browser {0}</value>
+  </data>
+  <data name="BrowserTabActivateHint" xml:space="preserve">
+    <value>Porta in primo piano questa scheda nel browser e avvia l'instradamento del suo audio. Il browser può chiederti di completare lì.</value>
+  </data>
+  <data name="BrowserTabActivating" xml:space="preserve">
+    <value>Avvio nel browser...</value>
+  </data>
+  <data name="BrowserTabActivatePopup" xml:space="preserve">
+    <value>Completa nel browser: premi Attiva questa scheda nel popup di OpenXLR.</value>
+  </data>
+  <data name="BrowserTabActivateToolbar" xml:space="preserve">
+    <value>Completa nel browser: in questa scheda fai clic sull'icona di OpenXLR nella barra degli strumenti o premi la sua scorciatoia, poi premi Attiva questa scheda.</value>
   </data>
   <data name="BrowserTabUsesDefault" xml:space="preserve">
     <value>Usa la destinazione predefinita del browser</value>

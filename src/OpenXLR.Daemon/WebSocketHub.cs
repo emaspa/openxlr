@@ -30,6 +30,7 @@ public sealed class WebSocketHub
     // enough for systemd to SIGKILL the daemon before the other services
     // ever get to tear down.
     private readonly CancellationToken _stopping;
+    private readonly IHostApplicationLifetime _lifetime;
     private readonly StateBroadcastQueue _stateBroadcasts;
 
     public WebSocketHub(DeviceManager devices, MixerService mixer, ILogger<WebSocketHub> log,
@@ -40,6 +41,7 @@ public sealed class WebSocketHub
         _mixer = mixer;
         _log = log;
         _stopping = lifetime.ApplicationStopping;
+        _lifetime = lifetime;
         // Either half changing pushes the combined state, so clients always see
         // device and mixer consistently in one message.
         _stateBroadcasts = new(() =>
@@ -257,6 +259,15 @@ public sealed class WebSocketHub
                     : "syncBrowserTabs: requires an authenticated WebSocket";
                 stateOnError = true;
                 break;
+            case "activateBrowserTab":
+                // Only the companion that registered the tab hears the request,
+                // since its session is its connection. Capture still needs the
+                // user's gesture in the browser; its tab list says what happened.
+                error = _mixer.CheckBrowserActivation(cmd)
+                    ?? (Guid.TryParseExact(cmd.Session, "N", out Guid provider) && _clients.TryGetValue(provider, out Client? companion)
+                        && companion.TrySend(Serialize(new BrowserTabActivationMessage(cmd.TabId!.Value, OpenXLR.Core.Mixing.BrowserTabRouting.CanonicalSite(cmd.Site)!)))
+                        ? null : "activateBrowserTab: the browser companion is not connected");
+                break;
             case "getDiagnostics":
                 await reply(new DiagnosticsMessage(_devices.DumpBlocks()));
                 break;
@@ -466,6 +477,13 @@ public sealed class WebSocketHub
             case "resetDevice":
                 error = _devices.ResetToDefaults();   // the state change broadcasts itself
                 if (error is null) _log.LogInformation("reset {dev} to its firmware defaults", ActiveDeviceId());
+                break;
+            case "restartDaemon":
+                // A daemon the UI did not start (the Flatpak's user service)
+                // is restarted by its service manager after this clean exit.
+                _log.LogInformation("restart requested by a client");
+                RestartRequest.Ask(RestartRequest.TemporaryFailure);
+                _lifetime.StopApplication();
                 break;
             default:
                 error = $"unknown cmd '{cmd.Cmd}'";

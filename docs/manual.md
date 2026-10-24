@@ -76,12 +76,11 @@ version under INTERFACE on an interface that reports one: the Wave XLR
 Pro, the MK.2 family, the Wave:3 and the Wave:1. On the Wave:3 and Wave:1
 the desktop's sound settings and OpenXLR also
 share the microphone mute and the headphone level, so a change in either
-shows in the other within a second. Wave:3 support is in beta: it is
-written from public protocol research, and one user's quick test covered
-detection, gain, mute, headphone volume and the monitor balance. The
-Wave:1 uses the Wave:3's backend and is in beta too: an owner's
-diagnostics showed the microphone recognised and every control read
-correctly, and a second run confirmed the gain, mute and headphone
+shows in the other within a second. Wave:3 support is written from
+public protocol research and works on the maintainer's unit: gain,
+mute, headphone volume and the monitor balance. The Wave:1 uses the
+Wave:3's backend: an owner's diagnostics showed the microphone
+recognised and every control read correctly, and a second run confirmed the gain, mute and headphone
 volume set from OpenXLR on the microphone itself. ClipGuard and the
 mic/PC mix are not confirmed yet; if you own one, change them, leave
 them changed, collect diagnostics and open an issue
@@ -629,19 +628,18 @@ OpenXLR saves the setup with the rest of the mixer, and profiles carry it.
 
 **Where it runs.** On most devices this computer runs it: OpenXLR adds a
 small stage for each ducked mix that lowers only the chosen channels.
-The Wave XLR Pro has ducking on its own processor too, but for now this
-computer runs it there as well. The unit ducks inside its own mix, and
-OpenXLR feeds the jacks around that mix, so the unit's ducking is not
-heard; its USB Aux port has not been checked by ear. The Ducking window says so
-under **Runs on**. Feeding the jacks through the unit's mix is planned, and
-then the unit takes ducking over when the setup fits what it can do. The unit only lowers a whole output, the mix OpenXLR sends to its
+The Wave XLR Pro has ducking on its own processor too, and runs it on its
+headphone jacks and Line Out when the setup fits what it can do; its USB
+Aux port has not been checked by ear yet, so a ducked Aux mix stays on this
+computer. The unit only lowers a whole output, the mix OpenXLR sends to its
 jacks and Line Out or to its USB Aux port, and only with XLR 1 as the key.
 When the setup does not fit, the computer runs it and the state says why
 (see [where ducking runs](api.md#where-ducking-runs)):
 
 - the key is not XLR 1;
-- the unit's ducking is not heard where the mix plays: the jacks are fed
-  around the unit's mix, and the USB Aux port is not checked yet;
+- the unit's ducking is not heard where the mix plays: the USB Aux port
+  is not checked yet, and for a moment after the unit connects the jacks'
+  feed is not read in its mix yet;
 - a ducked mix also plays somewhere the unit cannot lower, such as
   speakers on the computer or a virtual microphone like Stream;
 - the jacks play two mixes together and only one of them is ducked;
@@ -680,14 +678,17 @@ setting while OpenXLR runs, OpenXLR writes its own back within a few
 seconds. In hardware-control mode OpenXLR writes nothing and the unit
 keeps what it holds, and the Ducking window shows the setup without
 letting you change it. The unit's bytes
-come from Wave Link captures on Windows, and nobody has listened to the
-result on Linux yet
+come from Wave Link captures on Windows and a desk probe on Linux, and the
+result was checked by ear on Headphones 1
 ([hardware support](hardware-support.md#wave-xlr-pro-0fd900b4)).
 
-A muted key does not duck: XLR 1 muted in every mix it is sent to lowers
-nothing. On this computer, a key paused by **Mute microphone sends with
-monitoring** lowers nothing either until monitoring resumes. On this computer, [Sound Check](#sound-check)'s loop plays through
-the key channel, so a looped take ducks the music, which is a quick way to
+On this computer a muted key does not duck: XLR 1 muted in every mix it is
+sent to lowers nothing, and a key paused by **Mute microphone sends with
+monitoring** lowers nothing either until monitoring resumes. On the Pro the
+unit listens to XLR 1 before USB, so it ducks while XLR 1 is muted in every
+mix; choose **This computer** if muting the microphone should stop ducking.
+The unit reacts to XLR 1 only: talking into XLR 2 does not duck. On this
+computer, [Sound Check](#sound-check)'s loop plays through the key channel, so a looped take ducks the music, which is a quick way to
 try a sensitivity. On the Pro the unit hears the live microphone, so the
 loop does not duck.
 
@@ -793,8 +794,15 @@ and off. Below it, each tab has a row with its title, website, capture
 light, channel picker, Remember website and Forget website. Until the
 companion reports a tab, the window says so under the option. Its Manual
 button opens the browser routing guide.
-Enable the option, choose a channel and activate each tab from the
-browser. Remember website saves its origin's
+Enable the option, choose a channel and press Activate in the tab's row.
+The button shows on a row with a channel that is not routed yet. The
+browser lets the companion take a tab's audio only after you clicked its
+toolbar icon or pressed its shortcut on that tab. Activate brings the tab
+forward and starts it when the browser still allows that. When it does
+not, the row tells you what to press in the browser, either Activate this
+tab in the popup the companion opens or the OpenXLR icon on the tab. See the
+[browser routing guide](browser-routing.md#choose-and-activate-a-tab).
+Remember website saves its origin's
 default across restarts. Browser permission must be granted again for
 each tab after restarting the browser. While browser output selection is
 on, OpenXLR does not move the browser itself. Its row keeps the channel
@@ -1927,7 +1935,9 @@ Under WINDOW:
   including when the UI was minimized. "Quit OpenXLR" in the tray
   menu always exits. Neither choice stops the background audio service,
   except under Flatpak, where the UI owns its daemon and Quit stops
-  both ([Flatpak](flatpak.md)).
+  both, so the Flatpak keeps running in the tray unless you choose
+  otherwise ([Flatpak](flatpak.md)). In Game Mode on SteamOS and
+  Bazzite, which has no tray, closing always quits the UI.
 
 Launching OpenXLR again shows the UI that is already running. A launch requested while
 the first process is still initializing is kept until the UI is ready,
@@ -2185,8 +2195,10 @@ interface without a hardware low cut or ClipGuard, XLR 1's software low cut
 and ClipGuard are there too. They are the same buttons as in INPUTS, so
 switching one here switches it there. **Mic** turns green while one of them
 is on, and its small lamp lights red while phantom power is on, so you can
-see both without opening it. A capture channel that carries the interface's
-microphone has **Mic** too, and a strip bound to an additional interface
+see both without opening it. Under **Mic** is the input's gain in dB. While
+you move the row's volume fader it shows the volume instead, as a
+percentage, and goes back to the gain when you let go. A capture channel
+that carries the interface's microphone has **Mic** too, and a strip bound to an additional interface
 has that interface's switches. Aux In has its level and **Lock**. Each of
 them also has its [volume](#channel-volume),
 a second fader under the gain or the level, and the row grows to hold
@@ -2830,11 +2842,21 @@ other devices this would be new information: collect diagnostics
 <a name="daemon-hang"></a>
 ### 5.7 The daemon froze, or a control hung the UI
 
-The header's **Restart daemon** button restarts the systemd user service.
-Audio is interrupted during the restart. The UI stays responsive, and
-the button is disabled until the service command finishes. If it fails,
-check `journalctl --user -u openxlr-daemon`. A daemon started by hand must
-be restarted by hand.
+On a native installation, the header's **Restart daemon** button restarts
+the systemd user service. Audio is interrupted during the restart. The UI
+stays responsive, and the button is disabled until the service commands
+finish. An explicit restart first clears the daemon service's failed state
+and start counter, so the button also works after repeated starts produced
+`start-limit-hit` in the journal. Automatic restarts after crashes still
+obey the service's start limit. The waiting message clears when the daemon
+reconnects, including a connection restored before the service command
+finishes. If the explicit restart fails, check
+`journalctl --user -u openxlr-daemon`. A daemon started by hand must be
+restarted by hand.
+
+Changing **Enable software mixer** in Options uses the same background
+restart. Its switch is disabled while a restart is in progress, so the
+window stays responsive and concurrent changes cannot race the restart.
 
 An older user unit can fail before starting the daemon with
 `218/CAPABILITIES` and `Failed to drop capabilities`. Update the package
@@ -2966,7 +2988,13 @@ Options, SUPPORT, Collect diagnostics. It writes
 capabilities, a dump of the interface's vendor blocks, the PipeWire
 graph and device listings, the last two hours of the daemon journal (under
 Flatpak, `daemon.log` and its rotated copy), `mixer.json`, `ui.json` and
-version information. Warnings and command failure notes for the graph dump
+version information. Native installations also include `audio-journal.txt`
+with the last two hours of the PipeWire, pipewire-pulse and WirePlumber user
+service journals. Audio-server errors can explain distortion or disappearing
+nodes even when the daemon's own journal has no error. These entries use the
+same redaction as the daemon journal; unavailable journals leave a command
+failure note. The Flatpak sandbox keeps collecting its own daemon logs and
+does not read host journals. Warnings and command failure notes for the graph dump
 are kept in `pw-dump-errors.txt`, when present, instead of being appended
 to `pw-dump.json`. Plugin evidence includes the
 catalogue, effective bridge setup and latest native scan results. The home path, host name
@@ -2986,11 +3014,35 @@ created as a new private file; an existing file or symbolic link at its
 path is refused without overwriting its contents. A collection that
 fails part way removes its incomplete archive.
 
+Configuration copies are limited to 4 MiB per file, the preference reader's
+limit. Symbolic links, non-regular files and files that cannot be read are
+replaced with an omission notice. An unavailable configuration does not stop
+the rest of the collection. The Flatpak daemon logs keep their separate size
+limit and use the same file checks.
+
 Saved plugin scan logs also have credential-shaped values such as passwords
 and API tokens masked, including quoted fields, escaped values and long or
 truncated credentials. If this masking exceeds its time limit, the archive
 contains an omission notice in place of that log's text, never its
 unredacted contents. The original log on disk is kept.
+
+For audio glitches, collect while the problem is present and before restarting
+the daemon, if possible. Collection reads the current state without changing
+audio, recording samples or starting plugins. The extra reports are:
+
+- `pw-top.txt`: three batches of node statistics, including rate, quantum and
+  error counters.
+- `sink-inputs.json` and `source-outputs.json`: current playback and recording
+  streams, their formats, volume, mute state and buffering as Pulse reports
+  them. The archive masks process identity fields and keeps numeric audio
+  values as numbers.
+
+Each helper has a 15-second deadline, an 8 MiB stdout limit and a 64 KiB
+stderr limit, and runs in the C locale. A helper that fails, times out or
+exits with an error leaves a note beside its report, and collection goes on
+with the rest. When `pw-dump` appends update arrays because the graph
+changed during collection, the archive folds them into one array with the
+daemon's own rules, so `pw-dump.json` stays one JSON document.
 
 For a Windows plugin missing from the picker, collect diagnostics after the
 scan finishes and name the plugin and intended insert slot in the report.

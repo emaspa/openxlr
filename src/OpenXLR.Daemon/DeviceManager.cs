@@ -1161,15 +1161,16 @@ public sealed class DeviceManager : BackgroundService
             : null;
         // A unit that answered a poll but not the ducking block cannot run it.
         bool duckingRefused = _last is not null && dev.ReadDucking() is null;
-        // The unit ducks inside its own mix. OpenXLR feeds the jacks through
-        // the monitor return, which goes around that mix, so the unit's
-        // ducking is not heard there (desk test, 2026-10-21); the USB Aux
-        // port has not been checked by ear. Both stay in software until then.
+        // The unit ducks inside the mix the jacks play, which holds the
+        // jacks' feed while its membership bit reads set (desk probe,
+        // 2026-10-23), so the jacks are reached only once a poll has read
+        // it. The USB Aux port's mix ducked on its USB stream, but the port
+        // has not been checked by ear, so it stays in software until then.
         UnitDuckingSupport? ducking = dev.Capabilities.Ducking
             ? new UnitDuckingSupport(dev.Info.Model, dev.Firmware, !duckingRefused,
                 duckingRefused ? "unsupportedBlock" : null,
                 duckingRefused ? $"The {dev.Info.Model} did not answer a read of its ducking block." : null,
-                ReachesJacks: false, ReachesAux: false)
+                ReachesJacks: _last?.HpMixMonitorReturn == true, ReachesAux: false)
             : null;
         _published = new Published(msg, dev.Info, eq, ducking);
         return msg;

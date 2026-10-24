@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { deviceFor, errorText, MAX_CAPTURES, siteOf, tabRecords, TabAudio } from '../chromium/routing.mjs';
+import { deviceFor, errorText, MAX_CAPTURES, notInvoked, siteOf, tabRecords, TabAudio } from '../chromium/routing.mjs';
 
 const deferred = () => {
   let resolve, reject;
@@ -10,7 +10,7 @@ const deferred = () => {
   return { promise, resolve, reject };
 };
 
-function fixture({ acquire, sink, resume, timeoutMs } = {}) {
+function fixture({ acquire, sink, resume, close, timeoutMs } = {}) {
   const contexts = [], streams = [], statuses = [], acquisitions = [];
   const acquired = deferred();
   const makeStream = () => {
@@ -31,7 +31,7 @@ function fixture({ acquire, sink, resume, timeoutMs } = {}) {
   const audio = new TabAudio({ mediaDevices, timeoutMs, status: (...args) => statuses.push(args), createContext() {
     const context = { closed: false, destination: {}, async setSinkId(id) { if (sink) await sink(id); this.sink = id; },
       createMediaStreamSource() { return { connect() {}, disconnect() {} }; },
-      async resume() { if (resume) await resume(); }, async close() { this.closed = true; } };
+      async resume() { if (resume) await resume(); }, async close() { if (close) await close(); this.closed = true; } };
     contexts.push(context); return context;
   } });
   return { audio, contexts, streams, statuses, acquisitions, acquired, mediaDevices };
@@ -52,6 +52,20 @@ test('tab metadata excludes private/restricted tabs, bounds titles and keeps cap
   assert.equal(records[0].id, 179);
   assert(records.every(tab => tab.title.length <= 160 && !tab.title.includes('\n') && !tab.site.includes('secret')));
   assert(!records.some(tab => tab.id >= 200));
+});
+
+test('a tab record carries the stage of an activation OpenXLR asked for', () => {
+  const tabs = [{ id: 1, url: 'https://one.example' }, { id: 2, url: 'https://two.example' }];
+  const records = tabRecords(tabs, new Map(), new Map([[2, { stage: 'popup' }]]));
+  assert.deepEqual(records.map(tab => [tab.id, tab.activation]), [[1, null], [2, 'popup']]);
+  assert.deepEqual(Object.keys(records[0]), ['id', 'site', 'title', 'capturing', 'error', 'activation']);
+});
+
+test('only the refusal for a tab the user did not invoke the extension on counts as one', () => {
+  assert(notInvoked(new Error('Extension has not been invoked for the current page (see activeTab permission). Chrome pages cannot be captured.')));
+  assert(notInvoked('Extension has not been invoked for the current page (see activeTab permission).'));
+  for (const other of [new Error('Permission denied'), 'Cannot capture a tab with an active stream.', undefined, null])
+    assert.equal(notInvoked(other), false);
 });
 
 test('output matching refuses guesses and never chooses default-device aliases', () => {
@@ -195,4 +209,88 @@ test('native allowlist is fixed to the extension key and has no website access',
   assert.equal(manifest.host_permissions, undefined); assert.equal(manifest.content_scripts, undefined);
   assert.equal(manifest.externally_connectable, undefined);
   assert.deepEqual(manifest.permissions, ['activeTab', 'tabs', 'tabCapture', 'offscreen', 'storage', 'nativeMessaging']);
+});
+
+test('a failed old device query cannot stop a replacement or newly started capture', async () => {
+  const devices = deferred();
+  const f = fixture();
+  await f.audio.start(1, 'old', 'chat');
+  f.mediaDevices.enumerateDevices = () => devices.promise;
+  const checking = f.audio.checkDevices().catch(error => f.audio.stopAll(errorText(error)));
+  await f.audio.start(1, 'replacement', 'music');
+  await f.audio.start(2, 'new', 'chat');
+  devices.reject(new Error('enumeration failed'));
+  await checking;
+  assert.deepEqual(f.audio.snapshot().map(tab => tab.id), [1, 2]);
+  assert(f.streams[0].track.stopped);
+  assert(!f.streams[1].track.stopped && !f.streams[2].track.stopped);
+  await f.audio.stopAll();
+});
+
+test('a failed device query releases only unchanged captures and reports its bounded error', async () => {
+  const devices = deferred();
+  const f = fixture();
+  await f.audio.start(1, 'one', 'chat');
+  await f.audio.start(2, 'two', 'chat');
+  f.mediaDevices.enumerateDevices = () => devices.promise;
+  const checking = f.audio.checkDevices().catch(error => f.audio.stopAll(errorText(error)));
+  await f.audio.route(1, 'music');
+  devices.reject(new Error('devices\nunavailable'));
+  await checking;
+  assert.deepEqual(f.audio.snapshot().map(tab => tab.id), [1]);
+  assert.equal(f.audio.snapshot()[0].deviceId, 'music');
+  assert(f.streams[1].track.stopped && f.contexts[1].closed);
+  assert.deepEqual(f.statuses.at(-1), [2, false, 'devices unavailable']);
+  await f.audio.stopAll();
+});
+
+for (const failed of [false, true]) {
+  test(`an old ${failed ? 'failed' : 'missing-device'} query cannot undo an output round trip`, async () => {
+    const devices = deferred();
+    const f = fixture();
+    await f.audio.start(1, 'one', 'chat');
+    f.mediaDevices.enumerateDevices = () => devices.promise;
+    const checking = f.audio.checkDevices();
+    await f.audio.route(1, 'music');
+    await f.audio.route(1, 'chat');
+    if (failed) devices.reject(new Error('old failure')); else devices.resolve([]);
+    await checking;
+    assert.deepEqual(f.audio.snapshot().map(tab => [tab.id, tab.deviceId]), [[1, 'chat']]);
+    await f.audio.stopAll();
+  });
+
+  test(`an older ${failed ? 'failed' : 'missing-device'} query cannot override a newer successful device snapshot`, async () => {
+    const devices = deferred();
+    const f = fixture();
+    await f.audio.start(1, 'one', 'chat');
+    const enumerate = f.mediaDevices.enumerateDevices;
+    f.mediaDevices.enumerateDevices = () => devices.promise;
+    const checking = f.audio.checkDevices();
+    f.mediaDevices.enumerateDevices = enumerate;
+    await f.audio.checkDevices();
+    if (failed) devices.reject(new Error('old failure')); else devices.resolve([]);
+    await checking;
+    assert.deepEqual(f.audio.snapshot().map(tab => tab.id), [1]);
+    await f.audio.stopAll();
+  });
+}
+
+test('a superseded query cannot stop another tab after awaiting a context close', async () => {
+  const closing = deferred(), release = deferred();
+  let first = true;
+  const f = fixture({ close: async () => {
+    if (first) { first = false; closing.resolve(); await release.promise; }
+  } });
+  await f.audio.start(1, 'one', 'chat');
+  await f.audio.start(2, 'two', 'music');
+  const enumerate = f.mediaDevices.enumerateDevices;
+  f.mediaDevices.enumerateDevices = async () => [];
+  const checking = f.audio.checkDevices();
+  await closing.promise;
+  f.mediaDevices.enumerateDevices = enumerate;
+  await f.audio.checkDevices();
+  release.resolve();
+  await checking;
+  assert.deepEqual(f.audio.snapshot().map(tab => tab.id), [2]);
+  await f.audio.stopAll();
 });

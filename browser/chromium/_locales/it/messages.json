@@ -50,6 +50,15 @@
   "popupHelp": {
     "message": "Scegli i canali qui o in OpenXLR. Prima attiva ogni scheda nel browser. Quando interrompi, il browser torna a riprodurre normalmente."
   },
+  "popupRequested": {
+    "message": "OpenXLR ha chiesto di instradare questa scheda. Premi Attiva questa scheda per iniziare."
+  },
+  "popupInvokeShortcut": {
+    "message": "Il browser avvia l'audio della scheda solo dopo che hai aperto tu OpenXLR in questa scheda. Fai clic sull'icona di OpenXLR nella barra degli strumenti o premi $1, poi premi Attiva questa scheda."
+  },
+  "popupInvokeNoShortcut": {
+    "message": "Il browser avvia l'audio della scheda solo dopo che hai aperto tu OpenXLR in questa scheda. Fai clic sull'icona di OpenXLR nella barra degli strumenti, poi premi Attiva questa scheda. Non è impostata alcuna scorciatoia da tastiera; puoi sceglierne una nella pagina delle scorciatoie delle estensioni del browser."
+  },
   "statusDisconnected": {
     "message": "OpenXLR non è connesso."
   },

@@ -218,11 +218,11 @@ public sealed class DuckingDaemonTests
         using Mixer mixer = ProMixer(port, register: false);
         (string id, UnitDuckingSupport support) = port.Primary()!.Value;
         Assert.Equal(Pro, id);
-        // The daemon keeps the Pro's ducking off its outputs: the jacks are fed
-        // around the unit's mix and the Aux port is unchecked. The write path
-        // below is exercised as if the unit reached both.
-        Assert.Equal((false, false), (support.ReachesJacks, support.ReachesAux));
-        mixer.SetUnitDuckingSupport(id, support with { ReachesJacks = true, ReachesAux = true });
+        // The jacks' feed reads as a member of the mix the jacks play (byte
+        // 12 bit 5), so the unit reaches them; the Aux port is unchecked. The
+        // write path below is exercised as if the unit reached both.
+        Assert.Equal((true, false), (support.ReachesJacks, support.ReachesAux));
+        mixer.SetUnitDuckingSupport(id, support with { ReachesAux = true });
 
         // On: the jacks' pair, written by the device loop and read back held.
         mixer.SetDuckingSetup(DuckingSetup.Default(mixer.Config) with { Enabled = true, Amount = "high", Speed = "fast" }, _ => null);
@@ -247,6 +247,33 @@ public sealed class DuckingDaemonTests
         Assert.Empty(off.Device!.Readback!.Pairs);
         Assert.True(off.Device.Held);
         Assert.Contains(log.Written, line => line.StartsWith("ducking (update) on Elgato Wave XLR Pro: off.", StringComparison.Ordinal));
+    });
+
+    [Fact]
+    public void TheJacksAreReachedOnlyWhileTheirFeedIsInTheUnitsMix() => WithConfigDir(_ =>
+    {
+        var unit = new Mk2HardwareEqTests.Unit { Bank = 0x0103 };
+        unit.Blocks.Clear();
+        byte[] block1 = Block1();
+        block1[12] &= unchecked((byte)~0x20);
+        unit.Blocks[0x0001] = block1;
+        unit.Blocks[0x0003] = new byte[12];
+        unit.Blocks[0x0004] = Convert.FromHexString(
+            "34d800d4200a00c8001832f4040a00640006" + "01003c00f6030de300ff05f45c03f20507fd27e8" +
+            "1e0004d4200a00c800180af4040a00640006" + "01003c00f6030de300ff05f45c03f20507fd27e8" + "14000200");
+        unit.Blocks[0x0005] = Convert.FromHexString("0000000050000000");
+        unit.Blocks[0x0008] = Block8(MediumBytes, IdleFlags);
+        using var devices = new DeviceManager(new DeviceEqWriterTests.Lines(), new ConfigurationBuilder().Build(),
+            () => [new WaveXlrProDevice(unit)], time: new ManualTime());
+        devices.SweepOnce();
+        var port = new DeviceDuckingPort(devices);
+        Assert.False(port.Primary()!.Value.Support.ReachesJacks);
+
+        // Another program, or the daemon's own headphone mix sync, puts the
+        // feed back: the next poll reads it and the unit reaches the jacks.
+        unit.Blocks[0x0001][12] |= 0x20;
+        devices.SweepOnce();
+        Assert.True(port.Primary()!.Value.Support.ReachesJacks);
     });
 
     /// <summary>A Core mixer without a graph that sees the Pro's jacks playing Monitor A, as the hand-over tests build it.</summary>

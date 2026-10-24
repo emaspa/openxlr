@@ -2766,7 +2766,7 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
     <value>Брзо</value>
   </data>
   <data name="DuckingHint" xml:space="preserve">
-    <value>Пригушивање смањује изабране канале у изабраним миксевима док је окидачки микрофон гласан. Овај рачунар га извршава за сваки уређај, укључујући Wave XLR Pro: Pro пригушује у свом миксу, кроз који прикључци још не пролазе.</value>
+    <value>Пригушивање смањује изабране канале у изабраним миксевима док је окидачки микрофон гласан. Извршава га овај рачунар, или Wave XLR Pro на свом процесору када подешавање одговара ономе што уређај може.</value>
   </data>
   <data name="DuckingNotHeld" xml:space="preserve">
     <value>Уређај још не задржава ову поставку; OpenXLR је поново уписује за неколико секунди.</value>
@@ -2877,7 +2877,7 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
     <value>КАРТИЦЕ ПРЕГЛЕДАЧА</value>
   </data>
   <data name="BrowserTabCaptureHint" xml:space="preserve">
-    <value>Активирај звук сваке картице у проширењу прегледача. Избор канала овде не активира звук картице.</value>
+    <value>Притисни Активирај да усмериш звук картице, овде или у проширењу прегледача. Избор канала не активира звук картице.</value>
   </data>
   <data name="BrowserTabCaptureState" xml:space="preserve">
     <value>Стање звука картице прегледача</value>
@@ -2901,7 +2901,25 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
     <value>Звук картице је активан</value>
   </data>
   <data name="BrowserTabActivationRequired" xml:space="preserve">
-    <value>Активирај звук картице у проширењу прегледача.</value>
+    <value>Притисни Активирај да усмериш звук ове картице.</value>
+  </data>
+  <data name="BrowserTabActivate" xml:space="preserve">
+    <value>Активирај</value>
+  </data>
+  <data name="BrowserTabActivateName" xml:space="preserve">
+    <value>Активирај картицу прегледача {0}</value>
+  </data>
+  <data name="BrowserTabActivateHint" xml:space="preserve">
+    <value>Доводи ову картицу у први план у прегледачу и покреће усмеравање њеног звука. Прегледач може да затражи да завршиш тамо.</value>
+  </data>
+  <data name="BrowserTabActivating" xml:space="preserve">
+    <value>Покретање у прегледачу...</value>
+  </data>
+  <data name="BrowserTabActivatePopup" xml:space="preserve">
+    <value>Заврши у прегледачу: притисни Активирај ову картицу у искачућем прозору OpenXLR-а.</value>
+  </data>
+  <data name="BrowserTabActivateToolbar" xml:space="preserve">
+    <value>Заврши у прегледачу: на овој картици кликни на иконицу OpenXLR-а на траци са алаткама или притисни њену пречицу, па притисни Активирај ову картицу.</value>
   </data>
   <data name="BrowserTabUsesDefault" xml:space="preserve">
     <value>Користи подразумевано одредиште прегледача</value>

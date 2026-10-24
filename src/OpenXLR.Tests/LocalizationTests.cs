@@ -138,7 +138,7 @@ public sealed class LocalizationTests
     {
         string[] keys = [.. English.Keys.Where(key => key.StartsWith("PreserveBrowserOutputs", StringComparison.Ordinal)
             || key.StartsWith("BrowserTab", StringComparison.Ordinal) || key.StartsWith("BrowserOutputHeld", StringComparison.Ordinal))];
-        Assert.Equal(24, keys.Length);
+        Assert.Equal(30, keys.Length);
         Dictionary<string, string> translated = Read(file);
         Assert.Equal(keys, keys.Where(translated.ContainsKey));
     }

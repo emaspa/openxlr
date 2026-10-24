@@ -160,8 +160,9 @@
                           AutomationProperties.Name="{Binding Channel.BindingChipName}" ToolTip.Tip="{Binding Channel.BindingTip}"/>
                   <!-- the microphone's switches behind one button at the end of the name column, wherever the
                        order puts the part, so the source controls keep their room: lettered as a lit chain while
-                       one is on, with the interface's phantom power lamp, lit while phantom power is on -->
-                  <Button Grid.Column="3" Grid.RowSpan="2" Name="MatrixProcessing" Classes="matrixProcessing fx" Classes.fxOn="{Binding ProcessingOn}"
+                       one is on, with the interface's phantom power lamp, lit while phantom power is on; under it
+                       the input's gain, which reads the channel's volume while the volume fader moves -->
+                  <Button Grid.Column="3" Name="MatrixProcessing" Classes="matrixProcessing fx" Classes.fxOn="{Binding ProcessingOn}"
                           Padding="5,2" FontSize="11" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                           MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsProcessing}"
                           AutomationProperties.Name="{Binding ProcessingName}" ToolTip.Tip="{loc:Text Key=MatrixProcessingTip}">
@@ -176,6 +177,9 @@
                       </Flyout>
                     </Button.Flyout>
                   </Button>
+                  <TextBlock Grid.Column="3" Grid.Row="1" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="11"
+                             HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowsReadout}"
+                             AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
                 </Grid>
               </Border>
             <Border Width="{DynamicResource Ox.Matrix.CellWidth}" Padding="4,0" Name="MatrixSource">
@@ -210,6 +214,7 @@
                     <layout:MeterFader ShowsMeter="{Binding VolumeShowsMeter}" LeftLevel="{Binding Channel.MeterL}" RightLevel="{Binding Channel.MeterR}"
                                        LeftName="{Binding LeftLevelName}" RightName="{Binding RightLevelName}" VerticalAlignment="Center">
                       <Slider Name="MatrixVolume" Classes="matrixFader" vm:FaderInput.Step="0.01" Minimum="0" Maximum="1"
+                              vm:FaderInput.IsAdjusting="{Binding VolumeAdjusting, Mode=OneWayToSource}"
                               Value="{Binding Channel.Volume, Mode=TwoWay}"
                               AutomationProperties.Name="{Binding Channel.Name, StringFormat={loc:Text Key=ChannelVolumeName}}"
                               ToolTip.Tip="{Binding Channel.VolumeTip}"/>
@@ -283,8 +288,9 @@
                           AutomationProperties.Name="{Binding Channel.BindingChipName}" ToolTip.Tip="{Binding Channel.BindingTip}"/>
                   <!-- the microphone's switches behind one button at the end of the name column, wherever the
                        order puts the part, so the source controls keep their room: lettered as a lit chain while
-                       one is on, with the interface's phantom power lamp, lit while phantom power is on -->
-                  <Button Grid.Column="3" Grid.RowSpan="2" Name="MatrixProcessing" Classes="matrixProcessing fx" Classes.fxOn="{Binding ProcessingOn}"
+                       one is on, with the interface's phantom power lamp, lit while phantom power is on; under it
+                       the input's gain, which reads the channel's volume while the volume fader moves -->
+                  <Button Grid.Column="3" Name="MatrixProcessing" Classes="matrixProcessing fx" Classes.fxOn="{Binding ProcessingOn}"
                           Padding="5,2" FontSize="11" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                           MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsProcessing}"
                           AutomationProperties.Name="{Binding ProcessingName}" ToolTip.Tip="{loc:Text Key=MatrixProcessingTip}">
@@ -299,6 +305,9 @@
                       </Flyout>
                     </Button.Flyout>
                   </Button>
+                  <TextBlock Grid.Column="3" Grid.Row="1" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="11"
+                             HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowsReadout}"
+                             AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
                 </Grid>
               </Border>
             <Border Width="{DynamicResource Ox.Matrix.CellWidth}" Padding="4,0" Name="MatrixSource">
@@ -333,6 +342,7 @@
                     <layout:MeterFader ShowsMeter="{Binding VolumeShowsMeter}" LeftLevel="{Binding Channel.MeterL}" RightLevel="{Binding Channel.MeterR}"
                                        LeftName="{Binding LeftLevelName}" RightName="{Binding RightLevelName}" VerticalAlignment="Center">
                       <Slider Name="MatrixVolume" Classes="matrixFader" vm:FaderInput.Step="0.01" Minimum="0" Maximum="1"
+                              vm:FaderInput.IsAdjusting="{Binding VolumeAdjusting, Mode=OneWayToSource}"
                               Value="{Binding Channel.Volume, Mode=TwoWay}"
                               AutomationProperties.Name="{Binding Channel.Name, StringFormat={loc:Text Key=ChannelVolumeName}}"
                               ToolTip.Tip="{Binding Channel.VolumeTip}"/>
@@ -419,6 +429,7 @@
                     <layout:MeterFader ShowsMeter="{Binding VolumeShowsMeter}" LeftLevel="{Binding Channel.MeterL}" RightLevel="{Binding Channel.MeterR}"
                                        LeftName="{Binding LeftLevelName}" RightName="{Binding RightLevelName}" VerticalAlignment="Center">
                       <Slider Name="MatrixVolume" Classes="matrixFader" vm:FaderInput.Step="0.01" Minimum="0" Maximum="1"
+                              vm:FaderInput.IsAdjusting="{Binding VolumeAdjusting, Mode=OneWayToSource}"
                               Value="{Binding Channel.Volume, Mode=TwoWay}"
                               AutomationProperties.Name="{Binding Channel.Name, StringFormat={loc:Text Key=ChannelVolumeName}}"
                               ToolTip.Tip="{Binding Channel.VolumeTip}"/>
@@ -469,8 +480,9 @@
                              IsVisible="{Binding ShowsCaptureLabel}"/>
                   <!-- the microphone's switches behind one button at the end of the name column, wherever the
                        order puts the part, so the source controls keep their room: lettered as a lit chain while
-                       one is on, with the interface's phantom power lamp, lit while phantom power is on -->
-                  <Button Grid.Column="3" Grid.RowSpan="2" Name="MatrixProcessing" Classes="matrixProcessing fx" Classes.fxOn="{Binding ProcessingOn}"
+                       one is on, with the interface's phantom power lamp, lit while phantom power is on; under it
+                       the input's gain, which reads the channel's volume while the volume fader moves -->
+                  <Button Grid.Column="3" Name="MatrixProcessing" Classes="matrixProcessing fx" Classes.fxOn="{Binding ProcessingOn}"
                           Padding="5,2" FontSize="11" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                           MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsProcessing}"
                           AutomationProperties.Name="{Binding ProcessingName}" ToolTip.Tip="{loc:Text Key=MatrixProcessingTip}">
@@ -485,6 +497,9 @@
                       </Flyout>
                     </Button.Flyout>
                   </Button>
+                  <TextBlock Grid.Column="3" Grid.Row="1" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="11"
+                             HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowsReadout}"
+                             AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
                 </Grid>
               </Border>
             <Border Width="{DynamicResource Ox.Matrix.CellWidth}" Padding="4,0" Name="MatrixSource">
@@ -520,6 +535,7 @@
                     <layout:MeterFader ShowsMeter="{Binding VolumeShowsMeter}" LeftLevel="{Binding Channel.MeterL}" RightLevel="{Binding Channel.MeterR}" Mono="{Binding Channel.MonoMeter}"
                                        LeftName="{Binding LeftLevelName}" RightName="{Binding RightLevelName}" VerticalAlignment="Center">
                       <Slider Name="MatrixVolume" Classes="matrixFader" vm:FaderInput.Step="0.01" Minimum="0" Maximum="1"
+                              vm:FaderInput.IsAdjusting="{Binding VolumeAdjusting, Mode=OneWayToSource}"
                               Value="{Binding Channel.Volume, Mode=TwoWay}"
                               AutomationProperties.Name="{Binding Channel.Name, StringFormat={loc:Text Key=ChannelVolumeName}}"
                               ToolTip.Tip="{Binding Channel.VolumeTip}"/>

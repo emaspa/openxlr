@@ -39,7 +39,8 @@ public partial class MainWindow : Window
         _client = client;
         InitializeComponent();
         _vm = new MainViewModel(_client);
-        if (syncDesktopVolume && PlasmaVolumeRange.IsPlasma)
+        // The sandbox has no KDE helpers to read or write Plasma's preference.
+        if (syncDesktopVolume && PlasmaVolumeRange.IsPlasma && !FlatpakEnvironment.IsFlatpak)
         {
             _volumeRange = new PlasmaVolumeRange(_vm.ApplyDesktopVolumeBoost,
                 error => _vm.VolumeRangeError = error, action => Dispatcher.UIThread.Post(action));
@@ -51,6 +52,8 @@ public partial class MainWindow : Window
         _ = _desktopKeys.StartAsync();
         DataContext = _vm;
         _client.Start();          // connects, and keeps retrying if the daemon isn't up yet
+        // Queued rather than awaited: Options calls the restart on the UI thread.
+        StartupIntegration.AttachedRestart = () => { _ = _client.RestartDaemonAsync(); return _vm.DaemonConnected; };
         HeaderVersion.Text = $"v{AppVersion.Current}";
         UpdateControlSizing();
         Skinning.SkinService.Changed += UpdateControlSizing;
@@ -63,20 +66,33 @@ public partial class MainWindow : Window
             _automaticUpdateCheckStarted = true;
             if (FlatpakEnvironment.IsFlatpak && !System.IO.File.Exists(OpenXlrPaths.ConfigFile("flatpak-notice")))
             {
-                string setupError = FlatpakSetup.Prepare();
-                string setup = Localizer.Text("FlatpakSetup") + setupError;
-                if (await Dialogs.ConfirmAsync(this, "OpenXLR Flatpak", setup, Localizer.Text("Close")))
+                // Nothing is written to the host before the user agrees.
+                if (await Dialogs.ConfirmAsync(this, "OpenXLR Flatpak", Localizer.Text("FlatpakSetup"), Localizer.Text("FlatpakSetUpButton")))
                 {
+                    string setupError = FlatpakSetup.Prepare();
+                    var settings = UiSettings.Load();
+                    bool login = settings.StartDaemonAtLogin || settings.OpenWindowAtLogin;
+                    string? problem = setupError.Length > 0 ? setupError : null;
                     try
                     {
-                        var settings = UiSettings.Load();
                         if (!await FlatpakBackground.ConfigureAsync(settings.StartDaemonAtLogin, settings.OpenWindowAtLogin, _lifetime.Token))
                             throw new InvalidOperationException(Localizer.Text("FlatpakBackgroundUnavailable"));
-                        if (setupError.Length == 0) OpenXlrPaths.WriteAtomic(OpenXlrPaths.ConfigFile("flatpak-notice"), "1\n");
                     }
-                    catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException) { /* show again next time */ }
+                    catch (OperationCanceledException) { return; }
                     catch (Exception ex)
-                    { await Dialogs.ConfirmAsync(this, "OpenXLR Flatpak", ex.Message, Localizer.Text("Close")); }
+                    {
+                        // Without a login option the request only asks to keep
+                        // running in the tray; a desktop with no portal is no
+                        // reason to show this dialog at every launch.
+                        if (login) problem ??= ex.Message;
+                        else Console.Error.WriteLine("Background portal: " + ex.Message);
+                    }
+                    if (problem is null)
+                    {
+                        try { OpenXlrPaths.WriteAtomic(OpenXlrPaths.ConfigFile("flatpak-notice"), "1\n"); }
+                        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException) { /* show again next time */ }
+                    }
+                    else await Dialogs.ConfirmAsync(this, "OpenXLR Flatpak", problem, Localizer.Text("Close"));
                 }
             }
             await _vm.Updates.CheckAsync(manual: false, cancellation: _lifetime.Token);
@@ -104,7 +120,9 @@ public partial class MainWindow : Window
             // user-initiated window close is intercepted: cancelling an
             // OS/application shutdown request here blocks the whole system
             // from logging out or rebooting.
-            if (_vm.MinimizeToTray && !_reallyExit &&
+            // Game Mode on SteamOS and Bazzite has no tray: a hidden window
+            // would leave Steam showing OpenXLR as a game still running.
+            if (_vm.MinimizeToTray && !_reallyExit && !GameMode &&
                 e.CloseReason == WindowCloseReason.WindowClosing)
             {
                 e.Cancel = true;
@@ -211,6 +229,10 @@ public partial class MainWindow : Window
         Grid.SetColumn(MonitorVolumeReadout, readout);
         Grid.SetRow(MonitorVolumeReadout, stacked ? 1 : 0);
     }
+
+    /// <summary>A gamescope session, which SteamOS and Bazzite call Game Mode.</summary>
+    internal static bool GameMode => (Environment.GetEnvironmentVariable("XDG_CURRENT_DESKTOP") ?? "")
+        .Split(':').Contains("gamescope", StringComparer.OrdinalIgnoreCase);
 
     private void SetupTray()
     {

@@ -28,7 +28,9 @@ internal static class FlatpakSetup
             string temporary = Path.Combine(directory, ".openxlr-" + Guid.NewGuid().ToString("N"));
             try
             {
-                OpenXlrPaths.WriteAtomic(temporary, text);
+                // Readable like the packaged copies, and the user's directory keeps its own mode.
+                OpenXlrPaths.WriteAtomic(temporary, System.Text.Encoding.UTF8.GetBytes(text), privatePermissions: false,
+                    UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead);
                 // An intervening user write wins, including a newly made link.
                 File.Move(temporary, target, overwrite: false);
             }
@@ -47,6 +49,6 @@ internal static class FlatpakSetup
             return "";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        { return "\n\nWirePlumber setup needs attention: " + ex.Message; }
+        { return Localization.Localizer.Format("FlatpakRulesFailed", ex.Message); }
     }
 }

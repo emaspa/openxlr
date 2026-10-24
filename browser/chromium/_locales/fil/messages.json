@@ -50,6 +50,15 @@
   "popupHelp": {
     "message": "Pumili ng mga channel dito o sa OpenXLR. Paganahin muna ang bawat tab sa browser. Kapag inihinto, babalik sa normal ang pag-play ng browser."
   },
+  "popupRequested": {
+    "message": "Hiniling ng OpenXLR na i-route ang tab na ito. Pindutin ang Paganahin ang tab na ito para magsimula."
+  },
+  "popupInvokeShortcut": {
+    "message": "Sinisimulan lang ng browser ang audio ng tab kapag ikaw mismo ang nagbukas ng OpenXLR sa tab na ito. I-click ang icon ng OpenXLR sa toolbar o pindutin ang $1, saka pindutin ang Paganahin ang tab na ito."
+  },
+  "popupInvokeNoShortcut": {
+    "message": "Sinisimulan lang ng browser ang audio ng tab kapag ikaw mismo ang nagbukas ng OpenXLR sa tab na ito. I-click ang icon ng OpenXLR sa toolbar, saka pindutin ang Paganahin ang tab na ito. Walang nakatakdang keyboard shortcut; maaari kang pumili nito sa pahina ng mga shortcut ng extension sa browser."
+  },
   "statusDisconnected": {
     "message": "Hindi nakakonekta ang OpenXLR."
   },

@@ -14,19 +14,26 @@ public sealed class BrowserTabViewModel : ViewModelBase
     public const string BrowserDefault = "";
 
     private sealed record Route(string? Channel, bool Remember);
+    /// <summary>How long a request waits for the browser to report that it is acting on it.</summary>
+    public static readonly TimeSpan ActivationAnswerTimeout = TimeSpan.FromSeconds(10);
+
     private readonly Func<string, int, string, string?, bool, Task<string?>> _assign;
+    private readonly Func<string, int, string, Task<string?>>? _activate;
     private readonly Action<string> _reportError;
+    private readonly TimeSpan _activationTimeout;
     private Route _reported = new(null, false);
     private Route? _pending;
-    private long _editVersion;
-    private bool _applying, _canEdit, _isPending, _capturing;
+    private long _editVersion, _requestVersion;
+    private bool _applying, _canEdit, _isPending, _capturing, _requested;
     private string _title = "", _site = "";
-    private string? _error;
+    private string? _error, _activation, _requestError;
 
     public BrowserTabViewModel(string session, int id,
-        Func<string, int, string, string?, bool, Task<string?>> assign, Action<string> reportError)
+        Func<string, int, string, string?, bool, Task<string?>> assign, Action<string> reportError,
+        Func<string, int, string, Task<string?>>? activate = null, TimeSpan? activationTimeout = null)
     {
         Session = session; Id = id; _assign = assign; _reportError = reportError;
+        _activate = activate; _activationTimeout = activationTimeout ?? ActivationAnswerTimeout;
     }
 
     public string Session { get; }
@@ -39,6 +46,15 @@ public sealed class BrowserTabViewModel : ViewModelBase
     public bool IsPending => _isPending;
     public bool Capturing => _capturing;
     public string? ChannelId => (_pending ?? _reported).Channel;
+
+    /// <summary>What the browser reports about an activation OpenXLR asked for: starting, popup, browser or null.</summary>
+    public string? Activation => _activation;
+
+    /// <summary>An activation was asked for and the browser has not finished it.</summary>
+    public bool IsActivating => _requested || _activation is not null;
+
+    /// <summary>Activate offers itself only when it can start something.</summary>
+    public bool CanActivate => _activate is not null && CanEdit && ChannelId is not null && !IsPending && !Capturing && !IsActivating;
     public ChannelChoice? SelectedChannel
     {
         get => Channels.FirstOrDefault(c => c.Id == (ChannelId ?? BrowserDefault));
@@ -67,8 +83,52 @@ public sealed class BrowserTabViewModel : ViewModelBase
         if (CanEdit) Submit(new(null, false), forgetWebsite: true);
     }
 
+    /// <summary>
+    /// Ask the browser to bring this tab forward and start routing it. The
+    /// browser decides: it starts capture only for a tab the user invoked the
+    /// extension on, so the row says when the rest has to happen there.
+    /// </summary>
+    public void Activate()
+    {
+        if (!CanActivate) return;
+        long version = ++_requestVersion;
+        _requested = true;
+        _requestError = _error;
+        RaiseRoute();
+        _ = ActivateAsync(Site, version);
+        _ = ExpireRequestAsync(version);
+    }
+
+    private async Task ActivateAsync(string site, long version)
+    {
+        string? error = await _activate!(Session, Id, site);
+        if (error is null || version != _requestVersion) return;
+        EndRequest();
+        _error = error;
+        _reportError(error);
+        RaiseRoute();
+    }
+
+    private async Task ExpireRequestAsync(long version)
+    {
+        await Task.Delay(_activationTimeout);
+        if (version != _requestVersion) return;
+        EndRequest();
+        RaiseRoute();
+    }
+
+    /// <summary>Stop waiting for the browser's answer; late replies to the request are ignored.</summary>
+    private void EndRequest()
+    {
+        _requestVersion++;
+        _requested = false;
+    }
+
     /// <summary>Capture is always extension state. Assigning a channel cannot activate capture.</summary>
     public string StatusText => !CanEdit ? Localizer.Text("BrowserTabRoutingDisabled")
+        : _activation == "popup" ? Localizer.Text("BrowserTabActivatePopup")
+        : _activation == "browser" ? Localizer.Text("BrowserTabActivateToolbar")
+        : IsActivating ? Localizer.Text("BrowserTabActivating")
         : _error is { Length: > 0 } ? _error
         : IsPending ? Localizer.Text("BrowserTabApplying")
         : Capturing ? Localizer.Text("BrowserTabCapturing")
@@ -77,7 +137,7 @@ public sealed class BrowserTabViewModel : ViewModelBase
 
     /// <summary>Update the same row without echoing state or closing an unchanged channel picker.</summary>
     public void ApplyFromDaemon(string title, string site, string? channel, bool remember, bool capturing,
-        string? error, IReadOnlyList<ChannelChoice> channels, bool canEdit)
+        string? error, IReadOnlyList<ChannelChoice> channels, bool canEdit, string? activation = null)
     {
         _applying = true;
         try
@@ -94,6 +154,12 @@ public sealed class BrowserTabViewModel : ViewModelBase
                 foreach (ChannelChoice choice in channels) Channels.Add(choice);
             }
             Set(ref _capturing, capturing, nameof(Capturing));
+            _activation = activation;
+            // The browser has answered a request once it reports the request,
+            // capture, or an error it did not show before. A cleared error
+            // counts as not shown: the browser clears it on taking the request.
+            if (_requested && error is null) _requestError = null;
+            if (_requested && (navigated || capturing || activation is not null || error is not null && error != _requestError)) EndRequest();
             _error = error;
             SetCanEdit(canEdit);
             RaiseRoute();
@@ -103,9 +169,11 @@ public sealed class BrowserTabViewModel : ViewModelBase
 
     internal void SetCanEdit(bool value)
     {
-        if (!value) CancelPending();
+        if (!value) { EndRequest(); CancelPending(); }
         Set(ref _canEdit, value, nameof(CanEdit));
         Raise(nameof(CanRemember));
+        Raise(nameof(IsActivating));
+        Raise(nameof(CanActivate));
         Raise(nameof(StatusText));
     }
 
@@ -148,6 +216,7 @@ public sealed class BrowserTabViewModel : ViewModelBase
     private void RaiseRoute()
     {
         Raise(nameof(ChannelId)); Raise(nameof(SelectedChannel)); Raise(nameof(Remember));
-        Raise(nameof(CanRemember)); Raise(nameof(StatusText));
+        Raise(nameof(CanRemember)); Raise(nameof(Activation)); Raise(nameof(IsActivating)); Raise(nameof(CanActivate));
+        Raise(nameof(StatusText));
     }
 }

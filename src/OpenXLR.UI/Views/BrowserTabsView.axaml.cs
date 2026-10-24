@@ -12,4 +12,9 @@ public partial class BrowserTabsView : UserControl
     {
         if ((sender as Button)?.DataContext is BrowserTabViewModel tab) tab.ForgetWebsite();
     }
+
+    private void OnActivate(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Button)?.DataContext is BrowserTabViewModel tab) tab.Activate();
+    }
 }

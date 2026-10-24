@@ -24,6 +24,7 @@ done
 for rule in packaging/70-openxlr.rules packaging/5*-*.conf; do
     install -Dm644 "$rule" "/app/share/openxlr/$(basename "$rule")"
 done
+install -Dm755 packaging/flatpak/openxlr-flatpak-service /app/share/openxlr/openxlr-flatpak-service
 install -Dm644 docs/flatpak-build.md /app/share/doc/openxlr/flatpak-build.md
 if [ -f docs/flatpak.md ]; then install -Dm644 docs/flatpak.md /app/share/doc/openxlr/flatpak.md; fi
 mkdir -p /app/extensions/Plugins

@@ -69,13 +69,15 @@ public sealed partial class MainViewModel
             if (session.Length != 32 || !session.All(Uri.IsHexDigit) || id < 0 || !seen.Add((session, id))) continue;
             if (!existing.TryGetValue((session, id), out BrowserTabViewModel? tab))
             {
-                tab = new(session, id, _client.AssignBrowserTabAsync, error => Status = error);
+                tab = new(session, id, _client.AssignBrowserTabAsync, error => Status = error, _client.ActivateBrowserTabAsync);
                 BrowserTabs.Add(tab);
             }
             tab.ApplyFromDaemon(node["title"]?.GetValue<string>() ?? "", node["site"]?.GetValue<string>() ?? "",
                 node["channelId"]?.GetValue<string>(), node["remember"]?.GetValue<bool>() ?? false,
                 node["capturing"]?.GetValue<bool>() ?? false, node["error"]?.GetValue<string>(), choices,
-                supported && _preserveBrowserOutputs);
+                supported && _preserveBrowserOutputs,
+                node["activation"] is JsonValue activation && activation.TryGetValue<string>(out string? stage)
+                    && stage is "starting" or "popup" or "browser" ? stage : null);
         }
         for (int i = BrowserTabs.Count - 1; i >= 0; i--)
             if (!seen.Contains((BrowserTabs[i].Session, BrowserTabs[i].Id)))

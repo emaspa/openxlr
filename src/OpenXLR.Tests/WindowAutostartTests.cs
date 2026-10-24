@@ -194,6 +194,22 @@ public sealed class WindowAutostartTests : IDisposable
         Assert.False(Directory.Exists(AutostartDir));
     }
 
+    [Fact]
+    public void FlatpakStartupHintKeepsTheAppInTheTray()
+    {
+        string? previous = Environment.GetEnvironmentVariable("FLATPAK_ID");
+        try
+        {
+            Environment.SetEnvironmentVariable("FLATPAK_ID", FlatpakEnvironment.AppId);
+            new UiSettings { StartDaemonAtLogin = true, OpenWindowAtLogin = false }.Save();
+            var client = new DaemonClient();
+            var options = new OptionsViewModel(client, new MainViewModel(client));
+            // Its login entry runs the UI with --background, so the tray icon is there.
+            Assert.Equal("Audio will start at login with the app in the tray.", options.StartupHint);
+        }
+        finally { Environment.SetEnvironmentVariable("FLATPAK_ID", previous); }
+    }
+
     private static ComboBox BindSelector(OptionsViewModel options, string property, params string[] items)
     {
         var box = new ComboBox { DataContext = options, ItemsSource = items };

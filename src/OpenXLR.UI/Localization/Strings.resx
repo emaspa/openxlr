@@ -1907,6 +1907,12 @@ Select the interface OpenXLR drives</value>
   <data name="StartupAudioOnly" xml:space="preserve">
     <value>Audio will start at login without the app or tray icon.</value>
   </data>
+  <data name="StartupAudioService" xml:space="preserve">
+    <value>Audio runs as a user service outside the app, so these options only start the app.</value>
+  </data>
+  <data name="StartupAudioInTray" xml:space="preserve">
+    <value>Audio will start at login with the app in the tray.</value>
+  </data>
   <data name="StartupNothing" xml:space="preserve">
     <value>Neither audio nor the app will start at login.</value>
   </data>
@@ -2425,10 +2431,12 @@ Select the interface OpenXLR drives</value>
 USB controls require the host udev rule. Run outside the sandbox:
 sudo install -m 644 "$(flatpak info --show-location io.github.emaspa.openxlr)/files/share/openxlr/70-openxlr.rules" /etc/udev/rules.d/70-openxlr.rules
 sudo udevadm control --reload-rules
-Then reconnect the interface. The user WirePlumber rules take effect at the next login.
+Then reconnect the interface. OpenXLR's WirePlumber rules go in ~/.config/wireplumber/wireplumber.conf.d during the first launch's setup and take effect at the next login.
 
 The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins from Flathub's LinuxAudio extensions; host plugins and the Windows bridge are not included. See docs/flatpak.md for setup and limitations.</value></data>
   <data name="FlatpakBackgroundUnavailable" xml:space="preserve"><value>The desktop did not allow background activity. OpenXLR may stop when hidden.</value></data>
+  <data name="FlatpakSetUpButton" xml:space="preserve"><value>Set up</value></data>
+  <data name="FlatpakRulesFailed" xml:space="preserve"><value>WirePlumber setup needs attention: {0}</value></data>
   <data name="Eq" xml:space="preserve">
     <value>EQ</value>
   </data>
@@ -2757,7 +2765,7 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
     <value>Fast</value>
   </data>
   <data name="DuckingHint" xml:space="preserve">
-    <value>Ducking lowers the chosen channels in the chosen mixes while the key microphone is loud. This computer runs it on every device, the Wave XLR Pro included: the Pro ducks inside its own mix, which the jacks do not go through yet.</value>
+    <value>Ducking lowers the chosen channels in the chosen mixes while the key microphone is loud. This computer runs it, or the Wave XLR Pro on its own processor when the setup fits what the unit can do.</value>
   </data>
   <data name="DuckingNotHeld" xml:space="preserve">
     <value>The unit does not hold this setting yet; OpenXLR writes it again within a few seconds.</value>
@@ -2868,7 +2876,7 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
     <value>BROWSER TABS</value>
   </data>
   <data name="BrowserTabCaptureHint" xml:space="preserve">
-    <value>Activate audio for each tab in the browser extension. Choosing a channel here does not activate tab audio.</value>
+    <value>Press Activate to route a tab's audio, here or in the browser extension. Choosing a channel does not activate tab audio.</value>
   </data>
   <data name="BrowserTabCaptureState" xml:space="preserve">
     <value>Browser tab audio state</value>
@@ -2892,7 +2900,25 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
     <value>Tab audio active</value>
   </data>
   <data name="BrowserTabActivationRequired" xml:space="preserve">
-    <value>Activate tab audio in the browser extension.</value>
+    <value>Press Activate to route this tab's audio.</value>
+  </data>
+  <data name="BrowserTabActivate" xml:space="preserve">
+    <value>Activate</value>
+  </data>
+  <data name="BrowserTabActivateName" xml:space="preserve">
+    <value>Activate browser tab {0}</value>
+  </data>
+  <data name="BrowserTabActivateHint" xml:space="preserve">
+    <value>Bring this tab forward in the browser and start routing its audio. The browser can ask you to finish there.</value>
+  </data>
+  <data name="BrowserTabActivating" xml:space="preserve">
+    <value>Starting in the browser...</value>
+  </data>
+  <data name="BrowserTabActivatePopup" xml:space="preserve">
+    <value>Finish in the browser: press Activate this tab in the OpenXLR popup.</value>
+  </data>
+  <data name="BrowserTabActivateToolbar" xml:space="preserve">
+    <value>Finish in the browser: on this tab, click the OpenXLR icon in the toolbar or press its shortcut, then press Activate this tab.</value>
   </data>
   <data name="BrowserTabUsesDefault" xml:space="preserve">
     <value>Uses the browser default destination</value>

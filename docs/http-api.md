@@ -75,7 +75,11 @@ The required `site` must still match the tab's current canonical origin;
 a stale choice returns HTTP 400 before changing the tab or saving anything.
 A remembered choice is written before success is returned. `channel:null, remember:true`
 forgets the website default; `remember:false` keeps that default and changes
-only the tab. Companion registration and metadata publication,
+only the tab. `activateBrowserTab` with the same `session`, `tabId` and
+`site` asks the companion to bring a tab with a channel forward and start
+routing it. Success means the request reached the companion; the tab's
+`capturing`, `activation` and `error` in later states say what the browser
+did, since it may need the user to press Activate there. Companion registration and metadata publication,
 `getBrowserSession` and `syncBrowserTabs`, require an authenticated WebSocket
 because its lifetime owns the runtime tabs. They are refused over HTTP.
 

@@ -522,6 +522,7 @@ struct Vst3 {
   IPlugView *view = nullptr;
   Timer timers[MAX_TIMERS];
   Fd fds[MAX_FDS];
+  bool stopping_run_loop = false;
   std::atomic<bool> restart_requested{false}, values_changed{false};
   // The plugin's latency, read at activation and again only after the
   // plugin signals kLatencyChanged, so the tick never asks it in between.
@@ -634,6 +635,44 @@ tresult PLUGIN_API ComponentHandler::performEdit(ParamID id,
 
 // --- the run loop -------------------------------------------------------------
 
+void destroy_source(Vst3 *v, struct spa_source *source) {
+  // Older SPA headers expand a signed version check that warns inside a
+  // template instantiation. Keep their macro in an ordinary function.
+  pw_loop_destroy_source(host_loop(v->h), source);
+}
+
+template <typename Watch>
+void remove_watch(Vst3 *v, Watch &watch) {
+  auto *source = watch.source;
+  auto *handler = watch.handler;
+  // Releasing a plugin object can call back into the run loop. Detach the
+  // record first so it cannot remove this source or handler a second time.
+  watch = {};
+  destroy_source(v, source);
+  handler->release();
+}
+
+void clear_watches(Vst3 *v) {
+  for (Timer &t : v->timers)
+    if (t.source)
+      remove_watch(v, t);
+  for (Fd &f : v->fds)
+    if (f.source)
+      remove_watch(v, f);
+}
+
+void release_view(Vst3 *v) {
+  bool stopping = v->stopping_run_loop;
+  v->stopping_run_loop = true;
+  v->view->setFrame(nullptr);
+  // Run-loop handlers may be members of the view, even when addRef does
+  // not extend their lifetime. Remove them before releasing that view.
+  clear_watches(v);
+  v->view->release();
+  v->view = nullptr;
+  v->stopping_run_loop = stopping;
+}
+
 void fire_timer(void *p) {
   auto *t = static_cast<Timer *>(p);
   t->handler->onTimer();
@@ -660,6 +699,8 @@ tresult PLUGIN_API PlugFrame::registerEventHandler(Linux::IEventHandler *handler
                                                    Linux::FileDescriptor fd) {
   if (!handler)
     return kInvalidArgument;
+  if (v_->stopping_run_loop)
+    return kResultFalse;
   for (Fd &f : v_->fds) {
     if (f.source)
       continue;
@@ -668,8 +709,10 @@ tresult PLUGIN_API PlugFrame::registerEventHandler(Linux::IEventHandler *handler
     f.fd = fd;
     f.source = pw_loop_add_io(host_loop(v_->h), fd, SPA_IO_IN | SPA_IO_ERR,
                               false, fd_ready, &f);
-    if (!f.source)
+    if (!f.source) {
+      f = {};
       return kResultFalse;
+    }
     handler->addRef();
     return kResultOk;
   }
@@ -680,10 +723,7 @@ tresult PLUGIN_API PlugFrame::unregisterEventHandler(
     Linux::IEventHandler *handler) {
   for (Fd &f : v_->fds)
     if (f.source && f.handler == handler) {
-      pw_loop_destroy_source(host_loop(v_->h), f.source);
-      f.source = nullptr;
-      f.handler->release();
-      f.handler = nullptr;
+      remove_watch(v_, f);
       return kResultOk;
     }
   return kResultFalse;
@@ -693,14 +733,18 @@ tresult PLUGIN_API PlugFrame::registerTimer(Linux::ITimerHandler *handler,
                                             Linux::TimerInterval milliseconds) {
   if (!handler)
     return kInvalidArgument;
+  if (v_->stopping_run_loop)
+    return kResultFalse;
   for (Timer &t : v_->timers) {
     if (t.source)
       continue;
     t.v = v_;
     t.handler = handler;
     t.source = pw_loop_add_timer(host_loop(v_->h), timer_fired, &t);
-    if (!t.source)
+    if (!t.source) {
+      t = {};
       return kResultFalse;
+    }
     if (milliseconds == 0)
       milliseconds = 1;
     struct timespec interval = {(time_t)(milliseconds / 1000),
@@ -716,10 +760,7 @@ tresult PLUGIN_API PlugFrame::registerTimer(Linux::ITimerHandler *handler,
 tresult PLUGIN_API PlugFrame::unregisterTimer(Linux::ITimerHandler *handler) {
   for (Timer &t : v_->timers)
     if (t.source && t.handler == handler) {
-      pw_loop_destroy_source(host_loop(v_->h), t.source);
-      t.source = nullptr;
-      t.handler->release();
-      t.handler = nullptr;
+      remove_watch(v_, t);
       return kResultOk;
     }
   return kResultFalse;
@@ -1116,17 +1157,12 @@ void vst3_deactivate(Host *h) {
 
 void vst3_unload(Host *h) {
   Vst3 *v = of(h);
-  for (Timer &t : v->timers)
-    if (t.source) {
-      pw_loop_destroy_source(host_loop(h), t.source);
-      t.handler->release();
-    }
-  for (Fd &f : v->fds)
-    if (f.source) {
-      pw_loop_destroy_source(host_loop(h), f.source);
-      f.handler->release();
-    }
+  v->stopping_run_loop = true;
+  // A component may unregister its watches while terminating. Keep the run
+  // loop and frame alive until that finishes, then collect what remains
+  // while the module that implements the handlers is still loaded.
   release_plugin(v);
+  clear_watches(v);
   delete v->frame;
   for (Record *r : v->records)
     delete r;
@@ -1248,9 +1284,7 @@ bool vst3_editor_open(Host *h) {
     host_resize_editor(h, (unsigned)rect.getWidth(), (unsigned)rect.getHeight());
   if (v->view->attached((void *)(uintptr_t)host_window(h),
                         kPlatformTypeX11EmbedWindowID) != kResultOk) {
-    v->view->setFrame(nullptr);
-    v->view->release();
-    v->view = nullptr;
+    release_view(v);
     return false;
   }
   host_set_editor_resizable(h, v->view->canResize() == kResultTrue);
@@ -1268,9 +1302,7 @@ void vst3_editor_close(Host *h) {
   if (!v->view)
     return;
   v->view->removed();
-  v->view->setFrame(nullptr);
-  v->view->release();
-  v->view = nullptr;
+  release_view(v);
 }
 
 void vst3_editor_lost(Host *h) {

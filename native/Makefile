@@ -59,8 +59,8 @@ tests/gain.lv2/gain.so: tests/gain.lv2/gain.c
 tests/vst3.o: tests/vst3.cpp vst3.cpp $(HEADERS)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
-tests/host.o: host.c $(HEADERS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -Dmain=host_program_main -c $< -o $@
+tests/host.o: tests/vst3-host.c host.c $(HEADERS)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
 tests/vst3: tests/vst3.o tests/host.o lv2.o clap.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)

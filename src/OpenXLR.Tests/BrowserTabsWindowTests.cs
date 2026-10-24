@@ -66,7 +66,8 @@ internal static class BrowserTabsWindowTests
 
             BrowserTabViewModelTests.Report(model, true, new JsonArray(
                 BrowserTabViewModelTests.Tab(title: "A long browser tab title with a video, a playlist and more details that must remain within the row", channel: "music", remember: true, capturing: true),
-                BrowserTabViewModelTests.Tab(id: 8, title: "", channel: null)));
+                BrowserTabViewModelTests.Tab(id: 8, title: "", channel: null),
+                BrowserTabViewModelTests.Tab(id: 9, title: "A call waiting for its audio", channel: "chat")));
             Layout(main, 640, 1000);
 
             // Beside Manage, worn the same way, and nothing of the tab list left inline.
@@ -147,7 +148,8 @@ internal static class BrowserTabsWindowTests
             Assert.False(button.IsVisible);
             BrowserTabViewModelTests.Report(model, true, new JsonArray(
                 BrowserTabViewModelTests.Tab(title: "A long browser tab title with a video, a playlist and more details that must remain within the row", channel: "music", remember: true, capturing: true),
-                BrowserTabViewModelTests.Tab(id: 8, title: "", channel: null)));
+                BrowserTabViewModelTests.Tab(id: 8, title: "", channel: null),
+                BrowserTabViewModelTests.Tab(id: 9, title: "A call waiting for its audio", channel: "chat")));
 
             // A skin can give the window's content a narrow column. Controls wrap below the tab name.
             column.Show();
@@ -206,15 +208,30 @@ internal static class BrowserTabsWindowTests
     private static void CheckRows(Window window, BrowserTabsView view)
     {
         Border[] rows = [.. view.GetVisualDescendants().OfType<Border>().Where(b => b.Name == "BrowserTabRow")];
-        Assert.Equal(2, rows.Length);
+        Assert.Equal(3, rows.Length);
         AssertNoOverlap(rows);
         foreach (Border row in rows)
         {
             AssertInside(row, window);
-            Control[] controls = [.. row.GetVisualDescendants().OfType<Control>().Where(c => c.Name is
-                "BrowserTabTitle" or "BrowserTabSite" or "BrowserTabChannel" or "BrowserTabRemember" or "BrowserTabForgetWebsite" or "BrowserTabStatus")];
-            Assert.Equal(6, controls.Length);
+            var tab = (BrowserTabViewModel)row.DataContext!;
+            // Activate shows only on the row it can start: a channel, not routed yet.
+            Button activate = row.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "BrowserTabActivate");
+            Assert.Equal(tab.Id == 9, activate.IsEffectivelyVisible);
+            Assert.Equal(tab.CanActivate, activate.IsEffectivelyVisible);
+            Control[] controls = [.. row.GetVisualDescendants().OfType<Control>().Where(c => c.IsEffectivelyVisible && c.Name is
+                "BrowserTabTitle" or "BrowserTabSite" or "BrowserTabChannel" or "BrowserTabRemember" or "BrowserTabForgetWebsite"
+                    or "BrowserTabActivate" or "BrowserTabStatus")];
+            Assert.Equal(tab.CanActivate ? 7 : 6, controls.Length);
             AssertNoOverlap(controls);
+            if (tab.CanActivate)
+            {
+                // Worn like the button beside it.
+                var forget = (Button)controls.Single(c => c.Name == "BrowserTabForgetWebsite");
+                Assert.Equal(forget.Padding, activate.Padding);
+                Assert.Equal(forget.FontSize, activate.FontSize);
+                Assert.Equal(forget.Background, activate.Background);
+                Assert.Equal(Localizer.Text("BrowserTabActivationRequired"), tab.StatusText);
+            }
             foreach (Control control in controls) AssertInside(control, row);
             ComboBox picker = controls.OfType<ComboBox>().Single();
             Assert.True(picker.Bounds.Width >= 180);

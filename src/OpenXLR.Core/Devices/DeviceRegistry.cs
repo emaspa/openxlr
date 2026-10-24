@@ -10,11 +10,10 @@ namespace OpenXLR.Core.Devices;
 ///
 /// The order of the table is also the daemon's preference when several
 /// supported interfaces are attached and none is chosen: <see cref="DetectAll"/>
-/// lists them in this order, so an interface verified on hardware comes before
-/// one that is not. The Wave:3 backend is coded from public research with one
-/// user's quick test behind it, and the Wave:1 reuses it with no test at all,
-/// so they come last, in that order, and drive the mixer only when nothing
-/// verified is on the bus or the user picks them.
+/// lists them in this order. The XLR interfaces come first: a Wave:3 or
+/// Wave:1 beside one is usually a second microphone, so the USB microphones
+/// come last, in that order, and drive the mixer only when no interface is on
+/// the bus or the user picks them.
 /// </summary>
 public static class DeviceRegistry
 {
@@ -27,8 +26,8 @@ public static class DeviceRegistry
         (new Key(XlrDockDevice.VendorId, XlrDockDevice.ProductId), () => new XlrDockDevice()),
         (new Key(WaveXlrMk2Device.VendorId, WaveXlrMk2Device.ProductId), () => new WaveXlrMk2Device()),
         (new Key(XlrDockMk2Device.VendorId, XlrDockMk2Device.ProductId), () => new XlrDockMk2Device()),
-        (new Key(Wave3Device.VendorId, Wave3Device.ProductId), () => new Wave3Device()),   // beta, one quick test on a user's unit
-        (new Key(Wave1Device.VendorId, Wave1Device.ProductId), () => new Wave1Device()),   // last: the Wave:3's block, never run on a Wave:1
+        (new Key(Wave3Device.VendorId, Wave3Device.ProductId), () => new Wave3Device()),   // after the XLR interfaces
+        (new Key(Wave1Device.VendorId, Wave1Device.ProductId), () => new Wave1Device()),   // last: the Wave:3's backend under the Wave:1's id
         // Add more brands/models here, e.g.:
         // (new Key(0x1220, 0x8fe0), () => new GoXlrDevice()),
     ];

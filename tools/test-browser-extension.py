@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""The Chrome Web Store package of the browser companion, built into a temporary directory."""
+"""The browser companion's Store zip and release tar.gz, built into a temporary directory."""
 import contextlib
 import importlib.util
 import io
 import json
 from pathlib import Path
+import tarfile
 import tempfile
 import unittest
 from unittest import mock
@@ -98,6 +99,57 @@ class BrowserExtensionTests(unittest.TestCase):
         self.assertTrue({"routing.mjs", "devices.html"} <= package.references("popup.mjs", popup))
         self.assertEqual({"style.css", "popup.mjs"},
                          package.references("popup.html", (REPO / "browser/chromium/popup.html").read_text()))
+
+    def unpacked(self):
+        path = package.build_unpacked(self.root / "out")
+        with tarfile.open(path) as archive:
+            members = archive.getmembers()
+            files = {m.name: archive.extractfile(m).read() for m in members if m.isfile()}
+        return path, members, files
+
+    def test_the_release_archive_is_the_extension_with_its_key_under_one_directory(self):
+        path, members, files = self.unpacked()
+        source = json.loads((REPO / "browser/chromium/manifest.json").read_text())
+        top = f"openxlr-browser-{source['version']}"
+        self.assertEqual(f"{top}.tar.gz", path.name)
+        self.assertEqual({top}, {m.name.split("/")[0] for m in members})
+        self.assertEqual(sorted(f"{top}/{n}" for n in package.source_files()), sorted(files))
+        for name in package.source_files():
+            self.assertEqual((REPO / "browser/chromium" / name).read_bytes(), files[f"{top}/{name}"])
+        manifest = json.loads(files[f"{top}/manifest.json"])
+        self.assertEqual(package.EXTENSION_ID, package.extension_id(package.base64.b64decode(manifest["key"])))
+        self.assertTrue(all(m.uid == 0 and m.gid == 0 and m.mtime == package.STAMP_SECONDS for m in members))
+        self.assertEqual([], package.validate_unpacked(path))
+
+    def test_two_release_archives_are_identical(self):
+        first = package.build_unpacked(self.root / "a").read_bytes()
+        self.assertEqual(first, package.build_unpacked(self.root / "b").read_bytes())
+
+    def test_release_archive_validation_names_a_missing_key_and_a_second_directory(self):
+        manifest = json.loads((REPO / "browser/chromium/manifest.json").read_text())
+        del manifest["key"]
+        top = f"openxlr-browser-{manifest['version']}"
+
+        def write(path, names):
+            with tarfile.open(path, "w:gz") as archive:
+                for name, data in names.items():
+                    info = tarfile.TarInfo(name)
+                    info.size, info.mtime = len(data), package.STAMP_SECONDS
+                    archive.addfile(info, io.BytesIO(data))
+            return path
+
+        keyless = write(self.root / "keyless.tar.gz", {f"{top}/manifest.json": json.dumps(manifest).encode()})
+        problems = package.validate_unpacked(keyless)
+        self.assertIn(f"the manifest key must give id {package.EXTENSION_ID}, the one the native host allows", problems)
+        self.assertIn("worker.mjs is referenced but not in the zip", problems)
+        loose = write(self.root / "loose.tar.gz", {f"{top}/manifest.json": b"{}", "manifest.json": b"{}"})
+        self.assertEqual([f"the files must sit under one directory, not manifest.json, {top}"], package.validate_unpacked(loose))
+
+    def test_the_release_archive_never_takes_the_private_key(self):
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as refused:
+            package.main([str(self.root / "out"), "--unpacked", "--key-pem", str(self.root / "key.pem")])
+        self.assertEqual(2, refused.exception.code)
+        self.assertFalse((self.root / "out").exists())
 
     def test_check_passes_on_the_tree(self):
         with contextlib.redirect_stdout(io.StringIO()) as output:

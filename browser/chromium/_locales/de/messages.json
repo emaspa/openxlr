@@ -50,6 +50,15 @@
   "popupHelp": {
     "message": "Kanäle hier oder in OpenXLR wählen. Jeden Tab zuerst im Browser aktivieren. Nach dem Beenden spielt der Browser wieder normal ab."
   },
+  "popupRequested": {
+    "message": "OpenXLR möchte diesen Tab zuordnen. Zum Starten Diesen Tab aktivieren drücken."
+  },
+  "popupInvokeShortcut": {
+    "message": "Der Browser startet Tab-Audio erst, wenn OpenXLR in diesem Tab selbst geöffnet wurde. Auf das OpenXLR-Symbol in der Symbolleiste klicken oder $1 drücken, dann Diesen Tab aktivieren drücken."
+  },
+  "popupInvokeNoShortcut": {
+    "message": "Der Browser startet Tab-Audio erst, wenn OpenXLR in diesem Tab selbst geöffnet wurde. Auf das OpenXLR-Symbol in der Symbolleiste klicken, dann Diesen Tab aktivieren drücken. Es ist kein Tastenkürzel festgelegt; eines lässt sich auf der Seite für Tastenkürzel von Erweiterungen im Browser wählen."
+  },
   "statusDisconnected": {
     "message": "OpenXLR ist nicht verbunden."
   },

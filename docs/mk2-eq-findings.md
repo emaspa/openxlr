@@ -496,7 +496,7 @@ stored +3.25 dB shelf at 227 Hz and -3 dB bell at 860 Hz did nothing.
 - On firmware 1.0.15 the MK.2 family has a hardware equalizer, and
   OpenXLR drives it: the layout is known, a write applies at once, and the
   dock's filters match OpenXLR's software EQ for the same values. The
-  daemon's own writes have not been run on either MK.2 unit yet. A microphone
+  daemon's own writes were tested on hardware and work. A microphone
   that carries such a unit's input runs its EQ there, and the unit's
   `hardwareEq` capability is true; see
   [where the EQ runs](api.md#where-the-eq-runs).
@@ -512,8 +512,7 @@ stored +3.25 dB shelf at 227 Hz and -3 dB bell at 860 Hz did nothing.
   `0x0203` on 1.0.15. OpenXLR's dock backend tries `0x0103` first and
   `0x0203` when a block stalls or answers short. On the updated dock
   `0x0103` stalls and `0x0203` answers every block, as that fallback
-  expects; the daemon itself has not been run against this dock since its
-  update.
+  expects, and the daemon drives the updated dock.
 - The Wave XLR Pro runs its equalizer on the device too, in this layout
   once per input: Wave Link 3.5 was captured writing it on firmware 1.0.14
   on 2026-10-21, XLR 1's struct at block offset 0 and XLR 2's at 38, with

@@ -50,6 +50,15 @@
   "popupHelp": {
     "message": "Elige los canales aquí o en OpenXLR. Primero activa cada pestaña en el navegador. Al detenerlo, el navegador vuelve a reproducir con normalidad."
   },
+  "popupRequested": {
+    "message": "OpenXLR ha pedido enrutar esta pestaña. Pulsa Activar esta pestaña para empezar."
+  },
+  "popupInvokeShortcut": {
+    "message": "El navegador solo inicia el audio de la pestaña después de que abras OpenXLR tú mismo en esta pestaña. Haz clic en el icono de OpenXLR de la barra de herramientas o pulsa $1, y luego pulsa Activar esta pestaña."
+  },
+  "popupInvokeNoShortcut": {
+    "message": "El navegador solo inicia el audio de la pestaña después de que abras OpenXLR tú mismo en esta pestaña. Haz clic en el icono de OpenXLR de la barra de herramientas y luego pulsa Activar esta pestaña. No hay ningún atajo de teclado asignado; puedes elegir uno en la página de atajos de extensiones del navegador."
+  },
   "statusDisconnected": {
     "message": "OpenXLR no está conectado."
   },

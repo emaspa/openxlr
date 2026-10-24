@@ -50,6 +50,15 @@
   "popupHelp": {
     "message": "Choose channels here or in OpenXLR. Activate each tab in the browser first. Stopping restores normal browser playback."
   },
+  "popupRequested": {
+    "message": "OpenXLR asked to route this tab. Press Activate this tab to start."
+  },
+  "popupInvokeShortcut": {
+    "message": "The browser starts tab audio only after you open OpenXLR on this tab yourself. Click the OpenXLR icon in the toolbar or press $1, then press Activate this tab."
+  },
+  "popupInvokeNoShortcut": {
+    "message": "The browser starts tab audio only after you open OpenXLR on this tab yourself. Click the OpenXLR icon in the toolbar, then press Activate this tab. No keyboard shortcut is set; you can choose one on the browser's extension shortcuts page."
+  },
   "statusDisconnected": {
     "message": "OpenXLR is not connected."
   },

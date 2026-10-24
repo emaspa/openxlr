@@ -98,6 +98,29 @@ def cmd_setbit(h, blk, off, bit, on):
           f"{old:#04x} -> {back[off]:#04x}")
 
 
+def cmd_commit(h):
+    # Block 0x0003 is write-only and stalls on a read, so setbyte cannot
+    # reach it. Wave Link sends this twelve-byte payload after a config write;
+    # without it the firmware rolls output selector and path writes back.
+    commit = bytearray(BLOCKS[0x0003])
+    commit[0] = 0x04
+    vwrite(h, 0x0003, commit)
+    print(f"block 0x0003 commit: {hexdump(commit)}")
+
+
+def cmd_write(h, blk, text):
+    # Writes a whole block from a hex dump, as `read` prints it, to restore a
+    # saved state byte for byte.
+    data = bytes.fromhex(text)
+    if len(data) != BLOCKS[blk]:
+        sys.exit(f"block {blk:#06x} is {BLOCKS[blk]} bytes, got {len(data)}")
+    vwrite(h, blk, data)
+    back = vread(h, blk, BLOCKS[blk])
+    diff = [i for i in range(len(data)) if back[i] != data[i]]
+    print(f"block {blk:#06x} written, readback "
+          f"{'identical' if not diff else 'differs at ' + ', '.join(map(str, diff))}")
+
+
 if __name__ == "__main__":
     h = _open()
     a = sys.argv[1:]
@@ -109,6 +132,11 @@ if __name__ == "__main__":
         cmd_setbyte(h, int(a[1], 0), int(a[2]), int(a[3], 0))
     elif a[0] == "setbit":
         cmd_setbit(h, int(a[1], 0), int(a[2]), int(a[3]), int(a[4]))
+    elif a[0] == "commit":
+        cmd_commit(h)
+    elif a[0] == "write":
+        cmd_write(h, int(a[1], 0), ''.join(a[2:]))
     else:
-        print("usage: dump | read BLK | setbyte BLK OFF VAL | setbit BLK OFF BIT ON")
+        print("usage: dump | read BLK | setbyte BLK OFF VAL | setbit BLK OFF BIT ON"
+              " | commit | write BLK HEX")
     _lib.libusb_close(h)

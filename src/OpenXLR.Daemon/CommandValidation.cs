@@ -196,6 +196,9 @@ public static class CommandValidation
                 if (BrowserTabRouting.CanonicalSite(cmd.Site) is null) return "assignBrowserTab: supply the tab's HTTP or HTTPS origin";
                 if (cmd.Channel is not null && !layout.HasApplicationChannel(cmd.Channel)) return "assignBrowserTab: select an application channel or browser default";
                 return cmd.Remember.ValueKind is JsonValueKind.True or JsonValueKind.False ? null : "assignBrowserTab: remember must be a boolean";
+            case "activateBrowserTab":
+                if (!BrowserTabRouting.ValidSession(cmd.Session) || cmd.TabId is not >= 0) return "activateBrowserTab: supply a browser session and tabId";
+                return BrowserTabRouting.CanonicalSite(cmd.Site) is null ? "activateBrowserTab: supply the tab's HTTP or HTTPS origin" : null;
             case "getBrowserSession":
                 return null;
             case "syncBrowserTabs":
@@ -222,6 +225,8 @@ public static class CommandValidation
                 return null;   // no arguments; toggle the current state under the mixer lock
             case "resetDevice":
                 return null;   // no arguments; the device manager checks the device
+            case "restartDaemon":
+                return null;   // no arguments
             case "setMonitorFeed":
                 if (TooLong(cmd.Device, MaxText)) return "setMonitorFeed: device name too long";
                 if (cmd.Mix is null || !layout.IsMonitorFeed(cmd.Mix)) return $"setMonitorFeed: '{Short(cmd.Mix ?? "")}' is not a mix or a sum of distinct mixes";

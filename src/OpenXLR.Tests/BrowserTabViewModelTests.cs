@@ -16,22 +16,29 @@ public sealed class BrowserTabViewModelTests
     private sealed class Recorder
     {
         internal readonly List<(string Session, int Id, string Site, string? Channel, bool Remember, TaskCompletionSource<string?> Reply)> Sent = [];
+        internal readonly List<(string Session, int Id, string Site, TaskCompletionSource<string?> Reply)> Activations = [];
         internal readonly List<string> Errors = [];
         internal BrowserTabViewModel Model { get; }
-        internal Recorder()
+        internal Recorder(TimeSpan? activationTimeout = null)
         {
             Model = new(Session, 7, (session, id, site, channel, remember) =>
             {
                 var reply = new TaskCompletionSource<string?>();
                 Sent.Add((session, id, site, channel, remember, reply));
                 return reply.Task;
-            }, Errors.Add);
+            }, Errors.Add, (session, id, site) =>
+            {
+                var reply = new TaskCompletionSource<string?>();
+                Activations.Add((session, id, site, reply));
+                return reply.Task;
+            }, activationTimeout ?? TimeSpan.FromMinutes(5));
             Apply();
         }
 
         internal void Apply(string? channel = null, bool remember = false, bool capturing = false, string? error = null,
-            string title = "A browser tab", string site = "https://example.com", bool canEdit = true, ChannelChoice[]? choices = null)
-            => Model.ApplyFromDaemon(title, site, channel, remember, capturing, error, choices ?? Choices, canEdit);
+            string title = "A browser tab", string site = "https://example.com", bool canEdit = true, ChannelChoice[]? choices = null,
+            string? activation = null)
+            => Model.ApplyFromDaemon(title, site, channel, remember, capturing, error, choices ?? Choices, canEdit, activation);
     }
 
     [Fact]
@@ -286,6 +293,134 @@ public sealed class BrowserTabViewModelTests
     }
 
     [Fact]
+    public void ActivateIsOfferedOnlyWhenItCanStartSomething()
+    {
+        var f = new Recorder();
+        Assert.False(f.Model.CanActivate);
+        f.Apply("music");
+        Assert.True(f.Model.CanActivate);
+        f.Apply("music", capturing: true);
+        Assert.False(f.Model.CanActivate);
+        f.Apply("music", canEdit: false);
+        Assert.False(f.Model.CanActivate);
+        f.Model.Activate();
+        Assert.Empty(f.Activations);
+        f.Apply("music", activation: "popup");
+        Assert.False(f.Model.CanActivate);
+        f.Apply("music");
+        f.Model.SelectedChannel = f.Model.Channels[2];
+        Assert.True(f.Model.IsPending);
+        Assert.False(f.Model.CanActivate);
+        // Without a daemon command to call, as in a view built for layout, there is nothing to offer.
+        var bare = new BrowserTabViewModel(Session, 7, (_, _, _, _, _) => Task.FromResult<string?>(null), _ => { });
+        bare.ApplyFromDaemon("Tab", "https://example.com", "music", false, false, null, Choices, true);
+        Assert.False(bare.CanActivate);
+    }
+
+    [Fact]
+    public async Task ActivateWaitsForTheBrowserAndFollowsTheStagesItReports()
+    {
+        var f = new Recorder();
+        f.Apply("music");
+        f.Model.Activate();
+        var sent = Assert.Single(f.Activations);
+        Assert.Equal((Session, 7, "https://example.com"), (sent.Session, sent.Id, sent.Site));
+        Assert.True(f.Model.IsActivating);
+        Assert.False(f.Model.CanActivate);
+        Assert.Equal(Localizer.Text("BrowserTabActivating"), f.Model.StatusText);
+        f.Model.Activate();
+        Assert.Single(f.Activations);
+        sent.Reply.SetResult(null);
+        await Task.Yield();
+        // Delivered is not started: the row waits for the browser's own report.
+        Assert.True(f.Model.IsActivating);
+        f.Apply("music", activation: "starting");
+        Assert.Equal(Localizer.Text("BrowserTabActivating"), f.Model.StatusText);
+        f.Apply("music", activation: "popup");
+        Assert.Equal(Localizer.Text("BrowserTabActivatePopup"), f.Model.StatusText);
+        f.Apply("music", activation: "browser");
+        Assert.Equal(Localizer.Text("BrowserTabActivateToolbar"), f.Model.StatusText);
+        Assert.False(f.Model.Capturing);
+        f.Apply("music", capturing: true);
+        Assert.False(f.Model.IsActivating);
+        Assert.Equal(Localizer.Text("BrowserTabCapturing"), f.Model.StatusText);
+        Assert.Empty(f.Errors);
+    }
+
+    [Fact]
+    public async Task ARefusedRequestEndsWithTheDaemonsError()
+    {
+        var f = new Recorder();
+        f.Apply("music");
+        f.Model.Activate();
+        f.Activations[0].Reply.SetResult("activateBrowserTab: the browser companion is not connected");
+        await Until(() => !f.Model.IsActivating);
+        Assert.Equal("activateBrowserTab: the browser companion is not connected", f.Model.StatusText);
+        Assert.Equal(["activateBrowserTab: the browser companion is not connected"], f.Errors);
+        Assert.True(f.Model.CanActivate);
+    }
+
+    [Fact]
+    public void ANewBrowserErrorEndsTheRequestAndAnOldOneDoesNot()
+    {
+        var f = new Recorder();
+        f.Apply("music", error: "Permission denied");
+        f.Model.Activate();
+        f.Apply("music", error: "Permission denied");
+        Assert.True(f.Model.IsActivating);
+        f.Apply("music", error: "The selected OpenXLR output is unavailable.");
+        Assert.False(f.Model.IsActivating);
+        Assert.Equal("The selected OpenXLR output is unavailable.", f.Model.StatusText);
+        // The browser clears the old error when it takes a request, so the same error coming back is new.
+        f.Model.Activate();
+        f.Apply("music");
+        Assert.True(f.Model.IsActivating);
+        f.Apply("music", error: "The selected OpenXLR output is unavailable.");
+        Assert.False(f.Model.IsActivating);
+    }
+
+    [Fact]
+    public async Task ARequestTheBrowserNeverAnswersExpiresAndALateRefusalIsIgnored()
+    {
+        var f = new Recorder(TimeSpan.FromMilliseconds(50));
+        f.Apply("music");
+        f.Model.Activate();
+        await Until(() => !f.Model.IsActivating);
+        Assert.Equal(Localizer.Text("BrowserTabActivationRequired"), f.Model.StatusText);
+        Assert.True(f.Model.CanActivate);
+        f.Activations[0].Reply.SetResult("late refusal");
+        await Task.Yield();
+        Assert.Empty(f.Errors);
+        Assert.Equal(Localizer.Text("BrowserTabActivationRequired"), f.Model.StatusText);
+    }
+
+    [Fact]
+    public void NavigationOrDisablingRoutingEndsTheRequest()
+    {
+        var f = new Recorder();
+        f.Apply("music");
+        f.Model.Activate();
+        f.Apply("music", site: "https://another.example.com");
+        Assert.False(f.Model.IsActivating);
+        f.Model.Activate();
+        Assert.True(f.Model.IsActivating);
+        f.Model.SetCanEdit(false);
+        Assert.False(f.Model.IsActivating);
+        Assert.Equal(Localizer.Text("BrowserTabRoutingDisabled"), f.Model.StatusText);
+    }
+
+    [Fact]
+    public void TabRowsReadOnlyTheActivationStagesTheBrowserCanReport()
+    {
+        var model = new MainViewModel(new DaemonClient("ws://127.0.0.1:1/ws"));
+        Report(model, true, new JsonArray(Tab(channel: "music", activation: "popup"), Tab(id: 8, channel: "music", activation: "capturing")));
+        Assert.Equal("popup", model.BrowserTabs[0].Activation);
+        Assert.Equal(Localizer.Text("BrowserTabActivatePopup"), model.BrowserTabs[0].StatusText);
+        Assert.Null(model.BrowserTabs[1].Activation);
+        Assert.True(model.BrowserTabs[1].CanActivate);
+    }
+
+    [Fact]
     public void TabRowsUseSessionAndIdAndDisappearForLegacyStateOrDisconnect()
     {
         var model = new MainViewModel(new DaemonClient("ws://127.0.0.1:1/ws"));
@@ -372,11 +507,16 @@ public sealed class BrowserTabViewModelTests
     }
 
     internal static JsonObject Tab(string session = Session, int id = 7, string title = "A browser tab", string? channel = null,
-        bool remember = false, bool capturing = false) => new()
+        bool remember = false, bool capturing = false, string? activation = null)
     {
-        ["session"] = session, ["id"] = id, ["title"] = title, ["site"] = "https://example.com",
-        ["channelId"] = channel, ["remember"] = remember, ["capturing"] = capturing,
-    };
+        var tab = new JsonObject
+        {
+            ["session"] = session, ["id"] = id, ["title"] = title, ["site"] = "https://example.com",
+            ["channelId"] = channel, ["remember"] = remember, ["capturing"] = capturing,
+        };
+        if (activation is not null) tab["activation"] = activation;
+        return tab;
+    }
 
     internal static void Report(MainViewModel model, bool preserve, JsonArray tabs)
     {

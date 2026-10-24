@@ -145,7 +145,6 @@ def sandbox():
     os.environ['XDG_STATE_HOME'] = str(runtime / 'flatpak/state')
     config = Path(os.environ['XDG_CONFIG_HOME'], 'openxlr')
     config.mkdir(parents=True, exist_ok=True)
-    (config / 'ui.json').write_text(json.dumps({'minimizeToTray': True}))
     (config / 'daemon.json').write_text('{"submixer":true}')
     (config / 'mixer.json').write_text(json.dumps({'inputBindings': {'xlr1': {'source': 'acceptance_mic', 'pair': 0, 'monoChannel': 0}}}))
     (config / 'flatpak-notice').write_text('1\n')

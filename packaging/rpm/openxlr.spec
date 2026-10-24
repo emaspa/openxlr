@@ -5,7 +5,7 @@
 %global _build_id_links none
 
 Name:           openxlr
-Version: 0.2.0
+Version: 0.2.3
 Release:        1%{?dist}
 Summary:        Linux Wave Link replacement for Elgato XLR interfaces and Wave microphones
 License:        GPL-3.0-only
@@ -195,6 +195,27 @@ MSG
 %{_datadir}/openxlr/
 
 %changelog
+* Sat Oct 24 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.2.3-1
+- Devices: the Wave XLR keeps its ALSA mute and headphone controls in step with the unit, and its capture volume at the unit's gain, as the Wave:3 does; a missing amixer no longer stops polling.
+- UI: Restart daemon recovers a service stopped by systemd's start limit, and the software mixer switch restarts in the background.
+- Plugins: VST3 editors and timers are torn down without a use-after-free; a failed host keeps its last nonblank error line.
+- Diagnostics: the export adds audio journals, pw-top, client lists and a merged graph dump; copies are bounded and special files refused.
+- Browser: a failed output lookup stops only the tabs it affects, and a damaged saved output choice is reset.
+- Flatpak: SteamOS and Bazzite, a user service for audio in Game Mode, and the restartDaemon command.
+
+* Fri Oct 23 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.2.2-1
+- Ducking: the Wave XLR Pro now ducks the headphone jacks and Line Out on its own processor when the setup fits, keyed by XLR 1; the daemon writes both bits of a ducked pair's field, which the unit needs.
+- UI: a mix matrix row shows the input's gain under its Mic button, and the volume while the volume fader moves.
+- Docs: the Pro's five mix sections mapped in the protocol notes; a shorter readme with limitations and plans; the Wave:3 and Wave:1 out of beta; the EQ on the unit verified on the Pro and the MK.2 family; no Flathub release.
+- Tools: the Pro probe can commit and write a whole block.
+
+* Fri Oct 23 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.2.1-1
+- Browser: Chromium tabs routed to separate OpenXLR channels through an optional browser companion, with a Browser tabs window, website defaults and Activate from the UI; the packages install its native messaging host.
+- Monitor: an output can hear several mixes, every monitor mix can be renamed, reordered or deleted, and monitor mutes reach the physical outputs.
+- Mixer: an option pauses microphone sends with monitoring; hardware outputs are named without their ALSA profile; pending settings survive unchanged renames.
+- UI: Italian, Tagalog, Bisaya and Serbian translations; a quieter Broadcast and Wave matrix; Ko-fi in About.
+- Fixes: CLAP plugins that unregister host sources while closing no longer crash the host; diagnostics keep pw-dump.json valid; desktop keys survive a refused portal app ID.
+
 * Wed Oct 21 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.2.0-1
 - EQ: a four-band microphone EQ on XLR 1, XLR 2 and mono capture inputs, in software or on the Wave XLR Pro and MK.2 units, with an editor and a switch for where it runs.
 - Ducking: a key microphone lowers chosen channels in chosen mixes while it is loud, in software on every device, set up in the Ducking window, the terminal mixer and a Stream Deck key.

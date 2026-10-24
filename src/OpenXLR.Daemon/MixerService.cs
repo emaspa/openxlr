@@ -769,6 +769,24 @@ public sealed class MixerService : IHostedService, IDisposable
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return ex.Message; }
     }
 
+    /// <summary>
+    /// Whether activateBrowserTab may be passed to the tab's companion. It
+    /// changes nothing here: the browser reports what it does in its tab list.
+    /// </summary>
+    public string? CheckBrowserActivation(Command cmd)
+    {
+        // Like syncBrowserTabs, this needs no audio graph: the companion
+        // reports an output it cannot find as the tab's error.
+        string? invalid = CommandValidation.Check(cmd, _mixer, _ => null);
+        if (invalid is not null) return invalid;
+        try
+        {
+            _mixer.CheckBrowserActivation(cmd.Session!, cmd.TabId!.Value, cmd.Site!);
+            return null;
+        }
+        catch (InvalidOperationException ex) { return ex.Message; }
+    }
+
     /// <summary>Apply a mixer command. Returns null on success, else an error.</summary>
     public string? Apply(Command cmd)
     {

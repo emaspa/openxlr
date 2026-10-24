@@ -120,7 +120,7 @@ jobs:
         run: python3 tools/check-openapi.py docs/openapi-v1.json
 
       - name: Lint shell scripts
-        run: shellcheck --severity=error tools/check-version.sh tools/check-locked-restore.sh tools/ci-install-packages.sh packaging/ppa/make-source.sh packaging/omarchy/openxlr-omarchy-enable
+        run: shellcheck --severity=error tools/check-version.sh tools/check-locked-restore.sh tools/ci-install-packages.sh packaging/ppa/make-source.sh packaging/omarchy/openxlr-omarchy-enable packaging/flatpak/openxlr-flatpak-service
 
       - name: Locked restore enforced on every packaging path
         run: tools/check-locked-restore.sh

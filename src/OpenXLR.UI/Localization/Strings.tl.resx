@@ -2766,7 +2766,7 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
     <value>Mabilis</value>
   </data>
   <data name="DuckingHint" xml:space="preserve">
-    <value>Pinahihina ng ducking ang napiling channel sa napiling mix habang malakas ang key microphone. Sa computer na ito ito tumatakbo para sa lahat ng device, kasama ang Wave XLR Pro: sa sariling mix nito ginagawa ng Pro ang ducking, na hindi pa dinaraanan ng mga jack.</value>
+    <value>Pinahihina ng ducking ang napiling channel sa napiling mix habang malakas ang key microphone. Sa computer na ito ito tumatakbo, o sa sariling processor ng Wave XLR Pro kapag tugma ang setup sa kaya ng unit.</value>
   </data>
   <data name="DuckingNotHeld" xml:space="preserve">
     <value>Hindi pa pinananatili ng unit ang setting na ito; isusulat muli ito ng OpenXLR sa loob ng ilang segundo.</value>
@@ -2877,7 +2877,7 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
     <value>MGA BROWSER TAB</value>
   </data>
   <data name="BrowserTabCaptureHint" xml:space="preserve">
-    <value>Paganahin ang audio ng bawat tab sa browser extension. Hindi pinapagana ng pagpili ng channel dito ang audio ng tab.</value>
+    <value>Pindutin ang Paganahin para i-route ang audio ng isang tab, dito o sa browser extension. Hindi pinapagana ng pagpili ng channel ang audio ng tab.</value>
   </data>
   <data name="BrowserTabCaptureState" xml:space="preserve">
     <value>Estado ng audio ng browser tab</value>
@@ -2901,7 +2901,25 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
     <value>Aktibo ang audio ng tab</value>
   </data>
   <data name="BrowserTabActivationRequired" xml:space="preserve">
-    <value>Paganahin ang audio ng tab sa browser extension.</value>
+    <value>Pindutin ang Paganahin para i-route ang audio ng tab na ito.</value>
+  </data>
+  <data name="BrowserTabActivate" xml:space="preserve">
+    <value>Paganahin</value>
+  </data>
+  <data name="BrowserTabActivateName" xml:space="preserve">
+    <value>Paganahin ang browser tab na {0}</value>
+  </data>
+  <data name="BrowserTabActivateHint" xml:space="preserve">
+    <value>Dinadala sa harap ang tab na ito sa browser at sinisimulan ang pag-route ng audio nito. Maaaring hilingin ng browser na tapusin mo ito roon.</value>
+  </data>
+  <data name="BrowserTabActivating" xml:space="preserve">
+    <value>Sinisimulan sa browser...</value>
+  </data>
+  <data name="BrowserTabActivatePopup" xml:space="preserve">
+    <value>Tapusin sa browser: pindutin ang Paganahin ang tab na ito sa popup ng OpenXLR.</value>
+  </data>
+  <data name="BrowserTabActivateToolbar" xml:space="preserve">
+    <value>Tapusin sa browser: sa tab na ito, i-click ang icon ng OpenXLR sa toolbar o pindutin ang shortcut nito, saka pindutin ang Paganahin ang tab na ito.</value>
   </data>
   <data name="BrowserTabUsesDefault" xml:space="preserve">
     <value>Gumagamit ng default na destinasyon ng browser</value>

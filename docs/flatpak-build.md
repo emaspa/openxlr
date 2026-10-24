@@ -18,9 +18,8 @@ flatpak install --user openxlr-local io.github.emaspa.openxlr
 Use a build directory and state directory under the home directory, since
 the builder's private `/tmp` is not shared with commands it starts outside
 its own sandbox. The manifest's directory source builds the current tree.
-For Flathub submission this source becomes a pinned Git commit and the
-manifest's local packaging files move with it to the Flathub repository.
-No Flathub submission or release is created by these commands.
+OpenXLR is not published on Flathub, whose rules do not allow AI-assisted
+development; the build is for installing yourself.
 
 The native host and its LV2 dependencies are built in the SDK. PipeWire
 client tools and filter modules, ALSA's `amixer`, and WirePlumber's `wpctl`
@@ -56,19 +55,6 @@ flatpak install --user flathub org.freedesktop.LinuxAudio.Plugins.LSP//25.08
 
 Run the acceptance checks described in [flatpak-testing.md](flatpak-testing.md) before
 using the build with a live audio setup. The ordinary packages remain the
-recommended installation.
-
-## Flathub handoff
-
-The manifest is an in-repository development build. Before submission,
-replace its directory source with the immutable upstream Git commit that
-contains the runtime, packaging and acceptance changes. Keep the dependency
-checksums and locked restore. Add release metadata and a representative
-upstream-hosted screenshot for the version the maintainer chooses to ship,
-then run Flathub's manifest, build-directory and AppStream checks.
-
-The installable CI bundle and checksum described in
-[flatpak-testing.md](flatpak-testing.md) allow testing before a Flathub
-submission. A clean-desktop login, a physical-output hearing check and
-USB controls on the other supported models remain acceptance work. Neither
-the test artifact nor the manifest publishes an app to Flathub.
+recommended installation. A clean-desktop login, a physical-output hearing
+check and USB controls on the other supported models remain acceptance
+work.

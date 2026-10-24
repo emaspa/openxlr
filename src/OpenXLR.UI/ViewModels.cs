@@ -34,7 +34,7 @@ public abstract class ViewModelBase : INotifyPropertyChanged
 /// </summary>
 public sealed partial class MainViewModel : ViewModelBase
 {
-    public DaemonRestartViewModel DaemonRestart { get; } = new();
+    public DaemonRestartViewModel DaemonRestart { get; }
     public UpdatesViewModel Updates { get; } = new();
 
     /// <summary>The ducking setup the Ducking window edits; reported by every daemon that has it, on any device.</summary>
@@ -43,9 +43,12 @@ public sealed partial class MainViewModel : ViewModelBase
     private readonly DaemonClient _client;
     private bool _applying;
 
-    public MainViewModel(DaemonClient client)
+    public MainViewModel(DaemonClient client) : this(client, new DaemonRestartViewModel()) { }
+
+    internal MainViewModel(DaemonClient client, DaemonRestartViewModel daemonRestart)
     {
         _client = client;
+        DaemonRestart = daemonRestart;
         Ducking = new DuckingViewModel(client);
         LoadMixerView();
         OutputVolumeRange = new VolumeRangeViewModel(() => OutputVolume = Math.Min(OutputVolume, 1));
@@ -56,7 +59,7 @@ public sealed partial class MainViewModel : ViewModelBase
         _client.ConnectionChanged += up => Dispatcher.UIThread.Post(() =>
         {
             DaemonConnected = up;
-            if (up) DaemonRestart.ConnectionRestored();
+            DaemonRestart.ConnectionChanged(up);
             if (!up)
             {
                 DeviceConnected = false; RefreshBindings(); Status = Localizer.Text("StatusDaemonNotRunning");

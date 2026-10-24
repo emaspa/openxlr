@@ -99,24 +99,37 @@ install -Dm644 browser/external-extension.json \
     "$pkgdir/usr/share/google-chrome/extensions/beeohanoffjpcofbjiiamkdammhcihaf.json"
 ```
 
-### Load from a checkout
+### Load it unpacked
 
-For development, load the extension unpacked from a checkout of the same
-version as your native OpenXLR installation. Remove the Store copy first:
-both use the same id.
+Use the companion of the same version as your OpenXLR installation.
+Remove the Store copy first: both use the same id. Each release carries
+it as `openxlr-browser-<version>.tar.gz`. Extract it to a folder you keep,
+since the browser loads the extension from there:
+
+```sh
+rm -rf ~/.local/share/openxlr/browser
+mkdir -p ~/.local/share/openxlr/browser
+tar -xzf openxlr-browser-<version>.tar.gz --strip-components=1 \
+    -C ~/.local/share/openxlr/browser
+```
 
 1. Open `chrome://extensions`, `brave://extensions` or `edge://extensions`.
    Enable Developer mode, choose Load unpacked and select
-   `browser/chromium` from the checkout.
+   `~/.local/share/openxlr/browser`. From a checkout, select
+   `browser/chromium` instead.
 2. Check that its id is `beeohanoffjpcofbjiiamkdammhcihaf`. The public key in
-   the manifest keeps this id stable across checkouts. No private signing
+   the manifest keeps this id stable across copies. No private signing
    key is shipped.
 
-`python3 -I tools/browser-extension.py <directory>` writes
-`openxlr-browser-<version>.zip`, the package uploaded to the Store. It
-leaves out the manifest's public key, which the Store refuses, so an
-unpacked copy of that zip gets another id and the native host refuses it.
-Load the checkout instead.
+After an OpenXLR upgrade, run the same commands with the new release's
+archive and press Reload on the extension's card.
+
+`python3 -I tools/browser-extension.py <directory> --unpacked` writes that
+archive. It is a tar.gz, not a zip, because OpenDeck offers every zip on
+the latest release as a Stream Deck plugin. Without `--unpacked` the tool
+writes `openxlr-browser-<version>.zip`, the package uploaded to the Store.
+That zip leaves out the manifest's public key, which the Store refuses, so
+an unpacked copy of it gets another id and the native host refuses it.
 
 ### Languages
 
@@ -156,11 +169,28 @@ Chrome has no Cebuano, so a browser set to it shows English.
    tab-only choice leaves the
    site's existing default for other tabs intact. Forget website removes
    the saved default and returns that tab to Browser default.
-4. Return to the audio tab, open the companion and press Activate. A PWA
+4. Press Activate in the tab's row in the Browser tabs window, or return
+   to the audio tab, open the companion and press Activate this tab. A PWA
    without a toolbar can use the extension action shortcut, initially
    Ctrl+Shift+9. Change it in your browser's extension shortcuts page if
-   another application owns it. Activation requires a browser gesture;
-   choosing a channel in OpenXLR alone cannot grant capture permission.
+   another application owns it. Choosing a channel alone never starts
+   capture.
+
+   The browser captures a tab only after you invoked the companion on it,
+   with its toolbar button or its shortcut, and forgets that when the tab
+   navigates. Activate in OpenXLR is not such a gesture, so it brings the
+   tab's window and the tab forward and tries. If the browser still holds
+   the grant from an earlier click, routing starts and the row's light
+   turns on. Otherwise the companion opens its popup on that tab, which
+   Chrome 127 and later allow, and the popup says OpenXLR asked to route
+   the tab; press Activate this tab there. If the browser refuses that
+   press too, or cannot open the popup, the popup or the row says to click
+   the OpenXLR icon on the tab or press the shortcut, then Activate this
+   tab. The row reads Starting in the browser while the companion works,
+   then names the step left for you, and clears when routing starts, when
+   the companion reports an error, or after two minutes.
+   An older companion ignores the request; the row then returns to its
+   usual text after ten seconds.
 5. While active, channel changes in either place reroute that tab. Other
    active tabs keep their own channel. Stop, closing the tab, navigating
    to another origin, disabling browser output selection or losing the
@@ -194,9 +224,11 @@ partial list. Close some tabs and reconnect to publish a smaller list.
 If outputs cannot be enumerated, a channel is missing or an output label
 is ambiguous, activation is refused without taking over audio. Renaming
 an already matched channel preserves its output-device binding. A removed
-output or a failed reroute stops only the affected tab. The companion
-does not keep retrying a failed capture or native host in the background;
-correct the problem and activate or reconnect explicitly.
+output, a failed reroute or a failed output lookup stops only the tabs it
+affects. A damaged saved output choice is reset the next time that channel
+picks an output. The companion does not keep retrying a failed capture or
+native host in the background; correct the problem and activate or
+reconnect explicitly.
 
 ## Privacy and removal
 
@@ -222,7 +254,9 @@ defaults. Review it before sharing.
 No tab audio is sent through the control API or stored by the companion.
 
 The host accepts only tab registration, channel assignment and the browser
-output preference. It authenticates using the existing local daemon client
+output preference. Towards the browser it passes the daemon's state and
+OpenXLR's requests to activate a tab, each for a tab id and origin the
+companion itself registered. It authenticates using the existing local daemon client
 and does not expose the API token or unrelated daemon state to the browser.
 Web pages cannot call this host through the extension.
 

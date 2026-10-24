@@ -18,7 +18,8 @@ public sealed record UiSettings
 {
     public bool StartDaemonAtLogin { get; init; }
     public bool OpenWindowAtLogin { get; init; }
-    public bool MinimizeToTray { get; init; }
+    /// <summary>On by default in the Flatpak, whose UI owns the daemon: closing it would stop audio.</summary>
+    public bool MinimizeToTray { get; init; } = FlatpakEnvironment.IsFlatpak;
     public bool StartMinimized { get; init; }
     /// <summary>Opt-in only. False means the UI performs no startup network request.</summary>
     public bool CheckForUpdates { get; init; }
@@ -1089,10 +1090,19 @@ public static class StartupIntegration
     /// Restart the daemon's user service so a daemon-side setting takes
     /// effect. False when systemd does not manage it (source builds run by
     /// hand), so the caller can tell the user to restart it themselves.
+    /// An explicit request clears this unit's start limit before retrying;
+    /// automatic crash recovery still observes the service's start limit.
     /// </summary>
     public static bool RestartDaemon() => FlatpakEnvironment.IsFlatpak
-        ? FlatpakSession.Current?.Restart() == true
-        : Systemctl("restart", "openxlr-daemon.service");
+        ? FlatpakSession.Current is { Attached: true } ? AttachedRestart?.Invoke() == true : FlatpakSession.Current?.Restart() == true
+        : Systemctl("reset-failed", "openxlr-daemon.service")
+            && Systemctl("restart", "openxlr-daemon.service");
+
+    /// <summary>
+    /// How the Flatpak UI restarts a daemon it did not start: the window
+    /// sends restartDaemon and the user service brings the daemon back.
+    /// </summary>
+    internal static Func<bool>? AttachedRestart { get; set; }
 
     private static bool Systemctl(params string[] args)
     {

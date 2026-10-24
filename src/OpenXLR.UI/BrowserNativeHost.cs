@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace OpenXLR.UI;
 
-internal sealed record BrowserNativeTab(int Id, string Site, string Title, bool Capturing, string? Error = null);
+internal sealed record BrowserNativeTab(int Id, string Site, string Title, bool Capturing, string? Error = null, string? Activation = null);
 
 /// <summary>A bounded native-messaging bridge. Only browser routing crosses its standard output.</summary>
 internal sealed class BrowserNativeHost(DaemonClient client, Stream input, Stream output, Func<long>? clock = null)
@@ -92,8 +92,21 @@ internal sealed class BrowserNativeHost(DaemonClient client, Stream input, Strea
             }
             _updates.Writer.TryWrite(true);
         }
+        void Activate(int tabId, string site)
+        {
+            // Pass on a request only for a tab this browser listed under that
+            // origin. The extension checks the tab again before acting on it.
+            long generation;
+            lock (_gate)
+            {
+                if (_session is null || !_tabs.Any(tab => tab.Id == tabId && tab.Site == site)) return;
+                generation = _generation;
+            }
+            _outgoing.Writer.TryWrite(new(new JsonObject { ["type"] = "activate", ["tabId"] = tabId, ["site"] = site }, generation));
+        }
         client.StateReceived += State;
         client.ConnectionChanged += Connection;
+        client.BrowserTabActivationReceived += Activate;
         var incoming = Channel.CreateBounded<QueuedMessage>(new BoundedChannelOptions(8)
             { FullMode = BoundedChannelFullMode.Wait, SingleReader = true, SingleWriter = true });
         Task writer = WriteOutputAsync(lifetime);
@@ -113,6 +126,7 @@ internal sealed class BrowserNativeHost(DaemonClient client, Stream input, Strea
         {
             client.StateReceived -= State;
             client.ConnectionChanged -= Connection;
+            client.BrowserTabActivationReceived -= Activate;
             await lifetime.CancelAsync();
             _updates.Writer.TryComplete();
             _outgoing.Writer.TryComplete();
@@ -396,12 +410,13 @@ internal sealed class BrowserNativeHost(DaemonClient client, Stream input, Strea
                 || id < 0 || !ids.Add(id) || String(tab, "site") is not { } site
                 || String(tab, "title") is not { Length: <= 160 } title || title.Any(char.IsControl)
                 || tab["capturing"] is not JsonValue capture || !capture.TryGetValue<bool>(out bool capturing)
-                || tab["error"] is not null && (String(tab, "error") is not { Length: <= 200 } error || error.Any(char.IsControl)))
+                || tab["error"] is not null && (String(tab, "error") is not { Length: <= 200 } error || error.Any(char.IsControl))
+                || tab["activation"] is not null && String(tab, "activation") is not ("starting" or "popup" or "browser"))
                 throw new InvalidDataException("Invalid browser tab metadata.");
             // An address the daemon cannot take in the browser's own form, such
             // as a host holding "*" or an IPv4-mapped IPv6 address, leaves that
             // tab unlisted. The other tabs still register.
-            if (ValidSite(site)) tabs.Add(new(id, site, title, capturing, String(tab, "error")));
+            if (ValidSite(site)) tabs.Add(new(id, site, title, capturing, String(tab, "error"), String(tab, "activation")));
         }
         return tabs;
     }

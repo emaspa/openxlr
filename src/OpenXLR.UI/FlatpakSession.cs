@@ -15,6 +15,12 @@ internal sealed class FlatpakSession : IDisposable
     private readonly Func<TimeSpan, CancellationToken, Task> _delay;
     internal static FlatpakSession? Current { get; private set; }
 
+    /// <summary>
+    /// Another daemon held the lock when this one started: the user service
+    /// from docs/flatpak.md serves the UI, and Quit leaves its audio running.
+    /// </summary>
+    internal bool Attached { get; private set; }
+
     internal FlatpakSession(string binary, Func<TimeSpan, CancellationToken, Task>? delay = null)
     {
         _delay = delay ?? Task.Delay;
@@ -55,7 +61,7 @@ internal sealed class FlatpakSession : IDisposable
                         { ["OPENXLR_PARENT_PID"] = Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture) }).ConfigureAwait(false);
                     // A host installation owns the API port or lock: do not keep
                     // claiming hardware in a retry loop against another daemon.
-                    if (exit == 73 && !generation.IsCancellationRequested) return;
+                    if (exit == 73 && !generation.IsCancellationRequested) { Attached = true; return; }
                 }
                 catch (Exception ex) when (ex is IOException or System.ComponentModel.Win32Exception or InvalidOperationException)
                 {

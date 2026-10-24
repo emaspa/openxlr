@@ -1,4 +1,4 @@
-import { siteOf } from './routing.mjs';
+import { notInvoked, siteOf } from './routing.mjs';
 import { localized, t, translatePage } from './text.mjs';
 
 translatePage(document);
@@ -21,6 +21,20 @@ const send = async message => {
   if (result?.error) throw new Error(result.error);
   return result?.value;
 };
+// Chrome lets the extension capture a tab only after the user invoked it on
+// that tab. A popup Chrome opened on OpenXLR's request may not count, so say
+// how to invoke it, with the shortcut the user actually has.
+const invocationHint = async () => {
+  try {
+    const shortcut = (await chrome.commands.getAll()).find(command => command.name === '_execute_action')?.shortcut;
+    if (shortcut) return t('popupInvokeShortcut', shortcut);
+  } catch { /* The plain hint below still applies. */ }
+  return t('popupInvokeNoShortcut');
+};
+const start = async () => {
+  try { await send({ type: 'start', id: tab.id }); }
+  catch (error) { throw notInvoked(error.message) ? new Error(await invocationHint()) : error; }
+};
 const act = operation => {
   operationError = '';
   void operation().catch(error => {
@@ -40,6 +54,7 @@ async function refresh() {
   $('enable').hidden = !state || state.preserveBrowserOutputs;
   const starting = snapshot?.startingTabs?.includes(tab?.id);
   const assigning = snapshot?.pendingTabs?.includes(tab?.id);
+  $('request').hidden = !snapshot?.requestedTabs?.includes(tab?.id) || !!selected?.capturing;
   $('access').hidden = access === 'granted';
   $('start').disabled = access !== 'granted' || !state?.preserveBrowserOutputs || !selected?.channelId || selected.capturing || starting || assigning;
   $('stop').disabled = !selected?.capturing && !starting;
@@ -60,7 +75,7 @@ const assign = () => send({ type: 'assign', id: tab.id, site: siteOf(tab.url), c
 $('channel').addEventListener('change', () => act(assign));
 $('remember').addEventListener('change', () => act(assign));
 $('enable').addEventListener('click', () => act(() => send({ type: 'enable', value: true })));
-$('start').addEventListener('click', () => act(() => send({ type: 'start', id: tab.id })));
+$('start').addEventListener('click', () => act(start));
 $('stop').addEventListener('click', () => act(() => send({ type: 'stop', id: tab.id })));
 $('retry').addEventListener('click', () => act(() => send({ type: 'retry' })));
 $('forget').addEventListener('click', () => act(() => send({ type: 'assign', id: tab.id, site: siteOf(tab.url), channel: null, remember: true })));

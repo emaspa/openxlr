@@ -2,3 +2,6 @@
 # statically embed their codecs and are not built or stripped here.
 openxlr: embedded-library * [usr/lib/openxlr/*]
 openxlr: unstripped-binary-or-object [usr/lib/openxlr/*]
+# Google Chrome reads system native messaging hosts only from this
+# directory; the browser companion's host has nowhere else to go.
+openxlr: dir-or-file-in-etc-opt [etc/opt/chrome/*]

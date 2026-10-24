@@ -44,12 +44,16 @@ The extension sends messages only to the native messaging host
 installation on your computer. Those messages are:
 
 - the tab list: tab id, origin, title, whether the extension is playing
-  the tab's audio, and a short error text if routing that tab failed;
+  the tab's audio, a short error text if routing that tab failed, and
+  where an activation OpenXLR asked for stands;
 - a channel choice: tab id, origin, the OpenXLR channel, and whether to
   remember it for that website;
 - the setting that lets the browser choose its outputs.
 
-OpenXLR answers with its list of channels and the tabs' assignments. The
+OpenXLR answers with its list of channels and the tabs' assignments, and
+passes on a request when you press Activate for a tab in OpenXLR. The
+extension then brings that tab forward and may open its popup there; the
+browser still captures the tab only after you invoked the extension on it. The
 extension sends no tab audio over this connection. What OpenXLR keeps of
 the tab list, including the website defaults it saves when you check
 Remember for this website, is described in

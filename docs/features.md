@@ -25,34 +25,37 @@ Wave XLR Pro:
 - Mic/PC direct-monitor crossfade (inside the device, no host latency)
 - Physical output routing: Headphones 1, Headphones 2, Line Out and USB
   Aux are each switched in the device's hardware mixer
-- Ducking on the device, mapped from Wave Link on Windows but not used:
-  the unit lowers a whole output inside its own mix, and OpenXLR feeds
-  the jacks through the monitor return, which goes around that mix, so
-  on the desk the jacks did not dip. [Ducking](#submixer) runs in
-  software on the Pro, and the state says why
-  ([api.md](api.md#where-ducking-runs)). The unit is written with ducking
-  off while the submixer runs, which clears ducking Wave Link left
+- Ducking on the device, mapped from Wave Link on Windows: when the
+  [ducking](#submixer) setup fits what the unit can do (XLR 1 as the key, a
+  whole mix on the jacks and Line Out), the Pro runs it on its own
+  processor; otherwise this computer does, and the state says why
+  ([api.md](api.md#where-ducking-runs)). The USB Aux port stays in software
+  until it is checked by ear. The unit is written with ducking off while
+  this computer runs it, which clears ducking Wave Link left
 
 Wave XLR MK.2 and XLR Dock MK.2: gain, mute, phantom power, low cut,
 expander, voice tune with strength, ClipGuard, compressor, headphone
 volume, low impedance, crossfade.
 
 Wave XLR: gain, mute, headphone volume, low impedance, phantom power.
+The desktop's volume controls follow the interface's gain, mute and
+headphone level and can set the mute and headphone level; this is not yet
+checked on an MK.1.
 
 Wave:3: gain (0 to 40 dB), mute, ClipGuard, headphone volume and the
 direct monitor balance, shown as the crossfade; the low cut is the
 submixer's, by design. The desktop's volume controls follow the
 microphone's mute and headphone level and can set them, and Options
-shows the firmware version. Beta: written from public protocol research;
+shows the firmware version. Written from public protocol research;
 on the maintainer's unit every control writes and reads back, and the
-gain, the monitor balance and the desktop volume controls are verified,
-while the mute pad, the LED ring and a replug are not yet checked, so
-with another supported interface attached the daemon drives that one and
-the Wave:3 only when picked from the header. [hardware-support.md](hardware-support.md)
+gain, the monitor balance and the desktop volume controls are verified;
+the mute pad, the LED ring and a replug are not yet checked. With an XLR
+interface attached too, the daemon drives the interface and the Wave:3
+only when picked from the header. [hardware-support.md](hardware-support.md)
 names the sources, the bytes they dispute and what an owner checks.
 
 Wave:1: the same controls as the Wave:3, from the same backend under the
-Wave:1's product id, in beta. An owner's diagnostics showed the
+Wave:1's product id. An owner's diagnostics showed the
 microphone answering the Wave:3's block, firmware line and desktop
 volume mirror, and a second run showed the gain, mute and headphone
 volume set from the UI taking effect on the microphone. ClipGuard and
@@ -66,8 +69,8 @@ and the Wave XLR Pro on each of its two inputs from firmware 1.0.14, the
 way Wave Link 3.5 does ([findings](mk2-eq-findings.md),
 [Pro](hardware-support.md#wave-xlr-pro-0fd900b4)); every other model and
 older firmware run it in software. The Pro's EQ follows Wave Link
-captures and was measured once on the desk: a +12 dB bell written from
-OpenXLR read +12 dB on the unit's USB capture. The Pro's mix
+captures and is verified on hardware by the maintainer and other owners.
+The Pro's mix
 maximizer, channel booster and remaining hardware mix matrix are
 unmapped, as is any ducking key but XLR 1. Wave Link configures those onboard effects on supported systems;
 OpenXLR's LV2, CLAP and VST3 inserts process audio on the Linux host.
@@ -304,7 +307,8 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
   the skin chooses. Row heads carry
   the input gain, mute, microphone switches and plugin chain under the
   INPUTS panel's rules, the switches behind a **Mic** button that shows
-  whether one is on and whether phantom power is, and
+  whether one is on and whether phantom power is, the gain written under
+  it (the volume while its fader moves), and
   column heads the mix's master, mute, chain and how many outputs hear it.
   A skin orders and hides the parts of the heads and cells. See
   [The mix matrix](skins.md#the-mix-matrix)
@@ -592,16 +596,19 @@ restores the split profile when it stops.
   tabs in a Browser tabs window, opened from the button beside Manage in
   APPLICATIONS, which also holds the option that turns tab routing on.
   User-activated tab audio can follow
-  separate application channels, with saved website defaults. Browser
+  separate application channels, with saved website defaults. Activate
+  in a tab's row brings the tab forward in the browser and starts it, or
+  says what the browser still needs. Browser
   output selection suspends generic Chromium routing while enabled,
   keeping each browser's saved assignment and showing where it plays
   meanwhile; restarting the browser requires activating tabs again
 
-- The companion installs from the Chrome Web Store. The Debian, RPM and
-  Nix packages install its native messaging host and offer the Store
-  listing to Chrome and Chromium; the NixOS module can add it through the
-  browser policy. Its [privacy policy](browser-privacy.md) lists what it
-  reads and keeps.
+- The companion follows the browser's language and installs from the Chrome
+  Web Store. The Debian, RPM and Nix packages install its native messaging
+  host and offer the Store listing to Chrome and Chromium; the NixOS module
+  can add it through the browser policy. `tools/browser-extension.py` also
+  packages the tar.gz each release offers for loading unpacked. Its
+  [privacy policy](browser-privacy.md) lists what it reads and keeps.
 
 - Audio clients are detected from their PipeWire client registration
   and playback metadata, falling back to the owning client when fields
@@ -873,7 +880,9 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   tarball for bug reports. It also includes plugin catalogue and bridge
   setup, effective search paths and bounded native scan outcomes, with
   personal paths, the login name and host names redacted, and no forced
-  sync or insert changes
+  sync or insert changes. For audio glitches it adds the PipeWire,
+  pipewire-pulse and WirePlumber journals, node statistics, and playback and
+  recording stream metadata
 - Deep Wine trace checkbox in Options, SUPPORT for reproducing a bridged
   plugin scan failure. Enable it, Rescan, collect diagnostics, then disable
   it. Scans get much slower and produce large logs. The switch takes effect

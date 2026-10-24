@@ -480,6 +480,9 @@ public sealed class DiagnosticsTests
                 if [ "$1" = info ]; then
                   printf '%s\n' 'Server String: /run/user/1000/pulse/native' 'User Name: {{login}}' \
                     'Host Name: {{otherHost}}' 'Server Name: PulseAudio (on PipeWire 1.6.9)' 'Default Sink: OpenXLR_mix_monitor'
+                elif [ "$1" = --format=json ]; then
+                  {{(commandWarning ? "if [ \"$3\" = source-outputs ]; then printf '%s\\n' '{\"note\":\"/home/" + login + "/audio\"'; exit 7; fi" : "")}}
+                  printf '%s\n' '[{"index":47,"sample_specification":"float32le 2ch 48000Hz","buffer_latency_usec":1024,"properties":{"application.process.user":"{{login}}","application.process.host":"{{otherHost}}","application.process.id":123456} }]'
                 else
                   printf '%s\n' '1	OpenXLR_mix_monitor	PipeWire	float32le 2ch 48000Hz	RUNNING'
                 fi
@@ -500,12 +503,26 @@ public sealed class DiagnosticsTests
                  {"id":60,"type":"PipeWire:Interface:Node","info":{"props":{"node.name":"OpenXLR_mix_monitor",
                   "media.name":"/run/media/{{login}}/Samples/take.wav","clock.max-quantum":8192} } }]
                 JSON
+                {{(commandWarning ? "printf '%s\\n' '[{\"id\":62,\"type\":\"PipeWire:Interface:Node\",\"info\":{\"state\":\"error\",\"error\":\"fixture graph error\",\"props\":{\"node.name\":\"OpenXLR_fixture\",\"media.class\":\"Audio/Source\"} } }]'" : "")}}
                 """);
             ExecutableScript.Write(Path.Combine(bin, "journalctl"), $$"""
-                echo 'Okt 18 11:23:43 {{machine}} openxlr-daemon[2219]: loaded /mnt/{{login}}/lv2/eq.lv2 for {{login}}@{{machine}}'
+                case "$*" in
+                  '--user -u openxlr-daemon --since 2 hours ago --no-pager')
+                    echo 'Okt 18 11:23:43 {{machine}} openxlr-daemon[2219]: loaded /mnt/{{login}}/lv2/eq.lv2 for {{login}}@{{machine}}'
+                    ;;
+                  '--user -u pipewire.service -u pipewire-pulse.service -u wireplumber.service --since 2 hours ago --no-pager')
+                    echo 'Okt 18 11:23:44 {{machine}} pipewire[2220]: xrun for {{login}}@{{machine}}'
+                    {{(commandWarning ? $"echo 'journal warning for {login}@{machine}: access incomplete' >&2\nexit 1" : "")}}
+                    ;;
+                  *) echo 'unexpected journal request' >&2; exit 91 ;;
+                esac
                 """);
+            ExecutableScript.Write(Path.Combine(bin, "pw-top"), "printf '%s\\n' 'S ID QUANT RATE ERR NAME' 'R 60 1024 48000 2 OpenXLR_mix_monitor'\n");
             Environment.SetEnvironmentVariable("PATH", bin + Path.PathSeparator + path);
             Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", config);
+            Directory.CreateDirectory(UiSettings.ConfigDir);
+            File.WriteAllText(Path.Combine(UiSettings.ConfigDir, "ui.json"),
+                "{\"examplePath\":\"/home/" + login + "/capture\",\"numericValue\":1024}");
 
             await using var server = await SocketTestServer.Start(async (socket, stop) =>
             {
@@ -569,6 +586,10 @@ public sealed class DiagnosticsTests
             Assert.Contains("Server Name: PulseAudio (on PipeWire 1.6.9)", entries["pactl-info.txt"]);
             Assert.Contains("WirePlumber                         [1.6.9, <redacted>@<redacted>, pid:1585]", entries["wpctl-status.txt"]);
             Assert.Contains("loaded /mnt/<redacted>/lv2/eq.lv2 for <redacted>@<redacted>", entries["journal.txt"]);
+            Assert.Contains("pipewire[2220]: xrun for <redacted>@<redacted>", entries["audio-journal.txt"]);
+            Assert.DoesNotContain("loaded /mnt/", entries["audio-journal.txt"]);
+            if (commandWarning)
+                Assert.Contains("journal warning for <redacted>@<redacted>: access incomplete", entries["audio-journal.txt"]);
             Assert.Contains("/run/media/<redacted>/VST3", entries["plugin-setup.json"]);
             using var graph = System.Text.Json.JsonDocument.Parse(entries["pw-dump.json"]);
             Assert.Equal("pipewire-<redacted>-1655", graph.RootElement[0].GetProperty("info").GetProperty("props").GetProperty("core.name").GetString());
@@ -578,7 +599,21 @@ public sealed class DiagnosticsTests
                 Assert.Contains("warning for <redacted>@<redacted>: optional metadata unavailable", entries["pw-dump-errors.txt"]);
             else
                 Assert.DoesNotContain("pw-dump-errors.txt", entries.Keys);
+            Assert.DoesNotContain("audio-graph.json", entries.Keys);
+            using var preferences = System.Text.Json.JsonDocument.Parse(entries["ui.json"]);
+            Assert.Equal(1024, preferences.RootElement.GetProperty("numericValue").GetInt32());
+            using var streams = System.Text.Json.JsonDocument.Parse(entries["sink-inputs.json"]);
+            Assert.Equal(1024, streams.RootElement[0].GetProperty("buffer_latency_usec").GetInt32());
+            Assert.Equal("<redacted>", streams.RootElement[0].GetProperty("properties").GetProperty("application.process.id").GetString());
+            Assert.Contains("48000 2 OpenXLR_mix_monitor", entries["pw-top.txt"]);
+            Assert.DoesNotContain("collection.json", entries.Keys);
+            if (commandWarning)
+            {
+                Assert.Contains("exited with status 7", entries["source-outputs-errors.txt"]);
+                Assert.Contains("did not return complete valid JSON", entries["source-outputs-errors.txt"]);
+            }
             Assert.Contains("login name", entries["PRIVACY.txt"]);
+            Assert.Contains("audio-server", entries["PRIVACY.txt"]);
         }
         finally
         {

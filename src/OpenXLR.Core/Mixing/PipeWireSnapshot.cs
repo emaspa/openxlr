@@ -1,6 +1,12 @@
+using System;
+using System.Collections.Generic;
 using System.Text.Json;
 
+#if OPENXLR_UI
+namespace OpenXLR.UI;
+#else
 namespace OpenXLR.Core.Mixing;
+#endif
 
 /// <summary>
 /// pw-dump may append change arrays while the graph is changing. Fold those

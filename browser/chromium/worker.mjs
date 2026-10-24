@@ -1,8 +1,10 @@
-import { HOST, MAX_TABS, deviceFor, errorText, siteOf, tabRecords } from './routing.mjs';
+import { HOST, MAX_TABS, deviceFor, errorText, notInvoked, siteOf, tabRecords } from './routing.mjs';
 import { t } from './text.mjs';
 
 const ASSIGNMENT_PENDING = t('assignmentPending');
 const ASSIGNMENT_TIMEOUT = t('assignmentTimeout');
+// How long an activation OpenXLR asked for waits for the user in the browser.
+const REQUEST_TIMEOUT = 120000;
 
 let native = null;
 let state = null;
@@ -21,6 +23,7 @@ const operations = new Map();
 const starts = new Map();
 const stops = new Map();
 const assignments = new Map();
+const requests = new Map();
 
 function clearAssignment(id) {
   const pending = assignments.get(id);
@@ -32,6 +35,19 @@ function clearAssignments() {
   for (const id of assignments.keys()) clearAssignment(id);
 }
 
+/** Forget an activation OpenXLR asked for. True when there was one. */
+function clearRequest(id) {
+  const request = requests.get(id);
+  if (!request) return false;
+  clearTimeout(request.timer);
+  requests.delete(id);
+  return true;
+}
+
+function clearRequests() {
+  for (const id of [...requests.keys()]) clearRequest(id);
+}
+
 function connect() {
   if (recovering || native) return;
   try {
@@ -41,6 +57,7 @@ function connect() {
     lastTabs = '';
     port.onMessage.addListener(message => {
       if (native !== port) return;
+      if (message?.type === 'activate') { void activateRequest(message).catch(error => { bridgeError = errorText(error); }); return; }
       if (message?.type === 'error') { clearAssignments(); bridgeError = errorText(message.error); return; }
       if (message?.type !== 'state' || !Array.isArray(message.channels) || !Array.isArray(message.tabs)) return;
       state = message;
@@ -60,6 +77,7 @@ function connect() {
       native = null;
       state = null;
       clearAssignments();
+      clearRequests();
       void stopAll(bridgeError);
     });
     void refreshTabs();
@@ -155,6 +173,8 @@ async function refreshTabs() {
       for (const id of captures.keys()) if (!alive.has(id)) captures.delete(id);
       for (const [id, pending] of assignments)
         if (!alive.has(id) || siteOf(tabs.find(tab => tab.id === id)?.url) !== pending.site) clearAssignment(id);
+      for (const [id, request] of requests)
+        if (!alive.has(id) || siteOf(tabs.find(tab => tab.id === id)?.url) !== request.site) clearRequest(id);
       for (const [id, previous] of sites) {
         const tab = tabs.find(candidate => candidate.id === id);
         if (!alive.has(id) || siteOf(tab?.url) !== previous) {
@@ -163,7 +183,7 @@ async function refreshTabs() {
           sites.delete(id);
         }
       }
-      const records = tabRecords(tabs, captures);
+      const records = tabRecords(tabs, captures, requests);
       for (const tab of records) sites.set(tab.id, tab.site);
       const encoded = JSON.stringify(records);
       if (native && encoded !== lastTabs) { post({ type: 'tabs', tabs: records }); lastTabs = encoded; }
@@ -175,12 +195,14 @@ async function refreshTabs() {
 async function outputFor(channel) {
   const devices = await audio({ type: 'devices' }, true);
   const task = bindingOperation.catch(() => {}).then(async () => {
-    const { deviceBindings = {} } = await chrome.storage.local.get('deviceBindings');
+    const { deviceBindings: saved } = await chrome.storage.local.get('deviceBindings');
+    const deviceBindings = saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : {};
+    if (!state?.channels.some(item => item.id === channel.id)) throw new Error(t('changedWhileStarting'));
     const id = deviceFor(channel, devices ?? [], deviceBindings);
     const alive = new Set(state?.channels.map(item => item.id) ?? []);
-    const next = Object.fromEntries(Object.entries(deviceBindings).filter(([key]) => alive.has(key)));
+    const next = Object.fromEntries(Object.entries(deviceBindings).filter(([key, value]) => alive.has(key) && typeof value === 'string'));
     next[channel.id] = id;
-    if (JSON.stringify(next) !== JSON.stringify(deviceBindings)) await chrome.storage.local.set({ deviceBindings: next });
+    if (JSON.stringify(next) !== JSON.stringify(saved)) await chrome.storage.local.set({ deviceBindings: next });
     return id;
   });
   bindingOperation = task;
@@ -188,7 +210,11 @@ async function outputFor(channel) {
 }
 
 async function reconcile() {
-  if (!state?.preserveBrowserOutputs) { await stopAll(); return; }
+  if (!state?.preserveBrowserOutputs) { clearRequests(); await stopAll(); return; }
+  for (const [id, request] of requests) {
+    const tab = state.tabs.find(candidate => candidate.id === id);
+    if (tab?.site !== request.site || !tab.channelId) { clearRequest(id); scheduleRefresh(); }
+  }
   for (const [id, pending] of starts) {
     const tab = state.tabs.find(candidate => candidate.id === id);
     if (tab?.site !== pending.site || tab?.channelId !== pending.channel) {
@@ -215,9 +241,91 @@ async function reconcile() {
   }
 }
 
+/** Start routing a tab that is active in its window. Chrome decides whether it may be captured. */
+async function startCapture(active) {
+  if (assignments.has(active.id)) throw new Error(ASSIGNMENT_PENDING);
+  const selected = state?.tabs.find(tab => tab.id === active.id && tab.site === siteOf(active.url));
+  const channel = state?.channels.find(channel => channel.id === selected?.channelId);
+  if (!state?.preserveBrowserOutputs) throw new Error(t('enableOutputsFirst'));
+  if (!channel) throw new Error(t('chooseChannelFirst'));
+  if (starts.has(active.id)) throw new Error(t('alreadyStarting'));
+  const pending = { site: selected.site, channel: channel.id, cancelled: false };
+  starts.set(active.id, pending);
+  const check = () => {
+    const latest = state?.tabs.find(candidate => candidate.id === active.id);
+    if (assignments.has(active.id)) throw new Error(ASSIGNMENT_PENDING);
+    if (pending.cancelled || !state?.preserveBrowserOutputs || latest?.site !== pending.site || latest?.channelId !== pending.channel)
+      throw new Error(t('changedWhileStarting'));
+    return true;
+  };
+  try {
+    await stopping;
+    await stops.get(active.id);
+    check();
+    const deviceId = await outputFor(channel);
+    check();
+    // The browser grants this only for a user-activated tab. Never reuse ids.
+    const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: active.id });
+    check();
+    await audio({ type: 'start', id: active.id, streamId, deviceId }, true, check);
+    if (!pending.cancelled && captures.get(active.id)?.capturing) captures.get(active.id).channelId = channel.id;
+    return null;
+  } finally { if (starts.get(active.id) === pending) starts.delete(active.id); }
+}
+
+async function openPopup(windowId) {
+  // Chrome 127 opens an extension's popup on request; older versions cannot.
+  if (typeof chrome.action?.openPopup !== 'function') return false;
+  try { await chrome.action.openPopup({ windowId }); return true; } catch { return false; }
+}
+
+/**
+ * OpenXLR's Activate for one tab: bring it forward and start it as the
+ * popup's Activate would. Chrome captures only a tab the user invoked the
+ * extension on, so without that grant the popup opens on the tab, or the
+ * row in OpenXLR says what to do in the browser. The tab list reports the
+ * stage as activation: starting, popup or browser.
+ */
+async function activateRequest(message) {
+  const id = message.tabId;
+  const listed = state?.tabs.find(tab => tab.id === id);
+  // Only a tab this browser registered, on the origin OpenXLR showed.
+  if (!Number.isSafeInteger(id) || !listed || listed.site !== message.site || !state.preserveBrowserOutputs || !listed.channelId) return;
+  if (requests.has(id) || starts.has(id) || assignments.has(id) || captures.get(id)?.capturing) return;
+  let tab;
+  try { tab = await chrome.tabs.get(id); } catch { return; }
+  if (!tab || tab.incognito || siteOf(tab.url) !== message.site || requests.has(id)) return;
+  const request = { site: message.site, stage: 'starting', timer: null };
+  requests.set(id, request);
+  request.timer = setTimeout(() => { if (requests.get(id) === request && clearRequest(id)) scheduleRefresh(); }, REQUEST_TIMEOUT);
+  // This attempt replaces an earlier failure in OpenXLR's row.
+  if (captures.get(id)?.error) captures.set(id, { ...captures.get(id), error: null });
+  scheduleRefresh();
+  const current = () => requests.get(id) === request;
+  try {
+    await chrome.windows.update(tab.windowId, { focused: true });
+    await chrome.tabs.update(id, { active: true });
+    const shown = await chrome.tabs.get(id);
+    if (!current()) return;
+    if (!shown?.active || shown.incognito || siteOf(shown.url) !== request.site) throw new Error(t('changedWhileStarting'));
+    await startCapture(shown);
+  } catch (error) {
+    if (!current()) return;
+    if (notInvoked(error)) {
+      const opened = await openPopup(tab.windowId);
+      if (current()) request.stage = opened ? 'popup' : 'browser';
+    } else {
+      clearRequest(id);
+      if (!captures.get(id)?.capturing) captures.set(id, { capturing: false, error: errorText(error) });
+    }
+    scheduleRefresh();
+  }
+}
+
 async function handle(message) {
   switch (message.type) {
-    case 'snapshot': return { state, error: bridgeError, startingTabs: [...starts.keys()], pendingTabs: [...assignments.keys()] };
+    case 'snapshot': return { state, error: bridgeError, startingTabs: [...starts.keys()], pendingTabs: [...assignments.keys()],
+      requestedTabs: [...requests.keys()] };
     case 'retry': connect(); await refreshTabs(); return { state, error: bridgeError };
     case 'enable': post({ type: 'enable', value: message.value === true }); return null;
     case 'assign': {
@@ -245,34 +353,19 @@ async function handle(message) {
       if (assignments.has(message.id)) throw new Error(ASSIGNMENT_PENDING);
       const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!active || active.id !== message.id || active.incognito || !siteOf(active.url)) throw new Error(t('activateFromTab'));
-      if (assignments.has(active.id)) throw new Error(ASSIGNMENT_PENDING);
-      const selected = state?.tabs.find(tab => tab.id === active.id && tab.site === siteOf(active.url));
-      const channel = state?.channels.find(channel => channel.id === selected?.channelId);
-      if (!state?.preserveBrowserOutputs) throw new Error(t('enableOutputsFirst'));
-      if (!channel) throw new Error(t('chooseChannelFirst'));
-      if (starts.has(active.id)) throw new Error(t('alreadyStarting'));
-      const pending = { site: selected.site, channel: channel.id, cancelled: false };
-      starts.set(active.id, pending);
-      const check = () => {
-        const latest = state?.tabs.find(candidate => candidate.id === active.id);
-        if (assignments.has(active.id)) throw new Error(ASSIGNMENT_PENDING);
-        if (pending.cancelled || !state?.preserveBrowserOutputs || latest?.site !== pending.site || latest?.channelId !== pending.channel)
-          throw new Error(t('changedWhileStarting'));
-        return true;
-      };
-      try {
-        await stopping;
-        await stops.get(active.id);
-        check();
-        const deviceId = await outputFor(channel);
-        check();
-        // The browser grants this only for a user-activated tab. Never reuse ids.
-        const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: active.id });
-        check();
-        await audio({ type: 'start', id: active.id, streamId, deviceId }, true, check);
-        if (!pending.cancelled && captures.get(active.id)?.capturing) captures.get(active.id).channelId = channel.id;
-        return null;
-      } finally { if (starts.get(active.id) === pending) starts.delete(active.id); }
+      try { return await startCapture(active); }
+      catch (error) {
+        // An activation OpenXLR asked for: tell its row what happened.
+        if (requests.has(active.id) && !starts.has(active.id)) {
+          if (notInvoked(error)) requests.get(active.id).stage = 'browser';
+          else {
+            clearRequest(active.id);
+            if (!captures.get(active.id)?.capturing) captures.set(active.id, { capturing: false, error: errorText(error) });
+          }
+          scheduleRefresh();
+        }
+        throw error;
+      }
     }
     case 'stop': {
       return stopTab(message.id);
@@ -280,6 +373,7 @@ async function handle(message) {
     case 'audioStatus':
       if (!Number.isSafeInteger(message.id)) return null;
       captures.set(message.id, { capturing: message.capturing === true, error: message.error ? errorText(message.error) : null });
+      if (message.capturing === true) clearRequest(message.id);
       scheduleRefresh();
       return null;
     case 'devicesChanged': await reconcile(); return null;
@@ -296,15 +390,17 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
 
 chrome.tabs.onCreated.addListener(scheduleRefresh);
 chrome.tabs.onUpdated.addListener((id, changes) => {
-  const previous = assignments.get(id)?.site ?? starts.get(id)?.site ?? sites.get(id);
+  const previous = assignments.get(id)?.site ?? starts.get(id)?.site ?? requests.get(id)?.site ?? sites.get(id);
   if (changes.url && previous && siteOf(changes.url) !== previous) {
     clearAssignment(id);
+    clearRequest(id);
     void stopTab(id).catch(error => { bridgeError = errorText(error); });
   }
   scheduleRefresh();
 });
 chrome.tabs.onRemoved.addListener(id => {
   clearAssignment(id);
+  clearRequest(id);
   void stopTab(id).catch(error => { bridgeError = errorText(error); });
   scheduleRefresh();
 });

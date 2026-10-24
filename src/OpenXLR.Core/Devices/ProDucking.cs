@@ -8,7 +8,7 @@ namespace OpenXLR.Core.Devices;
 /// </summary>
 public static class ProReturnPairs
 {
-    /// <summary>The monitor feed of the jacks and Line Out: the unit's Personal mix takes it (channels 2/3).</summary>
+    /// <summary>The monitor feed of the jacks and Line Out (channels 2/3), a member of the mix the jacks play through block 0x0001 byte 12 bit 5.</summary>
     public const int Monitor = 1;
 
     /// <summary>The Aux mix for the USB Aux port: the aux mix's Music cell takes it (channels 10/11).</summary>
@@ -18,8 +18,8 @@ public static class ProReturnPairs
 /// <summary>
 /// What the unit held at the last read: the preset each of the three
 /// fields matches across all twelve entries (<c>custom</c> when the entries
-/// disagree or hold a value no preset writes), the USB pairs ducked in any
-/// of block 0x0001's three mix sections, and the block 0x0008 entries whose
+/// disagree or hold a value no preset writes), the USB pairs whose field
+/// reads 11 in any of block 0x0001's three mix sections, and the block 0x0008 entries whose
 /// flag bit 0 is set. <see cref="Raw"/> is the bytes the codec reads, hex,
 /// so a check that the unit holds a setting needs no transfer.
 /// </summary>
@@ -52,10 +52,14 @@ public sealed record DuckingReadback(string Sensitivity, string Amount, string S
 ///   byte 7      00, kept
 /// Wave Link writes the three presets to all twelve entries.
 ///
-/// Block 0x0001, in each of its three mix sections (after the aa at 15, 33
-/// and 51), bytes 16 to 17, 34 to 35 and 52 to 53: eight 2-bit fields, LE,
-/// field k for USB pair k, 01 normally and 11 while the pair is ducked in
-/// that mix. Only the high bit of each field is written here.
+/// Block 0x0001, in the last two bytes of its first three mix sections
+/// (bytes 16 to 17, 34 to 35 and 52 to 53, after each section's aa): eight
+/// 2-bit fields, LE, field k for USB pair k. The first section is the mix
+/// the jacks play, the third the aux mix (desk probe of 2026-10-23). Wave
+/// Link leaves every field at 01 and makes a ducked pair 11. The unit ducks
+/// a pair only at 11: 10, which setting the high bit alone gives on a unit
+/// whose fields read 00, does nothing. So a target pair gets both bits, and
+/// any other pair loses the high bit and keeps its low bit as read.
 ///
 /// How the key input is encoded was not found: only XLR 1 was ever the key,
 /// and nothing in these two blocks names it. Every byte and bit not listed
@@ -124,9 +128,9 @@ public static class ProDucking
 
     /// <summary>
     /// Write a target into the two blocks: the presets while it is on, the
-    /// ducked flag of every entry, and the high bit of every pair field in
-    /// the three mix sections, set for the target's pairs while it is on
-    /// and cleared otherwise. Everything else is left as it was.
+    /// ducked flag of every entry, and the pair fields of the three mix
+    /// sections, both bits set for the target's pairs while it is on and the
+    /// high bit cleared otherwise. Everything else is left as it was.
     /// </summary>
     /// <exception cref="ArgumentException">A block has the wrong length or the target a value the unit does not take.</exception>
     public static void Apply(Span<byte> block8, Span<byte> block1, ProDuckingTarget target)
@@ -149,8 +153,8 @@ public static class ProDucking
             int fields = block1[at] | block1[at + 1] << 8;
             for (int k = 0; k < PairCount; k++)
             {
-                int high = 1 << (2 * k + 1);
-                fields = (pairs & 1 << k) != 0 ? fields | high : fields & ~high;
+                int both = 3 << (2 * k), high = 1 << (2 * k + 1);
+                fields = (pairs & 1 << k) != 0 ? fields | both : fields & ~high;
             }
             block1[at] = (byte)fields;
             block1[at + 1] = (byte)(fields >> 8);
@@ -186,7 +190,7 @@ public static class ProDucking
             for (int i = 0; i < MixFieldOffsets.Count; i++)
             {
                 int fields = raw[Length + 2 * i] | raw[Length + 2 * i + 1] << 8;
-                if ((fields & 1 << (2 * k + 1)) != 0) { pairs.Add(k); break; }
+                if ((fields >> (2 * k) & 3) == 3) { pairs.Add(k); break; }
             }
         var entries = new List<int>();
         for (int e = 0; e < EntryCount; e++)

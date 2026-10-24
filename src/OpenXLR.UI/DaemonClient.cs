@@ -87,6 +87,20 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IDuckingComman
         => EditLayoutAsync(new() { ["cmd"] = "assignBrowserTab", ["session"] = session,
             ["tabId"] = tabId, ["site"] = site, ["channel"] = channel!, ["remember"] = remember });
 
+    /// <summary>
+    /// Ask the tab's browser companion to bring the tab forward and start
+    /// routing it. Null once the daemon passed the request on; whether capture
+    /// starts shows in the tab's state.
+    /// </summary>
+    public Task<string?> ActivateBrowserTabAsync(string session, int tabId, string site)
+        => EditLayoutAsync(new() { ["cmd"] = "activateBrowserTab", ["session"] = session, ["tabId"] = tabId, ["site"] = site });
+
+    /// <summary>
+    /// An activation request for a tab this connection registered as a browser
+    /// companion: the tab id and the origin the requester saw.
+    /// </summary>
+    internal event Action<int, string>? BrowserTabActivationReceived;
+
     public Task<string?> SetPreserveBrowserOutputsAsync(bool value)
         => EditLayoutAsync(new() { ["cmd"] = "setPreserveBrowserOutputs", ["value"] = value });
 
@@ -327,6 +341,12 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IDuckingComman
             else if (type == "diagnostics") StoreReply(type, node);
             else if (type == "plugins") StoreReply(type, node["plugins"]);
             else if (type == "nativeEditorRulesChanged") NativeEditorRulesChanged?.Invoke();
+            else if (type == "browserTabActivation")
+            {
+                if (node["tabId"] is JsonValue tabNode && tabNode.TryGetValue<int>(out int tabId)
+                    && node["site"] is JsonValue siteNode && siteNode.TryGetValue<string>(out string? site))
+                    BrowserTabActivationReceived?.Invoke(tabId, site);
+            }
             else if (type is "pluginSetup" or "pluginInstall" or "pluginDiagnostics" or "windowsPluginFiles" or "nativeEditorRules" or "browserSession") StoreReply(type, node);
             else if (type == "commandResult" && node["requestId"]?.GetValue<string>() is string requestId)
             {
@@ -355,6 +375,10 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IDuckingComman
     /// <summary>The profile recalled when the device connects; null clears it.</summary>
     public Task SetRecallOnConnectAsync(string? name)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setRecallOnConnect", ["name"] = name ?? "" });
+
+    /// <summary>Ask a daemon this UI did not start to exit so its service manager restarts it.</summary>
+    public Task<bool> RestartDaemonAsync()
+        => SendAsync(new Dictionary<string, object> { ["cmd"] = "restartDaemon" });
 
     /// <summary>Reset an interface without settings memory to its firmware defaults.</summary>
     public Task ResetDeviceAsync()

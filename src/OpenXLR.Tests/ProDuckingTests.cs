@@ -7,9 +7,10 @@ namespace OpenXLR.Tests;
 /// The Wave XLR Pro's ducking bytes, against the blocks the Windows captures
 /// of 2026-10-21 recorded (24 to 31): every preset in all twelve entries of
 /// block 0x0008, the ducked flag set and cleared per entry with bit 1 and
-/// the other unknown bits kept, the high bit of each pair's 2-bit field in
-/// all three mix sections of block 0x0001 with the low bits and every other
-/// byte of that block kept, and the decode of what Wave Link leaves behind.
+/// the other unknown bits kept, both bits of a ducked pair's 2-bit field in
+/// all three mix sections of block 0x0001 and the high bit alone cleared on
+/// release, every other byte of that block kept, and the decode of what Wave
+/// Link leaves behind.
 /// </summary>
 public sealed class ProDuckingTests
 {
@@ -237,9 +238,42 @@ public sealed class ProDuckingTests
         wanted[3] = 0x84;    // Line In: bit 1 clear, so its ducked bit goes
         wanted[11] = 0x03;   // pair 7 has bit 1: kept as read
         Assert.Equal(wanted, Enumerable.Range(0, 12).Select(e => b8[e * 8 + 6]));
-        // Low bits kept, high bits set for pairs 1 and 5 and cleared for 6 and 7 (0xa0: field 6 = 10, field 7 = 10).
-        foreach (int at in ProDucking.MixFieldOffsets) Assert.Equal(new byte[] { 0x08, 0x08 }, b1[at..(at + 2)]);
+        // Both bits set for pairs 1 and 5, the high bit cleared for 6 and 7 (0xa0: field 6 = 10, field 7 = 10).
+        foreach (int at in ProDucking.MixFieldOffsets) Assert.Equal(new byte[] { 0x0c, 0x0c }, b1[at..(at + 2)]);
         AssertOnlyMixFieldsChanged(before1, b1);
+    }
+
+    [Fact]
+    public void AFieldWhoseLowBitIsClearGetsBothBitsAndKeepsItsLowBitOnRelease()
+    {
+        // The desk unit under OpenXLR: pair 1's field reads 00 (0x51), and
+        // setting its high bit alone gave 10, which the unit ignored. The
+        // jacks dipped only at 11 (desk probe of 2026-10-23).
+        byte[] b8 = Block8(MediumBytes, IdleFlags);
+        byte[] b1 = Block1(0x51, 0x01);
+        byte[] before1 = (byte[])b1.Clone();
+        ProDucking.Apply(b8, b1, On(ProReturnPairs.Monitor));
+        foreach (int at in ProDucking.MixFieldOffsets) Assert.Equal(new byte[] { 0x5d, 0x01 }, b1[at..(at + 2)]);
+        AssertOnlyMixFieldsChanged(before1, b1);
+        Assert.Equal([ProReturnPairs.Monitor], ProDucking.Decode(b8, b1).Pairs);
+
+        ProDucking.Apply(b8, b1, Off);
+        foreach (int at in ProDucking.MixFieldOffsets) Assert.Equal(new byte[] { 0x55, 0x01 }, b1[at..(at + 2)]);
+        Assert.Empty(ProDucking.Decode(b8, b1).Pairs);
+    }
+
+    [Fact]
+    public void AHighBitAloneIsNotDuckedAndIsRewritten()
+    {
+        // What the daemon wrote before it set both bits: pair 1 at 10.
+        byte[] b8 = Block8(MediumBytes, IdleFlags);
+        b8[5 * 8 + 6] |= 0x01;
+        byte[] b1 = Block1(0x59, 0x01);
+        DuckingReadback unit = ProDucking.Decode(b8, b1);
+        Assert.Empty(unit.Pairs);
+        Assert.False(ProDucking.Holds(unit, On(ProReturnPairs.Monitor)));
+        ProDucking.Apply(b8, b1, On(ProReturnPairs.Monitor));
+        Assert.True(ProDucking.Holds(ProDucking.Decode(b8, b1), On(ProReturnPairs.Monitor)));
     }
 
     [Fact]

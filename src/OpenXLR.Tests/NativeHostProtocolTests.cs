@@ -11,6 +11,53 @@ public sealed class NativeHostProtocolTests
             "test", 2, 48000, "/usr/bin/python3", ["-u", "-c", script], startupTimeout, patience,
             meterSymbols: meters);
 
+    [Theory]
+    [InlineData("\n\n")]
+    [InlineData("\r\n \t\r\n   ")]
+    [InlineData("\u2003\n\u00a0")]
+    public void AHelpersFinalBlankOutputPreservesItsFailure(string blank)
+    {
+        string encoded = System.Text.Json.JsonSerializer.Serialize(blank);
+        using var host = Start($$"""
+            import sys
+            print('fatal: audio backend stopped', file=sys.stderr, flush=True)
+            print('ready')
+            for line in sys.stdin:
+                if line.strip() == 'show':
+                    sys.stderr.write({{encoded}})
+                    sys.stderr.flush()
+                    print('ui opened')
+                    break
+            """);
+        host.ShowUi();
+        Assert.True(host.Process.WaitForExit(5000));
+        Assert.True(SpinWait.SpinUntil(() => host.LastMessage == "fatal: audio backend stopped", TimeSpan.FromSeconds(5)), host.LastMessage);
+        Assert.Equal("fatal: audio backend stopped", host.LastMessage);
+    }
+
+    [Theory]
+    [InlineData("\n\nfinal failure", "final failure")]
+    [InlineData("\r\nsecond failure\n   ", "second failure")]
+    public void AHelpersUsefulFinalOutputReplacesItsEarlierFailure(string ending, string expected)
+    {
+        string encoded = System.Text.Json.JsonSerializer.Serialize(ending);
+        using var host = Start($$"""
+            import sys
+            print('earlier failure', file=sys.stderr, flush=True)
+            print('ready')
+            for line in sys.stdin:
+                if line.strip() == 'show':
+                    sys.stderr.write({{encoded}})
+                    sys.stderr.flush()
+                    print('ui opened')
+                    break
+            """);
+        host.ShowUi();
+        Assert.True(host.Process.WaitForExit(5000));
+        Assert.True(SpinWait.SpinUntil(() => host.LastMessage == expected, TimeSpan.FromSeconds(5)), host.LastMessage);
+        Assert.Equal(expected, host.LastMessage);
+    }
+
     [Fact]
     public void FakeHelperCoversReadyControlMeterAndUiReplies()
     {

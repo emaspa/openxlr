@@ -255,6 +255,10 @@ public sealed partial class DspAudioIntegrationTests
         f.Mixer.Build(DuckAudio.Config);
         f.Mixer.SetMonitorOutputs([DuckAudio.Output]);
         f.LinkSignals();
+        // The stream mix is back, but the stored plan lost its cell when the
+        // mix was deleted. The sweep settles the new legs first: the session
+        // manager's restore can land on a new leg after the build set it.
+        f.Legs(DuckPlan with { Cells = new HashSet<string> { "music|monitor" } });
         f.Level("monitor", DuckedMusic + .05);
         Assert.Equal(["monitor"], f.Mixer.DuckingStatus.RunningMixes);
         f.Mixer.DeleteApplicationChannel("key", _ => null);
@@ -398,6 +402,7 @@ public sealed partial class DspAudioIntegrationTests
                             process.wait()
                         for capture in files: capture.close()
                     """, _dir, probes ? "1" : "0"], TimeSpan.FromSeconds(180), cancel: _stop.Token);
+                Legs(null);   // every send on its fader before the first reading, as the daemon's sweep does
                 Level("monitor", .15);
             }
             catch { Dispose(); throw; }

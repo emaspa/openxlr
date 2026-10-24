@@ -471,8 +471,106 @@ keeps byte 6 as read), and the high bit of each pair field in the three
 mix sections. Every other byte of both blocks is copied from a fresh read.
 It writes 0x0008, then 0x0001, only the blocks that change, without the
 commit. Its targets are the pairs OpenXLR streams to: 2/3 (the jacks'
-monitor feed, through the Personal mix) and 10/11 (the Aux mix, through the
-aux mix's Music cell). On the desk the unit's ducking did not reach the
-jacks: it acts inside the unit's mix, and OpenXLR feeds the jacks through
-the monitor return, which goes around that mix, so OpenXLR ducks in
-software on the Pro ([hardware support](hardware-support.md)).
+monitor feed) and 10/11 (the Aux mix, through the aux mix's Music cell).
+On the desk the unit's ducking did not reach the jacks, so OpenXLR ducks in
+software on the Pro ([hardware support](hardware-support.md)). Section 12
+explains it: the unit ducks a pair only when its field reads `11`, and on
+this unit, outside Wave Link, the fields read `00`, so setting the high bit
+alone writes `10`, which the unit ignores.
+
+## 12. The mix sections and the jacks (desk probe of 2026-10-23)
+
+Firmware 1.0.14, the daemon stopped, `tools/proprobe.py` for every write.
+Four sine tones (1, 2.7, 4 and 7.9 kHz, a sweep from 0.6 to 11 kHz for the
+colour check) were played on one USB pair with `paplay --channel-map`.
+Headphones 1 was at 0 dB (block 0x0005 byte 0 `00`) with an ear cup pressed
+on the XLR 1 microphone, and each tone was read narrowband from capture
+AUX0 and from the capture channels the unit streams back. Repeated runs
+agreed within 0.5 dB. Every path or selector change was written with the
+0x0003 commit and followed by a sink bounce. Blocks 0x0001, 0x0005 and
+0x0008 were restored byte for byte afterwards.
+
+This corrects section 11 and the desk note of 2026-10-21 in three places:
+each pair of field bytes belongs to the section before its `aa`, the
+monitor return is not a path around a mix, and a ducked field must read
+`11`, not only have its high bit set.
+
+### Layout
+
+Block 0x0001 starts with five mix sections of 18 bytes, at 0, 18, 36, 54
+and 72. For a section starting at `s`:
+
+| Bytes | Field |
+|---|---|
+| `s` to `s+11` | one level per source, int8 in half dB, `00` unity, held at +12 dB (`18`) and above |
+| `s+12`, `s+13` | membership, little endian, one bit per source |
+| `s+14` | unknown |
+| `s+15` | `aa` |
+| `s+16`, `s+17` | the 2-bit ducking fields, field k for USB pair k |
+
+The sources, as bit and level index: 0 XLR 1, 1 XLR 2, 2 USB Aux, 3 Line
+In, then 4 + k for USB playback pair k (pair 1, the jacks' monitor feed on
+AUX2/AUX3, is bit 5; pair 5, the Aux mix on AUX10/AUX11, is bit 9). This
+fits the cells known before: Line In's level at 21 and membership at byte
+30 bit 3, the aux mix's Music level at 45 and membership at byte 49 bit 1.
+
+Each section is played by one output selector value and streamed back on
+one capture pair:
+
+| Section | Selector | Capture | Notes |
+|---|---|---|---|
+| 0 | `1e` | AUX8, AUX9 | the jacks' mix today; byte 12 bit 5 is pair 1's membership, the "monitor return" |
+| 18 | `1f` | AUX10, AUX11 | on this unit XLR 1 and XLR 2 are members (byte 30 `13`) |
+| 36 | `20` | AUX12, AUX13 | the aux mix |
+| 54 | `21` | AUX14, AUX15 | |
+| 72 | `22` | AUX16, AUX17 | |
+
+The other selector values from `18` to `2f` played nothing.
+
+### What the probe showed
+
+- With byte 12 bit 5 clear, the only pairs the jacks played on `1e` were 6
+  and 7, at the return's level: byte 13 is `0c`, bits 10 and 11. The
+  "monitor return" is pair 1's membership in the section the jacks play,
+  not a path around a mix.
+- Membership comes from the mask alone. Pair 1's field at `01`, `10` or
+  `11` added nothing; on `1f`, byte 30 bit 5 with the field at `00` put
+  pair 1 on the jacks.
+- Level cells: byte 5 (pair 1 in section 0) measured +6.2 dB at `0c` and
+  -6.1 dB at `f4`. Byte 23 (pair 1 in section 18) measured -30 dB at `c4`,
+  -10 dB at `ec`, -6 dB at `f4`, -3 dB at `fa`, +3 dB at `06` and +12 dB at
+  both `28` and `50`.
+- At the same level cell, sections 18 to 72 play 21 dB louder than section
+  0, on the jacks and on their capture streams alike. With byte 23 at `dc`
+  (-18 dB) the difference was a flat 3.0 dB from 1.5 to 11 kHz, each
+  reading within 0.3 dB of it: gain, no colour. Headphones 1's volume acts
+  on all of them.
+- Byte 0 at 0, 100 and 200 did not change pair 1.
+- Ducking: block 0x0008 with every threshold at -60 dB and depth 6 dB, pair
+  1's entry flagged, the key held by the tone itself through the cup (block
+  0x0002 bytes 26, 30, 38 and 42 at `18`, the full depth). On `1e` with
+  byte 12 bit 5 set, OpenXLR's path today, pair 1's field in byte 16 at
+  `11` lowered the jacks and capture AUX8/AUX9 by 6.0 dB, twice. At `10`,
+  `01` or `00` nothing changed. Pair 5's field in byte 53 at `11` (entry 9
+  flagged) lowered the aux mix's stream on AUX12/AUX13 by 6.0 dB; the USB
+  Aux port itself was not listened to.
+- Block 0x0002 bytes 48 and 49 stayed `f0` with noise on pair 1, so they
+  are not a playback meter for it. The bytes that moved all followed XLR 1.
+
+Wave Link leaves every field at `01` and sets the high bit on a ducked
+pair, which makes `11`. The daemon sets the high bit and keeps the low bit
+as read; with the fields at `00`, as this unit holds them under OpenXLR,
+that writes `10`, which is why the desk test of 2026-10-21 saw the engine
+reduce and the headphones stay level.
+
+### Open
+
+- What the low bit means alone, and whether setting it on every pair, as
+  Wave Link does, changes anything else.
+- Section 0 read through this layout puts XLR 1's level at byte 0 (the
+  crossfade, `c8` would be -28 dB) and pair 5's membership at byte 13 bit 1
+  (which the daemon drives as the microphone's direct path). Both were
+  verified by ear under their present names, so section 0's input side is
+  not settled.
+- Byte 14 of each section, and what section 0's 21 dB lower level comes
+  from.

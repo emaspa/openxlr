@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import test from 'node:test';
-import { HOST, MAX_TABS, deviceFor, errorText, siteOf, tabRecords } from '../chromium/routing.mjs';
+import { HOST, MAX_TABS, deviceFor, errorText, notInvoked, siteOf, tabRecords } from '../chromium/routing.mjs';
 import { t } from '../chromium/text.mjs';
 
 const workerSource = (await readFile(new URL('../chromium/worker.mjs', import.meta.url), 'utf8'))
@@ -13,15 +13,19 @@ const deferred = () => {
   return { promise, resolve, reject };
 };
 const tick = () => new Promise(resolve => setImmediate(resolve));
+const settle = async () => { for (let i = 0; i < 20; i++) await tick(); };
+// What Chrome says when the user has not invoked the extension on the tab.
+const NOT_INVOKED = 'Extension has not been invoked for the current page (see activeTab permission). Chrome pages cannot be captured.';
 const event = () => ({ listeners: [], addListener(listener) { this.listeners.push(listener); },
   emit(...args) { return this.listeners.map(listener => listener(...args)); } });
 
 function fixture({ existing = [], recovery } = {}) {
   const connected = deferred();
   const f = {
-    tabs: [1, 2].map(id => ({ id, active: id === 1, url: `https://site${id}.example/watch`, title: `Tab ${id}` })),
+    tabs: [1, 2].map(id => ({ id, windowId: id * 10, active: id === 1, url: `https://site${id}.example/watch`, title: `Tab ${id}` })),
     active: new Map(existing.map(session => [session.id, session])), document: existing.length > 0,
     calls: [], tokens: [], ports: [], posts: [], timers: new Map(), timerDelays: new Map(), bindings: {}, startGates: [],
+    focused: [], popups: [],
     state: { type: 'state', preserveBrowserOutputs: true,
       channels: [{ id: 'music', label: 'OpenXLR Music' }, { id: 'chat', label: 'OpenXLR Chat' }],
       tabs: [1, 2].map(id => ({ id, site: `https://site${id}.example`, channelId: id === 1 ? 'chat' : 'music', remember: false })) },
@@ -73,7 +77,11 @@ function fixture({ existing = [], recovery } = {}) {
       } },
     tabs: { onCreated: event(), onUpdated: event(), onRemoved: event(),
       async create(options) { (f.opened ??= []).push(options.url); },
+      async get(id) { const tab = f.tabs.find(item => item.id === id); if (!tab) throw new Error(`No tab with id: ${id}.`); return { ...tab }; },
+      async update(id, changes) { if (changes.active) f.activate(id); return { ...f.tabs.find(item => item.id === id) }; },
       async query(query) { return query.active ? f.tabs.filter(tab => tab.active) : [...f.tabs]; } },
+    windows: { async update(id, changes) { if (changes.focused) f.focused.push(id); return { id }; } },
+    action: { async openPopup(options) { if (f.popupError) throw new Error(f.popupError); f.popups.push(options?.windowId); } },
     offscreen: { async hasDocument() { return f.document; },
       async createDocument() { f.document = true; f.created = (f.created ?? 0) + 1; },
       async closeDocument() { f.document = false; f.active.clear(); f.closed = (f.closed ?? 0) + 1; } },
@@ -95,7 +103,13 @@ function fixture({ existing = [], recovery } = {}) {
     chrome.tabs.onUpdated.emit(id, { url: nextUrl }, tab);
   };
   let timer = 0;
-  vm.runInNewContext(workerSource, { chrome, HOST, MAX_TABS, deviceFor, errorText, siteOf, tabRecords, t,
+  f.native = async message => { f.ports.at(-1).onMessage.emit(message); await settle(); };
+  f.refresh = async () => {
+    for (const [id, callback] of [...f.timers]) if (f.timerDelays.get(id) === 100) { f.timers.delete(id); f.timerDelays.delete(id); callback(); }
+    await settle();
+    return f.posts.filter(message => message.type === 'tabs').at(-1)?.tabs;
+  };
+  vm.runInNewContext(workerSource, { chrome, HOST, MAX_TABS, deviceFor, errorText, notInvoked, siteOf, tabRecords, t,
     setTimeout(callback, delay) { f.timers.set(++timer, callback); f.timerDelays.set(timer, delay); return timer; },
     clearTimeout(id) { f.timers.delete(id); f.timerDelays.delete(id); } }, { filename: 'worker.mjs' });
   return f;
@@ -451,3 +465,129 @@ test('a fresh install opens the output access page and an update does not', { ti
   f.chrome.runtime.onInstalled.emit({ reason: 'install' }); await tick();
   assert.deepEqual(f.opened, ['chrome-extension://openxlr-test/devices.html']);
 });
+
+test('OpenXLR activation brings the tab forward and starts it while Chrome still holds the grant', { timeout: 2000 }, async () => {
+  const f = await readyFixture();
+  await f.native({ type: 'activate', tabId: 2, site: 'https://site2.example' });
+  assert.deepEqual(f.focused, [20]);
+  assert.equal(f.tabs.find(tab => tab.id === 2).active, true);
+  assert.deepEqual(f.tokens, [2]); assert.equal(f.active.get(2).deviceId, 'music-device');
+  assert.deepEqual(f.popups, []);
+  assert.equal((await f.request('snapshot')).value.requestedTabs.length, 0);
+  const listed = (await f.refresh()).find(tab => tab.id === 2);
+  assert.equal(listed.capturing, true); assert.equal(listed.activation, null);
+});
+
+test('without the grant the popup opens on the tab, and a refused press there asks for the toolbar', { timeout: 2000 }, async () => {
+  const f = await readyFixture(); f.permissionError = NOT_INVOKED;
+  await f.native({ type: 'activate', tabId: 2, site: 'https://site2.example' });
+  assert.deepEqual(f.popups, [20]); assert.equal(f.active.size, 0);
+  assert.deepEqual(Array.from((await f.request('snapshot')).value.requestedTabs), [2]);
+  let listed = (await f.refresh()).find(tab => tab.id === 2);
+  assert.equal(listed.activation, 'popup'); assert.equal(listed.capturing, false); assert.equal(listed.error, null);
+  // A press in a popup Chrome opened may not count as invoking the extension.
+  assert.match((await f.request('start', { id: 2 })).error, /not been invoked/);
+  assert.equal((await f.refresh()).find(tab => tab.id === 2).activation, 'browser');
+  // After a toolbar click Chrome grants it, and the request ends with the capture.
+  f.permissionError = null;
+  assert.equal((await f.request('start', { id: 2 })).error, undefined);
+  listed = (await f.refresh()).find(tab => tab.id === 2);
+  assert.equal(listed.capturing, true); assert.equal(listed.activation, null);
+  assert.equal((await f.request('snapshot')).value.requestedTabs.length, 0);
+});
+
+test('a browser that cannot open the popup leaves the activation to the user there', { timeout: 2000 }, async () => {
+  for (const missing of [true, false]) {
+    const f = await readyFixture(); f.permissionError = NOT_INVOKED;
+    if (missing) delete f.chrome.action.openPopup; else f.popupError = 'Could not find an active browser window.';
+    await f.native({ type: 'activate', tabId: 2, site: 'https://site2.example' });
+    assert.equal((await f.refresh()).find(tab => tab.id === 2).activation, 'browser');
+    assert.equal(f.active.size, 0);
+  }
+});
+
+test('an activation request is ignored unless it names a registered tab with a channel on its origin', { timeout: 2000 }, async () => {
+  const f = await readyFixture();
+  await f.native({ type: 'activate', tabId: 9, site: 'https://site2.example' });
+  await f.native({ type: 'activate', tabId: 2, site: 'https://site1.example' });
+  await f.native({ type: 'activate', tabId: '2', site: 'https://site2.example' });
+  await f.publish({ tabs: f.state.tabs.map(tab => tab.id === 2 ? { ...tab, channelId: null } : tab) });
+  await f.native({ type: 'activate', tabId: 2, site: 'https://site2.example' });
+  await f.publish({ tabs: f.state.tabs.map(tab => tab.id === 2 ? { ...tab, channelId: 'music' } : tab) });
+  f.tabs.find(tab => tab.id === 2).incognito = true;
+  await f.native({ type: 'activate', tabId: 2, site: 'https://site2.example' });
+  f.tabs.find(tab => tab.id === 2).incognito = false;
+  await f.publish({ preserveBrowserOutputs: false });
+  await f.native({ type: 'activate', tabId: 2, site: 'https://site2.example' });
+  assert.deepEqual(f.focused, []); assert.deepEqual(f.tokens, []); assert.deepEqual(f.popups, []);
+  assert.equal((await f.request('snapshot')).value.requestedTabs.length, 0);
+});
+
+test('another failure ends the request and reaches OpenXLR as the tab error', { timeout: 2000 }, async () => {
+  const f = await readyFixture(); f.permissionError = 'Permission denied';
+  await f.native({ type: 'activate', tabId: 2, site: 'https://site2.example' });
+  assert.deepEqual(f.popups, []);
+  let listed = (await f.refresh()).find(tab => tab.id === 2);
+  assert.equal(listed.activation, null); assert.equal(listed.error, 'Permission denied');
+  // The next request replaces the old error.
+  f.permissionError = NOT_INVOKED;
+  await f.native({ type: 'activate', tabId: 2, site: 'https://site2.example' });
+  listed = (await f.refresh()).find(tab => tab.id === 2);
+  assert.equal(listed.error, null); assert.equal(listed.activation, 'popup');
+});
+
+test('a waiting request ends after its timeout, on navigation and when routing is turned off', { timeout: 2000 }, async () => {
+  const f = await readyFixture(); f.permissionError = NOT_INVOKED;
+  await f.native({ type: 'activate', tabId: 2, site: 'https://site2.example' });
+  const timer = [...f.timerDelays].find(([, delay]) => delay === 120000)[0];
+  f.timers.get(timer)();
+  assert.equal((await f.refresh()).find(tab => tab.id === 2).activation, null);
+  await f.native({ type: 'activate', tabId: 2, site: 'https://site2.example' });
+  f.update(2, 'https://other.example/'); await settle();
+  assert.equal((await f.request('snapshot')).value.requestedTabs.length, 0);
+  await f.native({ type: 'activate', tabId: 1, site: 'https://site1.example' });
+  assert.deepEqual(Array.from((await f.request('snapshot')).value.requestedTabs), [1]);
+  await f.publish({ preserveBrowserOutputs: false }); await settle();
+  assert.equal((await f.request('snapshot')).value.requestedTabs.length, 0);
+  assert.equal([...f.timerDelays.values()].includes(120000), false);
+});
+
+test('a malformed saved output binding is repaired without blocking capture', { timeout: 2000 }, async () => {
+  for (const invalid of [null, [], 'corrupt', 42, true]) {
+    const f = await readyFixture();
+    f.bindings = invalid;
+    assert.equal((await f.request('start', { id: 1 })).error, undefined);
+    assert.equal(f.active.get(1).deviceId, 'chat-device');
+    assert.deepEqual(JSON.parse(JSON.stringify(f.bindings)), { chat: 'chat-device' });
+  }
+});
+
+test('repair keeps other valid output bindings and drops malformed values', { timeout: 2000 }, async () => {
+  const f = await readyFixture();
+  await f.publish({ channels: [...f.state.channels, { id: 'other', label: 'OpenXLR Other' }] });
+  f.bindings = { music: 'music-device', chat: null, other: { malformed: true }, removed: 'old-device' };
+  assert.equal((await f.request('start', { id: 1 })).error, undefined);
+  assert.deepEqual(JSON.parse(JSON.stringify(f.bindings)), { music: 'music-device', chat: 'chat-device' });
+});
+
+for (const change of ['disconnect', 'channel removal']) {
+  test(`an output lookup interrupted by ${change} preserves saved bindings`, { timeout: 2000 }, async () => {
+    const f = await readyFixture();
+    f.bindings = { music: 'music-device' };
+    const reading = deferred(), release = deferred();
+    f.chrome.storage.local.get = async () => {
+      reading.resolve(); await release.promise;
+      return { deviceBindings: f.bindings };
+    };
+    const starting = f.request('start', { id: 1 });
+    await reading.promise;
+    if (change === 'disconnect') f.ports.at(-1).onDisconnect.emit();
+    else await f.publish({ channels: f.state.channels.filter(channel => channel.id !== 'chat'),
+      tabs: f.state.tabs.map(tab => tab.id === 1 ? { ...tab, channelId: null } : tab) });
+    release.resolve();
+    assert.ok((await starting).error);
+    assert.deepEqual(JSON.parse(JSON.stringify(f.bindings)), { music: 'music-device' });
+    assert.equal(f.tokens.length, 0);
+    assert.equal(f.active.size, 0);
+  });
+}

@@ -489,7 +489,15 @@ public sealed class MatrixRowViewModel : ViewModelBase
         Raise(nameof(ShowsVolume));
         Raise(nameof(VolumeShowsMeter));
         Raise(nameof(Stacked));
+        Raise(nameof(ShowsReadout));
         Raise(nameof(Tall));
+        RaiseReadout();
+    }
+
+    private void RaiseReadout()
+    {
+        Raise(nameof(Readout));
+        Raise(nameof(ReadoutName));
     }
 
     /// <summary>The interface's input this row carries, whose gain and mute its head draws, or null.</summary>
@@ -569,7 +577,35 @@ public sealed class MatrixRowViewModel : ViewModelBase
     /// the EQ over the chain, so the row is as tall as the two need and at
     /// least the skin's row height, and its cells follow.
     /// </summary>
-    public bool Tall => Stacked || ShowsEq && Spec.Parts.Contains(SkinStripParts.Effects, StringComparer.Ordinal);
+    public bool Tall => Stacked || ShowsReadout || ShowsEq && Spec.Parts.Contains(SkinStripParts.Effects, StringComparer.Ordinal);
+
+    /// <summary>
+    /// The name column draws a readout under the processing button: the row
+    /// carries an interface's input and the head draws its gain. The row is
+    /// then tall, so the button and the readout fit at every control size.
+    /// </summary>
+    public bool ShowsReadout => (CarriesUnit || CarriesExtraUnit) && Spec.Parts.Contains(SkinStripParts.Gain, StringComparer.Ordinal);
+
+    private bool _volumeAdjusting;
+    /// <summary>True while the user is moving the row's volume fader; the fader writes it.</summary>
+    public bool VolumeAdjusting
+    {
+        get => _volumeAdjusting;
+        set
+        {
+            if (!Set(ref _volumeAdjusting, value)) return;
+            Raise(nameof(Readout));
+            Raise(nameof(ReadoutName));
+        }
+    }
+
+    /// <summary>The readout's text: the input's gain, or the channel's volume while its fader moves.</summary>
+    public string Readout => _volumeAdjusting ? Channel.VolumeText : Unit?.GainText ?? ExtraUnit?.GainText ?? "";
+
+    /// <summary>What the readout shows, for a screen reader and its tooltip.</summary>
+    public string ReadoutName => _volumeAdjusting
+        ? Localizer.Format("ChannelVolumeName", Channel.Name)
+        : Unit?.GainName ?? ExtraUnit?.GainName ?? "";
 
     /// <summary>The head draws the input's binding under the name, unless the skin hides it.</summary>
     public bool ShowsBinding => Kind is InputStripKind.Xlr1 or InputStripKind.Xlr2 or InputStripKind.Capture
@@ -665,8 +701,10 @@ public sealed class MatrixRowViewModel : ViewModelBase
                 Raise(nameof(LeftLevelName));
                 Raise(nameof(RightLevelName));
                 Raise(nameof(ProcessingName));
+                if (_volumeAdjusting) Raise(nameof(ReadoutName));
                 foreach (MatrixCellViewModel cell in Cells) cell.RefreshNames();
                 break;
+            case nameof(ChannelViewModel.VolumeText) when _volumeAdjusting: Raise(nameof(Readout)); break;
             case nameof(ChannelViewModel.HasVolume): RefreshSpec(); break;
             case nameof(ChannelViewModel.Inserts): Raise(nameof(Inserts)); Raise(nameof(InsertsKey)); RefreshSpec(); break;
             case nameof(ChannelViewModel.HasEq): Raise(nameof(ShowsEq)); Raise(nameof(Tall)); break;
@@ -721,6 +759,7 @@ public sealed class MatrixRowViewModel : ViewModelBase
         // An additional unit raises every name at once after a state.
         if (e.PropertyName is null or nameof(UnitInputViewModel.HasSwitches) or nameof(UnitInputViewModel.SwitchesOn)
             or nameof(UnitInputViewModel.PhantomShown)) RaiseSwitches();
+        if (e.PropertyName is null or nameof(UnitInputViewModel.GainText) or nameof(UnitInputViewModel.GainName)) RaiseReadout();
     }
 
     private void RaiseSwitches()

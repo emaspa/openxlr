@@ -2,6 +2,7 @@
 """Build the Chrome Web Store package of the browser companion.
 
     python3 -I tools/browser-extension.py OUTPUT_DIR [--key-pem PATH]
+    python3 -I tools/browser-extension.py OUTPUT_DIR --unpacked
     python3 -I tools/browser-extension.py --check
 
 Writes openxlr-browser-<version>.zip from browser/chromium. The Store
@@ -11,11 +12,19 @@ key as key.pem at the zip root; the Store then keeps the id the public key
 in the source manifest pins, which the native host manifest allows. A zip
 built with --key-pem holds a private key and is never published anywhere
 else. The zip is reproducible: sorted entries, fixed timestamps and modes.
---check builds into a temporary directory and validates the result.
+
+--unpacked writes openxlr-browser-<version>.tar.gz instead, the copy a
+release offers for Load unpacked. It keeps the manifest's public key, so the
+loaded extension has the id the native host allows, and it is not a zip
+because OpenDeck offers every zip on the latest release as a deck plugin.
+Its files sit under openxlr-browser-<version>/, also reproducible.
+
+--check builds both into a temporary directory and validates them.
 Standard library only; --key-pem also needs the openssl command.
 """
 import argparse
 import base64
+import gzip
 import hashlib
 import io
 import json
@@ -24,6 +33,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import tarfile
 import tempfile
 import zipfile
 from pathlib import Path, PurePosixPath
@@ -35,6 +45,7 @@ EXTENSION_ID = "beeohanoffjpcofbjiiamkdammhcihaf"
 ICON_SIZES = (16, 32, 48, 128)
 # 1980-01-01 is the earliest time a zip entry can record.
 STAMP = (1980, 1, 1, 0, 0, 0)
+STAMP_SECONDS = 315532800
 REFERENCE = re.compile(r"""^\.?/?[\w./-]+\.(?:html|mjs|js|css|png|json)$""")
 
 
@@ -148,17 +159,30 @@ def validate(path, key_pem=False):
         problems.append("entries are not sorted")
     if any(i.date_time != STAMP for i in infos):
         problems.append("an entry carries a build time")
-    if "manifest.json" not in files:
-        return problems + ["manifest.json is missing"]
-    try:
-        manifest = json.loads(files["manifest.json"])
-    except ValueError as error:
-        return problems + [f"manifest.json is not JSON: {error}"]
+    manifest, problem = read_manifest(files)
+    if manifest is None:
+        return problems + [problem]
     if "key" in manifest:
         problems.append("the manifest still carries a key, which the Store refuses")
     if ("key.pem" in files) != key_pem:
         problems.append("key.pem is present" if not key_pem else "key.pem is missing")
-    for name in names:
+    return problems + package_problems(manifest, files)
+
+
+def read_manifest(files):
+    """The manifest of a package's files, or None and the reason."""
+    if "manifest.json" not in files:
+        return None, "manifest.json is missing"
+    try:
+        return json.loads(files["manifest.json"]), None
+    except ValueError as error:
+        return None, f"manifest.json is not JSON: {error}"
+
+
+def package_problems(manifest, files):
+    """What both packages must hold: no tests, the icons, every reference."""
+    problems = []
+    for name in files:
         if "tests/" in name or ".test." in name:
             problems.append(f"{name} is a test file")
     action = manifest.get("action", {})
@@ -182,6 +206,61 @@ def validate(path, key_pem=False):
     return problems
 
 
+def build_unpacked(output, source=SOURCE):
+    """Write the release's tar.gz into the directory output and return its path."""
+    version = json.loads((source / "manifest.json").read_text())["version"]
+    top = f"openxlr-browser-{version}"
+    buffer = io.BytesIO()
+    # A fixed gzip and entry time, owner and mode make two builds identical.
+    with gzip.GzipFile(filename="", mode="wb", fileobj=buffer, mtime=0) as compressed, tarfile.open(fileobj=compressed, mode="w", format=tarfile.PAX_FORMAT) as archive:
+        directories = sorted({str(d) for n in source_files(source) for d in PurePosixPath(n).parents} - {"."})
+        for name in [top] + [f"{top}/{d}" for d in directories]:
+            info = tarfile.TarInfo(name)
+            info.type, info.mode, info.mtime = tarfile.DIRTYPE, 0o755, STAMP_SECONDS
+            archive.addfile(info)
+        for name in source_files(source):
+            data = (source / name).read_bytes()
+            info = tarfile.TarInfo(f"{top}/{name}")
+            info.size, info.mode, info.mtime = len(data), 0o644, STAMP_SECONDS
+            archive.addfile(info, io.BytesIO(data))
+    output = Path(output)
+    output.mkdir(parents=True, exist_ok=True)
+    path = output / f"{top}.tar.gz"
+    path.write_bytes(buffer.getvalue())
+    return path
+
+
+def validate_unpacked(path):
+    """Problems with a built tar.gz, as a list of sentences."""
+    problems = []
+    with tarfile.open(path) as archive:
+        members = archive.getmembers()
+        files = {m.name: archive.extractfile(m).read() for m in members if m.isfile()}
+    tops = {m.name.split("/")[0] for m in members}
+    if len(tops) != 1:
+        return [f"the files must sit under one directory, not {', '.join(sorted(tops))}"]
+    top = tops.pop()
+    if any(m.mtime != STAMP_SECONDS or m.uid or m.gid or m.uname or m.gname for m in members):
+        problems.append("an entry carries a build time or an owner")
+    if any(not (m.isfile() or m.isdir()) for m in members):
+        problems.append("an entry is neither a file nor a directory")
+    files = {name[len(top) + 1:]: data for name, data in files.items()}
+    manifest, problem = read_manifest(files)
+    if manifest is None:
+        return problems + [problem]
+    if top != f"openxlr-browser-{manifest.get('version')}":
+        problems.append(f"the directory {top} does not name the manifest's version")
+    try:
+        key_id = extension_id(base64.b64decode(manifest["key"]))
+    except (KeyError, ValueError, TypeError):
+        key_id = None
+    if key_id != EXTENSION_ID:
+        problems.append(f"the manifest key must give id {EXTENSION_ID}, the one the native host allows")
+    if "key.pem" in files:
+        problems.append("key.pem is present")
+    return problems + package_problems(manifest, files)
+
+
 def check():
     problems = []
     source = json.loads((SOURCE / "manifest.json").read_text())
@@ -200,6 +279,12 @@ def check():
             problems.append("two builds differ")
         with zipfile.ZipFile(built) as archive:
             count = len(archive.namelist())
+        unpacked = build_unpacked(first)
+        if unpacked.name != f"openxlr-browser-{source['version']}.tar.gz":
+            problems.append(f"unexpected archive name {unpacked.name}")
+        problems += validate_unpacked(unpacked)
+        if unpacked.read_bytes() != build_unpacked(second).read_bytes():
+            problems.append("two unpacked builds differ")
     for problem in problems:
         print(f"browser-extension: {problem}", file=sys.stderr)
     print(f"browser-extension: {count} files, {'ok' if not problems else str(len(problems)) + ' problems'}")
@@ -208,18 +293,25 @@ def check():
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("output", nargs="?", help="directory the zip is written to")
+    parser.add_argument("output", nargs="?", help="directory the package is written to")
     parser.add_argument("--key-pem", metavar="PATH", help="private key added as key.pem, for the first Store upload only")
+    parser.add_argument("--unpacked", action="store_true", help="write the release tar.gz for Load unpacked, with the manifest key")
     parser.add_argument("--check", action="store_true", help="build into a temporary directory and validate")
     args = parser.parse_args(argv)
     if args.check:
-        if args.output or args.key_pem:
+        if args.output or args.key_pem or args.unpacked:
             parser.error("--check takes no other argument")
         return check()
     if not args.output:
         parser.error("name the output directory")
-    path = build(args.output, args.key_pem)
-    problems = validate(path, key_pem=args.key_pem is not None)
+    if args.unpacked and args.key_pem:
+        parser.error("--unpacked never carries the private key")
+    if args.unpacked:
+        path = build_unpacked(args.output)
+        problems = validate_unpacked(path)
+    else:
+        path = build(args.output, args.key_pem)
+        problems = validate(path, key_pem=args.key_pem is not None)
     for problem in problems:
         print(f"browser-extension: {problem}", file=sys.stderr)
     print(path)

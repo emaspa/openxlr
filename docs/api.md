@@ -82,6 +82,7 @@ Messages from the daemon, each a JSON object with a `type` field:
 | `nativeEditorRules` | in answer to `getNativeEditorRules` or `setNativeEditorRule` | `rules` with `kind`, `plugin`, `name`, `reason`, `defaultBlocked`, `override` and effective `blocked`; `error` describes a refused change or unreadable configuration |
 | `nativeEditorRulesChanged` | after a successful rule change | notification to refresh the catalogue and editor availability; no plugin rescan is needed |
 | `browserSession` | in answer to `getBrowserSession` over WebSocket | `session`, a server-generated 32-character hexadecimal id owned by that connection; see [browser tabs](#browser-tabs) |
+| `browserTabActivation` | to the browser companion connection that registered the tab, after an accepted `activateBrowserTab` | `tabId` and `site`, the tab's canonical origin; no other client receives it. See [browser tabs](#browser-tabs) |
 | `pluginDiagnostics` | in answer to `getPluginDiagnostics` | `discovery`: daemon host/controller paths, Wine prefix, architecture, effective search paths, bounded `yabridgectl status` output and latest completed CLAP/VST3 scan reports. A scan entry that failed carries `logId`, the name of the file holding that attempt's bounded scanner output, or `logNote` saying why there is none; both are absent from an entry that did not fail and from one an older daemon recorded. `scanLogs` gives the `directory` those files are in and the bounds they are kept under (`stderrCapBytes`, `traceStderrCapBytes`, `traceCaptureBytes`, `stdoutCapBytes`, `maxFiles`, `maxTotalBytes`). Reading the reply or the directory scans nothing and starts no process |
 | `pluginInstall` | in answer to `installPlugin`, `addPluginSearchPath`, `removePluginSearchPath`, `addWindowsPluginFolder`, `removeWindowsPluginFolder`, `removeWindowsPluginInserts`, `setWindowsPluginEnabled`, `deleteWindowsPlugin`, `syncWindowsPlugins` and `rescanPlugins` | `ok`, `message` (a sentence or two for the user, ending with the bundles the scan that followed could not read, up to three by name and the rest as a count), `installed` (the bundles or folders put in place), `added` (plugins in the catalogue that were not before) and `total` |
 | `error` | when a command without a `requestId` is rejected | `message`; for the mixer commands a `state` follows, so an optimistic edit can be reverted |
@@ -100,7 +101,7 @@ failed reads and the unit has not answered yet, `state` holds the last values
 read from it and `warning` says the unit does not answer.
 
 The state message in full. At the top level: `daemonVersion`, `daemonBuildId`, `warning`,
-`connected`, `device` (`vendor`, `model`, `usbId`; when the unit is driven differently from the usual, `note`: today an XLR Dock taking a control through its config block, or a Wave:3 or Wave:1 whose ALSA card was not found, so the desktop's volume controls are not kept in step; and `firmware`, the version the unit reports, on a model that reports one, today the Wave:3, the Wave:1, the MK.2 family and the Wave XLR Pro), `capabilities` (`gain`,
+`connected`, `device` (`vendor`, `model`, `usbId`; when the unit is driven differently from the usual, `note`: today an XLR Dock taking a control through its config block, or a Wave XLR, Wave:3 or Wave:1 whose ALSA card was not found, so the desktop's volume controls are not kept in step; and `firmware`, the version the unit reports, on a model that reports one, today the Wave:3, the Wave:1, the MK.2 family and the Wave XLR Pro), `capabilities` (`gain`,
 `mute`, `lowCut`, `expander`, `voiceTune`, `hpVolume`, `lowImpedance`,
 `crossfade`, `phantom`, `clipGuard`, `compressor`, `outputRouting`,
 `auxInput`, `xlrInputs`, `xlrJacks` (false on the Wave:3 and Wave:1, whose one input is the microphone's own capsule rather than an XLR jack), `hpOutputs`, `physicalControls`, `retainsSettings`, `hardwareEq` (the unit's DSP runs the [microphone EQ](#microphone-eq) and the driver can write it: true on the Wave XLR MK.2 and the XLR Dock MK.2 from firmware 1.0.15 and on the Wave XLR Pro from firmware 1.0.14, false on every other model and on older firmware), `ducking` (the unit can run [ducking](#ducking) on its own processor: true on the Wave XLR Pro only),
@@ -217,6 +218,7 @@ that final acknowledgement (or an `error` without a request id):
 | `getBrowserSession` | none | WebSocket only; register this connection as a browser companion and return its `browserSession`. Repeated calls on the same connection return the same id |
 | `syncBrowserTabs` | `session`, `tabs` | WebSocket only; replace this companion's complete tab list. Only the connection that obtained the session may publish it; see [browser tabs](#browser-tabs) |
 | `assignBrowserTab` | `session`, `tabId`, `site`, `channel`, `remember` | select an application channel or `null` for browser default for a connected tab. Required `site` is the origin the caller saw; an assignment is refused if that tab has navigated to another origin. `remember` must be boolean; true saves the website origin preference, and `channel:null, remember:true` forgets it. False changes only this tab |
+| `activateBrowserTab` | `session`, `tabId`, `site` | ask the companion that registered a connected tab to bring it forward and start routing it, as its own Activate does. Refused unless `preserveBrowserOutputs` is on, `site` still matches the tab's origin, the tab has a channel, and it is neither capturing nor reporting an `activation`. Success means the request reached the companion, not that capture started; see [browser tabs](#browser-tabs) |
 | `setPreserveBrowserOutputs` | `value` | boolean only; explicitly enable or disable preservation of Chromium-family playback outputs. Saved in `mixer.json`, never recalled by a profile. Registration alone does not enable it |
 | `setMonitorMuteMicrophones` | `value` | boolean only, false by default; include XLR 1, XLR 2 and mono capture channels in the monitoring pause, across every OpenXLR mix. Stereo captures, Aux In and application channels keep playing. Saved only in `mixer.json`; takes effect immediately without restarting the daemon. See [monitoring and microphones](#monitoring-and-microphones) |
 | `listPlugins` | none | the installed LV2, CLAP and VST3 plugins, answered with a `plugins` message |
@@ -264,6 +266,7 @@ that final acknowledgement (or an `error` without a request id):
 | `setDucking` | `value` | change the [ducking](#ducking) setup: an object with any of `enabled`, `key`, `channels`, `mixes`, `sensitivity`, `amount`, `speed`; the fields it leaves out keep their values and an unknown one is refused. Saved in `mixer.json` before it applies. Needs the software mixer, on any device or none |
 | `setDuckingProcessing` | `value` | where [ducking](#ducking) should run: `device` (the default) on the unit when the setup fits it, or `software` on this computer. The Wave XLR Pro does not run it yet, so `device` runs in software there with the reason in the state. Saved in `mixer.json`, never in a profile |
 | `resetDevice` | none | write the recorded defaults back to a device using connect-time restoration and forget its last settings (an error until the daemon has seen the device connect after a power cycle once); on the Wave XLR Pro, which keeps its own settings, write OpenXLR's baseline instead: gain 30 dB on both inputs, every processing stage and phantom off, headphones and aux level at half, the crossfade fully on PC, routing untouched, refused while the gain lock is on. The capabilities say `builtInDefaults` when a model has a baseline |
+| `restartDaemon` | none | stop cleanly with exit code 75, so a service manager with `Restart=on-failure` or `Restart=always` starts the daemon again; a daemon run by hand just stops. The Flatpak UI sends it to a daemon running as a user service ([Flatpak](flatpak.md)) |
 | `getDiagnostics` | none | vendor block dump for bug reports |
 
 Profiles live in one directory per connected interface model. While no
@@ -970,7 +973,8 @@ A companion authenticates a WebSocket, calls `getBrowserSession`, then
 publishes `syncBrowserTabs` with that session and its full `tabs` array.
 Each entry has `id` (a distinct non-negative integer), `site` (an HTTP or
 HTTPS origin, at most 512 characters), `title` (at most 160 characters),
-`capturing` (boolean), and optional `error` (at most 200 characters).
+`capturing` (boolean), optional `error` (at most 200 characters) and
+optional `activation` (`starting`, `popup`, `browser` or null; see below).
 Origins cannot contain credentials, a browsing path, query or fragment.
 Titles and errors cannot contain control characters. The daemon normalizes
 origins to the form a Chromium browser serializes them in, for example
@@ -983,7 +987,8 @@ register. The normal 64 KiB incoming-frame limit also applies.
 At most eight companions and 128 tabs per companion can be registered.
 
 The mixer state's `browserTabs` entries carry `session`, `id`, `site`,
-`title`, `channelId`, `remember`, `capturing` and optional `error`.
+`title`, `channelId`, `remember`, `capturing`, optional `error` and optional
+`activation`.
 `channelId:null` explicitly means browser default. Title and capture updates
 on the same origin preserve the tab's choice. Navigation to another origin
 clears its temporary choice and uses the new origin's saved default, if any.
@@ -992,7 +997,8 @@ The shared `title` is empty unless the tab is capturing or has a non-null
 available for selection and navigation checks. The daemon coalesces
 title-only changes to the latest value on a one-second timer. An identical
 list, including one sent in a different order, causes no state broadcast.
-Changes to the tab list, origins, capture or errors publish immediately.
+Changes to the tab list, origins, capture, errors or activation publish
+immediately.
 Deleting a channel moves remembered website defaults to the fallback
 application channel; tab-only choices for it return to browser default.
 `capturing` and `error` describe the browser's last report,
@@ -1005,6 +1011,25 @@ such as `https://EXAMPLE.com:443/` and `https://example.com` match. Only the
 owning socket can replace the tab metadata. Closing it removes its runtime
 tabs and frees the companion slot. Reconnect, authenticate, get a new session and resync;
 there is no heartbeat or persisted session id.
+
+A controller can ask for capture with `activateBrowserTab`. The daemon
+checks the tab as it does for `assignBrowserTab` and sends a
+`browserTabActivation` message with `tabId` and `site` to the companion's
+connection alone, since the session is that connection. The browser lets
+the companion capture a tab only after the user invoked the extension on
+that tab, by its toolbar button or keyboard shortcut, and that grant ends
+when the tab navigates. The companion brings the tab's
+window and the tab forward and starts it as its popup's Activate would.
+While it works on the request the tab reports `activation:"starting"`. If
+the browser still holds the grant, capture starts and `activation` is
+cleared. Otherwise the companion opens its popup on the tab where the
+browser allows that (`popup`); when it cannot, or a press in that popup
+is refused too, the tab reports `browser`, meaning the user has to invoke
+the extension on the tab and press Activate there. Any other failure clears
+`activation` and sets the tab's `error`. The companion drops a request after
+two minutes, on navigation to another origin, when the tab closes or when
+`preserveBrowserOutputs` is turned off. A companion that predates this
+command ignores the message and never reports `activation`.
 
 With `remember:true`, a non-null channel saves a default for the origin and
 applies to other tabs from it that have no tab-only choice. At most 128
@@ -1611,7 +1636,7 @@ rule that fails gives `reason`:
 |---|---|---|
 | the software mixer runs | `mixerOff` | The software mixer is off, so ducking does not run. |
 | the key carries the unit's input 1 | `keyNotSupported` | The Wave XLR Pro ducks only with XLR 1 as the key. |
-| the unit's ducking is heard on the jacks: no target mix is heard on them while the unit cannot reach them | `monitorReturn` | The Wave XLR Pro ducks inside its own mix, and OpenXLR feeds the jacks around that mix, so this computer ducks. |
+| the unit's ducking is heard on the jacks: no target mix is heard on them while the last read shows the jacks' feed outside the mix they play | `monitorReturn` | The jacks' feed is not in the Wave XLR Pro's headphone mix, where it ducks, so this computer ducks. |
 | the unit's ducking is known to reach the USB Aux port: no target mix is heard there until it is | `auxNotChecked` | Ducking on the Wave XLR Pro's USB Aux port has not been checked by ear yet, so this computer ducks. |
 | every target mix that is heard is heard only on the unit: a monitor mix in the jacks' feed, or the Aux mix on the USB Aux port, and on no other output, virtual microphone or feed | `mixElsewhere` | Monitor A also plays on Speakers, which the Wave XLR Pro cannot duck. |
 | when one mix of the jacks' feed is ducked, all of them are | `sharedOutput` | The jacks play Monitor A and Chat together, and only Monitor A is ducked. |
@@ -1620,9 +1645,11 @@ rule that fails gives `reason`:
 | the unit kept the ducking written to it (two misses fail it) | `failed` | The Wave XLR Pro did not keep the ducking written to it. Switch ducking off and on to try again. |
 | the unit answers a read of its ducking block | `unsupportedBlock` | The Wave XLR Pro did not answer a read of its ducking block. |
 
-On the Wave XLR Pro both of these fail today, so it reports the unit's
-side and runs ducking in software: the unit ducks inside its own mix, and
-OpenXLR feeds the jacks through the monitor return, which goes around it.
+On the Wave XLR Pro the jacks pass once a poll reads their feed in the
+mix they play, which OpenXLR sets whenever a jack is a monitor output.
+`monitorReturn` shows for the sweep before that read, or while another
+program holds the feed out of the mix. The USB Aux port fails
+`auxNotChecked` until it is checked by ear.
 A target mix no output, virtual microphone or feed hears is left out of
 these rules; a setup whose target mixes nobody hears runs on the unit with
 no pairs ducked. The unit ducks the pairs `outputs` names.

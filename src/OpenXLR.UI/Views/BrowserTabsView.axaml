@@ -50,8 +50,14 @@
                             IsEnabled="{Binding CanRemember}" Margin="0,0,12,4"
                             Content="{loc:Text Key=BrowserTabRemember}" ToolTip.Tip="{loc:Text Key=BrowserTabRememberHint}"/>
                   <Button Name="BrowserTabForgetWebsite" Content="{loc:Text Key=BrowserTabForgetWebsite}"
-                          IsEnabled="{Binding CanEdit}" Margin="0,0,0,4" Padding="8,4"
+                          IsEnabled="{Binding CanEdit}" Margin="0,0,12,4" Padding="8,4"
                           ToolTip.Tip="{loc:Text Key=BrowserTabForgetWebsiteHint}" Click="OnForgetWebsite"/>
+                  <!-- Shown only when it can start something: routing on, a
+                       channel chosen, and the tab neither routed nor waiting. -->
+                  <Button Name="BrowserTabActivate" Content="{loc:Text Key=BrowserTabActivate}"
+                          IsVisible="{Binding CanActivate}" Margin="0,0,0,4" Padding="8,4"
+                          AutomationProperties.Name="{Binding Title, StringFormat={loc:Text Key=BrowserTabActivateName}}"
+                          ToolTip.Tip="{loc:Text Key=BrowserTabActivateHint}" Click="OnActivate"/>
                 </WrapPanel>
                 <TextBlock Name="BrowserTabStatus" Text="{Binding StatusText}" Classes="note" TextWrapping="Wrap"/>
               </StackPanel>

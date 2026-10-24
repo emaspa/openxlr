@@ -20,7 +20,7 @@ public sealed class DuckingPlacementTests
     [Theory]
     [InlineData("mixerOff", "The software mixer is off, so ducking does not run.")]
     [InlineData("keyNotSupported", "The Wave XLR Pro ducks only with XLR 1 as the key.")]
-    [InlineData("monitorReturn", "The Wave XLR Pro ducks inside its own mix, and OpenXLR feeds the jacks around that mix, so this computer ducks.")]
+    [InlineData("monitorReturn", "The jacks' feed is not in the Wave XLR Pro's headphone mix, where it ducks, so this computer ducks.")]
     [InlineData("mixElsewhere", "Monitor A also plays on Speakers, which the Wave XLR Pro cannot duck.")]
     [InlineData("sharedOutput", "The jacks play Monitor A and Monitor B together, and only Monitor A is ducked.")]
     [InlineData("partialMix", "Voice Chat plays in Monitor A and is not ducked; the Wave XLR Pro lowers a whole output.")]

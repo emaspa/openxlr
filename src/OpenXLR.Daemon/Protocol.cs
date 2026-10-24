@@ -364,6 +364,14 @@ public sealed record BrowserSessionMessage(string Session)
     [JsonPropertyName("type")] public string Type => "browserSession";
 }
 
+/// <summary>An activateBrowserTab request, sent only to the companion connection that registered the tab.</summary>
+public sealed record BrowserTabActivationMessage(
+    [property: JsonPropertyName("tabId")] int TabId,
+    [property: JsonPropertyName("site")] string Site)
+{
+    [JsonPropertyName("type")] public string Type => "browserTabActivation";
+}
+
 public sealed record ErrorMessage
 {
     public ErrorMessage(string message) => Message = message;

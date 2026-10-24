@@ -2746,7 +2746,7 @@ Von OpenXLR gesteuertes Interface wählen</value>
     <value>Schnell</value>
   </data>
   <data name="DuckingHint" xml:space="preserve">
-    <value>Ducking senkt die gewählten Kanäle in den gewählten Mixen ab, solange das Auslösemikrofon laut ist. Dieser Computer übernimmt das auf jedem Gerät, auch auf dem Wave XLR Pro: Das Pro senkt in seinem eigenen Mix ab, über den die Buchsen noch nicht laufen.</value>
+    <value>Ducking senkt die gewählten Kanäle in den gewählten Mixen ab, solange das Auslösemikrofon laut ist. Dieser Computer übernimmt das, oder das Wave XLR Pro auf seinem eigenen Prozessor, wenn die Einstellung zu dem passt, was das Gerät kann.</value>
   </data>
   <data name="DuckingNotHeld" xml:space="preserve">
     <value>Das Gerät hält diese Einstellung noch nicht; OpenXLR schreibt sie in wenigen Sekunden erneut.</value>
@@ -2857,7 +2857,7 @@ Von OpenXLR gesteuertes Interface wählen</value>
     <value>BROWSER-TABS</value>
   </data>
   <data name="BrowserTabCaptureHint" xml:space="preserve">
-    <value>Audio für jeden Tab in der Browser-Erweiterung aktivieren. Die Kanalauswahl hier startet keine Tab-Audioübernahme.</value>
+    <value>Mit Aktivieren das Audio eines Tabs übernehmen, hier oder in der Browser-Erweiterung. Die Kanalauswahl allein startet keine Tab-Audioübernahme.</value>
   </data>
   <data name="BrowserTabCaptureState" xml:space="preserve">
     <value>Status der Tab-Audioübernahme</value>
@@ -2881,7 +2881,25 @@ Von OpenXLR gesteuertes Interface wählen</value>
     <value>Audioübernahme aktiv</value>
   </data>
   <data name="BrowserTabActivationRequired" xml:space="preserve">
-    <value>Audio in der Browser-Erweiterung aktivieren.</value>
+    <value>Mit Aktivieren das Audio dieses Tabs übernehmen.</value>
+  </data>
+  <data name="BrowserTabActivate" xml:space="preserve">
+    <value>Aktivieren</value>
+  </data>
+  <data name="BrowserTabActivateName" xml:space="preserve">
+    <value>Browser-Tab {0} aktivieren</value>
+  </data>
+  <data name="BrowserTabActivateHint" xml:space="preserve">
+    <value>Holt diesen Tab im Browser nach vorn und startet die Übernahme seines Audios. Eventuell muss der Vorgang im Browser abgeschlossen werden.</value>
+  </data>
+  <data name="BrowserTabActivating" xml:space="preserve">
+    <value>Wird im Browser gestartet...</value>
+  </data>
+  <data name="BrowserTabActivatePopup" xml:space="preserve">
+    <value>Im Browser abschließen: im OpenXLR-Popup Diesen Tab aktivieren drücken.</value>
+  </data>
+  <data name="BrowserTabActivateToolbar" xml:space="preserve">
+    <value>Im Browser abschließen: in diesem Tab auf das OpenXLR-Symbol in der Symbolleiste klicken oder sein Tastenkürzel drücken, dann Diesen Tab aktivieren drücken.</value>
   </data>
   <data name="BrowserTabUsesDefault" xml:space="preserve">
     <value>Verwendet das Standardziel des Browsers</value>

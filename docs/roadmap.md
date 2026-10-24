@@ -14,15 +14,22 @@ the docs say it is coded or in beta. The project is small on
 purpose. It prefers one small, idiomatic change over a framework, and a
 feature that is measured over one that is described.
 
-## Where it stands (0.2.0)
+## Where it stands (0.2.3)
 
-This is what 0.2.0 ships. A checked item is in the released packages.
+This is what 0.2.3 ships. A checked item is in the released packages.
 
 - [x] Wave XLR Pro, XLR Dock (MK.1 and MK.2 modules), Wave XLR, Wave XLR
   MK.2: hardware controls, verified by owners of each device.
-- [x] Wave:3, in beta: gain, mute, headphone volume and the monitor
-  balance from one user's quick test, the rest coded from public
-  research ([hardware-support.md](hardware-support.md)).
+- [x] Wave:3 and Wave:1: every Wave:3 control writes and reads
+  back on the maintainer's unit, and a Wave:1 owner confirmed gain, mute
+  and headphone volume ([hardware-support.md](hardware-support.md)).
+- [x] Ducking on every device, and on the Wave XLR Pro's own processor
+  for a setup it can run; a microphone EQ on XLR 1, XLR 2 and mono capture
+  inputs, on the unit where the hardware has one; Sound Check.
+- [x] Capture inputs with their own insert chain, EQ and Sound Check;
+  browser tabs routed to channels through the Chromium companion; skins,
+  with Broadcast and Wave drawing the mixer as a matrix; the UI in seven
+  languages.
 - [x] Submixer: hardware and application channels, the monitor mixes
   (Monitor A, Monitor B), virtual microphones (Stream and Chat by
   default) and Aux; an editable layout (channels and microphones added,
@@ -304,8 +311,8 @@ while fixes to existing hosts remain part of normal maintenance.
   editor's badge, older-firmware note and switch between the unit and
   software, which the terminal mixer offers too
   ([api.md](api.md#where-the-eq-runs)), and on the Wave XLR Pro's two
-  inputs from firmware 1.0.14, coded from Wave Link captures, with one
-  bell measured on the desk. Capture microphones, any capture input on
+  inputs from firmware 1.0.14, coded from Wave Link captures and
+  verified on hardware. Capture microphones, any capture input on
   one mono port, have it too, in software only
   ([api.md](api.md#eq-on-capture-inputs)). Then the terminal mixer's editor
   and the OpenDeck plugin.
@@ -363,18 +370,17 @@ while fixes to existing hosts remain part of normal maintenance.
   directory already used by the release workflows; the PPA source package
   carries the NuGet packages (packaging/ppa/make-source.sh) because
   Launchpad builders have no network.
-- [ ] Flatpak on Flathub. The Flatpak mode and the manifest are on main
-  as experimental ([flatpak.md](flatpak.md)): the sandbox cannot install
+- [x] An experimental Flatpak, built from the manifest on main
+  ([flatpak.md](flatpak.md)). It will not be submitted to Flathub, whose
+  rules do not allow AI-assisted development: the sandbox cannot install
   the udev rules, the WirePlumber rules, the UCM profile or the systemd
   unit, so the UI starts the daemon as a child process and uses the
   background portal for login start, the daemon logs to a file instead
   of the journal, the WirePlumber rules are written to the user's config
   directory, the udev rule is a documented copy, and the UCM profile
-  stays a manual step. LV2 inserts follow the Flathub audio plugin
-  extension instead of host plugins. The watchdog does not work in the
-  sandbox, so the packaged units stay the recommended install and the
-  Flatpak covers the distributions without a package. Open: the Flathub
-  submission.
+  stays a manual step. LV2 inserts follow the LinuxAudio plugin
+  extensions instead of host plugins. The watchdog does not work in the
+  sandbox, so the packaged units stay the recommended install.
 
 ## Devices
 
@@ -383,40 +389,41 @@ while fixes to existing hosts remain part of normal maintenance.
   bytes 3 to 17 of the settings block,
   several of which change the level (likely compressor and expander
   parameters).
-- [ ] Pro: the remaining hardware mix matrix (which return feeds which
-  jack, per-return levels), now that the headphone mix bytes are known
-  (see the protocol notes, block 0x0001 bytes 12 and 13). Direct control
-  of that matrix from the UI is the long-term answer to the
-  crossfade and mic-monitoring questions.
-- [ ] The microphone EQ on hardware. On firmware 1.0.15 the XLR Dock
+- [ ] Pro: a hardware mixing mode. The layout of block 0x0001 is known
+  ([protocol notes section 12](wave-xlr-pro-protocol.md#12-the-mix-sections-and-the-jacks-desk-probe-of-2026-10-23)):
+  five mix sections, each with a level per source and a membership mask,
+  each selectable for a jack and streamed back on its own capture pair. A
+  mode that builds the mixes in the unit, one USB pair per channel, would
+  give Wave Link's per-channel ducking and mixing without the computer in
+  the path, at the cost of eight channels, five mixes and no plugin inserts
+  on a mix. Desk probes come first: whether the unit takes level and
+  membership changes live, the gain of each section, and the latency of
+  the returned mixes.
+- [x] The microphone EQ on hardware. On firmware 1.0.15 the XLR Dock
   MK.2 and the Wave XLR MK.2 run a four-band equalizer on the device
   behind a master enable bit, as Wave Link 3.5 writes it; on the dock's
   firmware 1.0.0 Wave Link ran it on the computer
   ([findings](mk2-eq-findings.md)). Measured on the dock from Linux with
   the enable bit set, its filters match the software EQ's for the same
-  values, and the daemon now drives it there, not yet run from OpenXLR on
-  either MK.2 unit ([api.md](api.md#where-the-eq-runs)).
+  values, and the daemon drives it there, tested on hardware
+  ([api.md](api.md#where-the-eq-runs)).
   The Wave XLR Pro holds the same layout once per input; Wave Link 3.5
   was captured writing it on firmware 1.0.14, and the daemon drives both
   inputs there too
   ([hardware support](hardware-support.md#wave-xlr-pro-0fd900b4)).
   Every other model and older firmware keep the
   [microphone EQ](#later-plugins) in software. The editor and the terminal
-  mixer switch each microphone between the unit and software. On the Pro
-  one bell was measured on the desk: +12 dB at 5 kHz read +12.3 to
-  +12.7 dB on the raw USB capture, and software mode left it flat. Still
-  open: acceptance on both MK.2 units, the Pro's other filter types
-  against the software EQ's curves, and whether its EQ reaches the
-  zero-latency headphone path.
+  mixer switch each microphone between the unit and software. The Pro's
+  EQ on the unit is verified on hardware by the maintainer and other
+  owners.
 - [ ] Ducking on the Pro's own processor. Mapped from Wave Link 3.5 on
-  Windows, and the daemon can write it, but the unit ducks inside its own
-  mix and OpenXLR feeds the jacks through the monitor return, which goes
-  around that mix, so the Pro runs ducking in software for now
-  ([manual](manual.md#ducking)). A desk test with USB pair 2/3 in the
-  Personal mix and the monitor return off gave clean music that the unit
-  ducked. Open: feeding the jacks through the unit's mix (levels, latency,
-  the direct microphone path, Headphones 2 and Line Out), a by-ear check of
-  the USB Aux port, the encoding of keys other than XLR 1, and per-channel
+  Windows; the daemon writes both bits of a ducked pair's field, which the
+  desk probe found the unit needs
+  ([protocol notes section 12](wave-xlr-pro-protocol.md#12-the-mix-sections-and-the-jacks-desk-probe-of-2026-10-23)),
+  and the unit runs a fitting setup on the jacks
+  ([manual](manual.md#ducking)), accepted by ear on the desk. Open: a by-ear
+  check of the USB Aux port, the encoding of keys other than
+  XLR 1, and per-channel
   hardware ducking, which needs each channel on its own pair: the hardware
   mixing track, starting with the remaining mix matrix above.
 - [ ] The Pro's mix maximizer and channel booster, the other two onboard
@@ -425,15 +432,15 @@ while fixes to existing hosts remain part of normal maintenance.
 - [ ] LED controls where captures show the registers; nothing is guessed.
 - [ ] UCM profile for the Pro upstreamed to alsa-ucm-conf once a second
   owner confirms the split.
-- [ ] Wave:3 (`0fd9:0070`), the USB condenser microphone rather than an
-  XLR interface, in beta. A backend exists, `Wave3Device`,
+- [x] Wave:3 (`0fd9:0070`), the USB condenser microphone rather than an
+  XLR interface. A backend exists, `Wave3Device`,
   one class and one registry line, with gain, mute, ClipGuard, headphone
   volume and the direct monitor balance as the crossfade; the low cut is
   the submixer's by design, as no implementation that runs on the
   hardware touches a low cut byte. The submixer is plain PipeWire, so
   above the device only two things changed: the node-name fragment
   spells a colon the way udev does, and the registry's order is the
-  daemon's preference, so with a verified interface attached the Wave:3
+  daemon's preference, so with an XLR interface attached the Wave:3
   is driven only when picked. It is written from public research
   (openwave, which runs on the hardware, wave3-research and LibreWave)
   with each fact's source named in the code. The bytes the sources
@@ -443,9 +450,8 @@ while fixes to existing hosts remain part of normal maintenance.
   are verified; an owner confirmed the capture-hold rule over several
   reboots. [hardware-support.md](hardware-support.md) records each
   control's state and the checks still open: the mute pad, the LED ring,
-  the dial modes, the headphones by ear and a replug. Those take it out
-  of beta.
-- [ ] Wave:1 (`0fd9:006e`), the Wave:3's smaller sibling, in beta: the
+  the dial modes, the headphones by ear and a replug.
+- [x] Wave:1 (`0fd9:006e`), the Wave:3's smaller sibling: the
   Wave:3 backend under the Wave:1's product id and name, `Wave1Device`,
   added after a user reported the microphone unrecognized. No public
   source has probed one. An owner's diagnostics on 0.1.60 showed the

@@ -63,6 +63,12 @@ only, however often the host reads the figure. Invalid
 lengths, seek modes and arithmetic overflow are rejected without changing
 stream contents. Reads at or beyond EOF return zero bytes; a later write
 fills the skipped bytes with zeroes. Empty binary attributes are supported.
+The component can unregister run-loop watches during termination; the host
+releases remaining watches before unloading the module and keeps plugin-owned
+file descriptors open. Unregistering detaches a watch before releasing its
+handler, so a callback from that release cannot destroy the source twice.
+Closing an editor or a failed editor attachment also collects its run-loop
+watches before releasing the view, including handlers owned by the view.
 These checks need no display, installed plugin or PipeWire server. They do
 not turn a native plugin into a sandbox or cap its own allocations.
 
@@ -221,7 +227,8 @@ can still interrupt that insert's chain.
   because every rebuild of an input chain interrupts the microphone. Changing
   or bypassing the chain starts it over. The last line the helper wrote to
   stderr goes to the daemon's log at each death and is shown with that
-  reason, so a helper that gives up says why in its final line.
+  reason. Trailing blank lines and whitespace do not replace the last useful
+  message; a helper that dies mid-line keeps that final partial message.
 - A VST3 plugin that reports a latency change keeps running: the host asks
   for the new figure and reports it, without reactivating the plugin, so a
   plugin that only settles a new figure on reactivation goes on reporting

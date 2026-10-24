@@ -112,7 +112,13 @@ public sealed partial class MonitorVolumeIntegrationTests
                 async Task Ok(string command)
                 {
                     ApiCommandResult result = await hub.ExecuteForApiAsync(command);
-                    Assert.True(result.Ok, command + "\n" + System.Text.Json.JsonSerializer.Serialize(result.Messages));
+                    string refusal = string.Join("; ", result.Messages.Select(m => m switch
+                    {
+                        ErrorMessage e => e.Message,
+                        CommandResultMessage { Error: { } error } => error,
+                        _ => null,
+                    }).OfType<string>());
+                    Assert.True(result.Ok, command + "\nrefused: " + refusal);
                 }
                 void SweepUntil(Func<bool> condition) => CaptureChainFixture.Wait(() => { mixer.SweepOnce(); return condition(); });
                 void FedFrom(string key, string source, bool chained)

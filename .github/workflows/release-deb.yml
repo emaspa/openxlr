@@ -22,7 +22,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential debhelper dotnet-sdk-10.0 lintian \
-            pkg-config libpipewire-0.3-dev liblilv-dev lv2-dev libx11-dev
+            pkg-config libpipewire-0.3-dev liblilv-dev lv2-dev libx11-dev \
+            wireplumber
 
       - name: Versions agree everywhere
         run: tools/check-version.sh
