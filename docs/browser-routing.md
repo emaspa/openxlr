@@ -18,12 +18,30 @@ with your headset before relying on this for meetings.
 
 ## Install the companion
 
-Until its Chrome Web Store listing is published, the companion is loaded
-unpacked, either from the release or from a checkout, as described in
-[Load it unpacked](#load-it-unpacked). Its id is
-`beeohanoffjpcofbjiiamkdammhcihaf`, the only extension the native host
-accepts. What it reads and where that goes is in the
-[privacy policy](browser-privacy.md).
+Install the companion from the
+[Chrome Web Store](https://chromewebstore.google.com/detail/beeohanoffjpcofbjiiamkdammhcihaf)
+in Chrome, Chromium, Brave or Edge, then pin its action if useful. Its id
+is `beeohanoffjpcofbjiiamkdammhcihaf`, the only extension the native host
+accepts. What it reads and where that goes is in
+the [privacy policy](browser-privacy.md).
+
+The Debian, RPM and Nix packages offer the Store listing to Chrome and
+Chromium themselves. They install `beeohanoffjpcofbjiiamkdammhcihaf.json`
+in `share/chromium/extensions` and `share/google-chrome/extensions` under
+their prefix, naming the Chrome Web Store as the place to fetch it from.
+On its next start the browser asks whether to add the companion; accept to
+enable it. On NixOS, the browser does not read those package directories.
+Set `services.openxlr.chromiumExtension = true` together with
+`programs.chromium.enable = true` to install it through the browser's
+forced install policy, which the user cannot remove, or install it from
+the Store page. The module refuses `chromiumExtension` without
+`programs.chromium.enable`, and keeps your other
+`programs.chromium.extensions` entries.
+
+If you declined the offer or removed the companion, an upgrade does not
+offer it again; install it from the Store page. The policy install shows
+under `ExtensionInstallForcelist` in `chrome://policy`. Brave and Edge
+need the native host copied by hand, as described below.
 
 ### Native messaging host
 
@@ -68,20 +86,25 @@ Its path names that package's `bin/openxlr`; update the copy when changing
 package versions.
 
 The AUR `PKGBUILD` is maintained outside this repository. Its `package()`
-function can install the same manifest for the `/usr/bin/openxlr` wrapper:
+function can install the same files for the `/usr/bin/openxlr` wrapper:
 
 ```sh
 install -Dm644 browser/native-host.json \
     "$pkgdir/etc/chromium/native-messaging-hosts/com.emaspa.openxlr.browser.json"
 install -Dm644 browser/native-host.json \
     "$pkgdir/etc/opt/chrome/native-messaging-hosts/com.emaspa.openxlr.browser.json"
+install -Dm644 browser/external-extension.json \
+    "$pkgdir/usr/share/chromium/extensions/beeohanoffjpcofbjiiamkdammhcihaf.json"
+install -Dm644 browser/external-extension.json \
+    "$pkgdir/usr/share/google-chrome/extensions/beeohanoffjpcofbjiiamkdammhcihaf.json"
 ```
 
 ### Load it unpacked
 
-Use the companion of the same version as your OpenXLR installation. Each
-release carries it as `openxlr-browser-<version>.tar.gz`. Extract it to a
-folder you keep, since the browser loads the extension from there:
+Use the companion of the same version as your OpenXLR installation.
+Remove the Store copy first: both use the same id. Each release carries
+it as `openxlr-browser-<version>.tar.gz`. Extract it to a folder you keep,
+since the browser loads the extension from there:
 
 ```sh
 rm -rf ~/.local/share/openxlr/browser
