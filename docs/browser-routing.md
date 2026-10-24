@@ -18,10 +18,10 @@ with your headset before relying on this for meetings.
 
 ## Install the companion
 
-The companion is published in the
-[Chrome Web Store](https://chromewebstore.google.com/detail/beeohanoffjpcofbjiiamkdammhcihaf).
-Install it from that page in Chrome, Chromium or Brave, then pin its
-action if useful. Its id is `beeohanoffjpcofbjiiamkdammhcihaf`, the only
+Install the companion from the
+[Chrome Web Store](https://chromewebstore.google.com/detail/beeohanoffjpcofbjiiamkdammhcihaf)
+in Chrome, Chromium, Brave or Edge, then pin its action if useful. Until
+the listing is available, use [Load from a checkout](#load-from-a-checkout). Its id is `beeohanoffjpcofbjiiamkdammhcihaf`, the only
 extension the native host accepts. What it reads and where that goes is in
 the [privacy policy](browser-privacy.md).
 
@@ -34,7 +34,17 @@ enable it. On NixOS, the browser does not read those package directories.
 Set `services.openxlr.chromiumExtension = true` together with
 `programs.chromium.enable = true` to install it through the browser's
 forced install policy, which the user cannot remove, or install it from
-the Store page.
+the Store page. An enabled `chromiumExtension` without the browser policy
+is a configuration error rather than a successful but ineffective install.
+Existing `programs.chromium.extensions` entries are kept.
+
+A normal package offer does not force installation. If the companion was
+previously removed or its offer declined, a package upgrade does not reset
+that choice. Install it directly from the Store to enable it again. In
+Chrome or Chromium, check `chrome://extensions`; for the NixOS policy,
+check `chrome://policy` and its `ExtensionInstallForcelist` entry.
+Brave and Edge still need the native host described below. An extension
+being installed does not by itself establish the daemon connection.
 
 ### Native messaging host
 

@@ -1,15 +1,18 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const manifest = 'com.emaspa.openxlr.browser.json';
 const directories = ['chromium/native-messaging-hosts', 'opt/chrome/native-messaging-hosts'];
-const extensionId = 'beeohanoffjpcofbjiiamkdammhcihaf';
+const extensionManifest = JSON.parse(readFileSync(join(root, 'browser/chromium/manifest.json'), 'utf8'));
+const extensionId = createHash('sha256').update(Buffer.from(extensionManifest.key, 'base64'))
+  .digest('hex').slice(0, 32).replace(/[0-9a-f]/g, digit => String.fromCharCode(97 + parseInt(digit, 16)));
 const storeUpdate = { external_update_url: 'https://clients2.google.com/service/update2/crx' };
 const extensionDirectories = ['chromium/extensions', 'google-chrome/extensions'];
 
@@ -35,7 +38,7 @@ for (const [name, recipe, expand, executable] of [
         assert.equal(actual.path, executable ?? `${out}/bin/openxlr`);
         assert.equal(actual.name, 'com.emaspa.openxlr.browser');
         assert.equal(actual.type, 'stdio');
-        assert.deepEqual(actual.allowed_origins, ['chrome-extension://beeohanoffjpcofbjiiamkdammhcihaf/']);
+        assert.deepEqual(actual.allowed_origins, [`chrome-extension://${extensionId}/`]);
         assert.equal(statSync(path).mode & 0o777, 0o644);
       }
     } finally { rmSync(directory, { recursive: true, force: true }); }
@@ -50,11 +53,12 @@ for (const [name, recipe, expand, executable] of [
       const block = source.match(/# Chromium and Chrome offer the companion from the Chrome Web Store\.\n([\s\S]*?)\n\s*\n/);
       assert.ok(block, 'external extension install commands are present');
       const out = join(directory, 'package');
-      execFileSync('sh', ['-eu', '-c', expand(block[1])], { cwd: directory, env: { ...process.env, out } });
+      execFileSync('sh', ['-eu', '-c', 'umask 077\n' + expand(block[1])], { cwd: directory, env: { ...process.env, out } });
       for (const browser of extensionDirectories) {
         const path = join(out, executable ? 'usr/share' : 'share', browser, `${extensionId}.json`);
         assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')), storeUpdate);
         assert.equal(statSync(path).mode & 0o777, 0o644);
+        assert.equal(statSync(dirname(path)).mode & 0o777, 0o755);
       }
     } finally { rmSync(directory, { recursive: true, force: true }); }
   });
@@ -75,6 +79,7 @@ test('the NixOS module adds the Store id to the Chromium policy only when asked'
   const source = readFileSync(join(root, 'packaging/nix/module.nix'), 'utf8');
   assert.match(source, /chromiumExtension = lib\.mkOption \{\n\s*type = lib\.types\.bool;\n\s*default = false;/);
   assert.ok(source.includes(`programs.chromium.extensions = lib.mkIf cfg.chromiumExtension [ "${extensionId}" ];`));
+  assert.ok(source.includes('assertion = !cfg.chromiumExtension || config.programs.chromium.enable;'));
 });
 
 test('the NixOS module exposes both generated manifests under /etc', () => {
