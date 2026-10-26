@@ -29,8 +29,11 @@ The Debian, RPM and Nix packages offer the Store listing to Chrome and
 Chromium themselves. They install `beeohanoffjpcofbjiiamkdammhcihaf.json`
 in `share/chromium/extensions` and `share/google-chrome/extensions` under
 their prefix, naming the Chrome Web Store as the place to fetch it from.
-On its next start the browser asks whether to add the companion; accept to
-enable it. On NixOS, the browser does not read those package directories.
+On its next start the browser discovers those files and requests the
+companion from the Store. Check `chrome://extensions` to confirm that it is
+installed and enabled. Do not rely on an approval prompt: Chrome documents
+[automatic external installation on Linux](https://developer.chrome.com/docs/extensions/how-to/distribute/install-extensions#linux).
+On NixOS, the browser does not read those package directories.
 Set `services.openxlr.chromiumExtension = true` together with
 `programs.chromium.enable = true` to install it through the browser's
 forced install policy, which the user cannot remove, or install it from
@@ -38,7 +41,7 @@ the Store page. The module refuses `chromiumExtension` without
 `programs.chromium.enable`, and keeps your other
 `programs.chromium.extensions` entries.
 
-If you declined the offer or removed the companion, an upgrade does not
+If you removed the companion, an upgrade does not
 offer it again; install it from the Store page. The policy install shows
 under `ExtensionInstallForcelist` in `chrome://policy`. Brave and Edge
 need the native host copied by hand, as described below.
