@@ -467,7 +467,9 @@ is connected before the old one stops. Each chained channel owns and heals
 its links independently; the direct-feed healer handles unchained channels.
 A source going away stops its chain, and its return rebuilds it. Load errors
 leave the direct feed playing. Three host failures within five minutes leave
-that channel on its direct feed with the reason on its inserts.
+that channel on its direct feed with the reason on its inserts, until the
+five minutes from the first failure have passed and the sweep builds the
+chain again.
 
 The settings loader checks insert keys against the restored layout. It
 keeps XLR 1, XLR 2, known mixes and capture channels, and drops and logs any

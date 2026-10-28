@@ -197,6 +197,23 @@ public sealed partial class MonitorVolumeIntegrationTests
         Assert.True(mixer.Snapshot().Channels.Single(c => c.Id == "capture").CaptureConnected);
         for (int i = 0; i < 3; i++) { mixer.EnsureInputFeeds(); mixer.EnsureFilterRoutes(); }
         Assert.Empty(CaptureChainFixture.Nodes(pw, "capture"));
+
+        // Once the window passes the sweep builds it again on its own, also
+        // when no other chain runs to keep the sweep going.
+        mixer.SetInserts("second", []);
+        CaptureChainFixture.Wait(() => CaptureChainFixture.Nodes(pw, "second").Length == 0);
+        for (int i = 0; i < 3; i++) { mixer.EnsureInputFeeds(); mixer.EnsureFilterRoutes(); }
+        var restarts = (RestartPolicy)typeof(Mixer).GetField("_restarts",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(mixer)!;
+        restarts.Clock = () => Environment.TickCount64 + 300_001;
+        CaptureChainFixture.Wait(() =>
+        {
+            mixer.EnsureInputFeeds();
+            mixer.EnsureFilterRoutes();
+            return CaptureChainFixture.Nodes(pw, "capture").Length > 0;
+        });
+        Assert.Null(Assert.Single(mixer.Snapshot().Inserts["capture"]).Error);
+        Assert.True(mixer.Snapshot().Channels.Single(c => c.Id == "capture").CaptureConnected);
     }
 
     [MonitorPipeWireFact]

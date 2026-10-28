@@ -656,8 +656,8 @@ Editor borders follow each plugin's size limits. TDR Nova uses its own UI
 scale menu instead of border resizing. LSP editors default to software
 rendering to avoid freezes during large drags. Display loss and stalled
 editor controls are handled without rebuilding a healthy audio instance;
-a crash of the plugin process interrupts its chain. Repeated chain failures
-stop automatic retries after three failures in five minutes. See
+a crash of the plugin process interrupts its chain. Three chain failures
+in five minutes pause automatic retries until those five minutes are over. See
 [plugin editors](manual.md#plugin-editors) for recovery and renderer settings.
 
 The submixer can be switched off in Options. The daemon then controls

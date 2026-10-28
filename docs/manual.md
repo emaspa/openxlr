@@ -3066,8 +3066,9 @@ inside its own processing is noticed after a few seconds and replaced the
 same way a crashed one is, since an instance that is neither dead nor
 processing would otherwise sit there silent. A plugin that keeps crashing
 has its chain switched off after it has failed three times in five
-minutes, with the reason on the insert;
-changing or bypassing that chain starts it over. When the plugin host said
+minutes, with the reason on the insert. Once those five minutes have
+passed since the first failure, OpenXLR starts the chain again on its
+own; changing or bypassing it starts it over sooner. When the plugin host said
 why it stopped, its last message is shown after that reason and written to
 the daemon's log each time the chain stops.
 

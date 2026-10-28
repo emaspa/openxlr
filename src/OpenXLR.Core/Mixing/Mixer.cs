@@ -677,7 +677,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             soundCheckChanged |= HealEqStagesLocked();
             soundCheckChanged |= TrackNoiseReportsLocked();
             soundCheckChanged |= HealDuckBusesLocked();
-            if (_chains.Count == 0 && _mixDelays.Count == 0 && _latencyReports.Count == 0)
+            if (_chains.Count == 0 && _mixDelays.Count == 0 && _latencyReports.Count == 0 && _insertErrors.Count == 0)
                 return EnsureMixRoutesLocked() || soundCheckChanged;
             bool changed = false;
             // Every chain heals on its own: a dead one is built again and the
@@ -704,6 +704,13 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             foreach ((string key, PortLink link) in _chainOuts)
                 if (waitingForPause?.Contains(key) != true && !broken.Contains(key) && _pw.EnsureLinks(link) == LinkHealth.Broken) broken.Add(key);
             if (broken.Count > 0) { WireInputFeedsLocked(broken); changed = true; }
+            // A chain given up on is built again when its window has
+            // passed. Only this sweep can notice: the chain is off, so no
+            // death or broken link points at it, and it would otherwise stay
+            // off until the user changed it.
+            List<string> lapsed = [.. _insertErrors.Keys.Where(key => waitingForPause?.Contains(key) != true
+                && !broken.Contains(key) && _restarts.Lapsed(key))];
+            if (lapsed.Count > 0) { RewireInsertKeysLocked(lapsed, endWine: false); changed = true; }
             changed |= UpdateMixLatencyLocked();
             changed |= EnsureMixRoutesLocked();
             // A heal can retire the last bridged plugin without any command

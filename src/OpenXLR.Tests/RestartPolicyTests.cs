@@ -30,6 +30,28 @@ public sealed class RestartPolicyTests
     }
 
     [Fact]
+    public void OnlyAGivenUpChainLapsesAndOnlyOnceItsWindowHasPassed()
+    {
+        long now = 0;
+        var policy = new RestartPolicy(() => now, limit: 2, windowMs: 300_000);
+        policy.Failed("xlr1");
+        policy.Failed("mix:stream");
+        policy.Failed("mix:stream");
+        Assert.False(policy.Lapsed("mix:stream"));
+
+        // A chain that failed fewer times than the limit was never off, so
+        // the window passing has nothing to give back.
+        now += 300_001;
+        Assert.True(policy.Lapsed("mix:stream"));
+        Assert.False(policy.Lapsed("xlr1"));
+        Assert.False(policy.Lapsed("xlr2"));
+
+        // Built again, it starts a new history.
+        policy.Forget("mix:stream");
+        Assert.False(policy.Lapsed("mix:stream"));
+    }
+
+    [Fact]
     public void ChangingAChainMakesItNewAgain()
     {
         long now = 0;
