@@ -151,6 +151,12 @@ buildDotnetModule {
     install -Dm644 browser-host.json \
       $out/etc/opt/chrome/native-messaging-hosts/com.emaspa.openxlr.browser.json
 
+    # Chromium and Chrome offer the companion from the Chrome Web Store.
+    install -Dm644 browser/external-extension.json \
+      $out/share/chromium/extensions/beeohanoffjpcofbjiiamkdammhcihaf.json
+    install -Dm644 browser/external-extension.json \
+      $out/share/google-chrome/extensions/beeohanoffjpcofbjiiamkdammhcihaf.json
+
     install -Dm644 packaging/70-openxlr.rules -t $out/lib/udev/rules.d
     install -Dm644 packaging/50-xlr-dock-capture-hold.conf \
       packaging/51-openxlr-pro-raw-names.conf \

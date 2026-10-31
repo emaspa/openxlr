@@ -42,15 +42,32 @@ in
         ~/.lv2 and the system profile's lib/lv2.
       '';
     };
+
+    chromiumExtension = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Add the browser companion's Chrome Web Store id to
+        programs.chromium.extensions. Chromium, Google Chrome and Brave then
+        install it through their ExtensionInstallForcelist policy, which
+        needs programs.chromium.enable and cannot be removed by the user.
+      '';
+    };
   };
 
   config = lib.mkIf cfg.enable {
+    assertions = [ {
+      assertion = !cfg.chromiumExtension || config.programs.chromium.enable;
+      message = "services.openxlr.chromiumExtension requires programs.chromium.enable = true.";
+    } ];
+
     environment.systemPackages = [ cfg.package ] ++ lib.optional (cfg.yabridgePackage != null) cfg.yabridgePackage;
 
     environment.etc."chromium/native-messaging-hosts/com.emaspa.openxlr.browser.json".source =
       "${cfg.package}/etc/chromium/native-messaging-hosts/com.emaspa.openxlr.browser.json";
     environment.etc."opt/chrome/native-messaging-hosts/com.emaspa.openxlr.browser.json".source =
       "${cfg.package}/etc/opt/chrome/native-messaging-hosts/com.emaspa.openxlr.browser.json";
+    programs.chromium.extensions = lib.mkIf cfg.chromiumExtension [ "beeohanoffjpcofbjiiamkdammhcihaf" ];
 
     # Device access for regular users (uaccess tag).
     services.udev.packages = [ cfg.package ];
