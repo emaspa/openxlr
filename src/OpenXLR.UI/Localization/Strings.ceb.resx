@@ -3764,6 +3764,9 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
   <data name="VoiceStarting" xml:space="preserve">
     <value>Nagsugod ang tingog.</value>
   </data>
+  <data name="VoiceRunning" xml:space="preserve">
+    <value>Modugang ang tingog og {0} ms nga delay.</value>
+  </data>
   <data name="VoicePitch" xml:space="preserve">
     <value>Pitch</value>
   </data>

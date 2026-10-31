@@ -3358,9 +3358,13 @@ The voices:
 - **Witch**: high, with a quiver.
 
 Changing the voice, or switching it on or off, crossfades, so it does not
-click. Off, the microphone passes through untouched. Pitch and formant
-shifting adds a short delay, the same in every mix and call, so the voice
-stays in step with itself.
+click. Off, the microphone passes through untouched. A voice adds 33 ms
+of delay, the same in every mix and call, so the voice stays in step with
+itself. Every voice adds it, Custom with pitch and formant at 0 included,
+so switch the voice changer off rather than leaving Custom at 0. The line
+above the voices says the delay while a voice runs. Noise removal's figure
+leaves it out: with both on, the microphone is late by the two added
+together.
 
 Interfaces with a direct monitor send your own voice to their headphone
 jacks in hardware, before any of this. On the MK.2 units, the Wave:3, the
@@ -3368,7 +3372,8 @@ Wave:3 MK.2 and the Wave:1, you hear the changed voice only through a
 monitor mix that carries the microphone. Turn the Mic ↔ PC crossfade
 towards PC to hear it as your listeners do. On the Wave XLR Pro OpenXLR
 turns the [zero-latency path](#volume-direct-monitor) off while a voice is
-on, so the jacks play the changed voice, a few milliseconds late.
+on, so the jacks play the changed voice, late by the voice's 33 ms and
+the computer's own path.
 
 The voice is saved with the mixer and in profiles, so a profile can recall
 a voice; a profile saved before the voice changer leaves it as it is. A
@@ -4617,8 +4622,9 @@ host carries both; and the strength, in steps of 6 dB with `[` and `]`
 moving one, and **no limit** at the top.
 
 Below that, **Voice changer** lists each microphone's
-[voice changer](#voice-changer): the voice heard now, or why it does not
-run, and one choice that steps through **Off** and every voice. With
+[voice changer](#voice-changer): the voice heard now and the delay it
+adds, or why it does not run, and one choice that steps through **Off**
+and every voice. With
 **Custom** chosen, its pitch and formant follow in whole semitones, and
 `[` and `]` move them by a half.
 

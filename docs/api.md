@@ -2048,7 +2048,11 @@ A channel's `noise` in the mixer state is
 - `active`: the engine heard now, or null. It lags `engine` while a change
   fades over, and while DeepFilterNet loads its model, which takes a moment
   the first time; the engine that played keeps playing meanwhile.
-- `latencyMs`: the delay the running engine adds, or null.
+- `latencyMs`: the delay the running engine adds, or null. It is noise
+  removal's own: a voice on the same microphone reports its delay in the
+  channel's `voice.latencyMs`, and the microphone is late by the two added
+  together. A plugin host older than the daemon reports only the stage's
+  total, which then stands here.
 - `available`: false when the native plugin host is not installed, or after
   the stage failed three times in five minutes.
 - `error`: why the setting does not run as asked, or null: no host, an
@@ -2108,7 +2112,7 @@ The voices, by the names the API uses:
 | `witch` | higher pitch with a vibrato quiver and reverb |
 
 A channel's `voice` in the mixer state is
-`{enabled, voice, pitch, formant, active, available, error}`:
+`{enabled, voice, pitch, formant, active, latencyMs, available, error}`:
 
 - `enabled`, `voice`, `pitch` and `formant`: the setting. `pitch` and
   `formant` are the custom voice's shifts, -12 to 12 semitones in half
@@ -2116,6 +2120,9 @@ A channel's `voice` in the mixer state is
   are off, `deep`, 0 and 0.
 - `active`: the voice heard now, or null. It lags `voice` while a change
   crossfades.
+- `latencyMs`: the delay the running voice adds, 33.3 ms at 48 kHz for
+  every voice, Custom at 0 and 0 semitones included, or null while the dry
+  voice plays. Noise removal's delay is reported apart, in `noise.latencyMs`.
 - `available`: false when the native plugin host is not installed, or after
   the stage failed three times in five minutes.
 - `error`: why the setting does not run as asked, or null: no host, a host

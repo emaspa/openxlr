@@ -103,7 +103,10 @@ public sealed class VoiceChangerViewModel : ViewModelBase
     /// <summary>The microphone a fresh window starts on, when there is one.</summary>
     internal const string DefaultMicrophone = "xlr1";
 
-    private sealed record Report(bool Enabled, string Voice, double Pitch, double Formant, string? Active, bool Available, string? Error);
+    private sealed record Report(bool Enabled, string Voice, double Pitch, double Formant, string? Active, bool Available, string? Error)
+    {
+        public double? LatencyMs { get; init; }
+    }
 
     private readonly IVoiceCommands _commands;
     private readonly TimeProvider _time;
@@ -113,6 +116,7 @@ public sealed class VoiceChangerViewModel : ViewModelBase
     private string _voice = MicVoice.DefaultVoice;
     private double _pitch, _formant;
     private string? _active, _error;
+    private double? _latencyMs;
     // When the user last changed each part, so a stale report does not undo it.
     private long _choiceAt = long.MinValue, _pitchAt = long.MinValue, _formantAt = long.MinValue;
 
@@ -208,7 +212,7 @@ public sealed class VoiceChangerViewModel : ViewModelBase
 
     /// <summary>
     /// One line above the tiles: why the voice does not run, else that it is
-    /// starting, else nothing.
+    /// starting, else the delay it adds.
     /// </summary>
     public string Status
     {
@@ -216,7 +220,8 @@ public sealed class VoiceChangerViewModel : ViewModelBase
         {
             if (!_enabled) return "";
             if (_error is { Length: > 0 } error) return error;
-            return _active == _voice ? "" : Localizer.Text("VoiceStarting");
+            if (_active != _voice) return Localizer.Text("VoiceStarting");
+            return _latencyMs is double ms ? Localizer.Format("VoiceRunning", Math.Round(ms).ToString(CultureInfo.CurrentCulture)) : "";
         }
     }
 
@@ -274,7 +279,10 @@ public sealed class VoiceChangerViewModel : ViewModelBase
             string voice = v["voice"]?.GetValue<string>() is string named && MicVoice.VoiceIndex(named) >= 0 ? named : MicVoice.DefaultVoice;
             _reports[id] = new Report(v["enabled"]?.GetValue<bool>() ?? false, voice,
                 v["pitch"]?.GetValue<double>() ?? 0, v["formant"]?.GetValue<double>() ?? 0,
-                v["active"]?.GetValue<string>(), v["available"]?.GetValue<bool>() ?? false, v["error"]?.GetValue<string>());
+                v["active"]?.GetValue<string>(), v["available"]?.GetValue<bool>() ?? false, v["error"]?.GetValue<string>())
+            {
+                LatencyMs = v["latencyMs"]?.GetValue<double>(),
+            };
         }
         bool reported = IsReported;
         if (!seen.SequenceEqual(Microphones))
@@ -302,6 +310,7 @@ public sealed class VoiceChangerViewModel : ViewModelBase
         report ??= Fresh();
         _available = report.Available;
         _active = report.Active;
+        _latencyMs = report.LatencyMs;
         _error = report.Error;
         if (Settled(_choiceAt))
         {

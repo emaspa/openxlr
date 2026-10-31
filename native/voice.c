@@ -172,7 +172,7 @@ typedef struct {
 struct Voice {
   Host *h;
   Control *enabled, *preset, *pitch, *formant;
-  Control *active_meter, *status_meter;
+  Control *active_meter, *status_meter, *latency_meter;
   bool ready;  // both slots and their shifters are there
   uint32_t shift_delay, delay_mask, comb_mask;
   uint32_t fade;
@@ -253,7 +253,9 @@ Voice *voice_load(Host *h) {
   v->formant = host_add_control(h, "voice_formant", -12, 12, 0, false, NULL);
   v->active_meter = host_add_control(h, "voice_active", VOICE_OFF, VOICE_COUNT - 1, VOICE_OFF, true, NULL);
   v->status_meter = host_add_control(h, "voice_status", 0, 2, VOICE_OK, true, NULL);
-  if (!v->enabled || !v->preset || !v->pitch || !v->formant || !v->active_meter || !v->status_meter) {
+  v->latency_meter = host_add_control(h, "voice_latency", 0, 1e9f, 0, true, NULL);
+  if (!v->enabled || !v->preset || !v->pitch || !v->formant || !v->active_meter || !v->status_meter
+      || !v->latency_meter) {
     voice_unload(v);
     return NULL;
   }
@@ -440,6 +442,7 @@ static int voice_of(const Voice *v, int slot) { return slot == DRY ? VOICE_OFF :
 static void publish(Voice *v) {
   bool shifting = v->playing != DRY || (v->incoming != NONE && v->incoming != DRY);
   atomic_store(&v->latency, shifting ? v->shift_delay : 0);
+  atomic_store(&v->latency_meter->observed, shifting ? (float)v->shift_delay : 0.0f);
   atomic_store(&v->active_meter->observed, (float)voice_of(v, v->playing));
 }
 

@@ -3436,6 +3436,9 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="VoiceStarting" xml:space="preserve">
     <value>Die Stimme startet.</value>
   </data>
+  <data name="VoiceRunning" xml:space="preserve">
+    <value>Die Stimme fügt {0} ms Verzögerung hinzu.</value>
+  </data>
   <data name="VoicePitch" xml:space="preserve">
     <value>Tonhöhe</value>
   </data>

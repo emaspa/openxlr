@@ -28,10 +28,11 @@ public sealed class VoiceChangerViewModelTests
     }
 
     private static string Voice(bool enabled = false, string voice = "deep", double pitch = 0, double formant = 0,
-        string? active = null, bool available = true, string? error = null)
+        string? active = null, bool available = true, string? error = null, double? latencyMs = null)
         => $$"""
             {"enabled":{{(enabled ? "true" : "false")}},"voice":"{{voice}}","pitch":{{pitch}},"formant":{{formant}},
              "active":{{(active is null ? "null" : $"\"{active}\"")}},"available":{{(available ? "true" : "false")}},
+             "latencyMs":{{(latencyMs is double ms ? ms.ToString(System.Globalization.CultureInfo.InvariantCulture) : "null")}},
              "error":{{(error is null ? "null" : $"\"{error}\"")}}}
             """;
 
@@ -106,6 +107,10 @@ public sealed class VoiceChangerViewModelTests
         changer.Apply(Channels(Voice(enabled: true, voice: "dracula", active: "dracula")));
         Assert.True(Tile(changer, "dracula").IsSelected);
         Assert.False(changer.HasStatus);
+        // Once the stage reports the voice's delay, the line says it.
+        changer.Apply(Channels(Voice(enabled: true, voice: "dracula", active: "dracula", latencyMs: 33.3)));
+        Assert.Equal(Localizer.Format("VoiceRunning", "33"), changer.Status);
+        Assert.False(changer.HasError);
 
         // The lit tile sends nothing; Off sends the switch alone.
         changer.Choose(Tile(changer, "dracula"));

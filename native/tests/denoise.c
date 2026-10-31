@@ -180,6 +180,7 @@ static void check_controls(void) {
       {"denoise_enabled", 0, 1, 0, false},  {"denoise_engine", 0, 1, 0, false},
       {"denoise_strength", 0, 100, 100, false}, {"denoise_active", -1, 1, -1, true},
       {"denoise_status", 0, 4, 0, true},    {"denoise_late", 0, 1e9f, 0, true},
+      {"denoise_latency", 0, 1e9f, 0, true},
   };
   for (size_t i = 0; i < sizeof(controls) / sizeof(controls[0]); i++) {
     const Control *found = NULL;
@@ -192,6 +193,7 @@ static void check_controls(void) {
   run(h, input, output, RATE, BLOCK);
   assert(!memcmp(input, output, RATE * sizeof(float)));
   assert(eq_latency(h) == 0 && meter(h, "denoise_active") == DENOISE_NONE);
+  assert(meter(h, "denoise_latency") == 0);
   release(h);
 }
 
@@ -201,6 +203,7 @@ static void check_engine(int engine, const char *name, double least_drop) {
   run(h, input, output, COUNT, BLOCK);
   assert(meter(h, "denoise_active") == engine && meter(h, "denoise_status") == DENOISE_OK);
   size_t latency = eq_latency(h);
+  assert(latency > 0 && meter(h, "denoise_latency") == (float)latency);  // the voice changer is off
   size_t from = 2 * RATE;  // past the engine's first adjustment
   double noise_in = rms_db(input, from, COUNT, between_syllables, 0);
   double noise_out = rms_db(output, from, COUNT, between_syllables, latency);
