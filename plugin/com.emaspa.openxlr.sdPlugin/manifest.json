@@ -2,7 +2,7 @@
 	"Name": "OpenXLR",
 	"Description": "Control the OpenXLR daemon: hardware DSP toggles, mix and channel faders on dials, mutes with live state on the keys, soundboard clips.",
 	"Author": "Emanuele Sparvoli",
-	"Version": "0.3.5",
+	"Version": "0.3.6",
 	"CodePath": "plugin.mjs",
 	"Icon": "icons/plugin",
 	"Category": "OpenXLR",

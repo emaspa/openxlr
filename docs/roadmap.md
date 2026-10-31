@@ -15,7 +15,7 @@ the docs say it is coded or in beta. The project is small on purpose. It
 prefers one small, idiomatic change over a framework, and a feature that
 is measured over one that is described.
 
-## Where it stands (0.3.5)
+## Where it stands (0.3.6)
 
 - [x] Devices. The Wave XLR Pro, the XLR Dock (MK.1 and MK.2 modules),
   the Wave XLR and the Wave XLR MK.2 have their exposed hardware controls
