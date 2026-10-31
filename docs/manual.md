@@ -216,14 +216,18 @@ it shows. XLR rows in a mix matrix do the same with the input's gain.
 <a name="volume-direct-monitor"></a>
 On a Wave XLR Pro, the [zero-latency path](#input-bindings) to the
 headphone jacks is inside the interface. It carries the microphone
-straight to the jacks, so the channel volume cannot reach it. While the
+straight to the jacks, past the mixer. While the
 path is on, the channel that carries the Pro's microphone shows a small
 ⓘ mark beside its volume. OpenXLR sets the path's level from the
 microphone's Monitor send, its channel volume and the Monitor mix's
 volume, so these change how loud you hear yourself just as they would
-through the computer. The path skips the channel's software effects, so
-the headphones hear the microphone without software EQ, noise removal, the
-voice changer or plugin inserts. The volume's tooltip says so.
+through the computer. The path cannot carry the channel's software
+effects, so OpenXLR turns it off while one is on: the EQ in software,
+noise removal, the voice changer, the soft low cut, ClipGuard or a plugin
+insert that is not bypassed. The headphones then hear the microphone
+through its Monitor send with the effects, a few milliseconds later, and
+the ⓘ mark goes away. Turn the last effect off and the path comes back.
+An EQ the unit runs keeps the path.
 
 ### Submixer categories
 
@@ -409,8 +413,8 @@ such channel the path is off, and a microphone bound to XLR 1 reaches the
 jacks through the software mix, a few milliseconds later. This holds while
 the jacks are not in use too, so a path another program such as Wave Link
 left on is switched off. The path is
-hardware, so that channel's [volume](#volume-direct-monitor) does not
-change what the jacks hear of it while the path is on.
+hardware, and OpenXLR sets its level from that channel's
+[volume](#volume-direct-monitor) and Monitor send.
 
 A strip can also take another Elgato interface's microphone, such as a
 Wave:3's capsule while a Wave XLR Pro is the primary interface. The dialog
@@ -1460,8 +1464,10 @@ and Q steps of 3.75 percent. The editor shows the values the daemon keeps.
   5 ms. A drag sends each band's changes at most 50 times a second. Off, the
   EQ stays in the path bypassed until the input is next rebuilt, so on, off
   and **Compare** switch at once.
-- In software, the hardware's zero-latency monitoring carries the
-  microphone without the EQ, as it does without your plugins.
+- In software, the EQ does not reach a unit's own zero-latency
+  monitoring, the Mic side of the Mic ↔ PC crossfade. On a Wave XLR Pro
+  OpenXLR turns that path off while the EQ is on, so the jacks hear it
+  (see [the channel volume](#volume-direct-monitor)).
 - The Flow window lists the EQ first in the input's card while it is on,
   naming the unit that runs it or saying it runs in software.
 - The EQ is saved with the mixer and in profiles. A profile saved before
@@ -1547,10 +1553,11 @@ the input's route, and the plugin host is not needed.
   unit plain without OpenXLR. Moving a microphone to another source, or
   keeping it in software, switches only the unit's EQ off and keeps its
   bands.
-- A measurement on the XLR Dock MK.2 suggests the unit's EQ also acts on
-  its own zero-latency headphone monitoring, which an EQ in software never
-  reaches, but this is not settled. Nobody has measured this on the Pro
-  yet, or compared the Pro's EQ by ear with the one on this computer.
+- On a Wave XLR Pro the unit's EQ also acts on its zero-latency path to
+  the headphone jacks, so the jacks hear the EQ the unit runs and OpenXLR
+  keeps that path on. A measurement on the XLR Dock MK.2 suggests the same
+  of its own headphone monitoring, but this is not settled there. Nobody
+  has compared the Pro's EQ by ear with the one on this computer yet.
 - `setEqProcessing` in the [control API](api.md#where-the-eq-runs) sets the
   same choice from a script.
 
@@ -3349,10 +3356,9 @@ Interfaces with a direct monitor send your own voice to their headphone
 jacks in hardware, before any of this. On the MK.2 units, the Wave:3, the
 Wave:3 MK.2 and the Wave:1, you hear the changed voice only through a
 monitor mix that carries the microphone. Turn the Mic ↔ PC crossfade
-towards PC to hear it as your listeners do. On the Wave XLR Pro the jacks
-play the microphone through the
-[zero-latency path](#volume-direct-monitor) while it is on, so they play
-your voice unchanged.
+towards PC to hear it as your listeners do. On the Wave XLR Pro OpenXLR
+turns the [zero-latency path](#volume-direct-monitor) off while a voice is
+on, so the jacks play the changed voice, a few milliseconds late.
 
 The voice is saved with the mixer and in profiles, so a profile can recall
 a voice; a profile saved before the voice changer leaves it as it is. A
@@ -4232,8 +4238,9 @@ Deleting the capture input stops its chain and removes it from the settings.
 A saved profile includes every capture chain, empty ones too. Older profiles
 leave capture chains alone. Input insert latency is reported per plugin but
 is not compensated against other inputs. The Wave XLR Pro's direct path to
-its jacks carries the raw microphone, bypassing a capture chain just as it
-bypasses XLR 1's inserts. The existing 32 editable-channel and 16 inserts per
+its jacks would carry the raw microphone, so OpenXLR turns it off while the
+channel carrying the Pro's first input runs an insert, and the jacks hear the
+chain. The existing 32 editable-channel and 16 inserts per
 chain limits apply; each native insert runs its own host, and Windows
 inserts also need Wine and the documented locked-memory allowance.
 

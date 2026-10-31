@@ -2230,7 +2230,7 @@ Pilia ang interface nga kontrolon sa OpenXLR</value>
     <value>Kaugalingong volume sa channel. Dungan niini nga usbon ang tanang send sa channel; tipigan sa matag send ang kaugalingong level ug mute.</value>
   </data>
   <data name="ChannelVolumeDirectTip" xml:space="preserve">
-    <value>Kaugalingong volume sa channel. Usbon niini ang matag mix nga padad-an sa channel. Madungog sa headphone kining mikropono pinaagi sa zero-latency nga agianan sa interface, nga mosunod sa volume apan dili moagi sa mga epekto sa channel.</value>
+    <value>Kaugalingong volume sa channel. Usbon niini ang matag mix nga padad-an sa channel. Madungog sa headphone kining mikropono pinaagi sa zero-latency nga agianan sa interface, nga mosunod sa volume. Kon i-on nimo ang usa ka epekto, madungog ang mikropono pinaagi sa mixer, uban ang epekto.</value>
   </data>
   <data name="ChannelVolumeMixesOnly" xml:space="preserve">
     <value>Sa mga mix ra ang volume, dili sa direct monitor</value>

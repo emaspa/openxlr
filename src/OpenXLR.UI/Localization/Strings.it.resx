@@ -2288,7 +2288,7 @@ Seleziona l'interfaccia gestita da OpenXLR</value>
     <value>Il volume proprio del canale. Scala tutte le mandate del canale insieme; ogni mandata mantiene il proprio livello e il proprio muto.</value>
   </data>
   <data name="ChannelVolumeDirectTip" xml:space="preserve">
-    <value>Il volume proprio del canale. Cambia ogni mix a cui il canale viene inviato. Le tue cuffie sentono questo microfono attraverso il percorso a latenza zero dell'interfaccia, che segue il volume ma salta gli effetti del canale.</value>
+    <value>Il volume proprio del canale. Cambia ogni mix a cui il canale viene inviato. Le tue cuffie sentono questo microfono attraverso il percorso a latenza zero dell'interfaccia, che segue il volume. Se attivi un effetto, sentono il microfono attraverso il mixer, con l'effetto.</value>
   </data>
   <data name="ChannelVolumeMixesOnly" xml:space="preserve">
     <value>Il volume agisce solo sui mix, non sul monitoraggio diretto</value>

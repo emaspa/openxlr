@@ -84,7 +84,9 @@ public sealed partial class SoundCheckIntegrationTests
             AssertSound(.75);
             Assert.Null(mixer.Snapshot().SoundCheck.Channel);
             Assert.Null(mixer.SoundCheckChannel);
-            Assert.True(mixer.SetHardwareMicMonitor(true));
+            // The Pro's direct path comes back once the session ends, unless
+            // the soft ClipGuard is still processing the channel.
+            Assert.Equal(!clipGuard, mixer.SetHardwareMicMonitor(true));
             mixer.SetHardwareMicMonitor(false);
             Assert.True(SpinWait.SpinUntil(() => pw.FindNodeId("OpenXLR_soundcheck_" + channel) is null, TimeSpan.FromSeconds(3)));
             mixer.SoundCheck(channel, "record");
