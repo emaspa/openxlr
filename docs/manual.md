@@ -3699,6 +3699,14 @@ diagnostics** in Options and open an issue with the archive.
   external installation. A Windows bundle also needs Wine and a working
   bridge; see [Windows plugins](#windows-plugins).
 
+A yabridge entry can remain after its original Windows plugin was moved or
+removed. OpenXLR checks the wrapper's Windows module link before loading it,
+including on an explicit rescan, so a dangling link is reported as
+`windows-module-missing` without opening a yabridge error dialog. The native
+host also checks the link when starting a saved insert. Restore or reinstall
+the original Windows plugin at the reported path, then sync and rescan.
+Copying the generated Linux wrapper cannot restore the Windows plugin.
+
 <a name="wrong-device"></a>
 ### 5.5 Sound comes out of the wrong device
 

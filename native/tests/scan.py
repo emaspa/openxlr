@@ -45,3 +45,32 @@ with tempfile.TemporaryDirectory(prefix="openxlr-scan-phases-") as directory:
         assert len(lines) == 200 * per_plugin + 4, (kind, len(lines))
         assert lines[-1] == f"trace: scan {kind}: complete"
         print(f"PASS: {kind} phase markers survive {len(phases)} abrupt exits; 200 plugins emit {len(lines)} lines")
+
+# The fixture exits from module initialization. A dangling bridge source must
+# be rejected before that code runs, while restored sources still reach it.
+with tempfile.TemporaryDirectory(prefix="openxlr-bridge-source-") as directory:
+    bundle = Path(directory) / "Fixture.vst3"
+    linux = bundle / "Contents/x86_64-linux"
+    linux.mkdir(parents=True)
+    (linux / "Fixture.so").symlink_to(root / "tests/scan-plugin.so")
+    for architecture in ("x86_64-win", "i386-win"):
+        win = bundle / "Contents" / architecture
+        win.mkdir()
+        original = Path(directory) / "original.vst3"
+        link = win / "Fixture.vst3"
+        link.symlink_to("../../../original.vst3")
+        command = [str(root / "openxlr-lv2-host"), "scan-vst3", str(bundle)]
+        for suffix in ("", "/"):
+            result = subprocess.run(command[:-1] + [str(bundle) + suffix],
+                                    env=env | {"OPENXLR_TEST_SCAN_STOP": "module"},
+                                    capture_output=True, text=True, timeout=5)
+            assert result.returncode == 1, result.stderr
+            assert "does not contain a Windows VST3 module" in result.stderr, result.stderr
+        original.write_bytes(b"MZ restored source")
+        result = subprocess.run(command, env=env | {"OPENXLR_TEST_SCAN_STOP": "module"},
+                                capture_output=True, text=True, timeout=5)
+        assert result.returncode == 73, result.stderr
+        original.unlink()
+        link.unlink()
+        win.rmdir()
+    print("PASS: dangling Windows sources rejected before plugin initialization; restoration loads again")

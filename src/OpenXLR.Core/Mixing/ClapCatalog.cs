@@ -219,6 +219,14 @@ internal static class HostScan
                                 detail: "The plugin path or its symbolic-link target is missing. Restore the original plugin or install it again, then rescan.");
                             continue;
                         }
+                        // Bridge constructors can show desktop dialogs. Validate the
+                        // source before accepting cache entries or retrying a scan.
+                        if (kind == "vst3" && MissingWindowsSource(bundle) is not null)
+                        {
+                            cache.Invalidate(bundle);
+                            evidence.Add(bundle, "windows-module-missing", detail: MissingWindowsModuleDetail(bundle));
+                            continue;
+                        }
                     }
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                     {
@@ -338,19 +346,28 @@ internal static class HostScan
             : file.ResolveLinkTarget(returnFinalTarget: true) is { Exists: true };
     }
 
+    internal static string? MissingWindowsSource(string bundle)
+    {
+        string name = Path.GetFileNameWithoutExtension(bundle.TrimEnd(Path.DirectorySeparatorChar));
+        foreach (string architecture in new[] { "x86_64-win", "i386-win" })
+        {
+            string module = Path.Combine(bundle, "Contents", architecture, name + ".vst3");
+            var file = new FileInfo(module);
+            string? target = file.LinkTarget;
+            if (target is not null)
+                return file.ResolveLinkTarget(returnFinalTarget: true) is FileInfo { Exists: true }
+                    ? null : Path.GetFullPath(target, Path.GetDirectoryName(module)!);
+        }
+        return null;
+    }
+
     internal static string MissingWindowsModuleDetail(string bundle)
     {
         const string advice = "Restore the original Windows plugin or install it again, then sync and rescan. A generated yabridge wrapper does not contain the original plugin.";
         try
         {
-            string name = Path.GetFileNameWithoutExtension(bundle.TrimEnd(Path.DirectorySeparatorChar));
-            foreach (string architecture in new[] { "x86_64-win", "i386-win" })
-            {
-                string module = Path.Combine(bundle, "Contents", architecture, name + ".vst3");
-                string? target = new FileInfo(module).LinkTarget;
-                if (target is not null && !SourceExists(module))
-                    return $"Missing Windows source: {Path.GetFullPath(target, Path.GetDirectoryName(module)!)}. {advice}";
-            }
+            if (MissingWindowsSource(bundle) is { } source)
+                return $"Missing Windows source: {source}. {advice}";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { }
         return advice;

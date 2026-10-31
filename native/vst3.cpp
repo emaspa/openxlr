@@ -798,6 +798,23 @@ bool open_module(Vst3 *v, const char *path) {
     fprintf(stderr, "no plugin library in %s\n", path);
     return false;
   }
+  // yabridge may show a desktop dialog from its library constructor. Refuse
+  // dangling Windows module links before dlopen, for scans and live inserts.
+  std::string bundle = path;
+  while (!bundle.empty() && bundle.back() == '/') bundle.pop_back();
+  std::string name = bundle.substr(bundle.find_last_of('/') + 1);
+  for (const char *architecture : {"x86_64-win", "i386-win"}) {
+    std::string module = bundle + "/Contents/" + architecture + "/" + name;
+    struct stat link, target;
+    if (lstat(module.c_str(), &link) != 0 || !S_ISLNK(link.st_mode)) continue;
+    if (stat(module.c_str(), &target) != 0 || !S_ISREG(target.st_mode)) {
+      fprintf(stderr, "%s does not contain a Windows VST3 module: %s. "
+              "Restore the original Windows plugin, then sync and rescan.\n",
+              path, module.c_str());
+      return false;
+    }
+    break;
+  }
   v->library = dlopen(library.c_str(), RTLD_NOW | RTLD_LOCAL);
   if (!v->library) {
     fprintf(stderr, "cannot load %s: %s\n", library.c_str(), dlerror());

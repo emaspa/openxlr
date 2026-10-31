@@ -240,12 +240,39 @@ public sealed class PluginSourceRecoveryTests
             File.CreateSymbolicLink(Path.Combine(win, "Compressor.vst3"), Path.Combine(dir, "gone.vst3"));
             var cache = new ScanCache(Path.Combine(dir, "cache"), "test-scanner");
             Assert.Empty(HostScan.Run("vst3", "unused", [dir], Vst3Catalog.Bundles,
-                _ => new ProcessResult(1, [], "Compressor.vst3 does not contain a Windows VST3 module.", false, false),
-                cache));
+                _ => throw new InvalidOperationException("A missing Windows module must never load the bridge."),
+                cache, retryFailures: true));
             var entry = Assert.Single(PluginScanDiagnostics.Snapshot().Single(r => r.Kind == "vst3").Entries,
                 e => e.Path == bundle);
             Assert.Equal("windows-module-missing", entry.Outcome);
             Assert.Null(cache.Lookup(bundle));
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Theory]
+    [InlineData("x86_64-win", false)]
+    [InlineData("i386-win", true)]
+    public void MissingWindowsSourceSkipsCachedWrappersAndRecoversAfterRestoration(string architecture, bool retry)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        string dir = Directory.CreateTempSubdirectory("vst3-preflight-").FullName;
+        try
+        {
+            string bundle = Path.Combine(dir, "Compressor.vst3");
+            string win = Directory.CreateDirectory(Path.Combine(bundle, "Contents", architecture)).FullName;
+            string original = Path.Combine(dir, "original.bin");
+            File.CreateSymbolicLink(Path.Combine(win, "Compressor.vst3"), "../../../original.bin");
+            var cache = new ScanCache(Path.Combine(dir, "cache"), "test-scanner");
+            cache.Store(bundle, Encoding.UTF8.GetBytes(Description));
+            int launches = 0;
+            ProcessResult Describe(string _) { launches++; return new(0, Encoding.UTF8.GetBytes(Description), "", false, false); }
+            Assert.Empty(HostScan.Run("vst3", "unused", [dir], Vst3Catalog.Bundles, Describe, cache, retryFailures: retry));
+            Assert.Equal(0, launches);
+            Assert.Null(cache.Lookup(bundle));
+            File.WriteAllText(original, "MZ restored plugin");
+            Assert.Single(HostScan.Run("vst3", "unused", [dir], Vst3Catalog.Bundles, Describe, cache));
+            Assert.Equal(1, launches);
         }
         finally { Directory.Delete(dir, recursive: true); }
     }
