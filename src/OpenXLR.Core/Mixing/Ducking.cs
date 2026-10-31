@@ -229,7 +229,7 @@ public sealed partial class Mixer
                     open[channel.Id] = ChannelNameLocked(channel);
             }
             bool keyInSoftware = open.ContainsKey(setup.Key)
-                && !(_hardwareMicChannel == setup.Key && mix.Kind == MixKind.Monitor && feed.Contains(mix.Id));
+                && !(IsHardwareMicLocked(setup.Key) && mix.Kind == MixKind.Monitor && feed.Contains(mix.Id));
             mixes.Add(new(mix.Id, mix.Name, mix.Kind, jacks,
                 mix.Kind == MixKind.AuxPort && _auxPortEnabled && _hardwareOutputRouting,
                 consumers, open, keyInSoftware));

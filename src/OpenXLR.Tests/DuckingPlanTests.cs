@@ -86,7 +86,7 @@ public sealed class DuckingPlanTests
         Assert.True(f.Targets("music", "monitor").Bus.Muted);
         f.Mixer.DeleteExclusiveGroup("players", _ => null);
         f.Mixer.SetChannelMuted("music", "monitor", false);
-        f.Set("_hardwareMicChannel", "music");
+        f.Field<string?[]>("_hardwareMicChannels")[0] = "music";
         Assert.True(f.Targets("music", "monitor").Bus.Muted);
         Assert.False(f.Mixer.IsChannelMutedIn("music", "monitor"));
     }

@@ -170,7 +170,7 @@ firmware keeps and asserts at the headphone floor, released by a level
 written above it; false on every other model), `lowImpedance`,
 `crossfade`, `phantom`, `clipGuard`,
 `compressor`, their `2` variants for XLR 2, `outHp1`, `outHp2`, `outUsbAux`,
-`outLineOut`, `hpMixMonitorReturn` (the Wave XLR Pro's Monitor return in the mix its headphone jacks and Line Out play, true only at 0 dB with XLR 2's and the Line In jack's own paths and every other USB playback pair, the Aux mix's stream among them, out of that mix, which is how the daemon sets it while a jack is a monitor output), `hpMixMicDirect` (XLR 1 in that mix: the Pro's zero-latency microphone path), `hpMixMicLevelDb` (that path's level in dB, -60 to +12 in half-dB steps; 0 on every other model), `auxReturnEnabled`,
+`outLineOut`, `hpMixMonitorReturn` (the Wave XLR Pro's Monitor return in the mix its headphone jacks and Line Out play, true only at 0 dB with the Line In jack's own path and every other USB playback pair, the Aux mix's stream among them, out of that mix, which is how the daemon sets it while a jack is a monitor output), `hpMixMicDirect` (XLR 1 in that mix: the Pro's zero-latency microphone path), `hpMixMicLevelDb` (that path's level in dB, -60 to +12 in half-dB steps; 0 on every other model), `hpMixMic2Direct` and `hpMixMic2LevelDb` (the same for XLR 2), `auxReturnEnabled`,
 `auxLevelDb`, `auxLevelLock`, `lineInGainDb` (the Line In's gain in dB as the unit reads it back, 0 to `lineInGainMaxDb` once OpenXLR has written it and up to 80 on a unit set higher elsewhere, on a model with `lineInput`; absent on every other model), `lineInLevelLock` (the Line In's level lock, on a model with `lineInput`: while true the unit ignores Line In gain writes through its ALSA control, so the desktop mixer and other applications cannot move the gain, while `lineInGain` still applies; absent on every other model), plus the daemon-stamped `gainLocked`,
 `phantomSettling`, `phantomSettling2`, `phantomSettleSeconds` and
 `phantomSettleSeconds2`), `ducking` (present whenever the daemon runs, see [ducking](#ducking)),
@@ -574,15 +574,16 @@ gain, the Aux In level or the Line In gain, and after the input's plugin
 chain; `set` and the gain
 lock are unchanged. It belongs to the strip, not to its source: an input
 binding change keeps it, and a strip bound to another source, which has no
-gain of its own, keeps its volume as its level control. The Wave XLR Pro's
-direct microphone path (`hpMixMicDirect`, see
+gain of its own, keeps its volume as its level control. Each of the Wave XLR
+Pro's direct microphone paths (`hpMixMicDirect` and `hpMixMic2Direct`, see
 [the interface while a strip is bound](#the-interface-while-a-strip-is-bound))
-carries the microphone to the jacks inside the interface. The daemon sets
-the path's level (`hpMixMicLevelDb`) to what the jacks' feed would play the
-microphone at through the software send: the send level, the channel volume
-and the feeding mix's volume, on the same cubic scale. The channel volume
-reaches the jacks as it reaches every other mix. The channel's software
-effects do not, because the path carries the raw microphone.
+carries its microphone to the jacks inside the interface. The daemon sets
+the path's level (`hpMixMicLevelDb`, `hpMixMic2LevelDb`) to what the jacks'
+feed would play the microphone at through the software send: the send level,
+the channel volume and the feeding mix's volume, on the same cubic scale. The
+channel volume reaches the jacks as it reaches every other mix. The path
+cannot carry the channel's software effects, so the daemon keeps it off while
+one runs and the send carries the processed microphone instead.
 
 
 Application identities use playback-node metadata, falling back to the
@@ -1021,11 +1022,13 @@ output selectors, the Aux mix on its USB Aux port and its monitor routes.
 Aux In, Line In and a strip still on the interface keep their audio.
 
 The unit's input-stage controls belong to the channel whose `unitInput`
-names them (see above). The Wave XLR Pro's direct microphone path
-(`hpMixMicDirect`, the zero-latency path from its first input to its jacks)
-follows the same channel: XLR 1 while it takes the interface, or the capture
-channel on the Pro's own node at its first port while XLR 1 is bound
-elsewhere. The daemon turns the path on while every monitor output is a Pro
+names them (see above). The Wave XLR Pro's direct microphone paths
+(`hpMixMicDirect`, the zero-latency path from its first input to its jacks,
+and `hpMixMic2Direct`, the same from its second) follow the same channels:
+XLR 1 (or XLR 2) while it takes the interface, or the capture channel on the
+Pro's own node at that input's port while the strip is bound elsewhere. Each
+path follows its own channel by the rule below, and input 2's never takes the
+channel that carries input 1. The daemon turns the path on while every monitor output is a Pro
 jack and at least one mix feeding them is unmuted and carries that channel
 unmuted. Muting the feeding mix turns the direct path off. For a summed feed,
 it stays on while any feeding mix and that channel's send to it are both
@@ -1038,9 +1041,9 @@ heard twice; it never uses the path while monitoring is paused or that channel
 is in an exclusive group or under Sound Check, nor while software changes the
 channel's audio: an insert that runs, the soft low cut or ClipGuard, or its EQ
 in software, noise removal or voice changer. The commands that change those
-move the path at once. With no channel carrying the Pro's first input
-the path is off, and a bound XLR 1 reaches the jacks through the software
-mix. The daemon holds the path to this rule whether or not a jack is in use,
+move the path at once. With no channel carrying an input that input's
+path is off, and a bound XLR 1 or XLR 2 reaches the jacks through the
+software mix. The daemon holds the path to this rule whether or not a jack is in use,
 so a path another program left on (Wave Link, for one) is switched off as
 soon as the Pro is driven.
 

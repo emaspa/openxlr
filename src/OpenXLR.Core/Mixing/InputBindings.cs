@@ -212,7 +212,7 @@ public sealed partial class Mixer
             }
             if (!_built) { AssignBindingLocked(channel, binding); return; }
             var previousMutes = new HashSet<string>(_muted);
-            string? previousHardwareMic = _hardwareMicChannel;
+            string?[] previousHardwareMics = [.. _hardwareMicChannels];
             bool previousClipGuard = _softClipGuard;
             try
             {
@@ -226,12 +226,11 @@ public sealed partial class Mixer
                 if (!clipGuardApplied && SoftClipGuardApplicableLocked && _softClipGuard
                     && !_pw.GetSoftwareClipGuardAvailability().Available)
                     _softClipGuard = false;
-                // The Pro's direct path follows the channel that carries the
-                // unit's input 1. When the binding moves that input to another
-                // channel, or out of the mixer, the path is off until the
+                // Each of the Pro's direct paths follows the channel that
+                // carries its input. When the binding moves an input to another
+                // channel, or out of the mixer, that path is off until the
                 // daemon has looked at the new channel's sends.
-                if (_hardwareMicChannel is not null && _hardwareMicChannel != DirectPathChannelLocked())
-                    SetHardwareMicChannelLocked(null);
+                DropMovedHardwareMicsLocked();
                 MuteInputMonitorsLocked(channel);
                 WireInputFeedsLocked([channel]);
                 if (save is not null) PersistLocked(save);
@@ -244,7 +243,7 @@ public sealed partial class Mixer
                 _muted.UnionWith(previousMutes);
                 try
                 {
-                    SetHardwareMicChannelLocked(previousHardwareMic);
+                    RestoreHardwareMicsLocked(previousHardwareMics);
                     ReapplyMixesLocked(_config.Mixes);
                     WireInputFeedsLocked([channel]);
                 }

@@ -23,12 +23,13 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     private readonly PipeWireAdapter _pw;
     private readonly Dictionary<string, double> _levels = [];   // "channel|mix" -> level
     private readonly HashSet<string> _muted = [];               // "channel|mix"
-    // While the Pro's hardware mic path feeds the headphone jacks, the
-    // software Monitor send of the channel that carries the Pro's input 1
-    // (XLR 1, or a capture channel on the unit's node while XLR 1 is bound
-    // elsewhere) is silenced in the graph, not in the saved mix, so the mic
-    // is not heard twice with a few ms between them. Null while it is off.
-    private string? _hardwareMicChannel;
+    // While one of the Pro's hardware mic paths feeds the headphone jacks,
+    // the software Monitor send of the channel that carries that input (XLR 1
+    // or XLR 2, or a capture channel on the unit's node while the strip is
+    // bound elsewhere) is silenced in the graph, not in the saved mix, so the
+    // mic is not heard twice with a few ms between them. One slot per unit
+    // input, index 0 for input 1; null while that path is off.
+    private readonly string?[] _hardwareMicChannels = new string?[2];
     private readonly HashSet<string> _cells = [];               // cells that exist
     private readonly Dictionary<string, double> _mixVolume = [];
     private readonly HashSet<string> _mixMuted = [];
@@ -2364,13 +2365,16 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// the unit's input 1 (see <see cref="UnitInputChannel"/>), or null when
     /// no channel does and the capsule is not in the mixer.
     /// </summary>
-    public string? HardwareMicChannel { get { lock (_gate) return DirectPathChannelLocked(); } }
+    public string? HardwareMicChannel { get { lock (_gate) return DirectPathChannelLocked(1); } }
 
-    private string? DirectPathChannelLocked() => CarrierOfLocked(1);
+    private string? DirectPathChannelLocked(int input) => CarrierOfLocked(input);
+
+    private bool IsHardwareMicLocked(string channel) => Array.IndexOf(_hardwareMicChannels, channel) >= 0;
 
     /// <summary>
-    /// The Pro's hardware mic path is carrying its input 1 to the headphone
-    /// jacks (or not); the software monitor send of the channel that carries
+    /// The Pro's hardware mic path for unit <paramref name="input"/> 1 (XLR 1)
+    /// or 2 (XLR 2) is carrying it to the headphone jacks (or not); the
+    /// software monitor send of the channel that carries
     /// that input is muted in the graph while it does, and restored when it
     /// stops. With <paramref name="whenHeardIn"/>, the path is used only while
     /// that channel's send is unmuted in one of the feed's mixes, read under
@@ -2383,17 +2387,20 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// must hear the loop the send carries. Never while software changes the
     /// channel's audio (see <see cref="ProcessedInSoftwareLocked"/>): the
     /// direct path would play the voice unchanged, so the send carries the
-    /// processed one instead, a few milliseconds later.
+    /// processed one instead, a few milliseconds later. Input 2 never takes
+    /// the channel that already carries input 1.
     /// </summary>
-    public bool SetHardwareMicMonitor(bool on, string? whenHeardIn = null)
+    public bool SetHardwareMicMonitor(bool on, string? whenHeardIn = null, int input = 1)
     {
+        if (input is not (1 or 2)) throw new ArgumentOutOfRangeException(nameof(input));
         lock (_gate)
         {
-            string? channel = DirectPathChannelLocked();
+            string? channel = DirectPathChannelLocked(input);
             on &= !_monitorMuted && channel is not null && GroupForChannelLocked(channel) is null && _soundCheckChannel != channel
                 && !ProcessedInSoftwareLocked(channel)
+                && (input == 1 || channel != DirectPathChannelLocked(1))
                 && (whenHeardIn is null || MonitorFeed.Parts(whenHeardIn).Any(m => !_mixMuted.Contains(m) && !_muted.Contains(Cell(channel, m))));
-            SetHardwareMicChannelLocked(on ? channel : null);
+            SetHardwareMicChannelLocked(input, on ? channel : null);
             return on;
         }
     }
@@ -2415,31 +2422,46 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// volume, then the feeding mix's volume, all on the desktop's cubic
     /// scale. For a summed feed the loudest unmuted part counts. Negative
     /// infinity while no part carries it; the device holds that to its floor.
+    /// This is input 1's; <see cref="HardwareMicLevelDbOf"/> takes either.
     /// </summary>
-    public double HardwareMicLevelDb
+    public double HardwareMicLevelDb => HardwareMicLevelDbOf(1);
+
+    /// <inheritdoc cref="HardwareMicLevelDb"/>
+    public double HardwareMicLevelDbOf(int input)
     {
-        get
+        lock (_gate)
         {
-            lock (_gate)
-            {
-                if (_hardwareMicChannel is not { } channel || JackFeedLocked() is not { } feed) return double.NegativeInfinity;
-                double gain = MonitorFeed.Parts(feed)
-                    .Where(m => !_mixMuted.Contains(m) && !_muted.Contains(Cell(channel, m)))
-                    .Select(m => SendGain(_levels.GetValueOrDefault(Cell(channel, m), 0.0), ChannelVolumeLocked(channel), 1)
-                        * Math.Clamp(_mixVolume.GetValueOrDefault(m, 1.0), 0, MixVolumeMaximumLocked(m)))
-                    .DefaultIfEmpty(0).Max();
-                return gain > 0 ? 60 * Math.Log10(gain) : double.NegativeInfinity;
-            }
+            if (_hardwareMicChannels[input - 1] is not { } channel || JackFeedLocked() is not { } feed) return double.NegativeInfinity;
+            double gain = MonitorFeed.Parts(feed)
+                .Where(m => !_mixMuted.Contains(m) && !_muted.Contains(Cell(channel, m)))
+                .Select(m => SendGain(_levels.GetValueOrDefault(Cell(channel, m), 0.0), ChannelVolumeLocked(channel), 1)
+                    * Math.Clamp(_mixVolume.GetValueOrDefault(m, 1.0), 0, MixVolumeMaximumLocked(m)))
+                .DefaultIfEmpty(0).Max();
+            return gain > 0 ? 60 * Math.Log10(gain) : double.NegativeInfinity;
         }
     }
 
-    private void SetHardwareMicChannelLocked(string? channel)
+    private void SetHardwareMicChannelLocked(int input, string? channel)
     {
-        if (_hardwareMicChannel == channel) return;
-        string? previous = _hardwareMicChannel;
-        _hardwareMicChannel = channel;
+        string? previous = _hardwareMicChannels[input - 1];
+        if (previous == channel) return;
+        _hardwareMicChannels[input - 1] = channel;
         RefreshHardwareMicCellsLocked(previous);
         RefreshHardwareMicCellsLocked(channel);
+    }
+
+    /// <summary>Turn off each path whose input another channel, or none, now carries.</summary>
+    private void DropMovedHardwareMicsLocked()
+    {
+        for (int input = 1; input <= _hardwareMicChannels.Length; input++)
+            if (_hardwareMicChannels[input - 1] is { } channel && channel != DirectPathChannelLocked(input))
+                SetHardwareMicChannelLocked(input, null);
+    }
+
+    /// <summary>Put both paths back as a refused change found them.</summary>
+    private void RestoreHardwareMicsLocked(string?[] previous)
+    {
+        for (int input = 1; input <= previous.Length; input++) SetHardwareMicChannelLocked(input, previous[input - 1]);
     }
 
     private void RefreshHardwareMicCellsLocked(string? channel)
@@ -2544,7 +2566,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             foreach (string output in group) _monitorFeeds[output] = feed;
         }
         _incompleteMonitorRoutes.Clear();
-        RefreshHardwareMicCellsLocked(_hardwareMicChannel);
+        foreach (string? channel in _hardwareMicChannels) RefreshHardwareMicCellsLocked(channel);
         if (!_monitorMuted)
             foreach ((string key, string target) in MonitorRouteTargetsLocked())
             {
@@ -3383,7 +3405,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             monitor ? 1 : _mixVolume.GetValueOrDefault(mixId, 1.0));
         waiting = !_muted.Contains(cell) && ExclusivePeerPendingLocked(channelId);
         bool muted = waiting || _muted.Contains(cell) || (!monitor && _mixMuted.Contains(mixId));
-        if (_hardwareMicChannel == channelId && monitor && MonitorFeed.Includes(JackFeedLocked(), mixId))
+        if (IsHardwareMicLocked(channelId) && monitor && MonitorFeed.Includes(JackFeedLocked(), mixId))
             muted = true;   // the hardware direct path carries it to the jacks
         else if (monitor && HearsMyselfLocked(channelId, mixId))
         {

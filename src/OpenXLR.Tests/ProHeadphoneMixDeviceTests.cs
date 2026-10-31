@@ -107,7 +107,8 @@ public sealed class ProHeadphoneMixDeviceTests
     {
         // The desk unit on 2026-10-31: the return at unity with Line In out,
         // and USB pairs 6 and 7 members (byte 13 `0c`). XLR 2 (bit 1) and USB
-        // Aux (bit 2) are set here too: XLR 2 leaves, USB Aux stays.
+        // Aux (bit 2) are set here too and stay: XLR 2's bit is its direct
+        // path, which has a setter of its own.
         byte[] block = Convert.FromHexString(ReturnAtUnity());
         block[12] = 0x26;
         block[13] = 0x0c;
@@ -118,9 +119,9 @@ public sealed class ProHeadphoneMixDeviceTests
 
         pro.SetHpMixMonitorReturn(true);
         byte[] after = unit.Blocks[0x0001];
-        Assert.Equal((0x24, 0x00), (after[12], after[13]));
+        Assert.Equal((0x26, 0x00), (after[12], after[13]));
         for (int i = 0; i < after.Length; i++)
-            if (i is not (12 or 13)) Assert.Equal(block[i], after[i]);
+            if (i != 13) Assert.Equal(block[i], after[i]);
         Assert.True(pro.ReadState().HpMixMonitorReturn);
 
         // Bits above pair 7 in byte 13 are no pair the sink has and stay as read.
@@ -130,6 +131,33 @@ public sealed class ProHeadphoneMixDeviceTests
         using var other = new WaveXlrProDevice(high);
         other.Connect();
         Assert.True(other.ReadState().HpMixMonitorReturn);
+    }
+
+    [Fact]
+    public void Xlr2sPathIsBit1AtTheLevelInByte1AndTheReturnLeavesIt()
+    {
+        var unit = Unit(ReturnAtUnity());
+        using var pro = new WaveXlrProDevice(unit);
+        pro.Connect();
+        Assert.False(pro.ReadState().HpMixMic2Direct);
+        byte[] before = unit.Blocks[0x0001];
+
+        pro.SetHpMixMic2LevelDb(-6);
+        pro.SetHpMixMic2Direct(true);
+        byte[] after = unit.Blocks[0x0001];
+        Assert.Equal((0xf4, before[12] | 0x02), (after[1], after[12]));
+        for (int i = 0; i < after.Length; i++)
+            if (i is not (1 or 12)) Assert.Equal(before[i], after[i]);
+        DeviceState state = pro.ReadState();
+        Assert.Equal((true, -6.0, false), (state.HpMixMic2Direct, state.HpMixMic2LevelDb, state.HpMixMicDirect));
+
+        // The return, asserted or not, keeps XLR 2's path as it is.
+        pro.SetHpMixMonitorReturn(true);
+        Assert.True(pro.ReadState().HpMixMic2Direct);
+        Assert.True(pro.ReadState().HpMixMonitorReturn);
+        pro.SetHpMixMic2Direct(false);
+        Assert.Equal(0x00, unit.Blocks[0x0001][12] & 0x02);
+        Assert.Equal(0xf4, unit.Blocks[0x0001][1]);
     }
 
     [Fact]

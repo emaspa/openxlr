@@ -1210,12 +1210,14 @@ public sealed class DeviceManager : BackgroundService
     /// #8): the Monitor stream's return pair must be a member for the jacks to
     /// hear the Monitor mix at all, and the mic's hardware direct path follows
     /// the software mixer, at <paramref name="micLevelDb"/>, the level the
-    /// software send would play it at. A null <paramref name="monitorReturn"/>
+    /// software send would play it at; XLR 2's path the same way with
+    /// <paramref name="mic2Direct"/> at <paramref name="mic2LevelDb"/>. A null <paramref name="monitorReturn"/>
     /// leaves the return pair as the unit holds it. Returns true when a
     /// membership bit was written, so the caller can restart the playback
     /// stream, which is what latches the change; the level applies at once.
     /// </summary>
-    public bool EnsureHeadphoneMix(bool? monitorReturn, bool micDirect, double micLevelDb = 0)
+    public bool EnsureHeadphoneMix(bool? monitorReturn, bool micDirect, double micLevelDb = 0,
+        bool mic2Direct = false, double mic2LevelDb = 0)
     {
         lock (_gate)
         {
@@ -1229,11 +1231,16 @@ public sealed class DeviceManager : BackgroundService
                 // left.
                 bool level = micDirect && HalfDb(s.HpMixMicLevelDb) != HalfDb(micLevelDb);
                 if (level) _device.SetHpMixMicLevelDb(micLevelDb);
+                bool level2 = mic2Direct && HalfDb(s.HpMixMic2LevelDb) != HalfDb(mic2LevelDb);
+                if (level2) _device.SetHpMixMic2LevelDb(mic2LevelDb);
+                level |= level2;
                 bool changed = false;
                 if (monitorReturn is { } ret && s.HpMixMonitorReturn != ret) { _device.SetHpMixMonitorReturn(ret); changed = true; }
                 if (s.HpMixMicDirect != micDirect) { _device.SetHpMixMicDirect(micDirect); changed = true; }
+                if (s.HpMixMic2Direct != mic2Direct) { _device.SetHpMixMic2Direct(mic2Direct); changed = true; }
                 if (changed)
-                    _log.LogInformation("headphone mix: monitor return {ret}, mic direct {mic}", monitorReturn ?? s.HpMixMonitorReturn, micDirect);
+                    _log.LogInformation("headphone mix: monitor return {ret}, mic direct {mic}, XLR 2 direct {mic2}",
+                        monitorReturn ?? s.HpMixMonitorReturn, micDirect, mic2Direct);
                 if (changed || level)
                 {
                     _last = Stamp(_device.ReadState());

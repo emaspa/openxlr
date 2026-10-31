@@ -58,8 +58,7 @@ public sealed partial class Mixer
                 _config = _config with { Channels = [.. _config.Channels.Select(c => c.Id == channel ? next : c)] };
                 try { PersistLocked(save); }
                 catch { _config = before; throw; }
-                if (_hardwareMicChannel is not null && _hardwareMicChannel != DirectPathChannelLocked())
-                    SetHardwareMicChannelLocked(null);
+                DropMovedHardwareMicsLocked();
                 return;
             }
             var previousMutes = new HashSet<string>(_muted);
@@ -82,8 +81,7 @@ public sealed partial class Mixer
             if (_soundCheckChannel == channel)
                 StopSoundCheckLocked(restore: false, error: "Sound Check stopped because the capture input's source changed.");
             SyncMicrophonePauseLocked();
-            if (_hardwareMicChannel is not null && _hardwareMicChannel != DirectPathChannelLocked())
-                SetHardwareMicChannelLocked(null);
+            DropMovedHardwareMicsLocked();
             if (_built) RebindCaptureFeedLocked(next);
         }
     }

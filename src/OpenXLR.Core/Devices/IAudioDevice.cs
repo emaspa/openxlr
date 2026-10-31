@@ -125,6 +125,10 @@ public interface IAudioDevice : IDisposable
     void SetHpMixMicDirect(bool on) { }
     /// <summary>Wave XLR Pro: that path's level in the headphone mix, in dB.</summary>
     void SetHpMixMicLevelDb(double db) { }
+    /// <summary>Wave XLR Pro: XLR 2's zero-latency hardware path into the headphone mix.</summary>
+    void SetHpMixMic2Direct(bool on) { }
+    /// <summary>Wave XLR Pro: that path's level in the headphone mix, in dB.</summary>
+    void SetHpMixMic2LevelDb(double db) { }
     void SetOutHp2(bool on) { }
     void SetOutUsbAux(bool on) { }
     void SetOutLineOut(bool on) { }

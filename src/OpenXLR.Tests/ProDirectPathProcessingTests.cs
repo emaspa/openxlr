@@ -46,6 +46,22 @@ public sealed class ProDirectPathProcessingTests
         Assert.True(mixer.SetHardwareMicMonitor(true));
     }
 
+    [Fact]
+    public void Xlr2TakesItsOwnPathOnlyOnAUnitWithTwoInputs()
+    {
+        using var mixer = new Mixer();
+        Assert.False(mixer.SetHardwareMicMonitor(true, input: 2));
+        mixer.SetInputJacks(2, auxInput: true);
+        Assert.True(mixer.SetHardwareMicMonitor(true, input: 2));
+        // Each path follows its own channel's send and processing.
+        mixer.SetVoiceChanger("xlr2", new(Enabled: true));
+        Assert.False(mixer.SetHardwareMicMonitor(true, input: 2));
+        Assert.True(mixer.SetHardwareMicMonitor(true));
+        mixer.SetVoiceChanger("xlr2", new(Enabled: false));
+        Assert.True(mixer.SetHardwareMicMonitor(true, input: 2));
+        Assert.Throws<ArgumentOutOfRangeException>(() => mixer.SetHardwareMicMonitor(true, input: 3));
+    }
+
     private static void Set(Mixer mixer, string kind, bool on)
     {
         switch (kind)
