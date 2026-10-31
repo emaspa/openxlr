@@ -2230,7 +2230,7 @@ Piliin ang interface na kinokontrol ng OpenXLR</value>
     <value>Sariling volume ng channel. Sabay nitong inaayos ang lahat ng send ng channel; pinananatili ng bawat send ang sariling level at mute.</value>
   </data>
   <data name="ChannelVolumeDirectTip" xml:space="preserve">
-    <value>Sariling volume ng channel. Binabago nito ang bawat mix na pinapadalhan ng channel. Sa zero-latency path ng interface mo naririnig ang mikroponong ito sa headphone. Sinusunod nito ang volume pero nilalaktawan ang mga effect ng channel.</value>
+    <value>Sariling volume ng channel. Binabago nito ang bawat mix na pinapadalhan ng channel. Sa zero-latency path ng interface mo naririnig ang mikroponong ito sa headphone. Sinusunod nito ang volume. Kapag nag-on ka ng effect, sa mixer na maririnig ang mikropono, kasama ang effect.</value>
   </data>
   <data name="ChannelVolumeMixesOnly" xml:space="preserve">
     <value>Sa mga mix lang ang volume, hindi sa direct monitor</value>

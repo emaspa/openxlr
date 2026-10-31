@@ -1035,7 +1035,10 @@ opens the path and again whenever the send, the channel volume or the mix
 volume moves. A level change needs no restart of the playback stream. The daemon mutes that
 channel's monitor send in the graph meanwhile so the microphone is not
 heard twice; it never uses the path while monitoring is paused or that channel
-is in an exclusive group or under Sound Check. With no channel carrying the Pro's first input
+is in an exclusive group or under Sound Check, nor while software changes the
+channel's audio: an insert that runs, the soft low cut or ClipGuard, or its EQ
+in software, noise removal or voice changer. The commands that change those
+move the path at once. With no channel carrying the Pro's first input
 the path is off, and a bound XLR 1 reaches the jacks through the software
 mix. The daemon holds the path to this rule whether or not a jack is in use,
 so a path another program left on (Wave Link, for one) is switched off as

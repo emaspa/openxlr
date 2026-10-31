@@ -2380,7 +2380,10 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// sends, and the device's direct path would keep the microphone in the
     /// jacks after the group closed it. Never while it is under Sound Check
     /// either: the direct path carries the live microphone, and the jacks
-    /// must hear the loop the send carries.
+    /// must hear the loop the send carries. Never while software changes the
+    /// channel's audio (see <see cref="ProcessedInSoftwareLocked"/>): the
+    /// direct path would play the voice unchanged, so the send carries the
+    /// processed one instead, a few milliseconds later.
     /// </summary>
     public bool SetHardwareMicMonitor(bool on, string? whenHeardIn = null)
     {
@@ -2388,11 +2391,23 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         {
             string? channel = DirectPathChannelLocked();
             on &= !_monitorMuted && channel is not null && GroupForChannelLocked(channel) is null && _soundCheckChannel != channel
+                && !ProcessedInSoftwareLocked(channel)
                 && (whenHeardIn is null || MonitorFeed.Parts(whenHeardIn).Any(m => !_mixMuted.Contains(m) && !_muted.Contains(Cell(channel, m))));
             SetHardwareMicChannelLocked(on ? channel : null);
             return on;
         }
     }
+
+    /// <summary>
+    /// Whether software changes the channel's audio before its sends: a
+    /// chain of its own (the soft low cut, ClipGuard or an insert that runs)
+    /// or the microphone stage (the EQ in software, noise removal or the
+    /// voice changer). An EQ the unit runs does not count, nor does a
+    /// bypassed insert.
+    /// </summary>
+    private bool ProcessedInSoftwareLocked(string channel)
+        => _config.Channels.FirstOrDefault(c => c.Id == channel) is { } ch
+            && InputRouteLocked(ch, null) is { } route && (route.Chained || route.Eq);
 
     /// <summary>
     /// The level, in dB, the jacks' feed would play the hardware mic path's

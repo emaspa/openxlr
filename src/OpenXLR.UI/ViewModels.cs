@@ -2064,8 +2064,8 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
     /// to the headphone jacks: the device reports the path on and this channel
     /// carries the unit's first input. The headphones then hear the
     /// microphone through the hardware, at the level the daemon gives it from
-    /// the send and the volume, but without the channel's software effects.
-    /// Set by <see cref="MainViewModel"/>.
+    /// the send and the volume. The daemon turns the path off while software
+    /// changes the channel's audio. Set by <see cref="MainViewModel"/>.
     /// </summary>
     public bool DirectMonitored
     {

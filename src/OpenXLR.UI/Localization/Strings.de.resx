@@ -2281,7 +2281,7 @@ Von OpenXLR gesteuertes Interface wählen</value>
     <value>Die eigene Lautstärke des Kanals. Sie skaliert alle Sends des Kanals zugleich; jeder Send behält seinen eigenen Pegel und seine Stummschaltung.</value>
   </data>
   <data name="ChannelVolumeDirectTip" xml:space="preserve">
-    <value>Die eigene Lautstärke des Kanals. Sie ändert jeden Mix, in den der Kanal sendet. Deine Kopfhörer hören dieses Mikrofon über den verzögerungsfreien Hardware-Signalweg des Interfaces, der der Lautstärke folgt, aber die Effekte des Kanals umgeht.</value>
+    <value>Die eigene Lautstärke des Kanals. Sie ändert jeden Mix, in den der Kanal sendet. Deine Kopfhörer hören dieses Mikrofon über den verzögerungsfreien Hardware-Signalweg des Interfaces, der der Lautstärke folgt. Schaltest du einen Effekt ein, hören sie das Mikrofon über den Mixer, mit dem Effekt.</value>
   </data>
   <data name="ChannelVolumeMixesOnly" xml:space="preserve">
     <value>Die Lautstärke wirkt nur auf die Mixe, nicht auf das direkte Monitoring</value>

@@ -2283,7 +2283,7 @@ Select the interface OpenXLR drives</value>
     <value>The channel's own volume. It scales every send of the channel at once; each send keeps its own level and mute.</value>
   </data>
   <data name="ChannelVolumeDirectTip" xml:space="preserve">
-    <value>The channel's own volume. It changes every mix the channel is sent to. Your headphones hear this microphone through the interface's zero-latency path, which follows the volume but skips the channel's effects.</value>
+    <value>The channel's own volume. It changes every mix the channel is sent to. Your headphones hear this microphone through the interface's zero-latency path, which follows the volume. Turn on an effect and they hear the microphone through the mixer, effect included.</value>
   </data>
   <data name="ChannelVolumeMixesOnly" xml:space="preserve">
     <value>The volume reaches the mixes only, not the direct monitor</value>

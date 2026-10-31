@@ -2272,7 +2272,7 @@ Selecciona la interfaz que controla OpenXLR</value>
     <value>El volumen propio del canal. Escala a la vez todos los envíos del canal; cada envío conserva su propio nivel y silencio.</value>
   </data>
   <data name="ChannelVolumeDirectTip" xml:space="preserve">
-    <value>El volumen propio del canal. Cambia todas las mezclas a las que envía el canal. Tus auriculares oyen este micrófono por la ruta sin latencia de la interfaz, que sigue el volumen pero no pasa por los efectos del canal.</value>
+    <value>El volumen propio del canal. Cambia todas las mezclas a las que envía el canal. Tus auriculares oyen este micrófono por la ruta sin latencia de la interfaz, que sigue el volumen. Si activas un efecto, oyen el micrófono por el mezclador, con el efecto.</value>
   </data>
   <data name="ChannelVolumeMixesOnly" xml:space="preserve">
     <value>El volumen solo afecta a las mezclas, no a la monitorización directa</value>

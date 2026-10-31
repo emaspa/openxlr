@@ -215,12 +215,13 @@ physical gain dial.
   the pitch and the formant by -12 to 12 semitones each; Deep, High,
   Robot, Radio, Alien, Dracula, Frankenstein, Mummy, Werewolf and Witch
   are presets. Changing the voice or switching it crossfades. Interfaces
-  with a direct monitor, the Wave XLR Pro and the MK.2 units among them,
-  send the dry voice to their jacks, so the changed one is heard through a
-  monitor mix. The Voice changer window, opened from the SUBMIXER header
-  after Soundboard, the terminal mixer, a Deck key with toggle and hold
-  modes and [`setVoiceChanger`](api.md#voice-changer) control it, and it is
-  saved with the mixer and in profiles.
+  with a direct monitor, the MK.2 units among them, send the dry voice to
+  their jacks, so the changed one is heard through a monitor mix. The Wave
+  XLR Pro turns its zero-latency path off while a voice is on. The Voice
+  changer window, opened from the SUBMIXER header after Soundboard, the
+  terminal mixer, a Deck key with toggle and hold modes and
+  [`setVoiceChanger`](api.md#voice-changer) control it, and it is saved
+  with the mixer and in profiles.
 - Gain lock: the daemon rejects every gain change while the lock is set,
   from any client, and stores the lock per device in `gainlock.json`.
   Shown only for devices without a physical gain dial, which would
@@ -285,8 +286,7 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
   in the channel tiles, in the input rack and in the mix matrix's row
   heads, under the gain on a hardware row; the terminal mixer and the
   OpenDeck dials change it too. The Wave XLR Pro's zero-latency headphone
-  path is hardware and does not follow it, and the UI says so on the
-  channel it carries
+  path takes its level from it, and the UI marks the channel it carries
 - Ducking on every device: a key microphone (XLR 1, XLR 2 or a mono
   capture input) lowers chosen channels in chosen mixes while it is loud,
   by 6, 12 or 24 dB with the Wave XLR Pro's sensitivity and speed presets.
@@ -422,8 +422,11 @@ that mix carries the Monitor stream (a unit set up by Wave Link on
 Windows may not), and when a jack is the only monitor output the
 microphone's zero-latency hardware path into the jacks follows XLR 1's
 send in the Monitor mix: unmuted, you hear yourself with no delay;
-muted, you do not. With another device in the monitor set, or with XLR 1
-in an exclusive group, the software send carries the microphone instead.
+muted, you do not. With another device in the monitor set, with XLR 1
+in an exclusive group, or while XLR 1 runs a software effect (EQ in
+software, noise removal, the voice changer, the soft low cut, ClipGuard or
+a plugin), the software send carries the microphone instead, effects
+included.
 
 Channels appear as playback devices in the desktop's audio applet, and
 the virtual microphones (Stream and Chat by default) as recording

@@ -1207,9 +1207,11 @@ public sealed class MixerService : IHostedService, IDisposable
                     int hz = cmd.Value.GetInt32();
                     if (hz is not (0 or 80 or 120)) return "setLowCutHz: value must be 0, 80, or 120";
                     _mixer.SetLowCutHz(hz);
+                    SyncOutputSelectors();   // software processing moves the Pro's mic between its hardware path and the send
                     break;
                 case "setSoftClipGuard":
                     _mixer.SetSoftClipGuard(cmd.Value.GetBoolean());
+                    SyncOutputSelectors();   // software processing moves the Pro's mic between its hardware path and the send
                     break;
                 case "renameInsert":
                     _mixer.RenameInsert(cmd.Channel!, cmd.InsertId!, cmd.Name!);   // checked by CommandValidation
@@ -1237,10 +1239,12 @@ public sealed class MixerService : IHostedService, IDisposable
                     return null;   // nothing clients see in state changes
                 case "setInserts":
                     _mixer.SetInserts(cmd.Channel!, cmd.Inserts!);   // both checked by CommandValidation
+                    SyncOutputSelectors();   // software processing moves the Pro's mic between its hardware path and the send
                     break;
                 case "setInsertBypass":
                     if (cmd.Channel is null || cmd.InsertId is null) return "setInsertBypass: need 'channel' and 'insertId'";
                     _mixer.SetInsertBypass(cmd.Channel, cmd.InsertId, cmd.Value.GetBoolean());
+                    SyncOutputSelectors();   // software processing moves the Pro's mic between its hardware path and the send
                     break;
                 case "setInsertParam":
                     if (cmd.Channel is null || cmd.InsertId is null || cmd.Symbol is null)
@@ -1249,21 +1253,26 @@ public sealed class MixerService : IHostedService, IDisposable
                     break;
                 case "setEq":
                     _mixer.SetEq(cmd.Channel!, MicEq.Read(cmd.Eq, out _)!);   // checked by CommandValidation
+                    SyncOutputSelectors();   // software processing moves the Pro's mic between its hardware path and the send
                     break;
                 case "setEqEnabled":
                     _mixer.SetEqEnabled(cmd.Channel!, cmd.Value.GetBoolean());
+                    SyncOutputSelectors();   // software processing moves the Pro's mic between its hardware path and the send
                     break;
                 case "setEqBand":
                     _mixer.SetEqBand(cmd.Channel!, cmd.Band!.Value, new EqBandChange(cmd.Enabled, cmd.Type, cmd.Frequency, cmd.Gain, cmd.Q));
                     break;
                 case "setEqProcessing":
                     _mixer.SetEqProcessing(cmd.Channel!, cmd.Value.GetString()!);   // checked by CommandValidation
+                    SyncOutputSelectors();   // software processing moves the Pro's mic between its hardware path and the send
                     break;
                 case "setNoiseRemoval":
                     _mixer.SetNoiseRemoval(cmd.Channel!, new MicNoiseChange(cmd.Enabled, cmd.Engine, cmd.Strength));
+                    SyncOutputSelectors();   // software processing moves the Pro's mic between its hardware path and the send
                     break;
                 case "setVoiceChanger":
                     _mixer.SetVoiceChanger(cmd.Channel!, new MicVoiceChange(cmd.Enabled, cmd.Voice, cmd.Pitch, cmd.Formant));
+                    SyncOutputSelectors();   // software processing moves the Pro's mic between its hardware path and the send
                     break;
                 case "setDucking":
                 case "setDuckingProcessing":
