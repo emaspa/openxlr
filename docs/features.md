@@ -420,13 +420,13 @@ On the Wave XLR Pro the headphone jacks are fed by a mix inside the
 device. Whenever a Pro jack is a monitor output the daemon makes sure
 that mix carries the Monitor stream (a unit set up by Wave Link on
 Windows may not), and when a jack is the only monitor output the
-microphone's zero-latency hardware path into the jacks follows XLR 1's
-send in the Monitor mix: unmuted, you hear yourself with no delay;
-muted, you do not. With another device in the monitor set, with XLR 1
-in an exclusive group, or while XLR 1 runs a software effect (EQ in
-software, noise removal, the voice changer, the soft low cut, ClipGuard or
-a plugin), the software send carries the microphone instead, effects
-included.
+microphones' zero-latency hardware paths into the jacks follow XLR 1's
+and XLR 2's sends in the Monitor mix, each its own: unmuted, you hear that
+microphone with no delay; muted, you do not. With another device in the
+monitor set, with the microphone in an exclusive group, or while it runs a
+software effect (EQ in software, noise removal, the voice changer, the soft
+low cut, ClipGuard or a plugin), the software send carries it instead,
+effects included.
 
 Channels appear as playback devices in the desktop's audio applet, and
 the virtual microphones (Stream and Chat by default) as recording

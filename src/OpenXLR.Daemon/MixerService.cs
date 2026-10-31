@@ -186,6 +186,7 @@ public sealed class MixerService : IHostedService, IDisposable
             // Keep software monitoring while no Pro is driven, and re-arm the
             // Aux stream when one is again.
             _mixer.SetHardwareMicMonitor(false);
+            _mixer.SetHardwareMicMonitor(false, input: 2);
             _prevAuxDesired = false;
             return;
         }
@@ -224,7 +225,7 @@ public sealed class MixerService : IHostedService, IDisposable
         // Monitor send's mute of the channel that carries the Pro's input 1:
         // XLR 1 on the interface, or the capture channel kept for the Pro's
         // microphone while XLR 1 is bound to another source, and off while
-        // no channel carries it. Only while every monitor output is a Pro
+        // no channel carries it. XLR 2's path follows input 2 the same way. Only while every monitor output is a Pro
         // jack: with another device in the set the software send has to
         // carry the mic there, and the hardware path would double it.
         bool anyJack = suffixes.Contains("hp1") || suffixes.Contains("hp2") || suffixes.Contains("lineout");
@@ -234,7 +235,9 @@ public sealed class MixerService : IHostedService, IDisposable
         string jackFeed = _mixer.JackMonitorMix ?? "monitor";
         // The mixer refuses the path while that channel is in an exclusive
         // group or under Sound Check, and reads its mutes under its own lock.
-        bool micDirect = _mixer.SetHardwareMicMonitor(jacksOnly && _mixer.IsMonitorOnlyFeed(jackFeed), whenHeardIn: jackFeed);
+        bool eligible = jacksOnly && _mixer.IsMonitorOnlyFeed(jackFeed);
+        bool micDirect = _mixer.SetHardwareMicMonitor(eligible, whenHeardIn: jackFeed);
+        bool mic2Direct = _mixer.SetHardwareMicMonitor(eligible, whenHeardIn: jackFeed, input: 2);
         // The direct path is driven whether or not a jack is in use: another
         // program (Wave Link in a virtual machine) can leave it on, and the
         // jacks would then carry the microphone with nothing here showing it.
@@ -243,7 +246,8 @@ public sealed class MixerService : IHostedService, IDisposable
         // The path plays the microphone at the level the send would have, so
         // the send, the channel volume and the mix volume still reach it.
         if (_devices.EnsureHeadphoneMix(monitorReturn: anyJack ? true : null, micDirect: micDirect,
-                micLevelDb: _mixer.HardwareMicLevelDb) && _mixer.Built)
+                micLevelDb: _mixer.HardwareMicLevelDbOf(1), mic2Direct: mic2Direct, mic2LevelDb: _mixer.HardwareMicLevelDbOf(2))
+            && _mixer.Built)
             _mixer.BounceMonitorHardwareOutput();
     }
 
@@ -1111,22 +1115,22 @@ public sealed class MixerService : IHostedService, IDisposable
                     return null;
                 case "cycleExclusiveGroup":
                     _mixer.CycleExclusiveGroup(cmd.Group!);
-                    SyncOutputSelectors();   // the input 1 channel's mute may move the Pro's hardware mic path
+                    SyncOutputSelectors();   // a microphone's mute may move one of the Pro's hardware mic paths
                     break;
                 case "setLevel":
                     if (cmd.Channel is null || cmd.Mix is null) return "setLevel: need 'channel' and 'mix'";
                     _mixer.SetLevel(cmd.Channel, cmd.Mix, cmd.Value.GetDouble());
-                    SyncOutputSelectors();   // the Pro's hardware mic path plays at the send's level
+                    SyncOutputSelectors();   // the Pro's hardware mic paths play at the send's level
                     break;
                 case "setChannelMuted":
                     if (cmd.Channel is null || cmd.Mix is null) return "setChannelMuted: need 'channel' and 'mix'";
                     _mixer.SetChannelMuted(cmd.Channel, cmd.Mix, cmd.Value.GetBoolean());
-                    SyncOutputSelectors();   // the input 1 channel's mute may move the Pro's hardware mic path
+                    SyncOutputSelectors();   // a microphone's mute may move one of the Pro's hardware mic paths
                     break;
                 case "setChannelVolume":
                     if (cmd.Channel is null) return "setChannelVolume: need 'channel'";
                     _mixer.SetChannelVolume(cmd.Channel, cmd.Value.GetDouble());
-                    SyncOutputSelectors();   // the Pro's hardware mic path plays at the send's level
+                    SyncOutputSelectors();   // the Pro's hardware mic paths play at the send's level
                     break;
                 case "setCaptureGain":
                     // The source keeps its own volume, as PipeWire saves it;
@@ -1137,7 +1141,7 @@ public sealed class MixerService : IHostedService, IDisposable
                 case "setMixVolume":
                     if (cmd.Mix is null) return "setMixVolume: need 'mix'";
                     _mixer.SetMixVolume(cmd.Mix, cmd.Value.GetDouble());
-                    SyncOutputSelectors();   // the Pro's hardware mic path plays at the send's level
+                    SyncOutputSelectors();   // the Pro's hardware mic paths play at the send's level
                     break;
                 case "setMixMuted":
                     if (cmd.Mix is null) return "setMixMuted: need 'mix'";

@@ -216,9 +216,9 @@ it shows. XLR rows in a mix matrix do the same with the input's gain.
 <a name="volume-direct-monitor"></a>
 On a Wave XLR Pro, the [zero-latency path](#input-bindings) to the
 headphone jacks is inside the interface. It carries the microphone
-straight to the jacks, past the mixer. While the
-path is on, the channel that carries the Pro's microphone shows a small
-ⓘ mark beside its volume. OpenXLR sets the path's level from the
+straight to the jacks, past the mixer, and each XLR input has its own. While
+a path is on, the channel that carries that input shows a small ⓘ mark
+beside its volume. OpenXLR sets the path's level from the
 microphone's Monitor send, its channel volume and the Monitor mix's
 volume, so these change how loud you hear yourself just as they would
 through the computer. The path cannot carry the channel's software
@@ -405,12 +405,13 @@ in HEADPHONES keeps mixing the interface's own microphone into its jack,
 and a line under it says where that microphone plays. The light in the header means the interface's
 connection and nothing else.
 
-On a Wave XLR Pro the zero-latency path to the headphone jacks follows the
-channel that carries the Pro's first input: while the jacks are the only
-monitor output and that channel is unmuted in their mix, the jacks hear the
-microphone directly and the channel's software send is held back. With no
-such channel the path is off, and a microphone bound to XLR 1 reaches the
-jacks through the software mix, a few milliseconds later. This holds while
+On a Wave XLR Pro each zero-latency path to the headphone jacks follows the
+channel that carries its input, XLR 1's the Pro's first and XLR 2's its
+second: while the jacks are the only monitor output and that channel is
+unmuted in their mix, the jacks hear the microphone directly and the
+channel's software send is held back. With no such channel the path is off,
+and a microphone bound to XLR 1 or XLR 2 reaches the jacks through the
+software mix, a few milliseconds later. This holds while
 the jacks are not in use too, so a path another program such as Wave Link
 left on is switched off. The path is
 hardware, and OpenXLR sets its level from that channel's
@@ -636,19 +637,19 @@ share the row equally. In MONITOR, a long output name is shortened to
 leave room for the volume fader; hover over the picker for the full name.
 
 On the Wave XLR Pro the headphone jacks are fed by a mix inside the
-device. When a jack is the only monitor output, XLR 1's send to the
-Monitor mix drives that hardware path: unmuted, you hear yourself with
-zero latency; muted, you do not. If another device (speakers, a headset)
+device. When a jack is the only monitor output, XLR 1's and XLR 2's
+sends to the Monitor mix each drive their own hardware path: unmuted, you
+hear that microphone with zero latency; muted, you do not. If another device (speakers, a headset)
 is ticked as well, the microphone reaches everything through the
 software mix instead, with a few milliseconds of delay.
 That device mix also holds a level for the computer audio OpenXLR sends,
 and Wave Link writes its own fader setting there. While a jack is a
 monitor output, OpenXLR keeps that level at 0 dB. A unit last used with
 Wave Link on another system would otherwise play quieter on its jacks.
-The same mix can hold XLR 2, the Line In jack and the Pro's other USB
-playback channels, which Wave Link uses for its own mixes. While a jack is a monitor
+The same mix can hold the Line In jack and the Pro's other USB playback
+channels, which Wave Link uses for its own mixes. While a jack is a monitor
 output OpenXLR takes them out of it, so the jacks play the Monitor mix and
-your microphone's direct path, and nothing OpenXLR does not show. A
+your microphones' direct paths, and nothing OpenXLR does not show. A
 program that plays to the Pro's own device instead of an OpenXLR channel
 is not heard on the jacks. A device on the USB Aux port is the exception:
 if the Pro already plays it on the jacks, OpenXLR leaves it there, so a

@@ -233,6 +233,37 @@ public sealed class ExclusiveGroupTests
     /// carrying the input, the path stays off.
     /// </summary>
     [Fact]
+    public void EachProInputHasItsOwnHardwareMonitorPathAndSilencesOnlyItsOwnSend()
+    {
+        using var f = new Sends();
+        f.Mixer.SetInputJacks(2, auxInput: true);
+        f.Mixer.SetChannelMuted("xlr1", "monitor", false);
+        f.Mixer.SetChannelMuted("xlr2", "monitor", false);
+        f.Clear();
+        Assert.True(f.Mixer.SetHardwareMicMonitor(true, whenHeardIn: "monitor", input: 2));
+        Assert.Equal(["set-sink-input-mute 20 1"], f.Mutes);
+        Assert.False(f.Mixer.IsChannelMutedIn("xlr2", "monitor"));   // the saved mix keeps it open
+        f.Clear();
+        Assert.True(f.Mixer.SetHardwareMicMonitor(true, whenHeardIn: "monitor"));
+        Assert.Equal(["set-sink-input-mute 10 1"], f.Mutes);
+
+        // Muting XLR 2's send takes its path off and leaves XLR 1's.
+        f.Mixer.SetChannelMuted("xlr2", "monitor", true);
+        Assert.False(f.Mixer.SetHardwareMicMonitor(true, whenHeardIn: "monitor", input: 2));
+        Assert.True(f.Mixer.SetHardwareMicMonitor(true, whenHeardIn: "monitor"));
+
+        // Closing XLR 1's path opens its send again; XLR 2's stays as muted.
+        f.Mixer.SetChannelMuted("xlr2", "monitor", false);
+        Assert.True(f.Mixer.SetHardwareMicMonitor(true, whenHeardIn: "monitor", input: 2));
+        f.Clear();
+        Assert.False(f.Mixer.SetHardwareMicMonitor(false));
+        Assert.Equal(["set-sink-input-mute 10 0"], f.Mutes);
+        f.Clear();
+        Assert.False(f.Mixer.SetHardwareMicMonitor(false, input: 2));
+        Assert.Equal(["set-sink-input-mute 20 0"], f.Mutes);
+    }
+
+    [Fact]
     public void TheProHardwareMonitorPathFollowsTheChannelCarryingInput1()
     {
         const string unit = "alsa_input.usb-Elgato_Systems_Elgato_Wave_XLR_Pro_SER-00.pro-input-0";

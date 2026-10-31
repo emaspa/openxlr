@@ -59,14 +59,16 @@ public sealed record DeviceState
     // The Pro's headphone ("Personal", selector 0x1e) mix membership, block
     // 0x0001 byte 12: bit 5 sums USB return pair 2/3 (where the Monitor mix
     // streams) into the jacks; bit 0 is XLR 1, the mic's direct,
-    // zero-latency path into them, at the level in byte 0. Wave Link on
-    // Windows may leave either state behind. The return reads as on only at
-    // unity, with byte 12 bit 3 (the Line In jack's own path into the jacks)
-    // and byte 13 bit 1 (the Aux mix's stream) clear, which is how OpenXLR
-    // sets it.
+    // zero-latency path into them, at the level in byte 0, and bit 1 XLR 2's
+    // at the level in byte 1. Wave Link on Windows may leave any of them
+    // behind. The return reads as on only at unity, with the Line In jack's
+    // own path and every other USB playback pair (the Aux mix's stream among
+    // them) out of the mix, which is how OpenXLR sets it.
     public bool HpMixMonitorReturn { get; init; }
     public bool HpMixMicDirect { get; init; }
     public double HpMixMicLevelDb { get; init; }
+    public bool HpMixMic2Direct { get; init; }
+    public double HpMixMic2LevelDb { get; init; }
 
     /// <summary>
     /// Whether the aux mix's Music-return matrix cell is open (level 0 dB +

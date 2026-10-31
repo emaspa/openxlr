@@ -531,10 +531,14 @@ public sealed partial class MainViewModel : ViewModelBase
     /// <summary>
     /// The Wave XLR Pro carries its first input straight to its headphone
     /// jacks (its zero-latency direct path), as the device reports it. The
-    /// daemon drives the path; the window only reads it, to say on the
-    /// carrying channel that its volume does not reach that path.
+    /// daemon drives the path; the UI only reads it, to mark the carrying
+    /// channel's volume.
     /// </summary>
     public bool HpMixMicDirect { get => _hpMixMicDirect; private set => Set(ref _hpMixMicDirect, value); }
+
+    private bool _hpMixMic2Direct;
+    /// <summary>The same for the Pro's second input, XLR 2.</summary>
+    public bool HpMixMic2Direct { get => _hpMixMic2Direct; private set => Set(ref _hpMixMic2Direct, value); }
 
     // USB Aux input stage.
     private double _auxLevelDb;
@@ -977,6 +981,7 @@ public sealed partial class MainViewModel : ViewModelBase
 
             // Read outside the state block, so a unit that left takes its path with it.
             HpMixMicDirect = node["state"]?["hpMixMicDirect"]?.GetValue<bool>() ?? false;
+            HpMixMic2Direct = node["state"]?["hpMixMic2Direct"]?.GetValue<bool>() ?? false;
 
             ApplyDetected(node["detected"]);
             ApplyProfiles(node["profiles"]);

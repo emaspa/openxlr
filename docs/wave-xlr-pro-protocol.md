@@ -648,9 +648,10 @@ Bit 1 is XLR 2, at the level in byte 1. With a microphone on XLR 2 and the
 daemon stopped, bits 0 and 1 clear left the mix silent; bit 1 set put XLR
 2's capture (AUX2) on AUX8 at a flat -21 dB with coherence 1.000, and byte
 1 at `f4` lowered it to -27 dB at once, without a stream restart, as XLR 1's
-level does. OpenXLR gives XLR 2 no direct path, so a unit holding the bit
-would play it on the jacks beside its Monitor send; the daemon clears it
-with the Monitor return, as it clears Line In.
+level does. It is XLR 2's zero-latency path, and the daemon drives it as it
+drives XLR 1's: open at the level the Monitor send would play while that send
+is unmuted, the jacks are the only monitor output and no software effect runs
+on XLR 2, and the send held back in the graph meanwhile.
 
 Bit 2 is the USB Aux input. With a Mac playing into the desk unit's USB
 Aux port, bit 2 set and byte 2 at `00`, section 0's capture carried the
