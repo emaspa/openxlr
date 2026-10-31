@@ -177,6 +177,19 @@ public sealed class VoiceChangerTests
         Assert.Null(Mixer.ActiveVoice(new Dictionary<string, double>()));
     }
 
+    [Theory]
+    [InlineData(1600, 48000, 33.3)]
+    [InlineData(1470, 44100, 33.3)]
+    [InlineData(1440, 48000, 30.0)]
+    [InlineData(0, 48000, null)]
+    [InlineData(double.NaN, 48000, null)]
+    public void ADelayMeterReadsInMillisecondsAtTheStagesRate(double samples, int rate, double? ms)
+    {
+        var meters = new Dictionary<string, double> { [SoftwareEqBackend.VoiceLatencyMeter] = samples };
+        Assert.Equal(ms, SoftwareEqBackend.MeterMilliseconds(meters, SoftwareEqBackend.VoiceLatencyMeter, rate));
+        Assert.Null(SoftwareEqBackend.MeterMilliseconds(meters, SoftwareEqBackend.NoiseLatencyMeter, rate));
+    }
+
     [Fact]
     public void TheVoiceChangerAloneAsksForTheMicrophoneStage()
     {
@@ -280,11 +293,12 @@ public sealed class VoiceChangerTests
         Assert.DoesNotContain(SoftwareEqBackend.Controls(MicEq.Default, MicNoise.Default).Keys, k => k.StartsWith("voice_", StringComparison.Ordinal));
         Assert.Contains("voice_active", SoftwareEqBackend.Meters);
         Assert.Contains("voice_status", SoftwareEqBackend.Meters);
+        Assert.Contains("voice_latency", SoftwareEqBackend.Meters);
         // The C side declares the same symbols and meters, once it is in the tree.
         string native = Path.Combine(MicEqTests.RepoRoot, "native", "voice.c");
         if (!File.Exists(native)) return;
         string source = File.ReadAllText(native);
-        foreach (string symbol in controls.Keys.Append("voice_active").Append("voice_status"))
+        foreach (string symbol in controls.Keys.Append("voice_active").Append("voice_status").Append("voice_latency"))
             Assert.Contains($"\"{symbol}\"", source);
     }
 }

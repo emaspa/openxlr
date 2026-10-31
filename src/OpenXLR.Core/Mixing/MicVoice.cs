@@ -129,6 +129,9 @@ public sealed record MicVoiceState(bool Enabled, string Voice, double Pitch, dou
     /// <summary>The voice whose output plays now, or null.</summary>
     public string? Active { get; init; }
 
+    /// <summary>The delay the running voice adds in milliseconds, or null while none runs.</summary>
+    public double? LatencyMs { get; init; }
+
     /// <summary>The native helper is installed, so the voice changer can be switched on.</summary>
     public bool Available { get; init; }
 

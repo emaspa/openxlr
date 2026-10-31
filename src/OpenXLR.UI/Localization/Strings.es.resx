@@ -3412,6 +3412,9 @@ Selecciona la interfaz que controla OpenXLR</value>
   <data name="VoiceStarting" xml:space="preserve">
     <value>La voz se está iniciando.</value>
   </data>
+  <data name="VoiceRunning" xml:space="preserve">
+    <value>La voz añade {0} ms de retardo.</value>
+  </data>
   <data name="VoicePitch" xml:space="preserve">
     <value>Tono</value>
   </data>

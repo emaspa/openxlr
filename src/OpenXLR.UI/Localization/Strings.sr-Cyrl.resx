@@ -3764,6 +3764,9 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
   <data name="VoiceStarting" xml:space="preserve">
     <value>Глас се покреће.</value>
   </data>
+  <data name="VoiceRunning" xml:space="preserve">
+    <value>Глас додаје {0} ms кашњења.</value>
+  </data>
   <data name="VoicePitch" xml:space="preserve">
     <value>Висина</value>
   </data>

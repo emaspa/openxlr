@@ -405,6 +405,8 @@ internal sealed record VoiceEntry
     public double Formant { get; init; }
     /// <summary>The voice heard now, or null.</summary>
     public string? Active { get; init; }
+    /// <summary>The delay the running voice adds, or null.</summary>
+    public double? LatencyMs { get; init; }
     public bool Available { get; init; }
     public string? Error { get; init; }
 
@@ -414,6 +416,7 @@ internal sealed record VoiceEntry
         : !Available ? "cannot run"
         : !Enabled ? "off"
         : Active != Voice ? "on, starting"
+        : LatencyMs is double ms ? $"on, {VoiceName(Voice)}, adds {ms:0} ms"
         : $"on, {VoiceName(Voice)}";
 
     /// <summary>A voice's name as the Inputs tab lists it: the id with a capital.</summary>

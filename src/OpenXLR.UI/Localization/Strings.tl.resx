@@ -3764,6 +3764,9 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
   <data name="VoiceStarting" xml:space="preserve">
     <value>Nagsisimula ang boses.</value>
   </data>
+  <data name="VoiceRunning" xml:space="preserve">
+    <value>Nagdadagdag ang boses ng {0} ms na delay.</value>
+  </data>
   <data name="VoicePitch" xml:space="preserve">
     <value>Pitch</value>
   </data>

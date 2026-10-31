@@ -3777,6 +3777,9 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
   <data name="VoiceStarting" xml:space="preserve">
     <value>La voce si sta avviando.</value>
   </data>
+  <data name="VoiceRunning" xml:space="preserve">
+    <value>La voce aggiunge {0} ms di ritardo.</value>
+  </data>
   <data name="VoicePitch" xml:space="preserve">
     <value>Tono</value>
   </data>

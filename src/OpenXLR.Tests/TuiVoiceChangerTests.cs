@@ -84,6 +84,8 @@ public sealed class TuiVoiceChangerTests
         Assert.Equal("off", Of(_ => { }).Status);
         Assert.Equal("on, starting", Of(v => v["enabled"] = true).Status);
         Assert.Equal("on, Dracula", Of(v => { v["enabled"] = true; v["voice"] = "dracula"; v["active"] = "dracula"; }).Status);
+        Assert.Equal("on, Dracula, adds 33 ms",
+            Of(v => { v["enabled"] = true; v["voice"] = "dracula"; v["active"] = "dracula"; v["latencyMs"] = 33.3; }).Status);
         Assert.Equal("cannot run", Of(v => v["available"] = false).Status);
         Assert.Equal("no host", Of(v => { v["available"] = false; v["error"] = "no host"; }).Status);
         Assert.Null(Snapshot.Parse(Json)!.Mixer.Channels[1].Voice);

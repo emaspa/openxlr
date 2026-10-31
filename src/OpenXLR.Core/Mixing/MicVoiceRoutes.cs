@@ -84,8 +84,8 @@ public sealed partial class Mixer
 
     /// <summary>
     /// A microphone's voice changer for the state: the setting, the voice
-    /// heard now and why what was asked for does not run. The running stage
-    /// reports its voice and its status as meters.
+    /// heard now, the delay it adds and why what was asked for does not run.
+    /// The running stage reports its voice, its status and its delay as meters.
     /// </summary>
     private MicVoiceState VoiceStateLocked(string channel)
     {
@@ -95,6 +95,8 @@ public sealed partial class Mixer
         NativePluginHost? host = _eqStages.TryGetValue(channel, out SoftwareEqBackend? stage) && stage.IsAlive ? stage.Stage.NativeHost : null;
         IReadOnlyDictionary<string, double> meters = host?.Meters ?? new Dictionary<string, double>();
         string? active = ActiveVoice(meters);
+        double? latency = active is null || host is null ? null
+            : SoftwareEqBackend.MeterMilliseconds(meters, SoftwareEqBackend.VoiceLatencyMeter, host.SampleRate);
         string? error = null;
         if (voice.Enabled)
         {
@@ -109,6 +111,7 @@ public sealed partial class Mixer
         return new MicVoiceState(voice.Enabled, voice.Voice, voice.Pitch, voice.Formant)
         {
             Active = active,
+            LatencyMs = latency,
             Available = installed && !blocked,
             Error = error,
         };
@@ -123,8 +126,8 @@ public sealed partial class Mixer
     }
 
     // What each running stage last said about its voice changer, so the sweep
-    // tells clients when a voice starts, stops or changes.
-    private readonly Dictionary<string, (double Active, double Status)> _voiceReports = new(StringComparer.Ordinal);
+    // tells clients when a voice starts, stops or changes, and its delay.
+    private readonly Dictionary<string, (double Active, double Status, double Latency)> _voiceReports = new(StringComparer.Ordinal);
 
     /// <summary>The sweep's part: true when a stage's voice or status changed since the last sweep.</summary>
     private bool TrackVoiceReportsLocked()
@@ -133,7 +136,8 @@ public sealed partial class Mixer
         foreach ((string channel, SoftwareEqBackend stage) in _eqStages)
         {
             IReadOnlyDictionary<string, double> meters = (stage.IsAlive ? stage.Stage.NativeHost : null)?.Meters ?? new Dictionary<string, double>();
-            var report = (meters.GetValueOrDefault(SoftwareEqBackend.VoiceActiveMeter, -1), meters.GetValueOrDefault(SoftwareEqBackend.VoiceStatusMeter));
+            var report = (meters.GetValueOrDefault(SoftwareEqBackend.VoiceActiveMeter, -1), meters.GetValueOrDefault(SoftwareEqBackend.VoiceStatusMeter),
+                meters.GetValueOrDefault(SoftwareEqBackend.VoiceLatencyMeter));
             if (_voiceReports.TryGetValue(channel, out var was) && was == report) continue;
             _voiceReports[channel] = report;
             changed = true;

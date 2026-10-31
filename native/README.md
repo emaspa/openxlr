@@ -430,11 +430,12 @@ The same stage removes noise before its EQ (`denoise.c`), so the EQ, the
 chain and every mix hear the cleaned voice. Its controls sit beside the
 EQ's: `denoise_enabled`, `denoise_engine` (0 RNNoise, 1 DeepFilterNet) and
 `denoise_strength` (0 to 100 dB, the most the noise is turned down, 100
-unlimited). It reports three meters: `denoise_active`, the engine heard
+unlimited). It reports four meters: `denoise_active`, the engine heard
 now (-1 none), `denoise_status`, why one asked for does not run (0 it runs,
 1 the graph is not at 48 kHz, 2 this build lacks the engine, 3 the engine
-could not start, 4 it stopped or fell behind), and `denoise_late`, the
-blocks DeepFilterNet answered late. Its delay is the stage's `latency`.
+could not start, 4 it stopped or fell behind), `denoise_late`, the
+blocks DeepFilterNet answered late, and `denoise_latency`, its delay in
+samples. The stage's `latency` is that delay plus the voice changer's.
 Both engines work at 48 kHz on mono audio; at any other rate the stage
 passes the microphone through untouched and says so.
 
@@ -520,12 +521,13 @@ The same stage ends with a voice changer (`voice.c`), after noise removal
 and the EQ, so the EQ shapes the human voice and the character goes on
 last. Its controls sit beside the others: `voice_enabled` (0 or 1),
 `voice_preset` (0 to 10, below) and, for Custom only, `voice_pitch` and
-`voice_formant` (-12 to 12 semitones). It reports two meters:
-`voice_active`, the voice heard now (-1 the dry voice), and
+`voice_formant` (-12 to 12 semitones). It reports three meters:
+`voice_active`, the voice heard now (-1 the dry voice),
 `voice_status`, why a voice asked for does not run (0 it runs, 1 the
 pitch shifter could not start, at a rate outside 16 to 192 kHz or without
 memory, 2 a voice put out something that is not a number and was cut off
-until a voice is asked for again).
+until a voice is asked for again), and `voice_latency`, its delay in
+samples, 0 while the dry voice plays.
 
 | preset | voice | what it does |
 |---|---|---|

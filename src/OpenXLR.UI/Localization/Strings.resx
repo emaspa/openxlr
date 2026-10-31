@@ -3769,6 +3769,9 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
   <data name="VoiceStarting" xml:space="preserve">
     <value>The voice is starting.</value>
   </data>
+  <data name="VoiceRunning" xml:space="preserve">
+    <value>The voice adds {0} ms of delay.</value>
+  </data>
   <data name="VoicePitch" xml:space="preserve">
     <value>Pitch</value>
   </data>

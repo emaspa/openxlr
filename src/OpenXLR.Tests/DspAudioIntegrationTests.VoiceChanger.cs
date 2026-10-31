@@ -8,7 +8,8 @@ namespace OpenXLR.Tests;
 /// tone: switched on with the EQ and noise removal off, the microphone stage
 /// splices in at the head of XLR 1 without restarting the chain behind it;
 /// changing the voice is live, with no new node or helper process; the stage
-/// reports the voice heard; off, the stage stays and the tone comes back at
+/// reports the voice heard and its delay, apart from noise removal's; off,
+/// the stage stays and the tone comes back at
 /// its level; a profile recall switches it live. A helper built before the
 /// voice changer runs the stage without it: the state says so and the
 /// microphone keeps playing, and the rest of the test is left out.
@@ -50,6 +51,16 @@ public sealed partial class DspAudioIntegrationTests
         WaitForVoice(mixer, "witch");
         mixer.SetVoiceChanger("xlr1", new(Voice: "custom", Pitch: -5, Formant: 2));
         WaitForVoice(mixer, "custom");
+
+        // Each part of the stage reports its own delay: the shifter's block,
+        // and noise removal's beside it, never the two added together.
+        Assert.True(SpinWait.SpinUntil(() => { mixer.EnsureFilterRoutes(); return VoiceState(mixer).LatencyMs == 33.3; },
+            TimeSpan.FromSeconds(10)), $"the voice changer reports {VoiceState(mixer).LatencyMs} ms");
+        mixer.SetNoiseRemoval("xlr1", new(Enabled: true, Strength: 0));
+        WaitForNoise(mixer, "rnnoise", 30);
+        Assert.Equal(33.3, VoiceState(mixer).LatencyMs);
+        mixer.SetNoiseRemoval("xlr1", new(Enabled: false));
+        WaitForNoise(mixer, null, null);
         Assert.Equal(before, Volatile.Read(ref runs.Count));
         Assert.Equal(stage, SettledChain("xlr1", "OpenXLR_eq_"));
         Assert.Equal(xlr1, SettledChain("xlr1"));
@@ -57,6 +68,7 @@ public sealed partial class DspAudioIntegrationTests
         // Off: dry inside the stage, which stays until the route is next built.
         mixer.SetVoiceChanger("xlr1", new(Enabled: false));
         WaitForVoice(mixer, null);
+        Assert.Null(VoiceState(mixer).LatencyMs);
         AssertLevel("xlr1", flat);
         Assert.Equal(stage, SettledChain("xlr1", "OpenXLR_eq_"));
 

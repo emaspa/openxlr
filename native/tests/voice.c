@@ -132,6 +132,20 @@ static Host *stage(uint32_t rate, int preset) {
   return h;
 }
 
+// The stage with noise removal on as well, RNNoise, for the split of its delay.
+static Host *stage_with_noise(int preset) {
+  Host *h = calloc(1, sizeof(*h));
+  assert(h);
+  h->backend = &eq_backend;
+  h->rate = RATE;
+  h->channels = 1;
+  assert(h->backend->load(h, NULL));
+  assert(set_control(h, "denoise_enabled", 1) && set_control(h, "denoise_engine", 0));
+  assert(set_control(h, "voice_enabled", 1) && set_control(h, "voice_preset", (float)preset));
+  assert(h->backend->activate(h));
+  return h;
+}
+
 static void release(Host *h) {
   h->backend->deactivate(h);
   h->backend->unload(h);
@@ -172,6 +186,7 @@ static void check_controls(void) {
       {"voice_enabled", 0, 1, 0, false}, {"voice_preset", 0, 10, 1, false},
       {"voice_pitch", -12, 12, 0, false}, {"voice_formant", -12, 12, 0, false},
       {"voice_active", -1, 10, -1, true}, {"voice_status", 0, 2, 0, true},
+      {"voice_latency", 0, 1e9f, 0, true},
   };
   for (size_t i = 0; i < sizeof(controls) / sizeof(controls[0]); i++) {
     const Control *found = NULL;
@@ -209,7 +224,7 @@ static void check_voice(int preset) {
   run(h, voice, output, COUNT, BLOCK);
   double used = cpu_seconds() - start;
   size_t latency = eq_latency(h);
-  assert(latency == (size_t)SHIFT_BLOCK);
+  assert(latency == (size_t)SHIFT_BLOCK && meter(h, "voice_latency") == (float)latency);
   double in_db = rms_db(voice, RATE, COUNT, 0), out_db = rms_db(output, RATE, COUNT, latency);
   float top = peak(output, 0, COUNT);
   // Then the voice stops: whatever rings on has to die away.
@@ -352,6 +367,19 @@ static int render(const char *path, const char *directory) {
   return 0;
 }
 
+// The stage's delay is noise removal's plus the voice changer's, and each
+// part reports its own share, so the daemon can show them apart.
+static void check_split(void) {
+  Host *h = stage_with_noise(VOICE_CUSTOM);
+  run(h, voice, output, RATE, BLOCK);
+  float noise = meter(h, "denoise_latency"), shift = meter(h, "voice_latency");
+  size_t total = eq_latency(h);
+  assert(meter(h, "denoise_active") == 0 && meter(h, "voice_active") == VOICE_CUSTOM);
+  assert(noise > 0 && shift == SHIFT_BLOCK && noise + shift == (float)total);
+  release(h);
+  printf("split: noise removal %.0f and the voice changer %.0f samples, the stage %zu\n", noise, shift, total);
+}
+
 int main(int argc, char **argv) {
   setvbuf(stdout, NULL, _IOLBF, 0);
   if (argc == 4 && !strcmp(argv[1], "--render")) return render(argv[2], argv[3]);
@@ -362,6 +390,7 @@ int main(int argc, char **argv) {
   for (int preset = 0; preset < VOICE_COUNT; preset++) check_voice(preset);
   check_switches();
   check_rates();
+  check_split();
   puts("voice: all checks passed");
   return 0;
 }

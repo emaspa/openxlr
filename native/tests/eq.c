@@ -10,10 +10,10 @@
 #include <assert.h>
 #include <time.h>
 
-// Noise removal's three controls and three meters, and the voice changer's
-// four controls and two meters, beside the EQ's own (tests/denoise.c and
+// Noise removal's three controls and four meters, and the voice changer's
+// four controls and three meters, beside the EQ's own (tests/denoise.c and
 // tests/voice.c check them).
-enum { DENOISE_CONTROLS = 6, VOICE_CONTROLS = 6 };
+enum { DENOISE_CONTROLS = 7, VOICE_CONTROLS = 7 };
 
 static const char *const TYPES[EQ_TYPES] = {"lowCut", "lowShelf", "peak",
                                             "notch", "highShelf", "highCut"};

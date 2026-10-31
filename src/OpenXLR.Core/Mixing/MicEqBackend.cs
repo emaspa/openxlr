@@ -34,20 +34,30 @@ internal sealed class SoftwareEqBackend(PipeWireAdapter pw, FilterHandle stage, 
 {
     /// <summary>
     /// The stage's noise removal meters: the engine that plays (-1 none,
-    /// 0 RNNoise, 1 DeepFilterNet), why one asked for does not, and how many
-    /// blocks DeepFilterNet answered late.
+    /// 0 RNNoise, 1 DeepFilterNet), why one asked for does not, how many
+    /// blocks DeepFilterNet answered late, and the delay in samples it adds.
     /// </summary>
-    internal const string ActiveMeter = "denoise_active", StatusMeter = "denoise_status", LateMeter = "denoise_late";
+    internal const string ActiveMeter = "denoise_active", StatusMeter = "denoise_status", LateMeter = "denoise_late",
+        NoiseLatencyMeter = "denoise_latency";
 
     /// <summary>
     /// The stage's voice changer meters: the voice that plays (-1 none, else
-    /// its number in <see cref="MicVoice.Voices"/>) and why one asked for
-    /// does not.
+    /// its number in <see cref="MicVoice.Voices"/>), why one asked for
+    /// does not, and the delay in samples it adds.
     /// </summary>
-    internal const string VoiceActiveMeter = "voice_active", VoiceStatusMeter = "voice_status";
+    internal const string VoiceActiveMeter = "voice_active", VoiceStatusMeter = "voice_status", VoiceLatencyMeter = "voice_latency";
 
     internal static readonly IReadOnlySet<string> Meters = new HashSet<string>(
-        [ActiveMeter, StatusMeter, LateMeter, VoiceActiveMeter, VoiceStatusMeter], StringComparer.Ordinal);
+        [ActiveMeter, StatusMeter, LateMeter, NoiseLatencyMeter, VoiceActiveMeter, VoiceStatusMeter, VoiceLatencyMeter],
+        StringComparer.Ordinal);
+
+    /// <summary>
+    /// A delay meter in milliseconds at the stage's rate, or null when the
+    /// stage has not reported it or the part adds nothing.
+    /// </summary>
+    internal static double? MeterMilliseconds(IReadOnlyDictionary<string, double> meters, string meter, int sampleRate)
+        => meters.TryGetValue(meter, out double samples) && double.IsFinite(samples) && samples > 0 && sampleRate > 0
+            ? Math.Round(samples * 1000.0 / sampleRate, 1) : null;
 
     // The voice changer's controls are never part of the stage's start: a
     // helper from before the voice changer refuses to start with a control it

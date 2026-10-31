@@ -119,7 +119,7 @@ public sealed partial class Mixer
             1 => MicNoise.DeepFilterNet,
             _ => null,
         };
-        double? latency = active is not null && host?.LatencyMilliseconds is double ms && ms > 0 ? Math.Round(ms, 1) : null;
+        double? latency = active is null || host is null ? null : NoiseLatency(meters, host);
         string? error = null;
         if (noise.Enabled)
         {
@@ -139,6 +139,16 @@ public sealed partial class Mixer
         };
     }
 
+    /// <summary>
+    /// Noise removal's own delay. The stage's latency also holds the voice
+    /// changer's, so it stands in only for a host from before the stage
+    /// reported each part.
+    /// </summary>
+    private static double? NoiseLatency(IReadOnlyDictionary<string, double> meters, NativePluginHost host)
+        => meters.ContainsKey(SoftwareEqBackend.NoiseLatencyMeter)
+            ? SoftwareEqBackend.MeterMilliseconds(meters, SoftwareEqBackend.NoiseLatencyMeter, host.SampleRate)
+            : host.LatencyMilliseconds is double ms && ms > 0 ? Math.Round(ms, 1) : null;
+
     // What each running stage last said about its noise removal, so the sweep
     // tells clients when an engine starts, stops or changes its delay.
     private readonly Dictionary<string, (double Active, double Status, double? Latency)> _noiseReports = new(StringComparer.Ordinal);
@@ -152,7 +162,7 @@ public sealed partial class Mixer
             NativePluginHost? host = stage.IsAlive ? stage.Stage.NativeHost : null;
             IReadOnlyDictionary<string, double> meters = host?.Meters ?? new Dictionary<string, double>();
             var report = (meters.GetValueOrDefault(SoftwareEqBackend.ActiveMeter, -1), meters.GetValueOrDefault(SoftwareEqBackend.StatusMeter),
-                host?.LatencyMilliseconds);
+                host is null ? null : NoiseLatency(meters, host));
             if (_noiseReports.TryGetValue(channel, out var was) && was == report) continue;
             _noiseReports[channel] = report;
             changed = true;

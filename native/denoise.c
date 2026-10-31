@@ -96,7 +96,7 @@ typedef struct DfWorker {
 struct Denoise {
   Host *h;
   Control *enabled, *engine, *strength;
-  Control *active_meter, *status_meter, *late_meter;
+  Control *active_meter, *status_meter, *late_meter, *latency_meter;
   bool rate_ok;
 
   // The audio thread's own.
@@ -270,8 +270,9 @@ Denoise *denoise_load(Host *h) {
   d->active_meter = host_add_control(h, "denoise_active", -1, 1, DENOISE_NONE, true, NULL);
   d->status_meter = host_add_control(h, "denoise_status", 0, 4, DENOISE_OK, true, NULL);
   d->late_meter = host_add_control(h, "denoise_late", 0, 1e9f, 0, true, NULL);
+  d->latency_meter = host_add_control(h, "denoise_latency", 0, 1e9f, 0, true, NULL);
   if (!d->rnn || !d->enabled || !d->engine || !d->strength || !d->active_meter
-      || !d->status_meter || !d->late_meter) {
+      || !d->status_meter || !d->late_meter || !d->latency_meter) {
     denoise_unload(d);
     return NULL;
   }
@@ -297,6 +298,7 @@ static void publish_latency(Denoise *d) {
   uint32_t latency = d->active == DENOISE_RNNOISE ? RNN_DELAY
       : d->active == DENOISE_DEEPFILTER && d->df ? d->df_lag + d->df->delay : 0;
   atomic_store(&d->latency, latency);
+  atomic_store(&d->latency_meter->observed, (float)latency);
 }
 
 // Make `engine` the one that plays, from its first sample.
