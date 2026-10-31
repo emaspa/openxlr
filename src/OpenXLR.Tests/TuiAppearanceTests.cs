@@ -49,12 +49,23 @@ public sealed class TuiAppearanceTests : IDisposable
         app.UseSystemScheme(0);
         Assert.Same(Theme.Material, app.Theme);
         // Duplicate and changing desktop events only select an existing palette.
+        // The runtime can allocate on this thread while it compiles or tiers
+        // up code mid-loop (a few kilobytes, once), so the best of three
+        // rounds must be zero. An event that allocated would show in every
+        // round, 10,000 times over.
         for (int i = 0; i < 100; i++) app.UseSystemScheme(i % 3);
-        long before = GC.GetAllocatedBytesForCurrentThread();
-        for (int i = 0; i < 10_000; i++) app.UseSystemScheme(i % 3);
-        long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        long allocated = Enumerable.Range(0, 3).Min(_ => AllocatedBySystemSchemeEvents(app));
         Assert.Equal(0, allocated);
         Assert.Same(Theme.Material, app.Theme);
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining
+        | System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)]
+    private static long AllocatedBySystemSchemeEvents(App app)
+    {
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        for (int i = 0; i < 10_000; i++) app.UseSystemScheme(i % 3);
+        return GC.GetAllocatedBytesForCurrentThread() - before;
     }
 
     [Fact]
