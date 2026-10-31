@@ -50,7 +50,9 @@ public sealed class ProDuckingTests
         block[0] = 0x64;
         block[5] = 0x00;
         block[12] = 0x24;
-        block[13] = 0x0c;
+        // No USB pair but the Monitor's in the jacks' mix, as the daemon
+        // leaves it; the desk unit held pairs 6 and 7 (0c) before that.
+        block[13] = 0x00;
         foreach (int at in new[] { 15, 33, 51, 69, 87 })
         {
             block[at] = 0xaa;

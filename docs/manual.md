@@ -645,6 +645,15 @@ That device mix also holds a level for the computer audio OpenXLR sends,
 and Wave Link writes its own fader setting there. While a jack is a
 monitor output, OpenXLR keeps that level at 0 dB. A unit last used with
 Wave Link on another system would otherwise play quieter on its jacks.
+The same mix can hold XLR 2, the Line In jack and the Pro's other USB
+playback channels, which Wave Link uses for its own mixes. While a jack is a monitor
+output OpenXLR takes them out of it, so the jacks play the Monitor mix and
+your microphone's direct path, and nothing OpenXLR does not show. A
+program that plays to the Pro's own device instead of an OpenXLR channel
+is not heard on the jacks. A device on the USB Aux port is the exception:
+if the Pro already plays it on the jacks, OpenXLR leaves it there, so a
+second computer or a console stays audible with Aux In muted in the
+Monitor mix. Unmuting that send as well plays it twice.
 Muting the mix feeding the jacks also turns off the direct microphone path.
 For a summed feed, it stays on while at least one feeding mix and the
 microphone's send to that mix are both unmuted.

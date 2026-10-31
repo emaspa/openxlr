@@ -616,6 +616,52 @@ back, and the microphone was missing from the jacks. It now drives byte
 12 bit 0 at the level the Monitor send would play, and clears byte 13
 bit 1 with the Monitor return.
 
+### The other USB pairs in section 0 (desk measurement of 2026-10-31)
+
+Firmware 1.0.14, the desk unit, daemon stopped. A probe played a 1 kHz tone
+at -40 dBFS on one USB playback pair at a time and read it on section 0's
+capture (AUX8) with that pair's membership bit clear and then set, the sink
+suspended and resumed after each write. The block held byte 12 `24`, byte
+13 `0c` and every level cell from byte 0 to 11 at `00`, and was written
+back identical afterwards.
+
+| Pair | Channels | Bit | Clear | Set |
+|---|---|---|---|---|
+| 0 | AUX0, AUX1 | byte 12 bit 4 | absent | -70.8 dBFS |
+| 2 | AUX4, AUX5 | byte 12 bit 6 | absent | -70.4 dBFS |
+| 3 | AUX6, AUX7 | byte 12 bit 7 | absent | -70.6 dBFS |
+| 4 | AUX8, AUX9 | byte 13 bit 0 | absent | -70.5 dBFS |
+| 6 | AUX12, AUX13 | byte 13 bit 2 | absent | -72.5 dBFS |
+| 7 | AUX14, AUX15 | byte 13 bit 3 | absent | -70.4 dBFS |
+
+So pair k is source 4 + k, as section 12 has it, with its level at byte
+4 + k. With the daemon running the desk unit played pairs 6 and 7 on the
+jacks' mix, an owner's unit pair 0 (byte 12 `30`), and the unit Wave Link
+left in section 13's table pairs 2, 3, 4, 6 and 7 (`e8 0d`). Nothing of
+OpenXLR's plays on those pairs, but a program that picks the Pro's sink
+directly lands on pair 0, and it reached the jacks with no control in
+OpenXLR. When the daemon turns the Monitor return on it now clears every
+pair but pair 1 in the same write, and the return reads as on only while
+they are clear.
+
+Bit 1 is XLR 2, at the level in byte 1. With a microphone on XLR 2 and the
+daemon stopped, bits 0 and 1 clear left the mix silent; bit 1 set put XLR
+2's capture (AUX2) on AUX8 at a flat -21 dB with coherence 1.000, and byte
+1 at `f4` lowered it to -27 dB at once, without a stream restart, as XLR 1's
+level does. OpenXLR gives XLR 2 no direct path, so a unit holding the bit
+would play it on the jacks beside its Monitor send; the daemon clears it
+with the Monitor return, as it clears Line In.
+
+Bit 2 is the USB Aux input. With a Mac playing into the desk unit's USB
+Aux port, bit 2 set and byte 2 at `00`, section 0's capture carried the
+Aux In capture (AUX4, AUX5) at a flat -21 dB, section 0's offset, with
+coherence 1.0, left to left and right to right, while the monitor played
+elsewhere and pair 1 was silent. So the jacks hear a device on the USB Aux
+port in hardware, whatever the Aux In channel's sends are. The daemon
+leaves this bit as read: unlike Line In, an owner can rely on it to hear a
+second computer or a console on the jacks with the Aux In channel muted in
+the Monitor mix.
+
 ## 13. Line In and the capture layout (desk measurement of 2026-10-25)
 
 Firmware 1.0.14, the desk unit. This corrects the mixer's earlier model, in
@@ -713,8 +759,10 @@ same write, with the 0x0003 commit, and the return reads as on only while
 bit 3 is clear, so a unit that connects with the return set and Line In
 in the mix is written once. The change latches when the host playback
 stream restarts, as the return does, and the daemon bounces it. Bit 2
-(USB Aux, set on the desk unit as `25`) and bit 0 are left as read until
-they are checked by ear. Turning the return off leaves bit 3 as read.
+(USB Aux, set on the desk unit as `25`, measured in section 12) stays as
+read, and bit 0 is XLR 1's direct path. The other USB pairs are cleared
+with bit 3 since 2026-10-31 (section 12). Turning the return off leaves
+all of them as read.
 
 ### Open
 

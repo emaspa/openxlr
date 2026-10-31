@@ -41,7 +41,7 @@ the commit block every selector write needs.
 | Control | State | Notes |
 |---|---|---|
 | Gain 0 to 80 dB, mute (per XLR input) | verified | both inputs, independent structures |
-| Low cut, expander, voice tune + strength | verified | per input |
+| Low cut, expander, voice tune + strength | verified | per input. The low cut also shapes the zero-latency path to the jacks: on 2026-10-31, switching it off raised 25 to 70 Hz of the room noise by 7.0 dB alike in XLR 1's USB capture and in the jacks' mix (AUX8, AUX9), which followed the USB capture at a flat -21 dB with coherence 1.0 |
 | Phantom 48V, ClipGuard, compressor | verified | ClipGuard is an inverted byte in the protocol. The firmware mutes the input for about 13 s around every 48V change (anti-thump) and unmutes it itself; the UI counts the hold down on the mute button |
 | Headphone volumes x2, low impedance | verified | independent jacks |
 | Zero-latency microphone path | measured on the unit | block 0x0001 byte 12 bit 0, XLR 1's membership in the mix the jacks play, at the level in byte 0. On the desk unit (firmware 1.0.14, 2026-10-30, the mix's capture stream against XLR 1's) the bit put the microphone in the mix and byte 0 set its level in half-dB steps (`00` with the Monitor return, `f4` 6 dB under, `c8` 28 dB under, held at +12 dB), and a level write applied without a commit or a stream restart. OpenXLR used to drive byte 0 as a Mic/PC crossfade and byte 13 bit 1 as this path; that bit is the Aux mix's USB stream, which an owner's unit held at -60 dB, so the microphone was missing from the jacks. The daemon now opens bit 0 at the level the Monitor send would play and clears byte 13 bit 1 with the Monitor return. The Pro shows no crossfade. Not yet checked by ear |

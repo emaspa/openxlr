@@ -138,6 +138,26 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
     // only, so the bit is cleared with the Monitor return, as Line In's is.
     private const int HpMixPairsOffset = 13;
     private const byte HpMixAuxMixMask = 0x02;
+    // The other USB playback pairs in the same mix: pair k is source 4 + k,
+    // so pairs 0, 2 and 3 are byte 12 bits 4, 6 and 7, and pairs 4 to 7 are
+    // byte 13 bits 0 to 3, beside the Aux mix's pair 5. Each measured on the
+    // desk unit (2026-10-31): a tone on the pair reached the mix's capture
+    // with its bit set and not with it clear, at its level cell (bytes 4 to
+    // 11, all 00 there). That unit held pairs 6 and 7 set and an owner's held
+    // pair 0, so anything played to those channels of the Pro's sink reached
+    // the jacks with no control in OpenXLR. Nothing of OpenXLR's plays there:
+    // the jacks hear the Monitor mix on pair 1 only, so the other pairs are
+    // cleared with the Monitor return too. Bit 2, the USB Aux input (desk,
+    // 2026-10-31, a Mac on the port reached the mix at 0 dB), stays as read:
+    // an owner can hear a second computer there with Aux In's send muted.
+    private const byte HpMixReturnsOtherPairsMask = 0xd0;
+    // XLR 2's membership, byte 12 bit 1 (source 1), at the level in byte 1
+    // (desk, 2026-10-31, a microphone on XLR 2: absent with the bit clear,
+    // its capture at 0 dB with it set, 6 dB down at f4). OpenXLR gives XLR 2
+    // no direct path, so a unit that holds the bit would play it on the jacks
+    // beside its Monitor send. It is cleared with the return, as Line In's is.
+    private const byte HpMixXlr2Mask = 0x02;
+    private const byte HpMixOtherPairsMask = HpMixAuxMixMask | 0x0d;
 
     // The aux mix's matrix cell for the Music return channel (USB playback
     // pair 10/11), decoded from capture 4 where music was confirmed flowing to
@@ -343,8 +363,8 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
             OutHp2 = b1[OutHp2Offset] != OutSourceOff,
             OutUsbAux = b1[OutUsbAuxOffset] != OutSourceOff,
             OutLineOut = b1[OutLineOutOffset] != OutSourceOff,
-            HpMixMonitorReturn = (b1[HpMixReturnsOffset] & (HpMixMonitorReturnMask | HpMixLineInMask)) == HpMixMonitorReturnMask &&
-                                 (b1[HpMixPairsOffset] & HpMixAuxMixMask) == 0 &&
+            HpMixMonitorReturn = (b1[HpMixReturnsOffset] & (HpMixMonitorReturnMask | HpMixXlr2Mask | HpMixLineInMask | HpMixReturnsOtherPairsMask)) == HpMixMonitorReturnMask &&
+                                 (b1[HpMixPairsOffset] & HpMixOtherPairsMask) == 0 &&
                                  b1[HpMixMonitorReturnLevelOffset] == 0x00,
             HpMixMicDirect = (b1[HpMixReturnsOffset] & HpMixMicDirectMask) != 0,
             HpMixMicLevelDb = Math.Min((int)(sbyte)b1[HpMixMicLevelOffset], HpMixMicLevelCeiling) / 2.0,
@@ -480,16 +500,17 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
     // The headphone mix latches membership changes when the host playback
     // stream (re)starts, like the aux return; the caller bounces the sink.
     // Turning the return on also opens its level cell, as the aux return does,
-    // and takes the Line In jack and the Aux mix's stream out of the mix: the
-    // jacks then hear both only through the Monitor mix, as the aux mix does
-    // once OpenXLR drives its port. Turning it off leaves those bits as they are.
+    // and takes XLR 2, the Line In jack and every other USB playback pair, the
+    // Aux mix's stream among them, out of the mix: the jacks then hear those
+    // only through the Monitor mix, as the aux mix does once
+    // OpenXLR drives its port. Turning it off leaves those bits as they are.
     public void SetHpMixMonitorReturn(bool on)
     {
         byte[] b = Read(BlockCrossfade, CrossfadeLen);
         if (on)
         {
-            b[HpMixReturnsOffset] = (byte)((b[HpMixReturnsOffset] | HpMixMonitorReturnMask) & ~HpMixLineInMask);
-            b[HpMixPairsOffset] &= unchecked((byte)~HpMixAuxMixMask);
+            b[HpMixReturnsOffset] = (byte)((b[HpMixReturnsOffset] | HpMixMonitorReturnMask) & ~(HpMixXlr2Mask | HpMixLineInMask | HpMixReturnsOtherPairsMask));
+            b[HpMixPairsOffset] &= unchecked((byte)~HpMixOtherPairsMask);
             b[HpMixMonitorReturnLevelOffset] = 0x00;          // 0 dB
         }
         else b[HpMixReturnsOffset] &= unchecked((byte)~HpMixMonitorReturnMask);
