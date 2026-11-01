@@ -80,7 +80,7 @@ public static class Diagnostics
                 No plugin binaries, presets, Wine registry
                 files or API token are collected. The home
                 path, the login name, the host name, the serial numbers of
-                attached USB devices (including inside PipeWire node names) and
+                attached USB devices (including inside PipeWire node names, but not a USB controller's PCI address) and
                 process-id fields are redacted, and so are browser tab titles
                 and the addresses of browser tabs not routed to a channel.
                 Files in the archive carry no
@@ -783,9 +783,20 @@ public static class Diagnostics
                 if (File.Exists(file)) serial = File.ReadAllText(file).Trim();
             }
             catch (Exception) { /* unreadable: nothing to redact */ }
-            if (serial is { Length: >= 4 }) yield return serial;
+            if (serial is not null && IsDeviceSerial(serial)) yield return serial;
         }
     }
+
+    /// <summary>
+    /// Whether a USB serial names the device and is masked. A root hub's
+    /// serial is its controller's PCI address ("0000:0e:00.0"), the same on
+    /// every machine with that board and nothing personal; it is what tells
+    /// which controller a kernel line is about, so it stays.
+    /// </summary>
+    internal static bool IsDeviceSerial(string? serial)
+        => serial is { Length: >= 4 } && !PciAddress.IsMatch(serial);
+
+    private static readonly Regex PciAddress = new(@"^[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-7]$", RegexOptions.CultureInvariant);
 
     /// <summary>
     /// Replaces every secret with a placeholder, then the login name where it

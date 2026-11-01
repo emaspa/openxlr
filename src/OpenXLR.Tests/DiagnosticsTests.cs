@@ -5,6 +5,17 @@ namespace OpenXLR.Tests;
 [Collection("xdg-config")]
 public sealed class DiagnosticsTests
 {
+    [Theory]
+    [InlineData("AAY3H5481241GS", true)]
+    [InlineData("DB5814F6C3FEEF641F", true)]
+    [InlineData("0000:0e:00.0", false)]   // a root hub: its controller's PCI address
+    [InlineData("0000:7A:00.3", false)]
+    [InlineData("0000:0e:00.0x", true)]
+    [InlineData("abc", false)]            // too short to mask safely
+    [InlineData(null, false)]
+    public void UsbSerialsAreMaskedButControllerAddressesStay(string? serial, bool masked)
+        => Assert.Equal(masked, Diagnostics.IsDeviceSerial(serial));
+
     [Fact]
     public async Task ArchiveIsNamedByTimestampAndPrivate()
     {

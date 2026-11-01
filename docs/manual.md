@@ -4074,7 +4074,10 @@ to `pw-dump.json`. Plugin evidence includes the
 catalogue, effective bridge setup and latest native scan results. The home path, host name
 and the serial numbers of attached USB devices are redacted, in the
 text files and inside the hex dump of the vendor blocks (the XLR Dock
-stores its serial in one). Your login name is redacted where it names
+stores its serial in one). A USB controller's PCI address, which the
+kernel reports as its root hub's serial, stays readable: it is the same on
+every machine with that board, and it shows which controller a kernel line
+is about. Your login name is redacted where it names
 your account: in `pactl info`, in the `user@host` part of each client in
 `wpctl status`, in PipeWire's user and core names in the graph dump, and
 in paths under `/home`, `/media`, `/run/media` and `/mnt`. The titles of
