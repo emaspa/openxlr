@@ -166,6 +166,14 @@ picks the custom voice four semitones down, and
 `{"cmd":"setVoiceChanger","channel":"xlr1","enabled":false}` switches it off.
 `GET /api/v1/channels/xlr1` reads it back as `voice`, with the voice heard
 now in `voice.active`.
+The [compressor and expander](api.md#compressor-and-expander) on this
+computer take the same shape:
+`{"cmd":"setCompressor","channel":"xlr1","enabled":true,"threshold":-24,"makeup":4}`
+compresses XLR 1 above -24 dB and adds 4 dB after it, and
+`{"cmd":"setExpander","channel":"xlr1","enabled":true,"threshold":-45}`
+turns it down below -45 dB. `GET /api/v1/channels/xlr1` reads them back as
+`compressor` and `expander`. Their levels go out only on the WebSocket's
+meters, after `watchDynamics`.
 [Ducking](api.md#ducking) is one setup on any device:
 `{"cmd":"setDucking","value":{"enabled":true,"channels":["music","game"],"mixes":["monitor"],"amount":"high"}}`
 lowers Music and Game in Monitor A by 24 dB while XLR 1 is loud. The fields

@@ -581,6 +581,24 @@
                     "enabled": true,
                     "voice": "dracula"
                   }
+                },
+                "compressor": {
+                  "summary": "Switch a microphone's compressor on this computer on at -24 dB",
+                  "value": {
+                    "cmd": "setCompressor",
+                    "channel": "xlr1",
+                    "enabled": true,
+                    "threshold": -24
+                  }
+                },
+                "expander": {
+                  "summary": "Switch a microphone's expander on this computer on at -45 dB",
+                  "value": {
+                    "cmd": "setExpander",
+                    "channel": "xlr1",
+                    "enabled": true,
+                    "threshold": -45
+                  }
                 }
               }
             }

@@ -54,6 +54,8 @@ internal static class SavedMixerValidation
             EqProcessing = EqProcessing(settings.EqProcessing, notes),
             NoiseRemoval = NoiseRemoval(settings.NoiseRemoval, notes),
             VoiceChanger = VoiceChanger(settings.VoiceChanger, notes),
+            Compressor = Dynamics(settings.Compressor, "compressor", MicCompressor.Check, MicCompressor.Snap, notes),
+            Expander = Dynamics(settings.Expander, "expander", MicExpander.Check, MicExpander.Snap, notes),
             Ducking = Ducking(settings, notes),
             Appearance = Appearance(settings.Appearance, notes),
             BlockSize = BlockSize(settings.BlockSize, notes),
@@ -80,6 +82,8 @@ internal static class SavedMixerValidation
         if (scene.Eq is not null) Eq(scene.Eq);
         if (scene.NoiseRemoval is not null) NoiseRemoval(scene.NoiseRemoval);
         if (scene.VoiceChanger is not null) VoiceChanger(scene.VoiceChanger);
+        if (scene.Compressor is not null) Dynamics(scene.Compressor, "compressor", MicCompressor.Check);
+        if (scene.Expander is not null) Dynamics(scene.Expander, "expander", MicExpander.Check);
         if (scene.Ducking is { } ducking)
         {
             Require(!string.IsNullOrWhiteSpace(ducking.Key), "key must name a microphone channel", "ducking.key");
@@ -293,6 +297,31 @@ internal static class SavedMixerValidation
             else kept[channel] = MicNoise.Snap(noise);
         }
         return kept;
+    }
+
+    /// <summary>
+    /// Compressor or expander settings, each checked and snapped onto its
+    /// steps. An entry that cannot be read is dropped and named, so that
+    /// microphone has the processor off; the others are kept.
+    /// </summary>
+    private static Dictionary<string, T> Dynamics<T>(Dictionary<string, T>? entries, string field, Func<T?, string?> check,
+        Func<T, T> snap, List<string> notes) where T : class
+    {
+        if (entries is null) { notes.Add($"{field}: {NullEntry}"); return []; }
+        var kept = new Dictionary<string, T>();
+        foreach ((string channel, T value) in entries)
+        {
+            if (check(value) is string problem) notes.Add($"{field}.{channel}: {problem}");
+            else kept[channel] = snap(value);
+        }
+        return kept;
+    }
+
+    private static void Dynamics<T>(IReadOnlyDictionary<string, T> entries, string field, Func<T?, string?> check) where T : class
+    {
+        foreach ((string channel, T value) in entries)
+            if (check(value) is string problem)
+                throw new JsonException($"Invalid saved mixer field '{field}.{channel}': {problem}.");
     }
 
     /// <summary>

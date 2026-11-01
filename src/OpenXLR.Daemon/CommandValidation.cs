@@ -106,6 +106,14 @@ public static class CommandValidation
                 return CheckNoise(cmd, layout, nativeHostInstalled ?? PluginCatalog.HostInstalled);
             case "setVoiceChanger":
                 return CheckVoice(cmd, layout, nativeHostInstalled ?? PluginCatalog.HostInstalled);
+            case "setCompressor":
+                return CheckCompressor(cmd, layout, nativeHostInstalled ?? PluginCatalog.HostInstalled);
+            case "setExpander":
+                return CheckExpander(cmd, layout, nativeHostInstalled ?? PluginCatalog.HostInstalled);
+            case "watchDynamics":
+                if (cmd.Channel is null || TooLong(cmd.Channel, 36) || !layout.IsMicrophoneChannel(cmd.Channel))
+                    return "watchDynamics: need a microphone channel";
+                return !(nativeHostInstalled ?? PluginCatalog.HostInstalled) ? Mixer.DynamicsNeedsHost : null;
             case "getNativeEditorRules":
                 return null;
             case "setNativeEditorRule":
@@ -444,6 +452,42 @@ public static class CommandValidation
             return $"setVoiceChanger: voice must be one of {string.Join(", ", MicVoice.Voices)}";
         if (MicVoice.Check(change.ApplyTo(MicVoice.Default)) is string problem) return $"setVoiceChanger: {problem}";
         return cmd.Enabled == true && !hostInstalled ? Mixer.VoiceNeedsHost : null;
+    }
+
+    /// <summary>
+    /// <c>setCompressor</c>: a microphone channel and at least one of
+    /// <c>enabled</c>, <c>threshold</c>, <c>ratio</c>, <c>attack</c>,
+    /// <c>release</c>, <c>knee</c> and <c>makeup</c>, each inside its range;
+    /// a value outside it is refused, not clamped. Switching it on is refused
+    /// at once when the native helper is not installed.
+    /// </summary>
+    internal static string? CheckCompressor(Command cmd, ILayoutInfo layout, bool hostInstalled)
+    {
+        if (cmd.Channel is null) return "setCompressor: need 'channel'";
+        if (TooLong(cmd.Channel, 36) || !layout.IsMicrophoneChannel(cmd.Channel))
+            return $"setCompressor: '{Short(cmd.Channel)}' is not a microphone input";
+        var change = new MicCompressorChange(cmd.Enabled, cmd.Threshold, cmd.Ratio, cmd.Attack, cmd.Release, cmd.Knee, cmd.Makeup);
+        if (change.IsEmpty) return "setCompressor: need at least one of 'enabled', 'threshold', 'ratio', 'attack', 'release', 'knee' and 'makeup'";
+        if (MicCompressor.Check(change.ApplyTo(MicCompressor.Default)) is string problem) return $"setCompressor: {problem}";
+        return cmd.Enabled == true && !hostInstalled ? Mixer.DynamicsNeedsHost : null;
+    }
+
+    /// <summary>
+    /// <c>setExpander</c>: a microphone channel and at least one of
+    /// <c>enabled</c>, <c>threshold</c>, <c>ratio</c>, <c>range</c>,
+    /// <c>attack</c>, <c>release</c> and <c>hold</c>, each inside its range.
+    /// Switching it on is refused at once when the native helper is not
+    /// installed.
+    /// </summary>
+    internal static string? CheckExpander(Command cmd, ILayoutInfo layout, bool hostInstalled)
+    {
+        if (cmd.Channel is null) return "setExpander: need 'channel'";
+        if (TooLong(cmd.Channel, 36) || !layout.IsMicrophoneChannel(cmd.Channel))
+            return $"setExpander: '{Short(cmd.Channel)}' is not a microphone input";
+        var change = new MicExpanderChange(cmd.Enabled, cmd.Threshold, cmd.Ratio, cmd.Range, cmd.Attack, cmd.Release, cmd.Hold);
+        if (change.IsEmpty) return "setExpander: need at least one of 'enabled', 'threshold', 'ratio', 'range', 'attack', 'release' and 'hold'";
+        if (MicExpander.Check(change.ApplyTo(MicExpander.Default)) is string problem) return $"setExpander: {problem}";
+        return cmd.Enabled == true && !hostInstalled ? Mixer.DynamicsNeedsHost : null;
     }
 
     /// <summary>The longest channel or mix list a <c>setDucking</c> may carry.</summary>

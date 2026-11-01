@@ -1241,6 +1241,9 @@ public sealed class MixerService : IHostedService, IDisposable
                 case "watchInputMeter":
                     _mixer.WatchInputMeter(cmd.Channel!);
                     return null;   // nothing clients see in state changes
+                case "watchDynamics":
+                    _mixer.WatchDynamics(cmd.Channel!);
+                    return null;   // the levels go out with the meters
                 case "setInserts":
                     _mixer.SetInserts(cmd.Channel!, cmd.Inserts!);   // both checked by CommandValidation
                     SyncOutputSelectors();   // software processing moves the Pro's mic between its hardware path and the send
@@ -1279,6 +1282,16 @@ public sealed class MixerService : IHostedService, IDisposable
                     break;
                 case "setVoiceChanger":
                     _mixer.SetVoiceChanger(cmd.Channel!, new MicVoiceChange(cmd.Enabled, cmd.Voice, cmd.Pitch, cmd.Formant));
+                    SyncOutputSelectors();   // software processing moves the Pro's mic between its hardware path and the send
+                    break;
+                case "setCompressor":
+                    _mixer.SetCompressor(cmd.Channel!,
+                        new MicCompressorChange(cmd.Enabled, cmd.Threshold, cmd.Ratio, cmd.Attack, cmd.Release, cmd.Knee, cmd.Makeup));
+                    SyncOutputSelectors();   // software processing moves the Pro's mic between its hardware path and the send
+                    break;
+                case "setExpander":
+                    _mixer.SetExpander(cmd.Channel!,
+                        new MicExpanderChange(cmd.Enabled, cmd.Threshold, cmd.Ratio, cmd.Range, cmd.Attack, cmd.Release, cmd.Hold));
                     SyncOutputSelectors();   // software processing moves the Pro's mic between its hardware path and the send
                     break;
                 case "setDucking":

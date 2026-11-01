@@ -342,6 +342,12 @@ public sealed partial record ChannelStatus(string Id, string Name,
 
     /// <summary>The voice changer, on every channel that carries the EQ; null on every other channel.</summary>
     public MicVoiceState? Voice { get; init; }
+
+    /// <summary>The compressor on this computer, on every channel that carries the EQ; null on every other channel.</summary>
+    public MicCompressorState? Compressor { get; init; }
+
+    /// <summary>The expander on this computer, on every channel that carries the EQ; null on every other channel.</summary>
+    public MicExpanderState? Expander { get; init; }
 }
 
 

@@ -117,7 +117,7 @@ public sealed record Command
     /// <summary>"setEqBand": which existing band, 1 to 16.</summary>
     [JsonPropertyName("band")] public int? Band { get; init; }
 
-    /// <summary>"setEqBand", "setNoiseRemoval" and "setVoiceChanger": the fields that change; an absent one is kept.</summary>
+    /// <summary>"setEqBand", "setNoiseRemoval", "setVoiceChanger", "setCompressor" and "setExpander": the fields that change; an absent one is kept.</summary>
     [JsonPropertyName("enabled")] public bool? Enabled { get; init; }
     /// <summary>"setNoiseRemoval": <c>rnnoise</c> or <c>deepfilternet</c>.</summary>
     [JsonPropertyName("engine")] public string? Engine { get; init; }
@@ -129,6 +129,22 @@ public sealed record Command
     [JsonPropertyName("pitch")] public double? Pitch { get; init; }
     /// <summary>"setVoiceChanger": the custom voice's formant shift, -12 to 12 semitones.</summary>
     [JsonPropertyName("formant")] public double? Formant { get; init; }
+    /// <summary>"setCompressor" and "setExpander": the threshold in dBFS.</summary>
+    [JsonPropertyName("threshold")] public double? Threshold { get; init; }
+    /// <summary>"setCompressor" and "setExpander": the ratio, 1 to 20.</summary>
+    [JsonPropertyName("ratio")] public double? Ratio { get; init; }
+    /// <summary>"setCompressor" and "setExpander": the attack in milliseconds.</summary>
+    [JsonPropertyName("attack")] public double? Attack { get; init; }
+    /// <summary>"setCompressor" and "setExpander": the release in milliseconds.</summary>
+    [JsonPropertyName("release")] public double? Release { get; init; }
+    /// <summary>"setCompressor": the soft knee's width in dB.</summary>
+    [JsonPropertyName("knee")] public double? Knee { get; init; }
+    /// <summary>"setCompressor": the make-up gain in dB.</summary>
+    [JsonPropertyName("makeup")] public double? Makeup { get; init; }
+    /// <summary>"setExpander": the most it turns the microphone down, in dB.</summary>
+    [JsonPropertyName("range")] public double? Range { get; init; }
+    /// <summary>"setExpander": the hold in milliseconds.</summary>
+    [JsonPropertyName("hold")] public double? Hold { get; init; }
     [JsonPropertyName("type")] public string? Type { get; init; }
     [JsonPropertyName("frequency")] public double? Frequency { get; init; }
     [JsonPropertyName("gain")] public double? Gain { get; init; }
