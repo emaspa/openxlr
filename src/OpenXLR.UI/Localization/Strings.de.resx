@@ -2571,6 +2571,84 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="EqResetConfirm" xml:space="preserve">
     <value>Die vier Bänder des EQ von {0} auf ihre Anfangswerte zurücksetzen? Der EQ bleibt an oder aus, wie er ist.</value>
   </data>
+  <data name="EqProfileLabel" xml:space="preserve">
+    <value>Profil</value>
+  </data>
+  <data name="EqProfileChoose" xml:space="preserve">
+    <value>Profil wählen</value>
+  </data>
+  <data name="EqProfileListName" xml:space="preserve">
+    <value>Gespeicherte EQ-Profile</value>
+  </data>
+  <data name="EqProfileLoad" xml:space="preserve">
+    <value>Laden</value>
+  </data>
+  <data name="EqProfileLoadTip" xml:space="preserve">
+    <value>Die Bänder des gewählten Profils auf dieses Mikrofon legen und seinen EQ einschalten.</value>
+  </data>
+  <data name="EqProfileSaveTip" xml:space="preserve">
+    <value>Die Bänder dieses EQ unter einem Namen speichern, um sie auf jedem Mikrofon zu laden.</value>
+  </data>
+  <data name="EqProfileRenameTip" xml:space="preserve">
+    <value>Dem gewählten Profil einen anderen Namen geben.</value>
+  </data>
+  <data name="EqProfileDeleteTip" xml:space="preserve">
+    <value>Das gewählte Profil löschen.</value>
+  </data>
+  <data name="EqProfileSaveTitle" xml:space="preserve">
+    <value>EQ-Profil speichern</value>
+  </data>
+  <data name="EqProfileRenameTitle" xml:space="preserve">
+    <value>EQ-Profil {0} umbenennen</value>
+  </data>
+  <data name="EqProfileNameHint" xml:space="preserve">
+    <value>Bis zu {0} Zeichen. Ein Profil enthält die Bänder, nicht den EQ-Schalter, und lässt sich auf jedem Mikrofon laden.</value>
+  </data>
+  <data name="EqProfileReplaceTitle" xml:space="preserve">
+    <value>EQ-Profil ersetzen</value>
+  </data>
+  <data name="EqProfileReplaceConfirm" xml:space="preserve">
+    <value>Ein EQ-Profil namens {0} gibt es schon. Seine Bänder durch die dieses EQ ersetzen?</value>
+  </data>
+  <data name="EqProfileReplace" xml:space="preserve">
+    <value>Ersetzen</value>
+  </data>
+  <data name="EqProfileDeleteTitle" xml:space="preserve">
+    <value>EQ-Profil löschen</value>
+  </data>
+  <data name="EqProfileDeleteConfirm" xml:space="preserve">
+    <value>Das EQ-Profil {0} löschen? Das lässt sich nicht rückgängig machen.</value>
+  </data>
+  <data name="EqProfileNameRule" xml:space="preserve">
+    <value>Ein Profilname hat 1 bis {0} Zeichen und keine Steuerzeichen.</value>
+  </data>
+  <data name="EqProfileNameExists" xml:space="preserve">
+    <value>Ein EQ-Profil namens {0} gibt es schon.</value>
+  </data>
+  <data name="EqProfileMissing" xml:space="preserve">
+    <value>Es gibt kein EQ-Profil namens {0} mehr.</value>
+  </data>
+  <data name="EqProfileLimit" xml:space="preserve">
+    <value>OpenXLR behält bis zu {0} EQ-Profile. Lösche eines, um ein weiteres zu speichern.</value>
+  </data>
+  <data name="EqProfileBandsInvalid" xml:space="preserve">
+    <value>Dieser EQ lässt sich nicht speichern: Ein Band liegt außerhalb der Bereiche des EQ.</value>
+  </data>
+  <data name="EqProfileBandCount" xml:space="preserve">
+    <value>{0} hat {1} Bänder, der EQ dieses Mikrofons nimmt {2} bis {3}.</value>
+  </data>
+  <data name="EqProfileFileTooLarge" xml:space="preserve">
+    <value>{0} ist größer als 1 MiB und wurde nicht gelesen.</value>
+  </data>
+  <data name="EqProfileFileChanged" xml:space="preserve">
+    <value>{0} hat sich beim Lesen geändert. Versuche es noch einmal.</value>
+  </data>
+  <data name="EqProfileFileDamaged" xml:space="preserve">
+    <value>{0} ist keine EQ-Profildatei, die OpenXLR lesen kann. Korrigiere oder verschiebe sie; OpenXLR überschreibt sie nicht.</value>
+  </data>
+  <data name="EqProfileFileUnreadable" xml:space="preserve">
+    <value>Einige Profile in {1} ließen sich nicht lesen ({0}) und werden nicht aufgeführt. Bis sie korrigiert oder entfernt sind, speichert OpenXLR keine Änderungen an der Datei.</value>
+  </data>
   <data name="EqColumnOn" xml:space="preserve">
     <value>An</value>
   </data>

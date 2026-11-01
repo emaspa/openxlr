@@ -1581,6 +1581,14 @@ clicking **EQ** again brings it to the front.
   microphone's EQ, switch and bands, to another. **Reset** asks first,
   then puts the four bands back where they start and leaves the EQ on or
   off.
+- The **Profile** row under them keeps EQs by name. **Save** asks for a
+  name and keeps this EQ's bands as an EQ profile; a name already in use
+  asks before it replaces that profile. Pick a profile in the list and
+  press **Load** to put its bands on this microphone and switch its EQ on.
+  A profile belongs to no microphone, so one saved on XLR 1 loads on
+  XLR 2 or on a capture input. **Rename** and **Delete** act on the profile
+  picked in the list, and Delete asks first. Every open editor lists the
+  same profiles. See [EQ profiles](#eq-profiles) below.
 - The line at the bottom says what runs the EQ, or why it cannot run. On
   a unit that can run the EQ itself, **Where the EQ runs** sits above it;
   see below.
@@ -1613,6 +1621,47 @@ and Q steps of 3.75 percent. The editor shows the values the daemon keeps.
   and the microphone keeps its path. On the unit it needs nothing.
 - Scripts drive the same EQ through the [control API](api.md#microphone-eq)
   with `setEq`, `setEqEnabled` and `setEqBand`.
+
+<a name="eq-profiles"></a>
+**EQ profiles.** An EQ profile is a name and a list of bands, each with
+its switch, type, frequency, gain and Q. It does not keep the EQ switch
+or where the EQ runs. Loading a profile switches the EQ on and leaves
+the microphone's choice of where it runs alone. The UI sends the bands as
+one `setEq`, the way Paste does. A profile with more or fewer bands than
+the microphone's EQ takes does not load, and the line under the row says
+why. An older daemon takes exactly four bands. EQ profiles are not the
+[profiles](#profiles) in the header, which save every microphone's EQ
+with the rest of the mixer.
+
+- The UI keeps them in `~/.config/openxlr/eq-profiles.json`, readable
+  by you alone, and writes the whole file at once. The daemon never reads
+  it. Up to 64 profiles fit, with names of up to 80 characters; names
+  differ by more than case.
+- You can edit the file by hand. When the UI reads it, it moves values
+  outside the EQ's ranges to the nearest edge and snaps them to the EQ's
+  steps, so what loads is what the daemon takes. A profile the UI cannot
+  read, such as one with an unknown band type, a missing field or a
+  repeated name, stays out of the list, and the line under the row says
+  so. Until you fix or remove it, the UI saves no changes to the file, so
+  a save never loses your edit. A file that is not a profile list at all
+  gets the same line and stays as it is.
+- The editor reads the file again each time it comes to the front.
+- The file looks like this:
+
+  ```json
+  {
+    "version": 1,
+    "profiles": [
+      {
+        "name": "Podcast",
+        "bands": [
+          { "enabled": true, "type": "lowCut", "frequency": 80, "gain": 0, "q": 0.7046930689671475 },
+          { "enabled": true, "type": "peak", "frequency": 3000, "gain": 2.5, "q": 0.7046930689671475 }
+        ]
+      }
+    ]
+  }
+  ```
 
 **EQ on a capture input.** A capture input on one mono port gets the same
 EQ button and editor as XLR 1, in INPUTS after its source chip, in an
@@ -4221,6 +4270,7 @@ settings. See
 | `~/.local/share/openxlr/yabridge/{vst3,clap,vst2}` | companion-generated wrappers; OpenXLR loads VST3 and CLAP only |
 | `~/.config/openxlr/ui.json` | UI preferences, the chosen skin, Material's mode and the language included ([section 3.10](#skins)) |
 | `~/.config/openxlr/effect-chain-presets.json` | the UI's saved effect presets ([effect-presets.md](effect-presets.md)) |
+| `~/.config/openxlr/eq-profiles.json` | the UI's saved EQ profiles ([EQ profiles](#eq-profiles)) |
 | `~/.config/openxlr/deck-palette.json` | the skin colours the UI hands to the OpenDeck plugin |
 | `~/.config/autostart/openxlr.desktop` | the UI's autostart entry, written by Start the OpenXLR app ([section 3.9](#autostart)) |
 | `~/.cache/openxlr/plugin-scans/`, `~/.cache/openxlr/plugin-scan-logs/` | the plugin catalogue and the latest scan logs |

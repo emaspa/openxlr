@@ -2539,6 +2539,84 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
   <data name="EqResetConfirm" xml:space="preserve">
     <value>Ibalik ang apat na band ng EQ ng {0} sa panimulang halaga? Hindi magbabago ang on/off ng EQ.</value>
   </data>
+  <data name="EqProfileLabel" xml:space="preserve">
+    <value>Profile</value>
+  </data>
+  <data name="EqProfileChoose" xml:space="preserve">
+    <value>Pumili ng profile</value>
+  </data>
+  <data name="EqProfileListName" xml:space="preserve">
+    <value>Mga naka-save na EQ profile</value>
+  </data>
+  <data name="EqProfileLoad" xml:space="preserve">
+    <value>I-load</value>
+  </data>
+  <data name="EqProfileLoadTip" xml:space="preserve">
+    <value>Ilagay ang mga band ng napiling profile sa mikroponong ito at buksan ang EQ nito.</value>
+  </data>
+  <data name="EqProfileSaveTip" xml:space="preserve">
+    <value>I-save ang mga band ng EQ na ito sa isang pangalan, upang i-load sa kahit anong mikropono.</value>
+  </data>
+  <data name="EqProfileRenameTip" xml:space="preserve">
+    <value>Bigyan ng ibang pangalan ang napiling profile.</value>
+  </data>
+  <data name="EqProfileDeleteTip" xml:space="preserve">
+    <value>Burahin ang napiling profile.</value>
+  </data>
+  <data name="EqProfileSaveTitle" xml:space="preserve">
+    <value>I-save ang EQ profile</value>
+  </data>
+  <data name="EqProfileRenameTitle" xml:space="preserve">
+    <value>Palitan ang pangalan ng EQ profile na {0}</value>
+  </data>
+  <data name="EqProfileNameHint" xml:space="preserve">
+    <value>Hanggang {0} na character. Iniingatan ng profile ang mga band, hindi ang switch ng EQ, at nalo-load ito sa kahit anong mikropono.</value>
+  </data>
+  <data name="EqProfileReplaceTitle" xml:space="preserve">
+    <value>Palitan ang EQ profile</value>
+  </data>
+  <data name="EqProfileReplaceConfirm" xml:space="preserve">
+    <value>May EQ profile nang may pangalang {0}. Palitan ang mga band nito ng sa EQ na ito?</value>
+  </data>
+  <data name="EqProfileReplace" xml:space="preserve">
+    <value>Palitan</value>
+  </data>
+  <data name="EqProfileDeleteTitle" xml:space="preserve">
+    <value>Burahin ang EQ profile</value>
+  </data>
+  <data name="EqProfileDeleteConfirm" xml:space="preserve">
+    <value>Burahin ang EQ profile na {0}? Hindi na ito maibabalik.</value>
+  </data>
+  <data name="EqProfileNameRule" xml:space="preserve">
+    <value>Ang pangalan ng profile ay may 1 hanggang {0} na character at walang control character.</value>
+  </data>
+  <data name="EqProfileNameExists" xml:space="preserve">
+    <value>May EQ profile nang may pangalang {0}.</value>
+  </data>
+  <data name="EqProfileMissing" xml:space="preserve">
+    <value>Wala nang EQ profile na may pangalang {0}.</value>
+  </data>
+  <data name="EqProfileLimit" xml:space="preserve">
+    <value>Hanggang {0} na EQ profile ang iniingatan ng OpenXLR. Magbura ng isa upang makapag-save ng iba.</value>
+  </data>
+  <data name="EqProfileBandsInvalid" xml:space="preserve">
+    <value>Hindi ma-save ang EQ na ito: may band na lampas sa saklaw ng EQ.</value>
+  </data>
+  <data name="EqProfileBandCount" xml:space="preserve">
+    <value>May {1} na band ang {0}, at {2} hanggang {3} ang tinatanggap ng EQ ng mikroponong ito.</value>
+  </data>
+  <data name="EqProfileFileTooLarge" xml:space="preserve">
+    <value>Mas malaki sa 1 MiB ang {0} at hindi ito binasa.</value>
+  </data>
+  <data name="EqProfileFileChanged" xml:space="preserve">
+    <value>Nagbago ang {0} habang binabasa. Subukan muli.</value>
+  </data>
+  <data name="EqProfileFileDamaged" xml:space="preserve">
+    <value>Ang {0} ay hindi EQ profile file na nababasa ng OpenXLR. Ayusin o ilipat ito; hindi ito papatungan ng OpenXLR.</value>
+  </data>
+  <data name="EqProfileFileUnreadable" xml:space="preserve">
+    <value>May mga profile sa {1} na hindi nabasa ({0}) at hindi nakalista. Hangga't hindi naaayos o naaalis ang mga ito, walang ise-save na pagbabago ang OpenXLR sa file.</value>
+  </data>
   <data name="EqColumnOn" xml:space="preserve">
     <value>On</value>
   </data>

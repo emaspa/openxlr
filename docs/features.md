@@ -173,7 +173,10 @@ physical gain dial.
   and gain, or for Q on a type without a gain; the wheel steps Q, a
   double click switches the band and a right click picks its type. Under
   the graph is a row of fields per band, and above it the EQ switch, a
-  bypass to compare, copy and paste between microphones and a reset. The
+  bypass to compare, copy and paste between microphones and a reset. EQ
+  profiles save the bands under a name and load them on any microphone.
+  The UI keeps them in one private file and does not write it while an
+  entry in it fails to read ([manual](manual.md#eq-profiles)). The
   handles take the keyboard and carry names for screen readers. A drag
   sends each band's changes at most every 20 ms, and the editor shows the
   values the daemon keeps. The [control API](api.md#microphone-eq) drives

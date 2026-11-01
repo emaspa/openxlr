@@ -1359,6 +1359,10 @@ All under `~/.config/openxlr/` (or `$XDG_CONFIG_HOME/openxlr/`):
 - `effect-chain-presets.json`: the UI's saved effect presets, 0600.
   Written by the UI only; the daemon never reads it. Format in
   [effect-presets.md](effect-presets.md).
+- `eq-profiles.json`: the UI's saved EQ profiles, 0600. Written by the UI
+  only; the daemon never reads it, and loading one is a plain `setEq`.
+  Format `{"version":1,"profiles":[{"name":"Podcast","bands":[...]}]}`,
+  each band as `setEq` takes it ([manual](manual.md#eq-profiles)).
 
 ## Plugin search paths
 

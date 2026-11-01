@@ -2603,6 +2603,84 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
   <data name="EqResetConfirm" xml:space="preserve">
     <value>Riportare le quattro bande dell'EQ di {0} ai valori iniziali? L'EQ resta acceso o spento come è ora.</value>
   </data>
+  <data name="EqProfileLabel" xml:space="preserve">
+    <value>Profilo</value>
+  </data>
+  <data name="EqProfileChoose" xml:space="preserve">
+    <value>Scegli un profilo</value>
+  </data>
+  <data name="EqProfileListName" xml:space="preserve">
+    <value>Profili EQ salvati</value>
+  </data>
+  <data name="EqProfileLoad" xml:space="preserve">
+    <value>Carica</value>
+  </data>
+  <data name="EqProfileLoadTip" xml:space="preserve">
+    <value>Applica le bande del profilo scelto a questo microfono e accendi il suo EQ.</value>
+  </data>
+  <data name="EqProfileSaveTip" xml:space="preserve">
+    <value>Salva le bande di questo EQ con un nome, da caricare su qualsiasi microfono.</value>
+  </data>
+  <data name="EqProfileRenameTip" xml:space="preserve">
+    <value>Dai un altro nome al profilo scelto.</value>
+  </data>
+  <data name="EqProfileDeleteTip" xml:space="preserve">
+    <value>Elimina il profilo scelto.</value>
+  </data>
+  <data name="EqProfileSaveTitle" xml:space="preserve">
+    <value>Salva profilo EQ</value>
+  </data>
+  <data name="EqProfileRenameTitle" xml:space="preserve">
+    <value>Rinomina il profilo EQ {0}</value>
+  </data>
+  <data name="EqProfileNameHint" xml:space="preserve">
+    <value>Fino a {0} caratteri. Un profilo conserva le bande, non l'interruttore dell'EQ, e si carica su qualsiasi microfono.</value>
+  </data>
+  <data name="EqProfileReplaceTitle" xml:space="preserve">
+    <value>Sostituisci profilo EQ</value>
+  </data>
+  <data name="EqProfileReplaceConfirm" xml:space="preserve">
+    <value>Esiste già un profilo EQ chiamato {0}. Sostituire le sue bande con quelle di questo EQ?</value>
+  </data>
+  <data name="EqProfileReplace" xml:space="preserve">
+    <value>Sostituisci</value>
+  </data>
+  <data name="EqProfileDeleteTitle" xml:space="preserve">
+    <value>Elimina profilo EQ</value>
+  </data>
+  <data name="EqProfileDeleteConfirm" xml:space="preserve">
+    <value>Eliminare il profilo EQ {0}? Non si può annullare.</value>
+  </data>
+  <data name="EqProfileNameRule" xml:space="preserve">
+    <value>Il nome di un profilo ha da 1 a {0} caratteri e nessun carattere di controllo.</value>
+  </data>
+  <data name="EqProfileNameExists" xml:space="preserve">
+    <value>Esiste già un profilo EQ chiamato {0}.</value>
+  </data>
+  <data name="EqProfileMissing" xml:space="preserve">
+    <value>Non c'è più un profilo EQ chiamato {0}.</value>
+  </data>
+  <data name="EqProfileLimit" xml:space="preserve">
+    <value>OpenXLR conserva fino a {0} profili EQ. Eliminane uno per salvarne un altro.</value>
+  </data>
+  <data name="EqProfileBandsInvalid" xml:space="preserve">
+    <value>Questo EQ non si può salvare: una banda è fuori dagli intervalli dell'EQ.</value>
+  </data>
+  <data name="EqProfileBandCount" xml:space="preserve">
+    <value>{0} ha {1} bande, e l'EQ di questo microfono ne accetta da {2} a {3}.</value>
+  </data>
+  <data name="EqProfileFileTooLarge" xml:space="preserve">
+    <value>{0} supera 1 MiB e non è stato letto.</value>
+  </data>
+  <data name="EqProfileFileChanged" xml:space="preserve">
+    <value>{0} è cambiato durante la lettura. Riprova.</value>
+  </data>
+  <data name="EqProfileFileDamaged" xml:space="preserve">
+    <value>{0} non è un file di profili EQ che OpenXLR sa leggere. Correggilo o spostalo; OpenXLR non lo sovrascrive.</value>
+  </data>
+  <data name="EqProfileFileUnreadable" xml:space="preserve">
+    <value>Alcuni profili in {1} non si sono potuti leggere ({0}) e non sono elencati. Finché non vengono corretti o rimossi, OpenXLR non salva modifiche al file.</value>
+  </data>
   <data name="EqColumnOn" xml:space="preserve">
     <value>Attiva</value>
   </data>

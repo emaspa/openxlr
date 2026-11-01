@@ -8,11 +8,14 @@ namespace OpenXLR.UI;
 /// <summary>The window's small confirmation and naming dialogs, shared by every window that asks before acting.</summary>
 internal static class Dialogs
 {
-    /// <summary>The trimmed new name, or null when the user cancels. An empty name cannot be submitted.</summary>
-    public static async Task<string?> NameAsync(Window owner, string title, string current, string hint, int maxLength)
+    /// <summary>
+    /// The trimmed new name, or null when the user cancels. An empty name
+    /// cannot be submitted. The button says Rename unless <paramref name="okLabel"/> names it.
+    /// </summary>
+    public static async Task<string?> NameAsync(Window owner, string title, string current, string hint, int maxLength, string? okLabel = null)
     {
-        var input = new TextBox { Text = current, MinWidth = 340, MaxLength = maxLength };
-        var ok = new Button { Content = Localizer.Text("Rename"), IsDefault = true };
+        var input = new TextBox { Text = current, MinWidth = 340, MaxLength = maxLength, Name = "NameInput" };
+        var ok = new Button { Content = okLabel ?? Localizer.Text("Rename"), IsDefault = true, Name = "NameOk" };
         var cancel = new Button { Content = Localizer.Text("Cancel"), IsCancel = true };
         string? result = null;
         var dialog = new Window

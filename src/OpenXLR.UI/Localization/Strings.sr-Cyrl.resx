@@ -2539,6 +2539,84 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
   <data name="EqResetConfirm" xml:space="preserve">
     <value>Вратити четири појаса EQ-а {0} на почетне вредности? Стање укључености EQ-а остаје исто.</value>
   </data>
+  <data name="EqProfileLabel" xml:space="preserve">
+    <value>Профил</value>
+  </data>
+  <data name="EqProfileChoose" xml:space="preserve">
+    <value>Изабери профил</value>
+  </data>
+  <data name="EqProfileListName" xml:space="preserve">
+    <value>Сачувани EQ профили</value>
+  </data>
+  <data name="EqProfileLoad" xml:space="preserve">
+    <value>Учитај</value>
+  </data>
+  <data name="EqProfileLoadTip" xml:space="preserve">
+    <value>Примени појасеве изабраног профила на овај микрофон и укључи његов EQ.</value>
+  </data>
+  <data name="EqProfileSaveTip" xml:space="preserve">
+    <value>Сачувај појасеве овог EQ-а под именом, да их учиташ на било ком микрофону.</value>
+  </data>
+  <data name="EqProfileRenameTip" xml:space="preserve">
+    <value>Дај изабраном профилу друго име.</value>
+  </data>
+  <data name="EqProfileDeleteTip" xml:space="preserve">
+    <value>Обриши изабрани профил.</value>
+  </data>
+  <data name="EqProfileSaveTitle" xml:space="preserve">
+    <value>Сачувај EQ профил</value>
+  </data>
+  <data name="EqProfileRenameTitle" xml:space="preserve">
+    <value>Преименуј EQ профил {0}</value>
+  </data>
+  <data name="EqProfileNameHint" xml:space="preserve">
+    <value>До {0} знакова. Профил чува појасеве, не прекидач EQ-а, и учитава се на било ком микрофону.</value>
+  </data>
+  <data name="EqProfileReplaceTitle" xml:space="preserve">
+    <value>Замени EQ профил</value>
+  </data>
+  <data name="EqProfileReplaceConfirm" xml:space="preserve">
+    <value>EQ профил са именом {0} већ постоји. Заменити његове појасеве појасевима овог EQ-а?</value>
+  </data>
+  <data name="EqProfileReplace" xml:space="preserve">
+    <value>Замени</value>
+  </data>
+  <data name="EqProfileDeleteTitle" xml:space="preserve">
+    <value>Обриши EQ профил</value>
+  </data>
+  <data name="EqProfileDeleteConfirm" xml:space="preserve">
+    <value>Обрисати EQ профил {0}? Ово се не може поништити.</value>
+  </data>
+  <data name="EqProfileNameRule" xml:space="preserve">
+    <value>Име профила има од 1 до {0} знакова и нема контролних знакова.</value>
+  </data>
+  <data name="EqProfileNameExists" xml:space="preserve">
+    <value>EQ профил са именом {0} већ постоји.</value>
+  </data>
+  <data name="EqProfileMissing" xml:space="preserve">
+    <value>EQ профил са именом {0} више не постоји.</value>
+  </data>
+  <data name="EqProfileLimit" xml:space="preserve">
+    <value>OpenXLR чува до {0} EQ профила. Обриши један да сачуваш други.</value>
+  </data>
+  <data name="EqProfileBandsInvalid" xml:space="preserve">
+    <value>Овај EQ се не може сачувати: један појас је ван опсега EQ-а.</value>
+  </data>
+  <data name="EqProfileBandCount" xml:space="preserve">
+    <value>{0} има {1} појасева, а EQ овог микрофона прима од {2} до {3}.</value>
+  </data>
+  <data name="EqProfileFileTooLarge" xml:space="preserve">
+    <value>{0} је већи од 1 MiB и није прочитан.</value>
+  </data>
+  <data name="EqProfileFileChanged" xml:space="preserve">
+    <value>{0} се променио током читања. Покушај поново.</value>
+  </data>
+  <data name="EqProfileFileDamaged" xml:space="preserve">
+    <value>{0} није датотека EQ профила коју OpenXLR може да прочита. Исправи је или премести; OpenXLR је не преписује.</value>
+  </data>
+  <data name="EqProfileFileUnreadable" xml:space="preserve">
+    <value>Неки профили у {1} нису могли да се прочитају ({0}) и нису на списку. Док се не исправе или уклоне, OpenXLR не чува измене у датотеци.</value>
+  </data>
   <data name="EqColumnOn" xml:space="preserve">
     <value>Укљ.</value>
   </data>
