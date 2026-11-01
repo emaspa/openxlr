@@ -4043,12 +4043,6 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
   <data name="DynamicsNoLevels" xml:space="preserve">
     <value>Чека се ниво микрофона.</value>
   </data>
-  <data name="CompressorNote" xml:space="preserve">
-    <value>Овај компресор ради на овом рачунару, после EQ-а. Прекидач Компресор на Wave XLR Pro, MK.2 уређају или Wave:3 је фиксно подешавање унутар уређаја. Када су оба укључена, глас се компресује два пута.</value>
-  </data>
-  <data name="ExpanderNote" xml:space="preserve">
-    <value>Овај експандер ради на овом рачунару, после уклањања шума. Прекидач Експандер на Wave XLR Pro, MK.2 уређају или Wave:3 је фиксно подешавање унутар уређаја. Када су оба укључена, тихи делови се утишавају два пута.</value>
-  </data>
   <data name="CompressorThresholdTip" xml:space="preserve">
     <value>Ниво изнад ког се глас утишава. Превуците линију или њену ручицу, или користите тастере са стрелицама.</value>
   </data>

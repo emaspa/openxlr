@@ -4043,12 +4043,6 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
   <data name="DynamicsNoLevels" xml:space="preserve">
     <value>Hinihintay ang level ng mikropono.</value>
   </data>
-  <data name="CompressorNote" xml:space="preserve">
-    <value>Tumatakbo ang compressor na ito sa computer na ito, pagkatapos ng EQ. Ang Compressor switch ng Wave XLR Pro, ng MK.2 unit o ng Wave:3 ay isang nakapirming setting sa loob ng unit. Kapag pareho silang naka-on, dalawang beses na ma-compress ang boses.</value>
-  </data>
-  <data name="ExpanderNote" xml:space="preserve">
-    <value>Tumatakbo ang expander na ito sa computer na ito, pagkatapos ng pag-alis ng ingay. Ang Expander switch ng Wave XLR Pro, ng MK.2 unit o ng Wave:3 ay isang nakapirming setting sa loob ng unit. Kapag pareho silang naka-on, dalawang beses na hihinaan ang mahihinang bahagi.</value>
-  </data>
   <data name="CompressorThresholdTip" xml:space="preserve">
     <value>Ang level na kapag nilampasan ay hihinaan ang boses. I-drag ang linya o ang hawakan nito, o gamitin ang mga arrow key.</value>
   </data>

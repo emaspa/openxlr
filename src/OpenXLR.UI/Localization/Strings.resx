@@ -4049,10 +4049,49 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
     <value>Waiting for the microphone's level.</value>
   </data>
   <data name="CompressorNote" xml:space="preserve">
-    <value>This compressor runs on this computer, after the EQ. The Compressor switch of a Wave XLR Pro, an MK.2 unit or a Wave:3 is a fixed setting inside the unit. With both on, the voice is compressed twice.</value>
+    <value>This compressor runs on this computer, after the EQ. Where the unit can run one itself, OpenXLR keeps the unit's compressor off meanwhile, so the voice is compressed once.</value>
   </data>
   <data name="ExpanderNote" xml:space="preserve">
-    <value>This expander runs on this computer, after noise removal. The Expander switch of a Wave XLR Pro, an MK.2 unit or a Wave:3 is a fixed setting inside the unit. With both on, quiet passages are turned down twice.</value>
+    <value>This expander runs on this computer, after noise removal. Where the unit can run one itself, OpenXLR keeps the unit's expander off meanwhile, so quiet passages are turned down once.</value>
+  </data>
+  <data name="CompressorNoteDevice" xml:space="preserve">
+    <value>The {0} runs this compressor on its own processor, before USB, so every channel that takes the unit's audio hears it. The sliders keep to the unit's limits, and the unit has no knee.</value>
+  </data>
+  <data name="ExpanderNoteDevice" xml:space="preserve">
+    <value>The {0} runs this expander on its own processor, before USB, so every channel that takes the unit's audio hears it. The sliders keep to the unit's limits, and the unit has no hold.</value>
+  </data>
+  <data name="DynamicsSubtitleDevice" xml:space="preserve">
+    <value>{0}, running on the {1}</value>
+  </data>
+  <data name="DynamicsHeadingDevice" xml:space="preserve">
+    <value>Dynamics on the {0}</value>
+  </data>
+  <data name="DynamicsHintDevice" xml:space="preserve">
+    <value>The expander turns the microphone down between words, and the compressor evens out loud and quiet speech. Both run on the {0}'s own processor.</value>
+  </data>
+  <data name="DynamicsProcessingLabel" xml:space="preserve">
+    <value>Where it runs</value>
+  </data>
+  <data name="DynamicsProcessingDeviceTip" xml:space="preserve">
+    <value>Run the compressor and the expander on the {0}'s own processor, before USB. Every channel that takes this unit's audio hears them, and the unit keeps them after OpenXLR stops. The unit has no knee or hold, and narrower limits.</value>
+  </data>
+  <data name="DynamicsProcessingSoftwareTip" xml:space="preserve">
+    <value>Run the compressor and the expander on this computer, in the microphone's processing. The unit's own are switched off and keep their settings.</value>
+  </data>
+  <data name="DynamicsUnitLevels" xml:space="preserve">
+    <value>The {0} reports no input level or gain reduction, so Output shows the microphone as it leaves the unit, after its expander and compressor.</value>
+  </data>
+  <data name="DynamicsDeviceFirmwareOld" xml:space="preserve">
+    <value>Runs in software: this {0} has firmware {1}, and the unit runs the compressor and the expander itself from firmware {2}. Elgato's updater is in Wave Link on Windows or macOS.</value>
+  </data>
+  <data name="DynamicsDeviceFirmwareUnknown" xml:space="preserve">
+    <value>Runs in software: the firmware version of this {0} could not be read, and the unit runs the compressor and the expander itself only from firmware {1}.</value>
+  </data>
+  <data name="DynamicsDeviceUnsupported" xml:space="preserve">
+    <value>Runs in software: this {0} holds compressor or expander settings OpenXLR does not recognise. Collect diagnostics for a device report.</value>
+  </data>
+  <data name="DynamicsDeviceFailed" xml:space="preserve">
+    <value>Runs in software: the {0} did not keep the settings written to it. Switch the compressor or the expander off and on to try the unit again.</value>
   </data>
   <data name="CompressorThresholdTip" xml:space="preserve">
     <value>The level above which the voice is turned down. Drag the line or its handle, or use the arrow keys.</value>

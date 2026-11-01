@@ -42,10 +42,37 @@ internal static class DynamicsWindowTests
         public Task WatchDynamicsAsync(string channel) => Task.CompletedTask;
 
         public Task WatchInputMeterAsync(string channel) => Task.CompletedTask;
+
+        public readonly ConcurrentQueue<(string Channel, string Value)> Processing = new();
+
+        public Task SetDynamicsProcessingAsync(string channel, string value)
+        {
+            Processing.Enqueue((channel, value));
+            return Task.CompletedTask;
+        }
     }
 
     /// <summary>A Wave XLR Pro's state with XLR 1 reporting its compressor and expander.</summary>
-    internal static JsonNode State(bool compressorOn)
+    internal static JsonNode State(bool compressorOn, bool onUnit = false)
+    {
+        JsonNode state = SoftwareState(compressorOn);
+        if (!onUnit) return state;
+        var xlr1 = state["mixer"]!["channels"]![0]!;
+        foreach (string processor in new[] { "compressor", "expander" })
+        {
+            xlr1[processor]!["backend"] = "device";
+            xlr1[processor]!["processing"] = "device";
+            xlr1[processor]!["device"] = new JsonObject
+            {
+                ["unit"] = "0fd9:00b4@1", ["input"] = 1, ["name"] = "Wave XLR Pro", ["firmware"] = "1.0.14", ["ready"] = true,
+                ["reason"] = null, ["note"] = null, ["minimumFirmware"] = "1.0.14",
+            };
+        }
+        xlr1["compressor"]!["threshold"] = -12;
+        return JsonNode.Parse(state.ToJsonString())!;
+    }
+
+    private static JsonNode SoftwareState(bool compressorOn)
     {
         JsonNode state = JsonNode.Parse(InputBindingModelTests.ProState(""))!;
         state["type"] = "state";
@@ -229,7 +256,60 @@ internal static class DynamicsWindowTests
                 Find<ToggleButton>(processor, "DynamicsSwitch").IsChecked = !model.Enabled;
                 Assert.True(sent.Sent.TryDequeue(out var press));
                 Assert.Equal((model.Kind, "enabled", (object)model.Enabled), press);
+                // A channel on no unit that runs them offers no choice of where.
+                Assert.False(Find<WrapPanel>(processor, "DynamicsProcessing").IsVisible);
             }
+
+            // On the unit: "Where it runs" lights the unit's side, a press on the
+            // other sends the choice, the unit's limits hold, and only the output
+            // shows, read from the microphone as it leaves the unit.
+            var unitSent = new Recorder();
+            var unitModels = new ChannelDynamicsViewModel(unitSent, "xlr1", "XLR 1", new ManualTime());
+            JsonNode onUnit = State(compressorOn: true, onUnit: true)["mixer"]!["channels"]![0]!;
+            unitModels.Apply(onUnit["compressor"], onUnit["expander"]);
+            foreach (MicDynamicsViewModel model in new[] { unitModels.Expander, unitModels.Compressor })
+            {
+                DynamicsWindow processor = DynamicsWindows.Show(window, model);
+                opened.Add(processor);
+                if (font is not null) processor.FontFamily = new FontFamily(font);
+                model.ApplyInputLevel(new JsonArray(0.4, 0.5, 0));
+                foreach ((double width, double height) in new[] { (760.0, 520.0), (560.0, 420.0) })
+                {
+                    Layout(processor, width, height);
+                    string where = $"{model.Kind} on the unit at {width}x{height}";
+                    foreach (string name in new[] { "DynamicsProcessing", "DynamicsOnUnit", "DynamicsInSoftware", "DynamicsStatus", "DynamicsGraph",
+                                 "DynamicsOutputMeter", "DynamicsOutputText", "DynamicsThresholdText", "DynamicsNote", "DynamicsSwitch" })
+                    {
+                        Control control = Find<Control>(processor, name);
+                        Assert.True(control.IsEffectivelyVisible, $"{where}: {name} hidden");
+                        AssertInside(control, processor);
+                    }
+                    foreach (string name in new[] { "DynamicsInputMeter", "DynamicsInputText", "DynamicsReductionMeter", "DynamicsReductionText" })
+                        Assert.False(Find<Control>(processor, name).IsVisible, $"{where}: {name} shown, though the unit reports none");
+                    Assert.True(Find<ToggleButton>(processor, "DynamicsOnUnit").IsChecked);
+                    Assert.False(Find<ToggleButton>(processor, "DynamicsInSoftware").IsChecked);
+                    Assert.Equal(Localizer.Format("DynamicsDecibels", "-30"), Find<TextBlock>(processor, "DynamicsOutputText").Text);
+                    Assert.Equal(Localizer.Format("DynamicsUnitLevels", "Wave XLR Pro"), Find<TextBlock>(processor, "DynamicsStatus").Text);
+                    Assert.True(Find<Control>(processor, "DynamicsGraph").Bounds.Height >= 100, $"{where}: the graph is too short");
+                    Capture(processor, $"dynamics-{model.Kind}-unit-{width:0}");
+                }
+                // The settings the unit has, and not the knee or the hold.
+                Find<ToggleButton>(processor, "DynamicsSettings").IsChecked = true;
+                Layout(processor, 760, 640);
+                Slider[] shown = [.. processor.GetVisualDescendants().OfType<Slider>().Where(s => s.Name == "DynamicsParameter" && s.IsEffectivelyVisible)];
+                Assert.Equal(model.Advanced.Count - 1, shown.Length);
+                foreach (Slider row in shown) AssertInside(row, processor);
+                Assert.Equal(model.Advanced[0].Maximum, shown[0].Maximum);
+                Assert.Equal(model.IsCompressor ? 20 : 3, shown[0].Maximum);
+                if (model.IsCompressor) Assert.Equal(20, Find<Slider>(processor, "DynamicsMakeup").Maximum);
+                Capture(processor, $"dynamics-{model.Kind}-unit-settings");
+            }
+            DynamicsWindow last = DynamicsWindows.Find(unitModels.Compressor)!;
+            Find<ToggleButton>(last, "DynamicsInSoftware").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(unitSent.Processing.TryDequeue(out var choice));
+            Assert.Equal(("xlr1", "software"), choice);
+            Assert.True(Find<ToggleButton>(last, "DynamicsInSoftware").IsChecked);
         }
         finally
         {

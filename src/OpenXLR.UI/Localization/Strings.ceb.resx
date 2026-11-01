@@ -4043,12 +4043,6 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
   <data name="DynamicsNoLevels" xml:space="preserve">
     <value>Naghulat sa lebel sa mikropono.</value>
   </data>
-  <data name="CompressorNote" xml:space="preserve">
-    <value>Kini nga compressor nagdagan niining kompyuter, human sa EQ. Ang Compressor switch sa Wave XLR Pro, sa MK.2 unit o sa Wave:3 usa ka pirmi nga setting sulod sa unit. Kung on ang duha, makaduha ma-compress ang tingog.</value>
-  </data>
-  <data name="ExpanderNote" xml:space="preserve">
-    <value>Kini nga expander nagdagan niining kompyuter, human sa pagtangtang sa kasaba. Ang Expander switch sa Wave XLR Pro, sa MK.2 unit o sa Wave:3 usa ka pirmi nga setting sulod sa unit. Kung on ang duha, makaduha pahinayon ang hinay nga mga bahin.</value>
-  </data>
   <data name="CompressorThresholdTip" xml:space="preserve">
     <value>Ang lebel nga kung molapas, pahinayon ang tingog. Guyora ang linya o ang kuptanan niini, o gamita ang mga arrow key.</value>
   </data>

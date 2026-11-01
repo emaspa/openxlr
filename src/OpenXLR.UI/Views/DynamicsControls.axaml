@@ -4,12 +4,12 @@
              xmlns:loc="using:OpenXLR.UI.Localization"
              x:Class="OpenXLR.UI.Views.DynamicsControls"
              x:DataType="vm:ChannelDynamicsViewModel">
-  <!-- A microphone's expander and compressor on this computer: a switch and a button that opens
+  <!-- A microphone's expander and compressor, on this computer or on the unit: a switch and a button that opens
        its window for each, in the order the signal meets them. The Dynamics button's flyout beside
        the EQ and the mix matrix's processing flyout show these, bound to the channel's one model. -->
   <StackPanel Spacing="8">
-    <TextBlock Text="{loc:Text Key=DynamicsHeading}" Classes="h"/>
-    <TextBlock Text="{loc:Text Key=DynamicsHint}" Classes="hint" TextWrapping="Wrap"/>
+    <TextBlock Name="DynamicsHeading" Text="{Binding Heading}" Classes="h"/>
+    <TextBlock Name="DynamicsHint" Text="{Binding Hint}" Classes="hint" TextWrapping="Wrap"/>
     <Grid ColumnDefinitions="*,Auto,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="6">
       <TextBlock Text="{Binding Expander.Name, FallbackValue=''}" Classes="body" VerticalAlignment="Center"/>
       <ToggleButton Grid.Column="1" Name="ExpanderSwitch" Content="{loc:Text Key=DynamicsSwitch}"

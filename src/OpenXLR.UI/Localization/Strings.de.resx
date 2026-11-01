@@ -3716,10 +3716,49 @@ Von OpenXLR gesteuertes Interface wählen</value>
     <value>Warte auf den Pegel des Mikrofons.</value>
   </data>
   <data name="CompressorNote" xml:space="preserve">
-    <value>Dieser Kompressor läuft auf diesem Computer, nach dem EQ. Der Kompressor-Schalter eines Wave XLR Pro, eines MK.2-Geräts oder eines Wave:3 ist eine feste Einstellung im Gerät. Sind beide an, wird die Stimme zweimal komprimiert.</value>
+    <value>Dieser Kompressor läuft auf diesem Computer, nach dem EQ. Wo das Gerät selbst einen rechnen kann, hält OpenXLR den Kompressor des Geräts solange aus, damit die Stimme nur einmal komprimiert wird.</value>
   </data>
   <data name="ExpanderNote" xml:space="preserve">
-    <value>Dieser Expander läuft auf diesem Computer, nach der Rauschentfernung. Der Expander-Schalter eines Wave XLR Pro, eines MK.2-Geräts oder eines Wave:3 ist eine feste Einstellung im Gerät. Sind beide an, werden leise Stellen zweimal abgesenkt.</value>
+    <value>Dieser Expander läuft auf diesem Computer, nach der Rauschentfernung. Wo das Gerät selbst einen rechnen kann, hält OpenXLR den Expander des Geräts solange aus, damit leise Stellen nur einmal abgesenkt werden.</value>
+  </data>
+  <data name="CompressorNoteDevice" xml:space="preserve">
+    <value>{0} rechnet diesen Kompressor auf seinem eigenen Prozessor, vor USB, also hört ihn jeder Kanal, der den Ton des Geräts nimmt. Die Regler bleiben in den Grenzen des Geräts, und das Gerät hat kein Knie.</value>
+  </data>
+  <data name="ExpanderNoteDevice" xml:space="preserve">
+    <value>{0} rechnet diesen Expander auf seinem eigenen Prozessor, vor USB, also hört ihn jeder Kanal, der den Ton des Geräts nimmt. Die Regler bleiben in den Grenzen des Geräts, und das Gerät hat kein Halten.</value>
+  </data>
+  <data name="DynamicsSubtitleDevice" xml:space="preserve">
+    <value>{0}, läuft auf {1}</value>
+  </data>
+  <data name="DynamicsHeadingDevice" xml:space="preserve">
+    <value>Dynamik auf {0}</value>
+  </data>
+  <data name="DynamicsHintDevice" xml:space="preserve">
+    <value>Der Expander senkt das Mikrofon zwischen den Wörtern ab, und der Kompressor gleicht laute und leise Sprache an. Beide laufen auf dem eigenen Prozessor von {0}.</value>
+  </data>
+  <data name="DynamicsProcessingLabel" xml:space="preserve">
+    <value>Wo es läuft</value>
+  </data>
+  <data name="DynamicsProcessingDeviceTip" xml:space="preserve">
+    <value>Kompressor und Expander auf dem eigenen Prozessor von {0} rechnen, vor USB. Jeder Kanal, der den Ton dieses Geräts nimmt, hört sie, und das Gerät behält sie, wenn OpenXLR beendet wird. Das Gerät hat kein Knie und kein Halten, und engere Grenzen.</value>
+  </data>
+  <data name="DynamicsProcessingSoftwareTip" xml:space="preserve">
+    <value>Kompressor und Expander auf diesem Computer rechnen, in der Verarbeitung des Mikrofons. Die des Geräts werden ausgeschaltet und behalten ihre Einstellungen.</value>
+  </data>
+  <data name="DynamicsUnitLevels" xml:space="preserve">
+    <value>{0} meldet weder Eingangspegel noch Pegelreduktion, also zeigt Ausgang das Mikrofon, wie es das Gerät verlässt, nach seinem Expander und Kompressor.</value>
+  </data>
+  <data name="DynamicsDeviceFirmwareOld" xml:space="preserve">
+    <value>Läuft in Software: {0} hat Firmware {1}, und das Gerät rechnet Kompressor und Expander ab Firmware {2} selbst. Elgatos Updater ist in Wave Link unter Windows oder macOS.</value>
+  </data>
+  <data name="DynamicsDeviceFirmwareUnknown" xml:space="preserve">
+    <value>Läuft in Software: die Firmware-Version von {0} ließ sich nicht lesen, und das Gerät rechnet Kompressor und Expander erst ab Firmware {1} selbst.</value>
+  </data>
+  <data name="DynamicsDeviceUnsupported" xml:space="preserve">
+    <value>Läuft in Software: {0} hält Kompressor- oder Expander-Einstellungen, die OpenXLR nicht kennt. Sammle Diagnosedaten für einen Gerätebericht.</value>
+  </data>
+  <data name="DynamicsDeviceFailed" xml:space="preserve">
+    <value>Läuft in Software: {0} hat die geschriebenen Einstellungen nicht behalten. Schalte Kompressor oder Expander aus und wieder an, um das Gerät erneut zu versuchen.</value>
   </data>
   <data name="CompressorThresholdTip" xml:space="preserve">
     <value>Der Pegel, über dem die Stimme abgesenkt wird. Ziehe die Linie oder ihren Griff, oder nutze die Pfeiltasten.</value>
