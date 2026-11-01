@@ -9,13 +9,13 @@ brand works in the mixer without hardware controls; see
 
 | Device | USB id | Status |
 |---|---|---|
-| Wave XLR Pro | `0fd9:00b4` | exposed controls verified on hardware, the microphone EQ on the unit included; ducking on the unit accepted by ear on the headphone jacks, keyed by XLR 1 |
+| Wave XLR Pro | `0fd9:00b4` | exposed controls verified on hardware, the microphone EQ on the unit included; ducking on the unit accepted by ear on the headphone jacks, keyed by XLR 1, with its presets (custom values not yet heard); the compressor and expander on the unit coded at the Wave:3 MK.2's layout, not yet checked |
 | XLR Dock | `0fd9:00a6` | exposed controls verified on hardware |
 | Wave XLR | `0fd9:007d` | core controls verified on hardware by community testers on two units (0.1.13) |
-| Wave XLR MK.2 | `0fd9:00b6` | exposed controls verified on hardware by a community tester; the microphone EQ on the unit verified on hardware |
-| XLR Dock MK.2 | `0fd9:00c7` | MK.2 backend with bank detection; exposed controls verified on the original 0x0103 unit, and the microphone EQ on the unit verified on firmware 1.0.15 |
+| Wave XLR MK.2 | `0fd9:00b6` | exposed controls verified on hardware by a community tester; the microphone EQ on the unit verified on hardware; the compressor and expander on the unit coded at the Wave:3 MK.2's layout, not yet checked |
+| XLR Dock MK.2 | `0fd9:00c7` | MK.2 backend with bank detection; exposed controls verified on the original 0x0103 unit, and the microphone EQ on the unit verified on firmware 1.0.15; the compressor and expander on the unit coded at the Wave:3 MK.2's layout, not yet checked |
 | Wave:3 | `0fd9:0070` | coded from public protocol research; on the maintainer's unit every control writes and reads back, and the gain, mute, the monitor balance and the desktop volume controls are verified |
-| Wave:3 MK.2 | `0fd9:00ca` | the Wave XLR MK.2's backend; on the maintainer's unit gain, mute, headphone volume, the crossfade, the microphone EQ, the low cut, the compressor and voice tune on the unit are verified, the expander and ClipGuard are mapped from the XLR MK.2; phantom power is not exposed |
+| Wave:3 MK.2 | `0fd9:00ca` | the Wave XLR MK.2's backend; on the maintainer's unit gain, mute, headphone volume, the crossfade, the microphone EQ, the low cut, the compressor and voice tune on the unit are verified, the compressor and expander settings on the unit are written and read back, ClipGuard is mapped from the XLR MK.2; phantom power is not exposed |
 | Wave:1 | `0fd9:006e` | the Wave:3's backend under the Wave:1's id; an owner's two archives showed the Wave:3's block, firmware line and desktop volume mirror, and the gain, mute and headphone volume writes taking effect; ClipGuard and the mix are not yet confirmed |
 
 ## USB access
@@ -729,8 +729,8 @@ What is left for an owner: replug the microphone with nothing written on
 connect and say whether the gain and headphone level come back as set;
 listen to the headphone level; say whether the microphone still stalls
 while its headphones play with rule 55 installed; and, with Wave Link on
-Windows or macOS, capture the expander and ClipGuard switches to confirm
-their offsets, and note the firmware version Wave Link shows.
+Windows or macOS, capture the ClipGuard switch to confirm its offset,
+and note the firmware version Wave Link shows.
 
 <a name="other-microphones"></a>
 ## Other microphones and interfaces
