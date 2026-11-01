@@ -666,7 +666,11 @@ plugin folders. See [Plugin folders](manual.md#plugin-search-folders).
 
 The Inserts row provides bypass, ordering, removal and generated parameter
 controls, and the button that opens a chain is green while a plugin in it
-is processing and red when none is; an empty chain keeps the plain button. Native plugin editors open on the instance processing the audio.
+is processing and red when none is; an empty chain keeps the plain button. Native plugin editors open on the instance processing the audio,
+from the chain window's Plugin UI button or from the controls window. A VST3 or
+CLAP plugin's own bypass parameter is left out of its controls, since the
+insert's Bypass already takes it out of the path, and the host keeps it
+processing after every load.
 Every chain is rebuilt on its own: an edit on XLR 2 leaves XLR 1's plugins
 running, and a profile recall rebuilds only the chains it changes and
 moves the controls of the others live.
@@ -1149,8 +1153,10 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   setup, effective search paths and bounded native scan outcomes, with
   personal paths, the login name and host names redacted, and no forced
   sync or insert changes. For audio glitches it adds the PipeWire,
-  pipewire-pulse and WirePlumber journals, node statistics, and playback and
-  recording stream metadata. Window and daemon build identities, state
+  pipewire-pulse and WirePlumber journals since the computer started, the
+  kernel's USB and sound messages, each open ALSA device's rate, period
+  and state, and playback and recording stream metadata. Window and daemon
+  build identities, state
   receive time and connection status distinguish source rebuilds and
   retained state from an earlier connection
 - Deep Wine trace checkbox in Options, SUPPORT for reproducing a bridged

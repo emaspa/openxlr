@@ -51,7 +51,7 @@ These Elgato devices also get their hardware controls over USB:
 | Wave XLR MK.2 | 0fd9:00b6 | gain, mute, phantom power, low impedance, DSP, ClipGuard, compressor, headphone volume, crossfade, verified by a community tester; the EQ on the unit from firmware 1.0.15, verified |
 | XLR Dock MK.2 (Stream Deck+ module) | 0fd9:00c7 | the Wave XLR MK.2's controls, verified |
 | Wave:3 | 0fd9:0070 | gain, mute, ClipGuard, headphone volume and the monitor balance, each written and read back on the maintainer's unit; gain, mute, the monitor balance and the desktop volume controls verified there |
-| Wave:3 MK.2 | 0fd9:00ca | gain, mute, headphone volume, crossfade, the EQ on the unit, low cut, compressor and voice tune verified on the maintainer's unit; expander and ClipGuard mapped from the Wave XLR MK.2 |
+| Wave:3 MK.2 | 0fd9:00ca | gain, mute, headphone volume, crossfade, the EQ on the unit, low cut, compressor and voice tune verified on the maintainer's unit; the compressor and expander settings on the unit written and read back there; ClipGuard mapped from the Wave XLR MK.2 |
 | Wave:1 | 0fd9:006e | the Wave:3's controls; gain, mute and headphone volume confirmed by an owner |
 
 [Hardware support](docs/hardware-support.md) has every control's state,
@@ -71,11 +71,14 @@ untested device, open an issue with a diagnostics archive
   record from. You change all of it while audio plays.
 - **Ducking**: a key microphone lowers chosen channels in chosen mixes
   while you speak, in software everywhere and on the Pro's own processor
-  when the setup fits.
+  when the setup fits, with presets or your own sensitivity, amount and
+  speed.
 - **Microphone processing**: an EQ of up to sixteen bands with Wave
-  Link's band types (up to four on the unit where it has an EQ), and Mic
-  setup, which loops a recorded take through the EQ and plugins while you
-  tune them.
+  Link's band types (up to four on the unit where it has an EQ), EQ
+  profiles saved by name and loaded from the UI or a Deck key, a
+  compressor and an expander with their own windows (on the unit's
+  processor where it has them), and Mic setup, which loops a recorded take
+  through the EQ and plugins while you tune them.
 - **Noise removal** first in each microphone's chain, RNNoise or
   DeepFilterNet 3, built into every package.
 - **Soundboard**: short clips played into the SFX channel from pads in
@@ -84,8 +87,11 @@ untested device, open an issue with a diagnostics archive
 - **Voice changer** on any microphone: a robot, a radio, monsters, or your
   own pitch and formant, from its own window or a Deck key.
 - **Plugin inserts**: LV2, CLAP and VST3 chains on each microphone input
-  and each mix, with native editors, generated controls and bypass.
-  Windows VST3 and CLAP plugins run through `openxlr-yabridge`.
+  and each mix, with native editors, generated controls and bypass. The
+  native host measures the delay each plugin adds on its audio, and a
+  plugin too slow for a small block size can run on its own block.
+  Windows VST3 and CLAP plugins run through `openxlr-yabridge`, whose host
+  lets a plugin that ties its licence to the system disk activate.
 - **Application routing** by name rules, Electron and Wine/Proton apps
   included; an optional Chromium companion routes single browser tabs
   ([browser routing](docs/browser-routing.md)).

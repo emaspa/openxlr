@@ -23,14 +23,20 @@ is measured over one that is described.
   on the Wave XLR MK.2 and the XLR Dock MK.2 from firmware 1.0.15, on the
   Wave:3 MK.2 from its 0.2.3 and on the Pro from 1.0.14,
   verified on hardware; other models and older firmware run it in
-  software. The Pro runs ducking itself for a setup keyed by XLR 1 on its
-  headphone jacks, accepted by ear. On the maintainer's Wave:3 every
+  software. The microphone compressor and expander run on the unit too,
+  wherever the EQ does: the byte layout is verified on the Wave:3 MK.2,
+  and the Pro, the XLR Dock MK.2 and the Wave XLR MK.2 are driven at the
+  same fields but not yet checked. The Pro runs ducking itself for a setup
+  keyed by XLR 1 on its headphone jacks, accepted by ear with the presets;
+  custom ducking values are not yet heard on it. On the maintainer's
+  Wave:3 every
   control writes and reads back, and the gain, mute, monitor balance and
   desktop volume controls are verified; a Wave:1 owner confirmed gain,
   mute and headphone volume. On the maintainer's Wave:3 MK.2, on the Wave
   XLR MK.2's backend, gain, mute, headphone volume, the crossfade, the EQ
   on the unit, the low cut, the compressor and voice tune are verified;
-  the expander and ClipGuard are driven at the Wave XLR MK.2's offsets.
+  the expander's switch and settings read back at the documented bytes,
+  and ClipGuard is driven at the Wave XLR MK.2's offset.
   The Wave XLR and the first XLR Dock get their
   last settings back on connect. Up to four additional interfaces run
   beside the primary one, and the one picked last is driven again after a
@@ -42,15 +48,23 @@ is measured over one that is described.
   capture source while the interface stays driven, and a capture input is
   a full microphone strip: its own insert chain, the microphone EQ, noise
   removal and Mic setup when mono, and the controls of the unit behind
-  it. Exclusive channel groups, ducking on every device, profiles with one recalled on
-  connect, and browser tabs routed to channels through the Chromium
+  it. Each microphone with the EQ also has noise removal, a compressor,
+  an expander and a voice changer. EQ profiles, three of them built in,
+  load from the UI, a Deck key or the API. Exclusive channel groups,
+  ducking on every device with presets or custom values, profiles with
+  one recalled on connect, and browser tabs routed to channels through the Chromium
   companion. A soundboard plays clips into SFX, with pages, audition,
   export and import, starter sounds, and keys on the Deck and the desktop.
 - [x] Plugins. LV2, CLAP and VST3 inserts on every input and mix, with
   generated controls and the plugin's own editor; Windows plugins through
   yabridge and the optional companion; installation from the UI; presets
-  with A/B comparison; latency compensation across mixes; a scanner that
-  passes over a bundle that hangs.
+  with A/B comparison; latency compensation across mixes; the delay a
+  plugin adds, measured on its audio beside the figure it reports; a plugin
+  that cannot keep up running on its own 1024-sample block; a plugin's
+  own bypass parameter left out of its controls; a scanner that passes
+  over a bundle that hangs. The companion's host reports the system
+  disk's identity, so a Windows plugin that ties its licence to that disk
+  can activate.
 - [x] Clients. The UI, with seventeen built-in skins, skins that rearrange
   it, Broadcast and Wave among them with the mixer drawn as a matrix,
   system, light and dark modes, a compact and a large density, the Flow
@@ -63,7 +77,8 @@ is measured over one that is described.
   incremental registry view instead of polling; commands validated and
   budgeted per client; a hard memory limit; an opt-in update notice; an
   installation receipt read back by `openxlr doctor`; a diagnostics
-  archive from Options.
+  archive from Options with the whole boot's journals, the kernel's USB
+  and sound messages and the state of each open ALSA device.
 - [x] Packages. AUR (Arch Linux, CachyOS and Omarchy), Debian and Ubuntu
   with a PPA, Fedora with COPR, a NixOS flake and module, and an
   experimental Flatpak bundle on each release. The packaged units stay
@@ -103,7 +118,9 @@ them for a while before more is built on top.
     and a replug; ClipGuard and the mic/PC mix on a Wave:1, from an owner;
   - the Wave:3 MK.2's headphone level by ear, a replug, whether the float
     playback rule ends its microphone stall, and a Wave Link capture of
-    its expander and ClipGuard switches;
+    its ClipGuard switch;
+  - the compressor and expander on the unit, by ear, on each model that
+    runs them, and custom ducking values on the Pro;
   - two units of one model at once, from an owner of two;
   - the Omarchy bar's live theme switch and its popout's hardware
     controls;
@@ -153,9 +170,10 @@ them for a while before more is built on top.
   ceiling on any input; the maximizer is per mix. Both need Wave Link
   captures ([capture guide](hardware-effects-capture.md)).
 - [ ] XLR Dock MK.2: blocks 0x0002, 0x0006 and 0x0016, which exist and
-  are not decoded, block 0x0000 beyond its firmware version bytes, and
-  bytes 3 to 17 of the settings block, several of which change the level
-  (likely compressor and expander parameters).
+  are not decoded, and block 0x0000 beyond its firmware version bytes.
+  OpenXLR drives bytes 3 to 17 of the settings block as the compressor
+  and expander settings, at the Wave:3 MK.2's layout; a check on the dock
+  is still owed.
 - [ ] LED controls where captures show the registers; nothing is
   guessed.
 - [ ] The Pro's UCM profile upstreamed to alsa-ucm-conf once a second
@@ -194,6 +212,11 @@ features wait until the sections above are done.
   forbids redistribution and use under an open source licence, so no
   package could carry it. It would fit technically: 48 kHz, 10 ms frames,
   on a worker like DeepFilterNet's.
+- AMD Noise Suppression as an engine for the microphones. To be explored,
+  not a commitment. AMD lists it for Windows 10 and 11 only, as part of
+  its Adrenalin driver software that applications reach through a virtual
+  audio device. Its developer site lists no library for other programs.
+  The first question is whether any form of it can run on Linux.
 
 ## Not planned
 

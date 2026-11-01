@@ -1755,6 +1755,7 @@ it; deleting the input deletes it. A capture input on a stereo pair has no
 EQ, and one moved from a mono port to a stereo pair keeps its EQ settings
 for when it goes back to a mono port.
 
+<a name="where-the-eq-runs"></a>
 **Where the EQ runs.** A Wave XLR MK.2 or XLR Dock MK.2 on firmware 1.0.15
 or later, a Wave:3 MK.2 on firmware 0.2.3 or later, and a Wave XLR Pro on
 firmware 1.0.14 or later run the EQ on their own processor, before USB,
