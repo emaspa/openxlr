@@ -114,6 +114,18 @@ public sealed record Command
     /// <summary>"setEq": the whole EQ, <c>{enabled, bands: [{enabled, type, frequency, gain, q}, ...]}</c>, with 1 to 16 bands.</summary>
     [JsonPropertyName("eq")] public System.Text.Json.JsonElement Eq { get; init; }
 
+    /// <summary>"saveEqProfile": the bands to save, each as <c>setEq</c> carries them, 1 to 16.</summary>
+    [JsonPropertyName("bands")] public System.Text.Json.JsonElement Bands { get; init; }
+
+    /// <summary>"saveEqProfile": put the bands in place of a saved profile of that name rather than refuse it.</summary>
+    [JsonPropertyName("replace")] public bool? Replace { get; init; }
+
+    /// <summary>"renameEqProfile": the saved profile's new name.</summary>
+    [JsonPropertyName("newName")] public string? NewName { get; init; }
+
+    /// <summary>"loadEqProfile": the profile's id from <c>eqProfiles</c>, <c>builtin:</c> and a key or <c>saved:</c> and a name.</summary>
+    [JsonPropertyName("profile")] public string? Profile { get; init; }
+
     /// <summary>"setEqBand": which existing band, 1 to 16.</summary>
     [JsonPropertyName("band")] public int? Band { get; init; }
 
@@ -373,6 +385,14 @@ public sealed record StateMessage
     /// (daemon start, replug, switch to it), or null when none is set.
     /// </summary>
     [JsonPropertyName("recallOnConnect")] public string? RecallOnConnect { get; init; }
+
+    /// <summary>
+    /// The microphone EQ profiles any client can load: the built-in ones,
+    /// then the saved ones, each with its id, name and bands.
+    /// </summary>
+    [JsonPropertyName("eqProfiles")] public IReadOnlyList<EqProfileEntry>? EqProfiles { get; init; }
+    /// <summary>Why the saved EQ profiles are not all listed, or null.</summary>
+    [JsonPropertyName("eqProfileProblem")] public EqProfileProblem? EqProfileProblem { get; init; }
 
     /// <summary>Every attached supported interface, so clients can offer a picker.</summary>
     [JsonPropertyName("detected")] public IReadOnlyList<DetectedDevice>? Detected { get; init; }

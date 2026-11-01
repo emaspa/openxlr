@@ -13,11 +13,15 @@ namespace OpenXLR.UI;
 public sealed record MicSetupPreset(string Id, MicEq Eq)
 {
     /// <summary>The preset's name in the UI's language.</summary>
-    public string Name => Id switch
+    public string Name => NameOf(Id) ?? Localizer.Text("MicSetupPresetClear");
+
+    /// <summary>A built-in preset's name in the UI's language, from its key; null for a key this UI does not know.</summary>
+    public static string? NameOf(string key) => key switch
     {
+        "clear" => Localizer.Text("MicSetupPresetClear"),
         "warm" => Localizer.Text("MicSetupPresetWarm"),
         "broadcast" => Localizer.Text("MicSetupPresetBroadcast"),
-        _ => Localizer.Text("MicSetupPresetClear"),
+        _ => null,
     };
 
     /// <summary>What the preset does to a voice, for its tooltip.</summary>
@@ -62,40 +66,18 @@ public sealed record MicSetupPreset(string Id, MicEq Eq)
 }
 
 /// <summary>
-/// The presets Mic setup offers. These are OpenXLR's own values for speech,
-/// written down here and nowhere else in code; the manual's table is checked
-/// against them. Each one keeps the low end out with the first band and
-/// shapes the voice with the other three, gently enough to be a starting
-/// point rather than a sound.
+/// The presets Mic setup offers: the built-in EQ profiles of
+/// <see cref="EqPresets"/>, the one table the daemon and the EQ editor use
+/// too, in the same order.
 /// </summary>
 public static class MicSetupPresets
 {
-    private static EqBand Band(string type, double hz, double db = 0, double? q = null)
-        => new() { Enabled = true, Type = type, Frequency = hz, Gain = db, Q = q ?? MicEq.DefaultQ };
-
-    private static MicEq Eq(params EqBand[] bands) => MicEq.Snap(new MicEq { Enabled = true, Bands = bands });
-
-    /// <summary>Rumble out below 80 Hz, a little less boxiness, a small lift for presence and air.</summary>
-    public static MicSetupPreset Clear { get; } = new("clear", Eq(
-        Band(MicEq.LowCut, 80),
-        Band(MicEq.Peak, 300, -2, 1.0),
-        Band(MicEq.Peak, 3500, 2, 1.0),
-        Band(MicEq.HighShelf, 10000, 1)));
-
-    /// <summary>A lower low cut, more body under 200 Hz and a softer top.</summary>
-    public static MicSetupPreset Warm { get; } = new("warm", Eq(
-        Band(MicEq.LowCut, 60),
-        Band(MicEq.LowShelf, 200, 2),
-        Band(MicEq.Peak, 3000, 1, 1.0),
-        Band(MicEq.HighShelf, 8000, -2)));
-
-    /// <summary>A tight low end, less mud around 400 Hz and a forward presence lift.</summary>
-    public static MicSetupPreset Broadcast { get; } = new("broadcast", Eq(
-        Band(MicEq.LowCut, 100),
-        Band(MicEq.Peak, 400, -3, 1.4),
-        Band(MicEq.Peak, 4000, 3, 0.8),
-        Band(MicEq.HighShelf, 12000, 2)));
-
     /// <summary>The presets in the order the Shape step shows them.</summary>
-    public static IReadOnlyList<MicSetupPreset> All { get; } = [Clear, Warm, Broadcast];
+    public static IReadOnlyList<MicSetupPreset> All { get; } = [.. EqPresets.All.Select(p => new MicSetupPreset(p.Key, p.Eq))];
+
+    public static MicSetupPreset Clear => All[0];
+
+    public static MicSetupPreset Warm => All[1];
+
+    public static MicSetupPreset Broadcast => All[2];
 }

@@ -1265,6 +1265,10 @@ public sealed class MixerService : IHostedService, IDisposable
                     _mixer.SetEq(cmd.Channel!, MicEq.Read(cmd.Eq, out _)!);   // checked by CommandValidation
                     SyncOutputSelectors();   // software processing moves the Pro's mic between its hardware path and the send
                     break;
+                case "loadEqProfile":
+                    // A profile's bands with the EQ switched on, as one setEq:
+                    // checked again as that, so a microphone that cannot run it says why.
+                    return ProfileEq(cmd, EqLimits.Instance, out string? profileError) is { } eq ? Apply(eq, connection) : profileError;
                 case "setEqEnabled":
                     _mixer.SetEqEnabled(cmd.Channel!, cmd.Value.GetBoolean());
                     SyncOutputSelectors();   // software processing moves the Pro's mic between its hardware path and the send
@@ -1375,6 +1379,37 @@ public sealed class MixerService : IHostedService, IDisposable
         Changed?.Invoke();
         ScheduleSave();
         return null;
+    }
+
+    /// <summary>
+    /// The <c>setEq</c> a <c>loadEqProfile</c> becomes: the profile's bands
+    /// on the channel with the EQ switched on. Null, with the reason, when
+    /// there is no such profile or the microphone's EQ does not take its
+    /// number of bands.
+    /// </summary>
+    internal static Command? ProfileEq(Command cmd, EqLimits limits, out string? error)
+    {
+        error = null;
+        if (EqProfileStore.Find(cmd.Profile) is not { } profile)
+        {
+            error = $"loadEqProfile: there is no EQ profile '{CommandValidation.Short(cmd.Profile ?? "")}'";
+            return null;
+        }
+        if (profile.Bands.Count < limits.MinBands || profile.Bands.Count > limits.MaxBands)
+        {
+            error = $"loadEqProfile: {profile.Name} has {profile.Bands.Count} bands, and this microphone's EQ takes {limits.MinBands} to {limits.MaxBands}";
+            return null;
+        }
+        return new Command
+        {
+            Cmd = "setEq",
+            Channel = cmd.Channel,
+            Eq = System.Text.Json.JsonSerializer.SerializeToElement(new
+            {
+                enabled = true,
+                bands = profile.Bands.Select(b => new { enabled = b.Enabled, type = b.Type, frequency = b.Frequency, gain = b.Gain, q = b.Q }),
+            }),
+        };
     }
 
     /// <summary>Remove current uses and persist them before file-management actions become available.</summary>
