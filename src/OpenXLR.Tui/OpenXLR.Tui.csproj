@@ -28,6 +28,7 @@
     <Compile Include="../OpenXLR.Core/Mixing/MicEq.cs" Link="MicEq.cs" />
     <Compile Include="../OpenXLR.Core/Mixing/MicNoise.cs" Link="MicNoise.cs" />
     <Compile Include="../OpenXLR.Core/Mixing/MicVoice.cs" Link="MicVoice.cs" />
+    <Compile Include="../OpenXLR.Core/Mixing/MicDynamics.cs" Link="MicDynamics.cs" />
   </ItemGroup>
 
   <ItemGroup>

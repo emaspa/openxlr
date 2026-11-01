@@ -115,6 +115,12 @@ internal sealed record ChannelEntry
     /// <summary>A microphone's voice changer, or null for a channel that has none and from a daemon that predates it.</summary>
     public VoiceEntry? Voice { get; init; }
 
+    /// <summary>A microphone's compressor on the computer, or null for a channel that has none and from a daemon that predates it.</summary>
+    public CompressorEntry? Compressor { get; init; }
+
+    /// <summary>A microphone's expander on the computer, or null for a channel that has none and from a daemon that predates it.</summary>
+    public ExpanderEntry? Expander { get; init; }
+
     /// <summary>XLR 1 or XLR 2, the strips a binding can move to another source.</summary>
     public bool Bindable => Hardware && Id is "xlr1" or "xlr2";
 
@@ -395,6 +401,49 @@ internal sealed record NoiseEntry
         : $"on, {EngineName(Active)}, adds {ms:0} ms";
 
     internal static string EngineName(string engine) => engine == MicNoise.DeepFilterNet ? "DeepFilterNet" : "RNNoise";
+}
+
+/// <summary>A microphone's compressor on the computer as the daemon reports it (docs/api.md, compressor and expander).</summary>
+internal sealed record CompressorEntry
+{
+    public bool Enabled { get; init; }
+    public double Threshold { get; init; } = MicCompressor.ThresholdRange.Default;
+    public double Ratio { get; init; } = MicCompressor.RatioRange.Default;
+    public double Attack { get; init; } = MicCompressor.AttackRange.Default;
+    public double Release { get; init; } = MicCompressor.ReleaseRange.Default;
+    public double Knee { get; init; } = MicCompressor.KneeRange.Default;
+    public double Makeup { get; init; } = MicCompressor.MakeupRange.Default;
+    public bool Available { get; init; }
+    public string? Error { get; init; }
+
+    /// <summary>Whether it runs, in a few words.</summary>
+    [JsonIgnore]
+    public string Status => DynamicsStatus.Of(Enabled, Available, Error);
+}
+
+/// <summary>A microphone's expander on the computer as the daemon reports it (docs/api.md, compressor and expander).</summary>
+internal sealed record ExpanderEntry
+{
+    public bool Enabled { get; init; }
+    public double Threshold { get; init; } = MicExpander.ThresholdRange.Default;
+    public double Ratio { get; init; } = MicExpander.RatioRange.Default;
+    public double Range { get; init; } = MicExpander.RangeRange.Default;
+    public double Attack { get; init; } = MicExpander.AttackRange.Default;
+    public double Release { get; init; } = MicExpander.ReleaseRange.Default;
+    public double Hold { get; init; } = MicExpander.HoldRange.Default;
+    public bool Available { get; init; }
+    public string? Error { get; init; }
+
+    /// <summary>Whether it runs, in a few words.</summary>
+    [JsonIgnore]
+    public string Status => DynamicsStatus.Of(Enabled, Available, Error);
+}
+
+internal static class DynamicsStatus
+{
+    public static string Of(bool enabled, bool available, string? error) => error is { Length: > 0 } problem ? problem
+        : !available ? "cannot run"
+        : enabled ? "on, on this computer" : "off";
 }
 
 /// <summary>A microphone's voice changer as the daemon reports it (docs/api.md, voice changer).</summary>

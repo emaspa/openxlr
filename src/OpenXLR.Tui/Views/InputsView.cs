@@ -105,6 +105,7 @@ internal sealed class InputsView : View
         Bindings(rows, app, state);
         Equalisers(rows, app, state);
         NoiseRemovals(rows, app.Link, state);
+        Dynamics(rows, app.Link, state);
         VoiceChangers(rows, app.Link, state);
 
         // The software low cut and ClipGuard run in the mixer, so they act on
@@ -335,6 +336,75 @@ internal sealed class InputsView : View
             rows.Add(new NumberRow($"{channel.Name} strength", noise.Strength, MicNoise.MinStrength, MicNoise.MaxStrength, 6,
                 value => value >= MicNoise.MaxStrength ? "no limit" : $"{value:0} dB",
                 value => Send("strength", MicNoise.SnapStrength(value))) { FineStep = MicNoise.StrengthStep, Integer = true });
+        }
+    }
+
+    /// <summary>
+    /// Each microphone's expander and compressor on this computer, in the
+    /// order the signal meets them: the switch and the threshold, and while
+    /// one is on its other settings, each sent on its own with setExpander or
+    /// setCompressor. They are not the unit's own Expander and Compressor
+    /// switches, which the unit's rows carry.
+    /// </summary>
+    private static void Dynamics(List<Row> rows, DaemonLink link, Snapshot state)
+    {
+        List<ChannelEntry> microphones = [.. state.Mixer.Shown.Where(channel => channel.Compressor is not null && channel.Expander is not null)];
+        if (microphones.Count == 0) return;
+        rows.Add(new HeadingRow("Dynamics on this computer"));
+        static string Db(double value) => $"{value:0.#} dB";
+        static string Ms(double value) => $"{value:0.#} ms";
+        static string Ratio(double value) => $"{value:0.#}:1";
+        foreach (ChannelEntry channel in microphones)
+        {
+            ExpanderEntry expander = channel.Expander!;
+            CompressorEntry compressor = channel.Compressor!;
+            string id = channel.Id;
+            Action<double> Sender(string command, string field, DynamicsRange range) => value =>
+                link.Send(command, body =>
+                {
+                    body["channel"] = id;
+                    body[field] = Math.Clamp(range.Snap(value), range.Minimum, range.Maximum);
+                });
+            // Times move on ratios, so a few milliseconds and two seconds are both in reach.
+            NumberRow Number(string label, double value, DynamicsRange range, double step, Func<double, string> text, string command) =>
+                new($"{channel.Name} {label}", value, range.Minimum, range.Maximum, step, text, Sender(command, range.Name, range))
+                {
+                    FineStep = range.Step,
+                    Logarithmic = range.Unit == "ms" && range.Minimum > 0,
+                };
+
+            rows.Add(new TextRow($"{channel.Name} expander", expander.Status));
+            if (expander.Available)
+            {
+                rows.Add(new ToggleRow($"{channel.Name} exp on", expander.Enabled, value => link.Send("setExpander", body =>
+                {
+                    body["channel"] = id;
+                    body["enabled"] = value;
+                })));
+                rows.Add(Number("exp threshold", expander.Threshold, MicExpander.ThresholdRange, 2, Db, "setExpander"));
+                if (expander.Enabled)
+                {
+                    rows.Add(Number("exp ratio", expander.Ratio, MicExpander.RatioRange, 0.5, Ratio, "setExpander"));
+                    rows.Add(Number("exp range", expander.Range, MicExpander.RangeRange, 2, Db, "setExpander"));
+                    rows.Add(Number("exp attack", expander.Attack, MicExpander.AttackRange, 1, Ms, "setExpander"));
+                    rows.Add(Number("exp hold", expander.Hold, MicExpander.HoldRange, 10, Ms, "setExpander"));
+                    rows.Add(Number("exp release", expander.Release, MicExpander.ReleaseRange, 10, Ms, "setExpander"));
+                }
+            }
+            rows.Add(new TextRow($"{channel.Name} compressor", compressor.Status));
+            if (!compressor.Available) continue;
+            rows.Add(new ToggleRow($"{channel.Name} comp on", compressor.Enabled, value => link.Send("setCompressor", body =>
+            {
+                body["channel"] = id;
+                body["enabled"] = value;
+            })));
+            rows.Add(Number("comp threshold", compressor.Threshold, MicCompressor.ThresholdRange, 2, Db, "setCompressor"));
+            if (!compressor.Enabled) continue;
+            rows.Add(Number("comp ratio", compressor.Ratio, MicCompressor.RatioRange, 0.5, Ratio, "setCompressor"));
+            rows.Add(Number("comp attack", compressor.Attack, MicCompressor.AttackRange, 1, Ms, "setCompressor"));
+            rows.Add(Number("comp release", compressor.Release, MicCompressor.ReleaseRange, 10, Ms, "setCompressor"));
+            rows.Add(Number("comp knee", compressor.Knee, MicCompressor.KneeRange, 1, Db, "setCompressor"));
+            rows.Add(Number("comp make-up", compressor.Makeup, MicCompressor.MakeupRange, 1, Db, "setCompressor"));
         }
     }
 
