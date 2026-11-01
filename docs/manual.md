@@ -4034,15 +4034,29 @@ you pick, attach the diagnostics archive described below.
 Options, SUPPORT, Collect diagnostics. It writes
 `~/openxlr-diagnostics-<timestamp>.tar.gz` with the daemon's state and
 capabilities, a dump of the interface's vendor blocks, the PipeWire
-graph and device listings, the last two hours of the daemon journal (under
-Flatpak, `daemon.log` and its rotated copy), `mixer.json`, `ui.json` and
-version information. Native installations also include `audio-journal.txt`
-with the last two hours of the PipeWire, pipewire-pulse and WirePlumber user
-service journals. Audio-server errors can explain distortion or disappearing
-nodes even when the daemon's own journal has no error. These entries use the
-same redaction as the daemon journal; unavailable journals leave a command
-failure note. The Flatpak sandbox keeps collecting its own daemon logs and
-does not read host journals. Warnings and command failure notes for the graph dump
+graph and device listings, the daemon journal since the computer last
+started (under Flatpak, `daemon.log` and its rotated copy), `mixer.json`,
+`ui.json` and version information. Native installations also include
+`audio-journal.txt` with the PipeWire, pipewire-pulse and WirePlumber user
+service journals since the computer last started, so a problem that began
+overnight is still in an archive collected the next morning. Audio-server
+errors can explain distortion or disappearing nodes even when the daemon's
+own journal has no error. Each journal keeps its newest 20,000 lines, at
+most 2 MiB. The archive cuts a longer one at its oldest end and says so on
+the file's first line. These entries use the same redaction as the daemon journal; unavailable
+journals leave a command failure note.
+
+`kernel-log.txt` holds the kernel's messages since the computer last
+started about USB devices, controllers and hubs, sound drivers, and suspend
+and resume. A USB disconnect or reset of the interface shows up here. The
+kernel log lives in the system journal, which members of the
+`systemd-journal`, `adm` or `wheel` group can read on most distributions.
+For other accounts the archive tries `dmesg`, which holds only recent
+messages and which many distributions also restrict. The file names the
+source it read, or quotes what both said when neither worked.
+
+The Flatpak sandbox keeps collecting its own daemon logs and does not read
+host journals or the kernel log. Warnings and command failure notes for the graph dump
 are kept in `pw-dump-errors.txt`, when present, instead of being appended
 to `pw-dump.json`. Plugin evidence includes the
 catalogue, effective bridge setup and latest native scan results. The home path, host name

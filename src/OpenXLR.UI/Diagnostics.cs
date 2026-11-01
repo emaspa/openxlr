@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Globalization;
 using System.Formats.Tar;
 using System.IO;
 using System.IO.Compression;
@@ -66,8 +67,9 @@ public static class Diagnostics
             await File.WriteAllTextAsync(Path.Combine(work, "PRIVACY.txt"), """
                 This archive is created locally and is never uploaded automatically.
                 It contains OpenXLR state, USB control blocks and topology, PipeWire topology,
-                recent openxlr-daemon journal entries or Flatpak logs,
-                native audio-server and session-manager journal entries,
+                openxlr-daemon journal entries from the current boot or Flatpak logs,
+                native audio-server and session-manager journal entries from the current boot,
+                kernel messages about USB, sound and power management from the current boot,
                 short PipeWire node statistics, application audio metadata,
                 configuration files, plugin names and paths, the plugin catalogue,
                 Wine/yabridge versions and status, latest scan results, the saved
@@ -112,11 +114,11 @@ public static class Diagnostics
                 CopyDaemonLogs(Clean, OpenXlrPaths.StateDir, work);
             else
             {
-                await Capture("journal.txt", "journalctl", "--user", "-u", "openxlr-daemon",
-                    "--since", "2 hours ago", "--no-pager");
-                await Capture("audio-journal.txt", "journalctl", "--user",
-                    "-u", "pipewire.service", "-u", "pipewire-pulse.service", "-u", "wireplumber.service",
-                    "--since", "2 hours ago", "--no-pager");
+                await WriteJournalAsync(Clean, work, "journal.txt", "journalctl",
+                    ["--user", "-u", "openxlr-daemon.service"]);
+                await WriteJournalAsync(Clean, work, "audio-journal.txt", "journalctl",
+                    ["--user", "-u", "pipewire.service", "-u", "pipewire-pulse.service", "-u", "wireplumber.service"]);
+                await WriteKernelLogAsync(Clean, work, "journalctl", "dmesg");
             }
 
             // Configs may include remembered application identities and device
@@ -497,15 +499,176 @@ public static class Diagnostics
 
     internal static async Task<(string Output, string Errors)> RunCommandAsync(string exe, string[] args)
     {
+        var (output, errors, _) = await RunHelperAsync(exe, args);
+        return (output, errors);
+    }
+
+    /// <summary>
+    /// <see cref="RunCommandAsync"/> with the helper's exit status as well:
+    /// -1 when it could not be started or did not finish on its own.
+    /// </summary>
+    private static async Task<(string Output, string Errors, int ExitCode)> RunHelperAsync(string exe, string[] args)
+    {
         try
         {
             // 15 s and 8 MiB per command; a helper that goes past either is
             // killed with its children and the archive says so.
             ProcessResult r = await ProcessRunner.RunAsync(exe, args, TimeSpan.FromSeconds(15),
                 stdoutCap: 8 * 1024 * 1024, stderrCap: 64 * 1024);
-            return (r.StdoutText, r.Stderr + CommandNotes(exe, r));
+            return (r.StdoutText, r.Stderr + CommandNotes(exe, r), r.TimedOut || r.Cancelled ? -1 : r.ExitCode);
         }
-        catch (Exception ex) { return ("", $"failed to run {exe}: {ex.Message}"); }
+        catch (Exception ex) { return ("", $"failed to run {exe}: {ex.Message}", -1); }
+    }
+
+    /// <summary>
+    /// How much of one boot's journal a file in the archive keeps: the newest
+    /// lines, up to both limits. A night of audio-server warnings fits; a
+    /// journal flooded by a failing device is cut from the oldest end, and
+    /// the file says so on its first line.
+    /// </summary>
+    internal const int JournalLineLimit = 20_000;
+    internal const int JournalByteLimit = 2 * 1024 * 1024;
+
+    /// <summary>
+    /// Kernel messages worth having beside an audio report: USB devices,
+    /// their controllers and hubs coming and going or being reset, sound
+    /// drivers, and suspend and resume. The same pattern serves journalctl's
+    /// PCRE2 --grep and the filter applied here when that is unavailable.
+    /// </summary>
+    internal const string KernelLogPattern = @"usb|xhci|snd|sound|alsa|hub|disconnect|reset|suspend|resume|\bpm:";
+
+    /// <summary>
+    /// The current boot's journal of the units <paramref name="selection"/>
+    /// names, newest lines last, kept within <see cref="JournalLineLimit"/>
+    /// and <see cref="JournalByteLimit"/>. A break in the night is in the
+    /// file the next morning, which a window counted back from the moment of
+    /// collection would miss.
+    /// </summary>
+    internal static async Task WriteJournalAsync(Func<string, string> clean, string dir, string file,
+        string journalctl, string[] selection)
+    {
+        // One line more than is kept: when it arrives, something was left out.
+        string[] args = [.. selection, "-b", "-o", "short-iso-precise", "--no-pager",
+            "-n", (JournalLineLimit + 1).ToString(CultureInfo.InvariantCulture)];
+        var (output, errors, _) = await RunHelperAsync(journalctl, args);
+        string kept = KeepNewest(output, out string? cut);
+        var text = new StringBuilder();
+        if (cut is not null) text.Append(cut).Append('\n');
+        text.Append(kept);
+        if (kept.Length > 0 && errors.Length > 0 && !kept.EndsWith('\n')) text.Append('\n');
+        text.Append(errors);
+        await File.WriteAllTextAsync(Path.Combine(dir, file), clean(text.ToString()));
+    }
+
+    /// <summary>
+    /// Kernel messages of the current boot that match <see cref="KernelLogPattern"/>,
+    /// as kernel-log.txt. The system journal is read first. When this account
+    /// may not read it, the kernel's own buffer is tried through
+    /// <paramref name="dmesg"/>, which many distributions also restrict; the
+    /// file then says which source answered, or that neither did and why.
+    /// </summary>
+    internal static async Task WriteKernelLogAsync(Func<string, string> clean, string dir, string journalctl, string dmesg)
+    {
+        var text = new StringBuilder();
+        // No line limit here: journalctl lists a grep with --lines newest
+        // first on some versions, and the filter already keeps this small.
+        var (output, errors, status) = await RunHelperAsync(journalctl,
+            ["-k", "-b", "-o", "short-iso-precise", "--no-pager", "--case-sensitive=false", "-g", KernelLogPattern]);
+        string body;
+        if (JournalRefused(output, errors))
+        {
+            text.Append("The system journal holds the kernel log, and this account may not read it: on most\n")
+                .Append("distributions members of the systemd-journal, adm or wheel group can. `journalctl -k -b`\n")
+                .Append("run as such a member, or with sudo, shows it. What journalctl said:\n")
+                .Append(errors.TrimEnd()).Append("\n\n");
+            var (kernel, dmesgErrors, dmesgStatus) = await RunHelperAsync(dmesg, ["--time-format=iso"]);
+            if (dmesgStatus != 0 || !HasLogLines(kernel))
+            {
+                text.Append("The kernel's own buffer could not be read either (dmesg; kernel.dmesg_restrict is\n")
+                    .Append("set on many distributions). What dmesg said:\n").Append(dmesgErrors.TrimEnd()).Append('\n');
+                await File.WriteAllTextAsync(Path.Combine(dir, "kernel-log.txt"), clean(text.ToString()));
+                return;
+            }
+            text.Append("Read from the kernel's own buffer instead (dmesg), which holds only its newest messages,\n")
+                .Append("filtered here for USB, sound and power management lines.\n");
+            body = FilterKernelLines(kernel);
+            errors = dmesgErrors;
+        }
+        else if (status != 0 && !HasLogLines(output)
+                 && (errors.Contains("pattern", StringComparison.OrdinalIgnoreCase) || errors.Contains("pcre", StringComparison.OrdinalIgnoreCase)))
+        {
+            // A journalctl built without pattern matching: take the newest
+            // kernel lines and filter them here.
+            var (all, allErrors, _) = await RunHelperAsync(journalctl,
+                ["-k", "-b", "-o", "short-iso-precise", "--no-pager", "-n", (JournalLineLimit + 1).ToString(CultureInfo.InvariantCulture)]);
+            text.Append($"This journalctl cannot filter by pattern, so the newest {JournalLineLimit} kernel lines were\n")
+                .Append("filtered here for USB, sound and power management lines.\n");
+            body = FilterKernelLines(all);
+            errors = allErrors;
+        }
+        else
+        {
+            text.Append("Kernel messages of the current boot about USB, sound and power management (journalctl -k).\n");
+            body = output;
+        }
+        string kept = KeepNewest(body, out string? cut);
+        if (cut is not null) text.Append(cut).Append('\n');
+        text.Append(kept);
+        if (kept.Length > 0 && errors.Length > 0 && !kept.EndsWith('\n')) text.Append('\n');
+        text.Append(errors);
+        await File.WriteAllTextAsync(Path.Combine(dir, "kernel-log.txt"), clean(text.ToString()));
+    }
+
+    /// <summary>
+    /// Whether journalctl answered with no entries because the account may
+    /// not read the system journal, as opposed to having nothing to show.
+    /// </summary>
+    internal static bool JournalRefused(string output, string errors)
+        => !HasLogLines(output)
+           && (errors.Contains("not seeing messages", StringComparison.OrdinalIgnoreCase)
+               || errors.Contains("insufficient permissions", StringComparison.OrdinalIgnoreCase)
+               || errors.Contains("permission denied", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Whether any line is a log line rather than journalctl's own "-- No entries --" marker.</summary>
+    private static bool HasLogLines(string output)
+        => output.Split('\n').Any(line => line.Length > 0 && !line.StartsWith("-- ", StringComparison.Ordinal));
+
+    private static readonly Regex KernelLogLine = new(KernelLogPattern,
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
+
+    internal static string FilterKernelLines(string text)
+    {
+        var kept = new StringBuilder();
+        foreach (string line in text.Split('\n'))
+            if (KernelLogLine.IsMatch(line)) kept.Append(line).Append('\n');
+        return kept.ToString();
+    }
+
+    /// <summary>
+    /// The newest whole lines of <paramref name="text"/> within
+    /// <see cref="JournalLineLimit"/> and <see cref="JournalByteLimit"/>.
+    /// <paramref name="cut"/> is the line that says what was left out, or
+    /// null when nothing was.
+    /// </summary>
+    internal static string KeepNewest(string text, out string? cut)
+    {
+        cut = null;
+        if (text.Length == 0) return text;
+        string[] lines = text.EndsWith('\n') ? text[..^1].Split('\n') : text.Split('\n');
+        int first = Math.Max(0, lines.Length - JournalLineLimit);
+        long bytes = 0;
+        int start = lines.Length;
+        while (start > first)
+        {
+            long line = Encoding.UTF8.GetByteCount(lines[start - 1]) + 1;
+            if (bytes + line > JournalByteLimit) break;
+            bytes += line;
+            start--;
+        }
+        if (start == 0) return text;
+        cut = $"[cut: older lines were left out; this file keeps the newest {lines.Length - start} lines "
+              + $"(at most {JournalLineLimit} lines and {JournalByteLimit} bytes)]";
+        return string.Join('\n', lines[start..]) + "\n";
     }
 
     private static string TryReadFile(string path)
