@@ -63,6 +63,7 @@ public sealed partial class SkinWindowTests
             CaptureChainsUseTheRackAndMatrixParts();
             SoundboardWindowTests.CheckSkins();
             VoiceChangerWindowTests.CheckSkins();
+            DynamicsWindowTests.CheckSkins();
             AnAdditionalUnitsControlsFollowTheStripsOwnParts();
             AppearanceModeWindowTests.Check(main, options, flow);
             TouchControlsWindowTests.Check(main, options, flow);
@@ -886,6 +887,8 @@ public sealed partial class SkinWindowTests
             ("ducking", new DuckingWindow { DataContext = vm.Ducking }),
             ("soundboard", new SoundboardWindow { DataContext = vm.Soundboard }),
             ("voice-changer", new VoiceChangerWindow { DataContext = vm.VoiceChanger }),
+            ("compressor", new DynamicsWindow { DataContext = new MicDynamicsViewModel(client, MicDynamicsViewModel.CompressorKind, "xlr1", "XLR 1") }),
+            ("expander", new DynamicsWindow { DataContext = new MicDynamicsViewModel(client, MicDynamicsViewModel.ExpanderKind, "xlr1", "XLR 1") }),
             ("mix-inserts", new MixInsertsWindow { DataContext = vm.Mixes[0].Inserts }),
             ("insert-controls", new InsertControlsWindow { DataContext = vm.Inserts.Items[0] }),
             ("plugin-picker", new PluginPickerWindow { DataContext = vm.Inserts }),

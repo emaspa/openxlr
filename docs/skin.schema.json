@@ -679,6 +679,28 @@
           "$ref": "#/$defs/radius",
           "description": "the graph's corners, Mic setup's waveform's, and the hardware badge's in the EQ editor and the Ducking window"
         },
+        "Ox.Dynamics.Level": {
+          "$ref": "#/$defs/flatColour",
+          "description": "the input's history: the expander's line and the outline of the compressor's envelope"
+        },
+        "Ox.Dynamics.LevelFill": {
+          "$ref": "#/$defs/flatColour",
+          "description": "the inside of the compressor's envelope"
+        },
+        "Ox.Dynamics.Threshold": {
+          "$ref": "#/$defs/flatColour",
+          "description": "the threshold lines and the threshold's handle"
+        },
+        "Ox.Dynamics.Reduction": {
+          "$ref": "#/$defs/flatColour",
+          "description": "the gain reduction meters, which fill from the top"
+        },
+        "Ox.Dynamics.LineThickness": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 6,
+          "description": "the width of the history's line; the threshold line is three quarters of it, and never under 1"
+        },
         "Ox.Mixer.ControlMinSize": {
           "type": "number",
           "minimum": 0,

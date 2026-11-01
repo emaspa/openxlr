@@ -3505,4 +3505,160 @@ Selecciona la interfaz que controla OpenXLR</value>
   <data name="VoiceWitchHint" xml:space="preserve">
     <value>Aguda, con un temblor</value>
   </data>
+  <data name="Dynamics" xml:space="preserve">
+    <value>Dinámica</value>
+  </data>
+  <data name="DynamicsButtonTip" xml:space="preserve">
+    <value>El expansor y el compresor de este micrófono, que funcionan en este ordenador</value>
+  </data>
+  <data name="DynamicsButtonNameOn" xml:space="preserve">
+    <value>Dinámica de {0}, activa</value>
+  </data>
+  <data name="DynamicsButtonNameOff" xml:space="preserve">
+    <value>Dinámica de {0}, apagada</value>
+  </data>
+  <data name="DynamicsButtonNameUnavailable" xml:space="preserve">
+    <value>Dinámica de {0}, no puede funcionar</value>
+  </data>
+  <data name="DynamicsHeading" xml:space="preserve">
+    <value>Dinámica en este ordenador</value>
+  </data>
+  <data name="DynamicsHint" xml:space="preserve">
+    <value>El expansor baja el micrófono entre palabras y el compresor iguala la voz fuerte y la suave. Los dos funcionan aquí por software y no son los interruptores Compresor y Expansor de la unidad.</value>
+  </data>
+  <data name="DynamicsSwitch" xml:space="preserve">
+    <value>Activo</value>
+  </data>
+  <data name="DynamicsSwitchTip" xml:space="preserve">
+    <value>Actívalo o apágalo. Funciona en este ordenador, en el procesamiento del micrófono.</value>
+  </data>
+  <data name="DynamicsSwitchName" xml:space="preserve">
+    <value>Interruptor {0}, {1}</value>
+  </data>
+  <data name="DynamicsOpen" xml:space="preserve">
+    <value>Abrir</value>
+  </data>
+  <data name="DynamicsOpenTip" xml:space="preserve">
+    <value>Abrir su ventana, con los niveles, el umbral y los demás ajustes</value>
+  </data>
+  <data name="DynamicsOpenName" xml:space="preserve">
+    <value>Abrir la ventana {0} de {1}</value>
+  </data>
+  <data name="CompressorWindowTitle" xml:space="preserve">
+    <value>Compresor de {0}</value>
+  </data>
+  <data name="ExpanderWindowTitle" xml:space="preserve">
+    <value>Expansor de {0}</value>
+  </data>
+  <data name="DynamicsSubtitle" xml:space="preserve">
+    <value>{0}, funciona en este ordenador</value>
+  </data>
+  <data name="DynamicsSettings" xml:space="preserve">
+    <value>Ajustes</value>
+  </data>
+  <data name="DynamicsSettingsTip" xml:space="preserve">
+    <value>Mostrar u ocultar la relación, el ataque, la liberación y los demás ajustes</value>
+  </data>
+  <data name="DynamicsInput" xml:space="preserve">
+    <value>Entrada</value>
+  </data>
+  <data name="DynamicsThreshold" xml:space="preserve">
+    <value>Umbral</value>
+  </data>
+  <data name="DynamicsReduction" xml:space="preserve">
+    <value>Reducción de ganancia</value>
+  </data>
+  <data name="DynamicsMakeup" xml:space="preserve">
+    <value>Ganancia de compensación</value>
+  </data>
+  <data name="DynamicsOutput" xml:space="preserve">
+    <value>Salida</value>
+  </data>
+  <data name="DynamicsDecibels" xml:space="preserve">
+    <value>{0} dB</value>
+  </data>
+  <data name="DynamicsMilliseconds" xml:space="preserve">
+    <value>{0} ms</value>
+  </data>
+  <data name="DynamicsRatioValue" xml:space="preserve">
+    <value>{0}:1</value>
+  </data>
+  <data name="DynamicsSilent" xml:space="preserve">
+    <value>-∞ dB</value>
+  </data>
+  <data name="DynamicsInputName" xml:space="preserve">
+    <value>Nivel de entrada {0}</value>
+  </data>
+  <data name="DynamicsReductionName" xml:space="preserve">
+    <value>Reducción de ganancia {0}</value>
+  </data>
+  <data name="DynamicsOutputName" xml:space="preserve">
+    <value>Nivel de salida {0}</value>
+  </data>
+  <data name="DynamicsNoHost" xml:space="preserve">
+    <value>El compresor y el expansor necesitan el host nativo de plugins de OpenXLR, que esta instalación no incluye.</value>
+  </data>
+  <data name="DynamicsNoLevels" xml:space="preserve">
+    <value>Los niveles se muestran mientras el procesamiento del micrófono funciona en este ordenador. Activa esto, o la reducción de ruido, el EQ o el cambiador de voz.</value>
+  </data>
+  <data name="CompressorNote" xml:space="preserve">
+    <value>Este compresor funciona en este ordenador, después del EQ. El interruptor Compresor de una Wave XLR Pro, una unidad MK.2 o un Wave:3 es un ajuste fijo dentro de la unidad. Con los dos activos, la voz se comprime dos veces.</value>
+  </data>
+  <data name="ExpanderNote" xml:space="preserve">
+    <value>Este expansor funciona en este ordenador, después de la reducción de ruido. El interruptor Expansor de una Wave XLR Pro, una unidad MK.2 o un Wave:3 es un ajuste fijo dentro de la unidad. Con los dos activos, los pasajes suaves se bajan dos veces.</value>
+  </data>
+  <data name="CompressorThresholdTip" xml:space="preserve">
+    <value>El nivel por encima del cual se baja la voz. Arrastra la línea o su asa, o usa las flechas.</value>
+  </data>
+  <data name="ExpanderThresholdTip" xml:space="preserve">
+    <value>El nivel por debajo del cual se baja el micrófono. Arrastra la línea o su asa, o usa las flechas.</value>
+  </data>
+  <data name="DynamicsMakeupTip" xml:space="preserve">
+    <value>Ganancia añadida después del compresor, para volver a subir la voz igualada</value>
+  </data>
+  <data name="DynamicsRatio" xml:space="preserve">
+    <value>Relación</value>
+  </data>
+  <data name="CompressorRatioTip" xml:space="preserve">
+    <value>Cuánto comprime: a 3:1, 3 dB por encima del umbral salen como 1 dB</value>
+  </data>
+  <data name="ExpanderRatioTip" xml:space="preserve">
+    <value>Cuánto baja: a 3:1, 1 dB por debajo del umbral sale 3 dB por debajo</value>
+  </data>
+  <data name="DynamicsAttack" xml:space="preserve">
+    <value>Ataque</value>
+  </data>
+  <data name="CompressorAttackTip" xml:space="preserve">
+    <value>Qué tan rápido baja una voz más fuerte</value>
+  </data>
+  <data name="ExpanderAttackTip" xml:space="preserve">
+    <value>Qué tan rápido se abre cuando vuelve la voz</value>
+  </data>
+  <data name="DynamicsRelease" xml:space="preserve">
+    <value>Liberación</value>
+  </data>
+  <data name="CompressorReleaseTip" xml:space="preserve">
+    <value>Qué tan rápido suelta cuando la voz es más suave</value>
+  </data>
+  <data name="ExpanderReleaseTip" xml:space="preserve">
+    <value>Qué tan rápido se cierra cuando pasa la retención</value>
+  </data>
+  <data name="DynamicsKnee" xml:space="preserve">
+    <value>Rodilla</value>
+  </data>
+  <data name="DynamicsKneeTip" xml:space="preserve">
+    <value>Qué tan suave empieza alrededor del umbral; 0 dB empieza de golpe</value>
+  </data>
+  <data name="DynamicsRange" xml:space="preserve">
+    <value>Rango</value>
+  </data>
+  <data name="DynamicsRangeTip" xml:space="preserve">
+    <value>Lo máximo que baja el micrófono</value>
+  </data>
+  <data name="DynamicsHold" xml:space="preserve">
+    <value>Retención</value>
+  </data>
+  <data name="DynamicsHoldTip" xml:space="preserve">
+    <value>Cuánto espera después de que la voz se detiene antes de cerrarse</value>
+  </data>
 </root>

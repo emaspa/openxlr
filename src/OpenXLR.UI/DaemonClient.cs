@@ -16,7 +16,7 @@ namespace OpenXLR.UI;
 /// <see cref="StateReceived"/> for every pushed state. State is handed over as a
 /// JsonNode so the UI can bind to it without duplicating the daemon's records.
 /// </summary>
-public sealed class DaemonClient : IAsyncDisposable, IEqCommands, INoiseCommands, IVoiceCommands, IDuckingCommands, ISoundboardCommands
+public sealed class DaemonClient : IAsyncDisposable, IEqCommands, INoiseCommands, IVoiceCommands, IDynamicsCommands, IDuckingCommands, ISoundboardCommands
 {
     private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
@@ -508,6 +508,23 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, INoiseCommands
         if (strength is double db) payload["strength"] = db;
         return SendAsync(payload);
     }
+
+    /// <summary>
+    /// One field of a microphone's compressor or expander: <paramref name="processor"/>
+    /// is <c>compressor</c> or <c>expander</c>, <paramref name="field"/> the
+    /// command's field, and the others keep their values.
+    /// </summary>
+    public Task SetDynamicsAsync(string processor, string channel, string field, object value)
+        => SendAsync(new Dictionary<string, object>
+        {
+            ["cmd"] = processor == MicDynamicsViewModel.CompressorKind ? "setCompressor" : "setExpander",
+            ["channel"] = channel,
+            [field] = value,
+        });
+
+    /// <summary>Keep the compressor's and expander's levels of a microphone coming for another lease.</summary>
+    public Task WatchDynamicsAsync(string channel)
+        => SendAsync(new Dictionary<string, object> { ["cmd"] = "watchDynamics", ["channel"] = channel }, reportErrors: false);
 
     /// <summary>Part of a microphone's voice changer: the fields given change, the others keep their values.</summary>
     public Task SetVoiceChangerAsync(string channel, bool? enabled = null, string? voice = null, double? pitch = null, double? formant = null)

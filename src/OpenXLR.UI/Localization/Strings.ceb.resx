@@ -3857,4 +3857,160 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
   <data name="VoiceWitchHint" xml:space="preserve">
     <value>Taas, nga may pagkurog</value>
   </data>
+  <data name="Dynamics" xml:space="preserve">
+    <value>Dynamics</value>
+  </data>
+  <data name="DynamicsButtonTip" xml:space="preserve">
+    <value>Ang expander ug compressor niining mikropono, nga nagdagan niining kompyuter</value>
+  </data>
+  <data name="DynamicsButtonNameOn" xml:space="preserve">
+    <value>Dynamics sa {0}, on</value>
+  </data>
+  <data name="DynamicsButtonNameOff" xml:space="preserve">
+    <value>Dynamics sa {0}, off</value>
+  </data>
+  <data name="DynamicsButtonNameUnavailable" xml:space="preserve">
+    <value>Dynamics sa {0}, dili makadagan</value>
+  </data>
+  <data name="DynamicsHeading" xml:space="preserve">
+    <value>Dynamics niining kompyuter</value>
+  </data>
+  <data name="DynamicsHint" xml:space="preserve">
+    <value>Ang expander mopahinay sa mikropono taliwala sa mga pulong, ug ang compressor mopahapsay sa kusog ug hinay nga sulti. Ang duha nagdagan dinhi isip software, ug dili sila ang kaugalingong Compressor ug Expander switch sa unit.</value>
+  </data>
+  <data name="DynamicsSwitch" xml:space="preserve">
+    <value>On</value>
+  </data>
+  <data name="DynamicsSwitchTip" xml:space="preserve">
+    <value>I-on o i-off kini. Nagdagan kini niining kompyuter, sa pagproseso sa mikropono.</value>
+  </data>
+  <data name="DynamicsSwitchName" xml:space="preserve">
+    <value>Switch sa {0}, {1}</value>
+  </data>
+  <data name="DynamicsOpen" xml:space="preserve">
+    <value>Ablihi</value>
+  </data>
+  <data name="DynamicsOpenTip" xml:space="preserve">
+    <value>Ablihi ang bintana niini, uban ang mga lebel, ang threshold ug ang ubang setting</value>
+  </data>
+  <data name="DynamicsOpenName" xml:space="preserve">
+    <value>Ablihi ang bintana sa {0} para sa {1}</value>
+  </data>
+  <data name="CompressorWindowTitle" xml:space="preserve">
+    <value>Compressor sa {0}</value>
+  </data>
+  <data name="ExpanderWindowTitle" xml:space="preserve">
+    <value>Expander sa {0}</value>
+  </data>
+  <data name="DynamicsSubtitle" xml:space="preserve">
+    <value>{0}, nagdagan niining kompyuter</value>
+  </data>
+  <data name="DynamicsSettings" xml:space="preserve">
+    <value>Mga setting</value>
+  </data>
+  <data name="DynamicsSettingsTip" xml:space="preserve">
+    <value>Ipakita o tagoa ang ratio, attack, release ug ang ubang setting</value>
+  </data>
+  <data name="DynamicsInput" xml:space="preserve">
+    <value>Input</value>
+  </data>
+  <data name="DynamicsThreshold" xml:space="preserve">
+    <value>Threshold</value>
+  </data>
+  <data name="DynamicsReduction" xml:space="preserve">
+    <value>Gain reduction</value>
+  </data>
+  <data name="DynamicsMakeup" xml:space="preserve">
+    <value>Make-up gain</value>
+  </data>
+  <data name="DynamicsOutput" xml:space="preserve">
+    <value>Output</value>
+  </data>
+  <data name="DynamicsDecibels" xml:space="preserve">
+    <value>{0} dB</value>
+  </data>
+  <data name="DynamicsMilliseconds" xml:space="preserve">
+    <value>{0} ms</value>
+  </data>
+  <data name="DynamicsRatioValue" xml:space="preserve">
+    <value>{0}:1</value>
+  </data>
+  <data name="DynamicsSilent" xml:space="preserve">
+    <value>-∞ dB</value>
+  </data>
+  <data name="DynamicsInputName" xml:space="preserve">
+    <value>Lebel sa input {0}</value>
+  </data>
+  <data name="DynamicsReductionName" xml:space="preserve">
+    <value>Gain reduction {0}</value>
+  </data>
+  <data name="DynamicsOutputName" xml:space="preserve">
+    <value>Lebel sa output {0}</value>
+  </data>
+  <data name="DynamicsNoHost" xml:space="preserve">
+    <value>Ang compressor ug ang expander nagkinahanglan sa native plugin host sa OpenXLR, nga wala niining instalasyon.</value>
+  </data>
+  <data name="DynamicsNoLevels" xml:space="preserve">
+    <value>Makita ang mga lebel samtang nagdagan ang pagproseso sa mikropono niining kompyuter. I-on kini, o ang pagtangtang sa kasaba, ang EQ o ang voice changer.</value>
+  </data>
+  <data name="CompressorNote" xml:space="preserve">
+    <value>Kini nga compressor nagdagan niining kompyuter, human sa EQ. Ang Compressor switch sa Wave XLR Pro, sa MK.2 unit o sa Wave:3 usa ka pirmi nga setting sulod sa unit. Kung on ang duha, makaduha ma-compress ang tingog.</value>
+  </data>
+  <data name="ExpanderNote" xml:space="preserve">
+    <value>Kini nga expander nagdagan niining kompyuter, human sa pagtangtang sa kasaba. Ang Expander switch sa Wave XLR Pro, sa MK.2 unit o sa Wave:3 usa ka pirmi nga setting sulod sa unit. Kung on ang duha, makaduha pahinayon ang hinay nga mga bahin.</value>
+  </data>
+  <data name="CompressorThresholdTip" xml:space="preserve">
+    <value>Ang lebel nga kung molapas, pahinayon ang tingog. Guyora ang linya o ang kuptanan niini, o gamita ang mga arrow key.</value>
+  </data>
+  <data name="ExpanderThresholdTip" xml:space="preserve">
+    <value>Ang lebel nga kung ubos niini, pahinayon ang mikropono. Guyora ang linya o ang kuptanan niini, o gamita ang mga arrow key.</value>
+  </data>
+  <data name="DynamicsMakeupTip" xml:space="preserve">
+    <value>Gain nga idugang human sa compressor, aron mopakusog pag-usab sa napahapsay nga tingog</value>
+  </data>
+  <data name="DynamicsRatio" xml:space="preserve">
+    <value>Ratio</value>
+  </data>
+  <data name="CompressorRatioTip" xml:space="preserve">
+    <value>Unsa kakusog ang pag-compress: sa 3:1, ang 3 dB labaw sa threshold mogawas nga 1 dB</value>
+  </data>
+  <data name="ExpanderRatioTip" xml:space="preserve">
+    <value>Unsa kakusog ang pagpahinay: sa 3:1, ang 1 dB ubos sa threshold mogawas nga 3 dB ubos niini</value>
+  </data>
+  <data name="DynamicsAttack" xml:space="preserve">
+    <value>Attack</value>
+  </data>
+  <data name="CompressorAttackTip" xml:space="preserve">
+    <value>Unsa kadali niya pahinayon ang mas kusog nga tingog</value>
+  </data>
+  <data name="ExpanderAttackTip" xml:space="preserve">
+    <value>Unsa kadali siya moabli kung mobalik ang tingog</value>
+  </data>
+  <data name="DynamicsRelease" xml:space="preserve">
+    <value>Release</value>
+  </data>
+  <data name="CompressorReleaseTip" xml:space="preserve">
+    <value>Unsa kadali siya mobuhi kung mohinay na ang tingog</value>
+  </data>
+  <data name="ExpanderReleaseTip" xml:space="preserve">
+    <value>Unsa kadali siya mosira human sa hold</value>
+  </data>
+  <data name="DynamicsKnee" xml:space="preserve">
+    <value>Knee</value>
+  </data>
+  <data name="DynamicsKneeTip" xml:space="preserve">
+    <value>Unsa kahinay siya magsugod palibot sa threshold; ang 0 dB magsugod dayon</value>
+  </data>
+  <data name="DynamicsRange" xml:space="preserve">
+    <value>Range</value>
+  </data>
+  <data name="DynamicsRangeTip" xml:space="preserve">
+    <value>Ang labing daghan nga iyang pahinayon ang mikropono</value>
+  </data>
+  <data name="DynamicsHold" xml:space="preserve">
+    <value>Hold</value>
+  </data>
+  <data name="DynamicsHoldTip" xml:space="preserve">
+    <value>Unsa kadugay siya maghulat human mohunong ang tingog sa dili pa mosira</value>
+  </data>
 </root>

@@ -1,0 +1,34 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:OpenXLR.UI"
+             xmlns:loc="using:OpenXLR.UI.Localization"
+             x:Class="OpenXLR.UI.Views.DynamicsControls"
+             x:DataType="vm:ChannelDynamicsViewModel">
+  <!-- A microphone's expander and compressor on this computer: a switch and a button that opens
+       its window for each, in the order the signal meets them. The Dynamics button's flyout beside
+       the EQ and the mix matrix's processing flyout show these, bound to the channel's one model. -->
+  <StackPanel Spacing="8">
+    <TextBlock Text="{loc:Text Key=DynamicsHeading}" Classes="h"/>
+    <TextBlock Text="{loc:Text Key=DynamicsHint}" Classes="hint" TextWrapping="Wrap"/>
+    <Grid ColumnDefinitions="*,Auto,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="6">
+      <TextBlock Text="{Binding Expander.Name, FallbackValue=''}" Classes="body" VerticalAlignment="Center"/>
+      <ToggleButton Grid.Column="1" Name="ExpanderSwitch" Content="{loc:Text Key=DynamicsSwitch}"
+                    IsEnabled="{Binding Expander.Available, FallbackValue=False}"
+                    IsChecked="{Binding Expander.Enabled, Mode=TwoWay, FallbackValue=False}"
+                    AutomationProperties.Name="{Binding Expander.SwitchName, FallbackValue=''}" ToolTip.Tip="{loc:Text Key=DynamicsSwitchTip}"/>
+      <Button Grid.Column="2" Name="ExpanderOpen" Content="{loc:Text Key=DynamicsOpen}" Click="OnOpenExpander"
+              AutomationProperties.Name="{Binding Expander.OpenName, FallbackValue=''}" ToolTip.Tip="{loc:Text Key=DynamicsOpenTip}"/>
+      <TextBlock Grid.Row="1" Text="{Binding Compressor.Name, FallbackValue=''}" Classes="body" VerticalAlignment="Center"/>
+      <ToggleButton Grid.Row="1" Grid.Column="1" Name="CompressorSwitch" Content="{loc:Text Key=DynamicsSwitch}"
+                    IsEnabled="{Binding Compressor.Available, FallbackValue=False}"
+                    IsChecked="{Binding Compressor.Enabled, Mode=TwoWay, FallbackValue=False}"
+                    AutomationProperties.Name="{Binding Compressor.SwitchName, FallbackValue=''}" ToolTip.Tip="{loc:Text Key=DynamicsSwitchTip}"/>
+      <Button Grid.Row="1" Grid.Column="2" Name="CompressorOpen" Content="{loc:Text Key=DynamicsOpen}" Click="OnOpenCompressor"
+              AutomationProperties.Name="{Binding Compressor.OpenName, FallbackValue=''}" ToolTip.Tip="{loc:Text Key=DynamicsOpenTip}"/>
+    </Grid>
+    <TextBlock Name="ExpanderError" Text="{Binding Expander.Status, FallbackValue=''}" Classes="warn" TextWrapping="Wrap"
+               IsVisible="{Binding Expander.IsFaulty, FallbackValue=False}"/>
+    <TextBlock Name="CompressorError" Text="{Binding Compressor.Status, FallbackValue=''}" Classes="warn" TextWrapping="Wrap"
+               IsVisible="{Binding Compressor.IsFaulty, FallbackValue=False}"/>
+  </StackPanel>
+</UserControl>

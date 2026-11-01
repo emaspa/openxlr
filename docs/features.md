@@ -222,6 +222,23 @@ physical gain dial.
   terminal mixer, a Deck key with toggle and hold modes and
   [`setVoiceChanger`](api.md#voice-changer) control it, and it is saved
   with the mixer and in profiles.
+- Compressor and expander on this computer: on the same microphones, in
+  the same native stage, the expander after noise removal and the
+  compressor after the EQ. The compressor has a threshold, ratio, attack,
+  release, soft knee and make-up gain; the expander a threshold, ratio,
+  range, attack, hold and release. Both are feed-forward on each sample's
+  peak in dB, add no delay and pass the microphone through to the bit while
+  off. Each has its own window, opened from the Dynamics button beside
+  Denoise or from the matrix's Mic button: input, gain reduction and
+  output meters, the input's last twelve seconds as a graph with a
+  draggable threshold, the compressor's make-up gain slider, and the other
+  settings behind a settings button. The levels travel only while a window
+  asks for them ([`watchDynamics`](api.md#compressor-and-expander)). They
+  are separate from the fixed Compressor and Expander switches of the Wave
+  XLR Pro, the MK.2 units and the Wave:3, and stack with them when both
+  are on. The terminal mixer and
+  [`setCompressor` and `setExpander`](api.md#compressor-and-expander)
+  control them, and they are saved with the mixer and in profiles.
 - Gain lock: the daemon rejects every gain change while the lock is set,
   from any client, and stores the lock per device in `gainlock.json`.
   Shown only for devices without a physical gain dial, which would
@@ -972,6 +989,8 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   since a terminal sends no key-up ([manual](manual.md#terminal-sounds))
 - The voice changer in Inputs: a choice of Off or a voice per microphone,
   and the custom voice's pitch and formant
+- The compressor and expander in Inputs: each microphone's switches and
+  thresholds, and every other setting while one is on
 - Insert editing opens the plugin's native editor. A blocked or refused
   editor falls back to terminal controls with the reason shown. Controls
   follow the catalogue's order, defaults, switches, named scale points and
