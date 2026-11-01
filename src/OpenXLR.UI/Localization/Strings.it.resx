@@ -1050,6 +1050,18 @@
   <data name="LatencyUnknown" xml:space="preserve">
     <value>Latenza: sconosciuta. La compensazione della latenza la conta come zero.</value>
   </data>
+  <data name="LatencyReportedMeasured" xml:space="preserve">
+    <value>Latenza: {0:0.##} ms dichiarata, {1:0.#} ms misurata</value>
+  </data>
+  <data name="LatencyReportedMeasuring" xml:space="preserve">
+    <value>Latenza: {0:0.##} ms dichiarata, misurazione in corso</value>
+  </data>
+  <data name="LatencyUnreportedMeasured" xml:space="preserve">
+    <value>Latenza: non dichiarata, {0:0.#} ms misurata. La compensazione della latenza la conta come zero.</value>
+  </data>
+  <data name="LatencyUnreportedMeasuring" xml:space="preserve">
+    <value>Latenza: non dichiarata, misurazione in corso. La compensazione della latenza la conta come zero.</value>
+  </data>
   <data name="LeftLevel" xml:space="preserve">
     <value>Livello sinistro</value>
   </data>

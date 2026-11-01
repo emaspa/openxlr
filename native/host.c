@@ -4,6 +4,9 @@
 // performs IPC or calls the editor.
 #include "host.h"
 #include "icon.h"
+// Weak, so the tests that compile this file without measure.o still link.
+#define LATENCY_METER_LINKAGE __attribute__((weak))
+#include "measure.h"
 
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
@@ -577,6 +580,9 @@ static void process_audio(void *data, struct spa_io_position *position) {
     float *buffer = pw_filter_get_dsp_buffer(h->tap_ports[t], frames);
     h->taps[t] = buffer ? buffer : host_fallback(h->tap_scratch[t], frames, false);
   }
+  // The input as it enters the node, before a plugin can write over it.
+  if (h->measure)
+    latency_meter_input(h->measure, in, h->channels, frames);
   // One invalid sample can poison a stateful processor until it is replaced.
   // Keep it out of the plugin and of downstream nodes. Finite headroom above
   // unity is left alone. Reporting and replacement happen off this thread.
@@ -610,6 +616,9 @@ static void process_audio(void *data, struct spa_io_position *position) {
     for (unsigned t = 0; t < h->tap_count; ++t)
       memset(h->taps[t], 0, sizeof(float) * frames);
   }
+  // The output as it leaves, so the measured delay holds all the node adds.
+  if (h->measure)
+    latency_meter_output(h->measure, out, h->channels, frames);
 }
 
 static void state_changed(void *data, enum pw_filter_state old,
@@ -1158,6 +1167,42 @@ static void trace_own_block(Host *h) {
             atomic_load(&b->delay));
 }
 
+// --- the measured delay -----------------------------------------------------
+
+// Every plugin's node measures the delay it really adds (measure.c), beside
+// the figure the plugin declares. The built-in stages report their own.
+static bool measures_latency(const Backend *backend) {
+  return backend == &lv2_backend || backend == &clap_backend ||
+         backend == &vst3_backend;
+}
+
+// The figure goes out as a meter of the host's own. Its name has a dot,
+// which no LV2 symbol can, and CLAP and VST3 parameters are named by number,
+// so it cannot be mistaken for one of the plugin's controls. It says nothing
+// until there is a figure, and a build that cannot measure leaves it out.
+static void measure_attach(Host *h) {
+  if (!latency_meter_new) return;
+  h->measured = host_add_control(h, "host.measured_latency", 0, 1e9f, 0, true, NULL);
+  if (!h->measured) return;
+  atomic_store(&h->measured->observed, NAN);
+  h->measure = latency_meter_new(h->rate);
+}
+
+static void measure_start(Host *h) {
+  if (measures_latency(h->backend)) measure_attach(h);
+}
+
+static void measure_tick(Host *h) {
+  if (h->measure && latency_meter_update(h->measure))
+    atomic_store(&h->measured->observed,
+                 (float)latency_meter_samples(h->measure));
+}
+
+static void measure_free(Host *h) {
+  if (h->measure) latency_meter_free(h->measure);
+  h->measure = NULL;
+}
+
 static void tick(void *data, uint64_t expirations) {
   Host *h = data;
   // Editor progress is separate from audio progress. A blocked editor must
@@ -1172,6 +1217,7 @@ static void tick(void *data, uint64_t expirations) {
     pw_main_loop_quit(h->loop);
     return;
   }
+  measure_tick(h);
   for (uint32_t i = 0; i < h->control_count; ++i) {
     Control *c = &h->controls[i];
     if (c->output) {
@@ -1389,6 +1435,7 @@ int main(int argc, char **argv) {
     h.exit_code = 1;
     goto cleanup;
   }
+  measure_start(&h);
   for (int i = first + 3; i < argc; ++i) {
     char *equals = strchr(argv[i], '=');
     if (!equals) {
@@ -1458,5 +1505,6 @@ cleanup:
   for (unsigned t = 0; t < MAX_TAPS; ++t)
     free(h.tap_scratch[t]);
   own_block_free(&h);
+  measure_free(&h);
   return h.exit_code;
 }

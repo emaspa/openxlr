@@ -41,6 +41,7 @@ internal sealed class NativePluginHost : IDisposable
     private long _lastUiHeartbeat = Stopwatch.GetTimestamp();
     private readonly int _sampleRate;
     private long _latencySamples = -1;
+    private long _measuredSamples = -1;
 
     /// <summary>
     /// The plugin's algorithmic latency as the helper last reported it, or
@@ -49,6 +50,24 @@ internal sealed class NativePluginHost : IDisposable
     /// changes.
     /// </summary>
     public double? LatencyMilliseconds => Interlocked.Read(ref _latencySamples) is >= 0 and var samples
+        ? samples * 1000.0 / _sampleRate : null;
+
+    /// <summary>
+    /// The meter a plugin's helper reports the delay it measured on its own
+    /// node with, in samples. The dot keeps it apart from every plugin
+    /// control: an LV2 symbol cannot hold one, and CLAP and VST3 controls
+    /// are named by number.
+    /// </summary>
+    internal const string MeasuredLatencyMeter = "host.measured_latency";
+
+    /// <summary>
+    /// The delay the helper measured between the audio entering its node and
+    /// leaving it, or null until it has a confident figure. It needs sound
+    /// passing through, and a plugin that changes the sound beyond
+    /// recognition may never give one. It is a separate figure from
+    /// <see cref="LatencyMilliseconds"/>, which is what the plugin declares.
+    /// </summary>
+    public double? MeasuredLatencyMilliseconds => Interlocked.Read(ref _measuredSamples) is >= 0 and var samples
         ? samples * 1000.0 / _sampleRate : null;
 
     public Process Process { get; }
@@ -321,6 +340,8 @@ internal sealed class NativePluginHost : IDisposable
                 || !double.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out double value)
                 || !double.IsFinite(value)) return;
             if (parts[0] == "control") StoreValue(_changes, parts[1], value);
+            else if (parts[0] == "meter" && parts[1] == MeasuredLatencyMeter)
+                Interlocked.Exchange(ref _measuredSamples, value is >= 0 and < int.MaxValue ? (long)Math.Round(value) : -1);
             else if (parts[0] == "meter" && (_meterSymbols is null || _meterSymbols.Contains(parts[1])))
                 StoreMeter(parts[1], value);
         }

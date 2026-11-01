@@ -1066,6 +1066,23 @@ runs in the PipeWire filter chain, which cannot read one, when the plugin
 reports nothing, and until its host first reports, once audio has run
 through it.
 
+<a name="measured-latency"></a>
+A plugin can report one delay and add another, and some report none at
+all. For a plugin in the native host, OpenXLR also measures the delay. It
+compares the sound going into the plugin with the sound coming out and
+finds how far apart they are. The window then shows both, for example
+"Latency: 0 ms reported, 48 ms measured". The measured figure includes
+everything the plugin's host adds, the [own block](#own-block) included.
+It needs sound going through the plugin. For a plugin on a microphone,
+speak into it for ten seconds or so; for one on a mix, play something.
+Until then the window says "measuring". A plugin that changes the sound
+so much that what comes out no longer resembles what went in, a heavy
+voice effect for instance, may stay at "measuring", and that is expected.
+Once found, the figure stays until a different one holds for a few
+seconds. A plugin in the PipeWire filter chain is not measured, and its
+window shows the reported figure alone. Latency compensation, below, uses
+the reported figure only.
+
 When a mix's plugins delay it, that mix arrives later than the others. In
 Options, AUDIO, **Compensate plugin latency across mixes** delays every
 other mix by the difference, so they line up with the slowest, for example

@@ -998,6 +998,18 @@
   <data name="LatencyUnknown" xml:space="preserve">
     <value>Кашњење: непознато. Изједначавање кашњења га рачуна као нулу.</value>
   </data>
+  <data name="LatencyReportedMeasured" xml:space="preserve">
+    <value>Кашњење: {0:0.##} ms пријављено, {1:0.#} ms измерено</value>
+  </data>
+  <data name="LatencyReportedMeasuring" xml:space="preserve">
+    <value>Кашњење: {0:0.##} ms пријављено, мери се</value>
+  </data>
+  <data name="LatencyUnreportedMeasured" xml:space="preserve">
+    <value>Кашњење: није пријављено, {0:0.#} ms измерено. Изједначавање кашњења га рачуна као нулу.</value>
+  </data>
+  <data name="LatencyUnreportedMeasuring" xml:space="preserve">
+    <value>Кашњење: није пријављено, мери се. Изједначавање кашњења га рачуна као нулу.</value>
+  </data>
   <data name="LeftLevel" xml:space="preserve">
     <value>Леви ниво</value>
   </data>

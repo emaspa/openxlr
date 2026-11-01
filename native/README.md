@@ -56,7 +56,15 @@ same alignment afterwards; a stall that fills the ring plays silence and
 never older audio; the delay follows a changed cycle without playing a
 frame twice; and with the real worker thread and the plugin held inside a
 call, 2000 callbacks return at once. A last part runs four seconds in real
-time against a plugin that takes 1 ms a call and once 53 ms. `make -C native test-clap` checks the
+time against a plugin that takes 1 ms a call and once 53 ms. It also runs
+`tests/measure`, which checks the [measured delay](#measured-delay) the same
+way: a plugin that delays by 0, 480, 2400 or 24000 frames is measured to the
+sample over a synthetic voice, in mono, in stereo and at 44.1 kHz; so is one
+that gates the pauses like a noise remover; on its own block the figure is
+the plugin's delay plus the block's, which is also what the `latency` line
+says; a plugin that puts out silence, unrelated noise or noise that follows
+the voice's level never gives a figure; and the audio callback allocates
+nothing. `make -C native test-clap` checks the
 CLAP port layout against fake plugins that declare more buses than the
 chain uses, and that the scanner and the loader agree about which layouts
 can be carried. It also checks that a CLAP plugin's latency is read after
@@ -147,6 +155,13 @@ is not treated as an open window. It creates no audio links.
   VST3's `kLatencyChanged`), so the per-tick check costs no call into the
   plugin. Nothing is added to the audio callback. The daemon keeps the last
   report and ignores one made at a rate other than the helper's own.
+- For an LV2, CLAP or VST3 plugin the helper also measures the delay its
+  node really adds, and prints it as `meter host.measured_latency SAMPLES`
+  once it is sure of a figure and again when it is sure of a different one;
+  see [Measured delay](#measured-delay). The dot keeps the name apart from
+  the plugin's own controls, since an LV2 symbol cannot hold one and CLAP
+  and VST3 controls are named by number. The daemon reads it apart from the
+  plugin's meters.
 - The daemon owns the process. Closing its stdin ends the helper, which is
   why it watches that pipe rather than using PDEATHSIG, whose Linux semantics
   follow the thread that spawned it.
@@ -216,6 +231,53 @@ daemon's bypass takes the insert out of the chain and the delay with it.
 With `OPENXLR_HOST_TRACE` set, the helper writes a `trace: own block:` line
 once a second while either of its counts moves: the cycles that played
 silence for a late block, and the blocks the worker dropped.
+
+## Measured delay
+
+A plugin declares its latency, and the declaration can be wrong. A plugin
+bridged from Windows can report 0 and still hold the audio back by tens of
+milliseconds. So for an LV2, CLAP or VST3 plugin the helper also measures
+the delay from the audio itself (`measure.c`). It measures at the edges of
+the audio callback, the input as it arrives and the output as it leaves,
+so the figure holds everything the node adds, the [own block](#own-block)
+included. The built-in stages report their own figures and are not
+measured.
+
+The audio callback copies a mono mix of its input and of its output into
+two rings of about five seconds, 1 MB each at 48 kHz. That copy is all it
+does: no allocation, no lock, no system call. Once a second of new audio
+has arrived, the main-thread tick looks at the last three seconds of output
+and the four seconds of input that can explain them:
+
+1. Coarse. Both sides become envelopes, the RMS of each millisecond
+   averaged over the eleven around it, and the output's envelope is
+   correlated with the input's at every lag up to one second, with
+   Pearson's coefficient. Envelopes survive what a noise remover does to
+   speech, and the averaging removes the ripple of the voice's pitch
+   without moving the peak.
+2. Fine. Within 7 ms of the coarse peak the waveforms themselves are
+   correlated, sample by sample, over the 250 ms where both sides are
+   loudest. Its peak is the figure, to the sample.
+
+A figure is reported only when all of these hold: at least 400 ms of the
+window has signal above -50 dBFS on both sides; the envelopes correlate at
+0.6 or more and no separate peak more than 25 ms away comes within 0.05 of
+that; the waveforms correlate at 0.5 or more; neither peak is on the edge
+of its search; and three analyses in a row agree to within two samples.
+Nothing is printed before the first such figure, and a figure stays until
+three agreeing analyses give another one. With speech going through from
+the start, the first figure comes after about six seconds: four to fill the
+window, then three agreeing analyses a second apart.
+
+The thresholds come from `tests/measure.c` and from running RNNoise and
+DeepFilterNet over the same synthetic voice. Unrelated noise reached 0.15 on
+the envelopes, noise that follows the voice's level 0.999 on the envelopes
+and 0.03 on the waveforms, and the two noise removers 0.98 or more on the
+envelopes and 0.96 or more on the waveforms. RNNoise measured 1436 to 1439
+frames against the 1440 it reports, DeepFilterNet 2432 against 2432. An
+analysis takes about 3 ms of the main thread once a second, 0.3% of one
+core, and the copy adds about 0.3 microseconds to a cycle of 256 stereo
+frames.
 
 ## Ducking
 

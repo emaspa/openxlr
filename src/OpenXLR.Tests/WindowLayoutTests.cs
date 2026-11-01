@@ -268,6 +268,21 @@ public sealed class WindowLayoutTests
                     AssertNoOverlap(((Grid)slider.Parent!).Children.Where(c => c.IsVisible).ToArray());
                     Capture(controls, "plugin-" + width);
                 }
+                // In the native host the latency line carries the measured
+                // delay too. Its longest form wraps inside the narrowest window.
+                insert.ApplyFromDaemon(JsonNode.Parse("""{"nativeHost":true}""")!, null, true);
+                insert.LatencyMilliseconds = null;
+                insert.MeasuredLatencyMilliseconds = 47.98;
+                Layout(controls, 420, 560);
+                var latency = controls.FindControl<TextBlock>("PluginLatency")!;
+                Assert.Equal(Localizer.Format("LatencyUnreportedMeasured", 47.98), latency.Text);
+                Assert.True(latency.IsVisible);
+                AssertInside(latency, controls);
+                Capture(controls, "plugin-latency-420");
+                insert.LatencyMilliseconds = 0;
+                insert.MeasuredLatencyMilliseconds = null;
+                Assert.Equal(Localizer.Format("LatencyReportedMeasuring", 0.0), latency.Text);
+                insert.ApplyFromDaemon(JsonNode.Parse("{}")!, null, false);
                 Assert.False(controls.FindControl<Button>("ManageNativeEditors")!.IsVisible);
                 insert.ApplyFromDaemon(JsonNode.Parse("""{"nativeHost":true}""")!, null, true, true, "This editor is blocked by its compatibility rule.");
                 Layout(controls, 420, 560);

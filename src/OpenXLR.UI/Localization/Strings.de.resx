@@ -1049,6 +1049,18 @@
   <data name="LatencyUnknown" xml:space="preserve">
     <value>Latenz unbekannt. Der Latenzausgleich rechnet mit null.</value>
   </data>
+  <data name="LatencyReportedMeasured" xml:space="preserve">
+    <value>Latenz: {0:0.##} ms gemeldet, {1:0.#} ms gemessen</value>
+  </data>
+  <data name="LatencyReportedMeasuring" xml:space="preserve">
+    <value>Latenz: {0:0.##} ms gemeldet, wird gemessen</value>
+  </data>
+  <data name="LatencyUnreportedMeasured" xml:space="preserve">
+    <value>Latenz: nicht gemeldet, {0:0.#} ms gemessen. Der Latenzausgleich rechnet mit null.</value>
+  </data>
+  <data name="LatencyUnreportedMeasuring" xml:space="preserve">
+    <value>Latenz: nicht gemeldet, wird gemessen. Der Latenzausgleich rechnet mit null.</value>
+  </data>
   <data name="LeftLevel" xml:space="preserve">
     <value>Linker Pegel</value>
   </data>
