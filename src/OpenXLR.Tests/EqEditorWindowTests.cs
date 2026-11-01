@@ -618,6 +618,7 @@ public sealed class EqEditorWindowTests
         Assert.True(choice.IsEffectivelyVisible);
         Assert.True(onUnit.IsChecked);
         Assert.False(note.IsVisible);
+        await OpensWithEveryBand(eq, window);
         Assert.Equal(Localizer.Format("EqHardwareBadgeTip", "Wave XLR Pro"), ToolTip.GetTip(badge));
         Assert.Equal(Localizer.Format("EqButtonTipDevice", "Wave XLR Pro"), ToolTip.GetTip(window.FindControl<Button>("Xlr2Eq")!));
         Assert.Equal(Localizer.Format("EqProcessingDeviceTip", "Wave XLR Pro"), ToolTip.GetTip(onUnit));
@@ -686,6 +687,40 @@ public sealed class EqEditorWindowTests
         SkinService.ApplyControlSizing(false);
     }
 
+    /// <summary>
+    /// A new editor opens tall enough to show every band without a scroll bar,
+    /// with the profile row and the choice of where the EQ runs above and below them.
+    /// </summary>
+    private static async Task OpensWithEveryBand(MicEqViewModel eq, Window owner)
+    {
+        foreach (string skin in new[] { SkinPackage.DefaultId, "broadcast" })
+        {
+            SkinLayoutWindowTests.Wear(skin);
+            await OpensWithEveryBand(eq, owner, skin);
+        }
+        SkinService.Apply(new SkinEntry(SkinPackage.Default, []));
+    }
+
+    private static async Task OpensWithEveryBand(MicEqViewModel eq, Window owner, string skin)
+    {
+        var fresh = new EqWindow { DataContext = eq };
+        try
+        {
+            fresh.Show(owner);
+            ScrollViewer bands = fresh.FindControl<ScrollViewer>("EqBandScroll")!;
+            DateTime deadline = DateTime.UtcNow.AddSeconds(5);
+            while (!(bands.Viewport.Height > 0 && bands.Extent.Height <= bands.Viewport.Height + 0.5) && DateTime.UtcNow < deadline)
+            {
+                Pump(30);
+                await Task.Yield();
+            }
+            Assert.True(bands.Viewport.Height > 0 && bands.Extent.Height <= bands.Viewport.Height + 0.5,
+                $"{skin}: the bands need {bands.Extent.Height:0.#} and get {bands.Viewport.Height:0.#} in an editor {fresh.Bounds.Height:0.#} tall");
+            AssertInside(fresh.FindControl<StackPanel>("EqFooter")!, fresh);
+        }
+        finally { fresh.Close(); }
+    }
+
     /// <summary>The editor at its opening size in Standard and Touch sizing.</summary>
     private static void CaptureBothSizings(EqWindow editor, string name)
     {
@@ -720,6 +755,10 @@ public sealed class EqEditorWindowTests
         daemon.Device = "unit"; daemon.Processing["xlr1"] = "device";
         daemon.Pushes.Release();
         await Until(() => eq.VariableBands);
+        // Four bands with Add band above them and Remove beside each, on the unit:
+        // the editor opens with every row showing.
+        Assert.Equal(4, eq.Bands.Count);
+        await OpensWithEveryBand(eq, editor.Owner as Window ?? editor);
         while (eq.CanAddBand) Click(editor.FindControl<Button>("EqAddBand")!);
         await Until(() => daemon.State()["mixer"]!["channels"]![0]!["eq"]!["bands"]!.AsArray().Count == 16 && !eq.OnDevice);
         SkinService.ApplyControlSizing(true);
