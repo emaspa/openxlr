@@ -507,6 +507,14 @@ struct Vst3 {
   ComponentHandler *handler = nullptr;
   PlugFrame *frame = nullptr;
   std::vector<Record *> records;
+  // The plugin's own bypass parameter, the one flagged kIsBypass. The
+  // chain's Bypass already takes a plugin out of the chain, so this one is
+  // not offered as a control: it starts at "processing" on every load and
+  // then follows only the plugin's own editor.
+  bool has_bypass = false;
+  ParamID bypass_id = 0;
+  std::atomic<double> bypass_desired{0.0};  // main thread -> audio thread
+  double bypass_sent = -1.0;                // audio thread; -1 sends the first value
   ParameterChanges in_changes, out_changes;
   // One entry per bus in each direction, active or not: a plugin indexes
   // its sidechain by bus number and must find something there.
@@ -622,6 +630,10 @@ Record *record_for(Vst3 *v, ParamID id) {
 
 tresult PLUGIN_API ComponentHandler::performEdit(ParamID id,
                                                  ParamValue normalized) {
+  if (v_->has_bypass && id == v_->bypass_id) {
+    v_->bypass_desired = normalized;
+    return kResultOk;
+  }
   Record *r = record_for(v_, id);
   if (!r || r->readonly)
     return kResultOk;
@@ -1021,10 +1033,20 @@ bool vst3_load(Host *h, char **arguments) {
   int32 count = v->controller->getParameterCount();
   v->in_changes.reserve((size_t)count);
   v->out_changes.reserve((size_t)count);
+  v->has_bypass = false;
+  v->bypass_desired = 0.0;
+  v->bypass_sent = -1.0;
   for (int32 i = 0; i < count; ++i) {
     ParameterInfo info;
-    if (v->controller->getParameterInfo(i, info) != kResultOk ||
-        (info.flags & ParameterInfo::kIsHidden))
+    if (v->controller->getParameterInfo(i, info) != kResultOk)
+      continue;
+    if ((info.flags & ParameterInfo::kIsBypass) && !v->has_bypass) {
+      v->has_bypass = true;
+      v->bypass_id = info.id;
+      v->controller->setParamNormalized(info.id, 0.0);
+      continue;
+    }
+    if (info.flags & (ParameterInfo::kIsHidden | ParameterInfo::kIsBypass))
       continue;
     auto *r = new Record();
     r->id = info.id;
@@ -1216,6 +1238,16 @@ void vst3_process(Host *h, uint32_t frames, float *const *in,
     if (queue)
       queue->addPoint(0, wanted, index);
     r->last_sent = wanted;
+  }
+  if (v->has_bypass) {
+    double wanted = v->bypass_desired.load();
+    if (wanted != v->bypass_sent) {
+      int32 index;
+      IParamValueQueue *queue = v->in_changes.addParameterData(v->bypass_id, index);
+      if (queue)
+        queue->addPoint(0, wanted, index);
+      v->bypass_sent = wanted;
+    }
   }
   v->data.numSamples = (int32)frames;
   v->in_buses[(size_t)v->main_in].silenceFlags = 0;  // the side inputs stay silent
@@ -1458,8 +1490,9 @@ extern "C" int vst3_scan(const char *path) {
     bool first_param = true;
     for (int32 p = 0; p < parameters; ++p) {
       ParameterInfo pinfo;
+      // The plugin's own bypass is left out: the chain has a Bypass of its own.
       if (v.controller->getParameterInfo(p, pinfo) != kResultOk ||
-          (pinfo.flags & ParameterInfo::kIsHidden))
+          (pinfo.flags & (ParameterInfo::kIsHidden | ParameterInfo::kIsBypass)))
         continue;
       double minimum = v.controller->normalizedParamToPlain(pinfo.id, 0.0);
       double maximum = v.controller->normalizedParamToPlain(pinfo.id, 1.0);

@@ -40,7 +40,9 @@ with tempfile.TemporaryDirectory(prefix="openxlr-scan-phases-") as directory:
                                 capture_output=True, text=True, timeout=10)
         assert result.returncode == 0, result.stderr
         plugins = json.loads(result.stdout)["plugins"]
+        # The fixture's 33rd parameter is its own bypass, which the scan leaves out.
         assert len(plugins) == 200 and all(len(p["params"]) == 32 for p in plugins)
+        assert all(q["id"] != 32 for p in plugins for q in p["params"])
         lines = result.stderr.splitlines()
         assert len(lines) == 200 * per_plugin + 4, (kind, len(lines))
         assert lines[-1] == f"trace: scan {kind}: complete"

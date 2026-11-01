@@ -83,6 +83,13 @@ struct Clap {
   // in_list and answers through out_list; neither allocates.
   clap_event_param_value_t in_events[MAX_EVENTS];
   uint32_t in_count;
+  // The plugin's own bypass parameter, flagged CLAP_PARAM_IS_BYPASS. The
+  // chain's Bypass already takes a plugin out of the chain, so this one is
+  // not offered as a control; the first process call after a load sets it
+  // to "processing", and from then on only the plugin's own editor moves it.
+  bool has_bypass, bypass_reset;
+  clap_id bypass_id;
+  void *bypass_cookie;
   clap_input_events_t in_list;
   clap_output_events_t out_list;
 };
@@ -553,8 +560,15 @@ static bool clap_load(Host *h, char **arguments) {
       return false;
     for (uint32_t i = 0; i < count; ++i) {
       clap_param_info_t info;
-      if (!c->params->get_info(c->plugin, i, &info) ||
-          (info.flags & CLAP_PARAM_IS_HIDDEN))
+      if (!c->params->get_info(c->plugin, i, &info))
+        continue;
+      if ((info.flags & CLAP_PARAM_IS_BYPASS) && !c->has_bypass) {
+        c->has_bypass = c->bypass_reset = true;
+        c->bypass_id = info.id;
+        c->bypass_cookie = info.cookie;
+        continue;
+      }
+      if (info.flags & (CLAP_PARAM_IS_HIDDEN | CLAP_PARAM_IS_BYPASS))
         continue;
       Param *p = &c->records[c->record_count];
       p->id = info.id;
@@ -666,6 +680,21 @@ static void clap_process_audio(Host *h, uint32_t frames, float *const *in,
         .value = desired,
     };
     p->last_sent = desired;
+  }
+  if (c->bypass_reset && c->in_count < MAX_EVENTS) {
+    clap_event_param_value_t *e = &c->in_events[c->in_count++];
+    *e = (clap_event_param_value_t){
+        .header = {sizeof(*e), 0, CLAP_CORE_EVENT_SPACE_ID,
+                   CLAP_EVENT_PARAM_VALUE, 0},
+        .param_id = c->bypass_id,
+        .cookie = c->bypass_cookie,
+        .note_id = -1,
+        .port_index = -1,
+        .channel = -1,
+        .key = -1,
+        .value = 0.0,
+    };
+    c->bypass_reset = false;
   }
   clap_process_t process = {
       .steady_time = c->steady,
@@ -911,8 +940,9 @@ int clap_scan(const char *file) {
     bool first_param = true;
     for (uint32_t p = 0; p < parameters; ++p) {
       clap_param_info_t info;
+      // The plugin's own bypass is left out: the chain has a Bypass of its own.
       if (!params->get_info(plugin, p, &info) ||
-          (info.flags & CLAP_PARAM_IS_HIDDEN))
+          (info.flags & (CLAP_PARAM_IS_HIDDEN | CLAP_PARAM_IS_BYPASS)))
         continue;
       printf("%s{\"id\":%u,\"name\":", first_param ? "" : ",", info.id);
       first_param = false;
