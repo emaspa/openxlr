@@ -2571,11 +2571,8 @@ Selecciona la interfaz que controla OpenXLR</value>
   <data name="EqProfileListName" xml:space="preserve">
     <value>Perfiles de EQ guardados</value>
   </data>
-  <data name="EqProfileLoad" xml:space="preserve">
-    <value>Cargar</value>
-  </data>
-  <data name="EqProfileLoadTip" xml:space="preserve">
-    <value>Pon las bandas del perfil elegido en este micrófono y activa su EQ.</value>
+  <data name="EqProfileListTip" xml:space="preserve">
+    <value>Elige un perfil para poner sus bandas en este micrófono y activar su EQ.</value>
   </data>
   <data name="EqProfileSaveTip" xml:space="preserve">
     <value>Guarda las bandas de este EQ con un nombre, para cargarlas en cualquier micrófono.</value>

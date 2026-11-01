@@ -102,20 +102,16 @@ public partial class EqWindow : Window
             eq.Reset();
     }
 
-    private async void OnProfileLoad(object? sender, RoutedEventArgs e)
-    {
-        if (Profiles is { } profiles) await profiles.Load();
-    }
-
     /// <summary>
-    /// Ask for a name, a chosen saved profile's to start with, and before
-    /// replacing a saved profile of that name. A built-in profile is never
-    /// replaced: a saved one beside it may share its name.
+    /// Ask for a name, starting from the chosen saved profile's or the one
+    /// last picked here, and before replacing a saved profile of that name.
+    /// A built-in profile is never replaced: a saved one beside it may share
+    /// its name.
     /// </summary>
     private async void OnProfileSave(object? sender, RoutedEventArgs e)
     {
         if (Profiles is not { } profiles) return;
-        string? name = await Dialogs.NameAsync(this, Localizer.Text("EqProfileSaveTitle"), profiles.Selected is { Builtin: false } chosen ? chosen.Name : "",
+        string? name = await Dialogs.NameAsync(this, Localizer.Text("EqProfileSaveTitle"), profiles.SaveName,
             Localizer.Format("EqProfileNameHint", EqProfileLibrary.MaximumNameLength), EqProfileLibrary.MaximumNameLength, Localizer.Text("Save"));
         if (name is null || _closed) return;
         bool replace = false;

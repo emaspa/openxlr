@@ -19,6 +19,12 @@ public sealed record EqProfile(string Id, string Name, bool Builtin, IReadOnlyLi
         ? Localizer.Format("EqProfileBuiltInName", MicSetupPreset.NameOf(Id[EqProfileIds.BuiltinPrefix.Length..]) ?? Name)
         : Name;
 
+    /// <summary>What loading the profile puts on a microphone: its bands with the EQ on.</summary>
+    public MicEq Eq => new() { Enabled = true, Bands = Bands };
+
+    /// <summary>The EQ holds this profile, by <see cref="MicEq.Holds"/>: an EQ that is off holds none.</summary>
+    public bool HeldBy(MicEq eq) => eq.Holds(Eq);
+
     public override string ToString() => DisplayName;
 }
 
@@ -169,8 +175,12 @@ public sealed class EqProfileLibrary(IEqProfileCommands commands)
 
 /// <summary>
 /// The profile row of one microphone's EQ editor: the built-in and saved
-/// profiles, the one chosen, and what went wrong last. Every editor lists
-/// from the same library, and a change made in one shows in the others.
+/// profiles, the one the EQ holds, and what went wrong last. Picking a
+/// profile in the list loads it. The list shows the profile the EQ holds
+/// now, so after an edit a pick of the same profile loads it again; the
+/// choices the row makes for itself, as the list or the EQ changes, send
+/// nothing. Every editor lists from the same library, and a change made in
+/// one shows in the others.
 /// </summary>
 public sealed class EqProfilesViewModel : ViewModelBase, IDisposable
 {
@@ -178,9 +188,15 @@ public sealed class EqProfilesViewModel : ViewModelBase, IDisposable
     private readonly EqProfileLibrary _library;
     private IReadOnlyList<EqProfile> _profiles = [];
     private EqProfile? _selected;
+    // The profile last picked or saved here, while it is listed: Save offers a saved one's name.
+    private EqProfile? _picked;
     private string? _error, _fileNote;
-    // A saved profile to choose once the list shows it: the one just saved here.
+    // A saved profile to prefer once the list shows it: the one just saved here.
     private string? _choose;
+    // The row chooses for itself: what the list reports back meanwhile is not a pick.
+    private bool _quiet;
+    // A pick puts its bands on the EQ: the EQ's changes meanwhile are the pick's own.
+    private bool _loading;
     private bool _disposed, _failed;
 
     public EqProfilesViewModel(MicEqViewModel eq, EqProfileLibrary library)
@@ -188,6 +204,7 @@ public sealed class EqProfilesViewModel : ViewModelBase, IDisposable
         _eq = eq;
         _library = library;
         _library.Changed += Refresh;
+        _eq.Changed += Follow;
         Refresh();
     }
 
@@ -198,30 +215,45 @@ public sealed class EqProfilesViewModel : ViewModelBase, IDisposable
 
     public IReadOnlyList<EqProfile> Profiles => _profiles;
 
+    /// <summary>
+    /// The profile chosen in the list: the one the EQ holds, or null for the
+    /// placeholder. Setting a listed profile other than the chosen one is a
+    /// pick and loads it; the list binds here, so that is what choosing in it
+    /// does. The row's own choices go round this setter and send nothing.
+    /// </summary>
     public EqProfile? Selected
     {
         get => _selected;
         set
         {
             if (value is not null && !_profiles.Contains(value)) return;
-            if (!Set(ref _selected, value)) return;
-            Raise(nameof(HasSelection));
-            Raise(nameof(HasSavedSelection));
+            if (_quiet || value is null || Equals(value, _selected))
+            {
+                Choose(value);
+                return;
+            }
+            Choose(value);
+            _ = Load(value);
         }
     }
 
-    /// <summary>A profile is chosen: Load acts on it.</summary>
-    public bool HasSelection => _selected is not null;
-
     /// <summary>A saved profile is chosen: Rename and Delete act on it. A built-in one keeps its name.</summary>
     public bool HasSavedSelection => _selected is { Builtin: false };
+
+    /// <summary>
+    /// The name Save offers: the chosen saved profile's, or else that of the
+    /// profile last picked or saved here when it is a saved one, so picking
+    /// one, changing a band and saving offers to replace it. Empty otherwise:
+    /// a built-in profile is never replaced.
+    /// </summary>
+    public string SaveName => (_selected is { Builtin: false } chosen ? chosen : _picked is { Builtin: false } picked ? picked : null)?.Name ?? "";
 
     /// <summary>Why the last action failed, or why some saved profiles are not listed; null when all is well.</summary>
     public string? Error => _error;
 
     public bool HasError => _error is not null;
 
-    /// <summary>List the library again after it changed, keeping the chosen profile, through a rename made here too.</summary>
+    /// <summary>List the library again after it changed, choosing the profile the EQ holds, a renamed one under its new name.</summary>
     public void Refresh() => Read(keepFailure: false);
 
     /// <summary>
@@ -239,18 +271,65 @@ public sealed class EqProfilesViewModel : ViewModelBase, IDisposable
     {
         if (_disposed) return;
         EqProfile? chosen = _selected;
-        _profiles = _library.Profiles;
-        _fileNote = _library.Problem?.Text;
-        Raise(nameof(Profiles));
-        _selected = null;
-        Selected = (chosen is null ? null : _library.FindId(chosen.Id)
-            ?? (chosen.Builtin || _library.RenamedTo(chosen.Name) is not { } renamed ? null : _library.FindSaved(renamed)))
-            ?? (_choose is null ? null : _library.FindSaved(_choose));
-        if (_selected is not null && _choose is not null && string.Equals(_selected.Name, _choose, StringComparison.OrdinalIgnoreCase)) _choose = null;
-        Raise(nameof(Selected));
-        Raise(nameof(HasSelection));
-        Raise(nameof(HasSavedSelection));
+        bool quiet = _quiet;
+        _quiet = true;
+        try
+        {
+            _profiles = _library.Profiles;
+            _fileNote = _library.Problem?.Text;
+            Raise(nameof(Profiles));
+            EqProfile? saved = _library.FindSaved(_choose);
+            if (saved is not null)
+            {
+                _choose = null;
+                _picked = saved;
+            }
+            else _picked = Relisted(_picked);
+            // The list may have dropped its choice with the old items: tell it again whatever the choice is.
+            _selected = Held(saved, Relisted(chosen));
+            Raise(nameof(Selected));
+            Raise(nameof(HasSavedSelection));
+        }
+        finally { _quiet = quiet; }
         if (!keepFailure || !_failed) Settle();
+    }
+
+    /// <summary>A profile as the list shows it now: by its id, or a saved one renamed from here under its new name; null once it is gone.</summary>
+    private EqProfile? Relisted(EqProfile? profile)
+        => profile is null ? null
+            : _library.FindId(profile.Id)
+                ?? (profile.Builtin || _library.RenamedTo(profile.Name) is not { } renamed ? null : _library.FindSaved(renamed));
+
+    /// <summary>The listed profile the EQ holds now: the first of <paramref name="preferred"/> it holds, else the first in the list; null when it holds none.</summary>
+    private EqProfile? Held(params EqProfile?[] preferred)
+    {
+        MicEq shown = _eq.Current;
+        return preferred.FirstOrDefault(p => p is not null && p.HeldBy(shown)) ?? _profiles.FirstOrDefault(p => p.HeldBy(shown));
+    }
+
+    /// <summary>
+    /// The EQ changed, here or from anywhere else: the list shows the profile
+    /// it holds now, keeping the chosen one while it holds that, and the
+    /// placeholder when it holds none. Nothing is loaded. A comparison keeps
+    /// the switch on, so it keeps the choice too.
+    /// </summary>
+    private void Follow()
+    {
+        if (_disposed || _loading) return;
+        Choose(Held(_selected));
+    }
+
+    /// <summary>Show a choice the row made itself.</summary>
+    private void Choose(EqProfile? value)
+    {
+        bool quiet = _quiet;
+        _quiet = true;
+        try
+        {
+            if (!Set(ref _selected, value, nameof(Selected))) return;
+            Raise(nameof(HasSavedSelection));
+        }
+        finally { _quiet = quiet; }
     }
 
     /// <summary>The listed saved profile with this name, whatever its case.</summary>
@@ -271,37 +350,41 @@ public sealed class EqProfilesViewModel : ViewModelBase, IDisposable
             ?? (Find(name) is { } existing ? replace ? null : Localizer.Format("EqProfileNameExists", existing.Name)
                 : _library.Saved.Count() >= EqProfileLibrary.MaximumProfiles ? Localizer.Format("EqProfileLimit", EqProfileLibrary.MaximumProfiles) : null);
         if (refused is not null) { Fail(refused); return false; }
+        // Kept until a list shows the profile saved, which may come before or after the answer.
         _choose = name;
         string? error = await _library.Commands.SaveEqProfileAsync(name, bands, replace);
         if (error is not null) { _choose = null; Fail(error); return false; }
         if (Find(name) is { } saved)
         {
-            _choose = null;
-            Selected = saved;
+            _picked = saved;
+            Choose(Held(saved, _selected));
         }
         Settle();
         return true;
     }
 
     /// <summary>
-    /// Put the chosen profile's bands on the microphone and switch its EQ on:
+    /// Put a picked profile's bands on the microphone and switch its EQ on:
     /// one <c>loadEqProfile</c>, shown at once. A profile with more or fewer
-    /// bands than this EQ takes is refused here.
+    /// bands than this EQ takes is refused here, and stays chosen with the
+    /// reason until the EQ or the list next changes.
     /// </summary>
-    public async Task<bool> Load()
+    private async Task Load(EqProfile profile)
     {
-        if (_disposed || _selected is not { } profile) return false;
+        if (_disposed) return;
+        _picked = profile;
         EqLimits limits = _eq.Limits;
         if (profile.Bands.Count < limits.MinBands || profile.Bands.Count > limits.MaxBands)
         {
             Fail(Localizer.Format("EqProfileBandCount", profile.DisplayName, profile.Bands.Count, limits.MinBands, limits.MaxBands));
-            return false;
+            return;
         }
-        _eq.ShowLoaded(new MicEq { Enabled = true, Bands = profile.Bands });
+        _loading = true;
+        try { _eq.ShowLoaded(profile.Eq); }
+        finally { _loading = false; }
+        Follow();
         Settle();
-        string? error = await _library.Commands.LoadEqProfileAsync(_eq.Channel, profile.Id);
-        if (error is not null) { Fail(error); return false; }
-        return true;
+        if (await _library.Commands.LoadEqProfileAsync(_eq.Channel, profile.Id) is { } error) Fail(error);
     }
 
     /// <summary>Give a saved profile another name; it stays chosen in every editor. False when it failed.</summary>
@@ -360,5 +443,6 @@ public sealed class EqProfilesViewModel : ViewModelBase, IDisposable
         if (_disposed) return;
         _disposed = true;
         _library.Changed -= Refresh;
+        _eq.Changed -= Follow;
     }
 }

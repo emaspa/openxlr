@@ -2612,11 +2612,8 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
   <data name="EqProfileListName" xml:space="preserve">
     <value>Profili EQ salvati</value>
   </data>
-  <data name="EqProfileLoad" xml:space="preserve">
-    <value>Carica</value>
-  </data>
-  <data name="EqProfileLoadTip" xml:space="preserve">
-    <value>Applica le bande del profilo scelto a questo microfono e accendi il suo EQ.</value>
+  <data name="EqProfileListTip" xml:space="preserve">
+    <value>Scegli un profilo per applicarne le bande a questo microfono e accenderne l'EQ.</value>
   </data>
   <data name="EqProfileSaveTip" xml:space="preserve">
     <value>Salva le bande di questo EQ con un nome, da caricare su qualsiasi microfono.</value>

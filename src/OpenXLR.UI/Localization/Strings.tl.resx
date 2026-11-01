@@ -2548,11 +2548,8 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
   <data name="EqProfileListName" xml:space="preserve">
     <value>Mga naka-save na EQ profile</value>
   </data>
-  <data name="EqProfileLoad" xml:space="preserve">
-    <value>I-load</value>
-  </data>
-  <data name="EqProfileLoadTip" xml:space="preserve">
-    <value>Ilagay ang mga band ng napiling profile sa mikroponong ito at buksan ang EQ nito.</value>
+  <data name="EqProfileListTip" xml:space="preserve">
+    <value>Pumili ng profile para ilagay ang mga band nito sa mikroponong ito at buksan ang EQ nito.</value>
   </data>
   <data name="EqProfileSaveTip" xml:space="preserve">
     <value>I-save ang mga band ng EQ na ito sa isang pangalan, upang i-load sa kahit anong mikropono.</value>

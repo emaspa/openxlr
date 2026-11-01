@@ -12,13 +12,16 @@ namespace OpenXLR.Tests;
 /// The EQ editor's profile row, with no window, against a daemon that keeps
 /// the profiles in its own store: the built-in presets come first, named in
 /// the UI's language and marked as built in, and load but are never renamed
-/// or deleted; a profile saved from one microphone loads on another as one
-/// loadEqProfile, shown at once with the EQ on; names are unique whatever
-/// their case, and a refusal says why in the UI's language before anything
-/// is sent; the daemon's word on a file it cannot read whole shows as the
-/// row's line and keeps every change from being sent; a profile with more
-/// bands than the microphone's EQ takes is refused; every open editor lists
-/// the same profiles and keeps a renamed profile chosen.
+/// or deleted; a profile saved from one microphone loads on another when
+/// picked in the list, as one loadEqProfile, shown at once with the EQ on;
+/// the list shows the profile the EQ holds, from any client, and the choices
+/// it makes itself send nothing; a pick after an edit loads again, and Save
+/// then offers the picked profile's name; names are unique whatever their
+/// case, and a refusal says why in the UI's language before anything is
+/// sent; the daemon's word on a file it cannot read whole shows as the row's
+/// line and keeps every change from being sent; a profile with more bands
+/// than the microphone's EQ takes is refused; every open editor lists the
+/// same profiles and keeps a renamed profile chosen.
 /// </summary>
 [Collection("xdg-config")]
 public sealed class EqProfileTests : IDisposable
@@ -92,9 +95,9 @@ public sealed class EqProfileTests : IDisposable
         public Task SetEqBandAsync(string channel, int band, EqBandChange change) { Sent.Enqueue(("setEqBand", channel, (band, change))); return Task.CompletedTask; }
     }
 
-    private static MicEqViewModel Eq(Daemon daemon, string channel, bool variable = false)
+    private static MicEqViewModel Eq(Daemon daemon, string channel, bool variable = false, ManualTime? time = null)
     {
-        var eq = new MicEqViewModel(daemon, channel, channel, TimeSpan.Zero, new ManualTime()) { ProfileLibrary = daemon.Library };
+        var eq = new MicEqViewModel(daemon, channel, channel, TimeSpan.Zero, time ?? new ManualTime()) { ProfileLibrary = daemon.Library };
         if (variable)
         {
             eq.Apply(JsonNode.Parse("""{"enabled":false,"bands":[],"backend":null,"available":true,"error":null}""")!,
@@ -114,44 +117,52 @@ public sealed class EqProfileTests : IDisposable
     private static IEnumerable<EqProfile> Saved(EqProfilesViewModel profiles) => profiles.Profiles.Where(p => !p.Builtin);
 
     [Fact]
-    public async Task AProfileSavedFromOneMicrophoneLoadsOnAnotherAsOneLoadEqProfileWithTheEqOn()
+    public async Task AProfileSavedFromOneMicrophoneLoadsOnAnotherWhenPickedAsOneLoadEqProfileWithTheEqOn()
     {
         var daemon = new Daemon();
         using MicEqViewModel xlr1 = Eq(daemon, "xlr1"), xlr2 = Eq(daemon, "xlr2");
+        xlr1.Enabled = true;
         xlr1.Bands[1].DragTo(1000, 6);
         xlr1.Bands[3].Enabled = true;
         daemon.Sent.Clear();
         using var saving = new EqProfilesViewModel(xlr1, daemon.Library);
         using var loading = new EqProfilesViewModel(xlr2, daemon.Library);
         Assert.Empty(Saved(saving));
-        Assert.False(saving.HasSelection);
+        Assert.Null(saving.Selected);
+        Assert.Empty(daemon.Sent);
 
+        // The EQ holds what was just saved, so the list shows it.
         Assert.True(await saving.Save("  Podcast  ", replace: false));
         Assert.Equal("Podcast", Assert.Single(Saved(saving)).Name);
         Assert.Equal("Podcast", saving.Selected?.Name);
         Assert.Equal("saved:Podcast", saving.Selected?.Id);
         Assert.True(saving.HasSavedSelection);
         Assert.Null(saving.Error);
-        Assert.True(daemon.Sent.TryDequeue(out var save));
-        Assert.Equal("saveEqProfile", save.Command);
-        // The other editor lists it too, without being asked.
+        Assert.Equal("saveEqProfile", Assert.Single(daemon.Sent).Command);
+        daemon.Sent.Clear();
+        // The other editor lists it too, without being asked, and its EQ holds none of the list.
         EqProfile listed = Assert.Single(Saved(loading));
         Assert.Equal(xlr1.Current.Bands, listed.Bands);
         Assert.Equal("Podcast", listed.DisplayName);
+        Assert.Null(loading.Selected);
+        Assert.Empty(daemon.Sent);
 
-        // Loading off nothing chosen does nothing.
-        Assert.False(await loading.Load());
-        Assert.Empty(daemon.Sent);
+        // Picking it is the load: one loadEqProfile, shown at once with the EQ on.
         loading.Selected = listed;
-        Assert.True(loading.HasSelection);
-        Assert.True(await loading.Load());
-        Assert.True(daemon.Sent.TryDequeue(out var load));
-        Assert.Equal(("loadEqProfile", "xlr2", (object)"saved:Podcast"), load);
-        Assert.Empty(daemon.Sent);
-        // Shown at once, with the EQ on.
+        Assert.Equal(("loadEqProfile", "xlr2", (object)"saved:Podcast"), Assert.Single(daemon.Sent));
+        Assert.Same(listed, loading.Selected);
+        Assert.Null(loading.Error);
         Assert.True(xlr2.Enabled);
         Assert.Equal(1000, xlr2.Bands[1].Frequency);
         Assert.Equal(6, xlr2.Bands[1].Gain);
+        // The same profile again is no pick: a list does not report its own choice.
+        daemon.Sent.Clear();
+        loading.Selected = listed;
+        Assert.Empty(daemon.Sent);
+        // Something not listed is not taken.
+        loading.Selected = listed with { Name = "Other" };
+        Assert.Same(listed, loading.Selected);
+        Assert.Empty(daemon.Sent);
     }
 
     [Fact]
@@ -168,23 +179,140 @@ public sealed class EqProfileTests : IDisposable
             profiles.Profiles.Select(p => p.ToString()));
         // Mic setup's presets, the same table.
         Assert.Equal(MicSetupPresets.All.Select(p => p.Eq.Bands), profiles.Profiles.Take(3).Select(p => p.Bands), new BandsComparer());
+        // Saved with the EQ off: an EQ that is off holds no profile, so the list stays on its placeholder.
+        Assert.Null(profiles.Selected);
 
         EqProfile warm = profiles.Profiles[1];
+        daemon.Sent.Clear();
         profiles.Selected = warm;
-        Assert.True(profiles.HasSelection);
+        Assert.Equal(("loadEqProfile", "guest", (object)"builtin:warm"), Assert.Single(daemon.Sent));
+        Assert.True(MicSetupPresets.Warm.Holds(eq.Current, eq.Limits));
+        Assert.Same(warm, profiles.Selected);
         Assert.False(profiles.HasSavedSelection);
+        Assert.Equal("", profiles.SaveName);
         daemon.Sent.Clear();
         Assert.False(await profiles.Rename(warm, "Hot"));
         Assert.False(await profiles.Delete(warm));
         Assert.Empty(daemon.Sent);
-        Assert.True(await profiles.Load());
-        Assert.Equal(("loadEqProfile", "guest", (object)"builtin:warm"), Assert.Single(daemon.Sent));
-        Assert.True(MicSetupPresets.Warm.Holds(eq.Current, eq.Limits));
 
-        // A saved profile may share a built-in one's name; both stay listed.
+        // A saved profile may share a built-in one's name; both stay listed, and the one just saved is chosen.
         Assert.True(await profiles.Save("Warm", false));
         Assert.Equal(2, profiles.Profiles.Count(p => p.Name == "Warm"));
         Assert.Equal("saved:Warm", profiles.Selected?.Id);
+        Assert.Equal("Warm", profiles.SaveName);
+    }
+
+    /// <summary>A channel's <c>eq</c> as the daemon reports it, on and with these bands.</summary>
+    private static JsonNode Report(IReadOnlyList<EqBand> bands, bool enabled = true)
+        => JsonNode.Parse(JsonSerializer.Serialize(new { enabled, bands, backend = "software", available = true, error = (string?)null }, Web))!;
+
+    [Fact]
+    public async Task TheListShowsTheProfileTheEqHoldsAndItsOwnChoicesSendNothing()
+    {
+        var daemon = new Daemon();
+        var time = new ManualTime();
+        using MicEqViewModel eq = Eq(daemon, "xlr1", time: time);
+        IReadOnlyList<EqBand> warm = EqPresets.Warm.Eq.Bands, broadcast = EqPresets.Broadcast.Eq.Bands;
+        // Opened on an EQ that holds a profile: that profile is chosen.
+        eq.Apply(Report(broadcast), null);
+        using var profiles = new EqProfilesViewModel(eq, daemon.Library);
+        Assert.Equal("builtin:broadcast", profiles.Selected?.Id);
+        Assert.Empty(daemon.Sent);
+
+        // A load from elsewhere (the deck, another client): the list follows, and sends nothing.
+        eq.Apply(Report(warm), null);
+        Assert.Equal("builtin:warm", profiles.Selected?.Id);
+        Assert.Empty(daemon.Sent);
+
+        // An edit here leaves the profile: the list goes back to its placeholder and only the edit is sent.
+        eq.Bands[1].SetGain(5);
+        Assert.Null(profiles.Selected);
+        Assert.False(profiles.HasSavedSelection);
+        Assert.All(daemon.Sent, s => Assert.Equal("setEqBand", s.Command));
+        daemon.Sent.Clear();
+        time.Advance(MicEqViewModel.EchoWait);
+
+        // Another client puts Warm back, then edits a band itself.
+        eq.Apply(Report(warm), null);
+        Assert.Equal("builtin:warm", profiles.Selected?.Id);
+        eq.Apply(Report([.. warm.Select((b, i) => i == 2 ? b with { Frequency = 3100 } : b)]), null);
+        Assert.Null(profiles.Selected);
+        // A value that came back a little off the grid still counts.
+        eq.Apply(Report([.. warm.Select((b, i) => i == 0 ? b with { Frequency = b.Frequency + 0.25 } : b)]), null);
+        Assert.Equal("builtin:warm", profiles.Selected?.Id);
+
+        // A comparison keeps the choice; the switch off clears it, and on again the profile is back.
+        eq.Comparing = true;
+        Assert.Equal("builtin:warm", profiles.Selected?.Id);
+        eq.Comparing = false;
+        eq.Enabled = false;
+        Assert.Null(profiles.Selected);
+        eq.Enabled = true;
+        Assert.Equal("builtin:warm", profiles.Selected?.Id);
+        // A whole EQ put on here, as Paste does without the shared clipboard, and Reset: the list follows.
+        eq.Replace(new MicEq { Enabled = true, Bands = broadcast });
+        Assert.Equal("builtin:broadcast", profiles.Selected?.Id);
+        eq.Reset();
+        Assert.Null(profiles.Selected);
+        Assert.DoesNotContain(daemon.Sent, s => s.Command == "loadEqProfile");
+
+        // A refresh of the list, for a change any client made, keeps what the EQ holds and loads nothing.
+        eq.Replace(new MicEq { Enabled = true, Bands = broadcast });
+        daemon.Sent.Clear();
+        Store.Save("Elsewhere", [new StoreBand { Enabled = true, Frequency = 500 }]);
+        daemon.Push();
+        await daemon.ListEqProfilesAsync();
+        profiles.Reread();
+        Assert.Equal("builtin:broadcast", profiles.Selected?.Id);
+        Assert.Equal(4, profiles.Profiles.Count);
+        Assert.Empty(daemon.Sent);
+    }
+
+    [Fact]
+    public async Task APickAfterAnEditLoadsAgainAndSaveOffersThePickedName()
+    {
+        var daemon = new Daemon();
+        using MicEqViewModel eq = Eq(daemon, "xlr1");
+        using var profiles = new EqProfilesViewModel(eq, daemon.Library);
+        eq.Enabled = true;
+        Assert.True(await profiles.Save("Voice", false));
+        eq.Bands[0].SetFrequency(80);
+        Assert.Null(profiles.Selected);
+        Assert.True(await profiles.Save("Music", false));
+        Assert.Equal("Music", profiles.Selected?.Name);
+        daemon.Sent.Clear();
+
+        // Pick Voice: it loads once and stays chosen.
+        EqProfile voice = profiles.Find("Voice")!;
+        profiles.Selected = voice;
+        Assert.Equal(("loadEqProfile", "xlr1", (object)"saved:Voice"), Assert.Single(daemon.Sent));
+        Assert.Same(voice, profiles.Selected);
+        Assert.Equal(36, eq.Bands[0].Frequency);
+        Assert.Equal("Voice", profiles.SaveName);
+        daemon.Sent.Clear();
+
+        // A tweak clears the choice, and Save offers to replace the profile it started from.
+        eq.Bands[1].SetGain(4);
+        Assert.Null(profiles.Selected);
+        Assert.Equal("Voice", profiles.SaveName);
+        // Picking Voice again loads it again.
+        daemon.Sent.Clear();
+        profiles.Selected = voice;
+        Assert.Equal(("loadEqProfile", "xlr1", (object)"saved:Voice"), Assert.Single(daemon.Sent));
+        Assert.Same(voice, profiles.Selected);
+        Assert.Equal(0, eq.Bands[1].Gain);
+
+        // A built-in pick is not offered for replacing.
+        daemon.Sent.Clear();
+        profiles.Selected = profiles.Profiles[0];
+        Assert.Equal("builtin:clear", Assert.Single(daemon.Sent).Value);
+        eq.Bands[1].SetGain(4);
+        Assert.Equal("", profiles.SaveName);
+
+        // What the daemon refuses shows as the line.
+        daemon.Refuse = "loadEqProfile: the microphone is gone";
+        profiles.Selected = voice;
+        Assert.Equal("loadEqProfile: the microphone is gone", profiles.Error);
     }
 
     private sealed class BandsComparer : IEqualityComparer<IReadOnlyList<EqBand>>
@@ -221,11 +349,16 @@ public sealed class EqProfileTests : IDisposable
         Assert.Equal(80, profiles.Find("VOICE")!.Bands[0].Frequency);
 
         // Rename: in place, a change of case alone, never onto another name.
-        // Another editor that had it chosen keeps it chosen under the new name.
-        var other = new EqProfilesViewModel(eq, daemon.Library);
+        // Another editor that had it chosen keeps it chosen under the new name, and loads nothing for it.
+        using MicEqViewModel eq2 = Eq(daemon, "xlr2");
+        var other = new EqProfilesViewModel(eq2, daemon.Library);
         other.Selected = other.Find("Music");
+        Assert.Equal("Music", other.Selected?.Name);
+        daemon.Sent.Clear();
         Assert.True(await profiles.Rename(profiles.Find("Music")!, "Singing"));
         Assert.Equal("Singing", other.Selected?.Name);
+        Assert.Equal("Singing", other.SaveName);
+        Assert.Equal("renameEqProfile", Assert.Single(daemon.Sent).Command);
         other.Dispose();
         Assert.Equal(["voice", "Singing", "Bright"], Saved(profiles).Select(p => p.Name));
         Assert.True(await profiles.Rename(profiles.Find("voice")!, "Voice"));
@@ -278,8 +411,9 @@ public sealed class EqProfileTests : IDisposable
         Assert.Equal(note, profiles.Error);
         // The good one still loads.
         profiles.Selected = profiles.Find("Good");
-        Assert.True(await profiles.Load());
-        Assert.True(daemon.Sent.TryDequeue(out _));
+        Assert.True(daemon.Sent.TryDequeue(out var load));
+        Assert.Equal("loadEqProfile", load.Command);
+        Assert.Equal("Good", profiles.Selected?.Name);
         Assert.Equal(note, profiles.Error);
         // Nothing is asked of the daemon while the file holds the entry.
         Assert.False(await profiles.Save("New", false));
@@ -318,18 +452,20 @@ public sealed class EqProfileTests : IDisposable
         // An older daemon's EQ takes four bands and no other count.
         using MicEqViewModel fixedEq = Eq(daemon, "xlr1");
         using var loading = new EqProfilesViewModel(fixedEq, daemon.Library);
-        loading.Selected = loading.Find("Six");
         daemon.Sent.Clear();
-        Assert.False(await loading.Load());
+        loading.Selected = loading.Find("Six");
         Assert.Equal(Localizer.Format("EqProfileBandCount", "Six", 6, 4, 4), loading.Error);
         Assert.Empty(daemon.Sent);
-        // The editor coming forward keeps the line; a change to the list clears it.
+        // The editor coming forward keeps the line and the pick; a change to the list clears both,
+        // since the EQ does not hold that profile.
         loading.Reread();
         Assert.Equal(Localizer.Format("EqProfileBandCount", "Six", 6, 4, 4), loading.Error);
         Assert.Equal("Six", loading.Selected?.Name);
         Assert.True(await saving.Save("Other", false));
         Assert.Null(loading.Error);
+        Assert.Null(loading.Selected);
         Assert.Equal(4, fixedEq.Bands.Count);
+        Assert.DoesNotContain(daemon.Sent, s => s.Command == "loadEqProfile");
     }
 
     [Fact]

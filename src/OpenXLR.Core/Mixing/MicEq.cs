@@ -136,6 +136,27 @@ public sealed record MicEq
     public static MicEq Snap(MicEq eq) => eq with { Bands = [.. eq.Bands.Select(Snap)] };
 
     /// <summary>
+    /// This EQ holds <paramref name="target"/>: the same switch and band
+    /// count, and every band with the target's switch and type and its values
+    /// within half a step of the grid, so a value that came back through the
+    /// daemon still counts.
+    /// </summary>
+    public bool Holds(MicEq target)
+    {
+        if (Enabled != target.Enabled || Bands.Count != target.Bands.Count) return false;
+        for (int i = 0; i < Bands.Count; i++)
+        {
+            EqBand a = Bands[i], b = target.Bands[i];
+            if (a.Enabled != b.Enabled || a.Type != b.Type
+                || Math.Abs(a.Frequency - b.Frequency) >= FrequencyStep / 2
+                || Math.Abs(a.Gain - b.Gain) >= GainStep / 2
+                || Math.Abs(QLog10(a.Q) - QLog10(b.Q)) >= QLog10Step / 2)
+                return false;
+        }
+        return true;
+    }
+
+    /// <summary>
     /// Why a band cannot be taken, or null. Values outside a range are refused,
     /// never clamped. The reason is protocol text, so its numbers are written
     /// the same way whatever the daemon's locale ("0.1", never "0,1").

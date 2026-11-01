@@ -2548,11 +2548,8 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
   <data name="EqProfileListName" xml:space="preserve">
     <value>Mga na-save nga EQ profile</value>
   </data>
-  <data name="EqProfileLoad" xml:space="preserve">
-    <value>I-load</value>
-  </data>
-  <data name="EqProfileLoadTip" xml:space="preserve">
-    <value>Ibutang ang mga band sa napiling profile niining mikropono ug i-on ang EQ niini.</value>
+  <data name="EqProfileListTip" xml:space="preserve">
+    <value>Pagpili og profile aron ibutang ang mga band niini niining mikropono ug i-on ang EQ niini.</value>
   </data>
   <data name="EqProfileSaveTip" xml:space="preserve">
     <value>I-save ang mga band niining EQ ubos sa usa ka ngalan, aron i-load sa bisan unsang mikropono.</value>
