@@ -40,8 +40,9 @@
 
     <!-- The footer: where the EQ runs while the microphone is on a unit that can
          run it, why the unit does not, and what runs it now. -->
-    <!-- Saved EQ profiles: the bands under a name, to load on any microphone.
-         The row has its own model, set by the window, over the same file in every editor. -->
+    <!-- EQ profiles: the built-in ones first, marked as built in, then the saved ones,
+         each a set of bands to load on any microphone. The row has its own model, set by
+         the window, over the daemon's list that every editor shares. -->
     <StackPanel Grid.Row="1" Name="EqProfileRow" x:DataType="vm:EqProfilesViewModel" Margin="0,0,0,8" Spacing="4">
       <WrapPanel Name="EqProfileActions" ItemSpacing="6" LineSpacing="4">
         <TextBlock Name="EqProfileLabel" Text="{loc:Text Key=EqProfileLabel}" VerticalAlignment="Center"/>
@@ -51,9 +52,9 @@
         <Button Name="EqProfileLoad" Content="{loc:Text Key=EqProfileLoad}" Click="OnProfileLoad" IsEnabled="{Binding HasSelection}"
                 ToolTip.Tip="{loc:Text Key=EqProfileLoadTip}"/>
         <Button Name="EqProfileSave" Content="{loc:Text Key=Save}" Click="OnProfileSave" ToolTip.Tip="{loc:Text Key=EqProfileSaveTip}"/>
-        <Button Name="EqProfileRename" Content="{loc:Text Key=Rename}" Click="OnProfileRename" IsEnabled="{Binding HasSelection}"
+        <Button Name="EqProfileRename" Content="{loc:Text Key=Rename}" Click="OnProfileRename" IsEnabled="{Binding HasSavedSelection}"
                 ToolTip.Tip="{loc:Text Key=EqProfileRenameTip}"/>
-        <Button Name="EqProfileDelete" Content="{loc:Text Key=Delete}" Click="OnProfileDelete" IsEnabled="{Binding HasSelection}"
+        <Button Name="EqProfileDelete" Content="{loc:Text Key=Delete}" Click="OnProfileDelete" IsEnabled="{Binding HasSavedSelection}"
                 ToolTip.Tip="{loc:Text Key=EqProfileDeleteTip}"/>
       </WrapPanel>
       <TextBlock Name="EqProfileError" Text="{Binding Error}" IsVisible="{Binding HasError}" Classes="hint warn" TextWrapping="Wrap"/>

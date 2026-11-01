@@ -10,7 +10,7 @@ namespace OpenXLR.UI;
 /// <summary>
 /// One microphone's EQ editor. Closing it ends a comparison, so the EQ is
 /// never left bypassed by a window that is gone. Its profile row has a model
-/// of its own over the saved profiles, made for the EQ the editor shows.
+/// of its own over the daemon's EQ profiles, made for the EQ the editor shows.
 /// </summary>
 public partial class EqWindow : Window
 {
@@ -29,12 +29,14 @@ public partial class EqWindow : Window
         };
         SizeChanged += (_, e) => Classes.Set("narrow", e.NewSize.Width < NarrowWidth);
         Opened += (_, _) => Dispatcher.UIThread.Post(FitBands, DispatcherPriority.Loaded);
-        // The file may have been edited by hand meanwhile: read it again when the editor comes forward.
+        // The file may have been edited by hand meanwhile: the daemon reads it again when the editor comes forward.
         Activated += (_, _) => Profiles?.Reread();
         DataContextChanged += (_, _) =>
         {
             Profiles?.Dispose();
-            ProfileRow.DataContext = DataContext is MicEqViewModel eq && !_closed ? new EqProfilesViewModel(eq) : null;
+            ProfileRow.DataContext = DataContext is MicEqViewModel { ProfileLibrary: { } library } eq && !_closed
+                ? new EqProfilesViewModel(eq, library) : null;
+            ProfileRow.IsVisible = ProfileRow.DataContext is not null;
         };
     }
 
@@ -75,7 +77,7 @@ public partial class EqWindow : Window
         else Height = Math.Ceiling(wanted);
     }
 
-    /// <summary>The saved profiles as this editor lists them; null before it has an EQ.</summary>
+    /// <summary>The EQ profiles as this editor lists them; null before it has an EQ.</summary>
     public EqProfilesViewModel? Profiles => ProfileRow.DataContext as EqProfilesViewModel;
 
     private void OnProcessOnUnit(object? sender, RoutedEventArgs e) => (DataContext as MicEqViewModel)?.ChooseProcessing("device");
@@ -100,14 +102,21 @@ public partial class EqWindow : Window
             eq.Reset();
     }
 
-    private void OnProfileLoad(object? sender, RoutedEventArgs e) => Profiles?.Load();
+    private async void OnProfileLoad(object? sender, RoutedEventArgs e)
+    {
+        if (Profiles is { } profiles) await profiles.Load();
+    }
 
-    /// <summary>Ask for a name, the chosen profile's to start with, and before replacing a profile of that name.</summary>
+    /// <summary>
+    /// Ask for a name, a chosen saved profile's to start with, and before
+    /// replacing a saved profile of that name. A built-in profile is never
+    /// replaced: a saved one beside it may share its name.
+    /// </summary>
     private async void OnProfileSave(object? sender, RoutedEventArgs e)
     {
         if (Profiles is not { } profiles) return;
-        string? name = await Dialogs.NameAsync(this, Localizer.Text("EqProfileSaveTitle"), profiles.Selected?.Name ?? "",
-            Localizer.Format("EqProfileNameHint", EqProfiles.MaximumNameLength), EqProfiles.MaximumNameLength, Localizer.Text("Save"));
+        string? name = await Dialogs.NameAsync(this, Localizer.Text("EqProfileSaveTitle"), profiles.Selected is { Builtin: false } chosen ? chosen.Name : "",
+            Localizer.Format("EqProfileNameHint", EqProfileLibrary.MaximumNameLength), EqProfileLibrary.MaximumNameLength, Localizer.Text("Save"));
         if (name is null || _closed) return;
         bool replace = false;
         if (profiles.Find(name) is { } existing)
@@ -117,23 +126,23 @@ public partial class EqWindow : Window
                 return;
             replace = true;
         }
-        profiles.Save(name, replace);
+        await profiles.Save(name, replace);
     }
 
     private async void OnProfileRename(object? sender, RoutedEventArgs e)
     {
-        if (Profiles is not { Selected: { } profile } profiles) return;
+        if (Profiles is not { Selected: { Builtin: false } profile } profiles) return;
         string? name = await Dialogs.NameAsync(this, Localizer.Format("EqProfileRenameTitle", profile.Name), profile.Name,
-            Localizer.Format("EqProfileNameHint", EqProfiles.MaximumNameLength), EqProfiles.MaximumNameLength);
+            Localizer.Format("EqProfileNameHint", EqProfileLibrary.MaximumNameLength), EqProfileLibrary.MaximumNameLength);
         if (name is null || _closed || name == profile.Name) return;
-        profiles.Rename(profile, name);
+        await profiles.Rename(profile, name);
     }
 
     private async void OnProfileDelete(object? sender, RoutedEventArgs e)
     {
-        if (Profiles is not { Selected: { } profile } profiles) return;
+        if (Profiles is not { Selected: { Builtin: false } profile } profiles) return;
         if (await Dialogs.ConfirmAsync(this, Localizer.Text("EqProfileDeleteTitle"), Localizer.Format("EqProfileDeleteConfirm", profile.Name),
                 Localizer.Text("Delete")) && !_closed)
-            profiles.Delete(profile);
+            await profiles.Delete(profile);
     }
 }

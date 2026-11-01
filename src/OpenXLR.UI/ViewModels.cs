@@ -76,6 +76,7 @@ public sealed partial class MainViewModel : ViewModelBase
                 ResetAppRouting();
                 Soundboard.Reset();
                 VoiceChanger.Reset();
+                _client.EqProfiles.Reset();
                 Inserts.ResetForNewConnection(); Inserts2.ResetForNewConnection();
                 foreach (MixViewModel mv in Mixes) mv.Inserts.ResetForNewConnection();
                 foreach (ChannelViewModel channel in Channels) channel.Inserts?.ResetForNewConnection();
@@ -897,6 +898,7 @@ public sealed partial class MainViewModel : ViewModelBase
     private void Apply(JsonNode node)
     {
         _applying = true;
+        _client.EqProfiles.Apply(node);
         DaemonWarning = node["warning"]?.GetValue<string>() ?? "";
         MixerWaiting = node["mixerWaiting"]?.GetValue<bool>() ?? false;
         try
@@ -1933,7 +1935,7 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
             }
             return;
         }
-        if (_eq is null) Eq = new MicEqViewModel(_client, Id, Name);
+        if (_eq is null) Eq = new MicEqViewModel(_client, Id, Name) { ProfileLibrary = _client.EqProfiles };
         _eq!.Apply(eq, limits);
     }
 

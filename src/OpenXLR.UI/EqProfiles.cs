@@ -1,276 +1,200 @@
 using OpenXLR.UI.Localization;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Threading.Tasks;
 
 namespace OpenXLR.UI;
 
 /// <summary>
-/// A saved microphone EQ: a name and its bands, as <c>setEq</c> carries
-/// them. It holds no channel and no switch, so it loads on any microphone.
+/// A microphone EQ profile as the daemon lists it: a built-in one, named
+/// from its key in the UI's language, or a saved one, named as saved. It
+/// holds no channel and no switch, so it loads on any microphone.
 /// </summary>
-public sealed record EqProfile(string Name, IReadOnlyList<EqBand> Bands)
+public sealed record EqProfile(string Id, string Name, bool Builtin, IReadOnlyList<EqBand> Bands)
 {
-    public override string ToString() => Name;
-}
+    /// <summary>The name the list shows: a built-in profile's in the UI's language and marked as built in.</summary>
+    public string DisplayName => Builtin
+        ? Localizer.Format("EqProfileBuiltInName", MicSetupPreset.NameOf(Id[EqProfileIds.BuiltinPrefix.Length..]) ?? Name)
+        : Name;
 
-/// <summary>What the profile file holds: the profiles that read, and how many entries did not.</summary>
-public sealed record EqProfileList(IReadOnlyList<EqProfile> Profiles, int Unreadable)
-{
-    public static EqProfileList Empty { get; } = new([], 0);
+    public override string ToString() => DisplayName;
 }
 
 /// <summary>
-/// The saved EQ profiles: one private, bounded file the UI writes whole,
-/// beside the effect presets. An entry that does not read is left out of the
-/// list and the file is not written while it holds one, so a hand edit is
-/// never lost to a save. Values outside the daemon's ranges are held to them
-/// and snapped to its steps on the way in, so what loads is what the daemon
-/// takes.
+/// Why the saved profiles are not all listed, as the daemon reports it:
+/// <c>unreadable</c> entries, a <c>damaged</c> or <c>tooLarge</c> file, or
+/// one that <c>failed</c> to read, with the daemon's own sentence.
 /// </summary>
-public static class EqProfiles
+public sealed record EqProfileProblem(string Reason, int Count, string Path, string Message)
+{
+    /// <summary>The problem in the UI's language.</summary>
+    public string Text => Reason switch
+    {
+        "unreadable" => Localizer.Format("EqProfileFileUnreadable", Count, Path),
+        "damaged" => Localizer.Format("EqProfileFileDamaged", Path),
+        "tooLarge" => Localizer.Format("EqProfileFileTooLarge", Path),
+        _ => Message,
+    };
+}
+
+/// <summary>The EQ profile commands the editors send. The daemon client sends them; a test records them.</summary>
+public interface IEqProfileCommands
+{
+    /// <summary>Save bands under a name, in place of a saved profile of that name when <paramref name="replace"/>; null or the daemon's refusal.</summary>
+    Task<string?> SaveEqProfileAsync(string name, IReadOnlyList<EqBand> bands, bool replace);
+    Task<string?> RenameEqProfileAsync(string name, string newName);
+    Task<string?> DeleteEqProfileAsync(string name);
+    /// <summary>Put a profile's bands on a microphone with its EQ on.</summary>
+    Task<string?> LoadEqProfileAsync(string channel, string profile);
+    /// <summary>Ask the daemon to read the profile file again, for a hand edit.</summary>
+    Task ListEqProfilesAsync();
+}
+
+/// <summary>
+/// The EQ profiles the daemon lists, as this UI last heard them, and the
+/// commands that change them. Every open editor lists from here, so a change
+/// any client makes shows in all of them with the state that follows it.
+/// </summary>
+public sealed class EqProfileLibrary(IEqProfileCommands commands)
 {
     public const int MaximumProfiles = 64;
     public const int MaximumNameLength = 80;
-    internal const int MaximumFileBytes = 1024 * 1024;
-    private const int Version = 1;
 
-    private static readonly object Gate = new();
-    private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
+    private string? _seen;
+    // Renames sent from here, old name to new, so a profile chosen in any editor stays
+    // chosen. One is kept until a list shows it done, or the daemon refused it: the state
+    // and the command's answer may arrive in either order.
+    private readonly Dictionary<string, string> _renames = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>The file, under the configuration folder.</summary>
-    public static string FilePath => OpenXlrPaths.ConfigFile("eq-profiles.json");
+    public IEqProfileCommands Commands { get; } = commands;
 
-    /// <summary>Raised after the file changed here, so every open editor lists the same profiles.</summary>
-    public static event Action? Changed;
+    /// <summary>Built-in profiles first, then the saved ones in the daemon's order.</summary>
+    public IReadOnlyList<EqProfile> Profiles { get; private set; } = [];
 
-    /// <summary>Raised before <see cref="Changed"/> when a profile is renamed: its old name, then its new one.</summary>
-    public static event Action<string, string>? Renamed;
+    public EqProfileProblem? Problem { get; private set; }
 
-    /// <summary>The failures the store reports; each becomes the editor's error line.</summary>
-    internal static bool IsFailure(Exception ex) => ex is IOException or InvalidDataException or UnauthorizedAccessException;
+    /// <summary>Raised on the UI thread when the list or the problem changed.</summary>
+    public event Action? Changed;
 
     public static bool ValidName(string? name)
         => name is { Length: > 0 and <= MaximumNameLength } && !string.IsNullOrWhiteSpace(name) && !name.Any(char.IsControl);
 
-    /// <summary>
-    /// Read the file. No file is no profiles. A file that is not a profile
-    /// list at all throws <see cref="InvalidDataException"/>; one entry that
-    /// does not read is counted in <see cref="EqProfileList.Unreadable"/>.
-    /// </summary>
-    public static EqProfileList Read()
+    /// <summary>The saved profiles, without the built-in ones.</summary>
+    public IEnumerable<EqProfile> Saved => Profiles.Where(p => !p.Builtin);
+
+    /// <summary>Take <c>eqProfiles</c> and <c>eqProfileProblem</c> from a state push; a state like the last one changes nothing.</summary>
+    public void Apply(JsonNode? state)
     {
-        lock (Gate)
-        {
-            if (!File.Exists(FilePath)) return EqProfileList.Empty;
-            RegularFile.Require(FilePath);
-            byte[] bytes;
-            using (var file = File.OpenRead(FilePath))
-            {
-                if (file.Length > MaximumFileBytes) throw new InvalidDataException(Localizer.Format("EqProfileFileTooLarge", FilePath));
-                bytes = new byte[checked((int)file.Length)];
-                file.ReadExactly(bytes);
-                if (file.ReadByte() != -1) throw new IOException(Localizer.Format("EqProfileFileChanged", FilePath));
-            }
-            return Parse(bytes);
-        }
-    }
-
-    /// <summary>Read a profile file's bytes; see <see cref="Read"/>.</summary>
-    internal static EqProfileList Parse(ReadOnlyMemory<byte> utf8)
-    {
-        JsonDocument document;
-        try { document = JsonDocument.Parse(utf8, new JsonDocumentOptions { AllowDuplicateProperties = false, MaxDepth = 16 }); }
-        catch (JsonException) { throw Damaged(); }
-        using (document)
-        {
-            JsonElement root = document.RootElement;
-            if (root.ValueKind != JsonValueKind.Object
-                || !root.TryGetProperty("version", out JsonElement version) || version.ValueKind != JsonValueKind.Number
-                || !version.TryGetInt32(out int number) || number != Version
-                || !root.TryGetProperty("profiles", out JsonElement entries) || entries.ValueKind != JsonValueKind.Array
-                || entries.GetArrayLength() > MaximumProfiles)
-                throw Damaged();
-            var profiles = new List<EqProfile>();
-            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            int unreadable = 0;
-            foreach (JsonElement entry in entries.EnumerateArray())
-            {
-                if (ReadProfile(entry) is { } profile && names.Add(profile.Name)) profiles.Add(profile);
-                else unreadable++;
-            }
-            return new(profiles, unreadable);
-        }
-    }
-
-    private static InvalidDataException Damaged() => new(Localizer.Format("EqProfileFileDamaged", FilePath));
-
-    private static EqProfile? ReadProfile(JsonElement entry)
-    {
-        if (entry.ValueKind != JsonValueKind.Object
-            || !entry.TryGetProperty("name", out JsonElement name) || name.ValueKind != JsonValueKind.String
-            || name.GetString()?.Trim() is not { } text || !ValidName(text)
-            || !entry.TryGetProperty("bands", out JsonElement bands) || bands.ValueKind != JsonValueKind.Array
-            || bands.GetArrayLength() is < MicEq.MinimumBands or > MicEq.MaximumBands)
-            return null;
-        var read = new List<EqBand>();
-        foreach (JsonElement band in bands.EnumerateArray())
-        {
-            if (ReadBand(band) is not { } value) return null;
-            read.Add(value);
-        }
-        return new(text, read);
-    }
-
-    /// <summary>
-    /// One band with every field, its type one the daemon knows. Numbers
-    /// outside the daemon's ranges are held to them and snapped to its steps.
-    /// </summary>
-    internal static EqBand? ReadBand(JsonElement band)
-    {
-        if (band.ValueKind != JsonValueKind.Object
-            || !band.TryGetProperty("enabled", out JsonElement on) || on.ValueKind is not (JsonValueKind.True or JsonValueKind.False)
-            || !band.TryGetProperty("type", out JsonElement type) || type.ValueKind != JsonValueKind.String
-            || MicEq.TypeIndex(type.GetString()) < 0
-            || Number(band, "frequency") is not double frequency
-            || Number(band, "gain") is not double gain
-            || Number(band, "q") is not double q)
-            return null;
-        return Clamp(new EqBand { Enabled = on.GetBoolean(), Type = type.GetString()!, Frequency = frequency, Gain = gain, Q = q });
-
-        static double? Number(JsonElement band, string name)
-            => band.TryGetProperty(name, out JsonElement value) && value.ValueKind == JsonValueKind.Number
-                && value.TryGetDouble(out double number) && double.IsFinite(number) ? number : null;
-    }
-
-    /// <summary>A band held to the daemon's ranges and snapped to its steps.</summary>
-    internal static EqBand Clamp(EqBand band) => MicEq.Snap(band with
-    {
-        Frequency = Math.Clamp(band.Frequency, MicEq.MinFrequency, MicEq.MaxFrequency),
-        Gain = Math.Clamp(band.Gain, MicEq.MinGain, MicEq.MaxGain),
-        Q = Math.Clamp(band.Q, MicEq.MinQ, MicEq.MaxQ),
-    });
-
-    /// <summary>
-    /// Save bands under a name. A name already saved is refused unless
-    /// <paramref name="replace"/>, which puts the new bands in its place.
-    /// </summary>
-    public static EqProfile Save(string name, IReadOnlyList<EqBand> bands, bool replace = false)
-    {
-        name = name.Trim();
-        if (!ValidName(name)) throw new InvalidDataException(Localizer.Format("EqProfileNameRule", MaximumNameLength));
-        if (bands.Count is < MicEq.MinimumBands or > MicEq.MaximumBands || bands.Any(b => MicEq.Check(b) is not null))
-            throw new InvalidDataException(Localizer.Text("EqProfileBandsInvalid"));
-        var profile = new EqProfile(name, [.. bands.Select(Clamp)]);
-        lock (Gate)
-        {
-            List<EqProfile> profiles = Writable();
-            int index = profiles.FindIndex(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
-            if (index >= 0 && !replace) throw new InvalidDataException(Localizer.Format("EqProfileNameExists", profiles[index].Name));
-            if (index >= 0) profiles[index] = profile;
-            else
-            {
-                if (profiles.Count >= MaximumProfiles) throw new InvalidDataException(Localizer.Format("EqProfileLimit", MaximumProfiles));
-                profiles.Add(profile);
-            }
-            Write(profiles);
-        }
+        JsonNode? list = state?["eqProfiles"], problem = state?["eqProfileProblem"];
+        string seen = (list?.ToJsonString() ?? "null") + "|" + (problem?.ToJsonString() ?? "null");
+        if (seen == _seen) return;
+        _seen = seen;
+        Profiles = list is JsonArray entries ? [.. entries.Select(ReadProfile).OfType<EqProfile>()] : [];
+        Problem = ReadProblem(problem);
         Changed?.Invoke();
-        return profile;
+        foreach ((string old, string renamed) in _renames.ToArray())
+            if (FindSaved(old) is null && FindSaved(renamed) is not null) _renames.Remove(old);
     }
 
-    /// <summary>Give a profile another name; a change of case alone is a rename too.</summary>
-    public static EqProfile Rename(string name, string newName)
+    /// <summary>Forget the list when the daemon goes away.</summary>
+    public void Reset()
     {
-        newName = newName.Trim();
-        if (!ValidName(newName)) throw new InvalidDataException(Localizer.Format("EqProfileNameRule", MaximumNameLength));
-        EqProfile renamed;
-        lock (Gate)
-        {
-            List<EqProfile> profiles = Writable();
-            int index = profiles.FindIndex(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
-            if (index < 0) throw new InvalidDataException(Localizer.Format("EqProfileMissing", name));
-            if (profiles.Where((_, i) => i != index).Any(p => string.Equals(p.Name, newName, StringComparison.OrdinalIgnoreCase)))
-                throw new InvalidDataException(Localizer.Format("EqProfileNameExists", newName));
-            renamed = profiles[index] with { Name = newName };
-            name = profiles[index].Name;
-            profiles[index] = renamed;
-            Write(profiles);
-        }
-        Renamed?.Invoke(name, newName);
-        Changed?.Invoke();
-        return renamed;
-    }
-
-    public static void Delete(string name)
-    {
-        lock (Gate)
-        {
-            List<EqProfile> profiles = Writable();
-            if (profiles.RemoveAll(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)) == 0)
-                throw new InvalidDataException(Localizer.Format("EqProfileMissing", name));
-            Write(profiles);
-        }
+        _seen = null;
+        Profiles = [];
+        Problem = null;
         Changed?.Invoke();
     }
 
-    /// <summary>The profiles to change, refused while the file holds an entry that does not read.</summary>
-    private static List<EqProfile> Writable()
+    private static EqProfile? ReadProfile(JsonNode? node)
     {
-        EqProfileList list = Read();
-        if (list.Unreadable > 0) throw new InvalidDataException(Localizer.Format("EqProfileFileUnreadable", list.Unreadable, FilePath));
-        return [.. list.Profiles];
+        try
+        {
+            if (node?["id"]?.GetValue<string>() is not { } id || node["name"]?.GetValue<string>() is not { } name
+                || node["bands"] is not JsonArray bands || bands.Count is < MicEq.MinimumBands or > MicEq.MaximumBands)
+                return null;
+            bool builtin = node["builtin"]?.GetValue<bool>() ?? false;
+            if (!id.StartsWith(builtin ? EqProfileIds.BuiltinPrefix : EqProfileIds.SavedPrefix, StringComparison.Ordinal)) return null;
+            var read = new List<EqBand>();
+            foreach (JsonNode? band in bands)
+            {
+                if (band is null) return null;
+                var value = new EqBand
+                {
+                    Enabled = band["enabled"]!.GetValue<bool>(),
+                    Type = band["type"]!.GetValue<string>(),
+                    Frequency = band["frequency"]!.GetValue<double>(),
+                    Gain = band["gain"]!.GetValue<double>(),
+                    Q = band["q"]!.GetValue<double>(),
+                };
+                if (MicEq.Check(value) is not null) return null;
+                read.Add(value);
+            }
+            return new(id, name, builtin, read);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or FormatException or NullReferenceException) { return null; }
     }
 
-    private static void Write(IReadOnlyList<EqProfile> profiles)
+    private static EqProfileProblem? ReadProblem(JsonNode? node)
     {
-        var document = new
+        try
         {
-            version = Version,
-            profiles = profiles.Select(p => new
-            {
-                name = p.Name,
-                bands = p.Bands.Select(b => new { enabled = b.Enabled, type = b.Type, frequency = b.Frequency, gain = b.Gain, q = b.Q }),
-            }),
-        };
-        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(document, Json);
-        if (bytes.Length > MaximumFileBytes) throw new InvalidDataException(Localizer.Format("EqProfileFileTooLarge", FilePath));
-        OpenXlrPaths.WriteAtomic(FilePath, bytes);
+            return node?["reason"]?.GetValue<string>() is { } reason
+                ? new(reason, node["count"]?.GetValue<int>() ?? 0, node["path"]?.GetValue<string>() ?? "", node["message"]?.GetValue<string>() ?? reason)
+                : null;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or FormatException) { return null; }
+    }
+
+    /// <summary>The saved profile with this name, whatever its case.</summary>
+    public EqProfile? FindSaved(string? name)
+        => name is null ? null : Saved.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+
+    public EqProfile? FindId(string? id) => id is null ? null : Profiles.FirstOrDefault(p => p.Id == id);
+
+    /// <summary>The name a saved profile was renamed to from here, or null.</summary>
+    internal string? RenamedTo(string name) => _renames.GetValueOrDefault(name);
+
+    internal async Task<string?> RenameAsync(string name, string newName)
+    {
+        _renames[name] = newName;
+        string? error = await Commands.RenameEqProfileAsync(name, newName);
+        if (error is not null || FindSaved(name) is null) _renames.Remove(name);
+        // Every editor settles on what is listed now, chosen profile and all.
+        Changed?.Invoke();
+        return error;
     }
 }
 
 /// <summary>
-/// The profile row of one microphone's EQ editor: the saved profiles, the
-/// one chosen, and what went wrong last. Every editor lists the same file,
-/// and a change made in one shows in the others.
+/// The profile row of one microphone's EQ editor: the built-in and saved
+/// profiles, the one chosen, and what went wrong last. Every editor lists
+/// from the same library, and a change made in one shows in the others.
 /// </summary>
 public sealed class EqProfilesViewModel : ViewModelBase, IDisposable
 {
     private readonly MicEqViewModel _eq;
+    private readonly EqProfileLibrary _library;
     private IReadOnlyList<EqProfile> _profiles = [];
     private EqProfile? _selected;
     private string? _error, _fileNote;
+    // A saved profile to choose once the list shows it: the one just saved here.
+    private string? _choose;
     private bool _disposed, _failed;
 
-    public EqProfilesViewModel(MicEqViewModel eq)
+    public EqProfilesViewModel(MicEqViewModel eq, EqProfileLibrary library)
     {
         _eq = eq;
-        EqProfiles.Changed += Refresh;
-        EqProfiles.Renamed += OnRenamed;
+        _library = library;
+        _library.Changed += Refresh;
         Refresh();
-    }
-
-    /// <summary>A profile chosen here was renamed, here or in another editor: it stays chosen under its new name.</summary>
-    private void OnRenamed(string name, string newName)
-    {
-        if (_selected is { } chosen && string.Equals(chosen.Name, name, StringComparison.OrdinalIgnoreCase))
-            _selected = chosen with { Name = newName };
     }
 
     /// <summary>The EQ the profiles load onto.</summary>
     public MicEqViewModel Eq => _eq;
+
+    public EqProfileLibrary Library => _library;
 
     public IReadOnlyList<EqProfile> Profiles => _profiles;
 
@@ -282,116 +206,138 @@ public sealed class EqProfilesViewModel : ViewModelBase, IDisposable
             if (value is not null && !_profiles.Contains(value)) return;
             if (!Set(ref _selected, value)) return;
             Raise(nameof(HasSelection));
+            Raise(nameof(HasSavedSelection));
         }
     }
 
-    /// <summary>A profile is chosen: Load, Rename and Delete act on it.</summary>
+    /// <summary>A profile is chosen: Load acts on it.</summary>
     public bool HasSelection => _selected is not null;
+
+    /// <summary>A saved profile is chosen: Rename and Delete act on it. A built-in one keeps its name.</summary>
+    public bool HasSavedSelection => _selected is { Builtin: false };
 
     /// <summary>Why the last action failed, or why some saved profiles are not listed; null when all is well.</summary>
     public string? Error => _error;
 
     public bool HasError => _error is not null;
 
-    /// <summary>Read the file again after it changed here, keeping the chosen profile by name.</summary>
+    /// <summary>List the library again after it changed, keeping the chosen profile, through a rename made here too.</summary>
     public void Refresh() => Read(keepFailure: false);
 
     /// <summary>
-    /// Read the file again in case it was edited by hand, as the editor comes
-    /// forward; a failure still on show stays, since closing its dialog brings
-    /// the editor forward too.
+    /// Ask the daemon to read the file again in case it was edited by hand,
+    /// as the editor comes forward; a failure still on show stays, since
+    /// closing its dialog brings the editor forward too.
     /// </summary>
-    public void Reread() => Read(keepFailure: true);
+    public void Reread()
+    {
+        if (_disposed) return;
+        _ = _library.Commands.ListEqProfilesAsync();
+    }
 
     private void Read(bool keepFailure)
     {
         if (_disposed) return;
-        string? chosen = _selected?.Name;
-        try
-        {
-            EqProfileList list = EqProfiles.Read();
-            _profiles = list.Profiles;
-            _fileNote = list.Unreadable > 0 ? Localizer.Format("EqProfileFileUnreadable", list.Unreadable, EqProfiles.FilePath) : null;
-        }
-        catch (Exception ex) when (EqProfiles.IsFailure(ex))
-        {
-            _profiles = [];
-            _fileNote = ex.Message;
-        }
+        EqProfile? chosen = _selected;
+        _profiles = _library.Profiles;
+        _fileNote = _library.Problem?.Text;
         Raise(nameof(Profiles));
         _selected = null;
-        Selected = Find(chosen);
+        Selected = (chosen is null ? null : _library.FindId(chosen.Id)
+            ?? (chosen.Builtin || _library.RenamedTo(chosen.Name) is not { } renamed ? null : _library.FindSaved(renamed)))
+            ?? (_choose is null ? null : _library.FindSaved(_choose));
+        if (_selected is not null && _choose is not null && string.Equals(_selected.Name, _choose, StringComparison.OrdinalIgnoreCase)) _choose = null;
         Raise(nameof(Selected));
         Raise(nameof(HasSelection));
+        Raise(nameof(HasSavedSelection));
         if (!keepFailure || !_failed) Settle();
     }
 
-    /// <summary>The listed profile with this name, whatever its case.</summary>
-    public EqProfile? Find(string? name)
-        => name is null ? null : _profiles.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+    /// <summary>The listed saved profile with this name, whatever its case.</summary>
+    public EqProfile? Find(string? name) => _library.FindSaved(name);
 
-    /// <summary>Save the EQ's bands as shown under a name, replacing a profile of that name when asked to. False when it failed.</summary>
-    public bool Save(string name, bool replace)
+    /// <summary>Why the file cannot take a change now, or null: the daemon writes no file it could not read whole.</summary>
+    private string? Unwritable => _library.Problem is { Reason: not "failed" } ? _fileNote : null;
+
+    /// <summary>Save the EQ's bands as shown under a name, replacing a saved profile of that name when asked to. False when it failed.</summary>
+    public async Task<bool> Save(string name, bool replace)
     {
         if (_disposed) return false;
-        try
+        name = name.Trim();
+        IReadOnlyList<EqBand> bands = _eq.Current.Bands;
+        string? refused = !EqProfileLibrary.ValidName(name) ? Localizer.Format("EqProfileNameRule", EqProfileLibrary.MaximumNameLength)
+            : bands.Count is < MicEq.MinimumBands or > MicEq.MaximumBands || bands.Any(b => MicEq.Check(b) is not null) ? Localizer.Text("EqProfileBandsInvalid")
+            : Unwritable
+            ?? (Find(name) is { } existing ? replace ? null : Localizer.Format("EqProfileNameExists", existing.Name)
+                : _library.Saved.Count() >= EqProfileLibrary.MaximumProfiles ? Localizer.Format("EqProfileLimit", EqProfileLibrary.MaximumProfiles) : null);
+        if (refused is not null) { Fail(refused); return false; }
+        _choose = name;
+        string? error = await _library.Commands.SaveEqProfileAsync(name, bands, replace);
+        if (error is not null) { _choose = null; Fail(error); return false; }
+        if (Find(name) is { } saved)
         {
-            EqProfile saved = EqProfiles.Save(name, _eq.Current.Bands, replace);
-            Selected = Find(saved.Name);
-            Settle();
-            return true;
+            _choose = null;
+            Selected = saved;
         }
-        catch (Exception ex) when (EqProfiles.IsFailure(ex)) { Fail(ex.Message); return false; }
+        Settle();
+        return true;
     }
 
     /// <summary>
     /// Put the chosen profile's bands on the microphone and switch its EQ on:
-    /// one <c>setEq</c>. A profile with more or fewer bands than this EQ takes is refused.
+    /// one <c>loadEqProfile</c>, shown at once. A profile with more or fewer
+    /// bands than this EQ takes is refused here.
     /// </summary>
-    public bool Load()
+    public async Task<bool> Load()
     {
         if (_disposed || _selected is not { } profile) return false;
         EqLimits limits = _eq.Limits;
         if (profile.Bands.Count < limits.MinBands || profile.Bands.Count > limits.MaxBands)
         {
-            Fail(Localizer.Format("EqProfileBandCount", profile.Name, profile.Bands.Count, limits.MinBands, limits.MaxBands));
+            Fail(Localizer.Format("EqProfileBandCount", profile.DisplayName, profile.Bands.Count, limits.MinBands, limits.MaxBands));
             return false;
         }
-        _eq.Replace(new MicEq { Enabled = true, Bands = profile.Bands });
+        _eq.ShowLoaded(new MicEq { Enabled = true, Bands = profile.Bands });
+        Settle();
+        string? error = await _library.Commands.LoadEqProfileAsync(_eq.Channel, profile.Id);
+        if (error is not null) { Fail(error); return false; }
+        return true;
+    }
+
+    /// <summary>Give a saved profile another name; it stays chosen in every editor. False when it failed.</summary>
+    public async Task<bool> Rename(EqProfile profile, string newName)
+    {
+        if (_disposed || profile.Builtin) return false;
+        newName = newName.Trim();
+        string? refused = !EqProfileLibrary.ValidName(newName) ? Localizer.Format("EqProfileNameRule", EqProfileLibrary.MaximumNameLength)
+            : Find(profile.Name) is null ? Localizer.Format("EqProfileMissing", profile.Name)
+            : Unwritable
+            ?? (_library.Saved.Any(p => !string.Equals(p.Name, profile.Name, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(p.Name, newName, StringComparison.OrdinalIgnoreCase))
+                ? Localizer.Format("EqProfileNameExists", newName) : null);
+        if (refused is not null) { Fail(refused); return false; }
+        string? error = await _library.RenameAsync(profile.Name, newName);
+        if (error is not null) { Fail(error); return false; }
         Settle();
         return true;
     }
 
-    /// <summary>Give a profile another name; it stays chosen. False when it failed.</summary>
-    public bool Rename(EqProfile profile, string newName)
+    /// <summary>Delete a saved profile. False when it failed.</summary>
+    public async Task<bool> Delete(EqProfile profile)
     {
-        if (_disposed) return false;
-        try
-        {
-            EqProfile renamed = EqProfiles.Rename(profile.Name, newName);
-            Selected = Find(renamed.Name);
-            Settle();
-            return true;
-        }
-        catch (Exception ex) when (EqProfiles.IsFailure(ex)) { Fail(ex.Message); return false; }
-    }
-
-    /// <summary>Delete a profile. False when it failed.</summary>
-    public bool Delete(EqProfile profile)
-    {
-        if (_disposed) return false;
-        try
-        {
-            EqProfiles.Delete(profile.Name);
-            Settle();
-            return true;
-        }
-        catch (Exception ex) when (EqProfiles.IsFailure(ex)) { Fail(ex.Message); return false; }
+        if (_disposed || profile.Builtin) return false;
+        string? refused = Find(profile.Name) is null ? Localizer.Format("EqProfileMissing", profile.Name) : Unwritable;
+        if (refused is not null) { Fail(refused); return false; }
+        string? error = await _library.Commands.DeleteEqProfileAsync(profile.Name);
+        if (error is not null) { Fail(error); return false; }
+        Settle();
+        return true;
     }
 
     /// <summary>Show why an action failed, until the next one.</summary>
     private void Fail(string error)
     {
+        if (_disposed) return;
         _failed = true;
         Show(error);
     }
@@ -413,7 +359,6 @@ public sealed class EqProfilesViewModel : ViewModelBase, IDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        EqProfiles.Changed -= Refresh;
-        EqProfiles.Renamed -= OnRenamed;
+        _library.Changed -= Refresh;
     }
 }

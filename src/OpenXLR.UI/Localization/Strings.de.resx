@@ -2640,14 +2640,14 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="EqProfileFileTooLarge" xml:space="preserve">
     <value>{0} ist größer als 1 MiB und wurde nicht gelesen.</value>
   </data>
-  <data name="EqProfileFileChanged" xml:space="preserve">
-    <value>{0} hat sich beim Lesen geändert. Versuche es noch einmal.</value>
-  </data>
   <data name="EqProfileFileDamaged" xml:space="preserve">
     <value>{0} ist keine EQ-Profildatei, die OpenXLR lesen kann. Korrigiere oder verschiebe sie; OpenXLR überschreibt sie nicht.</value>
   </data>
   <data name="EqProfileFileUnreadable" xml:space="preserve">
     <value>Einige Profile in {1} ließen sich nicht lesen ({0}) und werden nicht aufgeführt. Bis sie korrigiert oder entfernt sind, speichert OpenXLR keine Änderungen an der Datei.</value>
+  </data>
+  <data name="EqProfileBuiltInName" xml:space="preserve">
+    <value>{0} (mitgeliefert)</value>
   </data>
   <data name="EqColumnOn" xml:space="preserve">
     <value>An</value>

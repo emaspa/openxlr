@@ -2672,14 +2672,14 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
   <data name="EqProfileFileTooLarge" xml:space="preserve">
     <value>{0} supera 1 MiB e non è stato letto.</value>
   </data>
-  <data name="EqProfileFileChanged" xml:space="preserve">
-    <value>{0} è cambiato durante la lettura. Riprova.</value>
-  </data>
   <data name="EqProfileFileDamaged" xml:space="preserve">
     <value>{0} non è un file di profili EQ che OpenXLR sa leggere. Correggilo o spostalo; OpenXLR non lo sovrascrive.</value>
   </data>
   <data name="EqProfileFileUnreadable" xml:space="preserve">
     <value>Alcuni profili in {1} non si sono potuti leggere ({0}) e non sono elencati. Finché non vengono corretti o rimossi, OpenXLR non salva modifiche al file.</value>
+  </data>
+  <data name="EqProfileBuiltInName" xml:space="preserve">
+    <value>{0} (integrato)</value>
   </data>
   <data name="EqColumnOn" xml:space="preserve">
     <value>Attiva</value>
