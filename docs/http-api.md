@@ -151,6 +151,15 @@ own DSP runs the EQ, `eq.backend` reads `device` and `eq.device` names the unit;
 EQ to this computer and `"value":"device"` back to the unit (see
 [where the EQ runs](api.md#where-the-eq-runs)).
 
+[EQ profiles](api.md#eq-profiles) load the same way from any client.
+`GET /api/v1/state` lists them in `eqProfiles`, the built-in ones first;
+`{"cmd":"loadEqProfile","channel":"xlr1","profile":"builtin:warm"}` puts
+the Warm preset on XLR 1 with its EQ on, and
+`{"cmd":"loadEqProfile","channel":"xlr1","profile":"saved:Podcast"}` a
+saved one. `saveEqProfile` with a `name` and the `bands` of a `setEq`
+saves one, and `renameEqProfile` and `deleteEqProfile` change the saved
+ones.
+
 [Noise removal](api.md#noise-removal) takes one command, with any of its
 three fields:
 `{"cmd":"setNoiseRemoval","channel":"xlr1","enabled":true,"engine":"deepfilternet","strength":30}`

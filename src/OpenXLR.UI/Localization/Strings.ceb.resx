@@ -2608,14 +2608,14 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
   <data name="EqProfileFileTooLarge" xml:space="preserve">
     <value>Ang {0} mas dako sa 1 MiB ug wala kini basaha.</value>
   </data>
-  <data name="EqProfileFileChanged" xml:space="preserve">
-    <value>Nausab ang {0} samtang gibasa. Sulayi pag-usab.</value>
-  </data>
   <data name="EqProfileFileDamaged" xml:space="preserve">
     <value>Ang {0} dili EQ profile file nga mabasa sa OpenXLR. Ayoha o ibalhin kini; dili kini sapawan sa OpenXLR.</value>
   </data>
   <data name="EqProfileFileUnreadable" xml:space="preserve">
     <value>Adunay mga profile sa {1} nga wala mabasa ({0}) ug wala malista. Hangtod dili kini maayo o makuha, walay usab nga i-save sa OpenXLR sa file.</value>
+  </data>
+  <data name="EqProfileBuiltInName" xml:space="preserve">
+    <value>{0} (kauban)</value>
   </data>
   <data name="EqColumnOn" xml:space="preserve">
     <value>On</value>

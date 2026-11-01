@@ -16,7 +16,7 @@ namespace OpenXLR.UI;
 /// <see cref="StateReceived"/> for every pushed state. State is handed over as a
 /// JsonNode so the UI can bind to it without duplicating the daemon's records.
 /// </summary>
-public sealed class DaemonClient : IAsyncDisposable, IEqCommands, INoiseCommands, IVoiceCommands, IDynamicsCommands, IDuckingCommands, ISoundboardCommands
+public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileCommands, INoiseCommands, IVoiceCommands, IDynamicsCommands, IDuckingCommands, ISoundboardCommands
 {
     private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
@@ -60,7 +60,11 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, INoiseCommands
     {
         _uri = url is null ? null : new Uri(url);
         _probe = probe ?? (url is null ? token => DaemonProbe.ProbeAsync(cancel: token) : null);
+        EqProfiles = new EqProfileLibrary(this);
     }
+
+    /// <summary>The daemon's EQ profiles as the window last heard them; the window keeps it up to date on its own thread.</summary>
+    public EqProfileLibrary EqProfiles { get; }
 
     private volatile int _presence = (int)DaemonPresence.NotRunning;
 
@@ -490,6 +494,28 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, INoiseCommands
                 }).ToArray(),
             },
         });
+
+    public Task<string?> SaveEqProfileAsync(string name, IReadOnlyList<EqBand> bands, bool replace)
+        => EditLayoutAsync(new Dictionary<string, object>
+        {
+            ["cmd"] = "saveEqProfile", ["name"] = name, ["replace"] = replace,
+            ["bands"] = bands.Select(b => new Dictionary<string, object>
+            {
+                ["enabled"] = b.Enabled, ["type"] = b.Type, ["frequency"] = b.Frequency, ["gain"] = b.Gain, ["q"] = b.Q,
+            }).ToArray(),
+        });
+
+    public Task<string?> RenameEqProfileAsync(string name, string newName)
+        => EditLayoutAsync(new Dictionary<string, object> { ["cmd"] = "renameEqProfile", ["name"] = name, ["newName"] = newName });
+
+    public Task<string?> DeleteEqProfileAsync(string name)
+        => EditLayoutAsync(new Dictionary<string, object> { ["cmd"] = "deleteEqProfile", ["name"] = name });
+
+    public Task<string?> LoadEqProfileAsync(string channel, string profile)
+        => EditLayoutAsync(new Dictionary<string, object> { ["cmd"] = "loadEqProfile", ["channel"] = channel, ["profile"] = profile });
+
+    public Task ListEqProfilesAsync()
+        => SendAsync(new Dictionary<string, object> { ["cmd"] = "listEqProfiles" }, reportErrors: false);
 
     /// <summary>A microphone EQ's own switch.</summary>
     public Task SetEqEnabledAsync(string channel, bool enabled)

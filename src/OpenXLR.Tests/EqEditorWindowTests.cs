@@ -34,8 +34,9 @@ namespace OpenXLR.Tests;
 /// pointer sends setEqBand with snapped values at most every 20 ms and the
 /// editor then shows what the daemon reports; the wheel, the keyboard, a
 /// double click and the type menu each send their one change; the switch and
-/// the comparison send setEqEnabled; paste, reset and loading a saved profile
-/// send setEq, and saving, renaming and deleting profiles send nothing; the footer's
+/// the comparison send setEqEnabled; paste and reset send setEq, a profile
+/// loads with loadEqProfile, and saving, renaming and deleting a saved one send
+/// their own command, the built-in profiles listed first; the footer's
 /// switch between the unit and software sends setEqProcessing; and nothing
 /// else goes out. A state without an EQ draws no button. Run on its own,
 /// with OPENXLR_TEST_EQ=1 under xvfb-run, so the window layout run keeps
@@ -45,6 +46,8 @@ namespace OpenXLR.Tests;
 public sealed class EqEditorWindowTests
 {
     private static readonly string[] EqCommands = ["setEq", "setEqEnabled", "setEqBand", "setEqProcessing"];
+    private static readonly string[] ProfileCommands = ["saveEqProfile", "renameEqProfile", "deleteEqProfile", "loadEqProfile", "listEqProfiles"];
+    private static readonly System.Text.Json.JsonSerializerOptions Web = new(System.Text.Json.JsonSerializerDefaults.Web);
 
     /// <summary>A Wave XLR Pro with XLR 1 and XLR 2, each with an EQ the daemon's own model keeps.</summary>
     private sealed class EqDaemon
@@ -104,6 +107,10 @@ public sealed class EqEditorWindowTests
                     state["mixer"]!["eqLimits"]!["minBands"] = 1;
                     state["mixer"]!["eqLimits"]!["maxBands"] = 16;
                 }
+                // The daemon's EQ profiles, from its own store.
+                OpenXLR.Core.Mixing.EqProfilesState profiles = OpenXLR.Core.Mixing.EqProfileStore.State();
+                state["eqProfiles"] = JsonNode.Parse(System.Text.Json.JsonSerializer.Serialize(profiles.Profiles, Web));
+                state["eqProfileProblem"] = JsonNode.Parse(System.Text.Json.JsonSerializer.Serialize(profiles.Problem, Web));
                 state["type"] = "state";
                 state["daemonVersion"] = AppVersion.Current;
                 return state;
@@ -136,11 +143,12 @@ public sealed class EqEditorWindowTests
             },
         };
 
-        /// <summary>Take a command as the daemon does: checked, snapped, kept.</summary>
-        public void Handle(JsonNode cmd)
+        /// <summary>Take a command as the daemon does: checked, snapped, kept. Null, or why it was refused.</summary>
+        public string? Handle(JsonNode cmd)
         {
             string name = cmd["cmd"]!.GetValue<string>();
-            if (!EqCommands.Contains(name)) return;
+            if (ProfileCommands.Contains(name)) return HandleProfile(name, cmd);
+            if (!EqCommands.Contains(name)) return null;
             string channel = cmd["channel"]!.GetValue<string>();
             lock (_gate)
             {
@@ -169,6 +177,40 @@ public sealed class EqEditorWindowTests
                         break;
                 }
             }
+            return null;
+        }
+
+        /// <summary>The EQ profile commands, on the daemon's own store; a load becomes the setEq it is.</summary>
+        private string? HandleProfile(string name, JsonNode cmd)
+        {
+            try
+            {
+                switch (name)
+                {
+                    case "saveEqProfile":
+                        var bands = DaemonEq.Read(System.Text.Json.JsonDocument.Parse(
+                            new JsonObject { ["enabled"] = true, ["bands"] = cmd["bands"]!.DeepClone() }.ToJsonString()).RootElement, out string? error)
+                            ?? throw new InvalidOperationException(error);
+                        OpenXLR.Core.Mixing.EqProfileStore.Save(cmd["name"]!.GetValue<string>(), bands.Bands, cmd["replace"]?.GetValue<bool>() == true);
+                        return null;
+                    case "renameEqProfile":
+                        OpenXLR.Core.Mixing.EqProfileStore.Rename(cmd["name"]!.GetValue<string>(), cmd["newName"]!.GetValue<string>());
+                        return null;
+                    case "deleteEqProfile":
+                        OpenXLR.Core.Mixing.EqProfileStore.Delete(cmd["name"]!.GetValue<string>());
+                        return null;
+                    case "listEqProfiles":
+                        OpenXLR.Core.Mixing.EqProfileStore.State(reread: true);
+                        return null;
+                    default:
+                        var load = new OpenXLR.Daemon.Command { Cmd = name, Channel = cmd["channel"]!.GetValue<string>(), Profile = cmd["profile"]!.GetValue<string>() };
+                        OpenXLR.Daemon.Command setEq = OpenXLR.Daemon.MixerService.ProfileEq(load, OpenXLR.Core.Mixing.EqLimits.Instance, out string? refused)
+                            ?? throw new InvalidDataException(refused);
+                        lock (_gate) Eqs[load.Channel!] = DaemonEq.Read(setEq.Eq, out _)!;
+                        return null;
+                }
+            }
+            catch (Exception ex) when (OpenXLR.Core.Mixing.EqProfileStore.IsFailure(ex)) { return $"{name}: {ex.Message}"; }
         }
     }
 
@@ -259,11 +301,18 @@ public sealed class EqEditorWindowTests
                     await Send(new { type = "plugins", plugins = Array.Empty<object>() });
                     continue;
                 }
+                // An editor coming forward asks for the profiles read again; a read, not a change.
+                if (name == "listEqProfiles")
+                {
+                    daemon.Handle(cmd);
+                    await Send(daemon.State());
+                    continue;
+                }
                 daemon.Commands.Enqueue((clock.ElapsedMilliseconds, cmd));
-                daemon.Handle(cmd);
+                string? refused = daemon.Handle(cmd);
                 await Send(daemon.State());
                 if (cmd["requestId"] is { } requestId)
-                    await Send(new { type = "commandResult", requestId = requestId.GetValue<string>(), error = (string?)null });
+                    await Send(new { type = "commandResult", requestId = requestId.GetValue<string>(), error = refused });
             }
         });
 
@@ -1155,20 +1204,24 @@ public sealed class EqEditorWindowTests
     }
 
     /// <summary>
-    /// Saved profiles through the editors' own buttons and dialogs: Save on
-    /// XLR 1 asks for a name and writes the file, and XLR 2's editor lists the
-    /// profile at once; Load there sends one setEq to XLR 2 with XLR 1's bands
-    /// and the EQ on; saving under a name in use asks before replacing it;
-    /// Rename and Delete ask and act on the chosen profile in both editors. A
-    /// damaged file shows its line under the row, wrapped inside the editor,
-    /// and stays as it was. The row fits from 640 to 2400 pixels in both
-    /// sizings and at 640 in every language.
+    /// EQ profiles through the editors' own buttons and dialogs, against the
+    /// daemon's store: the built-in profiles come first in both editors, named
+    /// in the UI's language and marked as built in; one loads on XLR 2 with
+    /// loadEqProfile and cannot be renamed or deleted. Save on XLR 1 asks for
+    /// a name and sends saveEqProfile, and XLR 2's editor lists the profile at
+    /// once; Load there sends loadEqProfile and XLR 2 takes XLR 1's bands with
+    /// the EQ on; saving under a name in use asks before replacing it; Rename
+    /// and Delete ask and act on the chosen profile in both editors. A file the
+    /// daemon cannot read whole shows its line under the row, wrapped inside
+    /// the editor, and nothing is sent. The row fits from 640 to 2400 pixels in
+    /// both sizings and at 640 in every language.
     /// </summary>
     private static async Task Profiles(EqWindow first, EqWindow second, EqDaemon daemon, MicEqViewModel eq1, MicEqViewModel eq2)
     {
-        if (File.Exists(EqProfiles.FilePath)) File.Delete(EqProfiles.FilePath);
-        foreach (EqWindow editor in new[] { first, second }) editor.Profiles!.Refresh();
-        Pump(20);
+        string path = OpenXLR.Core.Mixing.EqProfileStore.FilePath;
+        if (File.Exists(path)) File.Delete(path);
+        foreach (EqWindow editor in new[] { first, second }) editor.Profiles!.Reread();
+        await Until(() => first.Profiles!.Profiles.Count == 3 && second.Profiles!.Profiles.Count == 3);
         CheckProfileRow(first, "profiles");
         ComboBox list1 = first.FindControl<ComboBox>("EqProfileList")!, list2 = second.FindControl<ComboBox>("EqProfileList")!;
         Assert.Equal(Localizer.Text("EqProfileChoose"), list1.PlaceholderText);
@@ -1179,41 +1232,67 @@ public sealed class EqEditorWindowTests
         Assert.Equal(Localizer.Text("Save"), first.FindControl<Button>("EqProfileSave")!.Content);
         Assert.Equal(Localizer.Text("EqProfileLoad"), first.FindControl<Button>("EqProfileLoad")!.Content);
 
-        // Save on XLR 1: the dialog asks for a name and the file holds the bands as shown.
+        // The built-in profiles: Mic setup's presets, first, in the UI's language and marked as built in.
+        Assert.Equal(["builtin:clear", "builtin:warm", "builtin:broadcast"], first.Profiles!.Profiles.Select(p => p.Id));
+        Assert.Equal(MicSetupPresets.All.Select(p => Localizer.Format("EqProfileBuiltInName", p.Name)),
+            list1.Items.Cast<EqProfile>().Select(p => p.ToString()));
+        list2.SelectedItem = second.Profiles!.Profiles[2];
+        Pump(20);
+        Assert.Contains(Localizer.Format("EqProfileBuiltInName", MicSetupPresets.Broadcast.Name),
+            list2.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible).Select(t => t.Text));
+        Assert.True(second.FindControl<Button>("EqProfileLoad")!.IsEnabled);
+        Assert.False(second.FindControl<Button>("EqProfileRename")!.IsEnabled);
+        Assert.False(second.FindControl<Button>("EqProfileDelete")!.IsEnabled);
+        Capture(second, "eq-editor-profile-builtin");
         daemon.Commands.Clear();
+        Click(second.FindControl<Button>("EqProfileLoad")!);
+        JsonNode sent = (await Sent(daemon, 1))[0];
+        Assert.Equal("loadEqProfile", sent["cmd"]!.GetValue<string>());
+        Assert.Equal("xlr2", sent["channel"]!.GetValue<string>());
+        Assert.Equal("builtin:broadcast", sent["profile"]!.GetValue<string>());
+        await Until(() => daemon.Eqs["xlr2"].Equals(OpenXLR.Core.Mixing.EqPresets.Broadcast.Eq));
+        await Until(() => MicSetupPresets.Broadcast.Holds(eq2.Current, eq2.Limits));
+        Assert.Null(second.Profiles!.Error);
+
+        // Save on XLR 1: the dialog asks for a name and the daemon keeps the bands as shown.
         Click(first.FindControl<Button>("EqProfileSave")!);
         Window dialog = await Dialog(first);
         Assert.Equal(Localizer.Text("EqProfileSaveTitle"), dialog.Title);
         TextBox input = dialog.GetVisualDescendants().OfType<TextBox>().Single();
         Assert.Equal("", input.Text);
-        Assert.Equal(EqProfiles.MaximumNameLength, input.MaxLength);
+        Assert.Equal(EqProfileLibrary.MaximumNameLength, input.MaxLength);
         Capture(dialog, "eq-profile-save-dialog");
         input.Text = "Podcast";
         Button ok = dialog.GetVisualDescendants().OfType<Button>().Single(b => b.IsDefault);
         Assert.Equal(Localizer.Text("Save"), ok.Content);
         Click(ok);
-        await Until(() => first.Profiles!.Profiles.Count == 1);
-        EqProfile saved = first.Profiles!.Profiles[0];
+        sent = (await Sent(daemon, 1))[0];
+        Assert.Equal("saveEqProfile", sent["cmd"]!.GetValue<string>());
+        Assert.Equal("Podcast", sent["name"]!.GetValue<string>());
+        Assert.False(sent["replace"]!.GetValue<bool>());
+        await Until(() => first.Profiles!.Profiles.Count == 4 && first.Profiles.Selected is { Builtin: false });
+        EqProfile saved = first.Profiles!.Profiles[3];
         Assert.Equal("Podcast", saved.Name);
+        Assert.Equal("saved:Podcast", saved.Id);
         Assert.Equal(eq1.Current.Bands, saved.Bands);
         Assert.Same(saved, list1.SelectedItem);
         Assert.True(first.FindControl<Button>("EqProfileLoad")!.IsEnabled);
-        // XLR 2's editor lists it, nothing chosen there.
-        Assert.Single(second.Profiles!.Profiles);
-        Assert.Null(list2.SelectedItem);
-        Assert.Empty(daemon.Commands);
+        Assert.True(first.FindControl<Button>("EqProfileRename")!.IsEnabled);
+        // XLR 2's editor lists it and keeps its own choice.
+        Assert.Equal(4, second.Profiles!.Profiles.Count);
+        Assert.Equal("builtin:broadcast", ((EqProfile)list2.SelectedItem!).Id);
 
-        // Load on XLR 2: one setEq with XLR 1's bands and the EQ on.
-        list2.SelectedItem = second.Profiles!.Profiles[0];
+        // Load on XLR 2: one loadEqProfile, and XLR 2 takes XLR 1's bands with the EQ on.
+        list2.SelectedItem = second.Profiles!.Profiles[3];
         Pump(20);
         Assert.True(second.FindControl<Button>("EqProfileLoad")!.IsEnabled);
         Click(second.FindControl<Button>("EqProfileLoad")!);
-        JsonNode sent = (await Sent(daemon, 1))[0];
-        Assert.Equal("setEq", sent["cmd"]!.GetValue<string>());
+        sent = (await Sent(daemon, 1))[0];
+        Assert.Equal("loadEqProfile", sent["cmd"]!.GetValue<string>());
         Assert.Equal("xlr2", sent["channel"]!.GetValue<string>());
-        Assert.True(sent["eq"]!["enabled"]!.GetValue<bool>());
+        Assert.Equal("saved:Podcast", sent["profile"]!.GetValue<string>());
         await Until(() => daemon.Eqs["xlr2"].Bands.SequenceEqual(daemon.Eqs["xlr1"].Bands) && daemon.Eqs["xlr2"].Enabled);
-        Assert.Equal(eq1.Current.Bands, eq2.Current.Bands);
+        await Until(() => eq1.Current.Bands.SequenceEqual(eq2.Current.Bands));
         Assert.True(eq2.Enabled);
         Capture(second, "eq-editor-profile-loaded");
 
@@ -1229,7 +1308,10 @@ public sealed class EqEditorWindowTests
         Assert.Equal(Localizer.Text("EqProfileReplace"), yes.Content);
         Click(yes);
         await Until(() => !replace.IsVisible);
-        Assert.Single(EqProfiles.Read().Profiles);
+        sent = (await Sent(daemon, 1))[0];
+        Assert.Equal("saveEqProfile", sent["cmd"]!.GetValue<string>());
+        Assert.True(sent["replace"]!.GetValue<bool>());
+        Assert.Single(OpenXLR.Core.Mixing.EqProfileStore.Read().Profiles);
         Assert.Null(first.Profiles!.Error);
 
         // Rename on XLR 2: the dialog starts from the name, and both editors follow.
@@ -1240,46 +1322,44 @@ public sealed class EqEditorWindowTests
         Assert.Equal("Podcast", input.Text);
         input.Text = "Voice";
         Click(dialog.GetVisualDescendants().OfType<Button>().Single(b => b.IsDefault));
-        await Until(() => first.Profiles!.Profiles.SingleOrDefault()?.Name == "Voice");
+        await Until(() => first.Profiles!.Profiles.LastOrDefault()?.Name == "Voice" && list1.SelectedItem is EqProfile { Name: "Voice" });
         Assert.Equal("Voice", ((EqProfile)list2.SelectedItem!).Name);
         Assert.Equal("Voice", ((EqProfile)list1.SelectedItem!).Name);
+        Assert.Equal("renameEqProfile", (await Sent(daemon, 1))[0]["cmd"]!.GetValue<string>());
 
         // Delete asks first.
         Click(second.FindControl<Button>("EqProfileDelete")!);
         Window confirm = await Dialog(second);
         Assert.Equal(Localizer.Text("EqProfileDeleteTitle"), confirm.Title);
         Click(confirm.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("danger")));
-        await Until(() => first.Profiles!.Profiles.Count == 0 && second.Profiles!.Profiles.Count == 0);
+        await Until(() => first.Profiles!.Profiles.Count == 3 && second.Profiles!.Profiles.Count == 3);
         Assert.Null(list1.SelectedItem);
         Assert.False(second.FindControl<Button>("EqProfileDelete")!.IsEnabled);
-        Assert.Empty(EqProfiles.Read().Profiles);
-        // Nothing but the load went to the daemon.
-        Assert.Empty(daemon.Commands);
+        Assert.Empty(OpenXLR.Core.Mixing.EqProfileStore.Read().Profiles);
+        Assert.Equal("deleteEqProfile", (await Sent(daemon, 1))[0]["cmd"]!.GetValue<string>());
 
-        // A damaged file: one line under the row, wrapped inside the editor, and the file kept.
+        // A file the daemon cannot read whole: one line under the row, wrapped inside the editor,
+        // nothing sent and the file kept. The daemon reads it again when an editor asks, as it comes forward.
         string damaged = "{\"version\":1,\"profiles\":[{\"name\":\"Broken\"}]}";
-        File.WriteAllText(EqProfiles.FilePath, damaged);
-        first.Profiles!.Refresh();
-        Pump(20);
+        File.WriteAllText(path, damaged);
+        first.Profiles!.Reread();
         TextBlock error = first.FindControl<TextBlock>("EqProfileError")!;
-        Assert.True(error.IsVisible);
-        Assert.Equal(Localizer.Format("EqProfileFileUnreadable", 1, EqProfiles.FilePath), error.Text);
+        await Until(() => error.IsVisible);
+        Assert.Equal(Localizer.Format("EqProfileFileUnreadable", 1, path), error.Text);
         Assert.Contains("warn", error.Classes);
         CheckProfileRow(first, "a damaged file");
         Layout(first, 820, 600);
         Capture(first, "eq-editor-profile-error");
-        Assert.False(first.Profiles!.Save("New", false));
-        Assert.Equal(damaged, File.ReadAllText(EqProfiles.FilePath));
+        Assert.False(await first.Profiles!.Save("New", false));
+        Assert.Equal(damaged, File.ReadAllText(path));
 
         // A profile with six bands on this four-band EQ: refused, said why, nothing sent,
         // and the line stays when the editor comes forward again.
         string band = "{\"enabled\":true,\"type\":\"peak\",\"frequency\":1000,\"gain\":0,\"q\":1}";
-        File.WriteAllText(EqProfiles.FilePath,
-            "{\"version\":1,\"profiles\":[{\"name\":\"Six\",\"bands\":[" + string.Join(",", Enumerable.Repeat(band, 6)) + "]}]}");
-        first.Profiles!.Refresh();
-        Pump(20);
-        Assert.False(error.IsVisible);
-        list1.SelectedItem = first.Profiles!.Profiles.Single();
+        File.WriteAllText(path, "{\"version\":1,\"profiles\":[{\"name\":\"Six\",\"bands\":[" + string.Join(",", Enumerable.Repeat(band, 6)) + "]}]}");
+        first.Profiles!.Reread();
+        await Until(() => !error.IsVisible && first.Profiles!.Profiles.Count == 4);
+        list1.SelectedItem = first.Profiles!.Profiles[3];
         Click(first.FindControl<Button>("EqProfileLoad")!);
         Pump(20);
         string refused = Localizer.Format("EqProfileBandCount", "Six", 6, 4, 4);
@@ -1292,10 +1372,9 @@ public sealed class EqEditorWindowTests
         Assert.True(error.IsVisible);
         Assert.Empty(daemon.Commands);
 
-        File.Delete(EqProfiles.FilePath);
-        first.Profiles!.Refresh();
-        Pump(20);
-        Assert.False(error.IsVisible);
+        File.Delete(path);
+        first.Profiles!.Reread();
+        await Until(() => !error.IsVisible && first.Profiles!.Profiles.Count == 3);
 
         CheckProfileLanguages(eq1);
     }

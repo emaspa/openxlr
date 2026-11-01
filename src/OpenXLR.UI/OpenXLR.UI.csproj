@@ -34,6 +34,8 @@
     <Compile Include="../OpenXLR.Core/Mixing/MicVoice.cs" Link="MicVoice.cs" />
     <Compile Include="../OpenXLR.Core/Mixing/MicDynamics.cs" Link="MicDynamics.cs" />
     <Compile Include="../OpenXLR.Core/Mixing/EqResponse.cs" Link="EqResponse.cs" />
+    <!-- Shared with the daemon: the built-in EQ profiles Mic setup offers and the EQ editor lists. -->
+    <Compile Include="../OpenXLR.Core/Mixing/EqPresets.cs" Link="EqPresets.cs" />
     <!-- Shared with the daemon: the browser native host forwards only the
          origins the daemon accepts, in the form it reports them. -->
     <Compile Include="../OpenXLR.Core/Mixing/BrowserOrigin.cs" Link="BrowserOrigin.cs" />

@@ -102,6 +102,14 @@ public static class CommandValidation
             case "setEqBand":
             case "setEqProcessing":
                 return CheckEq(cmd, layout, nativeHostInstalled ?? PluginCatalog.HostInstalled);
+            case "loadEqProfile":
+                return CheckLoadEqProfile(cmd, layout);
+            case "listEqProfiles":
+                return null;
+            case "saveEqProfile":
+            case "renameEqProfile":
+            case "deleteEqProfile":
+                return CheckEqProfile(cmd);
             case "setNoiseRemoval":
                 return CheckNoise(cmd, layout, nativeHostInstalled ?? PluginCatalog.HostInstalled);
             case "setVoiceChanger":
@@ -417,6 +425,53 @@ public static class CommandValidation
     }
 
     /// <summary>
+    /// <c>loadEqProfile</c>: a microphone channel, as <c>setEq</c> takes it,
+    /// and a profile id. Whether the profile exists, and whether the EQ can
+    /// be switched on, is decided when it loads, as the <c>setEq</c> it
+    /// becomes.
+    /// </summary>
+    internal static string? CheckLoadEqProfile(Command cmd, ILayoutInfo layout)
+    {
+        if (cmd.Channel is null) return "loadEqProfile: need 'channel'";
+        if (TooLong(cmd.Channel, 36) || !layout.IsMicrophoneChannel(cmd.Channel))
+            return $"loadEqProfile: '{Short(cmd.Channel)}' is not a microphone input";
+        return EqProfileStore.CheckId(cmd.Profile) is { } error ? $"loadEqProfile: {error}" : null;
+    }
+
+    /// <summary>
+    /// <c>saveEqProfile</c>, <c>renameEqProfile</c> and <c>deleteEqProfile</c>:
+    /// a saved profile's name, a new one to rename it to, and for a save one
+    /// to sixteen bands inside the EQ's ranges. A value outside a range is
+    /// refused, not clamped.
+    /// </summary>
+    internal static string? CheckEqProfile(Command cmd)
+    {
+        if (cmd.Name is null || cmd.Name.Length > 256 || !EqProfileStore.ValidName(cmd.Name.Trim()))
+            return $"{cmd.Cmd}: need 'name', {EqProfileStore.NameRule}";
+        switch (cmd.Cmd)
+        {
+            case "renameEqProfile":
+                return cmd.NewName is not null && cmd.NewName.Length <= 256 && EqProfileStore.ValidName(cmd.NewName.Trim())
+                    ? null : $"renameEqProfile: need 'newName', {EqProfileStore.NameRule}";
+            case "saveEqProfile":
+                return EqProfileBands(cmd, out string? error) is null ? $"saveEqProfile: {error}" : null;
+            default:
+                return null;
+        }
+    }
+
+    /// <summary>The bands of a <c>saveEqProfile</c>, read as <c>setEq</c> reads an EQ's; null when they cannot be taken.</summary>
+    internal static IReadOnlyList<EqBand>? EqProfileBands(Command cmd) => EqProfileBands(cmd, out _);
+
+    private static IReadOnlyList<EqBand>? EqProfileBands(Command cmd, out string? error)
+    {
+        error = "need 'bands'";
+        if (cmd.Bands.ValueKind != JsonValueKind.Array) return null;
+        MicEq? eq = MicEq.Read(JsonSerializer.SerializeToElement(new { enabled = true, bands = cmd.Bands }), out error);
+        return eq?.Bands;
+    }
+
+    /// <summary>
     /// <c>setNoiseRemoval</c>: a microphone channel (one that carries the EQ)
     /// and at least one of <c>enabled</c>, <c>engine</c> and <c>strength</c>,
     /// each inside its range; a value outside it is refused, not clamped.
@@ -687,7 +742,7 @@ public static class CommandValidation
     private static bool BadIcon(string? icon) => icon is not null && !LayoutIcons.IsValidChoice(icon);
     private static string IconError(string command)
         => $"{command}: icon must be empty, \"none\", a listed glyph or an icon name of lower-case letters, digits and hyphens";
-    private static string Short(string s) => s.Length <= 40 ? s : s[..40] + "...";
+    internal static string Short(string s) => s.Length <= 40 ? s : s[..40] + "...";
     private static string Tail(string uri) => uri[(uri.LastIndexOfAny(['#', '/']) + 1)..];
 
     /// <summary>A real channel, or the "ignore" pseudo-channel that leaves an app to the desktop.</summary>

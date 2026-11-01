@@ -68,6 +68,9 @@ public sealed class MicEqViewModel : ViewModelBase, IDisposable
     /// <summary>The channel id the commands name: <c>xlr1</c>, <c>xlr2</c> or a capture input's id.</summary>
     public string Channel { get; }
 
+    /// <summary>The EQ profiles the editor lists and loads, the daemon's; null shows no profile row.</summary>
+    public EqProfileLibrary? ProfileLibrary { get; init; }
+
     /// <summary>
     /// A capture input's EQ, which always runs on this computer: the editor
     /// offers no unit, no choice of where and no hardware badge, and names no
@@ -450,7 +453,19 @@ public sealed class MicEqViewModel : ViewModelBase, IDisposable
     /// <summary>Put an EQ on this microphone: one <c>setEq</c>, in place of any band change still waiting.</summary>
     public void Replace(MicEq eq)
     {
-        if (_disposed || MicEq.Check(eq) is not null) return;
+        if (ShowLocal(eq) is { } shown) _ = _commands.SetEqAsync(Channel, shown);
+    }
+
+    /// <summary>
+    /// Show an EQ a loaded profile puts on this microphone, which the caller
+    /// asks the daemon for its own way: it wins over older reports as an
+    /// edit made here does.
+    /// </summary>
+    public void ShowLoaded(MicEq eq) => ShowLocal(eq);
+
+    private MicEq? ShowLocal(MicEq eq)
+    {
+        if (_disposed || MicEq.Check(eq) is not null) return null;
         eq = MicEq.Snap(eq);
         _sender.Clear();
         if (eq.Bands.Count != Bands.Count) { _awaitingShape = eq; _awaitingShapeSince = _time.GetTimestamp(); }
@@ -459,8 +474,8 @@ public sealed class MicEqViewModel : ViewModelBase, IDisposable
         _enabled = eq.Enabled;
         Expect(eq.Enabled);
         for (int i = 0; i < Bands.Count; i++) Bands[i].ShowLocal(eq.Bands[i]);
-        _ = _commands.SetEqAsync(Channel, eq);
         RaiseState();
+        return eq;
     }
 
     private void ResizeBands(IReadOnlyList<EqBand> values)

@@ -1582,14 +1582,17 @@ clicking **EQ** again brings it to the front.
   microphone's EQ, switch and bands, to another. **Reset** asks first,
   then puts the four bands back where they start and leaves the EQ on or
   off.
-- The **Profile** row under them keeps EQs by name. **Save** asks for a
-  name and keeps this EQ's bands as an EQ profile; a name already in use
-  asks before it replaces that profile. Pick a profile in the list and
-  press **Load** to put its bands on this microphone and switch its EQ on.
-  A profile belongs to no microphone, so one saved on XLR 1 loads on
-  XLR 2 or on a capture input. **Rename** and **Delete** act on the profile
-  picked in the list, and Delete asks first. Every open editor lists the
-  same profiles. See [EQ profiles](#eq-profiles) below.
+- The **Profile** row under them keeps EQs by name. The list starts with
+  the three built-in profiles, Clear, Warm and Broadcast, marked "(built
+  in)". They are Mic setup's starting presets. Your saved profiles follow. **Save**
+  asks for a name and keeps this EQ's bands as an EQ profile; a name you
+  already saved asks before it replaces that profile. Pick a profile in
+  the list and press **Load** to put its bands on this microphone and switch
+  its EQ on. A profile belongs to no microphone, so one saved on XLR 1
+  loads on XLR 2 or on a capture input. **Rename** and **Delete** act on
+  the saved profile picked in the list, and Delete asks first; a built-in
+  profile keeps its name and stays. Every open editor lists the same
+  profiles. See [EQ profiles](#eq-profiles) below.
 - The line at the bottom says what runs the EQ, or why it cannot run. On
   a unit that can run the EQ itself, **Where the EQ runs** sits above it;
   see below.
@@ -1627,26 +1630,34 @@ and Q steps of 3.75 percent. The editor shows the values the daemon keeps.
 **EQ profiles.** An EQ profile is a name and a list of bands, each with
 its switch, type, frequency, gain and Q. It does not keep the EQ switch
 or where the EQ runs. Loading a profile switches the EQ on and leaves
-the microphone's choice of where it runs alone. The UI sends the bands as
-one `setEq`, the way Paste does. A profile with more or fewer bands than
-the microphone's EQ takes does not load, and the line under the row says
-why. An older daemon takes exactly four bands. EQ profiles are not the
-[profiles](#profiles) in the header, which save every microphone's EQ
-with the rest of the mixer.
+the microphone's choice of where it runs alone. A profile with more or
+fewer bands than the microphone's EQ takes does not load, and the line
+under the row says why. An older daemon takes exactly four bands. EQ
+profiles are not the [profiles](#profiles) in the header, which save
+every microphone's EQ with the rest of the mixer.
 
-- The UI keeps them in `~/.config/openxlr/eq-profiles.json`, readable
-  by you alone, and writes the whole file at once. The daemon never reads
-  it. Up to 64 profiles fit, with names of up to 80 characters; names
-  differ by more than case.
-- You can edit the file by hand. When the UI reads it, it moves values
-  outside the EQ's ranges to the nearest edge and snaps them to the EQ's
-  steps, so what loads is what the daemon takes. A profile the UI cannot
-  read, such as one with an unknown band type, a missing field or a
-  repeated name, stays out of the list, and the line under the row says
-  so. Until you fix or remove it, the UI saves no changes to the file, so
-  a save never loses your edit. A file that is not a profile list at all
-  gets the same line and stays as it is.
-- The editor reads the file again each time it comes to the front.
+- The daemon keeps the profiles, so the UI, a
+  [Stream Deck key](#eq-profile-keys) and a script through the
+  [control API](api.md#eq-profiles) load the same ones.
+- The built-in profiles are the presets Mic setup's Shape step offers,
+  with the same bands: Clear, Warm and Broadcast. They come first in the
+  list, named in the UI's language, and cannot be renamed or deleted.
+  A profile you save may share a built-in one's name.
+- The daemon keeps your profiles in `~/.config/openxlr/eq-profiles.json`,
+  readable by you alone, and writes the whole file at once. Up to 64
+  profiles fit, with names of up to 80 characters; names differ by more
+  than case. A file the UI wrote before the daemon kept the profiles
+  has the same format and keeps working.
+- You can edit the file by hand. The daemon moves values outside the EQ's
+  ranges to the nearest edge and snaps them to the EQ's steps as it reads
+  the file, so what loads is what the EQ takes. A profile it cannot read,
+  such as one with an unknown band type, a missing field or a repeated
+  name, stays out of the list, and the line under the row says so. Until
+  you fix or remove it, nothing saves changes to the file, so a save
+  never loses your edit. A file that is not a profile list at all gets
+  the same line and stays as it is.
+- The daemon reads the file again when it changes, and the editor asks
+  for it again each time it comes to the front.
 - The file looks like this:
 
   ```json
@@ -3599,7 +3610,8 @@ when not on the default monitor mix),
 the bypass of one insert or of a whole chain, a desktop output's mute, a
 5% step up or down in its volume, or its selection as the enforced system
 default, the routing of the focused
-application, a profile to recall, or the next member of an
+application, a profile to recall, an [EQ profile](#eq-profile-keys) to
+load on a microphone, or the next member of an
 [exclusive group](#exclusive-groups). A group key shows the group's name
 and the member that is heard, or None; a press unmutes the next member in
 the mixes the current one was heard in and mutes the current one. With
@@ -3696,6 +3708,22 @@ switches the voice changer off when it comes up. Inside a multi-action a
 hold key toggles, since OpenDeck lets the key up straight away there. A key
 cannot switch a voice on without the native plugin host. The saved target
 is `voice:<channel>:<voice>`, with the voice's name as the API spells it.
+
+<a name="eq-profile-keys"></a>
+Each microphone with an EQ also has a **Load EQ profile** group in the
+Toggle action's settings, with a key per [EQ profile](#eq-profiles). The
+built-in ones come first, marked "(built in)", then the saved ones. A press
+puts the profile's bands on that microphone and switches its EQ on, after
+any EQ dial turn still waiting. The key shows an EQ curve and names the
+microphone and the profile, with the microphone's colour on its frame and
+label. It lights while the microphone's EQ is on and holds the profile's
+bands, and goes dark when a band moves, from the UI or a dial. A profile
+with a band count the microphone's EQ does not take, or one deleted
+since, only flashes an alert. The saved target is
+`eqprofile:<channel>:<profile>`, with the profile's id from the API:
+`builtin:clear`, or `saved:` and the name. A saved profile is found by
+its name, so saving it again under the same name keeps the key; after a
+rename, pick the new name in the key's settings.
 
 Capture chains also appear in the insert key and dial choices, named by
 their channel. Saved insert targets keep the channel id through a rename.

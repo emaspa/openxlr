@@ -582,6 +582,14 @@
                     "voice": "dracula"
                   }
                 },
+                "loadEqProfile": {
+                  "summary": "Put the built-in Warm EQ profile on a microphone and switch its EQ on",
+                  "value": {
+                    "cmd": "loadEqProfile",
+                    "channel": "xlr1",
+                    "profile": "builtin:warm"
+                  }
+                },
                 "compressor": {
                   "summary": "Switch a microphone's compressor on this computer on at -24 dB",
                   "value": {

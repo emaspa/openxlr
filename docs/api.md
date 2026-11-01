@@ -174,7 +174,8 @@ written above it; false on every other model), `lowImpedance`,
 `auxLevelDb`, `auxLevelLock`, `lineInGainDb` (the Line In's gain in dB as the unit reads it back, 0 to `lineInGainMaxDb` once OpenXLR has written it and up to 80 on a unit set higher elsewhere, on a model with `lineInput`; absent on every other model), `lineInLevelLock` (the Line In's level lock, on a model with `lineInput`: while true the unit ignores Line In gain writes through its ALSA control, so the desktop mixer and other applications cannot move the gain, while `lineInGain` still applies; absent on every other model), plus the daemon-stamped `gainLocked`,
 `phantomSettling`, `phantomSettling2`, `phantomSettleSeconds` and
 `phantomSettleSeconds2`), `ducking` (present whenever the daemon runs, see [ducking](#ducking)),
-`mixer`, `mixerWaiting`, `devices`, `profiles`, `activeProfile`, `recallOnConnect` and
+`mixer`, `mixerWaiting`, `devices`, `profiles`, `activeProfile`, `recallOnConnect`,
+`eqProfiles` and `eqProfileProblem` (see [EQ profiles](#eq-profiles)) and
 `detected` (`usbId`, `name`, `active` for every attached interface; `usbId`
 is the unit's instance id, see [additional interface state](#additional-interface-state))
 and `waveInterfaces`. The
@@ -333,6 +334,11 @@ that final acknowledgement (or an `error` without a request id):
 | `setEqEnabled` | `channel`, `value` | the EQ's own switch, a boolean. Off bypasses inside the running stage, so on and off compare at once |
 | `setEqBand` | `channel`, `band`, at least one of `enabled`, `type`, `frequency`, `gain`, `q` | change part of one existing band, numbered from 1 to 16; an absent field keeps its value. Values outside the ranges are refused, not clamped, and what is taken is snapped onto the EQ's steps. Switching the EQ on, here or through `setEq`, is refused at once when the native plugin host is not installed and no unit runs the channel's EQ |
 | `setEqProcessing` | `channel`, `value` | where a microphone's EQ runs when the unit it carries can run it: `device` (the default) on the unit's own DSP, or `software` on this computer. Any other value is refused. Saved in `mixer.json` under `eqProcessing`, never in a profile. Moving between the two switches the leaving one off first. Refused on a capture input, whose EQ always runs on this computer. See [where the EQ runs](#where-the-eq-runs) |
+| `loadEqProfile` | `channel`, `profile` | put an [EQ profile](#eq-profiles)'s bands on a microphone and switch its EQ on, as one `setEq` with the profile's bands and `enabled` true, checked and refused as that `setEq` is. `profile` is an id from `eqProfiles`: `builtin:` and a key, or `saved:` and a saved profile's name, matched whatever its case. The channel rules are those of `setEq`. Refused for a profile the daemon does not list, and for one with a band count the microphone's EQ does not take |
+| `saveEqProfile` | `name`, `bands`, optional `replace` | save bands under a name as a saved EQ profile: `bands` is 1 to 16 bands as `setEq` takes them, refused, not clamped, outside the ranges and snapped onto the EQ's steps. A name already saved, compared without case, is refused unless `replace` is true, which puts the new bands in its place. Names have 1 to 80 characters and no control characters; spaces around one are dropped. At most 64 saved profiles. Refused, with the file unchanged, while the file holds an entry that does not read |
+| `renameEqProfile` | `name`, `newName` | give a saved EQ profile another name; a change of case alone is a rename too. Refused for a name that is not saved, onto another saved profile's name, and while the file holds an entry that does not read. A built-in profile has no name to rename |
+| `deleteEqProfile` | `name` | delete a saved EQ profile. Refused for a name that is not saved and while the file holds an entry that does not read |
+| `listEqProfiles` | none | read `eq-profiles.json` again, for an edit by hand, and send the state: to every client when the list changed, else to the one that asked |
 | `setNoiseRemoval` | `channel`, at least one of `enabled`, `engine`, `strength` | a microphone's noise removal: `enabled` a boolean, `engine` `rnnoise` or `deepfilternet`, `strength` the most the noise is turned down, 0 to 100 dB. The channel rules are those of `setEq`. Values outside the range are refused, not clamped. Switching it on is refused at once when the native plugin host is not installed, and an engine the host was built without is refused. See [noise removal](#noise-removal) |
 | `setVoiceChanger` | `channel`, at least one of `enabled`, `voice`, `pitch`, `formant` | a microphone's voice changer: `enabled` a boolean, `voice` one of `custom`, `deep`, `high`, `robot`, `radio`, `alien`, `dracula`, `frankenstein`, `mummy`, `werewolf` and `witch`, `pitch` and `formant` the custom voice's shifts, -12 to 12 semitones. The channel rules are those of `setEq`. Values outside the range are refused, not clamped. Switching it on is refused at once when the native plugin host is not installed. See [voice changer](#voice-changer) |
 | `setCompressor` | `channel`, at least one of `enabled`, `threshold`, `ratio`, `attack`, `release`, `knee`, `makeup` | a microphone's compressor on this computer, with the ranges in [compressor and expander](#compressor-and-expander). The channel rules are those of `setEq`. Values outside a range are refused, not clamped. Switching it on is refused at once when the native plugin host is not installed. It is not the unit's own `compressor` control |
@@ -1359,10 +1365,11 @@ All under `~/.config/openxlr/` (or `$XDG_CONFIG_HOME/openxlr/`):
 - `effect-chain-presets.json`: the UI's saved effect presets, 0600.
   Written by the UI only; the daemon never reads it. Format in
   [effect-presets.md](effect-presets.md).
-- `eq-profiles.json`: the UI's saved EQ profiles, 0600. Written by the UI
-  only; the daemon never reads it, and loading one is a plain `setEq`.
+- `eq-profiles.json`: the saved EQ profiles, 0600. Written whole by the
+  daemon, through `saveEqProfile`, `renameEqProfile` and `deleteEqProfile`.
   Format `{"version":1,"profiles":[{"name":"Podcast","bands":[...]}]}`,
-  each band as `setEq` takes it ([manual](manual.md#eq-profiles)).
+  each band as `setEq` takes it; the file the UI wrote before the daemon
+  kept it has the same format. See [EQ profiles](#eq-profiles).
 
 ## Plugin search paths
 
@@ -2050,6 +2057,55 @@ additional interface's input that no microphone carries, or in
 hardware-control mode: the unit keeps the EQ it last held.
 Another channel taking the same unit's audio, a capture channel on its node,
 hears the unit's EQ, as it hears the unit's low cut.
+
+#### EQ profiles
+
+An EQ profile is a set of bands to load on any microphone. It holds no
+channel, no EQ switch and no choice of where the EQ runs. The state lists
+the profiles in `eqProfiles`, the same list for every client, built-in
+profiles first:
+
+```json
+"eqProfiles": [
+  {"id": "builtin:clear", "name": "Clear", "builtin": true, "bands": [{"enabled": true, "type": "lowCut", "frequency": 80, "gain": 0, "q": 0.7047}, ...]},
+  {"id": "saved:Podcast", "name": "Podcast", "builtin": false, "bands": [...]}
+]
+```
+
+Each band is `{enabled, type, frequency, gain, q}` as `setEq` takes it.
+
+- The built-in profiles are Mic setup's starting presets: `builtin:clear`,
+  `builtin:warm` and `builtin:broadcast`, four bands each, in that order.
+  Their ids never change, and their `name` is English. A client names them
+  in its own language from the key after `builtin:`, and shows `name` for
+  a key it does not know. They cannot be renamed or deleted.
+- The saved profiles follow, in the order of `eq-profiles.json`, each with
+  the id `saved:` and its name. A saved profile may share a built-in one's
+  name; the ids keep them apart.
+- `loadEqProfile` puts a profile on a microphone; `saveEqProfile`,
+  `renameEqProfile` and `deleteEqProfile` change the saved ones and send
+  the new list to every client.
+
+The daemon reads the file again when its size or time changes, so an edit
+by hand shows with the next state, and at once after `listEqProfiles`.
+Values outside the EQ's ranges are moved to the nearest edge and snapped
+onto its steps as the file is read, so what loads is what the EQ takes. An
+entry that does not read, such as one with an unknown band type, a missing
+field or a name another entry has whatever its case, is left out of the
+list. A file over 1 MiB, one that is not a profile list, or more than 64
+entries is not read at all. `eqProfileProblem` then says why, and is
+absent while the whole file reads:
+
+```json
+"eqProfileProblem": {"reason": "unreadable", "count": 1, "path": "/home/me/.config/openxlr/eq-profiles.json", "message": "Some profiles in ... could not be read (1) and are not listed. ..."}
+```
+
+`reason` is `unreadable` (`count` entries were left out), `damaged` (not a
+profile list), `tooLarge` or `failed` (the file could not be read, the
+message says why). The message is English; a client may say it in its own
+language from the reason. While the file holds anything the daemon cannot
+read, it writes nothing to it, so a save never loses an edit by hand. An
+older daemon sends neither field.
 
 ### Noise removal
 

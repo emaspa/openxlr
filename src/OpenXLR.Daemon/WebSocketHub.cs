@@ -103,6 +103,7 @@ public sealed class WebSocketHub
             // the device and mixer controls away from connected clients.
             profileWarning = $"Profiles could not be read: {ex.Message}";
         }
+        OpenXLR.Core.Mixing.EqProfilesState eqProfiles = OpenXLR.Core.Mixing.EqProfileStore.State();
         return state with
         {
             DaemonVersion = OpenXLR.Daemon.DaemonVersion.Current,
@@ -114,6 +115,8 @@ public sealed class WebSocketHub
             Devices = _mixer.Devices(),
             Profiles = profiles,
             RecallOnConnect = recall,
+            EqProfiles = eqProfiles.Profiles,
+            EqProfileProblem = eqProfiles.Problem,
             Detected = [.. _devices.Detected().Select(d => new DetectedDevice(d.UsbId, d.Name, d.Active))],
             WaveInterfaces = _waveInterfaces?.Snapshot(),
         };
@@ -474,6 +477,7 @@ public sealed class WebSocketHub
             case "setEqEnabled":
             case "setEqBand":
             case "setEqProcessing":
+            case "loadEqProfile":
             case "setNoiseRemoval":
             case "setVoiceChanger":
             case "setCompressor":
@@ -521,6 +525,23 @@ public sealed class WebSocketHub
                 error = CommandValidation.CheckWave(cmd)
                     ?? (_waveInterfaces is null ? "additional interfaces are not available" : _waveInterfaces.Apply(cmd.Device!, cmd.Control!, cmd.Value));
                 break;
+            case "listEqProfiles":
+            {
+                // Read the file again, for a hand edit, and send the list
+                // to everyone when it changed, else to the one who asked.
+                OpenXLR.Core.Mixing.EqProfilesState? before = OpenXLR.Core.Mixing.EqProfileStore.Listed;
+                OpenXLR.Core.Mixing.EqProfilesState after = OpenXLR.Core.Mixing.EqProfileStore.State(reread: true);
+                if (before is not null && SameEqProfiles(before, after)) { if (cmd.RequestId is null) await reply(Snapshot()); }
+                else Broadcast(Snapshot());
+                break;
+            }
+            case "saveEqProfile":
+            case "renameEqProfile":
+            case "deleteEqProfile":
+                error = CommandValidation.CheckEqProfile(cmd) ?? ChangeEqProfiles(cmd);
+                // Every client lists the same profiles; a refusal can come from a file changed by hand.
+                Broadcast(Snapshot());
+                break;
             case "saveProfile":
             case "loadProfile":
             case "deleteProfile":
@@ -566,6 +587,36 @@ public sealed class WebSocketHub
             }
         }
     }
+
+    /// <summary>Save, rename or delete a saved EQ profile, after <see cref="CommandValidation.CheckEqProfile"/>. Null on success.</summary>
+    private static string? ChangeEqProfiles(Command cmd)
+    {
+        try
+        {
+            switch (cmd.Cmd)
+            {
+                case "saveEqProfile":
+                    OpenXLR.Core.Mixing.EqProfileStore.Save(cmd.Name!, CommandValidation.EqProfileBands(cmd)!, cmd.Replace == true);
+                    break;
+                case "renameEqProfile":
+                    OpenXLR.Core.Mixing.EqProfileStore.Rename(cmd.Name!, cmd.NewName!);
+                    break;
+                default:
+                    OpenXLR.Core.Mixing.EqProfileStore.Delete(cmd.Name!);
+                    break;
+            }
+            return null;
+        }
+        catch (Exception ex) when (OpenXLR.Core.Mixing.EqProfileStore.IsFailure(ex))
+        {
+            return $"{cmd.Cmd}: {ex.Message}";
+        }
+    }
+
+    private static bool SameEqProfiles(OpenXLR.Core.Mixing.EqProfilesState a, OpenXLR.Core.Mixing.EqProfilesState b)
+        => a.Problem == b.Problem && a.Profiles.Count == b.Profiles.Count
+           && a.Profiles.Zip(b.Profiles).All(p => p.First.Id == p.Second.Id && p.First.Name == p.Second.Name
+               && p.First.Bands.SequenceEqual(p.Second.Bands));
 
     /// <summary>
     /// Recall a saved profile onto the device and the mixer. Both halves are
