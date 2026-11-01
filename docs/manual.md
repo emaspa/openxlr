@@ -1996,7 +1996,8 @@ corner of the screen, and the plugin ignores the mouse entirely. Options
 says so when it sees that pair of versions. If it cannot read the Wine
 version, the rest of the setup still shows, without this warning.
 
-Some plugins, Elgato Voice Focus among them, tie their licence to the
+Some plugins, [Elgato Voice Focus](https://marketplace.elgato.com/product/voice-focus-cadb20d0-18f1-45da-bf59-0f898f1e1767)
+among them, tie their licence to the
 system disk's serial number. Wine reports that disk with no model or
 serial, so these plugins send an empty machine id and fail to activate.
 The companion's host reports the model, firmware revision and serial number

@@ -772,7 +772,9 @@ The `openxlr-yabridge` companion is packaged for every channel OpenXLR
 is, the Flatpak bundle apart,
 and includes the Wine 9.22+ editor input fix. Its host also reports the
 system disk's real model and serial number, which Wine leaves empty, to
-plugins that tie their licence to that disk. It creates wrappers under
+plugins that tie their licence to that disk, so a plugin such as
+[Elgato Voice Focus](https://marketplace.elgato.com/product/voice-focus-cadb20d0-18f1-45da-bf59-0f898f1e1767)
+can activate. It creates wrappers under
 `~/.local/share/openxlr/yabridge` and keeps its controller registry under
 `~/.config/openxlr/bridge`, honoring XDG overrides. Other DAWs' wrappers and controller settings remain separate.
 Private wrappers take priority over duplicate global copies. A system/user

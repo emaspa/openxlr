@@ -91,7 +91,10 @@ untested device, open an issue with a diagnostics archive
   native host measures the delay each plugin adds on its audio, and a
   plugin too slow for a small block size can run on its own block.
   Windows VST3 and CLAP plugins run through `openxlr-yabridge`, whose host
-  lets a plugin that ties its licence to the system disk activate.
+  reports the system disk's model and serial number the way Windows does,
+  so plugins that tie their licence to it, such as
+  [Elgato Voice Focus](https://marketplace.elgato.com/product/voice-focus-cadb20d0-18f1-45da-bf59-0f898f1e1767),
+  can activate.
 - **Application routing** by name rules, Electron and Wine/Proton apps
   included; an optional Chromium companion routes single browser tabs
   ([browser routing](docs/browser-routing.md)).
