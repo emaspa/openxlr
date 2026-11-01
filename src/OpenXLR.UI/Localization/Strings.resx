@@ -1812,6 +1812,12 @@ Saving will replace it with the current scene.</value>
   <data name="Running" xml:space="preserve">
     <value>running</value>
   </data>
+  <data name="RunOnItsOwnBlock" xml:space="preserve">
+    <value>Run on its own block (adds delay)</value>
+  </data>
+  <data name="RunOnItsOwnBlockTip" xml:space="preserve">
+    <value>Use it for a plugin that cannot keep up, one that makes the sound stutter or the interface drop out while it runs. The plugin then works on 1024 samples at a time on a thread of its own, which adds a fixed delay, 32 ms at a block size of 256. Switching restarts the plugin and interrupts its audio for a moment.</value>
+  </data>
   <data name="RunThisInsertInItsOwnProcessWhich" xml:space="preserve">
     <value>Run this insert in its own process, which is what lets its own editor open. Switching rebuilds the chain and interrupts audio for a moment.</value>
   </data>

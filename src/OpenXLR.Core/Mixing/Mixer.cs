@@ -1303,6 +1303,22 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         }
     }
 
+    /// <summary>
+    /// Run one insert on its own block, or back in PipeWire's cycle; rewires
+    /// when built, which starts that insert's host again in the new mode.
+    /// </summary>
+    public void SetInsertOwnBlock(string channel, string insertId, bool ownBlock)
+    {
+        lock (_gate)
+        {
+            if (!_inserts.TryGetValue(channel, out List<InsertDefinition>? list)) return;
+            int idx = list.FindIndex(i => i.Id == insertId);
+            if (idx < 0 || list[idx].OwnBlock == ownBlock) return;
+            list[idx] = list[idx] with { OwnBlock = ownBlock };
+            if (_built) RewireInsertKeyLocked(channel);
+        }
+    }
+
     /// <summary>Change one insert's label. A display edit: the running plugin and its ports are kept.</summary>
     public void RenameInsert(string channel, string insertId, string name)
     {

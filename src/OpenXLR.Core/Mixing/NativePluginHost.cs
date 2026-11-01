@@ -227,7 +227,18 @@ internal sealed class NativePluginHost : IDisposable
         }
     }
 
-    internal static IReadOnlyList<string> Arguments(InsertDefinition insert, string? bundle) => insert.Kind switch
+    /// <summary>
+    /// The helper's arguments up to the node: <c>--own-block</c> for a plugin
+    /// run on its own block, then the format and what it needs to find the
+    /// plugin. The built-in stages never run on their own block.
+    /// </summary>
+    internal static IReadOnlyList<string> Arguments(InsertDefinition insert, string? bundle)
+    {
+        IReadOnlyList<string> format = FormatArguments(insert, bundle);
+        return insert.OwnBlock && insert.Kind is "lv2" or "clap" or "vst3" ? ["--own-block", .. format] : format;
+    }
+
+    private static IReadOnlyList<string> FormatArguments(InsertDefinition insert, string? bundle) => insert.Kind switch
     {
         "soundcheck" => ["soundcheck"],
         "level" => ["level"],

@@ -466,6 +466,7 @@ public sealed class WebSocketHub
             case "setSoundCheckHearMyself":
             case "watchInputMeter":
             case "setInsertBypass":
+            case "setInsertOwnBlock":
             case "setInsertParam":
             case "renameInsert":
             case "showInsertUi":

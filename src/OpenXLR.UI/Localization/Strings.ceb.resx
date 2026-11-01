@@ -1763,6 +1763,12 @@ Ilisan kini sa kasamtangang eksena kon i-save.</value>
   <data name="Running" xml:space="preserve">
     <value>nagdagan</value>
   </data>
+  <data name="RunOnItsOwnBlock" xml:space="preserve">
+    <value>Padagana sa kaugalingong block (dugang delay)</value>
+  </data>
+  <data name="RunOnItsOwnBlockTip" xml:space="preserve">
+    <value>Para sa plugin nga dili makaapas: mag-utod-utod ang tingog, o mawala ang interface samtang modagan kini. Ang plugin magtrabaho dayon og 1024 ka sample matag higayon sa kaugalingon niining thread, nga magdugang og pirmi nga delay, 32 ms sa block size nga 256. Ang pag-ilis mo-restart sa plugin ug mohunong kadiyot ang tingog niini.</value>
+  </data>
   <data name="RunThisInsertInItsOwnProcessWhich" xml:space="preserve">
     <value>Padagana kining insert sa kaugalingong proseso aron maablihan ang kaugalingong editor niini. Tukoron pag-usab sa pagbalhin ang chain ug kadiyot nga maputol ang audio.</value>
   </data>

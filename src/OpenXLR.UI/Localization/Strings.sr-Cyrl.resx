@@ -1763,6 +1763,12 @@
   <data name="Running" xml:space="preserve">
     <value>покренуто</value>
   </data>
+  <data name="RunOnItsOwnBlock" xml:space="preserve">
+    <value>Покрени у сопственом блоку (додаје кашњење)</value>
+  </data>
+  <data name="RunOnItsOwnBlockTip" xml:space="preserve">
+    <value>За ефекат који не стиже да прати: звук сецка или интерфејс нестаје док ради. Ефекат тада обрађује 1024 узорка одједном у сопственој нити, што додаје фиксно кашњење, 32 ms при величини блока од 256. Промена поново покреће ефекат и на тренутак прекида његов звук.</value>
+  </data>
   <data name="RunThisInsertInItsOwnProcessWhich" xml:space="preserve">
     <value>Покрени овај ефекат у сопственом процесу, што омогућава отварање његовог уређивача. Промена поново гради ланац и накратко прекида звук.</value>
   </data>

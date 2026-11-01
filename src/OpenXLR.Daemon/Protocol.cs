@@ -105,7 +105,7 @@ public sealed record Command
     /// <summary>"soundCheck": record, loop, live or stop.</summary>
     [JsonPropertyName("action")] public string? Action { get; init; }
 
-    /// <summary>"setInsertParam" / "setInsertBypass" / "renameInsert": which insert.</summary>
+    /// <summary>"setInsertParam" / "setInsertBypass" / "setInsertOwnBlock" / "renameInsert": which insert.</summary>
     [JsonPropertyName("insertId")] public string? InsertId { get; init; }
 
     /// <summary>"setInsertParam": the control port symbol.</summary>

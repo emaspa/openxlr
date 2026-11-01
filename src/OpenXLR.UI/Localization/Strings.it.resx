@@ -1815,6 +1815,12 @@ Il salvataggio lo sostituirà con la scena attuale.</value>
   <data name="Running" xml:space="preserve">
     <value>in esecuzione</value>
   </data>
+  <data name="RunOnItsOwnBlock" xml:space="preserve">
+    <value>Esegui su un blocco proprio (aggiunge ritardo)</value>
+  </data>
+  <data name="RunOnItsOwnBlockTip" xml:space="preserve">
+    <value>Da usare per un plugin che non riesce a stare al passo, quando il suono va a scatti o l'interfaccia si scollega mentre il plugin lavora. Il plugin elabora allora 1024 campioni alla volta su un thread tutto suo, il che aggiunge un ritardo fisso, 32 ms con una dimensione di blocco di 256. Il cambio riavvia il plugin e interrompe il suo audio per un istante.</value>
+  </data>
   <data name="RunThisInsertInItsOwnProcessWhich" xml:space="preserve">
     <value>Esegui questo insert in un processo proprio, che è ciò che permette di aprire il suo editor. Il cambio ricostruisce la catena e interrompe l'audio per un istante.</value>
   </data>

@@ -183,7 +183,7 @@ internal sealed class InsertsView : View
         {
             JsonObject values = [];
             foreach ((string symbol, double value) in item.Insert.Params) values[symbol] = value;
-            array.Add(new JsonObject
+            var insert = new JsonObject
             {
                 ["id"] = item.Insert.Id,
                 ["kind"] = item.Insert.Kind,
@@ -192,7 +192,10 @@ internal sealed class InsertsView : View
                 ["bypass"] = item.Insert.Bypass,
                 ["nativeHost"] = item.Insert.NativeHost,
                 ["params"] = values,
-            });
+            };
+            // Carried back while on, so rewriting the chain never turns it off.
+            if (item.Insert.OwnBlock) insert["ownBlock"] = true;
+            array.Add(insert);
         }
         return array;
     }

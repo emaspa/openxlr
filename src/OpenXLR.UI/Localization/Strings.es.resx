@@ -1807,6 +1807,12 @@ Al guardar, se sustituirá por la escena actual.</value>
   <data name="Running" xml:space="preserve">
     <value>en ejecución</value>
   </data>
+  <data name="RunOnItsOwnBlock" xml:space="preserve">
+    <value>Ejecutar en su propio bloque (añade retardo)</value>
+  </data>
+  <data name="RunOnItsOwnBlockTip" xml:space="preserve">
+    <value>Para un plugin que no da abasto: el sonido se entrecorta, o la interfaz se desconecta mientras funciona. El plugin trabaja entonces con 1024 muestras a la vez en un hilo propio, lo que añade un retardo fijo, 32 ms con un tamaño de bloque de 256. El cambio reinicia el plugin e interrumpe su audio un momento.</value>
+  </data>
   <data name="RunThisInsertInItsOwnProcessWhich" xml:space="preserve">
     <value>Ejecutar esta inserción en su propio proceso para que sea posible abrir su editor. Cambiar de motor reconstruye la cadena e interrumpe el audio un momento.</value>
   </data>

@@ -1044,7 +1044,7 @@ regular file of at most 8 MiB; an unreadable or damaged list shows an error
 and is left unchanged.
 
 Hearing a slot or loading a preset rebuilds the chain, so audio through it
-stops for a moment. A preset holds the order, names, bypass, host choice
+stops for a moment. A preset holds the order, names, bypass, host choice, own block
 and control values; plugin-private state and sample files are not in it.
 A plugin that is not installed, or cannot run at the chain's width, is
 refused and the chain stays as it was. The file format and limits are in
@@ -1084,6 +1084,31 @@ why. Plugins on XLR 1, XLR 2 and capture inputs reach every mix alike and
 are not aligned against other inputs. Compensation does not cover the device's own latency or the
 hardware's direct monitoring. The setting is saved with the mixer and stays
 as it is when a profile is loaded.
+
+<a name="own-block"></a>
+**A plugin that cannot keep up.** A plugin gets audio one block at a time
+and has to hand each block back before the next is due. At a small
+[block size](#block-size) some plugins cannot, most often Windows plugins
+running through yabridge, which pay a fixed cost for every block however
+short it is. The sound then stutters, and some interfaces drop out and come
+back over and over while the plugin runs. In the plugin's controls window,
+**Run on its own block (adds delay)** gives the plugin a thread of its own
+and 1024 samples at a time, while everything else keeps the block size it
+has. The plugin then has longer to answer. When it is late once anyway, as
+some plugins are for a moment after they load, you hear a short gap in that
+chain instead of the device stopping.
+
+The price is delay on that chain. At a block size of 256 the plugin's
+audio comes out 1536 samples late, 32 ms at 48 kHz: the 1024 it waits for
+and 512 more to answer in. At a larger block size the 512 become one block,
+43 ms in all at 1024. The latency under the plugin's name includes this, on
+top of the plugin's own, and latency compensation counts it like any other.
+Switching restarts the plugin, which interrupts its chain for a moment. The
+choice is saved with the chain and kept in profiles and effect presets.
+Bypass takes the plugin out of the path and its delay with it. Only the
+native host can run a plugin this way, so an LV2 plugin with it on runs
+there whatever its Native host switch says. Turn it on only for a plugin
+that needs it. One that keeps up gains nothing but the delay.
 
 <a name="block-size"></a>
 PipeWire moves audio in blocks, and anything that has to wait for a whole

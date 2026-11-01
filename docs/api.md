@@ -299,8 +299,9 @@ that final acknowledgement (or an `error` without a request id):
 | `rescanPlugins` | none | read the plugin directories again, for plugins installed by other means; answered with `pluginInstall` |
 | `addPluginSearchPath` | `kind`, `path` | add an existing folder to the `lv2`, `clap` or `vst3` search path without copying anything, save the list in `daemon.json` and read the catalogues again; answered with `pluginInstall`. See [Plugin search paths](#plugin-search-paths) |
 | `removePluginSearchPath` | `kind`, `path` | stop searching an added folder, keeping its files, and read the catalogues again; works for a folder that no longer exists; answered with `pluginInstall` |
-| `setInserts` | `channel`, `inserts[]` | replace a chain; `channel` is `xlr1`, `xlr2`, a capture channel id or `mix:<id>`, each insert is `{id, kind, plugin, label?, bypass?, params?}` where `kind` is `"lv2"` with the plugin URI, `"clap"` with the plugin's id, or `"vst3"` with the class id as 32 hex digits; a CLAP or VST3 insert always runs in the native host, so its `nativeHost` reads true whatever was sent. An insert being added is refused when its plugin cannot run at the chain's width (`chainWidth` on an input, two on a mix, by `widths` or the port counts as `plugins` describes them); an insert already in the chain, the same plugin under the same id, is left to the chain builder, so one can always be removed; an id kept while its `kind` or `plugin` changes counts as an addition. Only this chain is rebuilt; every other chain keeps its running plugins |
+| `setInserts` | `channel`, `inserts[]` | replace a chain; `channel` is `xlr1`, `xlr2`, a capture channel id or `mix:<id>`, each insert is `{id, kind, plugin, label?, bypass?, ownBlock?, params?}` where `kind` is `"lv2"` with the plugin URI, `"clap"` with the plugin's id, or `"vst3"` with the class id as 32 hex digits; a CLAP or VST3 insert always runs in the native host, so its `nativeHost` reads true whatever was sent. An insert being added is refused when its plugin cannot run at the chain's width (`chainWidth` on an input, two on a mix, by `widths` or the port counts as `plugins` describes them); an insert already in the chain, the same plugin under the same id, is left to the chain builder, so one can always be removed; an id kept while its `kind` or `plugin` changes counts as an addition. Only this chain is rebuilt; every other chain keeps its running plugins |
 | `setInsertBypass` | `channel`, `insertId`, `value` | bypass one insert; rebuilds this chain only |
+| `setInsertOwnBlock` | `channel`, `insertId`, `value` | `true` runs one insert's plugin [on its own block](#own-block), `false` back in PipeWire's cycle; saved with the insert as `ownBlock`. Rebuilds this chain only, which starts that insert's host again in the new mode. Refused when the insert is not in the chain, when `value` is not a boolean, and, for `true`, when the native plugin host is not installed |
 | `setInsertParam` | `channel`, `insertId`, `symbol`, `value` | one plugin control, by the catalogue's `symbol` (LV2 port symbol or decimal CLAP/VST3 parameter id); use catalogue ranges and scale points. Refused when the insert is not in the chain or the catalogue does not declare the symbol for its plugin |
 | `renameInsert` | `channel`, `insertId`, `name` | change one insert's label; `name` is 1 to 256 characters with no control characters. The running plugin, its parameters and the audio path stay as they are. Refused when the insert is not in the chain |
 | `getNativeEditorRules` | none | read release defaults and explicit user overrides for native editor compatibility |
@@ -674,6 +675,24 @@ when the helper is installed. Unsupported native selections are rejected.
 Changing this choice via `setInserts` rebuilds the chain and can interrupt audio.
 Only exposed parameter values are persisted, not opaque plugin state or presets.
 
+<a name="own-block"></a>
+Any insert definition optionally carries `ownBlock: true`, set with
+`setInsertOwnBlock` or in a `setInserts` chain. The native host then calls
+the plugin on a worker thread with 1024 frames at a time, apart from
+PipeWire's cycle, for a plugin that cannot finish a short cycle in time;
+the node and its ports stay as they were. Missing or false keeps the plugin
+in the cycle. Only the native host can do this, so an LV2 insert with it
+runs there whatever its `nativeHost` says, and `nativeHost` is not changed.
+The audio comes out late by the block plus the larger of 512 frames and the
+graph's quantum: 1536 frames, 32 ms at 48 kHz, at a quantum of 256, and
+2048 frames at 1024. That delay is part of the insert's
+`latencyMilliseconds`, on top of the plugin's own figure, and counts as
+zero for a plugin that gives none, so such an insert reports the delay
+alone. A block the plugin answers late plays as silence and the delay
+stays the same. A bypassed insert is out of the chain, delay included. The
+helper's side is described in
+[native/README.md](../native/README.md#own-block).
+
 When PipeWire's filter chain refuses to load an LV2 insert and the helper is
 installed, the daemon runs that insert in the helper instead. Each insert is
 decided on its own. The daemon rebuilds a refused chain of several inserts with
@@ -749,8 +768,8 @@ as XLR 1, running on this computer (see
 pair has no EQ.
 
 The `mixer.inserts` map also accepts capture channel ids. `setInserts`,
-`setInsertBypass`, `setInsertParam`, `renameInsert` and `showInsertUi` use
-those ids as `channel`. `removeWindowsPluginInserts {path}` removes matching
+`setInsertBypass`, `setInsertOwnBlock`, `setInsertParam`, `renameInsert`
+and `showInsertUi` use those ids as `channel`. `removeWindowsPluginInserts {path}` removes matching
 occurrences from capture chains too; it still takes a plugin path, not a
 channel.
 
@@ -868,7 +887,8 @@ lacks, so a client needs its own fallback.
 ### Plugin latency
 
 Each insert's status carries `latencyMilliseconds`, the processing latency
-the plugin reports: zero for a bypassed insert, and absent (null over HTTP)
+the plugin reports, plus the fixed delay of an insert
+[on its own block](#own-block): zero for a bypassed insert, and absent (null over HTTP)
 when the plugin gives no figure. A plugin in the native host reports what
 the helper last read from it; there is no figure before the helper's first
 report, which comes once audio has run. An LV2 plugin in the PipeWire filter

@@ -253,9 +253,10 @@ public sealed class WindowLayoutTests
                     Assert.True(title.TranslatePoint(default, controls)!.Value.Y + title.Bounds.Height <=
                                 actions.TranslatePoint(default, controls)!.Value.Y);
                     var buttons = actions.Children.Where(c => c.IsVisible).ToArray();
-                    Assert.Equal(6, buttons.Length);
+                    Assert.Equal(7, buttons.Length);
+                    Assert.Contains(controls.FindControl<Avalonia.Controls.Primitives.ToggleButton>("PluginOwnBlock"), buttons);
                     Assert.Single(controls.GetVisualDescendants().OfType<Slider>());
-                    // In one row the six actions need more than 420 px, so
+                    // In one row the seven actions need more than 420 px, so
                     // there they have to wrap rather than run off the window.
                     foreach (var button in buttons)
                     {
