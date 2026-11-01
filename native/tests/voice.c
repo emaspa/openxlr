@@ -380,6 +380,77 @@ static void check_split(void) {
   printf("split: noise removal %.0f and the voice changer %.0f samples, the stage %zu\n", noise, shift, total);
 }
 
+// --- numbers that are not numbers ---------------------------------------------
+
+// A NaN and two infinities in the stage's input, mid-block, with a voice on:
+// the output is exactly what the same input with zeros there gives.
+static void check_nonfinite_input(void) {
+  static float poisoned[COUNT], zeroed[COUNT], expected[COUNT];
+  enum { LENGTH = 3 * RATE };
+  memcpy(poisoned, voice, LENGTH * sizeof(float));
+  memcpy(zeroed, voice, LENGTH * sizeof(float));
+  const size_t at[] = {RATE + 100, RATE + 101, 2 * RATE + 7};
+  poisoned[at[0]] = NAN, poisoned[at[1]] = INFINITY, poisoned[at[2]] = -INFINITY;
+  for (size_t i = 0; i < 3; i++) zeroed[at[i]] = 0;
+  Host *h = stage(RATE, VOICE_WITCH), *reference = stage(RATE, VOICE_WITCH);
+  run(h, poisoned, output, LENGTH, BLOCK);
+  run(reference, zeroed, expected, LENGTH, BLOCK);
+  assert(!memcmp(output, expected, LENGTH * sizeof(float)));
+  assert(meter(h, "stage_nonfinite") == 3 && meter(h, "stage_resets") == 0);
+  release(h), release(reference);
+  puts("non-finite input: the voice hears silence in its place and plays on unchanged");
+}
+
+// A voice whose state turned non-finite. The stage keeps NaN out of its
+// input, so the voice is handed one directly, past the stage's guard: that
+// block plays dry, the voice starts over from silence and is back at the
+// input's level once the shifter has heard enough, with nothing allocated.
+// Once more after more than a second, it starts over again; once more inside
+// a second of that, it is cut off and says so, and the stage plays dry.
+static void check_nonfinite_state(void) {
+  static float poisoned[BLOCK], out[BLOCK];
+  Host *h = stage(RATE, VOICE_DEEP);
+  Voice *v = ((Eq *)h->impl)->voice;
+  size_t at = 0;
+  for (int round = 0; round < 3; round++) {
+    run(h, voice + at, output + at, round == 2 ? RATE / 2 : 2 * RATE, BLOCK);
+    at += round == 2 ? RATE / 2 : 2 * RATE;
+    memcpy(poisoned, voice + at, sizeof(poisoned));
+    poisoned[BLOCK / 2] = NAN;
+    atomic_store(&counting, true);
+    voice_process(v, poisoned, out, BLOCK);
+    atomic_store(&counting, false);
+    assert(atomic_load(&allocations) == 0);
+    h->backend->main_thread(h);
+    at += BLOCK;
+    if (round < 2) {
+      assert(voice_resets(v) == (unsigned)round + 1 && meter(h, "stage_resets") == round + 1);
+      assert(meter(h, "voice_active") == VOICE_DEEP && meter(h, "voice_status") == VOICE_OK);
+    }
+  }
+  // The third failure came half a second after the second restart: cut off.
+  assert(voice_resets(v) == 2 && meter(h, "voice_status") == VOICE_FELL_BEHIND);
+  run(h, voice + at, output + at, RATE, BLOCK);
+  assert(meter(h, "voice_active") == VOICE_OFF);
+  release(h);
+
+  // After a restart the voice is back near the input's level.
+  h = stage(RATE, VOICE_DEEP);
+  v = ((Eq *)h->impl)->voice;
+  run(h, voice, output, RATE, BLOCK);
+  memcpy(poisoned, voice + RATE, sizeof(poisoned));
+  poisoned[3] = INFINITY;
+  voice_process(v, poisoned, out, BLOCK);
+  run(h, voice + RATE + BLOCK, output + RATE + BLOCK, 3 * RATE, BLOCK);
+  size_t from = RATE + BLOCK, latency = eq_latency(h);
+  double in_db = rms_db(voice, from, from + 3 * RATE, 0), out_db = rms_db(output, from, from + 3 * RATE, latency);
+  printf("non-finite state: the voice starts over, %.1f dB from the input after; a second failure within a "
+         "second cuts it off\n", out_db - in_db);
+  assert(fabs(out_db - in_db) <= 4);
+  assert(voice_resets(v) == 1 && meter(h, "voice_active") == VOICE_DEEP);
+  release(h);
+}
+
 int main(int argc, char **argv) {
   setvbuf(stdout, NULL, _IOLBF, 0);
   if (argc == 4 && !strcmp(argv[1], "--render")) return render(argv[2], argv[3]);
@@ -391,6 +462,8 @@ int main(int argc, char **argv) {
   check_switches();
   check_rates();
   check_split();
+  check_nonfinite_input();
+  check_nonfinite_state();
   puts("voice: all checks passed");
   return 0;
 }

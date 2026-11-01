@@ -31,6 +31,17 @@
 // DeepFilterNet keeps the current output playing until its model has loaded
 // on the main thread.
 //
+// Numbers that are not numbers. The stage (eq.c) hands this a finite input.
+// Should an engine still answer with something that is not a number, its
+// state is cleared rather than left to poison what follows: RNNoise is set
+// up anew on the audio thread, which allocates nothing, and the input,
+// delayed to match, plays until it has heard enough again. A DeepFilterNet
+// model that does so stops; the stage plays the dry input, and the main
+// thread loads a fresh model and switches back to it, at most once in
+// DF_RELOAD_SECONDS. A second failure inside that time holds as any other
+// DeepFilterNet failure does, until noise removal is asked for again. Each
+// clearing counts in denoise_resets.
+//
 // Who owns what. The daemon writes the controls; the audio thread reads them
 // once a block and owns the fade, RNNoise and the DeepFilterNet worker it
 // holds. The main thread loads and frees DeepFilterNet workers and hands them
@@ -69,6 +80,7 @@ enum {
   DF_RING = 1 << 15,   // each DeepFilterNet ring, in samples
   DF_MAX_HOP = 2048,
   DF_SETTLE = 2 * 48000,  // how long smaller blocks hold before the lag shrinks
+  DF_RELOAD_SECONDS = 10, // the least time between two automatic model reloads
 };
 
 // RNNoise works on 16-bit sample values held in floats.
@@ -85,6 +97,7 @@ typedef struct DfWorker {
   sem_t wake;
   _Atomic bool quit;
   _Atomic bool failed;  // the model failed; the audio thread stops using it
+  _Atomic bool nonfinite;  // it failed by answering with something not a number
   // Ring positions as running sample counts: the audio thread writes input
   // up to written, and the worker has taken input, and given output, up to
   // done. Output sample j answers input sample j - delay.
@@ -122,12 +135,14 @@ struct Denoise {
   // Main thread only. Remains true while the audio thread borrows the
   // worker, so returning it cannot make a second model load race the first.
   bool df_loaded;
+  struct timespec df_reloaded;  // when a model was last reloaded after a non-finite answer
 
   // Between the threads.
   _Atomic(DfWorker *) df_spare;  // loaded by the main thread, not in use
   _Atomic int df_broken;         // the audio thread gave up on DeepFilterNet
   _Atomic bool df_load_failed;   // the main thread could not load it
   _Atomic uint32_t latency;
+  _Atomic uint32_t resets;  // engine states cleared after a non-finite answer
 };
 
 bool denoise_engine_built(int engine) {
@@ -176,8 +191,10 @@ static void *df_work(void *data) {
         w->applied = strength;
       }
       bool ok = openxlr_df_process(w->model, w->hop_in, w->hop_out) == 0;
-      for (uint32_t n = 0; ok && n < w->hop; n++) ok = isfinite(w->hop_out[n]);
-      if (!ok) {
+      bool finite = true;
+      for (uint32_t n = 0; ok && finite && n < w->hop; n++) finite = isfinite(w->hop_out[n]);
+      if (!ok || !finite) {
+        if (ok) atomic_store(&w->nonfinite, true);
         atomic_store(&w->failed, true);
         break;
       }
@@ -351,6 +368,18 @@ void denoise_unload(Denoise *d) {
 
 uint32_t denoise_latency(const Denoise *d) { return d ? atomic_load(&d->latency) : 0; }
 
+uint32_t denoise_resets(const Denoise *d) { return d ? atomic_load(&d->resets) : 0; }
+
+// Whether a model that answered with something not a number may be replaced
+// now, without asking: not twice inside DF_RELOAD_SECONDS.
+static bool df_may_reload(Denoise *d) {
+  struct timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  if (d->df_reloaded.tv_sec && now.tv_sec - d->df_reloaded.tv_sec < DF_RELOAD_SECONDS) return false;
+  d->df_reloaded = now;
+  return true;
+}
+
 // --- the main thread -----------------------------------------------------------
 
 void denoise_main_thread(Denoise *d) {
@@ -374,8 +403,16 @@ void denoise_main_thread(Denoise *d) {
   } else {
     DfWorker *w = atomic_exchange(&d->df_spare, NULL);
     if (w) {
+      // The audio thread has given back a model that answered with
+      // something not a number: free it, and unless that happened lately,
+      // clear the failure so the next tick loads a fresh one.
+      bool reload = asked && atomic_load(&w->nonfinite) && df_may_reload(d);
       df_stop(w);
       d->df_loaded = false;
+      if (reload) {
+        atomic_fetch_add(&d->resets, 1);
+        atomic_store(&d->df_broken, DENOISE_OK);
+      }
     }
   }
 
@@ -407,6 +444,13 @@ static inline float dry_at(const Denoise *d, uint64_t t, uint32_t delay) {
   return t >= delay ? d->dry[(t - delay) & (DRY_SIZE - 1)] : 0.0f;
 }
 
+// Whether RNNoise's answer for a frame is all numbers.
+static bool rnn_finite(const float *frame, float voice) {
+  bool finite = isfinite(voice);
+  for (unsigned n = 0; n < RNN_FRAME; n++) finite &= isfinite(frame[n]) != 0;
+  return finite;
+}
+
 // One segment through RNNoise. `t` is the clock of in[0].
 static void run_rnnoise(Denoise *d, const float *in, float *out, uint32_t frames, uint64_t t) {
   double target = strength_mix(d), step = (target - d->mix) / frames;
@@ -414,15 +458,23 @@ static void run_rnnoise(Denoise *d, const float *in, float *out, uint32_t frames
     d->mix += step;
     float dry = dry_at(d, t + n, RNN_DELAY);
     d->rnn_in[d->rnn_at] = in[n] * RNN_SCALE;
-    float wet = d->session + n < RNN_DELAY ? dry : d->rnn_out[d->rnn_at] / RNN_SCALE;
+    float wet = d->session < RNN_DELAY ? dry : d->rnn_out[d->rnn_at] / RNN_SCALE;
     out[n] = dry + (float)((wet - dry) * d->mix);
+    d->session++;
     if (++d->rnn_at == RNN_FRAME) {
-      rnnoise_process_frame(d->rnn, d->rnn_out, d->rnn_in);
+      float voice = rnnoise_process_frame(d->rnn, d->rnn_out, d->rnn_in);
       d->rnn_at = 0;
+      if (!rnn_finite(d->rnn_out, voice)) {
+        // Start it over, as a switch to it would: the delayed input stands
+        // in until it has heard enough of its own again.
+        rnnoise_init(d->rnn, NULL);
+        memset(d->rnn_out, 0, sizeof(d->rnn_out));
+        d->session = 0;
+        atomic_fetch_add_explicit(&d->resets, 1, memory_order_relaxed);
+      }
     }
   }
   d->mix = target;
-  d->session += frames;
 }
 
 // The lag a block of `block` samples needs. The worker hears a hop only once

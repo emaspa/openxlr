@@ -5,6 +5,17 @@ namespace OpenXLR.Tests;
 [Collection("xdg-config")]
 public sealed class DiagnosticsTests
 {
+    [Theory]
+    [InlineData("AAY3H5481241GS", true)]
+    [InlineData("DB5814F6C3FEEF641F", true)]
+    [InlineData("0000:0e:00.0", false)]   // a root hub: its controller's PCI address
+    [InlineData("0000:7A:00.3", false)]
+    [InlineData("0000:0e:00.0x", true)]
+    [InlineData("abc", false)]            // too short to mask safely
+    [InlineData(null, false)]
+    public void UsbSerialsAreMaskedButControllerAddressesStay(string? serial, bool masked)
+        => Assert.Equal(masked, Diagnostics.IsDeviceSerial(serial));
+
     [Fact]
     public async Task ArchiveIsNamedByTimestampAndPrivate()
     {
@@ -515,17 +526,19 @@ public sealed class DiagnosticsTests
                 """);
             ExecutableScript.Write(Path.Combine(bin, "journalctl"), $$"""
                 case "$*" in
-                  '--user -u openxlr-daemon --since 2 hours ago --no-pager')
+                  '--user -u openxlr-daemon.service -b -o short-iso-precise --no-pager -n 20001')
                     echo 'Okt 18 11:23:43 {{machine}} openxlr-daemon[2219]: loaded /mnt/{{login}}/lv2/eq.lv2 for {{login}}@{{machine}}'
                     ;;
-                  '--user -u pipewire.service -u pipewire-pulse.service -u wireplumber.service --since 2 hours ago --no-pager')
+                  '--user -u pipewire.service -u pipewire-pulse.service -u wireplumber.service -b -o short-iso-precise --no-pager -n 20001')
                     echo 'Okt 18 11:23:44 {{machine}} pipewire[2220]: xrun for {{login}}@{{machine}}'
                     {{(commandWarning ? $"echo 'journal warning for {login}@{machine}: access incomplete' >&2\nexit 1" : "")}}
+                    ;;
+                  '-k -b -o short-iso-precise --no-pager --case-sensitive=false -g '*)
+                    echo '2026-10-18T11:23:45.000001+00:00 {{machine}} kernel: usb 3-2: USB disconnect, device number 4 ({{login}}@{{machine}})'
                     ;;
                   *) echo 'unexpected journal request' >&2; exit 91 ;;
                 esac
                 """);
-            ExecutableScript.Write(Path.Combine(bin, "pw-top"), "printf '%s\\n' 'S ID QUANT RATE ERR NAME' 'R 60 1024 48000 2 OpenXLR_mix_monitor'\n");
             Environment.SetEnvironmentVariable("PATH", bin + Path.PathSeparator + path);
             Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", config);
             Directory.CreateDirectory(UiSettings.ConfigDir);
@@ -628,6 +641,8 @@ public sealed class DiagnosticsTests
             Assert.Contains("loaded /mnt/<redacted>/lv2/eq.lv2 for <redacted>@<redacted>", entries["journal.txt"]);
             Assert.Contains("pipewire[2220]: xrun for <redacted>@<redacted>", entries["audio-journal.txt"]);
             Assert.DoesNotContain("loaded /mnt/", entries["audio-journal.txt"]);
+            Assert.Contains("usb 3-2: USB disconnect, device number 4 (<redacted>@<redacted>)", entries["kernel-log.txt"]);
+            Assert.DoesNotContain("unexpected journal request", entries["kernel-log.txt"]);
             if (commandWarning)
                 Assert.Contains("journal warning for <redacted>@<redacted>: access incomplete", entries["audio-journal.txt"]);
             Assert.Contains("/run/media/<redacted>/VST3", entries["plugin-setup.json"]);
@@ -645,7 +660,8 @@ public sealed class DiagnosticsTests
             using var streams = System.Text.Json.JsonDocument.Parse(entries["sink-inputs.json"]);
             Assert.Equal(1024, streams.RootElement[0].GetProperty("buffer_latency_usec").GetInt32());
             Assert.Equal("<redacted>", streams.RootElement[0].GetProperty("properties").GetProperty("application.process.id").GetString());
-            Assert.Contains("48000 2 OpenXLR_mix_monitor", entries["pw-top.txt"]);
+            Assert.StartsWith("ALSA sound cards and their open PCM devices", entries["alsa-pcm.txt"]);
+            Assert.DoesNotContain("pw-top.txt", entries.Keys);
             Assert.DoesNotContain("collection.json", entries.Keys);
             if (commandWarning)
             {

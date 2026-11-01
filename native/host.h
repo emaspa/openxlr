@@ -97,6 +97,10 @@ typedef struct {
   // A command line the core does not know, on the main thread. True when the
   // backend took it. NULL for a backend that only takes `set` lines.
   bool (*command)(Host *h, char *line);
+  // The backend replaces non-finite input samples itself before they reach
+  // any state, so the host hands such a block on instead of stopping. Its
+  // output is still checked like any other's.
+  bool guards_input;
 } Backend;
 
 #ifndef __cplusplus

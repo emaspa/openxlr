@@ -23,6 +23,7 @@ native/tests/eq
 native/tests/duck
 native/tests/denoise
 native/tests/denoise-handoff
+native/tests/denoise-recovery
 native/tests/voice
 native/tests/dynamics
 native/tests/player

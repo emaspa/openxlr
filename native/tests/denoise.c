@@ -250,6 +250,27 @@ static void check_strength(int engine, const char *name) {
   release(h);
 }
 
+// A NaN and two infinities in the input, mid-block, with the engine running:
+// the output is finite and exactly what the same input with zeros there
+// gives, so nothing reached the engine, and the stage counts the samples.
+static void check_nonfinite_input(int engine, const char *name) {
+  static float poisoned[COUNT], zeroed[COUNT], expected[COUNT];
+  enum { LENGTH = 3 * RATE };
+  memcpy(poisoned, input, LENGTH * sizeof(float));
+  memcpy(zeroed, input, LENGTH * sizeof(float));
+  const size_t at[] = {RATE + 100, RATE + 101, 2 * RATE + 7};
+  poisoned[at[0]] = NAN, poisoned[at[1]] = INFINITY, poisoned[at[2]] = -INFINITY;
+  for (size_t i = 0; i < 3; i++) zeroed[at[i]] = 0;
+  Host *h = stage(RATE, engine, 100), *reference = stage(RATE, engine, 100);
+  run(h, poisoned, output, LENGTH, BLOCK);
+  run(reference, zeroed, expected, LENGTH, BLOCK);
+  assert(!memcmp(output, expected, LENGTH * sizeof(float)));
+  assert(meter(h, "stage_nonfinite") == 3 && meter(h, "stage_resets") == 0);
+  assert(meter(h, "denoise_active") == engine && meter(h, "denoise_status") == DENOISE_OK);
+  release(h), release(reference);
+  printf("%s: NaN and infinities in the input become silence before the engine, which keeps running\n", name);
+}
+
 // The output does not depend on how the audio arrives in blocks.
 static void check_blocks(void) {
   static float other[COUNT];
@@ -450,6 +471,7 @@ int main(int argc, char **argv) {
   check_controls();
   check_engine(DENOISE_RNNOISE, "RNNoise", 10);
   check_strength(DENOISE_RNNOISE, "RNNoise");
+  check_nonfinite_input(DENOISE_RNNOISE, "RNNoise");
   check_blocks();
   check_switches();
   check_rate();
@@ -459,6 +481,7 @@ int main(int argc, char **argv) {
   check_deepfilter_blocks();
   check_deepfilter_follows();
   check_deepfilter_quiet_rooms();
+  check_nonfinite_input(DENOISE_DEEPFILTER, "DeepFilterNet");
 #else
   // Asked for anyway, it passes the input through and says why.
   Host *h = stage(RATE, DENOISE_DEEPFILTER, 100);

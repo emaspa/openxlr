@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Globalization;
 using System.Formats.Tar;
 using System.IO;
 using System.IO.Compression;
@@ -66,9 +67,10 @@ public static class Diagnostics
             await File.WriteAllTextAsync(Path.Combine(work, "PRIVACY.txt"), """
                 This archive is created locally and is never uploaded automatically.
                 It contains OpenXLR state, USB control blocks and topology, PipeWire topology,
-                recent openxlr-daemon journal entries or Flatpak logs,
-                native audio-server and session-manager journal entries,
-                short PipeWire node statistics, application audio metadata,
+                openxlr-daemon journal entries from the current boot or Flatpak logs,
+                native audio-server and session-manager journal entries from the current boot,
+                kernel messages about USB, sound and power management from the current boot,
+                the status of open ALSA devices, application audio metadata,
                 configuration files, plugin names and paths, the plugin catalogue,
                 Wine/yabridge versions and status, latest scan results, the saved
                 output of plugin scans that failed, and system
@@ -78,7 +80,7 @@ public static class Diagnostics
                 No plugin binaries, presets, Wine registry
                 files or API token are collected. The home
                 path, the login name, the host name, the serial numbers of
-                attached USB devices (including inside PipeWire node names) and
+                attached USB devices (including inside PipeWire node names, but not a USB controller's PCI address) and
                 process-id fields are redacted, and so are browser tab titles
                 and the addresses of browser tabs not routed to a channel.
                 Files in the archive carry no
@@ -105,18 +107,18 @@ public static class Diagnostics
             await Capture("modules.txt", "pactl", "list", "short", "modules");
             await Capture("lsusb.txt", "lsusb");
             await Capture("usb-topology.txt", "lsusb", "-t");
-            await Capture("pw-top.txt", "pw-top", "--batch-mode", "--iterations", "3");
+            await File.WriteAllTextAsync(Path.Combine(work, "alsa-pcm.txt"), Clean(AlsaSnapshot()));
             await Capture("sink-inputs.json", "pactl", "--format=json", "list", "sink-inputs");
             await Capture("source-outputs.json", "pactl", "--format=json", "list", "source-outputs");
             if (FlatpakEnvironment.IsFlatpak)
                 CopyDaemonLogs(Clean, OpenXlrPaths.StateDir, work);
             else
             {
-                await Capture("journal.txt", "journalctl", "--user", "-u", "openxlr-daemon",
-                    "--since", "2 hours ago", "--no-pager");
-                await Capture("audio-journal.txt", "journalctl", "--user",
-                    "-u", "pipewire.service", "-u", "pipewire-pulse.service", "-u", "wireplumber.service",
-                    "--since", "2 hours ago", "--no-pager");
+                await WriteJournalAsync(Clean, work, "journal.txt", "journalctl",
+                    ["--user", "-u", "openxlr-daemon.service"]);
+                await WriteJournalAsync(Clean, work, "audio-journal.txt", "journalctl",
+                    ["--user", "-u", "pipewire.service", "-u", "pipewire-pulse.service", "-u", "wireplumber.service"]);
+                await WriteKernelLogAsync(Clean, work, "journalctl", "dmesg");
             }
 
             // Configs may include remembered application identities and device
@@ -497,15 +499,249 @@ public static class Diagnostics
 
     internal static async Task<(string Output, string Errors)> RunCommandAsync(string exe, string[] args)
     {
+        var (output, errors, _) = await RunHelperAsync(exe, args);
+        return (output, errors);
+    }
+
+    /// <summary>
+    /// <see cref="RunCommandAsync"/> with the helper's exit status as well:
+    /// -1 when it could not be started or did not finish on its own.
+    /// </summary>
+    private static async Task<(string Output, string Errors, int ExitCode)> RunHelperAsync(string exe, string[] args)
+    {
         try
         {
             // 15 s and 8 MiB per command; a helper that goes past either is
             // killed with its children and the archive says so.
             ProcessResult r = await ProcessRunner.RunAsync(exe, args, TimeSpan.FromSeconds(15),
                 stdoutCap: 8 * 1024 * 1024, stderrCap: 64 * 1024);
-            return (r.StdoutText, r.Stderr + CommandNotes(exe, r));
+            return (r.StdoutText, r.Stderr + CommandNotes(exe, r), r.TimedOut || r.Cancelled ? -1 : r.ExitCode);
         }
-        catch (Exception ex) { return ("", $"failed to run {exe}: {ex.Message}"); }
+        catch (Exception ex) { return ("", $"failed to run {exe}: {ex.Message}", -1); }
+    }
+
+    /// <summary>
+    /// How much of one boot's journal a file in the archive keeps: the newest
+    /// lines, up to both limits. A night of audio-server warnings fits; a
+    /// journal flooded by a failing device is cut from the oldest end, and
+    /// the file says so on its first line.
+    /// </summary>
+    internal const int JournalLineLimit = 20_000;
+    internal const int JournalByteLimit = 2 * 1024 * 1024;
+
+    /// <summary>
+    /// Kernel messages worth having beside an audio report: USB devices,
+    /// their controllers and hubs coming and going or being reset, sound
+    /// drivers, and suspend and resume. The same pattern serves journalctl's
+    /// PCRE2 --grep and the filter applied here when that is unavailable.
+    /// </summary>
+    internal const string KernelLogPattern = @"usb|xhci|snd|sound|alsa|hub|disconnect|reset|suspend|resume|\bpm:";
+
+    /// <summary>
+    /// The current boot's journal of the units <paramref name="selection"/>
+    /// names, newest lines last, kept within <see cref="JournalLineLimit"/>
+    /// and <see cref="JournalByteLimit"/>. A break in the night is in the
+    /// file the next morning, which a window counted back from the moment of
+    /// collection would miss.
+    /// </summary>
+    internal static async Task WriteJournalAsync(Func<string, string> clean, string dir, string file,
+        string journalctl, string[] selection)
+    {
+        // One line more than is kept: when it arrives, something was left out.
+        string[] args = [.. selection, "-b", "-o", "short-iso-precise", "--no-pager",
+            "-n", (JournalLineLimit + 1).ToString(CultureInfo.InvariantCulture)];
+        var (output, errors, _) = await RunHelperAsync(journalctl, args);
+        string kept = KeepNewest(output, out string? cut);
+        var text = new StringBuilder();
+        if (cut is not null) text.Append(cut).Append('\n');
+        text.Append(kept);
+        if (kept.Length > 0 && errors.Length > 0 && !kept.EndsWith('\n')) text.Append('\n');
+        text.Append(errors);
+        await File.WriteAllTextAsync(Path.Combine(dir, file), clean(text.ToString()));
+    }
+
+    /// <summary>
+    /// Kernel messages of the current boot that match <see cref="KernelLogPattern"/>,
+    /// as kernel-log.txt. The system journal is read first. When this account
+    /// may not read it, the kernel's own buffer is tried through
+    /// <paramref name="dmesg"/>, which many distributions also restrict; the
+    /// file then says which source answered, or that neither did and why.
+    /// </summary>
+    internal static async Task WriteKernelLogAsync(Func<string, string> clean, string dir, string journalctl, string dmesg)
+    {
+        var text = new StringBuilder();
+        // No line limit here: journalctl lists a grep with --lines newest
+        // first on some versions, and the filter already keeps this small.
+        var (output, errors, status) = await RunHelperAsync(journalctl,
+            ["-k", "-b", "-o", "short-iso-precise", "--no-pager", "--case-sensitive=false", "-g", KernelLogPattern]);
+        string body;
+        if (JournalRefused(output, errors))
+        {
+            text.Append("The system journal holds the kernel log, and this account may not read it: on most\n")
+                .Append("distributions members of the systemd-journal, adm or wheel group can. `journalctl -k -b`\n")
+                .Append("run as such a member, or with sudo, shows it. What journalctl said:\n")
+                .Append(errors.TrimEnd()).Append("\n\n");
+            var (kernel, dmesgErrors, dmesgStatus) = await RunHelperAsync(dmesg, ["--time-format=iso"]);
+            if (dmesgStatus != 0 || !HasLogLines(kernel))
+            {
+                text.Append("The kernel's own buffer could not be read either (dmesg; kernel.dmesg_restrict is\n")
+                    .Append("set on many distributions). What dmesg said:\n").Append(dmesgErrors.TrimEnd()).Append('\n');
+                await File.WriteAllTextAsync(Path.Combine(dir, "kernel-log.txt"), clean(text.ToString()));
+                return;
+            }
+            text.Append("Read from the kernel's own buffer instead (dmesg), which holds only its newest messages,\n")
+                .Append("filtered here for USB, sound and power management lines.\n");
+            body = FilterKernelLines(kernel);
+            errors = dmesgErrors;
+        }
+        else if (status != 0 && !HasLogLines(output)
+                 && (errors.Contains("pattern", StringComparison.OrdinalIgnoreCase) || errors.Contains("pcre", StringComparison.OrdinalIgnoreCase)))
+        {
+            // A journalctl built without pattern matching: take the newest
+            // kernel lines and filter them here.
+            var (all, allErrors, _) = await RunHelperAsync(journalctl,
+                ["-k", "-b", "-o", "short-iso-precise", "--no-pager", "-n", (JournalLineLimit + 1).ToString(CultureInfo.InvariantCulture)]);
+            text.Append($"This journalctl cannot filter by pattern, so the newest {JournalLineLimit} kernel lines were\n")
+                .Append("filtered here for USB, sound and power management lines.\n");
+            body = FilterKernelLines(all);
+            errors = allErrors;
+        }
+        else
+        {
+            text.Append("Kernel messages of the current boot about USB, sound and power management (journalctl -k).\n");
+            body = output;
+        }
+        string kept = KeepNewest(body, out string? cut);
+        if (cut is not null) text.Append(cut).Append('\n');
+        text.Append(kept);
+        if (kept.Length > 0 && errors.Length > 0 && !kept.EndsWith('\n')) text.Append('\n');
+        text.Append(errors);
+        await File.WriteAllTextAsync(Path.Combine(dir, "kernel-log.txt"), clean(text.ToString()));
+    }
+
+    /// <summary>
+    /// Whether journalctl answered with no entries because the account may
+    /// not read the system journal, as opposed to having nothing to show.
+    /// </summary>
+    internal static bool JournalRefused(string output, string errors)
+        => !HasLogLines(output)
+           && (errors.Contains("not seeing messages", StringComparison.OrdinalIgnoreCase)
+               || errors.Contains("insufficient permissions", StringComparison.OrdinalIgnoreCase)
+               || errors.Contains("permission denied", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Whether any line is a log line rather than journalctl's own "-- No entries --" marker.</summary>
+    private static bool HasLogLines(string output)
+        => output.Split('\n').Any(line => line.Length > 0 && !line.StartsWith("-- ", StringComparison.Ordinal));
+
+    private static readonly Regex KernelLogLine = new(KernelLogPattern,
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
+
+    internal static string FilterKernelLines(string text)
+    {
+        var kept = new StringBuilder();
+        foreach (string line in text.Split('\n'))
+            if (KernelLogLine.IsMatch(line)) kept.Append(line).Append('\n');
+        return kept.ToString();
+    }
+
+    /// <summary>
+    /// The newest whole lines of <paramref name="text"/> within
+    /// <see cref="JournalLineLimit"/> and <see cref="JournalByteLimit"/>.
+    /// <paramref name="cut"/> is the line that says what was left out, or
+    /// null when nothing was.
+    /// </summary>
+    internal static string KeepNewest(string text, out string? cut)
+    {
+        cut = null;
+        if (text.Length == 0) return text;
+        string[] lines = text.EndsWith('\n') ? text[..^1].Split('\n') : text.Split('\n');
+        int first = Math.Max(0, lines.Length - JournalLineLimit);
+        long bytes = 0;
+        int start = lines.Length;
+        while (start > first)
+        {
+            long line = Encoding.UTF8.GetByteCount(lines[start - 1]) + 1;
+            if (bytes + line > JournalByteLimit) break;
+            bytes += line;
+            start--;
+        }
+        if (start == 0) return text;
+        cut = $"[cut: older lines were left out; this file keeps the newest {lines.Length - start} lines "
+              + $"(at most {JournalLineLimit} lines and {JournalByteLimit} bytes)]";
+        return string.Join('\n', lines[start..]) + "\n";
+    }
+
+    /// <summary>
+    /// The sound cards and their open PCM devices as the kernel reports them
+    /// under <paramref name="root"/>: the rate, period and buffer the audio
+    /// server opened each with, its state and fill, and for USB interfaces
+    /// the stream file with the frequency the device is actually running at.
+    /// This replaces pw-top, whose figures come from PipeWire's profiler: the
+    /// profiler sends a driver's report only when it fits in 16 KiB, and a
+    /// driver with OpenXLR's hundred or so followers needs more, so every row
+    /// came out as zero. Reading these files starts no process.
+    /// </summary>
+    internal static string AlsaSnapshot(string root = "/proc/asound")
+    {
+        const int MaxFileBytes = 64 * 1024;
+        var text = new StringBuilder();
+        text.AppendLine($"ALSA sound cards and their open PCM devices, read from {root}.");
+        text.AppendLine("hw_params is what the audio server opened a device with; status is its state and fill now.");
+        text.AppendLine("A USB card's stream file has the rate the device actually runs at (Momentary freq).");
+        text.AppendLine("PipeWire's quantum and driver for each node are in pw-dump.json (node.driver-id, clock settings).");
+        string Read(string path)
+        {
+            try { return RegularFile.ReadText(path, MaxFileBytes); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return $"unreadable: {ex.Message}\n"; }
+        }
+        void Section(string title, string body)
+        {
+            text.Append("\n== ").Append(title).Append(" ==\n").Append(body);
+            if (!body.EndsWith('\n')) text.Append('\n');
+        }
+        static IEnumerable<string> Numbered(string dir, string pattern)
+        {
+            var match = new Regex(pattern, RegexOptions.CultureInvariant);
+            IEnumerable<string> found;
+            try { found = Directory.EnumerateDirectories(dir).ToArray(); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { yield break; }
+            foreach (string path in found
+                         .Where(p => match.IsMatch(Path.GetFileName(p)) && new DirectoryInfo(p).LinkTarget is null)
+                         .OrderBy(p => int.Parse(Regex.Match(Path.GetFileName(p), "[0-9]+").Value, CultureInfo.InvariantCulture))
+                         .ThenBy(p => p, StringComparer.Ordinal))
+                yield return path;
+        }
+
+        if (!Directory.Exists(root))
+        {
+            text.AppendLine().AppendLine($"{root} does not exist: no ALSA sound cards, or not a Linux kernel.");
+            return text.ToString();
+        }
+        Section("cards", Read(Path.Combine(root, "cards")));
+        foreach (string card in Numbered(root, "^card[0-9]+$"))
+        {
+            string name = Path.GetFileName(card);
+            foreach (string file in new[] { "id", "usbid" })
+                if (File.Exists(Path.Combine(card, file))) Section($"{name}/{file}", Read(Path.Combine(card, file)));
+            IEnumerable<string> streams;
+            try { streams = Directory.EnumerateFiles(card, "stream*").Order(StringComparer.Ordinal).ToArray(); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { streams = []; }
+            foreach (string stream in streams) Section($"{name}/{Path.GetFileName(stream)}", Read(stream));
+            foreach (string pcm in Numbered(card, "^pcm[0-9]+[pc]$"))
+                foreach (string sub in Numbered(pcm, "^sub[0-9]+$"))
+                {
+                    string where = $"{name}/{Path.GetFileName(pcm)}/{Path.GetFileName(sub)}";
+                    string parameters = Read(Path.Combine(sub, "hw_params"));
+                    // A closed device has nothing more to say.
+                    if (parameters.Trim() == "closed") { Section(where, "closed\n"); continue; }
+                    Section($"{where}/hw_params", parameters);
+                    // The process that holds the device is an id, which the
+                    // archive does not keep.
+                    Section($"{where}/status", Regex.Replace(Read(Path.Combine(sub, "status")),
+                        @"(?m)^(owner_pid\s*:\s*)[0-9]+", "${1}<redacted>"));
+                }
+        }
+        return text.ToString();
     }
 
     private static string TryReadFile(string path)
@@ -547,9 +783,20 @@ public static class Diagnostics
                 if (File.Exists(file)) serial = File.ReadAllText(file).Trim();
             }
             catch (Exception) { /* unreadable: nothing to redact */ }
-            if (serial is { Length: >= 4 }) yield return serial;
+            if (serial is not null && IsDeviceSerial(serial)) yield return serial;
         }
     }
+
+    /// <summary>
+    /// Whether a USB serial names the device and is masked. A root hub's
+    /// serial is its controller's PCI address ("0000:0e:00.0"), the same on
+    /// every machine with that board and nothing personal; it is what tells
+    /// which controller a kernel line is about, so it stays.
+    /// </summary>
+    internal static bool IsDeviceSerial(string? serial)
+        => serial is { Length: >= 4 } && !PciAddress.IsMatch(serial);
+
+    private static readonly Regex PciAddress = new(@"^[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-7]$", RegexOptions.CultureInvariant);
 
     /// <summary>
     /// Replaces every secret with a placeholder, then the login name where it

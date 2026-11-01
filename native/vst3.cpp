@@ -1376,6 +1376,7 @@ extern "C" const Backend vst3_backend = {
     0,
     nullptr,
     nullptr,
+    false,  // guards_input: a plugin's input is checked by the host
 };
 
 // --- the scanner ------------------------------------------------------------

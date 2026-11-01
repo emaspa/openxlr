@@ -277,15 +277,25 @@ tests/denoise-handoff.o: tests/denoise-handoff.c denoise.c host.c build-config.h
 tests/denoise-handoff: tests/denoise-handoff.o $(RNN_OBJECTS) lv2.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
+# Recovery from an engine that answers with NaN: RNNoise's own state, and a
+# fake DeepFilterNet model, with denoise.c compiled in.
+tests/denoise-recovery.o: tests/denoise-recovery.c denoise.c host.c build-config.h $(HEADERS)
+	$(CC) $(CPPFLAGS) -Irnnoise/include $(CFLAGS) -c $< -o $@
+
+tests/denoise-recovery: tests/denoise-recovery.o $(RNN_OBJECTS) lv2.o clap.o vst3.o
+	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
 .PHONY: test-denoise clean-denoise
 test: test-denoise
-test-denoise: tests/denoise tests/denoise-handoff openxlr-lv2-host
+test-denoise: tests/denoise tests/denoise-handoff tests/denoise-recovery openxlr-lv2-host
 	./tests/denoise ./openxlr-lv2-host
 	./tests/denoise-handoff
+	./tests/denoise-recovery
 
 clean: clean-denoise
 clean-denoise:
-	rm -f tests/denoise tests/denoise.o tests/denoise-handoff tests/denoise-handoff.o build-config.h $(RNN_OBJECTS) rnnoise/src/x86/*.o
+	rm -f tests/denoise tests/denoise.o tests/denoise-handoff tests/denoise-handoff.o tests/denoise-recovery \
+	      tests/denoise-recovery.o build-config.h $(RNN_OBJECTS) rnnoise/src/x86/*.o
 	rm -rf deepfilter/target deepfilter/model/verified
 
 # The voice changer: every voice driven through the microphone stage over a

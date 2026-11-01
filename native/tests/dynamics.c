@@ -147,8 +147,10 @@ static void check_controls(void) {
     float initial = c->output ? atomic_load(&c->observed) : atomic_load(&c->desired);
     assert(initial == controls[i].initial);
   }
-  // The stage's own controls keep their places ahead of the new ones.
-  assert(!strcmp(h->controls[h->control_count - 1].symbol, "comp_output"));
+  // The stage's own controls keep their places ahead of the new ones; only
+  // the stage's two non-finite meters, added later, come after them.
+  assert(!strcmp(h->controls[h->control_count - 3].symbol, "comp_output"));
+  assert(!strcmp(h->controls[h->control_count - 1].symbol, "stage_resets"));
   release(h);
   puts("controls: the comp_* and exp_* controls and meters at the planned ranges and defaults, after the others");
 }
@@ -327,6 +329,54 @@ static void check_extremes(void) {
          "reductions end at %g and %g dB, never subnormal\n", top, makeup, r_comp, r_exp);
 }
 
+// A NaN and two infinities, with both processors working. Through the stage
+// they become silence before anything hears them; handed to a processor
+// directly, past the stage's guard, it takes them as silence too. Either way
+// the output is exactly what zeros there give, and the reduction stays a
+// number, where an infinity would have held the processor silent for good.
+static void check_nonfinite(void) {
+  enum { LENGTH = 2 * RATE };
+  static float zeroed[LENGTH], expected[LENGTH];
+  buzz(in, LENGTH);
+  memcpy(zeroed, in, sizeof(zeroed));
+  const size_t at[] = {RATE / 2 + 3, RATE / 2 + 4, RATE + 100};
+  in[at[0]] = NAN, in[at[1]] = INFINITY, in[at[2]] = -INFINITY;
+  for (size_t i = 0; i < 3; i++) zeroed[at[i]] = 0;
+  Host *hosts[2];
+  float *outputs[2] = {out, expected};
+  for (int k = 0; k < 2; k++) {
+    Host *h = hosts[k] = stage();
+    set(h, "comp_enabled", 1), set(h, "comp_threshold", -40), set(h, "comp_makeup", 6);
+    set(h, "exp_enabled", 1), set(h, "exp_threshold", -30);
+    run(h, k ? zeroed : in, outputs[k], LENGTH);
+  }
+  assert(!memcmp(out, expected, sizeof(expected)));
+  assert(meter(hosts[0], "stage_nonfinite") == 3);
+  for (int k = 0; k < 2; k++) release(hosts[k]);
+
+  for (int kind = 0; kind < 2; kind++) {
+    for (int k = 0; k < 2; k++) {
+      Host *h = hosts[k] = stage();
+      set(h, "comp_enabled", 1), set(h, "comp_threshold", -40);
+      set(h, "exp_enabled", 1), set(h, "exp_threshold", -30);
+      run(h, zeroed, outputs[k], RATE / 2);
+    }
+    // Directly into one processor, as the stage would after its guard.
+    for (size_t pos = RATE / 2; pos < LENGTH; pos += BLOCK) {
+      for (int k = 0; k < 2; k++) {
+        Dynamics *d = processor(hosts[k], kind);
+        dynamics_process(d, (k ? zeroed : in) + pos, outputs[k] + pos, BLOCK);
+        assert(isfinite(dynamics_reduction_now(d)));
+      }
+    }
+    for (size_t n = RATE / 2; n < LENGTH; n++) assert(isfinite(out[n]));
+    assert(!memcmp(out + RATE / 2, expected + RATE / 2, (LENGTH - RATE / 2) * sizeof(float)));
+    for (int k = 0; k < 2; k++) release(hosts[k]);
+  }
+  puts("non-finite: NaN and infinities are silence to both processors, through the stage or handed to them, "
+       "and the reduction stays a number");
+}
+
 // Meters off: they hold where they are while both processors work.
 static void check_meters_off(void) {
   Host *h = stage();
@@ -397,6 +447,7 @@ int main(void) {
   check_curves();
   check_timing();
   check_extremes();
+  check_nonfinite();
   check_meters_off();
   check_live_change();
   check_cost();

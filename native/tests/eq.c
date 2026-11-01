@@ -11,10 +11,11 @@
 #include <time.h>
 
 // Noise removal's three controls and four meters, the voice changer's four
-// controls and three meters, and the compressor's and expander's eight
-// controls and three meters each, beside the EQ's own (tests/denoise.c,
-// tests/voice.c and tests/dynamics.c check them).
-enum { DENOISE_CONTROLS = 7, VOICE_CONTROLS = 7, DYNAMICS_CONTROLS = 22 };
+// controls and three meters, the compressor's and expander's eight controls
+// and three meters each, beside the EQ's own (tests/denoise.c,
+// tests/voice.c and tests/dynamics.c check them), and the stage's two
+// non-finite meters.
+enum { DENOISE_CONTROLS = 7, VOICE_CONTROLS = 7, DYNAMICS_CONTROLS = 22, STAGE_METERS = 2 };
 
 static const char *const TYPES[EQ_TYPES] = {"lowCut", "lowShelf", "peak",
                                             "notch", "highShelf", "highCut"};
@@ -356,6 +357,78 @@ static void check_silence(void) {
   puts("silence: no subnormal state or sample, and every filter at rest, after a minute of silence");
 }
 
+// --- numbers that are not numbers ---------------------------------------------
+
+static float stage_meter(Host *h, const char *symbol) {
+  for (uint32_t i = 0; i < h->control_count; i++)
+    if (h->controls[i].output && !strcmp(h->controls[i].symbol, symbol))
+      return atomic_load(&h->controls[i].observed);
+  assert(!"no such meter");
+  return NAN;
+}
+
+static void all_finite(const float *x, size_t count) {
+  for (size_t n = 0; n < count; n++) assert(isfinite(x[n]));
+}
+
+// A NaN and two infinities in the input, mid-block, with the EQ on and off:
+// the output is finite throughout and is exactly what the same input with
+// zeros there gives, so nothing reached a filter. The stage counts the three
+// samples and clears no state.
+static void check_nonfinite_input(void) {
+  enum { COUNT = RATE };
+  static float input[COUNT], zeroed[COUNT], output[COUNT], expected[COUNT];
+  Setting bands[EQ_BANDS] = {{1, LOW_CUT, 80, 0, 0.7}, {1, PEAK, 310, 6, 2},
+                             {1, HIGH_SHELF, 6000, -4, 0.7}, {1, NOTCH, 2172, 0, 4}};
+  tone(input, COUNT, 440);
+  memcpy(zeroed, input, sizeof(input));
+  const size_t at[] = {1000, 1001, 30000};
+  input[at[0]] = NAN, input[at[1]] = INFINITY, input[at[2]] = -INFINITY;
+  for (size_t i = 0; i < 3; i++) zeroed[at[i]] = 0;
+  for (int on = 0; on <= 1; on++) {
+    Host *h = configured(RATE, bands), *reference = configured(RATE, bands);
+    set(h, "enabled", on), set(reference, "enabled", on);
+    run(h, input, output, COUNT, BLOCK);
+    run(reference, zeroed, expected, COUNT, BLOCK);
+    all_finite(output, COUNT);
+    assert(!memcmp(output, expected, sizeof(output)));
+    eq_main_thread(h);
+    assert(stage_meter(h, "stage_nonfinite") == 3 && stage_meter(h, "stage_resets") == 0);
+    release(h), release(reference);
+  }
+  puts("non-finite input: NaN and infinities become silence before any filter, EQ on and off, and are counted");
+}
+
+// A filter whose state turned non-finite anyway, a band's at a block
+// boundary: that sample plays dry, the filters are cleared, and from the next
+// sample the output is exactly a fresh EQ's on the same input.
+static void check_nonfinite_state(void) {
+  enum { COUNT = RATE, SPLIT = 16 * BLOCK };
+  static float input[COUNT], output[COUNT], restarted[COUNT];
+  Setting bands[EQ_BANDS] = {{1, LOW_CUT, 80, 0, 0.7}, {1, PEAK, 310, 6, 2},
+                             {1, HIGH_SHELF, 6000, -4, 0.7}, {0, PEAK, 1000, 0, 0.7}};
+  tone(input, COUNT, 440);
+  for (int on = 0; on <= 1; on++) {
+    // Set before activation, so neither starts with the switch's fade.
+    Host *h = fresh(RATE), *reference = fresh(RATE);
+    for (int i = 0; i < EQ_BANDS; i++) set_band(h, i + 1, bands[i]), set_band(reference, i + 1, bands[i]);
+    set(h, "enabled", on), set(reference, "enabled", on);
+    assert(eq_activate(h) && eq_activate(reference));
+    run(h, input, output, SPLIT, BLOCK);
+    ((Eq *)h->impl)->bands[1].live.s1 = NAN;
+    ((Eq *)h->impl)->bands[3].live.s2 = INFINITY;  // a band that is off holds it too
+    run(h, input + SPLIT, output + SPLIT, COUNT - SPLIT, BLOCK);
+    all_finite(output, COUNT);
+    assert(output[SPLIT] == input[SPLIT]);
+    run(reference, input + SPLIT + 1, restarted, COUNT - SPLIT - 1, BLOCK);
+    assert(!memcmp(output + SPLIT + 1, restarted, (COUNT - SPLIT - 1) * sizeof(float)));
+    eq_main_thread(h);
+    assert(stage_meter(h, "stage_resets") == 1 && stage_meter(h, "stage_nonfinite") == 0);
+    release(h), release(reference);
+  }
+  puts("non-finite state: one sample plays dry, then the cleared filters match a fresh EQ, EQ on and off");
+}
+
 // --- the controls, and what it costs ------------------------------------------
 
 static void check_controls(void) {
@@ -366,7 +439,7 @@ static void check_controls(void) {
   eq_unload(two);
   free(two);
   Host *h = fresh(RATE);
-  assert(h->control_count == 1 + 5 * EQ_BANDS + DENOISE_CONTROLS + VOICE_CONTROLS + DYNAMICS_CONTROLS);
+  assert(h->control_count == 1 + 5 * EQ_BANDS + DENOISE_CONTROLS + VOICE_CONTROLS + DYNAMICS_CONTROLS + STAGE_METERS);
   const char *names[] = {"enabled", "type", "frequency", "gain", "qlog10"};
   for (int band = 1; band <= EQ_BANDS; band++)
     for (int k = 0; k < 5; k++) {
@@ -400,7 +473,7 @@ static void check_variable_bands(void) {
     char *args[] = {number, NULL};
     assert(eq_load_bands(h, args));
     assert(((Eq *)h->impl)->band_count == (unsigned)count);
-    assert(h->control_count == (unsigned)(1 + 5 * count + DENOISE_CONTROLS + VOICE_CONTROLS + DYNAMICS_CONTROLS));
+    assert(h->control_count == (unsigned)(1 + 5 * count + DENOISE_CONTROLS + VOICE_CONTROLS + DYNAMICS_CONTROLS + STAGE_METERS));
     for (int band = 1; band <= count; band++) set_band(h, band, (Setting)OFF);
     set_band(h, count, (Setting){1, PEAK, 1000, 6, 1});
     set(h, "enabled", 1);
@@ -448,7 +521,9 @@ int main(int argc, char **argv) {
   check_steps();
   check_fades();
   check_silence();
+  check_nonfinite_input();
+  check_nonfinite_state();
   measure_cost();
-  puts("PASS: response, steps, crossfades and silence");
+  puts("PASS: response, steps, crossfades, silence and non-finite recovery");
   return 0;
 }

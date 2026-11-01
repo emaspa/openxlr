@@ -3264,6 +3264,18 @@ under the same restart limit. This handles a processor whose internal
 state would otherwise stay invalid until a daemon restart. Finite levels
 above unity remain unchanged; this check is not a limiter.
 
+The microphone stage, which runs noise removal, the EQ, the compressor and
+expander, and the voice changer, handles this itself and keeps running. It
+plays a non-finite input sample as silence, and if one of its own parts
+ends up holding an invalid value, it clears that part and plays on: the EQ
+within a sample, RNNoise within two of its 10 ms frames, and a voice by
+starting over. A DeepFilterNet
+model that answers with an invalid value is replaced by a fresh one while
+the microphone plays without noise removal for a moment, at most once in
+10 seconds. The daemon's journal gets a `trace: microphone stage` line
+with the counts while this happens, and the diagnostics archive carries
+that journal.
+
 A VST3 or CLAP plugin that fails to process a block of audio leaves that
 block silent, and the next block is tried. If it keeps failing for half a
 second, the daemon replaces the chain under the same restart limit, and
@@ -4034,21 +4046,38 @@ you pick, attach the diagnostics archive described below.
 Options, SUPPORT, Collect diagnostics. It writes
 `~/openxlr-diagnostics-<timestamp>.tar.gz` with the daemon's state and
 capabilities, a dump of the interface's vendor blocks, the PipeWire
-graph and device listings, the last two hours of the daemon journal (under
-Flatpak, `daemon.log` and its rotated copy), `mixer.json`, `ui.json` and
-version information. Native installations also include `audio-journal.txt`
-with the last two hours of the PipeWire, pipewire-pulse and WirePlumber user
-service journals. Audio-server errors can explain distortion or disappearing
-nodes even when the daemon's own journal has no error. These entries use the
-same redaction as the daemon journal; unavailable journals leave a command
-failure note. The Flatpak sandbox keeps collecting its own daemon logs and
-does not read host journals. Warnings and command failure notes for the graph dump
+graph and device listings, the daemon journal since the computer last
+started (under Flatpak, `daemon.log` and its rotated copy), `mixer.json`,
+`ui.json` and version information. Native installations also include
+`audio-journal.txt` with the PipeWire, pipewire-pulse and WirePlumber user
+service journals since the computer last started, so a problem that began
+overnight is still in an archive collected the next morning. Audio-server
+errors can explain distortion or disappearing nodes even when the daemon's
+own journal has no error. Each journal keeps its newest 20,000 lines, at
+most 2 MiB. The archive cuts a longer one at its oldest end and says so on
+the file's first line. These entries use the same redaction as the daemon journal; unavailable
+journals leave a command failure note.
+
+`kernel-log.txt` holds the kernel's messages since the computer last
+started about USB devices, controllers and hubs, sound drivers, and suspend
+and resume. A USB disconnect or reset of the interface shows up here. The
+kernel log lives in the system journal, which members of the
+`systemd-journal`, `adm` or `wheel` group can read on most distributions.
+For other accounts the archive tries `dmesg`, which holds only recent
+messages and which many distributions also restrict. The file names the
+source it read, or quotes what both said when neither worked.
+
+The Flatpak sandbox keeps collecting its own daemon logs and does not read
+host journals or the kernel log. Warnings and command failure notes for the graph dump
 are kept in `pw-dump-errors.txt`, when present, instead of being appended
 to `pw-dump.json`. Plugin evidence includes the
 catalogue, effective bridge setup and latest native scan results. The home path, host name
 and the serial numbers of attached USB devices are redacted, in the
 text files and inside the hex dump of the vendor blocks (the XLR Dock
-stores its serial in one). Your login name is redacted where it names
+stores its serial in one). A USB controller's PCI address, which the
+kernel reports as its root hub's serial, stays readable: it is the same on
+every machine with that board, and it shows which controller a kernel line
+is about. Your login name is redacted where it names
 your account: in `pactl info`, in the `user@host` part of each client in
 `wpctl status`, in PipeWire's user and core names in the graph dump, and
 in paths under `/home`, `/media`, `/run/media` and `/mnt`. The titles of
@@ -4098,8 +4127,16 @@ audio, recording samples or starting plugins. The extra reports are:
   drivers and connection speeds. Match bus and device numbers with
   `lsusb.txt` to locate the interface; the tree's indentation shows which
   port or hub it is attached to.
-- `pw-top.txt`: three batches of node statistics, including rate, quantum and
-  error counters.
+- `alsa-pcm.txt`: every sound card and its open devices as the kernel
+  reports them. It has the rate, period and buffer size the audio server
+  opened each device with, how full the buffer is, and for a USB interface
+  the rate it actually runs at (`Momentary freq`). A USB interface whose
+  clock drifts from 48000 Hz shows it here. PipeWire's quantum and driver
+  for each node are in `pw-dump.json`. The archive has no per-node timing
+  or xrun counts: PipeWire reports those only through its profiler, which
+  drops a driver's report above 16 KiB, and OpenXLR's graph of about a
+  hundred nodes on one driver is larger than that, so `pw-top` showed only
+  zeros.
 - `sink-inputs.json` and `source-outputs.json`: current playback and recording
   streams, their formats, volume, mute state and buffering as Pulse reports
   them. The archive masks process identity fields and keeps numeric audio
