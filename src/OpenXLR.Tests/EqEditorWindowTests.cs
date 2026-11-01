@@ -34,7 +34,8 @@ namespace OpenXLR.Tests;
 /// pointer sends setEqBand with snapped values at most every 20 ms and the
 /// editor then shows what the daemon reports; the wheel, the keyboard, a
 /// double click and the type menu each send their one change; the switch and
-/// the comparison send setEqEnabled; paste and reset send setEq; the footer's
+/// the comparison send setEqEnabled; paste, reset and loading a saved profile
+/// send setEq, and saving, renaming and deleting profiles send nothing; the footer's
 /// switch between the unit and software sends setEqProcessing; and nothing
 /// else goes out. A state without an EQ draws no button. Run on its own,
 /// with OPENXLR_TEST_EQ=1 under xvfb-run, so the window layout run keeps
@@ -330,6 +331,7 @@ public sealed class EqEditorWindowTests
             await Controls(editor, daemon, eq1, window);
             EqWindow second = await CopyAndReset(editor, daemon, eq1, eq2, window);
             editors.Add(second);
+            await Profiles(editor, second, daemon, eq1, eq2);
             await Tooltips(editor);
             await Skins(window, editor, main);
             await Hardware(window, editor, daemon, eq1);
@@ -1111,6 +1113,228 @@ public sealed class EqEditorWindowTests
         Assert.True((await Sent(daemon, 1))[0]["value"]!.GetValue<bool>());
         Click(window.FindControl<Button>("Xlr2Eq")!);
         return await Editor(window, eq2);
+    }
+
+    /// <summary>
+    /// Saved profiles through the editors' own buttons and dialogs: Save on
+    /// XLR 1 asks for a name and writes the file, and XLR 2's editor lists the
+    /// profile at once; Load there sends one setEq to XLR 2 with XLR 1's bands
+    /// and the EQ on; saving under a name in use asks before replacing it;
+    /// Rename and Delete ask and act on the chosen profile in both editors. A
+    /// damaged file shows its line under the row, wrapped inside the editor,
+    /// and stays as it was. The row fits from 640 to 2400 pixels in both
+    /// sizings and at 640 in every language.
+    /// </summary>
+    private static async Task Profiles(EqWindow first, EqWindow second, EqDaemon daemon, MicEqViewModel eq1, MicEqViewModel eq2)
+    {
+        if (File.Exists(EqProfiles.FilePath)) File.Delete(EqProfiles.FilePath);
+        foreach (EqWindow editor in new[] { first, second }) editor.Profiles!.Refresh();
+        Pump(20);
+        CheckProfileRow(first, "profiles");
+        ComboBox list1 = first.FindControl<ComboBox>("EqProfileList")!, list2 = second.FindControl<ComboBox>("EqProfileList")!;
+        Assert.Equal(Localizer.Text("EqProfileChoose"), list1.PlaceholderText);
+        Assert.Equal(Localizer.Text("EqProfileListName"), AutomationProperties.GetName(list1));
+        foreach (string name in new[] { "EqProfileLoad", "EqProfileRename", "EqProfileDelete" })
+            Assert.False(first.FindControl<Button>(name)!.IsEnabled, name);
+        Assert.True(first.FindControl<Button>("EqProfileSave")!.IsEnabled);
+        Assert.Equal(Localizer.Text("Save"), first.FindControl<Button>("EqProfileSave")!.Content);
+        Assert.Equal(Localizer.Text("EqProfileLoad"), first.FindControl<Button>("EqProfileLoad")!.Content);
+
+        // Save on XLR 1: the dialog asks for a name and the file holds the bands as shown.
+        daemon.Commands.Clear();
+        Click(first.FindControl<Button>("EqProfileSave")!);
+        Window dialog = await Dialog(first);
+        Assert.Equal(Localizer.Text("EqProfileSaveTitle"), dialog.Title);
+        TextBox input = dialog.GetVisualDescendants().OfType<TextBox>().Single();
+        Assert.Equal("", input.Text);
+        Assert.Equal(EqProfiles.MaximumNameLength, input.MaxLength);
+        Capture(dialog, "eq-profile-save-dialog");
+        input.Text = "Podcast";
+        Button ok = dialog.GetVisualDescendants().OfType<Button>().Single(b => b.IsDefault);
+        Assert.Equal(Localizer.Text("Save"), ok.Content);
+        Click(ok);
+        await Until(() => first.Profiles!.Profiles.Count == 1);
+        EqProfile saved = first.Profiles!.Profiles[0];
+        Assert.Equal("Podcast", saved.Name);
+        Assert.Equal(eq1.Current.Bands, saved.Bands);
+        Assert.Same(saved, list1.SelectedItem);
+        Assert.True(first.FindControl<Button>("EqProfileLoad")!.IsEnabled);
+        // XLR 2's editor lists it, nothing chosen there.
+        Assert.Single(second.Profiles!.Profiles);
+        Assert.Null(list2.SelectedItem);
+        Assert.Empty(daemon.Commands);
+
+        // Load on XLR 2: one setEq with XLR 1's bands and the EQ on.
+        list2.SelectedItem = second.Profiles!.Profiles[0];
+        Pump(20);
+        Assert.True(second.FindControl<Button>("EqProfileLoad")!.IsEnabled);
+        Click(second.FindControl<Button>("EqProfileLoad")!);
+        JsonNode sent = (await Sent(daemon, 1))[0];
+        Assert.Equal("setEq", sent["cmd"]!.GetValue<string>());
+        Assert.Equal("xlr2", sent["channel"]!.GetValue<string>());
+        Assert.True(sent["eq"]!["enabled"]!.GetValue<bool>());
+        await Until(() => daemon.Eqs["xlr2"].Bands.SequenceEqual(daemon.Eqs["xlr1"].Bands) && daemon.Eqs["xlr2"].Enabled);
+        Assert.Equal(eq1.Current.Bands, eq2.Current.Bands);
+        Assert.True(eq2.Enabled);
+        Capture(second, "eq-editor-profile-loaded");
+
+        // Saving under the chosen name asks before replacing it.
+        Click(first.FindControl<Button>("EqProfileSave")!);
+        dialog = await Dialog(first);
+        Assert.Equal("Podcast", dialog.GetVisualDescendants().OfType<TextBox>().Single().Text);
+        Click(dialog.GetVisualDescendants().OfType<Button>().Single(b => b.IsDefault));
+        await Until(() => first.OwnedWindows.Any(w => w.IsVisible && w.Classes.Contains("dialog") && w != dialog));
+        Window replace = await Dialog(first);
+        Assert.Equal(Localizer.Text("EqProfileReplaceTitle"), replace.Title);
+        Button yes = replace.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("danger"));
+        Assert.Equal(Localizer.Text("EqProfileReplace"), yes.Content);
+        Click(yes);
+        await Until(() => !replace.IsVisible);
+        Assert.Single(EqProfiles.Read().Profiles);
+        Assert.Null(first.Profiles!.Error);
+
+        // Rename on XLR 2: the dialog starts from the name, and both editors follow.
+        Click(second.FindControl<Button>("EqProfileRename")!);
+        dialog = await Dialog(second);
+        Assert.Equal(Localizer.Format("EqProfileRenameTitle", "Podcast"), dialog.Title);
+        input = dialog.GetVisualDescendants().OfType<TextBox>().Single();
+        Assert.Equal("Podcast", input.Text);
+        input.Text = "Voice";
+        Click(dialog.GetVisualDescendants().OfType<Button>().Single(b => b.IsDefault));
+        await Until(() => first.Profiles!.Profiles.SingleOrDefault()?.Name == "Voice");
+        Assert.Equal("Voice", ((EqProfile)list2.SelectedItem!).Name);
+        Assert.Equal("Voice", ((EqProfile)list1.SelectedItem!).Name);
+
+        // Delete asks first.
+        Click(second.FindControl<Button>("EqProfileDelete")!);
+        Window confirm = await Dialog(second);
+        Assert.Equal(Localizer.Text("EqProfileDeleteTitle"), confirm.Title);
+        Click(confirm.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("danger")));
+        await Until(() => first.Profiles!.Profiles.Count == 0 && second.Profiles!.Profiles.Count == 0);
+        Assert.Null(list1.SelectedItem);
+        Assert.False(second.FindControl<Button>("EqProfileDelete")!.IsEnabled);
+        Assert.Empty(EqProfiles.Read().Profiles);
+        // Nothing but the load went to the daemon.
+        Assert.Empty(daemon.Commands);
+
+        // A damaged file: one line under the row, wrapped inside the editor, and the file kept.
+        string damaged = "{\"version\":1,\"profiles\":[{\"name\":\"Broken\"}]}";
+        File.WriteAllText(EqProfiles.FilePath, damaged);
+        first.Profiles!.Refresh();
+        Pump(20);
+        TextBlock error = first.FindControl<TextBlock>("EqProfileError")!;
+        Assert.True(error.IsVisible);
+        Assert.Equal(Localizer.Format("EqProfileFileUnreadable", 1, EqProfiles.FilePath), error.Text);
+        Assert.Contains("warn", error.Classes);
+        CheckProfileRow(first, "a damaged file");
+        Layout(first, 820, 600);
+        Capture(first, "eq-editor-profile-error");
+        Assert.False(first.Profiles!.Save("New", false));
+        Assert.Equal(damaged, File.ReadAllText(EqProfiles.FilePath));
+
+        // A profile with six bands on this four-band EQ: refused, said why, nothing sent,
+        // and the line stays when the editor comes forward again.
+        string band = "{\"enabled\":true,\"type\":\"peak\",\"frequency\":1000,\"gain\":0,\"q\":1}";
+        File.WriteAllText(EqProfiles.FilePath,
+            "{\"version\":1,\"profiles\":[{\"name\":\"Six\",\"bands\":[" + string.Join(",", Enumerable.Repeat(band, 6)) + "]}]}");
+        first.Profiles!.Refresh();
+        Pump(20);
+        Assert.False(error.IsVisible);
+        list1.SelectedItem = first.Profiles!.Profiles.Single();
+        Click(first.FindControl<Button>("EqProfileLoad")!);
+        Pump(20);
+        string refused = Localizer.Format("EqProfileBandCount", "Six", 6, 4, 4);
+        Assert.Equal(refused, error.Text);
+        second.Activate();
+        Pump(60);
+        first.Activate();
+        Pump(60);
+        Assert.Equal(refused, error.Text);
+        Assert.True(error.IsVisible);
+        Assert.Empty(daemon.Commands);
+
+        File.Delete(EqProfiles.FilePath);
+        first.Profiles!.Refresh();
+        Pump(20);
+        Assert.False(error.IsVisible);
+
+        CheckProfileLanguages(eq1);
+    }
+
+    /// <summary>The profile row from 640 to 2400 pixels in both sizings: inside the editor, its parts apart, above the graph.</summary>
+    private static void CheckProfileRow(EqWindow editor, string state)
+    {
+        WrapPanel actions = editor.FindControl<WrapPanel>("EqProfileActions")!;
+        TextBlock error = editor.FindControl<TextBlock>("EqProfileError")!;
+        foreach (bool touch in new[] { false, true })
+        {
+            SkinService.ApplyControlSizing(touch);
+            foreach (double width in new[] { 640d, 1040, 2400 })
+            {
+                Layout(editor, width, width < 1000 ? 620 : 760);
+                string where = $"profile row with {state}, {Sizing(touch)} at {width}";
+                foreach (Control part in actions.Children) AssertInside(part, editor);
+                AssertNoOverlap([.. actions.Children]);
+                if (error.IsVisible)
+                {
+                    AssertInside(error, editor);
+                    Assert.DoesNotContain(error.TextLayout.TextLines, l => l.HasCollapsed);
+                }
+                foreach (Control action in editor.FindControl<WrapPanel>("EqActions")!.Children)
+                    AssertNoOverlap([.. actions.Children, action]);
+                double bottom = editor.FindControl<StackPanel>("EqProfileRow")!.TranslatePoint(
+                    new Point(0, editor.FindControl<StackPanel>("EqProfileRow")!.Bounds.Height), editor)!.Value.Y;
+                Assert.True(editor.Graph.TranslatePoint(default, editor)!.Value.Y >= bottom - 0.5, $"the graph starts above the profile row, {where}");
+                Assert.True(editor.Graph.Plot.Height > 120, $"the graph's plot is {editor.Graph.Plot.Height} tall, {where}");
+                if (width == 640) Capture(editor, $"eq-profile-row-{state.Replace(' ', '-')}-{Sizing(touch)}-640");
+            }
+        }
+        SkinService.ApplyControlSizing(false);
+        Layout(editor, 820, 600);
+    }
+
+    /// <summary>The profile row's label, list and buttons fit a 640 pixel editor in every language, in both sizings.</summary>
+    private static void CheckProfileLanguages(MicEqViewModel eq)
+    {
+        string? language = UiSettings.Load().Language;
+        try
+        {
+            foreach (string choice in new[] { "en", "de", "es", "it", "tl", "ceb", "sr-Cyrl" })
+            {
+                Assert.Null((UiSettings.Load() with { Language = choice }).Save());
+                Localizer.Initialize();
+                var window = new EqWindow { DataContext = eq };
+                try
+                {
+                    window.Show();
+                    foreach (bool touch in new[] { false, true })
+                    {
+                        SkinService.ApplyControlSizing(touch);
+                        Layout(window, 640, 480);
+                        WrapPanel actions = window.FindControl<WrapPanel>("EqProfileActions")!;
+                        foreach (Control part in actions.Children) AssertInside(part, window);
+                        AssertNoOverlap([.. actions.Children]);
+                        foreach (Button button in actions.Children.OfType<Button>())
+                        {
+                            TextBlock text = button.GetVisualDescendants().OfType<TextBlock>().Single();
+                            Assert.DoesNotContain(text.TextLayout.TextLines, l => l.HasCollapsed);
+                        }
+                        Assert.True(window.Graph.Plot.Height > 80, $"the graph's plot is {window.Graph.Plot.Height} tall in {choice}, {Sizing(touch)} at 640x480");
+                        Capture(window, $"eq-profile-row-{choice}-{Sizing(touch)}-640");
+                    }
+                }
+                finally
+                {
+                    window.Close();
+                    SkinService.ApplyControlSizing(false);
+                }
+            }
+        }
+        finally
+        {
+            Assert.Null((UiSettings.Load() with { Language = language }).Save());
+            Localizer.Initialize();
+        }
     }
 
     /// <summary>The confirmation the window opened, once it is shown.</summary>
