@@ -9,6 +9,7 @@ native/*.o
 native/tests/*.o
 native/tests/editor
 native/tests/audio
+native/tests/own-block
 native/tests/clap
 native/tests/lv2
 native/tests/latency.lv2/latency.so

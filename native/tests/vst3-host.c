@@ -38,3 +38,5 @@ void test_audio_host_free(Host *h) {
 bool test_host_audio_failed(Host *h) {
   return atomic_load(&h->audio_error);
 }
+
+void test_host_set_own_block(Host *h, bool own_block) { h->own_block = own_block; }

@@ -124,6 +124,13 @@ tests/audio.o: tests/audio.c host.c $(HEADERS)
 tests/audio: tests/audio.o lv2.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
+# The plugin's own block: the audio callback and its worker, without a graph.
+tests/own-block.o: tests/own-block.c host.c $(HEADERS)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
+tests/own-block: tests/own-block.o lv2.o clap.o vst3.o
+	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
 # This one compiles clap.c into itself to reach the layout reading, so it
 # links without clap.o.
 tests/clap.o: tests/clap.c host.c clap.c $(HEADERS)
@@ -175,8 +182,9 @@ test-scan: openxlr-lv2-host tests/scan-plugin.so
 test-editor: tests/editor
 	./tests/editor
 
-test-audio: tests/audio
+test-audio: tests/audio tests/own-block
 	./tests/audio
+	./tests/own-block
 
 test-clap: tests/clap
 	./tests/clap
@@ -192,7 +200,7 @@ test-vst3: tests/vst3
 	./tests/vst3
 
 clean:
-	rm -f openxlr-lv2-host $(OBJECTS) tests/editor tests/editor.o tests/audio tests/audio.o tests/clap tests/clap.o tests/lifecycle tests/lifecycle.o tests/lv2 tests/lv2.o tests/latency.lv2/latency.so tests/gain.lv2/gain.so tests/vst3 tests/vst3.o tests/host.o tests/scan-plugin.so
+	rm -f openxlr-lv2-host $(OBJECTS) tests/editor tests/editor.o tests/audio tests/audio.o tests/own-block tests/own-block.o tests/clap tests/clap.o tests/lifecycle tests/lifecycle.o tests/lv2 tests/lv2.o tests/latency.lv2/latency.so tests/gain.lv2/gain.so tests/vst3 tests/vst3.o tests/host.o tests/scan-plugin.so
 
 # Sound Check: the loop backend and the level meter beside it, driven
 # directly with deterministic samples and no audio server.

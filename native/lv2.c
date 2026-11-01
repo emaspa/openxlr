@@ -121,7 +121,7 @@ typedef struct {
   // because plugins are permitted to keep the pointer.
   int32_t min_block, max_block, sequence_size;
   float rate_hz;
-  LV2_Options_Option options[5];
+  LV2_Options_Option options[6];
   // The editor
   void *ui_library;
   const LV2UI_Descriptor *ui_descriptor;
@@ -269,9 +269,10 @@ static bool lv2_load(Host *h, char **arguments) {
     return false;
   l->work_ready_valid = true;
   // The block length is bounded by the check in the audio callback, so the
-  // promise these options make is one this host keeps.
-  l->min_block = 1;
-  l->max_block = MAX_FRAMES;
+  // promise these options make is one this host keeps. On its own block the
+  // plugin is only ever called with exactly that block.
+  l->max_block = (int32_t)host_max_block(h);
+  l->min_block = h->own_block ? l->max_block : 1;
   l->sequence_size = ATOM_CAPACITY;
   l->rate_hz = (float)h->rate;
   LV2_URID atom_int = map_uri(l, LV2_ATOM__Int),
@@ -288,7 +289,12 @@ static bool lv2_load(Host *h, char **arguments) {
   l->options[3] = (LV2_Options_Option){
       LV2_OPTIONS_INSTANCE, 0, map_uri(l, LV2_PARAMETERS__sampleRate),
       sizeof(float), atom_float, &l->rate_hz};
-  l->options[4] = (LV2_Options_Option){LV2_OPTIONS_BLANK, 0, 0, 0, 0, NULL};
+  l->options[4] = (LV2_Options_Option){
+      LV2_OPTIONS_INSTANCE, 0, map_uri(l, LV2_BUF_SIZE__nominalBlockLength),
+      sizeof(int32_t), atom_int, &l->max_block};
+  // The nominal length is only known on the plugin's own block.
+  l->options[h->own_block ? 5 : 4] =
+      (LV2_Options_Option){LV2_OPTIONS_BLANK, 0, 0, 0, 0, NULL};
 
   LV2_Feature map = {LV2_URID__map, &l->map},
               unmap = {LV2_URID__unmap, &l->unmap};

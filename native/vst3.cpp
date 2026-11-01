@@ -1084,7 +1084,7 @@ bool vst3_activate(Host *h) {
   ProcessSetup setup;
   setup.processMode = kRealtime;
   setup.symbolicSampleSize = kSample32;
-  setup.maxSamplesPerBlock = MAX_FRAMES;
+  setup.maxSamplesPerBlock = (int32)host_max_block(h);
   setup.sampleRate = host_rate(h);
   if (v->processor->setupProcessing(setup) != kResultOk) {
     fputs("the plugin refused the processing setup\n", stderr);

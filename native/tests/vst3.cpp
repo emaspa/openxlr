@@ -12,6 +12,7 @@ extern "C" void test_host_free(Host *h);
 extern "C" Host *test_audio_host_new(unsigned channels);
 extern "C" void test_audio_host_free(Host *h);
 extern "C" bool test_host_audio_failed(Host *h);
+extern "C" void test_host_set_own_block(Host *h, bool own_block);
 
 class Watch final : public Linux::ITimerHandler, public Linux::IEventHandler {
  public:
@@ -286,7 +287,9 @@ class LatencyProcessor final : public IAudioProcessor {
  public:
   uint32 samples = 0;
   int asked = 0;
+  int32 max_block = 0;
   tresult process_result = kResultOk;
+  tresult setup_result = kResultOk;
   tresult PLUGIN_API queryInterface(const TUID, void **obj) override {
     *obj = nullptr;
     return kNoInterface;
@@ -305,7 +308,10 @@ class LatencyProcessor final : public IAudioProcessor {
     ++asked;
     return samples;
   }
-  tresult PLUGIN_API setupProcessing(ProcessSetup &) override { return kResultOk; }
+  tresult PLUGIN_API setupProcessing(ProcessSetup &setup) override {
+    max_block = setup.maxSamplesPerBlock;
+    return setup_result;
+  }
   tresult PLUGIN_API setProcessing(TBool) override { return kResultOk; }
   tresult PLUGIN_API process(ProcessData &) override { return process_result; }
   uint32 PLUGIN_API getTailSamples() override { return 0; }
@@ -386,6 +392,26 @@ static void latency() {
   puts("PASS: VST3 latency is read at activation and after kLatencyChanged only");
 }
 
+// On its own block the processor is set up for that block; otherwise for the
+// host's largest cycle. The refused setup ends activation before anything
+// else is touched.
+static void own_block_setup() {
+  for (bool own : {false, true}) {
+    Host *h = test_audio_host_new(2);
+    test_host_set_own_block(h, own);
+    Vst3 v;
+    LatencyProcessor processor;
+    processor.setup_result = kResultFalse;
+    v.processor = &processor;
+    host_set_impl(h, &v);
+    assert(!vst3_activate(h));
+    assert(processor.max_block == (own ? (int32)OWN_BLOCK_FRAMES : (int32)MAX_FRAMES));
+    host_set_impl(h, nullptr);
+    test_audio_host_free(h);
+  }
+  puts("PASS: a VST3 plugin on its own block is set up for at most 1024 frames");
+}
+
 int main(int argc, char **argv) {
   if (argc == 1 || !strcmp(argv[1], "processing")) processing_failure();
   if (argc == 1 || !strcmp(argv[1], "parameters")) parameters();
@@ -394,5 +420,6 @@ int main(int argc, char **argv) {
   if (argc == 1 || !strcmp(argv[1], "restart")) restart();
   if (argc == 1 || !strcmp(argv[1], "latency")) latency();
   if (argc == 1 || !strcmp(argv[1], "teardown")) teardown();
+  if (argc == 1 || !strcmp(argv[1], "own-block")) own_block_setup();
   puts("VST3 host bounds passed");
 }

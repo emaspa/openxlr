@@ -50,8 +50,11 @@ static const clap_plugin_audio_ports_t ap_ext = {ap_count, ap_get};
 
 static bool fake_init(const clap_plugin_t *p) { return true; }
 static void fake_destroy(const clap_plugin_t *p) {}
+static uint32_t activated_min, activated_max;
 static bool fake_activate(const clap_plugin_t *p, double r, uint32_t a,
                           uint32_t b) {
+  activated_min = a;
+  activated_max = b;
   return true;
 }
 static void fake_deactivate(const clap_plugin_t *p) {}
@@ -354,7 +357,25 @@ static void sources_live_through_plugin_destruction(void) {
   puts("PASS: plugin destruction can unregister timers and FDs, and the host collects leftovers");
 }
 
+// On its own block the plugin is activated for that block and no other size;
+// otherwise for anything from one frame to the host's largest cycle.
+static void own_block_activation(void) {
+  for (int own = 0; own < 2; ++own) {
+    Host h = {.rate = 48000, .channels = 2, .backend = &clap_backend,
+              .own_block = own};
+    Clap *c = fresh(&h);
+    c->host.host_data = c;
+    assert(clap_activate(&h));
+    assert(activated_min == (own ? OWN_BLOCK_FRAMES : 1u));
+    assert(activated_max == (own ? OWN_BLOCK_FRAMES : (uint32_t)MAX_FRAMES));
+    clap_deactivate(&h);
+    release(c);
+  }
+  puts("PASS: a CLAP plugin on its own block is activated for exactly 1024 frames");
+}
+
 int main(void) {
+  own_block_activation();
   processing_failure();
   sources_live_through_plugin_destruction();
   readonly_parameters_use_main_thread();

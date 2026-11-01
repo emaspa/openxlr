@@ -13,7 +13,9 @@ extern "C" {
 #include <X11/Xlib.h>
 #include <pipewire/filter.h>
 #include <pipewire/pipewire.h>
+#include <pipewire/thread.h>
 #include <pthread.h>
+#include <semaphore.h>
 #include <setjmp.h>
 #include <signal.h>
 #include <stdatomic.h>
@@ -27,6 +29,18 @@ enum {
   MAX_TAPS = 2,
   MAX_CONTROLS = 4096,
   MAX_SYMBOL = 255
+};
+
+// A plugin run on its own block (`--own-block`) is called with this many
+// frames at a time on a worker thread instead of inside PipeWire's cycle.
+// The output plays the input this many frames late plus the larger of
+// OWN_BLOCK_SLACK and the cycle, which is the time the worker has to answer
+// (see own_block_cycle in host.c). The rings hold OWN_BLOCK_RING frames per
+// channel, a power of two well above the largest delay and cycle together.
+enum {
+  OWN_BLOCK_FRAMES = 1024,
+  OWN_BLOCK_SLACK = 512,
+  OWN_BLOCK_RING = 32768
 };
 
 // One mono output beside the audio: its port name and its channel position.
@@ -86,6 +100,31 @@ typedef struct {
 } Backend;
 
 #ifndef __cplusplus
+// The plugin's own block: two rings between the audio callback and a worker
+// thread that calls the plugin. Positions count frames since the start and
+// never wrap; a position's ring slot is its value modulo OWN_BLOCK_RING. The
+// worker's answer for input frame n is output frame n, so the delay between
+// the two is set by where the callback reads, and nothing else moves it.
+typedef struct {
+  float *in[MAX_CHANNELS], *out[MAX_CHANNELS];  // the rings
+  float *block_in[MAX_CHANNELS], *block_out[MAX_CHANNELS];  // the worker's block
+  _Atomic uint64_t written;  // audio thread: input frames taken
+  _Atomic uint64_t done;     // worker: input frames answered or dropped
+  _Atomic uint64_t lost;     // audio thread: input below this missed a full ring
+  _Atomic uint64_t heard;    // audio thread: output already played up to here
+  _Atomic uint32_t delay;    // audio thread: the delay now, for the latency report
+  uint32_t current;          // audio thread: the same, its own copy
+  uint32_t smaller_for;      // audio thread: frames a smaller delay has sufficed
+  _Atomic uint64_t short_cycles;    // cycles that played silence for a late block
+  _Atomic uint64_t dropped_blocks;  // blocks the worker skipped as too late
+  uint64_t reported_short, reported_dropped;  // main thread: last trace
+  sem_t wake;
+  bool wake_ready;
+  _Atomic bool stop;
+  struct spa_thread_utils *utils;
+  struct spa_thread *thread;
+} OwnBlock;
+
 // One value the daemon can set and the editor can move. Values cross threads
 // as atomics; nothing here locks and nothing here allocates after load.
 struct Control {
@@ -143,6 +182,10 @@ struct Host {
   _Atomic uint64_t audio_entered, audio_left;
   pthread_t main_thread, audio_thread;
   _Atomic bool audio_thread_known;
+  // The plugin runs on its own block: the audio thread above is then the
+  // worker that calls it, not PipeWire's.
+  bool own_block;
+  OwnBlock block;
   // The editor's window
   Display *display;
   struct spa_source *editor_source;
@@ -232,6 +275,9 @@ bool host_on_audio_thread(Host *h);
 
 // The same through accessors, for a backend that cannot see the structures.
 uint32_t host_rate(const Host *h);
+// The most frames one process call carries, which is what a plugin is set up
+// for: MAX_FRAMES, or OWN_BLOCK_FRAMES exactly when it runs on its own block.
+uint32_t host_max_block(const Host *h);
 unsigned host_channels(const Host *h);
 const float *host_key(const Host *h);
 unsigned long host_window(const Host *h);  // the X window, or 0

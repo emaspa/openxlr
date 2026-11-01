@@ -46,7 +46,17 @@ desktop testing.
 without a graph: a cycle the fixed buffers cannot carry is refused before
 anything is written, a plugin stuck inside one process call is told apart
 from a node that has no work, and invalid output is silenced, counting
-toward a restart only on sound and only after half a second of it. `make -C native test-clap` checks the
+toward a restart only on sound and only after half a second of it. The
+same target runs `tests/own-block`, which drives the
+[own block](#own-block) without a graph: the output is the input delayed
+by exactly the reported delay, sample for sample; a block answered within
+its time is never late and one answered later costs only its own late
+frames; a 53 ms stall of the worker is at most that much silence and the
+same alignment afterwards; a stall that fills the ring plays silence and
+never older audio; the delay follows a changed cycle without playing a
+frame twice; and with the real worker thread and the plugin held inside a
+call, 2000 callbacks return at once. A last part runs four seconds in real
+time against a plugin that takes 1 ms a call and once 53 ms. `make -C native test-clap` checks the
 CLAP port layout against fake plugins that declare more buses than the
 chain uses, and that the scanner and the loader agree about which layouts
 can be carried. It also checks that a CLAP plugin's latency is read after
@@ -149,6 +159,63 @@ and meter values each retain at most 4096 distinct symbols, matching the native
 host's control limit. Existing symbols can still update at that limit; draining
 pending changes frees their slots. These bounds protect the daemon's protocol
 buffers, not the plugin process's own memory or CPU use.
+
+## Own block
+
+```text
+openxlr-lv2-host --own-block lv2 URI NODE CHANNELS RATE [SYMBOL=VALUE ...]
+openxlr-lv2-host --own-block clap FILE ID NODE CHANNELS RATE [SYMBOL=VALUE ...]
+openxlr-lv2-host --own-block vst3 BUNDLE CLASS-ID NODE CHANNELS RATE [SYMBOL=VALUE ...]
+```
+
+`--own-block` runs the plugin on a block of its own: the node keeps its
+name and ports, so the daemon links it as before, but the plugin is called
+on a worker thread with exactly 1024 frames at a time, whatever PipeWire's
+cycle. It is for a plugin that cannot finish a short cycle in time. A
+Windows plugin through yabridge pays a cost for each call that hardly
+depends on its length; at a cycle of 256 one can miss its deadline again
+and again, and an interface that drives the graph, such as a Wave XLR Pro,
+restarts its playback each time. The built-in stages refuse the option.
+
+The audio callback copies its input into a ring, wakes the worker with a
+semaphore each time a block of 1024 is complete, and reads the worker's
+output from a second ring a fixed delay behind its input. It never waits
+for the worker. A frame the worker has not answered in time plays as
+silence, and the answer for input frame n is always output frame n, so a
+late block costs its own frames and moves nothing else. The worker drops a
+block whose frames have all been played already instead of answering it
+late, which puts the plugin back on time at once after a spike; the plugin
+hears the jump. A worker stuck for most of a second fills the input ring,
+and what the ring could not take is answered with silence, never with
+older audio.
+
+The delay is the block plus the larger of 512 frames and the cycle: 1536
+frames, 32 ms at 48 kHz, at a cycle of 256 or less, and 2048 at 1024. A
+block is complete at the end of a cycle and due when the read position
+reaches it, so the worker has the delay less the block plus one cycle to
+answer it: 768 frames, 16 ms, at a cycle of 256. A larger cycle lengthens
+the delay at once, with silence in between; a smaller one shortens it,
+skipping frames, once it has held for two seconds, so a cycle that changes
+back and forth does not move the audio each time. The `latency` line is
+the plugin's own figure plus the delay, or the delay alone while the plugin
+gives none.
+
+The worker is made real-time the way PipeWire makes its own data thread,
+through the thread utilities the client context loaded, RTKit or the
+process's own limits, at the priority configured for them. Where that
+fails it runs at normal priority and says so in a `note:` line on stderr.
+It is the thread the plugin is told is its audio thread, and the stall
+monitor brackets its calls as it does the audio callback's. The plugin is
+set up for the block: a VST3 plugin with a `maxSamplesPerBlock` of 1024, a
+CLAP plugin activated for 1024 to 1024 frames, and an LV2 plugin given
+1024 as its minimum, maximum and nominal block length. Its controls,
+state, editor, latency reports and the main-thread rules above are as
+without the option. The plugin's own bypass parameter keeps the delay; the
+daemon's bypass takes the insert out of the chain and the delay with it.
+
+With `OPENXLR_HOST_TRACE` set, the helper writes a `trace: own block:` line
+once a second while either of its counts moves: the cycles that played
+silence for a late block, and the blocks the worker dropped.
 
 ## Ducking
 
