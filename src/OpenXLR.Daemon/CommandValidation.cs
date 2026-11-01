@@ -304,7 +304,7 @@ public static class CommandValidation
                         if (plugin is null) return $"setInserts: plugin '{Short(i.Plugin)}' is not installed";
                         if (i.NativeHost && !plugin.NativeEditorSupported)
                             return $"setInserts: '{plugin.Name}' has no editor the native host can open";
-                        if (i.RunsNatively && !(nativeHostInstalled ?? PluginCatalog.HostInstalled))
+                        if (i.NeedsNativeHost && !(nativeHostInstalled ?? PluginCatalog.HostInstalled))
                             return "setInserts: the native plugin host is not installed on this machine";
                         if (!plugin.Supported)
                             return $"setInserts: '{plugin.Name}' needs {string.Join(", ", plugin.UnsupportedFeatures.Select(Tail))}, which the PipeWire chain does not provide";
@@ -336,6 +336,14 @@ public static class CommandValidation
                     }
                 }
                 return null;
+            case "setInsertOwnBlock":
+                if (cmd.Channel is null || cmd.InsertId is null || !layout.IsInsertKey(cmd.Channel)
+                    || layout.InsertInChain(cmd.Channel, cmd.InsertId) is null) return "setInsertOwnBlock: select an existing insert";
+                if (cmd.Value.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return "setInsertOwnBlock: value must be a boolean";
+                // Only the native host runs a plugin on its own block, so
+                // turning it on needs the host; turning it off never does.
+                return cmd.Value.GetBoolean() && !(nativeHostInstalled ?? PluginCatalog.HostInstalled)
+                    ? "setInsertOwnBlock: the native plugin host is not installed on this machine" : null;
             case "setInsertBypass":
             case "showInsertUi":
                 if (cmd.Channel is not null && !layout.IsInsertKey(cmd.Channel)) return $"{cmd.Cmd}: '{Short(cmd.Channel)}' has no insert chain";

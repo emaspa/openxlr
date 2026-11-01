@@ -475,6 +475,20 @@ public sealed class TuiInsertTests
         Assert.Contains("Saved EQ", frame, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task RewritingTheChainKeepsAnInsertOnItsOwnBlock()
+    {
+        await using Session session = new();
+        session.State["mixer"]!["inserts"]!["xlr1"]![0]!["insert"]!["ownBlock"] = true;
+        session.Echo();
+        session.Sent.Clear();
+        session.Key('a'); session.Key('u'); session.Key('n');
+        session.Key(OpenXLR.Tui.Key.Enter);
+        JsonArray inserts = session.Command()["inserts"]!.AsArray();
+        Assert.True(inserts[0]!["ownBlock"]!.GetValue<bool>());
+        Assert.Null(inserts[1]!["ownBlock"]);
+    }
+
     [Theory]
     [InlineData(1, 150, 42)]
     [InlineData(2, 150, 42)]

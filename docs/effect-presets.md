@@ -13,7 +13,8 @@ A preset is a name and a chain. The chain is an ordered list of effects,
 each written the way the UI sends it to the daemon with
 [`setInserts`](api.md). Every effect has its slot id, its format, the plugin identifier, the
 label it shows, whether it is bypassed, whether it runs in the native host,
-and the value of every control the UI has set. A single-effect preset
+`ownBlock: true` when it runs [on its own block](api.md#own-block), and the
+value of every control the UI has set. A single-effect preset
 is a chain with exactly one effect in it.
 
 ## Where they live
@@ -65,7 +66,7 @@ installs a plugin.
 | `kind` | `lv2`, `clap` or `vst3` |
 | `plugin` | the LV2 URI, CLAP id or VST3 class id, up to 512 characters |
 | `label` | optional, up to 256 characters |
-| `bypass`, `nativeHost` | optional booleans |
+| `bypass`, `nativeHost`, `ownBlock` | optional booleans |
 | `params` | an object of up to 256 controls, each a symbol of 1 to 256 characters without spaces or control characters, and a finite number |
 
 The UI refuses a whole file that is over 8 MiB, repeats a property in

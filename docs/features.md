@@ -650,6 +650,16 @@ so they line up with the mix whose inserts take longest, up to two seconds;
 a plugin with no figure counts as zero. Turning it on or off rebuilds every
 chain. See [plugin latency](manual.md#plugin-latency).
 
+A plugin that cannot keep up with a small block size, typically a Windows
+plugin through yabridge that makes the sound stutter or the interface drop
+out, can run on its own block. The native host then calls it with 1024
+samples at a time on a real-time thread of its own while the graph keeps its block
+size, and a block it answers late plays as a short gap instead of stalling
+the device. It adds a fixed delay to that chain, 32 ms at a block size of
+256, which the insert's latency includes. The switch is per insert, in the
+controls window and the API, and saved with the chain. See
+[a plugin that cannot keep up](manual.md#own-block).
+
 A block size option forces PipeWire's quantum for the graph OpenXLR runs
 in to 256, 512 or 1024 samples, or leaves it to PipeWire. It holds against
 other applications' requests, and it works on a Wave XLR Pro in the

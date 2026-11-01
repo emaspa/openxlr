@@ -32,7 +32,7 @@ public sealed record EffectChainData(int Version, int Channels, JsonArray Insert
                 || kind is not ("lv2" or "clap" or "vst3")) throw new InvalidDataException(Localizer.Text("EffectIdInvalid"));
             _ = Text(insert, "plugin", 512);
             if (insert["label"] is not null) _ = Text(insert, "label", 256, empty: true);
-            foreach (string field in new[] { "bypass", "nativeHost" })
+            foreach (string field in new[] { "bypass", "nativeHost", "ownBlock" })
                 if (insert[field] is not null && (insert[field] is not JsonValue value || !value.TryGetValue<bool>(out _)))
                     throw new InvalidDataException(Localizer.Text("EffectSwitchInvalid"));
             if (insert["params"] is not JsonObject parameters || parameters.Count > 256)

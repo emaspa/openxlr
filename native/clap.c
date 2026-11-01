@@ -578,7 +578,8 @@ static bool clap_load(Host *h, char **arguments) {
 
 static bool clap_activate(Host *h) {
   Clap *c = h->impl;
-  if (!c->plugin->activate(c->plugin, h->rate, 1, MAX_FRAMES)) {
+  uint32_t most = host_max_block(h);
+  if (!c->plugin->activate(c->plugin, h->rate, h->own_block ? most : 1, most)) {
     fputs("the plugin refused to activate\n", stderr);
     return false;
   }

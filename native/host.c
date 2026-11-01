@@ -183,6 +183,9 @@ void host_run_guarded(Host *h, void (*call)(void *), void *argument) {
 }
 
 uint32_t host_rate(const Host *h) { return h->rate; }
+uint32_t host_max_block(const Host *h) {
+  return h->own_block ? OWN_BLOCK_FRAMES : MAX_FRAMES;
+}
 unsigned host_channels(const Host *h) { return h->channels; }
 const float *host_key(const Host *h) { return h->key; }
 unsigned long host_window(const Host *h) { return h->window; }
@@ -306,9 +309,226 @@ static bool silent_audio(float *const *buffers, unsigned channels,
   return true;
 }
 
+// --- the plugin's own block ---------------------------------------------------
+
+// A plugin that cannot finish a short block in time, typically one bridged
+// from Windows whose cost is mostly per call, runs on a block of its own:
+// OWN_BLOCK_FRAMES at a time on a worker thread, while the audio callback
+// only moves samples. The callback writes the input into one ring, wakes the
+// worker each time a block is complete, and reads the other ring a fixed
+// delay behind what it wrote. It never waits for the worker. A block the
+// worker has not answered by the time it is due plays as silence, and since
+// the answer for input frame n is output frame n, a late block costs its own
+// frames and never shifts the rest.
+//
+// The delay is the block plus the time the worker has to answer it. A block
+// is complete only at the end of a cycle and is due to start playing when
+// the read position reaches it, so with cycles of q frames that dividing the
+// block the worker has delay - block + q frames of time: 768 frames, 16 ms
+// at 48 kHz, for a delay of 1536 under cycles of 256. Larger cycles get a
+// delay of the block plus one cycle, so a block that completes in one cycle
+// is never due in the same one.
+static uint32_t own_block_delay(uint32_t frames) {
+  return OWN_BLOCK_FRAMES + (frames > OWN_BLOCK_SLACK ? frames : OWN_BLOCK_SLACK);
+}
+
+static bool own_block_allowed(const Backend *backend) {
+  return backend == &lv2_backend || backend == &clap_backend ||
+         backend == &vst3_backend;
+}
+
+static bool own_block_init(Host *h) {
+  OwnBlock *b = &h->block;
+  for (unsigned c = 0; c < h->channels; ++c)
+    if (!(b->in[c] = calloc(OWN_BLOCK_RING, sizeof(float))) ||
+        !(b->out[c] = calloc(OWN_BLOCK_RING, sizeof(float))) ||
+        !(b->block_in[c] = calloc(OWN_BLOCK_FRAMES, sizeof(float))) ||
+        !(b->block_out[c] = calloc(OWN_BLOCK_FRAMES, sizeof(float))))
+      return false;
+  if (sem_init(&b->wake, 0, 0) != 0) return false;
+  b->wake_ready = true;
+  return true;
+}
+
+static void own_block_free(Host *h) {
+  OwnBlock *b = &h->block;
+  for (unsigned c = 0; c < MAX_CHANNELS; ++c) {
+    free(b->in[c]), free(b->out[c]), free(b->block_in[c]), free(b->block_out[c]);
+    b->in[c] = b->out[c] = b->block_in[c] = b->block_out[c] = NULL;
+  }
+  if (b->wake_ready) sem_destroy(&b->wake);
+  b->wake_ready = false;
+}
+
+static bool finite_audio(float *const *buffers, unsigned channels,
+                         uint32_t frames);
+static bool silent_audio(float *const *buffers, unsigned channels,
+                         uint32_t frames);
+
+// The audio thread's whole part: take this cycle's input, and play what the
+// worker answered for the frames `delay` before it. It allocates nothing,
+// takes no lock and waits for nothing; waking the worker is a semaphore post.
+static void own_block_cycle(Host *h, uint32_t frames, float *const *in,
+                            float *const *out) {
+  OwnBlock *b = &h->block;
+  const uint64_t mask = OWN_BLOCK_RING - 1;
+  uint64_t written = atomic_load_explicit(&b->written, memory_order_relaxed);
+  uint64_t done = atomic_load_explicit(&b->done, memory_order_acquire);
+  // The worker may still be reading the oldest unanswered block, so a ring
+  // with no room for this cycle is left alone and the cycle marked lost.
+  // That takes a worker stuck for most of a second.
+  if (written + frames - done <= OWN_BLOCK_RING) {
+    for (unsigned c = 0; c < h->channels; ++c)
+      for (uint32_t n = 0; n < frames; ++n)
+        b->in[c][(written + n) & mask] = in[c][n];
+  } else
+    atomic_store_explicit(&b->lost, written + frames, memory_order_relaxed);
+  atomic_store_explicit(&b->written, written + frames, memory_order_release);
+
+  // A larger cycle needs a longer delay at once; a smaller one shortens it
+  // only once it has held for two seconds, so a quantum that changes back
+  // and forth does not keep moving the audio.
+  uint32_t want = own_block_delay(frames);
+  if (want >= b->current) {
+    b->current = want;
+    b->smaller_for = 0;
+  } else if ((b->smaller_for += frames) >= 2 * h->rate) {
+    b->current = want;
+    b->smaller_for = 0;
+  }
+  atomic_store_explicit(&b->delay, b->current, memory_order_relaxed);
+
+  // Output frame `written + n` is input frame `written + n - delay`. Before
+  // the first input, and where a longer delay would play again what was
+  // already heard, the output is silence; a frame the worker has not
+  // answered yet is silence too, and that is a short cycle.
+  int64_t start = (int64_t)written - (int64_t)b->current;
+  uint64_t heard = atomic_load_explicit(&b->heard, memory_order_relaxed);
+  done = atomic_load_explicit(&b->done, memory_order_acquire);
+  bool short_cycle = false;
+  for (uint32_t n = 0; n < frames; ++n) {
+    int64_t at = start + (int64_t)n;
+    bool play = at >= 0 && (uint64_t)at >= heard;
+    if (play && (uint64_t)at >= done) {
+      play = false;
+      short_cycle = true;
+    }
+    for (unsigned c = 0; c < h->channels; ++c)
+      out[c][n] = play ? b->out[c][(uint64_t)at & mask] : 0;
+  }
+  if (start + (int64_t)frames > (int64_t)heard)
+    atomic_store_explicit(&b->heard, (uint64_t)(start + (int64_t)frames),
+                          memory_order_release);
+  if (short_cycle)
+    atomic_fetch_add_explicit(&b->short_cycles, 1, memory_order_relaxed);
+  if ((written + frames) / OWN_BLOCK_FRAMES != written / OWN_BLOCK_FRAMES)
+    sem_post(&b->wake);
+}
+
+// One block through the plugin, with the checks the audio callback makes
+// around an ordinary call: entered and left for the stall monitor, and a
+// block of invalid output silenced and counted the same way.
+static void own_block_process(Host *h) {
+  OwnBlock *b = &h->block;
+  float *in[MAX_CHANNELS], *out[MAX_CHANNELS];
+  for (unsigned c = 0; c < h->channels; ++c) {
+    in[c] = b->block_in[c];
+    out[c] = b->block_out[c];
+  }
+  bool invalid = false;
+  if (!atomic_load(&h->audio_error)) {
+    bool silent = silent_audio(in, h->channels, OWN_BLOCK_FRAMES);
+    atomic_fetch_add(&h->audio_entered, 1);
+    h->backend->process(h, OWN_BLOCK_FRAMES, in, out);
+    atomic_fetch_add(&h->audio_left, 1);
+    invalid = !finite_audio(out, h->channels, OWN_BLOCK_FRAMES);
+    host_output_result(h, !invalid, silent, OWN_BLOCK_FRAMES);
+  }
+  if (invalid || atomic_load(&h->audio_error))
+    for (unsigned c = 0; c < h->channels; ++c)
+      memset(out[c], 0, sizeof(float) * OWN_BLOCK_FRAMES);
+}
+
+// Answer every complete block waiting, oldest first. A block whose frames
+// have all been played already is dropped without a call: nobody would hear
+// the answer, and skipping it puts the plugin back on time at once, which
+// bounds the delay after a spike instead of letting it grow. The plugin
+// hears the jump. A block whose input never reached the ring is answered
+// with silence; everything below the newest such loss counts as lost, which
+// after a stall long enough to fill the ring costs at most one more delay.
+static void own_block_drain(Host *h) {
+  OwnBlock *b = &h->block;
+  const uint64_t mask = OWN_BLOCK_RING - 1;
+  uint64_t at = atomic_load_explicit(&b->done, memory_order_relaxed);
+  while (!atomic_load(&b->stop)) {
+    uint64_t written = atomic_load_explicit(&b->written, memory_order_acquire);
+    if (written - at < OWN_BLOCK_FRAMES) return;
+    uint64_t heard = atomic_load_explicit(&b->heard, memory_order_acquire);
+    if (at + OWN_BLOCK_FRAMES <= heard) {
+      atomic_fetch_add_explicit(&b->dropped_blocks, 1, memory_order_relaxed);
+    } else if (at < atomic_load_explicit(&b->lost, memory_order_relaxed)) {
+      for (unsigned c = 0; c < h->channels; ++c)
+        for (uint32_t n = 0; n < OWN_BLOCK_FRAMES; ++n)
+          b->out[c][(at + n) & mask] = 0;
+      atomic_fetch_add_explicit(&b->dropped_blocks, 1, memory_order_relaxed);
+    } else {
+      for (unsigned c = 0; c < h->channels; ++c)
+        for (uint32_t n = 0; n < OWN_BLOCK_FRAMES; ++n)
+          b->block_in[c][n] = b->in[c][(at + n) & mask];
+      own_block_process(h);
+      for (unsigned c = 0; c < h->channels; ++c)
+        for (uint32_t n = 0; n < OWN_BLOCK_FRAMES; ++n)
+          b->out[c][(at + n) & mask] = b->block_out[c][n];
+    }
+    at += OWN_BLOCK_FRAMES;
+    atomic_store_explicit(&b->done, at, memory_order_release);
+  }
+}
+
+static void *own_block_work(void *data) {
+  Host *h = data;
+  h->audio_thread = pthread_self();
+  atomic_store(&h->audio_thread_known, true);
+  while (!atomic_load(&h->block.stop)) {
+    if (sem_wait(&h->block.wake) != 0 && errno != EINTR) break;
+    own_block_drain(h);
+  }
+  return NULL;
+}
+
+// The worker is made real-time the way PipeWire makes its own data threads:
+// through the thread utilities its context loaded, RTKit or the process's
+// own limits, at the priority configured for them. Without them it still
+// runs, at ordinary priority, and says so.
+static bool own_block_start(Host *h, struct spa_thread_utils *utils) {
+  OwnBlock *b = &h->block;
+  if (!utils) utils = pw_thread_utils_get();
+  struct spa_dict_item items[] = {
+      SPA_DICT_ITEM_INIT(SPA_KEY_THREAD_NAME, "openxlr-block")};
+  struct spa_dict props = SPA_DICT_INIT_ARRAY(items);
+  b->utils = utils;
+  b->thread = spa_thread_utils_create(utils, &props, own_block_work, h);
+  if (!b->thread) return false;
+  if (spa_thread_utils_acquire_rt(utils, b->thread, -1) < 0)
+    fputs("note: the plugin's own block runs without real-time priority\n",
+          stderr);
+  return true;
+}
+
+static void own_block_stop(Host *h) {
+  OwnBlock *b = &h->block;
+  if (!b->thread) return;
+  atomic_store(&b->stop, true);
+  sem_post(&b->wake);
+  spa_thread_utils_join(b->utils, b->thread, NULL);
+  b->thread = NULL;
+}
+
 static void process_audio(void *data, struct spa_io_position *position) {
   Host *h = data;
-  if (!atomic_load(&h->audio_thread_known)) {
+  // On its own block the plugin is called from the worker, which is the
+  // thread a plugin asking about its audio thread has to hear about.
+  if (!h->own_block && !atomic_load(&h->audio_thread_known)) {
     h->audio_thread = pthread_self();
     atomic_store(&h->audio_thread_known, true);
   }
@@ -365,7 +585,12 @@ static void process_audio(void *data, struct spa_io_position *position) {
     atomic_store(&h->audio_error, true);
   }
   bool invalid_output = false;
-  if (!atomic_load(&h->audio_error)) {
+  if (h->own_block) {
+    // The worker checks the plugin's output and brackets its calls; this
+    // thread only moves samples.
+    if (!atomic_load(&h->audio_error))
+      own_block_cycle(h, frames, in, out);
+  } else if (!atomic_load(&h->audio_error)) {
     // Read before the call: a plugin may process in place.
     bool silent = silent_audio(in, h->channels, frames);
     // Bracket the plugin's callback so the process monitor can tell a stuck
@@ -881,9 +1106,17 @@ static void read_commands(void *data, int fd, uint32_t mask) {
 // the figure changes. A plugin may settle its latency on its first cycles,
 // so nothing is said before one has completed.
 static bool report_latency(Host *h) {
-  if (!h->backend->latency || atomic_load(&h->audio_left) == 0)
+  if ((!h->backend->latency && !h->own_block) ||
+      atomic_load(&h->audio_left) == 0)
     return false;
-  uint32_t latency = h->backend->latency(h);
+  uint32_t latency = h->backend->latency ? h->backend->latency(h) : UINT32_MAX;
+  // On its own block the insert is late by its delay as well as by whatever
+  // the plugin reports; a plugin with no figure counts as none.
+  if (h->own_block) {
+    uint32_t delay = atomic_load(&h->block.delay);
+    if (latency == UINT32_MAX) latency = 0;
+    latency = latency < UINT32_MAX - 1 - delay ? latency + delay : UINT32_MAX - 1;
+  }
   if (h->latency_reported && latency == h->reported_latency)
     return false;
   printf("latency %u %u\n", latency, h->rate);
@@ -905,6 +1138,24 @@ static void explain_audio_failure(Host *h) {
       ? "non-finite audio from the plugin output"
       : "unsupported audio quantum or sample-rate change";
   fprintf(stderr, "%s; restart the chain\n", reason);
+}
+
+// With OPENXLR_HOST_TRACE set, the own block says once a second, when either
+// count moved, how many cycles played silence for a block that came late and
+// how many blocks the worker dropped as too late to be heard.
+static void trace_own_block(Host *h) {
+  OwnBlock *b = &h->block;
+  uint64_t shorts = atomic_load(&b->short_cycles);
+  uint64_t dropped = atomic_load(&b->dropped_blocks);
+  if (shorts == b->reported_short && dropped == b->reported_dropped) return;
+  b->reported_short = shorts;
+  b->reported_dropped = dropped;
+  if (getenv("OPENXLR_HOST_TRACE"))
+    fprintf(stderr,
+            "trace: own block: %llu short cycles, %llu dropped blocks, "
+            "delay %u frames\n",
+            (unsigned long long)shorts, (unsigned long long)dropped,
+            atomic_load(&b->delay));
 }
 
 static void tick(void *data, uint64_t expirations) {
@@ -935,6 +1186,8 @@ static void tick(void *data, uint64_t expirations) {
   if (h->backend->main_thread)
     h->backend->main_thread(h);
   report_latency(h);
+  if (h->own_block && h->heartbeat_ticks == 0)
+    trace_own_block(h);
   if (h->editor_open)
     pump_editor(h, true);
 }
@@ -1049,15 +1302,22 @@ int main(int argc, char **argv) {
     return player_print_formats();
   if (argc == 3 && !strcmp(argv[1], "probe") && player_probe_main)
     return player_probe_main(argv[2]);
+  // `--own-block` before a plugin format runs the plugin on its own block.
+  bool own_block = argc >= 2 && !strcmp(argv[1], "--own-block");
+  if (own_block) {
+    argv[1] = argv[0];
+    ++argv;
+    --argc;
+  }
   const Backend *backend = argc >= 2 ? backend_named(argv[1]) : NULL;
   int first = backend ? 2 + backend->argument_count : 0;  // NODE
-  if (!backend || argc < first + 3) {
-    fputs("usage: openxlr-lv2-host lv2 URI NODE CHANNELS RATE "
+  if (!backend || argc < first + 3 || (own_block && !own_block_allowed(backend))) {
+    fputs("usage: openxlr-lv2-host [--own-block] lv2 URI NODE CHANNELS RATE "
           "[SYMBOL=VALUE ...]\n"
-          "       openxlr-lv2-host clap FILE ID NODE CHANNELS RATE "
+          "       openxlr-lv2-host [--own-block] clap FILE ID NODE CHANNELS RATE "
           "[SYMBOL=VALUE ...]\n"
-          "       openxlr-lv2-host vst3 BUNDLE CLASS-ID NODE CHANNELS RATE "
-          "[SYMBOL=VALUE ...]\n"
+          "       openxlr-lv2-host [--own-block] vst3 BUNDLE CLASS-ID NODE "
+          "CHANNELS RATE [SYMBOL=VALUE ...]\n"
           "       openxlr-lv2-host soundcheck NODE 1 RATE\n"
           "       openxlr-lv2-host eq NODE 1 RATE [SYMBOL=VALUE ...]\n"
           "       openxlr-lv2-host eq-bands COUNT NODE 1 RATE [SYMBOL=VALUE ...]\n"
@@ -1079,6 +1339,7 @@ int main(int argc, char **argv) {
   h.rate = (uint32_t)strtoul(argv[first + 2], NULL, 10);
   h.channels = (unsigned)channels;
   h.main_thread = pthread_self();
+  h.own_block = own_block;
   if (channels < 1 || channels > MAX_CHANNELS || h.rate < 8000 ||
       h.rate > 384000)
     return 2;
@@ -1096,6 +1357,8 @@ int main(int argc, char **argv) {
     if (!(h.tap_scratch[t] = calloc(MAX_FRAMES, sizeof(float))))
       return 1;
   if (!h.silence || !h.scratch)
+    return 1;
+  if (h.own_block && !own_block_init(&h))
     return 1;
 
   pw_init(NULL, NULL);
@@ -1148,6 +1411,17 @@ int main(int argc, char **argv) {
     h.exit_code = 1;
     goto deactivate;
   }
+  if (h.own_block) {
+    struct pw_core *core = pw_filter_get_core(h.filter);
+    struct pw_context *context = core ? pw_core_get_context(core) : NULL;
+    if (!own_block_start(&h, context ? pw_context_get_object(
+                                           context, SPA_TYPE_INTERFACE_ThreadUtils)
+                                     : NULL)) {
+      fputs("could not start the plugin's own block\n", stderr);
+      h.exit_code = 1;
+      goto disconnect;
+    }
+  }
   fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK);
   struct pw_loop *loop = pw_main_loop_get_loop(h.loop);
   pw_loop_add_io(loop, STDIN_FILENO, SPA_IO_IN | SPA_IO_HUP, false,
@@ -1165,8 +1439,11 @@ int main(int argc, char **argv) {
   pw_main_loop_run(h.loop);
   atomic_store(&h.monitor_stop, true);
   pthread_join(monitor, NULL);
+disconnect:
   pw_filter_disconnect(h.filter);
 deactivate:
+  // The worker calls the plugin, so it ends before the plugin is switched off.
+  own_block_stop(&h);
   backend->deactivate(&h);
 cleanup:
   close_ui(&h);
@@ -1180,5 +1457,6 @@ cleanup:
   free(h.scratch);
   for (unsigned t = 0; t < MAX_TAPS; ++t)
     free(h.tap_scratch[t]);
+  own_block_free(&h);
   return h.exit_code;
 }

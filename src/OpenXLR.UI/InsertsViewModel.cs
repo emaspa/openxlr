@@ -313,6 +313,11 @@ public sealed partial class InsertsViewModel : ViewModelBase
         if (!_applying && !IsDetached) { EffectEdited(); _ = _client.SetInsertBypassAsync(_channel, item.Id, bypass); }
     }
 
+    internal void SendOwnBlock(InsertViewModel item, bool ownBlock)
+    {
+        if (!_applying && !IsDetached) { EffectEdited(); _ = _client.SetInsertOwnBlockAsync(_channel, item.Id, ownBlock); }
+    }
+
     internal void SendParam(InsertViewModel item, string symbol, double value)
     {
         if (_applying || IsDetached) return;
@@ -428,6 +433,7 @@ public sealed class InsertViewModel : ViewModelBase
         Raise(nameof(NativeEditorAvailable));
         Raise(nameof(CanChooseNativeHost));
         Raise(nameof(CanTurnNativeHostOn));
+        Raise(nameof(CanChooseOwnBlock));
         Raise(nameof(ControlsHint));
     }
 
@@ -449,6 +455,31 @@ public sealed class InsertViewModel : ViewModelBase
     public bool CanChooseNativeHost => Kind == "lv2" && (NativeEditorSupported || NativeHost);
 
     private readonly Dictionary<string, double> _params = [];
+
+    private bool _ownBlock;
+    /// <summary>
+    /// The plugin runs on a block of its own in the native host, for one that
+    /// cannot keep up with a short block. Switching starts its host again.
+    /// </summary>
+    public bool OwnBlock
+    {
+        get => _ownBlock;
+        set
+        {
+            if (IsDetached) return;
+            if (Set(ref _ownBlock, value))
+            {
+                Raise(nameof(CanChooseOwnBlock));
+                _owner.SendOwnBlock(this, value);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Offered where the native host can run the plugin, and always while it
+    /// is on, so it can be turned off again.
+    /// </summary>
+    public bool CanChooseOwnBlock => OwnBlock || NativeHostRunning || NativeHostInstalled;
 
     private bool _bypass;
     public bool Bypass
@@ -561,7 +592,9 @@ public sealed class InsertViewModel : ViewModelBase
         _nativeUiBlockReason = nativeUiBlockReason;
         _bypass = ins["bypass"]?.GetValue<bool>() ?? false;
         _nativeHost = ins["nativeHost"]?.GetValue<bool>() ?? false;
+        _ownBlock = ins["ownBlock"]?.GetValue<bool>() ?? false;
         Raise(nameof(NativeHost));
+        Raise(nameof(OwnBlock));
         Raise(nameof(Bypass));
         Raise(nameof(StateText));
         Raise(nameof(IsActive));
@@ -651,16 +684,23 @@ public sealed class InsertViewModel : ViewModelBase
         _owner.SendParam(this, symbol, value);
     }
 
-    internal object ToPayload() => new Dictionary<string, object?>
+    internal object ToPayload()
     {
-        ["id"] = Id,
-        ["kind"] = Kind,
-        ["plugin"] = Plugin,
-        ["label"] = Label,
-        ["bypass"] = _bypass,
-        ["nativeHost"] = _nativeHost,
-        ["params"] = new Dictionary<string, double>(_params),
-    };
+        var payload = new Dictionary<string, object?>
+        {
+            ["id"] = Id,
+            ["kind"] = Kind,
+            ["plugin"] = Plugin,
+            ["label"] = Label,
+            ["bypass"] = _bypass,
+            ["nativeHost"] = _nativeHost,
+            ["params"] = new Dictionary<string, double>(_params),
+        };
+        // Written only while on, so a chain or a preset of inserts in
+        // PipeWire's cycle reads exactly as it did before the switch existed.
+        if (_ownBlock) payload["ownBlock"] = true;
+        return payload;
+    }
 }
 
 /// <summary>A titled run of controls in the controls window.</summary>

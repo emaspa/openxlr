@@ -1763,6 +1763,12 @@ Papalitan ito ng kasalukuyang eksena kapag nag-save.</value>
   <data name="Running" xml:space="preserve">
     <value>tumatakbo</value>
   </data>
+  <data name="RunOnItsOwnBlock" xml:space="preserve">
+    <value>Patakbuhin sa sariling block (may dagdag na delay)</value>
+  </data>
+  <data name="RunOnItsOwnBlockTip" xml:space="preserve">
+    <value>Para sa plugin na hindi makasabay: pumuputol-putol ang tunog, o nawawala ang interface habang tumatakbo ito. Gagawa ang plugin ng 1024 na sample bawat beses sa sarili nitong thread, na nagdadagdag ng nakapirming delay, 32 ms sa block size na 256. Ang paglipat ay nagre-restart sa plugin at saglit na pinuputol ang audio nito.</value>
+  </data>
   <data name="RunThisInsertInItsOwnProcessWhich" xml:space="preserve">
     <value>Patakbuhin ang insert na ito sa sariling proseso upang mabuksan ang sarili nitong editor. Muling binubuo ng paglipat ang chain at saglit na pinuputol ang audio.</value>
   </data>

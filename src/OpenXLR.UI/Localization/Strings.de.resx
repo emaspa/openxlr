@@ -1814,6 +1814,12 @@ Speichern ersetzt es durch die aktuelle Szene.</value>
   <data name="Running" xml:space="preserve">
     <value>Läuft</value>
   </data>
+  <data name="RunOnItsOwnBlock" xml:space="preserve">
+    <value>In eigenem Block ausführen (verzögert)</value>
+  </data>
+  <data name="RunOnItsOwnBlockTip" xml:space="preserve">
+    <value>Für ein Plugin, das nicht mitkommt: Der Ton stottert, oder das Interface fällt aus, solange es läuft. Das Plugin verarbeitet dann 1024 Samples auf einmal in einem eigenen Thread, was eine feste Verzögerung hinzufügt, 32 ms bei einer Blockgröße von 256. Das Umschalten startet das Plugin neu und unterbricht seinen Ton kurz.</value>
+  </data>
   <data name="RunThisInsertInItsOwnProcessWhich" xml:space="preserve">
     <value>Diesen Effekt in einem eigenen Prozess ausführen, damit sich sein eigener Editor öffnen lässt. Umschalten baut die Kette neu auf und unterbricht den Ton kurz.</value>
   </data>

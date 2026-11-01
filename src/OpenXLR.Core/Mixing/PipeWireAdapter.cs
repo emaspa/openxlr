@@ -1344,7 +1344,7 @@ public sealed class PipeWireAdapter
     private FilterHandle CreateFilterChain(string sinkName, string srcName, string description, int channels,
         int lowCutHz, bool clipGuard, IReadOnlyList<InsertDefinition>? inserts)
     {
-        if (inserts?.Any(i => !i.Bypass && (i.RunsNatively || NeedsLatencyHost(i))) == true)
+        if (inserts?.Any(i => !i.Bypass && (i.NeedsNativeHost || NeedsLatencyHost(i))) == true)
             return CreateHostedChain(sinkName, srcName, description, channels, lowCutHz, clipGuard, inserts);
         if (clipGuard)
         {
@@ -1566,7 +1566,7 @@ public sealed class PipeWireAdapter
                         $"{InsertName(insert)} is unavailable or requires unsupported host features.");
                 string node = $"{sinkName}_stage_{insertStages.Count}";
                 FilterHandle stage;
-                if (insert.RunsNatively || refused is not null || NeedsLatencyHost(insert))
+                if (insert.NeedsNativeHost || refused is not null || NeedsLatencyHost(insert))
                 {
                     if (!NativePluginHost.HostInstalled)
                         throw new InvalidOperationException("The native plugin host is not installed.");

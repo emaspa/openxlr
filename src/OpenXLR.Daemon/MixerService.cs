@@ -1250,6 +1250,9 @@ public sealed class MixerService : IHostedService, IDisposable
                     _mixer.SetInsertBypass(cmd.Channel, cmd.InsertId, cmd.Value.GetBoolean());
                     SyncOutputSelectors();   // software processing moves the Pro's mic between its hardware path and the send
                     break;
+                case "setInsertOwnBlock":
+                    _mixer.SetInsertOwnBlock(cmd.Channel!, cmd.InsertId!, cmd.Value.GetBoolean());   // checked by CommandValidation
+                    break;
                 case "setInsertParam":
                     if (cmd.Channel is null || cmd.InsertId is null || cmd.Symbol is null)
                         return "setInsertParam: need 'channel', 'insertId', and 'symbol'";

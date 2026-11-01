@@ -30,6 +30,20 @@ public sealed record InsertDefinition
     /// <summary>Explicit opt-in; omitted in old settings and profiles means filter-chain.</summary>
     public bool NativeHost { get; init; }
 
+    /// <summary>
+    /// The plugin runs on a block of its own: the native host calls it with
+    /// 1024 frames at a time on a worker thread, apart from PipeWire's cycle,
+    /// for a plugin that cannot finish a short block in time. It adds a fixed
+    /// delay, which the insert's latency includes. Only the native host can
+    /// do this, so an LV2 insert with it on runs there whatever
+    /// <see cref="NativeHost"/> says. Off by default and in older settings.
+    /// </summary>
+    public bool OwnBlock { get; init; }
+
+    /// <summary>Whether the insert runs in the native host: its saved choice, its format, or its own block.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool NeedsNativeHost => RunsNatively || OwnBlock;
+
     /// <summary>Control values by port symbol; ports not listed keep defaults.</summary>
     public Dictionary<string, double> Params { get; init; } = [];
 

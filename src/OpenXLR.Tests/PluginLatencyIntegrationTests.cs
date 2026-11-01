@@ -224,4 +224,78 @@ public sealed class PluginLatencyIntegrationTests
             return reported;
         }
     }
+
+    /// <summary>
+    /// The same plugin on its own block: the native host runs it, whatever
+    /// its saved host, and its figure is the plugin's own plus the block's
+    /// delay, which the other mix is then aligned to. Turning it off starts
+    /// the host again in PipeWire's cycle and the figure drops back.
+    /// </summary>
+    [DspPipeWireFact]
+    public async Task AnInsertOnItsOwnBlockReportsTheBlockDelayAndGoesBack()
+    {
+        RequireFixture();
+        var pw = new PipeWireAdapter();
+        using var registry = pw.WatchGraph();
+        using var mixer = new Mixer(pw);
+        using var stop = new CancellationTokenSource();
+        Task<ProcessResult>? playback = null;
+        try
+        {
+            pw.CreateNullSink("own_block_test_output", "Own block test output");
+            mixer.Build(new MixerConfig
+            {
+                Mixes = [new("monitor", "Monitor", MixKind.Monitor), new("chat", "Chat", MixKind.VirtualMic)],
+                Channels = [new("test", "Test") { Levels = new Dictionary<string, double> { ["monitor"] = 1, ["chat"] = 1 } }],
+            });
+            mixer.SetMonitorOutputs(["own_block_test_output"]);
+            mixer.SetMixLatencyCompensation(true);
+            mixer.SetInserts("mix:chat", [Delay(480) with { OwnBlock = true }]);
+            playback = ProcessRunner.RunAsync("python3", ["-c", """
+                import subprocess, struct
+                args = ['--format=f32', '--rate=48000', '--channels=2']
+                if '--raw' in subprocess.check_output(['pw-cat', '--help'], text=True): args.append('--raw')
+                p = subprocess.Popen(['pw-cat', '--playback', *args, '--properties={ node.link-group = openxlr-test-playback }', '--target', 'OpenXLR_ch_test', '-'], stdin=subprocess.PIPE)
+                try: p.communicate(struct.pack('<ff', .1, .1) * (48000 * 40), timeout=50)
+                finally:
+                    if p.poll() is None: p.kill()
+                    p.wait()
+                """], TimeSpan.FromSeconds(55), cancel: stop.Token);
+
+            // The plugin's 480 frames, then the block of 1024 and the larger
+            // of 512 and the server's cycle.
+            double own = WaitForReport(ms => ms >= (480 + 1024 + 512) / 48.0);
+            double beyond = own * 48 - 480 - 1024;
+            Assert.True(beyond is 512 or 1024 or 2048 or 4096 or 8192, $"{own} ms is not 480 frames plus the block's delay");
+            InsertStatus status = Assert.Single(mixer.Snapshot().Inserts["mix:chat"]);
+            Assert.True(status.NativeHostRunning && !status.Insert.NativeHost && status.Insert.OwnBlock);
+
+            mixer.SetInsertOwnBlock("mix:chat", "delay", false);
+            Assert.Equal(10, WaitForReport(ms => ms < own));
+        }
+        finally
+        {
+            stop.Cancel();
+            if (playback is not null) await playback;
+            pw.TearDown();
+        }
+
+        // Wait until the chat insert reports a figure the predicate accepts
+        // and the monitor mix is delayed by exactly that much.
+        double WaitForReport(Func<double, bool> accept)
+        {
+            double reported = -1;
+            Assert.True(SpinWait.SpinUntil(() =>
+            {
+                mixer.EnsureFilterRoutes();
+                mixer.EnsureCellLevels();
+                MixerState state = mixer.Snapshot();
+                InsertStatus insert = state.Inserts["mix:chat"].Single();
+                if (insert.LatencyMilliseconds is not double ms || !accept(ms) || state.MixLatencyError is not null) return false;
+                reported = ms;
+                return state.MixDelayMilliseconds.GetValueOrDefault("monitor", 0) == ms;
+            }, TimeSpan.FromSeconds(8)), JsonSerializer.Serialize(mixer.Snapshot()));
+            return reported;
+        }
+    }
 }

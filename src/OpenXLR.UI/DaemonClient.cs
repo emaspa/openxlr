@@ -839,6 +839,10 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, INoiseCommands
         => SendAsync(new Dictionary<string, object>
         { ["cmd"] = "setInsertBypass", ["channel"] = channel, ["insertId"] = insertId, ["value"] = bypass });
 
+    public Task SetInsertOwnBlockAsync(string channel, string insertId, bool ownBlock)
+        => SendAsync(new Dictionary<string, object>
+        { ["cmd"] = "setInsertOwnBlock", ["channel"] = channel, ["insertId"] = insertId, ["value"] = ownBlock });
+
     public Task ShowInsertUiAsync(string channel, string insertId)
         => SendAsync(new Dictionary<string, object>
         { ["cmd"] = "showInsertUi", ["channel"] = channel, ["insertId"] = insertId });

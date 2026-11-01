@@ -183,6 +183,7 @@ internal sealed record InsertBody
     public string? Label { get; init; }
     public bool Bypass { get; init; }
     public bool NativeHost { get; init; }
+    public bool OwnBlock { get; init; }
 
     /// <summary>The plugin's control values, carried back untouched whenever the chain is rewritten.</summary>
     public Dictionary<string, double> Params { get; init; } = [];

@@ -49,6 +49,53 @@ static void gain_fixture(uint32_t channels, char *uri) {
   lv2_unload(&h);
 }
 
+static int32_t option_value(Lv2 *l, const char *uri) {
+  LV2_URID key = map_uri(l, uri);
+  for (const LV2_Options_Option *o = l->options; o->key; ++o)
+    if (o->key == key) return *(const int32_t *)o->value;
+  return -1;
+}
+
+// On its own block the plugin is told the block is exactly 1024 frames:
+// minimum, maximum and nominal. Otherwise it is told the bounds the audio
+// callback keeps, and no nominal length. The real fixture then runs through
+// the block's worker side and its output is its gain on the input, exactly
+// the block's delay late.
+static void own_block_fixture(char *uri) {
+  for (int own = 0; own < 2; ++own) {
+    // The main thread is named so the plugin's URIs map to real keys.
+    Host h = {.rate = 48000, .channels = 1, .backend = &lv2_backend,
+              .own_block = own, .main_thread = pthread_self()};
+    char *arguments[] = {uri};
+    assert(lv2_load(&h, arguments));
+    Lv2 *l = h.impl;
+    assert(option_value(l, LV2_BUF_SIZE__minBlockLength) == (own ? 1024 : 1));
+    assert(option_value(l, LV2_BUF_SIZE__maxBlockLength) == (own ? 1024 : MAX_FRAMES));
+    assert(option_value(l, LV2_BUF_SIZE__nominalBlockLength) == (own ? 1024 : -1));
+    assert(lv2_activate(&h));
+    if (own) {
+      Control *gain = control_named(&h, "gain");
+      assert(gain && own_block_init(&h));
+      atomic_store(&gain->desired, 0.5f);
+      static float input[256], output[256], heard[256 * 64];
+      float *in[] = {input}, *out[] = {output};
+      for (unsigned i = 0; i < 64; ++i) {
+        for (unsigned n = 0; n < 256; ++n) input[n] = (float)(i * 256 + n + 1) / 65536.0f;
+        own_block_cycle(&h, 256, in, out);
+        own_block_drain(&h);
+        memcpy(heard + i * 256, output, sizeof(output));
+      }
+      for (unsigned n = 0; n < 256 * 64; ++n)
+        assert(heard[n] == (n < 1536 ? 0.0f : (float)(n - 1536 + 1) / 65536.0f * 0.5f));
+      assert(report_latency(&h) && h.reported_latency == 1536);
+      own_block_free(&h);
+    }
+    lv2_deactivate(&h);
+    lv2_unload(&h);
+  }
+  puts("PASS: an LV2 plugin on its own block is told 1024 frames and runs exactly 1536 frames late");
+}
+
 int main(void) {
   // The fixtures' bundles are the only ones this test may see: LV2_PATH
   // names a fresh directory holding a link to each and nothing else.
@@ -89,6 +136,7 @@ int main(void) {
   gain_fixture(1, "urn:openxlr:test:gain:mono");
   gain_fixture(2, "urn:openxlr:test:gain");
   puts("PASS: mono and stereo gain fixtures scale each audio channel");
+  own_block_fixture("urn:openxlr:test:gain:mono");
   unlink(gain_link);
   unlink(link);
   rmdir(directory);

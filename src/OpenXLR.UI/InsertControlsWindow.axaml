@@ -72,6 +72,9 @@
                       ToolTip.Tip="{loc:Text Key=RunThisInsertInItsOwnProcessWhich}"/>
         <Button Content="{loc:Text Key=Manual}" Padding="10,4" Margin="0,0,6,6" Click="OnEditorManual"
                 IsVisible="{Binding CanChooseNativeHost}" ToolTip.Tip="{loc:Text Key=OpenTheManualSectionOnPluginEditors}"/>
+        <ToggleButton Name="PluginOwnBlock" Content="{loc:Text Key=RunOnItsOwnBlock}" IsChecked="{Binding OwnBlock, Mode=TwoWay}"
+                      Padding="12,4" Margin="0,0,6,6" IsVisible="{Binding CanChooseOwnBlock}"
+                      ToolTip.Tip="{loc:Text Key=RunOnItsOwnBlockTip}"/>
       </WrapPanel>
       <TextBlock Text="{Binding NativeUiBlockReason}" Foreground="{DynamicResource Ox.Text.Secondary}" FontSize="11" TextWrapping="Wrap"
                  Margin="0,0,0,8" IsVisible="{Binding NativeUiBlocked}"/>
