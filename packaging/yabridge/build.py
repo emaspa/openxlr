@@ -23,6 +23,8 @@ HERE = Path(__file__).resolve().parent
 PIN = json.loads((HERE / "source.json").read_text())
 FILES = [f"libyabridge{loader}-{kind}.so" for loader in ("", "-chainloader") for kind in ("clap", "vst2", "vst3")]
 FILES += ["yabridge-host.exe", "yabridge-host.exe.so"]
+# Local patches to the pinned source, applied in this order.
+PATCHES = ["private-plugin-home.patch", "disk-identity.patch"]
 
 
 def run(args, cwd=None, **kwargs):
@@ -39,11 +41,12 @@ def prepare(source):
     actual = run(["git", "-C", source, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
     if actual != PIN["commit"]:
         raise RuntimeError("Source checkout does not match source.json")
-    patch = HERE / "private-plugin-home.patch"
-    applied = subprocess.run(["git", "-C", str(source), "apply", "--reverse", "--check", str(patch)], capture_output=True)
-    if applied.returncode:
-        run(["git", "-C", source, "apply", "--check", patch])
-        run(["git", "-C", source, "apply", patch])
+    for name in PATCHES:
+        patch = HERE / name
+        applied = subprocess.run(["git", "-C", str(source), "apply", "--reverse", "--check", str(patch)], capture_output=True)
+        if applied.returncode:
+            run(["git", "-C", source, "apply", "--check", patch])
+            run(["git", "-C", source, "apply", patch])
     sdk = source / "subprojects/vst3.wrap"
     sdk.write_text(re.sub(r"(?m)^revision = .*", "revision = " + PIN["vst3SdkCommit"], sdk.read_text()))
     for wrap in (source / "subprojects").glob("*.wrap"):
@@ -155,7 +158,8 @@ def stage_payload(source, output, destination, prefix, *, manager):
     notices.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source / "COPYING", notices / "COPYING")
     shutil.copy2(HERE / "source.json", notices / "source.json")
-    shutil.copy2(HERE / "private-plugin-home.patch", notices / "private-plugin-home.patch")
+    for name in PATCHES:
+        shutil.copy2(HERE / name, notices / name)
     (notices / "SOURCE").write_text(
         f"Source: {PIN['repository']}\nCommit: {PIN['commit']}\n"
         "Packaging and corresponding source archive: https://github.com/emaspa/openxlr\n"

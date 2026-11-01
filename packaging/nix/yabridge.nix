@@ -19,7 +19,8 @@ let
   bridge = (yabridge.override { wineWow64Packages = winePackages; }).overrideAttrs (old: {
     version = pin.version;
     inherit src;
-    patches = builtins.filter (patch: !(lib.hasInfix "libyabridge-drop-32-bit-support" (toString patch))) old.patches;
+    patches = builtins.filter (patch: !(lib.hasInfix "libyabridge-drop-32-bit-support" (toString patch))) old.patches
+      ++ [ ../yabridge/disk-identity.patch ];
     postUnpack = old.postUnpack + ''
       rm -rf "$sourceRoot/subprojects/asio"
       cp -R --no-preserve=mode,ownership ${asio} "$sourceRoot/subprojects/asio"
@@ -63,7 +64,7 @@ in runCommand "openxlr-yabridge-${pin.version}" {
   chmod +x "$out/bin/openxlr-yabridgectl"
   patchShebangs "$out/bin/openxlr-yabridgectl"
   cp ${src}/COPYING ${../yabridge/source.json} ${../yabridge/private-plugin-home.patch} \
-    "$out/share/licenses/openxlr-yabridge/"
+    ${../yabridge/disk-identity.patch} "$out/share/licenses/openxlr-yabridge/"
   python3 ${../install_receipt.py} --root / --prefix "$out" --manager nix \
     --package openxlr-yabridge --version '${pin.version}-${toString pin.revision}' --commit '${pin.commit}'
 ''

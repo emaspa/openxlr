@@ -3,8 +3,21 @@
 `openxlr-yabridge` supplies a tested 64-bit bridge. Wine remains a separate
 dependency. The libraries, chainloaders, Windows host and controller use
 the commit in `source.json`, including the Wine 9.22+ window-position fix.
+Two local patches apply to the pinned source, and nothing else changes.
 `private-plugin-home.patch` adds an environment-controlled output directory
-to yabridgectl. It is the only local patch to the pinned source.
+to yabridgectl.
+
+`disk-identity.patch` gives Windows plugins the system disk's identity.
+In Wine, `\\.\PhysicalDrive0` is a placeholder that no drive backs. Its
+answer to the storage property query has no model, firmware revision or
+serial number. A plugin that ties its licence to that disk then sends an
+empty machine id, and activation fails. With the patch, the Windows host
+answers that one query with the model, firmware revision and serial number
+of the NVMe drive that holds the Wine prefix, laid out the way Windows' own
+NVMe driver reports them. It replaces only Wine's empty answer. When the
+prefix is not on an NVMe drive, or the drive cannot be read, the host
+leaves Wine's answer alone. The host's output names the drive it found,
+with the serial masked.
 
 `source.json` also carries the package revision: the package version is
 `<version>-<revision>`, and a rebuild of the same commit bumps the
