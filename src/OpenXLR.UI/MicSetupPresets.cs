@@ -43,26 +43,8 @@ public sealed record MicSetupPreset(string Id, MicEq Eq)
         })],
     });
 
-    /// <summary>
-    /// The EQ holds this preset: switched on, and every band the preset's,
-    /// within half a step of the daemon's grid, so a value that came back
-    /// through the daemon still counts.
-    /// </summary>
-    public bool Holds(MicEq eq, EqLimits limits)
-    {
-        MicEq own = For(limits);
-        if (eq.Enabled != own.Enabled || eq.Bands.Count != own.Bands.Count) return false;
-        for (int i = 0; i < own.Bands.Count; i++)
-        {
-            EqBand a = eq.Bands[i], b = own.Bands[i];
-            if (a.Enabled != b.Enabled || a.Type != b.Type
-                || Math.Abs(a.Frequency - b.Frequency) >= MicEq.FrequencyStep / 2
-                || Math.Abs(a.Gain - b.Gain) >= MicEq.GainStep / 2
-                || Math.Abs(MicEq.QLog10(a.Q) - MicEq.QLog10(b.Q)) >= MicEq.QLog10Step / 2)
-                return false;
-        }
-        return true;
-    }
+    /// <summary>The EQ holds this preset as the ranges the daemon reports hold it, by <see cref="MicEq.Holds"/>.</summary>
+    public bool Holds(MicEq eq, EqLimits limits) => eq.Holds(For(limits));
 }
 
 /// <summary>

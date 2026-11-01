@@ -2595,11 +2595,8 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
   <data name="EqProfileListName" xml:space="preserve">
     <value>Saved EQ profiles</value>
   </data>
-  <data name="EqProfileLoad" xml:space="preserve">
-    <value>Load</value>
-  </data>
-  <data name="EqProfileLoadTip" xml:space="preserve">
-    <value>Put the chosen profile's bands on this microphone and switch its EQ on.</value>
+  <data name="EqProfileListTip" xml:space="preserve">
+    <value>Pick a profile to put its bands on this microphone and switch its EQ on.</value>
   </data>
   <data name="EqProfileSaveTip" xml:space="preserve">
     <value>Save this EQ's bands under a name, to load on any microphone.</value>

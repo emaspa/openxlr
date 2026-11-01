@@ -1584,15 +1584,19 @@ clicking **EQ** again brings it to the front.
   off.
 - The **Profile** row under them keeps EQs by name. The list starts with
   the three built-in profiles, Clear, Warm and Broadcast, marked "(built
-  in)". They are Mic setup's starting presets. Your saved profiles follow. **Save**
-  asks for a name and keeps this EQ's bands as an EQ profile; a name you
-  already saved asks before it replaces that profile. Pick a profile in
-  the list and press **Load** to put its bands on this microphone and switch
-  its EQ on. A profile belongs to no microphone, so one saved on XLR 1
-  loads on XLR 2 or on a capture input. **Rename** and **Delete** act on
-  the saved profile picked in the list, and Delete asks first; a built-in
-  profile keeps its name and stays. Every open editor lists the same
-  profiles. See [EQ profiles](#eq-profiles) below.
+  in)". They are Mic setup's starting presets. Your saved profiles follow.
+  Picking a profile in the list loads it at once: its bands go on this
+  microphone and its EQ switches on. The list shows the profile the EQ
+  holds, so it goes back to "Choose a profile" when you change a band, and
+  picking the same profile again loads it again. **Save** asks for a name
+  and keeps this EQ's bands as an EQ profile. It offers the name of the
+  saved profile you last picked, so you can pick one, adjust it and save
+  over it. A name you already saved asks before it replaces that profile.
+  A profile belongs to no microphone, so one saved on XLR 1 loads on XLR 2
+  or on a capture input. **Rename** and **Delete** act on the saved
+  profile shown in the list, and Delete asks first; a built-in profile
+  keeps its name and stays. Every open editor lists the same profiles. See
+  [EQ profiles](#eq-profiles) below.
 - The line at the bottom says what runs the EQ, or why it cannot run. On
   a unit that can run the EQ itself, **Where the EQ runs** sits above it;
   see below.
@@ -1639,6 +1643,13 @@ every microphone's EQ with the rest of the mixer.
 - The daemon keeps the profiles, so the UI, a
   [Stream Deck key](#eq-profile-keys) and a script through the
   [control API](api.md#eq-profiles) load the same ones.
+- The editor's list shows the profile the microphone's EQ holds now,
+  whoever loaded it: the list, a key or a script. When several profiles
+  have the same bands, it keeps the one you picked, or else shows the
+  first. A band change, **Paste**, **Reset** or switching the EQ off
+  usually leaves the profile, and then the list goes back to "Choose a
+  profile". **Compare** leaves the list as it is. Only a pick in the list
+  loads a profile; the list changing by itself sends nothing.
 - The built-in profiles are the presets Mic setup's Shape step offers,
   with the same bands: Clear, Warm and Broadcast. They come first in the
   list, named in the UI's language, and cannot be renamed or deleted.

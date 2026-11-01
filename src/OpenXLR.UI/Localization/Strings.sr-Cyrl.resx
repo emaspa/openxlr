@@ -2548,11 +2548,8 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
   <data name="EqProfileListName" xml:space="preserve">
     <value>Сачувани EQ профили</value>
   </data>
-  <data name="EqProfileLoad" xml:space="preserve">
-    <value>Учитај</value>
-  </data>
-  <data name="EqProfileLoadTip" xml:space="preserve">
-    <value>Примени појасеве изабраног профила на овај микрофон и укључи његов EQ.</value>
+  <data name="EqProfileListTip" xml:space="preserve">
+    <value>Изабери профил да примениш његове појасеве на овај микрофон и укључиш његов EQ.</value>
   </data>
   <data name="EqProfileSaveTip" xml:space="preserve">
     <value>Сачувај појасеве овог EQ-а под именом, да их учиташ на било ком микрофону.</value>

@@ -2580,11 +2580,8 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="EqProfileListName" xml:space="preserve">
     <value>Gespeicherte EQ-Profile</value>
   </data>
-  <data name="EqProfileLoad" xml:space="preserve">
-    <value>Laden</value>
-  </data>
-  <data name="EqProfileLoadTip" xml:space="preserve">
-    <value>Die Bänder des gewählten Profils auf dieses Mikrofon legen und seinen EQ einschalten.</value>
+  <data name="EqProfileListTip" xml:space="preserve">
+    <value>Ein Profil wählen, um seine Bänder auf dieses Mikrofon zu legen und dessen EQ einzuschalten.</value>
   </data>
   <data name="EqProfileSaveTip" xml:space="preserve">
     <value>Die Bänder dieses EQ unter einem Namen speichern, um sie auf jedem Mikrofon zu laden.</value>
