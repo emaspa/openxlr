@@ -1997,9 +1997,9 @@ says so when it sees that pair of versions. If it cannot read the Wine
 version, the rest of the setup still shows, without this warning.
 
 Some plugins, [Elgato Voice Focus](https://marketplace.elgato.com/product/voice-focus-cadb20d0-18f1-45da-bf59-0f898f1e1767)
-among them, tie their licence to the
-system disk's serial number. Wine reports that disk with no model or
-serial, so these plugins send an empty machine id and fail to activate.
+among them, tie their licence to a machine ID built from the system disk's
+model and serial number. Wine reports that disk with no model or serial,
+so these plugins send an empty machine ID and fail to activate.
 The companion's host reports the model, firmware revision and serial number
 of the NVMe drive that holds the Wine prefix, the way Windows does, so the
 plugin can activate with your own licence. When the prefix is on another
