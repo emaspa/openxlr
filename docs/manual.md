@@ -1636,7 +1636,8 @@ under the row says why. An older daemon takes exactly four bands. EQ
 profiles are not the [profiles](#profiles) in the header, which save
 every microphone's EQ with the rest of the mixer.
 
-- The daemon keeps the profiles, so the UI and a script through the
+- The daemon keeps the profiles, so the UI, a
+  [Stream Deck key](#eq-profile-keys) and a script through the
   [control API](api.md#eq-profiles) load the same ones.
 - The built-in profiles are the presets Mic setup's Shape step offers,
   with the same bands: Clear, Warm and Broadcast. They come first in the
@@ -3609,7 +3610,8 @@ when not on the default monitor mix),
 the bypass of one insert or of a whole chain, a desktop output's mute, a
 5% step up or down in its volume, or its selection as the enforced system
 default, the routing of the focused
-application, a profile to recall, or the next member of an
+application, a profile to recall, an [EQ profile](#eq-profile-keys) to
+load on a microphone, or the next member of an
 [exclusive group](#exclusive-groups). A group key shows the group's name
 and the member that is heard, or None; a press unmutes the next member in
 the mixes the current one was heard in and mutes the current one. With
@@ -3706,6 +3708,22 @@ switches the voice changer off when it comes up. Inside a multi-action a
 hold key toggles, since OpenDeck lets the key up straight away there. A key
 cannot switch a voice on without the native plugin host. The saved target
 is `voice:<channel>:<voice>`, with the voice's name as the API spells it.
+
+<a name="eq-profile-keys"></a>
+Each microphone with an EQ also has a **Load EQ profile** group in the
+Toggle action's settings, with a key per [EQ profile](#eq-profiles). The
+built-in ones come first, marked "(built in)", then the saved ones. A press
+puts the profile's bands on that microphone and switches its EQ on, after
+any EQ dial turn still waiting. The key shows an EQ curve and names the
+microphone and the profile, with the microphone's colour on its frame and
+label. It lights while the microphone's EQ is on and holds the profile's
+bands, and goes dark when a band moves, from the UI or a dial. A profile
+with a band count the microphone's EQ does not take, or one deleted
+since, only flashes an alert. The saved target is
+`eqprofile:<channel>:<profile>`, with the profile's id from the API:
+`builtin:clear`, or `saved:` and the name. A saved profile is found by
+its name, so saving it again under the same name keeps the key; after a
+rename, pick the new name in the key's settings.
 
 Capture chains also appear in the insert key and dial choices, named by
 their channel. Saved insert targets keep the channel id through a rename.

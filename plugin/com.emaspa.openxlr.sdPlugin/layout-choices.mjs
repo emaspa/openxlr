@@ -4,6 +4,7 @@
 import fs from "node:fs";
 import { eqChoices } from "./microphone-eq.mjs";
 import { voiceChoices } from "./voice-changer.mjs";
+import { eqProfileChoices } from "./eq-profiles.mjs";
 
 // The built-in icon set, generated from LayoutIcons.cs by tools/deck-icons.py.
 const ICON_TABLE = JSON.parse(fs.readFileSync(new URL("./icons.json", import.meta.url), "utf8"));
@@ -68,7 +69,8 @@ export function outputKey(target) {
   return null;
 }
 
-export function layoutChoices(mixer, devices = []) {
+// eqProfiles is the state's list of EQ profiles, which lives beside the mixer.
+export function layoutChoices(mixer, devices = [], eqProfiles = []) {
   const mixes = mixer?.mixes ?? [];
   const channels = mixer?.channels ?? [];
   if (!mixes.length || !channels.length) return { toggleGroups: [], levelGroups: [] };
@@ -155,7 +157,9 @@ export function layoutChoices(mixer, devices = []) {
   });
   const eq = eqChoices(mixer);
   const voices = voiceChoices(mixer);
-  return { toggleGroups: [...toggleGroups, ...eq.toggleGroups, ...voices.toggleGroups], levelGroups: [...levelGroups, ...eq.levelGroups] };
+  const profiles = eqProfileChoices({mixer, eqProfiles});
+  return { toggleGroups: [...toggleGroups, ...eq.toggleGroups, ...profiles.toggleGroups, ...voices.toggleGroups],
+    levelGroups: [...levelGroups, ...eq.levelGroups] };
 }
 
 // The member of an exclusive group heard in some mix, by channel id, or null.
@@ -182,7 +186,7 @@ export function targetAppearance(mixer, target) {
   if (typeof target !== "string") return { icon: "", path: null, colour: null };
   let item;
   if (/^(mixmute|mixvol):/.test(target)) item = mixer?.mixes?.find(m => m.id === target.split(":")[1]);
-  else if (/^(sendmute|send|focus|chvol|chgain|chmute|chphantom|chlowcut|chclipguard|eq|eqband|eqtype|eqfreq|eqgain|eqq|voice):/.test(target)) item = mixer?.channels?.find(c => c.id === target.split(":")[1]);
+  else if (/^(sendmute|send|focus|chvol|chgain|chmute|chphantom|chlowcut|chclipguard|eq|eqband|eqtype|eqfreq|eqgain|eqq|voice|eqprofile):/.test(target)) item = mixer?.channels?.find(c => c.id === target.split(":")[1]);
   else if (target.startsWith("group:")) {
     const open = openGroupMember(mixer, mixer?.exclusiveGroups?.find(g => g.id === target.slice(6)));
     item = open === null ? undefined : mixer?.channels?.find(c => c.id === open);

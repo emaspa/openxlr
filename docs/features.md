@@ -177,8 +177,8 @@ physical gain dial.
   profiles save the bands under a name and load them on any microphone;
   Mic setup's three presets are listed first as built-in profiles. The
   daemon keeps them in one private file, does not write it while an entry
-  in it fails to read, and lists them in its state, so the UI and the API
-  load the same ones ([manual](manual.md#eq-profiles)). The
+  in it fails to read, and lists them in its state, so the UI, a Deck key
+  and the API load the same ones ([manual](manual.md#eq-profiles)). The
   handles take the keyboard and carry names for screen readers. A drag
   sends each band's changes at most every 20 ms, and the editor shows the
   values the daemon keeps. The [control API](api.md#microphone-eq) drives
@@ -896,7 +896,9 @@ lock, switching the monitor output to a specific device, and cycling
 an output's feed through Monitor A, Monitor B, Monitor A+B and then every other mix, an
 output's volume in 5% steps and its mute (red while muted), the enforced
 system output, routing the focused application to a channel, the
-next member of an exclusive group, and ducking on or off on any device. Each key
+next member of an exclusive group, ducking on or off on any device, and
+loading an EQ profile on a microphone, lit while its EQ holds that
+profile. Each key
 can pick its icon, and a typed title replaces the built-in label. A key or
 dial on a channel or mix shows the icon and colour that channel or mix was
 given in the layout editor, unless the key has its own icon; a group key

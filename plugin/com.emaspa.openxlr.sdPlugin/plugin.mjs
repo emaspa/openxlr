@@ -11,6 +11,7 @@ import { SkinPalette } from "./skin-palette.mjs";
 import { captureGainOf, channelUnitControl, channelUnitTarget, deviceTargetSupported, duckingEnabled, duckingToggle, unitDialLabel, unitKeyLabel, unitMeterKey } from "./unit-inputs.mjs";
 import { isEqTarget, eqTarget, eqStep, eqCommand, eqLabel, eqDial } from "./microphone-eq.mjs";
 import { isVoiceTarget, voiceTarget, voiceMode, voicePress, voiceRelease, voiceLabel } from "./voice-changer.mjs";
+import { isEqProfileTarget, eqProfileTarget, eqProfilePress, eqProfileLabel } from "./eq-profiles.mjs";
 import { CLIP_ACTION, clipKey, clipIdOf, clipPress, clipProgress, progressBucket, clipAppearance, clipChoices } from "./soundboard.mjs";
 
 // ---------- launch arguments ----------
@@ -52,7 +53,7 @@ const layoutInspectors = new Set();
 let lastLayout = "";
 function publishLayout() {
   if (!layoutInspectors.size) return;
-  const choices = layoutChoices(daemonState?.mixer, daemonState?.devices);
+  const choices = layoutChoices(daemonState?.mixer, daemonState?.devices, daemonState?.eqProfiles);
   const serialized = JSON.stringify(choices);
   if (serialized === lastLayout) return;
   lastLayout = serialized;
@@ -376,7 +377,7 @@ host.onmessage = (e) => {
         layoutInspectors.add(m.context);
         // Record what this inspector now shows, so the next state that
         // differs from it is published even if it matches an older one.
-        const choices = layoutChoices(daemonState?.mixer, daemonState?.devices);
+        const choices = layoutChoices(daemonState?.mixer, daemonState?.devices, daemonState?.eqProfiles);
         lastLayout = JSON.stringify(choices);
         send({ event: "sendToPropertyInspector", context: m.context, payload: choices });
       }
@@ -446,6 +447,8 @@ const supported = (target) => deviceTargetSupported(daemonState?.capabilities, t
 function toggleValue(target, inst) {
   if (!target) return null;
   if (isVoiceTarget(target)) return voiceTarget(mixer(), target)?.lit ?? null;
+  // Lit while the microphone's EQ is on and holds the profile's bands.
+  if (isEqProfileTarget(target)) return eqProfileTarget(daemonState, target)?.lit ?? null;
   if (isEqTarget(target)) {
     const eq = eqTarget(mixer(), target);
     if (!eq) return null;
@@ -586,6 +589,7 @@ function outputVolume(name) {
 function toggleLabel(target, inst) {
   if (!target) return "OpenXLR";
   if (isVoiceTarget(target)) return voiceLabel(voiceTarget(mixer(), target), target);
+  if (isEqProfileTarget(target)) return eqProfileLabel(eqProfileTarget(daemonState, target), target);
   if (isEqTarget(target)) {
     const eq = eqTarget(mixer(), target);
     return eqLabel(eq, eq?.field === "type" ? dialNow(target, eq.value) : eq?.value);
@@ -920,6 +924,16 @@ function onKeyDown(context, inst, inMultiAction = false) {
   const cur = toggleValue(t, inst);
   if (cur === null) { send({ event: "showAlert", context }); return; }
   if (isVoiceTarget(t)) { onVoiceDown(context, inst, t, inMultiAction); return; }
+  if (isEqProfileTarget(t)) {
+    // One loadEqProfile, after any EQ dial turn still waiting, so the
+    // profile is what the microphone ends up with. A profile the
+    // microphone's EQ cannot take is refused here.
+    const payload = eqProfilePress(eqProfileTarget(daemonState, t));
+    if (!payload) { send({ event: "showAlert", context }); return; }
+    flushDialTurns();
+    keyCommands.enqueue(context, payload);
+    return;
+  }
   if (isEqTarget(t)) {
     const eq = eqTarget(mixer(), t);
     const value = eq.field === "type" ? eqStep(eq, dialNow(t, eq.value), 1) : !cur;
@@ -1178,6 +1192,10 @@ const GLYPHS = {
   play: `<path d="M56 40 l40 24 l-40 24 z" fill="currentColor" stroke="currentColor" stroke-width="6" stroke-linejoin="round"/>
         <path d="M38 102 q8 -10 16 0 t16 0 t16 0 t16 0 t16 0" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>`,
   stop: `<rect x="46" y="46" width="52" height="52" rx="8" fill="currentColor"/>`,
+  // an EQ curve with its handle over a baseline, for EQ profile keys
+  eq: `<path d="M32 92 C50 92 54 50 72 50 C90 50 94 92 112 92" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round"/>
+        <line x1="32" y1="106" x2="112" y2="106" stroke="currentColor" stroke-width="5" stroke-linecap="round" opacity="0.6"/>
+        <circle cx="72" cy="50" r="9" fill="currentColor"/>`,
   // a stack of scene cards, for profile keys
   scene: `<rect x="44" y="52" width="56" height="40" rx="6" fill="none" stroke="currentColor" stroke-width="6"/>
         <path d="M52 44 h52 a6 6 0 0 1 6 6 v34" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>
@@ -1189,6 +1207,7 @@ const GLYPHS = {
 function glyphFor(t) {
   if (!t) return null;
   if (isEqTarget(t)) return "knob";
+  if (isEqProfileTarget(t)) return "eq";
   if (t === "mute" || t === "mute2") return "mic";
   if (t === "outHp1" || t === "outHp2" || t === "lowImpedance") return "headphones";
   if (t === "outLineOut") return "jack";
@@ -1506,15 +1525,16 @@ function refresh(context) {
     const badge = t === "softLowCut" ? (mixer()?.lowCutHz ? String(mixer().lowCutHz) : "OFF") : "";
     const label = emptyTitle.has(context)
       ? (!daemonUp ? daemonNotice ?? "offline"
-        : isInsertTarget(t) || isProfileTarget(t) ? toggleLabel(t, inst) : defaultTitle(t)) : "";
+        : isInsertTarget(t) || isProfileTarget(t) || isEqProfileTarget(t) ? toggleLabel(t, inst) : defaultTitle(t)) : "";
     // The user can pick a glyph per key (a monitor output may be headphones
     // rather than speakers); "auto" or unset keeps the target's default.
     const iconChoice = inst.settings.icon;
     const hasIcon = typeof iconChoice === "string" && Object.hasOwn(GLYPHS, iconChoice);
     const glyphName = hasIcon ? iconChoice : glyphFor(t);
     const offColor = isInsertTarget(t) ? skinPalette.colours["Ox.Led.Alert"] : null;   // bypassed = red, as in the UI
-    // A glyph picked on the key itself wins over the channel's icon.
-    const appearance = { ...targetAppearance(mixer(), t), ...(hasIcon ? { icon: "", path: null } : {}) };
+    // A glyph picked on the key itself wins over the channel's icon. An EQ
+    // profile key wears the EQ glyph in its microphone's colour.
+    const appearance = { ...targetAppearance(mixer(), t), ...(hasIcon || isEqProfileTarget(t) ? { icon: "", path: null } : {}) };
     send({ event: "setImage", context,
            payload: { image: keySvg(v === true, isMuteLike(t), v !== null && daemonUp, glyphName, badge, label, offColor, appearance) } });
   } else if (inst.action === CLIP_ACTION) {
