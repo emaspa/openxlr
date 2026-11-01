@@ -245,6 +245,47 @@ static void check_invalid_audio(void) {
   puts("PASS: invalid input never reaches a plugin; invalid output silences the block, and half a second of it on sound retires the instance");
 }
 
+// A backend that zeroes non-finite input itself, as the microphone stage
+// does, gets the block and keeps running; what it puts out is still checked.
+static void zeroing_gain(Host *h, uint32_t frames, float *const *in, float *const *out) {
+  AudioFixture *fixture = h->impl;
+  fixture->calls++;
+  for (unsigned c = 0; c < h->channels; c++)
+    for (uint32_t n = 0; n < frames; n++) out[c][n] = isfinite(in[c][n]) ? 2 * in[c][n] : 0;
+  if (fixture->invalid_output) out[fixture->channel][frames - 1] = fixture->invalid;
+}
+
+static void check_guarded_input(void) {
+  const Backend guarded_backend = {.process = zeroing_gain, .guards_input = true};
+  AudioFixture fixture = {.invalid = NAN};
+  Host h = {.backend = &guarded_backend, .rate = 48000, .channels = 1, .impl = &fixture};
+  test_buffers[0] = guarded();
+  test_buffers[MAX_CHANNELS] = guarded();
+  h.in_ports[0] = &test_buffers[0];
+  h.out_ports[0] = &test_buffers[MAX_CHANNELS];
+  struct spa_io_position position = {0};
+  position.clock.duration = 32;
+  position.clock.rate.denom = h.rate;
+  const float invalid[] = {NAN, INFINITY, -INFINITY};
+  for (unsigned kind = 0; kind < 3; kind++) {
+    for (unsigned n = 0; n < 32; n++) test_buffers[0][n] = .25f;
+    test_buffers[0][7] = invalid[kind];
+    process_audio(&h, &position);
+    assert(!atomic_load(&h.audio_error) && !atomic_load(&h.invalid_audio));
+    assert(fixture.calls == kind + 1);
+    for (unsigned n = 0; n < 32; n++) assert(test_buffers[MAX_CHANNELS][n] == (n == 7 ? 0 : .5f));
+  }
+  // Its output is held to the usual rule: non-finite output is silenced.
+  fixture.invalid_output = true;
+  process_audio(&h, &position);
+  for (unsigned n = 0; n < 32; n++) assert(test_buffers[MAX_CHANNELS][n] == 0);
+  assert_canary(test_buffers[0]);
+  assert_canary(test_buffers[MAX_CHANNELS]);
+  free(test_buffers[0]), free(test_buffers[MAX_CHANNELS]);
+  test_buffers[0] = test_buffers[MAX_CHANNELS] = NULL;
+  puts("PASS: a backend that guards its own input gets non-finite samples and keeps running; its output is still checked");
+}
+
 // Feed `blocks` blocks of 256 frames at `level`, the plugin adding a NaN to
 // each when `nan`, and check what leaves the host.
 static void feed(Host *h, float *const *out, float level, bool nan,
@@ -453,6 +494,7 @@ int main(void) {
   check_processing_failure();
   check_outputs_unread();
   check_invalid_audio();
+  check_guarded_input();
   check_inplace_audio();
   check_invalid_output_on_silence();
   Host h = {.rate = 48000, .channels = 2};

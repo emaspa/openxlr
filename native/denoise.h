@@ -36,6 +36,9 @@ void denoise_process(Denoise *d, const float *in, float *out, uint32_t frames);
 void denoise_main_thread(Denoise *d);
 // The delay the running engine adds, in samples. Any thread.
 uint32_t denoise_latency(const Denoise *d);
+// How many times an engine's state was cleared after it answered with
+// something that is not a number. Any thread.
+uint32_t denoise_resets(const Denoise *d);
 // Free everything; audio has stopped. Main thread.
 void denoise_unload(Denoise *d);
 

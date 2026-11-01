@@ -1314,7 +1314,10 @@ public sealed class PipeWireAdapter
         try
         {
             host = new NativePluginHost(new() { Id = id, Kind = "eq", Plugin = bands.ToString(CultureInfo.InvariantCulture), Params = new(controls) },
-                node, 1, rate, executable, [], meterSymbols: SoftwareEqBackend.Meters);
+                node, 1, rate, executable, [], meterSymbols: SoftwareEqBackend.Meters,
+                // The stage's trace lines say when it replaced non-finite
+                // samples or cleared a state; they belong in the journal.
+                note: _note);
         }
         catch (InvalidOperationException ex)
         {

@@ -3264,6 +3264,18 @@ under the same restart limit. This handles a processor whose internal
 state would otherwise stay invalid until a daemon restart. Finite levels
 above unity remain unchanged; this check is not a limiter.
 
+The microphone stage, which runs noise removal, the EQ, the compressor and
+expander, and the voice changer, handles this itself and keeps running. It
+plays a non-finite input sample as silence, and if one of its own parts
+ends up holding an invalid value, it clears that part and plays on: the EQ
+within a sample, RNNoise within two of its 10 ms frames, and a voice by
+starting over. A DeepFilterNet
+model that answers with an invalid value is replaced by a fresh one while
+the microphone plays without noise removal for a moment, at most once in
+10 seconds. The daemon's journal gets a `trace: microphone stage` line
+with the counts while this happens, and the diagnostics archive carries
+that journal.
+
 A VST3 or CLAP plugin that fails to process a block of audio leaves that
 block silent, and the next block is tried. If it keeps failing for half a
 second, the daemon replaces the chain under the same restart limit, and

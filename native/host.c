@@ -586,7 +586,10 @@ static void process_audio(void *data, struct spa_io_position *position) {
   // One invalid sample can poison a stateful processor until it is replaced.
   // Keep it out of the plugin and of downstream nodes. Finite headroom above
   // unity is left alone. Reporting and replacement happen off this thread.
-  if (!atomic_load(&h->audio_error) && !finite_audio(in, h->channels, frames)) {
+  // A backend that guards its own input (the microphone stage) is trusted
+  // to, and keeps running.
+  if (!atomic_load(&h->audio_error) && !h->backend->guards_input &&
+      !finite_audio(in, h->channels, frames)) {
     atomic_store(&h->invalid_audio, AUDIO_INVALID_INPUT);
     atomic_store(&h->audio_error, true);
   }

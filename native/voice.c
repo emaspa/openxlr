@@ -36,9 +36,15 @@
 // finish. Custom's pitch and formant follow their sliders with no fade: the
 // shifter moves to a new figure at its next 5 ms step.
 //
-// A voice that puts out something other than a number is cut off: its slot's
-// output is replaced by the dry input, the stage fades to it and says so on
-// voice_status until the voice is asked for again.
+// A voice that puts out something other than a number has its block replaced
+// by the dry input and starts over from silence, as a switch to it would;
+// voice_resets counts these. Stretch's own reset leaves the energies and
+// predictions it carries between blocks alone, where a NaN would outlive it,
+// so the slot's shifter is swapped for a spare one the main thread made
+// beforehand, and the main thread frees the old one and makes the next spare.
+// If the voice fails again within a second of starting over, or no spare is
+// ready, it is cut off instead: the stage fades to the dry input and says so
+// on voice_status until the voice is asked for again.
 //
 // Who owns what. The daemon writes the controls; the audio thread reads them
 // once a block and owns the slots. The main thread allocates everything at
@@ -56,6 +62,8 @@ enum {
   DRY = -1,   // the dry input, where a slot index would be
   NONE = -2,  // no switch under way
 };
+
+#define NEVER UINT64_MAX
 
 static const double VOICE_PI = 3.14159265358979323846;
 static const double SHIFT_SECONDS = 1600.0 / 48000, STEP_SECONDS = 0.005, FADE_SECONDS = 0.020;
@@ -166,6 +174,7 @@ typedef struct {
   float *reverb_pool;
   size_t reverb_pool_size;
   float gain;
+  uint64_t restarted;  // the stage clock when it last started over, or NEVER
   float out[MAX_FRAMES];
 } VoiceSlot;
 
@@ -174,6 +183,7 @@ struct Voice {
   Control *enabled, *preset, *pitch, *formant;
   Control *active_meter, *status_meter, *latency_meter;
   bool ready;  // both slots and their shifters are there
+  int shift_block, shift_interval;  // what each shifter is made with
   uint32_t shift_delay, delay_mask, comb_mask;
   uint32_t fade;
   VoiceSlot *slots[2];
@@ -183,10 +193,14 @@ struct Voice {
   int incoming;   // the slot or DRY a switch goes to, or NONE
   uint32_t wait;  // samples before the incoming one fades in
   uint32_t faded; // samples of the fade done
+  uint64_t clock; // samples since the stage started
 
   // Between the threads.
   _Atomic int broken;  // 1 + the voice that failed, 0 when none has
   _Atomic uint32_t latency;
+  _Atomic uint32_t resets;  // voices started over after a non-finite answer
+  _Atomic(VoiceShifter *) spare;  // made by the main thread, taken by the audio thread
+  _Atomic(VoiceShifter *) spent;  // given back by the audio thread, freed by the main thread
 };
 
 static bool on(const Control *c) { return atomic_load(&c->desired) >= 0.5f; }
@@ -222,8 +236,7 @@ static VoiceSlot *slot_new(Voice *v, uint32_t rate) {
   VoiceSlot *s = calloc(1, sizeof(*s));
   if (!s) return NULL;
   s->voice = VOICE_OFF;
-  int block = (int)lrint(rate * SHIFT_SECONDS), interval = (int)lrint(rate * STEP_SECONDS);
-  s->shifter = voice_shifter_create(block, interval);
+  s->shifter = voice_shifter_create(v->shift_block, v->shift_interval);
   s->delay = calloc(v->delay_mask + 1, sizeof(float));
   s->comb = calloc(v->comb_mask + 1, sizeof(float));
   // Room for every line at the largest room a voice may ask for.
@@ -247,6 +260,9 @@ Voice *voice_load(Host *h) {
   v->incoming = NONE;
   atomic_init(&v->broken, 0);
   atomic_init(&v->latency, 0);
+  atomic_init(&v->resets, 0);
+  atomic_init(&v->spare, NULL);
+  atomic_init(&v->spent, NULL);
   v->enabled = host_add_control(h, "voice_enabled", 0, 1, 0, false, NULL);
   v->preset = host_add_control(h, "voice_preset", 0, VOICE_COUNT - 1, VOICE_DEEP, false, NULL);
   v->pitch = host_add_control(h, "voice_pitch", -12, 12, 0, false, NULL);
@@ -262,6 +278,8 @@ Voice *voice_load(Host *h) {
   v->fade = (uint32_t)lrint(h->rate * FADE_SECONDS);
   if (v->fade == 0) v->fade = 1;
   if (h->rate < RATE_LOWEST || h->rate > RATE_HIGHEST) return v;
+  v->shift_block = (int)lrint(h->rate * SHIFT_SECONDS);
+  v->shift_interval = (int)lrint(h->rate * STEP_SECONDS);
   v->shift_delay = (uint32_t)lrint(h->rate * SHIFT_SECONDS);
   v->delay_mask = power_of_two_above(v->shift_delay) - 1;
   v->comb_mask = power_of_two_above((uint32_t)ceil(h->rate * COMB_LONGEST) + 2) - 1;
@@ -270,16 +288,23 @@ Voice *voice_load(Host *h) {
   // The shifter's delay is its block; the stage reports what it says.
   if (v->ready) v->shift_delay = (uint32_t)voice_shifter_latency(v->slots[0]->shifter);
   if (v->ready && v->shift_delay > v->delay_mask) v->ready = false;
+  // Without a spare a failing voice is cut off rather than started over.
+  if (v->ready) atomic_store(&v->spare, voice_shifter_create(v->shift_block, v->shift_interval));
   return v;
 }
 
 void voice_unload(Voice *v) {
   if (!v) return;
   for (int i = 0; i < 2; i++) slot_free(v->slots[i]);
+  VoiceShifter *spare = atomic_load(&v->spare), *spent = atomic_load(&v->spent);
+  if (spare) voice_shifter_free(spare);
+  if (spent) voice_shifter_free(spent);
   free(v);
 }
 
 uint32_t voice_latency(const Voice *v) { return v ? atomic_load(&v->latency) : 0; }
+
+uint32_t voice_resets(const Voice *v) { return v ? atomic_load(&v->resets) : 0; }
 
 // --- one voice in one slot -----------------------------------------------------
 
@@ -304,6 +329,7 @@ static void slot_start(Voice *v, VoiceSlot *s, int voice) {
   const VoicePreset *p = &PRESETS[voice];
   s->voice = voice;
   s->p = p;
+  s->restarted = NEVER;
   s->vibrato_phase = s->ring_phase = s->sweep_phase = 0;
   voice_shifter_reset(s->shifter);
   s->pitch_now = NAN;  // set on the first block
@@ -422,6 +448,26 @@ static bool slot_run(Voice *v, VoiceSlot *s, const float *in, uint32_t frames) {
   return ok;
 }
 
+// The slot's voice answered with something that is not a number. Start it
+// over from silence on the spare shifter, or cut it off when it already did
+// so within a second or there is no spare yet.
+static void slot_failed(Voice *v, VoiceSlot *s) {
+  VoiceShifter *clean = NULL;
+  if (s->restarted == NEVER || v->clock - s->restarted >= v->h->rate)
+    clean = atomic_exchange(&v->spare, NULL);
+  if (!clean) {
+    atomic_store(&v->broken, s->voice + 1);
+    return;
+  }
+  // The main thread frees what it finds here before it makes a spare, so
+  // with a spare in hand this is empty.
+  atomic_store(&v->spent, s->shifter);
+  s->shifter = clean;
+  slot_start(v, s, s->voice);
+  s->restarted = v->clock;
+  atomic_fetch_add_explicit(&v->resets, 1, memory_order_relaxed);
+}
+
 // --- switching -----------------------------------------------------------------
 
 // What the controls ask to hear now, as far as it can run.
@@ -460,6 +506,10 @@ bool voice_activate(Voice *v) {
 }
 
 void voice_main_thread(Voice *v) {
+  VoiceShifter *spent = atomic_exchange(&v->spent, NULL);
+  if (spent) voice_shifter_free(spent);
+  if (v->ready && !atomic_load(&v->spare))
+    atomic_store(&v->spare, voice_shifter_create(v->shift_block, v->shift_interval));
   int status = VOICE_OK;
   if (on(v->enabled)) {
     if (!v->ready) status = VOICE_NOT_STARTED;
@@ -485,20 +535,22 @@ void voice_process(Voice *v, const float *in, float *out, uint32_t frames) {
   }
   if (v->playing == DRY && v->incoming == NONE) {
     memcpy(out, in, sizeof(float) * frames);
+    v->clock += frames;
     return;
   }
   const float *now = in, *next = NULL;
   if (v->playing != DRY) {
     VoiceSlot *s = v->slots[v->playing];
-    if (!slot_run(v, s, in, frames)) atomic_store(&v->broken, s->voice + 1);
+    if (!slot_run(v, s, in, frames)) slot_failed(v, s);
     now = s->out;
   }
   if (v->incoming == DRY) next = in;
   else if (v->incoming != NONE) {
     VoiceSlot *s = v->slots[v->incoming];
-    if (!slot_run(v, s, in, frames)) atomic_store(&v->broken, s->voice + 1);
+    if (!slot_run(v, s, in, frames)) slot_failed(v, s);
     next = s->out;
   }
+  v->clock += frames;
   for (uint32_t n = 0; n < frames; n++) {
     if (!next) {
       out[n] = now[n];

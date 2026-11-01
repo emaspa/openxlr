@@ -39,6 +39,13 @@
 // 0.1 dB, and asks for a fresh count. While the switch is off the meters
 // hold the floor, no reduction and the floor, so the tick prints nothing.
 //
+// Numbers that are not numbers. An infinity would pin the smoothed reduction
+// at infinity, the processor silent from then on, and a NaN would come out
+// as NaN. The stage keeps both out of its input (eq.c), and each processor
+// also takes a non-finite sample as 0 before its detector sees it. With
+// finite input every value it keeps is bounded: the level has a floor, and
+// the reduction is a weighted mean of finite targets.
+//
 // Who owns what. The daemon writes the controls; the audio thread reads them
 // once a block and owns the detector. Nothing allocates or locks while audio
 // runs.
@@ -232,7 +239,7 @@ void dynamics_process(Dynamics *d, const float *in, float *out, uint32_t frames)
     double makeup_step = frames ? (makeup_to - makeup_from) / frames : 0;
     double peak_in = d->peak_in, peak_out = d->peak_out, least_gain = d->least_gain;
     for (uint32_t n = 0; n < frames; n++) {
-      double x = in[n], level = fabs(x);
+      double x = isfinite(in[n]) ? in[n] : 0, level = fabs(x);
       peak_in = fmax(peak_in, level);
       double level_db = 20 * log10(fmax(level, LEVEL_FLOOR));
       double target = dynamics_reduction_db(d->kind, level_db, d->threshold_db, d->ratio_value, d->shape_db);

@@ -31,7 +31,7 @@ enum {
 enum {
   VOICE_OK = 0,
   VOICE_NOT_STARTED = 1,  // the pitch shifter could not start: the rate, or memory
-  VOICE_FELL_BEHIND = 2,  // a voice gave out something that is not a number
+  VOICE_FELL_BEHIND = 2,  // a voice gave out something that is not a number twice within a second
 };
 
 // The voice's name as the daemon spells it, for tests and messages.
@@ -54,6 +54,9 @@ void voice_main_thread(Voice *v);
 // The delay the running voice adds, in samples: 0 while the dry voice plays.
 // Any thread.
 uint32_t voice_latency(const Voice *v);
+// How many times a voice started over after answering with something that
+// is not a number. Any thread.
+uint32_t voice_resets(const Voice *v);
 // Free everything; audio has stopped. Main thread.
 void voice_unload(Voice *v);
 #endif
@@ -65,7 +68,9 @@ typedef struct VoiceShifter VoiceShifter;
 // A shifter for mono audio that analyses `block` samples every `interval`.
 VoiceShifter *voice_shifter_create(int block, int interval);
 void voice_shifter_free(VoiceShifter *s);
-// Clear what it has heard, as if it had just been created.
+// Clear what it has heard, for a new voice. Stretch keeps some figures from
+// block to block that this leaves alone, so a shifter that put out something
+// that is not a number is replaced instead (voice.c).
 void voice_shifter_reset(VoiceShifter *s);
 // Pitch and formant in semitones; the formant shift is relative to the
 // input's own formants, so 0 keeps them where they were whatever the pitch.

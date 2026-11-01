@@ -27,6 +27,18 @@
 // Who writes what. The daemon writes the controls' desired values through
 // the command pipe; only the audio thread reads them, at the start of a
 // block, and only the audio thread touches the filters.
+//
+// Numbers that are not numbers. One NaN or infinity inside a filter's state
+// stays there: every later sample comes out NaN, even through a band or an
+// EQ that is off, since its mix still multiplies it, and the host silences
+// the stage until it restarts. So a non-finite input sample becomes 0 before
+// any part of the stage hears it, and a state that turns non-finite anyway
+// is cleared where it is found: the EQ's filters here, noise removal's
+// engine in denoise.c, the voice in voice.c. The compressor and expander
+// (dynamics.c) also take a non-finite sample as 0, so nothing can stick in
+// their detectors. The stage_nonfinite meter
+// counts the input samples replaced and stage_resets the states cleared,
+// and a trace line says so on stderr, at most once a second.
 #include "denoise.h"
 #include "dynamics.h"
 #include "eq.h"
@@ -37,6 +49,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 enum { EQ_BANDS = 4, EQ_MAX_BANDS = 16, EQ_TYPES = 6, EQ_HISTORY = 8192 };
 static const double EQ_PI = 3.14159265358979323846;
@@ -71,6 +84,13 @@ typedef struct {
   float *shaped;           // the EQ's output, the voice changer's input
   Dynamics *expander;      // in place on cleaned, before the EQ
   Dynamics *compressor;    // in place on shaped, after the EQ
+  float *guarded;          // the input with non-finite samples replaced, when it had any
+  _Atomic uint64_t nonfinite;  // input samples replaced; audio thread writes
+  _Atomic uint32_t resets;     // times the filters were cleared; audio thread writes
+  Control *nonfinite_meter, *resets_meter;
+  uint64_t traced_nonfinite;   // main thread: what the last trace line said
+  uint32_t traced_resets;
+  struct timespec traced_at;
   unsigned band_count;
   double mix, mix_target;  // the EQ's on switch
   uint32_t fade;           // 5 ms in samples
@@ -166,9 +186,10 @@ static bool eq_load_count(Host *h, unsigned bands) {
   e->band_count = bands;
   e->cleaned = calloc(MAX_FRAMES, sizeof(float));
   e->shaped = calloc(MAX_FRAMES, sizeof(float));
+  e->guarded = calloc(MAX_FRAMES, sizeof(float));
   e->denoise = denoise_load(h);
   e->voice = voice_load(h);
-  if (!e->cleaned || !e->shaped || !e->denoise || !e->voice) return false;
+  if (!e->cleaned || !e->shaped || !e->guarded || !e->denoise || !e->voice) return false;
   e->fade = (uint32_t)lrint(h->rate * 0.005);
   if (e->fade == 0) e->fade = 1;
   e->step = 1.0 / e->fade;
@@ -194,10 +215,13 @@ static bool eq_load_count(Host *h, unsigned bands) {
     EQ_CONTROL(qlog10, "qlog10", -1, 1, -0.152f)
 #undef EQ_CONTROL
   }
-  // Last, so every control above keeps its place.
+  // Last, so every control above keeps its place, and the non-finite
+  // meters after them for the same reason.
   e->expander = dynamics_load(h, DYNAMICS_EXPANDER);
   e->compressor = dynamics_load(h, DYNAMICS_COMPRESSOR);
-  return e->expander && e->compressor;
+  e->nonfinite_meter = host_add_control(h, "stage_nonfinite", 0, 1e9f, 0, true, NULL);
+  e->resets_meter = host_add_control(h, "stage_resets", 0, 1e9f, 0, true, NULL);
+  return e->expander && e->compressor && e->nonfinite_meter && e->resets_meter;
 }
 
 // Keep the original four-band invocation compatible with older daemons.
@@ -245,6 +269,7 @@ static void eq_unload(Host *h) {
   dynamics_unload(e->compressor);
   free(e->cleaned);
   free(e->shaped);
+  free(e->guarded);
   free(e);
   h->impl = NULL;
 }
@@ -281,9 +306,34 @@ static inline double eq_ramp(double mix, double target, double step) {
   return mix;
 }
 
+// The input as the stage may hear it: unchanged, or a copy with every
+// non-finite sample at 0. The host's buffer is not written; other nodes
+// may read it.
+static const float *eq_guard(Eq *e, const float *in, uint32_t frames) {
+  uint32_t bad = 0;
+  for (uint32_t n = 0; n < frames; n++) bad += !isfinite(in[n]);
+  if (!bad) return in;
+  for (uint32_t n = 0; n < frames; n++) e->guarded[n] = isfinite(in[n]) ? in[n] : 0.0f;
+  atomic_fetch_add_explicit(&e->nonfinite, bad, memory_order_relaxed);
+  return e->guarded;
+}
+
+// Clear every band's filters after one turned non-finite. A band's history
+// took the bad value only as its newest entry, this sample's, so that entry
+// is all it needs cleared.
+static void eq_reset(Eq *e) {
+  for (unsigned i = 0; i < e->band_count; i++) {
+    EqBand *b = &e->bands[i];
+    b->live.s1 = b->live.s2 = b->fading.s1 = b->fading.s2 = 0;
+    double *newest = &b->history[(b->history_at + EQ_HISTORY - 1) % EQ_HISTORY];
+    if (!isfinite(*newest)) *newest = 0;
+  }
+  atomic_fetch_add_explicit(&e->resets, 1, memory_order_relaxed);
+}
+
 static void eq_process(Host *h, uint32_t frames, float *const *in, float *const *out) {
   Eq *e = h->impl;
-  denoise_process(e->denoise, in[0], e->cleaned, frames);
+  denoise_process(e->denoise, eq_guard(e, in[0], frames), e->cleaned, frames);
   dynamics_process(e->expander, e->cleaned, e->cleaned, frames);
   eq_follow(e, h->rate);
   for (uint32_t n = 0; n < frames; n++) {
@@ -302,11 +352,39 @@ static void eq_process(Host *h, uint32_t frames, float *const *in, float *const 
       b->mix = eq_ramp(b->mix, b->mix_target, e->step);
       u += (y - u) * b->mix;
     }
+    if (!isfinite(u)) {
+      // This sample plays dry; the next one runs through clean filters.
+      eq_reset(e);
+      if (!isfinite(x)) x = 0;
+      u = x;
+    }
     e->mix = eq_ramp(e->mix, e->mix_target, e->step);
     e->shaped[n] = (float)(x + (u - x) * e->mix);
   }
   dynamics_process(e->compressor, e->shaped, e->shaped, frames);
   voice_process(e->voice, e->shaped, out[0], frames);
+}
+
+// Publish the non-finite counts and say once a second, while they move,
+// what they are.
+static void eq_report(Eq *e) {
+  uint64_t replaced = atomic_load_explicit(&e->nonfinite, memory_order_relaxed);
+  uint32_t filters = atomic_load_explicit(&e->resets, memory_order_relaxed);
+  uint32_t noise = denoise_resets(e->denoise), voice = voice_resets(e->voice);
+  uint32_t resets = filters + noise + voice;
+  atomic_store(&e->nonfinite_meter->observed, (float)replaced);
+  atomic_store(&e->resets_meter->observed, (float)resets);
+  if (replaced == e->traced_nonfinite && resets == e->traced_resets) return;
+  struct timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  if (e->traced_at.tv_sec && now.tv_sec - e->traced_at.tv_sec < 1) return;
+  e->traced_at = now;
+  e->traced_nonfinite = replaced;
+  e->traced_resets = resets;
+  fprintf(stderr,
+          "trace: microphone stage: %llu non-finite input samples replaced; states cleared: "
+          "%u EQ, %u noise removal, %u voice\n",
+          (unsigned long long)replaced, filters, noise, voice);
 }
 
 static void eq_main_thread(Host *h) {
@@ -315,6 +393,7 @@ static void eq_main_thread(Host *h) {
   voice_main_thread(e->voice);
   dynamics_main_thread(e->expander);
   dynamics_main_thread(e->compressor);
+  eq_report(e);
 }
 
 static uint32_t eq_latency(Host *h) {
@@ -323,7 +402,7 @@ static uint32_t eq_latency(Host *h) {
 }
 
 const Backend eq_backend = {
-  .name = "EQ", .argument_count = 0,
+  .name = "EQ", .argument_count = 0, .guards_input = true,
   .load = eq_load, .activate = eq_activate,
   .deactivate = eq_deactivate, .process = eq_process,
   .main_thread = eq_main_thread, .unload = eq_unload,
@@ -333,7 +412,7 @@ const Backend eq_backend = {
 // The same DSP with a selected band count. Only changing the count replaces
 // this stage; every ordinary band edit still uses its live controls.
 const Backend eq_bands_backend = {
-  .name = "EQ", .argument_count = 1,
+  .name = "EQ", .argument_count = 1, .guards_input = true,
   .load = eq_load_bands, .activate = eq_activate,
   .deactivate = eq_deactivate, .process = eq_process,
   .main_thread = eq_main_thread, .unload = eq_unload,

@@ -122,8 +122,11 @@ Audio EQ Cookbook, within 0.05 dB; checks that a 0.25 dB or 1 Hz step keeps
 the error below -30 dB of the ideal output while an emptied filter state
 measures far worse; that switching a band or the EQ and changing a band's type
 follow a 5 ms crossfade to within -40 dB; that a minute of silence after a
-loud burst leaves no subnormal number and every filter at rest; and prints
-what a sample costs.
+loud burst leaves no subnormal number and every filter at rest; that a NaN
+and two infinities in the input leave the output, with the EQ on and off,
+exactly as zeros there would, counted on `stage_nonfinite`; that a band
+state set to NaN plays one sample dry and then matches a fresh EQ bit for
+bit, counted on `stage_resets`; and prints what a sample costs.
 
 `python3 native/tests/lsp-editor.py` is an opt-in desktop regression using
 an isolated LSP Gate Mono LV2 instance. It needs python-xlib, the installed
@@ -553,6 +556,23 @@ rest, so a decaying tail never reaches subnormal numbers. The test programs
 that compile `host.c` into themselves do not link `eq.o`; to them `eq` is an
 unknown backend.
 
+A NaN or an infinity that reaches a filter's state stays there. Every later
+sample comes out NaN, even with the EQ off, because its crossfade still
+multiplies the cascade's output, and the host silences the stage until it
+restarts. The host exits at once on non-finite input to a plugin, which
+costs a chain restart; the microphone stage instead tells the host it
+guards its own input (`guards_input` in `Backend`) and keeps running. It
+replaces a non-finite input sample with 0 before noise removal, the EQ or
+the voice changer hears it, on a copy of the block, never in the host's
+buffer. If a state turns non-finite anyway, the part that holds it clears
+it: the EQ resets every band's filter and plays that one sample dry, and
+noise removal and the voice changer start their engines over as described
+below. The host still checks the stage's output as it checks a plugin's.
+Two meters count this: `stage_nonfinite`, the input samples replaced, and
+`stage_resets`, the states cleared. While either moves, the stage writes
+`trace: microphone stage: ...` to stderr at most once a second, which the
+daemon passes to its journal.
+
 ## Noise removal
 
 The same stage removes noise before its EQ (`denoise.c`), so the EQ, the
@@ -603,7 +623,18 @@ passes the microphone through untouched and says so.
   input back without its delay, so the wrapper never goes lower. A hop the
   worker has not answered in time plays the delayed input instead and counts
   in `denoise_late`; a worker that fails or falls a ring behind turns
-  DeepFilterNet off until it is asked for again.
+  DeepFilterNet off until it is asked for again. A model that answers with
+  something that is not a number is the exception: the stage plays the dry
+  input while the main thread loads a fresh model, then switches back to
+  it. That happens at most once in 10 s; a second such answer inside that
+  time is handled like any other failure.
+
+If RNNoise answers a frame with something that is not a number, the stage
+sets it up again on the audio thread, which allocates nothing, and the
+delayed input plays until it has heard its delay's worth again, as after a
+switch. RNNoise keeps a frame of lookahead in its state, so a NaN in one
+frame's input comes out in the next frame's answer: the restart lands one
+frame after the bad sample.
 
 Changing what is heard, on, off or the other engine, fades out over 5 ms
 and in over 5 ms: the engines are late by different amounts, so their
@@ -643,6 +674,12 @@ each engine's processing time.
 The same target runs `tests/denoise-handoff` with a fake model: a worker
 returned during a tick, repeated switches while it is borrowed, and a
 retry after loading fails. All created models must be freed at unload.
+`tests/denoise` also feeds each engine a NaN and two infinities mid-block
+and checks the output against the same input with zeros there, bit for
+bit. `tests/denoise-recovery` puts a NaN inside RNNoise's frame and checks
+that from the restart on the output is exactly that of an engine switched
+on at that sample, then has a fake DeepFilterNet model answer with NaN and
+checks that a fresh model takes over once and a second failure holds.
 
 ## Voice changer
 
@@ -654,9 +691,9 @@ last. Its controls sit beside the others: `voice_enabled` (0 or 1),
 `voice_active`, the voice heard now (-1 the dry voice),
 `voice_status`, why a voice asked for does not run (0 it runs, 1 the
 pitch shifter could not start, at a rate outside 16 to 192 kHz or without
-memory, 2 a voice put out something that is not a number and was cut off
-until a voice is asked for again), and `voice_latency`, its delay in
-samples, 0 while the dry voice plays.
+memory, 2 a voice put out something that is not a number twice within a
+second and was cut off until a voice is asked for again), and
+`voice_latency`, its delay in samples, 0 while the dry voice plays.
 
 | preset | voice | what it does |
 |---|---|---|
@@ -705,6 +742,15 @@ switch waits for the first to finish. Custom's pitch and formant follow
 their controls without a fade, at the shifter's next 5 ms step; the witch's
 quiver moves the pitch once a block.
 
+A voice that puts out something that is not a number plays the dry input for
+that block and starts over from silence. Stretch's own reset leaves the
+energies and predictions it carries from block to block alone, where a NaN
+would outlive it, so the slot swaps its shifter for a spare the main thread
+made beforehand. The main thread then frees the old shifter and makes the
+next spare, so the audio thread still allocates nothing. A voice that fails
+again within a second of starting over, or finds no spare ready, is cut off
+with status 2.
+
 The pitch shifter is vendored under `signalsmith/`, both parts MIT with
 their licences beside them, unchanged from their tags:
 
@@ -746,7 +792,12 @@ dies away to below -100 dBFS within 5 s of the voice stopping, and turns
 silence into exact silence; that switching through every voice, on and off,
 on a steady buzz never makes a larger sample-to-sample step than either
 voice makes on its own, and ends bit-exact when it ends off; and that
-44.1 kHz keeps the delay while 8 kHz stays dry with status 1. It prints each
+44.1 kHz keeps the delay while 8 kHz stays dry with status 1. It also feeds
+the stage a NaN and two infinities mid-block, which must leave the output
+exactly as zeros there would, and hands the voice a NaN directly: the voice
+must start over without allocating, come back within 4 dB of the input, do
+so again two seconds later, and be cut off with status 2 by a third failure
+half a second after that. It prints each
 voice's latency, CPU and level. `./tests/voice --render IN.wav DIR` runs
 every voice over a recording and writes `DIR/00-dry.wav` to
 `DIR/11-witch.wav` with each one's level against the input, for tuning the
@@ -803,7 +854,10 @@ processed signal. Once off and faded, the output is the input to the bit
 and the detector is reset, so switching on starts from no reduction.
 Parameter changes take effect at the next block and keep the detector's
 state. The smoothed reduction is set to 0 below 1e-9 dB, so a long release
-never reaches subnormal numbers.
+never reaches subnormal numbers. Each processor takes a non-finite sample as
+0 before its detector sees it, besides the stage's own guard: an infinity
+would otherwise pin the reduction at infinity and keep the processor silent
+for good.
 
 Each reports three meters, `exp_input`, `exp_reduction` and `exp_output`,
 and `comp_input`, `comp_reduction` and `comp_output`: the highest input and
@@ -826,9 +880,11 @@ and the levels; that the reduction covers 63.2 percent of a step in the
 attack and release times within 5 percent, after the hold for the
 expander, with nothing moving during the hold; that full scale and six
 seconds of silence after it stay finite, bounded and clear of subnormal
-numbers; that the meters stay at rest while off; and that a live change of
-threshold, ratio, knee, attack and make-up moves the output by no more
-than the new gain allows. It prints the measured figures and the cost of
+numbers; that a NaN and two infinities, through the stage or handed to a
+processor directly, leave the output exactly as zeros there would and the
+reduction a number; that the meters stay at rest while off; and that a
+live change of threshold, ratio, knee, attack and make-up moves the output
+by no more than the new gain allows. It prints the measured figures and the cost of
 both processors.
 
 ## Soundboard player
