@@ -49,9 +49,10 @@ class Plugin final : public IComponent, public IAudioProcessor, public IEditCont
   tresult PLUGIN_API setState(IBStream *) override { return kResultOk; }
   tresult PLUGIN_API getState(IBStream *) override { return kNotImplemented; }
   tresult PLUGIN_API setComponentState(IBStream *) override { return kResultOk; }
-  int32 PLUGIN_API getParameterCount() override { phase("parameters"); return 32; }
+  // 32 ordinary parameters and the plugin's own bypass, which is not listed.
+  int32 PLUGIN_API getParameterCount() override { phase("parameters"); return 33; }
   tresult PLUGIN_API getParameterInfo(int32 i, ParameterInfo &info) override {
-    info = {}; info.id = i; return kResultOk;
+    info = {}; info.id = i; if (i == 32) info.flags = ParameterInfo::kIsBypass; return kResultOk;
   }
   tresult PLUGIN_API getParamStringByValue(ParamID, ParamValue, String128) override { return kNotImplemented; }
   tresult PLUGIN_API getParamValueByString(ParamID, TChar *, ParamValue &) override { return kNotImplemented; }
@@ -103,9 +104,11 @@ static bool port_info(const clap_plugin_t *, uint32_t, bool, clap_audio_port_inf
   *info = {}; info->flags = CLAP_AUDIO_PORT_IS_MAIN; info->channel_count = 2; return true;
 }
 static const clap_plugin_audio_ports_t ports = {port_count, port_info};
-static uint32_t param_count(const clap_plugin_t *) { phase("parameters"); return 32; }
+static uint32_t param_count(const clap_plugin_t *) { phase("parameters"); return 33; }
 static bool param_info(const clap_plugin_t *, uint32_t i, clap_param_info_t *info) {
-  *info = {}; info->id = i; info->max_value = 1; return true;
+  *info = {}; info->id = i; info->max_value = 1;
+  if (i == 32) info->flags = CLAP_PARAM_IS_BYPASS | CLAP_PARAM_IS_STEPPED;
+  return true;
 }
 static const clap_plugin_params_t params = {param_count, param_info, nullptr, nullptr, nullptr, nullptr};
 static const void *extension(const clap_plugin_t *, const char *id) {

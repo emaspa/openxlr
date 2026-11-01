@@ -1003,6 +1003,11 @@ and its Level Lock as they are.
    grouped, with a Defaults button. Bypass takes it out of the path
    (red light); the arrows reorder the chain; the cross removes it. The
    strip keeps the short form: bypass and the cog that opens the controls.
+   A VST3 or CLAP plugin that marks one of its parameters as its own bypass
+   does not get that parameter in Controls, because Bypass already does the
+   job. The plugin starts processing every time it loads; a bypass button in
+   its own editor still works until the next load. A parameter the plugin
+   only names "Bypass", without that mark, is listed like any other.
 4. Chains and exposed parameter values are saved with the mixer and
    profiles. OpenXLR does not save opaque plugin state, sample-file
    selections or a plugin's own presets. OpenXLR's presets of control

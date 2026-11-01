@@ -290,6 +290,10 @@ class LatencyProcessor final : public IAudioProcessor {
   int32 max_block = 0;
   tresult process_result = kResultOk;
   tresult setup_result = kResultOk;
+  // The points one parameter got in the last process call.
+  ParamID watched = ~0u;
+  int32 points = 0;
+  ParamValue value = -1;
   tresult PLUGIN_API queryInterface(const TUID, void **obj) override {
     *obj = nullptr;
     return kNoInterface;
@@ -313,7 +317,19 @@ class LatencyProcessor final : public IAudioProcessor {
     return setup_result;
   }
   tresult PLUGIN_API setProcessing(TBool) override { return kResultOk; }
-  tresult PLUGIN_API process(ProcessData &) override { return process_result; }
+  tresult PLUGIN_API process(ProcessData &data) override {
+    points = 0;
+    IParameterChanges *changes = data.inputParameterChanges;
+    for (int32 i = 0; changes && i < changes->getParameterCount(); ++i) {
+      IParamValueQueue *queue = changes->getParameterData(i);
+      if (queue->getParameterId() != watched)
+        continue;
+      int32 offset;
+      points = queue->getPointCount();
+      queue->getPoint(0, offset, value);
+    }
+    return process_result;
+  }
   uint32 PLUGIN_API getTailSamples() override { return 0; }
 };
 
@@ -412,6 +428,40 @@ static void own_block_setup() {
   puts("PASS: a VST3 plugin on its own block is set up for at most 1024 frames");
 }
 
+// The plugin's own bypass parameter is not a control. The first block tells
+// the processor "processing", and after that only the plugin's own editor
+// moves it, one change per edit.
+static void bypass_parameter() {
+  Host *h = test_audio_host_new(2);
+  Vst3 v;
+  LatencyProcessor processor;
+  ComponentHandler handler(&v);
+  v.processor = &processor;
+  v.in_buses.resize(1);
+  v.out_buses.resize(1);
+  v.in_changes.reserve(1);
+  v.data.inputParameterChanges = &v.in_changes;
+  v.has_bypass = true;
+  v.bypass_id = 77;
+  processor.watched = 77;
+  host_set_impl(h, &v);
+  float left[32] = {}, right[32] = {};
+  float *buffers[] = {left, right};
+  vst3_process(h, 32, buffers, buffers);
+  assert(processor.points == 1 && processor.value == 0);
+  vst3_process(h, 32, buffers, buffers);
+  assert(processor.points == 0);
+  assert(handler.performEdit(77, 1.0) == kResultOk);
+  assert(v.records.empty());
+  vst3_process(h, 32, buffers, buffers);
+  assert(processor.points == 1 && processor.value == 1);
+  vst3_process(h, 32, buffers, buffers);
+  assert(processor.points == 0);
+  host_set_impl(h, nullptr);
+  test_audio_host_free(h);
+  puts("PASS: a VST3 bypass parameter starts at processing and follows only the plugin's editor");
+}
+
 int main(int argc, char **argv) {
   if (argc == 1 || !strcmp(argv[1], "processing")) processing_failure();
   if (argc == 1 || !strcmp(argv[1], "parameters")) parameters();
@@ -421,5 +471,6 @@ int main(int argc, char **argv) {
   if (argc == 1 || !strcmp(argv[1], "latency")) latency();
   if (argc == 1 || !strcmp(argv[1], "teardown")) teardown();
   if (argc == 1 || !strcmp(argv[1], "own-block")) own_block_setup();
+  if (argc == 1 || !strcmp(argv[1], "bypass")) bypass_parameter();
   puts("VST3 host bounds passed");
 }

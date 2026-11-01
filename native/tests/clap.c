@@ -109,6 +109,23 @@ static clap_plugin_t fake = {.plugin_data = NULL,
                              .get_extension = fake_ext,
                              .on_main_thread = fake_on_main};
 
+// The parameter events one process call carried for parameter 5.
+static unsigned bypass_events;
+static double bypass_value;
+static clap_process_status bypass_process(const clap_plugin_t *p,
+                                          const clap_process_t *pr) {
+  bypass_events = 0;
+  for (uint32_t i = 0; i < pr->in_events->size(pr->in_events); ++i) {
+    const clap_event_header_t *e = pr->in_events->get(pr->in_events, i);
+    if (e->type != CLAP_EVENT_PARAM_VALUE ||
+        ((const clap_event_param_value_t *)e)->param_id != 5)
+      continue;
+    ++bypass_events;
+    bypass_value = ((const clap_event_param_value_t *)e)->value;
+  }
+  return fake_process(p, pr);
+}
+
 // --- the harness ------------------------------------------------------------
 
 static Clap *fresh(Host *h) {
@@ -374,7 +391,33 @@ static void own_block_activation(void) {
   puts("PASS: a CLAP plugin on its own block is activated for exactly 1024 frames");
 }
 
+// The plugin's own bypass parameter is not a control; the first block sets
+// it to processing and the host leaves it alone after that.
+static void bypass_parameter(void) {
+  Host h = {.rate = 48000, .channels = 2};
+  Clap *c = fresh(&h);
+  clap_plugin_t plugin = fake;
+  plugin.process = bypass_process;
+  c->plugin = &plugin;
+  in_side = (Side){.count = 1, .channels = {2}, .main = 0, .flag_main = true};
+  out_side = in_side;
+  assert(clap_map_ports(c, &h, &ap_ext, true));
+  assert(clap_map_ports(c, &h, &ap_ext, false));
+  c->in_list = (clap_input_events_t){c, in_size, in_get};
+  c->out_list = (clap_output_events_t){c, out_push};
+  c->has_bypass = c->bypass_reset = true;
+  c->bypass_id = 5;
+  bypass_value = -1;
+  run(&h, c, 16);
+  assert(bypass_events == 1 && bypass_value == 0);
+  run(&h, c, 16);
+  assert(bypass_events == 0);
+  release(c);
+  puts("PASS: a CLAP bypass parameter is set to processing once, on the first block");
+}
+
 int main(void) {
+  bypass_parameter();
   own_block_activation();
   processing_failure();
   sources_live_through_plugin_destruction();
