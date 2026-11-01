@@ -50,6 +50,12 @@ def main():
             assert (package / (prefix + kind + ".so")).read_bytes()[:4] == b"\x7fELF"
     for name in ("yabridgectl", "yabridge-host.exe"):
         assert os.access(package / name, os.X_OK), name
+    # The host is built with the disk identity patch, and both local patches
+    # ship with the notices (a Nix output names them after their store paths).
+    assert b"[disk identity]" in (package / "yabridge-host.exe.so").read_bytes()
+    notices = [path.name for path in (args.stage.resolve() / args.prefix / "share/licenses/openxlr-yabridge").iterdir()]
+    for patch in ("private-plugin-home.patch", "disk-identity.patch"):
+        assert any(name == patch or name.endswith("-" + patch) for name in notices), patch
 
     global_config = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "yabridgectl/config.toml"
     original = global_config.read_bytes() if global_config.exists() else None

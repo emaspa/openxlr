@@ -109,6 +109,29 @@ class ReceiptTests(unittest.TestCase):
         self.assertTrue(any(entry["path"] == "/usr/bin/openxlr-yabridgectl" for entry in receipt["files"]))
         self.assertEqual(bridge.PIN, json.loads((HERE / "source.json").read_text()))
 
+    def test_every_local_patch_is_listed_and_ships_with_the_notices(self):
+        self.assertEqual(["private-plugin-home.patch", "disk-identity.patch"], bridge.PATCHES)
+        # prepare applies the patches to the pinned checkout and the bridge
+        # workflow builds from it; here, check each one parses and touches only
+        # the files it is meant to.
+        touched = {}
+        for name in bridge.PATCHES:
+            stat = subprocess.run(["git", "apply", "--numstat", str(HERE / name)], check=True,
+                                  capture_output=True, text=True, cwd=self.root).stdout
+            touched[name] = {line.split("\t")[2] for line in stat.splitlines()}
+        self.assertEqual({"tools/yabridgectl/src/config.rs"}, touched["private-plugin-home.patch"])
+        self.assertEqual({"src/wine-host/disk-identity.cpp", "src/wine-host/disk-identity.h",
+                          "src/wine-host/host.cpp", "src/wine-host/meson.build"}, touched["disk-identity.patch"])
+        payload = self.stage(manager="arch", prefix="/usr")
+        receipt = json.loads((payload / "share/openxlr/installations/openxlr-yabridge.json").read_text())
+        paths = {entry["path"] for entry in receipt["files"]}
+        for name in bridge.PATCHES:
+            self.assertEqual((HERE / name).read_bytes(), (payload / "share/licenses/openxlr-yabridge" / name).read_bytes())
+            self.assertIn("/usr/share/licenses/openxlr-yabridge/" + name, paths)
+        nix = (HERE.parent / "nix/yabridge.nix").read_text()
+        for name in bridge.PATCHES:
+            self.assertEqual(2, nix.count("../yabridge/" + name), name)
+
     def test_debian_source_recipe_stages_with_the_debian_manager(self):
         recipe = subprocess.run(["make", "--no-print-directory", "--just-print", "-f", str(HERE / "debian/rules"),
                                  "override_dh_auto_install"], check=True, capture_output=True, text=True)
@@ -225,7 +248,10 @@ class ReceiptTests(unittest.TestCase):
         self.install()
         receipt = json.loads((root / "share/openxlr/installations/openxlr-yabridge.json").read_text())
         self.assertEqual("manual", receipt["manager"])
-        self.assertEqual(previous, {entry["path"] for entry in receipt["files"] if entry["kind"] != "receipt"})
+        paths = {entry["path"] for entry in receipt["files"] if entry["kind"] != "receipt"}
+        self.assertLessEqual(previous, paths)
+        # The old stage shipped only the first local patch; the upgrade adds the second.
+        self.assertEqual({"/usr/local/share/licenses/openxlr-yabridge/disk-identity.patch"}, paths - previous)
         self.assertEqual(b"test binary", (root / "lib/openxlr/yabridge/libyabridge-vst3.so").read_bytes())
         self.assertEqual(b"controller", (root / "lib/openxlr/yabridge/yabridgectl").read_bytes())
         version = json.loads((root / "lib/openxlr/yabridge/openxlr-yabridge.json").read_text())["version"]

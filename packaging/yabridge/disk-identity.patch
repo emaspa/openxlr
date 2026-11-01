@@ -1,0 +1,632 @@
+diff --git a/src/wine-host/disk-identity.cpp b/src/wine-host/disk-identity.cpp
+new file mode 100644
+index 0000000..c151fdb
+--- /dev/null
++++ b/src/wine-host/disk-identity.cpp
+@@ -0,0 +1,566 @@
++// Real disk identity for plugins that read \\.\PhysicalDrive0.
++// See disk-identity.h.
++
++#include "disk-identity.h"
++
++#include <dirent.h>
++#include <limits.h>
++#include <stdlib.h>
++#include <algorithm>
++#include <atomic>
++#include <cctype>
++#include <cstring>
++#include <exception>
++#include <fstream>
++#include <iostream>
++#include <mutex>
++#include <set>
++#include <sstream>
++#include <string>
++#include <vector>
++
++#ifndef NOMINMAX
++#define NOMINMAX
++#endif
++#include <windows.h>
++#include <winioctl.h>
++#include <ntddstor.h>
++#include <winternl.h>
++
++namespace {
++
++// The layout Windows' NVMe driver (stornvme) returns for
++// StorageDeviceProperty, read from a Windows 11 system: a 396 byte descriptor,
++// no vendor string, then product, revision and serial at fixed offsets.
++constexpr DWORD descriptor_size = 396;
++constexpr DWORD product_offset = 57;
++constexpr DWORD revision_offset = 122;
++constexpr DWORD serial_offset = 139;
++constexpr STORAGE_BUS_TYPE bus_type_nvme = static_cast<STORAGE_BUS_TYPE>(17);
++
++using DeviceIoControlFn = BOOL(WINAPI*)(HANDLE,
++                                        DWORD,
++                                        LPVOID,
++                                        DWORD,
++                                        LPVOID,
++                                        DWORD,
++                                        LPDWORD,
++                                        LPOVERLAPPED);
++using CreateFileAFn = HANDLE(WINAPI*)(LPCSTR,
++                                      DWORD,
++                                      DWORD,
++                                      LPSECURITY_ATTRIBUTES,
++                                      DWORD,
++                                      DWORD,
++                                      HANDLE);
++using CreateFileWFn = HANDLE(WINAPI*)(LPCWSTR,
++                                      DWORD,
++                                      DWORD,
++                                      LPSECURITY_ATTRIBUTES,
++                                      DWORD,
++                                      DWORD,
++                                      HANDLE);
++using CloseHandleFn = BOOL(WINAPI*)(HANDLE);
++using LdrRegisterFn = NTSTATUS(WINAPI*)(ULONG,
++                                        PLDR_DLL_NOTIFICATION_FUNCTION,
++                                        void*,
++                                        void**);
++
++DeviceIoControlFn real_device_io_control = nullptr;
++CreateFileAFn real_create_file_a = nullptr;
++CreateFileWFn real_create_file_w = nullptr;
++CloseHandleFn real_close_handle = nullptr;
++
++std::vector<unsigned char> descriptor;
++std::atomic<bool> wine_answer_replaced{false};
++std::mutex drive_handles_mutex;
++std::set<HANDLE> drive_handles;
++
++std::string read_trimmed(const std::string& path) {
++    std::ifstream file(path);
++    std::stringstream buffer;
++    buffer << file.rdbuf();
++    std::string value = buffer.str();
++    const auto first = value.find_first_not_of(" \t\r\n");
++    if (first == std::string::npos) {
++        return "";
++    }
++    const auto last = value.find_last_not_of(" \t\r\n");
++    return value.substr(first, last - first + 1);
++}
++
++std::string hex_digits(const std::string& value) {
++    std::string digits;
++    for (const char c : value) {
++        if (std::isxdigit(static_cast<unsigned char>(c))) {
++            digits += static_cast<char>(
++                std::toupper(static_cast<unsigned char>(c)));
++        }
++    }
++    return digits;
++}
++
++// stornvme reports a namespace identifier as groups of four hex digits joined
++// by underscores, with a trailing period: the NGUID when it is set, otherwise
++// the EUI-64, otherwise the controller's serial number.
++std::string windows_nvme_serial(const std::string& block) {
++    for (const auto& [file, length] :
++         {std::pair{std::string("nguid"), 32}, std::pair{std::string("eui"), 16}}) {
++        const std::string digits =
++            hex_digits(read_trimmed("/sys/block/" + block + "/" + file));
++        if (static_cast<int>(digits.size()) != length ||
++            digits.find_first_not_of('0') == std::string::npos) {
++            continue;
++        }
++        std::string serial;
++        for (size_t i = 0; i < digits.size(); i += 4) {
++            if (i > 0) {
++                serial += '_';
++            }
++            serial += digits.substr(i, 4);
++        }
++        return serial + '.';
++    }
++    return read_trimmed("/sys/block/" + block + "/device/serial");
++}
++
++std::string unescape_mount_path(const std::string& path) {
++    std::string result;
++    for (size_t i = 0; i < path.size(); ++i) {
++        if (path[i] == '\\' && i + 3 < path.size()) {
++            result += static_cast<char>(std::stoi(path.substr(i + 1, 3), nullptr, 8));
++            i += 3;
++        } else {
++            result += path[i];
++        }
++    }
++    return result;
++}
++
++// The block device behind the mount that holds `path`.
++std::string mount_source(const std::string& path) {
++    std::ifstream mountinfo("/proc/self/mountinfo");
++    std::string line;
++    std::string best_mount;
++    std::string best_source;
++    while (std::getline(mountinfo, line)) {
++        std::istringstream fields(line);
++        std::string id, parent, device, root, mount_point;
++        fields >> id >> parent >> device >> root >> mount_point;
++        mount_point = unescape_mount_path(mount_point);
++        const auto separator = line.find(" - ");
++        if (separator == std::string::npos) {
++            continue;
++        }
++        std::istringstream tail(line.substr(separator + 3));
++        std::string fs_type, source;
++        tail >> fs_type >> source;
++
++        const bool contains =
++            mount_point == "/" || path == mount_point ||
++            path.rfind(mount_point + "/", 0) == 0;
++        if (contains && mount_point.size() >= best_mount.size()) {
++            best_mount = mount_point;
++            best_source = source;
++        }
++    }
++    return best_source;
++}
++
++std::string base_name(const std::string& path) {
++    const auto slash = path.find_last_of('/');
++    return slash == std::string::npos ? path : path.substr(slash + 1);
++}
++
++std::string real_path(const std::string& path) {
++    char resolved[PATH_MAX];
++    return realpath(path.c_str(), resolved) ? std::string(resolved) : "";
++}
++
++// The whole disk under a partition or a device-mapper device.
++std::string disk_for(std::string name) {
++    for (int depth = 0; depth < 4; ++depth) {
++        const std::string sys = real_path("/sys/class/block/" + name);
++        if (sys.empty()) {
++            return "";
++        }
++        if (!read_trimmed(sys + "/partition").empty()) {
++            return base_name(sys.substr(0, sys.find_last_of('/')));
++        }
++        if (name.rfind("dm-", 0) != 0) {
++            return name;
++        }
++        // Follow the first device a mapping (LUKS, LVM) sits on
++        DIR* slaves = opendir((sys + "/slaves").c_str());
++        if (!slaves) {
++            return "";
++        }
++        std::string next;
++        while (const dirent* entry = readdir(slaves)) {
++            if (entry->d_name[0] != '.') {
++                next = entry->d_name;
++                break;
++            }
++        }
++        closedir(slaves);
++        if (next.empty()) {
++            return "";
++        }
++        name = next;
++    }
++    return "";
++}
++
++std::vector<unsigned char> build_descriptor() {
++    const char* prefix_env = getenv("WINEPREFIX");
++    const char* home = getenv("HOME");
++    const std::string prefix =
++        prefix_env && *prefix_env ? prefix_env
++                                  : std::string(home ? home : "") + "/.wine";
++    const std::string drive_c = real_path(prefix + "/drive_c");
++    if (drive_c.empty()) {
++        return {};
++    }
++
++    const std::string source = mount_source(drive_c);
++    if (source.rfind("/dev/", 0) != 0) {
++        std::cerr << "[disk identity] " << drive_c << " is on '" << source
++                  << "', not a block device; leaving Wine's answer"
++                  << std::endl;
++        return {};
++    }
++    const std::string device = base_name(real_path(source));
++    const std::string disk = disk_for(device);
++    if (disk.rfind("nvme", 0) != 0) {
++        std::cerr << "[disk identity] the prefix disk '" << disk
++                  << "' is not an NVMe drive; leaving Wine's answer"
++                  << std::endl;
++        return {};
++    }
++
++    const std::string product =
++        read_trimmed("/sys/block/" + disk + "/device/model");
++    const std::string revision =
++        read_trimmed("/sys/block/" + disk + "/device/firmware_rev");
++    const std::string serial = windows_nvme_serial(disk);
++    if (product.empty() || serial.empty() ||
++        product.size() >= revision_offset - product_offset ||
++        revision.size() >= serial_offset - revision_offset ||
++        serial.size() >= descriptor_size - serial_offset) {
++        std::cerr << "[disk identity] could not read the identity of '"
++                  << disk << "'; leaving Wine's answer" << std::endl;
++        return {};
++    }
++
++    std::vector<unsigned char> blob(descriptor_size, 0);
++    auto* header = reinterpret_cast<STORAGE_DEVICE_DESCRIPTOR*>(blob.data());
++    header->Version = sizeof(STORAGE_DEVICE_DESCRIPTOR);
++    header->Size = descriptor_size;
++    header->DeviceType = 0;
++    header->DeviceTypeModifier = 0;
++    header->RemovableMedia = FALSE;
++    header->CommandQueueing = TRUE;
++    header->VendorIdOffset = 0;
++    header->ProductIdOffset = product_offset;
++    header->ProductRevisionOffset = revision.empty() ? 0 : revision_offset;
++    header->SerialNumberOffset = serial_offset;
++    header->BusType = bus_type_nvme;
++    header->RawPropertiesLength = 0;
++    std::memcpy(blob.data() + product_offset, product.data(), product.size());
++    std::memcpy(blob.data() + revision_offset, revision.data(),
++                revision.size());
++    std::memcpy(blob.data() + serial_offset, serial.data(), serial.size());
++
++    std::string shape = serial;
++    for (char& c : shape) {
++        if (std::isalnum(static_cast<unsigned char>(c))) {
++            c = 'x';
++        }
++    }
++    std::cerr << "[disk identity] PhysicalDrive0 reports " << disk << ": '"
++              << product << "', revision '" << revision << "', serial "
++              << shape << std::endl;
++    return blob;
++}
++
++bool is_physical_drive0(const std::string& name) {
++    std::string lower = name;
++    std::transform(lower.begin(), lower.end(), lower.begin(), [](char c) {
++        return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
++    });
++    return lower == "\\\\.\\physicaldrive0" ||
++           lower == "\\\\?\\physicaldrive0";
++}
++
++void remember(HANDLE handle) {
++    if (handle != INVALID_HANDLE_VALUE) {
++        std::lock_guard lock(drive_handles_mutex);
++        drive_handles.insert(handle);
++    }
++}
++
++HANDLE WINAPI hooked_create_file_a(LPCSTR name,
++                                   DWORD access,
++                                   DWORD share,
++                                   LPSECURITY_ATTRIBUTES security,
++                                   DWORD disposition,
++                                   DWORD flags,
++                                   HANDLE template_file) {
++    const HANDLE handle = real_create_file_a(name, access, share, security,
++                                             disposition, flags, template_file);
++    if (name && is_physical_drive0(name)) {
++        remember(handle);
++    }
++    return handle;
++}
++
++HANDLE WINAPI hooked_create_file_w(LPCWSTR name,
++                                   DWORD access,
++                                   DWORD share,
++                                   LPSECURITY_ATTRIBUTES security,
++                                   DWORD disposition,
++                                   DWORD flags,
++                                   HANDLE template_file) {
++    const HANDLE handle = real_create_file_w(name, access, share, security,
++                                             disposition, flags, template_file);
++    if (name) {
++        std::string narrow;
++        for (const WCHAR* c = name; *c && narrow.size() < 64; ++c) {
++            narrow += *c < 128 ? static_cast<char>(*c) : '?';
++        }
++        if (is_physical_drive0(narrow)) {
++            remember(handle);
++        }
++    }
++    return handle;
++}
++
++BOOL WINAPI hooked_close_handle(HANDLE handle) {
++    {
++        std::lock_guard lock(drive_handles_mutex);
++        drive_handles.erase(handle);
++    }
++    return real_close_handle(handle);
++}
++
++BOOL WINAPI hooked_device_io_control(HANDLE handle,
++                                     DWORD code,
++                                     LPVOID in,
++                                     DWORD in_size,
++                                     LPVOID out,
++                                     DWORD out_size,
++                                     LPDWORD returned,
++                                     LPOVERLAPPED overlapped) {
++    // Once Wine's empty answer has been seen and replaced, later queries on a
++    // drive handle get the same answer without the round trip to Wine's
++    // mount manager. Voice Focus asks once per audio block.
++    if (wine_answer_replaced.load(std::memory_order_acquire) &&
++        code == IOCTL_STORAGE_QUERY_PROPERTY && !overlapped && in &&
++        in_size >= sizeof(STORAGE_PROPERTY_QUERY) && out &&
++        out_size >= sizeof(STORAGE_DESCRIPTOR_HEADER)) {
++        const auto* query = static_cast<const STORAGE_PROPERTY_QUERY*>(in);
++        bool tracked;
++        {
++            std::lock_guard lock(drive_handles_mutex);
++            tracked = drive_handles.count(handle) != 0;
++        }
++        if (tracked && query->PropertyId == StorageDeviceProperty &&
++            query->QueryType == PropertyStandardQuery) {
++            const DWORD copied = std::min<DWORD>(
++                out_size, static_cast<DWORD>(descriptor.size()));
++            std::memcpy(out, descriptor.data(), copied);
++            if (returned) {
++                *returned = copied;
++            }
++            return TRUE;
++        }
++    }
++
++    const BOOL ok = real_device_io_control(handle, code, in, in_size, out,
++                                           out_size, returned, overlapped);
++    if (!ok || code != IOCTL_STORAGE_QUERY_PROPERTY || overlapped || !in ||
++        in_size < sizeof(STORAGE_PROPERTY_QUERY) || !out ||
++        out_size < sizeof(STORAGE_DESCRIPTOR_HEADER)) {
++        return ok;
++    }
++    const auto* query = static_cast<const STORAGE_PROPERTY_QUERY*>(in);
++    if (query->PropertyId != StorageDeviceProperty ||
++        query->QueryType != PropertyStandardQuery) {
++        return ok;
++    }
++    {
++        std::lock_guard lock(drive_handles_mutex);
++        if (!drive_handles.count(handle)) {
++            return ok;
++        }
++    }
++
++    // Only replace Wine's empty placeholder: a descriptor with no strings
++    const auto* header = static_cast<const STORAGE_DESCRIPTOR_HEADER*>(out);
++    if (header->Size != sizeof(STORAGE_DEVICE_DESCRIPTOR)) {
++        return ok;
++    }
++    if (out_size >= sizeof(STORAGE_DEVICE_DESCRIPTOR)) {
++        const auto* found = static_cast<const STORAGE_DEVICE_DESCRIPTOR*>(out);
++        if (found->VendorIdOffset || found->ProductIdOffset ||
++            found->SerialNumberOffset) {
++            return ok;
++        }
++    }
++
++    const DWORD copied =
++        std::min<DWORD>(out_size, static_cast<DWORD>(descriptor.size()));
++    std::memcpy(out, descriptor.data(), copied);
++    if (returned) {
++        *returned = copied;
++    }
++    wine_answer_replaced.store(true, std::memory_order_release);
++    return TRUE;
++}
++
++bool is_kernel_dll(const char* name) {
++    std::string lower = name;
++    std::transform(lower.begin(), lower.end(), lower.begin(), [](char c) {
++        return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
++    });
++    return lower == "kernel32.dll" || lower == "kernelbase.dll" ||
++           lower.rfind("api-ms-win-core-io-", 0) == 0 ||
++           lower.rfind("api-ms-win-core-file-", 0) == 0 ||
++           lower.rfind("api-ms-win-core-handle-", 0) == 0;
++}
++
++void* replacement_for(const char* function) {
++    if (!std::strcmp(function, "DeviceIoControl")) {
++        return reinterpret_cast<void*>(&hooked_device_io_control);
++    }
++    if (!std::strcmp(function, "CreateFileA")) {
++        return reinterpret_cast<void*>(&hooked_create_file_a);
++    }
++    if (!std::strcmp(function, "CreateFileW")) {
++        return reinterpret_cast<void*>(&hooked_create_file_w);
++    }
++    if (!std::strcmp(function, "CloseHandle")) {
++        return reinterpret_cast<void*>(&hooked_close_handle);
++    }
++    return nullptr;
++}
++
++void patch_imports(void* base) {
++    auto* image = static_cast<unsigned char*>(base);
++    const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(image);
++    if (dos->e_magic != IMAGE_DOS_SIGNATURE) {
++        return;
++    }
++    const auto* nt =
++        reinterpret_cast<const IMAGE_NT_HEADERS*>(image + dos->e_lfanew);
++    const IMAGE_DATA_DIRECTORY& directory =
++        nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
++    if (!directory.VirtualAddress) {
++        return;
++    }
++
++    for (auto* import = reinterpret_cast<const IMAGE_IMPORT_DESCRIPTOR*>(
++             image + directory.VirtualAddress);
++         import->Name; ++import) {
++        if (!is_kernel_dll(reinterpret_cast<const char*>(image + import->Name)) ||
++            !import->OriginalFirstThunk) {
++            continue;
++        }
++        const auto* names = reinterpret_cast<const IMAGE_THUNK_DATA*>(
++            image + import->OriginalFirstThunk);
++        auto* addresses =
++            reinterpret_cast<IMAGE_THUNK_DATA*>(image + import->FirstThunk);
++        for (; names->u1.AddressOfData; ++names, ++addresses) {
++            if (IMAGE_SNAP_BY_ORDINAL(names->u1.Ordinal)) {
++                continue;
++            }
++            const auto* by_name = reinterpret_cast<const IMAGE_IMPORT_BY_NAME*>(
++                image + names->u1.AddressOfData);
++            void* replacement =
++                replacement_for(reinterpret_cast<const char*>(by_name->Name));
++            if (!replacement) {
++                continue;
++            }
++            DWORD old_protection;
++            if (VirtualProtect(&addresses->u1.Function, sizeof(void*),
++                               PAGE_READWRITE, &old_protection)) {
++                addresses->u1.Function = reinterpret_cast<ULONG_PTR>(replacement);
++                VirtualProtect(&addresses->u1.Function, sizeof(void*),
++                               old_protection, &old_protection);
++            }
++        }
++    }
++}
++
++bool in_windows_directory(const UNICODE_STRING* name) {
++    static const WCHAR prefix[] = L"c:\\windows\\";
++    const size_t prefix_length = sizeof(prefix) / sizeof(WCHAR) - 1;
++    if (!name || !name->Buffer || name->Length / sizeof(WCHAR) < prefix_length) {
++        return false;
++    }
++    for (size_t i = 0; i < prefix_length; ++i) {
++        WCHAR c = name->Buffer[i];
++        if (c >= L'A' && c <= L'Z') {
++            c = static_cast<WCHAR>(c - L'A' + L'a');
++        }
++        if (c != prefix[i]) {
++            return false;
++        }
++    }
++    return true;
++}
++
++void CALLBACK on_dll_notification(ULONG reason,
++                                  LDR_DLL_NOTIFICATION_DATA* data,
++                                  void*) {
++    if (reason != LDR_DLL_NOTIFICATION_REASON_LOADED || !data ||
++        in_windows_directory(data->Loaded.FullDllName)) {
++        return;
++    }
++    patch_imports(data->Loaded.DllBase);
++}
++
++template <typename F>
++F entry_point(HMODULE module, const char* name) {
++    return reinterpret_cast<F>(
++        reinterpret_cast<void*>(GetProcAddress(module, name)));
++}
++
++}  // namespace
++
++void install_disk_identity_hook() {
++    // This runs before every plugin, so nothing it reads may stop the host
++    try {
++        descriptor = build_descriptor();
++    } catch (const std::exception& error) {
++        std::cerr << "[disk identity] " << error.what() << "; not installed"
++                  << std::endl;
++        descriptor.clear();
++    }
++    if (descriptor.empty()) {
++        return;
++    }
++
++    const HMODULE kernel32 = GetModuleHandleW(L"kernel32.dll");
++    const HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
++    real_device_io_control = entry_point<DeviceIoControlFn>(kernel32, "DeviceIoControl");
++    real_create_file_a = entry_point<CreateFileAFn>(kernel32, "CreateFileA");
++    real_create_file_w = entry_point<CreateFileWFn>(kernel32, "CreateFileW");
++    real_close_handle =
++        entry_point<CloseHandleFn>(kernel32, "CloseHandle");
++    const auto register_notification = entry_point<LdrRegisterFn>(ntdll, "LdrRegisterDllNotification");
++    if (!real_device_io_control || !real_create_file_a || !real_create_file_w ||
++        !real_close_handle || !register_notification) {
++        std::cerr << "[disk identity] missing a Wine entry point; not installed"
++                  << std::endl;
++        return;
++    }
++
++    void* cookie = nullptr;
++    if (register_notification(0, &on_dll_notification, nullptr, &cookie) !=
++        0) {
++        std::cerr << "[disk identity] the loader refused the notification; "
++                     "not installed"
++                  << std::endl;
++    }
++}
+diff --git a/src/wine-host/disk-identity.h b/src/wine-host/disk-identity.h
+new file mode 100644
+index 0000000..ae14bca
+--- /dev/null
++++ b/src/wine-host/disk-identity.h
+@@ -0,0 +1,18 @@
++// Real disk identity for plugins that read \\.\PhysicalDrive0.
++//
++// Wine's mountmgr answers IOCTL_STORAGE_QUERY_PROPERTY on its placeholder
++// PhysicalDrive0 with a descriptor that has no product, revision or serial.
++// Plugins that key a licence on that serial then send an empty machine id.
++// This fills the descriptor with the real model, firmware revision and serial
++// of the disk that holds the Wine prefix, formatted the way Windows' NVMe
++// driver reports them. It only replaces Wine's empty answer.
++
++#pragma once
++
++/**
++ * Register a loader notification that redirects the `DeviceIoControl`,
++ * `CreateFileA`, `CreateFileW` and `CloseHandle` imports of every DLL loaded
++ * from outside the Windows directory. Call once at startup, before any plugin
++ * is loaded. Does nothing when the disk cannot be identified.
++ */
++void install_disk_identity_hook();
+diff --git a/src/wine-host/host.cpp b/src/wine-host/host.cpp
+index 072c003..f4970e4 100644
+--- a/src/wine-host/host.cpp
++++ b/src/wine-host/host.cpp
+@@ -22,6 +22,7 @@
+ #include <version.h>
+ 
+ #include "../common/utils.h"
++#include "disk-identity.h"
+ #ifdef WITH_CLAP
+ #include "bridges/clap.h"
+ #endif
+@@ -88,6 +89,11 @@ int YABRIDGE_EXPORT
+ 
+     std::cerr << "Initializing " << host_name << std::endl;
+ 
++    // Plugins that key a licence on the system disk read its identity through
++    // \\.\PhysicalDrive0, which Wine leaves empty. This has to be in place
++    // before the first plugin library is loaded.
++    install_disk_identity_hook();
++
+     // NOTE: Without this, Wine 9.17+ will try to scale surface bitmaps in the
+     //       X11 driver, which results in window client areas being larger than
+     //       should be.
+diff --git a/src/wine-host/meson.build b/src/wine-host/meson.build
+index e86e6d1..74d281b 100644
+--- a/src/wine-host/meson.build
++++ b/src/wine-host/meson.build
+@@ -70,6 +70,7 @@ host_sources = files(
+   'bridges/common.cpp',
+   'bridges/group.cpp',
+   'bridges/vst2.cpp',
++  'disk-identity.cpp',
+   'editor.cpp',
+   'host.cpp',
+   'utils.cpp',
