@@ -114,7 +114,10 @@ public sealed class DuckingViewModelTests
         Assert.Equal(["monitor", "monitor2", "stream", "chat", "auxout"], model.Mixes.Select(m => m.Id));
         Assert.Equal(["Monitor A", "Monitor B", "Stream", "Chat", "Aux"], model.Mixes.Select(m => m.Name));
         Assert.Equal(["monitor", "stream"], model.Mixes.Where(m => m.IsChecked).Select(m => m.Id));
-        Assert.Equal((1, 2, 2), (model.Sensitivity, model.Amount, model.Speed));
+        // Preset words show as their numbers on the sliders.
+        Assert.Equal((-12, 24, 30, 200), (model.Sensitivity.Value, model.Amount.Value, model.Attack.Value, model.Release.Value));
+        Assert.Equal((Localizer.Format("DuckingDbfs", "-12"), Localizer.Format("DynamicsDecibels", "24"), Localizer.Format("DynamicsMilliseconds", "200")),
+            (model.Sensitivity.Text, model.Amount.Text, model.Release.Text));
         // No unit with hardware ducking: no choice of where it runs and no badge.
         Assert.False(model.HasProcessingChoice);
         Assert.False(model.OnDevice);
@@ -148,12 +151,13 @@ public sealed class DuckingViewModelTests
         Assert.Equal(["mixes"], mixes.Select(f => f.Key));
         Assert.Equal(["monitor", "stream"], Ids(mixes["mixes"]));
 
-        model.Sensitivity = 2;
-        Assert.Equal("""{"sensitivity":"high"}""", sent.One().ToJsonString());
-        model.Amount = 0;
-        Assert.Equal("""{"amount":"low"}""", sent.One().ToJsonString());
-        model.Speed = 0;
-        Assert.Equal("""{"speed":"slow"}""", sent.One().ToJsonString());
+        // The sliders send numbers; the speed sends both its times.
+        model.Sensitivity.Choose(model.Sensitivity.Marks[2]);
+        Assert.Equal("""{"sensitivity":-24}""", sent.One().ToJsonString());
+        model.Amount.Step(-1, large: false);
+        Assert.Equal("""{"amount":23}""", sent.One().ToJsonString());
+        model.Release.Choose(model.Release.Marks[0]);
+        Assert.Equal("""{"speed":{"attack":30,"release":2000}}""", sent.One().ToJsonString());
 
         // The two buttons: every application channel and nothing else, then none.
         model.ChooseNoChannels();
@@ -214,8 +218,8 @@ public sealed class DuckingViewModelTests
         // Without the field, XLR 1 and XLR 2 are the microphones.
         Assert.Equal(["xlr1", "xlr2"], model.Keys.Select(k => k.Id));
 
-        model.Amount = 1;
-        Assert.Equal("""{"amount":"medium"}""", sent.One().ToJsonString());
+        model.Amount.Choose(model.Amount.Marks[1]);
+        Assert.Equal("""{"amount":12}""", sent.One().ToJsonString());
         model.Enabled = false;
         Assert.Equal("""{"enabled":false}""", sent.One().ToJsonString());
 
@@ -394,6 +398,113 @@ public sealed class DuckingViewModelTests
     }
 
     [Fact]
+    public void NumbersInTheStateShowAsTheyAreAndAnUnknownValueLeavesTheSlider()
+    {
+        JsonObject state = Ducking();
+        state["sensitivity"] = -37;
+        state["amount"] = 31;
+        state["speed"] = new JsonObject { ["attack"] = 7, ["release"] = 4321 };
+        var (model, sent, _) = Model(state);
+        Assert.Equal((-37, 31, 7, 4321), (model.Sensitivity.Value, model.Amount.Value, model.Attack.Value, model.Release.Value));
+        Assert.Equal(Math.Log10(4321), model.Release.Position, 9);
+        Assert.Equal(37, model.Sensitivity.Position);
+        Assert.Empty(sent.Sent);
+
+        state["sensitivity"] = "loud";
+        state["amount"] = 12.5;
+        state["speed"] = new JsonObject { ["attack"] = 7 };
+        model.Apply(state, Mixer());
+        Assert.Equal((-37, 31, 7, 4321), (model.Sensitivity.Value, model.Amount.Value, model.Attack.Value, model.Release.Value));
+        Assert.Empty(sent.Sent);
+    }
+
+    [Fact]
+    public void ADragShowsItsValueSnapsToMarksAndSendsOnlyWhenItEnds()
+    {
+        var (model, sent, _) = Model();
+        DuckingSliderViewModel attack = model.Attack;
+        // Without a drag the slider's own value changes nothing: a range clamped as it is built is not an edit.
+        attack.Position = Math.Log10(500);
+        Assert.Equal(30, attack.Value);
+        Assert.Empty(sent.Sent);
+
+        attack.BeginDrag();
+        attack.Position = Math.Log10(500);
+        Assert.Equal((500, Localizer.Format("DynamicsMilliseconds", "500")), (attack.Value, attack.Text));
+        // Near Slow's 100 ms it lands on 100 exactly, and the thumb with it.
+        attack.Position = Math.Log10(107);
+        Assert.Equal(100, attack.Value);
+        Assert.Equal(Math.Log10(100), attack.Position, 9);
+        // Between Medium and Slow, the nearer mark wins.
+        attack.Position = Math.Log10(84);
+        Assert.Equal(80, attack.Value);
+        attack.Position = Math.Log10(250);
+        Assert.Equal(250, attack.Value);
+        Assert.Empty(sent.Sent);
+        // A report while the pointer holds it waits.
+        model.Apply(Ducking(), Mixer());
+        Assert.Equal(250, attack.Value);
+        attack.EndDrag();
+        Assert.Equal("""{"speed":{"attack":250,"release":200}}""", sent.One().ToJsonString());
+        // A second release, or a drag that comes back where it started, sends nothing.
+        attack.EndDrag();
+        attack.BeginDrag();
+        attack.Position = Math.Log10(600);
+        attack.Position = Math.Log10(250);
+        attack.EndDrag();
+        Assert.Empty(sent.Sent);
+
+        // The echo of the speed object clears the wait; the older report before it does not undo the edit.
+        model.Apply(Ducking(), Mixer());
+        Assert.Equal(250, attack.Value);
+        JsonObject echo = Ducking();
+        echo["speed"] = new JsonObject { ["attack"] = 250, ["release"] = 200 };
+        model.Apply(echo, Mixer());
+        model.Apply(Ducking(), Mixer());
+        Assert.Equal(30, attack.Value);
+        Assert.Empty(sent.Sent);
+    }
+
+    [Fact]
+    public void KeysStepEachSliderAndSendEachStep()
+    {
+        var (model, sent, _) = Model();
+        // Sensitivity rises to the right, so its threshold falls.
+        model.Sensitivity.Step(1, large: false);
+        Assert.Equal("""{"sensitivity":-13}""", sent.One().ToJsonString());
+        model.Sensitivity.Step(-1, large: true);
+        Assert.Equal("""{"sensitivity":-8}""", sent.One().ToJsonString());
+        model.Sensitivity.StepToEnd(right: true);
+        Assert.Equal("""{"sensitivity":-60}""", sent.One().ToJsonString());
+        model.Sensitivity.Step(1, large: false);
+        Assert.Empty(sent.Sent);
+
+        // A logarithmic slider steps by a share of its value, at least one.
+        model.Release.Step(1, large: false);
+        Assert.Equal("""{"speed":{"attack":30,"release":210}}""", sent.One().ToJsonString());
+        model.Release.Step(1, large: true);
+        Assert.Equal("""{"speed":{"attack":30,"release":263}}""", sent.One().ToJsonString());
+        model.Attack.StepToEnd(right: false);
+        Assert.Equal("""{"speed":{"attack":1,"release":263}}""", sent.One().ToJsonString());
+        model.Attack.Step(1, large: false);
+        Assert.Equal("""{"speed":{"attack":2,"release":263}}""", sent.One().ToJsonString());
+        model.Amount.StepToEnd(right: true);
+        Assert.Equal("""{"amount":40}""", sent.One().ToJsonString());
+        // Each slider's marks are the Wave XLR Pro's presets.
+        Assert.Equal([-3, -12, -24], model.Sensitivity.Marks.Select(m => m.Value));
+        Assert.Equal([6, 12, 24], model.Amount.Marks.Select(m => m.Value));
+        Assert.Equal([100, 80, 30], model.Attack.Marks.Select(m => m.Value));
+        Assert.Equal([2000, 1200, 200], model.Release.Marks.Select(m => m.Value));
+        Assert.Equal(Localizer.Format("DuckingMarkTip", Localizer.Text("DuckingMedium"), Localizer.Format("DuckingDbfs", "-12")),
+            model.Sensitivity.Marks[1].Tip);
+        // A mark already held sends nothing.
+        model.Amount.Choose(model.Amount.Marks[2]);
+        sent.One();
+        model.Amount.Choose(model.Amount.Marks[2]);
+        Assert.Empty(sent.Sent);
+    }
+
+    [Fact]
     public void TheReductionBarTakesTheLargestDuckMeter()
     {
         var (model, _, _) = Model(Ducking(enabled: true, backend: "\"software\""));
@@ -407,6 +518,12 @@ public sealed class DuckingViewModelTests
         Assert.Equal(1, model.ReductionLevel);
         model.ApplyMeters(JsonNode.Parse("""{"ch:music":[0.5,0.5]}""")!.AsObject());
         Assert.Equal(0, model.Reduction);
+        // A deeper amount than the deepest preset fills the bar at that depth.
+        JsonObject deep = Ducking(enabled: true, backend: "\"software\"");
+        deep["amount"] = 40;
+        model.Apply(deep, Mixer());
+        model.ApplyMeters(JsonNode.Parse("""{"duck:monitor":[30.0]}""")!.AsObject());
+        Assert.Equal(0.75, model.ReductionLevel);
 
         // The unit gives no reading: the bar hides while it runs ducking.
         model.Apply(Ducking(enabled: true, backend: "\"device\"", device: Pro()), Mixer());

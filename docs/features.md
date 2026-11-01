@@ -311,7 +311,10 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
   path takes its level from it, and the UI marks the channel it carries
 - Ducking on every device: a key microphone (XLR 1, XLR 2 or a mono
   capture input) lowers chosen channels in chosen mixes while it is loud,
-  by 6, 12 or 24 dB with the Wave XLR Pro's sensitivity and speed presets.
+  by the Wave XLR Pro's presets (6, 12 or 24 dB, with its sensitivity and
+  speed presets) or by custom values: a threshold from -60 to 0 dBFS, a
+  depth from 1 to 40 dB, an attack from 1 to 1000 ms and a release from
+  10 to 10000 ms.
   The key is never lowered. A native stage per ducked mix runs it on this
   computer with no added latency. On a Wave XLR Pro whose setup fits what
   the unit can do, the unit runs it instead; otherwise the state says why
@@ -319,7 +322,8 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
   `duck:<mix>` reduction meter while software runs. Set up in the
   Ducking window, opened from the SUBMIXER header, the layout editor and
   Options, with
-  the key, a channel and a mix checklist, the presets, where it runs and
+  the key, a channel and a mix checklist, sliders for sensitivity, amount,
+  attack and release with the presets marked on them, where it runs and
   a reduction bar ([manual](manual.md#ducking))
 - Bidirectional Linux volume and mute controls for every monitor mix,
   with an explicit 150% boost button for monitor masters and output volume
@@ -978,7 +982,8 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   the chain's width
 - Ducking in Inputs on any device: the switch, a key that cycles through
   the microphones, a row of keys for the channels to lower and one for the
-  mixes, the three presets, and on a Wave XLR Pro the choice between the
+  mixes, the three presets (a custom value set elsewhere shows as a fourth
+  choice), and on a Wave XLR Pro the choice between the
   unit and this computer with the reason the unit does not run it. A short
   bar shows the reduction while software runs it
   ([manual](manual.md#terminal-ducking))

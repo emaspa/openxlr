@@ -7,7 +7,7 @@
         Title="{loc:Text Key=Ducking}" Width="680" Height="760" MinWidth="480" MinHeight="420"
         WindowStartupLocation="CenterOwner" Background="{DynamicResource Ox.Window.Background}">
   <!-- The ducking setup: the switch and the key, the channels and the mixes,
-       the presets, where it runs and what runs it now. Every colour, size and
+       the sliders with their presets, where it runs and what runs it now. Every colour, size and
        radius is an Ox.* token or a control theme; the badge is the EQ
        editor's. -->
   <!-- A wide window keeps the setup at a readable width, centred. -->
@@ -106,30 +106,16 @@
           </StackPanel>
         </Grid>
 
-        <!-- the Wave XLR Pro's three presets, which software uses too -->
-        <Grid Name="DuckingPresets" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
-          <TextBlock Text="{loc:Text Key=DuckingSensitivity}" Classes="h" VerticalAlignment="Center"/>
-          <ComboBox Name="DuckingSensitivity" Grid.Column="1" HorizontalAlignment="Stretch"
-                    SelectedIndex="{Binding Sensitivity, Mode=TwoWay}" AutomationProperties.Name="{loc:Text Key=DuckingSensitivity}">
-            <ComboBoxItem Content="{loc:Text Key=DuckingLow}"/>
-            <ComboBoxItem Content="{loc:Text Key=DuckingMedium}"/>
-            <ComboBoxItem Content="{loc:Text Key=DuckingHigh}"/>
-          </ComboBox>
-          <TextBlock Grid.Row="1" Text="{loc:Text Key=DuckingAmount}" Classes="h" VerticalAlignment="Center"/>
-          <ComboBox Name="DuckingAmount" Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch"
-                    SelectedIndex="{Binding Amount, Mode=TwoWay}" AutomationProperties.Name="{loc:Text Key=DuckingAmount}">
-            <ComboBoxItem Content="{loc:Text Key=DuckingAmountLow}"/>
-            <ComboBoxItem Content="{loc:Text Key=DuckingAmountMedium}"/>
-            <ComboBoxItem Content="{loc:Text Key=DuckingAmountHigh}"/>
-          </ComboBox>
-          <TextBlock Grid.Row="2" Text="{loc:Text Key=DuckingSpeed}" Classes="h" VerticalAlignment="Center"/>
-          <ComboBox Name="DuckingSpeed" Grid.Row="2" Grid.Column="1" HorizontalAlignment="Stretch"
-                    SelectedIndex="{Binding Speed, Mode=TwoWay}" AutomationProperties.Name="{loc:Text Key=DuckingSpeed}">
-            <ComboBoxItem Content="{loc:Text Key=DuckingSlow}"/>
-            <ComboBoxItem Content="{loc:Text Key=DuckingMedium}"/>
-            <ComboBoxItem Content="{loc:Text Key=DuckingFast}"/>
-          </ComboBox>
-        </Grid>
+        <!-- Sensitivity, amount and speed on sliders, the Wave XLR Pro's presets marked
+             under each; software takes the same numbers. The sliders share their name and
+             value columns, so the tracks line up. -->
+        <StackPanel Name="DuckingPresets" Spacing="8" Grid.IsSharedSizeScope="True">
+          <vm:DuckingSliderView Name="DuckingSensitivity" DataContext="{Binding Sensitivity}"/>
+          <vm:DuckingSliderView Name="DuckingAmount" DataContext="{Binding Amount}"/>
+          <TextBlock Name="DuckingSpeed" Text="{loc:Text Key=DuckingSpeed}" Classes="h"/>
+          <vm:DuckingSliderView Name="DuckingAttack" DataContext="{Binding Attack}"/>
+          <vm:DuckingSliderView Name="DuckingRelease" DataContext="{Binding Release}"/>
+        </StackPanel>
       </StackPanel>
     </ScrollViewer>
   </DockPanel>

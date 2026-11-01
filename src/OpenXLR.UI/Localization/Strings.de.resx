@@ -2907,20 +2907,29 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="DuckingHigh" xml:space="preserve">
     <value>Hoch</value>
   </data>
-  <data name="DuckingAmountLow" xml:space="preserve">
-    <value>Niedrig, 6 dB</value>
-  </data>
-  <data name="DuckingAmountMedium" xml:space="preserve">
-    <value>Mittel, 12 dB</value>
-  </data>
-  <data name="DuckingAmountHigh" xml:space="preserve">
-    <value>Hoch, 24 dB</value>
-  </data>
   <data name="DuckingSlow" xml:space="preserve">
     <value>Langsam</value>
   </data>
   <data name="DuckingFast" xml:space="preserve">
     <value>Schnell</value>
+  </data>
+  <data name="DuckingDbfs" xml:space="preserve">
+    <value>{0} dBFS</value>
+  </data>
+  <data name="DuckingMarkTip" xml:space="preserve">
+    <value>{0}, {1}</value>
+  </data>
+  <data name="DuckingSensitivityTip" xml:space="preserve">
+    <value>Wie laut das Auslösemikrofon sein muss, bevor die Kanäle abgesenkt werden. Weiter rechts reagiert auf eine leisere Stimme.</value>
+  </data>
+  <data name="DuckingAmountTip" xml:space="preserve">
+    <value>Wie weit die Kanäle abgesenkt werden, solange das Auslösemikrofon laut ist.</value>
+  </data>
+  <data name="DuckingAttackTip" xml:space="preserve">
+    <value>Wie lange die Kanäle zum Absenken brauchen, sobald das Auslösemikrofon laut ist.</value>
+  </data>
+  <data name="DuckingReleaseTip" xml:space="preserve">
+    <value>Wie lange die Kanäle zum Zurückkehren brauchen, sobald das Auslösemikrofon leise ist.</value>
   </data>
   <data name="DuckingHint" xml:space="preserve">
     <value>Ducking senkt die gewählten Kanäle in den gewählten Mixen ab, solange das Auslösemikrofon laut ist. Dieser Computer übernimmt das, oder das Wave XLR Pro auf seinem eigenen Prozessor, wenn die Einstellung zu dem passt, was das Gerät kann.</value>

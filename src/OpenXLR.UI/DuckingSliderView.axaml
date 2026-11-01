@@ -1,0 +1,55 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:OpenXLR.UI"
+             x:Class="OpenXLR.UI.DuckingSliderView" x:DataType="vm:DuckingSliderViewModel">
+  <!-- One ducking setting: its name, the slider with the Wave XLR Pro's
+       presets marked under it, and the value. The name and value columns are
+       shared with the window's other sliders, so the tracks line up. A
+       preset's name is a button that sets its value. Every colour and size
+       is an Ox.* token. -->
+  <UserControl.Styles>
+    <Style Selector="Button.duckingMark">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Padding" Value="2,0"/>
+      <Setter Property="MinWidth" Value="0"/>
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Foreground" Value="{DynamicResource Ox.Text.Secondary}"/>
+      <Setter Property="FontSize" Value="{DynamicResource Ox.Eq.LabelFontSize}"/>
+      <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Button.duckingMark:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{DynamicResource Ox.Text.Primary}"/>
+    </Style>
+    <Style Selector="Button.duckingMark:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{DynamicResource Ox.Text.Primary}"/>
+    </Style>
+    <!-- Speed's attack and release sit under its name. -->
+    <Style Selector="TextBlock.duckingPart">
+      <Setter Property="Margin" Value="12,0,0,0"/>
+    </Style>
+  </UserControl.Styles>
+
+  <Grid ColumnSpacing="12">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="Auto" SharedSizeGroup="DuckingName"/>
+      <ColumnDefinition Width="*"/>
+      <ColumnDefinition Width="Auto" SharedSizeGroup="DuckingValue"/>
+    </Grid.ColumnDefinitions>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+    <TextBlock Name="DuckingSliderName" Text="{Binding Name}" Classes="h" Classes.duckingPart="{Binding IsPart}" VerticalAlignment="Center"/>
+    <!-- the range comes before the value, so the value is never clamped to the slider's default range -->
+    <Slider Grid.Column="1" Name="DuckingSlider" Minimum="{Binding MinimumPosition}" Maximum="{Binding MaximumPosition}"
+            Value="{Binding Position, Mode=TwoWay}" VerticalAlignment="Center"
+            AutomationProperties.Name="{Binding Name}" ToolTip.Tip="{Binding Tip}"/>
+    <TextBlock Grid.Column="2" Name="DuckingSliderValue" Text="{Binding Text}" Classes="val" VerticalAlignment="Center"
+               MinWidth="72" TextAlignment="Right"/>
+    <vm:DuckingMarks Grid.Row="1" Grid.Column="1" Name="DuckingSliderMarks" Marks="{Binding Marks}"
+                     TickBrush="{DynamicResource Ox.Text.Muted}"/>
+  </Grid>
+</UserControl>

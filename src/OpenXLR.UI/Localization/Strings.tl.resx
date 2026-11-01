@@ -2875,20 +2875,29 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
   <data name="DuckingHigh" xml:space="preserve">
     <value>Mataas</value>
   </data>
-  <data name="DuckingAmountLow" xml:space="preserve">
-    <value>Mababa, 6 dB</value>
-  </data>
-  <data name="DuckingAmountMedium" xml:space="preserve">
-    <value>Katamtaman, 12 dB</value>
-  </data>
-  <data name="DuckingAmountHigh" xml:space="preserve">
-    <value>Mataas, 24 dB</value>
-  </data>
   <data name="DuckingSlow" xml:space="preserve">
     <value>Mabagal</value>
   </data>
   <data name="DuckingFast" xml:space="preserve">
     <value>Mabilis</value>
+  </data>
+  <data name="DuckingDbfs" xml:space="preserve">
+    <value>{0} dBFS</value>
+  </data>
+  <data name="DuckingMarkTip" xml:space="preserve">
+    <value>{0}, {1}</value>
+  </data>
+  <data name="DuckingSensitivityTip" xml:space="preserve">
+    <value>Gaano kalakas dapat ang key microphone bago humina ang mga channel. Ang mas pakanan ay tumutugon sa mas mahinang boses.</value>
+  </data>
+  <data name="DuckingAmountTip" xml:space="preserve">
+    <value>Gaano kalaki ang ihihina ng mga channel habang malakas ang key microphone.</value>
+  </data>
+  <data name="DuckingAttackTip" xml:space="preserve">
+    <value>Gaano katagal bago humina ang mga channel kapag malakas na ang key microphone.</value>
+  </data>
+  <data name="DuckingReleaseTip" xml:space="preserve">
+    <value>Gaano katagal bago bumalik ang mga channel kapag tahimik na ang key microphone.</value>
   </data>
   <data name="DuckingHint" xml:space="preserve">
     <value>Pinahihina ng ducking ang napiling channel sa napiling mix habang malakas ang key microphone. Sa computer na ito ito tumatakbo, o sa sariling processor ng Wave XLR Pro kapag tugma ang setup sa kaya ng unit.</value>

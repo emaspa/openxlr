@@ -677,12 +677,14 @@ The setup has four parts:
 - The **mixes** to lower them in. By default the default monitor mix,
   Monitor A until it is removed.
   Add Stream to dip the music your viewers hear while you talk.
-- Three presets, with the Wave XLR Pro's own numbers. **Sensitivity** is
-  how quiet a voice already counts: Low reacts only to a loud voice
-  (-3 dBFS), Medium at -12 dBFS, High to a soft one (-24 dBFS). **Amount**
-  is how far the channels drop: 6, 12 or 24 dB. **Speed** is how fast they
-  drop and come back: Slow 100 ms and 2 s, Medium 80 ms and 1.2 s, Fast
-  30 ms and 0.2 s.
+- How it reacts. **Sensitivity** is how quiet a voice already counts,
+  from 0 down to -60 dBFS: Low reacts only to a loud voice (-3 dBFS),
+  Medium at -12 dBFS, High to a soft one (-24 dBFS). **Amount** is how far
+  the channels drop, 1 to 40 dB; the presets are 6, 12 and 24 dB.
+  **Speed** is how fast they drop (attack, 1 to 1000 ms) and come back
+  (release, 10 to 10000 ms): Slow 100 ms and 2 s, Medium 80 ms and 1.2 s,
+  Fast 30 ms and 0.2 s. The named values are the Wave XLR Pro's presets;
+  any whole number in between works too.
 
 Ducking is off until you switch it on. In the UI, open **Ducking**
 from the SUBMIXER header beside **Mic setup**, from the bottom row of the
@@ -699,7 +701,16 @@ the setup without letting you change it:
    channels** ticks the application channels and nothing else; **None**
    clears the list.
 4. Tick the mixes under **In these mixes**.
-5. Choose **Sensitivity**, **Amount** and **Speed**.
+5. Set **Sensitivity**, **Amount** and the two **Speed** sliders,
+   **Attack** and **Release**. Each slider shows its value on the right,
+   with the presets marked under it. Click a preset's name, such as
+   **Medium**, to set its value exactly. A drag that passes close to a
+   mark stops on it; elsewhere it moves in whole dB or ms. Sensitivity
+   rises to the right, so the threshold falls as you drag right. Attack
+   and release use a log scale, so 30 ms and 2 s both get room. The arrow
+   keys move a focused slider one step, Page Up and Page Down a larger
+   one, Home and End to either end. OpenXLR sends the value when you let
+   go of the slider and on each key step, not while you drag.
 
 Each change applies at once. With the Wave XLR Pro attached, **Runs on**
 offers **This unit** and **This computer** (see below). The line at the
@@ -5057,7 +5068,10 @@ channel on the list becomes the key, it leaves the list in the same step.
 a check on each one ducked. Left and right move along the row, which
 scrolls when the keys do not fit, and space ducks the key under the
 cursor or stops ducking it. The key microphone is never on the Channels
-row. **Sensitivity**, **Amount** and **Speed** are the three presets.
+row. **Sensitivity**, **Amount** and **Speed** are the three presets. A
+number that matches a preset shows as that preset. A custom value set in
+the UI or over the API shows as a fourth choice, such as custom, -30 dBFS;
+left or right from it picks a preset.
 
 On a Wave XLR Pro the card adds **Runs on**, this unit or this computer,
 which `setDuckingProcessing` sends, and **Key heard**. On the unit that

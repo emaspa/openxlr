@@ -2875,20 +2875,29 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
   <data name="DuckingHigh" xml:space="preserve">
     <value>Taas</value>
   </data>
-  <data name="DuckingAmountLow" xml:space="preserve">
-    <value>Ubos, 6 dB</value>
-  </data>
-  <data name="DuckingAmountMedium" xml:space="preserve">
-    <value>Tunga, 12 dB</value>
-  </data>
-  <data name="DuckingAmountHigh" xml:space="preserve">
-    <value>Taas, 24 dB</value>
-  </data>
   <data name="DuckingSlow" xml:space="preserve">
     <value>Hinay</value>
   </data>
   <data name="DuckingFast" xml:space="preserve">
     <value>Paspas</value>
+  </data>
+  <data name="DuckingDbfs" xml:space="preserve">
+    <value>{0} dBFS</value>
+  </data>
+  <data name="DuckingMarkTip" xml:space="preserve">
+    <value>{0}, {1}</value>
+  </data>
+  <data name="DuckingSensitivityTip" xml:space="preserve">
+    <value>Unsa ka kusog ang key microphone sa dili pa mohinay ang mga channel. Sa tuo pa, motubag sa mas hinay nga tingog.</value>
+  </data>
+  <data name="DuckingAmountTip" xml:space="preserve">
+    <value>Unsa ka layo mohinay ang mga channel samtang kusog ang key microphone.</value>
+  </data>
+  <data name="DuckingAttackTip" xml:space="preserve">
+    <value>Unsa ka dugay mohinay ang mga channel kung kusog na ang key microphone.</value>
+  </data>
+  <data name="DuckingReleaseTip" xml:space="preserve">
+    <value>Unsa ka dugay mobalik ang mga channel kung hilom na ang key microphone.</value>
   </data>
   <data name="DuckingHint" xml:space="preserve">
     <value>Pahinayon sa ducking ang gipiling mga channel sa gipiling mga mix samtang kusog ang key microphone. Niining computer kini nagdagan, o sa kaugalingong processor sa Wave XLR Pro kung mohaum ang setup sa mahimo sa unit.</value>

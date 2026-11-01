@@ -62,7 +62,8 @@ public sealed class DuckingChoice : ViewModelBase
 /// <summary>
 /// The ducking setup as the Ducking window edits it: the switch, the key
 /// microphone, the channels lowered and the mixes they are lowered in, the
-/// three presets, where it runs, and what runs it now. Every value is the
+/// sensitivity, amount and speed on sliders that mark the Wave XLR Pro's
+/// presets and send numbers, where it runs, and what runs it now. Every value is the
 /// daemon's, or one the user just set; a state that differs from an edit not
 /// yet reported back is taken as older than the edit, for a second at most,
 /// as the EQ editor does. A refused edit puts the daemon's state back and
@@ -70,12 +71,15 @@ public sealed class DuckingChoice : ViewModelBase
 /// </summary>
 public sealed class DuckingViewModel : ViewModelBase
 {
-    // The API's words for each choice, in the order the pickers list them.
-    internal static readonly string[] Sensitivities = ["low", "medium", "high"];
-    internal static readonly string[] Amounts = ["low", "medium", "high"];
-    internal static readonly string[] Speeds = ["slow", "medium", "fast"];
+    // The Wave XLR Pro's presets, which a state may name by word and the
+    // sliders mark, and the bounds the daemon takes for a number.
+    internal static readonly (string Word, int Db)[] SensitivityPresets = [("low", -3), ("medium", -12), ("high", -24)];
+    internal static readonly (string Word, int Db)[] AmountPresets = [("low", 6), ("medium", 12), ("high", 24)];
+    internal static readonly (string Word, int Attack, int Release)[] SpeedPresets = [("slow", 100, 2000), ("medium", 80, 1200), ("fast", 30, 200)];
+    public const int MinThreshold = -60, MaxThreshold = 0, MinDepth = 1, MaxDepth = 40;
+    public const int MinAttack = 1, MaxAttack = 1000, MinRelease = 10, MaxRelease = 10000;
 
-    /// <summary>The deepest preset, in dB: the reduction bar is full at this depth.</summary>
+    /// <summary>The deepest preset, in dB: the reduction bar is full at this depth, or at a deeper amount.</summary>
     public const double FullScaleDb = 24;
 
     /// <summary>How long an edit waits for the daemon to report it back before a different report wins.</summary>
@@ -96,7 +100,6 @@ public sealed class DuckingViewModel : ViewModelBase
     private bool _reported, _mixerRunning, _targetsReported, _enabled;
     private string _key = "xlr1";
     private List<string> _channels = [], _mixes = [];
-    private int _sensitivity = 1, _amount = 1, _speed = 1;
     private string _processing = "device";
 
     // What runs it, from the daemon only.
@@ -114,6 +117,20 @@ public sealed class DuckingViewModel : ViewModelBase
     {
         _commands = commands;
         _time = time ?? TimeProvider.System;
+        string Db(int value) => Localizer.Format("DynamicsDecibels", DuckingSliderViewModel.Number(value));
+        string Ms(int value) => Localizer.Format("DynamicsMilliseconds", DuckingSliderViewModel.Number(value));
+        string low = Localizer.Text("DuckingLow"), medium = Localizer.Text("DuckingMedium"), high = Localizer.Text("DuckingHigh");
+        string slow = Localizer.Text("DuckingSlow"), fast = Localizer.Text("DuckingFast");
+        // Sensitivity rises to the right, so its threshold falls.
+        Sensitivity = new(Localizer.Text("DuckingSensitivity"), Localizer.Text("DuckingSensitivityTip"), MinThreshold, MaxThreshold,
+            DuckingScale.Reversed, value => Localizer.Format("DuckingDbfs", DuckingSliderViewModel.Number(value)), -12,
+            [(-3, low), (-12, medium), (-24, high)], SliderMoved);
+        Amount = new(Localizer.Text("DuckingAmount"), Localizer.Text("DuckingAmountTip"), MinDepth, MaxDepth,
+            DuckingScale.Linear, Db, 12, [(6, low), (12, medium), (24, high)], SliderMoved);
+        Attack = new(Localizer.Text("DynamicsAttack"), Localizer.Text("DuckingAttackTip"), MinAttack, MaxAttack,
+            DuckingScale.Log, Ms, 80, [(100, slow), (80, medium), (30, fast)], SliderMoved, isPart: true);
+        Release = new(Localizer.Text("DynamicsRelease"), Localizer.Text("DuckingReleaseTip"), MinRelease, MaxRelease,
+            DuckingScale.Log, Ms, 1200, [(2000, slow), (1200, medium), (200, fast)], SliderMoved, isPart: true);
     }
 
     /// <summary>The daemon reports ducking: the buttons that open the window show.</summary>
@@ -173,22 +190,29 @@ public sealed class DuckingViewModel : ViewModelBase
     /// <summary>The daemon names the channels and mixes; one from before the per-channel setup does not, and the lists stay hidden.</summary>
     public bool HasTargets => _targetsReported;
 
-    public int Sensitivity
-    {
-        get => _sensitivity;
-        set { if (Set(ref _sensitivity, value) && !_applying && value >= 0) Send(new() { ["sensitivity"] = Sensitivities[value] }); }
-    }
+    /// <summary>The key threshold in dBFS, which falls as the slider moves right.</summary>
+    public DuckingSliderViewModel Sensitivity { get; }
 
-    public int Amount
-    {
-        get => _amount;
-        set { if (Set(ref _amount, value) && !_applying && value >= 0) Send(new() { ["amount"] = Amounts[value] }); }
-    }
+    /// <summary>How far the channels go down, in dB.</summary>
+    public DuckingSliderViewModel Amount { get; }
 
-    public int Speed
+    /// <summary>The speed's attack, in ms.</summary>
+    public DuckingSliderViewModel Attack { get; }
+
+    /// <summary>The speed's release, in ms.</summary>
+    public DuckingSliderViewModel Release { get; }
+
+    /// <summary>
+    /// A slider settled on a new value: it goes to the daemon as a number,
+    /// and the speed as both its times, since the command takes them together.
+    /// </summary>
+    private void SliderMoved(DuckingSliderViewModel slider)
     {
-        get => _speed;
-        set { if (Set(ref _speed, value) && !_applying && value >= 0) Send(new() { ["speed"] = Speeds[value] }); }
+        if (_applying) return;
+        if (slider == Sensitivity) Send(new() { ["sensitivity"] = slider.Value });
+        else if (slider == Amount) Send(new() { ["amount"] = slider.Value });
+        else Send(new() { ["speed"] = new Dictionary<string, int> { ["attack"] = Attack.Value, ["release"] = Release.Value } });
+        Raise(nameof(ReductionLevel));
     }
 
     /// <summary>Lower every application channel and nothing else.</summary>
@@ -337,7 +361,7 @@ public sealed class DuckingViewModel : ViewModelBase
     public double Reduction => _reduction;
 
     /// <summary>The bar's fill, 0 to 1 of <see cref="FullScaleDb"/>.</summary>
-    public double ReductionLevel => Math.Clamp(_reduction / FullScaleDb, 0, 1);
+    public double ReductionLevel => Math.Clamp(_reduction / Math.Max(FullScaleDb, Amount.Value), 0, 1);
 
     public string ReductionText => Localizer.Format("DuckingReductionValue", Math.Round(_reduction));
 
@@ -424,9 +448,15 @@ public sealed class DuckingViewModel : ViewModelBase
             _targetsReported = ducking["channels"] is JsonArray && ducking["mixes"] is JsonArray;
             if (Fresh("channels", ducking["channels"])) _channels = Words(ducking["channels"]);
             if (Fresh("mixes", ducking["mixes"])) _mixes = Words(ducking["mixes"]);
-            if (Fresh("sensitivity", ducking["sensitivity"])) Sensitivity = Index(Sensitivities, ducking["sensitivity"]);
-            if (Fresh("amount", ducking["amount"])) Amount = Index(Amounts, ducking["amount"]);
-            if (Fresh("speed", ducking["speed"])) Speed = Index(Speeds, ducking["speed"]);
+            // A word or a number; a word the window does not know leaves the slider where it is.
+            if (Fresh("sensitivity", ducking["sensitivity"]) && Level(ducking["sensitivity"], SensitivityPresets) is { } threshold)
+                Sensitivity.Show(threshold);
+            if (Fresh("amount", ducking["amount"]) && Level(ducking["amount"], AmountPresets) is { } depth) Amount.Show(depth);
+            if (Fresh("speed", ducking["speed"]) && Times(ducking["speed"]) is { } times)
+            {
+                Attack.Show(times.Attack);
+                Release.Show(times.Release);
+            }
             if (Fresh("processing", ducking["processing"])) _processing = Text(ducking["processing"]) is "software" ? "software" : "device";
             _backend = Text(ducking["backend"]);
             _available = Flag(ducking["available"]) ?? true;
@@ -529,9 +559,7 @@ public sealed class DuckingViewModel : ViewModelBase
         Raise(nameof(Enabled));
         Raise(nameof(SelectedKey));
         Raise(nameof(HasTargets));
-        Raise(nameof(Sensitivity));
-        Raise(nameof(Amount));
-        Raise(nameof(Speed));
+        Raise(nameof(ReductionLevel));
         Raise(nameof(HasProcessingChoice));
         Raise(nameof(Processing));
         Raise(nameof(ProcessOnDevice));
@@ -555,6 +583,21 @@ public sealed class DuckingViewModel : ViewModelBase
 
     private static List<string> Words(JsonNode? node) => node is JsonArray array ? [.. array.Select(Text).OfType<string>()] : [];
 
-    // A word the window does not know shows as no choice, as before.
-    private static int Index(string[] words, JsonNode? node) => Array.IndexOf(words, Text(node));
+    private static int? Whole(JsonNode? node)
+        => node is JsonValue value && value.GetValueKind() == JsonValueKind.Number
+            && double.TryParse(value.ToJsonString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double number)
+            && double.IsFinite(number) && number == Math.Floor(number)
+            && number is >= int.MinValue and <= int.MaxValue ? (int)number : null;
+
+    /// <summary>A sensitivity's or an amount's number: its preset's for a word, or the number the state holds.</summary>
+    private static int? Level(JsonNode? node, (string Word, int Db)[] presets)
+        => Text(node) is { } word ? Array.FindIndex(presets, p => p.Word == word) is int at and >= 0 ? presets[at].Db : null : Whole(node);
+
+    /// <summary>A speed's attack and release: its preset's for a word, or the object's.</summary>
+    private static (int Attack, int Release)? Times(JsonNode? node)
+    {
+        if (Text(node) is { } word)
+            return Array.FindIndex(SpeedPresets, p => p.Word == word) is int at and >= 0 ? (SpeedPresets[at].Attack, SpeedPresets[at].Release) : null;
+        return node is JsonObject times && Whole(times["attack"]) is { } attack && Whole(times["release"]) is { } release ? (attack, release) : null;
+    }
 }

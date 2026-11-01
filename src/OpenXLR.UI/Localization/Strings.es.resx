@@ -2898,20 +2898,29 @@ Selecciona la interfaz que controla OpenXLR</value>
   <data name="DuckingHigh" xml:space="preserve">
     <value>Alta</value>
   </data>
-  <data name="DuckingAmountLow" xml:space="preserve">
-    <value>Baja, 6 dB</value>
-  </data>
-  <data name="DuckingAmountMedium" xml:space="preserve">
-    <value>Media, 12 dB</value>
-  </data>
-  <data name="DuckingAmountHigh" xml:space="preserve">
-    <value>Alta, 24 dB</value>
-  </data>
   <data name="DuckingSlow" xml:space="preserve">
     <value>Lenta</value>
   </data>
   <data name="DuckingFast" xml:space="preserve">
     <value>Rápida</value>
+  </data>
+  <data name="DuckingDbfs" xml:space="preserve">
+    <value>{0} dBFS</value>
+  </data>
+  <data name="DuckingMarkTip" xml:space="preserve">
+    <value>{0}, {1}</value>
+  </data>
+  <data name="DuckingSensitivityTip" xml:space="preserve">
+    <value>Qué tan fuerte debe sonar el micrófono de disparo para que bajen los canales. Más a la derecha reacciona a una voz más suave.</value>
+  </data>
+  <data name="DuckingAmountTip" xml:space="preserve">
+    <value>Cuánto bajan los canales mientras el micrófono de disparo suena fuerte.</value>
+  </data>
+  <data name="DuckingAttackTip" xml:space="preserve">
+    <value>Cuánto tardan los canales en bajar cuando el micrófono de disparo suena fuerte.</value>
+  </data>
+  <data name="DuckingReleaseTip" xml:space="preserve">
+    <value>Cuánto tardan los canales en volver cuando el micrófono de disparo se calla.</value>
   </data>
   <data name="DuckingHint" xml:space="preserve">
     <value>La atenuación baja los canales elegidos en las mezclas elegidas mientras el micrófono de disparo suena fuerte. La hace este ordenador, o el Wave XLR Pro en su propio procesador cuando la configuración encaja con lo que el equipo puede hacer.</value>
