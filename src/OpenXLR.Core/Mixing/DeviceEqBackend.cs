@@ -40,6 +40,18 @@ public interface IDeviceEqPort
 
     /// <summary>Where the last post to this input stands.</summary>
     DeviceEqStatus Status(string unit, int input);
+
+    /// <summary>
+    /// The compressor and expander this input should hold, as <see cref="Post"/>
+    /// for the EQ; a value with no settings names the two switches alone.
+    /// </summary>
+    void PostDynamics(string unit, int input, DeviceDynamics dynamics, string owner) { }
+
+    /// <summary>Where the last compressor and expander post to this input stands.</summary>
+    DeviceDynamicsStatus DynamicsStatus(string unit, int input) => DeviceDynamicsStatus.None;
+
+    /// <summary>The compressor and expander the input held at the last read, raw; null when not known.</summary>
+    DeviceDynamics? HeldDynamics(string unit, int input) => null;
 }
 
 /// <summary>
@@ -56,6 +68,13 @@ public sealed record UnitEqSupport(string Name, string? Firmware, bool Ready, st
 
     /// <summary>The first firmware the model runs the EQ on, as major.minor.patch.</summary>
     public string MinimumFirmware { get; init; } = WaveFxEq.Format(WaveFxEq.Mk2EqFirmware);
+
+    /// <summary>
+    /// Whether the unit runs the microphone compressor and expander now, and
+    /// why not; null on a model without them, whose microphones run them in
+    /// software.
+    /// </summary>
+    public DeviceEqSupport? Dynamics { get; init; }
 }
 
 /// <summary>One input of one unit, by the unit's instance id and the input's number (1 or 2).</summary>

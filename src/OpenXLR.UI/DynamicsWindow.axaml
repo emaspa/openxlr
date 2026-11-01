@@ -6,7 +6,7 @@
         x:Class="OpenXLR.UI.DynamicsWindow" x:DataType="vm:MicDynamicsViewModel"
         Title="{Binding Title}" Width="760" Height="520" MinWidth="560" MinHeight="420"
         WindowStartupLocation="CenterOwner" Background="{DynamicResource Ox.Window.Background}">
-  <!-- One microphone's compressor or expander on this computer. Across the top its name, the
+  <!-- One microphone's compressor or expander, on this computer or on its unit. Across the top its name, the
        settings button that shows the advanced settings and its switch; then, left to right, the
        input meter, the input's history with the threshold across it, the gain reduction meter,
        the compressor's make-up gain and the output meter, each with its value above and its
@@ -58,11 +58,27 @@
                     AutomationProperties.Name="{Binding SwitchName}" ToolTip.Tip="{loc:Text Key=DynamicsSwitchTip}"/>
     </Grid>
 
-    <!-- Why it does not run, or that the levels wait for the stage -->
+    <!-- Where it runs, while the microphone's unit can run a compressor and an expander itself.
+         Two sides of one switch, as in the EQ editor: the lit side is the daemon's choice, a press
+         asks for its side, and one choice covers the compressor and the expander -->
+    <WrapPanel DockPanel.Dock="Top" Name="DynamicsProcessing" IsVisible="{Binding HasProcessingChoice}" ItemSpacing="6" LineSpacing="4" Margin="0,8,0,0">
+      <TextBlock Name="DynamicsProcessingLabel" Text="{loc:Text Key=DynamicsProcessingLabel}" VerticalAlignment="Center"/>
+      <ToggleButton Name="DynamicsOnUnit" Content="{loc:Text Key=EqProcessingDevice}" IsChecked="{Binding ProcessOnDevice, Mode=OneWay}"
+                    IsEnabled="{Binding CanProcessOnDevice}" ToolTip.ShowOnDisabled="True"
+                    Click="OnProcessOnUnit" ToolTip.Tip="{Binding ProcessOnDeviceTip}"/>
+      <ToggleButton Name="DynamicsInSoftware" Content="{loc:Text Key=EqProcessingSoftware}" IsChecked="{Binding ProcessInSoftware, Mode=OneWay}"
+                    Click="OnProcessInSoftware" ToolTip.Tip="{loc:Text Key=DynamicsProcessingSoftwareTip}"/>
+    </WrapPanel>
+
+    <!-- why the unit the microphone is on does not run them itself -->
+    <TextBlock DockPanel.Dock="Top" Name="DynamicsDeviceNote" Text="{Binding DeviceNote}" IsVisible="{Binding HasDeviceNote}"
+               Classes="hint" TextWrapping="Wrap" Margin="0,8,0,0"/>
+
+    <!-- Why it does not run, or where the levels come from -->
     <TextBlock DockPanel.Dock="Top" Name="DynamicsStatus" Text="{Binding Status}" Classes="hint" Classes.warn="{Binding HasError}"
                TextWrapping="Wrap" Margin="0,8,0,0" IsVisible="{Binding HasStatus}"/>
 
-    <!-- How this differs from the unit's own switch -->
+    <!-- Where it sits, and how it relates to the unit -->
     <TextBlock DockPanel.Dock="Bottom" Name="DynamicsNote" Text="{Binding Note}" Classes="hint" TextWrapping="Wrap" Margin="0,10,0,0"/>
 
     <!-- The advanced settings, behind the settings button -->
@@ -72,7 +88,7 @@
       </ItemsControl.ItemsPanel>
       <ItemsControl.ItemTemplate>
         <DataTemplate x:DataType="vm:DynamicsParameterViewModel">
-          <Grid ColumnDefinitions="120,*,80" ColumnSpacing="10">
+          <Grid ColumnDefinitions="120,*,80" ColumnSpacing="10" IsVisible="{Binding Shown}">
             <TextBlock Text="{Binding Label}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
             <Slider Grid.Column="1" Name="DynamicsParameter" Minimum="{Binding Minimum}" Maximum="{Binding Maximum}"
                     SmallChange="{Binding Step}" LargeChange="{Binding Step}" vm:FaderInput.Step="{Binding Step}"
@@ -85,10 +101,11 @@
 
     <!-- The meters and the graph, each with its value above and its name below -->
     <Grid Name="DynamicsBody" ColumnDefinitions="Auto,*,Auto,Auto,Auto" RowDefinitions="Auto,*,Auto" ColumnSpacing="16" Margin="0,14,0,0">
-      <TextBlock Name="DynamicsInputText" Text="{Binding InputText}" Classes="val dynamicsValue"/>
+      <!-- the input and the gain reduction exist only in software: the unit reports neither -->
+      <TextBlock Name="DynamicsInputText" Text="{Binding InputText}" Classes="val dynamicsValue" IsVisible="{Binding ShowsStageMeters}"/>
       <skin:LevelMeter Grid.Row="1" Name="DynamicsInputMeter" Classes="dynamics" Level="{Binding InputLevel}"
-                       AutomationProperties.Name="{Binding InputName}"/>
-      <TextBlock Grid.Row="2" Text="{loc:Text Key=DynamicsInput}" Classes="body dynamicsLabel"/>
+                       AutomationProperties.Name="{Binding InputName}" IsVisible="{Binding ShowsStageMeters}"/>
+      <TextBlock Grid.Row="2" Text="{loc:Text Key=DynamicsInput}" Classes="body dynamicsLabel" IsVisible="{Binding ShowsStageMeters}"/>
 
       <TextBlock Grid.Column="1" Name="DynamicsThresholdText" Text="{Binding Threshold.Text}" Classes="val dynamicsValue" HorizontalAlignment="Right"/>
       <vm:DynamicsGraph Grid.Row="1" Grid.Column="1" Name="DynamicsGraph" MinWidth="200" MinHeight="140"
@@ -100,19 +117,19 @@
                         AutomationProperties.Name="{loc:Text Key=DynamicsThreshold}" ToolTip.Tip="{Binding Threshold.Tip}"/>
       <TextBlock Grid.Row="2" Grid.Column="1" Text="{loc:Text Key=DynamicsThreshold}" Classes="body dynamicsLabel" HorizontalAlignment="Right"/>
 
-      <TextBlock Grid.Column="2" Name="DynamicsReductionText" Text="{Binding ReductionText}" Classes="val dynamicsValue"/>
+      <TextBlock Grid.Column="2" Name="DynamicsReductionText" Text="{Binding ReductionText}" Classes="val dynamicsValue" IsVisible="{Binding ShowsStageMeters}"/>
       <!-- gain reduction fills from the top, the way it takes level away -->
       <skin:LevelMeter Grid.Row="1" Grid.Column="2" Name="DynamicsReductionMeter" Classes="dynamics" Level="{Binding ReductionLevel}"
                        RenderTransform="scale(1,-1)" Fill="{DynamicResource Ox.Dynamics.Reduction}"
                        Warning="{DynamicResource Ox.Dynamics.Reduction}" Hot="{DynamicResource Ox.Dynamics.Reduction}"
-                       AutomationProperties.Name="{Binding ReductionName}"/>
-      <TextBlock Grid.Row="2" Grid.Column="2" Text="{loc:Text Key=DynamicsReduction}" Classes="body dynamicsLabel"/>
+                       AutomationProperties.Name="{Binding ReductionName}" IsVisible="{Binding ShowsStageMeters}"/>
+      <TextBlock Grid.Row="2" Grid.Column="2" Text="{loc:Text Key=DynamicsReduction}" Classes="body dynamicsLabel" IsVisible="{Binding ShowsStageMeters}"/>
 
       <TextBlock Grid.Column="3" Name="DynamicsMakeupText" Text="{Binding Makeup.Text, FallbackValue=''}" Classes="val dynamicsValue"
                  IsVisible="{Binding HasMakeup}"/>
       <Slider Grid.Row="1" Grid.Column="3" Name="DynamicsMakeup" Orientation="Vertical" HorizontalAlignment="Center" IsVisible="{Binding HasMakeup}"
               Minimum="{Binding Makeup.Minimum, FallbackValue=0}" Maximum="{Binding Makeup.Maximum, FallbackValue=24}"
-              SmallChange="0.5" LargeChange="3" vm:FaderInput.Step="0.5"
+              SmallChange="{Binding Makeup.Step, FallbackValue=0.5}" LargeChange="3" vm:FaderInput.Step="{Binding Makeup.Step, FallbackValue=0.5}"
               Value="{Binding Makeup.Value, Mode=TwoWay, FallbackValue=0}"
               AutomationProperties.Name="{loc:Text Key=DynamicsMakeup}" ToolTip.Tip="{Binding Makeup.Tip, FallbackValue=''}"/>
       <TextBlock Grid.Row="2" Grid.Column="3" Text="{loc:Text Key=DynamicsMakeup}" Classes="body dynamicsLabel" IsVisible="{Binding HasMakeup}"/>

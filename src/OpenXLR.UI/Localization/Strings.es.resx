@@ -3689,10 +3689,49 @@ Selecciona la interfaz que controla OpenXLR</value>
     <value>Esperando el nivel del micrófono.</value>
   </data>
   <data name="CompressorNote" xml:space="preserve">
-    <value>Este compresor funciona en este ordenador, después del EQ. El interruptor Compresor de una Wave XLR Pro, una unidad MK.2 o un Wave:3 es un ajuste fijo dentro de la unidad. Con los dos activos, la voz se comprime dos veces.</value>
+    <value>Este compresor funciona en este ordenador, después del EQ. Donde la unidad puede ejecutar uno propio, OpenXLR mantiene apagado el compresor de la unidad mientras tanto, así la voz se comprime una sola vez.</value>
   </data>
   <data name="ExpanderNote" xml:space="preserve">
-    <value>Este expansor funciona en este ordenador, después de la reducción de ruido. El interruptor Expansor de una Wave XLR Pro, una unidad MK.2 o un Wave:3 es un ajuste fijo dentro de la unidad. Con los dos activos, los pasajes suaves se bajan dos veces.</value>
+    <value>Este expansor funciona en este ordenador, después de la reducción de ruido. Donde la unidad puede ejecutar uno propio, OpenXLR mantiene apagado el expansor de la unidad mientras tanto, así los pasajes suaves se bajan una sola vez.</value>
+  </data>
+  <data name="CompressorNoteDevice" xml:space="preserve">
+    <value>{0} ejecuta este compresor en su propio procesador, antes del USB, así que lo oye cada canal que toma el audio de la unidad. Los controles se quedan en los límites de la unidad, y la unidad no tiene rodilla.</value>
+  </data>
+  <data name="ExpanderNoteDevice" xml:space="preserve">
+    <value>{0} ejecuta este expansor en su propio procesador, antes del USB, así que lo oye cada canal que toma el audio de la unidad. Los controles se quedan en los límites de la unidad, y la unidad no tiene retención.</value>
+  </data>
+  <data name="DynamicsSubtitleDevice" xml:space="preserve">
+    <value>{0}, funciona en {1}</value>
+  </data>
+  <data name="DynamicsHeadingDevice" xml:space="preserve">
+    <value>Dinámica en {0}</value>
+  </data>
+  <data name="DynamicsHintDevice" xml:space="preserve">
+    <value>El expansor baja el micrófono entre palabras, y el compresor iguala el habla fuerte y la suave. Los dos funcionan en el procesador propio de {0}.</value>
+  </data>
+  <data name="DynamicsProcessingLabel" xml:space="preserve">
+    <value>Dónde funciona</value>
+  </data>
+  <data name="DynamicsProcessingDeviceTip" xml:space="preserve">
+    <value>Ejecuta el compresor y el expansor en el procesador propio de {0}, antes del USB. Todos los canales que toman el audio de esta unidad los oyen, y la unidad los conserva cuando OpenXLR se detiene. La unidad no tiene rodilla ni retención, y sus límites son más estrechos.</value>
+  </data>
+  <data name="DynamicsProcessingSoftwareTip" xml:space="preserve">
+    <value>Ejecuta el compresor y el expansor en este ordenador, en el procesamiento del micrófono. Los de la unidad se apagan y conservan sus ajustes.</value>
+  </data>
+  <data name="DynamicsUnitLevels" xml:space="preserve">
+    <value>{0} no informa del nivel de entrada ni de la reducción de ganancia, así que Salida muestra el micrófono tal como sale de la unidad, después de su expansor y su compresor.</value>
+  </data>
+  <data name="DynamicsDeviceFirmwareOld" xml:space="preserve">
+    <value>Funciona en software: el firmware de {0} es {1}, y la unidad ejecuta el compresor y el expansor por sí misma a partir del firmware {2}. El actualizador de Elgato está en Wave Link para Windows o macOS.</value>
+  </data>
+  <data name="DynamicsDeviceFirmwareUnknown" xml:space="preserve">
+    <value>Funciona en software: no se pudo leer la versión de firmware de {0}, y la unidad ejecuta el compresor y el expansor por sí misma solo a partir del firmware {1}.</value>
+  </data>
+  <data name="DynamicsDeviceUnsupported" xml:space="preserve">
+    <value>Funciona en software: {0} tiene ajustes de compresor o expansor que OpenXLR no reconoce. Recoge diagnósticos para un informe del dispositivo.</value>
+  </data>
+  <data name="DynamicsDeviceFailed" xml:space="preserve">
+    <value>Funciona en software: {0} no conservó los ajustes escritos. Apaga y enciende el compresor o el expansor para volver a probar la unidad.</value>
   </data>
   <data name="CompressorThresholdTip" xml:space="preserve">
     <value>El nivel por encima del cual se baja la voz. Arrastra la línea o su asa, o usa las flechas.</value>

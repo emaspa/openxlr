@@ -305,6 +305,8 @@ public sealed partial class Mixer
                 port.Post(unit.Unit, unit.Input, DeviceEq.Off, ChannelNameLocked(ch));
         }
         HoldUncarriedInputsOffLocked(port, carried);
+        // The compressor and expander live in the same struct and follow the same rule.
+        changed |= SyncDeviceDynamicsLocked(port, carried, now);
         return changed;
     }
 
@@ -333,25 +335,28 @@ public sealed partial class Mixer
     }
 
     /// <summary>
-    /// Before Sound Check records on a channel whose unit runs its EQ: hand
-    /// the EQ to software and wait for the unit to confirm it is off, one
-    /// device sweep and <see cref="EqReleaseWait"/> at most, so the take is
-    /// the raw microphone and the loop hears every edit. Waits outside the
-    /// mixer's lock.
+    /// Before Sound Check records on a channel whose unit runs its EQ or its
+    /// compressor and expander: hand them to software and wait for the unit
+    /// to confirm they are off, one device sweep and
+    /// <see cref="EqReleaseWait"/> at most, so the take is the raw microphone
+    /// and the loop hears every edit. Waits outside the mixer's lock.
     /// </summary>
     private void ReleaseDeviceEqForSoundCheck(string channel)
     {
         DeviceEqBackend? leaving;
+        DeviceDynamicsBackend? leavingDynamics;
         lock (_gate)
         {
-            if (_soundCheck is not null || !_eqDevices.ContainsKey(channel)) return;
+            if (_soundCheck is not null || !_eqDevices.ContainsKey(channel) && !_dynamicsDevices.ContainsKey(channel)) return;
             _soundCheckClaim = channel;
             SyncDeviceEqLocked();
             leaving = _eqReleasing.TryGetValue(channel, out var entry) ? entry.Backend : null;
+            leavingDynamics = _dynamicsReleasing.TryGetValue(channel, out var dynamicsEntry) ? dynamicsEntry.Backend : null;
         }
-        if (leaving is null) return;
+        if (leaving is null && leavingDynamics is null) return;
         long deadline = NowMs + (long)EqReleaseWait.TotalMilliseconds;
-        while (NowMs < deadline && leaving.Status is not ({ IsOff: true } or { Phase: DeviceEqPhase.Failed }))
+        while (NowMs < deadline && (leaving is not null && leaving.Status is not ({ IsOff: true } or { Phase: DeviceEqPhase.Failed })
+                                    || leavingDynamics is not null && leavingDynamics.Status is not ({ IsOff: true } or { Phase: DeviceEqPhase.Failed })))
             Thread.Sleep(10);
     }
 
@@ -447,8 +452,8 @@ public sealed partial class Mixer
                     if (stage.BandCount == eq.Bands.Count) stage.Apply(eq);
                     else stage.SetEnabled(false);
                     stage.ApplyNoise(noise);
-                    stage.ApplyExpander(ExpanderLocked(channel));
-                    stage.ApplyCompressor(CompressorLocked(channel));
+                    stage.ApplyExpander(SoftwareExpanderLocked(channel));
+                    stage.ApplyCompressor(SoftwareCompressorLocked(channel));
                     stage.ApplyVoice(voice);
                     return;
                 }
@@ -533,8 +538,8 @@ public sealed partial class Mixer
             // The voice, the expander and the compressor go in live, before
             // the microphone is linked in, and their levels when a client
             // shows them.
-            stage.ApplyExpander(ExpanderLocked(ch.Id));
-            stage.ApplyCompressor(CompressorLocked(ch.Id));
+            stage.ApplyExpander(SoftwareExpanderLocked(ch.Id));
+            stage.ApplyCompressor(SoftwareCompressorLocked(ch.Id));
             stage.ApplyVoice(VoiceLocked(ch.Id));
             if (_dynamicsWatch.ContainsKey(ch.Id)) stage.SetDynamicsMeters(true);
             into = RouteInputLocked(upstream, stage.Node, ch, upstreamProcessed);

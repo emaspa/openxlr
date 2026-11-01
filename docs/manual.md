@@ -1438,8 +1438,9 @@ replacement input.
 
 <a name="compressor-and-expander"></a>
 **Compressor and expander.** XLR 1, XLR 2 and every capture input on one
-mono port also have a compressor and an expander that run on this
-computer. The expander turns the microphone down when you are not
+mono port also have a compressor and an expander. They run on this
+computer, or on the unit itself when the microphone is on a unit that has
+them (see [where they run](#where-the-compressor-and-expander-run)). The expander turns the microphone down when you are not
 speaking, so room noise, keyboard and breaths between words drop away. The
 compressor turns loud passages down so loud and quiet speech come out
 closer in level. In INPUTS and in an input rack, **Dynamics** right after
@@ -1502,17 +1503,61 @@ words. To set the compressor, speak at your loudest and put the threshold
 where **Gain reduction** shows a few decibels, then raise **Make-up gain**
 until **Output** peaks where it did before.
 
-These are not the **Compressor** and **Expander** switches of a Wave XLR
-Pro, an MK.2 unit or a Wave:3. Those switch a fixed
-setting inside the unit, with nothing to adjust, and they act before the
-microphone reaches the computer. The ones here run on the computer, with
-every setting above. You can use both. The voice then goes through the
-unit's and then through this one, so it is compressed or turned down
-twice. Use one or the other unless you mean to stack them.
+<a name="where-the-compressor-and-expander-run"></a>
+**Where they run.** The Wave:3 MK.2, the Wave XLR MK.2, the XLR Dock MK.2
+and each input of the Wave XLR Pro have a compressor and an expander of
+their own, which act before the microphone reaches the computer. When the
+microphone is on such a unit, and the unit also runs the
+[EQ](#where-the-eq-runs) (the same firmware), the window shows **Where it
+runs** with **On the unit** and **In software**, as the EQ editor does.
+**On the unit** is the default. One choice covers the compressor and the
+expander together.
+
+- On the unit, the window's **On** switch is the unit's own Compressor or
+  Expander switch, and its settings are the unit's. The sliders keep to
+  what the unit takes, and it has no knee and no hold:
+
+  | Setting | Compressor on the unit | Expander on the unit |
+  |---|---|---|
+  | Threshold | -60 to -1 dB | -60 to -1 dB |
+  | Ratio | 1:1 to 20:1, in whole steps | 1:1 to 3:1, in steps of 0.1 |
+  | Attack | 1 to 200 ms, in whole ms | 1 to 200 ms |
+  | Release | 50 to 1000 ms | 10 to 1000 ms |
+  | Make-up gain | 0 to 20 dB, in whole dB | |
+  | Range | | 0 to 60 dB |
+
+  A value set in software outside these, or between their steps, is held
+  to the nearest one the unit takes while the unit runs it, and the window
+  shows that value; your own comes back when you choose **In software**.
+- The unit reports no input level and no gain reduction, so on the unit
+  the window shows only **Output**: the microphone as it leaves the unit,
+  after its expander and compressor. The graph draws that level.
+- **In software** runs both on this computer, with every setting in the
+  table further up, and switches the unit's own off; the unit keeps its
+  settings. While the unit cannot take them (older firmware, settings it
+  cannot read, a write it did not keep), **In software** is lit and a note
+  says why, as for the EQ.
+- While OpenXLR runs a unit's compressor and expander, INPUTS and the
+  **Mic** button no longer show the unit's own **Compressor** and
+  **Expander** switches: they are these. So the voice is never compressed
+  or turned down twice. A microphone that had no compressor or expander
+  setting yet takes the unit's switches and settings the first time, so a
+  compressor you had switched on stays on. One that already has a setting,
+  saved from an earlier session, writes that setting to the unit instead.
+- A Mic setup session moves them to this computer while it runs, and
+  moving between the unit and this computer switches the old place off
+  first, as for the EQ.
+
+The Wave:3 MK.2 runs them as described. On the other units the settings
+sit in the same place, but whether they shape the voice the same way has
+not been checked by ear yet.
 
 The settings are saved with the mixer and in profiles. A profile saved
-before them leaves them as they are. The terminal mixer's Inputs tab has
-the switches and every setting, without the levels.
+before them leaves them as they are. Where they run is saved with the
+mixer and never in a profile. The terminal mixer's Inputs tab has the
+switches and every setting, without the levels; on the unit it shows the
+values the unit holds, and the choice of where they run is made in the
+UI.
 
 <a name="microphone-eq"></a>
 **Microphone EQ.** XLR 1, XLR 2 and every capture input on one mono port

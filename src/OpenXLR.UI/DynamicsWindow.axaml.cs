@@ -6,7 +6,7 @@ using Avalonia.Threading;
 namespace OpenXLR.UI;
 
 /// <summary>
-/// One microphone's compressor or expander on this computer. While it is open
+/// One microphone's compressor or expander, on this computer or on its unit. While it is open
 /// it keeps asking the daemon for the processor's levels, which go out only
 /// while some window shows them, and lets levels that stopped coming go.
 /// </summary>
@@ -48,6 +48,10 @@ public partial class DynamicsWindow : Window
     }
 
     private void KeepLevels() { if (Processor is { } vm) _ = vm.KeepLevelsAsync(); }
+
+    private void OnProcessOnUnit(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Processor?.ChooseProcessing(UnitDynamics.Device);
+
+    private void OnProcessInSoftware(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Processor?.ChooseProcessing(UnitDynamics.Software);
 }
 
 /// <summary>

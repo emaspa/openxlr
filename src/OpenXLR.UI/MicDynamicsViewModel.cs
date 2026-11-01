@@ -23,6 +23,9 @@ public interface IDynamicsCommands
 
     /// <summary>Keep the microphone's meter before the chain running for another lease.</summary>
     Task WatchInputMeterAsync(string channel);
+
+    /// <summary>Where the microphone's compressor and expander run: <c>device</c> or <c>software</c>.</summary>
+    Task SetDynamicsProcessingAsync(string channel, string value);
 }
 
 /// <summary>Where a compressor's or expander's window takes its levels from.</summary>
@@ -74,31 +77,55 @@ public sealed class DynamicsHistory
 /// <summary>
 /// One number of a compressor or an expander: its slider, its value text,
 /// and the field it sends. A report that arrives while an edit is still on
-/// its way does not move the slider back.
+/// its way does not move the slider back. While the unit runs the processor
+/// the slider keeps to the unit's limits and step, and a number the unit
+/// does not have (the knee, the hold) is not shown.
 /// </summary>
 public sealed class DynamicsParameterViewModel : ViewModelBase
 {
     private readonly MicDynamicsViewModel _owner;
     private double _value;
 
-    internal DynamicsParameterViewModel(MicDynamicsViewModel owner, DynamicsRange range, string label, string tip)
+    internal DynamicsParameterViewModel(MicDynamicsViewModel owner, DynamicsRange range, DynamicsRange? unitRange, string label, string tip)
     {
         _owner = owner;
-        Range = range;
+        SoftwareRange = range;
+        UnitRange = unitRange;
         Label = label;
         Tip = tip;
         _value = range.Default;
     }
 
-    public DynamicsRange Range { get; }
+    /// <summary>The range the software stage takes.</summary>
+    public DynamicsRange SoftwareRange { get; }
+
+    /// <summary>The range a unit running the processor takes (<see cref="UnitDynamics"/>); null for a number the unit does not have.</summary>
+    public DynamicsRange? UnitRange { get; }
+
+    /// <summary>The range the slider offers now.</summary>
+    public DynamicsRange Range => _owner.OnDevice && UnitRange is { } unit ? unit : SoftwareRange;
+
+    /// <summary>Shown: software runs the processor, or the unit has this number.</summary>
+    public bool Shown => !_owner.OnDevice || UnitRange is not null;
 
     /// <summary>The command's field: <c>threshold</c>, <c>ratio</c> and so on.</summary>
-    public string Field => Range.Name;
+    public string Field => SoftwareRange.Name;
     public string Label { get; }
     public string Tip { get; }
     public double Minimum => Range.Minimum;
     public double Maximum => Range.Maximum;
     public double Step => Range.Step;
+
+    /// <summary>Where the processor runs changed: the slider's range, step and visibility follow.</summary>
+    internal void RangeChanged()
+    {
+        Raise(nameof(Range));
+        Raise(nameof(Minimum));
+        Raise(nameof(Maximum));
+        Raise(nameof(Step));
+        Raise(nameof(Shown));
+        Raise(nameof(Text));
+    }
 
     private string Key => $"{_owner.Kind}:{_owner.Channel}:{Field}";
 
@@ -175,28 +202,33 @@ public sealed class MicDynamicsViewModel : ViewModelBase
         Channel = channel;
         _channelName = channelName;
         _time = time ?? TimeProvider.System;
+        // Each number with the range the unit takes for it, null where the unit has none.
+        DynamicsParameterViewModel Compressor(DynamicsRange range, string label, string tip)
+            => new(this, range, UnitDynamics.CompressorControl(range), label, tip);
+        DynamicsParameterViewModel Expander(DynamicsRange range, string label, string tip)
+            => new(this, range, UnitDynamics.ExpanderControl(range), label, tip);
         if (IsCompressor)
         {
-            Threshold = new(this, MicCompressor.ThresholdRange, Localizer.Text("DynamicsThreshold"), Localizer.Text("CompressorThresholdTip"));
-            Makeup = new(this, MicCompressor.MakeupRange, Localizer.Text("DynamicsMakeup"), Localizer.Text("DynamicsMakeupTip"));
+            Threshold = Compressor(MicCompressor.ThresholdRange, Localizer.Text("DynamicsThreshold"), Localizer.Text("CompressorThresholdTip"));
+            Makeup = Compressor(MicCompressor.MakeupRange, Localizer.Text("DynamicsMakeup"), Localizer.Text("DynamicsMakeupTip"));
             Advanced =
             [
-                new(this, MicCompressor.RatioRange, Localizer.Text("DynamicsRatio"), Localizer.Text("CompressorRatioTip")),
-                new(this, MicCompressor.AttackRange, Localizer.Text("DynamicsAttack"), Localizer.Text("CompressorAttackTip")),
-                new(this, MicCompressor.ReleaseRange, Localizer.Text("DynamicsRelease"), Localizer.Text("CompressorReleaseTip")),
-                new(this, MicCompressor.KneeRange, Localizer.Text("DynamicsKnee"), Localizer.Text("DynamicsKneeTip")),
+                Compressor(MicCompressor.RatioRange, Localizer.Text("DynamicsRatio"), Localizer.Text("CompressorRatioTip")),
+                Compressor(MicCompressor.AttackRange, Localizer.Text("DynamicsAttack"), Localizer.Text("CompressorAttackTip")),
+                Compressor(MicCompressor.ReleaseRange, Localizer.Text("DynamicsRelease"), Localizer.Text("CompressorReleaseTip")),
+                Compressor(MicCompressor.KneeRange, Localizer.Text("DynamicsKnee"), Localizer.Text("DynamicsKneeTip")),
             ];
         }
         else
         {
-            Threshold = new(this, MicExpander.ThresholdRange, Localizer.Text("DynamicsThreshold"), Localizer.Text("ExpanderThresholdTip"));
+            Threshold = Expander(MicExpander.ThresholdRange, Localizer.Text("DynamicsThreshold"), Localizer.Text("ExpanderThresholdTip"));
             Advanced =
             [
-                new(this, MicExpander.RatioRange, Localizer.Text("DynamicsRatio"), Localizer.Text("ExpanderRatioTip")),
-                new(this, MicExpander.RangeRange, Localizer.Text("DynamicsRange"), Localizer.Text("DynamicsRangeTip")),
-                new(this, MicExpander.AttackRange, Localizer.Text("DynamicsAttack"), Localizer.Text("ExpanderAttackTip")),
-                new(this, MicExpander.HoldRange, Localizer.Text("DynamicsHold"), Localizer.Text("DynamicsHoldTip")),
-                new(this, MicExpander.ReleaseRange, Localizer.Text("DynamicsRelease"), Localizer.Text("ExpanderReleaseTip")),
+                Expander(MicExpander.RatioRange, Localizer.Text("DynamicsRatio"), Localizer.Text("ExpanderRatioTip")),
+                Expander(MicExpander.RangeRange, Localizer.Text("DynamicsRange"), Localizer.Text("DynamicsRangeTip")),
+                Expander(MicExpander.AttackRange, Localizer.Text("DynamicsAttack"), Localizer.Text("ExpanderAttackTip")),
+                Expander(MicExpander.HoldRange, Localizer.Text("DynamicsHold"), Localizer.Text("DynamicsHoldTip")),
+                Expander(MicExpander.ReleaseRange, Localizer.Text("DynamicsRelease"), Localizer.Text("ExpanderReleaseTip")),
             ];
         }
     }
@@ -231,11 +263,115 @@ public sealed class MicDynamicsViewModel : ViewModelBase
     public string Title => IsCompressor ? Localizer.Format("CompressorWindowTitle", _channelName)
         : Localizer.Format("ExpanderWindowTitle", _channelName);
 
-    /// <summary>Under the heading: the microphone, and that this runs on the computer, not on the unit.</summary>
-    public string Subtitle => Localizer.Format("DynamicsSubtitle", _channelName);
+    /// <summary>Under the heading: the microphone, and where the processor runs.</summary>
+    public string Subtitle => OnDevice ? Localizer.Format("DynamicsSubtitleDevice", _channelName, UnitName)
+        : Localizer.Format("DynamicsSubtitle", _channelName);
 
-    /// <summary>The window's note on how it differs from the unit's own switch.</summary>
-    public string Note => IsCompressor ? Localizer.Text("CompressorNote") : Localizer.Text("ExpanderNote");
+    /// <summary>The window's note: where the processor sits and how it relates to the unit.</summary>
+    public string Note => OnDevice
+        ? IsCompressor ? Localizer.Format("CompressorNoteDevice", UnitName) : Localizer.Format("ExpanderNoteDevice", UnitName)
+        : IsCompressor ? Localizer.Text("CompressorNote") : Localizer.Text("ExpanderNote");
+
+    // --- where it runs ---
+
+    private string? _backend, _deviceName, _deviceFirmware, _deviceReason, _deviceNote, _minimumFirmware;
+    private string _processing = UnitDynamics.Device;
+    private bool _processingReported, _hasDevice, _deviceReady;
+    private string? _awaitingProcessing;
+    private long _awaitingProcessingSince = long.MinValue;
+
+    /// <summary>Which side runs the processor: <c>device</c> on the unit, <c>software</c>, or null while neither does.</summary>
+    public string? Backend => _backend;
+
+    /// <summary>The unit's own processor runs it, on or off: its window shows the unit's limits and no stage levels.</summary>
+    public bool OnDevice => _backend == UnitDynamics.Device;
+
+    /// <summary>The unit the channel carries, by its model name; "the interface" when the daemon names none.</summary>
+    public string UnitName => _deviceName ?? Localizer.Text("EqTheInterface");
+
+    /// <summary>The channel's choice for its compressor and expander: <c>device</c> or <c>software</c>.</summary>
+    public string Processing => _processing;
+
+    /// <summary>
+    /// The window offers the choice: the channel carries a unit whose model
+    /// runs a compressor and an expander, and the daemon reports the choice.
+    /// The unit may not be ready; the choice is kept until it is.
+    /// </summary>
+    public bool HasProcessingChoice => _hasDevice && _processingReported;
+
+    /// <summary>The "On the unit" side is lit: the unit is chosen and can take them.</summary>
+    public bool ProcessOnDevice => _processing == UnitDynamics.Device && _deviceReady;
+
+    /// <summary>The "In software" side is lit: by choice, or because the unit cannot take them.</summary>
+    public bool ProcessInSoftware => _processing == UnitDynamics.Software || !_deviceReady;
+
+    /// <summary>The "On the unit" side can be pressed.</summary>
+    public bool CanProcessOnDevice => _deviceReady;
+
+    /// <summary>The "On the unit" side's tooltip: the unit named, or why it cannot take them.</summary>
+    public string ProcessOnDeviceTip => (_deviceReady ? null : DeviceNote) ?? Localizer.Format("DynamicsProcessingDeviceTip", UnitName);
+
+    /// <summary>
+    /// A side of the switch was pressed: <c>device</c> or <c>software</c>.
+    /// The side already chosen sends nothing and stays lit.
+    /// </summary>
+    public void ChooseProcessing(string value)
+    {
+        if (Detached) return;
+        if (!UnitDynamics.IsValid(value) || value == _processing || !HasProcessingChoice || value == UnitDynamics.Device && !_deviceReady)
+        {
+            Raise(nameof(ProcessOnDevice));
+            Raise(nameof(ProcessInSoftware));
+            return;
+        }
+        _processing = value;
+        _awaitingProcessing = value;
+        _awaitingProcessingSince = _time.GetTimestamp();
+        _ = Commands.SetDynamicsProcessingAsync(Channel, value);
+        RaisePlace();
+    }
+
+    /// <summary>
+    /// Why a unit the channel carries does not run the processor while its
+    /// model can: older firmware, settings it cannot read or a write it did
+    /// not keep. Null while it runs them, while software runs them by choice
+    /// (the switch shows that), or when the channel carries no such unit.
+    /// </summary>
+    public string? DeviceNote
+    {
+        get
+        {
+            if (!_hasDevice || OnDevice || _deviceReady) return null;
+            return _deviceReason switch
+            {
+                "firmwareOld" => Localizer.Format("DynamicsDeviceFirmwareOld", UnitName, _deviceFirmware ?? "?", _minimumFirmware ?? "?"),
+                "firmwareUnknown" => Localizer.Format("DynamicsDeviceFirmwareUnknown", UnitName, _minimumFirmware ?? "?"),
+                "unsupportedBlock" => Localizer.Format("DynamicsDeviceUnsupported", UnitName),
+                "failed" => Localizer.Format("DynamicsDeviceFailed", UnitName),
+                _ => _deviceNote,
+            };
+        }
+    }
+
+    public bool HasDeviceNote => DeviceNote is not null;
+
+    /// <summary>The input and gain reduction meters show: software runs it. The unit reports neither.</summary>
+    public bool ShowsStageMeters => !OnDevice;
+
+    private void RaisePlace()
+    {
+        foreach (string name in new[]
+        {
+            nameof(Backend), nameof(OnDevice), nameof(UnitName), nameof(Processing), nameof(HasProcessingChoice), nameof(ProcessOnDevice),
+            nameof(ProcessInSoftware), nameof(CanProcessOnDevice), nameof(ProcessOnDeviceTip), nameof(DeviceNote), nameof(HasDeviceNote),
+            nameof(ShowsStageMeters), nameof(Subtitle), nameof(Note), nameof(FloorDb),
+        })
+            Raise(name);
+        Threshold.RangeChanged();
+        Makeup?.RangeChanged();
+        foreach (DynamicsParameterViewModel parameter in Advanced) parameter.RangeChanged();
+        RaiseStatus();
+    }
 
     /// <summary>The switch's accessible name, with the processor and the channel in it.</summary>
     public string SwitchName => Localizer.Format("DynamicsSwitchName", Name, _channelName);
@@ -288,6 +424,7 @@ public sealed class MicDynamicsViewModel : ViewModelBase
         {
             if (_enabled && _error is { Length: > 0 } error) return error;
             if (!_available) return Localizer.Text("DynamicsNoHost");
+            if (OnDevice) return Localizer.Format("DynamicsUnitLevels", UnitName);
             return Source switch
             {
                 DynamicsLevelSource.Raw => Localizer.Text("DynamicsRawInput"),
@@ -331,7 +468,8 @@ public sealed class MicDynamicsViewModel : ViewModelBase
 
     /// <summary>The input on the meter's 0 to 1 scale, from <see cref="FloorDb"/> to 0 dBFS.</summary>
     public double InputLevel => Scale(_inputDb);
-    public double OutputLevel => Source == DynamicsLevelSource.Raw ? 0 : Scale(_outputDb);
+    /// <summary>The output on the same scale; nothing while the raw microphone stands in for a stage that does not run.</summary>
+    public double OutputLevel => Source == DynamicsLevelSource.Raw && !OnDevice ? 0 : Scale(_outputDb);
 
     /// <summary>
     /// The gain reduction on the meter's 0 to 1 scale: 30 dB fills the
@@ -342,9 +480,14 @@ public sealed class MicDynamicsViewModel : ViewModelBase
 
     private double ReductionScale => IsCompressor ? 30 : Math.Max(Advanced[1].Value, 6);
 
-    public string InputText => LevelText(_inputDb);
-    /// <summary>The output, or a dash while the levels come from before the stage, which has no output to show.</summary>
-    public string OutputText => Source == DynamicsLevelSource.Raw ? Localizer.Text("DynamicsNoReading") : LevelText(_outputDb);
+    /// <summary>The input, or a dash while the unit runs the processor, since it reports none.</summary>
+    public string InputText => OnDevice ? Localizer.Text("DynamicsNoReading") : LevelText(_inputDb);
+    /// <summary>
+    /// The output, or a dash while the levels come from before a stage that
+    /// does not run. While the unit runs the processor the output is the
+    /// microphone as it leaves the unit.
+    /// </summary>
+    public string OutputText => Source == DynamicsLevelSource.Raw && !OnDevice ? Localizer.Text("DynamicsNoReading") : LevelText(_outputDb);
     public string ReductionText => DynamicsParameterViewModel.Format(MicCompressor.MakeupRange, Math.Round(_reductionDb, 0) + 0);
 
     public string InputName => Localizer.Format("DynamicsInputName", InputText);
@@ -360,7 +503,8 @@ public sealed class MicDynamicsViewModel : ViewModelBase
     /// <summary>Take this processor's <c>[input, reduction, output]</c> from a meter push.</summary>
     internal void ApplyLevels(JsonArray levels)
     {
-        if (Detached || levels.Count < 3) return;
+        // The unit runs it: a stage that runs for something else has this processor off and nothing to report.
+        if (Detached || OnDevice || levels.Count < 3) return;
         double Read(int i) => levels[i] is JsonValue v && v.TryGetValue(out double d) && double.IsFinite(d) ? d : double.NaN;
         double input = Read(0), reduction = Read(1), output = Read(2);
         if (double.IsNaN(input) || double.IsNaN(reduction) || double.IsNaN(output)) return;
@@ -381,7 +525,10 @@ public sealed class MicDynamicsViewModel : ViewModelBase
     /// on the meters' 0 to 1 scale (-60 to 0 dBFS), while the stage does not
     /// run: the input and the history show the raw microphone, the gain
     /// reduction stays at 0 and the output shows a dash. The stage's own
-    /// levels win while they come.
+    /// levels win while they come. While the unit runs the processor the
+    /// same meter reads the microphone as it leaves the unit, after the
+    /// unit's compressor and expander: it is the output, and the history
+    /// draws it; the unit reports no input or gain reduction.
     /// </summary>
     internal void ApplyInputLevel(JsonArray level)
     {
@@ -394,10 +541,11 @@ public sealed class MicDynamicsViewModel : ViewModelBase
         if (was == DynamicsLevelSource.None && _levelsAt != long.MinValue) History.Clear();
         _levelsAt = long.MinValue;
         _rawAt = _time.GetTimestamp();
-        _inputDb = peak <= 0 ? -120 : Math.Clamp(peak, 0, 1) * 60 - 60;
+        double db = peak <= 0 ? -120 : Math.Clamp(peak, 0, 1) * 60 - 60;
+        _inputDb = OnDevice ? -120 : db;
         _reductionDb = 0;
-        _outputDb = -120;
-        History.Add(Math.Max(_inputDb, FloorDb));
+        _outputDb = OnDevice ? db : -120;
+        History.Add(Math.Max(db, FloorDb));
         RaiseLevels();
         if (was != DynamicsLevelSource.Raw) RaiseStatus();
     }
@@ -422,6 +570,11 @@ public sealed class MicDynamicsViewModel : ViewModelBase
     internal async Task KeepLevelsAsync()
     {
         if (Detached) return;
+        if (OnDevice)
+        {
+            await Commands.WatchInputMeterAsync(Channel);
+            return;
+        }
         await Commands.WatchDynamicsAsync(Channel);
         if (!Live(_levelsAt)) await Commands.WatchInputMeterAsync(Channel);
     }
@@ -455,11 +608,52 @@ public sealed class MicDynamicsViewModel : ViewModelBase
             _enabled = enabled;
             Raise(nameof(Enabled));
         }
+        ApplyPlace(s);
         Threshold.Apply(s["threshold"]);
         Makeup?.Apply(s["makeup"]);
         foreach (DynamicsParameterViewModel parameter in Advanced) parameter.Apply(s[parameter.Field]);
         Raise(nameof(Available));
         RaiseStatus();
+    }
+
+    /// <summary>
+    /// Where it runs, from a state push: the backend, the choice (a press a
+    /// moment ago wins over a report that may precede it) and the unit. A
+    /// move between the unit and software starts the levels again, since the
+    /// two read at different points.
+    /// </summary>
+    private void ApplyPlace(JsonObject s)
+    {
+        bool wasOnDevice = OnDevice;
+        _backend = s["backend"]?.GetValue<string>();
+        string? processing = s["processing"]?.GetValue<string>();
+        _processingReported = UnitDynamics.IsValid(processing);
+        processing = _processingReported ? processing! : UnitDynamics.Device;
+        if (_awaitingProcessing is { } chosen && _awaitingProcessingSince != long.MinValue
+            && _time.GetElapsedTime(_awaitingProcessingSince) < EchoWait && processing != chosen)
+            _processing = chosen;
+        else
+        {
+            _awaitingProcessing = null;
+            _processing = processing;
+        }
+        JsonObject? device = s["device"] as JsonObject;
+        _hasDevice = device is not null;
+        _deviceReady = device?["ready"]?.GetValue<bool>() ?? false;
+        _deviceName = device?["name"]?.GetValue<string>();
+        _deviceFirmware = device?["firmware"]?.GetValue<string>();
+        _deviceReason = device?["reason"]?.GetValue<string>();
+        _deviceNote = device?["note"]?.GetValue<string>();
+        _minimumFirmware = device?["minimumFirmware"]?.GetValue<string>();
+        if (wasOnDevice != OnDevice)
+        {
+            _levelsAt = _rawAt = long.MinValue;
+            _inputDb = _outputDb = -120;
+            _reductionDb = 0;
+            History.Clear();
+            RaiseLevels();
+        }
+        RaisePlace();
     }
 
     private void RaiseStatus()
@@ -521,12 +715,24 @@ public sealed class ChannelDynamicsViewModel : ViewModelBase
     public bool IsLit => Expander.IsLit || Compressor.IsLit;
     public bool IsFaulty => Expander.IsFaulty || Compressor.IsFaulty;
 
+    /// <summary>The flyout's heading: where the two run.</summary>
+    public string Heading => Compressor.OnDevice ? Localizer.Format("DynamicsHeadingDevice", Compressor.UnitName) : Localizer.Text("DynamicsHeading");
+
+    /// <summary>The flyout's hint: what the two do, and where.</summary>
+    public string Hint => Compressor.OnDevice ? Localizer.Format("DynamicsHintDevice", Compressor.UnitName) : Localizer.Text("DynamicsHint");
+
     /// <summary>The Dynamics button's name for a screen reader: whose, and whether something in it is on.</summary>
     public string ButtonName => IsFaulty ? Localizer.Format("DynamicsButtonNameUnavailable", _channelName)
         : IsLit ? Localizer.Format("DynamicsButtonNameOn", _channelName) : Localizer.Format("DynamicsButtonNameOff", _channelName);
 
     private void OnPartChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName is nameof(MicDynamicsViewModel.OnDevice) or nameof(MicDynamicsViewModel.UnitName))
+        {
+            Raise(nameof(Heading));
+            Raise(nameof(Hint));
+            return;
+        }
         if (e.PropertyName is not (null or nameof(MicDynamicsViewModel.IsLit) or nameof(MicDynamicsViewModel.IsFaulty))) return;
         Raise(nameof(IsLit));
         Raise(nameof(IsFaulty));

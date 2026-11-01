@@ -36,6 +36,14 @@ public interface IAudioDevice : IDisposable
     /// </summary>
     DeviceEqSupport? EqSupport => null;
 
+    /// <summary>
+    /// Whether this unit runs the microphone compressor and expander on its
+    /// own DSP for OpenXLR, by the same gate as <see cref="EqSupport"/> and
+    /// its compressor and expander fields. Null on a model without them.
+    /// <see cref="DeviceCapabilities.HardwareDynamics"/> is its <c>Ready</c>.
+    /// </summary>
+    DeviceEqSupport? DynamicsSupport => null;
+
     void Connect();
     void Disconnect();
 
@@ -96,6 +104,22 @@ public interface IAudioDevice : IDisposable
     /// where the unit does not run the EQ or nothing has been read yet.
     /// </summary>
     DeviceEq? ReadEq(int input) => null;
+
+    /// <summary>
+    /// Write one input's compressor and expander (1 or 2) through a read of
+    /// the settings block, an edit of the fields they own and a write of the
+    /// whole block. A value with no settings writes the two switches alone.
+    /// False when the unit already held it and nothing was written.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The unit does not run them, or a transfer failed.</exception>
+    bool SetDynamics(int input, DeviceDynamics dynamics) => throw new InvalidOperationException("this unit does not run a compressor or an expander");
+
+    /// <summary>
+    /// One input's compressor and expander as the last poll read them, raw,
+    /// without a transfer; null where the unit does not run them or nothing
+    /// has been read yet.
+    /// </summary>
+    DeviceDynamics? ReadDynamics(int input) => null;
 
     // Ducking on the unit's own DSP (the Wave XLR Pro). A unit whose
     // capabilities report Ducking overrides both.
@@ -231,6 +255,16 @@ public sealed record DeviceCapabilities
     /// microphone's EQ runs in software.
     /// </summary>
     public bool HardwareEq { get; init; }
+
+    /// <summary>
+    /// The unit's DSP runs the microphone compressor and expander and the
+    /// driver can write their settings: a unit whose
+    /// <see cref="HardwareEq"/> is true and whose compressor and expander
+    /// fields hold values the unit takes (<see cref="WaveFxDynamics"/>).
+    /// Verified on the Wave:3 MK.2; the Wave XLR MK.2, the XLR Dock MK.2 and
+    /// the Wave XLR Pro hold the same fields and are driven the same way.
+    /// </summary>
+    public bool HardwareDynamics { get; init; }
 
     /// <summary>
     /// The unit ducks its own outputs while the key input is loud and the

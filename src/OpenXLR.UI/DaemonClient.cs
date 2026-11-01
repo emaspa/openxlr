@@ -552,6 +552,10 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
     public Task WatchDynamicsAsync(string channel)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "watchDynamics", ["channel"] = channel }, reportErrors: false);
 
+    /// <summary>Where a microphone's compressor and expander run: <c>device</c> on the unit's own processor or <c>software</c>.</summary>
+    public Task SetDynamicsProcessingAsync(string channel, string value)
+        => SendAsync(new Dictionary<string, object> { ["cmd"] = "setDynamicsProcessing", ["channel"] = channel, ["value"] = value });
+
     /// <summary>Part of a microphone's voice changer: the fields given change, the others keep their values.</summary>
     public Task SetVoiceChangerAsync(string channel, bool? enabled = null, string? voice = null, double? pitch = null, double? formant = null)
     {

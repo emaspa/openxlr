@@ -5,15 +5,17 @@ namespace OpenXLR.Core.Mixing;
 
 /// <summary>
 /// The compressor and the expander on the microphones that carry the EQ:
-/// XLR 1, XLR 2 and every capture input on one mono port. Both run on this
-/// computer in the same native stage as noise removal, the software EQ and
-/// the voice changer, in this order:
+/// XLR 1, XLR 2 and every capture input on one mono port. On XLR 1 and
+/// XLR 2 they run on the unit when it can run them (see the rule in
+/// MicDynamicsDevice.cs); otherwise on this computer in the same native
+/// stage as noise removal, the software EQ and the voice changer, in this
+/// order:
 ///
 ///   source -> OpenXLR_eq_&lt;id&gt;_&lt;gen&gt; (noise removal, expander, EQ, compressor, voice) -> chain or channel
 ///
-/// They are not the unit's own Compressor and Expander switches, which the
-/// device state carries; the two can run together and then stack. Every
-/// change goes to a running stage live. A client that shows their levels
+/// On a unit that runs them they are the unit's own Compressor and Expander
+/// switches and settings, so the two never stack. Every change goes to a
+/// running stage live, or to the unit. A client that shows their levels
 /// asks for them with <see cref="WatchDynamics"/> and keeps asking; while it
 /// does and the stage runs, the levels go out with the other meters as
 /// <c>exp:</c> and <c>comp:</c> and the channel.
@@ -54,11 +56,11 @@ public sealed partial class Mixer
     private MicExpander ExpanderLocked(string channel) => _expander.GetValueOrDefault(channel) ?? MicExpander.Default;
 
     /// <summary>
-    /// The stage is wanted for the compressor or the expander: one is on. A
-    /// client showing their levels does not start it, since a stage in the
-    /// route takes the Pro's direct microphone path off.
+    /// The stage is wanted for the compressor or the expander: one is on and
+    /// software runs it. A client showing their levels does not start it,
+    /// since a stage in the route takes the Pro's direct microphone path off.
     /// </summary>
-    private bool DynamicsWantedLocked(string channel) => CompressorLocked(channel).Enabled || ExpanderLocked(channel).Enabled;
+    private bool DynamicsWantedLocked(string channel) => SoftwareCompressorLocked(channel).Enabled || SoftwareExpanderLocked(channel).Enabled;
 
     /// <summary>Change part of a microphone's compressor. Turning it on clears a stage the restart policy gave up on.</summary>
     public void SetCompressor(string channel, MicCompressorChange change)
@@ -71,9 +73,13 @@ public sealed partial class Mixer
             MicCompressor was = CompressorLocked(channel);
             MicCompressor next = change.ApplyTo(was);
             if (MicCompressor.Check(next) is string problem) throw new ArgumentException($"setCompressor: {problem}");
-            if (next.Enabled && !was.Enabled) _restarts.Forget(EqKey(channel));
+            if (next.Enabled && !was.Enabled)
+            {
+                _restarts.Forget(EqKey(channel));
+                ForgetDeviceDynamicsFailureLocked(channel);
+            }
             _compressor[channel] = MicCompressor.Snap(next);
-            ApplySoftwareEqLocked(channel);
+            ApplyEqLocked(channel);
         }
     }
 
@@ -88,9 +94,13 @@ public sealed partial class Mixer
             MicExpander was = ExpanderLocked(channel);
             MicExpander next = change.ApplyTo(was);
             if (MicExpander.Check(next) is string problem) throw new ArgumentException($"setExpander: {problem}");
-            if (next.Enabled && !was.Enabled) _restarts.Forget(EqKey(channel));
+            if (next.Enabled && !was.Enabled)
+            {
+                _restarts.Forget(EqKey(channel));
+                ForgetDeviceDynamicsFailureLocked(channel);
+            }
             _expander[channel] = MicExpander.Snap(next);
-            ApplySoftwareEqLocked(channel);
+            ApplyEqLocked(channel);
         }
     }
 
@@ -146,25 +156,38 @@ public sealed partial class Mixer
     private Dictionary<string, MicExpander> SceneExpanderLocked()
         => _config.Channels.Where(CarriesEq).ToDictionary(c => c.Id, c => ExpanderLocked(c.Id), StringComparer.Ordinal);
 
-    /// <summary>A microphone's compressor for the state: the setting, and why it does not run as asked.</summary>
-    private MicCompressorState CompressorStateLocked(string channel)
+    /// <summary>
+    /// A microphone's compressor for the state: the setting, why it does not
+    /// run as asked, and where it runs. While the unit runs it, the numbers
+    /// are the ones the unit holds, and it needs no helper.
+    /// <paramref name="carried"/> is <see cref="UnitInputsLocked"/>.
+    /// </summary>
+    private MicCompressorState CompressorStateLocked(string channel, IReadOnlyDictionary<string, UnitInputStatus> carried)
     {
-        MicCompressor c = CompressorLocked(channel);
+        bool onUnit = _dynamicsDevices.ContainsKey(channel);
+        MicCompressor c = onUnit ? UnitDynamics.Compressor(CompressorLocked(channel)) : CompressorLocked(channel);
         return new MicCompressorState(c.Enabled, c.Threshold, c.Ratio, c.Attack, c.Release, c.Knee, c.Makeup)
         {
-            Available = DynamicsAvailableLocked(channel),
-            Error = c.Enabled ? DynamicsErrorLocked(channel) : null,
+            Available = onUnit || DynamicsAvailableLocked(channel),
+            Error = c.Enabled && !onUnit ? DynamicsErrorLocked(channel) : null,
+            Backend = DynamicsBackendLocked(channel),
+            Processing = DynamicsProcessingLocked(channel),
+            Device = DynamicsDeviceStateLocked(channel, carried),
         };
     }
 
-    /// <summary>A microphone's expander for the state: the setting, and why it does not run as asked.</summary>
-    private MicExpanderState ExpanderStateLocked(string channel)
+    /// <summary>A microphone's expander for the state, by the rule of <see cref="CompressorStateLocked"/>.</summary>
+    private MicExpanderState ExpanderStateLocked(string channel, IReadOnlyDictionary<string, UnitInputStatus> carried)
     {
-        MicExpander e = ExpanderLocked(channel);
+        bool onUnit = _dynamicsDevices.ContainsKey(channel);
+        MicExpander e = onUnit ? UnitDynamics.Expander(ExpanderLocked(channel)) : ExpanderLocked(channel);
         return new MicExpanderState(e.Enabled, e.Threshold, e.Ratio, e.Range, e.Attack, e.Release, e.Hold)
         {
-            Available = DynamicsAvailableLocked(channel),
-            Error = e.Enabled ? DynamicsErrorLocked(channel) : null,
+            Available = onUnit || DynamicsAvailableLocked(channel),
+            Error = e.Enabled && !onUnit ? DynamicsErrorLocked(channel) : null,
+            Backend = DynamicsBackendLocked(channel),
+            Processing = DynamicsProcessingLocked(channel),
+            Device = DynamicsDeviceStateLocked(channel, carried),
         };
     }
 

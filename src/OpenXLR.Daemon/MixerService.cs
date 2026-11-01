@@ -1298,6 +1298,10 @@ public sealed class MixerService : IHostedService, IDisposable
                         new MicExpanderChange(cmd.Enabled, cmd.Threshold, cmd.Ratio, cmd.Range, cmd.Attack, cmd.Release, cmd.Hold));
                     SyncOutputSelectors();   // software processing moves the Pro's mic between its hardware path and the send
                     break;
+                case "setDynamicsProcessing":
+                    _mixer.SetDynamicsProcessing(cmd.Channel!, cmd.Value.GetString()!);   // checked by CommandValidation
+                    SyncOutputSelectors();   // software processing moves the Pro's mic between its hardware path and the send
+                    break;
                 case "setDucking":
                 case "setDuckingProcessing":
                     // Saved in mixer.json before it applies; a failed save

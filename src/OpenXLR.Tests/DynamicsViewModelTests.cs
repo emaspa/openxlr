@@ -38,6 +38,14 @@ public sealed class DynamicsViewModelTests
             Interlocked.Increment(ref InputWatches);
             return Task.CompletedTask;
         }
+
+        public readonly ConcurrentQueue<(string Channel, string Value)> Processing = new();
+
+        public Task SetDynamicsProcessingAsync(string channel, string value)
+        {
+            Processing.Enqueue((channel, value));
+            return Task.CompletedTask;
+        }
     }
 
     private static JsonNode Compressor(bool enabled = false, double threshold = -18, bool available = true, string? error = null)
@@ -227,5 +235,127 @@ public sealed class DynamicsViewModelTests
         Assert.Equal([-30d], Enumerable.Range(0, expander.History.Count).Select(i => expander.History[i]));
         _ = expander.KeepLevelsAsync();
         Assert.Equal((3, 2), (sent.Watches, sent.InputWatches));
+    });
+
+    /// <summary>A processor's state with where it runs: the backend, the choice and the unit the channel carries.</summary>
+    private static JsonNode OnUnit(JsonNode processor, string? backend, string processing = "device", bool ready = true,
+        string? reason = null, string name = "Wave:3 MK.2")
+    {
+        JsonNode copy = JsonNode.Parse(processor.ToJsonString())!;
+        copy["backend"] = backend;
+        copy["processing"] = processing;
+        copy["device"] = new JsonObject
+        {
+            ["unit"] = "0fd9:00ca@1", ["input"] = 1, ["name"] = name, ["firmware"] = ready ? "1.0.1" : "0.2.2", ["ready"] = ready,
+            ["reason"] = reason, ["note"] = null, ["minimumFirmware"] = "0.2.3",
+        };
+        return copy;
+    }
+
+    [Fact]
+    public void OnTheUnitTheControlsKeepToItsLimitsAndTheSwitchSendsTheChoice() => TestUi.Run(() =>
+    {
+        var time = new ManualTime();
+        var sent = new Recorder();
+        var pair = new ChannelDynamicsViewModel(sent, "xlr1", "XLR 1", time);
+        MicDynamicsViewModel compressor = pair.Compressor, expander = pair.Expander;
+        // A channel on no such unit offers no choice and keeps the software ranges.
+        pair.Apply(Compressor(), Expander());
+        Assert.False(compressor.HasProcessingChoice);
+        Assert.False(compressor.OnDevice);
+        Assert.Equal((-60, 0, 1), (compressor.Threshold.Minimum, compressor.Threshold.Maximum, compressor.Threshold.Step));
+        Assert.Equal(Localizer.Text("DynamicsHeading"), pair.Heading);
+
+        // The unit runs them: its limits and steps, no knee and no hold, its own words.
+        pair.Apply(OnUnit(Compressor(enabled: true, threshold: -12), "device"), OnUnit(Expander(), "device"));
+        Assert.True(compressor.OnDevice);
+        Assert.True(compressor.HasProcessingChoice);
+        Assert.True(compressor.ProcessOnDevice);
+        Assert.False(compressor.ProcessInSoftware);
+        Assert.True(compressor.IsLit);
+        Assert.Equal((-60, -1, 1), (compressor.Threshold.Minimum, compressor.Threshold.Maximum, compressor.Threshold.Step));
+        Assert.Equal((1, 20, 1), (compressor.Advanced[0].Minimum, compressor.Advanced[0].Maximum, compressor.Advanced[0].Step));
+        Assert.Equal((1, 200), (compressor.Advanced[1].Minimum, compressor.Advanced[1].Maximum));     // attack: the software's 200 ms within the unit's 300
+        Assert.Equal((50, 1000), (compressor.Advanced[2].Minimum, compressor.Advanced[2].Maximum));   // release
+        Assert.Equal((0, 20, 1), (compressor.Makeup!.Minimum, compressor.Makeup.Maximum, compressor.Makeup.Step));
+        Assert.Equal([true, true, true, false], compressor.Advanced.Select(p => p.Shown));            // no knee
+        Assert.Equal((1, 3, 0.1), (expander.Advanced[0].Minimum, expander.Advanced[0].Maximum, expander.Advanced[0].Step));
+        Assert.Equal((0, 60), (expander.Advanced[1].Minimum, expander.Advanced[1].Maximum));          // range
+        Assert.Equal([true, true, true, false, true], expander.Advanced.Select(p => p.Shown));       // no hold
+        Assert.Equal(-60, expander.FloorDb);
+        Assert.Equal(Localizer.Format("DynamicsSubtitleDevice", "XLR 1", "Wave:3 MK.2"), compressor.Subtitle);
+        Assert.Equal(Localizer.Format("CompressorNoteDevice", "Wave:3 MK.2"), compressor.Note);
+        Assert.Equal(Localizer.Format("ExpanderNoteDevice", "Wave:3 MK.2"), expander.Note);
+        Assert.Equal(Localizer.Format("DynamicsHeadingDevice", "Wave:3 MK.2"), pair.Heading);
+        Assert.Equal(Localizer.Format("DynamicsHintDevice", "Wave:3 MK.2"), pair.Hint);
+        Assert.Equal(Localizer.Format("DynamicsUnitLevels", "Wave:3 MK.2"), compressor.Status);
+        Assert.False(compressor.ShowsStageMeters);
+        Assert.Null(compressor.DeviceNote);
+        // A drag past the unit's limit stops at it, on the unit's step.
+        compressor.Advanced[0].Value = 3.4;
+        Assert.Equal(3, compressor.Advanced[0].Value);
+        compressor.Threshold.Value = 0;
+        Assert.Equal(-1, compressor.Threshold.Value);
+
+        // The unit reports no input or reduction: the meter before the chain is
+        // the microphone leaving the unit, so it is the output and the history.
+        _ = compressor.KeepLevelsAsync();
+        Assert.Equal((0, 1), (sent.Watches, sent.InputWatches));
+        compressor.ApplyLevels(new JsonArray(-20.0, 3.0, -23.0));
+        Assert.False(compressor.HasLevels);
+        compressor.ApplyInputLevel(new JsonArray(0.4, 0.5, 0));
+        Assert.Equal(-30, compressor.OutputDb);
+        Assert.Equal(Localizer.Format("DynamicsDecibels", "-30"), compressor.OutputText);
+        Assert.Equal(0.5, compressor.OutputLevel);
+        Assert.Equal(Localizer.Text("DynamicsNoReading"), compressor.InputText);
+        Assert.Equal(0, compressor.ReductionLevel);
+        Assert.Equal([-30d], Enumerable.Range(0, compressor.History.Count).Select(i => compressor.History[i]));
+
+        // The software side sends the choice for the channel; the unit's side, chosen, sends nothing.
+        compressor.ChooseProcessing("device");
+        Assert.Empty(sent.Processing);
+        expander.ChooseProcessing("software");
+        Assert.True(sent.Processing.TryDequeue(out var choice));
+        Assert.Equal(("xlr1", "software"), choice);
+        Assert.True(expander.ProcessInSoftware);
+        // A report from before the press does not undo it.
+        pair.Apply(OnUnit(Compressor(enabled: true), "device"), OnUnit(Expander(), "device"));
+        Assert.True(expander.ProcessInSoftware);
+        time.Advance(MicDynamicsViewModel.EchoWait);
+        pair.Apply(OnUnit(Compressor(enabled: true), "software", "software"), OnUnit(Expander(), "software", "software"));
+        Assert.False(compressor.OnDevice);
+        Assert.True(compressor.ProcessInSoftware);
+        Assert.True(compressor.HasProcessingChoice);
+        Assert.Equal((-60, 0), (compressor.Threshold.Minimum, compressor.Threshold.Maximum));
+        Assert.Equal([true, true, true, true], compressor.Advanced.Select(p => p.Shown));
+        Assert.True(compressor.ShowsStageMeters);
+        Assert.Equal(0, compressor.History.Count);   // the levels start again on the new side
+        Assert.Null(compressor.DeviceNote);           // software by choice: the switch says so
+    });
+
+    [Fact]
+    public void AUnitThatCannotTakeThemSaysWhyAndOffersOnlySoftware() => TestUi.Run(() =>
+    {
+        var sent = new Recorder();
+        var pair = new ChannelDynamicsViewModel(sent, "xlr1", "XLR 1", new ManualTime());
+        MicDynamicsViewModel compressor = pair.Compressor;
+        pair.Apply(OnUnit(Compressor(), null, ready: false, reason: "firmwareOld"), OnUnit(Expander(), null, ready: false, reason: "firmwareOld"));
+        Assert.True(compressor.HasProcessingChoice);
+        Assert.False(compressor.CanProcessOnDevice);
+        Assert.False(compressor.ProcessOnDevice);
+        Assert.True(compressor.ProcessInSoftware);
+        Assert.Equal(Localizer.Format("DynamicsDeviceFirmwareOld", "Wave:3 MK.2", "0.2.2", "0.2.3"), compressor.DeviceNote);
+        Assert.Equal(compressor.DeviceNote, compressor.ProcessOnDeviceTip);
+        compressor.ChooseProcessing("device");
+        Assert.Empty(sent.Processing);
+        pair.Apply(OnUnit(Compressor(), "device", ready: false, reason: "failed"), OnUnit(Expander(), null, ready: false, reason: "failed"));
+        Assert.Equal(Localizer.Format("DynamicsDeviceFailed", "Wave:3 MK.2"), pair.Expander.DeviceNote);
+        pair.Apply(OnUnit(Compressor(), null, ready: false, reason: "unsupportedBlock"), OnUnit(Expander(), null, ready: false, reason: "firmwareUnknown"));
+        Assert.Equal(Localizer.Format("DynamicsDeviceUnsupported", "Wave:3 MK.2"), compressor.DeviceNote);
+        Assert.Equal(Localizer.Format("DynamicsDeviceFirmwareUnknown", "Wave:3 MK.2", "0.2.3"), pair.Expander.DeviceNote);
+        // A ready unit's side names it.
+        var ready = new ChannelDynamicsViewModel(sent, "xlr2", "XLR 2", new ManualTime());
+        ready.Apply(OnUnit(Compressor(), "device"), OnUnit(Expander(), "device"));
+        Assert.Equal(Localizer.Format("DynamicsProcessingDeviceTip", "Wave:3 MK.2"), ready.Compressor.ProcessOnDeviceTip);
     });
 }

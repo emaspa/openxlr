@@ -238,12 +238,23 @@ physical gain dial.
   output meters, the input's last twelve seconds as a graph with a
   draggable threshold, the compressor's make-up gain slider, and the other
   settings behind a settings button. The levels travel only while a window
-  asks for them ([`watchDynamics`](api.md#compressor-and-expander)). They
-  are separate from the fixed Compressor and Expander switches of the Wave
-  XLR Pro, the MK.2 units and the Wave:3, and stack with them when both
-  are on. The terminal mixer and
+  asks for them ([`watchDynamics`](api.md#compressor-and-expander)). The
+  terminal mixer and
   [`setCompressor` and `setExpander`](api.md#compressor-and-expander)
   control them, and they are saved with the mixer and in profiles.
+- Compressor and expander on the unit: on a Wave:3 MK.2, Wave XLR MK.2,
+  XLR Dock MK.2 or Wave XLR Pro whose EQ runs on the unit, XLR 1's and
+  XLR 2's compressor and expander run on the unit's own processor by
+  default, with every setting written to the unit within its own limits
+  (no knee, no hold). Each window has **Where it runs**, **On the unit** or
+  **In software**, one choice for both
+  ([`setDynamicsProcessing`](api.md#where-the-compressor-and-expander-run)).
+  On the unit the window shows the output only, since the unit reports no
+  input or gain reduction. The unit's own Compressor and Expander switches
+  become the microphone's, so the two never stack, and a microphone with
+  no setting of its own takes what the unit holds. Byte layout checked on
+  the Wave:3 MK.2; the other units hold the same fields and are not yet
+  checked by ear.
 - Gain lock: the daemon rejects every gain change while the lock is set,
   from any client, and stores the lock per device in `gainlock.json`.
   Shown only for devices without a physical gain dial, which would
