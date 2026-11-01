@@ -18,6 +18,13 @@ namespace OpenXLR.Core.Devices;
 /// (captures 16 to 20 of 2026-10-21). Block 0x0000 (117 bytes) holds the
 /// firmware version at bytes 5 to 7, read once at connect; the EQ is driven
 /// from 1.0.14.
+///
+/// Each struct also holds the input's compressor and expander settings at
+/// bytes 3 to 17 (XLR 2's at 41 to 55), the layout verified on the Wave:3
+/// MK.2 (<see cref="WaveFxDynamics"/>). The Pro holds the same factory
+/// values there on both inputs, so it is driven the same way, behind the
+/// EQ's gate and only when both inputs' fields decode; that its DSP runs
+/// them from these bytes is inferred and not yet heard.
 /// </summary>
 public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
 {
@@ -34,6 +41,9 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
 
     /// <summary>Whether this unit runs the EQ, decided at connect by its firmware and its block.</summary>
     public DeviceEqSupport? EqSupport { get; private set; }
+
+    /// <summary>Whether this unit runs each input's compressor and expander, decided at connect with the EQ.</summary>
+    public DeviceEqSupport? DynamicsSupport { get; private set; }
 
     /// <summary>Said once at connect when the EQ fields do not decode.</summary>
     public string? ConnectionNote { get; private set; }
@@ -245,6 +255,7 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
     {
         Firmware = null;
         EqSupport = null;
+        DynamicsSupport = null;
         ConnectionNote = null;
         Capabilities = ModelCapabilities;
         _settings = null;
@@ -272,11 +283,17 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
         });
         if (EqSupport.Ready) _settings = block;
         else if (EqSupport.Reason == DeviceEqSupport.UnsupportedBlock) ConnectionNote = WaveFxEq.UnsupportedBlockNote;
-        Capabilities = ModelCapabilities with { HardwareEq = EqSupport.Ready };
+        // Each input's compressor and expander, in the same struct as its EQ.
+        DynamicsSupport = WaveFxDynamics.Gate(Info.Model, EqSupport,
+            () => WaveFxDynamics.Decodes(DynamicsOf(block!, 1)) && WaveFxDynamics.Decodes(DynamicsOf(block!, 2)));
+        Capabilities = ModelCapabilities with { HardwareEq = EqSupport.Ready, HardwareDynamics = DynamicsSupport.Ready };
     }
 
     private static DeviceEq? EqOf(byte[] settings, int input)
         => WaveFxEq.Decode(settings.AsSpan(WaveFxEq.InputBase(input), WaveFxEq.StructLength));
+
+    private static DeviceDynamics? DynamicsOf(byte[] settings, int input)
+        => WaveFxDynamics.Decode(settings.AsSpan(WaveFxEq.InputBase(input), WaveFxEq.StructLength));
 
     /// <summary>
     /// All control transfers go through here. A transfer that never returns
@@ -657,6 +674,39 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
             return input is 1 or 2 && EqSupport?.Ready == true && _settings is { Length: SettingsLen } s ? EqOf(s, input) : null;
     }
 
+    /// <summary>
+    /// Write one input's compressor and expander into its struct, as
+    /// <see cref="SetEq"/> writes its EQ: one read of the settings block and
+    /// one write of the whole block under the lock, no commit, every byte
+    /// they do not own (the other input's struct and the aux tail included)
+    /// as read. False when the unit already held them.
+    /// </summary>
+    public bool SetDynamics(int input, DeviceDynamics dynamics)
+    {
+        if (input is not (1 or 2) || DynamicsSupport?.Ready != true)
+            throw new InvalidOperationException($"{Info.Model}: this unit does not run the compressor and expander on input {input}");
+        lock (_lock)
+        {
+            byte[] b = Read(BlockSettings, SettingsLen);
+            byte[] held = (byte[])b.Clone();
+            WaveFxDynamics.Encode(b.AsSpan(WaveFxEq.InputBase(input), WaveFxEq.StructLength), dynamics);
+            if (b.AsSpan().SequenceEqual(held))
+            {
+                _settings = held;
+                return false;
+            }
+            Write(BlockSettings, b);
+            _settings = b;
+            return true;
+        }
+    }
+
+    public DeviceDynamics? ReadDynamics(int input)
+    {
+        lock (_lock)
+            return input is 1 or 2 && DynamicsSupport?.Ready == true && _settings is { Length: SettingsLen } s ? DynamicsOf(s, input) : null;
+    }
+
     // --- ducking (blocks 0x0008 and 0x0001, see ProDucking) ---
 
     private volatile DuckingReadback? _ducking;
@@ -699,14 +749,21 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
                 blocks[$"0x{block:X4}"] = Convert.ToHexString(read);
                 if (block == BlockSettings)
                     for (int input = 1; input <= 2; input++)
+                    {
                         blocks[$"eq{input}"] = EqOf(read, input) is { } eq
                             ? eq + (WaveFxEq.Decodes(eq) ? "" : " (outside the EQ's ranges)")
                             : "too short to hold the EQ";
+                        blocks[$"dynamics{input}"] = DynamicsOf(read, input) is { } dynamics
+                            ? dynamics + (WaveFxDynamics.Decodes(dynamics) ? "" : " (outside the unit's limits)")
+                            : "too short to hold the compressor and expander";
+                    }
             }
             catch (IOException ex) { blocks[$"0x{block:X4}"] = $"read failed: {ex.Message}"; }
         }
         blocks["firmware"] = Firmware ?? "not read";
         blocks["eqSupport"] = EqSupport is { } support ? support.Ready ? "on the unit" : $"in software: {support.Reason}" : "not decided";
+        blocks["dynamicsSupport"] = DynamicsSupport is { } dynamicsSupport
+            ? dynamicsSupport.Ready ? "on the unit" : $"in software: {dynamicsSupport.Reason}" : "not decided";
         return blocks;
     }
 

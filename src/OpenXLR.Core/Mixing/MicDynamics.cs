@@ -32,8 +32,8 @@ public sealed record DynamicsRange(string Name, double Minimum, double Maximum, 
 /// above which it turns the voice down, the ratio, how fast it reacts and
 /// recovers, the soft knee and the make-up gain after it. It runs in the
 /// native helper's microphone stage after the EQ and before the voice
-/// changer, on XLR 1, XLR 2 and every capture input on one mono port. It is
-/// not the unit's own Compressor switch. Off by default, so an upgrade
+/// changer, on XLR 1, XLR 2 and every capture input on one mono port. It runs
+/// on the unit instead where the unit runs one (UnitDynamics). Off by default, so an upgrade
 /// changes nobody's sound.
 /// </summary>
 public sealed record MicCompressor
@@ -118,8 +118,8 @@ public sealed record MicCompressor
 /// room noise and breaths between words drop away. Attack is how fast it
 /// opens when the voice comes back, hold how long it waits once the voice
 /// stops, release how fast it then closes. It runs in the native helper's
-/// microphone stage after noise removal and before the EQ. It is not the
-/// unit's own Expander switch. Off by default.
+/// microphone stage after noise removal and before the EQ, or on the unit
+/// where the unit runs one (UnitDynamics). Off by default.
 /// </summary>
 public sealed record MicExpander
 {
@@ -264,28 +264,140 @@ public sealed record MicExpanderChange(bool? Enabled = null, double? Threshold =
 
 /// <summary>
 /// A microphone's compressor as clients see it: the setting, whether it can
-/// run at all, and why what was asked for does not run.
+/// run at all, why what was asked for does not run, and where it runs. While
+/// the unit runs it the numbers are the ones the unit holds
+/// (<see cref="UnitDynamics.Compressor"/>).
 /// </summary>
 public sealed record MicCompressorState(bool Enabled, double Threshold, double Ratio, double Attack, double Release,
     double Knee, double Makeup)
 {
-    /// <summary>The native helper is installed, so the compressor can be switched on.</summary>
+    /// <summary>It can be switched on: the unit runs it, or the native helper is installed.</summary>
     public bool Available { get; init; }
 
     /// <summary>Why the setting does not run as asked, or null.</summary>
     public string? Error { get; init; }
+
+    /// <summary><c>device</c> while the unit runs it, on or off; <c>software</c> while a stage runs; null while neither does.</summary>
+    public string? Backend { get; init; }
+
+    /// <summary>The channel's choice for its compressor and expander, <c>device</c> (the default) or <c>software</c>.</summary>
+    public string Processing { get; init; } = UnitDynamics.Device;
+
+    /// <summary>The unit input the channel carries, while that unit's model runs a compressor and an expander; null otherwise.</summary>
+    public MicEqDevice? Device { get; init; }
 }
 
 /// <summary>
 /// A microphone's expander as clients see it: the setting, whether it can run
-/// at all, and why what was asked for does not run.
+/// at all, why what was asked for does not run, and where it runs. While the
+/// unit runs it the numbers are the ones the unit holds
+/// (<see cref="UnitDynamics.Expander"/>).
 /// </summary>
 public sealed record MicExpanderState(bool Enabled, double Threshold, double Ratio, double Range, double Attack,
     double Release, double Hold)
 {
-    /// <summary>The native helper is installed, so the expander can be switched on.</summary>
+    /// <summary>It can be switched on: the unit runs it, or the native helper is installed.</summary>
     public bool Available { get; init; }
 
     /// <summary>Why the setting does not run as asked, or null.</summary>
     public string? Error { get; init; }
+
+    /// <summary><c>device</c> while the unit runs it, on or off; <c>software</c> while a stage runs; null while neither does.</summary>
+    public string? Backend { get; init; }
+
+    /// <summary>The channel's choice for its compressor and expander, <c>device</c> (the default) or <c>software</c>.</summary>
+    public string Processing { get; init; } = UnitDynamics.Device;
+
+    /// <summary>The unit input the channel carries, while that unit's model runs a compressor and an expander; null otherwise.</summary>
+    public MicEqDevice? Device { get; init; }
+}
+
+/// <summary>
+/// The compressor and the expander a unit runs on its own DSP: the Wave:3
+/// MK.2, and by the same settings layout the Wave XLR MK.2, the XLR Dock
+/// MK.2 and each input of the Wave XLR Pro. This is the one table of what
+/// the unit takes: each field's limits and step as the unit holds it, and
+/// the unit's factory value as the default. The device side and the clients
+/// read it from here.
+///
+/// A setting goes to the unit through <see cref="Compressor"/> and
+/// <see cref="Expander"/>: each number is rounded onto the unit's step and
+/// clamped into its limits where the software stage takes a wider range.
+/// The unit has no knee and no hold; those stay with the setting for
+/// software. While the unit runs them the state reports the numbers it holds,
+/// and the UI limits its controls to <see cref="CompressorControl"/> and
+/// <see cref="ExpanderControl"/>.
+/// </summary>
+public static class UnitDynamics
+{
+    /// <summary>The choices of where a microphone's compressor and expander run, as for the EQ.</summary>
+    public const string Device = "device", Software = "software";
+
+    public static bool IsValid(string? value) => value is Device or Software;
+
+    public static readonly DynamicsRange CompressorThreshold = new("threshold", -60, -1, 1, -12, "dB");
+    public static readonly DynamicsRange CompressorRatio = new("ratio", 1, 20, 1, 4, "to 1");
+    public static readonly DynamicsRange CompressorAttack = new("attack", 1, 300, 1, 10, "ms");
+    public static readonly DynamicsRange CompressorRelease = new("release", 50, 1000, 1, 100, "ms");
+    public static readonly DynamicsRange CompressorMakeup = new("makeup", 0, 20, 1, 6, "dB");
+    public static readonly DynamicsRange ExpanderThreshold = new("threshold", -60, -1, 1, -44, "dB");
+    /// <summary>Held in sixteenths, 16 to 48; set in steps of 0.1, each of which has its own sixteenth.</summary>
+    public static readonly DynamicsRange ExpanderRatio = new("ratio", 1, 3, 0.1, 2, "to 1");
+    public static readonly DynamicsRange ExpanderAttack = new("attack", 1, 200, 1, 10, "ms");
+    public static readonly DynamicsRange ExpanderRelease = new("release", 10, 1000, 1, 200, "ms");
+    public static readonly DynamicsRange ExpanderRange = new("range", 0, 60, 1, 24, "dB");
+
+    private static double Hold(DynamicsRange unit, double value) => Math.Clamp(unit.Snap(value), unit.Minimum, unit.Maximum);
+
+    /// <summary>A compressor setting as the unit runs it: each number on the unit's step and in its limits; the switch and the knee as set.</summary>
+    public static MicCompressor Compressor(MicCompressor c) => c with
+    {
+        Threshold = Hold(CompressorThreshold, c.Threshold),
+        Ratio = Hold(CompressorRatio, c.Ratio),
+        Attack = Hold(CompressorAttack, c.Attack),
+        Release = Hold(CompressorRelease, c.Release),
+        Makeup = Hold(CompressorMakeup, c.Makeup),
+    };
+
+    /// <summary>An expander setting as the unit runs it, by the rule of <see cref="Compressor"/>; the hold as set.</summary>
+    public static MicExpander Expander(MicExpander e) => e with
+    {
+        Threshold = Hold(ExpanderThreshold, e.Threshold),
+        Ratio = Hold(ExpanderRatio, e.Ratio),
+        Range = Hold(ExpanderRange, e.Range),
+        Attack = Hold(ExpanderAttack, e.Attack),
+        Release = Hold(ExpanderRelease, e.Release),
+    };
+
+    /// <summary>
+    /// What a compressor field's control offers while the unit runs it: the
+    /// software range narrowed to the unit's limits, on the coarser step.
+    /// Null for the knee, which the unit does not have.
+    /// </summary>
+    public static DynamicsRange? CompressorControl(DynamicsRange software) => software.Name switch
+    {
+        "threshold" => Narrow(software, CompressorThreshold),
+        "ratio" => Narrow(software, CompressorRatio),
+        "attack" => Narrow(software, CompressorAttack),
+        "release" => Narrow(software, CompressorRelease),
+        "makeup" => Narrow(software, CompressorMakeup),
+        _ => null,
+    };
+
+    /// <summary>What an expander field's control offers while the unit runs it; null for the hold.</summary>
+    public static DynamicsRange? ExpanderControl(DynamicsRange software) => software.Name switch
+    {
+        "threshold" => Narrow(software, ExpanderThreshold),
+        "ratio" => Narrow(software, ExpanderRatio),
+        "range" => Narrow(software, ExpanderRange),
+        "attack" => Narrow(software, ExpanderAttack),
+        "release" => Narrow(software, ExpanderRelease),
+        _ => null,
+    };
+
+    private static DynamicsRange Narrow(DynamicsRange software, DynamicsRange unit)
+    {
+        double min = Math.Max(software.Minimum, unit.Minimum), max = Math.Min(software.Maximum, unit.Maximum);
+        return new DynamicsRange(software.Name, min, max, Math.Max(software.Step, unit.Step), Math.Clamp(software.Default, min, max), software.Unit);
+    }
 }

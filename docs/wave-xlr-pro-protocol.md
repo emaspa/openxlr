@@ -772,3 +772,42 @@ all of them as read.
 - Hearing the Line In path on the jacks come and go with byte 12 bit 3.
 - Byte 78, and byte 77 beyond its two level locks. Line In's lock at bit
   3, open until 2026-10-26, is now measured above.
+
+<a name="compressor-and-expander-on-the-unit"></a>
+## 14. Compressor and expander on the unit (2026-11-01)
+
+The 38-byte input struct of block 0x0004 carries the settings of the
+unit's own compressor and expander between the flag byte and the EQ bands.
+The layout is the one the Wave:3 MK.2 (firmware 1.0.1, bank 0x0103) holds,
+where every field was seen written to both ends of its limits and read
+back at once, with no commit, as part of a write of the whole block. The
+Pro holds the same fields at the same offsets in both structs, XLR 1's at
+0 and XLR 2's at 38, with the same factory values (a unit on firmware
+1.0.14 read `d4 20 0a 00 c8 00 18 .. f4 04 0a 00 64 00 06` from byte 3 of
+each struct). The Pro's layout is inferred from those matching fields:
+nobody has yet heard its DSP act on values written there.
+
+| Offset (XLR 1 / XLR 2) | Field | Encoding | Limits |
+|---|---|---|---|
+| 1 / 39, bit 7 (0x80) | compressor on | the switch the `compressor` control sets | |
+| 1 / 39, bit 5 (0x20) | expander on | the switch the `expander` control sets | |
+| 3 / 41 | expander threshold | int8, dB | -60 to -1 |
+| 4 / 42 | expander ratio | uint8, sixteenths (2.0:1 is `20`) | 16 to 48 (1.0 to 3.0) |
+| 5, 6 / 43, 44 | expander attack | uint16 little endian, ms | 1 to 200 |
+| 7, 8 / 45, 46 | expander release | uint16 little endian, ms | 10 to 1000 |
+| 9 / 47 | expander range | uint8, dB, the most it turns down | 0 to 60 |
+| 10 / 48 | voice tune strength | (section 6) | |
+| 11 / 49 | compressor threshold | int8, dB | -60 to -1 |
+| 12 / 50 | compressor ratio | uint8, a whole number | 1 to 20 |
+| 13, 14 / 51, 52 | compressor attack | uint16 little endian, ms | 1 to 300 |
+| 15, 16 / 53, 54 | compressor release | uint16 little endian, ms | 50 to 1000 |
+| 17 / 55 | compressor make-up gain | uint8, dB | 0 to 20 |
+
+The factory values are: compressor -12 dB, 4:1, 10 ms, 100 ms, +6 dB;
+expander -44 dB, 2:1, 10 ms, 200 ms, 24 dB range. The other bits of byte 1
+(mute, phantom power, the low cut, voice tune, and bits 2 and 3, which
+nobody has named; bit 3 reads set on several units) are kept as read.
+
+OpenXLR writes these fields only on a unit whose EQ it drives (section 10)
+and whose fields hold values inside the limits above, through the same
+read-modify-write path and timing as the EQ ([api.md](api.md#where-the-compressor-and-expander-run)).
