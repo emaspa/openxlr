@@ -4112,8 +4112,16 @@ audio, recording samples or starting plugins. The extra reports are:
   drivers and connection speeds. Match bus and device numbers with
   `lsusb.txt` to locate the interface; the tree's indentation shows which
   port or hub it is attached to.
-- `pw-top.txt`: three batches of node statistics, including rate, quantum and
-  error counters.
+- `alsa-pcm.txt`: every sound card and its open devices as the kernel
+  reports them. It has the rate, period and buffer size the audio server
+  opened each device with, how full the buffer is, and for a USB interface
+  the rate it actually runs at (`Momentary freq`). A USB interface whose
+  clock drifts from 48000 Hz shows it here. PipeWire's quantum and driver
+  for each node are in `pw-dump.json`. The archive has no per-node timing
+  or xrun counts: PipeWire reports those only through its profiler, which
+  drops a driver's report above 16 KiB, and OpenXLR's graph of about a
+  hundred nodes on one driver is larger than that, so `pw-top` showed only
+  zeros.
 - `sink-inputs.json` and `source-outputs.json`: current playback and recording
   streams, their formats, volume, mute state and buffering as Pulse reports
   them. The archive masks process identity fields and keeps numeric audio

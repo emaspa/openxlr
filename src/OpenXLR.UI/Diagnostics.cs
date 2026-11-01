@@ -70,7 +70,7 @@ public static class Diagnostics
                 openxlr-daemon journal entries from the current boot or Flatpak logs,
                 native audio-server and session-manager journal entries from the current boot,
                 kernel messages about USB, sound and power management from the current boot,
-                short PipeWire node statistics, application audio metadata,
+                the status of open ALSA devices, application audio metadata,
                 configuration files, plugin names and paths, the plugin catalogue,
                 Wine/yabridge versions and status, latest scan results, the saved
                 output of plugin scans that failed, and system
@@ -107,7 +107,7 @@ public static class Diagnostics
             await Capture("modules.txt", "pactl", "list", "short", "modules");
             await Capture("lsusb.txt", "lsusb");
             await Capture("usb-topology.txt", "lsusb", "-t");
-            await Capture("pw-top.txt", "pw-top", "--batch-mode", "--iterations", "3");
+            await File.WriteAllTextAsync(Path.Combine(work, "alsa-pcm.txt"), Clean(AlsaSnapshot()));
             await Capture("sink-inputs.json", "pactl", "--format=json", "list", "sink-inputs");
             await Capture("source-outputs.json", "pactl", "--format=json", "list", "source-outputs");
             if (FlatpakEnvironment.IsFlatpak)
@@ -669,6 +669,79 @@ public static class Diagnostics
         cut = $"[cut: older lines were left out; this file keeps the newest {lines.Length - start} lines "
               + $"(at most {JournalLineLimit} lines and {JournalByteLimit} bytes)]";
         return string.Join('\n', lines[start..]) + "\n";
+    }
+
+    /// <summary>
+    /// The sound cards and their open PCM devices as the kernel reports them
+    /// under <paramref name="root"/>: the rate, period and buffer the audio
+    /// server opened each with, its state and fill, and for USB interfaces
+    /// the stream file with the frequency the device is actually running at.
+    /// This replaces pw-top, whose figures come from PipeWire's profiler: the
+    /// profiler sends a driver's report only when it fits in 16 KiB, and a
+    /// driver with OpenXLR's hundred or so followers needs more, so every row
+    /// came out as zero. Reading these files starts no process.
+    /// </summary>
+    internal static string AlsaSnapshot(string root = "/proc/asound")
+    {
+        const int MaxFileBytes = 64 * 1024;
+        var text = new StringBuilder();
+        text.AppendLine($"ALSA sound cards and their open PCM devices, read from {root}.");
+        text.AppendLine("hw_params is what the audio server opened a device with; status is its state and fill now.");
+        text.AppendLine("A USB card's stream file has the rate the device actually runs at (Momentary freq).");
+        text.AppendLine("PipeWire's quantum and driver for each node are in pw-dump.json (node.driver-id, clock settings).");
+        string Read(string path)
+        {
+            try { return RegularFile.ReadText(path, MaxFileBytes); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return $"unreadable: {ex.Message}\n"; }
+        }
+        void Section(string title, string body)
+        {
+            text.Append("\n== ").Append(title).Append(" ==\n").Append(body);
+            if (!body.EndsWith('\n')) text.Append('\n');
+        }
+        static IEnumerable<string> Numbered(string dir, string pattern)
+        {
+            var match = new Regex(pattern, RegexOptions.CultureInvariant);
+            IEnumerable<string> found;
+            try { found = Directory.EnumerateDirectories(dir).ToArray(); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { yield break; }
+            foreach (string path in found
+                         .Where(p => match.IsMatch(Path.GetFileName(p)) && new DirectoryInfo(p).LinkTarget is null)
+                         .OrderBy(p => int.Parse(Regex.Match(Path.GetFileName(p), "[0-9]+").Value, CultureInfo.InvariantCulture))
+                         .ThenBy(p => p, StringComparer.Ordinal))
+                yield return path;
+        }
+
+        if (!Directory.Exists(root))
+        {
+            text.AppendLine().AppendLine($"{root} does not exist: no ALSA sound cards, or not a Linux kernel.");
+            return text.ToString();
+        }
+        Section("cards", Read(Path.Combine(root, "cards")));
+        foreach (string card in Numbered(root, "^card[0-9]+$"))
+        {
+            string name = Path.GetFileName(card);
+            foreach (string file in new[] { "id", "usbid" })
+                if (File.Exists(Path.Combine(card, file))) Section($"{name}/{file}", Read(Path.Combine(card, file)));
+            IEnumerable<string> streams;
+            try { streams = Directory.EnumerateFiles(card, "stream*").Order(StringComparer.Ordinal).ToArray(); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { streams = []; }
+            foreach (string stream in streams) Section($"{name}/{Path.GetFileName(stream)}", Read(stream));
+            foreach (string pcm in Numbered(card, "^pcm[0-9]+[pc]$"))
+                foreach (string sub in Numbered(pcm, "^sub[0-9]+$"))
+                {
+                    string where = $"{name}/{Path.GetFileName(pcm)}/{Path.GetFileName(sub)}";
+                    string parameters = Read(Path.Combine(sub, "hw_params"));
+                    // A closed device has nothing more to say.
+                    if (parameters.Trim() == "closed") { Section(where, "closed\n"); continue; }
+                    Section($"{where}/hw_params", parameters);
+                    // The process that holds the device is an id, which the
+                    // archive does not keep.
+                    Section($"{where}/status", Regex.Replace(Read(Path.Combine(sub, "status")),
+                        @"(?m)^(owner_pid\s*:\s*)[0-9]+", "${1}<redacted>"));
+                }
+        }
+        return text.ToString();
     }
 
     private static string TryReadFile(string path)

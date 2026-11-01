@@ -528,7 +528,6 @@ public sealed class DiagnosticsTests
                   *) echo 'unexpected journal request' >&2; exit 91 ;;
                 esac
                 """);
-            ExecutableScript.Write(Path.Combine(bin, "pw-top"), "printf '%s\\n' 'S ID QUANT RATE ERR NAME' 'R 60 1024 48000 2 OpenXLR_mix_monitor'\n");
             Environment.SetEnvironmentVariable("PATH", bin + Path.PathSeparator + path);
             Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", config);
             Directory.CreateDirectory(UiSettings.ConfigDir);
@@ -650,7 +649,8 @@ public sealed class DiagnosticsTests
             using var streams = System.Text.Json.JsonDocument.Parse(entries["sink-inputs.json"]);
             Assert.Equal(1024, streams.RootElement[0].GetProperty("buffer_latency_usec").GetInt32());
             Assert.Equal("<redacted>", streams.RootElement[0].GetProperty("properties").GetProperty("application.process.id").GetString());
-            Assert.Contains("48000 2 OpenXLR_mix_monitor", entries["pw-top.txt"]);
+            Assert.StartsWith("ALSA sound cards and their open PCM devices", entries["alsa-pcm.txt"]);
+            Assert.DoesNotContain("pw-top.txt", entries.Keys);
             Assert.DoesNotContain("collection.json", entries.Keys);
             if (commandWarning)
             {

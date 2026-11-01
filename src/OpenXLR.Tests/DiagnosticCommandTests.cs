@@ -144,4 +144,43 @@ public sealed class DiagnosticCommandTests
         Assert.False(valid);
         Assert.DoesNotContain("alice", text);
     }
+
+    [Fact]
+    public void TheAlsaSnapshotCarriesOpenDevicesTheirUsbFrequencyAndNoProcessIds()
+    {
+        string root = Directory.CreateTempSubdirectory("openxlr-diagnostic-asound-").FullName;
+        try
+        {
+            File.WriteAllText(Path.Combine(root, "cards"), " 6 [Pro            ]: USB-Audio - Elgato Wave XLR Pro\n");
+            string card = Directory.CreateDirectory(Path.Combine(root, "card6")).FullName;
+            File.WriteAllText(Path.Combine(card, "id"), "Pro\n");
+            File.WriteAllText(Path.Combine(card, "usbid"), "0fd9:009b\n");
+            File.WriteAllText(Path.Combine(card, "stream0"), "Capture:\n  Status: Running\n    Momentary freq = 47999 Hz (0x5.fff8)\n");
+            string open = Directory.CreateDirectory(Path.Combine(card, "pcm0c", "sub0")).FullName;
+            File.WriteAllText(Path.Combine(open, "hw_params"), "format: FLOAT_LE\nrate: 48000 (48000/1)\nperiod_size: 1024\nbuffer_size: 3072\n");
+            File.WriteAllText(Path.Combine(open, "status"), "state: RUNNING\nowner_pid   : 1727\ndelay       : 80\n");
+            string closed = Directory.CreateDirectory(Path.Combine(card, "pcm0p", "sub0")).FullName;
+            File.WriteAllText(Path.Combine(closed, "hw_params"), "closed\n");
+            File.WriteAllText(Path.Combine(closed, "status"), "closed\n");
+            // card10 sorts after card6 by number, and the named link
+            // /proc/asound keeps beside each card is not read twice.
+            File.WriteAllText(Path.Combine(Directory.CreateDirectory(Path.Combine(root, "card10")).FullName, "id"), "Katana\n");
+            Directory.CreateSymbolicLink(Path.Combine(root, "Pro"), card);
+
+            string text = Diagnostics.AlsaSnapshot(root);
+            Assert.Contains("== card6/usbid ==\n0fd9:009b", text);
+            Assert.Contains("Momentary freq = 47999 Hz", text);
+            Assert.Contains("== card6/pcm0c/sub0/hw_params ==\nformat: FLOAT_LE\nrate: 48000 (48000/1)\nperiod_size: 1024", text);
+            Assert.Contains("owner_pid   : <redacted>", text);
+            Assert.DoesNotContain("1727", text);
+            Assert.Contains("delay       : 80", text);
+            Assert.Contains("== card6/pcm0p/sub0 ==\nclosed", text);
+            Assert.DoesNotContain("pcm0p/sub0/status", text);
+            Assert.Single(System.Text.RegularExpressions.Regex.Matches(text, "Momentary freq = "));
+            Assert.True(text.IndexOf("== card6/id ==", StringComparison.Ordinal) < text.IndexOf("== card10/id ==\nKatana", StringComparison.Ordinal));
+            Assert.Contains("ALSA sound cards and their open PCM devices", Diagnostics.AlsaSnapshot(Path.Combine(root, "missing")));
+            Assert.Contains("does not exist", Diagnostics.AlsaSnapshot(Path.Combine(root, "missing")));
+        }
+        finally { Directory.Delete(root, true); }
+    }
 }
