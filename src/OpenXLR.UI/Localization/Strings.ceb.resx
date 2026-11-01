@@ -3951,7 +3951,7 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
     <value>Ang compressor ug ang expander nagkinahanglan sa native plugin host sa OpenXLR, nga wala niining instalasyon.</value>
   </data>
   <data name="DynamicsNoLevels" xml:space="preserve">
-    <value>Makita ang mga lebel samtang nagdagan ang pagproseso sa mikropono niining kompyuter. I-on kini, o ang pagtangtang sa kasaba, ang EQ o ang voice changer.</value>
+    <value>Naghulat sa lebel sa mikropono.</value>
   </data>
   <data name="CompressorNote" xml:space="preserve">
     <value>Kini nga compressor nagdagan niining kompyuter, human sa EQ. Ang Compressor switch sa Wave XLR Pro, sa MK.2 unit o sa Wave:3 usa ka pirmi nga setting sulod sa unit. Kung on ang duha, makaduha ma-compress ang tingog.</value>
@@ -4012,5 +4012,17 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
   </data>
   <data name="DynamicsHoldTip" xml:space="preserve">
     <value>Unsa kadugay siya maghulat human mohunong ang tingog sa dili pa mosira</value>
+  </data>
+  <data name="DynamicsNoReading" xml:space="preserve">
+    <value>-</value>
+  </data>
+  <data name="DynamicsRawInput" xml:space="preserve">
+    <value>Wala nagdagan ang pagproseso sa mikropono niining kompyuter, mao nga ang Input nagpakita sa hilaw nga mikropono, una sa pagtangtang sa kasaba ug sa tanan. Ang Gain reduction ug Output makita kung modagan na kini.</value>
+  </data>
+  <data name="ExpanderInputPoint" xml:space="preserve">
+    <value>Ang Input mao ang mikropono human sa pagtangtang sa kasaba, diin kini madungog sa expander.</value>
+  </data>
+  <data name="CompressorInputPoint" xml:space="preserve">
+    <value>Ang Input mao ang mikropono human sa pagtangtang sa kasaba, sa expander ug sa EQ, diin kini madungog sa compressor.</value>
   </data>
 </root>

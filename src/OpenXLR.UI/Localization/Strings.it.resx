@@ -3964,7 +3964,7 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
     <value>Il compressore e l'expander richiedono l'host nativo dei plugin di OpenXLR, che questa installazione non include.</value>
   </data>
   <data name="DynamicsNoLevels" xml:space="preserve">
-    <value>I livelli compaiono mentre l'elaborazione del microfono funziona su questo computer. Accendi questo, oppure la riduzione del rumore, l'EQ o il cambiavoce.</value>
+    <value>In attesa del livello del microfono.</value>
   </data>
   <data name="CompressorNote" xml:space="preserve">
     <value>Questo compressore funziona su questo computer, dopo l'EQ. L'interruttore Compressore di una Wave XLR Pro, di un'unità MK.2 o di un Wave:3 è un'impostazione fissa dentro l'unità. Con entrambi accesi, la voce viene compressa due volte.</value>
@@ -4025,5 +4025,17 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
   </data>
   <data name="DynamicsHoldTip" xml:space="preserve">
     <value>Quanto aspetta dopo che la voce si ferma prima di chiudersi</value>
+  </data>
+  <data name="DynamicsNoReading" xml:space="preserve">
+    <value>-</value>
+  </data>
+  <data name="DynamicsRawInput" xml:space="preserve">
+    <value>L'elaborazione del microfono su questo computer non è in funzione, quindi Ingresso mostra il microfono grezzo, prima della riduzione del rumore e di tutto il resto. Riduzione di guadagno e Uscita compaiono quando è in funzione.</value>
+  </data>
+  <data name="ExpanderInputPoint" xml:space="preserve">
+    <value>Ingresso è il microfono dopo la riduzione del rumore, dove lo sente l'expander.</value>
+  </data>
+  <data name="CompressorInputPoint" xml:space="preserve">
+    <value>Ingresso è il microfono dopo la riduzione del rumore, l'expander e l'EQ, dove lo sente il compressore.</value>
   </data>
 </root>

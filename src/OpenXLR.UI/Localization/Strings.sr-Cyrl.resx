@@ -3951,7 +3951,7 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
     <value>Компресору и експандеру треба OpenXLR-ов изворни домаћин за додатке, који ова инсталација не садржи.</value>
   </data>
   <data name="DynamicsNoLevels" xml:space="preserve">
-    <value>Нивои се приказују док обрада микрофона ради на овом рачунару. Укључите ово, или уклањање шума, EQ или мењач гласа.</value>
+    <value>Чека се ниво микрофона.</value>
   </data>
   <data name="CompressorNote" xml:space="preserve">
     <value>Овај компресор ради на овом рачунару, после EQ-а. Прекидач Компресор на Wave XLR Pro, MK.2 уређају или Wave:3 је фиксно подешавање унутар уређаја. Када су оба укључена, глас се компресује два пута.</value>
@@ -4012,5 +4012,17 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
   </data>
   <data name="DynamicsHoldTip" xml:space="preserve">
     <value>Колико чека пошто глас престане пре него што се затвори</value>
+  </data>
+  <data name="DynamicsNoReading" xml:space="preserve">
+    <value>-</value>
+  </data>
+  <data name="DynamicsRawInput" xml:space="preserve">
+    <value>Обрада микрофона на овом рачунару не ради, па Улаз приказује сирови микрофон, пре уклањања шума и свега осталог. Смањење појачања и Излаз се приказују када обрада проради.</value>
+  </data>
+  <data name="ExpanderInputPoint" xml:space="preserve">
+    <value>Улаз је микрофон после уклањања шума, где га експандер чује.</value>
+  </data>
+  <data name="CompressorInputPoint" xml:space="preserve">
+    <value>Улаз је микрофон после уклањања шума, експандера и EQ-а, где га компресор чује.</value>
   </data>
 </root>

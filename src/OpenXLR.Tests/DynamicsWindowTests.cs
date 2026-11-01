@@ -40,6 +40,8 @@ internal static class DynamicsWindowTests
         }
 
         public Task WatchDynamicsAsync(string channel) => Task.CompletedTask;
+
+        public Task WatchInputMeterAsync(string channel) => Task.CompletedTask;
     }
 
     /// <summary>A Wave XLR Pro's state with XLR 1 reporting its compressor and expander.</summary>
@@ -146,6 +148,25 @@ internal static class DynamicsWindowTests
             opened.Add(compressor);
             Assert.Same(window, compressor.Owner);
             Assert.Equal(Localizer.Format("CompressorWindowTitle", "XLR 1"), compressor.Title);
+
+            // The mixer's meter push feeds the window from either source: the meter
+            // before the chain while the stage does not run, the stage's own once it does.
+            void Meters(string json) => typeof(MainViewModel).GetMethod("ApplyMeters",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(main, [JsonNode.Parse(json)!]);
+            Meters("""{"in:xlr1":[0.4,0.5,0]}""");
+            Layout(compressor, 760, 520);
+            Assert.Equal(DynamicsLevelSource.Raw, pair.Compressor.Source);
+            Assert.Equal(Localizer.Format("DynamicsDecibels", "-30"), Find<TextBlock>(compressor, "DynamicsInputText").Text);
+            Assert.Equal(Localizer.Text("DynamicsNoReading"), Find<TextBlock>(compressor, "DynamicsOutputText").Text);
+            Assert.Equal(Localizer.Text("DynamicsRawInput"), Find<TextBlock>(compressor, "DynamicsStatus").Text);
+            AssertInside(Find<TextBlock>(compressor, "DynamicsStatus"), compressor);
+            Capture(compressor, "dynamics-compressor-raw");
+            Meters("""{"comp:xlr1":[-20.0,3.0,-23.0],"exp:xlr1":[-20.0,0.0,-20.0],"in:xlr1":[0.9,0.9,0]}""");
+            Layout(compressor, 760, 520);
+            Assert.Equal(DynamicsLevelSource.Stage, pair.Compressor.Source);
+            Assert.Equal(Localizer.Format("DynamicsDecibels", "-20"), Find<TextBlock>(compressor, "DynamicsInputText").Text);
+            Assert.Equal(Localizer.Format("DynamicsDecibels", "-23"), Find<TextBlock>(compressor, "DynamicsOutputText").Text);
+            Assert.Equal(Localizer.Text("CompressorInputPoint"), Find<TextBlock>(compressor, "DynamicsStatus").Text);
             open.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Dispatcher.UIThread.RunJobs();
             Assert.Single(window.OwnedWindows.OfType<DynamicsWindow>());

@@ -2243,8 +2243,14 @@ runs, the `meters` frame then carries `exp:<id>` and `comp:<id>`, each
 since the stage's last report, -120 for silence, and the most gain
 reduction in dB, 0 or more, not counting the make-up gain. The stage
 reports about 30 times a second and the frame goes out 15 times a second.
-Asking starts no stage, so with nothing in the stage on, no levels come.
-Once nobody asks, the stage stops reporting them.
+The expander's input is the microphone after noise removal, and the
+compressor's is the microphone after noise removal, the expander and the
+EQ. Asking starts no stage, so with nothing in the stage on, no `exp:` or
+`comp:` levels come. Once nobody asks, the stage stops reporting them. The
+UI fills that gap from the [meter before the chain](#meter-before-the-chain):
+while no stage levels come it also sends `watchInputMeter` and shows the
+peak of `in:<id>` as the input, which is the raw microphone before noise
+removal, with no reduction and no output.
 
 Both are saved in `mixer.json` under `compressor` and `expander`, by
 channel id. A microphone absent there has them off. A profile saved now

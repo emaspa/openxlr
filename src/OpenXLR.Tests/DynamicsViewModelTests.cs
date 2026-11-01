@@ -30,6 +30,14 @@ public sealed class DynamicsViewModelTests
             Interlocked.Increment(ref Watches);
             return Task.CompletedTask;
         }
+
+        public int InputWatches;
+
+        public Task WatchInputMeterAsync(string channel)
+        {
+            Interlocked.Increment(ref InputWatches);
+            return Task.CompletedTask;
+        }
     }
 
     private static JsonNode Compressor(bool enabled = false, double threshold = -18, bool available = true, string? error = null)
@@ -132,7 +140,10 @@ public sealed class DynamicsViewModelTests
 
         expander.ApplyLevels(new JsonArray(-40.0, 10.0, -50.0));
         Assert.True(expander.HasLevels);
-        Assert.False(expander.HasStatus);
+        Assert.Equal(DynamicsLevelSource.Stage, expander.Source);
+        // The line says where the processor's own input is measured.
+        Assert.Equal(Localizer.Text("ExpanderInputPoint"), expander.Status);
+        Assert.False(expander.HasError);
         Assert.Equal(0.5, expander.InputLevel);
         Assert.Equal(0.25, expander.ReductionLevel);   // 10 of a 40 dB range
         Assert.Equal(Localizer.Format("DynamicsDecibels", "-40"), expander.InputText);
@@ -164,5 +175,57 @@ public sealed class DynamicsViewModelTests
 
         _ = expander.KeepLevelsAsync();
         Assert.Equal(1, sent.Watches);
+    });
+
+    [Fact]
+    public void WithoutTheStageTheMeterBeforeTheChainFeedsTheInputAndTheStageTakesOverOnceItRuns() => TestUi.Run(() =>
+    {
+        var time = new ManualTime();
+        var sent = new Recorder();
+        var pair = new ChannelDynamicsViewModel(sent, "xlr1", "XLR 1", time);
+        pair.Apply(Compressor(), Expander());
+        MicDynamicsViewModel expander = pair.Expander;
+
+        // Nothing in the stage runs: the window asks for both, and the meter before the chain answers.
+        _ = expander.KeepLevelsAsync();
+        Assert.Equal((1, 1), (sent.Watches, sent.InputWatches));
+        expander.ApplyInputLevel(new JsonArray(0.4, 0.5, 0));   // rms, peak, clip on the -60 to 0 dBFS scale
+        Assert.Equal(DynamicsLevelSource.Raw, expander.Source);
+        Assert.True(expander.HasLevels);
+        Assert.Equal(-30, expander.InputDb);
+        Assert.Equal(Localizer.Format("DynamicsDecibels", "-30"), expander.InputText);
+        Assert.Equal(0.625, expander.InputLevel);   // -30 on the expander's -80 dB floor
+        Assert.Equal(0, expander.ReductionDb);
+        Assert.Equal(0, expander.ReductionLevel);
+        Assert.Equal(Localizer.Text("DynamicsNoReading"), expander.OutputText);
+        Assert.Equal(0, expander.OutputLevel);
+        Assert.Equal(Localizer.Text("DynamicsRawInput"), expander.Status);
+        Assert.Equal([-30d], Enumerable.Range(0, expander.History.Count).Select(i => expander.History[i]));
+        // Silence on the meter reads as silence, held at the graph's floor.
+        expander.ApplyInputLevel(new JsonArray(0, 0, 0));
+        Assert.Equal(Localizer.Text("DynamicsSilent"), expander.InputText);
+        Assert.Equal(-80, expander.History[1]);
+
+        // The stage starts: its own levels win, the history starts again, and the
+        // meter before the chain is no longer asked for or taken.
+        expander.ApplyLevels(new JsonArray(-35.0, 6.0, -41.0));
+        Assert.Equal(DynamicsLevelSource.Stage, expander.Source);
+        Assert.Equal(1, expander.History.Count);
+        expander.ApplyInputLevel(new JsonArray(0.9, 0.9, 0));
+        Assert.Equal(-35, expander.InputDb);
+        Assert.Equal(Localizer.Format("DynamicsDecibels", "-41"), expander.OutputText);
+        Assert.Equal(Localizer.Text("ExpanderInputPoint"), expander.Status);
+        pair.Compressor.ApplyLevels(new JsonArray(-20.0, 3.0, -23.0));
+        Assert.Equal(Localizer.Text("CompressorInputPoint"), pair.Compressor.Status);
+        _ = expander.KeepLevelsAsync();
+        Assert.Equal((2, 1), (sent.Watches, sent.InputWatches));
+
+        // The stage stops reporting: after the wait the raw meter feeds the window again.
+        time.Advance(MicDynamicsViewModel.LevelsWait);
+        expander.ApplyInputLevel(new JsonArray(0.4, 0.5, 0));
+        Assert.Equal(DynamicsLevelSource.Raw, expander.Source);
+        Assert.Equal([-30d], Enumerable.Range(0, expander.History.Count).Select(i => expander.History[i]));
+        _ = expander.KeepLevelsAsync();
+        Assert.Equal((3, 2), (sent.Watches, sent.InputWatches));
     });
 }

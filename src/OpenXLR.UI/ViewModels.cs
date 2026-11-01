@@ -1296,7 +1296,15 @@ public sealed partial class MainViewModel : ViewModelBase
                 if (m is not null) { m.MeterL = l; m.MeterR = r; }
             }
             else if (kv.Key.StartsWith("in:", StringComparison.Ordinal) && kv.Value is JsonArray level)
+            {
                 MicSetupOf(kv.Key[3..])?.ApplyInputLevel(level);
+                // A compressor or expander window shows it while the microphone's stage does not run.
+                if (Channels.FirstOrDefault(x => x.Id == kv.Key[3..])?.Dynamics is { } dynamics)
+                {
+                    dynamics.Expander.ApplyInputLevel(level);
+                    dynamics.Compressor.ApplyInputLevel(level);
+                }
+            }
             else if (kv.Key.StartsWith("comp:", StringComparison.Ordinal) && kv.Value is JsonArray compressor)
                 Channels.FirstOrDefault(x => x.Id == kv.Key[5..])?.Dynamics?.Compressor.ApplyLevels(compressor);
             else if (kv.Key.StartsWith("exp:", StringComparison.Ordinal) && kv.Value is JsonArray expander)

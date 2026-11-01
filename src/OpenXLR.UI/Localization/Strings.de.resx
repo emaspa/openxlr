@@ -3623,7 +3623,7 @@ Von OpenXLR gesteuertes Interface wählen</value>
     <value>Kompressor und Expander brauchen den nativen Plugin-Host von OpenXLR, den diese Installation nicht enthält.</value>
   </data>
   <data name="DynamicsNoLevels" xml:space="preserve">
-    <value>Die Pegel erscheinen, solange die Verarbeitung des Mikrofons auf diesem Computer läuft. Schalte dies ein, oder die Rauschentfernung, den EQ oder den Stimmverzerrer.</value>
+    <value>Warte auf den Pegel des Mikrofons.</value>
   </data>
   <data name="CompressorNote" xml:space="preserve">
     <value>Dieser Kompressor läuft auf diesem Computer, nach dem EQ. Der Kompressor-Schalter eines Wave XLR Pro, eines MK.2-Geräts oder eines Wave:3 ist eine feste Einstellung im Gerät. Sind beide an, wird die Stimme zweimal komprimiert.</value>
@@ -3684,5 +3684,17 @@ Von OpenXLR gesteuertes Interface wählen</value>
   </data>
   <data name="DynamicsHoldTip" xml:space="preserve">
     <value>Wie lange er nach dem Ende der Stimme wartet, bevor er schließt</value>
+  </data>
+  <data name="DynamicsNoReading" xml:space="preserve">
+    <value>-</value>
+  </data>
+  <data name="DynamicsRawInput" xml:space="preserve">
+    <value>Die Verarbeitung des Mikrofons auf diesem Computer läuft nicht, darum zeigt Eingang das rohe Mikrofon, vor der Rauschentfernung und allem anderen. Pegelreduktion und Ausgang erscheinen, sobald sie läuft.</value>
+  </data>
+  <data name="ExpanderInputPoint" xml:space="preserve">
+    <value>Eingang ist das Mikrofon nach der Rauschentfernung, wo der Expander es hört.</value>
+  </data>
+  <data name="CompressorInputPoint" xml:space="preserve">
+    <value>Eingang ist das Mikrofon nach Rauschentfernung, Expander und EQ, wo der Kompressor es hört.</value>
   </data>
 </root>

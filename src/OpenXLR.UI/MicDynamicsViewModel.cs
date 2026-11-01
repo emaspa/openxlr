@@ -20,6 +20,20 @@ public interface IDynamicsCommands
 
     /// <summary>Keep the microphone's compressor and expander levels coming for another lease.</summary>
     Task WatchDynamicsAsync(string channel);
+
+    /// <summary>Keep the microphone's meter before the chain running for another lease.</summary>
+    Task WatchInputMeterAsync(string channel);
+}
+
+/// <summary>Where a compressor's or expander's window takes its levels from.</summary>
+public enum DynamicsLevelSource
+{
+    /// <summary>No level has come lately.</summary>
+    None,
+    /// <summary>The stage's own meters: the processor's input, its gain reduction and its output.</summary>
+    Stage,
+    /// <summary>The meter before the chain, while the stage does not run: the raw microphone, no reduction, no output.</summary>
+    Raw,
 }
 
 /// <summary>
@@ -150,7 +164,7 @@ public sealed class MicDynamicsViewModel : ViewModelBase
     private string _channelName;
     private bool _enabled, _available, _showsAdvanced;
     private string? _error;
-    private long _enabledAt = long.MinValue, _levelsAt = long.MinValue;
+    private long _enabledAt = long.MinValue, _levelsAt = long.MinValue, _rawAt = long.MinValue;
     private double _inputDb = -120, _reductionDb, _outputDb = -120;
 
     public MicDynamicsViewModel(IDynamicsCommands commands, string kind, string channel, string channelName, TimeProvider? time = null)
@@ -264,8 +278,9 @@ public sealed class MicDynamicsViewModel : ViewModelBase
     public bool IsFaulty => _enabled && (!_available || _error is { Length: > 0 });
 
     /// <summary>
-    /// One line under the heading: why the setting does not run, else that the
-    /// levels show only while the stage runs, else nothing.
+    /// One line under the heading: why the setting does not run, else where
+    /// the Input meter reads, since that differs between the two sources and
+    /// the two processors, else that no level has come yet.
     /// </summary>
     public string Status
     {
@@ -273,7 +288,12 @@ public sealed class MicDynamicsViewModel : ViewModelBase
         {
             if (_enabled && _error is { Length: > 0 } error) return error;
             if (!_available) return Localizer.Text("DynamicsNoHost");
-            return HasLevels ? "" : Localizer.Text("DynamicsNoLevels");
+            return Source switch
+            {
+                DynamicsLevelSource.Raw => Localizer.Text("DynamicsRawInput"),
+                DynamicsLevelSource.Stage => IsCompressor ? Localizer.Text("CompressorInputPoint") : Localizer.Text("ExpanderInputPoint"),
+                _ => Localizer.Text("DynamicsNoLevels"),
+            };
         }
     }
 
@@ -293,8 +313,17 @@ public sealed class MicDynamicsViewModel : ViewModelBase
     /// <summary>The graph's and the input and output meters' floor: the threshold's lowest setting.</summary>
     public double FloorDb => Threshold.Minimum;
 
+    private bool Live(long at) => at != long.MinValue && _time.GetElapsedTime(at) < LevelsWait;
+
+    /// <summary>
+    /// Where the levels come from now: the stage's own meters while it runs,
+    /// else the meter before the chain, which reads the raw microphone.
+    /// </summary>
+    public DynamicsLevelSource Source => Live(_levelsAt) ? DynamicsLevelSource.Stage
+        : Live(_rawAt) ? DynamicsLevelSource.Raw : DynamicsLevelSource.None;
+
     /// <summary>Levels arrived a moment ago, so the meters and the graph are live.</summary>
-    public bool HasLevels => _levelsAt != long.MinValue && _time.GetElapsedTime(_levelsAt) < LevelsWait;
+    public bool HasLevels => Source != DynamicsLevelSource.None;
 
     public double InputDb => _inputDb;
     public double ReductionDb => _reductionDb;
@@ -302,7 +331,7 @@ public sealed class MicDynamicsViewModel : ViewModelBase
 
     /// <summary>The input on the meter's 0 to 1 scale, from <see cref="FloorDb"/> to 0 dBFS.</summary>
     public double InputLevel => Scale(_inputDb);
-    public double OutputLevel => Scale(_outputDb);
+    public double OutputLevel => Source == DynamicsLevelSource.Raw ? 0 : Scale(_outputDb);
 
     /// <summary>
     /// The gain reduction on the meter's 0 to 1 scale: 30 dB fills the
@@ -314,7 +343,8 @@ public sealed class MicDynamicsViewModel : ViewModelBase
     private double ReductionScale => IsCompressor ? 30 : Math.Max(Advanced[1].Value, 6);
 
     public string InputText => LevelText(_inputDb);
-    public string OutputText => LevelText(_outputDb);
+    /// <summary>The output, or a dash while the levels come from before the stage, which has no output to show.</summary>
+    public string OutputText => Source == DynamicsLevelSource.Raw ? Localizer.Text("DynamicsNoReading") : LevelText(_outputDb);
     public string ReductionText => DynamicsParameterViewModel.Format(MicCompressor.MakeupRange, Math.Round(_reductionDb, 0) + 0);
 
     public string InputName => Localizer.Format("DynamicsInputName", InputText);
@@ -334,21 +364,49 @@ public sealed class MicDynamicsViewModel : ViewModelBase
         double Read(int i) => levels[i] is JsonValue v && v.TryGetValue(out double d) && double.IsFinite(d) ? d : double.NaN;
         double input = Read(0), reduction = Read(1), output = Read(2);
         if (double.IsNaN(input) || double.IsNaN(reduction) || double.IsNaN(output)) return;
-        bool had = HasLevels;
+        DynamicsLevelSource was = Source;
+        // The two sources read at different points of the chain: the history starts again.
+        if (was == DynamicsLevelSource.Raw) History.Clear();
         _levelsAt = _time.GetTimestamp();
         _inputDb = input;
         _reductionDb = Math.Max(0, reduction);
         _outputDb = output;
         History.Add(Math.Max(input, FloorDb));
         RaiseLevels();
-        if (!had) RaiseStatus();
+        if (was != DynamicsLevelSource.Stage) RaiseStatus();
+    }
+
+    /// <summary>
+    /// Take the microphone's meter before the chain, <c>[rms, peak, clip]</c>
+    /// on the meters' 0 to 1 scale (-60 to 0 dBFS), while the stage does not
+    /// run: the input and the history show the raw microphone, the gain
+    /// reduction stays at 0 and the output shows a dash. The stage's own
+    /// levels win while they come.
+    /// </summary>
+    internal void ApplyInputLevel(JsonArray level)
+    {
+        if (Detached || level.Count < 2 || Live(_levelsAt)) return;
+        // Any number form: the socket's text, or a value built in code.
+        if (level[1] is not JsonValue v || v.GetValueKind() != System.Text.Json.JsonValueKind.Number
+            || !double.TryParse(v.ToJsonString(), NumberStyles.Float, CultureInfo.InvariantCulture, out double peak)
+            || !double.IsFinite(peak)) return;
+        DynamicsLevelSource was = Source;
+        if (was == DynamicsLevelSource.None && _levelsAt != long.MinValue) History.Clear();
+        _levelsAt = long.MinValue;
+        _rawAt = _time.GetTimestamp();
+        _inputDb = peak <= 0 ? -120 : Math.Clamp(peak, 0, 1) * 60 - 60;
+        _reductionDb = 0;
+        _outputDb = -120;
+        History.Add(Math.Max(_inputDb, FloorDb));
+        RaiseLevels();
+        if (was != DynamicsLevelSource.Raw) RaiseStatus();
     }
 
     /// <summary>A second passed: levels that stopped coming stop showing.</summary>
     internal void CheckLevels()
     {
-        if (_levelsAt == long.MinValue || HasLevels) return;
-        _levelsAt = long.MinValue;
+        if (_levelsAt == long.MinValue && _rawAt == long.MinValue || HasLevels) return;
+        _levelsAt = _rawAt = long.MinValue;
         _inputDb = _outputDb = -120;
         _reductionDb = 0;
         History.Clear();
@@ -356,14 +414,23 @@ public sealed class MicDynamicsViewModel : ViewModelBase
         RaiseStatus();
     }
 
-    /// <summary>Ask for the levels for another lease, while a window shows them.</summary>
-    internal Task KeepLevelsAsync() => Detached ? Task.CompletedTask : Commands.WatchDynamicsAsync(Channel);
+    /// <summary>
+    /// Ask for the levels for another lease, while a window shows them: the
+    /// stage's, and while those do not come, the meter before the chain, which
+    /// runs beside the route and starts no stage.
+    /// </summary>
+    internal async Task KeepLevelsAsync()
+    {
+        if (Detached) return;
+        await Commands.WatchDynamicsAsync(Channel);
+        if (!Live(_levelsAt)) await Commands.WatchInputMeterAsync(Channel);
+    }
 
     private void RaiseLevels()
     {
         foreach (string name in new[]
         {
-            nameof(HasLevels), nameof(InputDb), nameof(ReductionDb), nameof(OutputDb), nameof(InputLevel), nameof(OutputLevel),
+            nameof(Source), nameof(HasLevels), nameof(InputDb), nameof(ReductionDb), nameof(OutputDb), nameof(InputLevel), nameof(OutputLevel),
             nameof(ReductionLevel), nameof(InputText), nameof(OutputText), nameof(ReductionText),
             nameof(InputName), nameof(ReductionName), nameof(OutputName),
         })

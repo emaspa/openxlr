@@ -1447,10 +1447,19 @@ left to right:
   back up after it has been evened out.
 - **Output**, the level coming out.
 
-The levels move while the microphone's processing on this computer runs,
-which needs one of noise removal, the EQ in software, the voice changer,
-the compressor or the expander on. Until then the window says so. They go
-from the daemon to the window only while the window is open.
+Where **Input** reads depends on whether the microphone's processing on
+this computer runs, which needs one of noise removal, the EQ in software,
+the voice changer, the compressor or the expander on. While it runs, the
+expander's Input is the microphone after noise removal and the
+compressor's is the microphone after noise removal, the expander and the
+EQ, which is what each one hears. While it does not, Input and the graph
+show the raw microphone, before noise removal and everything else,
+**Gain reduction** stays at 0 and **Output** shows a dash. That is enough
+to set the expander's threshold against the room before you switch it on.
+If you switch noise removal on later, the expander hears the room quieter
+than the raw figure, so check the threshold again. A line under the heading says which of the two you
+are looking at. The levels go from the daemon to the window only while
+the window is open.
 
 The settings button shows the rest:
 

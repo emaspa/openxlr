@@ -3956,7 +3956,7 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
     <value>The compressor and the expander need the OpenXLR native plugin host, which this installation does not include.</value>
   </data>
   <data name="DynamicsNoLevels" xml:space="preserve">
-    <value>The levels show while the microphone's processing runs on this computer. Switch this on, or noise removal, the EQ or the voice changer.</value>
+    <value>Waiting for the microphone's level.</value>
   </data>
   <data name="CompressorNote" xml:space="preserve">
     <value>This compressor runs on this computer, after the EQ. The Compressor switch of a Wave XLR Pro, an MK.2 unit or a Wave:3 is a fixed setting inside the unit. With both on, the voice is compressed twice.</value>
@@ -4017,5 +4017,17 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
   </data>
   <data name="DynamicsHoldTip" xml:space="preserve">
     <value>How long it waits after the voice stops before it closes</value>
+  </data>
+  <data name="DynamicsNoReading" xml:space="preserve">
+    <value>-</value>
+  </data>
+  <data name="DynamicsRawInput" xml:space="preserve">
+    <value>The microphone's processing on this computer is not running, so Input shows the raw microphone, before noise removal and everything else. Gain reduction and Output show once it runs.</value>
+  </data>
+  <data name="ExpanderInputPoint" xml:space="preserve">
+    <value>Input is the microphone after noise removal, where the expander hears it.</value>
+  </data>
+  <data name="CompressorInputPoint" xml:space="preserve">
+    <value>Input is the microphone after noise removal, the expander and the EQ, where the compressor hears it.</value>
   </data>
 </root>

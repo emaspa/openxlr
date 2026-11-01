@@ -3599,7 +3599,7 @@ Selecciona la interfaz que controla OpenXLR</value>
     <value>El compresor y el expansor necesitan el host nativo de plugins de OpenXLR, que esta instalación no incluye.</value>
   </data>
   <data name="DynamicsNoLevels" xml:space="preserve">
-    <value>Los niveles se muestran mientras el procesamiento del micrófono funciona en este ordenador. Activa esto, o la reducción de ruido, el EQ o el cambiador de voz.</value>
+    <value>Esperando el nivel del micrófono.</value>
   </data>
   <data name="CompressorNote" xml:space="preserve">
     <value>Este compresor funciona en este ordenador, después del EQ. El interruptor Compresor de una Wave XLR Pro, una unidad MK.2 o un Wave:3 es un ajuste fijo dentro de la unidad. Con los dos activos, la voz se comprime dos veces.</value>
@@ -3660,5 +3660,17 @@ Selecciona la interfaz que controla OpenXLR</value>
   </data>
   <data name="DynamicsHoldTip" xml:space="preserve">
     <value>Cuánto espera después de que la voz se detiene antes de cerrarse</value>
+  </data>
+  <data name="DynamicsNoReading" xml:space="preserve">
+    <value>-</value>
+  </data>
+  <data name="DynamicsRawInput" xml:space="preserve">
+    <value>El procesamiento del micrófono en este ordenador no está funcionando, así que Entrada muestra el micrófono sin procesar, antes de la reducción de ruido y de todo lo demás. Reducción de ganancia y Salida aparecen cuando funcione.</value>
+  </data>
+  <data name="ExpanderInputPoint" xml:space="preserve">
+    <value>Entrada es el micrófono después de la reducción de ruido, donde lo oye el expansor.</value>
+  </data>
+  <data name="CompressorInputPoint" xml:space="preserve">
+    <value>Entrada es el micrófono después de la reducción de ruido, el expansor y el EQ, donde lo oye el compresor.</value>
   </data>
 </root>
