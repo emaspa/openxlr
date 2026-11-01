@@ -55,9 +55,9 @@ DF_DEPS = $(DEEPFILTER_LIB)
 DF_LINK = -Wl,--gc-sections $(DEEPFILTER_LIB) -lgcc_s -lutil -lrt
 endif
 
-OBJECTS = host.o lv2.o clap.o vst3.o sound-check.o eq.o duck.o level.o player.o denoise.o \
+OBJECTS = host.o measure.o lv2.o clap.o vst3.o sound-check.o eq.o duck.o level.o player.o denoise.o \
           voice.o voice-stretch.o dynamics.o $(RNN_OBJECTS)
-HEADERS = host.h icon.h denoise.h dynamics.h eq.h voice.h $(wildcard clap/include/clap/*.h clap/include/clap/*/*.h) \
+HEADERS = host.h measure.h icon.h denoise.h dynamics.h eq.h voice.h $(wildcard clap/include/clap/*.h clap/include/clap/*/*.h) \
           $(wildcard vst3/pluginterfaces/*/*.h)
 # The stages and their tests link these beside the noise removal objects.
 DENOISE_OBJECTS = denoise.o $(RNN_OBJECTS)
@@ -131,6 +131,14 @@ tests/own-block.o: tests/own-block.c host.c $(HEADERS)
 tests/own-block: tests/own-block.o lv2.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
+# The measured delay: known delays, a noise remover, the own block, and
+# outputs that must never give a figure, without a graph.
+tests/measure.o: tests/measure.c host.c $(HEADERS)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
+tests/measure: tests/measure.o measure.o lv2.o clap.o vst3.o
+	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
 # This one compiles clap.c into itself to reach the layout reading, so it
 # links without clap.o.
 tests/clap.o: tests/clap.c host.c clap.c $(HEADERS)
@@ -182,9 +190,10 @@ test-scan: openxlr-lv2-host tests/scan-plugin.so
 test-editor: tests/editor
 	./tests/editor
 
-test-audio: tests/audio tests/own-block
+test-audio: tests/audio tests/own-block tests/measure
 	./tests/audio
 	./tests/own-block
+	./tests/measure
 
 test-clap: tests/clap
 	./tests/clap
@@ -200,7 +209,7 @@ test-vst3: tests/vst3
 	./tests/vst3
 
 clean:
-	rm -f openxlr-lv2-host $(OBJECTS) tests/editor tests/editor.o tests/audio tests/audio.o tests/own-block tests/own-block.o tests/clap tests/clap.o tests/lifecycle tests/lifecycle.o tests/lv2 tests/lv2.o tests/latency.lv2/latency.so tests/gain.lv2/gain.so tests/vst3 tests/vst3.o tests/host.o tests/scan-plugin.so
+	rm -f openxlr-lv2-host $(OBJECTS) tests/editor tests/editor.o tests/audio tests/audio.o tests/own-block tests/own-block.o tests/measure tests/measure.o tests/clap tests/clap.o tests/lifecycle tests/lifecycle.o tests/lv2 tests/lv2.o tests/latency.lv2/latency.so tests/gain.lv2/gain.so tests/vst3 tests/vst3.o tests/host.o tests/scan-plugin.so
 
 # Sound Check: the loop backend and the level meter beside it, driven
 # directly with deterministic samples and no audio server.

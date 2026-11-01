@@ -1438,7 +1438,10 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                     : !i.Bypass && _insertErrors.TryGetValue(channel, out string? err) ? err
                     : host?.EditorStalled == true ? "the plugin's editor stopped answering; its controls are frozen while audio keeps playing"
                     : null, host?.Meters, host?.IsRunning == true)
-                { FilterChainError = stage?.FilterChainError, LatencyMilliseconds = InsertLatencyLocked(channel, i) };
+                {
+                    FilterChainError = stage?.FilterChainError, LatencyMilliseconds = InsertLatencyLocked(channel, i),
+                    MeasuredLatencyMilliseconds = InsertMeasuredLatencyLocked(channel, i),
+                };
             })];
         }
         return result;

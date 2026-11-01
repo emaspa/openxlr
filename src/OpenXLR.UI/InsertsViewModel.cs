@@ -252,6 +252,7 @@ public sealed partial class InsertsViewModel : ViewModelBase
                     entry?["nativeUiBlocked"]?.GetValue<bool>() == true,
                     entry?["nativeUiBlockReason"]?.GetValue<string>());
                 vm.LatencyMilliseconds = entry?["latencyMilliseconds"]?.GetValue<double>();
+                vm.MeasuredLatencyMilliseconds = entry?["measuredLatencyMilliseconds"]?.GetValue<double>();
                 next.Add(vm);
             }
             if (!next.SequenceEqual(Items))
@@ -375,9 +376,29 @@ public sealed class InsertViewModel : ViewModelBase
         internal set { if (Set(ref _latencyMilliseconds, value)) Raise(nameof(LatencyText)); }
     }
 
-    public string LatencyText => LatencyMilliseconds is double ms
-        ? Localizer.Format("LatencyMilliseconds", ms)
-        : Localizer.Text("LatencyUnknown");
+    private double? _measuredLatencyMilliseconds;
+    /// <summary>The delay the native host measured on the insert's node, or null until it has a figure.</summary>
+    public double? MeasuredLatencyMilliseconds
+    {
+        get => _measuredLatencyMilliseconds;
+        internal set { if (Set(ref _measuredLatencyMilliseconds, value)) Raise(nameof(LatencyText)); }
+    }
+
+    /// <summary>
+    /// The latency the plugin reports and, for an insert in the native host,
+    /// the delay measured on its node, or "measuring" until there is a
+    /// figure. An insert in PipeWire's filter chain is not measured, so it
+    /// shows the reported figure alone.
+    /// </summary>
+    public string LatencyText => (NativeHostRunning, LatencyMilliseconds, MeasuredLatencyMilliseconds) switch
+    {
+        (true, double reported, double measured) => Localizer.Format("LatencyReportedMeasured", reported, measured),
+        (true, double reported, null) => Localizer.Format("LatencyReportedMeasuring", reported),
+        (true, null, double measured) => Localizer.Format("LatencyUnreportedMeasured", measured),
+        (true, null, null) => Localizer.Text("LatencyUnreportedMeasuring"),
+        (false, double reported, _) => Localizer.Format("LatencyMilliseconds", reported),
+        _ => Localizer.Text("LatencyUnknown"),
+    };
 
     /// <summary>The channel chain this insert belongs to (row buttons route through it).</summary>
     public InsertsViewModel Owner => _owner;
@@ -500,7 +521,12 @@ public sealed class InsertViewModel : ViewModelBase
     public bool NativeHostRunning
     {
         get => _nativeHostRunning;
-        private set { if (Set(ref _nativeHostRunning, value)) RaiseNativeFlags(); }
+        private set
+        {
+            if (!Set(ref _nativeHostRunning, value)) return;
+            RaiseNativeFlags();
+            Raise(nameof(LatencyText));
+        }
     }
 
     public string StateText => HasError ? Localizer.Text("InsertStateProblem") : Bypass ? Localizer.Text("InsertStateBypassed") : Localizer.Text("InsertStateActive");

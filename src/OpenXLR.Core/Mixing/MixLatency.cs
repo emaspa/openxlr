@@ -28,6 +28,16 @@ internal static class MixLatency
     }
 
     /// <summary>
+    /// The delay the native host measured on one insert's node, in
+    /// milliseconds, or null: before it has a confident figure, for a
+    /// bypassed insert, which is out of the chain, and for one whose chain is
+    /// not running or that runs in PipeWire's filter chain, where nothing
+    /// measures. Shown beside the reported figure; compensation never uses it.
+    /// </summary>
+    internal static double? MeasuredMilliseconds(bool bypass, bool running, double? measured)
+        => bypass || !running ? null : measured;
+
+    /// <summary>
     /// A mix's total: the sum of its inserts' figures, with an insert that
     /// gives none counted as zero. Compensation never waits for a figure
     /// that may not come; the insert shows as unknown instead.
@@ -64,8 +74,9 @@ public sealed partial class Mixer
     private readonly Dictionary<string, PortLink> _mixDelayInputs = [];
     private readonly Dictionary<string, double> _mixDelayValues = [];
     private readonly Dictionary<string, string> _mixDelayErrors = [];
-    // Every insert's last figure, so a sweep tells clients when one changes.
-    private readonly Dictionary<(string Chain, string Insert), double?> _latencyReports = [];
+    // Every insert's last figures, reported and measured, so a sweep tells
+    // clients when one changes.
+    private readonly Dictionary<(string Chain, string Insert), (double? Reported, double? Measured)> _latencyReports = [];
 
     /// <summary>Whether mixes are delayed to line up with the slowest mix's inserts.</summary>
     public bool CompensateMixLatency { get { lock (_gate) return _compensateMixLatency; } }
@@ -112,6 +123,14 @@ public sealed partial class Mixer
         return MixLatency.InsertMilliseconds(insert.Bypass, running, host is not null,
             host is { IsHealthy: true } ? host.LatencyMilliseconds : null,
             insert.Bypass || !running ? null : PluginCatalog.Find(insert));
+    }
+
+    private double? InsertMeasuredLatencyLocked(string key, InsertDefinition insert)
+    {
+        bool running = !_insertErrors.ContainsKey(key) && _chains.TryGetValue(key, out FilterHandle? chain) && chain.IsAlive;
+        NativePluginHost? host = running ? _chains[key].InsertStages.FirstOrDefault(s => s.Id == insert.Id).Stage?.NativeHost : null;
+        return MixLatency.MeasuredMilliseconds(insert.Bypass, running,
+            host is { IsHealthy: true } ? host.MeasuredLatencyMilliseconds : null);
     }
 
     private double MixLatencyLocked(MixDefinition mix)
@@ -184,8 +203,8 @@ public sealed partial class Mixer
             {
                 var identity = (key, insert.Id);
                 seen.Add(identity);
-                double? value = InsertLatencyLocked(key, insert);
-                if (_latencyReports.TryGetValue(identity, out double? old) && old == value) continue;
+                (double?, double?) value = (InsertLatencyLocked(key, insert), InsertMeasuredLatencyLocked(key, insert));
+                if (_latencyReports.TryGetValue(identity, out (double?, double?) old) && old == value) continue;
                 _latencyReports[identity] = value;
                 changed = true;
             }

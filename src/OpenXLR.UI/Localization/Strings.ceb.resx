@@ -998,6 +998,18 @@
   <data name="LatencyUnknown" xml:space="preserve">
     <value>Latency: wala mahibaloi. Isipon kini nga zero sa pagpahiuyon sa latency.</value>
   </data>
+  <data name="LatencyReportedMeasured" xml:space="preserve">
+    <value>Latency: {0:0.##} ms ang gi-report, {1:0.#} ms ang nasukod</value>
+  </data>
+  <data name="LatencyReportedMeasuring" xml:space="preserve">
+    <value>Latency: {0:0.##} ms ang gi-report, ginasukod pa</value>
+  </data>
+  <data name="LatencyUnreportedMeasured" xml:space="preserve">
+    <value>Latency: walay gi-report, {0:0.#} ms ang nasukod. Isipon kini nga zero sa pagpahiuyon sa latency.</value>
+  </data>
+  <data name="LatencyUnreportedMeasuring" xml:space="preserve">
+    <value>Latency: walay gi-report, ginasukod pa. Isipon kini nga zero sa pagpahiuyon sa latency.</value>
+  </data>
   <data name="LeftLevel" xml:space="preserve">
     <value>Level sa wala</value>
   </data>

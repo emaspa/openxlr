@@ -998,6 +998,18 @@
   <data name="LatencyUnknown" xml:space="preserve">
     <value>Latency: hindi alam. Itinuturing itong zero sa pagtutugma ng latency.</value>
   </data>
+  <data name="LatencyReportedMeasured" xml:space="preserve">
+    <value>Latency: {0:0.##} ms ang iniulat, {1:0.#} ms ang nasukat</value>
+  </data>
+  <data name="LatencyReportedMeasuring" xml:space="preserve">
+    <value>Latency: {0:0.##} ms ang iniulat, sinusukat pa</value>
+  </data>
+  <data name="LatencyUnreportedMeasured" xml:space="preserve">
+    <value>Latency: walang iniulat, {0:0.#} ms ang nasukat. Itinuturing itong zero sa pagtutugma ng latency.</value>
+  </data>
+  <data name="LatencyUnreportedMeasuring" xml:space="preserve">
+    <value>Latency: walang iniulat, sinusukat pa. Itinuturing itong zero sa pagtutugma ng latency.</value>
+  </data>
   <data name="LeftLevel" xml:space="preserve">
     <value>Kaliwang level</value>
   </data>

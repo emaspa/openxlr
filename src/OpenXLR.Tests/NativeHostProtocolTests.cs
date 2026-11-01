@@ -151,6 +151,36 @@ public sealed class NativeHostProtocolTests
         host.ShowUi(); Assert.Null(host.LatencyMilliseconds);
     }
 
+    [Fact]
+    public void TheMeasuredDelayIsReadApartFromThePluginsMeters()
+    {
+        using var host = Start("""
+            import sys
+            print('ready')
+            count = 0
+            for line in sys.stdin:
+                if line.strip() == 'show':
+                    count += 1
+                    if count == 2:
+                        print('meter host.measured_latency 2400')
+                        print('meter peak 0.25')
+                        print('meter host.other 1')
+                    if count == 3: print('meter host.measured_latency 961')
+                    if count == 4: print('meter host.measured_latency -1')
+                    if count == 5: print('meter host.measured_latency 0')
+                    print('ui opened')
+            """, meters: new HashSet<string>(StringComparer.Ordinal) { "peak" });
+        host.ShowUi(); Assert.Null(host.MeasuredLatencyMilliseconds);
+        host.ShowUi(); Assert.Equal(50, host.MeasuredLatencyMilliseconds);
+        // The figure is the host's own, so it is no meter of the plugin's, and
+        // a host-level name the helper does not use is refused like any other.
+        Assert.Equal(new Dictionary<string, double> { ["peak"] = 0.25 }, host.Meters);
+        Assert.Null(host.LatencyMilliseconds);
+        host.ShowUi(); Assert.Equal(961 * 1000.0 / 48000, host.MeasuredLatencyMilliseconds);
+        host.ShowUi(); Assert.Null(host.MeasuredLatencyMilliseconds);
+        host.ShowUi(); Assert.Equal(0, host.MeasuredLatencyMilliseconds);
+    }
+
     [Theory]
     [InlineData("latency 512 48000", 512)]
     [InlineData("latency 0 48000", 0)]

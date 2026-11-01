@@ -58,6 +58,13 @@ public sealed record InsertStatus(InsertDefinition Insert, string? Error,
 {
     /// <summary>The plugin's processing latency in milliseconds, zero when bypassed, null when it gives no figure.</summary>
     public double? LatencyMilliseconds { get; init; }
+    /// <summary>
+    /// The delay the native host measured between the audio entering the
+    /// insert's node and leaving it, in milliseconds; null until it has a
+    /// confident figure, and always for an insert that is bypassed or runs in
+    /// PipeWire's filter chain.
+    /// </summary>
+    public double? MeasuredLatencyMilliseconds { get; init; }
     public bool NativeUiBlocked { get; init; }
     public string? NativeUiBlockReason { get; init; }
     /// <summary>

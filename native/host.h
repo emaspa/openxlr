@@ -186,6 +186,11 @@ struct Host {
   // worker that calls it, not PipeWire's.
   bool own_block;
   OwnBlock block;
+  // The delay the node adds, measured from its audio (measure.c), and the
+  // meter that reports it. Both NULL for a built-in stage, and in a build
+  // without measure.o.
+  struct LatencyMeter *measure;
+  Control *measured;
   // The editor's window
   Display *display;
   struct spa_source *editor_source;

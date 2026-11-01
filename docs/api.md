@@ -200,7 +200,8 @@ to a source, or the driven unit lacks the control, so `lowCutHz` and
 [microphone EQ](#microphone-eq)), `inserts`
 (chains by insert key, `xlr1`, `xlr2`, a capture channel id or `mix:<id>`; each entry carries
 `insert`, `error`, `meters`, `nativeHostRunning`, `nativeUiBlocked`,
-`nativeUiBlockReason`, `filterChainError` and `latencyMilliseconds`),
+`nativeUiBlockReason`, `filterChainError`, `latencyMilliseconds` and
+`measuredLatencyMilliseconds`),
 `soundCheck` (see [Sound Check](#sound-check)), `soundboard` (see
 [Soundboard](#soundboard)),
 `exclusiveGroups` (`id`, `name`, `channels`; see
@@ -897,6 +898,19 @@ the helper last read from it; there is no figure before the helper's first
 report, which comes once audio has run. An LV2 plugin in the PipeWire filter
 chain cannot report, so it reads zero when its metadata declares no latency
 port and has no figure otherwise.
+
+Each insert's status also carries `measuredLatencyMilliseconds`, the delay
+the native host measured between the audio entering the insert's node and
+leaving it. The host lines the two up by cross-correlation, so the figure
+holds delay the plugin does not report and the delay of an insert
+[on its own block](#own-block). It is absent (null over HTTP) until the
+host has a figure it is sure of, which takes several seconds of signal
+through the insert, and always for an insert that is bypassed, whose chain
+is not running, or that runs in PipeWire's filter chain. A plugin that
+changes the signal beyond recognition may never give one. Once given, a
+figure stays until the host is as sure of a different one. Latency
+compensation does not use it. The helper's side is described in
+[native/README.md](../native/README.md#measured-delay).
 
 `setMixLatencyCompensation` turns compensation on or off. It is a mixer
 setting, saved in `mixer.json` and not part of a profile. With it on, an LV2

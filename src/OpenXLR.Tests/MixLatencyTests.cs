@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using OpenXLR.Core.Mixing;
 using OpenXLR.Daemon;
 using OpenXLR.UI;
+using OpenXLR.UI.Localization;
 
 namespace OpenXLR.Tests;
 
@@ -114,5 +115,71 @@ public sealed class MixLatencyTests
         Assert.Null(owner.Items[1].LatencyMilliseconds);
         Assert.Contains("unknown", owner.Items[1].LatencyText, StringComparison.Ordinal);
         Assert.Contains("zero", owner.Items[1].LatencyText, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    // Bypassed: out of the chain, so nothing measures it.
+    [InlineData(true, true, 48.0, null)]
+    // A chain that is not running, or a native host with no figure yet.
+    [InlineData(false, false, 48.0, null)]
+    [InlineData(false, true, null, null)]
+    [InlineData(false, true, 48.0, 48.0)]
+    [InlineData(false, true, 0.0, 0.0)]
+    public void AnInsertGivesItsMeasuredDelayOnlyWhileItRuns(bool bypass, bool running, double? measured, double? expected)
+        => Assert.Equal(expected, MixLatency.MeasuredMilliseconds(bypass, running, measured));
+
+    [Fact]
+    public void TheStateCarriesTheMeasuredDelayBesideTheReportedOne()
+    {
+        var status = new InsertStatus(new InsertDefinition { Id = "focus", Kind = "vst3", Plugin = "0123" }, null, NativeHostRunning: true)
+        { LatencyMilliseconds = 0, MeasuredLatencyMilliseconds = 48 };
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        string json = JsonSerializer.Serialize(status, options);
+        Assert.Contains("\"latencyMilliseconds\":0", json, StringComparison.Ordinal);
+        Assert.Contains("\"measuredLatencyMilliseconds\":48", json, StringComparison.Ordinal);
+        json = JsonSerializer.Serialize(status with { MeasuredLatencyMilliseconds = null }, options);
+        Assert.Contains("\"measuredLatencyMilliseconds\":null", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheMixerLeavesTheMeasuredDelayOutUntilAHostHasOne()
+    {
+        using var mixer = new Mixer();
+        mixer.SetInserts("xlr1", [new InsertDefinition { Id = "a", Kind = "lv2", Plugin = "urn:a" }]);
+        InsertStatus status = Assert.Single(mixer.Snapshot().Inserts["xlr1"]);
+        Assert.Null(status.MeasuredLatencyMilliseconds);
+    }
+
+    [Theory]
+    // In the filter chain nothing measures: the reported figure alone.
+    [InlineData(false, 10.5, 48.0, "Latency: 10.5 ms")]
+    [InlineData(false, null, null, "Latency: unknown. Latency compensation counts it as zero.")]
+    // In the native host, both, or "measuring" until there is a figure.
+    [InlineData(true, 0.0, 48.0, "Latency: 0 ms reported, 48 ms measured")]
+    [InlineData(true, 0.0, null, "Latency: 0 ms reported, measuring")]
+    [InlineData(true, 32.0, 41.958, "Latency: 32 ms reported, 42 ms measured")]
+    [InlineData(true, null, 29.96, "Latency: not reported, 30 ms measured. Latency compensation counts it as zero.")]
+    [InlineData(true, null, null, "Latency: not reported, measuring. Latency compensation counts it as zero.")]
+    public void TheControlsWindowShowsTheReportedAndTheMeasuredDelay(bool native, double? reported, double? measured, string expected)
+    {
+        // The window's text in English, numbers written the invariant way.
+        System.Globalization.CultureInfo culture = System.Globalization.CultureInfo.CurrentCulture;
+        System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
+        try
+        {
+            Assert.Equal("en", Localizer.Language);
+            var owner = new InsertsViewModel(new DaemonClient(), "xlr1");
+            var entry = new JsonObject
+            {
+                ["insert"] = JsonNode.Parse("""{"id":"a","kind":"vst3","plugin":"0123","bypass":false}"""),
+                ["nativeHostRunning"] = native,
+                ["latencyMilliseconds"] = reported,
+                ["measuredLatencyMilliseconds"] = measured,
+            };
+            owner.Apply(new JsonArray(entry));
+            Assert.Equal(expected, owner.Items[0].LatencyText);
+            Assert.Equal(measured, owner.Items[0].MeasuredLatencyMilliseconds);
+        }
+        finally { System.Globalization.CultureInfo.CurrentCulture = culture; }
     }
 }

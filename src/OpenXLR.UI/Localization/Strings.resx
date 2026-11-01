@@ -1041,6 +1041,18 @@
   <data name="LatencyUnknown" xml:space="preserve">
     <value>Latency: unknown. Latency compensation counts it as zero.</value>
   </data>
+  <data name="LatencyReportedMeasured" xml:space="preserve">
+    <value>Latency: {0:0.##} ms reported, {1:0.#} ms measured</value>
+  </data>
+  <data name="LatencyReportedMeasuring" xml:space="preserve">
+    <value>Latency: {0:0.##} ms reported, measuring</value>
+  </data>
+  <data name="LatencyUnreportedMeasured" xml:space="preserve">
+    <value>Latency: not reported, {0:0.#} ms measured. Latency compensation counts it as zero.</value>
+  </data>
+  <data name="LatencyUnreportedMeasuring" xml:space="preserve">
+    <value>Latency: not reported, measuring. Latency compensation counts it as zero.</value>
+  </data>
   <data name="LeftLevel" xml:space="preserve">
     <value>Left level</value>
   </data>
