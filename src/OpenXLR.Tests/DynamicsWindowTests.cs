@@ -137,6 +137,15 @@ internal static class DynamicsWindowTests
             Find<Control>(window, "DynamicsReductionMeter"), Find<Control>(window, "DynamicsOutputMeter")]);
     }
 
+    /// <summary>The make-up gain slider inside the window and clear of its value above and its name below.</summary>
+    private static void AssertMakeup(DynamicsWindow window, string where)
+    {
+        Slider makeup = Find<Slider>(window, "DynamicsMakeup");
+        Assert.True(makeup.IsEffectivelyVisible, $"{where}: the make-up gain is hidden");
+        AssertInside(makeup, window);
+        AssertNoOverlap([Find<Control>(window, "DynamicsMakeupText"), makeup, Find<Control>(window, "DynamicsMakeupLabel")]);
+    }
+
     internal static void Check()
     {
         var window = new MainWindow(new DaemonClient("ws://127.0.0.1:1/ws"));
@@ -220,7 +229,7 @@ internal static class DynamicsWindowTests
                     AssertBody(processor, where);
                     Slider makeup = Find<Slider>(processor, "DynamicsMakeup");
                     Assert.Equal(model.IsCompressor, makeup.IsEffectivelyVisible);
-                    if (model.IsCompressor) AssertInside(makeup, processor);
+                    if (model.IsCompressor) AssertMakeup(processor, where);
                     Assert.False(Find<ItemsControl>(processor, "DynamicsAdvanced").IsVisible, $"{where}: settings shown before asked for");
                     Assert.Equal(Localizer.Format("DynamicsDecibels", "-28"), Find<TextBlock>(processor, "DynamicsInputText").Text);
                     Assert.Equal(Localizer.Format("DynamicsDecibels", "6"), Find<TextBlock>(processor, "DynamicsReductionText").Text);
@@ -291,6 +300,7 @@ internal static class DynamicsWindowTests
                     Assert.Equal(Localizer.Format("DynamicsDecibels", "-30"), Find<TextBlock>(processor, "DynamicsOutputText").Text);
                     Assert.Equal(Localizer.Format("DynamicsUnitLevels", "Wave XLR Pro"), Find<TextBlock>(processor, "DynamicsStatus").Text);
                     Assert.True(Find<Control>(processor, "DynamicsGraph").Bounds.Height >= 100, $"{where}: the graph is too short");
+                    if (model.IsCompressor) AssertMakeup(processor, where);
                     Capture(processor, $"dynamics-{model.Kind}-unit-{width:0}");
                 }
                 // The settings the unit has, and not the knee or the hold.
