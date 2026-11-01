@@ -45,6 +45,9 @@
                 <TextBlock Text="{Binding Error}" Foreground="{DynamicResource Ox.Text.Warning}" FontSize="11"
                            TextWrapping="Wrap" IsVisible="{Binding HasError}"/>
                 <WrapPanel>
+                  <Button Name="InsertPluginUi" Content="{loc:Text Key=PluginUI}" Padding="8,3" MinHeight="0" FontSize="{DynamicResource Ox.Label.FontSize}" Margin="0,0,6,0"
+                          Click="OnInsertPluginUi" IsVisible="{Binding NativeEditorSupported}" IsEnabled="{Binding NativeEditorAvailable}"
+                          ToolTip.Tip="{loc:Text Key=OpenThisPluginSOwnEditorOnThe}"/>
                   <Button Content="{loc:Text Key=Controls}" Padding="8,3" MinHeight="0" FontSize="11" Margin="0,0,6,0" Click="OnInsertControls"/>
                   <Button Content="{loc:Text Key=Copy}" Padding="8,3" MinHeight="0" FontSize="{DynamicResource Ox.Label.FontSize}" Margin="0,0,6,0"
                           Click="OnCopyInsert" ToolTip.Tip="{loc:Text Key=CopyThisEffectToPasteOnAny}"/>

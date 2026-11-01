@@ -1,6 +1,8 @@
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.TextFormatting;
+using Avalonia.VisualTree;
+using System.Text.Json.Nodes;
 using OpenXLR.UI;
 using OpenXLR.UI.Localization;
 
@@ -35,6 +37,25 @@ internal static class LocalizationRenderingTests
         {
             chain.Show();
             Assert.Equal(Localizer.Format("InsertsTitle", "XLR 1"), chain.Title);
+
+            // Each effect whose editor the host can open has Plugin UI before
+            // Controls; an effect without one shows no such button.
+            inserts.PluginChoices.Add(new PluginChoice("urn:editor", "Editor", "", new JsonArray(),
+                NativeEditorAvailable: true, NativeEditorSupported: true, Kind: "vst3"));
+            inserts.PluginChoices.Add(new PluginChoice("urn:plain", "Plain", "", new JsonArray(), Kind: "lv2"));
+            inserts.Apply(JsonNode.Parse("""
+                [{"insert":{"id":"a","kind":"vst3","plugin":"urn:editor","bypass":false,"params":{}},"nativeHostRunning":true},
+                 {"insert":{"id":"b","kind":"lv2","plugin":"urn:plain","bypass":false,"params":{}}}]
+                """));
+            chain.UpdateLayout();
+            Button[] pluginUi = [.. chain.GetVisualDescendants().OfType<Button>().Where(b => b.Name == "InsertPluginUi")];
+            Assert.Equal(2, pluginUi.Length);
+            Assert.True(pluginUi[0].IsEffectivelyVisible);
+            Assert.True(pluginUi[0].IsEnabled);
+            Assert.Equal(Localizer.Text("PluginUI"), pluginUi[0].Content);
+            var row = (Panel)pluginUi[0].Parent!;
+            Assert.Equal(Localizer.Text("Controls"), ((Button)row.Children[1]).Content);
+            Assert.False(pluginUi[1].IsVisible);
         }
         finally { chain.Close(); }
     }

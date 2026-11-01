@@ -56,6 +56,11 @@ public partial class MixInsertsWindow : Window
         if ((sender as Control)?.DataContext is InsertViewModel ins) InsertWindows.OpenControls(this, ins);
     }
 
+    private async void OnInsertPluginUi(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is InsertViewModel ins) await ins.Owner.ShowNativeEditorAsync(ins);
+    }
+
     private void OnInsertUp(object? sender, RoutedEventArgs e)
     {
         if ((sender as Control)?.DataContext is InsertViewModel ins) ins.Owner.Move(ins, -1);

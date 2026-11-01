@@ -293,7 +293,8 @@ public sealed class WindowLayoutTests
                 foreach (var actions in chain.GetVisualDescendants().OfType<WrapPanel>())
                 {
                     Assert.NotEmpty(actions.Children);
-                    foreach (var button in actions.Children)
+                    // Plugin UI shows only for an effect whose editor the host can open.
+                    foreach (var button in actions.Children.Where(c => c.IsVisible))
                     {
                         AssertInside(button, actions);
                         AssertInside(button, chain);

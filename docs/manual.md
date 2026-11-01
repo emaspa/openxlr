@@ -3063,6 +3063,11 @@ A CLAP or VST3 plugin has no shared chain to go back to, so it always runs
 this way: its row shows no switch, and the cog opens its editor whenever
 the plugin is running.
 
+The chain window has the same "Plugin UI" button on each effect, before
+Controls, so an editor opens without going through the controls window.
+It shows for a plugin with an editor OpenXLR can host and works when
+"Plugin UI" in the controls window would.
+
 Some PipeWire packages are built without the filter chain's LV2 loader,
 and the filter chain can also refuse a single plugin. When it refuses an
 LV2 insert and the host process is installed, OpenXLR runs that insert in
