@@ -52,6 +52,7 @@ internal static class SavedMixerValidation
             Inserts = Inserts(settings, notes),
             Eq = Eq(settings.Eq, notes),
             EqProcessing = EqProcessing(settings.EqProcessing, notes),
+            DynamicsProcessing = Processing(settings.DynamicsProcessing, "dynamicsProcessing", notes),
             NoiseRemoval = NoiseRemoval(settings.NoiseRemoval, notes),
             VoiceChanger = VoiceChanger(settings.VoiceChanger, notes),
             Compressor = Dynamics(settings.Compressor, "compressor", MicCompressor.Check, MicCompressor.Snap, notes),
@@ -347,13 +348,17 @@ internal static class SavedMixerValidation
     /// takes the default.
     /// </summary>
     private static Dictionary<string, string> EqProcessing(Dictionary<string, string>? entries, List<string> notes)
+        => Processing(entries, "eqProcessing", notes);
+
+    /// <summary>Where each microphone's EQ, or compressor and expander, run, by the rule of <see cref="EqProcessing"/>.</summary>
+    private static Dictionary<string, string> Processing(Dictionary<string, string>? entries, string name, List<string> notes)
     {
-        if (entries is null) { notes.Add($"eqProcessing: {NullEntry}"); return []; }
+        if (entries is null) { notes.Add($"{name}: {NullEntry}"); return []; }
         var kept = new Dictionary<string, string>();
         foreach ((string channel, string value) in entries)
         {
             if (MicEqProcessing.IsValid(value)) kept[channel] = value;
-            else notes.Add($"eqProcessing.{channel}: must be 'device' or 'software'");
+            else notes.Add($"{name}.{channel}: must be 'device' or 'software'");
         }
         return kept;
     }

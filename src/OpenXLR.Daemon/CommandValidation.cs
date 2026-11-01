@@ -118,6 +118,8 @@ public static class CommandValidation
                 return CheckCompressor(cmd, layout, nativeHostInstalled ?? PluginCatalog.HostInstalled);
             case "setExpander":
                 return CheckExpander(cmd, layout, nativeHostInstalled ?? PluginCatalog.HostInstalled);
+            case "setDynamicsProcessing":
+                return CheckDynamicsProcessing(cmd, layout);
             case "watchDynamics":
                 if (cmd.Channel is null || TooLong(cmd.Channel, 36) || !layout.IsMicrophoneChannel(cmd.Channel))
                     return "watchDynamics: need a microphone channel";
@@ -514,7 +516,7 @@ public static class CommandValidation
     /// <c>enabled</c>, <c>threshold</c>, <c>ratio</c>, <c>attack</c>,
     /// <c>release</c>, <c>knee</c> and <c>makeup</c>, each inside its range;
     /// a value outside it is refused, not clamped. Switching it on is refused
-    /// at once when the native helper is not installed.
+    /// at once when the native helper is not installed and no unit runs it.
     /// </summary>
     internal static string? CheckCompressor(Command cmd, ILayoutInfo layout, bool hostInstalled)
     {
@@ -524,7 +526,7 @@ public static class CommandValidation
         var change = new MicCompressorChange(cmd.Enabled, cmd.Threshold, cmd.Ratio, cmd.Attack, cmd.Release, cmd.Knee, cmd.Makeup);
         if (change.IsEmpty) return "setCompressor: need at least one of 'enabled', 'threshold', 'ratio', 'attack', 'release', 'knee' and 'makeup'";
         if (MicCompressor.Check(change.ApplyTo(MicCompressor.Default)) is string problem) return $"setCompressor: {problem}";
-        return cmd.Enabled == true && !hostInstalled ? Mixer.DynamicsNeedsHost : null;
+        return cmd.Enabled == true && !hostInstalled && !layout.DynamicsRunOnDevice(cmd.Channel) ? Mixer.DynamicsNeedsHost : null;
     }
 
     /// <summary>
@@ -532,7 +534,7 @@ public static class CommandValidation
     /// <c>enabled</c>, <c>threshold</c>, <c>ratio</c>, <c>range</c>,
     /// <c>attack</c>, <c>release</c> and <c>hold</c>, each inside its range.
     /// Switching it on is refused at once when the native helper is not
-    /// installed.
+    /// installed and no unit runs it.
     /// </summary>
     internal static string? CheckExpander(Command cmd, ILayoutInfo layout, bool hostInstalled)
     {
@@ -542,7 +544,24 @@ public static class CommandValidation
         var change = new MicExpanderChange(cmd.Enabled, cmd.Threshold, cmd.Ratio, cmd.Range, cmd.Attack, cmd.Release, cmd.Hold);
         if (change.IsEmpty) return "setExpander: need at least one of 'enabled', 'threshold', 'ratio', 'range', 'attack', 'release' and 'hold'";
         if (MicExpander.Check(change.ApplyTo(MicExpander.Default)) is string problem) return $"setExpander: {problem}";
-        return cmd.Enabled == true && !hostInstalled ? Mixer.DynamicsNeedsHost : null;
+        return cmd.Enabled == true && !hostInstalled && !layout.DynamicsRunOnDevice(cmd.Channel) ? Mixer.DynamicsNeedsHost : null;
+    }
+
+    /// <summary>
+    /// <c>setDynamicsProcessing</c>: XLR 1 or XLR 2 and a <c>value</c> of
+    /// <c>device</c> or <c>software</c>, as <c>setEqProcessing</c> takes it. A
+    /// capture input's compressor and expander always run in software, so it
+    /// is refused there. A unit that cannot run them is no refusal: the choice
+    /// is kept and takes effect once it can.
+    /// </summary>
+    internal static string? CheckDynamicsProcessing(Command cmd, ILayoutInfo layout)
+    {
+        if (cmd.Channel is null) return "setDynamicsProcessing: need 'channel'";
+        if (TooLong(cmd.Channel, 36) || !layout.IsMicrophoneChannel(cmd.Channel))
+            return $"setDynamicsProcessing: '{Short(cmd.Channel)}' is not a microphone input";
+        if (layout.EqRunsInSoftwareOnly(cmd.Channel)) return Mixer.DynamicsSoftwareOnly(Short(cmd.Channel));
+        return cmd.Value.ValueKind == JsonValueKind.String && UnitDynamics.IsValid(cmd.Value.GetString())
+            ? null : "setDynamicsProcessing: value must be 'device' or 'software'";
     }
 
     /// <summary>The longest channel or mix list a <c>setDucking</c> may carry.</summary>

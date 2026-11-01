@@ -184,7 +184,7 @@ public sealed partial class Mixer
                 ? $"The microphone is not connected. {ChannelNameLocked(input)}: {why}"
                 : $"The microphone is not connected. {ChannelNameLocked(input)}.");
         // The wait for the unit is over, confirmed or not.
-        if (_soundCheckClaim == channel && _eqReleasing.Remove(channel)) ApplySoftwareEqLocked(channel);
+        if (_soundCheckClaim == channel && (_eqReleasing.Remove(channel) | _dynamicsReleasing.Remove(channel))) ApplySoftwareEqLocked(channel);
         FilterHandle filter = _pw.CreateSoundCheck(channel, out int rate, out int? quantum);
         PortLink? feed = null;
         try

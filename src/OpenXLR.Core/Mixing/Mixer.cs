@@ -1636,6 +1636,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 Inserts = CopyInsertsLocked(),
                 Eq = new Dictionary<string, MicEq>(_eq, StringComparer.Ordinal),
                 EqProcessing = new Dictionary<string, string>(_eqProcessing, StringComparer.Ordinal),
+                DynamicsProcessing = new Dictionary<string, string>(_dynamicsProcessing, StringComparer.Ordinal),
                 NoiseRemoval = new Dictionary<string, MicNoise>(_noise, StringComparer.Ordinal),
                 VoiceChanger = new Dictionary<string, MicVoice>(_voice, StringComparer.Ordinal),
                 Compressor = new Dictionary<string, MicCompressor>(_compressor, StringComparer.Ordinal),
@@ -1820,6 +1821,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             _eqProcessing.Clear();
             foreach ((string channel, string processing) in s.EqProcessing)
                 if (processing == MicEqProcessing.Software) _eqProcessing[channel] = processing;
+            _dynamicsProcessing.Clear();
+            foreach ((string channel, string processing) in s.DynamicsProcessing)
+                if (processing == UnitDynamics.Software) _dynamicsProcessing[channel] = processing;
             // A chain the file does not name keeps what it has, and only a
             // chain whose structure changed is built again.
             if (chainsChanged || rebuildAll || s.Inserts.Count > 0)
@@ -3381,8 +3385,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                     Eq = CarriesEq(c) ? EqStateLocked(c.Id, unitInputs) : null,
                     Noise = CarriesEq(c) ? NoiseStateLocked(c.Id) : null,
                     Voice = CarriesEq(c) ? VoiceStateLocked(c.Id) : null,
-                    Compressor = CarriesEq(c) ? CompressorStateLocked(c.Id) : null,
-                    Expander = CarriesEq(c) ? ExpanderStateLocked(c.Id) : null,
+                    Compressor = CarriesEq(c) ? CompressorStateLocked(c.Id, unitInputs) : null,
+                    Expander = CarriesEq(c) ? ExpanderStateLocked(c.Id, unitInputs) : null,
                 })],
                 RenamedSinceStart = _renamedSinceBuild,
                 DefaultMonitorMix = PrimaryMonitorLocked()?.Id,

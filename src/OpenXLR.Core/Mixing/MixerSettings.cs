@@ -139,6 +139,13 @@ public sealed record MixerSettings
     public Dictionary<string, string> EqProcessing { get; init; } = [];
 
     /// <summary>
+    /// Where each microphone's compressor and expander run when its unit can
+    /// run them, by channel id: <c>software</c>, or <c>device</c> for a channel
+    /// absent here. Machine wiring like <see cref="EqProcessing"/>.
+    /// </summary>
+    public Dictionary<string, string> DynamicsProcessing { get; init; } = [];
+
+    /// <summary>
     /// Noise removal by channel id. A microphone absent here has it off. An
     /// entry for a channel that is not a microphone is kept as it is.
     /// </summary>

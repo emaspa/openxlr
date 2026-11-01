@@ -12,7 +12,7 @@ namespace OpenXLR.Daemon;
 /// other clients, so every UI/plugin stays in sync. Commands from clients are
 /// applied here; the device's own lock serialises the USB transfers.
 /// </summary>
-public sealed class DeviceManager : BackgroundService
+public sealed partial class DeviceManager : BackgroundService
 {
     private readonly ILogger<DeviceManager> _log;
     private readonly object _gate = new();
@@ -401,6 +401,7 @@ public sealed class DeviceManager : BackgroundService
             EnsureConnected();
             Progress.Mark();
             WriteEq();
+            WriteDynamics();
             WriteDucking();
             PollOnce();
             Progress.Mark();
@@ -559,6 +560,7 @@ public sealed class DeviceManager : BackgroundService
             {
                 RaiseFromLocked();
                 ForgetEq();
+                ForgetDynamics();
                 ForgetDucking();
             }
             foreach (string drivenInstance in _drivenInstances)
@@ -617,6 +619,7 @@ public sealed class DeviceManager : BackgroundService
             _device = dev;
             _last = null;
             ForgetEq();
+            ForgetDynamics();
             ForgetDucking();
             ConnectDuckingLocked(dev);
             if (dev.EqSupport is { Ready: false } eqSupport && eqSupport.Note is { } eqNote)
@@ -934,6 +937,7 @@ public sealed class DeviceManager : BackgroundService
             // A readback that changed can change whether the unit runs ducking at all.
             changed |= VerifyDuckingLocked(_device);
             VerifyEqLocked(_device);
+            VerifyDynamicsLocked(_device);
             if (changed || recovered) RaiseFromLocked();
         }
     }
@@ -968,7 +972,7 @@ public sealed class DeviceManager : BackgroundService
         lock (_gate)
         {
             if (_device is null || !_device.Connected) return "no device connected";
-            string? unsupported = UnsupportedControlReason(_device.Capabilities, control);
+            string? unsupported = UnsupportedControlReason(EffectiveCapabilitiesLocked(_device), control);
             if (unsupported is not null) return unsupported;
             int? lineInWritten = null;
             try
@@ -1110,7 +1114,7 @@ public sealed class DeviceManager : BackgroundService
         {
             if (_device is null || !_device.Connected) return "no device connected";
             DeviceState s = _last ?? Stamp(_device.ReadState());
-            DeviceCapabilities c = _device.Capabilities;
+            DeviceCapabilities c = EffectiveCapabilitiesLocked(_device);
             bool lockApplies = GainIsLocked && !restoring;
             bool gainBlocked = lockApplies &&
                 (c.Gain && s.GainDb != p.GainDb ||
@@ -1301,16 +1305,18 @@ public sealed class DeviceManager : BackgroundService
             Connected = true,
             Device = new DeviceDescriptor(dev.Info.Vendor, dev.Info.Model,
                 $"{dev.Info.VendorId:x4}:{dev.Info.ProductId:x4}", dev.ConnectionNote, dev.Firmware),
-            Capabilities = dev.Capabilities,
+            Capabilities = EffectiveCapabilitiesLocked(dev),
             // Reopened but not answering yet: the values it last gave, which
             // the warning marks as such.
             State = _last ?? (_unansweredId == id && _lastGoodId == id ? _lastGood : null),
         };
+        KeepHeldDynamicsLocked(dev);
         UnitEqSupport? eq = dev.EqSupport is { } support
             ? new UnitEqSupport(dev.Info.Model, dev.Firmware, support.Ready, support.Reason, support.Note)
             {
                 Inputs = dev.Capabilities.XlrInputs,
                 MinimumFirmware = support.MinimumFirmware ?? WaveFxEq.Format(WaveFxEq.Mk2EqFirmware),
+                Dynamics = dev.DynamicsSupport,
             }
             : null;
         // A unit that answered a poll but not the ducking block cannot run it.
@@ -1343,6 +1349,7 @@ public sealed class DeviceManager : BackgroundService
             // Nothing is written to a unit that went away: what was posted
             // to it is forgotten, and the mixer posts again when it returns.
             ForgetEq();
+            ForgetDynamics();
             ForgetDucking();
             if (was) StateChanged?.Invoke(NothingDriven.Message);
         }

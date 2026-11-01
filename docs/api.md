@@ -159,7 +159,7 @@ The state message in full. At the top level: `daemonVersion`, `daemonBuildId`, `
 `connected`, `device` (`vendor`, `model`, `usbId`; when the unit is driven differently from the usual, `note`: today an XLR Dock taking a control through its config block, an XLR Dock MK.2 that answered on its other USB control bank or on neither, or a Wave XLR, Wave:3 or Wave:1 whose ALSA card was not found, so the desktop's volume controls are not kept in step; and `firmware`, the version the unit reports, on a model that reports one, today the Wave:3, the Wave:1, the MK.2 family, the Wave:3 MK.2 (in its own numbering, 0.2.x) and the Wave XLR Pro), `capabilities` (`gain`,
 `mute`, `lowCut`, `expander`, `voiceTune`, `hpVolume`, `lowImpedance`,
 `crossfade`, `phantom`, `clipGuard`, `compressor`, `outputRouting`,
-`auxInput`, `lineInput` (the analog Line In with a gain of its own, separate from the USB Aux input: true on the Wave XLR Pro only), `lineInGainMaxDb` (the highest Line In gain in dB that `lineInGain` takes, from 0: 40 on the Wave XLR Pro, whose unit takes 80 but hisses above about 20; 0 on a model without `lineInput`), `xlrInputs`, `xlrJacks` (false on the Wave:3, Wave:3 MK.2 and Wave:1, whose one input is the microphone's own capsule rather than an XLR jack), `hpOutputs`, `physicalControls`, `retainsSettings`, `hardwareEq` (the unit's DSP runs the [microphone EQ](#microphone-eq) and the driver can write it: true on the Wave XLR MK.2 and the XLR Dock MK.2 from firmware 1.0.15, on the Wave:3 MK.2 from its firmware 0.2.3 and on the Wave XLR Pro from firmware 1.0.14, false on every other model and on older firmware), `ducking` (the unit can run [ducking](#ducking) on its own processor: true on the Wave XLR Pro only),
+`auxInput`, `lineInput` (the analog Line In with a gain of its own, separate from the USB Aux input: true on the Wave XLR Pro only), `lineInGainMaxDb` (the highest Line In gain in dB that `lineInGain` takes, from 0: 40 on the Wave XLR Pro, whose unit takes 80 but hisses above about 20; 0 on a model without `lineInput`), `xlrInputs`, `xlrJacks` (false on the Wave:3, Wave:3 MK.2 and Wave:1, whose one input is the microphone's own capsule rather than an XLR jack), `hpOutputs`, `physicalControls`, `retainsSettings`, `hardwareEq` (the unit's DSP runs the [microphone EQ](#microphone-eq) and the driver can write it: true on the Wave XLR MK.2 and the XLR Dock MK.2 from firmware 1.0.15, on the Wave:3 MK.2 from its firmware 0.2.3 and on the Wave XLR Pro from firmware 1.0.14, false on every other model and on older firmware), `hardwareDynamics` (the unit's DSP runs the microphone's [compressor and expander](#where-the-compressor-and-expander-run) and the driver can write their settings: true where `hardwareEq` is true and the unit's compressor and expander fields hold values it takes), `ducking` (the unit can run [ducking](#ducking) on its own processor: true on the Wave XLR Pro only),
 `builtInDefaults`, `captureRecovery` (the daemon brings the unit's microphone back by a USB reset when its capture stalls under its own playback, and takes `recoverCapture`, which first links the capture again: true on the Wave:3 MK.2 only), and `gainMaxDb`, the highest gain in dB that `gain` and
 `gain2` take, from 0: 80 on the Wave XLR Pro and the MK.2 family, 75 on the
 Wave XLR and the first XLR Dock, 40 on the Wave:3, Wave:3 MK.2 and Wave:1; a higher value is held
@@ -249,7 +249,7 @@ that final acknowledgement (or an `error` without a request id):
 | Command | Fields | Purpose |
 |---|---|---|
 | `getState` | none | request a state push |
-| `set` | `control`, `value` | hardware control (`gain`, `mute`, `lowCut`, `expander`, `voiceTune`, `voiceTuneStrength`, `phantom`, `clipGuard`, `compressor`, their `…2` variants for XLR 2, `hpVolumeDb`, `hp2VolumeDb`, `lowImpedance`, `crossfade`, `auxLevelDb`, `auxLevelLock`, `lineInGain`, `lineInLevelLock`, `outHp1`, `outHp2`, `outUsbAux`, `outLineOut`) and the software `gainLock`. `lineInLevelLock` is a boolean, and a saved state from before it existed leaves the lock as it is. `lineInGain` is the Line In's gain, an integer in dB held to 0 to `lineInGainMaxDb`, as is a saved state's gain on recall; the gain lock does not cover it, and the daemon logs each write with the value the unit reads back. A control the active device's capabilities do not advertise is refused with an error, as is an XLR Dock control the card lacks while the USB handle is closed |
+| `set` | `control`, `value` | hardware control (`gain`, `mute`, `lowCut`, `expander`, `voiceTune`, `voiceTuneStrength`, `phantom`, `clipGuard`, `compressor`, their `…2` variants for XLR 2, `hpVolumeDb`, `hp2VolumeDb`, `lowImpedance`, `crossfade`, `auxLevelDb`, `auxLevelLock`, `lineInGain`, `lineInLevelLock`, `outHp1`, `outHp2`, `outUsbAux`, `outLineOut`) and the software `gainLock`. `lineInLevelLock` is a boolean, and a saved state from before it existed leaves the lock as it is. `lineInGain` is the Line In's gain, an integer in dB held to 0 to `lineInGainMaxDb`, as is a saved state's gain on recall; the gain lock does not cover it, and the daemon logs each write with the value the unit reads back. A control the active device's capabilities do not advertise is refused with an error, as is an XLR Dock control the card lacks while the USB handle is closed. While the mixer runs a unit's [compressor and expander](#where-the-compressor-and-expander-run), `compressor`, `expander` and their `2` variants are left out of its capabilities and refused: they are the microphone's, set through `setCompressor` and `setExpander`. A recalled profile's values for them are skipped then |
 | `setLowCutHz` | `value` | software low cut: 0, 80, or 120 |
 | `setSoftClipGuard` | `value` | software ClipGuard (post-ADC limiter at -3 dB); enabling is rejected if `swh-plugins` is unavailable, without replacing or disconnecting the live microphone route |
 | `setMixLatencyCompensation` | `value` | boolean; delay the other mixes to line up with the mix whose inserts take longest (see [plugin latency](#plugin-latency)). Off by default. Either way every insert chain is rebuilt, which briefly interrupts audio |
@@ -341,8 +341,9 @@ that final acknowledgement (or an `error` without a request id):
 | `listEqProfiles` | none | read `eq-profiles.json` again, for an edit by hand, and send the state: to every client when the list changed, else to the one that asked |
 | `setNoiseRemoval` | `channel`, at least one of `enabled`, `engine`, `strength` | a microphone's noise removal: `enabled` a boolean, `engine` `rnnoise` or `deepfilternet`, `strength` the most the noise is turned down, 0 to 100 dB. The channel rules are those of `setEq`. Values outside the range are refused, not clamped. Switching it on is refused at once when the native plugin host is not installed, and an engine the host was built without is refused. See [noise removal](#noise-removal) |
 | `setVoiceChanger` | `channel`, at least one of `enabled`, `voice`, `pitch`, `formant` | a microphone's voice changer: `enabled` a boolean, `voice` one of `custom`, `deep`, `high`, `robot`, `radio`, `alien`, `dracula`, `frankenstein`, `mummy`, `werewolf` and `witch`, `pitch` and `formant` the custom voice's shifts, -12 to 12 semitones. The channel rules are those of `setEq`. Values outside the range are refused, not clamped. Switching it on is refused at once when the native plugin host is not installed. See [voice changer](#voice-changer) |
-| `setCompressor` | `channel`, at least one of `enabled`, `threshold`, `ratio`, `attack`, `release`, `knee`, `makeup` | a microphone's compressor on this computer, with the ranges in [compressor and expander](#compressor-and-expander). The channel rules are those of `setEq`. Values outside a range are refused, not clamped. Switching it on is refused at once when the native plugin host is not installed. It is not the unit's own `compressor` control |
-| `setExpander` | `channel`, at least one of `enabled`, `threshold`, `ratio`, `range`, `attack`, `release`, `hold` | a microphone's expander on this computer, as `setCompressor` takes the compressor. It is not the unit's own `expander` control |
+| `setCompressor` | `channel`, at least one of `enabled`, `threshold`, `ratio`, `attack`, `release`, `knee`, `makeup` | a microphone's compressor, with the ranges in [compressor and expander](#compressor-and-expander). The channel rules are those of `setEq`. Values outside a range are refused, not clamped. On a unit that runs it, the unit takes it rounded and held to its own limits (see [where they run](#where-the-compressor-and-expander-run)). Switching it on is refused at once when the native plugin host is not installed and no unit runs the channel's compressor |
+| `setExpander` | `channel`, at least one of `enabled`, `threshold`, `ratio`, `range`, `attack`, `release`, `hold` | a microphone's expander, as `setCompressor` takes the compressor |
+| `setDynamicsProcessing` | `channel`, `value` | where a microphone's compressor and expander run when the unit it carries can run them: `device` (the default) on the unit's own DSP, or `software` on this computer. One choice covers both. Any other value is refused. Saved in `mixer.json` under `dynamicsProcessing`, never in a profile. Moving between the two switches the leaving one off first. Refused on a capture input, whose compressor and expander always run on this computer. See [where they run](#where-the-compressor-and-expander-run) |
 | `watchDynamics` | `channel` | send the [compressor and expander](#compressor-and-expander) levels of a channel whose `microphone` is true for the next 15 seconds, as `exp:<id>` and `comp:<id>` in `meters`. Send it again to keep them coming. They come only while the microphone's stage runs; asking starts nothing and changes nothing in the route. Refused at once when the native plugin host is not installed |
 | `adjustOutputVolume` | optional `device`, `value` | change a PipeWire output by desktop percentage points (`0.05` is 5%). Finite steps from -0.5 to 0.5, final volume clamped to 0 through 1.5. Omit `device` for the current desktop default |
 | `setOutputDeviceVolume` | optional `device`, `value` | set a PipeWire output's desktop volume; `value` finite, 0 to 1.5 on the desktop scale (1.0 is 100%), rejected outside that range. A monitor mix sink is set through its mix master; a selected monitor output follows the linked monitor-volume behaviour. Omit `device` for the current desktop default; device names are accepted and rejected as for `adjustOutputVolume` |
@@ -1297,8 +1298,9 @@ All under `~/.config/openxlr/` (or `$XDG_CONFIG_HOME/openxlr/`):
   absent from profiles), the software low
   cut, the insert chains, the microphone EQs (`eq`), noise removal
   (`noiseRemoval`), the voice changer (`voiceChanger`), the compressor
-  (`compressor`), the expander (`expander`) and where the EQs run
-  (`eqProcessing`), the [ducking](#ducking) setup (`ducking`), the
+  (`compressor`), the expander (`expander`), where the EQs run
+  (`eqProcessing`) and where the compressors and expanders run
+  (`dynamicsProcessing`), the [ducking](#ducking) setup (`ducking`), the
   per-channel volumes (`channelVolumes`), the exclusive groups
   (`exclusiveGroups`), the monitor feeds (`monitorFeeds`),
   `compensateMixLatency`, and `inputBindings`, the hardware strips bound to
@@ -2258,18 +2260,16 @@ a capture input drops its setting with the channel.
 ### Compressor and expander
 
 Every channel that carries the [microphone EQ](#microphone-eq) has a
-compressor and an expander that run on this computer, in the native plugin
+compressor and an expander. On XLR 1 and XLR 2 they run on the unit's own
+DSP when the unit can run them (see
+[where they run](#where-the-compressor-and-expander-run)). Everywhere else
+they run on this computer, in the native plugin
 host, in the same stage as noise removal, the software EQ and the voice
 changer. The order in the stage is noise removal, expander, EQ, compressor,
 voice changer. The expander closes on the noise that noise removal leaves,
 and the compressor evens out the shaped voice. Both are off until switched
 on, and off they pass the microphone through untouched, to the bit. Neither
 adds delay.
-
-They are not the unit's own `compressor` and `expander` controls, which
-`set` switches and which turn a fixed setting inside a Wave XLR Pro, an
-MK.2 unit or a Wave:3 on or off. The two kinds are independent: with the
-unit's switch and the one here both on, the voice goes through both.
 
 The compressor turns the voice down above its threshold by its ratio, with
 a soft knee. The expander turns the microphone down below its threshold by
@@ -2290,13 +2290,20 @@ gets louder and release as it gets quieter.
 | `hold` | | 0 to 500 ms, whole ms, default 50 |
 
 A channel's `compressor` in the mixer state is
-`{enabled, threshold, ratio, attack, release, knee, makeup, available, error}`
+`{enabled, threshold, ratio, attack, release, knee, makeup, available, error, backend, processing, device}`
 and its `expander`
-`{enabled, threshold, ratio, range, attack, release, hold, available, error}`:
-the setting, `available` (false when the native plugin host is not
-installed, or after the stage failed three times in five minutes) and
+`{enabled, threshold, ratio, range, attack, release, hold, available, error, backend, processing, device}`:
+the setting, `available` (always true while the unit runs them, which needs
+no helper; in software false when the native plugin host is not
+installed, or after the stage failed three times in five minutes),
 `error` (why the setting does not run as asked, or null: no host, a host
-from before the compressor and expander, or the stage's own failure).
+from before the compressor and expander, or the stage's own failure),
+`backend` (`device` while the unit runs them, on or off; `software` while
+the stage runs with either on; null otherwise), `processing` (the
+channel's choice, below; always `software` on a capture input) and
+`device` (the unit the channel carries, below). While the unit runs them,
+the numbers are the ones the unit holds, and `knee` and `hold`, which the
+unit does not have, are the setting's.
 
 `setCompressor` and `setExpander` take the channel and at least one of
 their fields; an absent field keeps its value, so
@@ -2324,7 +2331,11 @@ EQ. Asking starts no stage, so with nothing in the stage on, no `exp:` or
 UI fills that gap from the [meter before the chain](#meter-before-the-chain):
 while no stage levels come it also sends `watchInputMeter` and shows the
 peak of `in:<id>` as the input, which is the raw microphone before noise
-removal, with no reduction and no output.
+removal, with no reduction and no output. While the unit runs them no
+`exp:` or `comp:` levels come for them, since the unit reports neither
+its input nor its gain reduction; the UI then shows the peak of
+`in:<id>`, which is the microphone after the unit's processing, as the
+output alone.
 
 Both are saved in `mixer.json` under `compressor` and `expander`, by
 channel id. A microphone absent there has them off. A profile saved now
@@ -2332,6 +2343,80 @@ carries `mixer.compressor` and `mixer.expander` for every microphone; a
 recall replaces the setting of each channel it names, and a profile
 without them, as every older one is, leaves them alone. Deleting a capture
 input drops its settings with the channel.
+
+#### Where the compressor and expander run
+
+The compressor and the expander of XLR 1 and XLR 2 run on the unit's own
+DSP when all of these hold, and on this computer otherwise. It is the rule
+of [where the EQ runs](#where-the-eq-runs):
+
+1. The channel carries a driven unit's input, by the rule `unitInput`
+   follows.
+2. The unit runs them: it runs the EQ (the same models and firmware), and
+   the compressor and expander fields of its settings block hold values
+   the unit takes, on the Pro on both inputs. Its
+   `capabilities.hardwareDynamics` is then true.
+3. The channel's `processing` is `device`, the default.
+   `setDynamicsProcessing` sets it, for the compressor and the expander
+   together.
+4. No Sound Check session runs on the channel.
+5. The unit has not failed to keep what was written to it in this run.
+
+`device` in each of the two objects is non-null while the channel carries
+an input of a unit whose model has them, with the fields of the EQ's
+`device`: `{unit, input, name, firmware, ready, reason, note,
+minimumFirmware}`. `reason` is `firmwareOld`, `firmwareUnknown`,
+`unsupportedBlock` (the compressor or expander fields, or the EQ's, hold
+values the unit does not take) or `failed` (the unit did not keep a write
+twice; switching either processor or the choice off and on tries again).
+
+On the way to the unit the daemon rounds each value to the unit's step
+and clamps it to the unit's limits:
+
+| Setting | Compressor on the unit | Expander on the unit |
+|---|---|---|
+| `threshold` | -60 to -1 dB, whole dB | -60 to -1 dB, whole dB |
+| `ratio` | 1 to 20, whole numbers | 1 to 3, steps of 0.1, held in sixteenths |
+| `attack` | 1 to 300 ms, whole ms (the setting stops at 200) | 1 to 200 ms, whole ms |
+| `release` | 50 to 1000 ms, whole ms | 10 to 1000 ms, whole ms |
+| `makeup` | 0 to 20 dB, whole dB | |
+| `range` | | 0 to 60 dB, whole dB |
+| `knee`, `hold` | none: kept for software | none: kept for software |
+
+A value the commands take that the unit cannot hold is clamped and
+rounded, never refused, so the same setting runs on either side; the
+setting itself is kept as sent and comes back when software runs it. While
+the unit runs them the state reports the values it holds, and the UI
+limits its sliders to these ranges.
+
+The unit's two switches are the same bits the unit's own `compressor` and
+`expander` controls set. While the mixer drives a unit's compressor and
+expander, those controls are left out of the unit's `capabilities` and
+`set` refuses them, so the microphone's setting is the only one. When
+software runs them, or they are off, the unit's switches are held off, so
+they never stack. A microphone with no compressor and no expander setting
+of its own when its unit first runs them takes the unit's switches and
+settings (each held to the software's ranges, the knee and the hold at
+their defaults), so a compressor switched on with the unit's own switch
+before stays on; the daemon waits for the unit's first read for that and
+writes nothing before it. The journal says so once.
+
+On the unit, each change is a read of the settings block and a write of
+the whole block with only these fields changed, without a commit, written
+and read back as the EQ is: the first change at once, then at most ten a
+second, the last always, nothing while phantom power settles, a write the
+unit does not keep tried once more, and a change another program makes
+written back at most every 5 s. Moving between the two switches the
+leaving side off first, and software takes over once the unit confirms
+it, after 1 s at most.
+
+The settings layout is the one in
+[the Pro protocol notes](wave-xlr-pro-protocol.md#compressor-and-expander-on-the-unit).
+On the Wave:3 MK.2 every field was seen written to both ends of its limits
+and read back by the unit. The Wave XLR MK.2, the XLR Dock MK.2 and both
+inputs of the Wave XLR Pro hold the same fields at the same offsets, with
+the same factory values, and are driven the same way. How any of them
+sounds with OpenXLR's writes has not been checked by ear yet.
 
 ### Ducking
 
