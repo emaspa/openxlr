@@ -1296,7 +1296,19 @@ public sealed partial class MainViewModel : ViewModelBase
                 if (m is not null) { m.MeterL = l; m.MeterR = r; }
             }
             else if (kv.Key.StartsWith("in:", StringComparison.Ordinal) && kv.Value is JsonArray level)
+            {
                 MicSetupOf(kv.Key[3..])?.ApplyInputLevel(level);
+                // A compressor or expander window shows it while the microphone's stage does not run.
+                if (Channels.FirstOrDefault(x => x.Id == kv.Key[3..])?.Dynamics is { } dynamics)
+                {
+                    dynamics.Expander.ApplyInputLevel(level);
+                    dynamics.Compressor.ApplyInputLevel(level);
+                }
+            }
+            else if (kv.Key.StartsWith("comp:", StringComparison.Ordinal) && kv.Value is JsonArray compressor)
+                Channels.FirstOrDefault(x => x.Id == kv.Key[5..])?.Dynamics?.Compressor.ApplyLevels(compressor);
+            else if (kv.Key.StartsWith("exp:", StringComparison.Ordinal) && kv.Value is JsonArray expander)
+                Channels.FirstOrDefault(x => x.Id == kv.Key[4..])?.Dynamics?.Expander.ApplyLevels(expander);
             else if (kv.Key.StartsWith("take:", StringComparison.Ordinal) && kv.Value is JsonArray position)
                 MicSetupOf(kv.Key[5..])?.ApplyPosition(position);
         }
@@ -1486,6 +1498,7 @@ public sealed partial class MainViewModel : ViewModelBase
                     vm.ApplyFromDaemon(c);
                     vm.ApplyEq(c["eq"], mixer["eqLimits"]);
                     vm.ApplyNoise(c["noise"]);
+                    vm.ApplyDynamics(c["compressor"], c["expander"]);
                     vm.Inserts?.Apply(mixer["inserts"]?[vm.Id]);
                     vm.Inserts?.MicSetup.Apply(mixer["soundCheck"]);
                     vm.Inserts?.EnsurePluginsLoaded();
@@ -1858,6 +1871,7 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
             if (_showsVolumeReadout) Raise(nameof(ReadoutName));
             if (_eq is not null) _eq.ChannelName = value;
             if (_noise is not null) _noise.ChannelName = value;
+            if (_dynamics is not null) _dynamics.ChannelName = value;
             if (_inserts is not null) _inserts.Title = value;
         }
     }
@@ -1948,6 +1962,35 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
         }
         if (_noise is null) Noise = new MicNoiseViewModel(_client, Id, Name);
         _noise!.Apply(noise);
+    }
+
+    private ChannelDynamicsViewModel? _dynamics;
+    /// <summary>
+    /// The compressor and the expander on this computer, on a channel the
+    /// daemon reports them for (the channels that carry the EQ); null on every
+    /// other channel and from a daemon without them.
+    /// </summary>
+    public ChannelDynamicsViewModel? Dynamics { get => _dynamics; private set { if (Set(ref _dynamics, value)) Raise(nameof(HasDynamics)); } }
+
+    /// <summary>The channel has the compressor and the expander, so its Dynamics button shows.</summary>
+    public bool HasDynamics => _dynamics is not null;
+
+    /// <summary>Take the channel's <c>compressor</c> and <c>expander</c> from a state push; both or neither.</summary>
+    internal void ApplyDynamics(JsonNode? compressor, JsonNode? expander)
+    {
+        if (compressor is not JsonObject || expander is not JsonObject)
+        {
+            if (_dynamics is { } gone)
+            {
+                Dynamics = null;
+                gone.Detach();
+                DynamicsWindows.Close(gone.Expander);
+                DynamicsWindows.Close(gone.Compressor);
+            }
+            return;
+        }
+        if (_dynamics is null) Dynamics = new ChannelDynamicsViewModel(_client, Id, Name);
+        _dynamics!.Apply(compressor, expander);
     }
 
     private bool _isHardware;
@@ -2276,6 +2319,7 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
         SliderSync.Forget($"capgain:{Id}");
         ApplyEq(null, null);
         ApplyNoise(null);
+        ApplyDynamics(null, null);
         ApplyChainWidth(null);
     }
 

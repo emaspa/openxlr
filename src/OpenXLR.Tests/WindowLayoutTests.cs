@@ -58,6 +58,7 @@ public sealed class WindowLayoutTests
                 DuckingWindowTests.Check();
                 SoundboardWindowTests.Check();
                 VoiceChangerWindowTests.Check();
+                DynamicsWindowTests.Check();
                 InputBindingWindowTests.CheckCaptureInputs();
                 CaptureInputWindowTests.ThreeCaptureInputsFitClassicWidths();
                 VolumeRangeWindowTests.Check();

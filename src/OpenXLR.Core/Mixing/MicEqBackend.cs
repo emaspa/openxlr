@@ -24,9 +24,10 @@ internal interface IMicEqBackend
 
 /// <summary>
 /// The EQ in the native helper's <c>eq</c> backend: a mono node at the head
-/// of a microphone's route, which runs the microphone's noise removal ahead
-/// of the EQ (native/denoise.c) and its voice changer after it
-/// (native/voice.c). Values go down the helper's command pipe; the helper
+/// of a microphone's route, which runs the microphone's noise removal and
+/// expander ahead of the EQ (native/denoise.c, native/dynamics.c) and its
+/// compressor and voice changer after it (native/dynamics.c,
+/// native/voice.c). Values go down the helper's command pipe; the helper
 /// takes them at its next block, keeping its filter state, so a change spawns
 /// nothing and builds no node. Only the controls that changed are written.
 /// </summary>
@@ -47,8 +48,20 @@ internal sealed class SoftwareEqBackend(PipeWireAdapter pw, FilterHandle stage, 
     /// </summary>
     internal const string VoiceActiveMeter = "voice_active", VoiceStatusMeter = "voice_status", VoiceLatencyMeter = "voice_latency";
 
+    /// <summary>
+    /// The stage's compressor and expander meters, each in dB: the highest
+    /// input and output peak and the most gain reduction since the helper's
+    /// last tick. They move only while <see cref="SetDynamicsMeters"/> has
+    /// switched them on; a helper from before the two has none of them.
+    /// </summary>
+    internal const string CompressorInputMeter = "comp_input", CompressorReductionMeter = "comp_reduction",
+        CompressorOutputMeter = "comp_output", ExpanderInputMeter = "exp_input", ExpanderReductionMeter = "exp_reduction",
+        ExpanderOutputMeter = "exp_output";
+
     internal static readonly IReadOnlySet<string> Meters = new HashSet<string>(
-        [ActiveMeter, StatusMeter, LateMeter, NoiseLatencyMeter, VoiceActiveMeter, VoiceStatusMeter, VoiceLatencyMeter],
+        [ActiveMeter, StatusMeter, LateMeter, NoiseLatencyMeter, VoiceActiveMeter, VoiceStatusMeter, VoiceLatencyMeter,
+            CompressorInputMeter, CompressorReductionMeter, CompressorOutputMeter,
+            ExpanderInputMeter, ExpanderReductionMeter, ExpanderOutputMeter],
         StringComparer.Ordinal);
 
     /// <summary>
@@ -59,11 +72,12 @@ internal sealed class SoftwareEqBackend(PipeWireAdapter pw, FilterHandle stage, 
         => meters.TryGetValue(meter, out double samples) && double.IsFinite(samples) && samples > 0 && sampleRate > 0
             ? Math.Round(samples * 1000.0 / sampleRate, 1) : null;
 
-    // The voice changer's controls are never part of the stage's start: a
-    // helper from before the voice changer refuses to start with a control it
-    // does not declare, which would take noise removal and the EQ down with
-    // it. The stage starts on the voice changer's own defaults, which are
-    // the default setting's, and a voice is written live once it runs.
+    // The voice changer's, the compressor's and the expander's controls are
+    // never part of the stage's start: a helper from before them refuses to
+    // start with a control it does not declare, which would take noise
+    // removal and the EQ down with it. The stage starts on their own
+    // defaults, which are the default settings', and a setting is written
+    // live once it runs.
     private readonly Dictionary<string, double> _written = Startup(applied, noise ?? MicNoise.Default);
     private MicEq _applied = applied;
 
@@ -120,11 +134,50 @@ internal sealed class SoftwareEqBackend(PipeWireAdapter pw, FilterHandle stage, 
         ["voice_enabled"] = voice.Enabled ? 1 : 0,
     };
 
-    /// <summary>What a stage holds once started: the values it was given, and the voice changer's defaults.</summary>
+    /// <summary>
+    /// The helper's controls for the compressor, by the symbols
+    /// native/dynamics.c declares, the switch last so switching on starts on
+    /// the setting asked for.
+    /// </summary>
+    public static Dictionary<string, double> Controls(MicCompressor compressor) => new(StringComparer.Ordinal)
+    {
+        ["comp_threshold"] = compressor.Threshold,
+        ["comp_ratio"] = compressor.Ratio,
+        ["comp_attack"] = compressor.Attack,
+        ["comp_release"] = compressor.Release,
+        ["comp_knee"] = compressor.Knee,
+        ["comp_makeup"] = compressor.Makeup,
+        ["comp_enabled"] = compressor.Enabled ? 1 : 0,
+    };
+
+    /// <summary>The helper's controls for the expander, by the symbols native/dynamics.c declares, the switch last.</summary>
+    public static Dictionary<string, double> Controls(MicExpander expander) => new(StringComparer.Ordinal)
+    {
+        ["exp_threshold"] = expander.Threshold,
+        ["exp_ratio"] = expander.Ratio,
+        ["exp_range"] = expander.Range,
+        ["exp_attack"] = expander.Attack,
+        ["exp_release"] = expander.Release,
+        ["exp_hold"] = expander.Hold,
+        ["exp_enabled"] = expander.Enabled ? 1 : 0,
+    };
+
+    /// <summary>The switches that make the stage report the compressor's and the expander's levels.</summary>
+    internal const string CompressorMetersControl = "comp_meters", ExpanderMetersControl = "exp_meters";
+
+    /// <summary>
+    /// What a stage holds once started: the values it was given, and the
+    /// voice changer's, the compressor's and the expander's defaults, with
+    /// their meters off.
+    /// </summary>
     private static Dictionary<string, double> Startup(MicEq eq, MicNoise noise)
     {
         Dictionary<string, double> controls = Controls(eq, noise);
         foreach ((string symbol, double value) in Controls(MicVoice.Default)) controls[symbol] = value;
+        foreach ((string symbol, double value) in Controls(MicCompressor.Default)) controls[symbol] = value;
+        foreach ((string symbol, double value) in Controls(MicExpander.Default)) controls[symbol] = value;
+        controls[CompressorMetersControl] = 0;
+        controls[ExpanderMetersControl] = 0;
         return controls;
     }
 
@@ -148,6 +201,34 @@ internal sealed class SoftwareEqBackend(PipeWireAdapter pw, FilterHandle stage, 
     /// <exception cref="InvalidOperationException">The helper did not take a value.</exception>
     public void ApplyVoice(MicVoice voice)
         => Write(voice.Enabled ? Controls(voice) : new Dictionary<string, double>(StringComparer.Ordinal) { ["voice_enabled"] = 0 });
+
+    /// <summary>
+    /// The microphone's compressor, live. Off, only the switch is written, and
+    /// only when it was on, so a helper without one is never sent a control
+    /// it lacks.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The helper did not take a value.</exception>
+    public void ApplyCompressor(MicCompressor compressor)
+        => Write(compressor.Enabled ? Controls(compressor) : new Dictionary<string, double>(StringComparer.Ordinal) { ["comp_enabled"] = 0 });
+
+    /// <summary>The microphone's expander, live, written the way <see cref="ApplyCompressor"/> writes.</summary>
+    /// <exception cref="InvalidOperationException">The helper did not take a value.</exception>
+    public void ApplyExpander(MicExpander expander)
+        => Write(expander.Enabled ? Controls(expander) : new Dictionary<string, double>(StringComparer.Ordinal) { ["exp_enabled"] = 0 });
+
+    /// <summary>
+    /// Switch the compressor's and the expander's level meters on while a
+    /// client shows them, and off again, so the helper prints them only then.
+    /// Written only while a client asks, so a helper from before the two is
+    /// sent nothing it lacks unless someone opens their window.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The helper did not take a value.</exception>
+    public void SetDynamicsMeters(bool on)
+        => Write(new Dictionary<string, double>(StringComparer.Ordinal)
+        {
+            [CompressorMetersControl] = on ? 1 : 0,
+            [ExpanderMetersControl] = on ? 1 : 0,
+        });
 
     private void Write(Dictionary<string, double> controls)
     {

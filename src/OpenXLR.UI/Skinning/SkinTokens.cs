@@ -375,6 +375,15 @@ public static class SkinTokens
         Number("Ox.Eq.LabelFontSize", 10, 8, 24),
         Radius("Ox.Eq.CornerRadius", 6),
 
+        // The compressor's and expander's windows. Their graphs draw in code
+        // on the EQ graph's ground, grid, labels and corners, so these are
+        // flat too; the reduction meters take theirs through markup.
+        SolidBrush("Ox.Dynamics.Level", "#5ba8f5"),
+        SolidBrush("Ox.Dynamics.LevelFill", "#b35ba8f5"),
+        SolidBrush("Ox.Dynamics.Threshold", "#e6e9f0"),
+        SolidBrush("Ox.Dynamics.Reduction", "#e0a05a"),
+        Number("Ox.Dynamics.LineThickness", 1.5, 0.5, 6),
+
         // Mixer control sizing. Touch sizing raises these to TouchMinimums.
         Number("Ox.Mixer.ControlMinSize", null, 0, 64),
         Number("Ox.Mixer.SliderMinHeight", null, 0, 96),

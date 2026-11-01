@@ -347,7 +347,7 @@
             <StackPanel Grid.Column="1" Spacing="2">
               <!-- the chip, then the microphone's EQ and noise removal at the chip's height; a grid,
                    so a long source name trims before the buttons leave the row -->
-              <Grid Name="Xlr1ChipRow" ColumnDefinitions="*,Auto,Auto" HorizontalAlignment="Left">
+              <Grid Name="Xlr1ChipRow" ColumnDefinitions="*,Auto,Auto,Auto" HorizontalAlignment="Left">
                 <views:BindingChip DataContext="{Binding Xlr1Strip}" HorizontalAlignment="Left"/>
                 <Button Name="Xlr1Eq" Grid.Column="1" Content="{loc:Text Key=Eq}" Classes="fx" Margin="6,0,0,0" Padding="6,1" BorderThickness="0" FontSize="11"
                         MinWidth="0" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalContentAlignment="Center"
@@ -364,6 +364,19 @@
                     <Flyout Placement="BottomEdgeAlignedLeft">
                       <StackPanel Classes="dev" MaxWidth="360">
                         <views:NoiseRemovalControls DataContext="{Binding Xlr1Strip.Noise}"/>
+                      </StackPanel>
+                    </Flyout>
+                  </Button.Flyout>
+                </Button>
+                <Button Name="Xlr1Dynamics" Grid.Column="3" Content="{loc:Text Key=Dynamics}" Classes="fx" Margin="4,0,0,0" Padding="6,1" BorderThickness="0" FontSize="11"
+                        MinWidth="0" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalContentAlignment="Center"
+                        Classes.fxOn="{Binding Xlr1Strip.Dynamics.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Xlr1Strip.Dynamics.IsFaulty, FallbackValue=False}"
+                        IsVisible="{Binding Xlr1Strip.HasDynamics, FallbackValue=False}"
+                        AutomationProperties.Name="{Binding Xlr1Strip.Dynamics.ButtonName, FallbackValue=''}" ToolTip.Tip="{loc:Text Key=DynamicsButtonTip}">
+                  <Button.Flyout>
+                    <Flyout Placement="BottomEdgeAlignedLeft">
+                      <StackPanel Classes="dev" MaxWidth="360">
+                        <views:DynamicsControls DataContext="{Binding Xlr1Strip.Dynamics}"/>
                       </StackPanel>
                     </Flyout>
                   </Button.Flyout>
@@ -495,7 +508,7 @@
             <StackPanel Grid.Column="1" Spacing="2">
               <!-- the chip, then the microphone's EQ and noise removal at the chip's height; a grid,
                    so a long source name trims before the buttons leave the row -->
-              <Grid Name="Xlr2ChipRow" ColumnDefinitions="*,Auto,Auto" HorizontalAlignment="Left">
+              <Grid Name="Xlr2ChipRow" ColumnDefinitions="*,Auto,Auto,Auto" HorizontalAlignment="Left">
                 <views:BindingChip DataContext="{Binding Xlr2Strip}" HorizontalAlignment="Left"/>
                 <Button Name="Xlr2Eq" Grid.Column="1" Content="{loc:Text Key=Eq}" Classes="fx" Margin="6,0,0,0" Padding="6,1" BorderThickness="0" FontSize="11"
                         MinWidth="0" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalContentAlignment="Center"
@@ -512,6 +525,19 @@
                     <Flyout Placement="BottomEdgeAlignedLeft">
                       <StackPanel Classes="dev" MaxWidth="360">
                         <views:NoiseRemovalControls DataContext="{Binding Xlr2Strip.Noise}"/>
+                      </StackPanel>
+                    </Flyout>
+                  </Button.Flyout>
+                </Button>
+                <Button Name="Xlr2Dynamics" Grid.Column="3" Content="{loc:Text Key=Dynamics}" Classes="fx" Margin="4,0,0,0" Padding="6,1" BorderThickness="0" FontSize="11"
+                        MinWidth="0" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalContentAlignment="Center"
+                        Classes.fxOn="{Binding Xlr2Strip.Dynamics.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Xlr2Strip.Dynamics.IsFaulty, FallbackValue=False}"
+                        IsVisible="{Binding Xlr2Strip.HasDynamics, FallbackValue=False}"
+                        AutomationProperties.Name="{Binding Xlr2Strip.Dynamics.ButtonName, FallbackValue=''}" ToolTip.Tip="{loc:Text Key=DynamicsButtonTip}">
+                  <Button.Flyout>
+                    <Flyout Placement="BottomEdgeAlignedLeft">
+                      <StackPanel Classes="dev" MaxWidth="360">
+                        <views:DynamicsControls DataContext="{Binding Xlr2Strip.Dynamics}"/>
                       </StackPanel>
                     </Flyout>
                   </Button.Flyout>
@@ -646,7 +672,7 @@
                 </Grid>
                 <!-- the source chip, then the microphone's EQ and noise removal at its height, as on XLR 1:
                      the button letters at the size the chip letters its source in, so they stay level -->
-                <Grid Name="CaptureChipRow" ColumnDefinitions="*,Auto,Auto" HorizontalAlignment="Left">
+                <Grid Name="CaptureChipRow" ColumnDefinitions="*,Auto,Auto,Auto" HorizontalAlignment="Left">
                   <views:CaptureSourceChip HorizontalAlignment="Left"/>
                   <Button Name="CaptureEq" Grid.Column="1" Content="{loc:Text Key=Eq}" Classes="fx" Margin="6,0,0,0" Padding="6,1" BorderThickness="0" FontSize="11"
                           MinWidth="0" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalContentAlignment="Center"
@@ -663,6 +689,19 @@
                       <Flyout Placement="BottomEdgeAlignedLeft">
                         <StackPanel Classes="dev" MaxWidth="360">
                           <views:NoiseRemovalControls DataContext="{Binding Noise}"/>
+                        </StackPanel>
+                      </Flyout>
+                    </Button.Flyout>
+                  </Button>
+                  <Button Name="CaptureDynamics" Grid.Column="3" Content="{loc:Text Key=Dynamics}" Classes="fx" Margin="4,0,0,0" Padding="6,1" BorderThickness="0" FontSize="11"
+                          MinWidth="0" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalContentAlignment="Center"
+                          Classes.fxOn="{Binding Dynamics.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Dynamics.IsFaulty, FallbackValue=False}"
+                          IsVisible="{Binding HasDynamics, FallbackValue=False}"
+                          AutomationProperties.Name="{Binding Dynamics.ButtonName, FallbackValue=''}" ToolTip.Tip="{loc:Text Key=DynamicsButtonTip}">
+                    <Button.Flyout>
+                      <Flyout Placement="BottomEdgeAlignedLeft">
+                        <StackPanel Classes="dev" MaxWidth="360">
+                          <views:DynamicsControls DataContext="{Binding Dynamics}"/>
                         </StackPanel>
                       </Flyout>
                     </Button.Flyout>

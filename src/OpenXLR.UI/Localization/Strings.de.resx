@@ -3529,4 +3529,172 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="VoiceWitchHint" xml:space="preserve">
     <value>Hoch, mit Zittern</value>
   </data>
+  <data name="Dynamics" xml:space="preserve">
+    <value>Dynamik</value>
+  </data>
+  <data name="DynamicsButtonTip" xml:space="preserve">
+    <value>Expander und Kompressor dieses Mikrofons, die auf diesem Computer laufen</value>
+  </data>
+  <data name="DynamicsButtonNameOn" xml:space="preserve">
+    <value>Dynamik von {0}, an</value>
+  </data>
+  <data name="DynamicsButtonNameOff" xml:space="preserve">
+    <value>Dynamik von {0}, aus</value>
+  </data>
+  <data name="DynamicsButtonNameUnavailable" xml:space="preserve">
+    <value>Dynamik von {0}, kann nicht laufen</value>
+  </data>
+  <data name="DynamicsHeading" xml:space="preserve">
+    <value>Dynamik auf diesem Computer</value>
+  </data>
+  <data name="DynamicsHint" xml:space="preserve">
+    <value>Der Expander senkt das Mikrofon zwischen den Wörtern ab, der Kompressor gleicht laute und leise Sprache an. Beide laufen hier in Software und sind nicht die Kompressor- und Expander-Schalter des Geräts.</value>
+  </data>
+  <data name="DynamicsSwitch" xml:space="preserve">
+    <value>An</value>
+  </data>
+  <data name="DynamicsSwitchTip" xml:space="preserve">
+    <value>Ein- oder ausschalten. Es läuft auf diesem Computer, in der Verarbeitung des Mikrofons.</value>
+  </data>
+  <data name="DynamicsSwitchName" xml:space="preserve">
+    <value>Schalter {0}, {1}</value>
+  </data>
+  <data name="DynamicsOpen" xml:space="preserve">
+    <value>Öffnen</value>
+  </data>
+  <data name="DynamicsOpenTip" xml:space="preserve">
+    <value>Das Fenster öffnen, mit Pegeln, Schwelle und den übrigen Einstellungen</value>
+  </data>
+  <data name="DynamicsOpenName" xml:space="preserve">
+    <value>Fenster {0} für {1} öffnen</value>
+  </data>
+  <data name="CompressorWindowTitle" xml:space="preserve">
+    <value>Kompressor von {0}</value>
+  </data>
+  <data name="ExpanderWindowTitle" xml:space="preserve">
+    <value>Expander von {0}</value>
+  </data>
+  <data name="DynamicsSubtitle" xml:space="preserve">
+    <value>{0}, läuft auf diesem Computer</value>
+  </data>
+  <data name="DynamicsSettings" xml:space="preserve">
+    <value>Einstellungen</value>
+  </data>
+  <data name="DynamicsSettingsTip" xml:space="preserve">
+    <value>Verhältnis, Attack, Release und die übrigen Einstellungen zeigen oder verbergen</value>
+  </data>
+  <data name="DynamicsInput" xml:space="preserve">
+    <value>Eingang</value>
+  </data>
+  <data name="DynamicsThreshold" xml:space="preserve">
+    <value>Schwelle</value>
+  </data>
+  <data name="DynamicsReduction" xml:space="preserve">
+    <value>Pegelreduktion</value>
+  </data>
+  <data name="DynamicsMakeup" xml:space="preserve">
+    <value>Aufholverstärkung</value>
+  </data>
+  <data name="DynamicsOutput" xml:space="preserve">
+    <value>Ausgang</value>
+  </data>
+  <data name="DynamicsDecibels" xml:space="preserve">
+    <value>{0} dB</value>
+  </data>
+  <data name="DynamicsMilliseconds" xml:space="preserve">
+    <value>{0} ms</value>
+  </data>
+  <data name="DynamicsRatioValue" xml:space="preserve">
+    <value>{0}:1</value>
+  </data>
+  <data name="DynamicsSilent" xml:space="preserve">
+    <value>-∞ dB</value>
+  </data>
+  <data name="DynamicsInputName" xml:space="preserve">
+    <value>Eingangspegel {0}</value>
+  </data>
+  <data name="DynamicsReductionName" xml:space="preserve">
+    <value>Pegelreduktion {0}</value>
+  </data>
+  <data name="DynamicsOutputName" xml:space="preserve">
+    <value>Ausgangspegel {0}</value>
+  </data>
+  <data name="DynamicsNoHost" xml:space="preserve">
+    <value>Kompressor und Expander brauchen den nativen Plugin-Host von OpenXLR, den diese Installation nicht enthält.</value>
+  </data>
+  <data name="DynamicsNoLevels" xml:space="preserve">
+    <value>Warte auf den Pegel des Mikrofons.</value>
+  </data>
+  <data name="CompressorNote" xml:space="preserve">
+    <value>Dieser Kompressor läuft auf diesem Computer, nach dem EQ. Der Kompressor-Schalter eines Wave XLR Pro, eines MK.2-Geräts oder eines Wave:3 ist eine feste Einstellung im Gerät. Sind beide an, wird die Stimme zweimal komprimiert.</value>
+  </data>
+  <data name="ExpanderNote" xml:space="preserve">
+    <value>Dieser Expander läuft auf diesem Computer, nach der Rauschentfernung. Der Expander-Schalter eines Wave XLR Pro, eines MK.2-Geräts oder eines Wave:3 ist eine feste Einstellung im Gerät. Sind beide an, werden leise Stellen zweimal abgesenkt.</value>
+  </data>
+  <data name="CompressorThresholdTip" xml:space="preserve">
+    <value>Der Pegel, über dem die Stimme abgesenkt wird. Ziehe die Linie oder ihren Griff, oder nutze die Pfeiltasten.</value>
+  </data>
+  <data name="ExpanderThresholdTip" xml:space="preserve">
+    <value>Der Pegel, unter dem das Mikrofon abgesenkt wird. Ziehe die Linie oder ihren Griff, oder nutze die Pfeiltasten.</value>
+  </data>
+  <data name="DynamicsMakeupTip" xml:space="preserve">
+    <value>Verstärkung nach dem Kompressor, die die ausgeglichene Stimme wieder anhebt</value>
+  </data>
+  <data name="DynamicsRatio" xml:space="preserve">
+    <value>Verhältnis</value>
+  </data>
+  <data name="CompressorRatioTip" xml:space="preserve">
+    <value>Wie stark er komprimiert: bei 3:1 werden 3 dB über der Schwelle zu 1 dB</value>
+  </data>
+  <data name="ExpanderRatioTip" xml:space="preserve">
+    <value>Wie stark er absenkt: bei 3:1 wird 1 dB unter der Schwelle zu 3 dB darunter</value>
+  </data>
+  <data name="DynamicsAttack" xml:space="preserve">
+    <value>Attack</value>
+  </data>
+  <data name="CompressorAttackTip" xml:space="preserve">
+    <value>Wie schnell er eine lautere Stimme absenkt</value>
+  </data>
+  <data name="ExpanderAttackTip" xml:space="preserve">
+    <value>Wie schnell er öffnet, wenn die Stimme zurückkommt</value>
+  </data>
+  <data name="DynamicsRelease" xml:space="preserve">
+    <value>Release</value>
+  </data>
+  <data name="CompressorReleaseTip" xml:space="preserve">
+    <value>Wie schnell er loslässt, sobald die Stimme leiser ist</value>
+  </data>
+  <data name="ExpanderReleaseTip" xml:space="preserve">
+    <value>Wie schnell er schließt, wenn die Haltezeit vorbei ist</value>
+  </data>
+  <data name="DynamicsKnee" xml:space="preserve">
+    <value>Knie</value>
+  </data>
+  <data name="DynamicsKneeTip" xml:space="preserve">
+    <value>Wie sanft er um die Schwelle einsetzt; 0 dB setzt sofort ein</value>
+  </data>
+  <data name="DynamicsRange" xml:space="preserve">
+    <value>Bereich</value>
+  </data>
+  <data name="DynamicsRangeTip" xml:space="preserve">
+    <value>Wie weit er das Mikrofon höchstens absenkt</value>
+  </data>
+  <data name="DynamicsHold" xml:space="preserve">
+    <value>Halten</value>
+  </data>
+  <data name="DynamicsHoldTip" xml:space="preserve">
+    <value>Wie lange er nach dem Ende der Stimme wartet, bevor er schließt</value>
+  </data>
+  <data name="DynamicsNoReading" xml:space="preserve">
+    <value>-</value>
+  </data>
+  <data name="DynamicsRawInput" xml:space="preserve">
+    <value>Die Verarbeitung des Mikrofons auf diesem Computer läuft nicht, darum zeigt Eingang das rohe Mikrofon, vor der Rauschentfernung und allem anderen. Pegelreduktion und Ausgang erscheinen, sobald sie läuft.</value>
+  </data>
+  <data name="ExpanderInputPoint" xml:space="preserve">
+    <value>Eingang ist das Mikrofon nach der Rauschentfernung, wo der Expander es hört.</value>
+  </data>
+  <data name="CompressorInputPoint" xml:space="preserve">
+    <value>Eingang ist das Mikrofon nach Rauschentfernung, Expander und EQ, wo der Kompressor es hört.</value>
+  </data>
 </root>

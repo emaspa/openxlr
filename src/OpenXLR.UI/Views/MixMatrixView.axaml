@@ -134,6 +134,9 @@
         <Panel IsVisible="{Binding ShowsNoise}">
           <views:NoiseRemovalControls Name="MatrixNoise" DataContext="{Binding Channel.Noise}"/>
         </Panel>
+        <Panel IsVisible="{Binding ShowsDynamics}">
+          <views:DynamicsControls Name="MatrixDynamics" DataContext="{Binding Channel.Dynamics}"/>
+        </Panel>
       </StackPanel>
     </DataTemplate>
 

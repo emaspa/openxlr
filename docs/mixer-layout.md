@@ -234,6 +234,8 @@ every save. Every field is optional on read; an absent one is empty or off.
 | `eq` | the [microphone EQ](api.md#microphone-eq) of `xlr1`, `xlr2` and every capture input on one mono port, by channel id |
 | `noiseRemoval` | channel id to `{enabled, engine, strength}`, the microphone's [noise removal](api.md#noise-removal); a microphone absent here has it off |
 | `voiceChanger` | channel id to `{enabled, voice, pitch, formant}`, the microphone's [voice changer](api.md#voice-changer); a microphone absent here has it off |
+| `compressor` | channel id to `{enabled, threshold, ratio, attack, release, knee, makeup}`, the microphone's [compressor](api.md#compressor-and-expander) on this computer; a microphone absent here has it off |
+| `expander` | channel id to `{enabled, threshold, ratio, range, attack, release, hold}`, the microphone's [expander](api.md#compressor-and-expander) on this computer; a microphone absent here has it off |
 | `eqProcessing` | channel id to `device` or `software`, where that microphone's EQ runs; machine wiring, never in a profile |
 | `compensateMixLatency` | the latency compensation switch across mixes, see [api.md](api.md) |
 | `exclusiveGroups` | exclusive channel groups, see [Exclusive groups](#exclusive-groups) |

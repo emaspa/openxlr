@@ -93,11 +93,13 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     public IReadOnlyDictionary<string, double[]> ReadMeters()
     {
         IReadOnlyDictionary<string, double[]> levels = _meters.Read();
-        if (_duckMeterHosts.IsEmpty && _inputMeterHosts.IsEmpty && _soundCheckProbe is null && _player is null) return levels;
+        if (_duckMeterHosts.IsEmpty && _inputMeterHosts.IsEmpty && _dynamicsMeterHosts.IsEmpty && _soundCheckProbe is null && _player is null)
+            return levels;
         var meters = new Dictionary<string, double[]>(levels);
         foreach ((string mix, NativePluginHost host) in _duckMeterHosts)
             if (host.IsHealthy) meters[DuckKey(mix)] = [host.Meters.GetValueOrDefault("reduction")];
         AddInputLevels(meters);
+        AddDynamicsLevels(meters);
         AddSoundCheckPosition(meters);
         AddClipPositions(meters);
         return meters;
@@ -685,6 +687,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             bool soundCheckChanged = EnsureSoundCheckLocked();
             soundCheckChanged |= EnsureSoundboardLocked(rateAway);
             soundCheckChanged |= HealEqStagesLocked();
+            EnsureDynamicsMetersLocked();
             soundCheckChanged |= TrackNoiseReportsLocked();
             soundCheckChanged |= TrackVoiceReportsLocked();
             soundCheckChanged |= HealDuckBusesLocked();
@@ -1632,6 +1635,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 EqProcessing = new Dictionary<string, string>(_eqProcessing, StringComparer.Ordinal),
                 NoiseRemoval = new Dictionary<string, MicNoise>(_noise, StringComparer.Ordinal),
                 VoiceChanger = new Dictionary<string, MicVoice>(_voice, StringComparer.Ordinal),
+                Compressor = new Dictionary<string, MicCompressor>(_compressor, StringComparer.Ordinal),
+                Expander = new Dictionary<string, MicExpander>(_expander, StringComparer.Ordinal),
                 Ducking = DuckingSetupLocked().Copy(),
                 Appearance = ExportAppearanceLocked(),
             };
@@ -1807,6 +1812,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             RecallEqLocked(s.Eq);
             RecallNoiseLocked(s.NoiseRemoval);
             RecallVoiceLocked(s.VoiceChanger);
+            RecallCompressorLocked(s.Compressor);
+            RecallExpanderLocked(s.Expander);
             _eqProcessing.Clear();
             foreach ((string channel, string processing) in s.EqProcessing)
                 if (processing == MicEqProcessing.Software) _eqProcessing[channel] = processing;
@@ -1842,6 +1849,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 Eq = SceneEqLocked(),
                 NoiseRemoval = SceneNoiseLocked(),
                 VoiceChanger = SceneVoiceLocked(),
+                Compressor = SceneCompressorLocked(),
+                Expander = SceneExpanderLocked(),
                 Ducking = DuckingSetupLocked().ToScene(),
             };
         }
@@ -1948,13 +1957,16 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             // replaces the EQ of each microphone it names. Values reach a
             // running stage live; an EQ switched on is spliced in.
             if (s.Eq is not null) RecallEqLocked(s.Eq);
-            // Noise removal and the voice changer the same way: a profile
-            // without one leaves it alone.
+            // Noise removal, the voice changer, the compressor and the
+            // expander the same way: a profile without one leaves it alone.
             if (s.NoiseRemoval is not null) RecallNoiseLocked(s.NoiseRemoval);
             if (s.VoiceChanger is not null) RecallVoiceLocked(s.VoiceChanger);
+            if (s.Compressor is not null) RecallCompressorLocked(s.Compressor);
+            if (s.Expander is not null) RecallExpanderLocked(s.Expander);
             if (chainsChanged || s.Inserts is not null)
                 ApplyChainsLocked(s.Inserts, absentMixesEmpty: true, rebuildAll: false);
-            if (s.Eq is not null || s.NoiseRemoval is not null || s.VoiceChanger is not null) SyncEqStagesLocked();
+            if (s.Eq is not null || s.NoiseRemoval is not null || s.VoiceChanger is not null || s.Compressor is not null
+                || s.Expander is not null) SyncEqStagesLocked();
             SyncDuckingLocked();
         }
         if (s.OutputVolume is double v) SetOutputVolume(v);
@@ -3366,6 +3378,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                     Eq = CarriesEq(c) ? EqStateLocked(c.Id, unitInputs) : null,
                     Noise = CarriesEq(c) ? NoiseStateLocked(c.Id) : null,
                     Voice = CarriesEq(c) ? VoiceStateLocked(c.Id) : null,
+                    Compressor = CarriesEq(c) ? CompressorStateLocked(c.Id) : null,
+                    Expander = CarriesEq(c) ? ExpanderStateLocked(c.Id) : null,
                 })],
                 RenamedSinceStart = _renamedSinceBuild,
                 DefaultMonitorMix = PrimaryMonitorLocked()?.Id,
@@ -3623,6 +3637,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         if (_soundCheck is not null)
             StopSoundCheckLocked(restore: false, error: "Sound Check stopped because the audio graph was rebuilt.");
         RemoveInputMetersLocked();
+        // The stages go with the graph; a client that still shows the levels asks again.
+        _dynamicsWatch.Clear();
+        _dynamicsMeterHosts.Clear();
         _meters.Dispose();
         _meters = new MeterReader();   // Dispose is terminal; a rebuild needs a fresh reader
         _meters.SetForceQuantum(_blockSize);

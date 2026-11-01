@@ -3857,4 +3857,172 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
   <data name="VoiceWitchHint" xml:space="preserve">
     <value>Висок, са подрхтавањем</value>
   </data>
+  <data name="Dynamics" xml:space="preserve">
+    <value>Динамика</value>
+  </data>
+  <data name="DynamicsButtonTip" xml:space="preserve">
+    <value>Експандер и компресор овог микрофона, који раде на овом рачунару</value>
+  </data>
+  <data name="DynamicsButtonNameOn" xml:space="preserve">
+    <value>Динамика за {0}, укључена</value>
+  </data>
+  <data name="DynamicsButtonNameOff" xml:space="preserve">
+    <value>Динамика за {0}, искључена</value>
+  </data>
+  <data name="DynamicsButtonNameUnavailable" xml:space="preserve">
+    <value>Динамика за {0}, не може да ради</value>
+  </data>
+  <data name="DynamicsHeading" xml:space="preserve">
+    <value>Динамика на овом рачунару</value>
+  </data>
+  <data name="DynamicsHint" xml:space="preserve">
+    <value>Експандер утишава микрофон између речи, а компресор уједначава гласан и тих говор. Оба раде овде у софтверу и нису прекидачи Компресор и Експандер на самом уређају.</value>
+  </data>
+  <data name="DynamicsSwitch" xml:space="preserve">
+    <value>Укључено</value>
+  </data>
+  <data name="DynamicsSwitchTip" xml:space="preserve">
+    <value>Укључите или искључите. Ради на овом рачунару, у обради микрофона.</value>
+  </data>
+  <data name="DynamicsSwitchName" xml:space="preserve">
+    <value>Прекидач {0}, {1}</value>
+  </data>
+  <data name="DynamicsOpen" xml:space="preserve">
+    <value>Отвори</value>
+  </data>
+  <data name="DynamicsOpenTip" xml:space="preserve">
+    <value>Отворите његов прозор, са нивоима, прагом и осталим подешавањима</value>
+  </data>
+  <data name="DynamicsOpenName" xml:space="preserve">
+    <value>Отвори прозор {0} за {1}</value>
+  </data>
+  <data name="CompressorWindowTitle" xml:space="preserve">
+    <value>Компресор за {0}</value>
+  </data>
+  <data name="ExpanderWindowTitle" xml:space="preserve">
+    <value>Експандер за {0}</value>
+  </data>
+  <data name="DynamicsSubtitle" xml:space="preserve">
+    <value>{0}, ради на овом рачунару</value>
+  </data>
+  <data name="DynamicsSettings" xml:space="preserve">
+    <value>Подешавања</value>
+  </data>
+  <data name="DynamicsSettingsTip" xml:space="preserve">
+    <value>Прикажите или сакријте однос, напад, отпуштање и остала подешавања</value>
+  </data>
+  <data name="DynamicsInput" xml:space="preserve">
+    <value>Улаз</value>
+  </data>
+  <data name="DynamicsThreshold" xml:space="preserve">
+    <value>Праг</value>
+  </data>
+  <data name="DynamicsReduction" xml:space="preserve">
+    <value>Смањење појачања</value>
+  </data>
+  <data name="DynamicsMakeup" xml:space="preserve">
+    <value>Надокнада појачања</value>
+  </data>
+  <data name="DynamicsOutput" xml:space="preserve">
+    <value>Излаз</value>
+  </data>
+  <data name="DynamicsDecibels" xml:space="preserve">
+    <value>{0} dB</value>
+  </data>
+  <data name="DynamicsMilliseconds" xml:space="preserve">
+    <value>{0} ms</value>
+  </data>
+  <data name="DynamicsRatioValue" xml:space="preserve">
+    <value>{0}:1</value>
+  </data>
+  <data name="DynamicsSilent" xml:space="preserve">
+    <value>-∞ dB</value>
+  </data>
+  <data name="DynamicsInputName" xml:space="preserve">
+    <value>Ниво улаза {0}</value>
+  </data>
+  <data name="DynamicsReductionName" xml:space="preserve">
+    <value>Смањење појачања {0}</value>
+  </data>
+  <data name="DynamicsOutputName" xml:space="preserve">
+    <value>Ниво излаза {0}</value>
+  </data>
+  <data name="DynamicsNoHost" xml:space="preserve">
+    <value>Компресору и експандеру треба OpenXLR-ов изворни домаћин за додатке, који ова инсталација не садржи.</value>
+  </data>
+  <data name="DynamicsNoLevels" xml:space="preserve">
+    <value>Чека се ниво микрофона.</value>
+  </data>
+  <data name="CompressorNote" xml:space="preserve">
+    <value>Овај компресор ради на овом рачунару, после EQ-а. Прекидач Компресор на Wave XLR Pro, MK.2 уређају или Wave:3 је фиксно подешавање унутар уређаја. Када су оба укључена, глас се компресује два пута.</value>
+  </data>
+  <data name="ExpanderNote" xml:space="preserve">
+    <value>Овај експандер ради на овом рачунару, после уклањања шума. Прекидач Експандер на Wave XLR Pro, MK.2 уређају или Wave:3 је фиксно подешавање унутар уређаја. Када су оба укључена, тихи делови се утишавају два пута.</value>
+  </data>
+  <data name="CompressorThresholdTip" xml:space="preserve">
+    <value>Ниво изнад ког се глас утишава. Превуците линију или њену ручицу, или користите тастере са стрелицама.</value>
+  </data>
+  <data name="ExpanderThresholdTip" xml:space="preserve">
+    <value>Ниво испод ког се микрофон утишава. Превуците линију или њену ручицу, или користите тастере са стрелицама.</value>
+  </data>
+  <data name="DynamicsMakeupTip" xml:space="preserve">
+    <value>Појачање после компресора, које враћа уједначени глас на јачину</value>
+  </data>
+  <data name="DynamicsRatio" xml:space="preserve">
+    <value>Однос</value>
+  </data>
+  <data name="CompressorRatioTip" xml:space="preserve">
+    <value>Колико снажно компресује: при 3:1, 3 dB изнад прага излази као 1 dB</value>
+  </data>
+  <data name="ExpanderRatioTip" xml:space="preserve">
+    <value>Колико снажно утишава: при 3:1, 1 dB испод прага излази 3 dB испод њега</value>
+  </data>
+  <data name="DynamicsAttack" xml:space="preserve">
+    <value>Напад</value>
+  </data>
+  <data name="CompressorAttackTip" xml:space="preserve">
+    <value>Колико брзо утишава гласнији глас</value>
+  </data>
+  <data name="ExpanderAttackTip" xml:space="preserve">
+    <value>Колико брзо се отвара када се глас врати</value>
+  </data>
+  <data name="DynamicsRelease" xml:space="preserve">
+    <value>Отпуштање</value>
+  </data>
+  <data name="CompressorReleaseTip" xml:space="preserve">
+    <value>Колико брзо попушта када је глас тиши</value>
+  </data>
+  <data name="ExpanderReleaseTip" xml:space="preserve">
+    <value>Колико брзо се затвара када прође задржавање</value>
+  </data>
+  <data name="DynamicsKnee" xml:space="preserve">
+    <value>Колено</value>
+  </data>
+  <data name="DynamicsKneeTip" xml:space="preserve">
+    <value>Колико благо почиње око прага; 0 dB почиње одмах</value>
+  </data>
+  <data name="DynamicsRange" xml:space="preserve">
+    <value>Опсег</value>
+  </data>
+  <data name="DynamicsRangeTip" xml:space="preserve">
+    <value>Највише за колико утишава микрофон</value>
+  </data>
+  <data name="DynamicsHold" xml:space="preserve">
+    <value>Задржавање</value>
+  </data>
+  <data name="DynamicsHoldTip" xml:space="preserve">
+    <value>Колико чека пошто глас престане пре него што се затвори</value>
+  </data>
+  <data name="DynamicsNoReading" xml:space="preserve">
+    <value>-</value>
+  </data>
+  <data name="DynamicsRawInput" xml:space="preserve">
+    <value>Обрада микрофона на овом рачунару не ради, па Улаз приказује сирови микрофон, пре уклањања шума и свега осталог. Смањење појачања и Излаз се приказују када обрада проради.</value>
+  </data>
+  <data name="ExpanderInputPoint" xml:space="preserve">
+    <value>Улаз је микрофон после уклањања шума, где га експандер чује.</value>
+  </data>
+  <data name="CompressorInputPoint" xml:space="preserve">
+    <value>Улаз је микрофон после уклањања шума, експандера и EQ-а, где га компресор чује.</value>
+  </data>
 </root>

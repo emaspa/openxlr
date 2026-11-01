@@ -150,6 +150,18 @@ public sealed record MixerSettings
     /// </summary>
     public Dictionary<string, MicVoice> VoiceChanger { get; init; } = [];
 
+    /// <summary>
+    /// The compressor on this computer by channel id. A microphone absent here
+    /// has it off. An entry for a channel that is not a microphone is kept.
+    /// </summary>
+    public Dictionary<string, MicCompressor> Compressor { get; init; } = [];
+
+    /// <summary>
+    /// The expander on this computer by channel id. A microphone absent here
+    /// has it off. An entry for a channel that is not a microphone is kept.
+    /// </summary>
+    public Dictionary<string, MicExpander> Expander { get; init; } = [];
+
     /// <summary>The ducking setup and processing choice. Absent takes the layout's default targets, switched off.</summary>
     public DuckingSetup? Ducking { get; init; }
 

@@ -161,6 +161,19 @@
                         </Flyout>
                       </Button.Flyout>
                     </Button>
+                    <Button Name="RackDynamics" Content="{loc:Text Key=Dynamics}" Classes="fx"
+                            Padding="12,3" FontSize="12" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                            Classes.fxOn="{Binding Channel.Dynamics.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Channel.Dynamics.IsFaulty, FallbackValue=False}"
+                            IsVisible="{Binding Channel.HasDynamics, FallbackValue=False}"
+                            AutomationProperties.Name="{Binding Channel.Dynamics.ButtonName, FallbackValue=''}" ToolTip.Tip="{loc:Text Key=DynamicsButtonTip}">
+                      <Button.Flyout>
+                        <Flyout Placement="BottomEdgeAlignedLeft">
+                          <StackPanel Classes="dev" MaxWidth="360">
+                            <views:DynamicsControls DataContext="{Binding Channel.Dynamics}"/>
+                          </StackPanel>
+                        </Flyout>
+                      </Button.Flyout>
+                    </Button>
                     <Button Content="{Binding Main.Inserts.ButtonText}" Classes="fx" Classes.fxOn="{Binding Main.Inserts.IsProcessing}" Classes.fxOff="{Binding Main.Inserts.IsOff}"
                             Padding="12,3" FontSize="12"
                             MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
@@ -267,6 +280,19 @@
                         <Flyout Placement="BottomEdgeAlignedLeft">
                           <StackPanel Classes="dev" MaxWidth="360">
                             <views:NoiseRemovalControls DataContext="{Binding Channel.Noise}"/>
+                          </StackPanel>
+                        </Flyout>
+                      </Button.Flyout>
+                    </Button>
+                    <Button Name="RackDynamics" Content="{loc:Text Key=Dynamics}" Classes="fx"
+                            Padding="12,3" FontSize="12" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                            Classes.fxOn="{Binding Channel.Dynamics.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Channel.Dynamics.IsFaulty, FallbackValue=False}"
+                            IsVisible="{Binding Channel.HasDynamics, FallbackValue=False}"
+                            AutomationProperties.Name="{Binding Channel.Dynamics.ButtonName, FallbackValue=''}" ToolTip.Tip="{loc:Text Key=DynamicsButtonTip}">
+                      <Button.Flyout>
+                        <Flyout Placement="BottomEdgeAlignedLeft">
+                          <StackPanel Classes="dev" MaxWidth="360">
+                            <views:DynamicsControls DataContext="{Binding Channel.Dynamics}"/>
                           </StackPanel>
                         </Flyout>
                       </Button.Flyout>
@@ -493,6 +519,19 @@
                       <Flyout Placement="BottomEdgeAlignedLeft">
                         <StackPanel Classes="dev" MaxWidth="360">
                           <views:NoiseRemovalControls DataContext="{Binding Channel.Noise}"/>
+                        </StackPanel>
+                      </Flyout>
+                    </Button.Flyout>
+                  </Button>
+                  <Button Name="RackDynamics" Content="{loc:Text Key=Dynamics}" Classes="fx"
+                          Padding="12,3" FontSize="12" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                          Classes.fxOn="{Binding Channel.Dynamics.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Channel.Dynamics.IsFaulty, FallbackValue=False}"
+                          IsVisible="{Binding Channel.HasDynamics, FallbackValue=False}"
+                          AutomationProperties.Name="{Binding Channel.Dynamics.ButtonName, FallbackValue=''}" ToolTip.Tip="{loc:Text Key=DynamicsButtonTip}">
+                    <Button.Flyout>
+                      <Flyout Placement="BottomEdgeAlignedLeft">
+                        <StackPanel Classes="dev" MaxWidth="360">
+                          <views:DynamicsControls DataContext="{Binding Channel.Dynamics}"/>
                         </StackPanel>
                       </Flyout>
                     </Button.Flyout>

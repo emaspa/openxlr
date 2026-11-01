@@ -767,6 +767,25 @@ The microphone EQ reuses `Ox.Eq.Band1` through `Ox.Eq.Band4` cyclically for
 bands 5 through 16. Every handle and row keeps its own number. No additional
 palette entries are required by an existing skin.
 
+### Compressor and expander
+
+The compressor's and expander's windows draw the input's recent level as a
+graph with the threshold across it. The graph uses the EQ graph's ground,
+grid, axis labels, label size and corners (`Ox.Eq.Background`,
+`Ox.Eq.Grid`, `Ox.Eq.GridLabel`, `Ox.Eq.LabelFontSize` and
+`Ox.Eq.CornerRadius`), and draws in code, so its own colours are flat. The
+input and output meters are the ordinary level meters in the skin's meter
+appearance. The windows' switches, sliders and buttons are the ordinary
+controls.
+
+| Token | Kind | Default | Range | What it paints |
+|---|---|---|---|---|
+| `Ox.Dynamics.Level` | colour | #5ba8f5 |  | the input's history: the expander's line and the outline of the compressor's envelope |
+| `Ox.Dynamics.LevelFill` | colour | #b35ba8f5 |  | the inside of the compressor's envelope |
+| `Ox.Dynamics.Threshold` | colour | #e6e9f0 |  | the threshold lines and the threshold's handle |
+| `Ox.Dynamics.Reduction` | colour | #e0a05a |  | the gain reduction meters, which fill from the top |
+| `Ox.Dynamics.LineThickness` | number | 1.5 | 0.5 to 6 | the width of the history's line; the threshold line is three quarters of it, and never under 1 |
+
 ### Mixer control sizing
 
 These size the main mixer's controls and strips. Options offers two

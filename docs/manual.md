@@ -223,8 +223,9 @@ microphone's Monitor send, its channel volume and the Monitor mix's
 volume, so these change how loud you hear yourself just as they would
 through the computer. The path cannot carry the channel's software
 effects, so OpenXLR turns it off while one is on: the EQ in software,
-noise removal, the voice changer, the soft low cut, ClipGuard or a plugin
-insert that is not bypassed. The headphones then hear the microphone
+noise removal, the voice changer, the compressor or expander on this
+computer, the soft low cut, ClipGuard or a plugin insert that is not
+bypassed. The headphones then hear the microphone
 through its Monitor send with the effects, a few milliseconds later, and
 the ⓘ mark goes away. Turn the last effect off and the path comes back.
 An EQ the unit runs keeps the path.
@@ -1412,6 +1413,84 @@ The setting is saved with the mixer and in profiles. A profile saved
 before noise removal leaves it as it is. Removing an input discards its
 pending strength edit and stops its old noise controls from changing a
 replacement input.
+
+<a name="compressor-and-expander"></a>
+**Compressor and expander.** XLR 1, XLR 2 and every capture input on one
+mono port also have a compressor and an expander that run on this
+computer. The expander turns the microphone down when you are not
+speaking, so room noise, keyboard and breaths between words drop away. The
+compressor turns loud passages down so loud and quiet speech come out
+closer in level. In INPUTS and in an input rack, **Dynamics** right after
+**Denoise** opens a small panel with an **On** switch and an **Open**
+button for each; in the Broadcast, Wave and Compact Desk matrix the same
+panel is in the row head's **Mic** button. **Dynamics** turns green while
+either runs and red when one is on and cannot run. Both are off until you
+switch them on.
+
+They work in this order: noise removal, the expander, the EQ, the
+compressor, the voice changer. The expander closes on what noise removal
+leaves, and the compressor evens out the voice after the EQ has shaped it.
+Neither adds delay, and switched off they leave the microphone untouched.
+
+**Open** shows the processor's own window. Across the top are its name,
+the settings button with the three sliders and its **On** switch. Below,
+left to right:
+
+- **Input**, the level going in.
+- The graph of the input over the last twelve seconds: a line for the
+  expander, a filled shape for the compressor. The line across it is the
+  **Threshold**. Drag it, or the tab on its right edge, or click the graph
+  and use the arrow keys, a decibel at a time.
+- **Gain reduction**, how far it turns the microphone down now. It fills
+  from the top.
+- **Make-up gain**, on the compressor only, a slider that brings the voice
+  back up after it has been evened out.
+- **Output**, the level coming out.
+
+Where **Input** reads depends on whether the microphone's processing on
+this computer runs, which needs one of noise removal, the EQ in software,
+the voice changer, the compressor or the expander on. While it runs, the
+expander's Input is the microphone after noise removal and the
+compressor's is the microphone after noise removal, the expander and the
+EQ, which is what each one hears. While it does not, Input and the graph
+show the raw microphone, before noise removal and everything else,
+**Gain reduction** stays at 0 and **Output** shows a dash. That is enough
+to set the expander's threshold against the room before you switch it on.
+If you switch noise removal on later, the expander hears the room quieter
+than the raw figure, so check the threshold again. A line under the heading says which of the two you
+are looking at. The levels go from the daemon to the window only while
+the window is open.
+
+The settings button shows the rest:
+
+| Setting | Compressor | Expander |
+|---|---|---|
+| Threshold | -60 to 0 dB, default -18 dB | -80 to 0 dB, default -50 dB |
+| Ratio | 1:1 to 20:1, default 3:1. At 3:1, 3 dB over the threshold come out as 1 dB | 1:1 to 20:1, default 3:1. At 3:1, 1 dB under the threshold comes out 3 dB under it |
+| Attack | 0.1 to 200 ms, default 5 ms: how fast it turns a louder voice down | 0.1 to 200 ms, default 1 ms: how fast it opens when you speak again |
+| Release | 10 to 2000 ms, default 150 ms: how fast it lets go | 10 to 2000 ms, default 150 ms: how fast it closes once the hold has passed |
+| Knee | 0 to 24 dB, default 6 dB: how gently it starts around the threshold | |
+| Make-up gain | 0 to 24 dB, default 0 dB | |
+| Range | | 0 to 80 dB, default 24 dB: the most it turns the microphone down |
+| Hold | | 0 to 500 ms, default 50 ms: how long it waits after you stop before it closes |
+
+To set the expander, watch the line while you stay quiet: put the
+threshold a few decibels above the room's level and below your quietest
+words. To set the compressor, speak at your loudest and put the threshold
+where **Gain reduction** shows a few decibels, then raise **Make-up gain**
+until **Output** peaks where it did before.
+
+These are not the **Compressor** and **Expander** switches of a Wave XLR
+Pro, an MK.2 unit or a Wave:3. Those switch a fixed
+setting inside the unit, with nothing to adjust, and they act before the
+microphone reaches the computer. The ones here run on the computer, with
+every setting above. You can use both. The voice then goes through the
+unit's and then through this one, so it is compressed or turned down
+twice. Use one or the other unless you mean to stack them.
+
+The settings are saved with the mixer and in profiles. A profile saved
+before them leaves them as they are. The terminal mixer's Inputs tab has
+the switches and every setting, without the levels.
 
 <a name="microphone-eq"></a>
 **Microphone EQ.** XLR 1, XLR 2 and every capture input on one mono port
@@ -4709,7 +4788,7 @@ Nine sections are reachable with `1` to `9`, Tab and Shift+Tab:
 |---|---|
 | 1 Mixer | channel sends, mix masters, stereo meters and level history; channel and user mix creation, renaming, removal and ordering |
 | 2 Matrix | the whole submixer as one grid: every channel's send into every mix, the mix masters and their meters across the top, a meter beside each channel. With height to spare a channel's meter is stereo: its name and its sends sit on a row of their own, the left bar on the row above and the right bar on the row below, so the name is centred between its two bars and each bar is centred on its letter. Where only two rows a channel fit, the name sits beside the left bar. Either way a blank row follows each channel, so its right bar never touches the next channel's left one. A short terminal keeps one row a channel and one summed bar. A microphone input, including a mono capture input, carries one bar rather than a pair of the same reading. A strip bound to another microphone shows its source, or why it is silent, on the row under its name, and a silent one's name is in the warning colour |
-| 3 Inputs | hardware controls in grouped cards with gain arcs on a wide terminal, or a scrolling list in a small one; gain, mute, low cut, expander, voice tune and its strength, phantom power, ClipGuard and the compressor for each of the interface's inputs, headed by the channel that carries it; what feeds XLR 1 and XLR 2; each capture microphone's source, connection and carried unit controls; what runs each microphone's EQ and, on a unit that can run it, the choice between the unit and software; each microphone's noise removal, its engine and strength; software processing, headphones, direct monitor blend, hardware output routing, [ducking](#terminal-ducking) on any device, USB Aux return and, on a Wave XLR Pro, the Line In gain; each capture input's own gain |
+| 3 Inputs | hardware controls in grouped cards with gain arcs on a wide terminal, or a scrolling list in a small one; gain, mute, low cut, expander, voice tune and its strength, phantom power, ClipGuard and the compressor for each of the interface's inputs, headed by the channel that carries it; what feeds XLR 1 and XLR 2; each capture microphone's source, connection and carried unit controls; what runs each microphone's EQ and, on a unit that can run it, the choice between the unit and software; each microphone's noise removal, its engine and strength; each microphone's expander and compressor on this computer; software processing, headphones, direct monitor blend, hardware output routing, [ducking](#terminal-ducking) on any device, USB Aux return and, on a Wave XLR Pro, the Line In gain; each capture input's own gain |
 | 4 Outputs | selected monitor sinks and their feeds, shared output volume, the monitoring pause (**Mute monitoring**, microphone sends also pause when enabled in Options), each sink's volume and mute, and the system default sink and source |
 | 5 Apps | every known application and its channel assignment, including the desktop's own routing |
 | 6 Inserts | the chain on each input and mix, its order, bypass and status; add a plugin from the catalogue, narrowed by typing, of those that fit the chain's width; open a plugin's native editor or edit its generated controls when the editor is blocked or refused |

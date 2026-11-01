@@ -26,9 +26,10 @@ namespace OpenXLR.Core.Mixing;
 /// EQ's own switch included, goes to the running stage live; turning the EQ
 /// off bypasses inside the stage and keeps it running until the route is
 /// next built, so on and off compare at once. The same stage runs the
-/// microphone's noise removal ahead of the EQ (<see cref="NoiseFor"/>) and its
-/// voice changer after it (<see cref="VoiceFor"/>), and a microphone with none
-/// of the three on when its route is built gets no stage.
+/// microphone's noise removal and expander ahead of the EQ (<see cref="NoiseFor"/>,
+/// <see cref="ExpanderFor"/>) and its compressor and voice changer after it
+/// (<see cref="CompressorFor"/>, <see cref="VoiceFor"/>), and a microphone
+/// with none of them on when its route is built gets no stage.
 /// </summary>
 public sealed partial class Mixer
 {
@@ -222,7 +223,7 @@ public sealed partial class Mixer
     /// <summary>Whether a route built now would run the channel's EQ in a software stage at its head.</summary>
     internal bool EqWantsSoftwareStage(string channel) { lock (_gate) return CarriesEqLocked(channel) && SoftwareEqLocked(channel).Enabled; }
 
-    /// <summary>Whether a route built now would put the microphone stage at the channel's head, for its EQ, its noise removal or both.</summary>
+    /// <summary>Whether a route built now would put the microphone stage at the channel's head, for anything in it.</summary>
     internal bool WantsMicrophoneStage(string channel) { lock (_gate) return StageWantedLocked(channel); }
 
     /// <summary>Whether a channel's EQ is software's to run: no unit runs it and none is still letting it go.</summary>
@@ -424,11 +425,12 @@ public sealed partial class Mixer
 
     /// <summary>
     /// Bring a microphone's software stage to its values, the EQ's, noise
-    /// removal's and the voice changer's: written live to a running stage,
-    /// which builds nothing; spliced in when any is on (the EQ running in
-    /// software) and no stage runs. A stage that refuses a value is replaced.
-    /// A stage whose unit took the EQ over is switched off and kept until the
-    /// route is next built, as is one whose three were all switched off.
+    /// removal's, the expander's, the compressor's and the voice changer's:
+    /// written live to a running stage, which builds nothing; spliced in when
+    /// any is on (the EQ running in software) and no stage runs. A stage that
+    /// refuses a value is replaced. A stage whose unit took the EQ over is
+    /// switched off and kept until the route is next built, as is one whose
+    /// parts were all switched off.
     /// </summary>
     private void ApplySoftwareEqLocked(string channel)
     {
@@ -445,6 +447,8 @@ public sealed partial class Mixer
                     if (stage.BandCount == eq.Bands.Count) stage.Apply(eq);
                     else stage.SetEnabled(false);
                     stage.ApplyNoise(noise);
+                    stage.ApplyExpander(ExpanderLocked(channel));
+                    stage.ApplyCompressor(CompressorLocked(channel));
                     stage.ApplyVoice(voice);
                     return;
                 }
@@ -456,7 +460,7 @@ public sealed partial class Mixer
             SpliceEqLocked(channel, replace: true);
             return;
         }
-        if (!eq.Enabled && !noise.Enabled && !voice.Enabled) return;
+        if (!eq.Enabled && !noise.Enabled && !voice.Enabled && !DynamicsWantedLocked(channel)) return;
         // A capture input without inserts plays on its direct feed, which
         // has no head to splice into: it moves to its own route, with the
         // stage at the head, as an insert would move it. A source that is
@@ -526,8 +530,13 @@ public sealed partial class Mixer
         {
             filter = _pw.CreateMicEq($"{ch.Id}_{++_eqGeneration}", SoftwareEqBackend.Controls(eq, noise), eq.Bands.Count);
             var stage = new SoftwareEqBackend(_pw, filter, eq, noise);
-            // The voice goes in live, before the microphone is linked in.
+            // The voice, the expander and the compressor go in live, before
+            // the microphone is linked in, and their levels when a client
+            // shows them.
+            stage.ApplyExpander(ExpanderLocked(ch.Id));
+            stage.ApplyCompressor(CompressorLocked(ch.Id));
             stage.ApplyVoice(VoiceLocked(ch.Id));
+            if (_dynamicsWatch.ContainsKey(ch.Id)) stage.SetDynamicsMeters(true);
             into = RouteInputLocked(upstream, stage.Node, ch, upstreamProcessed);
             if (into.Pairs.Count == 0) throw new InvalidOperationException("The microphone could not be linked into its EQ.");
             _eqErrors.Remove(ch.Id);
@@ -589,6 +598,7 @@ public sealed partial class Mixer
         if (stage is not null)
         {
             _eqStages[channel] = stage;
+            if (_dynamicsWatch.ContainsKey(channel)) _dynamicsMeterHosts[channel] = stage.Stage.NativeHost!;
             _eqInputs[channel] = into!;
             _eqUpstreams[channel] = upstream;
             // A direct link from the microphone that this daemon does not

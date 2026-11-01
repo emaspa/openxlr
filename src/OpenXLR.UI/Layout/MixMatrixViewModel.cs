@@ -472,7 +472,7 @@ public sealed class MatrixRowViewModel : ViewModelBase
     {
         (InputStripKind.Xlr1 or InputStripKind.Xlr2 or InputStripKind.Capture, SkinStripParts.Mute) => CarriesUnit || CarriesExtraUnit,
         (InputStripKind.Xlr1 or InputStripKind.Xlr2 or InputStripKind.Capture, SkinMatrixParts.Processing) =>
-            Unit is { HasSwitches: true } || ExtraUnit is { HasSwitches: true } || ShowsSoftware || ShowsNoise,
+            Unit is { HasSwitches: true } || ExtraUnit is { HasSwitches: true } || ShowsSoftware || ShowsNoise || ShowsDynamics,
         (InputStripKind.AuxIn, SkinStripParts.Gain) => Main.CapAuxInput || Channel.HasVolume,
         (InputStripKind.LineIn, SkinStripParts.Gain) => Main.CapLineInput || Channel.HasVolume,
         (_, SkinStripParts.Gain) => CarriesUnit || CarriesExtraUnit || Channel.HasVolume || ShowsCaptureGain,
@@ -528,13 +528,17 @@ public sealed class MatrixRowViewModel : ViewModelBase
     /// <summary>The processing part holds the microphone's noise removal: the daemon reports it for the channel and the mixer is there.</summary>
     public bool ShowsNoise => Channel.HasNoise && Main.HasMixer;
 
+    /// <summary>The processing part holds the microphone's expander and compressor on this computer, as it holds noise removal.</summary>
+    public bool ShowsDynamics => Channel.HasDynamics && Main.HasMixer;
+
     /// <summary>
     /// The processing button is lit: a switch the input's interface has is
     /// on, XLR 1's software low cut or ClipGuard is, or noise removal runs.
     /// </summary>
     public bool ProcessingOn => Unit is { SwitchesOn: true } || ExtraUnit is { SwitchesOn: true }
         || ShowsSoftware && (Main.ShowSoftLowCut && Main.SoftLowCutOn || Main.ShowSoftClipGuard && Main.SoftClipGuard)
-        || ShowsNoise && Channel.Noise is { IsLit: true };
+        || ShowsNoise && Channel.Noise is { IsLit: true }
+        || ShowsDynamics && Channel.Dynamics is { IsLit: true };
 
     /// <summary>The processing button says that phantom power is on, or settling, without being opened.</summary>
     public bool PhantomOn => Unit is { PhantomShown: true } || ExtraUnit is { PhantomShown: true };
@@ -734,6 +738,7 @@ public sealed class MatrixRowViewModel : ViewModelBase
             case nameof(ChannelViewModel.Inserts): Raise(nameof(Inserts)); Raise(nameof(InsertsKey)); RefreshSpec(); break;
             case nameof(ChannelViewModel.HasEq): Raise(nameof(ShowsEq)); Raise(nameof(Tall)); break;
             case nameof(ChannelViewModel.Noise): WatchUnits(); Raise(nameof(ShowsNoise)); RaiseSwitches(); break;
+            case nameof(ChannelViewModel.Dynamics): WatchUnits(); Raise(nameof(ShowsDynamics)); RaiseSwitches(); break;
             case nameof(ChannelViewModel.ShownUnitInput):
                 Raise(nameof(Unit)); Raise(nameof(CarriesUnit)); WatchUnits(); RefreshSpec(); RaiseSwitches();
                 break;
@@ -749,7 +754,7 @@ public sealed class MatrixRowViewModel : ViewModelBase
         {
             case nameof(MainViewModel.CapAuxInput) when Kind == InputStripKind.AuxIn: RefreshSpec(); break;
             case nameof(MainViewModel.CapLineInput) when Kind == InputStripKind.LineIn: RefreshSpec(); break;
-            case nameof(MainViewModel.HasMixer): Raise(nameof(ShowsEq)); Raise(nameof(Tall)); Raise(nameof(ShowsNoise)); RaiseSwitches(); break;
+            case nameof(MainViewModel.HasMixer): Raise(nameof(ShowsEq)); Raise(nameof(Tall)); Raise(nameof(ShowsNoise)); Raise(nameof(ShowsDynamics)); RaiseSwitches(); break;
             case nameof(MainViewModel.ShowSoftLowCut) or nameof(MainViewModel.ShowSoftClipGuard) when Kind == InputStripKind.Xlr1:
                 Raise(nameof(ShowsSoftware)); RaiseSwitches(); break;
             case nameof(MainViewModel.SoftLowCutHz) or nameof(MainViewModel.SoftClipGuard) when Kind == InputStripKind.Xlr1:
@@ -763,6 +768,7 @@ public sealed class MatrixRowViewModel : ViewModelBase
     private UnitInputViewModel? _watchedUnit;
     private WaveUnitInputViewModel? _watchedExtra;
     private MicNoiseViewModel? _watchedNoise;
+    private ChannelDynamicsViewModel? _watchedDynamics;
 
     private void WatchUnits()
     {
@@ -786,6 +792,13 @@ public sealed class MatrixRowViewModel : ViewModelBase
             if (_watchedNoise is not null) _watchedNoise.PropertyChanged -= OnNoiseChanged;
             _watchedNoise = noise;
             if (noise is not null) noise.PropertyChanged += OnNoiseChanged;
+        }
+        ChannelDynamicsViewModel? dynamics = _detached ? null : Channel.Dynamics;
+        if (!ReferenceEquals(_watchedDynamics, dynamics))
+        {
+            if (_watchedDynamics is not null) _watchedDynamics.PropertyChanged -= OnNoiseChanged;
+            _watchedDynamics = dynamics;
+            if (dynamics is not null) dynamics.PropertyChanged += OnNoiseChanged;
         }
     }
 
