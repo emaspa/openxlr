@@ -165,6 +165,28 @@ public sealed class TuiDuckingTests
     }
 
     [Fact]
+    public void NumbersShowAsTheirPresetOrAsACustomChoiceThatSendsNothing()
+    {
+        (App app, List<string> sent) = Ready(Edit(root =>
+        {
+            Ducking(root)["sensitivity"] = -30;
+            Ducking(root)["amount"] = 24;
+            Ducking(root)["speed"] = new JsonObject { ["attack"] = 45, ["release"] = 900 };
+            Ducking(root)["device"]!["readback"]!["speed"] = new JsonObject { ["attack"] = 45, ["release"] = 900 };
+        }));
+        // The state still parses: a number the UI's sliders set is no reason to drop the whole snapshot.
+        Assert.Contains("custom, -30 dBFS", Select(app, "Sensitivity"), StringComparison.Ordinal);
+        app.Handle(new KeyPress(Key.Right));
+        Assert.Equal("low", Command(sent).GetProperty("sensitivity").GetString());
+        // A number a preset writes reads as that preset.
+        Assert.Contains("high, 24 dB", Select(app, "Amount"), StringComparison.Ordinal);
+        Assert.Contains("custom, 45/900 ms", Select(app, "Speed"), StringComparison.Ordinal);
+        app.Handle(new KeyPress(Key.Left));
+        Assert.Equal("fast", Command(sent).GetProperty("speed").GetString());
+        Assert.Equal(24, app.Link.State!.Ducking!.Depth);
+    }
+
+    [Fact]
     public void TheKeyCyclesThroughTheMicrophonesAndLeavesTheChannelsWhenItBecomesOne()
     {
         (App app, List<string> sent) = Ready(ProJson);
