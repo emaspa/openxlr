@@ -220,7 +220,7 @@ public sealed class ProDuckingTests
             Assert.Equal(new[] { threshold, depth, times[0], times[1], times[2], times[3] }, b8[(e * 8)..(e * 8 + 6)]);
             Assert.Equal((byte)(0x40 + e), b8[e * 8 + 7]);
         }
-        Assert.Equal(ProDucking.PresetBytes(sensitivity, amount, speed), b8[..6]);
+        Assert.Equal(ProDucking.SettingBytes(sensitivity, amount, speed), b8[..6]);
         DuckingReadback unit = ProDucking.Decode(b8, b1);
         Assert.Equal((sensitivity, amount, speed), (unit.Sensitivity, unit.Amount, unit.Speed));
         Assert.True(ProDucking.Holds(unit, s));
@@ -281,7 +281,61 @@ public sealed class ProDuckingTests
     }
 
     [Fact]
-    public void ADisagreeingOrForeignPresetReadsAsCustomAndIsNotHeld()
+    public void CustomNumbersGoIntoTheSameBytesAndReadBackAsNumbers()
+    {
+        // Never seen on a unit: the same layout with values no preset writes.
+        var target = new ProDuckingTarget(true, -37, 31, DuckingSpeed.Times(7, 4321), new HashSet<int> { 1 });
+        Assert.Null(ProDucking.Valid(target));
+        byte[] b8 = Block8(MediumBytes, IdleFlags);
+        byte[] b1 = Block1();
+        ProDucking.Apply(b8, b1, target);
+        for (int e = 0; e < 12; e++)
+            Assert.Equal(new byte[] { 0xdb, 0x1f, 0x07, 0x00, 0xe1, 0x10 }, b8[(e * 8)..(e * 8 + 6)]);
+        DuckingReadback unit = ProDucking.Decode(b8, b1);
+        Assert.Equal((DuckingLevel.Number(-37), DuckingLevel.Number(31), DuckingSpeed.Times(7, 4321)), (unit.Sensitivity, unit.Amount, unit.Speed));
+        Assert.True(ProDucking.Holds(unit, target));
+        Assert.False(ProDucking.Holds(unit, target with { Amount = 30 }));
+
+        // The bounds fit the bytes: a signed threshold, one depth byte, little-endian times.
+        target = target with { Sensitivity = -60, Amount = 40, Speed = DuckingSpeed.Times(1000, 10000) };
+        ProDucking.Apply(b8, b1, target);
+        Assert.Equal(new byte[] { 0xc4, 0x28, 0xe8, 0x03, 0x10, 0x27 }, b8[..6]);
+        Assert.True(ProDucking.Holds(ProDucking.Decode(b8, b1), target));
+
+        // A number a preset writes reads back as the preset's word, a word written reads the same.
+        ProDucking.Apply(b8, b1, target with { Sensitivity = -12, Amount = "high", Speed = DuckingSpeed.Times(30, 200) });
+        unit = ProDucking.Decode(b8, b1);
+        Assert.Equal(("medium", "high", "fast"), (unit.Sensitivity, unit.Amount, unit.Speed));
+        Assert.True(ProDucking.Holds(unit, target with { Sensitivity = "medium", Amount = 24, Speed = "fast" }));
+    }
+
+    [Fact]
+    public void TheReadbackSerializesNumbersAndTheSpeedObject()
+    {
+        var readback = new DuckingReadback(-30, "custom", DuckingSpeed.Times(45, 900), [1], [4]);
+        string json = System.Text.Json.JsonSerializer.Serialize(readback,
+            new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+        Assert.Equal("""{"sensitivity":-30,"amount":"custom","speed":{"attack":45,"release":900},"pairs":[1],"entries":[4]}""", json);
+    }
+
+    [Theory]
+    [InlineData(1, 12, 80, 1200)]
+    [InlineData(-61, 12, 80, 1200)]
+    [InlineData(-12, 0, 80, 1200)]
+    [InlineData(-12, 41, 80, 1200)]
+    [InlineData(-12, 12, 0, 1200)]
+    [InlineData(-12, 12, 1001, 1200)]
+    [InlineData(-12, 12, 80, 9)]
+    [InlineData(-12, 12, 80, 10001)]
+    public void NumbersOutOfRangeAreRefused(int threshold, int depth, int attack, int release)
+    {
+        var target = new ProDuckingTarget(true, threshold, depth, DuckingSpeed.Times(attack, release), new HashSet<int> { 1 });
+        Assert.NotNull(ProDucking.Valid(target));
+        Assert.Throws<ArgumentException>(() => ProDucking.Apply(new byte[96], new byte[108], target));
+    }
+
+    [Fact]
+    public void DisagreeingEntriesReadAsCustomAndAreNotHeld()
     {
         byte[] b8 = Block8(MediumBytes, IdleFlags);
         b8[8 * 3] = 0xe8;               // one entry more sensitive than the rest

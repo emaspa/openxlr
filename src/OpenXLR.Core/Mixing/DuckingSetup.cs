@@ -32,10 +32,7 @@ public sealed record DuckingSetup : DuckingScene
         return CheckPresets(setup) ?? (MicEqProcessing.IsValid(setup.Processing) ? null : "processing must be device or software");
     }
 
-    internal static string? CheckPresets(DuckingScene setup)
-        => !ProDucking.Sensitivities.Contains(setup.Sensitivity) ? "sensitivity must be low, medium or high"
-            : !ProDucking.Amounts.Contains(setup.Amount) ? "amount must be low, medium or high"
-            : !ProDucking.Speeds.Contains(setup.Speed) ? "speed must be slow, medium or fast" : null;
+    internal static string? CheckPresets(DuckingScene setup) => ProDucking.CheckValues(setup.Sensitivity, setup.Amount, setup.Speed);
 
     /// <summary>
     /// Keep surviving targets without adding new ones. A missing microphone
@@ -89,15 +86,15 @@ public sealed record DuckingSetup : DuckingScene
         Sensitivity = scene.Sensitivity, Amount = scene.Amount, Speed = scene.Speed, Processing = processing,
     };
 
-    // D2 computes key_open from the live cells. The hardware codec is the
-    // single preset table; its signed threshold and little-endian times are
-    // also the software stage's values.
+    // D2 computes key_open from the live cells. The hardware codec holds the
+    // single preset table; a number goes to the software stage as it is.
     internal DuckingPlan ToPlan()
     {
-        byte[] bytes = ProDucking.PresetBytes(Sensitivity, Amount, Speed);
+        if (ProDucking.CheckValues(Sensitivity, Amount, Speed) is { } problem) throw new ArgumentException(problem);
+        (int attack, int release) = ProDucking.TimesOf(Speed)!.Value;
         return new(Key, Channels.Where(c => c != Key).SelectMany(c => Mixes.Select(m => $"{c}|{m}"))
-            .ToFrozenSet(StringComparer.Ordinal), unchecked((sbyte)bytes[0]), bytes[1],
-            bytes[2] | bytes[3] << 8, bytes[4] | bytes[5] << 8, Enabled);
+            .ToFrozenSet(StringComparer.Ordinal), ProDucking.ThresholdOf(Sensitivity)!.Value, ProDucking.DepthOf(Amount)!.Value,
+            attack, release, Enabled);
     }
 }
 
@@ -106,7 +103,7 @@ public sealed record DuckingSetup : DuckingScene
 /// absent one keeps it. Where ducking runs is a separate command.
 /// </summary>
 public sealed record DuckingChange(bool? Enabled = null, string? Key = null, IReadOnlyList<string>? Channels = null,
-    IReadOnlyList<string>? Mixes = null, string? Sensitivity = null, string? Amount = null, string? Speed = null)
+    IReadOnlyList<string>? Mixes = null, DuckingLevel? Sensitivity = null, DuckingLevel? Amount = null, DuckingSpeed? Speed = null)
 {
     public DuckingSetup ApplyTo(DuckingSetup setup) => setup with
     {

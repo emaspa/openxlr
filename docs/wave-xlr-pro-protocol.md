@@ -458,6 +458,23 @@ channel returns (Browser 2/3, Music 10/11, Game 12/13, System 14/15).
 | 6 | flags | bit 0 set on a ducked channel; bit 1 unknown |
 | 7 | `00` | |
 
+What the daemon writes to bytes 0 to 5:
+
+| Byte | A preset word | A custom value |
+|---|---|---|
+| 0 | the preset's threshold above | the number, -60 to 0 dBFS, as int8 |
+| 1 | the preset's depth above | the number, 1 to 40 dB |
+| 2, 3 | the preset's attack above | the attack, 1 to 1000 ms, LE16 |
+| 4, 5 | the preset's release above | the release, 10 to 10000 ms, LE16 |
+
+Only the three preset values of each field have ever been seen on the
+unit. A custom value goes into the same bytes, but nobody has yet checked
+how the unit behaves with one. If the unit does not keep a value, the
+read back after the write shows it and the `failed` rule moves ducking to
+software. The readback reports a value every entry holds as the preset's
+word when a preset writes it and as the number otherwise, and `custom`
+only when the entries disagree.
+
 Each preset change wrote one field in all twelve entries and nothing else
 (three values each). With no key at all Wave Link left byte 6 at `00 02 00
 00 03 00 00 03 03 00 00 00`; the `02` and `03` are unexplained.
@@ -473,8 +490,9 @@ pairs by the configured depth (block 0x0002 meters, capture 28). Nothing
 in either block was seen to name the key.
 
 The daemon writes the same fields
-(`src/OpenXLR.Core/Devices/ProDucking.cs`): the presets in all twelve
-entries while ducking is on, bit 0 of byte 6 set on the target pairs and
+(`src/OpenXLR.Core/Devices/ProDucking.cs`): the setup's sensitivity,
+amount and speed in bytes 0 to 5 of all twelve entries while ducking is
+on, bit 0 of byte 6 set on the target pairs and
 cleared on every other entry whose bit 1 is clear (an entry with bit 1 set
 keeps byte 6 as read), and the high bit of each pair field in the three
 mix sections. Every other byte of both blocks is copied from a fresh read.

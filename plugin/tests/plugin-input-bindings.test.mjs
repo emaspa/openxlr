@@ -216,7 +216,9 @@ test("hardware keys stay unit controls and are named after the carrying channel"
     const dark = keyImage("ducking");
     host.receive({event:"keyDown",context:"ducking"});
     assert.deepEqual(daemon.messages.at(-1), {cmd:"setDucking",value:{enabled:true}});
-    state.ducking = {...state.ducking, enabled:true, backend:"software"};
+    // Custom values, as the UI's sliders set them, change nothing for the key.
+    state.ducking = {...state.ducking, enabled:true, backend:"software", sensitivity:-30, amount:18,
+      speed:{attack:45, release:900}};
     daemon.receive(state);
     assert.notEqual(keyImage("ducking"), dark);
     host.receive({event:"keyDown",context:"ducking"});

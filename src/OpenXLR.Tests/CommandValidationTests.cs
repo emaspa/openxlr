@@ -43,6 +43,14 @@ public sealed class CommandValidationTests : IDisposable
         Assert.Empty(none.Mixes!);
         Assert.Equal(new DuckingChange(Sensitivity: "low", Amount: "high", Speed: "fast"),
             Change("""{"sensitivity":"low","amount":"high","speed":"fast"}"""));
+        // Numbers, at the bounds and between, stay numbers: one equal to a preset is not turned into its word.
+        Assert.Equal(new DuckingChange(Sensitivity: -60, Amount: 1, Speed: DuckingSpeed.Times(1, 10)),
+            Change("""{"sensitivity":-60,"amount":1,"speed":{"attack":1,"release":10}}"""));
+        Assert.Equal(new DuckingChange(Sensitivity: 0, Amount: 40, Speed: DuckingSpeed.Times(1000, 10000)),
+            Change("""{"sensitivity":0,"amount":40.0,"speed":{"release":10000,"attack":1000}}"""));
+        DuckingChange preset = Change("""{"sensitivity":-12,"amount":12,"speed":{"attack":80,"release":1200}}""");
+        Assert.Equal((null, -12, null, 12, null, 80, 1200), (preset.Sensitivity!.Word, preset.Sensitivity.Db, preset.Amount!.Word,
+            preset.Amount.Db, preset.Speed!.Word, preset.Speed.Attack, preset.Speed.Release));
         // The key may be named with channels that leave it out.
         Assert.Equal("xlr2", Change("""{"key":"xlr2","channels":["xlr1","music"]}""").Key);
         // The general check knows the command too.
@@ -59,6 +67,9 @@ public sealed class CommandValidationTests : IDisposable
         Assert.Equal(["music"], moved.Channels);
         Assert.Empty(moved.Mixes);
         Assert.Equal(("high", "software", true), (moved.Sensitivity, moved.Processing, moved.Enabled));
+        DuckingSetup custom = new DuckingChange(Amount: 18, Speed: DuckingSpeed.Times(50, 600)).ApplyTo(saved);
+        Assert.Equal((DuckingLevel.Preset("high"), DuckingLevel.Number(18), DuckingSpeed.Times(50, 600)),
+            (custom.Sensitivity, custom.Amount, custom.Speed));
     }
 
     [Theory]
@@ -81,11 +92,31 @@ public sealed class CommandValidationTests : IDisposable
     [InlineData("""{"mixes":["monitor","monitor"]}""", "mixes must be distinct mix ids")]
     [InlineData("""{"mixes":["music"]}""", "mixes must be distinct mix ids")]
     [InlineData("""{"mixes":[null]}""", "mixes must be distinct mix ids")]
-    [InlineData("""{"sensitivity":"loud"}""", "sensitivity must be low, medium or high")]
-    [InlineData("""{"sensitivity":12}""", "sensitivity must be low, medium or high")]
-    [InlineData("""{"amount":"slow"}""", "amount must be low, medium or high")]
-    [InlineData("""{"speed":"high"}""", "speed must be slow, medium or fast")]
-    [InlineData("""{"sensitivity":"custom"}""", "sensitivity must be low, medium or high")]
+    [InlineData("""{"sensitivity":"loud"}""", "sensitivity must be low, medium, high or a whole number of dBFS from -60 to 0")]
+    [InlineData("""{"sensitivity":12}""", "sensitivity must be low, medium, high or a whole number of dBFS from -60 to 0")]
+    [InlineData("""{"sensitivity":1}""", "sensitivity must be low, medium, high or a whole number of dBFS from -60 to 0")]
+    [InlineData("""{"sensitivity":-61}""", "sensitivity must be low, medium, high or a whole number of dBFS from -60 to 0")]
+    [InlineData("""{"sensitivity":-12.5}""", "sensitivity must be low, medium, high or a whole number of dBFS from -60 to 0")]
+    [InlineData("""{"sensitivity":"-12"}""", "sensitivity must be low, medium, high or a whole number of dBFS from -60 to 0")]
+    [InlineData("""{"sensitivity":null}""", "sensitivity must be low, medium, high or a whole number of dBFS from -60 to 0")]
+    [InlineData("""{"sensitivity":{"db":-12}}""", "sensitivity must be low, medium, high or a whole number of dBFS from -60 to 0")]
+    [InlineData("""{"amount":"slow"}""", "amount must be low, medium, high or a whole number of dB from 1 to 40")]
+    [InlineData("""{"amount":0}""", "amount must be low, medium, high or a whole number of dB from 1 to 40")]
+    [InlineData("""{"amount":41}""", "amount must be low, medium, high or a whole number of dB from 1 to 40")]
+    [InlineData("""{"amount":true}""", "amount must be low, medium, high or a whole number of dB from 1 to 40")]
+    [InlineData("""{"speed":"high"}""", "speed must be slow, medium, fast or {attack, release} in whole ms, attack 1 to 1000 and release 10 to 10000")]
+    [InlineData("""{"speed":80}""", "speed must be slow, medium, fast or {attack, release} in whole ms, attack 1 to 1000 and release 10 to 10000")]
+    [InlineData("""{"speed":{"attack":80}}""", "speed must be slow, medium, fast or {attack, release} in whole ms, attack 1 to 1000 and release 10 to 10000")]
+    [InlineData("""{"speed":{"release":1200}}""", "speed must be slow, medium, fast or {attack, release} in whole ms, attack 1 to 1000 and release 10 to 10000")]
+    [InlineData("""{"speed":{"attack":0,"release":1200}}""", "speed must be slow, medium, fast or {attack, release} in whole ms, attack 1 to 1000 and release 10 to 10000")]
+    [InlineData("""{"speed":{"attack":1001,"release":1200}}""", "speed must be slow, medium, fast or {attack, release} in whole ms, attack 1 to 1000 and release 10 to 10000")]
+    [InlineData("""{"speed":{"attack":80,"release":9}}""", "speed must be slow, medium, fast or {attack, release} in whole ms, attack 1 to 1000 and release 10 to 10000")]
+    [InlineData("""{"speed":{"attack":80,"release":10001}}""", "speed must be slow, medium, fast or {attack, release} in whole ms, attack 1 to 1000 and release 10 to 10000")]
+    [InlineData("""{"speed":{"attack":80.5,"release":1200}}""", "speed must be slow, medium, fast or {attack, release} in whole ms, attack 1 to 1000 and release 10 to 10000")]
+    [InlineData("""{"speed":{"attack":"80","release":1200}}""", "speed must be slow, medium, fast or {attack, release} in whole ms, attack 1 to 1000 and release 10 to 10000")]
+    [InlineData("""{"speed":{"attack":80,"release":1200,"hold":5}}""", "speed must be slow, medium, fast or {attack, release} in whole ms, attack 1 to 1000 and release 10 to 10000")]
+    [InlineData("""{"speed":{"attack":80,"attack":90,"release":1200}}""", "speed must be slow, medium, fast or {attack, release} in whole ms, attack 1 to 1000 and release 10 to 10000")]
+    [InlineData("""{"sensitivity":"custom"}""", "sensitivity must be low, medium, high or a whole number of dBFS from -60 to 0")]
     [InlineData("""{"processing":"device"}""", "unknown field 'processing'")]
     [InlineData("""{"targets":["monitor"]}""", "unknown field 'targets'")]
     [InlineData("""{"enable":true}""", "unknown field 'enable'")]

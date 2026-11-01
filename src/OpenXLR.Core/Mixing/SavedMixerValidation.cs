@@ -112,16 +112,16 @@ internal static class SavedMixerValidation
         setup = DuckingSetup.Prune(setup, MixerConfig.FromSettings(settings), notes);
         return setup with
         {
-            Sensitivity = Preset(setup.Sensitivity, Devices.ProDucking.Sensitivities, "sensitivity"),
-            Amount = Preset(setup.Amount, Devices.ProDucking.Amounts, "amount"),
-            Speed = Preset(setup.Speed, Devices.ProDucking.Speeds, "speed"),
+            // An unknown word and a number out of range are the same mistake.
+            Sensitivity = setup.Sensitivity is { } s && Devices.ProDucking.ThresholdOf(s) is not null ? s : Reset("sensitivity"),
+            Amount = setup.Amount is { } a && Devices.ProDucking.DepthOf(a) is not null ? a : Reset("amount"),
+            Speed = setup.Speed is { } sp && Devices.ProDucking.TimesOf(sp) is not null ? sp : Reset("speed"),
             Processing = Processing(),
         };
 
-        string Preset(string value, IReadOnlyList<string> choices, string field)
+        string Reset(string field)
         {
-            if (choices.Contains(value)) return value;
-            notes.Add($"ducking.{field}: invalid preset; reset to medium");
+            notes.Add($"ducking.{field}: invalid value; reset to medium");
             return Devices.ProDucking.Medium;
         }
 

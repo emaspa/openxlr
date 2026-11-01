@@ -552,9 +552,11 @@ public static class CommandValidation
     /// <c>setDucking</c>: <c>value</c> is an object with at least one of
     /// <c>enabled</c> (boolean), <c>key</c> (a microphone channel id),
     /// <c>channels</c> (distinct channel ids, possibly none), <c>mixes</c>
-    /// (distinct mix ids, possibly none), <c>sensitivity</c> and
-    /// <c>amount</c> (<c>low</c>, <c>medium</c>, <c>high</c>) and
-    /// <c>speed</c> (<c>slow</c>, <c>medium</c>, <c>fast</c>). Any other
+    /// (distinct mix ids, possibly none), <c>sensitivity</c> (<c>low</c>,
+    /// <c>medium</c>, <c>high</c> or whole dBFS), <c>amount</c> (<c>low</c>,
+    /// <c>medium</c>, <c>high</c> or whole dB) and <c>speed</c> (<c>slow</c>,
+    /// <c>medium</c>, <c>fast</c> or an object of whole-ms <c>attack</c> and
+    /// <c>release</c>), the numbers within <see cref="ProDucking"/>'s bounds. Any other
     /// field is refused, so a misspelt one is not silently ignored. Ids are
     /// checked against the layout when one is given; the key's absence from
     /// <c>channels</c> is checked here when both come in one command, and by
@@ -565,7 +567,9 @@ public static class CommandValidation
         change = null;
         if (cmd.Value.ValueKind != JsonValueKind.Object) return "setDucking: value must be an object";
         bool? enabled = null;
-        string? key = null, sensitivity = null, amount = null, speed = null;
+        string? key = null;
+        DuckingLevel? sensitivity = null, amount = null;
+        DuckingSpeed? speed = null;
         List<string>? channels = null, mixes = null;
         int fields = 0;
         foreach (JsonProperty field in cmd.Value.EnumerateObject())
@@ -593,15 +597,17 @@ public static class CommandValidation
                     mixes = m;
                     break;
                 case "sensitivity":
-                    if (Word(field.Value, ProDucking.Sensitivities) is not { } sv) return "setDucking: sensitivity must be low, medium or high";
+                    if (Level(field.Value) is not { } sv || ProDucking.ThresholdOf(sv) is null) return $"setDucking: {ProDucking.SensitivityProblem}";
                     sensitivity = sv;
                     break;
                 case "amount":
-                    if (Word(field.Value, ProDucking.Amounts) is not { } a) return "setDucking: amount must be low, medium or high";
+                    if (Level(field.Value) is not { } a || ProDucking.DepthOf(a) is null) return $"setDucking: {ProDucking.AmountProblem}";
                     amount = a;
                     break;
                 case "speed":
-                    if (Word(field.Value, ProDucking.Speeds) is not { } sp) return "setDucking: speed must be slow, medium or fast";
+                    DuckingSpeed? sp = field.Value.ValueKind == JsonValueKind.String ? DuckingSpeed.Preset(field.Value.GetString()!)
+                        : DuckingJson.Speed(field.Value);
+                    if (sp is null || ProDucking.TimesOf(sp) is null) return $"setDucking: {ProDucking.SpeedProblem}";
                     speed = sp;
                     break;
                 default:
@@ -612,6 +618,14 @@ public static class CommandValidation
         if (key is not null && channels?.Contains(key) == true) return "setDucking: channels must be distinct channel ids other than the key";
         change = new DuckingChange(enabled, key, channels, mixes, sensitivity, amount, speed);
         return null;
+
+        // A word, or a whole number; its range is checked by the caller.
+        static DuckingLevel? Level(JsonElement value) => value.ValueKind switch
+        {
+            JsonValueKind.String => DuckingLevel.Preset(value.GetString()!),
+            JsonValueKind.Number when DuckingJson.Whole(value.GetDouble()) is { } number => DuckingLevel.Number(number),
+            _ => null,
+        };
 
         static List<string>? Ids(JsonElement value, Func<string, bool> known)
         {
@@ -636,10 +650,6 @@ public static class CommandValidation
     internal static string? CheckDuckingProcessing(Command cmd)
         => cmd.Value.ValueKind == JsonValueKind.String && MicEqProcessing.IsValid(cmd.Value.GetString())
             ? null : "setDuckingProcessing: value must be 'device' or 'software'";
-
-    /// <summary>The listed word a JSON string holds, or null.</summary>
-    private static string? Word(JsonElement value, IReadOnlyList<string> words)
-        => value.ValueKind == JsonValueKind.String && value.GetString() is { } word && words.Contains(word) ? word : null;
 
     internal static string? CheckEditorRule(Command cmd)
         => cmd.Kind is not ("lv2" or "clap" or "vst3") || string.IsNullOrWhiteSpace(cmd.Plugin)
