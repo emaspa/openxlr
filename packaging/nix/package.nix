@@ -68,7 +68,7 @@ let
 in
 buildDotnetModule {
   pname = "openxlr";
-  version = "0.3.6";
+  version = "0.5.0";
 
   src = ../..;
 

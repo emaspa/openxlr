@@ -12,7 +12,7 @@
 %global deepfilter_version 0.5.6
 
 Name:           openxlr
-Version: 0.3.6
+Version: 0.5.0
 Release:        1%{?dist}
 Summary:        Linux Wave Link replacement for Elgato XLR interfaces and Wave microphones
 # OpenXLR is GPL-3.0-only. The native helper links RNNoise (BSD-3-Clause),
@@ -246,6 +246,17 @@ MSG
 %{_datadir}/gnome-shell/extensions/openxlr-focus@emaspa.github.com/
 
 %changelog
+* Sun Nov 01 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.5.0-1
+- Mixer: a compressor and an expander per microphone, each with its own window
+- Devices: the compressor and expander run on the unit's own processor on the MK.2 units and the Pro
+- Mixer: custom ducking sensitivity, amount and speed, set with sliders that mark the presets
+- UI: EQ profiles in the EQ editor, kept by the daemon, with three built-in profiles
+- Deck: a key per EQ profile loads it on a microphone
+- Plugins: run a plugin on its own block of 1024 samples, which adds a fixed delay
+- Plugins: the controls window shows the measured plugin delay beside the reported one
+- Daemon: diagnostics hold the whole boot's journals, a kernel log and the ALSA device status
+- Packaging: openxlr-yabridge revision 3 gives Windows plugins the system disk's identity
+
 * Sat Oct 31 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.3.6-1
 - Wave XLR Pro: the zero-latency path turns off while XLR 1 has software processing, so the jacks play the processed voice
 - Wave XLR Pro: XLR 2 gets its own zero-latency path at its Monitor send's level
