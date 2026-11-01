@@ -1525,8 +1525,9 @@ ClipGuard, so its EQ comes straight before its plugins.
 The existing four-band setup stays the default. **Add band** adds a neutral
 bell in a gap between the existing frequencies; **Remove** beside a band
 removes it and renumbers the following bands. At least one band remains and
-at most sixteen are offered. The band list scrolls while the response graph
-stays visible. Reset restores the four defaults. Copy, paste, profiles and a
+at most sixteen are offered. The editor opens tall enough to show every
+band, up to the height of its screen; past that, the band list scrolls while
+the response graph stays visible. Reset restores the four defaults. Copy, paste, profiles and a
 restart retain the full table. The four skin colours repeat for additional
 bands, which retain their individual numbers.
 

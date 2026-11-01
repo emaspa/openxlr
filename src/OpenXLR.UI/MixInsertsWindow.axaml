@@ -48,13 +48,13 @@
                   <Button Name="InsertPluginUi" Content="{loc:Text Key=PluginUI}" Padding="8,3" MinHeight="0" FontSize="{DynamicResource Ox.Label.FontSize}" Margin="0,0,6,0"
                           Click="OnInsertPluginUi" IsVisible="{Binding NativeEditorSupported}" IsEnabled="{Binding NativeEditorAvailable}"
                           ToolTip.Tip="{loc:Text Key=OpenThisPluginSOwnEditorOnThe}"/>
-                  <Button Content="{loc:Text Key=Controls}" Padding="8,3" MinHeight="0" FontSize="11" Margin="0,0,6,0" Click="OnInsertControls"/>
+                  <Button Content="{loc:Text Key=Controls}" Padding="8,3" MinHeight="0" FontSize="{DynamicResource Ox.Label.FontSize}" Margin="0,0,6,0" Click="OnInsertControls"/>
                   <Button Content="{loc:Text Key=Copy}" Padding="8,3" MinHeight="0" FontSize="{DynamicResource Ox.Label.FontSize}" Margin="0,0,6,0"
                           Click="OnCopyInsert" ToolTip.Tip="{loc:Text Key=CopyThisEffectToPasteOnAny}"/>
                   <Button Content="{loc:Text Key=Rename}" Padding="8,3" MinHeight="0" FontSize="{DynamicResource Ox.Label.FontSize}" Margin="0,0,6,0"
                           Click="OnRenameInsert" ToolTip.Tip="{loc:Text Key=ChangeTheNameThisEffectShowsThe}"/>
                   <ToggleButton Content="{loc:Text Key=Bypass}" IsChecked="{Binding Bypass, Mode=TwoWay}"
-                                Padding="8,3" MinHeight="0" FontSize="11" Margin="0,0,6,0"/>
+                                Padding="8,3" MinHeight="0" FontSize="{DynamicResource Ox.Label.FontSize}" Margin="0,0,6,0"/>
                   <Button Content="▲" Padding="6,3" MinHeight="0" FontSize="10" Margin="0,0,4,0" Click="OnInsertUp"
                           AutomationProperties.Name="{loc:Text Key=MovePluginUp}" ToolTip.Tip="{loc:Text Key=MoveUp}"/>
                   <Button Content="▼" Padding="6,3" MinHeight="0" FontSize="10" Margin="0,0,6,0" Click="OnInsertDown"

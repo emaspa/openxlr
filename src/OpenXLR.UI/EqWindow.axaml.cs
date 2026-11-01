@@ -1,5 +1,8 @@
+using System;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using OpenXLR.UI.Localization;
 
 namespace OpenXLR.UI;
@@ -25,6 +28,7 @@ public partial class EqWindow : Window
             Profiles?.Dispose();
         };
         SizeChanged += (_, e) => Classes.Set("narrow", e.NewSize.Width < NarrowWidth);
+        Opened += (_, _) => Dispatcher.UIThread.Post(FitBands, DispatcherPriority.Loaded);
         // The file may have been edited by hand meanwhile: read it again when the editor comes forward.
         Activated += (_, _) => Profiles?.Reread();
         DataContextChanged += (_, _) =>
@@ -41,6 +45,35 @@ public partial class EqWindow : Window
     public EqGraph Graph => this.FindControl<EqGraph>("EqGraph")!;
 
     private StackPanel ProfileRow => this.FindControl<StackPanel>("EqProfileRow")!;
+
+    private ScrollViewer BandScroll => this.FindControl<ScrollViewer>("EqBandScroll")!;
+
+    /// <summary>
+    /// Grow the editor once, as it opens, until every band row shows without
+    /// scrolling, never past the screen it is on, and keep its frame inside
+    /// that screen. The graph and the bands share the height the other rows
+    /// leave in equal parts, so the window grows by twice what the bands lack.
+    /// Past the screen's height the bands scroll.
+    /// </summary>
+    internal void FitBands()
+    {
+        if (_closed) return;
+        UpdateLayout();
+        double missing = BandScroll.Extent.Height - BandScroll.Viewport.Height;
+        if (missing < 1) return;
+        double wanted = ClientSize.Height + 2 * missing;
+        if ((Screens.ScreenFromWindow(this) ?? Screens.Primary) is { } screen)
+        {
+            Size frame = FrameSize ?? ClientSize;
+            double decoration = Math.Max(0, frame.Height - ClientSize.Height);
+            wanted = Math.Min(wanted, Math.Max(MinHeight, screen.WorkingArea.Height / screen.Scaling - decoration));
+            Height = Math.Ceiling(wanted);
+            int height = (int)Math.Ceiling((Height + decoration) * screen.Scaling);
+            PixelRect area = screen.WorkingArea;
+            if (Position.Y + height > area.Bottom) Position = Position.WithY(Math.Max(area.Y, area.Bottom - height));
+        }
+        else Height = Math.Ceiling(wanted);
+    }
 
     /// <summary>The saved profiles as this editor lists them; null before it has an EQ.</summary>
     public EqProfilesViewModel? Profiles => ProfileRow.DataContext as EqProfilesViewModel;
