@@ -15,15 +15,20 @@
 // belongs to another filter: the new filter is first run over the band's
 // recent input, then faded in over 5 ms while the old one fades out.
 //
-// Noise removal (denoise.c) runs first, so the EQ shapes the cleaned voice,
-// and the voice changer (voice.c) runs last, so the character goes on the
-// shaped voice. Their controls live in this stage as denoise_* and voice_*,
-// and their delays add up to the stage's latency.
+// The stage runs, in order: noise removal (denoise.c), the expander
+// (dynamics.c), the EQ, the compressor (dynamics.c) and the voice changer
+// (voice.c). The EQ shapes the cleaned voice, the expander closes on the
+// noise that noise removal left, the compressor evens out the shaped voice,
+// and the character goes on last. Their controls live in this stage as
+// denoise_*, exp_*, comp_* and voice_*; noise removal's and the voice
+// changer's delays add up to the stage's latency, and the two dynamics
+// processors add none.
 //
 // Who writes what. The daemon writes the controls' desired values through
 // the command pipe; only the audio thread reads them, at the start of a
 // block, and only the audio thread touches the filters.
 #include "denoise.h"
+#include "dynamics.h"
 #include "eq.h"
 #include "host.h"
 #include "voice.h"
@@ -64,6 +69,8 @@ typedef struct {
   float *cleaned;          // noise removal's output, the EQ's input
   Voice *voice;
   float *shaped;           // the EQ's output, the voice changer's input
+  Dynamics *expander;      // in place on cleaned, before the EQ
+  Dynamics *compressor;    // in place on shaped, after the EQ
   unsigned band_count;
   double mix, mix_target;  // the EQ's on switch
   uint32_t fade;           // 5 ms in samples
@@ -187,7 +194,10 @@ static bool eq_load_count(Host *h, unsigned bands) {
     EQ_CONTROL(qlog10, "qlog10", -1, 1, -0.152f)
 #undef EQ_CONTROL
   }
-  return true;
+  // Last, so every control above keeps its place.
+  e->expander = dynamics_load(h, DYNAMICS_EXPANDER);
+  e->compressor = dynamics_load(h, DYNAMICS_COMPRESSOR);
+  return e->expander && e->compressor;
 }
 
 // Keep the original four-band invocation compatible with older daemons.
@@ -207,7 +217,9 @@ static bool eq_load_bands(Host *h, char **arguments) {
 // without any fade, as if the EQ had always been set this way.
 static bool eq_activate(Host *h) {
   Eq *e = h->impl;
-  if (!denoise_activate(e->denoise) || !voice_activate(e->voice)) return false;
+  if (!denoise_activate(e->denoise) || !voice_activate(e->voice) || !dynamics_activate(e->expander)
+      || !dynamics_activate(e->compressor))
+    return false;
   e->mix = e->mix_target = eq_on(e->enabled);
   for (unsigned i = 0; i < e->band_count; i++) {
     EqBand *b = &e->bands[i];
@@ -229,6 +241,8 @@ static void eq_unload(Host *h) {
       free((char *)h->controls[i].symbol);
   denoise_unload(e->denoise);
   voice_unload(e->voice);
+  dynamics_unload(e->expander);
+  dynamics_unload(e->compressor);
   free(e->cleaned);
   free(e->shaped);
   free(e);
@@ -270,6 +284,7 @@ static inline double eq_ramp(double mix, double target, double step) {
 static void eq_process(Host *h, uint32_t frames, float *const *in, float *const *out) {
   Eq *e = h->impl;
   denoise_process(e->denoise, in[0], e->cleaned, frames);
+  dynamics_process(e->expander, e->cleaned, e->cleaned, frames);
   eq_follow(e, h->rate);
   for (uint32_t n = 0; n < frames; n++) {
     double x = e->cleaned[n], u = x;
@@ -290,6 +305,7 @@ static void eq_process(Host *h, uint32_t frames, float *const *in, float *const 
     e->mix = eq_ramp(e->mix, e->mix_target, e->step);
     e->shaped[n] = (float)(x + (u - x) * e->mix);
   }
+  dynamics_process(e->compressor, e->shaped, e->shaped, frames);
   voice_process(e->voice, e->shaped, out[0], frames);
 }
 
@@ -297,6 +313,8 @@ static void eq_main_thread(Host *h) {
   Eq *e = h->impl;
   denoise_main_thread(e->denoise);
   voice_main_thread(e->voice);
+  dynamics_main_thread(e->expander);
+  dynamics_main_thread(e->compressor);
 }
 
 static uint32_t eq_latency(Host *h) {

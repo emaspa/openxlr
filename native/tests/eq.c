@@ -10,10 +10,11 @@
 #include <assert.h>
 #include <time.h>
 
-// Noise removal's three controls and four meters, and the voice changer's
-// four controls and three meters, beside the EQ's own (tests/denoise.c and
-// tests/voice.c check them).
-enum { DENOISE_CONTROLS = 7, VOICE_CONTROLS = 7 };
+// Noise removal's three controls and four meters, the voice changer's four
+// controls and three meters, and the compressor's and expander's eight
+// controls and three meters each, beside the EQ's own (tests/denoise.c,
+// tests/voice.c and tests/dynamics.c check them).
+enum { DENOISE_CONTROLS = 7, VOICE_CONTROLS = 7, DYNAMICS_CONTROLS = 22 };
 
 static const char *const TYPES[EQ_TYPES] = {"lowCut", "lowShelf", "peak",
                                             "notch", "highShelf", "highCut"};
@@ -365,7 +366,7 @@ static void check_controls(void) {
   eq_unload(two);
   free(two);
   Host *h = fresh(RATE);
-  assert(h->control_count == 1 + 5 * EQ_BANDS + DENOISE_CONTROLS + VOICE_CONTROLS);
+  assert(h->control_count == 1 + 5 * EQ_BANDS + DENOISE_CONTROLS + VOICE_CONTROLS + DYNAMICS_CONTROLS);
   const char *names[] = {"enabled", "type", "frequency", "gain", "qlog10"};
   for (int band = 1; band <= EQ_BANDS; band++)
     for (int k = 0; k < 5; k++) {
@@ -399,7 +400,7 @@ static void check_variable_bands(void) {
     char *args[] = {number, NULL};
     assert(eq_load_bands(h, args));
     assert(((Eq *)h->impl)->band_count == (unsigned)count);
-    assert(h->control_count == (unsigned)(1 + 5 * count + DENOISE_CONTROLS + VOICE_CONTROLS));
+    assert(h->control_count == (unsigned)(1 + 5 * count + DENOISE_CONTROLS + VOICE_CONTROLS + DYNAMICS_CONTROLS));
     for (int band = 1; band <= count; band++) set_band(h, band, (Setting)OFF);
     set_band(h, count, (Setting){1, PEAK, 1000, 6, 1});
     set(h, "enabled", 1);

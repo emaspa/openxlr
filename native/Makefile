@@ -56,14 +56,14 @@ DF_LINK = -Wl,--gc-sections $(DEEPFILTER_LIB) -lgcc_s -lutil -lrt
 endif
 
 OBJECTS = host.o lv2.o clap.o vst3.o sound-check.o eq.o duck.o level.o player.o denoise.o \
-          voice.o voice-stretch.o $(RNN_OBJECTS)
-HEADERS = host.h icon.h denoise.h eq.h voice.h $(wildcard clap/include/clap/*.h clap/include/clap/*/*.h) \
+          voice.o voice-stretch.o dynamics.o $(RNN_OBJECTS)
+HEADERS = host.h icon.h denoise.h dynamics.h eq.h voice.h $(wildcard clap/include/clap/*.h clap/include/clap/*/*.h) \
           $(wildcard vst3/pluginterfaces/*/*.h)
 # The stages and their tests link these beside the noise removal objects.
 DENOISE_OBJECTS = denoise.o $(RNN_OBJECTS)
-# The microphone stage (eq.c) runs noise removal first and the voice changer
-# last; its tests link both.
-STAGE_OBJECTS = $(DENOISE_OBJECTS) voice.o voice-stretch.o
+# The microphone stage (eq.c) runs noise removal first, the expander and the
+# compressor around the EQ, and the voice changer last; its tests link them.
+STAGE_OBJECTS = $(DENOISE_OBJECTS) voice.o voice-stretch.o dynamics.o
 SIGNALSMITH_HEADERS = signalsmith/signalsmith-stretch.h $(wildcard signalsmith/signalsmith-linear/*.h)
 
 openxlr-lv2-host: $(OBJECTS) $(DF_DEPS)
@@ -296,6 +296,24 @@ test-voice: tests/voice
 clean: clean-voice
 clean-voice:
 	rm -f tests/voice tests/voice.o
+
+# The compressor and the expander: driven through the microphone stage with
+# steady and stepped levels and with no audio server, checked against their
+# static curves, their time constants and their meters.
+tests/dynamics.o: tests/dynamics.c eq.c host.c $(HEADERS)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
+tests/dynamics: tests/dynamics.o $(STAGE_OBJECTS) lv2.o clap.o vst3.o $(DF_DEPS)
+	$(CXX) $(filter %.o,$^) -o $@ $(LDFLAGS) $(DF_LINK) $(LDLIBS)
+
+.PHONY: test-dynamics clean-dynamics
+test: test-dynamics
+test-dynamics: tests/dynamics
+	./tests/dynamics
+
+clean: clean-dynamics
+clean-dynamics:
+	rm -f tests/dynamics tests/dynamics.o
 
 # The soundboard player: decoding, resampling, press modes and ramps, driven
 # directly with no audio server. It asks the helper for its `formats` and

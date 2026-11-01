@@ -23,6 +23,7 @@ native/tests/duck
 native/tests/denoise
 native/tests/denoise-handoff
 native/tests/voice
+native/tests/dynamics
 native/tests/player
 native/build-config.h
 native/rnnoise/src/*.o

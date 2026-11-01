@@ -12,8 +12,8 @@ The distribution packages build and install it, and its presence changes
 nothing for existing LV2 inserts: they use filter-chain until explicitly
 switched in the controls window. CLAP and VST3 always use this helper, and
 so do OpenXLR's own stages: Sound Check, the level meter, the microphone EQ
-with noise removal and the voice changer, ducking and the soundboard
-player, each described below.
+with noise removal, the expander, the compressor and the voice changer,
+ducking and the soundboard player, each described below.
 
 ## Build
 
@@ -689,6 +689,85 @@ voice's latency, CPU and level. `./tests/voice --render IN.wav DIR` runs
 every voice over a recording and writes `DIR/00-dry.wav` to
 `DIR/11-witch.wav` with each one's level against the input, for tuning the
 table by ear.
+
+## Compressor and expander
+
+The same stage carries a downward expander and a compressor
+(`dynamics.c`). The order inside the stage is noise removal, the
+expander, the EQ, the compressor and the voice changer. The expander
+closes on the noise that noise removal left, and the compressor evens out
+the shaped voice before any character goes on. Neither adds latency.
+
+| Control | Range | Default |
+| --- | --- | --- |
+| `exp_enabled` | 0 or 1 | 0 |
+| `exp_threshold` | -80 to 0 dB | -50 |
+| `exp_ratio` | 1 to 20 (1:N below the threshold) | 3 |
+| `exp_range` | 0 to 80 dB, the most it turns down | 24 |
+| `exp_attack` | 0.1 to 200 ms, how fast it opens | 1 |
+| `exp_release` | 10 to 2000 ms, how fast it closes | 150 |
+| `exp_hold` | 0 to 500 ms, how long it waits before it closes | 50 |
+| `exp_meters` | 0 or 1 | 0 |
+| `comp_enabled` | 0 or 1 | 0 |
+| `comp_threshold` | -60 to 0 dB | -18 |
+| `comp_ratio` | 1 to 20 (N:1 above the threshold) | 3 |
+| `comp_attack` | 0.1 to 200 ms | 5 |
+| `comp_release` | 10 to 2000 ms | 150 |
+| `comp_knee` | 0 to 24 dB, the width of the soft knee | 6 |
+| `comp_makeup` | 0 to 24 dB | 0 |
+| `comp_meters` | 0 or 1 | 0 |
+
+Both are feed-forward and work in the log domain. A sample's level is
+`20 log10 |x|` with a floor of -120 dBFS, a static curve turns it into the
+reduction the processor wants, and a one-pole filter per direction smooths
+that reduction in dB, with the coefficient `exp(-1 / (time * rate))`, so a
+step reaches 63.2 percent of its way in the attack or release time. Attack
+is always the response to a louder input: the compressor's reduction rising
+and the expander's falling. With `L` the level, `T` the threshold, `R` the
+ratio and `d = L - T`:
+
+- compressor, with a soft knee of width `W` (Giannoulis, Massberg and
+  Reiss): no reduction while `2d < -W`, `(1 - 1/R)(d + W/2)^2 / (2W)` while
+  `|2d| <= W`, and `d (1 - 1/R)` above; the output is
+  `x * 10^((makeup - reduction) / 20)`, and a make-up change ramps across
+  one block;
+- expander: no reduction at or above `T`, below it
+  `min((T - L)(R - 1), range)`. Before it starts to close, the level has to
+  stay below what keeps it open for the hold time, so it does not close
+  between the peaks of a voice's own waveform.
+
+Switching either on or off is a 5 ms crossfade between the dry and the
+processed signal. Once off and faded, the output is the input to the bit
+and the detector is reset, so switching on starts from no reduction.
+Parameter changes take effect at the next block and keep the detector's
+state. The smoothed reduction is set to 0 below 1e-9 dB, so a long release
+never reaches subnormal numbers.
+
+Each reports three meters, `exp_input`, `exp_reduction` and `exp_output`,
+and `comp_input`, `comp_reduction` and `comp_output`: the highest input and
+output sample peak in dBFS (floor -120) and the most reduction applied in dB
+since the last tick, the on and off crossfade included, rounded to 0.1 dB.
+They are measured only while `exp_meters` or `comp_meters` is 1; while it
+is 0 they rest at -120, 0 and -120, so the tick prints them once at start
+and then nothing. The audio thread keeps the peaks; the main thread
+publishes them each tick and asks for a fresh count through an atomic flag.
+
+`make test-dynamics` drives the stage with no audio server, at 48 kHz in
+blocks of 256, counting every allocation made while a block runs (there
+must be none). It checks the controls and meters against the table above;
+that both off pass the input through bit for bit, by default and after
+running on; that a steady level, a square wave whose every sample has the
+same magnitude, comes out at the curve's gain within 0.05 dB for a hard
+knee, a soft knee with make-up, a 20:1 setting and two expander settings
+with their range caps, with the meters within 0.1 dB of the applied gain
+and the levels; that the reduction covers 63.2 percent of a step in the
+attack and release times within 5 percent, after the hold for the
+expander, with nothing moving during the hold; that full scale and six
+seconds of silence after it stay finite, bounded and clear of subnormal
+numbers; that the meters stay at rest while off; and that a live change of
+threshold, ratio, knee, attack and make-up moves the output by no more
+than the new gain allows. It prints the measured figures and the cost of
+both processors.
 
 ## Soundboard player
 
