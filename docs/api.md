@@ -2469,8 +2469,16 @@ device}`:
 - `sensitivity` (`low` -3 dBFS, `medium` -12 dBFS, `high` -24 dBFS; a
   higher one reacts to a softer voice), `amount` (`low` 6 dB, `medium`
   12 dB, `high` 24 dB) and `speed` (`slow` 100 ms down and 2000 ms back,
-  `medium` 80 and 1200, `fast` 30 and 200). These are the Wave XLR Pro's
-  presets, and software uses the same numbers.
+  `medium` 80 and 1200, `fast` 30 and 200). The words are the Wave XLR
+  Pro's presets, and software uses the same numbers. Each field also takes
+  a custom value in whole numbers: `sensitivity` the key threshold in
+  dBFS, -60 to 0; `amount` the depth in dB, 1 to 40; `speed` an object
+  `{"attack": ms, "release": ms}` with both fields, attack 1 to 1000 and
+  release 10 to 10000. A number written as `12.0` counts as whole; `12.5`
+  is refused. The state reports each field in the form it was set: a
+  word stays a word, and a number stays a number even when it equals a
+  preset, so `-12` is reported as `-12`, not `medium`. The UI's sliders
+  always send numbers.
 - `processing`: `device` (the default) or `software`.
 - `backend`: `device` while the unit runs the setup, on or off, since the
   unit holds the switch; `software` while the software stages exist; null
@@ -2492,8 +2500,12 @@ device}`:
   1) and `aux` (the USB Aux port, pair 5), given even when it is not
   ready. `held` is true when the unit was last read holding what OpenXLR
   wrote to it. `readback` is that read decoded: `sensitivity`, `amount`
-  and `speed` as the unit holds them (`custom` when its entries disagree
-  or hold a value no preset writes), `pairs`, the USB playback pairs
+  and `speed` as the unit holds them, in the setup's shapes: the preset
+  word when all twelve entries hold the value a preset writes, the number
+  (for the speed, the attack and release object) when they agree on any
+  other value, and `custom` when the entries disagree. The unit cannot
+  tell a word from its number, so a setup of `-12` reads back `medium`.
+  `pairs`, the USB playback pairs
   ducked in any of its mix sections (0 to 7, pair n is channels 2n and
   2n+1), and `entries`, the block 0x0008 entries whose ducked flag is set
   (0 to 3 the hardware inputs, 4 to 11 the pairs). Wave Link leaves flags
@@ -2513,9 +2525,14 @@ The errors name the field: `setDucking: value must be an object`,
 sensitivity, amount and speed`, `setDucking: key must be a microphone channel`,
 `setDucking: channels must be distinct channel ids other than the key`,
 `setDucking: mixes must be distinct mix ids`, `setDucking: sensitivity
-must be low, medium or high`, `setDucking: amount must be low, medium or
-high`, `setDucking: speed must be slow, medium or fast`, `setDucking:
-enabled must be a boolean`, `setDucking: unknown field '<name>'`.
+must be low, medium, high or a whole number of dBFS from -60 to 0`,
+`setDucking: amount must be low, medium, high or a whole number of dB from
+1 to 40`, `setDucking: speed must be slow, medium, fast or {attack,
+release} in whole ms, attack 1 to 1000 and release 10 to 10000`,
+`setDucking: enabled must be a boolean`, `setDucking: unknown field
+'<name>'`. A speed object with a field missing, an extra field or a value
+that is not a whole number in range takes the speed error. For example
+`{"cmd":"setDucking","value":{"sensitivity":-30,"amount":18,"speed":{"attack":45,"release":900}}}`.
 `setDuckingProcessing` takes `value` `device` or `software`, as
 `setEqProcessing` does. The daemon saves the setup in `mixer.json` first
 and applies it only once the save succeeded; a failed save leaves the
@@ -2525,23 +2542,26 @@ mixer; in hardware-control mode they are refused with `mixer not built
 nothing running.
 
 `mixer.json` holds the setup as `ducking`, `{enabled, key, channels, mixes,
-sensitivity, amount, speed, processing}`. A file without it takes the
+sensitivity, amount, speed, processing}`, each of the three a word or a
+custom value in the command's form. A file without it takes the
 defaults, and the next save writes them: off, key `xlr1`, every
 application channel, the default monitor mix (`defaultMonitorMix`, which is
 `monitor` while Monitor A exists), medium presets and processing `device`. A
 `ducking` object without `mixes`, here or in a profile, takes the default
 monitor mix of the layout it is applied to. On load, ids the layout lacks are
 dropped, a key that is not a microphone turns ducking off and resets the key
-to `xlr1`, and a word the daemon does not know takes its default; each drop is
-noted in the journal.
+to `xlr1`, and a word the daemon does not know takes its default, `medium`, as
+does a number out of range, a fraction or a speed object it cannot read;
+each drop is noted in the journal.
 Layout edits prune the setup in the same save: a deleted channel leaves
 `channels`, a deleted mix leaves `mixes`, and a deleted key turns ducking
 off and resets the key to `xlr1`. A new channel is not added. A profile
 carries `mixer.ducking` without `processing`. Recalling it replaces the
 setup, drops ids the layout lacks and turns ducking off when the key is
 missing; a profile without `ducking` leaves the setup alone. A profile
-whose `ducking` holds a preset word the daemon does not know is refused
-whole, as any other invalid mixer field is.
+whose `ducking` holds a preset word the daemon does not know, or a custom
+value it does not take, is refused whole, as any other invalid mixer field
+is.
 
 A key ducks only while it is heard: a key muted in every send it has does
 not duck, and in software neither does a microphone key while

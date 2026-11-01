@@ -269,7 +269,9 @@ internal sealed record WaveInterfaceEntry
 
 /// <summary>
 /// Ducking as the daemon reports it: the switch, the key microphone, the
-/// channels it lowers and the mixes it lowers them in, the three presets,
+/// channels it lowers and the mixes it lowers them in, the three settings
+/// (each a preset word or a custom number, the speed's an object of attack
+/// and release),
 /// where it should run (<see cref="Processing"/>), what runs it now
 /// (<see cref="Backend"/>: <c>device</c>, <c>software</c> or nothing) and
 /// the unit's side in <see cref="Device"/>. A daemon that predates the
@@ -281,14 +283,38 @@ internal sealed record DuckingEntry
     public string Key { get; init; } = "xlr1";
     public List<string>? Channels { get; init; }
     public List<string>? Mixes { get; init; }
-    public string Sensitivity { get; init; } = "medium";
-    public string Amount { get; init; } = "medium";
-    public string Speed { get; init; } = "medium";
+    public JsonElement Sensitivity { get; init; }
+    public JsonElement Amount { get; init; }
+    public JsonElement Speed { get; init; }
     public string? Processing { get; init; }
     public string? Backend { get; init; }
     public bool Available { get; init; } = true;
     public string? Error { get; init; }
     public DuckingDeviceEntry? Device { get; init; }
+
+    /// <summary>
+    /// Which of three presets a sensitivity or an amount stands for, by its
+    /// word or by the number the preset writes, and the custom number as a
+    /// row shows it otherwise, with <paramref name="unit"/>. An unknown or
+    /// missing value is preset -1 with no custom text.
+    /// </summary>
+    public static (int Preset, string? Custom) Level(JsonElement value, string[] words, int[] numbers, string unit)
+    {
+        if (value.ValueKind == JsonValueKind.String) return (Array.IndexOf(words, value.GetString()), null);
+        if (value.ValueKind != JsonValueKind.Number || !value.TryGetInt32(out int number)) return (-1, null);
+        int at = Array.IndexOf(numbers, number);
+        return at >= 0 ? (at, null) : (-1, $"{number} {unit}");
+    }
+
+    /// <summary>The same for a speed, whose custom form is an object of attack and release in ms.</summary>
+    public static (int Preset, string? Custom) Times(JsonElement value, string[] words, (int Attack, int Release)[] times)
+    {
+        if (value.ValueKind == JsonValueKind.String) return (Array.IndexOf(words, value.GetString()), null);
+        if (value.ValueKind != JsonValueKind.Object || !value.TryGetProperty("attack", out JsonElement a) || !value.TryGetProperty("release", out JsonElement r)
+            || !a.TryGetInt32(out int attack) || !r.TryGetInt32(out int release)) return (-1, null);
+        int at = Array.IndexOf(times, (attack, release));
+        return at >= 0 ? (at, null) : (-1, $"{attack}/{release} ms");
+    }
 
     /// <summary>A short word for the switch row: where it runs, or what is wrong; null while off.</summary>
     [JsonIgnore]
@@ -300,7 +326,8 @@ internal sealed record DuckingEntry
 
     /// <summary>The depth of the chosen amount in dB, which the reduction bar fills to.</summary>
     [JsonIgnore]
-    public double Depth => Amount switch { "low" => 6, "high" => 24, _ => 12 };
+    public double Depth => Amount.ValueKind == JsonValueKind.Number && Amount.TryGetDouble(out double db) && db > 0 ? db
+        : Amount.ValueKind == JsonValueKind.String ? Amount.GetString() switch { "low" => 6, "high" => 24, _ => 12 } : 12;
 
     /// <summary>True while the unit runs it, or would once switched on.</summary>
     [JsonIgnore]

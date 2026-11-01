@@ -414,9 +414,11 @@ public sealed record DuckingState
     [JsonPropertyName("key")] public string Key { get; init; } = "";
     [JsonPropertyName("channels")] public IReadOnlyList<string> Channels { get; init; } = [];
     [JsonPropertyName("mixes")] public IReadOnlyList<string> Mixes { get; init; } = [];
-    [JsonPropertyName("sensitivity")] public string Sensitivity { get; init; } = "";
-    [JsonPropertyName("amount")] public string Amount { get; init; } = "";
-    [JsonPropertyName("speed")] public string Speed { get; init; } = "";
+    // A preset word or a number (an attack and release object for the
+    // speed), in the form the setup was given.
+    [JsonPropertyName("sensitivity")] public DuckingLevel Sensitivity { get; init; } = ProDucking.Medium;
+    [JsonPropertyName("amount")] public DuckingLevel Amount { get; init; } = ProDucking.Medium;
+    [JsonPropertyName("speed")] public DuckingSpeed Speed { get; init; } = ProDucking.Medium;
     [JsonPropertyName("processing")] public string Processing { get; init; } = ProDucking.Device;
     [JsonPropertyName("backend"), JsonIgnore(Condition = JsonIgnoreCondition.Never)] public string? Backend { get; init; }
     [JsonPropertyName("available")] public bool Available { get; init; }

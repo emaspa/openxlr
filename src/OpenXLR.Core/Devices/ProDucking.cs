@@ -16,14 +16,15 @@ public static class ProReturnPairs
 }
 
 /// <summary>
-/// What the unit held at the last read: the preset each of the three
-/// fields matches across all twelve entries (<c>custom</c> when the entries
-/// disagree or hold a value no preset writes), the USB pairs whose field
-/// reads 11 in any of block 0x0001's three mix sections, and the block 0x0008 entries whose
-/// flag bit 0 is set. <see cref="Raw"/> is the bytes the codec reads, hex,
-/// so a check that the unit holds a setting needs no transfer.
+/// What the unit held at the last read: the value each of the three fields
+/// holds across all twelve entries, as the preset word when a preset writes
+/// it and as the number otherwise (<c>custom</c> when the entries
+/// disagree), the USB pairs whose field reads 11 in any of block 0x0001's
+/// three mix sections, and the block 0x0008 entries whose flag bit 0 is
+/// set. <see cref="Raw"/> is the bytes the codec reads, hex, so a check
+/// that the unit holds a setting needs no transfer.
 /// </summary>
-public sealed record DuckingReadback(string Sensitivity, string Amount, string Speed,
+public sealed record DuckingReadback(DuckingLevel Sensitivity, DuckingLevel Amount, DuckingSpeed Speed,
     IReadOnlyList<int> Pairs, IReadOnlyList<int> Entries)
 {
     [System.Text.Json.Serialization.JsonIgnore]
@@ -47,6 +48,8 @@ public sealed record DuckingReadback(string Sensitivity, string Amount, string S
 ///   byte 1      depth, dB: amount Low 6, Medium 12, High 24
 ///   bytes 2, 3  attack, LE16 ms; bytes 4, 5 release, LE16 ms:
 ///               speed Slow 100/2000, Medium 80/1200, Fast 30/200
+/// OpenXLR writes these bytes from the setup: a preset word's values, or a
+/// custom number as is (only the presets were ever seen on a unit).
 ///   byte 6      flags: bit 0 this channel is ducked; bit 1 unknown (Wave
 ///               Link leaves 02 and 03 on some entries with no key at all)
 ///   byte 7      00, kept
@@ -98,36 +101,69 @@ public static class ProDucking
     private static readonly byte[] Depths = [6, 12, 24];
     private static readonly (ushort Attack, ushort Release)[] Times = [(100, 2000), (80, 1200), (30, 200)];
 
+    // The custom numbers a setup takes, whole numbers within both the
+    // software stage's controls (native/duck.c) and the unit's bytes, and
+    // narrowed to what a voice key can use.
+    public const int MinThreshold = -60, MaxThreshold = 0;
+    public const int MinDepth = 1, MaxDepth = 40;
+    public const int MinAttack = 1, MaxAttack = 1000;
+    public const int MinRelease = 10, MaxRelease = 10000;
+
+    public const string SensitivityProblem = "sensitivity must be low, medium, high or a whole number of dBFS from -60 to 0";
+    public const string AmountProblem = "amount must be low, medium, high or a whole number of dB from 1 to 40";
+    public const string SpeedProblem = "speed must be slow, medium, fast or {attack, release} in whole ms, attack 1 to 1000 and release 10 to 10000";
+
     /// <summary>The USB playback pair an output streams on.</summary>
     public static int PairOf(string output) => output == TargetAux ? ProReturnPairs.Aux : ProReturnPairs.Monitor;
+
+    /// <summary>The key threshold in dBFS a sensitivity sets, or null for an unknown word or a number out of range.</summary>
+    public static int? ThresholdOf(DuckingLevel sensitivity)
+        => sensitivity.Word is { } word ? Find(Sensitivities, word) is int i and >= 0 ? Thresholds[i] : null
+            : sensitivity.Db is int db and >= MinThreshold and <= MaxThreshold ? db : null;
+
+    /// <summary>The depth in dB an amount sets, or null for an unknown word or a number out of range.</summary>
+    public static int? DepthOf(DuckingLevel amount)
+        => amount.Word is { } word ? Find(Amounts, word) is int i and >= 0 ? Depths[i] : null
+            : amount.Db is int db and >= MinDepth and <= MaxDepth ? db : null;
+
+    /// <summary>The attack and release in ms a speed sets, or null for an unknown word or times out of range.</summary>
+    public static (int Attack, int Release)? TimesOf(DuckingSpeed speed)
+        => speed.Word is { } word ? Find(Speeds, word) is int i and >= 0 ? (Times[i].Attack, Times[i].Release) : null
+            : speed is { Attack: int attack and >= MinAttack and <= MaxAttack, Release: int release and >= MinRelease and <= MaxRelease }
+                ? (attack, release) : null;
+
+    private static int Find(IReadOnlyList<string> names, string name)
+    {
+        for (int i = 0; i < names.Count; i++) if (names[i] == name) return i;
+        return -1;
+    }
+
+    /// <summary>Why the three values cannot be used, or null when each is a known word or a number in range.</summary>
+    public static string? CheckValues(DuckingLevel? sensitivity, DuckingLevel? amount, DuckingSpeed? speed)
+        => sensitivity is null || ThresholdOf(sensitivity) is null ? SensitivityProblem
+            : amount is null || DepthOf(amount) is null ? AmountProblem
+            : speed is null || TimesOf(speed) is null ? SpeedProblem : null;
 
     /// <summary>Why a target cannot be written, or null when every value is one the unit takes.</summary>
     public static string? Valid(ProDuckingTarget target)
     {
-        if (!Sensitivities.Contains(target.Sensitivity)) return "sensitivity must be low, medium or high";
-        if (!Amounts.Contains(target.Amount)) return "amount must be low, medium or high";
-        if (!Speeds.Contains(target.Speed)) return "speed must be slow, medium or fast";
+        if (CheckValues(target.Sensitivity, target.Amount, target.Speed) is { } problem) return problem;
         if (target.Pairs is null || target.Pairs.Any(p => p is < 0 or >= PairCount)) return $"pairs must be USB playback pairs 0 to {PairCount - 1}";
         return null;
     }
 
-    /// <summary>The six preset bytes every entry takes for the three preset words.</summary>
-    public static byte[] PresetBytes(string sensitivity, string amount, string speed)
+    /// <summary>The six bytes every entry takes for the three values, preset words or numbers.</summary>
+    /// <exception cref="ArgumentException">A value is an unknown word or a number out of range.</exception>
+    public static byte[] SettingBytes(DuckingLevel sensitivity, DuckingLevel amount, DuckingSpeed speed)
     {
-        sbyte threshold = Thresholds[IndexOf(Sensitivities, sensitivity)];
-        byte depth = Depths[IndexOf(Amounts, amount)];
-        (ushort attack, ushort release) = Times[IndexOf(Speeds, speed)];
-        return [(byte)threshold, depth, (byte)attack, (byte)(attack >> 8), (byte)release, (byte)(release >> 8)];
-    }
-
-    private static int IndexOf(IReadOnlyList<string> names, string name)
-    {
-        for (int i = 0; i < names.Count; i++) if (names[i] == name) return i;
-        throw new ArgumentException($"'{name}' is not one of {string.Join(", ", names)}");
+        if (CheckValues(sensitivity, amount, speed) is { } problem) throw new ArgumentException(problem);
+        int threshold = ThresholdOf(sensitivity)!.Value, depth = DepthOf(amount)!.Value;
+        (int attack, int release) = TimesOf(speed)!.Value;
+        return [unchecked((byte)(sbyte)threshold), (byte)depth, (byte)attack, (byte)(attack >> 8), (byte)release, (byte)(release >> 8)];
     }
 
     /// <summary>
-    /// Write a target into the two blocks: the presets while it is on, the
+    /// Write a target into the two blocks: its values while it is on, the
     /// ducked flag of every entry, and the pair fields of the three mix
     /// sections, both bits set for the target's pairs while it is on and the
     /// high bit cleared otherwise. Everything else is left as it was.
@@ -139,7 +175,7 @@ public static class ProDucking
         if (block1.Length != MixBlockLength) throw new ArgumentException($"block 0x0001 is {MixBlockLength} bytes", nameof(block1));
         if (Valid(target) is { } problem) throw new ArgumentException(problem, nameof(target));
         int pairs = WantedPairs(target);
-        byte[]? preset = target.Enabled ? PresetBytes(target.Sensitivity, target.Amount, target.Speed) : null;
+        byte[]? preset = target.Enabled ? SettingBytes(target.Sensitivity, target.Amount, target.Speed) : null;
         for (int e = 0; e < EntryCount; e++)
         {
             Span<byte> entry = block8.Slice(e * EntryLength, EntryLength);
@@ -182,9 +218,14 @@ public static class ProDucking
 
     private static DuckingReadback FromRaw(byte[] raw)
     {
-        string sensitivity = Same(raw, 0, 1, v => Array.IndexOf(Thresholds, (sbyte)v), Sensitivities);
-        string amount = Same(raw, 1, 1, v => Array.IndexOf(Depths, (byte)v), Amounts);
-        string speed = Same(raw, 2, 4, v => Array.FindIndex(Times, t => (t.Attack | t.Release << 16) == v), Speeds);
+        DuckingLevel sensitivity = Same(raw, 0, 1) is int t
+            ? Array.IndexOf(Thresholds, (sbyte)t) is int ti and >= 0 ? Sensitivities[ti] : (int)(sbyte)t : Custom;
+        DuckingLevel amount = Same(raw, 1, 1) is int d
+            ? Array.IndexOf(Depths, (byte)d) is int di and >= 0 ? Amounts[di] : d : Custom;
+        DuckingSpeed speed = Same(raw, 2, 4) is int times
+            ? Array.FindIndex(Times, p => (p.Attack | p.Release << 16) == times) is int si and >= 0 ? Speeds[si]
+                : DuckingSpeed.Times(times & 0xffff, (int)((uint)times >> 16))
+            : Custom;
         var pairs = new List<int>();
         for (int k = 0; k < PairCount; k++)
             for (int i = 0; i < MixFieldOffsets.Count; i++)
@@ -199,12 +240,11 @@ public static class ProDucking
     }
 
     /// <summary>
-    /// The preset a field holds in all twelve entries: the field's
-    /// little-endian value at <paramref name="offset"/>, <paramref name="width"/>
-    /// bytes wide, looked up by <paramref name="index"/>; <c>custom</c> when
-    /// the entries disagree or no preset writes the value.
+    /// The value a field holds in all twelve entries: its little-endian
+    /// value at <paramref name="offset"/>, <paramref name="width"/> bytes
+    /// wide, or null when the entries disagree.
     /// </summary>
-    private static string Same(byte[] block8, int offset, int width, Func<int, int> index, IReadOnlyList<string> names)
+    private static int? Same(byte[] block8, int offset, int width)
     {
         int first = 0;
         for (int e = 0; e < EntryCount; e++)
@@ -212,9 +252,9 @@ public static class ProDucking
             int value = 0;
             for (int b = width - 1; b >= 0; b--) value = value << 8 | block8[e * EntryLength + offset + b];
             if (e == 0) first = value;
-            else if (value != first) return Custom;
+            else if (value != first) return null;
         }
-        return index(first) is int i and >= 0 ? names[i] : Custom;
+        return first;
     }
 
     /// <summary>

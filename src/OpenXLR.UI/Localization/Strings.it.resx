@@ -2936,20 +2936,29 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
   <data name="DuckingHigh" xml:space="preserve">
     <value>Alta</value>
   </data>
-  <data name="DuckingAmountLow" xml:space="preserve">
-    <value>Bassa, 6 dB</value>
-  </data>
-  <data name="DuckingAmountMedium" xml:space="preserve">
-    <value>Media, 12 dB</value>
-  </data>
-  <data name="DuckingAmountHigh" xml:space="preserve">
-    <value>Alta, 24 dB</value>
-  </data>
   <data name="DuckingSlow" xml:space="preserve">
     <value>Lenta</value>
   </data>
   <data name="DuckingFast" xml:space="preserve">
     <value>Veloce</value>
+  </data>
+  <data name="DuckingDbfs" xml:space="preserve">
+    <value>{0} dBFS</value>
+  </data>
+  <data name="DuckingMarkTip" xml:space="preserve">
+    <value>{0}, {1}</value>
+  </data>
+  <data name="DuckingSensitivityTip" xml:space="preserve">
+    <value>Quanto deve essere forte il microfono chiave prima che i canali si abbassino. Più a destra reagisce a una voce più debole.</value>
+  </data>
+  <data name="DuckingAmountTip" xml:space="preserve">
+    <value>Di quanto si abbassano i canali mentre il microfono chiave è forte.</value>
+  </data>
+  <data name="DuckingAttackTip" xml:space="preserve">
+    <value>Quanto impiegano i canali ad abbassarsi quando il microfono chiave è forte.</value>
+  </data>
+  <data name="DuckingReleaseTip" xml:space="preserve">
+    <value>Quanto impiegano i canali a tornare quando il microfono chiave tace.</value>
   </data>
   <data name="DuckingHint" xml:space="preserve">
     <value>Il ducking abbassa i canali scelti nei mix scelti mentre il microfono chiave è forte. Lo esegue questo computer, oppure il Wave XLR Pro sul proprio processore quando l'impostazione rientra in ciò che il dispositivo sa fare.</value>

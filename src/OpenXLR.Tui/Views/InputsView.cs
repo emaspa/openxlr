@@ -616,12 +616,12 @@ internal sealed class InputsView : View
         }
 
         string[] levels = ["low", "medium", "high"], speeds = ["slow", "medium", "fast"];
-        rows.Add(new ChoiceRow("Sensitivity", ["low, -3 dBFS", "medium, -12 dBFS", "high, -24 dBFS"],
-            Math.Max(0, Array.IndexOf(levels, ducking.Sensitivity)), index => Duck(link, "sensitivity", levels[index])));
-        rows.Add(new ChoiceRow("Amount", ["low, 6 dB", "medium, 12 dB", "high, 24 dB"],
-            Math.Max(0, Array.IndexOf(levels, ducking.Amount)), index => Duck(link, "amount", levels[index])));
-        rows.Add(new ChoiceRow("Speed", speeds, Math.Max(0, Array.IndexOf(speeds, ducking.Speed)),
-            index => Duck(link, "speed", speeds[index])));
+        rows.Add(PresetRow(link, "Sensitivity", "sensitivity", levels, ["low, -3 dBFS", "medium, -12 dBFS", "high, -24 dBFS"],
+            DuckingEntry.Level(ducking.Sensitivity, levels, [-3, -12, -24], "dBFS")));
+        rows.Add(PresetRow(link, "Amount", "amount", levels, ["low, 6 dB", "medium, 12 dB", "high, 24 dB"],
+            DuckingEntry.Level(ducking.Amount, levels, [6, 12, 24], "dB")));
+        rows.Add(PresetRow(link, "Speed", "speed", speeds, speeds,
+            DuckingEntry.Times(ducking.Speed, speeds, [(100, 2000), (80, 1200), (30, 200)])));
 
         // The choice of where it runs is offered only on a unit that can run it.
         if (ducking.Device is not null && ducking.Processing is "device" or "software")
@@ -667,6 +667,20 @@ internal sealed class InputsView : View
     private static JsonArray Ids(IEnumerable<string> ids) => new(ids.Select(id => (JsonNode?)JsonValue.Create(id)).ToArray());
 
     /// <summary>One field of the ducking setup; the daemon keeps the others.</summary>
+    // The three presets, and a custom value the daemon holds (one the UI's
+    // sliders set) as a fourth choice that sends nothing: moving off it
+    // picks a preset.
+    private static ChoiceRow PresetRow(DaemonLink link, string label, string field, string[] words, string[] names,
+        (int Preset, string? Custom) value)
+    {
+        string[] options = value.Custom is null ? names : [.. names, $"custom, {value.Custom}"];
+        int selected = value.Custom is null ? Math.Max(0, value.Preset) : names.Length;
+        return new ChoiceRow(label, options, selected, index =>
+        {
+            if (index < words.Length) Duck(link, field, words[index]);
+        });
+    }
+
     private static void Duck(DaemonLink link, string field, JsonNode? value) =>
         link.Send("setDucking", body => body["value"] = new JsonObject { [field] = value });
 

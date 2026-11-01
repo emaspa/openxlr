@@ -40,8 +40,46 @@ public sealed class DuckingSetupTests
         Assert.True(plan.Cells.SetEquals(["music|monitor", "music|stream", "game|monitor", "game|stream"]));
         Assert.Empty((setup with { Channels = [] }).ToPlan().Cells);
         Assert.Empty((setup with { Mixes = [] }).ToPlan().Cells);
-        byte[] bytes = ProDucking.PresetBytes(sensitivity, amount, speed);
+        byte[] bytes = ProDucking.SettingBytes(sensitivity, amount, speed);
         Assert.Equal(unchecked((sbyte)bytes[0]), plan.ThresholdDb);
+    }
+
+    [Fact]
+    public void CustomNumbersGoToTheSoftwareStageAsTheyAre()
+    {
+        var setup = new DuckingSetup { Key = "xlr1", Channels = ["music"], Mixes = ["monitor"], Enabled = true,
+            Sensitivity = -37, Amount = 31, Speed = DuckingSpeed.Times(7, 4321) };
+        Assert.Equal((-37.0, 31.0, 7.0, 4321.0), Values(setup.ToPlan()));
+        // The bounds themselves are taken.
+        Assert.Equal((-60.0, 1.0, 1.0, 10.0), Values((setup with { Sensitivity = -60, Amount = 1, Speed = DuckingSpeed.Times(1, 10) }).ToPlan()));
+        Assert.Equal((0.0, 40.0, 1000.0, 10000.0),
+            Values((setup with { Sensitivity = 0, Amount = 40, Speed = DuckingSpeed.Times(1000, 10000) }).ToPlan()));
+        // A word and the number it stands for plan the same stage.
+        Assert.Equal(Values((setup with { Sensitivity = "high", Amount = "low", Speed = "fast" }).ToPlan()),
+            Values((setup with { Sensitivity = -24, Amount = 6, Speed = DuckingSpeed.Times(30, 200) }).ToPlan()));
+        Assert.Throws<ArgumentException>(() => (setup with { Amount = 41 }).ToPlan());
+    }
+
+    [Fact]
+    public void ValuesKeepTheirFormInJson()
+    {
+        var setup = new DuckingSetup { Sensitivity = -18, Amount = "high", Speed = DuckingSpeed.Times(45, 900) };
+        string json = JsonSerializer.Serialize(setup, Json);
+        Assert.Contains("\"sensitivity\":-18", json);
+        Assert.Contains("\"amount\":\"high\"", json);
+        Assert.Contains("\"speed\":{\"attack\":45,\"release\":900}", json);
+        DuckingSetup back = JsonSerializer.Deserialize<DuckingSetup>(json, Json)!;
+        Assert.Equal((setup.Sensitivity, setup.Amount, setup.Speed), (back.Sensitivity, back.Amount, back.Speed));
+        // A number equal to a preset stays a number.
+        Assert.Contains("\"sensitivity\":-12", JsonSerializer.Serialize(setup with { Sensitivity = -12 }, Json));
+        // What is neither a word nor a whole number reads as a value every check refuses.
+        foreach (string bad in new[] { "-12.5", "true", "[]", "{}", "{\"attack\":1}", "{\"attack\":1,\"release\":10,\"x\":1}" })
+        {
+            DuckingScene read = JsonSerializer.Deserialize<DuckingScene>($$"""{"sensitivity":{{bad}},"amount":{{bad}},"speed":{{bad}}}""", Json)!;
+            Assert.Null(ProDucking.ThresholdOf(read.Sensitivity));
+            Assert.Null(ProDucking.DepthOf(read.Amount));
+            Assert.Null(ProDucking.TimesOf(read.Speed));
+        }
     }
 
     private static (double, double, double, double) Values(DuckingPlan plan)
@@ -61,9 +99,15 @@ public sealed class DuckingSetupTests
         { new() { Mixes = ["gone"] }, "mixes must be distinct mix ids" },
         { new() { Mixes = null! }, "mixes must be distinct mix ids" },
         { new() { Mixes = [null!] }, "mixes must be distinct mix ids" },
-        { new() { Sensitivity = "custom" }, "sensitivity must be low, medium or high" },
-        { new() { Amount = null! }, "amount must be low, medium or high" },
-        { new() { Speed = "low" }, "speed must be slow, medium or fast" },
+        { new() { Sensitivity = "custom" }, "sensitivity must be low, medium, high or a whole number of dBFS from -60 to 0" },
+        { new() { Sensitivity = 3 }, "sensitivity must be low, medium, high or a whole number of dBFS from -60 to 0" },
+        { new() { Sensitivity = -61 }, "sensitivity must be low, medium, high or a whole number of dBFS from -60 to 0" },
+        { new() { Amount = null! }, "amount must be low, medium, high or a whole number of dB from 1 to 40" },
+        { new() { Amount = 0 }, "amount must be low, medium, high or a whole number of dB from 1 to 40" },
+        { new() { Amount = 41 }, "amount must be low, medium, high or a whole number of dB from 1 to 40" },
+        { new() { Speed = "low" }, "speed must be slow, medium, fast or {attack, release} in whole ms, attack 1 to 1000 and release 10 to 10000" },
+        { new() { Speed = DuckingSpeed.Times(0, 200) }, "speed must be slow, medium, fast or {attack, release} in whole ms, attack 1 to 1000 and release 10 to 10000" },
+        { new() { Speed = DuckingSpeed.Times(30, 10001) }, "speed must be slow, medium, fast or {attack, release} in whole ms, attack 1 to 1000 and release 10 to 10000" },
         { new() { Processing = "hardware" }, "processing must be device or software" },
     };
 
@@ -198,6 +242,42 @@ public sealed class DuckingSetupTests
     }
 
     [Fact]
+    public void SavedNumbersLoadAsTheyAreAndOutOfRangeOnesAreResetLikeUnknownWords()
+    {
+        string dir = Directory.CreateTempSubdirectory("openxlr-duck-numbers-").FullName;
+        try
+        {
+            string path = Path.Combine(dir, "mixer.json");
+            OpenXlrPaths.WriteAtomic(path, """
+                {"ducking":{"enabled":true,"channels":["music"],"mixes":["monitor"],
+                "sensitivity":-30,"amount":18,"speed":{"attack":45,"release":900}}}
+                """);
+            MixerSettings saved = MixerSettings.Load(path, out string? warning)!;
+            Assert.Null(warning);
+            DuckingSetup setup = saved.Ducking!;
+            Assert.Equal((DuckingLevel.Number(-30), DuckingLevel.Number(18), DuckingSpeed.Times(45, 900)),
+                (setup.Sensitivity, setup.Amount, setup.Speed));
+            Assert.Null(saved.Save(path));
+            string written = File.ReadAllText(path);
+            Assert.Contains("\"sensitivity\": -30", written);
+            Assert.Contains("\"amount\": 18", written);
+            Assert.Contains("\"attack\": 45", written);
+            Assert.Null(MixerSettings.Load(path, out warning)!.Ducking!.Speed.Word);
+            Assert.Null(warning);
+
+            OpenXlrPaths.WriteAtomic(path, """
+                {"ducking":{"sensitivity":5,"amount":12.5,"speed":{"attack":80,"release":20000},"channels":["music"]}}
+                """);
+            setup = MixerSettings.Load(path, out warning)!.Ducking!;
+            foreach (string field in new[] { "sensitivity", "amount", "speed" })
+                Assert.Contains($"ducking.{field}: invalid value; reset to medium", warning);
+            Assert.Equal(("medium", "medium", "medium"), (setup.Sensitivity, setup.Amount, setup.Speed));
+            Assert.Equal(["music"], setup.Channels);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
     public void SavedDuckingWithoutMixesLowersTheDefaultMonitorOfTheLayout()
     {
         using var mixer = new Mixer();
@@ -240,8 +320,17 @@ public sealed class DuckingSetupTests
             new() { Channels = ["music", "music"] }, new() { Mixes = [null!] },
             new() { Mixes = ["monitor", "monitor"] }, new() { Sensitivity = "wrong" },
             new() { Amount = "wrong" }, new() { Speed = "wrong" },
+            new() { Sensitivity = 1 }, new() { Amount = 0 }, new() { Speed = DuckingSpeed.Times(80, 5) },
         }) Assert.Throws<JsonException>(() => mixer.ApplyScene(new() { Ducking = invalid }));
         Assert.False(mixer.DuckingSnapshot().Setup.Enabled);
+        // A profile file holding numbers in range recalls them as numbers.
+        MixerScene scene = JsonSerializer.Deserialize<MixerScene>(
+            """{"ducking":{"enabled":true,"channels":["music"],"sensitivity":-45,"amount":3,"speed":{"attack":2,"release":30}}}""", Json)!;
+        mixer.ApplyScene(scene);
+        DuckingSetup recalled = mixer.DuckingSnapshot().Setup;
+        Assert.Equal((DuckingLevel.Number(-45), DuckingLevel.Number(3), DuckingSpeed.Times(2, 30)),
+            (recalled.Sensitivity, recalled.Amount, recalled.Speed));
+        Assert.Contains("\"speed\":{\"attack\":2,\"release\":30}", JsonSerializer.Serialize(mixer.ExportScene(), Json));
     }
 
     [Fact]

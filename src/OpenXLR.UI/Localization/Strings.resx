@@ -2919,20 +2919,29 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
   <data name="DuckingHigh" xml:space="preserve">
     <value>High</value>
   </data>
-  <data name="DuckingAmountLow" xml:space="preserve">
-    <value>Low, 6 dB</value>
-  </data>
-  <data name="DuckingAmountMedium" xml:space="preserve">
-    <value>Medium, 12 dB</value>
-  </data>
-  <data name="DuckingAmountHigh" xml:space="preserve">
-    <value>High, 24 dB</value>
-  </data>
   <data name="DuckingSlow" xml:space="preserve">
     <value>Slow</value>
   </data>
   <data name="DuckingFast" xml:space="preserve">
     <value>Fast</value>
+  </data>
+  <data name="DuckingDbfs" xml:space="preserve">
+    <value>{0} dBFS</value>
+  </data>
+  <data name="DuckingMarkTip" xml:space="preserve">
+    <value>{0}, {1}</value>
+  </data>
+  <data name="DuckingSensitivityTip" xml:space="preserve">
+    <value>How loud the key microphone has to be before the channels go down. Further right reacts to a softer voice.</value>
+  </data>
+  <data name="DuckingAmountTip" xml:space="preserve">
+    <value>How far the channels go down while the key microphone is loud.</value>
+  </data>
+  <data name="DuckingAttackTip" xml:space="preserve">
+    <value>How long the channels take to go down once the key microphone is loud.</value>
+  </data>
+  <data name="DuckingReleaseTip" xml:space="preserve">
+    <value>How long the channels take to come back once the key microphone is quiet.</value>
   </data>
   <data name="DuckingHint" xml:space="preserve">
     <value>Ducking lowers the chosen channels in the chosen mixes while the key microphone is loud. This computer runs it, or the Wave XLR Pro on its own processor when the setup fits what the unit can do.</value>

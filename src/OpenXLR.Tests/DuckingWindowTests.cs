@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -20,10 +21,12 @@ namespace OpenXLR.Tests;
 /// opens the same window beside Exclusive groups, every control sends its
 /// command and shows the daemon's answer, the key leaves the channel list,
 /// "Runs on" follows the unit with the badge and the note, a refused change
-/// comes back with its reason, the reduction bar follows the duck meters, and
-/// the whole window fits at 640 and 2400 logical pixels with nine channels
-/// and five mixes, in the font <c>OPENXLR_LAYOUT_FONT</c> names. Run from the
-/// window layout test, on its UI thread.
+/// comes back with its reason, the reduction bar follows the duck meters, the
+/// sliders send numbers on a mark's click, a key step and the end of a drag
+/// with their marks under the thumb's travel, and the whole window fits at
+/// 640 and 2400 logical pixels with nine channels and five mixes, in the font
+/// <c>OPENXLR_LAYOUT_FONT</c> names. Run from the window layout test, on its
+/// UI thread.
 /// </summary>
 internal static class DuckingWindowTests
 {
@@ -162,8 +165,10 @@ internal static class DuckingWindowTests
 
             CheckBox enabled = Find<CheckBox>(ducking, "DuckingEnabled");
             ComboBox key = Find<ComboBox>(ducking, "DuckingKey");
-            ComboBox sensitivity = Find<ComboBox>(ducking, "DuckingSensitivity"), amount = Find<ComboBox>(ducking, "DuckingAmount"),
-                speed = Find<ComboBox>(ducking, "DuckingSpeed");
+            DuckingSliderView sensitivity = Find<DuckingSliderView>(ducking, "DuckingSensitivity"),
+                amount = Find<DuckingSliderView>(ducking, "DuckingAmount"), attack = Find<DuckingSliderView>(ducking, "DuckingAttack"),
+                release = Find<DuckingSliderView>(ducking, "DuckingRelease");
+            DuckingSliderView[] sliders = [sensitivity, amount, attack, release];
             ToggleButton onUnit = Find<ToggleButton>(ducking, "DuckingOnUnit"), onComputer = Find<ToggleButton>(ducking, "DuckingOnComputer");
             Border badge = Find<Border>(ducking, "DuckingHardwareBadge");
             TextBlock status = Find<TextBlock>(ducking, "DuckingStatus"), note = Find<TextBlock>(ducking, "DuckingDeviceNote"),
@@ -186,7 +191,9 @@ internal static class DuckingWindowTests
             Assert.False(Channel("Aux In").IsChecked);
             Assert.True(Mix("Monitor A").IsChecked);
             Assert.False(Mix("Stream").IsChecked);
-            Assert.Equal((1, 1, 1), (sensitivity.SelectedIndex, amount.SelectedIndex, speed.SelectedIndex));
+            Assert.Equal([Localizer.Format("DuckingDbfs", "-12"), Localizer.Format("DynamicsDecibels", "12"), Localizer.Format("DynamicsMilliseconds", "80"),
+                Localizer.Format("DynamicsMilliseconds", "1200")], sliders.Select(s => Part<TextBlock>(s, "DuckingSliderValue").Text));
+            Assert.Equal([12d, 12, Math.Log10(80), Math.Log10(1200)], sliders.Select(s => Part<Slider>(s, "DuckingSlider").Value));
             Assert.True(onUnit.IsEffectivelyVisible);
             Assert.True(onUnit.IsChecked);
             Assert.False(onComputer.IsChecked);
@@ -209,13 +216,34 @@ internal static class DuckingWindowTests
             JsonNode ticked = await Sent(() => Channel("Aux In").IsChecked = true);
             Assert.Equal("""["aux","game","music","browser","system","voicechat"]""", ticked["value"]!["channels"]!.ToJsonString());
             await Until(() => daemon.Ducking["channels"]!.AsArray().Count == 6 && Channel("Aux In").IsChecked == true);
-            Assert.Equal("high", (await Sent(() => sensitivity.SelectedIndex = 2))["value"]!["sensitivity"]!.GetValue<string>());
-            Assert.Equal("low", (await Sent(() => amount.SelectedIndex = 0))["value"]!["amount"]!.GetValue<string>());
-            Assert.Equal("fast", (await Sent(() => speed.SelectedIndex = 2))["value"]!["speed"]!.GetValue<string>());
+            // A mark's name sets its preset's number exactly.
+            Assert.Equal(-24, (await Sent(() => Mark(sensitivity, "DuckingHigh").RaiseEvent(new RoutedEventArgs(Button.ClickEvent))))
+                ["value"]!["sensitivity"]!.GetValue<int>());
+            // A key step on the focused slider sends it.
+            Slider amountSlider = Part<Slider>(amount, "DuckingSlider");
+            amountSlider.Focus();
+            Assert.Equal(11, (await Sent(() => amountSlider.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Left })))
+                ["value"]!["amount"]!.GetValue<int>());
+            // A drag shows its value as it goes, lands on a mark near it, and sends once it ends.
+            Slider attackSlider = Part<Slider>(attack, "DuckingSlider");
+            main.Ducking.Attack.BeginDrag();
+            attackSlider.SetCurrentValue(RangeBase.ValueProperty, Math.Log10(33));
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal((30, Math.Log10(30)), (main.Ducking.Attack.Value, attackSlider.Value));
+            Assert.Equal(Localizer.Format("DynamicsMilliseconds", "30"), Part<TextBlock>(attack, "DuckingSliderValue").Text);
+            attackSlider.SetCurrentValue(RangeBase.ValueProperty, Math.Log10(45));
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(Localizer.Format("DynamicsMilliseconds", "45"), Part<TextBlock>(attack, "DuckingSliderValue").Text);
+            Assert.Equal(4, commands.Count);
+            Assert.Equal("""{"attack":45,"release":1200}""", (await Sent(() => main.Ducking.Attack.EndDrag()))["value"]!["speed"]!.ToJsonString());
             Assert.Equal("""["monitor","stream"]""", (await Sent(() => Mix("Stream").IsChecked = true))["value"]!["mixes"]!.ToJsonString());
-            await Until(() => main.Ducking.Speed == 2 && main.Ducking.Amount == 0 && main.Ducking.Sensitivity == 2
-                && Mix("Stream").IsChecked == true && speed.SelectedIndex == 2);
+            await Until(() => main.Ducking.Attack.Value == 45 && main.Ducking.Amount.Value == 11 && main.Ducking.Sensitivity.Value == -24
+                && Mix("Stream").IsChecked == true && daemon.Ducking["speed"] is JsonObject);
             Assert.Equal(6, commands.Count);
+            // Back to the presets the rest of the test expects, by their marks.
+            await Sent(() => Mark(amount, "DuckingMedium").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)));
+            await Sent(() => Mark(attack, "DuckingMedium").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)));
+            await Until(() => main.Ducking.Attack.Value == 80 && main.Ducking.Amount.Value == 12);
 
             // The buttons under the channels: none, then every application channel.
             Assert.Equal("[]", (await Sent(() => Find<Button>(ducking, "DuckingNoChannels").RaiseEvent(new RoutedEventArgs(Button.ClickEvent))))
@@ -265,6 +293,7 @@ internal static class DuckingWindowTests
             {
                 Layout(ducking, width, 1000);
                 AssertFits(ducking, $"at {width}");
+                AssertMarks(sliders, $"at {width}");
                 Capture(ducking, $"ducking-software-{(int)width}");
             }
 
@@ -287,6 +316,7 @@ internal static class DuckingWindowTests
             {
                 Layout(ducking, width, 1000);
                 AssertFits(ducking, $"on the unit at {width}");
+                AssertMarks(sliders, $"on the unit at {width}");
                 Capture(ducking, $"ducking-unit-{(int)width}");
             }
 
@@ -298,6 +328,10 @@ internal static class DuckingWindowTests
             await Until(() => status.Text == Localizer.Format("DuckingStatusOnComputer", "XLR 1"));
             Layout(ducking, 640, 1000);
             AssertFits(ducking, "without a unit");
+            // The narrowest the window goes.
+            Layout(ducking, ducking.MinWidth, 1000);
+            AssertFits(ducking, "at the minimum width");
+            AssertMarks(sliders, "at the minimum width");
         }
         finally
         {
@@ -309,11 +343,59 @@ internal static class DuckingWindowTests
         }
     }
 
+    private static T Part<T>(Control view, string name) where T : Control
+        => view.GetVisualDescendants().OfType<T>().Single(c => c.Name == name);
+
+    /// <summary>A slider's mark by its preset's catalogue key.</summary>
+    private static Button Mark(DuckingSliderView view, string key)
+        => view.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "DuckingMark" && (string?)b.Content == Localizer.Text(key));
+
+    /// <summary>
+    /// Under every slider each preset's tick stands where the thumb's centre
+    /// stands at that preset, within a pixel; each name is centred under its
+    /// tick unless the slider's end holds it in; and no two names overlap.
+    /// </summary>
+    private static void AssertMarks(DuckingSliderView[] views, string where)
+    {
+        foreach (DuckingSliderView view in views)
+        {
+            var model = (DuckingSliderViewModel)view.DataContext!;
+            Slider slider = Part<Slider>(view, "DuckingSlider");
+            DuckingMarks marks = Part<DuckingMarks>(view, "DuckingSliderMarks");
+            Thumb thumb = slider.GetVisualDescendants().OfType<Thumb>().First();
+            double was = slider.Value;
+            Button[] labels = [.. marks.GetVisualChildren().OfType<Button>()];
+            Assert.Equal(3, labels.Length);
+            foreach (Button label in labels)
+            {
+                var mark = (DuckingMark)label.Tag!;
+                Avalonia.Controls.Shapes.Rectangle tick = marks.GetVisualChildren().OfType<Avalonia.Controls.Shapes.Rectangle>()
+                    .ElementAt(Array.IndexOf(labels, label));
+                // Move the thumb alone, as a layout check: the value is not the model's.
+                slider.SetCurrentValue(RangeBase.ValueProperty, mark.Position);
+                slider.UpdateLayout();
+                double thumbCentre = thumb.TranslatePoint(new Point(thumb.Bounds.Width / 2, 0), marks)!.Value.X;
+                double tickAt = tick.Bounds.X + 0.5;
+                Assert.True(Math.Abs(thumbCentre - tickAt) <= 1.0,
+                    $"{where}: {model.Name} {label.Content}: tick at {tickAt:0.0}, thumb at {thumbCentre:0.0}.");
+                double centre = label.Bounds.Center.X;
+                Assert.True(Math.Abs(centre - tickAt) <= 1.0 || label.Bounds.X <= 0.5 || label.Bounds.Right >= marks.Bounds.Width - 0.5,
+                    $"{where}: {model.Name} {label.Content} is not under its tick.");
+                Assert.InRange(label.Bounds.X, -0.5, marks.Bounds.Width - label.Bounds.Width + 0.5);
+            }
+            slider.SetCurrentValue(RangeBase.ValueProperty, was);
+            for (int i = 0; i < labels.Length; i++)
+                for (int j = i + 1; j < labels.Length; j++)
+                    Assert.False(labels[i].Bounds.Intersects(labels[j].Bounds),
+                        $"{where}: {model.Name}: {labels[i].Content} overlaps {labels[j].Content}.");
+        }
+    }
+
     /// <summary>Every visible control and text sits inside the window's width, and nothing scrolls sideways.</summary>
     private static void AssertFits(DuckingWindow window, string where)
     {
         foreach (Control control in window.GetVisualDescendants().OfType<Control>()
-                     .Where(c => c.IsEffectivelyVisible && c is TextBlock or Button or ToggleButton or CheckBox or ComboBox or LevelMeter))
+                     .Where(c => c.IsEffectivelyVisible && c is TextBlock or Button or ToggleButton or CheckBox or ComboBox or LevelMeter or Slider))
         {
             if (control is TextBlock { Text.Length: 0 } || control is TextBlock { Text: null }) continue;
             // A list's off-screen rows are inside the scroller, which is what has to fit.

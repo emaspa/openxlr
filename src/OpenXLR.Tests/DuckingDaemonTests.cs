@@ -188,6 +188,12 @@ public sealed class DuckingDaemonTests
         Assert.Null(device["reason"]);
         Assert.Equal(DuckingPlacementTests.Pro.Firmware, device["firmware"]!.GetValue<string>());
 
+        // Numbers are reported in the form they were set, a speed as its object.
+        mixer.SetDuckingSetup(mixer.DuckingSnapshot().Setup with { Sensitivity = -12, Amount = "high", Speed = DuckingSpeed.Times(45, 900) }, _ => null);
+        json = Serialized(new StateMessage { Ducking = DuckingState.From(mixer.DuckingSnapshot()) })["ducking"]!;
+        Assert.Equal("""[-12,"high",{"attack":45,"release":900}]""",
+            new JsonArray(json["sensitivity"]!.DeepClone(), json["amount"]!.DeepClone(), json["speed"]!.DeepClone()).ToJsonString());
+
         // Keyed by XLR 2: software, the unit's reason and the outputs it would have ducked.
         mixer.SetDuckingSetup(mixer.DuckingSnapshot().Setup with { Key = "xlr2", Channels = ["music"] }, _ => null);
         device = Serialized(new StateMessage { Ducking = DuckingState.From(mixer.DuckingSnapshot()) })["ducking"]!["device"]!;
@@ -237,6 +243,20 @@ public sealed class DuckingDaemonTests
         Assert.Equal(("medium", "high", "fast"), (on.Device.Readback.Sensitivity, on.Device.Readback.Amount, on.Device.Readback.Speed));
         Assert.Contains(log.Written, line => line.StartsWith(
             "ducking (update) on Elgato Wave XLR Pro: on, pairs 1, sensitivity medium, amount high, speed fast, keyed by XLR 1.", StringComparison.Ordinal));
+
+        // Custom numbers go into the same bytes and read back as numbers.
+        mixer.SetDuckingSetup(on.Setup with { Sensitivity = -30, Amount = 18, Speed = DuckingSpeed.Times(45, 900) }, _ => null);
+        devices.SweepOnce();
+        mixer.SyncDucking();
+        on = mixer.DuckingSnapshot();
+        Assert.Equal("device", on.Backend);
+        Assert.True(on.Device!.Held);
+        Assert.Equal((DuckingLevel.Number(-30), DuckingLevel.Number(18), DuckingSpeed.Times(45, 900)),
+            (on.Device.Readback!.Sensitivity, on.Device.Readback.Amount, on.Device.Readback.Speed));
+        Assert.Equal(new byte[] { 0xe2, 0x12, 0x2d, 0x00, 0x84, 0x03 }, unit.Blocks[0x0008][..6]);
+        Assert.Contains(log.Written, line => line.StartsWith(
+            "ducking (update) on Elgato Wave XLR Pro: on, pairs 1, sensitivity -30, amount 18, speed attack 45 ms, release 900 ms, keyed by XLR 1.",
+            StringComparison.Ordinal));
 
         // Software chosen: the unit is written off and reads back without pairs.
         mixer.SetDuckingSetup(on.Setup with { Processing = "software" }, _ => null);

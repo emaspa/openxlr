@@ -2872,20 +2872,29 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
   <data name="DuckingHigh" xml:space="preserve">
     <value>Високо</value>
   </data>
-  <data name="DuckingAmountLow" xml:space="preserve">
-    <value>Ниско, 6 dB</value>
-  </data>
-  <data name="DuckingAmountMedium" xml:space="preserve">
-    <value>Средње, 12 dB</value>
-  </data>
-  <data name="DuckingAmountHigh" xml:space="preserve">
-    <value>Високо, 24 dB</value>
-  </data>
   <data name="DuckingSlow" xml:space="preserve">
     <value>Споро</value>
   </data>
   <data name="DuckingFast" xml:space="preserve">
     <value>Брзо</value>
+  </data>
+  <data name="DuckingDbfs" xml:space="preserve">
+    <value>{0} dBFS</value>
+  </data>
+  <data name="DuckingMarkTip" xml:space="preserve">
+    <value>{0}, {1}</value>
+  </data>
+  <data name="DuckingSensitivityTip" xml:space="preserve">
+    <value>Колико гласан мора бити окидачки микрофон пре него што се канали смање. Даље удесно реагује на тиши глас.</value>
+  </data>
+  <data name="DuckingAmountTip" xml:space="preserve">
+    <value>Колико се канали смањују док је окидачки микрофон гласан.</value>
+  </data>
+  <data name="DuckingAttackTip" xml:space="preserve">
+    <value>Колико је каналима потребно да се смање кад окидачки микрофон постане гласан.</value>
+  </data>
+  <data name="DuckingReleaseTip" xml:space="preserve">
+    <value>Колико је каналима потребно да се врате кад окидачки микрофон утихне.</value>
   </data>
   <data name="DuckingHint" xml:space="preserve">
     <value>Пригушивање смањује изабране канале у изабраним миксевима док је окидачки микрофон гласан. Извршава га овај рачунар, или Wave XLR Pro на свом процесору када подешавање одговара ономе што уређај може.</value>

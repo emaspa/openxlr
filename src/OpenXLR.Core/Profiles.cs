@@ -93,9 +93,12 @@ public record DuckingScene
     /// <summary>The mixes of a scene that never named any; Monitor A until a layout resolves it.</summary>
     internal static readonly IReadOnlyList<string> UnsavedMixes = ["monitor"];
 
-    public string Sensitivity { get; init; } = ProDucking.Medium;
-    public string Amount { get; init; } = ProDucking.Medium;
-    public string Speed { get; init; } = ProDucking.Medium;
+    /// <summary>A preset word or the key threshold in whole dBFS.</summary>
+    public DuckingLevel Sensitivity { get; init; } = ProDucking.Medium;
+    /// <summary>A preset word or the depth in whole dB.</summary>
+    public DuckingLevel Amount { get; init; } = ProDucking.Medium;
+    /// <summary>A preset word or the attack and release in whole ms.</summary>
+    public DuckingSpeed Speed { get; init; } = ProDucking.Medium;
 }
 
 /// <summary>

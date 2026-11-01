@@ -2,8 +2,8 @@ using OpenXLR.Core.Devices;
 
 namespace OpenXLR.Core.Mixing;
 
-/// <summary>The presets and USB return pairs the primary unit should duck.</summary>
-public sealed record ProDuckingTarget(bool Enabled, string Sensitivity, string Amount, string Speed, IReadOnlySet<int> Pairs)
+/// <summary>The three values, preset words or numbers, and the USB return pairs the primary unit should duck.</summary>
+public sealed record ProDuckingTarget(bool Enabled, DuckingLevel Sensitivity, DuckingLevel Amount, DuckingSpeed Speed, IReadOnlySet<int> Pairs)
 {
     public bool Equals(ProDuckingTarget? other)
         => other is not null && Enabled == other.Enabled && Sensitivity == other.Sensitivity
@@ -14,7 +14,7 @@ public sealed record ProDuckingTarget(bool Enabled, string Sensitivity, string A
     /// <summary>The unit's ducking switched off, which writes no preset.</summary>
     public static ProDuckingTarget Off { get; } = new(false, ProDucking.Medium, ProDucking.Medium, ProDucking.Medium, new HashSet<int>());
 
-    /// <summary>For the journal: off, or the pairs and presets.</summary>
+    /// <summary>For the journal: off, or the pairs and values.</summary>
     public override string ToString() => Enabled
         ? $"on, pairs {(Pairs.Count == 0 ? "none" : string.Join(" ", Pairs.Order()))}, sensitivity {Sensitivity}, amount {Amount}, speed {Speed}"
         : "off";
