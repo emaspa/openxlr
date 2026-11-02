@@ -650,6 +650,7 @@ const isMuteLike = (t) =>
 // value is what the next tick steps from and what the strip shows, the daemon
 // hears the first tick at once and a burst as one send per window, and its echo
 // cannot pull the dial back while the turn is still warm.
+const DIAL_STEP_SIZES = new Set([1, 3, 5, 10]);
 const DIAL_SEND_MS = 80;    // trailing edge, as the window's sliders use
 const DIAL_HOLD_MS = 800;   // how long the local value outranks the echo
 const dialTurns = new Map();   // value key -> {value, at}
@@ -988,6 +989,7 @@ function onKeyDown(context, inst, inMultiAction = false) {
 }
 
 function onDialRotate(context, inst, ticks) {
+  if (!Number.isSafeInteger(ticks) || ticks === 0) return;
   const t = activeTarget(inst);
   if (!t || !daemonState) return;
   if (isEqTarget(t)) {
@@ -1001,17 +1003,18 @@ function onDialRotate(context, inst, ticks) {
     send({ event: "showAlert", context });
     return;
   }
+  const step = DIAL_STEP_SIZES.has(inst.settings.stepSize) ? inst.settings.stepSize : null;
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
   // A level steps in whole percent and a dB control in tenths, so a long turn
   // never accumulates float dust in the value the daemon is told.
-  const level = (v, lo, hi) => Math.round(clamp(v + ticks * 0.01, lo, hi) * 100) / 100;
-  const decibels = (v, size) => Math.round(clamp(v + ticks * size, -60, 0) * 10) / 10;
+  const level = (v, lo, hi) => Math.round(clamp(v + ticks * (step ?? 1) / 100, lo, hi) * 100) / 100;
+  const decibels = v => Math.round(clamp(v + ticks * (step ?? 0.6), -60, 0) * 10) / 10;
   let turned = true;
   if (t.startsWith("chgain:") && !channelUnitControl(daemonState, t.slice(7), "gain") && captureGainOf(daemonState, t.slice(7))) {
-    // A capture input's own gain, a dB a tick, never past the range the daemon reports.
+    // A capture input's own gain never passes the range the daemon reports.
     const channel = t.slice(7), gain = captureGainOf(daemonState, channel);
     const key = `capgain:${channel}`;
-    const value = Math.round(clamp(dialNow(key, gain.value) + ticks, gain.min, gain.max) * 10) / 10;
+    const value = Math.round(clamp(dialNow(key, gain.value) + ticks * (step ?? 1), gain.min, gain.max) * 10) / 10;
     dialTurn(key, value, () => {
       if (captureGainOf(daemonState, channel)) cmd({ cmd: "setCaptureGain", channel, value });
     });
@@ -1019,7 +1022,7 @@ function onDialRotate(context, inst, ticks) {
     const channel = t.slice(7), gain = channelUnitControl(daemonState, channel, "gain");
     if (!gain) { send({ event: "showAlert", context }); return; }
     const key = `unit:${gain.device}:${gain.control}`;
-    const value = clamp(dialNow(key, gain.value) + ticks, 0, gain.max);
+    const value = clamp(dialNow(key, gain.value) + ticks * (step ?? 1), 0, gain.max);
     dialTurn(key, value, () => {
       const current = channelUnitControl(daemonState, channel, "gain");
       if (current?.device === gain.device && current.control === gain.control)
@@ -1067,28 +1070,28 @@ function onDialRotate(context, inst, ticks) {
   } else if (t === "gain" || t === "gain2") {
     const db = t === "gain" ? dev()?.gainDb : dev()?.gain2Db;
     if (db == null) return;
-    const value = clamp(dialNow(t, db) + ticks, 0, gainMaxDb());
+    const value = clamp(dialNow(t, db) + ticks * (step ?? 1), 0, gainMaxDb());
     dialTurn(t, value, () => cmd({ cmd: "set", control: t, value }));
   } else if (t === "hp" || t === "hp2") {
     const db = t === "hp" ? dev()?.hpVolumeDb : dev()?.hp2VolumeDb;
     if (db == null) return;
     const control = t === "hp" ? "hpVolumeDb" : "hp2VolumeDb";
-    const value = decibels(dialNow(t, db), 0.6);
+    const value = decibels(dialNow(t, db));
     dialTurn(t, value, () => cmd({ cmd: "set", control, value }));
   } else if (t === "lineIn") {
     const db = dev()?.lineInGainDb;
     if (db == null) return;
-    const value = clamp(dialNow(t, db) + ticks, 0, lineInGainMaxDb());
+    const value = clamp(dialNow(t, db) + ticks * (step ?? 1), 0, lineInGainMaxDb());
     dialTurn(t, value, () => cmd({ cmd: "set", control: "lineInGain", value }));
   } else if (t === "auxLevel") {
     const db = dev()?.auxLevelDb;
     if (db == null) return;
-    const value = decibels(dialNow(t, db), 0.6);
+    const value = decibels(dialNow(t, db));
     dialTurn(t, value, () => cmd({ cmd: "set", control: "auxLevelDb", value }));
   } else if (t === "crossfade") {
     const v = dev()?.crossfade;
     if (v == null) return;
-    const value = clamp(dialNow(t, v) + ticks * 5, 0, 200);
+    const value = clamp(dialNow(t, v) + ticks * (step ?? 5), 0, 200);
     dialTurn(t, value, () => cmd({ cmd: "set", control: "crossfade", value }));
   } else turned = false;
   // The strip follows the finger, not the echo.

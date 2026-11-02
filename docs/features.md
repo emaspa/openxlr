@@ -906,6 +906,10 @@ headphone volume, the crossfade and each desktop output's volume (up to
 hold several targets cycled by tap or press. A turn leads locally: the
 dial steps from its own value, sends a burst as one command per 80 ms,
 and the daemon's echo cannot pull it back while the turn is warm.
+Each dial saves a step per tick of 1, 3, 5 or 10 in its gain or level
+control's units: dB for gains and hardware levels, percentage points for
+faders and crossfade. Default retains each control's original step, and
+EQ and insert parameters keep their own steps. Fast turns retain every tick.
 
 ![Dial panels](plugin-dials.png)
 

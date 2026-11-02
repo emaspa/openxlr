@@ -41,6 +41,15 @@
     <label style="display:inline"><input type="radio" name="gesture" value="tap" checked> Screen tap</label>
     <label style="display:inline; margin-left:14px"><input type="radio" name="gesture" value="push"> Dial press</label>
   </div>
+  <label for="stepSize" style="margin-top:12px">Step per tick</label>
+  <select id="stepSize" aria-describedby="stepHint">
+    <option value="">Default (per control)</option>
+    <option value="1">1</option>
+    <option value="3">3</option>
+    <option value="5">5</option>
+    <option value="10">10</option>
+  </select>
+  <p id="stepHint" style="color:#8b93a7; line-height:1.4">dB for gain, headphones and Aux In. Percentage points for faders and crossfade. EQ and insert controls keep their own steps.</p>
   <script src="layout-options.js"></script>
   <script>
     let ws = null, piUuid = null, settings = {};
@@ -61,6 +70,14 @@
             settings.cycleGesture = document.querySelector('input[name="gesture"]:checked').value;
             save();
           });
+        const step = document.getElementById("stepSize");
+        step.value = [1, 3, 5, 10].includes(settings.stepSize) ? String(settings.stepSize) : "";
+        step.addEventListener("change", () => {
+          const value = Number(step.value);
+          if ([1, 3, 5, 10].includes(value)) settings.stepSize = value;
+          else settings.stepSize = null;
+          save(false);
+        });
         render();
         // The plugin lists the loaded inserts' controls from live state.
         for (const request of ["layout", "inserts"])
@@ -95,9 +112,11 @@
     window.connectElgatoStreamDeckSocket = connect;
     window.connectOpenActionSocket = connect;
 
-    function save() {
-      settings.target = settings.targets[0] ?? "";
-      settings.activeIndex = 0;
+    function save(resetTarget = true) {
+      if (resetTarget) {
+        settings.target = settings.targets[0] ?? "";
+        settings.activeIndex = 0;
+      }
       ws.send(JSON.stringify({ event: "setSettings", context: piUuid, payload: settings }));
     }
     function labelFor(v) {
