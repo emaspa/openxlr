@@ -88,7 +88,7 @@ reads to stay live (matches upstream OpenWave's keepalive concern), to be confir
 ### Block 0x0005 (8 B) two level faders. Framing `[L0] 00 [L2] 00  50 00 00 00`
 - **offset 0**: one-byte level, swept full range **0x00–0xf0** (0–240), t=361–379 s.
 - **offset 2**: one-byte level, swept full range **0x03–0xf0**, t=388–405 s.
-- offset 4 constant **0x50** (80), a third level parked at default (candidate: a fixed/again level).
+- offset 4 constant **0x50** (80), a third level parked at default. Section 19 measured it: Line Out's level, dB = -byte/4.
 - These two are the analog level controls dragged end-to-end during capture, i.e. **headphone
   volume and monitor/direct-monitor blend** (which is which not yet distinguished; see §4).
 
@@ -150,8 +150,8 @@ Cycled 01, 05, 01 at 4:11–4:18 (during the mic-toggle window), consistent with
   before monitor blend). MED-HIGH.
 - **offset 2**: swept full-range second, 6:27–6:45: **MONITOR / DIRECT-MONITOR BLEND** (plan step
   19). MED-HIGH.
-- offset 4 constant **0x50**, a third level parked at default (candidate: a second monitor/mic
-  level). Range for both faders 0x00–0xf0.
+- offset 4 constant **0x50**, a third level parked at default; Line Out's level (section 19).
+  Range for both faders 0x00–0xf0.
 
 ### Block 0x0004 offset 10, one-byte fader, range **0x00–0x64 (0–100 %)**, swept 8:25–8:36:
 **MIC OUTPUT VOLUME** (plan step 20, in the output cluster). MED.
@@ -213,7 +213,7 @@ structures cleanly (all verified bidirectionally against ALSA on hardware):
 - **Block 0x0005: off0 = Headphones 1 volume, off2 = Headphones 2 volume** (both dB =
   -byte/4). This retires the earlier provisional "monitor blend" label for off2; the
   monitor/crossfade blend remains block 0x0001 off0 per the MK.2 field identity. off4
-  (0x50) is still unlabeled.
+  (0x50) is Line Out's level, dB = -byte/4 (section 19).
 
 Implemented in OpenXLR end to end (device layer, daemon controls gain2/mute2/lowCut2/
 expander2/voiceTune2/voiceTuneStrength2/phantom2/clipGuard2/compressor2/hp2VolumeDb, UI
@@ -1074,6 +1074,38 @@ and 0x0008 read back identical afterwards.
   `21`, `1f`, `1e` and `23` played section 54, section 18, section 0 and
   nothing. So each jack plays its own section at the same time as the
   other, with no commit.
-- Line Out and the USB Aux port on sections other than their own were not
-  tested.
+- Line Out on each section is in section 19. The USB Aux port on sections
+  other than its own was not tested.
+
+## 19. Line Out on each section, and its level (desk probe of 2026-11-02)
+
+Firmware 1.0.14, the desk unit, the daemon stopped, a cable from Line Out
+into Line In. Line In was a member of no section, so nothing could loop.
+Each section held one USB pair at `00` carrying its own white noise at
+-40 dBFS (section 0 pair 4, section 18 pair 2, section 54 pair 6, section
+72 pair 7), with byte 98 at `00`. Line In's gain was 20 dB. Line In's
+capture (AUX6) was matched against each section's stream with a 96-tap
+filter fit. Blocks 0x0001, 0x0004, 0x0005 and 0x0008 read back identical
+afterwards.
+
+| Write | AUX6 |
+|---|---|
+| byte 93 `23` | Line In's own noise, -90.6 dBFS |
+| byte 93 `1e`, `1f`, `21`, `22` in turn | section 0, 18, 54 and 72 respectively, only that one |
+| block 0x0005 byte 4 `50` to `4c` | +1.00 dB |
+| block 0x0005 byte 4 `60` | -4.00 dB |
+| block 0x0005 byte 4 back to `50` | as before |
+| byte 93 `20` | silence (section 36 carried nothing) |
+
+- Line Out plays the section its selector names within half a second of
+  the write, with no commit.
+- Block 0x0005 byte 4 is Line Out's level, dB = -byte/4, the encoding of
+  the headphone volumes at bytes 0 and 2. It did nothing to section 0's
+  capture stream (section 17), so it acts on the jack only. At `50`
+  (-20 dB) the loop through Line In's 20 dB gain measured -0.4 dB at
+  1 kHz.
+- The path from a section to Line Out and back through Line In is flat
+  within 0.6 dB from 50 Hz to 20 kHz and takes 97 samples (2.02 ms) more
+  than the section's own capture stream. That is the output and input
+  converters together; how it splits between them was not measured.
 
