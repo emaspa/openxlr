@@ -63,6 +63,8 @@ public sealed class WaveInterfaceViewModel(DaemonClient client, MainViewModel ma
     public bool PhantomSettling { get; private set; }
     public string? Error { get; private set; }
     public string? Warning { get; private set; }
+    /// <summary>The unit's audio card has no microphone input; the card then offers the manual section.</summary>
+    public bool CardProfileProblem { get; private set; }
     public ObservableCollection<AudioDeviceItem> Sources { get; } = [];
     public AudioDeviceItem? Source { get; set; }
     public string ChannelName { get; set; } = "";
@@ -198,6 +200,7 @@ public sealed class WaveInterfaceViewModel(DaemonClient client, MainViewModel ma
             Connected = value["connected"]?.GetValue<bool>() ?? false;
             _enabled = value["enabled"]?.GetValue<bool>() ?? false;
             Warning = value["warning"]?.GetValue<string>();
+            CardProfileProblem = value["cardProfile"]?["problem"] is JsonValue problem && problem.TryGetValue(out string? text) && text.Length > 0;
             JsonNode? capabilities = value["capabilities"];
             HasGain = capabilities?["gain"]?.GetValue<bool>() ?? false;
             HasMute = capabilities?["mute"]?.GetValue<bool>() ?? false;

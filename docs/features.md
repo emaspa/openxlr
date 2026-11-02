@@ -135,6 +135,18 @@ Each XLR Dock drives the ALSA card at its own USB address. A Wave XLR Pro with
 an XLR Dock beside it, and with a Wave:3 beside it, has run this way; two
 units of one model have not. See [Multiple Wave interfaces](wave-interfaces.md).
 
+A driven unit's card has to be on an audio profile with a microphone
+input. When it is on one that only plays, such as the original Wave XLR on
+`output:analog-stereo`, the daemon switches it once per connection to the
+profile with the same output and an input, chosen from the profiles' own
+data in PipeWire, and logs both names. When the card offers no such
+profile, the switch fails or something puts the old profile back, the
+daemon does not switch again; the UI shows a warning with a link to the
+[manual](manual.md#card-profile), and the diagnostics archive states each
+driven card's profile and whether it has an input. The Wave XLR Pro keeps
+its pro-audio rule. Tested with pw-dump fixtures in the shape of an
+owner's archive, not yet on an original Wave XLR.
+
 ## Software controls
 
 These run on the computer. The microphone EQ is on XLR 1 and XLR 2

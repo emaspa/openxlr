@@ -18,6 +18,8 @@ public partial class WaveInterfacesWindow : Window
         toggle.SetCurrentValue(ToggleButton.IsCheckedProperty, unit.Enabled);
     }
 
+    private void OnCardProfileManual(object? sender, RoutedEventArgs e) => ExternalLink.Open(MainWindow.CardProfileManualLink);
+
     private async void OnAddInput(object? sender, RoutedEventArgs e)
     {
         if ((sender as Control)?.DataContext is WaveInterfaceViewModel unit) await unit.AddInputAsync();

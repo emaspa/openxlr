@@ -458,11 +458,12 @@ public sealed partial class DeviceManager : BackgroundService
 
     /// <summary>
     /// A condition about the hardware the user should see, or null: a device
-    /// set aside after repeated hung transfers, or one that does not answer
-    /// reads. Read without the device lock, like <see cref="Snapshot"/>.
+    /// set aside after repeated hung transfers, one that does not answer
+    /// reads, or a driven card whose profile has no microphone input. Read
+    /// without the device lock, like <see cref="Snapshot"/>.
     /// </summary>
     public string? Warning
-        => string.Join(" ", new[] { _setAsideWarning, _unansweredWarning }.Where(w => w is not null)) is { Length: > 0 } w ? w : null;
+        => string.Join(" ", new[] { _setAsideWarning, _unansweredWarning, CardProblem }.Where(w => w is not null)) is { Length: > 0 } w ? w : null;
 
     private void NoteHung(UsbHungException ex)
     {
@@ -628,13 +629,12 @@ public sealed partial class DeviceManager : BackgroundService
             _log.LogInformation("connected {dev}", dev.Info.DisplayName);
             if (dev.ConnectionNote is string note) _log.LogWarning("{dev}: {note}", dev.Info.DisplayName, note);
             _lastLoopError = null;
-            // The UCM split profile that hides the raw multichannel nodes exists
-            // for the Wave XLR Pro only; on the other devices the check would
-            // poll wpctl for two minutes and then warn about a profile that
-            // never exists.
-            if (dev.Capabilities.OutputRouting) EnsureCardProfile(dev.Info);
             bool powerCycled = _absentInstances.Remove(dev.Info.InstanceId) || AddressChanged(dev.Info);
             bool fresh = !_everConnected || powerCycled || _lastInstance != dev.Info.InstanceId;
+            // The UCM split profile that hides the raw multichannel nodes exists
+            // for the Wave XLR Pro only, so only its card is parked; every
+            // driven card is checked for a capture node.
+            EnsureCardProfile(dev.Info, parksUcm: dev.Capabilities.OutputRouting, fresh);
             if (fresh && !dev.Capabilities.RetainsSettings)
             {
                 // A device without settings memory: what it answers now is
@@ -824,61 +824,54 @@ public sealed partial class DeviceManager : BackgroundService
 
     // UCM coexistence: a card with a UCM split profile hides the raw
     // multichannel nodes the mixer links against, so drive it in pro-audio
-    // while connected and restore the split on graceful shutdown.
+    // while connected and restore the split on graceful shutdown. Capture:
+    // a card on a profile that only plays is switched once per connection
+    // to the same output with an input, and is not switched back when the
+    // daemon stops, since a microphone interface never wants the profile
+    // without its microphone; what cannot be fixed is reported.
     private string? _profileRestore;
     private string? _profileCardFragment;   // the fragment that found the card, used to restore it
-    private IReadOnlyList<string> _profileCardFragments = [];
-    private int _profileChecksLeft;
-    private DateTime _profileNextCheck;
+    private volatile CardProfileWatch? _cardWatch;
 
-    private void EnsureCardProfile(DeviceInfo info)
+    private void EnsureCardProfile(DeviceInfo info, bool parksUcm, bool fresh)
     {
         if (!_submixer) return;   // hardware-control mode leaves the card's layout alone
+        // A unit without a USB location is a backend with no card of its own
+        // (a test's); only the Pro's park ever looked for one.
+        if (!parksUcm && info.Location is null) { _cardWatch = null; return; }
         // The USB device is visible to libusb before WirePlumber has created
         // (and profiled) the card, so a single check at connect misses the
-        // boot case entirely: keep checking until the card settles.
-        _profileCardFragments = FragmentsLocked(info);
+        // boot case entirely: the watch keeps checking until the card settles.
+        // A reconnect after a USB error is the same connection, and a switch
+        // made in it is not made again.
+        (string From, string To)? switched = fresh ? null : _cardWatch?.Switched;
         _profileCardFragment = info.NodeNameFragment;
-        _profileChecksLeft = 60;
-        _profileNextCheck = DateTime.UtcNow;
+        _cardWatch = new CardProfileWatch(info.DisplayName, FragmentsLocked(info), parksUcm, switched, (info.VendorId, info.ProductId));
         TryParkCardProfile();
     }
 
     private void TryParkCardProfile()
     {
-        if (_profileChecksLeft <= 0 || DateTime.UtcNow < _profileNextCheck) return;
-        IReadOnlyList<string> fragments = _profileCardFragments;
-        if (fragments.Count == 0) { _profileChecksLeft = 0; return; }
-        string fragment = fragments[0];
-        try
+        if (_cardWatch is not { } watch) return;
+        CardProfileStatus? before = watch.Status;
+        foreach (CardProfileNote note in watch.Check())
         {
-            (string? active, string? parked) = OpenXLR.Core.Mixing.CardProfile.EnsureProAudio(fragments, out string? matched);
-            if (matched is not null)
-            {
-                if (matched != fragment && _profileCardFragment != matched)
-                    _log.LogWarning("card {frag}: no card carries this unit's serial; found it by the model name {model} instead", fragment, matched);
-                _profileCardFragment = matched;
-                fragment = matched;
-            }
-            if (parked is not null)
-            {
-                _profileRestore = parked;
-                _log.LogInformation("card {frag}: UCM profile {prev} parked, pro-audio active", fragment, parked);
-            }
-            // Settled: we parked it, or it already runs pro-audio. Anything
-            // else (card absent, or still "off" while the session manager
-            // brings it up) gets another look.
-            if (parked is not null || active == "pro-audio") { _profileChecksLeft = 0; return; }
+            if (note.Warning) _log.LogWarning("{note}", note.Text);
+            else _log.LogInformation("{note}", note.Text);
         }
-        catch (Exception ex)
+        // A switch of unit or a restore that came in meanwhile has replaced
+        // the watch; what this one found no longer applies.
+        lock (_gate)
         {
-            _log.LogWarning("card profile check: {msg}", ex.Message);
+            if (_cardWatch != watch) return;
+            if (watch.Matched is { } matched) _profileCardFragment = matched;
+            if (watch.Parked is { } parked) _profileRestore = parked;
+            if (!Equals(before, watch.Status) && _device is { Connected: true }) RaiseFromLocked();
         }
-        _profileChecksLeft--;
-        _profileNextCheck = DateTime.UtcNow.AddSeconds(2);
-        if (_profileChecksLeft == 0)
-            _log.LogWarning("card {frag}: gave up waiting for a pro-audio profile", fragment);
     }
+
+    /// <summary>The driven card's capture problem, or null; read without the device lock.</summary>
+    private string? CardProblem => _published.Info is not null ? _cardWatch?.Status?.Problem : null;
 
     // Restore at the START of shutdown: the teardown of the rest of the
     // daemon can take many seconds, and the profile flip must not depend
@@ -892,7 +885,7 @@ public sealed partial class DeviceManager : BackgroundService
 
     private void RestoreCardProfile()
     {
-        _profileChecksLeft = 0;
+        _cardWatch = null;
         if (_profileRestore is null || _profileCardFragment is null) return;
         try
         {
@@ -905,7 +898,6 @@ public sealed partial class DeviceManager : BackgroundService
         }
         _profileRestore = null;
         _profileCardFragment = null;
-        _profileCardFragments = [];
     }
 
     private void PollOnce()
@@ -1309,6 +1301,7 @@ public sealed partial class DeviceManager : BackgroundService
             // Reopened but not answering yet: the values it last gave, which
             // the warning marks as such.
             State = _last ?? (_unansweredId == id && _lastGoodId == id ? _lastGood : null),
+            CardProfile = _cardWatch?.Status,
         };
         KeepHeldDynamicsLocked(dev);
         UnitEqSupport? eq = dev.EqSupport is { } support

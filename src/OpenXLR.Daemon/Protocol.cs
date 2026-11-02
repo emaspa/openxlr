@@ -356,6 +356,13 @@ public sealed record StateMessage
     [JsonPropertyName("waveInterfaces")] public IReadOnlyList<WaveInterfaceState>? WaveInterfaces { get; init; }
     [JsonPropertyName("capabilities")] public DeviceCapabilities? Capabilities { get; init; }
     [JsonPropertyName("state")] public DeviceState? State { get; init; }
+    /// <summary>
+    /// The driven unit's audio card as last checked: its profile, whether the
+    /// profile has a capture node, a switch the daemon made and a problem
+    /// for the user (see <see cref="OpenXLR.Core.Mixing.CardProfileWatch"/>).
+    /// Absent until the card is found, and while the software mixer is off.
+    /// </summary>
+    [JsonPropertyName("cardProfile")] public OpenXLR.Core.Mixing.CardProfileStatus? CardProfile { get; init; }
     /// <summary>The ducking setup and where it runs (see <see cref="DuckingState"/>); set whenever the daemon runs.</summary>
     [JsonPropertyName("ducking")] public DuckingState? Ducking { get; init; }
     /// <summary>Submixer state; null until the mixer graph is built.</summary>
