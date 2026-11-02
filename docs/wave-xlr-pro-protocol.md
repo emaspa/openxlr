@@ -866,6 +866,14 @@ no step, so a mixer driving these bytes needs no fade of its own.
   matched AUX0 at 0.0 dB with coherence 1.0000. Only section 0 has the
   -21 dB offset of section 12. Byte 14 reads `00` in all five sections,
   so it does not account for that offset.
+- The unit's other inputs behave the same (a second run the same day, a
+  microphone on XLR 2 and a phone playing into Line In). XLR 2 (byte 66
+  bit 1, level byte 55) and Line In (byte 66 bit 3, level byte 57) came
+  back in sections 54 and 72 as exact copies of their own capture, AUX2
+  and AUX6/AUX7: 0.00 dB at `00`, 6.00 dB lower at `f4`, residual below
+  -144 dB, 0 samples of delay. Line In stays stereo: its left reaches only
+  the section's left (AUX14, AUX16) and its right only the right. USB Aux
+  has not been measured.
 - A USB playback pair in a section at level `00` comes back 7.9 dB below
   what the computer sent: a 1 kHz tone at -43.0 dBFS RMS on pair 7, played
   with the Pro's sink at 100% and linked port by port, read -51.0 dBFS on
