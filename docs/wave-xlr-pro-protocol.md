@@ -1033,7 +1033,11 @@ with every threshold at 0 dB (`00`).
   nothing.
 - The dip settled within 0.5 s of the threshold write and came back
   within 1 s of the release.
-- XLR 2 was made a member of section 54 with entry 1 flagged, but it
-  carried no signal during the run, so whether a unit input can be
-  ducked is still open.
+- A unit input is not ducked this way. In a second run, with a
+  microphone live on XLR 2, XLR 2 was a member of sections 54 and 72 at
+  `00` and entry 1 was flagged with depth 12 dB. While the key was held
+  XLR 2 stayed at 0.00 dB in both sections, flagged or not, and pair 7 in
+  the same section dipped its 6.00 dB. The sections have no ducking field
+  for the inputs, so the unit ducks only USB playback pairs, as far as
+  these bytes go.
 
