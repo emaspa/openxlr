@@ -20,7 +20,7 @@ public static class ProReturnPairs
 /// holds across all twelve entries, as the preset word when a preset writes
 /// it and as the number otherwise (<c>custom</c> when the entries
 /// disagree), the USB pairs whose field reads 11 in any of block 0x0001's
-/// four mix sections, and the block 0x0008 entries whose flag bit 0 is
+/// five mix sections, and the block 0x0008 entries whose flag bit 0 is
 /// set. <see cref="Raw"/> is the bytes the codec reads, hex, so a check
 /// that the unit holds a setting needs no transfer.
 /// </summary>
@@ -55,16 +55,24 @@ public sealed record DuckingReadback(DuckingLevel Sensitivity, DuckingLevel Amou
 ///   byte 7      00, kept
 /// Wave Link writes the three presets to all twelve entries.
 ///
-/// Block 0x0001, in the last two bytes of its first four mix sections
-/// (bytes 16 to 17, 34 to 35, 52 to 53 and 70 to 71, after each section's
-/// aa): eight 2-bit fields, LE, field k for USB pair k. The first section is
-/// the mix the jacks play, the third the aux mix (desk probe of 2026-10-23),
-/// the second and fourth the jacks' second and third feeds; the fields work
-/// in the fourth too (protocol notes, section 16, probe P5). Wave
-/// Link leaves every field at 01 and makes a ducked pair 11. The unit ducks
-/// a pair only at 11: 10, which setting the high bit alone gives on a unit
-/// whose fields read 00, does nothing. So a target pair gets both bits, and
-/// any other pair loses the high bit and keeps its low bit as read.
+/// Block 0x0001, in the last two bytes of each of its five mix sections
+/// (bytes 16 to 17, 34 to 35, 52 to 53, 70 to 71 and 88 to 89, after each
+/// section's aa): eight 2-bit fields, LE, field k for USB pair k. The first
+/// section is the mix the jacks play, the third the aux mix (desk probe of
+/// 2026-10-23), the second and fourth the jacks' second and third feeds; the
+/// fields work in the fourth and fifth too (protocol notes, section 16,
+/// probe P5). Wave Link leaves every field at 01 and makes a ducked pair 11.
+/// The unit ducks a pair only at 11: 10, which setting the high bit alone
+/// gives on a unit whose fields read 00, does nothing. So a target pair gets
+/// both bits, and any other pair loses the high bit and keeps its low bit as
+/// read. The depth is per block 0x0008 entry, so a pair ducked in two
+/// sections dips by the same amount in both.
+///
+/// A target without <see cref="ProDuckingTarget.Sections"/> ducks its pairs
+/// in the first four sections, as a whole output (today's mode, the fifth
+/// left as read). One with sections (hardware mixing, where the unit builds
+/// each jack's mix from the channels' pairs) ducks each pair only in the
+/// sections it names, and covers all five.
 ///
 /// How the key input is encoded was not found: only XLR 1 was ever the key,
 /// and nothing in these two blocks names it. Every byte and bit not listed
@@ -84,8 +92,14 @@ public static class ProDucking
     /// <summary>Unknown; an entry that has it keeps its flags byte as read unless it is a target.</summary>
     public const byte UnknownBit = 0x02;
 
-    /// <summary>The first byte of each mix section's eight 2-bit pair fields in block 0x0001.</summary>
+    /// <summary>
+    /// The first byte of the eight 2-bit pair fields of the four mix sections
+    /// a whole-output target covers in block 0x0001 (sections 0 to 54).
+    /// </summary>
     public static IReadOnlyList<int> MixFieldOffsets { get; } = [16, 34, 52, 70];
+
+    /// <summary>The same for all five sections (0 to 72), which a target with sections covers and the readback decodes.</summary>
+    public static IReadOnlyList<int> SectionFieldOffsets { get; } = [16, 34, 52, 70, 88];
     public const int MixBlockLength = 108;
 
     public const string KeyXlr1 = "xlr1";
@@ -151,6 +165,8 @@ public static class ProDucking
     {
         if (CheckValues(target.Sensitivity, target.Amount, target.Speed) is { } problem) return problem;
         if (target.Pairs is null || target.Pairs.Any(p => p is < 0 or >= PairCount)) return $"pairs must be USB playback pairs 0 to {PairCount - 1}";
+        if (target.Sections is { } sections && sections.Any(s => !ProMixSections.Starts.Contains(s.Key) || s.Value is null || !s.Value.IsSubsetOf(target.Pairs)))
+            return "sections must be block 0x0001's section starts, each with pairs the target ducks";
         return null;
     }
 
@@ -202,42 +218,55 @@ public static class ProDucking
     /// <summary>
     /// Block 0x0001's part of <see cref="Apply"/>, which
     /// <see cref="ProMixPlan"/> writes with the rest of that block: the pair
-    /// fields of the four mix sections.
+    /// fields of the four mix sections, or of all five, each with its own
+    /// pairs, for a target with <see cref="ProDuckingTarget.Sections"/>.
     /// </summary>
     /// <exception cref="ArgumentException">The block has the wrong length or the target a value the unit does not take.</exception>
     public static void ApplyFields(Span<byte> block1, ProDuckingTarget target)
     {
         if (block1.Length != MixBlockLength) throw new ArgumentException($"block 0x0001 is {MixBlockLength} bytes", nameof(block1));
         if (Valid(target) is { } problem) throw new ArgumentException(problem, nameof(target));
-        int pairs = WantedPairs(target);
-        foreach (int at in MixFieldOffsets)
+        if (target.Sections is { } sections)
         {
-            int fields = block1[at] | block1[at + 1] << 8;
-            for (int k = 0; k < PairCount; k++)
-            {
-                int both = 3 << (2 * k), high = 1 << (2 * k + 1);
-                fields = (pairs & 1 << k) != 0 ? fields | both : fields & ~high;
-            }
-            block1[at] = (byte)fields;
-            block1[at + 1] = (byte)(fields >> 8);
+            foreach (int section in ProMixSections.Starts)
+                SetFields(block1, section + ProMixSections.DuckingOffset,
+                    target.Enabled && sections.TryGetValue(section, out IReadOnlySet<int>? ducked) ? Mask(ducked) : 0);
+            return;
         }
+        int pairs = WantedPairs(target);
+        foreach (int at in MixFieldOffsets) SetFields(block1, at, pairs);
+    }
+
+    private static int Mask(IEnumerable<int> pairs) => pairs.Aggregate(0, (mask, pair) => mask | 1 << pair);
+
+    /// <summary>One section's fields: both bits for each pair in <paramref name="pairs"/>, the high bit cleared for the others.</summary>
+    private static void SetFields(Span<byte> block1, int at, int pairs)
+    {
+        int fields = block1[at] | block1[at + 1] << 8;
+        for (int k = 0; k < PairCount; k++)
+        {
+            int both = 3 << (2 * k), high = 1 << (2 * k + 1);
+            fields = (pairs & 1 << k) != 0 ? fields | both : fields & ~high;
+        }
+        block1[at] = (byte)fields;
+        block1[at + 1] = (byte)(fields >> 8);
     }
 
     /// <summary>The pairs a target ducks, as a mask with bit k for pair k: none while it is off.</summary>
     public static int WantedPairs(ProDuckingTarget target)
-        => target.Enabled ? target.Pairs.Aggregate(0, (mask, pair) => mask | 1 << pair) : 0;
+        => target.Enabled ? Mask(target.Pairs) : 0;
 
     /// <summary>What the two blocks hold, decoded; the 96 bytes of 0x0008 and the 108 of 0x0001.</summary>
     public static DuckingReadback Decode(ReadOnlySpan<byte> block8, ReadOnlySpan<byte> block1)
     {
         if (block8.Length != Length || block1.Length != MixBlockLength)
             throw new ArgumentException("block 0x0008 is 96 bytes and block 0x0001 108");
-        var raw = new byte[Length + 2 * MixFieldOffsets.Count];
+        var raw = new byte[Length + 2 * SectionFieldOffsets.Count];
         block8.CopyTo(raw);
-        for (int i = 0; i < MixFieldOffsets.Count; i++)
+        for (int i = 0; i < SectionFieldOffsets.Count; i++)
         {
-            raw[Length + 2 * i] = block1[MixFieldOffsets[i]];
-            raw[Length + 2 * i + 1] = block1[MixFieldOffsets[i] + 1];
+            raw[Length + 2 * i] = block1[SectionFieldOffsets[i]];
+            raw[Length + 2 * i + 1] = block1[SectionFieldOffsets[i] + 1];
         }
         return FromRaw(raw);
     }
@@ -254,7 +283,7 @@ public static class ProDucking
             : Custom;
         var pairs = new List<int>();
         for (int k = 0; k < PairCount; k++)
-            for (int i = 0; i < MixFieldOffsets.Count; i++)
+            for (int i = 0; i < SectionFieldOffsets.Count; i++)
             {
                 int fields = raw[Length + 2 * i] | raw[Length + 2 * i + 1] << 8;
                 if ((fields >> (2 * k) & 3) == 3) { pairs.Add(k); break; }
@@ -289,14 +318,14 @@ public static class ProDucking
     /// </summary>
     public static bool Holds(DuckingReadback unit, ProDuckingTarget target)
     {
-        if (unit.Raw.Length != 2 * (Length + 2 * MixFieldOffsets.Count) || Valid(target) is not null) return false;
+        if (unit.Raw.Length != 2 * (Length + 2 * SectionFieldOffsets.Count) || Valid(target) is not null) return false;
         byte[] raw = Convert.FromHexString(unit.Raw);
         byte[] block8 = raw[..Length];
         var block1 = new byte[MixBlockLength];
-        for (int i = 0; i < MixFieldOffsets.Count; i++)
+        for (int i = 0; i < SectionFieldOffsets.Count; i++)
         {
-            block1[MixFieldOffsets[i]] = raw[Length + 2 * i];
-            block1[MixFieldOffsets[i] + 1] = raw[Length + 2 * i + 1];
+            block1[SectionFieldOffsets[i]] = raw[Length + 2 * i];
+            block1[SectionFieldOffsets[i] + 1] = raw[Length + 2 * i + 1];
         }
         byte[] want8 = (byte[])block8.Clone(), want1 = (byte[])block1.Clone();
         Apply(want8, want1, target);

@@ -368,10 +368,19 @@ public static class HardwareMixingPlanner
         {
             string name = setup.Mixes.FirstOrDefault(m => m.Id == mix)?.Name ?? mix;
             disabled[$"inserts:mix:{mix}"] = $"The Wave XLR Pro builds {name} for its jacks, so no insert runs on it there.";
-            disabled[$"ducking:mix:{mix}"] = $"Ducking does not run on {name} while the Wave XLR Pro builds it.";
         }
         if (unitMixes.Count > 0)
+        {
             disabled["latencyCompensation"] = "Latency compensation leaves out the mixes the Wave XLR Pro builds.";
+            // The unit ducks the mixes it builds itself, keyed by XLR 1 only,
+            // and never lowers its own inputs.
+            disabled["ducking:key"] = "The Wave XLR Pro ducks the mixes it builds only with XLR 1 as the key.";
+            foreach (string channel in setup.UnitSources.Where(s => s.Key != ProMixSections.Xlr1).Select(s => s.Value))
+            {
+                string name = setup.Channels.FirstOrDefault(c => c.Id == channel)?.Name ?? channel;
+                disabled[$"ducking:channel:{channel}"] = $"The Wave XLR Pro does not duck {name}, its own input, in the mixes it builds.";
+            }
+        }
         foreach (string channel in setup.UnitSources.Values.Where(setup.Processed.Contains))
         {
             string name = setup.Channels.FirstOrDefault(c => c.Id == channel)?.Name ?? channel;

@@ -185,6 +185,83 @@ public sealed class ProDuckingTests
             (On() with { Sensitivity = "high", Amount = "low", Speed = "fast" }).ToString());
         Assert.Equal(On(1, 5), On(5, 1));
         Assert.NotEqual(On(1), On(1, 5));
+        Assert.Equal("on, pairs 1 2 in section 0; 1 in section 18, sensitivity medium, amount medium, speed medium",
+            InSections(new() { [18] = [1], [0] = [2, 1] }).ToString());
+        Assert.Equal(InSections(new() { [0] = [1, 2], [18] = [1] }), InSections(new() { [18] = [1], [0] = [2, 1] }));
+        Assert.NotEqual(InSections(new() { [0] = [1] }), On(1));
+        Assert.NotEqual(InSections(new() { [0] = [1] }), InSections(new() { [18] = [1] }));
+    }
+
+    /// <summary>A hardware mixing target: each section's pairs, the union as its pairs.</summary>
+    internal static ProDuckingTarget InSections(Dictionary<int, int[]> sections)
+        => On([.. sections.Values.SelectMany(p => p).Distinct()]) with
+        {
+            Sections = sections.ToDictionary(p => p.Key, p => (IReadOnlySet<int>)p.Value.ToHashSet()),
+        };
+
+    private static void AssertOnlySectionFieldsChanged(byte[] before, byte[] after)
+    {
+        for (int i = 0; i < before.Length; i++)
+            if (!ProDucking.SectionFieldOffsets.Any(at => i == at || i == at + 1))
+                Assert.True(before[i] == after[i], $"block 0x0001 byte {i} changed from {before[i]:x2} to {after[i]:x2}");
+    }
+
+    [Fact]
+    public void InHardwareMixingEachPairIsDuckedOnlyInTheSectionsNamedForIt()
+    {
+        // Music (pair 2), Game (1) and SFX (6) ducked in Monitor A on section
+        // 0, only Game in Monitor B on section 18.
+        byte[] b8 = Block8(MediumBytes, IdleFlags);
+        byte[] b1 = Block1();
+        byte[] before1 = (byte[])b1.Clone();
+        ProDuckingTarget target = InSections(new() { [0] = [1, 2, 6], [18] = [1] });
+        ProDucking.Apply(b8, b1, target);
+
+        Assert.Equal(new byte[] { 0x7d, 0x75 }, b1[16..18]);
+        Assert.Equal(new byte[] { 0x5d, 0x55 }, b1[34..36]);
+        foreach (int at in new[] { 52, 70, 88 }) Assert.Equal(new byte[] { 0x55, 0x55 }, b1[at..(at + 2)]);
+        AssertOnlySectionFieldsChanged(before1, b1);
+        // One depth for every pair: the entries of pairs 1, 2 and 6 flagged.
+        byte[] flags = (byte[])IdleFlags.Clone();
+        foreach (int entry in new[] { 5, 6, 10 }) flags[entry] |= 0x01;
+        Assert.Equal(Block8(MediumBytes, flags), b8);
+        DuckingReadback unit = ProDucking.Decode(b8, b1);
+        Assert.Equal([1, 2, 6], unit.Pairs);
+        Assert.True(ProDucking.Holds(unit, target));
+        Assert.False(ProDucking.Holds(unit, InSections(new() { [0] = [1, 2, 6], [18] = [1, 2] })));
+        Assert.False(ProDucking.Holds(unit, On(1, 2, 6)));
+    }
+
+    [Fact]
+    public void ASectionsTargetCoversTheFifthSectionAndAWholeOutputTargetLeavesIt()
+    {
+        // Every field of every section at 11, as if another program ducked everything.
+        byte[] all = Block1(0xff, 0xff);
+        all[88] = all[89] = 0xff;
+
+        byte[] b1 = (byte[])all.Clone();
+        ProDucking.ApplyFields(b1, On(ProReturnPairs.Monitor));
+        Assert.Equal(new byte[] { 0x5d, 0x55 }, b1[16..18]);
+        Assert.Equal(new byte[] { 0xff, 0xff }, b1[88..90]);
+
+        b1 = (byte[])all.Clone();
+        ProDucking.ApplyFields(b1, InSections(new() { [54] = [3] }));
+        foreach (int at in new[] { 16, 34, 52, 88 }) Assert.Equal(new byte[] { 0x55, 0x55 }, b1[at..(at + 2)]);
+        Assert.Equal(new byte[] { 0xd5, 0x55 }, b1[70..72]);
+
+        // Off with sections clears the high bit in all five.
+        b1 = (byte[])all.Clone();
+        ProDucking.ApplyFields(b1, InSections(new() { [54] = [3] }) with { Enabled = false });
+        foreach (int at in ProDucking.SectionFieldOffsets) Assert.Equal(new byte[] { 0x55, 0x55 }, b1[at..(at + 2)]);
+    }
+
+    [Fact]
+    public void ASectionsTargetNamesOnlySectionStartsAndItsOwnPairs()
+    {
+        Assert.Null(ProDucking.Valid(InSections(new() { [0] = [1], [72] = [7] })));
+        Assert.NotNull(ProDucking.Valid(InSections(new() { [5] = [1] })));
+        Assert.NotNull(ProDucking.Valid(On(1) with { Sections = new Dictionary<int, IReadOnlySet<int>> { [0] = new HashSet<int> { 2 } } }));
+        Assert.Throws<ArgumentException>(() => ProDucking.ApplyFields(Block1(), InSections(new() { [17] = [1] })));
     }
 
     public static TheoryData<string, string, string> Presets()

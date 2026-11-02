@@ -126,6 +126,29 @@ public sealed partial class MonitorVolumeIntegrationTests
             // What the mode turns off is refused with its sentence.
             Assert.Contains("Auditions are not available", service.Apply(new() { Cmd = "auditionClip" }));
 
+            // Ducking: the unit lowers Game and Music in section 0 only, from
+            // their own pairs, keyed by XLR 1; Monitor A is the unit's alone,
+            // so no software stage runs for it.
+            Run(new()
+            {
+                Cmd = "setDucking",
+                Value = JsonSerializer.SerializeToElement(new { enabled = true, channels = new[] { "game", "music" }, mixes = new[] { "monitor" } }),
+            });
+            PrimaryWait(() => { Sweep(); return service.Ducking().Device?.Held == true && (pro.Block[16] & 0x3c) == 0x3c; });
+            DuckingState ducking = service.Ducking();
+            Assert.Equal("device", ducking.Backend);
+            Assert.True(ducking.Device!.Ready, ducking.Device.Note);
+            Assert.Equal([1, 2], ducking.Device.Readback!.Pairs);
+            byte[] ducked = pro.Block;
+            Assert.Equal(0, ducked[16] & 0x82);                 // pairs 0 and 3 not ducked
+            Assert.Equal(0, ducked[17] & 0xaa);                 // nor 4 to 7
+            foreach (int at in new[] { 34, 52, 70, 88 }) Assert.Equal(0, (ducked[at] | ducked[at + 1]) & 0xaa);
+            Assert.Equal(0x01, pro.Ducking[5 * 8 + ProDucking.FlagsByte] & 0x01);
+            Assert.Equal(0x01, pro.Ducking[6 * 8 + ProDucking.FlagsByte] & 0x01);
+            Assert.DoesNotContain(service.Meters()!.Keys, k => k.StartsWith("duck:", StringComparison.Ordinal));
+            Run(new() { Cmd = "setDucking", Value = JsonSerializer.SerializeToElement(new { enabled = false }) });
+            PrimaryWait(() => { Sweep(); return (pro.Block[16] & 0xaa) == 0; });
+
             // Leaving: the graph, the sink, section 0, byte 98 and the jack as before.
             Run(new() { Cmd = "setChannelMuted", Channel = "game", Mix = "monitor", Value = JsonSerializer.SerializeToElement(false) });
             Run(new() { Cmd = "setLevel", Channel = "music", Mix = "monitor", Value = JsonSerializer.SerializeToElement(1.0) });
@@ -166,16 +189,19 @@ public sealed partial class MonitorVolumeIntegrationTests
     {
         private readonly byte[] _block = ProMixPlanTests.Neutral();
         private readonly byte[] _levels = [40, 0x02, 40, 0, 0, 0, 0, 0];
+        private readonly byte[] _ducking = ProDuckingTests.Block8(ProDuckingTests.MediumBytes, ProDuckingTests.IdleFlags);
 
         public byte[] Block { get { lock (this) return (byte[])_block.Clone(); } }
         public byte[] Levels { get { lock (this) return (byte[])_levels.Clone(); } }
+        public byte[] Ducking { get { lock (this) return (byte[])_ducking.Clone(); } }
 
         public DeviceInfo Info { get; } = new("Elgato", "Wave XLR Pro", 0x0fd9, 0x00b4) { Location = new(1, 53, "1-" + MixSerial, MixSerial) };
         public DeviceCapabilities Capabilities { get; } = new()
         {
             Gain = true, Mute = true, LowCut = true, ClipGuard = true, OutputRouting = true, AuxInput = true, LineInput = true,
-            XlrInputs = 2, RetainsSettings = true, HardwareMixing = true,
+            XlrInputs = 2, RetainsSettings = true, HardwareMixing = true, Ducking = true,
         };
+        public DuckingReadback? ReadDucking() { lock (this) return ProDucking.Decode(_ducking, _block); }
         public string? Firmware => "1.0.14";
         public bool Connected { get; private set; }
         public DeviceState ReadState()
@@ -196,6 +222,7 @@ public sealed partial class MonitorVolumeIntegrationTests
             lock (this)
             {
                 byte[] before = (byte[])_block.Clone(), levels = (byte[])_levels.Clone();
+                if (plan.Ducking is { } ducking) ProDucking.ApplyEntries(_ducking, ducking);
                 ProMixChanges changes = plan.Apply(before, _block);
                 if (plan.JackLevels is { } wanted) wanted.All(levels).CopyTo(_levels, 0);
                 bool wrote = !_block.AsSpan().SequenceEqual(before);
