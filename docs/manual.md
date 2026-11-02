@@ -530,9 +530,16 @@ that was the default.
    the picker without changing its routes. A missing output keeps its
    selection and its feeds until it returns. Device descriptions update in
    place without changing the selected outputs or pending feed edits.
-   The Wave XLR Pro's Headphones 1/2 and Line Out share one hardware
-   return bus. Changing the feed of any of these jacks changes all selected
-   jacks on that interface; they cannot carry independent blends.
+   On the Wave XLR Pro, Headphones 1, Headphones 2 and Line Out each take
+   their own feed: Monitor A on the front jack and Monitor B on the rear
+   one, for example. Each distinct feed plays on its own mix inside the
+   unit, at the same level the first one plays at, so two jacks at equal
+   faders and equal headphone volumes are equally loud. Jacks with the
+   same feed share it. The output volume still moves every jack together,
+   since the Pro is one device on the computer. The first time a second or
+   third feed uses one of the unit's mixes, OpenXLR keeps what that mix
+   held, and puts it back once the jacks share one feed again, so a unit
+   you also use with Wave Link comes back as you left it there.
    Stream, Chat, Aux and custom virtual microphones are also available,
    so you can listen to a recorder's mix without moving its recording
    clients. The same assignments are available through the API.
@@ -670,7 +677,9 @@ second computer or a console stays audible with Aux In muted in the
 Monitor mix. Unmuting that send as well plays it twice.
 Muting the mix feeding the jacks also turns off the direct microphone path.
 For a summed feed, it stays on while at least one feeding mix and the
-microphone's send to that mix are both unmuted.
+microphone's send to that mix are both unmuted. With the jacks on different
+feeds, each jack hears the path when its own feed carries the microphone,
+at that feed's send level.
 
 <a name="ducking"></a>
 #### Lower what you hear while you speak
@@ -750,7 +759,8 @@ When the setup does not fit, the computer runs it and the state says why
   its mix yet;
 - a ducked mix also plays somewhere the unit cannot lower, such as
   speakers on the computer or a virtual microphone like Stream;
-- the jacks play two mixes together and only one of them is ducked;
+- a jack plays two mixes together and only one of them is ducked. A
+  jack on another feed does not count: it keeps its level;
 - a channel that plays in a ducked mix is not on the list, so lowering
   the whole output would lower it too;
 - XLR 1 is heard in the ducked mix through its software send, so the unit

@@ -451,7 +451,8 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
   and one device can hear several mixes summed at unity. The API uses
   the same feeds, each a direct port link so a sum costs no node or
   additional mixer. At least one mix stays selected; untick the output
-  to disconnect it. Outputs that share a hardware bus follow one feed, and mix
+  to disconnect it. Each Wave XLR Pro jack takes its own feed on a mix of
+  its own inside the unit, and mix
   inserts sit upstream so every output hears the processed mix. Profiles recall the feeds. A
   headset with a game sink and a chat sink hears two selections, and
   one pair of headphones can hear the desktop from A with a separately

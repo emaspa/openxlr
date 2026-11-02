@@ -2161,6 +2161,18 @@ public sealed class PipeWireAdapter
     }
 
     /// <summary>
+    /// Route a tap into one USB playback pair of an output's device: a jack
+    /// feed of the Wave XLR Pro beyond the first streams on a pair of its own
+    /// (see <see cref="OpenXLR.Core.Devices.ProJackFeeds"/>). Any '#' marker
+    /// only names the device.
+    /// </summary>
+    public PortLink RouteTapToOutput(string fromNode, string fromPrefix, string outputSink, int pair)
+    {
+        int marker = outputSink.IndexOf('#');
+        return LinkNodes(fromNode, fromPrefix, marker < 0 ? outputSink : outputSink[..marker], "playback", pair);
+    }
+
+    /// <summary>
     /// Feed a capture device into a channel sink; <paramref name="sourcePair"/>
     /// selects which stereo pair of a multichannel source (0 = first).
     /// </summary>
@@ -2306,11 +2318,12 @@ public sealed class PipeWireAdapter
                 if (shortNames[k] != found[of[k]].Description) found[of[k]] = found[of[k]] with { Description = shortNames[k] };
         }
 
-        // The Pro's physical outputs all share its hardware monitor bus, fed by
-        // USB playback channels 2/3 and gated per-output by the selectors in
-        // block 0x0001 (decoded 2026-08-25, confirmed by ear on both jacks).
-        // Each output is advertised as its own pseudo-sink; the daemon flips
-        // the matching hardware selector when one is chosen as the monitor.
+        // The Pro's physical outputs each play the hardware mix their selector
+        // in block 0x0001 names (decoded 2026-08-25, confirmed by ear on both
+        // jacks): the first jack feed on USB playback channels 2/3, a second
+        // and third on pairs of their own (ProJackFeeds). Each output is
+        // advertised as its own pseudo-sink; the daemon sets the matching
+        // hardware selector when one is chosen as the monitor.
         // Headphones jack 1 is on the front of the unit, jack 2 on the back.
         AudioNode? pro = null;
         if (exposeHardwareMonitorOutputs)

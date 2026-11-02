@@ -273,7 +273,7 @@ that final acknowledgement (or an `error` without a request id):
 | `setMixVolume` / `setMixMuted` | `mix`, `value` | mix masters; monitor volume range 0 to 1.5, other mixes 0 to 1; values outside the range are clamped |
 | `setMonitorOutputs` | `devices[]` | every sink the monitor mixes feed, at most 16; a newly listed output is fed by `defaultMonitorMix`. A missing sink stays selected and saved, and is linked when it appears. A client that lists outputs for the user keeps the missing ones in the list it sends |
 | `setMonitorOutput` | `device` | a single monitor sink; `null` disconnects the route |
-| `setMonitorFeed` | `device`, `mix` | what feeds one selected output, independently of other outputs: any existing mix id, including `stream`, `chat`, `auxout` and user mixes of either kind, or distinct ids joined with `+` to sum them at unity. One mix can appear in several outputs' feeds. An empty feed is rejected; remove an output from `setMonitorOutputs` to disconnect it. The Pro's own jacks follow one feed together. The state's `monitorFeeds` lists exceptions from `defaultMonitorMix` (`monitor` when present, otherwise the lowest monitor id), independent of layout order. Unknown or repeated mix ids and unselected outputs are rejected. Deleting the last included mix returns that output to `defaultMonitorMix` |
+| `setMonitorFeed` | `device`, `mix` | what feeds one selected output, independently of other outputs: any existing mix id, including `stream`, `chat`, `auxout` and user mixes of either kind, or distinct ids joined with `+` to sum them at unity. One mix can appear in several outputs' feeds. An empty feed is rejected; remove an output from `setMonitorOutputs` to disconnect it. Each of the Wave XLR Pro's jacks (`<sink>#hp1`, `#hp2`, `#lineout`) takes its own feed, and a `device` that ends at `#` sets every selected jack of that unit. Each distinct feed the jacks play has a mix of its own on the unit, in the order Headphones 1, Headphones 2, Line Out: the first streams on USB playback pair 1 into section 0 of block 0x0001, as all jacks did before, the second on pair 2 into section 18 and the third on pair 3 into section 54. Jacks that play the same feed share it. Sections 18 and 54 are kept in `mixer.json` as they were before their first use and put back once no jack plays them (see [mixer-layout.md](mixer-layout.md)). The state's `monitorFeeds` lists exceptions from `defaultMonitorMix` (`monitor` when present, otherwise the lowest monitor id), independent of layout order. Unknown or repeated mix ids and unselected outputs are rejected. Deleting the last included mix returns that output to `defaultMonitorMix` |
 | `setAuxPortEnabled` | `value` | send the Aux mix to the USB Aux port |
 | `setOutputVolume` | `value` | volume of the selected monitor devices, 0 to 1.5; the range the devices themselves take, so a desktop level above unity can be held and written back unchanged. Values outside it are clamped, and the state reports what reached the devices. With no output selected the command succeeds and changes nothing |
 | `setMonitorMuted` | `value` | boolean only; pause or resume OpenXLR's feeds to all selected monitor outputs, including the Pro's direct microphone monitoring. Selected physical sinks mirror the pause, preserving their previous native mutes for resume. Raw mix and channel mutes, levels and feeds stay unchanged. Recording stays live unless `monitorMuteMicrophones` is enabled. The state reports `monitorMuted`; saved in `mixer.json`, not in profiles, and profile recall keeps the current pause |
@@ -1346,7 +1346,9 @@ All under `~/.config/openxlr/` (or `$XDG_CONFIG_HOME/openxlr/`):
   (`noiseRemoval`), the voice changer (`voiceChanger`), the compressor
   (`compressor`), the expander (`expander`), where the EQs run
   (`eqProcessing`) and where the compressors and expanders run
-  (`dynamicsProcessing`), the [ducking](#ducking) setup (`ducking`), the
+  (`dynamicsProcessing`), the Wave XLR Pro sections kept for jack feeds
+  (`hardwareRestore`, machine wiring, never in a profile), the
+  [ducking](#ducking) setup (`ducking`), the
   per-channel volumes (`channelVolumes`), the exclusive groups
   (`exclusiveGroups`), the monitor feeds (`monitorFeeds`),
   `compensateMixLatency`, and `inputBindings`, the hardware strips bound to
@@ -2542,9 +2544,9 @@ device}`:
   when it is false, `reason` says why in a word and `note` in a sentence
   (see [where ducking runs](#where-ducking-runs)). A client shows `note`
   for a reason it does not know. `outputs` is what the unit would duck for
-  this setup, any of `monitor` (the jacks and Line Out, USB playback pair
-  1) and `aux` (the USB Aux port, pair 5), given even when it is not
-  ready. `held` is true when the unit was last read holding what OpenXLR
+  this setup, any of `monitor` (the jacks and Line Out, USB playback pairs
+  1 to 3, one per jack feed) and `aux` (the USB Aux port, pair 5), given
+  even when it is not ready. `held` is true when the unit was last read holding what OpenXLR
   wrote to it. `readback` is that read decoded: `sensitivity`, `amount`
   and `speed` as the unit holds them, in the setup's shapes: the preset
   word when all twelve entries hold the value a preset writes, the number
@@ -2629,7 +2631,7 @@ rule that fails gives `reason`:
 | the key carries the unit's input 1 | `keyNotSupported` | The Wave XLR Pro ducks only with XLR 1 as the key. |
 | the unit's ducking is heard on the jacks: no target mix is heard on them while the last read shows the jacks' feed outside the mix they play | `monitorReturn` | The jacks' feed is not in the Wave XLR Pro's headphone mix, where it ducks, so this computer ducks. |
 | every target mix that is heard is heard only on the unit: a monitor mix in the jacks' feed, or the Aux mix on the USB Aux port, and on no other output, virtual microphone or feed | `mixElsewhere` | Monitor A also plays on Speakers, which the Wave XLR Pro cannot duck. |
-| when one mix of the jacks' feed is ducked, all of them are | `sharedOutput` | The jacks play Monitor A and Chat together, and only Monitor A is ducked. |
+| when one mix of a jack's feed is ducked, all of that feed's mixes are; jacks on other feeds are not counted | `sharedOutput` | The jacks play Monitor A and Chat together, and only Monitor A is ducked. |
 | every channel heard in a target mix (send above 0, not muted) is in `channels`, the key excepted | `partialMix` | Voice Chat plays in Monitor A and is not ducked; the Wave XLR Pro lowers a whole output. |
 | the key is not heard in a target mix through its software send | `keyInMix` | XLR 1 is heard in Monitor A through its software send, so the unit would lower the voice too. |
 | the unit kept the ducking written to it (two misses fail it) | `failed` | The Wave XLR Pro did not keep the ducking written to it. Switch ducking off and on to try again. |
@@ -2642,7 +2644,9 @@ program holds the feed out of the mix. The USB Aux port dips with its
 mix, so it needs no rule of its own.
 A target mix no output, virtual microphone or feed hears is left out of
 these rules; a setup whose target mixes nobody hears runs on the unit with
-no pairs ducked. The unit ducks the pairs `outputs` names.
+no pairs ducked. The unit ducks the pairs `outputs` names: for `monitor`,
+the pair of each jack feed that plays a target mix, so a jack on another
+feed keeps its level.
 
 Moving between the two never doubles a duck. From the unit to software,
 the unit is written with ducking off, and the software stages start once

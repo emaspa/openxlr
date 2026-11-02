@@ -1,3 +1,5 @@
+using OpenXLR.Core.Devices;
+
 namespace OpenXLR.Core.Mixing;
 
 /// <summary>
@@ -975,8 +977,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     private IEnumerable<string> MonitorOutputsForLocked(string output)
     {
         int marker = output.IndexOf('#');
-        return marker < 0 ? (_monitorOutputs.Contains(output) ? [output] : [])
-            : _monitorOutputs.Where(o => o.StartsWith(output[..(marker + 1)], StringComparison.Ordinal));
+        return marker < 0 || marker < output.Length - 1 ? (_monitorOutputs.Contains(output) ? [output] : [])
+            : _monitorOutputs.Where(o => o.StartsWith(output, StringComparison.Ordinal));
     }
     public bool IsInsertKey(string key) { lock (_gate) return IsInsertChannel(key); }
     public int InsertChannels(string key) { lock (_gate) return ChainWidthLocked(key) ?? 0; }
@@ -1637,6 +1639,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 Eq = new Dictionary<string, MicEq>(_eq, StringComparer.Ordinal),
                 EqProcessing = new Dictionary<string, string>(_eqProcessing, StringComparer.Ordinal),
                 DynamicsProcessing = new Dictionary<string, string>(_dynamicsProcessing, StringComparer.Ordinal),
+                HardwareRestore = _hardwareRestore.ToDictionary(p => p.Key.ToString(System.Globalization.CultureInfo.InvariantCulture), p => p.Value),
                 NoiseRemoval = new Dictionary<string, MicNoise>(_noise, StringComparer.Ordinal),
                 VoiceChanger = new Dictionary<string, MicVoice>(_voice, StringComparer.Ordinal),
                 Compressor = new Dictionary<string, MicCompressor>(_compressor, StringComparer.Ordinal),
@@ -1695,6 +1698,13 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             RestoreBrowserSettingsLocked(s);
             SetMonitorMuteMicrophones(s.MonitorMuteMicrophones);
             _duckingSetup = DuckingSetup.Prune(s.Ducking ?? DuckingSetup.Default(_config), _config);
+            // What the Pro's sections held before a jack feed used them is
+            // kept whether or not the mixer runs, so no save loses it.
+            _hardwareRestore.Clear();
+            foreach ((string section, string hex) in s.HardwareRestore)
+                if (int.TryParse(section, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int at)
+                    && ProJackFeeds.SlotOfSection(at) is 1 or 2 && ProMixPlan.IsRestore(hex))
+                    _hardwareRestore[at] = hex.ToUpperInvariant();
             if (!_built) { SyncDuckingLocked(); return; }
             if (_config.RepairedMonitorMix is { } repaired)
             {
@@ -2467,16 +2477,40 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// <inheritdoc cref="HardwareMicLevelDb"/>
     public double HardwareMicLevelDbOf(int input)
     {
+        lock (_gate) return HardwareMicLevelDbLocked(input, JackFeedLocked());
+    }
+
+    /// <summary>
+    /// <see cref="HardwareMicLevelDb"/> for one jack feed: the level the
+    /// path plays at on the section that carries <paramref name="feed"/>.
+    /// </summary>
+    public double HardwareMicLevelDbOf(int input, string feed)
+    {
+        lock (_gate) return HardwareMicLevelDbLocked(input, feed);
+    }
+
+    /// <summary>
+    /// Whether unit <paramref name="input"/>'s hardware path is on and the
+    /// channel it carries is heard in <paramref name="feed"/>: a part of the
+    /// feed that is not muted and whose send of that channel is not muted.
+    /// The path's bit is set only in the sections of such feeds.
+    /// </summary>
+    public bool HardwareMicHeardIn(int input, string feed)
+    {
         lock (_gate)
-        {
-            if (_hardwareMicChannels[input - 1] is not { } channel || JackFeedLocked() is not { } feed) return double.NegativeInfinity;
-            double gain = MonitorFeed.Parts(feed)
-                .Where(m => !_mixMuted.Contains(m) && !_muted.Contains(Cell(channel, m)))
-                .Select(m => SendGain(_levels.GetValueOrDefault(Cell(channel, m), 0.0), ChannelVolumeLocked(channel), 1)
-                    * Math.Clamp(_mixVolume.GetValueOrDefault(m, 1.0), 0, MixVolumeMaximumLocked(m)))
-                .DefaultIfEmpty(0).Max();
-            return gain > 0 ? 60 * Math.Log10(gain) + JackOutputVolumeDb(_outputVolume) : double.NegativeInfinity;
-        }
+            return _hardwareMicChannels[input - 1] is { } channel
+                && MonitorFeed.Parts(feed).Any(m => !_mixMuted.Contains(m) && !_muted.Contains(Cell(channel, m)));
+    }
+
+    private double HardwareMicLevelDbLocked(int input, string? feed)
+    {
+        if (_hardwareMicChannels[input - 1] is not { } channel || feed is null) return double.NegativeInfinity;
+        double gain = MonitorFeed.Parts(feed)
+            .Where(m => !_mixMuted.Contains(m) && !_muted.Contains(Cell(channel, m)))
+            .Select(m => SendGain(_levels.GetValueOrDefault(Cell(channel, m), 0.0), ChannelVolumeLocked(channel), 1)
+                * Math.Clamp(_mixVolume.GetValueOrDefault(m, 1.0), 0, MixVolumeMaximumLocked(m)))
+            .DefaultIfEmpty(0).Max();
+        return gain > 0 ? 60 * Math.Log10(gain) + JackOutputVolumeDb(_outputVolume) : double.NegativeInfinity;
     }
 
     /// <summary>
@@ -2613,14 +2647,6 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         foreach (string stale in _monitorOutputLabels.Keys.Where(o => !_monitorOutputs.Contains(o)).ToList())
             _monitorOutputLabels.Remove(stale);
         _monitorOutputLabelsDue = true;
-        // Several physical jacks on the same return pair cannot carry distinct
-        // feeds. Keep every published member consistent with the audible one.
-        foreach (var group in _monitorOutputs.Where(output => output.Contains('#')).GroupBy(OutputRouteKey))
-        {
-            string? feed = FeedOfLocked(group.First());
-            if (feed is null) continue;
-            foreach (string output in group) _monitorFeeds[output] = feed;
-        }
         _incompleteMonitorRoutes.Clear();
         foreach (string? channel in _hardwareMicChannels) RefreshHardwareMicCellsLocked(channel);
         if (!_monitorMuted)
@@ -2758,14 +2784,84 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
 
     /// <summary>
     /// One identity for the outputs that share a hardware return bus: the
-    /// Pro's jacks are "device#hp1", "device#hp2" and "device#lineout" and
-    /// carry one feed, so they are routed and grouped as "device#bus".
+    /// Pro's jacks are "device#hp1", "device#hp2" and "device#lineout", and
+    /// the jacks that play the first jack feed are routed as "device#bus".
+    /// The second and third feeds are "device#bus2" and "device#bus3" (see
+    /// <see cref="RouteKeyLocked"/>).
     /// </summary>
-    internal static string OutputRouteKey(string output)
+    internal static string OutputRouteKey(string output, int slot = 0)
     {
         int marker = output.IndexOf('#');
-        return marker < 0 ? output : output[..marker] + "#bus";
+        return marker < 0 ? output : output[..marker] + (slot == 0 ? "#bus" : $"#bus{slot + 1}");
     }
+
+    /// <summary>The route identity of an output: its own name, or for a jack its feed's bus.</summary>
+    private string RouteKeyLocked(string output) => OutputRouteKey(output, JackSlotLocked(output));
+
+    // The jacks in the order their feeds take the unit's sections.
+    private static readonly string[] JackSuffixes = ["hp1", "hp2", "lineout"];
+
+    private static int JackOrder(string output)
+    {
+        int marker = output.IndexOf('#');
+        int at = marker < 0 ? -1 : Array.IndexOf(JackSuffixes, output[(marker + 1)..]);
+        return at < 0 ? JackSuffixes.Length : at;
+    }
+
+    /// <summary>
+    /// The distinct feeds the selected jacks play, each with its jacks, in
+    /// the order they take the unit's sections (see <see cref="ProJackFeeds"/>):
+    /// Headphones 1's feed first, then Headphones 2's if it differs, then Line
+    /// Out's. Empty while no jack is selected.
+    /// </summary>
+    private List<JackFeed> JackFeedsLocked()
+    {
+        var feeds = new List<JackFeed>();
+        foreach (string jack in _monitorOutputs.Where(o => o.Contains('#')).OrderBy(JackOrder))
+        {
+            if (FeedOfLocked(jack) is not string feed) continue;
+            int at = feeds.FindIndex(f => f.Feed == feed);
+            if (at >= 0) feeds[at] = feeds[at] with { Jacks = [.. feeds[at].Jacks, jack] };
+            else if (feeds.Count < ProJackFeeds.Slots) feeds.Add(new JackFeed(feed, [jack]));
+        }
+        return feeds;
+    }
+
+    /// <summary>The slot of a jack's feed, 0 for anything else.</summary>
+    private int JackSlotLocked(string output)
+    {
+        if (!output.Contains('#')) return 0;
+        int slot = JackFeedsLocked().FindIndex(f => f.Jacks.Contains(output));
+        return slot < 0 ? 0 : slot;
+    }
+
+    // The Pro's sections 18 and 54 as they were before a jack feed first
+    // used them (see MixerSettings.HardwareRestore).
+    private readonly Dictionary<int, string> _hardwareRestore = [];
+
+    /// <summary>The Pro's sections to put back once no jack plays them, by section, hex (see <see cref="MixerSettings.HardwareRestore"/>).</summary>
+    public IReadOnlyDictionary<int, string> HardwareRestore { get { lock (_gate) return new Dictionary<int, string>(_hardwareRestore); } }
+
+    /// <summary>
+    /// Keep a section's bytes from before its first use by a jack feed. A
+    /// section already kept keeps its first bytes. True when it was added;
+    /// the caller saves the settings.
+    /// </summary>
+    /// <exception cref="ArgumentException">Not section 18 or 54, or not the bytes a restore holds.</exception>
+    public bool KeepHardwareRestore(int section, string hex)
+    {
+        _ = ProMixPlan.RestoreBytes(section, hex);
+        lock (_gate) return _hardwareRestore.TryAdd(section, hex.ToUpperInvariant());
+    }
+
+    /// <summary>Drop a section put back as it was. True when one was kept; the caller saves the settings.</summary>
+    public bool ForgetHardwareRestore(int section)
+    {
+        lock (_gate) return _hardwareRestore.Remove(section);
+    }
+
+    /// <summary>The selected jacks' feeds in slot order (see <see cref="JackFeedsLocked"/>).</summary>
+    public IReadOnlyList<JackFeed> JackFeeds { get { lock (_gate) return JackFeedsLocked(); } }
 
     /// <summary>
     /// Link every mix of an output's feed into that output. PipeWire sums
@@ -2777,7 +2873,10 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     {
         if (_monitorMuted) return null;
         List<MixDefinition> mixes = MixesForOutputLocked(target);
-        string key = OutputRouteKey(target);
+        string key = RouteKeyLocked(target);
+        // A jack plays its feed's section, which takes that feed's USB pair.
+        int? pair = target.Contains('#') && !target.EndsWith("#usbaux", StringComparison.Ordinal)
+            ? ProJackFeeds.Pairs[JackSlotLocked(target)] : null;
         _incompleteMonitorRoutes.Remove(key);
         if (mixes.Count == 0) return null;
         // An empty route is tried again by the next sweep (EnsureMonitorRoutes).
@@ -2788,7 +2887,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             foreach (MixDefinition mix in mixes)
             {
                 (string tap, string prefix) = MixTapLocked(mix);
-                PortLink route = _pw.RouteTapToOutput(tap, prefix, target);
+                PortLink route = pair is int p ? _pw.RouteTapToOutput(tap, prefix, target, p) : _pw.RouteTapToOutput(tap, prefix, target);
                 if (route.Pairs.Count == 0 || !route.Complete) _incompleteMonitorRoutes.Add(key);
                 pairs.AddRange(route.Pairs);
             }
@@ -2820,30 +2919,30 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     }
 
     /// <summary>
-    /// Mix ids that reach the Wave XLR Pro's own jacks (its
-    /// pseudo-outputs share one return bus, so they follow one feed), or the
-    /// default monitor mix when no jack is selected.
+    /// The first jack feed of the Wave XLR Pro (see <see cref="JackFeedsLocked"/>),
+    /// the one section 0 carries, or the default monitor mix when no jack is
+    /// selected.
     /// </summary>
     private string? JackFeedLocked()
-    {
-        string? jack = _monitorOutputs.FirstOrDefault(o => o.Contains('#'));
-        return jack is null ? PrimaryMonitorLocked()?.Id : FeedOfLocked(jack);
-    }
+        => JackFeedsLocked() is [var first, ..] ? first.Feed : PrimaryMonitorLocked()?.Id;
 
-    /// <summary>The feed of the interface's own jacks (see <see cref="JackFeedLocked"/> and <see cref="MonitorFeed"/>).</summary>
+    /// <summary>Whether a mix plays on any of the Pro's jacks.</summary>
+    private bool OnAnyJackFeedLocked(string mixId)
+        => JackFeedsLocked() is { Count: > 0 } feeds ? feeds.Any(f => MonitorFeed.Includes(f.Feed, mixId))
+            : MonitorFeed.Includes(JackFeedLocked(), mixId);
+
+    /// <summary>The first jack feed (see <see cref="JackFeedLocked"/> and <see cref="MonitorFeed"/>).</summary>
     public string? JackMonitorMix { get { lock (_gate) return JackFeedLocked(); } }
 
     /// <summary>The feed of one selected output (see <see cref="MonitorFeed"/>).</summary>
     public string? MonitorFeedOf(string output) { lock (_gate) return FeedOfLocked(output); }
 
     /// <summary>
-    /// Choose which mix feeds a selected output. The Pro's
-    /// pseudo-outputs ride one return bus, so a choice on one applies to
-    /// every jack of that device. An unknown mix or an unselected output is
-    /// ignored; the first monitor mix is stored as "no exception".
-    /// Choose what feeds one selected output: a mix, or several
-    /// summed ("monitor+monitor2", see <see cref="MonitorFeed"/>). Null on
-    /// success, else why nothing changed.
+    /// Choose what feeds one selected output: a mix, or several summed
+    /// ("monitor+monitor2", see <see cref="MonitorFeed"/>). Each of the
+    /// Pro's jacks takes its own feed; a name that ends at the '#' marker
+    /// sets every selected jack of that device. The default monitor mix is
+    /// stored as "no exception". Null on success, else why nothing changed.
     /// </summary>
     public string? SetMonitorFeed(string output, string feed)
     {
@@ -2867,14 +2966,14 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// <summary>
     /// One route per selected monitor destination, keyed so pseudo-outputs of
     /// one device share a route when they ride the same USB return pair: the
-    /// analog outputs (hp1/hp2/lineout) all use the monitor-bus pair.
+    /// jacks that play one feed share its pair (see <see cref="JackFeedsLocked"/>).
     /// </summary>
     private IEnumerable<(string Key, string Target)> MonitorRouteTargetsLocked()
     {
         var seen = new HashSet<string>();
         foreach (string name in _monitorOutputs)
         {
-            string key = OutputRouteKey(name);
+            string key = RouteKeyLocked(name);
             if (seen.Add(key)) yield return (key, name);
         }
     }
@@ -3463,7 +3562,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             monitor ? 1 : _mixVolume.GetValueOrDefault(mixId, 1.0));
         waiting = !_muted.Contains(cell) && ExclusivePeerPendingLocked(channelId);
         bool muted = waiting || _muted.Contains(cell) || (!monitor && _mixMuted.Contains(mixId));
-        if (IsHardwareMicLocked(channelId) && monitor && MonitorFeed.Includes(JackFeedLocked(), mixId))
+        if (IsHardwareMicLocked(channelId) && monitor && OnAnyJackFeedLocked(mixId))
             muted = true;   // the hardware direct path carries it to the jacks
         else if (monitor && HearsMyselfLocked(channelId, mixId))
         {

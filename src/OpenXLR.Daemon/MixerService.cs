@@ -219,14 +219,44 @@ public sealed class MixerService : IHostedService, IDisposable
         // carry the mic there, and the hardware path would double it.
         bool anyJack = suffixes.Contains("hp1") || suffixes.Contains("hp2") || suffixes.Contains("lineout");
         bool jacksOnly = !monitorMuted && anyJack && _mixer.MonitorOutputs.All(o => o.Contains('#'));
-        // With a summed feed (A+B) the mic rides the hardware path as soon as
-        // any of the summed mixes carries it.
-        string jackFeed = _mixer.JackMonitorMix ?? "monitor";
+        // Each distinct feed the jacks play has a section and a USB pair of
+        // its own (ProJackFeeds): the first stays on section 0 and pair 1,
+        // the second takes section 18 and pair 2, the third section 54 and
+        // pair 3. With a summed feed (A+B) the mic rides the hardware path as
+        // soon as any of the summed mixes carries it, and with several feeds
+        // as soon as any of them does; its bit is set in the sections of the
+        // feeds that carry it.
+        IReadOnlyList<JackFeed> feeds = _mixer.JackFeeds;
+        string jackFeed = feeds.Count == 0 ? _mixer.JackMonitorMix ?? "monitor"
+            : MonitorFeed.Join(feeds.SelectMany(f => MonitorFeed.Parts(f.Feed)).Distinct());
         // The mixer refuses the path while that channel is in an exclusive
         // group or under Sound Check, and reads its mutes under its own lock.
         bool eligible = jacksOnly && _mixer.IsMonitorOnlyFeed(jackFeed);
         bool micDirect = _mixer.SetHardwareMicMonitor(eligible, whenHeardIn: jackFeed);
         bool mic2Direct = _mixer.SetHardwareMicMonitor(eligible, whenHeardIn: jackFeed, input: 2);
+        bool mic1First = micDirect && (feeds.Count == 0 || _mixer.HardwareMicHeardIn(1, feeds[0].Feed));
+        bool mic2First = mic2Direct && (feeds.Count == 0 || _mixer.HardwareMicHeardIn(2, feeds[0].Feed));
+        var feedSections = new Dictionary<int, ProFeedSection>();
+        for (int slot = 1; slot < feeds.Count; slot++)
+        {
+            string feed = feeds[slot].Feed;
+            feedSections[ProJackFeeds.Sections[slot]] = new ProFeedSection(ProJackFeeds.Pairs[slot],
+                new ProMicPath(micDirect && _mixer.HardwareMicHeardIn(1, feed), _mixer.HardwareMicLevelDbOf(1, feed)),
+                new ProMicPath(mic2Direct && _mixer.HardwareMicHeardIn(2, feed), _mixer.HardwareMicLevelDbOf(2, feed)));
+        }
+        int SectionOf(string suffix)
+        {
+            int slot = -1;
+            for (int i = 0; i < feeds.Count && slot < 0; i++)
+                if (feeds[i].Jacks.Any(j => j.EndsWith("#" + suffix, StringComparison.Ordinal))) slot = i;
+            return ProJackFeeds.Sections[Math.Max(slot, 0)];
+        }
+        IReadOnlyDictionary<int, string> restore = KeepFeedSections(feedSections.Keys);
+        // A feed section is written only once its old bytes are kept. Before
+        // the first poll has read the block there is nothing to keep, so this
+        // sweep writes nothing and the next one, after the poll, does.
+        IReadOnlyDictionary<int, string> kept = _mixer.HardwareRestore;
+        if (!feedSections.Keys.All(kept.ContainsKey)) return;
         // The direct path is driven whether or not a jack is in use: another
         // program (Wave Link in a virtual machine) can leave it on, and the
         // jacks would then carry the microphone with nothing here showing it.
@@ -240,9 +270,12 @@ public sealed class MixerService : IHostedService, IDisposable
         bool membership = _devices.EnsureMix(new ProMixPlan
         {
             Hp1 = AudibleJack("hp1"), Hp2 = AudibleJack("hp2"), UsbAux = auxDesired, LineOut = AudibleJack("lineout"),
+            JackSections = new ProJackSections(SectionOf("hp1"), SectionOf("hp2"), SectionOf("lineout")),
             MonitorReturn = anyJack ? true : null,
-            Mic1 = new ProMicPath(micDirect, _mixer.HardwareMicLevelDbOf(1)),
-            Mic2 = new ProMicPath(mic2Direct, _mixer.HardwareMicLevelDbOf(2)),
+            Mic1 = new ProMicPath(mic1First, _mixer.HardwareMicLevelDbOf(1)),
+            Mic2 = new ProMicPath(mic2First, _mixer.HardwareMicLevelDbOf(2)),
+            Feeds = feedSections,
+            Restore = restore,
         });
 
         // The device latches aux-return routing at playback-stream start, so a
@@ -256,6 +289,52 @@ public sealed class MixerService : IHostedService, IDisposable
 
         if (membership && _mixer.Built)
             _mixer.BounceMonitorHardwareOutput();
+    }
+
+    /// <summary>
+    /// Keep the Pro's sections 18 and 54 as they were before a jack feed
+    /// first uses them, and let them go once they are put back. A section a
+    /// feed is about to take is kept from the last poll's block and saved
+    /// before anything is written to it. A kept section no feed uses any
+    /// more is returned for the plan to put back, and is dropped once a
+    /// poll reads it back as kept, so another program's later edits to it
+    /// are left alone. Returns the sections to put back.
+    /// </summary>
+    private IReadOnlyDictionary<int, string> KeepFeedSections(IEnumerable<int> used)
+    {
+        HashSet<int> wanted = [.. used];
+        string? hex = _devices.ProMixBlock;
+        byte[]? block = hex is { Length: 2 * ProMixSections.Length } ? Convert.FromHexString(hex) : null;
+        bool changed = false;
+        if (block is not null)
+            foreach (int section in wanted)
+                if (_mixer.KeepHardwareRestore(section, ProMixPlan.RestoreOf(block, section)))
+                {
+                    changed = true;
+                    _log.LogInformation("Pro section {section} kept as {bytes} before a jack feed uses it", section, ProMixPlan.RestoreOf(block, section));
+                }
+        var restore = new Dictionary<int, string>();
+        foreach ((int section, string bytes) in _mixer.HardwareRestore)
+        {
+            if (wanted.Contains(section)) continue;
+            if (block is not null && ProMixPlan.RestoreOf(block, section) == bytes)
+            {
+                if (_mixer.ForgetHardwareRestore(section))
+                {
+                    changed = true;
+                    _log.LogInformation("Pro section {section} is back as it was before a jack feed used it", section);
+                }
+            }
+            else restore[section] = bytes;
+        }
+        if (changed)
+        {
+            // Saved before the write that changes the section, so a daemon
+            // stopped in between still knows what to put back.
+            _saves.Schedule();
+            _saves.Flush();
+        }
+        return restore;
     }
 
     /// <summary>Raised when mixer state changes, so the hub can broadcast.</summary>

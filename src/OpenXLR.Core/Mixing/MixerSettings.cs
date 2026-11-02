@@ -146,6 +146,16 @@ public sealed record MixerSettings
     public Dictionary<string, string> DynamicsProcessing { get; init; } = [];
 
     /// <summary>
+    /// The Wave XLR Pro's sections 18 and 54 as they were before a jack feed
+    /// first used them, by section ("18", "54"), as the hex of their first
+    /// 16 bytes (cells, membership, byte 14 and the marker). Taken before the
+    /// first write and put back, then dropped, once no jack plays that
+    /// section, so a unit shared with Wave Link comes back as it was. Machine
+    /// wiring like <see cref="EqProcessing"/>, never profile state.
+    /// </summary>
+    public Dictionary<string, string> HardwareRestore { get; init; } = [];
+
+    /// <summary>
     /// Noise removal by channel id. A microphone absent here has it off. An
     /// entry for a channel that is not a microphone is kept as it is.
     /// </summary>

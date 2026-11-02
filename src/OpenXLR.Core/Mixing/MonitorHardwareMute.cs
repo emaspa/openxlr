@@ -120,7 +120,7 @@ public sealed partial class Mixer
         // mute until the last owned route into this output is gone.
         var due = pending.Where(n => Clock() >= _desktopMuteResets.GetValueOrDefault(n).RetryAt
             && !_monitorRoutes.Any(route => route.Value.Pairs.Count > 0
-                && (route.Key == n || route.Key == OutputRouteKey(n + "#"))))
+                && (route.Key == n || route.Key.StartsWith(n + "#", StringComparison.Ordinal))))
             .ToHashSet(StringComparer.Ordinal);
         if (due.Count == 0) return pending;
         IReadOnlyDictionary<string, (string Identity, bool Muted)> native;

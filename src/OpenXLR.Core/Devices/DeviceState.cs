@@ -78,6 +78,14 @@ public sealed record DeviceState
     /// </summary>
     public bool AuxReturnEnabled { get; init; }
 
+    /// <summary>
+    /// The Wave XLR Pro's block 0x0001 as the poll read it, hex, so the
+    /// device manager can tell whether the unit holds a mix plan without a
+    /// transfer. Not published and not saved; null on every other model.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? ProMixBlock { get; init; }
+
     // USB Aux input stage (block 0x0004 tail): level -60..0 dB and level lock.
     public double AuxLevelDb { get; init; }
     public bool AuxLevelLock { get; init; }

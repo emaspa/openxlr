@@ -64,7 +64,7 @@ public sealed class ProDuckingDeviceTests
         Assert.EndsWith("86 01->00, 88 fd->f4, 89 06->0c, 90 64->50, 92 d0->b0, 93 07->04, 94 01->00", write.Change8);
         Assert.Equal(new ushort[] { 0x0008, 0x0001 }, Writes(unit));
         Assert.All(unit.Calls, c => Assert.Equal(0x0103, c.Bank));
-        Assert.Equal(new byte[] { 0x5d, 0x55, 0x5d, 0x55, 0x5d, 0x55 }, Fields(unit.Blocks[0x0001]));
+        Assert.Equal(new byte[] { 0x5d, 0x55, 0x5d, 0x55, 0x5d, 0x55, 0x5d, 0x55 }, Fields(unit.Blocks[0x0001]));
         byte[] flags = (byte[])IdleFlags.Clone();
         flags[5] = 0x01;
         Assert.Equal(Block8(MediumBytes, flags), unit.Blocks[0x0008]);
@@ -84,7 +84,7 @@ public sealed class ProDuckingDeviceTests
         pro.Connect();
         pro.WriteMix(new ProMixPlan { Ducking = On(ProReturnPairs.Monitor, ProReturnPairs.Aux) });
         byte[] ducked = Fields(unit.Blocks[0x0001]);
-        Assert.Equal(new byte[] { 0x5d, 0x5d, 0x5d, 0x5d, 0x5d, 0x5d }, ducked);
+        Assert.Equal(new byte[] { 0x5d, 0x5d, 0x5d, 0x5d, 0x5d, 0x5d, 0x5d, 0x5d }, ducked);
 
         // Every part of a plan without ducking: the microphone's path and
         // level in the jacks' mix, the four selectors with the aux cell, and
@@ -108,7 +108,7 @@ public sealed class ProDuckingDeviceTests
         byte[] after = unit.Blocks[0x0001];
         for (int i = 0; i < after.Length; i++)
             if (!ProDucking.MixFieldOffsets.Any(at => i == at || i == at + 1)) Assert.Equal(routed[i], after[i]);
-        Assert.Equal(new byte[] { 0x55, 0x55, 0x55, 0x55, 0x55, 0x55 }, Fields(after));
+        Assert.Equal(new byte[] { 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55 }, Fields(after));
     }
 
     [Fact]
@@ -207,7 +207,7 @@ public sealed class ProDuckingDeviceTests
 
         // Hardware-control mode never posts, so Wave Link's ducking stays.
         Assert.DoesNotContain((ushort)0x0008, Writes(unit));
-        Assert.Equal(new byte[] { 0x5d, 0xfd, 0x5d, 0xfd, 0x5d, 0xfd }, Fields(unit.Blocks[0x0001]));
+        Assert.Equal(new byte[] { 0x5d, 0xfd, 0x5d, 0xfd, 0x5d, 0xfd, 0x5d, 0xfd }, Fields(unit.Blocks[0x0001]));
         Assert.Equal(Block8(LowLowSlowBytes, WaveLinkFlags), unit.Blocks[0x0008]);
         Assert.DoesNotContain(log.Written, line => line.StartsWith("ducking (", StringComparison.Ordinal));
         DeviceDuckingStatus status = manager.DuckingStatus(Unit);
@@ -243,7 +243,7 @@ public sealed class ProDuckingDeviceTests
         Assert.Equal(("medium", "medium", "medium"), (status.Readback.Sensitivity, status.Readback.Amount, status.Readback.Speed));
         Assert.Contains(log.Written, line => line.StartsWith(
             "ducking (update) on Elgato Wave XLR Pro: on, pairs 1, sensitivity medium, amount medium, speed medium, keyed by XLR 1. Block 0x0008 written: ",
-            StringComparison.Ordinal) && line.Contains("Block 0x0001 written: 17 fd->55, 35 fd->55, 53 fd->55.", StringComparison.Ordinal));
+            StringComparison.Ordinal) && line.Contains("Block 0x0001 written: 17 fd->55, 35 fd->55, 53 fd->55, 71 fd->55.", StringComparison.Ordinal));
 
         // The same target again is not written; another unit's post is dropped.
         unit.Calls.Clear();
@@ -275,10 +275,10 @@ public sealed class ProDuckingDeviceTests
         // fields, then the one commit the selector needs.
         Assert.Equal(new ushort[] { 0x0008, 0x0001, 0x0003 }, Writes(unit));
         Assert.Equal(0x1e, unit.Blocks[0x0001][90]);
-        Assert.Equal(new byte[] { 0x5d, 0x55, 0x5d, 0x55, 0x5d, 0x55 }, Fields(unit.Blocks[0x0001]));
+        Assert.Equal(new byte[] { 0x5d, 0x55, 0x5d, 0x55, 0x5d, 0x55, 0x5d, 0x55 }, Fields(unit.Blocks[0x0001]));
         Assert.Contains(log.Written, line => line.StartsWith(
             "ducking (update) on Elgato Wave XLR Pro: on, pairs 1, sensitivity medium, amount medium, speed medium, keyed by XLR 1. Block 0x0008 written: ",
-            StringComparison.Ordinal) && line.Contains("Block 0x0001 written: 17 fd->55, 35 fd->55, 53 fd->55, 90 23->1e.", StringComparison.Ordinal));
+            StringComparison.Ordinal) && line.Contains("Block 0x0001 written: 17 fd->55, 35 fd->55, 53 fd->55, 71 fd->55, 90 23->1e.", StringComparison.Ordinal));
 
         // The loop finds nothing left to write, and the poll verifies the target.
         unit.Calls.Clear();
@@ -376,7 +376,7 @@ public sealed class ProDuckingDeviceTests
         manager.SweepOnce();
         Replug();
         Assert.Equal(Block8(LowLowSlowBytes, IdleFlags), unit.Blocks[0x0008]);
-        Assert.Equal(new byte[] { 0x55, 0x55, 0x55, 0x55, 0x55, 0x55 }, Fields(unit.Blocks[0x0001]));
+        Assert.Equal(new byte[] { 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55 }, Fields(unit.Blocks[0x0001]));
         Assert.Equal((DeviceDuckingPhase.Verified, ProDuckingTarget.Off), (manager.DuckingStatus(Unit).Phase, manager.DuckingStatus(Unit).Value));
         Assert.Contains(log.Written, line => line.StartsWith("ducking (connect) on Elgato Wave XLR Pro: off. Block 0x0008 written: ", StringComparison.Ordinal)
             && line.Contains("Block 0x0001 written: 16 5d->55, 17 fd->55, 34 5d->55", StringComparison.Ordinal));
