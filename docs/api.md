@@ -1077,9 +1077,13 @@ jack and at least one mix feeding them is unmuted and carries that channel
 unmuted. Muting the feeding mix turns the direct path off. For a summed feed,
 it stays on while any feeding mix and that channel's send to it are both
 unmuted. The path plays at the level that send would have (see
-[channel volume](#channel-volume)). The daemon writes that level before it
-opens the path and again whenever the send, the channel volume or the mix
-volume moves. A level change needs no restart of the playback stream. The daemon mutes that
+[channel volume](#channel-volume)), less what the Monitor mix loses on its
+way to the jacks: the 7.94 dB the unit takes from every USB playback pair,
+and `outputVolume` while it is below 100% (60 times its log10, the cubic
+scale). Above 100% nothing more comes off, so the path is never louder
+than the send. The daemon writes that level before it
+opens the path and again whenever the send, the channel volume, the mix
+volume or the output volume moves. A level change needs no restart of the playback stream. The daemon mutes that
 channel's monitor send in the graph meanwhile so the microphone is not
 heard twice; it never uses the path while monitoring is paused or that channel
 is in an exclusive group or under Sound Check, nor while software changes the

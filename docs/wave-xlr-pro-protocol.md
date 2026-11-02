@@ -1032,6 +1032,13 @@ lifts quiet material only, and full-scale playback never comes back
 louder than about -8 dBFS. Whether the limiter acts on the jacks as it
 does on the returned streams has not been measured.
 
+The daemon uses the loss on the jacks: the microphone's path in section 0
+plays at the Monitor send's level less 7.94 dB and less the output
+volume's attenuation while it is below 100% (the Pro sink's volume, which
+acts on the pairs and not on the path), so the voice keeps the balance the
+faders set against the Monitor mix (`Mixer.JackReturnOffsetDb`). Before
+that the voice sat 7.94 dB plus the output volume's attenuation above it.
+
 ## 17. Section 0's offset, a capture tap and per-pair ducking (desk probe of 2026-11-02)
 
 Firmware 1.0.14, the desk unit, the daemon stopped for both runs (it

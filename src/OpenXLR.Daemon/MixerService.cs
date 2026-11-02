@@ -1199,6 +1199,7 @@ public sealed class MixerService : IHostedService, IDisposable
                     break;
                 case "setOutputVolume":
                     _mixer.SetOutputVolume(cmd.Value.GetDouble());
+                    SyncOutputSelectors();   // the Pro's microphone paths follow the output volume on the jacks
                     break;
                 case "setEnforcedDefaults":
                     _mixer.SetEnforcedDefaults(cmd.Sink, cmd.Source);
