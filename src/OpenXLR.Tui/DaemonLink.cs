@@ -148,6 +148,37 @@ internal sealed class DaemonLink : IAsyncDisposable
         Changed?.Invoke();
     }
 
+    /// <summary>
+    /// The last dry run of hardware mixing the daemon answered, or null
+    /// before the first. The Options tab lists it under the switch until the
+    /// mode is chosen or the check is asked again.
+    /// </summary>
+    public HardwareMixingEntry? MixingPlan { get; private set; }
+
+    /// <summary>Whether a dry run is on its way; the Options tab says so instead of an old one.</summary>
+    public bool CheckingMixing { get; private set; }
+
+    /// <summary>Ask the daemon what hardware mixing would do with the layout as it stands. Nothing changes.</summary>
+    public void CheckMixing()
+    {
+        if (!Connected || CheckingMixing) return;
+        CheckingMixing = true;
+        MixingPlan = null;
+        Request("setMixing", body =>
+        {
+            body["value"] = "hardware";
+            body["check"] = true;
+        }).ContinueWith(task =>
+        {
+            CheckingMixing = false;
+            if (!task.IsCompletedSuccessfully || task.Result is not null) LastError = task.IsCompletedSuccessfully ? task.Result : "The check did not finish";
+            Changed?.Invoke();
+        }, TaskScheduler.Default);
+    }
+
+    /// <summary>Forget the dry run, once the switch it was for has been sent.</summary>
+    public void ForgetMixingPlan() => MixingPlan = null;
+
     /// <summary>The last error the daemon sent back, shown once and then cleared.</summary>
     public string? LastError { get; private set; }
 
@@ -484,6 +515,15 @@ internal sealed class DaemonLink : IAsyncDisposable
             case "starterSounds":
                 // As for clipImport: the sentence, before the commandResult.
                 _importReply = (null, Message(json));
+                break;
+
+            case "mixingPlan":
+                // The dry run's fields sit at the top of the message, as in the state.
+                try { MixingPlan = JsonSerializer.Deserialize<HardwareMixingEntry>(json, Snapshot.Options); }
+                catch (JsonException) { LastError = "Could not read the hardware mixing check"; }
+                // The answer is here; the commandResult that follows only closes the request.
+                CheckingMixing = false;
+                Changed?.Invoke();
                 break;
 
             case "nativeEditorRulesChanged":

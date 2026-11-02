@@ -773,8 +773,16 @@ public sealed class SoundboardViewModel : ViewModelBase
     /// </summary>
     public void Audition(SoundClipViewModel clip)
     {
-        if (clip.CanPlay) Send(_commands.AuditionClipAsync(clip.Id));
+        if (clip.CanPlay && AuditionNote is null) Send(_commands.AuditionClipAsync(clip.Id));
     }
+
+    private string? _auditionNote;
+    /// <summary>
+    /// Why no clip can be auditioned: the Wave XLR Pro builds the mixes its
+    /// jacks play, and the daemon refuses auditions then. Null otherwise. A
+    /// pad's menu greys its Audition entry and carries this as its tooltip.
+    /// </summary>
+    public string? AuditionNote { get => _auditionNote; internal set => Set(ref _auditionNote, value); }
 
     /// <summary>End the audition, whichever clip it plays.</summary>
     public void StopAudition()

@@ -615,6 +615,8 @@ internal sealed class SoundsView : View
         _lastPress[key] = now;
         if (repeat) return;
         if (board.Auditioning == clip.Id) app.Link.Send("stopAudition");
+        // While the Wave XLR Pro builds the mixes its jacks play, the daemon refuses auditions: say why instead.
+        else if (app.Link.State?.Mixer.Disabled("audition") is { } why) app.Say(why);
         else app.Link.Send("auditionClip", body => body["clip"] = clip.Id);
     }
 

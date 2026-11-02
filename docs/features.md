@@ -31,6 +31,12 @@ Wave XLR Pro:
 - Mic/PC direct-monitor crossfade (inside the device, no host latency)
 - Physical output routing: Headphones 1, Headphones 2, Line Out and USB
   Aux are each switched in the device's hardware mixer
+- Hardware mixing (experimental, not yet heard on a unit): the unit builds
+  the mixes its jacks play from one USB pair per channel and its own
+  inputs, which reach the jacks with no delay. Chosen in Options, AUDIO,
+  under "Mixes on the Pro's outputs", after a check that lists what the
+  layout loses; the terminal mixer's Options tab has the same choice
+  ([manual](manual.md#hardware-mixing))
 - Ducking on the device, mapped from Wave Link on Windows: when the
   [ducking](#submixer) setup fits what the unit can do (XLR 1 as the key, a
   whole mix on the jacks and Line Out or on the USB Aux port), the Pro

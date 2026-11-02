@@ -21,11 +21,23 @@ internal sealed record FlowGraph(IReadOnlyList<FlowNode> Nodes, IReadOnlyList<Fl
 {
     private const double Top = 62, Gap = 10;
 
+    /// <summary>The one card that stands for every mix the Wave XLR Pro builds for its jacks.</summary>
+    internal const string UnitMixKey = "mix:@unit";
+
     public static FlowGraph From(MainViewModel vm)
     {
         var nodes = new List<FlowNode>();
         var routes = new List<FlowRoute>();
         double y = Top;
+        // While hardware mixing runs, the mixes the unit builds for its jacks
+        // are one card named for the unit, between the channels and the jacks.
+        // A mix also heard on another output keeps its own card for that output.
+        HashSet<string> unitMixes = vm.HardwareMixing.Active
+            ? [.. vm.Mixes.Where(m => m.HardwareSection is not null).Select(m => m.Id)]
+            : [];
+        static bool IsJack(MonitorOutputItem output) => output.Name.Contains('#', StringComparison.Ordinal);
+        HashSet<string> heardElsewhere = [.. vm.MonitorOutputs.Where(o => o.IsSelected && !IsJack(o))
+            .SelectMany(o => (o.Feed?.Id ?? vm.DefaultMonitorMix).Split('+', StringSplitOptions.RemoveEmptyEntries))];
         static string Inserts(InsertsViewModel inserts) => string.Join("\n", inserts.Items.Select(i =>
             i.HasError ? Localizer.Format("FlowInsertProblem", i.Label) : i.Bypass ? Localizer.Format("FlowInsertBypassed", i.Label) : i.Label));
 
@@ -90,9 +102,19 @@ internal sealed record FlowGraph(IReadOnlyList<FlowNode> Nodes, IReadOnlyList<Fl
                     source.Icon, y + i * (58 + Gap), source.Active));
                 routes.Add(new FlowRoute(source.Key, node.Key, FlowStage.Input, source.Active));
             }
+            bool toUnit = false, toUnitHeard = false;
             foreach (SendViewModel send in channel.Sends)
                 if (send.Level > 0.001 && vm.Mixes.Any(m => m.Id == send.MixId))
+                {
+                    if (unitMixes.Contains(send.MixId))
+                    {
+                        toUnit = true;
+                        toUnitHeard |= !send.Muted;
+                        if (!heardElsewhere.Contains(send.MixId)) continue;
+                    }
                     routes.Add(new FlowRoute(node.Key, $"mix:{send.MixId}", FlowStage.Channel, !send.Muted));
+                }
+            if (toUnit) routes.Add(new FlowRoute(node.Key, UnitMixKey, FlowStage.Channel, toUnitHeard));
             y += laneHeight + Gap;
         }
         // Desktop-managed or stale assignments remain visible without inventing a route.
@@ -105,8 +127,18 @@ internal sealed record FlowGraph(IReadOnlyList<FlowNode> Nodes, IReadOnlyList<Fl
         }
 
         y = Top;
+        if (unitMixes.Count > 0)
+        {
+            MixViewModel[] built = [.. vm.Mixes.Where(m => unitMixes.Contains(m.Id))];
+            var unit = new FlowNode(UnitMixKey, vm.DeviceName.Length > 0 ? vm.DeviceName : Localizer.Text("HardwareMixingUnitCard"),
+                Localizer.Format("FlowUnitMixes", string.Join(", ", built.Select(m => m.Name))), FlowStage.Mix, FlowIcon.Mix, y,
+                built.Any(m => !m.Muted && m.Volume > 0.001));
+            nodes.Add(unit);
+            y += unit.Height + Gap;
+        }
         foreach (MixViewModel mix in vm.Mixes)
         {
+            if (unitMixes.Contains(mix.Id) && !heardElsewhere.Contains(mix.Id)) continue;
             bool active = !mix.Muted && mix.Volume > 0.001;
             var node = new FlowNode($"mix:{mix.Id}", mix.Name,
                 mix.Muted ? Localizer.Text("FlowMuted") : Localizer.Format("FlowVolume", mix.VolumeText), FlowStage.Mix,
@@ -127,9 +159,13 @@ internal sealed record FlowGraph(IReadOnlyList<FlowNode> Nodes, IReadOnlyList<Fl
             y += 58 + Gap;
         }
         foreach (MonitorOutputItem output in vm.MonitorOutputs.Where(o => o.IsSelected))
+        {
+            string[] feeds = (output.Feed?.Id ?? vm.DefaultMonitorMix).Split('+', StringSplitOptions.RemoveEmptyEntries);
+            // A jack the unit feeds hears its card; every other output the mixes this computer builds.
+            if (IsJack(output) && feeds.Any(unitMixes.Contains)) feeds = [UnitMixKey[4..]];
             Output($"out:{output.Name}", output.Label, output.Feed?.Name ?? Localizer.Text("MonitorOutput"),
-                (output.Feed?.Id ?? vm.DefaultMonitorMix)
-                    .Split('+', StringSplitOptions.RemoveEmptyEntries), output.IsPresent, FlowIcon.Speaker);
+                feeds, output.IsPresent, FlowIcon.Speaker);
+        }
         foreach (MixViewModel mix in vm.Mixes)
         {
             if (mix.Kind == "virtualMic")

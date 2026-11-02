@@ -1,0 +1,48 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:loc="using:OpenXLR.UI.Localization"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:OpenXLR.UI"
+        x:Class="OpenXLR.UI.HardwareMixingWindow" x:DataType="vm:HardwareMixingConfirmViewModel"
+        Title="{loc:Text Key=HardwareMixingConfirmTitle}" Width="560" SizeToContent="Height" MinWidth="420"
+        WindowStartupLocation="CenterOwner" CanResize="False"
+        Background="{DynamicResource Ox.Window.Background}">
+  <!-- The confirm step before the Wave XLR Pro builds the mixes its jacks
+       play: what the mode is, what this layout loses (the daemon's dry run,
+       one sentence per item), how far each jack is turned down first, and
+       the one button that switches. Every colour is an Ox.* token through the
+       shared text classes. -->
+  <DockPanel Margin="16">
+    <TextBlock DockPanel.Dock="Top" Text="{loc:Text Key=HardwareMixingConfirmTitle}" Classes="title" Margin="0,0,0,8"/>
+    <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,12,0,0">
+      <TextBlock Name="HardwareMixingConfirmRefusal" Text="{Binding Refusal}" Classes="warn" TextWrapping="Wrap"
+                 IsVisible="{Binding Refusal, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+        <Button Name="HardwareMixingConfirmCancel" Content="{loc:Text Key=Cancel}" Padding="18,6" Click="OnCancel"/>
+        <Button Name="HardwareMixingConfirmSwitch" Content="{loc:Text Key=HardwareMixingConfirmSwitch}" Padding="18,6"
+                IsEnabled="{Binding CanSwitch}" Click="OnSwitch"/>
+      </StackPanel>
+    </StackPanel>
+    <StackPanel Spacing="10">
+      <TextBlock Text="{loc:Text Key=HardwareMixingConfirmIntro}" Classes="body" TextWrapping="Wrap"/>
+      <TextBlock Name="HardwareMixingConfirmStatus" Text="{Binding Status}" Classes="hint" TextWrapping="Wrap"
+                 IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+      <StackPanel Name="HardwareMixingConfirmPlan" Spacing="6" IsVisible="{Binding HasPlan}">
+        <TextBlock Text="{loc:Text Key=HardwareMixingConfirmLosses}" Classes="h"/>
+        <ItemsControl Name="HardwareMixingConfirmLines" ItemsSource="{Binding Lines}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="x:String">
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" Margin="0,0,0,4">
+                <TextBlock Text="•" Classes="body"/>
+                <TextBlock Grid.Column="1" Text="{Binding}" Classes="body" TextWrapping="Wrap"/>
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <!-- not running yet: the reason it waits, or why this layout is refused -->
+        <TextBlock Name="HardwareMixingConfirmNote" Text="{Binding Note}" Classes="hint" Classes.warn="{Binding Refused}" TextWrapping="Wrap"
+                   IsVisible="{Binding Note, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+      </StackPanel>
+      <TextBlock Text="{loc:Text Key=HardwareMixingConfirmLeave}" Classes="hint" TextWrapping="Wrap"/>
+    </StackPanel>
+  </DockPanel>
+</Window>

@@ -54,6 +54,46 @@ public sealed class FlowGraphTests
         Assert.All(graph.Routes.Where(r => r.To == "out:gone"), r => Assert.False(r.Active));
     }
 
+    /// <summary>
+    /// While the Wave XLR Pro builds the jacks' mixes, they are one card named
+    /// for the unit that feeds the jacks; a mix another output also plays
+    /// keeps its own card for that output, and out of the mode nothing changes.
+    /// </summary>
+    [Fact]
+    public async Task MixesTheUnitBuildsAreOneCardThatFeedsTheJacks()
+    {
+        await using var client = new DaemonClient();
+        var vm = new MainViewModel(client);
+        vm.Mixes.Add(new(client, "monitor", "Monitor A"));
+        vm.Mixes.Add(new(client, "stream", "Stream") { Kind = "virtualMic" });
+        vm.Mixes[0].ApplyFromDaemon(System.Text.Json.Nodes.JsonNode.Parse("""{"volume":1,"muted":false,"kind":"monitor","hardwareSection":0}""")!);
+        var jack = new MonitorOutputItem("alsa_output.pro#hp1", "Headphones 1", () => { }, (_, _) => Task.FromResult<string?>(null));
+        jack.Sync(true);
+        jack.SyncFeed([new("monitor", "Monitor A")], "monitor");
+        vm.MonitorOutputs.Add(jack);
+
+        // Out of the mode the jack hears the computer's mix.
+        Assert.Contains(FlowGraph.From(vm).Routes, r => r.From == "mix:monitor" && r.To == "out:alsa_output.pro#hp1");
+
+        vm.HardwareMixing.Apply(System.Text.Json.Nodes.JsonNode.Parse("""{"hardwareMixing":{"wanted":true,"active":true}}"""), capable: true);
+        FlowGraph graph = FlowGraph.From(vm);
+        FlowNode unit = Assert.Single(graph.Nodes, n => n.Key == FlowGraph.UnitMixKey);
+        Assert.Contains("Monitor A", unit.Detail, StringComparison.Ordinal);
+        Assert.Contains(graph.Routes, r => r.From == FlowGraph.UnitMixKey && r.To == "out:alsa_output.pro#hp1");
+        Assert.DoesNotContain(graph.Nodes, n => n.Key == "mix:monitor");
+        Assert.Contains(graph.Nodes, n => n.Key == "mix:stream");
+
+        // A headset on the same mix keeps the computer's card for itself.
+        var headset = new MonitorOutputItem("headset", "Headset", () => { }, (_, _) => Task.FromResult<string?>(null));
+        headset.Sync(true);
+        headset.SyncFeed([new("monitor", "Monitor A")], "monitor");
+        vm.MonitorOutputs.Add(headset);
+        graph = FlowGraph.From(vm);
+        Assert.Contains(graph.Routes, r => r.From == "mix:monitor" && r.To == "out:headset");
+        Assert.Contains(graph.Routes, r => r.From == FlowGraph.UnitMixKey && r.To == "out:alsa_output.pro#hp1");
+        Assert.DoesNotContain(graph.Routes, r => r.From == "mix:monitor" && r.To == "out:alsa_output.pro#hp1");
+    }
+
     [Fact]
     public void InputTraceDoesNotSpreadToOtherInputsSharingItsMix()
     {

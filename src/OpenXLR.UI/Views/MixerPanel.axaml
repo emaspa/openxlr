@@ -153,7 +153,7 @@
             </layout:StripPanel>
             <Button Content="{Binding Mix.Inserts.ButtonText}" HorizontalAlignment="Stretch" Classes="fx" Classes.fxOn="{Binding Mix.Inserts.IsProcessing}" Classes.fxOff="{Binding Mix.Inserts.IsOff}"
                     HorizontalContentAlignment="Center" Padding="8,4" FontSize="12" Click="OnMixInserts"
-                    ToolTip.Tip="{loc:Text Key=StereoPluginsProcessingThisMixBeforeItReaches}"/>
+                    ToolTip.Tip="{Binding Mix.Inserts.ButtonTip}"/>
             <ItemsControl ItemsSource="{Binding Mix.Inserts.Items}" IsVisible="{Binding Mix.Inserts.HasItems}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:InsertViewModel">
@@ -239,7 +239,7 @@
                  plugin, failing ones lit in the alert colour; bypass and the
                  rest live in the chain window -->
             <Button Click="OnMixInserts" Padding="4,2" FontSize="11" HorizontalAlignment="Stretch" Classes="fx" Classes.fxOn="{Binding Mix.Inserts.IsProcessing}" Classes.fxOff="{Binding Mix.Inserts.IsOff}"
-                    HorizontalContentAlignment="Center" ToolTip.Tip="{loc:Text Key=StereoPluginsProcessingThisMixBeforeItReaches}">
+                    HorizontalContentAlignment="Center" ToolTip.Tip="{Binding Mix.Inserts.ButtonTip}">
               <TextBlock Text="{Binding Mix.Inserts.ButtonText}" TextTrimming="CharacterEllipsis"/>
             </Button>
             <ItemsControl ItemsSource="{Binding Mix.Inserts.Items}" IsVisible="{Binding Mix.Inserts.HasItems}" HorizontalAlignment="Center">

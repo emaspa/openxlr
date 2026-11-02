@@ -2071,7 +2071,7 @@ Pilia ang interface nga kontrolon sa OpenXLR</value>
     <value>ang pag-sync</value>
   </data>
   <data name="MonitorOutputRoutingTip" xml:space="preserve">
-    <value>Tseki ang matag output nga gusto nimong madungog, dayon pagpili og usa o daghang mix tupad sa matag output. Ihiusa ang mga mix sa ilang kasamtangang mga level. Tipigi ang labing menos usa ka mix; tangtanga ang tsek sa output aron idiskonektar kini. Usa ra ka feed ang Headphones 1/2 ug Line Out sa Wave XLR Pro. Sundon sa USB Aux port niini ang lahi nga Aux mix. Anaa sa Mga opsyon ang system default device alang sa mga app.</value>
+    <value>Tseki ang matag output nga gusto nimong madungog, dayon pagpili og usa o daghang mix tupad sa matag output. Ihiusa ang mga mix sa ilang kasamtangang mga level. Tipigi ang labing menos usa ka mix; tangtanga ang tsek sa output aron idiskonektar kini. Mahimong adunay kaugalingong feed ang matag usa sa Headphones 1, Headphones 2 ug Line Out sa Wave XLR Pro. Sundon sa USB Aux port niini ang lahi nga Aux mix. Anaa sa Mga opsyon ang system default device alang sa mga app.</value>
   </data>
   <data name="TimeNotRecorded" xml:space="preserve">
     <value>wala marekord ang oras</value>
@@ -4123,5 +4123,77 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
   </data>
   <data name="CompressorInputPoint" xml:space="preserve">
     <value>Ang Input mao ang mikropono human sa pagtangtang sa kasaba, sa expander ug sa EQ, diin kini madungog sa compressor.</value>
+  </data>
+  <data name="HardwareMixingLabel" xml:space="preserve">
+    <value>Mga mix sa mga output sa Pro</value>
+  </data>
+  <data name="HardwareMixingUnit" xml:space="preserve">
+    <value>Kini nga unit</value>
+  </data>
+  <data name="HardwareMixingComputer" xml:space="preserve">
+    <value>Kini nga computer</value>
+  </data>
+  <data name="HardwareMixingUnitTip" xml:space="preserve">
+    <value>Gitukod sa Wave XLR Pro ang mga mix nga gipatukar sa mga headphone jack ug Line Out niini, ug moabot kanila ang kaugalingong mga input niini nga walay delay. Eksperimental.</value>
+  </data>
+  <data name="HardwareMixingComputerTip" xml:space="preserve">
+    <value>Gitukod niini nga computer ang matag mix, ug gipatukar sa mga jack ang gipadala niini.</value>
+  </data>
+  <data name="HardwareMixingHint" xml:space="preserve">
+    <value>Eksperimental. Sa Kini nga unit, ang matag channel moadto sa Wave XLR Pro makausa ug i-mix kini sa unit alang sa mga jack niini. Magpabilin niini nga computer ang Stream, Chat ug ang ubang mga output.</value>
+  </data>
+  <data name="HardwareMixingWaiting" xml:space="preserve">
+    <value>Tukoron sa Wave XLR Pro ang mga mix kung andam na kini.</value>
+  </data>
+  <data name="HardwareMixingBadge" xml:space="preserve">
+    <value>Sa unit</value>
+  </data>
+  <data name="HardwareMixingBadgeTip" xml:space="preserve">
+    <value>Gitukod sa Wave XLR Pro ang mga mix nga gipatukar sa mga jack niini. Ibalik kini sa Kini nga computer, sa Audio sa Mga opsyon.</value>
+  </data>
+  <data name="HardwareMixingConfirmTitle" xml:space="preserve">
+    <value>Mag-mix sa Wave XLR Pro</value>
+  </data>
+  <data name="HardwareMixingConfirmIntro" xml:space="preserve">
+    <value>Tukoron sa Wave XLR Pro ang mga mix nga gipatukar sa mga headphone jack ug Line Out niini. Ang matag channel moadto niini sa kaugalingong USB pair, ug moabot sa maong mga mix ang mga input sa unit nga walay delay. Magpabilin niini nga computer ang Stream, Chat ug bisan unsang mix nga gipatukar sa laing output. Eksperimental kini.</value>
+  </data>
+  <data name="HardwareMixingConfirmLosses" xml:space="preserve">
+    <value>Unsa ang mausab niini nga layout</value>
+  </data>
+  <data name="HardwareMixingConfirmNoLosses" xml:space="preserve">
+    <value>Walay mohunong niini nga layout.</value>
+  </data>
+  <data name="HardwareMixingJackDrop" xml:space="preserve">
+    <value>Hinayan una ang {0} og {1} dB, aron walay mokusog.</value>
+  </data>
+  <data name="HardwareMixingConfirmLeave" xml:space="preserve">
+    <value>Ibalik sa Kini nga computer, sa Mga opsyon, ang unit sa kanhi ug ang mga jack sa ilang level.</value>
+  </data>
+  <data name="HardwareMixingConfirmSwitch" xml:space="preserve">
+    <value>Mag-mix sa unit</value>
+  </data>
+  <data name="HardwareMixingConfirmWaits" xml:space="preserve">
+    <value>Magsugod kini kung masulbad kini: {0}</value>
+  </data>
+  <data name="HardwareMixingChecking" xml:space="preserve">
+    <value>Gisusi kini nga layout sa daemon.</value>
+  </data>
+  <data name="HardwareMixingCheckFailed" xml:space="preserve">
+    <value>Wala motubag ang daemon sa pagsusi, busa walay nalista. Sirad-i kini ug sulayi pag-usab.</value>
+  </data>
+  <data name="HardwareMixingJackHp1" xml:space="preserve">
+    <value>Headphones 1</value>
+  </data>
+  <data name="HardwareMixingJackHp2" xml:space="preserve">
+    <value>Headphones 2</value>
+  </data>
+  <data name="HardwareMixingJackLineOut" xml:space="preserve">
+    <value>Line Out</value>
+  </data>
+  <data name="HardwareMixingUnitCard" xml:space="preserve">
+    <value>Wave XLR Pro</value>
+  </data>
+  <data name="FlowUnitMixes" xml:space="preserve">
+    <value>Nagtukod sa {0}</value>
   </data>
 </root>

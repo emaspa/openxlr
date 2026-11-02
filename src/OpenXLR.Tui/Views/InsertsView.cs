@@ -111,9 +111,16 @@ internal sealed class InsertsView : View
         }
         if (key.Is('a') && _editing is null && Targets(state).Count > 0)
         {
-            _picking = true;
             var targets = Targets(state);
-            _pickTarget = targets[Math.Clamp(_target, 0, targets.Count - 1)].Key;
+            string target = targets[Math.Clamp(_target, 0, targets.Count - 1)].Key;
+            // A mix the Wave XLR Pro builds for its jacks runs no insert there.
+            if (state.Mixer.Disabled($"inserts:{target}") is { } why)
+            {
+                app.Say(why);
+                return true;
+            }
+            _picking = true;
+            _pickTarget = target;
             _filter = string.Empty;
             _picker = new RowList();
             return true;
@@ -390,6 +397,8 @@ internal sealed class InsertsView : View
             new ChoiceRow("Chain", targets.Select(target => target.Name).ToList(), _target, index => _target = index),
             new HeadingRow(targets[_target].Name),
         ];
+        if (state.Mixer.Disabled($"inserts:{targets[_target].Key}") is { } unit)
+            rows.Add(new TextRow("On the unit", unit));
 
         List<InsertEntry> chain = state.Mixer.Inserts.TryGetValue(targets[_target].Key, out List<InsertEntry>? entries)
             ? entries

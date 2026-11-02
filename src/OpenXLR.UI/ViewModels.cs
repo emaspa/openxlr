@@ -46,6 +46,9 @@ public sealed partial class MainViewModel : ViewModelBase
     /// <summary>The voice changer the Voice changer window sets; reported on every microphone by a daemon that has it.</summary>
     public VoiceChangerViewModel VoiceChanger { get; }
 
+    /// <summary>Hardware mixing on the Wave XLR Pro: the Options choice, the SUBMIXER badge and what the mode turns off.</summary>
+    public HardwareMixingViewModel HardwareMixing { get; }
+
     private readonly DaemonClient _client;
     private bool _applying;
 
@@ -58,6 +61,7 @@ public sealed partial class MainViewModel : ViewModelBase
         Ducking = new DuckingViewModel(client);
         Soundboard = new SoundboardViewModel(client);
         VoiceChanger = new VoiceChangerViewModel(client);
+        HardwareMixing = new HardwareMixingViewModel(client);
         LoadMixerView();
         OutputVolumeRange = new VolumeRangeViewModel(() => OutputVolume = Math.Min(OutputVolume, 1));
         OutputVolumeRange.Changed += RequestDesktopVolumeBoost;
@@ -76,6 +80,8 @@ public sealed partial class MainViewModel : ViewModelBase
                 ResetAppRouting();
                 Soundboard.Reset();
                 VoiceChanger.Reset();
+                HardwareMixing.Reset();
+                ApplyHardwareMixingNotes();
                 _client.EqProfiles.Reset();
                 Inserts.ResetForNewConnection(); Inserts2.ResetForNewConnection();
                 foreach (MixViewModel mv in Mixes) mv.Inserts.ResetForNewConnection();
@@ -1001,6 +1007,9 @@ public sealed partial class MainViewModel : ViewModelBase
             ApplyAppRouting(node["mixer"]);
             Ducking.Apply(node["ducking"], node["mixer"]);
             Soundboard.Apply(node["mixer"]?["soundboard"], Channels, node["mixer"] is JsonObject);
+            HardwareMixing.Apply(node["mixer"],
+                node["capabilities"]?["hardwareMixing"] is JsonValue hardwareMixing && hardwareMixing.TryGetValue(out bool canMix) && canMix);
+            ApplyHardwareMixingNotes();
             VoiceChanger.Apply(node["mixer"]?["channels"]);
             // The daemon says whether XLR 1's signal has a hardware low cut and
             // ClipGuard in front of it; an older daemon leaves the window to
@@ -1331,6 +1340,20 @@ public sealed partial class MainViewModel : ViewModelBase
     }
 
     private MicSetupViewModel? MicSetupOf(string channel) => MicSetups().FirstOrDefault(c => c.Channel == channel);
+
+    /// <summary>
+    /// Hand what hardware mixing turns off to the controls it greys: the
+    /// chain of each mix a Pro jack plays, Mic setup's checks and the
+    /// soundboard's auditions. Each takes the daemon's sentence, or null
+    /// while the mode leaves it alone.
+    /// </summary>
+    private void ApplyHardwareMixingNotes()
+    {
+        foreach (MixViewModel mix in Mixes) mix.Inserts.UnitNote = HardwareMixing.DisabledSentence($"inserts:mix:{mix.Id}");
+        string? soundCheck = HardwareMixing.DisabledSentence("soundCheck");
+        foreach (MicSetupViewModel setup in MicSetups()) setup.UnitNote = soundCheck;
+        Soundboard.AuditionNote = HardwareMixing.DisabledSentence("audition");
+    }
 
     /// <summary>The microphones Mic setup can test now, for the window's picker and the mixer header's button.</summary>
     public MicSetupInputs MicSetupInputs { get; } = new();
@@ -1838,9 +1861,14 @@ public sealed class MixViewModel : ViewModelBase, IHasId
             Kind = n["kind"]?.GetValue<string>() ?? Kind;
             Muted = (n["muted"]?.GetValue<bool>() ?? false) || IsMonitor && monitorMuted;
             if (n["name"]?.GetValue<string>() is { Length: > 0 } name) Name = name;
+            HardwareSection = n["hardwareSection"] is JsonValue section && section.TryGetValue(out int start) ? start : null;
         }
         finally { _applying = false; }
     }
+
+    private int? _hardwareSection;
+    /// <summary>The Wave XLR Pro's section that builds this mix for a jack while hardware mixing runs, or null.</summary>
+    public int? HardwareSection { get => _hardwareSection; private set => Set(ref _hardwareSection, value); }
 
     public void ApplyAuxPort(bool enabled)
     {
