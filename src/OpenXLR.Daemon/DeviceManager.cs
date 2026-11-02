@@ -1317,13 +1317,12 @@ public sealed partial class DeviceManager : BackgroundService
         // The unit ducks inside the mix the jacks play, which holds the
         // jacks' feed while its membership bit reads set (desk probe,
         // 2026-10-23), so the jacks are reached only once a poll has read
-        // it. The USB Aux port's mix ducked on its USB stream, but the port
-        // has not been checked by ear, so it stays in software until then.
+        // it. The USB Aux port dips with its mix (desk probe, 2026-11-02).
         UnitDuckingSupport? ducking = dev.Capabilities.Ducking
             ? new UnitDuckingSupport(dev.Info.Model, dev.Firmware, !duckingRefused,
                 duckingRefused ? "unsupportedBlock" : null,
                 duckingRefused ? $"The {dev.Info.Model} did not answer a read of its ducking block." : null,
-                ReachesJacks: _last?.HpMixMonitorReturn == true, ReachesAux: false)
+                ReachesJacks: _last?.HpMixMonitorReturn == true)
             : null;
         _published = new Published(msg, dev.Info, eq, ducking);
         return msg;

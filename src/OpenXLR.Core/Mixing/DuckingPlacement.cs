@@ -33,8 +33,6 @@ public static class DuckingPlacement
         if (!view.KeyIsUnitInput1) return No("keyNotSupported", $"The {support.Name} ducks only with XLR 1 as the key.");
         if (!support.ReachesJacks && targets.Any(m => m.OnJacks))
             return No("monitorReturn", $"The jacks' feed is not in the {support.Name}'s headphone mix, where it ducks, so this computer ducks.");
-        if (!support.ReachesAux && targets.Any(m => m.OnAux))
-            return No("auxNotChecked", $"Ducking on the {support.Name}'s USB Aux port has not been checked by ear yet, so this computer ducks.");
         foreach (DuckingMixView mix in targets)
             if (mix.OtherConsumers.Count > 0 || mix.Kind == MixKind.VirtualMic
                 || mix.OnJacks && mix.Kind != MixKind.Monitor || mix.OnAux && mix.Kind != MixKind.AuxPort)
