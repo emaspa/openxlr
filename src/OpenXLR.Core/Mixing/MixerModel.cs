@@ -164,7 +164,7 @@ public sealed record ChannelDefinition(string Id, string Name)
 }
 
 /// <summary>Live mixer state pushed to clients.</summary>
-public sealed record MixerState
+public sealed partial record MixerState
 {
     /// <summary>XLR 1's signal has no hardware low cut in front of it: a source binding, or a unit without one.</summary>
     public bool SoftLowCutApplicable { get; init; }

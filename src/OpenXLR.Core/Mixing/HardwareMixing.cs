@@ -1,0 +1,384 @@
+using System.Globalization;
+using OpenXLR.Core.Devices;
+
+namespace OpenXLR.Core.Mixing;
+
+/// <summary>Where the mixes the Wave XLR Pro's outputs play are built: <c>mixing</c> in mixer.json and <c>setMixing</c>.</summary>
+public static class MixingMode
+{
+    /// <summary>The computer builds every mix, as before hardware mixing (the default).</summary>
+    public const string Software = "software";
+    /// <summary>The Wave XLR Pro builds the mixes its outputs play.</summary>
+    public const string Hardware = "hardware";
+
+    public static bool IsValid(string? value) => value is Software or Hardware;
+}
+
+/// <summary>What the daemon knows of the driven unit, for hardware mixing's eligibility.</summary>
+public sealed record HardwareMixingUnit
+{
+    /// <summary>The driven unit is a Wave XLR Pro.</summary>
+    public bool Pro { get; init; }
+    public bool Connected { get; init; }
+    /// <summary>The version block 0x0000 reports, major.minor.patch, or null before it is read.</summary>
+    public string? Firmware { get; init; }
+    /// <summary>Block 0x0001 was read and its five sections decode (aa at each section's byte 15).</summary>
+    public bool SectionsDecode { get; init; }
+}
+
+/// <summary>Everything <see cref="HardwareMixingPlanner.Plan"/> reads: the mixer's model, the unit's facts and the saved maps.</summary>
+public sealed record HardwareMixingSetup
+{
+    /// <summary><c>mixing</c> is <c>hardware</c>.</summary>
+    public bool Wanted { get; init; }
+    /// <summary>The software mixer runs (the graph is built).</summary>
+    public bool MixerRunning { get; init; }
+    public HardwareMixingUnit? Unit { get; init; }
+    /// <summary>Port counts of the Pro's raw sink and source as PipeWire shows them, null when not found.</summary>
+    public int? SinkPorts { get; init; }
+    public int? SourcePorts { get; init; }
+    /// <summary>The writer gave up on the mode this run (two reads that did not hold the plan).</summary>
+    public bool Failed { get; init; }
+
+    public IReadOnlyList<ChannelDefinition> Channels { get; init; } = [];
+    public IReadOnlyList<MixDefinition> Mixes { get; init; } = [];
+
+    /// <summary>
+    /// The level each channel plays at in each mix, by <c>channel|mix</c>, in
+    /// dB: the send, the channel volume and the mix's volume on the desktop's
+    /// cubic scale (<c>60 log10</c> per factor), negative infinity while the
+    /// send, the mix or an exclusive group mutes it. A missing entry is silent.
+    /// </summary>
+    public IReadOnlyDictionary<string, double> LevelsDb { get; init; } = new Dictionary<string, double>();
+
+    /// <summary>The selected jacks with the feed each plays, in jack order (<c>hp1</c>, <c>hp2</c>, <c>lineout</c>).</summary>
+    public IReadOnlyList<(string Jack, string Feed)> Jacks { get; init; } = [];
+
+    /// <summary>The unit's own inputs the layout carries raw: source 0 XLR 1, 1 XLR 2, 2 USB Aux, 3 Line In, to the channel that carries it.</summary>
+    public IReadOnlyDictionary<int, string> UnitSources { get; init; } = new Dictionary<int, string>();
+
+    /// <summary>Channels software changes before their sends (noise removal, the voice changer, an insert, the soft low cut, a software EQ).</summary>
+    public IReadOnlySet<string> Processed { get; init; } = new HashSet<string>();
+
+    /// <summary>Channels whose input reaches the jacks through the unit's direct path in software mode.</summary>
+    public IReadOnlySet<string> DirectPath { get; init; } = new HashSet<string>();
+
+    /// <summary>Mixes with an insert chain.</summary>
+    public IReadOnlySet<string> MixChains { get; init; } = new HashSet<string>();
+
+    /// <summary>The monitoring pause is on.</summary>
+    public bool MonitorMuted { get; init; }
+
+    /// <summary>Section 0's level as the unit holds it in byte 98 (-21 dB on every unit read so far).</summary>
+    public double Section0LevelDb { get; init; } = HardwareMixingPlanner.Section0LevelDb;
+
+    /// <summary><c>hardwarePairs</c> as saved: channel id to USB playback pair.</summary>
+    public IReadOnlyDictionary<string, int> SavedPairs { get; init; } = new Dictionary<string, int>();
+
+    /// <summary><c>hardwareSections</c> as saved: feed to section start.</summary>
+    public IReadOnlyDictionary<string, int> SavedSections { get; init; } = new Dictionary<string, int>();
+}
+
+/// <summary>A level the unit cannot play as the faders set it: the cell holds it at the ceiling.</summary>
+public sealed record HardwareMixingClamp(string Channel, string Feed, double WantedDb, double HeldDb);
+
+/// <summary>
+/// One section the unit builds: the twelve level cells and the membership
+/// mask (bytes 0 to 13 of the section), in source order (0 XLR 1, 1 XLR 2,
+/// 2 USB Aux, 3 Line In, 4 + k pair k).
+/// </summary>
+public sealed record HardwareSectionContent(string Feed, int Section, IReadOnlyList<byte> Cells, ushort Members)
+{
+    /// <summary>Bytes 0 to 13 of the section as hex, cells then the mask low byte first.</summary>
+    public string Hex => Convert.ToHexString([.. Cells, (byte)Members, (byte)(Members >> 8)]);
+}
+
+/// <summary>
+/// The outcome of <see cref="HardwareMixingPlanner.Plan"/>: whether the mode
+/// can run and why not, the pair of every channel that needs one, the section
+/// of every feed a jack plays with its bytes, the levels held at the ceiling,
+/// and what the mode turns off, as the sentence each client shows.
+/// </summary>
+public sealed record HardwareMixingPlan
+{
+    public bool Wanted { get; init; }
+    /// <summary>Wanted and nothing in the way.</summary>
+    public bool Active => Wanted && Reason is null;
+    /// <summary>
+    /// Why the mode cannot run, whether or not it is wanted: <c>mixerOff</c>,
+    /// <c>notSupported</c>, <c>unitAway</c>, <c>firmware</c>,
+    /// <c>unsupportedBlock</c>, <c>captureLayout</c>, <c>budget</c> or
+    /// <c>failed</c>; null when it can.
+    /// </summary>
+    public string? Reason { get; init; }
+    /// <summary>One sentence for the reason, or null.</summary>
+    public string? Note { get; init; }
+
+    /// <summary>Channel id to USB playback pair, for every channel that streams on one.</summary>
+    public IReadOnlyDictionary<string, int> Pairs { get; init; } = new Dictionary<string, int>();
+    /// <summary>Feed to section start, for every feed a selected jack plays.</summary>
+    public IReadOnlyDictionary<string, int> Sections { get; init; } = new Dictionary<string, int>();
+    /// <summary>Jack (<c>hp1</c>, <c>hp2</c>, <c>lineout</c>) to the section it plays.</summary>
+    public IReadOnlyDictionary<string, int> Jacks { get; init; } = new Dictionary<string, int>();
+    /// <summary>The bytes of each section the unit builds.</summary>
+    public IReadOnlyList<HardwareSectionContent> Content { get; init; } = [];
+    public IReadOnlyList<HardwareMixingClamp> Clamped { get; init; } = [];
+    /// <summary>What the mode turns off, by fixed key, as the sentence a client shows.</summary>
+    public IReadOnlyDictionary<string, string> Disabled { get; init; } = new Dictionary<string, string>();
+    /// <summary>
+    /// How far each jack's level (headphone volume or Line Out level) is
+    /// lowered on entering the mode, in dB, by jack (see
+    /// <see cref="HardwareMixingPlanner.EntryOffsetDb"/>).
+    /// </summary>
+    public IReadOnlyDictionary<string, double> EntryOffsetsDb { get; init; } = new Dictionary<string, double>();
+}
+
+/// <summary>
+/// Hardware mixing on the Wave XLR Pro, as a pure plan from the mixer's model
+/// (design notes: the hardware mixing plan, sections 3.2, 3.3, 3.7, 3.8 and
+/// 3.11). Nothing here touches the unit or the graph.
+///
+/// The unit builds only the mixes its jacks play. Every channel the unit
+/// cannot take raw streams on a USB playback pair of its own: pair 0 System,
+/// 1 Game, 2 Music, 3 Browser, 4 Voice Chat, 6 SFX, 7 the first channel
+/// beyond those; pair 5 stays the Aux mix's stream. The unit's own inputs
+/// (XLR 1, XLR 2, USB Aux, Line In) are sources of their own. A channel keeps
+/// its pair across restarts and layout edits (<c>hardwarePairs</c>), a feed
+/// its section (<c>hardwareSections</c>).
+///
+/// Each level cell is the fader's: the send, the channel volume and the mix
+/// volume, in half-dB steps. A pair plays 7.94 dB below its cell on the unit
+/// and a cell above 0 dB does not make that up (protocol notes, section 16),
+/// so pairs and unit inputs keep the balance Wave Link gives them, a pair cell
+/// never goes above 0 dB, and a unit input's cell stops at +12 dB.
+/// </summary>
+public static class HardwareMixingPlanner
+{
+    /// <summary>The pair the Aux mix streams on, kept for it until the unit builds the Aux mix.</summary>
+    public const int AuxPair = ProReturnPairs.Aux;
+
+    /// <summary>The section starts a jack feed can take, in the order a new feed takes them.</summary>
+    public static IReadOnlyList<int> JackSections { get; } = [0, 18, 54];
+
+    /// <summary>Ports of the Pro's raw sink and source in the layout the mode was measured in.</summary>
+    public const int SinkPortsNeeded = 17;
+    public const int SourcePortsNeeded = 18;
+
+    /// <summary>The oldest firmware the mode was measured on.</summary>
+    public static readonly Version MinimumFirmware = new(1, 0, 14);
+
+    /// <summary>A USB playback pair plays this far below its cell (protocol notes, section 16).</summary>
+    public const double PairLossDb = 7.94;
+
+    /// <summary>Section 0's level, byte 98, on every unit read so far; the mode writes it to 0 dB.</summary>
+    public const double Section0LevelDb = -21;
+
+    private static readonly Dictionary<string, int> DefaultPairs = new(StringComparer.Ordinal)
+    {
+        ["system"] = 0, ["game"] = 1, ["music"] = 2, ["browser"] = 3, ["voicechat"] = 4, ["sfx"] = 6,
+    };
+
+    /// <summary>The pairs a channel can take, in the order a channel without a default takes them.</summary>
+    public static IReadOnlyList<int> ChannelPairs { get; } = [7, 0, 1, 2, 3, 4, 6];
+
+    public static string BudgetNote(int needed)
+        => $"Hardware mixing on the Wave XLR Pro streams at most {ChannelPairs.Count} channels; this layout has {needed} that need a USB pair.";
+
+    public static HardwareMixingPlan Plan(HardwareMixingSetup setup)
+    {
+        (string? reason, string? note) = Eligibility(setup);
+        List<ChannelDefinition> needing = [.. setup.Channels.Where(c => !setup.UnitSources.Values.Contains(c.Id))];
+        Dictionary<string, int> pairs = [];
+        if (needing.Count > ChannelPairs.Count)
+        {
+            reason ??= "budget";
+            note ??= BudgetNote(needing.Count);
+        }
+        else pairs = AllocatePairs(needing.Select(c => c.Id), setup.SavedPairs);
+
+        Dictionary<string, int> sections = AllocateSections(setup.Jacks.Select(j => j.Feed).Distinct(), setup.SavedSections);
+        var jacks = setup.Jacks.ToDictionary(j => j.Jack, j => sections[j.Feed], StringComparer.Ordinal);
+        var clamped = new List<HardwareMixingClamp>();
+        var content = new List<HardwareSectionContent>();
+        if (pairs.Count == needing.Count)
+            foreach ((string feed, int section) in sections.OrderBy(p => p.Value))
+                content.Add(Build(setup, feed, section, pairs, clamped));
+
+        return new HardwareMixingPlan
+        {
+            Wanted = setup.Wanted,
+            Reason = reason,
+            Note = note,
+            Pairs = pairs,
+            Sections = sections,
+            Jacks = jacks,
+            Content = content,
+            Clamped = clamped,
+            Disabled = Disabled(setup, sections.Keys),
+            EntryOffsetsDb = setup.Jacks.ToDictionary(j => j.Jack, j => EntryOffsetDb(setup, j.Feed), StringComparer.Ordinal),
+        };
+    }
+
+    /// <summary>The first thing in the way of the mode, with its sentence; nulls when nothing is.</summary>
+    private static (string? Reason, string? Note) Eligibility(HardwareMixingSetup setup)
+    {
+        if (!setup.MixerRunning) return ("mixerOff", "Hardware mixing needs the software mixer running.");
+        if (setup.Unit is not { Pro: true } unit) return ("notSupported", "Hardware mixing needs a Wave XLR Pro as the driven unit.");
+        if (!unit.Connected) return ("unitAway", "The Wave XLR Pro is not connected; hardware mixing starts when it is back.");
+        if (!FirmwareSupported(unit.Firmware))
+            return ("firmware", $"Hardware mixing needs Wave XLR Pro firmware {MinimumFirmware} or later; this unit reports {unit.Firmware ?? "no version"}.");
+        if (!unit.SectionsDecode) return ("unsupportedBlock", "The Wave XLR Pro's mixes are not in the layout hardware mixing knows.");
+        if (setup.SinkPorts != SinkPortsNeeded || setup.SourcePorts != SourcePortsNeeded)
+            return ("captureLayout", $"Hardware mixing needs the Wave XLR Pro's audio in its {SinkPortsNeeded}-channel playback and {SourcePortsNeeded}-channel capture layout.");
+        if (setup.Failed) return ("failed", "The Wave XLR Pro did not keep the mixes OpenXLR wrote, so hardware mixing stopped for this run.");
+        return (null, null);
+    }
+
+    internal static bool FirmwareSupported(string? firmware)
+        => firmware is not null && Version.TryParse(firmware, out Version? version) && version >= MinimumFirmware;
+
+    /// <summary>
+    /// A pair for every channel that needs one, in layout order: the saved
+    /// pair when it is a channel pair and still free, then the channel's
+    /// default, then the first free pair in <see cref="ChannelPairs"/> order.
+    /// The caller has checked the budget.
+    /// </summary>
+    internal static Dictionary<string, int> AllocatePairs(IEnumerable<string> channels, IReadOnlyDictionary<string, int> saved)
+    {
+        List<string> order = [.. channels];
+        var pairs = new Dictionary<string, int>(StringComparer.Ordinal);
+        var taken = new HashSet<int>();
+        foreach (string channel in order)
+            if (saved.TryGetValue(channel, out int pair) && ChannelPairs.Contains(pair) && taken.Add(pair)) pairs[channel] = pair;
+        foreach (string channel in order.Where(c => !pairs.ContainsKey(c)))
+            if (DefaultPairs.TryGetValue(channel, out int pair) && taken.Add(pair)) pairs[channel] = pair;
+        foreach (string channel in order.Where(c => !pairs.ContainsKey(c)))
+        {
+            int free = ChannelPairs.First(p => !taken.Contains(p));
+            taken.Add(free);
+            pairs[channel] = free;
+        }
+        return pairs;
+    }
+
+    /// <summary>A section for every feed: the saved one when still free, then the first free in <see cref="JackSections"/> order.</summary>
+    internal static Dictionary<string, int> AllocateSections(IEnumerable<string> feeds, IReadOnlyDictionary<string, int> saved)
+    {
+        List<string> order = [.. feeds];
+        var sections = new Dictionary<string, int>(StringComparer.Ordinal);
+        var taken = new HashSet<int>();
+        foreach (string feed in order)
+            if (saved.TryGetValue(feed, out int section) && JackSections.Contains(section) && taken.Add(section)) sections[feed] = section;
+        foreach (string feed in order.Where(f => !sections.ContainsKey(f)))
+        {
+            int free = JackSections.First(s => !taken.Contains(s));
+            taken.Add(free);
+            sections[feed] = free;
+        }
+        return sections;
+    }
+
+    /// <summary>
+    /// A section's cells and mask for one feed. A source plays at the sum of
+    /// its levels in the feed's mixes (amplitudes add); it is a member while
+    /// that is at or above the lowest cell that plays and the monitoring pause
+    /// is off. A source no channel carries, and pair 5, are out.
+    /// </summary>
+    private static HardwareSectionContent Build(HardwareMixingSetup setup, string feed, int section,
+        IReadOnlyDictionary<string, int> pairs, List<HardwareMixingClamp> clamped)
+    {
+        var cells = Enumerable.Repeat(ProMixSections.CellOff, ProMixSections.SourceCount).ToArray();
+        ushort members = 0;
+        IReadOnlyList<string> parts = MonitorFeed.Parts(feed);
+        void Source(int source, string channel, double ceilingDb)
+        {
+            double db = FeedLevelDb(setup, channel, parts);
+            if (!double.IsFinite(db)) return;
+            double held = Math.Min(db, ceilingDb);
+            if (Math.Round(db * 2, MidpointRounding.AwayFromZero) > Math.Round(ceilingDb * 2))
+                clamped.Add(new HardwareMixingClamp(channel, feed, Round(db), held));
+            cells[source] = ProMixSections.CellOf(held);
+            if (!setup.MonitorMuted && cells[source] != ProMixSections.CellOff) members |= (ushort)(1 << source);
+        }
+        foreach ((int source, string channel) in setup.UnitSources)
+            if (source is >= 0 and < ProMixSections.FirstPair) Source(source, channel, ProMixSections.CellCeiling / 2.0);
+        foreach ((string channel, int pair) in pairs)
+            if (pair != AuxPair) Source(ProMixSections.SourceOfPair(pair), channel, 0);
+        return new HardwareSectionContent(feed, section, cells, members);
+    }
+
+    private static double Round(double db) => Math.Round(db, 2, MidpointRounding.AwayFromZero);
+
+    /// <summary>A channel's level in a feed: the amplitudes of its levels in the feed's mixes summed, in dB.</summary>
+    internal static double FeedLevelDb(HardwareMixingSetup setup, string channel, IReadOnlyList<string> parts)
+    {
+        double amplitude = 0;
+        foreach (string mix in parts)
+            if (setup.LevelsDb.TryGetValue($"{channel}|{mix}", out double db) && double.IsFinite(db))
+                amplitude += Math.Pow(10, db / 20);
+        return amplitude > 0 ? 20 * Math.Log10(amplitude) : double.NegativeInfinity;
+    }
+
+    /// <summary>
+    /// How far a jack's level (its headphone volume, or Line Out's level) is
+    /// lowered on entering the mode, so no source gets louder on it. Byte 98
+    /// goes from -21 dB (or what the unit holds there, if lower) to 0 dB,
+    /// which every source on section 0 gains, and the trim on sections 18 and
+    /// 54 gave the other feeds 21 dB: the larger of the two. A unit
+    /// input the jack heard through the Monitor mix on a USB pair (Line In,
+    /// USB Aux, a microphone the direct path did not carry) now plays as a
+    /// source of its own, without the pair's 7.94 dB: 7.94 dB more while one
+    /// is in the feed. Leaving the mode gives back the 21 dB only.
+    /// </summary>
+    public static double EntryOffsetDb(HardwareMixingSetup setup, string feed)
+    {
+        IReadOnlyList<string> parts = MonitorFeed.Parts(feed);
+        bool fromPair = setup.UnitSources.Values.Any(channel => !setup.DirectPath.Contains(channel)
+            && double.IsFinite(FeedLevelDb(setup, channel, parts)));
+        return Math.Max(-Section0LevelDb, -setup.Section0LevelDb) + (fromPair ? PairLossDb : 0);
+    }
+
+    /// <summary>
+    /// A jack's level in the mode: its base (the level it had, lowered by the
+    /// entry offset, and every change the owner makes after) with the output
+    /// volume's attenuation, as the Pro sink gave it to the pairs before. Never
+    /// above the base: above 100% the output volume does nothing on the jacks.
+    /// </summary>
+    public static double JackLevelDb(double baseDb, double? outputVolume)
+        => baseDb + Mixer.JackOutputVolumeDb(outputVolume);
+
+    /// <summary>
+    /// A jack's level after leaving the mode: its base with the 21 dB back,
+    /// less what the Pro sink's volume above 100% will add to the pairs again,
+    /// so nothing is louder than it was in the mode.
+    /// </summary>
+    public static double LeaveLevelDb(double baseDb, double? outputVolume)
+        => baseDb - Section0LevelDb - (outputVolume is > 1 and var v ? 60 * Math.Log10(v) : 0);
+
+    /// <summary>The fixed keys of what the mode turns off for this layout, with each sentence.</summary>
+    private static Dictionary<string, string> Disabled(HardwareMixingSetup setup, IEnumerable<string> feeds)
+    {
+        var disabled = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        HashSet<string> unitMixes = [.. feeds.SelectMany(MonitorFeed.Parts)];
+        foreach (string mix in unitMixes)
+        {
+            string name = setup.Mixes.FirstOrDefault(m => m.Id == mix)?.Name ?? mix;
+            disabled[$"inserts:mix:{mix}"] = $"The Wave XLR Pro builds {name} for its jacks, so no insert runs on it there.";
+            disabled[$"ducking:mix:{mix}"] = $"Ducking does not run on {name} while the Wave XLR Pro builds it.";
+        }
+        if (unitMixes.Count > 0)
+            disabled["latencyCompensation"] = "Latency compensation leaves out the mixes the Wave XLR Pro builds.";
+        foreach (string channel in setup.UnitSources.Values.Where(setup.Processed.Contains))
+        {
+            string name = setup.Channels.FirstOrDefault(c => c.Id == channel)?.Name ?? channel;
+            disabled[$"processedMic:{channel}"] = $"The Wave XLR Pro's mixes take {name} as it comes in, without the processing on this computer.";
+        }
+        disabled["soundCheck"] = "Mic setup's checks are not available while the Wave XLR Pro builds the mixes.";
+        disabled["audition"] = "Auditions are not available while the Wave XLR Pro builds the mixes.";
+        return new Dictionary<string, string>(disabled, StringComparer.Ordinal);
+    }
+
+    /// <summary>A plan's sections as the dry run shows them: section start to bytes 0 to 13 as hex.</summary>
+    public static IReadOnlyDictionary<string, string> ContentHex(HardwareMixingPlan plan)
+        => plan.Content.ToDictionary(c => c.Section.ToString(CultureInfo.InvariantCulture), c => c.Hex, StringComparer.Ordinal);
+}

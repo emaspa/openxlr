@@ -267,6 +267,12 @@ public sealed record DeviceCapabilities
     /// <summary>Per-jack routing of the hardware monitor bus (HP1/HP2/USB Aux out/Line out).</summary>
     public bool OutputRouting { get; init; }
 
+    /// <summary>
+    /// The unit can build the mixes its outputs play (<c>setMixing</c>):
+    /// the Wave XLR Pro. False on every other model.
+    /// </summary>
+    public bool HardwareMixing { get; init; }
+
     /// <summary>A controllable auxiliary input stage (level + lock).</summary>
     public bool AuxInput { get; init; }
 

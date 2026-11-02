@@ -54,6 +54,9 @@ internal static class SavedMixerValidation
             EqProcessing = EqProcessing(settings.EqProcessing, notes),
             DynamicsProcessing = Processing(settings.DynamicsProcessing, "dynamicsProcessing", notes),
             HardwareRestore = HardwareRestore(settings.HardwareRestore, notes),
+            Mixing = Mixing(settings.Mixing, notes),
+            HardwarePairs = HardwareMap(settings.HardwarePairs, "hardwarePairs", HardwareMixingPlanner.ChannelPairs, notes),
+            HardwareSections = HardwareMap(settings.HardwareSections, "hardwareSections", HardwareMixingPlanner.JackSections, notes),
             NoiseRemoval = NoiseRemoval(settings.NoiseRemoval, notes),
             VoiceChanger = VoiceChanger(settings.VoiceChanger, notes),
             Compressor = Dynamics(settings.Compressor, "compressor", MicCompressor.Check, MicCompressor.Snap, notes),
@@ -364,6 +367,32 @@ internal static class SavedMixerValidation
             if (section is not ("18" or "54")) notes.Add($"hardwareRestore.{section}: only sections 18 and 54 are restored");
             else if (!Devices.ProMixPlan.IsRestore(hex)) notes.Add($"hardwareRestore.{section}: must be {2 * Devices.ProJackFeeds.RestoredLength} hex digits");
             else kept[section] = hex.ToUpperInvariant();
+        }
+        return kept;
+    }
+
+    /// <summary>The mixing mode: anything but <c>software</c> or <c>hardware</c> is named and becomes <c>software</c>.</summary>
+    private static string Mixing(string? value, List<string> notes)
+    {
+        if (MixingMode.IsValid(value)) return value!;
+        notes.Add("mixing: must be 'software' or 'hardware'");
+        return MixingMode.Software;
+    }
+
+    /// <summary>
+    /// A hardware mixing map: an entry whose value is not one the map takes,
+    /// or that repeats a value an earlier entry holds, is dropped and named.
+    /// </summary>
+    private static Dictionary<string, int> HardwareMap(Dictionary<string, int>? entries, string name, IReadOnlyList<int> allowed, List<string> notes)
+    {
+        if (entries is null) { notes.Add($"{name}: {NullEntry}"); return []; }
+        var kept = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach ((string key, int value) in entries)
+        {
+            if (string.IsNullOrEmpty(key) || key.Length > 256) notes.Add($"{name}: an entry has no usable key");
+            else if (!allowed.Contains(value)) notes.Add($"{name}.{key}: must be one of {string.Join(", ", allowed)}");
+            else if (kept.ContainsValue(value)) notes.Add($"{name}.{key}: {value} is already taken");
+            else kept[key] = value;
         }
         return kept;
     }

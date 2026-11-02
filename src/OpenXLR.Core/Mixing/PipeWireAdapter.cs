@@ -2373,6 +2373,20 @@ public sealed class PipeWireAdapter
     }
 
     /// <summary>
+    /// A node's channel count as its <c>audio.channels</c> property gives it,
+    /// read from the graph the adapter already holds; null when the node is
+    /// not there or does not say.
+    /// </summary>
+    public int? NodeChannels(string nodeName)
+    {
+        foreach (JsonElement o in GraphObjects())
+            if (o.TryGetProperty("info", out JsonElement info) && info.TryGetProperty("props", out JsonElement props)
+                && props.TryGetProperty("node.name", out JsonElement n) && n.ValueKind == JsonValueKind.String && n.GetString() == nodeName)
+                return PortLayout(props).Channels;
+        return null;
+    }
+
+    /// <summary>
     /// A node's channel count and channel positions from its properties:
     /// <c>audio.channels</c> is a number and <c>audio.position</c> a list
     /// PipeWire writes as text ("[ FL, FR ]", or "FL,FR" from pactl). The

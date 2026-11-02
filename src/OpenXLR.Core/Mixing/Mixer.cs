@@ -1640,6 +1640,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 EqProcessing = new Dictionary<string, string>(_eqProcessing, StringComparer.Ordinal),
                 DynamicsProcessing = new Dictionary<string, string>(_dynamicsProcessing, StringComparer.Ordinal),
                 HardwareRestore = _hardwareRestore.ToDictionary(p => p.Key.ToString(System.Globalization.CultureInfo.InvariantCulture), p => p.Value),
+                Mixing = _mixing,
+                HardwarePairs = new Dictionary<string, int>(_hardwarePairs, StringComparer.Ordinal),
+                HardwareSections = new Dictionary<string, int>(_hardwareSections, StringComparer.Ordinal),
                 NoiseRemoval = new Dictionary<string, MicNoise>(_noise, StringComparer.Ordinal),
                 VoiceChanger = new Dictionary<string, MicVoice>(_voice, StringComparer.Ordinal),
                 Compressor = new Dictionary<string, MicCompressor>(_compressor, StringComparer.Ordinal),
@@ -1705,6 +1708,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 if (int.TryParse(section, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int at)
                     && ProJackFeeds.SlotOfSection(at) is 1 or 2 && ProMixPlan.IsRestore(hex))
                     _hardwareRestore[at] = hex.ToUpperInvariant();
+            RestoreHardwareMixingLocked(s);
             if (!_built) { SyncDuckingLocked(); return; }
             if (_config.RepairedMonitorMix is { } repaired)
             {
@@ -3476,7 +3480,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             DspFeatureAvailability clipGuard = _pw.GetSoftwareClipGuardAvailability();
             Dictionary<string, UnitInputStatus> unitInputs = UnitInputsLocked();
             int monitorCount = _config.Mixes.Count(m => m.Kind == MixKind.Monitor);
-            return WithAppearanceLocked(new MixerState
+            return WithHardwareMixingLocked(WithAppearanceLocked(new MixerState
             {
                 SoftLowCutApplicable = SoftLowCutApplicableLocked,
                 SoftClipGuardApplicable = SoftClipGuardApplicableLocked,
@@ -3537,7 +3541,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 RouteAppsByDefault = Matcher.RouteByDefault,
                 BlockSize = _blockSize,
                 BrowserTabs = BrowserTabsLocked(),
-            });
+            }));
         }
     }
 

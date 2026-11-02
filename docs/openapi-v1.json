@@ -607,6 +607,14 @@
                     "enabled": true,
                     "threshold": -45
                   }
+                },
+                "hardwareMixingDryRun": {
+                  "summary": "Ask what hardware mixing on the Wave XLR Pro would do with the current layout, without switching",
+                  "value": {
+                    "cmd": "setMixing",
+                    "value": "hardware",
+                    "check": true
+                  }
                 }
               }
             }

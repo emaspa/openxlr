@@ -36,6 +36,13 @@ public static class CommandValidation
             ? null : "setWaveControl: value must be a boolean or a finite number";
     }
 
+    /// <summary><c>setMixing</c>: a value of <c>software</c> or <c>hardware</c>, and <c>check</c> absent or a boolean.</summary>
+    internal static string? CheckMixing(Command cmd)
+        => cmd.Value.ValueKind != JsonValueKind.String || !MixingMode.IsValid(cmd.Value.GetString())
+            ? "setMixing: value must be 'software' or 'hardware'"
+            : cmd.Check.ValueKind is JsonValueKind.Undefined or JsonValueKind.True or JsonValueKind.False ? null
+            : "setMixing: check must be a boolean";
+
     public const int MaxText = 256;          // identities, labels, device names, symbols
     public const int MaxUri = 512;
     public const int MaxDevices = 16;
@@ -137,6 +144,8 @@ public static class CommandValidation
             case "setMonitorMuteMicrophones":
                 return cmd.Value.ValueKind is JsonValueKind.True or JsonValueKind.False
                     ? null : $"{cmd.Cmd}: value must be a boolean";
+            case "setMixing":
+                return CheckMixing(cmd);
             case "setBlockSize":
                 return cmd.Value.ValueKind is JsonValueKind.Null
                     || cmd.Value.ValueKind is JsonValueKind.Number && cmd.Value.TryGetInt32(out int frames) && Mixer.BlockSizes.Contains(frames)

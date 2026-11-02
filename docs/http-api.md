@@ -151,6 +151,11 @@ own DSP runs the EQ, `eq.backend` reads `device` and `eq.device` names the unit;
 EQ to this computer and `"value":"device"` back to the unit (see
 [where the EQ runs](api.md#where-the-eq-runs)).
 
+[Hardware mixing](api.md#hardware-mixing) has a dry run:
+`{"cmd":"setMixing","value":"hardware","check":true}` answers with a
+`mixingPlan` message saying what the Wave XLR Pro would build for the
+layout as it stands, or why it cannot, and changes nothing.
+
 [EQ profiles](api.md#eq-profiles) load the same way from any client.
 `GET /api/v1/state` lists them in `eqProfiles`, the built-in ones first;
 `{"cmd":"loadEqProfile","channel":"xlr1","profile":"builtin:warm"}` puts
