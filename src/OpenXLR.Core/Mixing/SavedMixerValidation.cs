@@ -53,6 +53,7 @@ internal static class SavedMixerValidation
             Eq = Eq(settings.Eq, notes),
             EqProcessing = EqProcessing(settings.EqProcessing, notes),
             DynamicsProcessing = Processing(settings.DynamicsProcessing, "dynamicsProcessing", notes),
+            HardwareRestore = HardwareRestore(settings.HardwareRestore, notes),
             NoiseRemoval = NoiseRemoval(settings.NoiseRemoval, notes),
             VoiceChanger = VoiceChanger(settings.VoiceChanger, notes),
             Compressor = Dynamics(settings.Compressor, "compressor", MicCompressor.Check, MicCompressor.Snap, notes),
@@ -349,6 +350,23 @@ internal static class SavedMixerValidation
     /// </summary>
     private static Dictionary<string, string> EqProcessing(Dictionary<string, string>? entries, List<string> notes)
         => Processing(entries, "eqProcessing", notes);
+
+    /// <summary>
+    /// The Pro's sections to put back: an entry for a section other than 18
+    /// or 54, or bytes other than the 16 a restore holds, is dropped and named.
+    /// </summary>
+    private static Dictionary<string, string> HardwareRestore(Dictionary<string, string>? entries, List<string> notes)
+    {
+        if (entries is null) { notes.Add($"hardwareRestore: {NullEntry}"); return []; }
+        var kept = new Dictionary<string, string>();
+        foreach ((string section, string hex) in entries)
+        {
+            if (section is not ("18" or "54")) notes.Add($"hardwareRestore.{section}: only sections 18 and 54 are restored");
+            else if (!Devices.ProMixPlan.IsRestore(hex)) notes.Add($"hardwareRestore.{section}: must be {2 * Devices.ProJackFeeds.RestoredLength} hex digits");
+            else kept[section] = hex.ToUpperInvariant();
+        }
+        return kept;
+    }
 
     /// <summary>Where each microphone's EQ, or compressor and expander, run, by the rule of <see cref="EqProcessing"/>.</summary>
     private static Dictionary<string, string> Processing(Dictionary<string, string>? entries, string name, List<string> notes)

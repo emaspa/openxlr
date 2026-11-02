@@ -237,6 +237,7 @@ every save. Every field is optional on read; an absent one is empty or off.
 | `compressor` | channel id to `{enabled, threshold, ratio, attack, release, knee, makeup}`, the microphone's [compressor](api.md#compressor-and-expander) on this computer; a microphone absent here has it off |
 | `expander` | channel id to `{enabled, threshold, ratio, range, attack, release, hold}`, the microphone's [expander](api.md#compressor-and-expander) on this computer; a microphone absent here has it off |
 | `eqProcessing` | channel id to `device` or `software`, where that microphone's EQ runs; machine wiring, never in a profile |
+| `hardwareRestore` | `"18"` and `"54"` to 32 hex digits: the first 16 bytes of that section of the Wave XLR Pro's block 0x0001 as they were before a second or third jack feed first used it. The daemon writes them back and drops the entry once no jack plays that section. Any other section or length is dropped with a note; machine wiring, never in a profile |
 | `compensateMixLatency` | the latency compensation switch across mixes, see [api.md](api.md) |
 | `exclusiveGroups` | exclusive channel groups, see [Exclusive groups](#exclusive-groups) |
 | `ducking` | the [ducking](api.md#ducking) setup, `{enabled, key, channels, mixes, sensitivity, amount, speed, processing}`; absent takes the defaults, off, and the next save writes them; one without `mixes` lowers in the default monitor mix. Unknown ids are dropped and an unknown preset or processing word is reset to its default, each with a note |

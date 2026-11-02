@@ -284,6 +284,101 @@ public sealed partial class MonitorVolumeIntegrationTests
         }
     }
 
+    /// <summary>
+    /// Each jack plays its own feed: two jacks on one feed share pair 1 and
+    /// section 0 as before; a jack moved to another mix gets pair 2 and
+    /// section 18, with its selector on 1f, and the section is kept as it was
+    /// in the settings before the first write; back on one feed the section
+    /// is put back byte for byte and the kept copy is dropped.
+    /// </summary>
+    [MonitorPipeWireFact]
+    public async Task EachJackPlaysItsOwnFeedOnItsOwnPairAndSection()
+    {
+        const string hp1 = DirectSink + "#hp1", hp2 = DirectSink + "#hp2";
+        var pw = new PipeWireAdapter();
+        using var registry = pw.WatchGraph();
+        var modules = new List<uint>();
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["mixer"] = "true" }).Build();
+        // Section 18 as another program left it: pairs 2 and 3 in it, XLR 1 at +6 dB.
+        var pro = new DirectPro(held: "18=0c,30=c1");
+        const string kept = "0C0000000000000000000000C10000AA";
+        DeviceManager? devices = null;
+        MixerService? mixer = null;
+        try
+        {
+            modules.Add(LoadModule("module-null-sink", "sink_name=pro_direct_parent", "channels=6", "sink_properties=device.description=Pro-direct-parent"));
+            WaitForRecovery(() => ProcessRunner.Run("pactl", ["list", "sources", "short"]).StdoutText.Contains("pro_direct_parent.monitor", StringComparison.Ordinal));
+            modules.Add(LoadModule("module-remap-source", $"source_name={DirectSource}", "master=pro_direct_parent.monitor", "channels=6",
+                "source_properties=device.description=Pro-direct-capture"));
+            modules.Add(LoadModule("module-null-sink", $"sink_name={DirectSink}", "channels=12",
+                "channel_map=" + string.Join(',', Enumerable.Range(0, 12).Select(i => "aux" + i)), "sink_properties=device.description=Pro-direct-raw"));
+            WaitForRecovery(() => pw.ListDevices().Any(d => d.Name == DirectSource));
+            WaitForInputPorts(DirectSink, 12);
+
+            devices = new DeviceManager(NullLogger<DeviceManager>.Instance, config, () => [pro]);
+            devices.SweepOnce();
+            Assert.True(pro.Connected);
+            mixer = new MixerService(NullLogger<MixerService>.Instance, config, devices);
+            await mixer.StartAsync(CancellationToken.None);
+            Assert.True(mixer.Built);
+            MixerService service = mixer;
+            void Run(Command command) => Assert.Null(service.Apply(command));
+            void Sweep() { devices.SweepOnce(); service.SweepOnce(); }
+            string[] PortsFrom(string mix) => [.. GraphLinksInto(DirectSink).Where(l => l.From.StartsWith($"OpenXLR_mix_{mix}:", StringComparison.Ordinal))
+                .Select(l => l.To[(DirectSink.Length + 1)..]).Distinct().Order()];
+            string? Kept() => MixerSettings.Load()?.HardwareRestore.GetValueOrDefault("18");
+
+            PrimaryWait(() => { Sweep(); return service.Devices()!.Any(d => d.Name == hp2); });
+            Run(new() { Cmd = "setMonitorOutputs", Devices = [hp1, hp2] });
+            for (int i = 0; i < 2; i++) Sweep();
+            Assert.Equal(0x1e, pro[90]);
+            Assert.Equal(0x1e, pro[91]);
+            Assert.Equal(0xc1, pro[30]);
+            WaitForRecovery(() => PortsFrom("monitor").SequenceEqual(["playback_AUX2", "playback_AUX3"]));
+            Assert.Empty(PortsFrom("monitor2"));
+            Assert.Null(Kept());
+
+            // Headphones 2 on Monitor B: its own section and pair.
+            Run(new() { Cmd = "setMonitorFeed", Device = hp2, Mix = "monitor2" });
+            Assert.Equal("monitor2", service.Snapshot()!.MonitorFeeds[hp2]);
+            Assert.False(service.Snapshot()!.MonitorFeeds.ContainsKey(hp1));
+            Assert.Equal(0x1e, pro[90]);
+            Assert.Equal(0x1f, pro[91]);
+            Assert.Equal(0xd6, pro[24]);
+            Assert.Equal(0x40, pro[30]);
+            Assert.Equal(kept, Kept());
+            WaitForRecovery(() => PortsFrom("monitor2").SequenceEqual(["playback_AUX4", "playback_AUX5"]));
+            WaitForRecovery(() => PortsFrom("monitor").SequenceEqual(["playback_AUX2", "playback_AUX3"]));
+            for (int i = 0; i < 2; i++) Sweep();
+            Assert.Equal(0x40, pro[30]);
+
+            // Back on one feed: section 18 as it was, and the copy dropped
+            // once a poll reads it back.
+            Run(new() { Cmd = "setMonitorFeed", Device = hp2, Mix = "monitor" });
+            Assert.Equal(0x1e, pro[91]);
+            Assert.Equal(0x0c, pro[18]);
+            Assert.Equal(0x00, pro[24]);
+            Assert.Equal(0xc1, pro[30]);
+            WaitForRecovery(() => PortsFrom("monitor2").Length == 0);
+            PrimaryWait(() => { Sweep(); return Kept() is null; });
+            Assert.Equal(0xc1, pro[30]);
+        }
+        finally
+        {
+            if (mixer is not null)
+            {
+                if (mixer.Built) await mixer.StopAsync(CancellationToken.None);
+                mixer.Dispose();
+            }
+            devices?.SuspendSession();
+            devices?.Dispose();
+            foreach (uint module in Enumerable.Reverse(modules)) UnloadModule(module);
+            if (File.Exists(MixerSettings.DefaultPath)) File.Delete(MixerSettings.DefaultPath);
+            string state = Path.Combine(OpenXlrPaths.ConfigDir, "devices", "0fd9-00b4");
+            if (Directory.Exists(state)) Directory.Delete(state, true);
+        }
+    }
+
     /// <summary>The graph mute of one send, or null while its leg is not found.</summary>
     private static bool? LegMuted(PipeWireAdapter pw, string channel, string mix)
     {
@@ -307,10 +402,18 @@ public sealed partial class MonitorVolumeIntegrationTests
         private int _gainDb = 30;
         public int MicDirectWrites;
 
-        public DirectPro(bool micDirect = false)
+        public DirectPro(bool micDirect = false, string held = "")
         {
             if (micDirect) _block[12] |= 0x01;
+            foreach (string pair in held.Split(',', StringSplitOptions.RemoveEmptyEntries))
+            {
+                string[] parts = pair.Split('=');
+                _block[int.Parse(parts[0])] = Convert.ToByte(parts[1], 16);
+            }
         }
+
+        /// <summary>One byte of block 0x0001 as the unit holds it.</summary>
+        public byte this[int offset] { get { lock (this) return _block[offset]; } }
 
         public DeviceInfo Info { get; } = new("Elgato", "Wave XLR Pro", 0x0fd9, 0x00b4) { Location = new(1, 52, "1-" + DirectSerial, DirectSerial) };
         public DeviceCapabilities Capabilities { get; } = new()

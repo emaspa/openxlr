@@ -20,7 +20,7 @@ public static class ProReturnPairs
 /// holds across all twelve entries, as the preset word when a preset writes
 /// it and as the number otherwise (<c>custom</c> when the entries
 /// disagree), the USB pairs whose field reads 11 in any of block 0x0001's
-/// three mix sections, and the block 0x0008 entries whose flag bit 0 is
+/// four mix sections, and the block 0x0008 entries whose flag bit 0 is
 /// set. <see cref="Raw"/> is the bytes the codec reads, hex, so a check
 /// that the unit holds a setting needs no transfer.
 /// </summary>
@@ -55,10 +55,12 @@ public sealed record DuckingReadback(DuckingLevel Sensitivity, DuckingLevel Amou
 ///   byte 7      00, kept
 /// Wave Link writes the three presets to all twelve entries.
 ///
-/// Block 0x0001, in the last two bytes of its first three mix sections
-/// (bytes 16 to 17, 34 to 35 and 52 to 53, after each section's aa): eight
-/// 2-bit fields, LE, field k for USB pair k. The first section is the mix
-/// the jacks play, the third the aux mix (desk probe of 2026-10-23). Wave
+/// Block 0x0001, in the last two bytes of its first four mix sections
+/// (bytes 16 to 17, 34 to 35, 52 to 53 and 70 to 71, after each section's
+/// aa): eight 2-bit fields, LE, field k for USB pair k. The first section is
+/// the mix the jacks play, the third the aux mix (desk probe of 2026-10-23),
+/// the second and fourth the jacks' second and third feeds; the fields work
+/// in the fourth too (protocol notes, section 16, probe P5). Wave
 /// Link leaves every field at 01 and makes a ducked pair 11. The unit ducks
 /// a pair only at 11: 10, which setting the high bit alone gives on a unit
 /// whose fields read 00, does nothing. So a target pair gets both bits, and
@@ -83,12 +85,12 @@ public static class ProDucking
     public const byte UnknownBit = 0x02;
 
     /// <summary>The first byte of each mix section's eight 2-bit pair fields in block 0x0001.</summary>
-    public static IReadOnlyList<int> MixFieldOffsets { get; } = [16, 34, 52];
+    public static IReadOnlyList<int> MixFieldOffsets { get; } = [16, 34, 52, 70];
     public const int MixBlockLength = 108;
 
     public const string KeyXlr1 = "xlr1";
     public const string Device = "device";
-    /// <summary>The outputs a unit can duck: the jacks' feed on pair 1 and the USB Aux port on pair 5.</summary>
+    /// <summary>The outputs a unit can duck: the jacks' feeds on pairs 1 to 3 and the USB Aux port on pair 5.</summary>
     public const string TargetMonitor = "monitor";
     public const string TargetAux = "aux";
     public const string Low = "low", Medium = "medium", High = "high", Slow = "slow", Fast = "fast", Custom = "custom";
@@ -164,7 +166,7 @@ public static class ProDucking
 
     /// <summary>
     /// Write a target into the two blocks: its values while it is on, the
-    /// ducked flag of every entry, and the pair fields of the three mix
+    /// ducked flag of every entry, and the pair fields of the four mix
     /// sections, both bits set for the target's pairs while it is on and the
     /// high bit cleared otherwise. Everything else is left as it was.
     /// </summary>
@@ -200,7 +202,7 @@ public static class ProDucking
     /// <summary>
     /// Block 0x0001's part of <see cref="Apply"/>, which
     /// <see cref="ProMixPlan"/> writes with the rest of that block: the pair
-    /// fields of the three mix sections.
+    /// fields of the four mix sections.
     /// </summary>
     /// <exception cref="ArgumentException">The block has the wrong length or the target a value the unit does not take.</exception>
     public static void ApplyFields(Span<byte> block1, ProDuckingTarget target)

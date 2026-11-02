@@ -42,6 +42,7 @@ public sealed class ProMixPlanTests
             AuxReturnEnabled = mix.AuxReturnEnabled, HpMixMonitorReturn = mix.MonitorReturn,
             HpMixMicDirect = mix.Mic1Direct, HpMixMicLevelDb = mix.Mic1LevelDb,
             HpMixMic2Direct = mix.Mic2Direct, HpMixMic2LevelDb = mix.Mic2LevelDb,
+            ProMixBlock = Convert.ToHexString(block),
         };
     }
 
@@ -96,14 +97,148 @@ public sealed class ProMixPlanTests
         // XLR 2's path, bit 1 at byte 1.
         ["mic 2 opens"] = ("", new() { Mic2 = new(true, -6) }, "1 00->f4, 12 00->02", Lvl | Path),
         ["mic 2 closes"] = ("1=f4,12=03", new() { Mic2 = new(false, 0) }, "12 03->01", Path),
-        // Ducking: both bits for a target pair in the first three sections, the high bit off elsewhere.
-        ["ducking on"] = ("", new() { Ducking = On(ProReturnPairs.Monitor) }, "16 55->5d, 34 55->5d, 52 55->5d", Duck),
+        // Ducking: both bits for a target pair in the first four sections, the high bit off elsewhere.
+        ["ducking on"] = ("", new() { Ducking = On(ProReturnPairs.Monitor) }, "16 55->5d, 34 55->5d, 52 55->5d, 70 55->5d", Duck),
         ["ducking off"] = ("16=5d,17=fd,34=5d,35=fd,52=5d,53=fd", new() { Ducking = ProDuckingTarget.Off },
             "16 5d->55, 17 fd->55, 34 5d->55, 35 fd->55, 52 5d->55, 53 fd->55", Duck),
         // Everything at once is one edit of one block.
         ["all at once"] = ("0=64", new() { Hp1 = true, MonitorReturn = true, Mic1 = new(true, 0), Ducking = On(ProReturnPairs.Monitor) },
-            "0 64->00, 12 00->21, 16 55->5d, 34 55->5d, 52 55->5d, 90 23->1e", Sel | Ret | Path | Lvl | Duck),
+            "0 64->00, 12 00->21, 16 55->5d, 34 55->5d, 52 55->5d, 70 55->5d, 90 23->1e", Sel | Ret | Path | Lvl | Duck),
     };
+
+    private const ProMixChanges Feed = ProMixChanges.FeedSections;
+
+    private static ProFeedSection Quiet(int pair) => new(pair, new(false, 0), new(false, 0));
+
+    /// <summary>Section 18 as <see cref="Neutral"/> holds it, with byte 12 at c0 (pairs 2 and 3, as a unit can hold them).</summary>
+    private const string Kept18 = "000000000000000000000000C00000AA";
+
+    /// <summary>
+    /// The jacks' own feeds: each distinct feed on a section and a pair of its
+    /// own, the exact selector each jack names, and sections put back as they
+    /// were.
+    /// </summary>
+    private static readonly Dictionary<string, (string Held, ProMixPlan Plan, string Diff, ProMixChanges Changes)> FeedScenes = new()
+    {
+        // One feed: every jack on section 0, as before.
+        ["one feed"] = ("", new() { Hp1 = true, Hp2 = true, LineOut = true, JackSections = ProJackSections.Shared },
+            "90 23->1e, 91 23->1e, 93 23->1e", Sel),
+        // A jack another program left on section 18 is moved to its feed's.
+        ["one feed, a jack on section 18"] = ("91=1f", new() { Hp2 = true, JackSections = ProJackSections.Shared }, "91 1f->1e", Sel),
+        ["one feed, held"] = ("90=1e,91=1e", new() { Hp1 = true, Hp2 = true, JackSections = ProJackSections.Shared }, "no change", None),
+        // Two feeds: Headphones 2 on section 18, pair 2 at -21 dB and alone in it.
+        ["two feeds"] = ("", new()
+        {
+            Hp1 = true, Hp2 = true, JackSections = new(0, 18, 0), MonitorReturn = true,
+            Feeds = new Dictionary<int, ProFeedSection> { [18] = Quiet(2) },
+        }, "12 00->20, 24 00->d6, 30 00->40, 90 23->1e, 91 23->1f", Sel | Ret | Feed),
+        // A third feed: Line Out on section 54, pair 3.
+        ["line out on a third feed"] = ("", new()
+        {
+            LineOut = true, JackSections = new(0, 18, 54),
+            Feeds = new Dictionary<int, ProFeedSection> { [54] = Quiet(3) },
+        }, "61 00->d6, 66 00->80, 93 23->21", Sel | Feed),
+        // The microphones' paths in a feed section, trimmed like the pair.
+        ["a feed with both paths"] = ("", new()
+        {
+            Feeds = new Dictionary<int, ProFeedSection> { [18] = new(2, new(true, 0), new(true, -6)) },
+        }, "18 00->d6, 19 00->ca, 24 00->d6, 30 00->43", Feed),
+        // A path off leaves its level as held.
+        ["a feed with the path off"] = ("18=64,24=d6,30=41", new() { Feeds = new Dictionary<int, ProFeedSection> { [18] = Quiet(2) } },
+            "30 41->40", Feed),
+        // What another program left goes: Line In, other pairs, and the
+        // feed's pair in the Aux mix's section, whose own pair 5 stays.
+        ["a feed takes out what was left"] = ("30=fd,31=0f,48=40,49=02", new()
+        {
+            Feeds = new Dictionary<int, ProFeedSection> { [18] = Quiet(2) },
+        }, "24 00->d6, 30 fd->40, 31 0f->00, 48 40->00", Feed),
+        // Bits of byte 13 above pair 7 stay as read.
+        ["a feed keeps the bits above pair 7"] = ("24=d6,30=40,31=f0", new() { Feeds = new Dictionary<int, ProFeedSection> { [18] = Quiet(2) } },
+            "no change", None),
+        // USB Aux reaches a feed as it reaches section 0.
+        ["a feed copies usb aux"] = ("2=f4,12=24", new() { Feeds = new Dictionary<int, ProFeedSection> { [18] = Quiet(2) } },
+            "20 00->ca, 24 00->d6, 30 00->44", Feed),
+        // Back to one feed: the section as it was before, ducking fields left.
+        ["a section put back"] = ("24=d6,30=40,34=5d", new()
+        {
+            Hp2 = true, JackSections = ProJackSections.Shared, Restore = new Dictionary<int, string> { [18] = Kept18 },
+        }, "24 d6->00, 30 40->c0, 91 23->1e", Sel | Feed),
+        ["a section already back"] = ("30=c0", new() { Restore = new Dictionary<int, string> { [18] = Kept18 } }, "no change", None),
+        // A section a feed uses is not put back.
+        ["a restore while fed"] = ("24=d6,30=40", new()
+        {
+            Feeds = new Dictionary<int, ProFeedSection> { [18] = Quiet(2) }, Restore = new Dictionary<int, string> { [18] = Kept18 },
+        }, "no change", None),
+        // Ducking a second feed's pair reaches its section.
+        ["ducking the second feed"] = ("", new() { Ducking = On(2) }, "16 55->75, 34 55->75, 52 55->75, 70 55->75", Duck),
+        ["ducking the third feed"] = ("", new() { Ducking = On(3) }, "16 55->d5, 34 55->d5, 52 55->d5, 70 55->d5", Duck),
+    };
+
+    public static TheoryData<string> FeedSceneNames() => [.. FeedScenes.Keys];
+
+    [Theory]
+    [MemberData(nameof(FeedSceneNames))]
+    public void EachFeedSceneChangesExactlyItsBytes(string scene)
+    {
+        (string held, ProMixPlan plan, string diff, ProMixChanges changes) = FeedScenes[scene];
+        byte[] before = Held(held);
+        var after = new byte[ProMixSections.Length];
+        Assert.Equal(changes, plan.Apply(before, after));
+        Assert.Equal(diff, ProDucking.Diff(before, after));
+        // What the device manager decides from the last poll's block, without a transfer.
+        Assert.Equal(changes & ~ProMixChanges.DuckingFields, plan.Needs(before));
+        var twice = new byte[ProMixSections.Length];
+        Assert.Equal(ProMixChanges.None, plan.Apply(after, twice));
+        Assert.Equal(after, twice);
+        Assert.Equal(ProMixChanges.None, plan.Needs(after));
+    }
+
+    [Theory]
+    [MemberData(nameof(SceneNames))]
+    public void TheCheckOnTheWholeBlockAgreesWithTheEdit(string scene)
+    {
+        (string held, ProMixPlan plan, _, ProMixChanges changes) = Scenes[scene];
+        Assert.Equal(changes & ~ProMixChanges.DuckingFields, plan.Needs(Held(held)));
+    }
+
+    [Fact]
+    public void FeedSectionsApplyLiveWithoutTheCommit()
+    {
+        Assert.False(ProMixChanges.FeedSections.Commits());
+        Assert.False(ProMixChanges.FeedSections.Membership());
+    }
+
+    [Fact]
+    public void ARestoreIsTheSectionsFirstSixteenBytes()
+    {
+        byte[] block = Held("30=c0,34=5d");
+        Assert.Equal(Kept18, ProMixPlan.RestoreOf(block, 18));
+        Assert.True(ProMixPlan.IsRestore(Kept18));
+        Assert.False(ProMixPlan.IsRestore(Kept18 + "00"));
+        Assert.False(ProMixPlan.IsRestore("zz" + Kept18[2..]));
+        Assert.Throws<ArgumentException>(() => ProMixPlan.RestoreBytes(36, Kept18));
+        Assert.Throws<ArgumentException>(() => ProMixPlan.RestoreBytes(18, "00"));
+    }
+
+    [Theory]
+    [InlineData(0, 2)]
+    [InlineData(36, 2)]
+    [InlineData(72, 2)]
+    [InlineData(18, 1)]
+    [InlineData(18, 5)]
+    [InlineData(18, 8)]
+    public void AFeedOnlyGoesOnASectionAndPairOfItsOwn(int section, int pair)
+    {
+        var plan = new ProMixPlan { Feeds = new Dictionary<int, ProFeedSection> { [section] = Quiet(pair) } };
+        Assert.Throws<ArgumentException>(() => plan.Apply(Neutral(), new byte[ProMixSections.Length]));
+    }
+
+    [Fact]
+    public void AJackOnASectionNoFeedUsesIsRefused()
+    {
+        var plan = new ProMixPlan { Hp1 = true, JackSections = new(36, 0, 0) };
+        Assert.Throws<ArgumentException>(() => plan.Apply(Neutral(), new byte[ProMixSections.Length]));
+    }
 
     public static TheoryData<string> SceneNames() => [.. Scenes.Keys];
 

@@ -6,6 +6,40 @@ namespace OpenXLR.Core.Devices;
 public readonly record struct ProMicPath(bool Direct, double LevelDb);
 
 /// <summary>
+/// A jack feed beyond the first, on a section of its own: the USB playback
+/// pair it streams on and the two microphones' paths into it, at the levels
+/// the feed's sends would play them at.
+/// </summary>
+public readonly record struct ProFeedSection(int Pair, ProMicPath Mic1, ProMicPath Mic2);
+
+/// <summary>
+/// The jack feeds on the Wave XLR Pro's own sections. Each distinct feed the
+/// jacks play takes a slot, in the jack order Headphones 1, Headphones 2,
+/// Line Out: slot 0 is pair 1 on section 0 (the jacks' mix as before), slot
+/// 1 pair 2 on section 18 and slot 2 pair 3 on section 54. The Aux mix keeps
+/// pair 5 on section 36. Sections 18 and 54 have no level byte of their own,
+/// so a feed there takes <see cref="TrimDb"/> into its cells, the level byte
+/// 98 gives section 0 (protocol notes, sections 16 to 18): two jacks at
+/// equal faders and equal headphone volumes are equally loud.
+/// </summary>
+public static class ProJackFeeds
+{
+    public const int Slots = 3;
+    public static IReadOnlyList<int> Pairs { get; } = [ProReturnPairs.Monitor, 2, 3];
+    public static IReadOnlyList<int> Sections { get; } = [0, 18, 54];
+    public static IReadOnlyList<byte> Selectors { get; } = [0x1E, 0x1F, 0x21];
+
+    /// <summary>Section 0's level as byte 98 holds it on every unit read so far, which the other jack sections take into their cells.</summary>
+    public const double TrimDb = -21;
+
+    /// <summary>The slot of a section, or -1 for a section no jack feed uses.</summary>
+    public static int SlotOfSection(int section) => section switch { 0 => 0, 18 => 1, 54 => 2, _ => -1 };
+
+    /// <summary>The bytes of a section a restore puts back: its cells, membership, byte 14 and marker. The ducking fields stay with ducking.</summary>
+    public const int RestoredLength = ProMixSections.DuckingOffset;
+}
+
+/// <summary>
 /// What OpenXLR wants block 0x0001 of a Wave XLR Pro to hold while the
 /// computer builds the mixes (today's mode), as one target: the four output
 /// selectors, the Monitor return and the two microphones' paths in section
@@ -33,6 +67,11 @@ public readonly record struct ProMicPath(bool Direct, double LevelDb);
 ///                 differs; its level (byte 0 or 1) only while the path is
 ///                 wanted and the half-dB value differs
 ///   ducking       the fields <see cref="ProDucking.ApplyFields"/> owns
+/// With <see cref="JackSections"/>, each jack's selector is written whenever
+/// it is not the exact byte for its feed's section, and
+/// <see cref="Feeds"/> and <see cref="Restore"/> give sections 18 and 54
+/// to the jacks' second and third feeds and back (see <see cref="ProJackFeeds"/>);
+/// <see cref="Needs(ReadOnlySpan{byte})"/> judges those on the block itself.
 /// </summary>
 public sealed record ProMixPlan
 {
@@ -44,6 +83,23 @@ public sealed record ProMixPlan
     public ProMicPath? Mic1 { get; init; }
     public ProMicPath? Mic2 { get; init; }
     public ProDuckingTarget? Ducking { get; init; }
+
+    /// <summary>
+    /// The section each jack plays while it is on (0, 18 or 54, see
+    /// <see cref="ProJackFeeds"/>). Null keeps the rule from before per-jack
+    /// feeds: on is any selector but 23, and a jack turned on gets 1e.
+    /// </summary>
+    public ProJackSections? JackSections { get; init; }
+
+    /// <summary>The jack feeds beyond the first, by section (18 or 54). A section absent here is left as held, or restored.</summary>
+    public IReadOnlyDictionary<int, ProFeedSection>? Feeds { get; init; }
+
+    /// <summary>
+    /// Sections to put back as they were before a jack feed first used them,
+    /// by section, as the hex of their first <see cref="ProJackFeeds.RestoredLength"/>
+    /// bytes. Ignored for a section <see cref="Feeds"/> names.
+    /// </summary>
+    public IReadOnlyDictionary<int, string>? Restore { get; init; }
 
     /// <summary>A plan that leaves every byte as the unit holds it.</summary>
     public static ProMixPlan Nothing { get; } = new();
@@ -90,6 +146,8 @@ public sealed record ProMixPlan
     // Monitor return. Bit 2, the USB Aux input (desk, 2026-10-31, a Mac on
     // the port reached the mix at 0 dB), stays as read: an owner can hear a
     // second computer there with Aux In's send muted.
+    internal const byte UsbAuxMask = 0x04;
+    internal const int AuxSection = 36;
     internal const byte OtherPairsLowMask = 0xd0;
     internal const byte OtherPairsHighMask = 0x0f;
 
@@ -173,6 +231,123 @@ public sealed record ProMixPlan
         return changes;
     }
 
+    /// <summary>
+    /// <see cref="Needs(ProMixHeld)"/> on the whole block, with the parts only
+    /// the bytes show: the section each jack's selector names, the feed
+    /// sections and the restores.
+    /// </summary>
+    public ProMixChanges Needs(ReadOnlySpan<byte> block)
+    {
+        if (block.Length != ProMixSections.Length) throw new ArgumentException($"block 0x0001 is {ProMixSections.Length} bytes", nameof(block));
+        ProMixHeld held = Read(block);
+        ProMixChanges changes = Needs(held) & ~ProMixChanges.Selectors;
+        if (UsbAuxWritten(held) || SelectorsWritten(block, held)) changes |= ProMixChanges.Selectors;
+        Span<byte> copy = stackalloc byte[ProMixSections.Length];
+        block.CopyTo(copy);
+        if (ApplySections(block, copy)) changes |= ProMixChanges.FeedSections;
+        return changes;
+    }
+
+    /// <summary>The jacks' selector bytes the plan wants, for each jack it sets; only with <see cref="JackSections"/>.</summary>
+    private IEnumerable<(int Offset, byte Wanted)> JackSelectors()
+    {
+        if (JackSections is not { } sections) yield break;
+        if (Hp1 is { } hp1) yield return (ProMixSections.SelectorHp1, hp1 ? SelectorOf(sections.Hp1) : SelectorOff);
+        if (Hp2 is { } hp2) yield return (ProMixSections.SelectorHp2, hp2 ? SelectorOf(sections.Hp2) : SelectorOff);
+        if (LineOut is { } lineOut) yield return (ProMixSections.SelectorLineOut, lineOut ? SelectorOf(sections.LineOut) : SelectorOff);
+    }
+
+    private static byte SelectorOf(int section)
+        => ProJackFeeds.SlotOfSection(section) is int slot and >= 0 ? ProJackFeeds.Selectors[slot]
+            : throw new ArgumentException($"no jack feed plays section {section}", nameof(section));
+
+    /// <summary>Whether a jack's selector is written: with <see cref="JackSections"/> when it is not the exact byte, without by the on and off rule.</summary>
+    private bool SelectorsWritten(ReadOnlySpan<byte> block, ProMixHeld held)
+    {
+        if (JackSections is null)
+            return Hp1 is { } hp1 && held.Hp1 != hp1 || Hp2 is { } hp2 && held.Hp2 != hp2 || LineOut is { } lineOut && held.LineOut != lineOut;
+        foreach ((int offset, byte wanted) in JackSelectors())
+            if (block[offset] != wanted) return true;
+        return false;
+    }
+
+    /// <summary>
+    /// The feed sections' and restores' edits on <paramref name="into"/>, a
+    /// copy of <paramref name="held"/>. True when a byte changed.
+    ///
+    /// A feed section holds its pair at <see cref="ProJackFeeds.TrimDb"/>, each
+    /// microphone's path when the feed's send carries it (the bit, and the
+    /// level trimmed the same way while on), USB Aux's bit 2 as section 0
+    /// holds it with its level trimmed, and no other source: Line In and every
+    /// other pair out. The pair a feed streams on also leaves section 36, so a
+    /// jack's feed never reaches the USB Aux port. Byte 14, the marker and the
+    /// ducking fields stay as read.
+    /// </summary>
+    private bool ApplySections(ReadOnlySpan<byte> held, Span<byte> into)
+    {
+        bool changed = false;
+        if (Restore is { } restore)
+            foreach ((int section, string hex) in restore)
+            {
+                if (Feeds?.ContainsKey(section) == true) continue;
+                byte[] bytes = RestoreBytes(section, hex);
+                if (held.Slice(section, bytes.Length).SequenceEqual(bytes)) continue;
+                bytes.CopyTo(into[section..]);
+                changed = true;
+            }
+        if (Feeds is not { } feeds) return changed;
+        foreach ((int section, ProFeedSection feed) in feeds)
+        {
+            if (ProJackFeeds.SlotOfSection(section) is not (1 or 2))
+                throw new ArgumentException($"section {section} carries no jack feed beyond the first", nameof(Feeds));
+            if (feed.Pair is < 0 or >= ProMixSections.PairCount || feed.Pair is ProReturnPairs.Aux or ProReturnPairs.Monitor)
+                throw new ArgumentException($"pair {feed.Pair} cannot carry a jack feed of its own", nameof(Feeds));
+            int source = ProMixSections.SourceOfPair(feed.Pair);
+            changed |= Set(into, section + source, LevelCell(ProJackFeeds.TrimDb));
+            changed |= SetMicLevel(into, section + Mic1LevelOffset, feed.Mic1);
+            changed |= SetMicLevel(into, section + Mic2LevelOffset, feed.Mic2);
+            int usbAux = held[ReturnsOffset] & UsbAuxMask;
+            if (usbAux != 0)
+                changed |= Set(into, section + ProMixSections.UsbAux, LevelCell(HeldLevelDb(held[ProMixSections.UsbAux]) + ProJackFeeds.TrimDb));
+            int mask = (feed.Mic1.Direct ? Mic1Mask : 0) | (feed.Mic2.Direct ? Mic2Mask : 0) | usbAux | 1 << source;
+            changed |= Set(into, section + ReturnsOffset, (byte)mask);
+            changed |= Set(into, section + PairsOffset, (byte)(held[section + PairsOffset] & ~OtherPairsHighMask | mask >> 8));
+            int auxMask = AuxSection + ReturnsOffset + source / 8;
+            changed |= Set(into, auxMask, (byte)(into[auxMask] & ~(1 << source % 8)));
+        }
+        return changed;
+    }
+
+    private static bool Set(Span<byte> into, int offset, byte value)
+    {
+        if (into[offset] == value) return false;
+        into[offset] = value;
+        return true;
+    }
+
+    private static bool SetMicLevel(Span<byte> into, int offset, ProMicPath mic)
+    {
+        double wanted = mic.LevelDb + ProJackFeeds.TrimDb;
+        return mic.Direct && HalfDb(HeldLevelDb(into[offset])) != HalfDb(wanted) && Set(into, offset, LevelCell(wanted));
+    }
+
+    /// <summary>A restore's bytes, checked: hex of <see cref="ProJackFeeds.RestoredLength"/> bytes for section 18 or 54.</summary>
+    /// <exception cref="ArgumentException">Another section, or hex of another length.</exception>
+    public static byte[] RestoreBytes(int section, string hex)
+    {
+        if (ProJackFeeds.SlotOfSection(section) is not (1 or 2)) throw new ArgumentException($"section {section} is not restored", nameof(section));
+        if (!IsRestore(hex)) throw new ArgumentException($"a restore is {ProJackFeeds.RestoredLength} bytes of hex", nameof(hex));
+        return Convert.FromHexString(hex);
+    }
+
+    /// <summary>Whether a saved restore is <see cref="ProJackFeeds.RestoredLength"/> bytes of hex.</summary>
+    public static bool IsRestore(string? hex)
+        => hex is { Length: 2 * ProJackFeeds.RestoredLength } && hex.All(Uri.IsHexDigit);
+
+    /// <summary>The bytes of a section a restore would put back, as hex, from a whole block.</summary>
+    public static string RestoreOf(ReadOnlySpan<byte> block, int section)
+        => Convert.ToHexString(block.Slice(section, ProJackFeeds.RestoredLength));
+
     private bool UsbAuxWritten(ProMixHeld held)
         => UsbAux is { } aux && (held.UsbAux != aux || (aux && !held.AuxReturnEnabled));
 
@@ -187,11 +362,16 @@ public sealed record ProMixPlan
         if (into.Length != ProMixSections.Length) throw new ArgumentException($"block 0x0001 is {ProMixSections.Length} bytes", nameof(into));
         ProMixHeld was = Read(held);
         held.CopyTo(into);
-        ProMixChanges changes = Needs(was);
+        ProMixChanges changes = Needs(held) & ~ProMixChanges.FeedSections;
 
-        if (Hp1 is { } hp1 && was.Hp1 != hp1) into[ProMixSections.SelectorHp1] = hp1 ? SelectorMonitor : SelectorOff;
-        if (Hp2 is { } hp2 && was.Hp2 != hp2) into[ProMixSections.SelectorHp2] = hp2 ? SelectorMonitor : SelectorOff;
-        if (LineOut is { } lineOut && was.LineOut != lineOut) into[ProMixSections.SelectorLineOut] = lineOut ? SelectorMonitor : SelectorOff;
+        if (JackSections is null)
+        {
+            if (Hp1 is { } hp1 && was.Hp1 != hp1) into[ProMixSections.SelectorHp1] = hp1 ? SelectorMonitor : SelectorOff;
+            if (Hp2 is { } hp2 && was.Hp2 != hp2) into[ProMixSections.SelectorHp2] = hp2 ? SelectorMonitor : SelectorOff;
+            if (LineOut is { } lineOut && was.LineOut != lineOut) into[ProMixSections.SelectorLineOut] = lineOut ? SelectorMonitor : SelectorOff;
+        }
+        else
+            foreach ((int offset, byte wanted) in JackSelectors()) into[offset] = wanted;
         // The USB Aux port cannot play the jacks' mix (no USB playback pair
         // reaches it under 1e); it plays the Aux mix with pair 5's cell open,
         // as Wave Link delivers audio there, and without the unit's own
@@ -223,13 +403,17 @@ public sealed record ProMixPlan
         }
         ApplyMic(Mic1, was.Mic1Direct, was.Mic1LevelDb, Mic1LevelOffset, Mic1Mask, into);
         ApplyMic(Mic2, was.Mic2Direct, was.Mic2LevelDb, Mic2LevelOffset, Mic2Mask, into);
+        // After section 0, whose USB Aux bit the feed sections copy.
+        Span<byte> before = stackalloc byte[ProMixSections.Length];
+        into.CopyTo(before);
+        if (ApplySections(before, into)) changes |= ProMixChanges.FeedSections;
 
         if (Ducking is { } ducking)
         {
-            Span<byte> before = stackalloc byte[ProMixSections.Length];
-            into.CopyTo(before);
+            Span<byte> unducked = stackalloc byte[ProMixSections.Length];
+            into.CopyTo(unducked);
             ProDucking.ApplyFields(into, ducking);
-            if (!into.SequenceEqual(before)) changes |= ProMixChanges.DuckingFields;
+            if (!into.SequenceEqual(unducked)) changes |= ProMixChanges.DuckingFields;
         }
         return changes;
     }
@@ -270,6 +454,15 @@ public enum ProMixChanges
     Levels = 8,
     /// <summary>The ducking fields; no commit, as Wave Link sends none.</summary>
     DuckingFields = 16,
+    /// <summary>A jack feed's own section, or a section put back as it was; applies live, no commit (protocol notes, section 16).</summary>
+    FeedSections = 32,
+}
+
+/// <summary>The section each of the Pro's jacks plays while it is on: 0, 18 or 54 (see <see cref="ProJackFeeds"/>).</summary>
+public readonly record struct ProJackSections(int Hp1, int Hp2, int LineOut)
+{
+    /// <summary>Every jack on section 0, as before per-jack feeds.</summary>
+    public static ProJackSections Shared { get; } = new(0, 0, 0);
 }
 
 public static class ProMixChangesExtensions

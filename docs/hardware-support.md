@@ -46,6 +46,7 @@ the commit block every selector write needs.
 | Headphone volumes x2, low impedance | verified | independent jacks |
 | Zero-latency microphone path | measured on the unit | block 0x0001 byte 12 bit 0, XLR 1's membership in the mix the jacks play, at the level in byte 0. On the desk unit (firmware 1.0.14, 2026-10-30, the mix's capture stream against XLR 1's) the bit put the microphone in the mix and byte 0 set its level in half-dB steps (`00` with the Monitor return, `f4` 6 dB under, `c8` 28 dB under, held at +12 dB), and a level write applied without a commit or a stream restart. OpenXLR used to drive byte 0 as a Mic/PC crossfade and byte 13 bit 1 as this path; that bit is the Aux mix's USB stream, which an owner's unit held at -60 dB, so the microphone was missing from the jacks. The daemon now opens bit 0 at the level the Monitor send would play and clears byte 13 bit 1 with the Monitor return. That level follows the output volume below 100%, which acts on the Monitor mix's USB stream and not on the path, and keeps the 7.94 dB the unit takes from that stream (protocol notes section 16), as Wave Link does. Taking the 7.94 dB off as well was heard on the desk on 2026-11-02 and left the voice inaudible under music at equal faders. The Pro shows no crossfade. Not yet checked by ear XLR 2's path is byte 12 bit 1 at the level in byte 1, measured the same way on 2026-10-31 with a microphone on XLR 2 (absent clear, 0 dB set, 6 dB down at `f4`), and the daemon drives it as it drives XLR 1's |
 | Physical output routing | verified | HP1, HP2, Line Out, USB Aux; verified by listening on both jacks |
+| A feed of its own on each jack | beta | each distinct jack feed streams on its own USB pair into its own section of block 0x0001: the first on pair 1 and section 0 (selector `1e`), the second on pair 2 and section 18 (`1f`), the third on pair 3 and section 54 (`21`), with the pair's cell at -21 dB, the level byte 98 gives section 0. Probes on the desk unit showed each jack plays the section its selector names with no commit, two jacks play two sections at once, and a pair's cell and membership apply live (protocol notes, sections 16 and 18). Two jacks on two feeds by ear, the levels matching on the capture streams, and sections 18 and 54 put back as they were are not yet checked on hardware |
 | USB Aux input level + lock, aux return | verified | return routing latches at stream open; the daemon bounces the stream |
 | Line In on a channel of its own | measured on the capture source | on the desk unit (firmware 1.0.14, 2026-10-25) the raw capture source has 18 channels, and a source playing into the Line In jack arrived on AUX6 and AUX7, apart from USB Aux on AUX4 and AUX5. The Line In channel takes AUX6 and AUX7 and is shown only on that 18-channel layout. Listening to it through OpenXLR's channel is not yet checked on hardware |
 | Line In gain, 0 to 40 dB | beta | block 0x0004 byte 76, which matches the centre pair of the ALSA capture volume (20 dB on the desk unit). The unit takes 0 to 80 dB, but an owner reports hiss above about 20 dB and that Wave Link limits it to 20 dB, so OpenXLR writes no more than 40. A unit set higher elsewhere reads back its own value. A write changes that byte alone, like the XLR gains. Writing it from OpenXLR and hearing the change are not yet checked on hardware |
@@ -92,11 +93,12 @@ Ducking comes from captures of Wave Link 3.5 on Windows, firmware 1.0.14. Block
 with the key threshold, depth, attack, release and a ducked flag, and each
 of the five mix sections of block 0x0001 holds a 2-bit field per USB pair.
 Wave Link sets the high bit of a ducked pair's field in the first three
-sections only, the two at 54 and 72 untouched, and the daemon writes the
-same three. With XLR 1 loud the unit
+sections only, the two at 54 and 72 untouched. The daemon writes those
+three and the one at 54, where a third jack feed plays. With XLR 1 loud the unit
 lowered the ducked pairs by the configured depth with no host write. The
-daemon can write the same bytes, without the commit block, on the two pairs
-OpenXLR streams to: 2/3 for the jacks and Line Out, 10/11 for the USB Aux
+daemon can write the same bytes, without the commit block, on the pairs
+OpenXLR streams to: 2/3 for the jacks and Line Out, 4/5 and 6/7 for a
+second and third jack feed, 10/11 for the USB Aux
 port. A first desk test saw the unit's meters lower pair 2/3 while XLR 1
 was loud and the headphones stay level: the daemon set the high bit of
 each field alone, and the unit ducks a pair only when both bits are set.

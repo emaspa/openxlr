@@ -19,3 +19,6 @@ public static class MonitorFeed
 
     public static bool Includes(string? feed, string mixId) => Parts(feed).Contains(mixId);
 }
+
+/// <summary>One feed the Wave XLR Pro's jacks play and the selected jacks that play it.</summary>
+public sealed record JackFeed(string Feed, IReadOnlyList<string> Jacks);

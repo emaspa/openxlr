@@ -1188,7 +1188,9 @@ public sealed partial class DeviceManager : BackgroundService
             if (s is null) return false;
             bool duckWaiting;
             lock (_duckGate) duckWaiting = _device.Capabilities.Ducking && _duckPending is not null;
-            if (!duckWaiting && plan.Needs(ProMixHeld.Of(s)) == ProMixChanges.None) return false;
+            ProMixChanges needed = s.ProMixBlock is { Length: 2 * ProMixSections.Length } hex
+                ? plan.Needs(Convert.FromHexString(hex)) : plan.Needs(ProMixHeld.Of(s));
+            if (!duckWaiting && needed == ProMixChanges.None) return false;
             try
             {
                 ProMixWrite? write = WriteMixLocked(_device, plan, "update");
@@ -1214,6 +1216,19 @@ public sealed partial class DeviceManager : BackgroundService
                 _log.LogDebug("block 0x0001 sync: {msg}", ex.Message);
                 return false;
             }
+        }
+    }
+
+    /// <summary>
+    /// The Pro's block 0x0001 as the last poll read it, hex; null without a
+    /// connected unit that has output routing or before its first poll.
+    /// </summary>
+    public string? ProMixBlock
+    {
+        get
+        {
+            lock (_gate)
+                return _device is { Connected: true } dev && dev.Capabilities.OutputRouting ? _last?.ProMixBlock : null;
         }
     }
 

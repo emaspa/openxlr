@@ -154,7 +154,7 @@ public sealed partial class Mixer
         DuckingVerdict verdict = DuckingPlacement.Evaluate(setup, view, unit is null ? null : _unitDucking);
         bool wantDevice = verdict.Backend == ProDucking.Device && _duckingWriter is not null;
         string owner = _config.Channels.FirstOrDefault(c => c.Id == setup.Key)?.Name ?? setup.Key;
-        ProDuckingTarget target = DuckingTarget(setup, verdict.Outputs);
+        ProDuckingTarget target = DuckingTarget(setup, verdict.Pairs);
 
         if (wantDevice)
         {
@@ -197,16 +197,18 @@ public sealed partial class Mixer
             && left.ThresholdDb == right.ThresholdDb && left.DepthDb == right.DepthDb
             && left.AttackMs == right.AttackMs && left.ReleaseMs == right.ReleaseMs && left.Cells.SetEquals(right.Cells);
 
-    private static ProDuckingTarget DuckingTarget(DuckingSetup setup, IReadOnlyList<string> outputs)
+    private static ProDuckingTarget DuckingTarget(DuckingSetup setup, IReadOnlyList<int> pairs)
         => new(setup.Enabled && setup.Channels.Count > 0 && setup.Mixes.Count > 0,
-            setup.Sensitivity, setup.Amount, setup.Speed, outputs.Select(ProDucking.PairOf).ToFrozenSet());
+            setup.Sensitivity, setup.Amount, setup.Speed, pairs.ToFrozenSet());
 
     private DuckingView DuckingViewLocked()
     {
         DuckingSetup setup = DuckingSetupLocked();
         bool carrier = UnitInputsLocked().TryGetValue(setup.Key, out UnitInputStatus? input)
             && input.Primary && input.Input == 1 && input.Unit == _duckingUnit;
-        IReadOnlyList<string> feed = MonitorFeed.Parts(JackFeedLocked());
+        List<JackFeed> jackFeeds = JackFeedsLocked();
+        IReadOnlyList<string> feed = jackFeeds.Count == 0 ? MonitorFeed.Parts(JackFeedLocked())
+            : [.. jackFeeds.SelectMany(f => MonitorFeed.Parts(f.Feed)).Distinct()];
         var mixes = new List<DuckingMixView>();
         foreach (MixDefinition mix in _config.Mixes)
         {
@@ -235,7 +237,11 @@ public sealed partial class Mixer
                 consumers, open, keyInSoftware));
         }
         return new(_built || _duckingPort is not null, carrier, mixes, feed,
-            DuckingStatus.RunningMixes.Count > 0, _duckingUnit is not null && _duckingFailed.Contains(_duckingUnit));
+            DuckingStatus.RunningMixes.Count > 0, _duckingUnit is not null && _duckingFailed.Contains(_duckingUnit))
+        {
+            JackFeeds = jackFeeds.Count == 0 ? null
+                : [.. jackFeeds.Select((f, slot) => new DuckingJackFeed(ProJackFeeds.Pairs[slot], MonitorFeed.Parts(f.Feed)))],
+        };
     }
 
     /// <summary>A detached snapshot. Device is null without hardware ducking on the primary driven unit.</summary>

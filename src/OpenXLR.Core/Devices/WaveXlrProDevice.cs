@@ -309,6 +309,7 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
             HpMixMic2Direct = mix.Mic2Direct,
             HpMixMic2LevelDb = mix.Mic2LevelDb,
             AuxReturnEnabled = mix.AuxReturnEnabled,
+            ProMixBlock = Convert.ToHexString(b1),
             AuxLevelDb = -b4[AuxLevelOffset] / 4.0,
             AuxLevelLock = (b4[AuxLevelLockOffset] & AuxLevelLockMask) != 0,
             LineInGainDb = b4[LineInGainOffset],

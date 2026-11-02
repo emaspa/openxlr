@@ -111,6 +111,31 @@ public sealed class DuckingPlacementTests
     }
 
     [Fact]
+    public void EachJackFeedIsDuckedOnItsOwnPair()
+    {
+        DuckingView view = View with
+        {
+            JackFeed = ["monitor", "monitor2"],
+            JackFeeds = [new(ProReturnPairs.Monitor, ["monitor"]), new(2, ["monitor2"])],
+            Mixes = [.. View.Mixes.Select(m => m.Id == "monitor2" ? m with { OnJacks = true } : m)],
+        };
+        // Only the feed that plays a ducked mix dips; the other jack is not a shared output.
+        DuckingVerdict one = DuckingPlacement.Evaluate(Setup, view, Pro);
+        Assert.True(one.Ready);
+        Assert.Equal([ProReturnPairs.Monitor], one.Pairs);
+        DuckingVerdict both = DuckingPlacement.Evaluate(Setup with { Mixes = ["monitor", "monitor2", "auxout"] }, view, Pro);
+        Assert.True(both.Ready);
+        Assert.Equal([ProReturnPairs.Monitor, 2, ProReturnPairs.Aux], both.Pairs);
+        Assert.Equal([2], DuckingPlacement.Evaluate(Setup with { Mixes = ["monitor2"] }, view, Pro).Pairs);
+        // A third feed summing a ducked mix with one that is not.
+        view = view with { JackFeeds = [.. view.JackFeeds!, new(3, ["monitor", "monitor2"])] };
+        DuckingVerdict summed = DuckingPlacement.Evaluate(Setup, view, Pro);
+        Assert.Equal("sharedOutput", summed.Reason);
+        Assert.Equal("The jacks play Monitor A and Monitor B together, and only Monitor A is ducked.", summed.Note);
+        Assert.Equal([ProReturnPairs.Monitor, 3], summed.Pairs);
+    }
+
+    [Fact]
     public void AHardwareKeyPathIsAllowedAndSoftwareChoiceKeepsTheDeviceVerdict()
     {
         DuckingView view = EditMonitor(View, m => m with
