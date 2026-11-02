@@ -19,6 +19,14 @@ Wine's empty answer. When the prefix is not on an NVMe drive, or the drive
 cannot be read, the host leaves Wine's answer alone. The host's output
 names the drive it found, with the serial masked.
 
+The version in `source.json`, 5.1.1.54, is the companion's own label for
+the pinned commit. Its last number is not a commit count. The commit is
+yabridge 5.1.1 plus 42 commits, and `git describe` gives
+`5.1.1-42-ge4bca2d3`.
+The label stays, since 5.1.1.42 sorts below the published 5.1.1.54 and
+every package manager would treat it as a downgrade. A move to a newer
+commit takes a version above 5.1.1.54.
+
 `source.json` also carries the package revision: the package version is
 `<version>-<revision>`, and a rebuild of the same commit bumps the
 revision. `build.py` strips any `-march`, `-mtune` or instruction-set flag
