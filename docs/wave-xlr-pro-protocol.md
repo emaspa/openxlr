@@ -580,8 +580,8 @@ The other selector values from `18` to `2f` played nothing.
   byte 12 bit 5 set, OpenXLR's path today, pair 1's field in byte 16 at
   `11` lowered the jacks and capture AUX8/AUX9 by 6.0 dB, twice. At `10`,
   `01` or `00` nothing changed. Pair 5's field in byte 53 at `11` (entry 9
-  flagged) lowered the aux mix's stream on AUX12/AUX13 by 6.0 dB; the USB
-  Aux port itself was not listened to.
+  flagged) lowered the aux mix's stream on AUX12/AUX13 by 6.0 dB. The USB
+  Aux port itself dips too (section 17, the probe of 2026-11-02).
 - Block 0x0002 bytes 48 and 49 stayed `f0` with noise on pair 1, so they
   are not a playback meter for it. The bytes that moved all followed XLR 1.
 
@@ -1081,6 +1081,25 @@ tested. Bytes 95 to 97 at `00` changed nothing that could be seen: XLR 2
 and USB Aux carried digital silence during the run and Line In's noise
 floor stayed the same, so whether they hold the same choice for the other
 inputs is still open.
+
+### Ducking on the USB Aux port
+
+A later run the same day, the daemon stopped, a MacBook recording the USB
+Aux port. Section 36 holds pair 5 alone and the port plays it on `20`. A
+1 kHz tone at -20 dBFS on pair 5, pair 5's field in byte 53 at `11`
+(bits 2 and 3; the byte read `01` and was written `0d`), entry 9 flagged
+with depth 12 dB, the key switched with every threshold at `c4` or `00`
+as below. The section's stream (AUX12) and the MacBook's recording,
+aligned on three beeps at the start:
+
+| Key | AUX12 | the USB Aux port, as the MacBook heard it |
+|---|---|---|
+| off | -27.9 dBFS | -25.5 dBFS |
+| on, twice | -39.9 dBFS | -37.5 dBFS |
+
+The port dips by the entry's 12.0 dB at the same moments as the section's
+stream and comes back with it, so the unit's ducking reaches the USB Aux
+port. The 2.4 dB between the two columns is the MacBook's input level.
 
 ### Ducking in sections 54 and 72
 
