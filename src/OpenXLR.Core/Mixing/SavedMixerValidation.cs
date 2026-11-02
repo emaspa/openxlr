@@ -57,6 +57,7 @@ internal static class SavedMixerValidation
             Mixing = Mixing(settings.Mixing, notes),
             HardwarePairs = HardwareMap(settings.HardwarePairs, "hardwarePairs", HardwareMixingPlanner.ChannelPairs, notes),
             HardwareSections = HardwareMap(settings.HardwareSections, "hardwareSections", HardwareMixingPlanner.JackSections, notes),
+            HardwareEntry = Entry(settings.HardwareEntry, notes),
             NoiseRemoval = NoiseRemoval(settings.NoiseRemoval, notes),
             VoiceChanger = VoiceChanger(settings.VoiceChanger, notes),
             Compressor = Dynamics(settings.Compressor, "compressor", MicCompressor.Check, MicCompressor.Snap, notes),
@@ -369,6 +370,20 @@ internal static class SavedMixerValidation
             else kept[section] = hex.ToUpperInvariant();
         }
         return kept;
+    }
+
+    /// <summary>
+    /// What the unit held before hardware mixing: kept whole or, when any of
+    /// it does not read, dropped with a note. The unit keeps the mode's bytes
+    /// then, which play nothing louder than before it.
+    /// </summary>
+    private static HardwareEntry? Entry(HardwareEntry? entry, List<string> notes)
+    {
+        if (entry is null) return null;
+        if (entry.Jacks is not null && entry.Section0 is not null && entry.Section36 is not null && entry.Valid)
+            return entry with { Section0 = entry.Section0.ToUpperInvariant(), Section36 = entry.Section36.ToUpperInvariant(), Offsets = entry.Offsets ?? [] };
+        notes.Add("hardwareEntry: not readable, dropped");
+        return null;
     }
 
     /// <summary>The mixing mode: anything but <c>software</c> or <c>hardware</c> is named and becomes <c>software</c>.</summary>

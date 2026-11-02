@@ -101,6 +101,34 @@ public sealed record ProMixPlan
     /// </summary>
     public IReadOnlyDictionary<int, string>? Restore { get; init; }
 
+    /// <summary>
+    /// Hardware mixing: the sections the unit builds, by section start, as
+    /// their first 14 bytes (the twelve level cells and the membership mask),
+    /// written exactly. Byte 14, the marker and the ducking fields stay as
+    /// read. A restore for a section named here is skipped.
+    /// </summary>
+    public IReadOnlyDictionary<int, byte[]>? UnitSections { get; init; }
+
+    /// <summary>Byte 98, section 0's level in quarter-dB attenuation, as written; null leaves it.</summary>
+    public byte? Section0Level { get; init; }
+
+    /// <summary>
+    /// Hardware mixing: every source but pair 5 out of section 36, so no
+    /// channel's pair reaches the USB Aux port beside the Aux mix.
+    /// </summary>
+    public bool AuxPairOnly { get; init; }
+
+    /// <summary>
+    /// Sections 0 and 36 as they were before hardware mixing, by section
+    /// start, as the hex of their first <see cref="ProJackFeeds.RestoredLength"/>
+    /// bytes: put back first when leaving, so every other part is judged on
+    /// the bytes as they were.
+    /// </summary>
+    public IReadOnlyDictionary<int, string>? EntryRestore { get; init; }
+
+    /// <summary>The jacks' own levels in block 0x0005, written with the block by the driver (see <see cref="ProJackLevels"/>).</summary>
+    public ProJackLevels? JackLevels { get; init; }
+
     /// <summary>A plan that leaves every byte as the unit holds it.</summary>
     public static ProMixPlan Nothing { get; } = new();
 
@@ -239,12 +267,25 @@ public sealed record ProMixPlan
     public ProMixChanges Needs(ReadOnlySpan<byte> block)
     {
         if (block.Length != ProMixSections.Length) throw new ArgumentException($"block 0x0001 is {ProMixSections.Length} bytes", nameof(block));
+        if (EntryRestore is null) return NeedsCore(block);
+        // Putting sections 0 and 36 back and asserting today's parts over
+        // them gives the same bytes every time, so the plan is held when a
+        // write would change nothing.
+        Span<byte> after = stackalloc byte[ProMixSections.Length];
+        ProMixChanges changes = Apply(block, after);
+        return after.SequenceEqual(block) ? ProMixChanges.None : changes;
+    }
+
+    /// <summary><see cref="Needs(ReadOnlySpan{byte})"/> without <see cref="EntryRestore"/>.</summary>
+    private ProMixChanges NeedsCore(ReadOnlySpan<byte> block)
+    {
         ProMixHeld held = Read(block);
         ProMixChanges changes = Needs(held) & ~ProMixChanges.Selectors;
         if (UsbAuxWritten(held) || SelectorsWritten(block, held)) changes |= ProMixChanges.Selectors;
         Span<byte> copy = stackalloc byte[ProMixSections.Length];
         block.CopyTo(copy);
         if (ApplySections(block, copy)) changes |= ProMixChanges.FeedSections;
+        changes |= ApplyUnit(copy);
         return changes;
     }
 
@@ -289,7 +330,7 @@ public sealed record ProMixPlan
         if (Restore is { } restore)
             foreach ((int section, string hex) in restore)
             {
-                if (Feeds?.ContainsKey(section) == true) continue;
+                if (Feeds?.ContainsKey(section) == true || UnitSections?.ContainsKey(section) == true) continue;
                 byte[] bytes = RestoreBytes(section, hex);
                 if (held.Slice(section, bytes.Length).SequenceEqual(bytes)) continue;
                 bytes.CopyTo(into[section..]);
@@ -316,6 +357,62 @@ public sealed record ProMixPlan
             changed |= Set(into, auxMask, (byte)(into[auxMask] & ~(1 << source % 8)));
         }
         return changed;
+    }
+
+    /// <summary>Sections 0 and 36 put back as <see cref="EntryRestore"/> holds them. True when a byte changed.</summary>
+    private bool ApplyEntryRestore(Span<byte> into)
+    {
+        bool changed = false;
+        if (EntryRestore is not { } restore) return false;
+        foreach ((int section, string hex) in restore)
+        {
+            if (section is not (0 or AuxSection)) throw new ArgumentException($"section {section} is not put back on leaving", nameof(EntryRestore));
+            if (!IsRestore(hex)) throw new ArgumentException($"a restore is {ProJackFeeds.RestoredLength} bytes of hex", nameof(EntryRestore));
+            byte[] bytes = Convert.FromHexString(hex);
+            if (into.Slice(section, bytes.Length).SequenceEqual(bytes)) continue;
+            bytes.CopyTo(into[section..]);
+            changed = true;
+        }
+        return changed;
+    }
+
+    /// <summary>The bytes of a section the unit builds that a plan writes: the cells and the mask.</summary>
+    public const int UnitSectionLength = ProMixSections.MaskOffset + 2;
+
+    /// <summary>
+    /// Hardware mixing's edits on <paramref name="into"/>: the unit-built
+    /// sections, pair 5 alone in section 36, and byte 98. Returns the parts
+    /// that changed a byte.
+    /// </summary>
+    private ProMixChanges ApplyUnit(Span<byte> into)
+    {
+        ProMixChanges changes = ProMixChanges.None;
+        if (UnitSections is { } sections)
+            foreach ((int section, byte[] bytes) in sections)
+            {
+                if (ProJackFeeds.SlotOfSection(section) < 0)
+                    throw new ArgumentException($"section {section} is not one a jack plays", nameof(UnitSections));
+                if (bytes.Length != UnitSectionLength) throw new ArgumentException($"a unit section is {UnitSectionLength} bytes", nameof(UnitSections));
+                if (into.Slice(section, UnitSectionLength).SequenceEqual(bytes)) continue;
+                bytes.CopyTo(into[section..]);
+                changes |= ProMixChanges.UnitSections;
+            }
+        if (AuxPairOnly)
+        {
+            ushort wanted = (ushort)(ProMixSections.Members(into, AuxSection) & 1 << ProMixSections.SourceOfPair(ProReturnPairs.Aux));
+            if (ProMixSections.Members(into, AuxSection) != wanted)
+            {
+                into[AuxSection + ReturnsOffset] = (byte)wanted;
+                into[AuxSection + PairsOffset] = (byte)(wanted >> 8);
+                changes |= ProMixChanges.UnitSections;
+            }
+        }
+        if (Section0Level is byte level && into[ProMixSections.Section0LevelOffset] != level)
+        {
+            into[ProMixSections.Section0LevelOffset] = level;
+            changes |= ProMixChanges.Section0Level;
+        }
+        return changes;
     }
 
     private static bool Set(Span<byte> into, int offset, byte value)
@@ -360,9 +457,15 @@ public sealed record ProMixPlan
     public ProMixChanges Apply(ReadOnlySpan<byte> held, Span<byte> into)
     {
         if (into.Length != ProMixSections.Length) throw new ArgumentException($"block 0x0001 is {ProMixSections.Length} bytes", nameof(into));
-        ProMixHeld was = Read(held);
         held.CopyTo(into);
-        ProMixChanges changes = Needs(held) & ~ProMixChanges.FeedSections;
+        // Leaving hardware mixing puts sections 0 and 36 back first; every
+        // other part is judged on the bytes as they were before it.
+        bool unwound = ApplyEntryRestore(into);
+        Span<byte> restored = stackalloc byte[ProMixSections.Length];
+        into.CopyTo(restored);
+        ProMixHeld was = Read(restored);
+        ProMixChanges changes = NeedsCore(restored) & ~(ProMixChanges.FeedSections | ProMixChanges.UnitSections | ProMixChanges.Section0Level);
+        if (unwound) changes |= ProMixChanges.FeedSections;
 
         if (JackSections is null)
         {
@@ -407,6 +510,7 @@ public sealed record ProMixPlan
         Span<byte> before = stackalloc byte[ProMixSections.Length];
         into.CopyTo(before);
         if (ApplySections(before, into)) changes |= ProMixChanges.FeedSections;
+        changes |= ApplyUnit(into);
 
         if (Ducking is { } ducking)
         {
@@ -456,6 +560,61 @@ public enum ProMixChanges
     DuckingFields = 16,
     /// <summary>A jack feed's own section, or a section put back as it was; applies live, no commit (protocol notes, section 16).</summary>
     FeedSections = 32,
+    /// <summary>A section the unit builds in hardware mixing, or section 36's members; applies live, no commit.</summary>
+    UnitSections = 64,
+    /// <summary>Byte 98, section 0's level; committed, as a selector is.</summary>
+    Section0Level = 128,
+}
+
+/// <summary>
+/// The levels of the Wave XLR Pro's jacks in block 0x0005, in dB: the
+/// headphone volumes (bytes 0 and 2) and Line Out's level (byte 4), each
+/// -4 x dB, 0 to -60 dB. A null leaves that level as the unit holds it. The
+/// driver lowers before it writes block 0x0001 and raises after it, so no
+/// transition is louder for a moment.
+/// </summary>
+public sealed record ProJackLevels(double? Hp1Db, double? Hp2Db, double? LineOutDb)
+{
+    public const int Hp1Offset = 0;
+    public const int Hp2Offset = 2;
+    public const int LineOutOffset = 4;
+
+    /// <summary>The byte for a level: -4 x dB, held to 0 (0 dB) and 240 (-60 dB).</summary>
+    public static byte ByteOf(double db)
+        => double.IsFinite(db) ? (byte)Math.Clamp((int)Math.Round(-db * 4, MidpointRounding.AwayFromZero), 0, 240) : (byte)240;
+
+    /// <summary>The level a byte gives.</summary>
+    public static double DbOf(byte value) => -value / 4.0;
+
+    private IEnumerable<(int Offset, double Db)> Wanted()
+    {
+        if (Hp1Db is double hp1) yield return (Hp1Offset, hp1);
+        if (Hp2Db is double hp2) yield return (Hp2Offset, hp2);
+        if (LineOutDb is double lineOut) yield return (LineOutOffset, lineOut);
+    }
+
+    /// <summary>Block 0x0005 with every level that goes down set, and the rest as held.</summary>
+    public byte[] Lowered(ReadOnlySpan<byte> held)
+    {
+        byte[] block = held.ToArray();
+        foreach ((int offset, double db) in Wanted())
+            if (ByteOf(db) > block[offset]) block[offset] = ByteOf(db);
+        return block;
+    }
+
+    /// <summary>Block 0x0005 with every level set.</summary>
+    public byte[] All(ReadOnlySpan<byte> held)
+    {
+        byte[] block = held.ToArray();
+        foreach ((int offset, double db) in Wanted()) block[offset] = ByteOf(db);
+        return block;
+    }
+
+    /// <summary>Whether a unit holding <paramref name="state"/> holds these levels.</summary>
+    public bool HeldBy(DeviceState state)
+        => (Hp1Db is not double hp1 || ByteOf(hp1) == ByteOf(state.HpVolumeDb))
+        && (Hp2Db is not double hp2 || ByteOf(hp2) == ByteOf(state.Hp2VolumeDb))
+        && (LineOutDb is not double lineOut || ByteOf(lineOut) == ByteOf(state.LineOutLevelDb));
 }
 
 /// <summary>The section each of the Pro's jacks plays while it is on: 0, 18 or 54 (see <see cref="ProJackFeeds"/>).</summary>
@@ -469,7 +628,7 @@ public static class ProMixChangesExtensions
 {
     /// <summary>A selector or membership changed: the commit Wave Link sends follows, which the selectors need.</summary>
     public static bool Commits(this ProMixChanges changes)
-        => (changes & (ProMixChanges.Selectors | ProMixChanges.MonitorReturn | ProMixChanges.MicPaths)) != 0;
+        => (changes & (ProMixChanges.Selectors | ProMixChanges.MonitorReturn | ProMixChanges.MicPaths | ProMixChanges.Section0Level)) != 0;
 
     /// <summary>The jacks' mix membership changed: the caller restarts the Monitor playback stream, as before.</summary>
     public static bool Membership(this ProMixChanges changes)
@@ -484,5 +643,8 @@ public static class ProMixChangesExtensions
 /// </summary>
 public sealed record ProMixWrite(ProMixChanges Changes, bool Wrote8, string Change8, bool Wrote1, string Change1, bool Committed)
 {
-    public bool Wrote => Wrote8 || Wrote1;
+    /// <summary>The bytes of block 0x0005 the jack levels changed, empty when none.</summary>
+    public string Change5 { get; init; } = "";
+
+    public bool Wrote => Wrote8 || Wrote1 || Change5.Length > 0;
 }

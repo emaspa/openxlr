@@ -20,6 +20,9 @@ public sealed record DuckingView(bool MixerRunning, bool KeyIsUnitInput1, IReadO
     IReadOnlyList<string> JackFeed, bool SoftwareRunning = false, bool Failed = false)
 {
     public IReadOnlyList<DuckingJackFeed>? JackFeeds { get; init; }
+
+    /// <summary>The unit builds the mixes its jacks play (hardware mixing), where it does not duck yet.</summary>
+    public bool HardwareMixing { get; init; }
 }
 
 /// <summary>One feed of the Pro's jacks: the USB pair it streams on and the mixes it sums.</summary>
@@ -55,6 +58,10 @@ public static class DuckingPlacement
         string? software = view.MixerRunning && view.SoftwareRunning ? MicEqProcessing.Software : null;
         if (support is null) return new(software, false, null, null, outputs) { Pairs = pairs };
         if (!view.MixerRunning) return No("mixerOff", "The software mixer is off, so ducking does not run.");
+        // The unit's own copies of the jacks' mixes take no ducking until it
+        // ducks per channel; the computer's copies, heard elsewhere, still can.
+        if (view.HardwareMixing && targets.Any(m => m.OnJacks))
+            return No("hardwareMixing", $"The {support.Name} builds the mixes its jacks play, and ducking does not run on them yet.");
         if (!view.KeyIsUnitInput1) return No("keyNotSupported", $"The {support.Name} ducks only with XLR 1 as the key.");
         if (!support.ReachesJacks && targets.Any(m => m.OnJacks))
             return No("monitorReturn", $"The jacks' feed is not in the {support.Name}'s headphone mix, where it ducks, so this computer ducks.");

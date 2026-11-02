@@ -239,6 +239,7 @@ public sealed partial class Mixer
         return new(_built || _duckingPort is not null, carrier, mixes, feed,
             DuckingStatus.RunningMixes.Count > 0, _duckingUnit is not null && _duckingFailed.Contains(_duckingUnit))
         {
+            HardwareMixing = UnitBuildsJacksLocked,
             JackFeeds = jackFeeds.Count == 0 ? null
                 : [.. jackFeeds.Select((f, slot) => new DuckingJackFeed(ProJackFeeds.Pairs[slot], MonitorFeed.Parts(f.Feed)))],
         };

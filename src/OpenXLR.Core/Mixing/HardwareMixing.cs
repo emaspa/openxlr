@@ -328,7 +328,8 @@ public static class HardwareMixingPlanner
     /// input the jack heard through the Monitor mix on a USB pair (Line In,
     /// USB Aux, a microphone the direct path did not carry) now plays as a
     /// source of its own, without the pair's 7.94 dB: 7.94 dB more while one
-    /// is in the feed. Leaving the mode gives back the 21 dB only.
+    /// is in the feed. Leaving the mode gives the whole offset back (see
+    /// <see cref="LeaveLevelDb"/>).
     /// </summary>
     public static double EntryOffsetDb(HardwareMixingSetup setup, string feed)
     {
@@ -348,12 +349,15 @@ public static class HardwareMixingPlanner
         => baseDb + Mixer.JackOutputVolumeDb(outputVolume);
 
     /// <summary>
-    /// A jack's level after leaving the mode: its base with the 21 dB back,
-    /// less what the Pro sink's volume above 100% will add to the pairs again,
-    /// so nothing is louder than it was in the mode.
+    /// A jack's level after leaving the mode: its base with the entry offset
+    /// back, so the jack is where the owner had it before the mode, moved by
+    /// whatever they changed in it, less what the Pro sink's volume above
+    /// 100% will add to the pairs again. A source the mode heard without the
+    /// pair's 7.94 dB goes back through a pair, so nothing is louder than
+    /// before the mode.
     /// </summary>
-    public static double LeaveLevelDb(double baseDb, double? outputVolume)
-        => baseDb - Section0LevelDb - (outputVolume is > 1 and var v ? 60 * Math.Log10(v) : 0);
+    public static double LeaveLevelDb(double baseDb, double offsetDb, double? outputVolume)
+        => baseDb + offsetDb - (outputVolume is > 1 and var v ? 60 * Math.Log10(v) : 0);
 
     /// <summary>The fixed keys of what the mode turns off for this layout, with each sentence.</summary>
     private static Dictionary<string, string> Disabled(HardwareMixingSetup setup, IEnumerable<string> feeds)
@@ -381,4 +385,45 @@ public static class HardwareMixingPlanner
     /// <summary>A plan's sections as the dry run shows them: section start to bytes 0 to 13 as hex.</summary>
     public static IReadOnlyDictionary<string, string> ContentHex(HardwareMixingPlan plan)
         => plan.Content.ToDictionary(c => c.Section.ToString(CultureInfo.InvariantCulture), c => c.Hex, StringComparer.Ordinal);
+}
+
+/// <summary>
+/// What the Wave XLR Pro held when hardware mixing began, and the mode's own
+/// levels while it runs: saved as <c>hardwareEntry</c> in mixer.json before
+/// anything is written to the unit, so a daemon stopped in the mode comes
+/// back to it, and one stopped while leaving finishes leaving.
+/// </summary>
+public sealed record HardwareEntry
+{
+    /// <summary>Section 0's first 16 bytes before the mode, hex.</summary>
+    public string Section0 { get; init; } = "";
+    /// <summary>Section 36's first 16 bytes before the mode, hex.</summary>
+    public string Section36 { get; init; } = "";
+    /// <summary>Byte 98 before the mode.</summary>
+    public int Section0Level { get; init; } = 0x54;
+    /// <summary>
+    /// Each jack's base level in the mode, in dB, by jack (<c>hp1</c>,
+    /// <c>hp2</c>, <c>lineout</c>): its level before the mode less the entry
+    /// offset, and every change the owner makes on the unit after. May be
+    /// below the -60 dB the unit takes.
+    /// </summary>
+    public Dictionary<string, double> Jacks { get; init; } = [];
+    /// <summary>
+    /// How far each jack was lowered on entry, in dB, by jack (see
+    /// <see cref="HardwareMixingPlanner.EntryOffsetDb"/>); leaving gives it
+    /// back. A jack absent here gets the 21 dB of section 0's level.
+    /// </summary>
+    public Dictionary<string, double> Offsets { get; init; } = [];
+    /// <summary>The jacks' output volume in the mode (desktop scale), which the Pro's sink had before it.</summary>
+    public double? OutputVolume { get; init; }
+    /// <summary>The graph has left the mode and the unit is being put back.</summary>
+    public bool Leaving { get; init; }
+
+    public static IReadOnlyList<string> JackNames { get; } = ["hp1", "hp2", "lineout"];
+
+    /// <summary>Whether a saved entry can be used: both sections 16 bytes of hex, byte 98 a byte, known jacks with finite levels.</summary>
+    public bool Valid => ProMixPlan.IsRestore(Section0) && ProMixPlan.IsRestore(Section36) && Section0Level is >= 0 and <= 255
+        && Jacks.All(j => JackNames.Contains(j.Key) && double.IsFinite(j.Value) && j.Value is >= -200 and <= 0)
+        && (Offsets ?? []).All(o => JackNames.Contains(o.Key) && double.IsFinite(o.Value) && o.Value is >= 0 and <= 60)
+        && OutputVolume is null or (>= 0 and <= PipeWireAdapter.MaxSinkVolume);
 }

@@ -155,6 +155,8 @@ EQ to this computer and `"value":"device"` back to the unit (see
 `{"cmd":"setMixing","value":"hardware","check":true}` answers with a
 `mixingPlan` message saying what the Wave XLR Pro would build for the
 layout as it stands, or why it cannot, and changes nothing.
+`{"cmd":"setMixing","value":"hardware"}` switches the mode on and
+`"value":"software"` off again; `GET /api/v1/mixer` reads `hardwareMixing`.
 
 [EQ profiles](api.md#eq-profiles) load the same way from any client.
 `GET /api/v1/state` lists them in `eqProfiles`, the built-in ones first;

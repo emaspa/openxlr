@@ -1179,8 +1179,17 @@ public sealed partial class DeviceManager : BackgroundService
     /// Quietly does nothing without a connected device that has output
     /// routing.
     /// </summary>
-    public bool EnsureMix(ProMixPlan plan)
+    public bool EnsureMix(ProMixPlan plan) => EnsureMix(plan, out _);
+
+    /// <summary>
+    /// <see cref="EnsureMix(ProMixPlan)"/>, saying whether the unit holds the
+    /// plan afterwards, as the last read shows it: block 0x0001 needs nothing
+    /// more and the jacks' levels are the plan's. Hardware mixing's entry and
+    /// leave steps go on only when it does.
+    /// </summary>
+    public bool EnsureMix(ProMixPlan plan, out bool held)
     {
+        held = false;
         lock (_gate)
         {
             if (_device is null || !_device.Connected || !_device.Capabilities.OutputRouting) return false;
@@ -1188,9 +1197,7 @@ public sealed partial class DeviceManager : BackgroundService
             if (s is null) return false;
             bool duckWaiting;
             lock (_duckGate) duckWaiting = _device.Capabilities.Ducking && _duckPending is not null;
-            ProMixChanges needed = s.ProMixBlock is { Length: 2 * ProMixSections.Length } hex
-                ? plan.Needs(Convert.FromHexString(hex)) : plan.Needs(ProMixHeld.Of(s));
-            if (!duckWaiting && needed == ProMixChanges.None) return false;
+            if (!duckWaiting && Holds(s, plan)) { held = true; return false; }
             try
             {
                 ProMixWrite? write = WriteMixLocked(_device, plan, "update");
@@ -1199,11 +1206,13 @@ public sealed partial class DeviceManager : BackgroundService
                 if (membership)
                     _log.LogInformation("headphone mix: monitor return {ret}, mic direct {mic}, XLR 2 direct {mic2}",
                         plan.MonitorReturn ?? s.HpMixMonitorReturn, plan.Mic1?.Direct ?? s.HpMixMicDirect, plan.Mic2?.Direct ?? s.HpMixMic2Direct);
-                if (write.Wrote1)
+                if (write.Change5.Length > 0) _log.LogInformation("jack levels: block 0x0005 {change}", write.Change5);
+                if (write.Wrote1 || write.Change5.Length > 0)
                 {
                     _last = Stamp(_device.ReadState());
                     RaiseFromLocked();
                 }
+                held = _last is { } now && Holds(now, plan);
                 return membership;
             }
             catch (UsbHungException ex)
@@ -1217,6 +1226,11 @@ public sealed partial class DeviceManager : BackgroundService
                 return false;
             }
         }
+
+        static bool Holds(DeviceState state, ProMixPlan plan)
+            => (state.ProMixBlock is { Length: 2 * ProMixSections.Length } hex
+                    ? plan.Needs(Convert.FromHexString(hex)) : plan.Needs(ProMixHeld.Of(state))) == ProMixChanges.None
+                && plan.JackLevels?.HeldBy(state) != false;
     }
 
     /// <summary>
@@ -1254,6 +1268,12 @@ public sealed partial class DeviceManager : BackgroundService
                 };
             }
         }
+    }
+
+    /// <summary>What the last poll read from a connected unit, or null.</summary>
+    public DeviceState? LastState
+    {
+        get { lock (_gate) return _device is { Connected: true } ? _last : null; }
     }
 
     /// <summary>Section 0's level as the Pro's last poll read it in byte 98, or null without one.</summary>

@@ -1870,7 +1870,7 @@ public sealed class PipeWireAdapter
     /// are the standard PipeWire answer for this exact routing.
     /// </summary>
     public PortLink LinkNodes(string fromNode, string fromPortPrefix, string toNode, string toPortPrefix,
-        int toPairOffset = 0, int fromPairOffset = 0, int? fromChannel = null)
+        int toPairOffset = 0, int fromPairOffset = 0, int? fromChannel = null, bool exactPair = false)
     {
         if (fromChannel is < 0 or >= 64) throw new ArgumentOutOfRangeException(nameof(fromChannel));
         // Port names vary by device (FL/FR on most nodes, AUX0/AUX1 on
@@ -1894,7 +1894,7 @@ public sealed class PipeWireAdapter
         }
         else if (outs.Count > 2)
             outs = [.. outs.Take(2)];
-        if (toPairOffset > 0)
+        if (toPairOffset > 0 || exactPair)
         {
             // A target without the requested return pair must receive
             // nothing. Keeping its first pair here routed the Pro-only Aux
@@ -2171,6 +2171,15 @@ public sealed class PipeWireAdapter
         int marker = outputSink.IndexOf('#');
         return LinkNodes(fromNode, fromPrefix, marker < 0 ? outputSink : outputSink[..marker], "playback", pair);
     }
+
+    /// <summary>
+    /// Route a tap into exactly one USB playback pair of a device's sink,
+    /// pair 0 included: a channel's own pair in hardware mixing.
+    /// </summary>
+    public PortLink RouteTapToPair(string fromNode, string fromPrefix, string sink, int pair)
+        => LinkNodes(fromNode, fromPrefix, StripMarkerOf(sink), "playback", pair, exactPair: true);
+
+    private static string StripMarkerOf(string name) => name.IndexOf('#') is int marker and >= 0 ? name[..marker] : name;
 
     /// <summary>
     /// Feed a capture device into a channel sink; <paramref name="sourcePair"/>
