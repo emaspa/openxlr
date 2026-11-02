@@ -160,9 +160,11 @@ them for a while before more is built on top.
   mode that builds the mixes in the unit, one USB pair per channel, would
   give Wave Link's per-channel ducking and mixing without the computer in
   the path, at the cost of eight channels, five mixes and no plugin
-  inserts on a mix. Probes on a unit come first: whether the unit takes level
-  and membership changes live, the gain of each section, and the latency
-  of the returned mixes. The rest of the Pro's ducking waits on this
+  inserts on a mix. The probes on a unit are done
+  ([section 15](wave-xlr-pro-protocol.md#15-the-mix-sections-as-a-mixer-desk-probe-of-2026-11-02)):
+  the unit takes level and membership changes live and ramps them itself,
+  a microphone comes back at its own gain with no added delay, and a
+  playback pair comes back 7.9 dB down. The rest of the Pro's ducking waits on this
   mode: ducking per channel, and keys other than XLR 1, whose encoding no
   capture has shown.
 - [ ] The Pro's mix maximizer and channel booster, the onboard effects
