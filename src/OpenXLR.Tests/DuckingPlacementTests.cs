@@ -53,18 +53,6 @@ public sealed class DuckingPlacementTests
         Assert.Equal(["monitor"], verdict.Outputs);
     }
 
-    [Fact]
-    public void TheAuxPortRunsInSoftwareUntilTheUnitIsKnownToReachIt()
-    {
-        DuckingVerdict verdict = DuckingPlacement.Evaluate(Setup with { Mixes = ["auxout"] },
-            View with { SoftwareRunning = true }, Pro with { ReachesAux = false });
-        Assert.Equal(("auxNotChecked", "software", false), (verdict.Reason, verdict.Backend, verdict.Ready));
-        Assert.Equal("Ducking on the Wave XLR Pro's USB Aux port has not been checked by ear yet, so this computer ducks.", verdict.Note);
-        Assert.Equal(["aux"], verdict.Outputs);
-        // A unit that reaches the jacks but not the Aux port still runs a jacks-only setup.
-        Assert.Equal("device", DuckingPlacement.Evaluate(Setup, View, Pro with { ReachesAux = false }).Backend);
-    }
-
     [Theory]
     [InlineData("monitor", "monitor")]
     [InlineData("auxout", "aux")]

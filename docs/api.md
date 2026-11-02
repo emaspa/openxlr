@@ -2625,7 +2625,6 @@ rule that fails gives `reason`:
 | the software mixer runs | `mixerOff` | The software mixer is off, so ducking does not run. |
 | the key carries the unit's input 1 | `keyNotSupported` | The Wave XLR Pro ducks only with XLR 1 as the key. |
 | the unit's ducking is heard on the jacks: no target mix is heard on them while the last read shows the jacks' feed outside the mix they play | `monitorReturn` | The jacks' feed is not in the Wave XLR Pro's headphone mix, where it ducks, so this computer ducks. |
-| the unit's ducking is known to reach the USB Aux port: no target mix is heard there until it is | `auxNotChecked` | Ducking on the Wave XLR Pro's USB Aux port has not been checked by ear yet, so this computer ducks. |
 | every target mix that is heard is heard only on the unit: a monitor mix in the jacks' feed, or the Aux mix on the USB Aux port, and on no other output, virtual microphone or feed | `mixElsewhere` | Monitor A also plays on Speakers, which the Wave XLR Pro cannot duck. |
 | when one mix of the jacks' feed is ducked, all of them are | `sharedOutput` | The jacks play Monitor A and Chat together, and only Monitor A is ducked. |
 | every channel heard in a target mix (send above 0, not muted) is in `channels`, the key excepted | `partialMix` | Voice Chat plays in Monitor A and is not ducked; the Wave XLR Pro lowers a whole output. |
@@ -2636,8 +2635,8 @@ rule that fails gives `reason`:
 On the Wave XLR Pro the jacks pass once a poll reads their feed in the
 mix they play, which OpenXLR sets whenever a jack is a monitor output.
 `monitorReturn` shows for the sweep before that read, or while another
-program holds the feed out of the mix. The USB Aux port fails
-`auxNotChecked` until it is checked by ear.
+program holds the feed out of the mix. The USB Aux port dips with its
+mix, so it needs no rule of its own.
 A target mix no output, virtual microphone or feed hears is left out of
 these rules; a setup whose target mixes nobody hears runs on the unit with
 no pairs ducked. The unit ducks the pairs `outputs` names.

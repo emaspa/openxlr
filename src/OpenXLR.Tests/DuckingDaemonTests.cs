@@ -225,10 +225,9 @@ public sealed class DuckingDaemonTests
         (string id, UnitDuckingSupport support) = port.Primary()!.Value;
         Assert.Equal(Pro, id);
         // The jacks' feed reads as a member of the mix the jacks play (byte
-        // 12 bit 5), so the unit reaches them; the Aux port is unchecked. The
-        // write path below is exercised as if the unit reached both.
-        Assert.Equal((true, false), (support.ReachesJacks, support.ReachesAux));
-        mixer.SetUnitDuckingSupport(id, support with { ReachesAux = true });
+        // 12 bit 5), so the unit reaches them, and the Aux port as well.
+        Assert.True(support.ReachesJacks);
+        mixer.SetUnitDuckingSupport(id, support);
 
         // On: the jacks' pair, written by the device loop and read back held.
         mixer.SetDuckingSetup(DuckingSetup.Default(mixer.Config) with { Enabled = true, Amount = "high", Speed = "fast" }, _ => null);

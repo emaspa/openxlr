@@ -734,17 +734,15 @@ OpenXLR saves the setup with the rest of the mixer, and profiles carry it.
 **Where it runs.** On most devices this computer runs it: OpenXLR adds a
 small stage for each ducked mix that lowers only the chosen channels.
 The Wave XLR Pro has ducking on its own processor too, and runs it on its
-headphone jacks and Line Out when the setup fits what it can do; its USB
-Aux port has not been checked by ear yet, so a ducked Aux mix stays on this
-computer. The unit only lowers a whole output, the mix OpenXLR sends to its
+headphone jacks, Line Out and USB Aux port when the setup fits what it
+can do. The unit only lowers a whole output, the mix OpenXLR sends to its
 jacks and Line Out or to its USB Aux port, and only with XLR 1 as the key.
 When the setup does not fit, the computer runs it and the state says why
 (see [where ducking runs](api.md#where-ducking-runs)):
 
 - the key is not XLR 1;
-- the unit's ducking is not heard where the mix plays: the USB Aux port
-  is not checked yet, and for a moment after the unit connects the jacks'
-  feed is not read in its mix yet;
+- for a moment after the unit connects, the jacks' feed is not read in
+  its mix yet;
 - a ducked mix also plays somewhere the unit cannot lower, such as
   speakers on the computer or a virtual microphone like Stream;
 - the jacks play two mixes together and only one of them is ducked;

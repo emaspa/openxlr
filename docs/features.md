@@ -33,10 +33,9 @@ Wave XLR Pro:
   Aux are each switched in the device's hardware mixer
 - Ducking on the device, mapped from Wave Link on Windows: when the
   [ducking](#submixer) setup fits what the unit can do (XLR 1 as the key, a
-  whole mix on the jacks and Line Out), the Pro runs it on its own
-  processor; otherwise this computer does, and the state says why
-  ([api.md](api.md#where-ducking-runs)). The USB Aux port stays in software
-  until it is checked by ear. The unit is written with ducking off while
+  whole mix on the jacks and Line Out or on the USB Aux port), the Pro
+  runs it on its own processor; otherwise this computer does, and the
+  state says why ([api.md](api.md#where-ducking-runs)). The unit is written with ducking off while
   this computer runs it, which clears ducking Wave Link left
 
 Wave XLR MK.2 and XLR Dock MK.2: gain, mute, phantom power, low cut,

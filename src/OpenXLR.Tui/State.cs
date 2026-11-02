@@ -354,7 +354,6 @@ internal sealed record DuckingEntry
             "mixerOff" => "the software mixer is off",
             "keyNotSupported" => "the unit ducks only with XLR 1",
             "monitorReturn" => "the jacks' feed is not in the unit's mix",
-            "auxNotChecked" => "the Aux port is not checked yet",
             "mixElsewhere" => "a ducked mix plays elsewhere too",
             "sharedOutput" => "the jacks play a mix not ducked",
             "partialMix" => "a channel in the mix is not ducked",
