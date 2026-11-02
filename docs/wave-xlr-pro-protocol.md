@@ -27,6 +27,12 @@ is right. The daemon control names are listed in [api.md](api.md). An
 earlier prototype written into a fork of openwave was used to validate the
 transport and is not maintained.
 
+The mix sections of block 0x0001 (sections 12 and 15 to 19) have their own
+codec, `src/OpenXLR.Core/Devices/ProMixSections.cs`: the five sections'
+levels, membership and ducking fields, the output selectors, byte 94 and
+byte 98, the cell law with its floor and ceiling, and the small low-level
+changes the unit drops. Diagnostics show the block decoded with it.
+
 ## 0. HARDWARE-CONFIRMED (2026-08-25, live on the device)
 
 Everything below was validated live against the plugged-in Pro with a ctypes-libusb probe
