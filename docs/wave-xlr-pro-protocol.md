@@ -594,9 +594,10 @@ reduce and the headphones stay level.
 ### Open
 
 - What the low bit means alone, and whether setting it on every pair, as
-  Wave Link does, changes anything else.
-- Byte 14 of each section, and what section 0's 21 dB lower level comes
-  from.
+  Wave Link does, changes anything else. Section 17 found it does nothing
+  to the level by itself.
+- Byte 14 of each section. Section 0's 21 dB lower level is byte 98
+  (section 17).
 
 ### Section 0's input side (desk measurement of 2026-10-30)
 
@@ -920,7 +921,7 @@ then single steps from nine levels:
 
 - Where the playback pairs' 7.9 dB goes (section 16 shows it is fixed and
   uniform, with a limiter above it).
-- Section 0's -21 dB.
+- Section 0's -21 dB is byte 98 (section 17).
 - Per-channel ducking keys other than XLR 1 (section 11).
 
 ## 16. USB playback pairs in the mix sections (desk probe of 2026-11-02)
@@ -970,3 +971,69 @@ the playback sum near that peak with a clean limiter. A cell above `00`
 lifts quiet material only, and full-scale playback never comes back
 louder than about -8 dBFS. Whether the limiter acts on the jacks as it
 does on the returned streams has not been measured.
+
+## 17. Section 0's offset, a capture tap and per-pair ducking (desk probe of 2026-11-02)
+
+Firmware 1.0.14, the desk unit, the daemon stopped for both runs (it
+writes blocks 0x0005 and 0x0008 itself). No output selector played
+sections 0, 54 or 72 (bytes 90 to 93 read `23 23 20 23`). Every write was
+followed by the 0x0003 commit in the first run and not in the second, and
+blocks 0x0001, 0x0004, 0x0005 and 0x0008 read back identical after each
+run.
+
+### Section 0's 21 dB
+
+With XLR 1 the only member of section 0 at `00`, AUX8 against AUX0:
+
+| Write | AUX8 |
+|---|---|
+| none | -21.00 dB |
+| block 0x0005 byte 4 `50` to `4c`, `60`, back | -21.00 dB throughout |
+| block 0x0001 byte 98 `54` to `50` | -20.00 dB |
+| byte 98 `60` | -24.00 dB |
+| byte 98 back to `54` | -21.00 dB |
+| block 0x0004 byte 78 `02` to `00`, `03`, back | -21.00 dB throughout |
+
+Byte 98 is section 0's level in quarter-dB attenuation, dB = -byte/4, and
+`54` (84) is the 21 dB. Section 18 (AUX10) was unchanged by it. Block
+0x0005 byte 4 and block 0x0004 byte 78 did not move section 0.
+
+### Byte 94
+
+Byte 94 at `00` left every mix as it was and changed XLR 1's own capture:
+AUX0 dropped 10.7 dB from 500 Hz to 3 kHz and 2.6 dB at 60 Hz, still
+coherent with XLR 1 in the mixes from 150 Hz up, with 0 samples of delay.
+At `03` AUX0 was the same as at `02`. The unit had XLR 1's low cut, Voice
+Tune, clip guard and compressor on, so `00` may be a tap before the
+unit's processing; that is inferred, not measured. Bytes 94 to 97 read
+`02` each and may hold the same choice for the other inputs.
+
+### Ducking in sections 54 and 72
+
+A -20 dBFS tone on pair 6 (1 kHz) and on pair 7 (1.5 kHz), both members
+of sections 54 and 72 at `00`. Block 0x0008: entry 10 (pair 6) flagged
+with depth 12 dB, entry 11 (pair 7) flagged with depth 6 dB, attack and
+release as the unit held them (30 ms and 200 ms). The key was XLR 1 with
+room noise on it, held with every threshold at -60 dB (`c4`) and released
+with every threshold at 0 dB (`00`).
+
+| Fields | Key held | Section 54 | Section 72 |
+|---|---|---|---|
+| pair 7 `11` in 54, pair 6 `11` in 72 | yes | pair 7 -6.00 dB, pair 6 level | pair 6 -12.00 dB, pair 7 level |
+| the same | no | level | level |
+| both at `01` | yes | level | level |
+| both at `10` | yes | level | level |
+| every field in 54 and 72 at `11` | yes | pair 6 -12.00 dB, pair 7 -6.00 dB | pair 6 -12.00 dB, pair 7 -6.00 dB |
+
+- The fields duck in sections 54 and 72 as they do in sections 0 to 36,
+  for pairs 6 and 7 as for pairs 1 and 5.
+- The depth belongs to the pair's entry in block 0x0008, not to the
+  section: a pair dips by the same amount in every section that marks it.
+- A field ducks only at `11`. The low bit alone and the high bit alone do
+  nothing.
+- The dip settled within 0.5 s of the threshold write and came back
+  within 1 s of the release.
+- XLR 2 was made a member of section 54 with entry 1 flagged, but it
+  carried no signal during the run, so whether a unit input can be
+  ducked is still open.
+
