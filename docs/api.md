@@ -2550,7 +2550,8 @@ device}`:
   (see [where ducking runs](#where-ducking-runs)). A client shows `note`
   for a reason it does not know. `outputs` is what the unit would duck for
   this setup, any of `monitor` (the jacks and Line Out, USB playback pairs
-  1 to 3, one per jack feed) and `aux` (the USB Aux port, pair 5), given
+  1 to 3, one per jack feed) and `aux` (the USB Aux port, pair 5, or
+  section 36 in hardware mixing), given
   even when it is not ready. `held` is true when the unit was last read holding what OpenXLR
   wrote to it. `readback` is that read decoded: `sensitivity`, `amount`
   and `speed` as the unit holds them, in the setup's shapes: the preset
@@ -2654,8 +2655,9 @@ no pairs ducked. The unit ducks the pairs `outputs` names: for `monitor`,
 the pair of each jack feed that plays a target mix, so a jack on another
 feed keeps its level.
 
-In [hardware mixing](#hardware-mixing) a target mix a jack plays is built
-by the unit from each channel's own pair, and the unit ducks it per
+In [hardware mixing](#hardware-mixing) a target mix a jack plays, and the
+Aux mix while the USB Aux port is on, is built by the unit from each
+channel's own pair, and the unit ducks it per
 channel instead, whatever `processing` says, since nothing on this
 computer can lower a mix the unit builds. Each channel in `channels` that
 streams on a pair is ducked in the section of each such target mix (a
@@ -2664,16 +2666,17 @@ else. The rules above do not apply to these mixes: a channel heard there
 and not in `channels` keeps its level, and so does the key. Only these
 rules do, giving `ready` false and leaving the unit's mixes unducked:
 `keyNotSupported` (the key must carry XLR 1, "The Wave XLR Pro ducks only
-with XLR 1 as the key, so the mixes it builds for its jacks are not
+with XLR 1 as the key, so the mixes it builds for its outputs are not
 ducked."), `failed` and `unsupportedBlock`. The unit's own inputs (XLR 2,
 Aux In, Line In) are never lowered by it; one in `channels` is skipped
 and `note` says so with `ready` true: "XLR 2 and Line In are the Wave XLR
 Pro's own inputs, which it does not duck." Every other target mix (Stream,
-Chat, the Aux mix, a monitor mix no jack plays) and the computer's copy of
+Chat, a monitor mix no jack plays) and the computer's copy of
 a unit-built mix another output also plays are ducked in software at the
 same time, from the channels' sends. The two never meet, since a pair
 carries a channel before its sends, so they need no hand-over. `backend`
-reads `device` while the unit ducks, `outputs` is `["monitor"]`, and
+reads `device` while the unit ducks, `outputs` names `monitor` for a jack's
+section and `aux` for section 36, and
 `readback.pairs` lists every pair ducked in any section. The amount and
 speed are one per unit, so every pair dips by the same depth in every
 section. A setup whose target mixes the unit does not build follows the
@@ -2701,9 +2704,9 @@ holds them and only the ducked flags are cleared. The bytes are in the
 
 ### Hardware mixing
 
-Experimental. On the Wave XLR Pro the mixes its jacks play (Headphones 1,
-Headphones 2 and Line Out) can be built by the unit instead of this
-computer. Every channel then streams to the unit once, on a USB playback
+Experimental. On the Wave XLR Pro the mixes its outputs play (Headphones 1,
+Headphones 2 and Line Out, and the Aux mix on the USB Aux port) can be
+built by the unit instead of this computer. Every channel then streams to the unit once, on a USB playback
 pair of its own, and the unit mixes the pairs with its own inputs at zero
 latency. `mixing` in `mixer.json` holds the choice, `software` (the
 default) or `hardware`, and `setMixing` changes it live. The UI offers
@@ -2714,27 +2717,34 @@ from `disabled`. Nothing of it has been heard on a unit yet.
 
 **Pairs.** A channel the unit cannot take raw streams on a pair: System on
 pair 0, Game on 1, Music on 2, Browser on 3, Voice Chat on 4 and SFX on 6.
-Any other channel takes the first free pair of 7, 0, 1, 2, 3, 4 and 6.
-Pair 5 stays the Aux mix's stream to the USB Aux port. XLR 1, XLR 2, Aux
+Any other channel takes the first free pair of 7, 5, 0, 1, 2, 3, 4 and 6.
+Pair 5 carries the Aux mix's stream to the USB Aux port outside the mode;
+in it the unit builds the Aux mix itself, so pair 5 is a channel pair like
+the others. XLR 1, XLR 2, Aux
 In and Line In are the unit's own inputs and need no pair while they carry
 the unit's input. A strip bound to another source takes a pair, and the
 capture input kept for the unit's microphone takes the unit's input
 instead. A channel keeps its pair in `hardwarePairs` across restarts and
-layout edits. Seven channels fit, hidden ones included. A layout with
+layout edits. Eight channels fit, hidden ones included. A layout with
 more is refused, and `note` says how many need a pair: "Hardware mixing on
-the Wave XLR Pro streams at most 7 channels; this layout has 8 that need a
+the Wave XLR Pro streams at most 8 channels; this layout has 9 that need a
 USB pair."
 
 **Sections.** Each distinct feed a selected jack plays takes one of the
 unit's sections 0, 18 and 54, kept per feed in `hardwareSections`. A feed
-that sums two mixes is a section of its own. Section 36 stays the Aux
-mix's.
+that sums two mixes is a section of its own. While the USB Aux port is on
+(`setAuxPortEnabled`), the unit builds the Aux mix in section 36, the one
+the port plays, from the same pairs and inputs at the Aux mix's levels.
+Aux In is never in it, since the port would send the second computer its
+own audio back. The Aux mix then shows `hardwareSection` 36. With the port
+off, section 36 is left as the unit holds it.
 
 **Levels.** A source's level cell is the channel's level in the feed: the
 send, the channel volume and the mix volume, in half-dB steps. A summed
 feed adds its mixes' levels as amplitudes. A muted send, a muted mix, an
 exclusive group holding the channel and a level of 0 take the source out
-of the section; the monitoring pause takes every source out. The unit
+of the section; the monitoring pause takes every source out of the jacks'
+sections and leaves the Aux mix playing. The unit
 plays a USB pair 7.94 dB below its cell, and a cell above 0 dB does not
 make that up ([protocol notes, section 16](wave-xlr-pro-protocol.md)). So
 the mode keeps the balance Wave Link has: nothing adds the 7.94 dB back, a
@@ -2759,11 +2769,13 @@ and 36, byte 98, each jack's level less its entry offset, and the output
 volume, and how far each jack was lowered) as `hardwareEntry` in `mixer.json`, and saves it before anything is
 written. It then writes the unit's sections with every membership clear,
 the jacks' levels lowered and byte 98 at 0 dB. Only then does the graph
-take every mix off the jacks, hold the Pro's playback sink at 100% and link
-each channel's sink to its pair. Last, the memberships open and the jacks'
-selectors move to their sections. Leaving runs the other way: memberships
-cleared, the pairs unlinked, the sink back at its volume, the mixes routed
-to the jacks again, and then sections 0 and 36 and byte 98 put back and
+take every mix off the jacks and the Aux mix off pair 5, hold the Pro's
+playback sink at 100% and link each channel's sink to its pair. Last, the
+memberships open and the jacks' selectors move to their sections. Leaving
+runs the other way: memberships cleared (section 36's too while the port
+plays it), the pairs unlinked, the sink back at its volume, the mixes
+routed to the jacks and the Aux mix to pair 5 again, and then sections 0
+and 36 and byte 98 put back and
 each jack raised, after block 0x0001. `hardwareEntry` goes once a read
 shows the unit put back. A daemon stopped in the mode writes nothing, and
 the next start resumes the mode, or finishes leaving it. While the unit is
@@ -2773,10 +2785,11 @@ or 54 the mode takes is kept first in `hardwareRestore`, as a second jack
 feed keeps it.
 
 **While it runs.** A fader, mute, channel volume or mix volume moves the
-unit's cells in the next write, at most one block write per sweep. Section
-36 keeps pair 5 alone, so no channel reaches the USB Aux port beside the
-Aux mix. With the sink at 100% the Aux mix reaches the second computer
-without the output volume's attenuation. The output volume of the jacks
+unit's cells in the next write, at most one block write per sweep, the Aux
+mix's in section 36 as well. The second computer hears the Aux mix with
+the unit's inputs at their faders and the channels' pairs 7.94 dB under
+theirs, the balance the jacks have; it no longer follows the output
+volume, which only moves the jacks. The output volume of the jacks
 (`setOutputVolume`, `adjustOutputVolume`, a desktop key on the Pro's sink)
 moves their levels, and the state's `outputVolume` reads it. A headphone
 volume moved on the unit, by its knob or by `set` with `hpVolumeDb`, is
@@ -2791,9 +2804,10 @@ the `disabled` sentence, and so is `setInserts` with a chain for a mix a
 jack plays. `createChannel`, `createCaptureChannel` and a `setInputBinding`
 that would need a pair when none is left are refused with the budget
 sentence. `setMixing` with `hardware` is refused with that sentence while
-the layout has more channels than pairs. Ducking on a mix a jack plays
-runs on the unit per channel (see [where ducking runs](#where-ducking-runs));
-on mixes the computer builds it runs as before.
+the layout has more channels than pairs. Ducking on a mix the unit builds,
+the Aux mix included while the port is on, runs on the unit per channel
+(see [where ducking runs](#where-ducking-runs)); on mixes the computer
+builds it runs as before.
 
 **Eligibility.** `reason` names the first thing in the way, whether or not
 the mode is wanted: `mixerOff`, `notSupported` (the driven unit is not a
@@ -2803,8 +2817,9 @@ is not 17 channels or its capture source not 18), `budget` and `failed`.
 `note` says it in one sentence.
 
 **What the mode turns off.** `disabled` maps fixed keys to the sentence a
-client shows: `inserts:mix:<id>` for each mix a jack plays, since the
-unit's copy runs none; while a jack plays a mix, `ducking:key` (the unit
+client shows: `inserts:mix:<id>` for each mix the unit builds (a jack's
+feed, and the Aux mix while the port is on), since the unit's copy runs
+none; while the unit builds a mix, `ducking:key` (the unit
 ducks its mixes only with XLR 1 as the key) and `ducking:channel:<id>`
 for each of the unit's own inputs other than XLR 1, which it never
 lowers; `latencyCompensation`;

@@ -102,21 +102,18 @@ public sealed record ProMixPlan
     public IReadOnlyDictionary<int, string>? Restore { get; init; }
 
     /// <summary>
-    /// Hardware mixing: the sections the unit builds, by section start, as
-    /// their first 14 bytes (the twelve level cells and the membership mask),
-    /// written exactly. Byte 14, the marker and the ducking fields stay as
-    /// read. A restore for a section named here is skipped.
+    /// Hardware mixing: the sections the unit builds, by section start (a
+    /// jack's 0, 18 or 54, and 36 for the Aux mix), as their first 14 bytes
+    /// (the twelve level cells and the membership mask), written exactly.
+    /// Byte 14, the marker and the ducking fields stay as read. A restore for
+    /// a section named here is skipped. With section 36 here,
+    /// <see cref="UsbAux"/> sets the port's selector alone: the section's
+    /// cells are the unit's Aux mix, not pair 5's stream.
     /// </summary>
     public IReadOnlyDictionary<int, byte[]>? UnitSections { get; init; }
 
     /// <summary>Byte 98, section 0's level in quarter-dB attenuation, as written; null leaves it.</summary>
     public byte? Section0Level { get; init; }
-
-    /// <summary>
-    /// Hardware mixing: every source but pair 5 out of section 36, so no
-    /// channel's pair reaches the USB Aux port beside the Aux mix.
-    /// </summary>
-    public bool AuxPairOnly { get; init; }
 
     /// <summary>
     /// Sections 0 and 36 as they were before hardware mixing, by section
@@ -381,8 +378,7 @@ public sealed record ProMixPlan
 
     /// <summary>
     /// Hardware mixing's edits on <paramref name="into"/>: the unit-built
-    /// sections, pair 5 alone in section 36, and byte 98. Returns the parts
-    /// that changed a byte.
+    /// sections and byte 98. Returns the parts that changed a byte.
     /// </summary>
     private ProMixChanges ApplyUnit(Span<byte> into)
     {
@@ -390,23 +386,13 @@ public sealed record ProMixPlan
         if (UnitSections is { } sections)
             foreach ((int section, byte[] bytes) in sections)
             {
-                if (ProJackFeeds.SlotOfSection(section) < 0)
-                    throw new ArgumentException($"section {section} is not one a jack plays", nameof(UnitSections));
+                if (ProJackFeeds.SlotOfSection(section) < 0 && section != AuxSection)
+                    throw new ArgumentException($"section {section} is not one a jack or the USB Aux port plays", nameof(UnitSections));
                 if (bytes.Length != UnitSectionLength) throw new ArgumentException($"a unit section is {UnitSectionLength} bytes", nameof(UnitSections));
                 if (into.Slice(section, UnitSectionLength).SequenceEqual(bytes)) continue;
                 bytes.CopyTo(into[section..]);
                 changes |= ProMixChanges.UnitSections;
             }
-        if (AuxPairOnly)
-        {
-            ushort wanted = (ushort)(ProMixSections.Members(into, AuxSection) & 1 << ProMixSections.SourceOfPair(ProReturnPairs.Aux));
-            if (ProMixSections.Members(into, AuxSection) != wanted)
-            {
-                into[AuxSection + ReturnsOffset] = (byte)wanted;
-                into[AuxSection + PairsOffset] = (byte)(wanted >> 8);
-                changes |= ProMixChanges.UnitSections;
-            }
-        }
         if (Section0Level is byte level && into[ProMixSections.Section0LevelOffset] != level)
         {
             into[ProMixSections.Section0LevelOffset] = level;
@@ -445,8 +431,11 @@ public sealed record ProMixPlan
     public static string RestoreOf(ReadOnlySpan<byte> block, int section)
         => Convert.ToHexString(block.Slice(section, ProJackFeeds.RestoredLength));
 
+    /// <summary>The unit builds the Aux mix in section 36 (hardware mixing): the port's selector is all <see cref="UsbAux"/> sets.</summary>
+    private bool AuxInUnit => UnitSections?.ContainsKey(AuxSection) == true;
+
     private bool UsbAuxWritten(ProMixHeld held)
-        => UsbAux is { } aux && (held.UsbAux != aux || (aux && !held.AuxReturnEnabled));
+        => UsbAux is { } aux && (held.UsbAux != aux || (aux && !AuxInUnit && !held.AuxReturnEnabled));
 
     /// <summary>
     /// Make the plan's edits: <paramref name="into"/> gets
@@ -478,12 +467,14 @@ public sealed record ProMixPlan
         // The USB Aux port cannot play the jacks' mix (no USB playback pair
         // reaches it under 1e); it plays the Aux mix with pair 5's cell open,
         // as Wave Link delivers audio there, and without the unit's own
-        // inputs, which the Aux mix on the computer already carries.
+        // inputs, which the Aux mix on the computer already carries. In
+        // hardware mixing the unit builds the Aux mix in section 36 itself,
+        // so only the selector moves.
         if (UsbAuxWritten(was))
         {
             bool aux = UsbAux!.Value;
             into[ProMixSections.SelectorUsbAux] = aux ? SelectorAuxMix : SelectorOff;
-            if (aux)
+            if (aux && !AuxInUnit)
             {
                 into[AuxMusicLevelOffset] = 0x00;
                 into[AuxPairsOffset] |= AuxPair5Mask;

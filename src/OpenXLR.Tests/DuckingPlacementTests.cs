@@ -160,6 +160,31 @@ public sealed class DuckingPlacementTests
     }
 
     [Fact]
+    public void InHardwareMixingTheAuxMixTheUnitBuildsIsDuckedInSectionThirtySix()
+    {
+        // The USB Aux port on: the unit builds the Aux mix in section 36, and
+        // a channel beyond the defaults streams on pair 5 like any other.
+        DuckingView view = Mode with
+        {
+            UnitMixSections = new Dictionary<string, IReadOnlyList<int>> { ["monitor"] = [0], ["auxout"] = [36] },
+            ChannelPairs = new Dictionary<string, int>(Mode.ChannelPairs) { ["discord"] = 5 },
+        };
+        DuckingVerdict verdict = DuckingPlacement.Evaluate(Setup with { Channels = ["music", "discord"], Mixes = ["monitor", "auxout"] }, view, Pro);
+        Assert.True(verdict.Ready);
+        Assert.Equal("device", verdict.Backend);
+        Assert.Equal("0: 2 5; 36: 2 5", Sections(verdict));
+        Assert.Equal([2, 5], verdict.Pairs);
+        Assert.Equal(["monitor", "aux"], verdict.Outputs);
+        // Nothing of the computer's is heard on the port: no software ducking for it.
+        Assert.Empty(verdict.SoftwareMixes!);
+
+        // The Aux mix alone ducks section 36 alone, heard on the port.
+        DuckingVerdict aux = DuckingPlacement.Evaluate(Setup with { Channels = ["music"], Mixes = ["auxout"] }, view, Pro);
+        Assert.Equal("36: 2", Sections(aux));
+        Assert.Equal(["aux"], aux.Outputs);
+    }
+
+    [Fact]
     public void InHardwareMixingAComputerCopyHeardElsewhereIsDuckedInSoftwareToo()
     {
         DuckingView view = EditMonitor(Mode, m => m with { OtherConsumers = ["Speakers"] });
@@ -170,7 +195,7 @@ public sealed class DuckingPlacementTests
     }
 
     [Theory]
-    [InlineData("keyNotSupported", "The Wave XLR Pro ducks only with XLR 1 as the key, so the mixes it builds for its jacks are not ducked.")]
+    [InlineData("keyNotSupported", "The Wave XLR Pro ducks only with XLR 1 as the key, so the mixes it builds for its outputs are not ducked.")]
     [InlineData("failed", "The Wave XLR Pro did not keep the ducking written to it. Switch ducking off and on to try again.")]
     [InlineData("unsupportedBlock", "The Wave XLR Pro's ducking block holds values OpenXLR does not know.")]
     public void InHardwareMixingAUnitThatCannotDuckLeavesItsMixesUnduckedAndTheRestToSoftware(string reason, string note)

@@ -129,6 +129,7 @@ public sealed partial class Mixer
             DirectPath = _hardwareMicChannels.OfType<string>().ToHashSet(StringComparer.Ordinal),
             MixChains = _config.Mixes.Where(m => InsertsFor(MixKey(m)).Count > 0).Select(m => m.Id).ToHashSet(StringComparer.Ordinal),
             MonitorMuted = _monitorMuted,
+            AuxPort = _auxPortEnabled,
             SavedPairs = new Dictionary<string, int>(_hardwarePairs, StringComparer.Ordinal),
             SavedSections = new Dictionary<string, int>(_hardwareSections, StringComparer.Ordinal),
             Section0LevelDb = section0LevelDb,
@@ -246,7 +247,8 @@ public sealed partial class Mixer
                 _hardwarePairs[channel] = pair;
                 changed = true;
             }
-        foreach ((string feed, int section) in sections)
+        // The Aux mix's section is fixed, so only the jacks' feeds are kept.
+        foreach ((string feed, int section) in sections.Where(s => HardwareMixingPlanner.JackSections.Contains(s.Value)))
             if (!_hardwareSections.TryGetValue(feed, out int was) || was != section)
             {
                 foreach (string other in _hardwareSections.Where(p => p.Value == section && p.Key != feed).Select(p => p.Key).ToList())
@@ -260,9 +262,10 @@ public sealed partial class Mixer
     /// <summary>
     /// Enter hardware mixing in the graph, after the unit's sections were
     /// written with every membership clear and the jacks' levels lowered:
-    /// every route off the jacks, the Pro's sink held at 100%, each channel
-    /// linked to its pair. True when the kept maps changed, so the caller
-    /// saves the settings.
+    /// every route off the jacks, the Aux mix's route to pair 5 dropped (the
+    /// unit builds the Aux mix, and pair 5 is a channel's now), the Pro's
+    /// sink held at 100%, each channel linked to its pair. True when the kept
+    /// maps changed, so the caller saves the settings.
     /// </summary>
     public bool EnterHardwareGraph(IReadOnlyDictionary<string, int> pairs, IReadOnlyDictionary<string, int> sections)
     {
@@ -272,6 +275,7 @@ public sealed partial class Mixer
             bool changed = KeepHardwareMapsLocked(pairs, sections);
             _hardwareGraphEntered = true;
             SetMonitorOutputsLocked([.. _monitorOutputs]);
+            WireAuxRouteLocked();
             PinProSinkLocked();
             LinkHardwarePairsLocked(pairs);
             return changed;
@@ -306,8 +310,9 @@ public sealed partial class Mixer
     /// <summary>
     /// Leave hardware mixing in the graph, after every membership of the
     /// unit's sections was cleared: unlink the pairs, give the Pro's sink
-    /// its volume back and route the mixes to the jacks again. The entry
-    /// stays, marked leaving, until the unit is put back. The caller saves.
+    /// its volume back, route the mixes to the jacks again and the Aux mix to
+    /// pair 5. The entry stays, marked leaving, until the unit is put back.
+    /// The caller saves.
     /// </summary>
     public void LeaveHardwareMixing()
     {
@@ -324,6 +329,7 @@ public sealed partial class Mixer
                 catch (InvalidOperationException) { /* the unit left; its sink comes back at its own volume */ }
             }
             SetMonitorOutputsLocked([.. _monitorOutputs]);
+            WireAuxRouteLocked();
         }
     }
 

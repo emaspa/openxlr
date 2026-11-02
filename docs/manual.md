@@ -992,6 +992,16 @@ If you change the monitor outputs while the hardware stream restarts,
 your latest selection is kept. A restart that finishes after the mixer
 has stopped does not reconnect its outputs.
 
+With hardware mixing on (experimental, see
+[hardware mixing](api.md#hardware-mixing)), the Pro builds the Aux mix
+itself from the same faders, so the second computer gets it without
+going through this computer's mix. Your voice reaches the port 7.9 dB
+louder against the other channels than in the usual mode, as it does on
+the jacks: the unit takes 7.9 dB off every USB stream and nothing off its
+own inputs. The port no longer follows your output volume. Aux In never
+goes back out of the port, whatever its send into the Aux mix says, and
+ducking on the Aux mix runs on the unit too.
+
 The USB Aux *input* (what the second computer sends back) is the Aux In
 channel, with its level and **Level Lock** on the USB Aux in row of the
 INPUTS card.
@@ -3726,23 +3736,23 @@ unit takes over again when it comes back; a daemon stopped while the unit
 mixes leaves the unit as it is, and the next start carries on.
 
 Stream, Chat, your own virtual microphones and any mix a device other than
-the Pro's jacks plays stay on this computer, with their plugins, ducking
+the Pro's jacks and USB Aux port plays stay on this computer, with their plugins, ducking
 and processed microphones. Applications, channels, faders, mutes and
 profiles work as before. What changes on the mixes the unit builds:
 
 | What | While the unit builds the jacks' mixes |
 |---|---|
-| How many channels | Seven fit, hidden ones included, each on its own USB pair. XLR 1, XLR 2, Line In and Aux In are the unit's own inputs and need none. A bigger layout is refused, and so is adding an eighth channel. |
+| How many channels | Eight fit, hidden ones included, each on its own USB pair. XLR 1, XLR 2, Line In and Aux In are the unit's own inputs and need none. A bigger layout is refused, and so is adding a ninth channel. |
 | Headphones when it starts | Turned down 21 dB, or 29 dB while a jack's mix holds Line In, Aux In or a processed microphone, so nothing gets louder. |
 | Output volume of a jack | Turns that jack's headphone volume, or Line Out's level, down. It never goes above where it was. |
 | Balance | Applications sit 7.9 dB under the microphones at equal faders, as they do under Wave Link. |
 | Noise removal, the voice changer, a software EQ and plugins on a microphone | Still heard on Stream and Chat. The jacks get the microphone as it comes into the unit, without them. |
-| Plugins on a mix a jack plays | Not run there, and no plugin can be added. |
-| Ducking on a mix a jack plays | Runs on the unit for each chosen channel, with XLR 1 as the key. The unit never lowers its own inputs. |
+| Plugins on a mix the unit builds | Not run there, and no plugin can be added. |
+| Ducking on a mix the unit builds | Runs on the unit for each chosen channel, with XLR 1 as the key. The unit never lowers its own inputs. |
 | Latency compensation | Leaves out the mixes the unit builds. |
 | Mic setup's checks and soundboard auditions | Not available. |
 | Exclusive groups and the monitoring pause | Work, by taking channels out of the unit's mix. |
-| The USB Aux port | Keeps the Aux mix, which your output volume no longer turns down. |
+| The USB Aux port | Plays the Aux mix, which the unit builds too while the port is on, at the same balance as the jacks and without Aux In. Your output volume no longer turns it down, and the monitoring pause leaves it playing. |
 | Mix meters | Read this computer's copy of each mix, at the same faders. |
 
 A greyed control says why in its tooltip. The plugin chain window, Mic

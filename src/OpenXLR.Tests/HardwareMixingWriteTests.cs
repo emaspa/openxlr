@@ -5,8 +5,8 @@ namespace OpenXLR.Tests;
 
 /// <summary>
 /// What hardware mixing writes to the Wave XLR Pro: the sections the unit
-/// builds as their cells and mask exactly, every source but pair 5 out of
-/// section 36, byte 98, sections 0 and 36 put back before today's parts on
+/// builds as their cells and mask exactly, the Aux mix in section 36 with
+/// the port's selector alone, byte 98, sections 0 and 36 put back before today's parts on
 /// leaving, and the jacks' levels in block 0x0005, lowered before block
 /// 0x0001 changes and raised after it. A plan the unit holds needs nothing.
 /// </summary>
@@ -61,19 +61,35 @@ public sealed class HardwareMixingWriteTests
     }
 
     [Fact]
-    public void SectionThirtySixKeepsPairFiveAlone()
+    public void TheAuxMixTheUnitBuildsIsWrittenAndThePortOnlyMovesItsSelector()
     {
         byte[] held = ProMixPlanTests.Neutral();
-        // Pairs 0, 5 and 7, XLR 1 and Line In in section 36, as Wave Link can leave them.
-        held[36 + 12] = 0x19;
-        held[36 + 13] = 0x0a;
-        var plan = new ProMixPlan { AuxPairOnly = true };
+        held[ProMixSections.SelectorUsbAux] = ProMixSections.SelectorNothing;
+        // The Aux mix from the channels' pairs: Game on pair 1 at -6 dB, a
+        // channel on pair 5 at -12 dB, XLR 1 at 0 dB; no pair 5 stream at 0 dB.
+        byte[] section36 = Unit((ProMixSections.Xlr1, 0x00, true), (ProMixSections.SourceOfPair(1), 0xf4, true),
+            (ProMixSections.SourceOfPair(5), 0xe8, true));
+        var plan = new ProMixPlan { UsbAux = true, UnitSections = new Dictionary<int, byte[]> { [36] = section36 } };
         byte[] after = Apply(plan, held, out ProMixChanges changes);
-        Assert.Equal(ProMixChanges.UnitSections, changes);
-        Assert.Equal(0x00, after[36 + 12]);
-        Assert.Equal(0x02, after[36 + 13]);
+        Assert.Equal(ProMixChanges.Selectors | ProMixChanges.UnitSections, changes);
+        Assert.Equal(0x20, after[ProMixSections.SelectorUsbAux]);
+        Assert.Equal(section36, after[36..(36 + ProMixPlan.UnitSectionLength)]);
+        // Today's port rule (pair 5 at 0 dB, XLR 1 and Line In out) does not
+        // touch the unit's Aux mix, so the plan holds once written.
+        Assert.Equal(0xe8, after[36 + 9]);
         Assert.Equal(ProMixChanges.None, plan.Needs(after));
+        // The port off moves its selector alone and leaves the section.
+        var off = new ProMixPlan { UsbAux = false };
+        byte[] quiet = Apply(off, after, out ProMixChanges offChanges);
+        Assert.Equal(ProMixChanges.Selectors, offChanges);
+        Assert.Equal(ProMixSections.SelectorNothing, quiet[ProMixSections.SelectorUsbAux]);
+        Assert.Equal(section36, quiet[36..(36 + ProMixPlan.UnitSectionLength)]);
     }
+
+    [Fact]
+    public void ASectionNoOutputPlaysIsNotAUnitSection()
+        => Assert.Throws<ArgumentException>(() => Apply(new ProMixPlan { UnitSections = new Dictionary<int, byte[]> { [72] = Unit() } },
+            ProMixPlanTests.Neutral(), out _));
 
     [Fact]
     public void ARestoreOfASectionTheUnitBuildsIsSkipped()

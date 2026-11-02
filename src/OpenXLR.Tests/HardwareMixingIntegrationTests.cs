@@ -21,8 +21,11 @@ public sealed partial class MonitorVolumeIntegrationTests
     /// pair and links each channel to its own pair instead; the unit gets
     /// section 0 from the faders, byte 98 at 0 dB and Headphones 1 lowered by
     /// 21 dB and by the output volume, while the Pro's sink goes to 100%. The
-    /// output volume then moves the headphone volume. Leaving puts the graph,
-    /// the sink's volume, section 0, byte 98 and the jack back as they were.
+    /// output volume then moves the headphone volume. With the USB Aux port
+    /// on, the unit builds the Aux mix in section 36 from the same pairs, Aux
+    /// In left out, and the graph's Aux mix leaves pair 5. Leaving puts the
+    /// graph, the Aux mix's route, the sink's volume, sections 0 and 36, byte
+    /// 98 and the jack back as they were.
     /// </summary>
     [MonitorPipeWireFact]
     public async Task HardwareMixingEntersAndLeavesWithTheGraphAndTheUnitAsTheyWere()
@@ -61,12 +64,17 @@ public sealed partial class MonitorVolumeIntegrationTests
             string[] PortsFrom(string node) => [.. Links().Where(l => l.From.StartsWith(node + ":", StringComparison.Ordinal))
                 .Select(l => l.To[(MixSink.Length + 1)..]).Distinct().Order()];
             double SinkVolume() => pw.GetSinkVolume(MixSink) ?? double.NaN;
+            string[] Into(string port) => [.. Links().Where(l => l.To == MixSink + ":" + port).Select(l => l.From)];
 
             PrimaryWait(() => { Sweep(); return service.Devices()!.Any(d => d.Name == hp1); });
             Run(new() { Cmd = "setMonitorOutputs", Devices = [hp1] });
+            Run(new() { Cmd = "setAuxPortEnabled", Value = JsonSerializer.SerializeToElement(true) });
             for (int i = 0; i < 2; i++) Sweep();
             WaitForRecovery(() => PortsFrom("OpenXLR_mix_monitor").SequenceEqual(["playback_AUX2", "playback_AUX3"]));
+            // The Aux mix streams on pair 5 in software mixing.
+            WaitForRecovery(() => Into("playback_AUX10").Length > 0 && Into("playback_AUX11").Length > 0);
             byte[] before = pro.Block;
+            Assert.Equal(0x20, before[ProMixSections.SelectorUsbAux]);
             Assert.Equal(0x54, before[98]);
             Assert.Equal(0.5, SinkVolume(), 2);
 
@@ -105,6 +113,16 @@ public sealed partial class MonitorVolumeIntegrationTests
             Assert.Equal(0.5, entry.OutputVolume!.Value, 2);
             Assert.Equal(1, service.Snapshot()!.Channels.Single(c => c.Id == "game").HardwarePair);
             Assert.Equal(0, service.Snapshot()!.Mixes.Single(m => m.Id == "monitor").HardwareSection);
+            // The Aux mix: built by the unit in section 36, the port still on
+            // 20, Aux In and pair 5 out (no channel streams there), and the
+            // graph's Aux mix off pair 5.
+            Assert.Equal(36, service.Snapshot()!.Mixes.Single(m => m.Id == "auxout").HardwareSection);
+            Assert.Equal(0x20, mode[ProMixSections.SelectorUsbAux]);
+            Assert.Equal(0, mode[36 + 12] & 0x04);
+            Assert.Equal(0, mode[36 + 13] & 0x02);
+            Assert.Equal(service.DryRunMixing(MixingMode.Hardware).Content.Single(c => c.Section == 36).Hex,
+                Convert.ToHexString(mode, 36, ProMixPlan.UnitSectionLength));
+            WaitForRecovery(() => Into("playback_AUX10").Length == 0 && Into("playback_AUX11").Length == 0);
             PrimaryWait(() => MixerSettings.Load()?.HardwarePairs.GetValueOrDefault("game", -1) == 1);
 
             // The output volume moves the headphone volume, not the sink.
@@ -126,15 +144,15 @@ public sealed partial class MonitorVolumeIntegrationTests
             // What the mode turns off is refused with its sentence.
             Assert.Contains("Auditions are not available", service.Apply(new() { Cmd = "auditionClip" }));
 
-            // Ducking: the unit lowers Game and Music in section 0 only, from
-            // their own pairs, keyed by XLR 1; Monitor A is the unit's alone,
-            // so no software stage runs for it.
+            // Ducking: the unit lowers Game and Music in sections 0 and 36
+            // only, from their own pairs, keyed by XLR 1; Monitor A and the Aux
+            // mix are the unit's alone, so no software stage runs for them.
             Run(new()
             {
                 Cmd = "setDucking",
-                Value = JsonSerializer.SerializeToElement(new { enabled = true, channels = new[] { "game", "music" }, mixes = new[] { "monitor" } }),
+                Value = JsonSerializer.SerializeToElement(new { enabled = true, channels = new[] { "game", "music" }, mixes = new[] { "monitor", "auxout" } }),
             });
-            PrimaryWait(() => { Sweep(); return service.Ducking().Device?.Held == true && (pro.Block[16] & 0x3c) == 0x3c; });
+            PrimaryWait(() => { Sweep(); return service.Ducking().Device?.Held == true && (pro.Block[16] & 0x3c) == 0x3c && (pro.Block[52] & 0x3c) == 0x3c; });
             DuckingState ducking = service.Ducking();
             Assert.Equal("device", ducking.Backend);
             Assert.True(ducking.Device!.Ready, ducking.Device.Note);
@@ -142,12 +160,14 @@ public sealed partial class MonitorVolumeIntegrationTests
             byte[] ducked = pro.Block;
             Assert.Equal(0, ducked[16] & 0x82);                 // pairs 0 and 3 not ducked
             Assert.Equal(0, ducked[17] & 0xaa);                 // nor 4 to 7
-            foreach (int at in new[] { 34, 52, 70, 88 }) Assert.Equal(0, (ducked[at] | ducked[at + 1]) & 0xaa);
+            Assert.Equal(0, ducked[52] & 0x82);
+            Assert.Equal(0, ducked[53] & 0xaa);
+            foreach (int at in new[] { 34, 70, 88 }) Assert.Equal(0, (ducked[at] | ducked[at + 1]) & 0xaa);
             Assert.Equal(0x01, pro.Ducking[5 * 8 + ProDucking.FlagsByte] & 0x01);
             Assert.Equal(0x01, pro.Ducking[6 * 8 + ProDucking.FlagsByte] & 0x01);
             Assert.DoesNotContain(service.Meters()!.Keys, k => k.StartsWith("duck:", StringComparison.Ordinal));
             Run(new() { Cmd = "setDucking", Value = JsonSerializer.SerializeToElement(new { enabled = false }) });
-            PrimaryWait(() => { Sweep(); return (pro.Block[16] & 0xaa) == 0; });
+            PrimaryWait(() => { Sweep(); return (pro.Block[16] & 0xaa) == 0 && (pro.Block[52] & 0xaa) == 0; });
 
             // Leaving: the graph, the sink, section 0, byte 98 and the jack as before.
             Run(new() { Cmd = "setChannelMuted", Channel = "game", Mix = "monitor", Value = JsonSerializer.SerializeToElement(false) });
@@ -156,11 +176,13 @@ public sealed partial class MonitorVolumeIntegrationTests
             PrimaryWait(() => { Sweep(); return MixerSettings.Load()?.HardwareEntry is null; });
             WaitForRecovery(() => PortsFrom("OpenXLR_mix_monitor").SequenceEqual(["playback_AUX2", "playback_AUX3"]));
             WaitForRecovery(() => PortsFrom("OpenXLR_ch_game").Length == 0 && PortsFrom("OpenXLR_ch_system").Length == 0);
+            WaitForRecovery(() => Into("playback_AUX10").Length > 0 && Into("playback_AUX11").Length > 0);
             Assert.Equal(0.5, SinkVolume(), 2);
             byte[] after = pro.Block;
             Assert.Equal(0x54, after[98]);
             Assert.Equal(before[..16], after[..16]);
             Assert.Equal(before[36..52], after[36..52]);
+            Assert.Equal(0x20, after[ProMixSections.SelectorUsbAux]);
             Assert.Equal(ProJackLevels.ByteOf(-10), pro.Levels[0]);
             Assert.False(service.Snapshot()!.HardwareMixing!.Active);
         }
