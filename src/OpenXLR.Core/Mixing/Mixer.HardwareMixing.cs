@@ -172,5 +172,224 @@ public sealed partial class Mixer
         foreach ((string channel, int pair) in s.HardwarePairs) _hardwarePairs[channel] = pair;
         _hardwareSections.Clear();
         foreach ((string feed, int section) in s.HardwareSections) _hardwareSections[feed] = section;
+        _hardwareEntry = s.HardwareEntry is { Valid: true } entry ? entry : null;
     }
+
+    // --- the mode in the graph ---
+
+    // What the unit held before the mode, while the unit holds the mode or is
+    // being put back; the channels' links into their pairs and the pair each
+    // link goes to.
+    private HardwareEntry? _hardwareEntry;
+    private readonly Dictionary<string, PortLink> _hardwareLinks = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> _linkedPairs = new(StringComparer.Ordinal);
+
+    /// <summary>The first selected output's volume as the state shows it: the jacks' own in hardware mixing.</summary>
+    public double? OutputVolume { get { lock (_gate) return _outputVolume; } }
+
+    /// <summary>What the unit held before hardware mixing, while it runs or is being left; null otherwise.</summary>
+    public HardwareEntry? HardwareEntry { get { lock (_gate) return _hardwareEntry; } }
+
+    // The graph has entered the mode this run: the channels are linked to
+    // their pairs and the Pro's sink is held at 100%.
+    private bool _hardwareGraphEntered;
+
+    /// <summary>
+    /// The unit holds the mode, or is about to: no mix of the computer's is
+    /// routed to a jack, since what the unit plays there is its own.
+    /// </summary>
+    private bool RoutesOffJacksLocked => _hardwareEntry is { Leaving: false };
+
+    /// <summary>The unit builds the jacks' mixes and the graph is in the mode: the Pro's sink is held at 100%.</summary>
+    private bool UnitBuildsJacksLocked => RoutesOffJacksLocked && _hardwareGraphEntered;
+
+    /// <summary>Whether the graph has entered the mode this run.</summary>
+    public bool HardwareGraphEntered { get { lock (_gate) return UnitBuildsJacksLocked; } }
+
+    /// <summary>
+    /// Keep <paramref name="entry"/> as the mode's, before anything is written
+    /// to the unit: from here no mix is routed to a jack. The caller saves the
+    /// settings, then writes the unit and enters the graph.
+    /// </summary>
+    public void BeginHardwareMixing(HardwareEntry entry)
+    {
+        lock (_gate)
+        {
+            _hardwareEntry = entry with { Leaving = false };
+            _hardwareGraphEntered = false;
+            if (_built) SetMonitorOutputsLocked([.. _monitorOutputs]);
+        }
+    }
+
+    /// <summary>The Pro's raw sink while a jack is selected, by the jack's bare name.</summary>
+    private string? JackSinkLocked()
+        => _monitorOutputs.FirstOrDefault(o => o.Contains('#') && !o.EndsWith("#usbaux", StringComparison.Ordinal)) is { } jack
+            ? StripMarker(jack) : null;
+
+    /// <summary>Set the mixing choice. The caller saves the settings; the next sweep enters or leaves.</summary>
+    public void SetMixing(string mixing)
+    {
+        if (!MixingMode.IsValid(mixing)) throw new ArgumentException("mixing must be 'software' or 'hardware'", nameof(mixing));
+        lock (_gate) _mixing = mixing;
+    }
+
+    /// <summary>Keep the pairs and sections a running plan uses, so they stay across restarts. True when they changed.</summary>
+    private bool KeepHardwareMapsLocked(IReadOnlyDictionary<string, int> pairs, IReadOnlyDictionary<string, int> sections)
+    {
+        bool changed = false;
+        foreach ((string channel, int pair) in pairs)
+            if (!_hardwarePairs.TryGetValue(channel, out int was) || was != pair)
+            {
+                // A pair another channel kept goes to this one now.
+                foreach (string other in _hardwarePairs.Where(p => p.Value == pair && p.Key != channel).Select(p => p.Key).ToList())
+                    _hardwarePairs.Remove(other);
+                _hardwarePairs[channel] = pair;
+                changed = true;
+            }
+        foreach ((string feed, int section) in sections)
+            if (!_hardwareSections.TryGetValue(feed, out int was) || was != section)
+            {
+                foreach (string other in _hardwareSections.Where(p => p.Value == section && p.Key != feed).Select(p => p.Key).ToList())
+                    _hardwareSections.Remove(other);
+                _hardwareSections[feed] = section;
+                changed = true;
+            }
+        return changed;
+    }
+
+    /// <summary>
+    /// Enter hardware mixing in the graph, after the unit's sections were
+    /// written with every membership clear and the jacks' levels lowered:
+    /// every route off the jacks, the Pro's sink held at 100%, each channel
+    /// linked to its pair. True when the kept maps changed, so the caller
+    /// saves the settings.
+    /// </summary>
+    public bool EnterHardwareGraph(IReadOnlyDictionary<string, int> pairs, IReadOnlyDictionary<string, int> sections)
+    {
+        lock (_gate)
+        {
+            if (!RoutesOffJacksLocked || !_built) return false;
+            bool changed = KeepHardwareMapsLocked(pairs, sections);
+            _hardwareGraphEntered = true;
+            SetMonitorOutputsLocked([.. _monitorOutputs]);
+            PinProSinkLocked();
+            LinkHardwarePairsLocked(pairs);
+            return changed;
+        }
+    }
+
+    /// <summary>
+    /// Keep the running mode in step: the maps, the links of channels added,
+    /// removed or moved, links that died, and the Pro's sink at 100%. True
+    /// when the maps changed, so the caller saves the settings.
+    /// </summary>
+    public bool DriveHardwareMixing(IReadOnlyDictionary<string, int> pairs, IReadOnlyDictionary<string, int> sections)
+    {
+        lock (_gate)
+        {
+            if (!UnitBuildsJacksLocked) return false;
+            bool changed = KeepHardwareMapsLocked(pairs, sections);
+            if (!_built) return changed;
+            PinProSinkLocked();
+            LinkHardwarePairsLocked(pairs);
+            return changed;
+        }
+    }
+
+    /// <summary>Replace the running entry: a jack's base level the owner moved on the unit. The caller saves the settings.</summary>
+    public void KeepHardwareEntry(HardwareEntry entry)
+    {
+        lock (_gate)
+            if (_hardwareEntry is not null) _hardwareEntry = entry with { Leaving = _hardwareEntry.Leaving };
+    }
+
+    /// <summary>
+    /// Leave hardware mixing in the graph, after every membership of the
+    /// unit's sections was cleared: unlink the pairs, give the Pro's sink
+    /// its volume back and route the mixes to the jacks again. The entry
+    /// stays, marked leaving, until the unit is put back. The caller saves.
+    /// </summary>
+    public void LeaveHardwareMixing()
+    {
+        lock (_gate)
+        {
+            if (_hardwareEntry is not { Leaving: false } entry) return;
+            UnlinkHardwarePairsLocked();
+            _hardwareEntry = entry with { Leaving = true };
+            _hardwareGraphEntered = false;
+            if (!_built) return;
+            if (JackSinkLocked() is { } pro)
+            {
+                try { _pw.SetSinkVolume(pro, entry.OutputVolume ?? 1.0); }
+                catch (InvalidOperationException) { /* the unit left; its sink comes back at its own volume */ }
+            }
+            SetMonitorOutputsLocked([.. _monitorOutputs]);
+        }
+    }
+
+    /// <summary>The unit is back as it was before the mode: the entry goes. The caller saves.</summary>
+    public void ForgetHardwareEntry()
+    {
+        lock (_gate)
+        {
+            _hardwareEntry = null;
+            _hardwareGraphEntered = false;
+        }
+    }
+
+    /// <summary>
+    /// Hold the Pro's sink at 100% while the unit builds the jacks' mixes: its
+    /// volume would move every channel against the unit's own inputs, and the
+    /// Aux mix with them. The jacks' output volume moves their headphone
+    /// volumes instead (see <see cref="HardwareEntry.OutputVolume"/>).
+    /// </summary>
+    private void PinProSinkLocked()
+    {
+        if (JackSinkLocked() is not { } pro) return;
+        try
+        {
+            if (_pw.GetSinkVolume(pro) is double volume && Math.Abs(volume - 1.0) > 0.005) _pw.SetSinkVolume(pro, 1.0);
+        }
+        catch (InvalidOperationException) { /* the unit left */ }
+    }
+
+    /// <summary>
+    /// Link every channel that needs a pair into it on the Pro's sink, from
+    /// the channel's monitor: the audio its sends start from. A link to a
+    /// pair the channel no longer has, or of a channel gone, is undone first,
+    /// so two channels never share a pair.
+    /// </summary>
+    private void LinkHardwarePairsLocked(IReadOnlyDictionary<string, int> pairs)
+    {
+        string? pro = JackSinkLocked() ?? HardwareOutputSinkLocked();
+        foreach (string channel in _hardwareLinks.Keys.ToList())
+            if (pro is null || !pairs.TryGetValue(channel, out int pair) || _linkedPairs.GetValueOrDefault(channel, -1) != pair)
+            {
+                _pw.Unlink(_hardwareLinks[channel]);
+                _hardwareLinks.Remove(channel);
+                _linkedPairs.Remove(channel);
+            }
+        if (pro is null || HoldPlaybackLocked(pro)) return;
+        foreach ((string channel, int pair) in pairs)
+        {
+            if (_hardwareLinks.TryGetValue(channel, out PortLink? link))
+            {
+                if (_pw.EnsureLinks(link) != LinkHealth.Broken && link.Complete) continue;
+                _pw.Unlink(link);
+            }
+            if (_config.Channels.FirstOrDefault(c => c.Id == channel) is not { } definition) continue;
+            _hardwareLinks[channel] = _pw.RouteTapToPair(definition.SinkName, "monitor", pro, pair);
+            _linkedPairs[channel] = pair;
+        }
+    }
+
+    private void UnlinkHardwarePairsLocked()
+    {
+        foreach (PortLink link in _hardwareLinks.Values) _pw.Unlink(link);
+        _hardwareLinks.Clear();
+        _linkedPairs.Clear();
+    }
+
+    /// <summary>The channels' pairs as linked now, for tests and diagnostics.</summary>
+    internal IReadOnlyDictionary<string, int> LinkedPairs { get { lock (_gate) return new Dictionary<string, int>(_linkedPairs); } }
 }

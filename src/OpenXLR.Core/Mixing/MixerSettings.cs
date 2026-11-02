@@ -172,6 +172,9 @@ public sealed record MixerSettings
     /// <summary>The Wave XLR Pro section each jack feed takes in hardware mixing, by feed, kept like <see cref="HardwarePairs"/>.</summary>
     public Dictionary<string, int> HardwareSections { get; init; } = [];
 
+    /// <summary>What the unit held before hardware mixing, while the mode runs or is being left; null otherwise (see <see cref="OpenXLR.Core.Mixing.HardwareEntry"/>).</summary>
+    public HardwareEntry? HardwareEntry { get; init; }
+
     /// <summary>
     /// Noise removal by channel id. A microphone absent here has it off. An
     /// entry for a channel that is not a microphone is kept as it is.

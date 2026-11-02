@@ -287,6 +287,7 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
             VoiceTuneStrength = b4[VoiceTuneStrengthOffset],
             HpVolumeDb = -b5[HpVolOffset] / 4.0,
             Hp2VolumeDb = -b5[Hp2VolOffset] / 4.0,
+            LineOutLevelDb = ProJackLevels.DbOf(b5[ProJackLevels.LineOutOffset]),
             LowImpedance = (b5[FlagsOffset] & LowZMask) != 0,
             Phantom = (f & PhantomMask) != 0,
             ClipGuard = (b4[ClipGuardOffset] & ClipGuardOffMask) == 0,
@@ -436,12 +437,23 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
             ProMixChanges changes = plan.Apply(b1, new1);
             bool wrote8 = b8 is not null && !new8.AsSpan().SequenceEqual(b8);
             bool wrote1 = !new1.AsSpan().SequenceEqual(b1);
+            // The jacks' levels: every one that goes down before the mixes
+            // change, every one that goes up after, so no source is louder
+            // on a jack for a moment (hardware mixing's ear safety).
+            byte[]? b5 = plan.JackLevels is null ? null : Read(BlockHp, HpLen);
+            byte[]? down5 = b5 is null ? null : plan.JackLevels!.Lowered(b5);
+            if (b5 is not null && !down5.AsSpan().SequenceEqual(b5)) Write(BlockHp, down5!);
             if (wrote8) Write(ProDucking.Block, new8!);
             bool committed = wrote1 && changes.Commits();
             if (committed) WriteCommitted(BlockCrossfade, new1);
             else if (wrote1) Write(BlockCrossfade, new1);
+            byte[]? new5 = b5 is null ? null : plan.JackLevels!.All(b5);
+            if (new5 is not null && !new5.AsSpan().SequenceEqual(down5)) Write(BlockHp, new5);
             if (b8 is not null) _ducking = ProDucking.Decode(new8!, new1);
-            return new ProMixWrite(changes, wrote8, b8 is null ? "not read" : ProDucking.Diff(b8, new8!), wrote1, ProDucking.Diff(b1, new1), committed);
+            return new ProMixWrite(changes, wrote8, b8 is null ? "not read" : ProDucking.Diff(b8, new8!), wrote1, ProDucking.Diff(b1, new1), committed)
+            {
+                Change5 = b5 is null || new5.AsSpan().SequenceEqual(b5) ? "" : ProDucking.Diff(b5, new5!),
+            };
         }
     }
 

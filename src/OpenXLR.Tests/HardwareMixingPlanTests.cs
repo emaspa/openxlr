@@ -257,15 +257,17 @@ public sealed class HardwareMixingPlanTests
     }
 
     [Theory]
-    [InlineData(-30, null, -30, -9)]
-    [InlineData(-30, 1.0, -30, -9)]
-    [InlineData(-30, 0.5, -48.062, -9)]
-    [InlineData(-30, 1.5, -30, -19.565)]
-    [InlineData(-30, 0.0, double.NegativeInfinity, -9)]
-    public void InTheModeTheOutputVolumeOnlyLowersAJack(double baseDb, double? volume, double inMode, double afterLeaving)
+    [InlineData(-30, 21, null, -30, -9)]
+    [InlineData(-30, 21, 1.0, -30, -9)]
+    [InlineData(-30, 21, 0.5, -48.062, -9)]
+    [InlineData(-30, 21, 1.5, -30, -19.565)]
+    [InlineData(-30, 21, 0.0, double.NegativeInfinity, -9)]
+    [InlineData(-38.94, 28.94, null, -38.94, -10)]
+    [InlineData(-38.94, 28.94, 1.0, -38.94, -10)]
+    public void InTheModeTheOutputVolumeOnlyLowersAJack(double baseDb, double offsetDb, double? volume, double inMode, double afterLeaving)
     {
         Assert.Equal(inMode, HardwareMixingPlanner.JackLevelDb(baseDb, volume), 3);
-        Assert.Equal(afterLeaving, HardwareMixingPlanner.LeaveLevelDb(baseDb, volume), 3);
+        Assert.Equal(afterLeaving, HardwareMixingPlanner.LeaveLevelDb(baseDb, offsetDb, volume), 3);
     }
 
     [Fact]

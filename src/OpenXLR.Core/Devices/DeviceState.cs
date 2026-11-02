@@ -86,6 +86,9 @@ public sealed record DeviceState
     [System.Text.Json.Serialization.JsonIgnore]
     public string? ProMixBlock { get; init; }
 
+    /// <summary>The Wave XLR Pro's Line Out level, block 0x0005 byte 4, dB = -byte/4; 0 on every other model.</summary>
+    public double LineOutLevelDb { get; init; }
+
     // USB Aux input stage (block 0x0004 tail): level -60..0 dB and level lock.
     public double AuxLevelDb { get; init; }
     public bool AuxLevelLock { get; init; }

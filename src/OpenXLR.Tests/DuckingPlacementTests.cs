@@ -91,6 +91,18 @@ public sealed class DuckingPlacementTests
     }
 
     [Fact]
+    public void WhileTheUnitBuildsTheJacksMixesItDucksNoneOfThem()
+    {
+        DuckingVerdict verdict = DuckingPlacement.Evaluate(Setup, View with { HardwareMixing = true }, Pro);
+        Assert.False(verdict.Ready);
+        Assert.Equal("hardwareMixing", verdict.Reason);
+        Assert.Contains("builds the mixes its jacks play", verdict.Note);
+        // A target only other outputs play is not the unit's to build.
+        DuckingView elsewhere = EditMonitor(View, m => m with { OnJacks = false }) with { HardwareMixing = true };
+        Assert.NotEqual("hardwareMixing", DuckingPlacement.Evaluate(Setup, elsewhere, Pro).Reason);
+    }
+
+    [Fact]
     public void UnheardMixesAreIgnoredButVirtualMicrophonesAlwaysPreventDevicePlacement()
     {
         DuckingView view = View with { Mixes = [.. View.Mixes.Select(m => m.Id == "monitor2"

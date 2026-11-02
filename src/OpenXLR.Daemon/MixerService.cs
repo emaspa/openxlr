@@ -185,8 +185,14 @@ public sealed class MixerService : IHostedService, IDisposable
     /// choice for a dry run.
     /// </summary>
     private HardwareMixingPlan PlanHardwareMixing(string? mixing = null)
-        => _mixer.PlanHardwareMixing(_devices.HardwareMixingUnit, failed: false, mixing,
+        => _mixer.PlanHardwareMixing(_devices.HardwareMixingUnit, failed: _hardwareMisses >= HardwareMissLimit, mixing,
             _devices.ProSection0LevelDb ?? HardwareMixingPlanner.Section0LevelDb);
+
+    // Sweeps in a row whose write the unit did not keep while the mode ran;
+    // at the limit the mode stops for this run (reason failed) until
+    // setMixing is sent again.
+    private int _hardwareMisses;
+    private const int HardwareMissLimit = 5;
 
     /// <summary>
     /// <c>setMixing</c> with <c>check</c>: what switching to
@@ -197,13 +203,228 @@ public sealed class MixerService : IHostedService, IDisposable
         lock (_selectorGate) return PlanHardwareMixing(mixing);
     }
 
-    /// <summary>The sentence <c>setMixing</c> answers <c>hardware</c> with until the daemon can run the mode.</summary>
-    internal const string HardwareMixingNotYet =
-        "setMixing: hardware mixing cannot be switched on yet; send \"check\": true for a dry run";
+    // The jacks' levels as last written in hardware mixing, with the one
+    // before: a poll showing anything else is the owner's own change on the
+    // unit (the knob, or the headphone volume from a client).
+    private readonly Dictionary<string, (byte Now, byte Before)> _jackWritten = new(StringComparer.Ordinal);
+    private HardwareEntry? _savedEntry;
+
+    /// <summary>
+    /// Hardware mixing's part of a sweep, with the block 0x0001 plan it owns.
+    /// True when the mode took the sweep: entering, running, or holding while
+    /// something in its way clears. False when the software path runs, which
+    /// also puts the unit back after the mode left the graph.
+    /// </summary>
+    private bool HardwareMixingSweepLocked(HardwareMixingPlan plan)
+    {
+        HardwareEntry? entry = _mixer.HardwareEntry;
+        if (entry is { Leaving: false })
+        {
+            if (!plan.Wanted || plan.Reason == "failed") return !LeaveHardwareMixingLocked(plan);
+            // Anything else in the way (a capture layout read short for a
+            // moment, the mixer rebuilding) holds the mode as it is.
+            if (plan.Active) DriveHardwareMixingLocked(plan);
+            return true;
+        }
+        if (entry is not null || !plan.Active) return false;
+        return EnterHardwareMixingLocked(plan);
+    }
+
+    /// <summary>
+    /// Begin the mode: keep what the unit holds (sections 0 and 36, byte 98,
+    /// each jack's level less its entry offset, the output volume) and save
+    /// it before anything is written, then drive it. False when the unit's
+    /// block has not been read yet.
+    /// </summary>
+    private bool EnterHardwareMixingLocked(HardwareMixingPlan plan)
+    {
+        if (_devices.ProMixBlock is not { Length: 2 * ProMixSections.Length } hex || _devices.LastState is not { } state) return false;
+        byte[] block = Convert.FromHexString(hex);
+        double idle = Math.Max(-HardwareMixingPlanner.Section0LevelDb, -ProMixSections.Section0LevelDb(block[ProMixSections.Section0LevelOffset]));
+        var levels = new Dictionary<string, double> { ["hp1"] = state.HpVolumeDb, ["hp2"] = state.Hp2VolumeDb, ["lineout"] = state.LineOutLevelDb };
+        var entry = new HardwareEntry
+        {
+            Section0 = ProMixPlan.RestoreOf(block, 0),
+            Section36 = ProMixPlan.RestoreOf(block, ProMixPlan.AuxSection),
+            Section0Level = block[ProMixSections.Section0LevelOffset],
+            Jacks = levels.ToDictionary(p => p.Key, p => p.Value - plan.EntryOffsetsDb.GetValueOrDefault(p.Key, idle)),
+            Offsets = levels.ToDictionary(p => p.Key, p => plan.EntryOffsetsDb.GetValueOrDefault(p.Key, idle)),
+            OutputVolume = _mixer.OutputVolume,
+        };
+        _mixer.BeginHardwareMixing(entry);
+        SaveEntryNow();
+        _log.LogInformation("hardware mixing: entering; jack levels {hp1} / {hp2} / {lineout} dB lowered to {base1} / {base2} / {base3} dB",
+            levels["hp1"], levels["hp2"], levels["lineout"], entry.Jacks["hp1"], entry.Jacks["hp2"], entry.Jacks["lineout"]);
+        DriveHardwareMixingLocked(plan);
+        return true;
+    }
+
+    /// <summary>
+    /// The running mode: the jacks' levels from their bases and the output
+    /// volume, a change the owner made on the unit taken into its base; the
+    /// unit's sections from the plan. Until the graph has entered this run,
+    /// the sections go first with every membership clear, then the graph, so
+    /// a channel never plays on its pair beside the Monitor mix.
+    /// </summary>
+    private void DriveHardwareMixingLocked(HardwareMixingPlan plan)
+    {
+        if (_mixer.HardwareEntry is not { Leaving: false } entry || _devices.LastState is not { } state) return;
+        // A microphone is the unit's own input in its mixes: no direct path.
+        _mixer.SetHardwareMicMonitor(false);
+        _mixer.SetHardwareMicMonitor(false, input: 2);
+        entry = AdoptJackChanges(entry, state);
+        double? volume = entry.OutputVolume;
+        double Level(string jack) => HardwareMixingPlanner.JackLevelDb(entry.Jacks.GetValueOrDefault(jack, ProJackLevels.DbOf(240)), volume);
+        var levels = new ProJackLevels(Level("hp1"), Level("hp2"), Level("lineout"));
+
+        // Sections 18 and 54 are kept before the mode first writes them, as
+        // a second jack feed keeps them; one the mode does not use goes back.
+        int[] feedSections = [.. plan.Sections.Values.Where(s => ProJackFeeds.SlotOfSection(s) is 1 or 2)];
+        IReadOnlyDictionary<int, string> restore = KeepFeedSections(feedSections);
+        if (!feedSections.All(_mixer.HardwareRestore.ContainsKey)) return;
+        Dictionary<int, byte[]> sections = plan.Content.ToDictionary(c => c.Section, c => Convert.FromHexString(c.Hex));
+        bool AudibleJack(string suffix) => _mixer.MonitorOutputs.Any(output =>
+            output.EndsWith("#" + suffix, StringComparison.Ordinal) && _mixer.IsMonitorOutputAudible(output));
+        int SectionOf(string jack) => plan.Jacks.GetValueOrDefault(jack, 0);
+        var full = new ProMixPlan
+        {
+            Hp1 = AudibleJack("hp1"), Hp2 = AudibleJack("hp2"), UsbAux = _mixer.AuxPortEnabled, LineOut = AudibleJack("lineout"),
+            JackSections = new ProJackSections(SectionOf("hp1"), SectionOf("hp2"), SectionOf("lineout")),
+            UnitSections = sections,
+            Section0Level = ProMixSections.Section0LevelByte(0),
+            AuxPairOnly = true,
+            JackLevels = levels,
+            Restore = restore,
+        };
+        if (!_mixer.HardwareGraphEntered)
+        {
+            var quiet = sections.ToDictionary(p => p.Key, p =>
+            {
+                byte[] bytes = (byte[])p.Value.Clone();
+                bytes[ProMixSections.MaskOffset] = bytes[ProMixSections.MaskOffset + 1] = 0;
+                return bytes;
+            });
+            _devices.EnsureMix(full with { Hp1 = null, Hp2 = null, LineOut = null, JackSections = null, UnitSections = quiet }, out bool held);
+            if (!held) return;
+            if (_mixer.EnterHardwareGraph(plan.Pairs, plan.Sections)) ScheduleSave();
+            _log.LogInformation("hardware mixing: running; pairs {pairs}", string.Join(", ", plan.Pairs.Select(p => $"{p.Key} {p.Value}")));
+        }
+        else if (_mixer.DriveHardwareMixing(plan.Pairs, plan.Sections)) ScheduleSave();
+        _devices.EnsureMix(full, out bool kept);
+        if (kept) _hardwareMisses = 0;
+        else if (++_hardwareMisses == HardwareMissLimit)
+            _log.LogWarning("hardware mixing: the Wave XLR Pro did not keep {count} writes in a row; leaving the mode for this run", HardwareMissLimit);
+        foreach ((string jack, double db) in new[] { ("hp1", levels.Hp1Db!.Value), ("hp2", levels.Hp2Db!.Value), ("lineout", levels.LineOutDb!.Value) })
+        {
+            byte now = ProJackLevels.ByteOf(db);
+            _jackWritten[jack] = _jackWritten.TryGetValue(jack, out var was) ? was.Now == now ? was : (now, was.Now) : (now, now);
+        }
+        if (_mixer.HardwareEntry != _savedEntry) ScheduleSave();
+    }
+
+    /// <summary>
+    /// A jack level the poll shows that is neither the one last written nor
+    /// the one before is the owner's: it becomes the jack's base, less the
+    /// output volume's part.
+    /// </summary>
+    private HardwareEntry AdoptJackChanges(HardwareEntry entry, DeviceState state)
+    {
+        var jacks = new Dictionary<string, double>(entry.Jacks);
+        bool moved = false;
+        foreach ((string jack, double held) in new[] { ("hp1", state.HpVolumeDb), ("hp2", state.Hp2VolumeDb), ("lineout", state.LineOutLevelDb) })
+        {
+            byte read = ProJackLevels.ByteOf(held);
+            if (!_jackWritten.TryGetValue(jack, out var written) || read == written.Now || read == written.Before) continue;
+            jacks[jack] = held - Mixer.JackOutputVolumeDb(entry.OutputVolume);
+            _jackWritten[jack] = (read, read);
+            moved = true;
+            _log.LogInformation("hardware mixing: {jack} moved on the unit to {db} dB, kept", jack, held);
+        }
+        if (!moved) return entry;
+        entry = entry with { Jacks = jacks };
+        _mixer.KeepHardwareEntry(entry);
+        return entry;
+    }
+
+    /// <summary>
+    /// Leave the mode: every membership of the sections the jacks play
+    /// cleared first, then the graph back to software mixing. The software
+    /// path then puts sections 0 and 36, byte 98 and the jacks' levels back.
+    /// False when the unit did not take the first step, to try again.
+    /// </summary>
+    private bool LeaveHardwareMixingLocked(HardwareMixingPlan plan)
+    {
+        if (_devices.ProMixBlock is not { Length: 2 * ProMixSections.Length } hex) return false;
+        byte[] block = Convert.FromHexString(hex);
+        var quiet = new Dictionary<int, byte[]>();
+        foreach (int offset in new[] { ProMixSections.SelectorHp1, ProMixSections.SelectorHp2, ProMixSections.SelectorLineOut })
+            if (ProMixSections.SectionOf(block[offset]) is int section && ProJackFeeds.SlotOfSection(section) >= 0)
+            {
+                byte[] bytes = block.AsSpan(section, ProMixPlan.UnitSectionLength).ToArray();
+                bytes[ProMixSections.MaskOffset] = bytes[ProMixSections.MaskOffset + 1] = 0;
+                quiet[section] = bytes;
+            }
+        _devices.EnsureMix(new ProMixPlan { UnitSections = quiet }, out bool held);
+        if (!held) return false;
+        _mixer.LeaveHardwareMixing();
+        _jackWritten.Clear();
+        SaveEntryNow();
+        _log.LogInformation("hardware mixing: leaving ({why})", plan.Wanted ? plan.Reason : "switched off");
+        return true;
+    }
+
+    /// <summary>
+    /// What hardware mixing turns off while it runs, as the command's error:
+    /// a Sound Check session and Hear myself, an audition, an insert chain on
+    /// a mix a jack plays (the unit builds it), and a channel or binding that
+    /// needs a USB pair when none is left. Null otherwise.
+    /// </summary>
+    private string? RefusedInHardwareMixing(Command cmd)
+    {
+        if (_mixer.HardwareEntry is not { Leaving: false } || _mixer.HardwarePlan is not { } plan) return null;
+        string? Disabled(string key) => plan.Disabled.TryGetValue(key, out string? sentence) ? $"{cmd.Cmd}: {sentence}" : null;
+        string? Budget() => plan.Pairs.Count < HardwareMixingPlanner.ChannelPairs.Count ? null
+            : $"{cmd.Cmd}: {HardwareMixingPlanner.BudgetNote(plan.Pairs.Count + 1)}";
+        return cmd.Cmd switch
+        {
+            "soundCheck" when cmd.Action != "stop" => Disabled("soundCheck"),
+            "setSoundCheckHearMyself" when cmd.Value.ValueKind == System.Text.Json.JsonValueKind.True => Disabled("soundCheck"),
+            "auditionClip" => Disabled("audition"),
+            "setInserts" when cmd.Channel is { } key && key.StartsWith("mix:", StringComparison.Ordinal) && cmd.Inserts is { Count: > 0 }
+                => Disabled($"inserts:{key}"),
+            "createChannel" or "createCaptureChannel" => Budget(),
+            // A strip bound to another source streams on a pair of its own.
+            "setInputBinding" when cmd.Source is not null && cmd.Channel is { } strip && !plan.Pairs.ContainsKey(strip) => Budget(),
+            _ => null,
+        };
+    }
+
+    /// <summary>The software plan's part of putting the unit back after the mode, or null when there is none.</summary>
+    private static ProMixPlan WithLeaveParts(ProMixPlan plan, HardwareEntry? entry)
+        => entry is not { Leaving: true } ? plan : plan with
+        {
+            EntryRestore = new Dictionary<int, string> { [0] = entry.Section0, [ProMixPlan.AuxSection] = entry.Section36 },
+            Section0Level = (byte)entry.Section0Level,
+            JackLevels = new ProJackLevels(LeaveLevel(entry, "hp1"), LeaveLevel(entry, "hp2"), LeaveLevel(entry, "lineout")),
+        };
+
+    private static double? LeaveLevel(HardwareEntry entry, string jack)
+        => entry.Jacks.TryGetValue(jack, out double baseDb)
+            ? HardwareMixingPlanner.LeaveLevelDb(baseDb,
+                entry.Offsets?.GetValueOrDefault(jack, -HardwareMixingPlanner.Section0LevelDb) ?? -HardwareMixingPlanner.Section0LevelDb, entry.OutputVolume)
+            : null;
+
+    private void SaveEntryNow()
+    {
+        _savedEntry = _mixer.HardwareEntry;
+        _saves.Schedule();
+        _saves.Flush();
+    }
 
     private void SyncOutputSelectorsLocked()
     {
-        if (_mixer.NoteHardwarePlan(PlanHardwareMixing())) Changed?.Invoke();
+        HardwareMixingPlan hardwarePlan = PlanHardwareMixing();
+        if (_mixer.NoteHardwarePlan(hardwarePlan)) Changed?.Invoke();
         if (_devices.ActiveCapabilities?.OutputRouting is not true)
         {
             // A saved Pro jack is not evidence of a live hardware mic path.
@@ -214,6 +435,8 @@ public sealed class MixerService : IHostedService, IDisposable
             _prevAuxDesired = false;
             return;
         }
+        if (HardwareMixingSweepLocked(hardwarePlan)) return;
+        HardwareEntry? leaving = _mixer.HardwareEntry;
         var suffixes = new HashSet<string>();
         string? anyProOutput = null;
         foreach (string output in _mixer.MonitorOutputs)
@@ -290,7 +513,7 @@ public sealed class MixerService : IHostedService, IDisposable
         // One plan for block 0x0001 per sweep, with the four selectors: the
         // device manager writes it at most once, together with any ducking
         // target waiting to be written.
-        bool membership = _devices.EnsureMix(new ProMixPlan
+        bool membership = _devices.EnsureMix(WithLeaveParts(new ProMixPlan
         {
             Hp1 = AudibleJack("hp1"), Hp2 = AudibleJack("hp2"), UsbAux = auxDesired, LineOut = AudibleJack("lineout"),
             JackSections = new ProJackSections(SectionOf("hp1"), SectionOf("hp2"), SectionOf("lineout")),
@@ -299,7 +522,14 @@ public sealed class MixerService : IHostedService, IDisposable
             Mic2 = new ProMicPath(mic2First, _mixer.HardwareMicLevelDbOf(2)),
             Feeds = feedSections,
             Restore = restore,
-        });
+        }, leaving), out bool putBack);
+        // The unit is as it was before the mode, with today's parts over it.
+        if (leaving is { Leaving: true } && putBack)
+        {
+            _mixer.ForgetHardwareEntry();
+            SaveEntryNow();
+            _log.LogInformation("hardware mixing: left; the Wave XLR Pro is back as it was before it");
+        }
 
         // The device latches aux-return routing at playback-stream start, so a
         // freshly enabled aux output needs the stream bounced once. The bounce
@@ -1135,6 +1365,7 @@ public sealed class MixerService : IHostedService, IDisposable
     public string? Apply(Command cmd, Guid? connection = null)
     {
         if (!_mixer.Built) return NotBuiltError;
+        if (RefusedInHardwareMixing(cmd) is { } refused) return refused;
         string? invalid = CommandValidation.Check(cmd, _mixer, OpenXLR.Core.Mixing.PluginCatalog.Find);
         if (invalid is not null) return invalid;
         try
@@ -1318,10 +1549,20 @@ public sealed class MixerService : IHostedService, IDisposable
                     SyncOutputSelectors();
                     break;
                 case "setMixing":
+                {
                     // The dry run is answered by the hub; checked by CommandValidation.
-                    if (cmd.Value.GetString() == MixingMode.Hardware) return HardwareMixingNotYet;
+                    string mixing = cmd.Value.GetString()!;
+                    if (mixing == MixingMode.Hardware && DryRunMixing(mixing) is { Reason: "budget", Note: { } budget })
+                        return $"setMixing: {budget}";
+                    _mixer.SetMixing(mixing);
+                    _hardwareMisses = 0;
+                    _saves.Schedule();
+                    _saves.Flush();
+                    // The next sweep enters or leaves; this one already may.
                     SyncOutputSelectors();
-                    break;
+                    Changed?.Invoke();
+                    return null;
+                }
                 case "setLowCutHz":
                     int hz = cmd.Value.GetInt32();
                     if (hz is not (0 or 80 or 120)) return "setLowCutHz: value must be 0, 80, or 120";

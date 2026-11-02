@@ -1643,6 +1643,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 Mixing = _mixing,
                 HardwarePairs = new Dictionary<string, int>(_hardwarePairs, StringComparer.Ordinal),
                 HardwareSections = new Dictionary<string, int>(_hardwareSections, StringComparer.Ordinal),
+                HardwareEntry = _hardwareEntry,
                 NoiseRemoval = new Dictionary<string, MicNoise>(_noise, StringComparer.Ordinal),
                 VoiceChanger = new Dictionary<string, MicVoice>(_voice, StringComparer.Ordinal),
                 Compressor = new Dictionary<string, MicCompressor>(_compressor, StringComparer.Ordinal),
@@ -2006,6 +2007,15 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             string[] sinks = [.. _monitorOutputs.Select(StripMarker).Distinct()];
             if (sinks.Length == 0) return;
             volume = Math.Clamp(volume, 0, PipeWireAdapter.MaxSinkVolume);
+            if (UnitBuildsJacksLocked && JackSinkLocked() is { } pro)
+            {
+                // The jacks' volume is their headphone volume now; the Pro's
+                // sink stays at 100% and the other outputs follow as before.
+                _hardwareEntry = _hardwareEntry! with { OutputVolume = volume };
+                foreach (string sink in sinks.Where(s => s != pro)) WriteFollowerVolumeLocked(sink, volume);
+                _outputVolume = volume;
+                return;
+            }
             // The first output is the one the desktop drives and the one
             // every sweep reads back, so a failed write on it corrects
             // itself; only what the others owe is worth chasing.
@@ -2018,7 +2028,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
 
     /// <summary>The selected outputs the first one's volume is copied to.</summary>
     private IEnumerable<string> FollowerOutputsLocked()
-        => _monitorOutputs.Select(StripMarker).Distinct().Skip(1);
+        => _monitorOutputs.Select(StripMarker).Distinct().Skip(1).Where(s => !UnitBuildsJacksLocked || s != JackSinkLocked());
 
     /// <summary>Write one follower's volume, remembering it when the device refuses.</summary>
     private void WriteFollowerVolumeLocked(string sink, double volume)
@@ -2126,13 +2136,30 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             {
                 string? first = _monitorOutputs.FirstOrDefault();
                 double? outV = first is null ? null : _pw.GetSinkVolume(first);
+                if (UnitBuildsJacksLocked && JackSinkLocked() is { } pro)
+                {
+                    // The desktop moved the Pro's sink: a step of the jacks'
+                    // output volume, and the sink goes back to 100%.
+                    double? held = pro == StripMarker(first!) ? outV : _pw.GetSinkVolume(pro);
+                    double jacks = _hardwareEntry!.OutputVolume ?? 1.0;
+                    if (held is double moved && Math.Abs(moved - 1.0) > 0.005)
+                    {
+                        jacks = Math.Clamp(jacks + moved - 1.0, 0, PipeWireAdapter.MaxSinkVolume);
+                        _hardwareEntry = _hardwareEntry with { OutputVolume = jacks };
+                        try { _pw.SetSinkVolume(pro, 1.0); } catch (InvalidOperationException) { /* the unit left */ }
+                    }
+                    if (pro == StripMarker(first!)) outV = jacks;
+                }
                 changed = Differs(outV, _outputVolume);
                 // In follow mode the desktop changes the first output directly.
                 // Carry that change to the other selected outputs just as the
                 // MONITOR slider does. A new output selection establishes a fresh
                 // baseline rather than overwriting its remembered device volume.
                 if (_enforcedSink == FollowMonitorOutput && changed && _outputVolume is not null && outV is double volume)
+                {
                     foreach (string sink in FollowerOutputsLocked()) WriteFollowerVolumeLocked(sink, volume);
+                    if (UnitBuildsJacksLocked && JackSinkLocked() is not null) _hardwareEntry = _hardwareEntry! with { OutputVolume = volume };
+                }
                 // Nothing moved, so a device that refused an earlier copy is the
                 // only thing left out of step; it gets that value again.
                 else
@@ -2977,6 +3004,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         var seen = new HashSet<string>();
         foreach (string name in _monitorOutputs)
         {
+            // In hardware mixing the unit builds what its jacks play.
+            if (RoutesOffJacksLocked && name.Contains('#') && !name.EndsWith("#usbaux", StringComparison.Ordinal)) continue;
             string key = RouteKeyLocked(name);
             if (seen.Add(key)) yield return (key, name);
         }
@@ -3763,6 +3792,10 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     private void TearDownLocked()
     {
         ResetDesktopMonitorMuteLocked();
+        // The channels' links into their pairs go with the graph.
+        _hardwareLinks.Clear();
+        _linkedPairs.Clear();
+        _hardwareGraphEntered = false;
         // The sends go with the graph, so Hear myself has nothing to put back.
         _soundCheckHearMyself = false;
         if (_soundCheck is not null)

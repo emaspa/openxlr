@@ -276,7 +276,7 @@ that final acknowledgement (or an `error` without a request id):
 | `setMonitorOutput` | `device` | a single monitor sink; `null` disconnects the route |
 | `setMonitorFeed` | `device`, `mix` | what feeds one selected output, independently of other outputs: any existing mix id, including `stream`, `chat`, `auxout` and user mixes of either kind, or distinct ids joined with `+` to sum them at unity. One mix can appear in several outputs' feeds. An empty feed is rejected; remove an output from `setMonitorOutputs` to disconnect it. Each of the Wave XLR Pro's jacks (`<sink>#hp1`, `#hp2`, `#lineout`) takes its own feed, and a `device` that ends at `#` sets every selected jack of that unit. Each distinct feed the jacks play has a mix of its own on the unit, in the order Headphones 1, Headphones 2, Line Out: the first streams on USB playback pair 1 into section 0 of block 0x0001, as all jacks did before, the second on pair 2 into section 18 and the third on pair 3 into section 54. Jacks that play the same feed share it. Sections 18 and 54 are kept in `mixer.json` as they were before their first use and put back once no jack plays them (see [mixer-layout.md](mixer-layout.md)). The state's `monitorFeeds` lists exceptions from `defaultMonitorMix` (`monitor` when present, otherwise the lowest monitor id), independent of layout order. Unknown or repeated mix ids and unselected outputs are rejected. Deleting the last included mix returns that output to `defaultMonitorMix` |
 | `setAuxPortEnabled` | `value` | send the Aux mix to the USB Aux port |
-| `setMixing` | `value`, optional `check` | experimental: where the mixes the Wave XLR Pro's outputs play are built, `software` (the default) or `hardware`; see [hardware mixing](#hardware-mixing). With `check` true nothing changes and the answer is a `mixingPlan` message. This version refuses `hardware` without `check` |
+| `setMixing` | `value`, optional `check` | experimental: where the mixes the Wave XLR Pro's outputs play are built, `software` (the default) or `hardware`, switched live; see [hardware mixing](#hardware-mixing). With `check` true nothing changes and the answer is a `mixingPlan` message. `hardware` is refused while the layout has more channels than USB pairs |
 | `setOutputVolume` | `value` | volume of the selected monitor devices, 0 to 1.5; the range the devices themselves take, so a desktop level above unity can be held and written back unchanged. Values outside it are clamped, and the state reports what reached the devices. With no output selected the command succeeds and changes nothing |
 | `setMonitorMuted` | `value` | boolean only; pause or resume OpenXLR's feeds to all selected monitor outputs, including the Pro's direct microphone monitoring. Selected physical sinks mirror the pause, preserving their previous native mutes for resume. Raw mix and channel mutes, levels and feeds stay unchanged. Recording stays live unless `monitorMuteMicrophones` is enabled. The state reports `monitorMuted`; saved in `mixer.json`, not in profiles, and profile recall keeps the current pause |
 | `toggleMonitorMuted` | none | atomically toggle the same monitor pause. Use this for keys and repeated presses instead of reading `monitorMuted` and sending its inverse; each accepted command toggles once |
@@ -1350,8 +1350,9 @@ All under `~/.config/openxlr/` (or `$XDG_CONFIG_HOME/openxlr/`):
   (`eqProcessing`) and where the compressors and expanders run
   (`dynamicsProcessing`), the Wave XLR Pro sections kept for jack feeds
   (`hardwareRestore`, machine wiring, never in a profile),
-  [hardware mixing](#hardware-mixing) (`mixing`, `hardwarePairs` and
-  `hardwareSections`, machine wiring, never in a profile), the
+  [hardware mixing](#hardware-mixing) (`mixing`, `hardwarePairs`,
+  `hardwareSections` and `hardwareEntry`, machine wiring, never in a
+  profile), the
   [ducking](#ducking) setup (`ducking`), the
   per-channel volumes (`channelVolumes`), the exclusive groups
   (`exclusiveGroups`), the monitor feeds (`monitorFeeds`),
@@ -2633,6 +2634,7 @@ rule that fails gives `reason`:
 |---|---|---|
 | the software mixer runs | `mixerOff` | The software mixer is off, so ducking does not run. |
 | the key carries the unit's input 1 | `keyNotSupported` | The Wave XLR Pro ducks only with XLR 1 as the key. |
+| no target mix is one the unit builds in [hardware mixing](#hardware-mixing) | `hardwareMixing` | The Wave XLR Pro builds the mixes its jacks play, and ducking does not run on them yet. |
 | the unit's ducking is heard on the jacks: no target mix is heard on them while the last read shows the jacks' feed outside the mix they play | `monitorReturn` | The jacks' feed is not in the Wave XLR Pro's headphone mix, where it ducks, so this computer ducks. |
 | every target mix that is heard is heard only on the unit: a monitor mix in the jacks' feed, or the Aux mix on the USB Aux port, and on no other output, virtual microphone or feed | `mixElsewhere` | Monitor A also plays on Speakers, which the Wave XLR Pro cannot duck. |
 | when one mix of a jack's feed is ducked, all of that feed's mixes are; jacks on other feeds are not counted | `sharedOutput` | The jacks play Monitor A and Chat together, and only Monitor A is ducked. |
@@ -2679,9 +2681,9 @@ Headphones 2 and Line Out) can be built by the unit instead of this
 computer. Every channel then streams to the unit once, on a USB playback
 pair of its own, and the unit mixes the pairs with its own inputs at zero
 latency. `mixing` in `mixer.json` holds the choice, `software` (the
-default) or `hardware`, and `setMixing` changes it. This version plans the
-mode and answers a dry run. It refuses `setMixing` with `hardware` and no
-`check`, and writes nothing to the unit.
+default) or `hardware`, and `setMixing` changes it live. No client offers
+the choice yet; it is reached through the API. Nothing of it has been
+heard on a unit yet.
 
 **Pairs.** A channel the unit cannot take raw streams on a pair: System on
 pair 0, Game on 1, Music on 2, Browser on 3, Voice Chat on 4 and SFX on 6.
@@ -2719,8 +2721,52 @@ and 7.94 dB more while the jack's feed holds a unit input it heard through
 the Monitor mix's USB pair before (Line In, Aux In, or a microphone the
 direct path did not carry). No source gets louder on any jack. In the mode
 the output volume of a jack lowers its headphone volume and never raises
-it, and the Pro's playback sink stays at 100%. Leaving gives back the
-21 dB, less what the sink above 100% then adds to the pairs.
+it, and the Pro's playback sink stays at 100%. Leaving gives back each
+jack's whole entry offset, so a jack returns to the level it had before
+the mode, moved by any change made in it, less what the sink above 100%
+then adds to the pairs.
+
+**Entering and leaving.** On the first sweep that finds the mode wanted
+and nothing in its way, the daemon keeps what the unit holds (sections 0
+and 36, byte 98, each jack's level less its entry offset, and the output
+volume, and how far each jack was lowered) as `hardwareEntry` in `mixer.json`, and saves it before anything is
+written. It then writes the unit's sections with every membership clear,
+the jacks' levels lowered and byte 98 at 0 dB. Only then does the graph
+take every mix off the jacks, hold the Pro's playback sink at 100% and link
+each channel's sink to its pair. Last, the memberships open and the jacks'
+selectors move to their sections. Leaving runs the other way: memberships
+cleared, the pairs unlinked, the sink back at its volume, the mixes routed
+to the jacks again, and then sections 0 and 36 and byte 98 put back and
+each jack raised, after block 0x0001. `hardwareEntry` goes once a read
+shows the unit put back. A daemon stopped in the mode writes nothing, and
+the next start resumes the mode, or finishes leaving it. While the unit is
+away, or something else is in the way for a moment, the mode holds as it
+is; only `setMixing` with `software`, or `failed`, leaves it. A section 18
+or 54 the mode takes is kept first in `hardwareRestore`, as a second jack
+feed keeps it.
+
+**While it runs.** A fader, mute, channel volume or mix volume moves the
+unit's cells in the next write, at most one block write per sweep. Section
+36 keeps pair 5 alone, so no channel reaches the USB Aux port beside the
+Aux mix. With the sink at 100% the Aux mix reaches the second computer
+without the output volume's attenuation. The output volume of the jacks
+(`setOutputVolume`, `adjustOutputVolume`, a desktop key on the Pro's sink)
+moves their levels, and the state's `outputVolume` reads it. A headphone
+volume moved on the unit, by its knob or by `set` with `hpVolumeDb`, is
+taken as the jack's new base. Microphones play as the unit's inputs, so
+the direct path is not used, and the mix meters read the computer's copy
+of each mix, at the same faders. If the unit does not keep five writes in
+a row, the mode leaves with `failed` until `setMixing` is sent again.
+
+**Refused while it runs.** `soundCheck` (other than `stop`),
+`setSoundCheckHearMyself` with true and `auditionClip` are refused with
+the `disabled` sentence, and so is `setInserts` with a chain for a mix a
+jack plays. `createChannel`, `createCaptureChannel` and a `setInputBinding`
+that would need a pair when none is left are refused with the budget
+sentence. `setMixing` with `hardware` is refused with that sentence while
+the layout has more channels than pairs. Ducking on a mix a jack plays
+gives the reason `hardwareMixing` and runs nowhere; on mixes the computer
+builds it runs as before.
 
 **Eligibility.** `reason` names the first thing in the way, whether or not
 the mode is wanted: `mixerOff`, `notSupported` (the driven unit is not a
