@@ -305,10 +305,10 @@ public sealed class MixerService : IHostedService, IDisposable
             });
             _devices.EnsureMix(full with { Hp1 = null, Hp2 = null, LineOut = null, JackSections = null, UnitSections = quiet }, out bool held);
             if (!held) return;
-            if (_mixer.EnterHardwareGraph(plan.Pairs, plan.Sections)) ScheduleSave();
+            if (_mixer.EnterHardwareGraph(plan.Pairs, plan.Sections, plan.ReturnPairs, plan.CuePair)) ScheduleSave();
             _log.LogInformation("hardware mixing: running; pairs {pairs}", string.Join(", ", plan.Pairs.Select(p => $"{p.Key} {p.Value}")));
         }
-        else if (_mixer.DriveHardwareMixing(plan.Pairs, plan.Sections)) ScheduleSave();
+        else if (_mixer.DriveHardwareMixing(plan.Pairs, plan.Sections, plan.ReturnPairs, plan.CuePair)) ScheduleSave();
         _devices.EnsureMix(full, out bool kept);
         if (kept) _hardwareMisses = 0;
         else if (++_hardwareMisses == HardwareMissLimit)
@@ -386,12 +386,15 @@ public sealed class MixerService : IHostedService, IDisposable
     {
         if (_mixer.HardwareEntry is not { Leaving: false } || _mixer.HardwarePlan is not { } plan) return null;
         string? Disabled(string key) => plan.Disabled.TryGetValue(key, out string? sentence) ? $"{cmd.Cmd}: {sentence}" : null;
+        // A session on a channel that has no pair for its take, or on any while none has.
+        string? SoundCheck() => Disabled($"soundCheck:{cmd.Channel}") ?? Disabled("soundCheck");
         string? Budget() => plan.Pairs.Count < HardwareMixingPlanner.ChannelPairs.Count ? null
             : $"{cmd.Cmd}: {HardwareMixingPlanner.BudgetNote(plan.Pairs.Count + 1)}";
         return cmd.Cmd switch
         {
-            "soundCheck" when cmd.Action != "stop" => Disabled("soundCheck"),
-            "setSoundCheckHearMyself" when cmd.Value.ValueKind == System.Text.Json.JsonValueKind.True => Disabled("soundCheck"),
+            "soundCheck" when cmd.Action != "stop" && _mixer.SoundCheckChannel != cmd.Channel => SoundCheck(),
+            "setSoundCheckRaw" or "setSoundCheckHearMyself" when cmd.Value.ValueKind == System.Text.Json.JsonValueKind.True
+                && _mixer.SoundCheckChannel != cmd.Channel => SoundCheck(),
             "auditionClip" => Disabled("audition"),
             "setInserts" when cmd.Channel is { } key && key.StartsWith("mix:", StringComparison.Ordinal) && cmd.Inserts is { Count: > 0 }
                 => Disabled($"inserts:{key}"),

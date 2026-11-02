@@ -14,6 +14,10 @@ public sealed record HardwareMixingState
     public string? Reason { get; init; }
     public string? Note { get; init; }
     public IReadOnlyDictionary<string, int> Pairs { get; init; } = new Dictionary<string, int>();
+    /// <summary>The unit inputs whose processed audio plays back to the unit, to their return pairs (see <see cref="HardwareMixingPlan.ReturnPairs"/>).</summary>
+    public IReadOnlyDictionary<string, int> ReturnPairs { get; init; } = new Dictionary<string, int>();
+    /// <summary>The pair auditions play on, or null when none is free.</summary>
+    public int? CuePair { get; init; }
     public IReadOnlyDictionary<string, int> Sections { get; init; } = new Dictionary<string, int>();
     public IReadOnlyDictionary<string, int> Jacks { get; init; } = new Dictionary<string, int>();
     public IReadOnlyList<HardwareMixingClamp> Clamped { get; init; } = [];
@@ -23,8 +27,8 @@ public sealed record HardwareMixingState
     public static HardwareMixingState Of(HardwareMixingPlan plan) => plan.Active
         ? new()
         {
-            Wanted = true, Active = true, Pairs = plan.Pairs, Sections = plan.Sections, Jacks = plan.Jacks,
-            Clamped = plan.Clamped, Disabled = plan.Disabled,
+            Wanted = true, Active = true, Pairs = plan.Pairs, ReturnPairs = plan.ReturnPairs, CuePair = plan.CuePair,
+            Sections = plan.Sections, Jacks = plan.Jacks, Clamped = plan.Clamped, Disabled = plan.Disabled,
         }
         : new() { Wanted = plan.Wanted, Reason = plan.Reason, Note = plan.Note };
 }
@@ -76,6 +80,7 @@ public sealed partial class Mixer
     private static bool SameState(HardwareMixingState a, HardwareMixingState b)
         => a.Wanted == b.Wanted && a.Active == b.Active && a.Reason == b.Reason && a.Note == b.Note
             && a.Pairs.Count == b.Pairs.Count && !a.Pairs.Except(b.Pairs).Any()
+            && a.ReturnPairs.Count == b.ReturnPairs.Count && !a.ReturnPairs.Except(b.ReturnPairs).Any() && a.CuePair == b.CuePair
             && a.Sections.Count == b.Sections.Count && !a.Sections.Except(b.Sections).Any()
             && a.Jacks.Count == b.Jacks.Count && !a.Jacks.Except(b.Jacks).Any()
             && a.Clamped.SequenceEqual(b.Clamped)
@@ -125,7 +130,11 @@ public sealed partial class Mixer
                 .Where(j => JackSuffixes.Contains(j.Jack) && j.Feed is not null)
                 .Select(j => (j.Jack, j.Feed!))],
             UnitSources = unitSources,
-            Processed = unitSources.Values.Where(ProcessedInSoftwareLocked).ToHashSet(StringComparer.Ordinal),
+            // Mic setup plays its take back through the channel, so the unit's
+            // mixes need the channel's audio, not the raw input, for the session.
+            Processed = unitSources.Values.Where(c => ProcessedInSoftwareLocked(c) || _soundCheck is not null && _soundCheckChannel == c)
+                .ToHashSet(StringComparer.Ordinal),
+            MixVolumesDb = _config.Mixes.ToDictionary(m => m.Id, m => HardwareMixVolumeDbLocked(m.Id), StringComparer.Ordinal),
             DirectPath = _hardwareMicChannels.OfType<string>().ToHashSet(StringComparer.Ordinal),
             MixChains = _config.Mixes.Where(m => InsertsFor(MixKey(m)).Count > 0).Select(m => m.Id).ToHashSet(StringComparer.Ordinal),
             MonitorMuted = _monitorMuted,
@@ -145,10 +154,26 @@ public sealed partial class Mixer
     private double HardwareLevelDbLocked(string channel, string mix)
     {
         string cell = Cell(channel, mix);
-        if (_muted.Contains(cell) || _mixMuted.Contains(mix) || ExclusivePeerPendingLocked(channel)) return double.NegativeInfinity;
-        double send = SendGain(_levels.GetValueOrDefault(cell, 0.0), ChannelVolumeLocked(channel), 1);
+        if (_mixMuted.Contains(mix) || ExclusivePeerPendingLocked(channel)) return double.NegativeInfinity;
+        double level = _levels.GetValueOrDefault(cell, 0.0);
+        if (HearsMyselfLocked(channel, mix))
+        {
+            // Mic setup's Hear myself opens the send for the session, at
+            // unity when it was pulled all the way down, as in the graph.
+            if (level <= 0) level = 1;
+        }
+        else if (_muted.Contains(cell)) return double.NegativeInfinity;
+        double send = SendGain(level, ChannelVolumeLocked(channel), 1);
+        double master = HardwareMixVolumeDbLocked(mix);
+        return send > 0 && double.IsFinite(master) ? 60 * Math.Log10(send) + master : double.NegativeInfinity;
+    }
+
+    /// <summary>A mix's volume in dB on the desktop's cubic scale, negative infinity while it is muted or at 0.</summary>
+    private double HardwareMixVolumeDbLocked(string mix)
+    {
+        if (_mixMuted.Contains(mix)) return double.NegativeInfinity;
         double master = Math.Clamp(_mixVolume.GetValueOrDefault(mix, 1.0), 0, MixVolumeMaximumLocked(mix));
-        return send > 0 && master > 0 ? 60 * Math.Log10(send) + 60 * Math.Log10(master) : double.NegativeInfinity;
+        return master > 0 ? 60 * Math.Log10(master) : double.NegativeInfinity;
     }
 
     /// <summary>The state's view of hardware mixing, and each channel's pair and each mix's section while it runs.</summary>
@@ -160,7 +185,8 @@ public sealed partial class Mixer
         return state with
         {
             HardwareMixing = view,
-            Channels = [.. state.Channels.Select(c => view.Pairs.TryGetValue(c.Id, out int pair) ? c with { HardwarePair = pair } : c)],
+            Channels = [.. state.Channels.Select(c => view.Pairs.TryGetValue(c.Id, out int pair) || view.ReturnPairs.TryGetValue(c.Id, out pair)
+                ? c with { HardwarePair = pair } : c)],
             Mixes = [.. state.Mixes.Select(m => view.Sections.FirstOrDefault(s => MonitorFeed.Parts(s.Key).Contains(m.Id)) is { Key: not null } s
                 ? m with { HardwareSection = s.Value } : m)],
         };
@@ -264,10 +290,14 @@ public sealed partial class Mixer
     /// written with every membership clear and the jacks' levels lowered:
     /// every route off the jacks, the Aux mix's route to pair 5 dropped (the
     /// unit builds the Aux mix, and pair 5 is a channel's now), the Pro's
-    /// sink held at 100%, each channel linked to its pair. True when the kept
-    /// maps changed, so the caller saves the settings.
+    /// sink held at 100%, each channel linked to its pair, and each processed
+    /// unit input to its return pair and the soundboard's audition to the cue
+    /// pair (<paramref name="returns"/>, <paramref name="cue"/>; on demand,
+    /// never kept). True when the kept maps changed, so the caller saves the
+    /// settings.
     /// </summary>
-    public bool EnterHardwareGraph(IReadOnlyDictionary<string, int> pairs, IReadOnlyDictionary<string, int> sections)
+    public bool EnterHardwareGraph(IReadOnlyDictionary<string, int> pairs, IReadOnlyDictionary<string, int> sections,
+        IReadOnlyDictionary<string, int>? returns = null, int? cue = null)
     {
         lock (_gate)
         {
@@ -277,17 +307,21 @@ public sealed partial class Mixer
             SetMonitorOutputsLocked([.. _monitorOutputs]);
             WireAuxRouteLocked();
             PinProSinkLocked();
-            LinkHardwarePairsLocked(pairs);
+            LinkHardwarePairsLocked(WithReturns(pairs, returns));
+            LinkCueLocked(cue);
             return changed;
         }
     }
 
     /// <summary>
     /// Keep the running mode in step: the maps, the links of channels added,
-    /// removed or moved, links that died, and the Pro's sink at 100%. True
-    /// when the maps changed, so the caller saves the settings.
+    /// removed or moved, of processed inputs and the cue, links that died, and
+    /// the Pro's sink at 100%. Called before the unit's sections are written,
+    /// so a pair is linked before its membership opens. True when the maps
+    /// changed, so the caller saves the settings.
     /// </summary>
-    public bool DriveHardwareMixing(IReadOnlyDictionary<string, int> pairs, IReadOnlyDictionary<string, int> sections)
+    public bool DriveHardwareMixing(IReadOnlyDictionary<string, int> pairs, IReadOnlyDictionary<string, int> sections,
+        IReadOnlyDictionary<string, int>? returns = null, int? cue = null)
     {
         lock (_gate)
         {
@@ -295,10 +329,60 @@ public sealed partial class Mixer
             bool changed = KeepHardwareMapsLocked(pairs, sections);
             if (!_built) return changed;
             PinProSinkLocked();
-            LinkHardwarePairsLocked(pairs);
+            LinkHardwarePairsLocked(WithReturns(pairs, returns));
+            LinkCueLocked(cue);
             return changed;
         }
     }
+
+    /// <summary>The channels' pairs with the processed inputs' return pairs: each links from the channel's own sink.</summary>
+    private static Dictionary<string, int> WithReturns(IReadOnlyDictionary<string, int> pairs, IReadOnlyDictionary<string, int>? returns)
+    {
+        var all = new Dictionary<string, int>(pairs, StringComparer.Ordinal);
+        foreach ((string channel, int pair) in returns ?? new Dictionary<string, int>()) all.TryAdd(channel, pair);
+        return all;
+    }
+
+    // The soundboard player's audition pair linked into the cue pair, and the pair.
+    private PortLink? _cueLink;
+    private int? _cueLinked;
+
+    /// <summary>
+    /// Link the soundboard's audition into the cue pair on the Pro's sink, or
+    /// undo the link while there is no cue pair or no player. A link into a
+    /// pair the cue no longer has, or one that broke, is made again.
+    /// </summary>
+    private void LinkCueLocked(int? cue)
+    {
+        string? pro = JackSinkLocked() ?? HardwareOutputSinkLocked();
+        bool player = _player is not null && _playerFilter is not null;
+        if (_cueLink is { } link && (cue is null || pro is null || !player || _cueLinked != cue || _pw.EnsureLinks(link) == LinkHealth.Broken || !link.Complete))
+        {
+            _pw.Unlink(link);
+            _cueLink = null;
+            _cueLinked = null;
+        }
+        if (_cueLink is not null || cue is not int pair || pro is null || !player || HoldPlaybackLocked(pro)) return;
+        try
+        {
+            _cueLink = _pw.RouteTapToPair(PipeWireAdapter.PlayerNode, PipeWireAdapter.AuditionPorts, pro, pair);
+            _cueLinked = pair;
+        }
+        catch (InvalidOperationException ex)
+        {
+            _pw.Note($"The soundboard's audition could not be linked into the Wave XLR Pro's cue pair and is tried again: {ex.Message}");
+        }
+    }
+
+    private void UnlinkCueLocked()
+    {
+        if (_cueLink is { } link) _pw.Unlink(link);
+        _cueLink = null;
+        _cueLinked = null;
+    }
+
+    /// <summary>The pair the audition is linked into now, for tests.</summary>
+    internal int? LinkedCuePair { get { lock (_gate) return _cueLink is null ? null : _cueLinked; } }
 
     /// <summary>Replace the running entry: a jack's base level the owner moved on the unit. The caller saves the settings.</summary>
     public void KeepHardwareEntry(HardwareEntry entry)
@@ -320,6 +404,7 @@ public sealed partial class Mixer
         {
             if (_hardwareEntry is not { Leaving: false } entry) return;
             UnlinkHardwarePairsLocked();
+            UnlinkCueLocked();
             _hardwareEntry = entry with { Leaving = true };
             _hardwareGraphEntered = false;
             if (!_built) return;

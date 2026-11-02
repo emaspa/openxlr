@@ -581,6 +581,8 @@ public sealed record MixingPlanMessage(HardwareMixingPlan Plan)
     [JsonPropertyName("reason")] public string? Reason => Plan.Reason;
     [JsonPropertyName("note")] public string? Note => Plan.Note;
     [JsonPropertyName("pairs")] public IReadOnlyDictionary<string, int> Pairs => Plan.Pairs;
+    [JsonPropertyName("returnPairs")] public IReadOnlyDictionary<string, int> ReturnPairs => Plan.ReturnPairs;
+    [JsonPropertyName("cuePair")] public int? CuePair => Plan.CuePair;
     [JsonPropertyName("sections")] public IReadOnlyDictionary<string, int> Sections => Plan.Sections;
     [JsonPropertyName("jacks")] public IReadOnlyDictionary<string, int> Jacks => Plan.Jacks;
     [JsonPropertyName("cells")] public IReadOnlyDictionary<string, string> Cells => HardwareMixingPlanner.ContentHex(Plan);

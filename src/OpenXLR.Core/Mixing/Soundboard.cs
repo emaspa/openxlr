@@ -787,6 +787,7 @@ public sealed partial class Mixer
         if (_playerLink is not null) _pw.Unlink(_playerLink);
         _playerLink = null;
         UnlinkAuditionLocked();
+        UnlinkCueLocked();
         if (_playerFilter is not null) _pw.StopFilter(_playerFilter);
         _playerFilter = null;
     }
