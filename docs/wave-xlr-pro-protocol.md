@@ -913,6 +913,18 @@ then single steps from nine levels:
   signals were tens of dB apart, so it belongs to the cell's gain, not to
   the signal.
 
+### Across a power cycle
+
+With the daemon stopped, section 54 got XLR 1 at `f4` (bytes 54 and 66)
+followed by the 0x0003 commit, then section 72 got XLR 1 at `e8` (bytes 72
+and 84) with no commit. The unit was unplugged for about 4 s within a
+minute of the writes and plugged back in. Five seconds later block 0x0001
+read exactly as written, both sections included, and blocks 0x0004,
+0x0005 and 0x0008 had not changed. The unit keeps block 0x0001 across a
+power cycle whether or not the commit followed the write, so a mix
+written to it is still there on the next connect. Whether a write made a
+second before the power goes would survive was not tested.
+
 ### Notes for a probe
 
 - pipewire-pulse and pw-play remix a two-channel stream onto the first
