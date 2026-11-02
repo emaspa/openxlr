@@ -3825,7 +3825,8 @@ by tap or press as chosen in its settings. A turn leads: the strip
 follows the dial at once and each tick steps from the value shown, while
 the daemon hears the first tick immediately and a fast turn as a short
 series of changes. The daemon's own value takes over once the turn has
-settled.
+settled. After a daemon reconnect, turns start from its newly reported
+values; unsent turns from the previous connection are discarded.
 
 **Clip** (a key) plays one clip of the [soundboard](#play-sound-clips)
 into the SFX channel, or stops every clip. Its settings list the clips by
