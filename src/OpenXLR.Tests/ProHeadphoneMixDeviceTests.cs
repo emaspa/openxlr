@@ -61,7 +61,7 @@ public sealed class ProHeadphoneMixDeviceTests
         Assert.Equal(0xe8, before[12]);
         Assert.False(pro.ReadState().HpMixMonitorReturn);
 
-        pro.SetHpMixMonitorReturn(true);
+        pro.WriteMix(new ProMixPlan { MonitorReturn = true });
         byte[] after = unit.Blocks[0x0001];
         Assert.Equal(0x00, after[5]);
         // Bit 5 was already set; Line In's bit 3 goes, and so do bits 6 and 7,
@@ -82,7 +82,7 @@ public sealed class ProHeadphoneMixDeviceTests
         pro.Connect();
         unit.Calls.Clear();
 
-        pro.SetHpMixMonitorReturn(true);
+        pro.WriteMix(new ProMixPlan { MonitorReturn = true });
 
         Assert.Equal(new[] { (0x41, 0x0001), (0x41, 0x0003) },
             unit.Calls.Where(c => c.Type == 0x41).Select(c => ((int)c.Type, (int)c.Block)));
@@ -97,7 +97,7 @@ public sealed class ProHeadphoneMixDeviceTests
         Assert.Equal((0x00, 0xe8, 0x1e), (unit.Blocks[0x0001][5], unit.Blocks[0x0001][12], unit.Blocks[0x0001][90]));
         Assert.False(pro.ReadState().HpMixMonitorReturn);
 
-        pro.SetHpMixMonitorReturn(true);
+        pro.WriteMix(new ProMixPlan { MonitorReturn = true });
         Assert.Equal(0x20, unit.Blocks[0x0001][12]);
         Assert.True(pro.ReadState().HpMixMonitorReturn);
     }
@@ -117,7 +117,7 @@ public sealed class ProHeadphoneMixDeviceTests
         pro.Connect();
         Assert.False(pro.ReadState().HpMixMonitorReturn);
 
-        pro.SetHpMixMonitorReturn(true);
+        pro.WriteMix(new ProMixPlan { MonitorReturn = true });
         byte[] after = unit.Blocks[0x0001];
         Assert.Equal((0x26, 0x00), (after[12], after[13]));
         for (int i = 0; i < after.Length; i++)
@@ -142,8 +142,7 @@ public sealed class ProHeadphoneMixDeviceTests
         Assert.False(pro.ReadState().HpMixMic2Direct);
         byte[] before = unit.Blocks[0x0001];
 
-        pro.SetHpMixMic2LevelDb(-6);
-        pro.SetHpMixMic2Direct(true);
+        pro.WriteMix(new ProMixPlan { Mic2 = new(true, -6) });
         byte[] after = unit.Blocks[0x0001];
         Assert.Equal((0xf4, before[12] | 0x02), (after[1], after[12]));
         for (int i = 0; i < after.Length; i++)
@@ -152,10 +151,10 @@ public sealed class ProHeadphoneMixDeviceTests
         Assert.Equal((true, -6.0, false), (state.HpMixMic2Direct, state.HpMixMic2LevelDb, state.HpMixMicDirect));
 
         // The return, asserted or not, keeps XLR 2's path as it is.
-        pro.SetHpMixMonitorReturn(true);
+        pro.WriteMix(new ProMixPlan { MonitorReturn = true });
         Assert.True(pro.ReadState().HpMixMic2Direct);
         Assert.True(pro.ReadState().HpMixMonitorReturn);
-        pro.SetHpMixMic2Direct(false);
+        pro.WriteMix(new ProMixPlan { Mic2 = new(false, -6) });
         Assert.Equal(0x00, unit.Blocks[0x0001][12] & 0x02);
         Assert.Equal(0xf4, unit.Blocks[0x0001][1]);
     }
@@ -166,18 +165,21 @@ public sealed class ProHeadphoneMixDeviceTests
         var unit = Unit();
         using var pro = new WaveXlrProDevice(unit);
         pro.Connect();
-        pro.SetHpMixMonitorReturn(true);
-        pro.SetHpMixMonitorReturn(false);
+        pro.WriteMix(new ProMixPlan { MonitorReturn = true });
+        pro.WriteMix(new ProMixPlan { MonitorReturn = false });
         byte[] block = unit.Blocks[0x0001];
         Assert.Equal((0x00, 0x00), (block[5], block[12]));
         Assert.False(pro.ReadState().HpMixMonitorReturn);
 
-        // A unit that still holds Line In in the mix keeps it when the return goes off.
+        // A unit whose return already reads as off, Line In still in the mix,
+        // is not written: turning the return off never touches Line In.
         var held = Unit(ReturnAtUnity());
         using var other = new WaveXlrProDevice(held);
         other.Connect();
-        other.SetHpMixMonitorReturn(false);
-        Assert.Equal(0xc8, held.Blocks[0x0001][12]);
+        held.Calls.Clear();
+        Assert.False(other.WriteMix(new ProMixPlan { MonitorReturn = false })!.Wrote);
+        Assert.Equal(0xe8, held.Blocks[0x0001][12]);
+        Assert.DoesNotContain(held.Calls, c => c.Type == 0x41);
     }
 
     [Fact]
@@ -198,13 +200,16 @@ public sealed class ProHeadphoneMixDeviceTests
             // A jack is the monitor output: the return is asserted, which
             // writes the bit out, and the caller restarts the playback stream.
             bool mic = (unit.Blocks[0x0001][13] & 0x02) != 0;
-            Assert.True(manager.EnsureHeadphoneMix(monitorReturn: true, micDirect: mic));
+            ProMixPlan plan = new() { MonitorReturn = true, Mic1 = new(mic, 0), Mic2 = new(false, 0) };
+            Assert.True(manager.EnsureMix(plan));
             Assert.Equal((0x20, 0x00), (unit.Blocks[0x0001][12], unit.Blocks[0x0001][13]));
             Assert.True(manager.Snapshot().State!.HpMixMonitorReturn);
 
             // Later passes find it set and write nothing.
             manager.SweepOnce();
-            Assert.False(manager.EnsureHeadphoneMix(monitorReturn: true, micDirect: mic));
+            unit.Calls.Clear();
+            Assert.False(manager.EnsureMix(plan));
+            Assert.Empty(unit.Calls);
         }
         finally
         {
@@ -238,7 +243,7 @@ public sealed class ProHeadphoneMixDeviceTests
         Assert.False(state.HpMixMonitorReturn);
 
         byte[] before = unit.Blocks[0x0001];
-        pro.SetHpMixMonitorReturn(true);
+        pro.WriteMix(new ProMixPlan { MonitorReturn = true });
         byte[] after = unit.Blocks[0x0001];
         // Pair 5's bit goes from byte 13, and pair 0's bit 4 from byte 12.
         Assert.Equal((0x20, 0x00), (after[12], after[13]));
@@ -246,13 +251,12 @@ public sealed class ProHeadphoneMixDeviceTests
             if (i is not (12 or 13)) Assert.Equal(before[i], after[i]);
         Assert.True(pro.ReadState().HpMixMonitorReturn);
 
-        pro.SetHpMixMicLevelDb(0);
-        pro.SetHpMixMicDirect(true);
+        pro.WriteMix(new ProMixPlan { Mic1 = new(true, 0) });
         Assert.Equal((0x00, 0x21), (unit.Blocks[0x0001][0], unit.Blocks[0x0001][12]));
         state = pro.ReadState();
         Assert.Equal((true, 0.0, true), (state.HpMixMicDirect, state.HpMixMicLevelDb, state.HpMixMonitorReturn));
 
-        pro.SetHpMixMicDirect(false);
+        pro.WriteMix(new ProMixPlan { Mic1 = new(false, 0) });
         Assert.Equal(0x20, unit.Blocks[0x0001][12]);
         Assert.False(pro.ReadState().HpMixMicDirect);
     }
@@ -269,14 +273,20 @@ public sealed class ProHeadphoneMixDeviceTests
     [InlineData(double.NaN, 0x88)]
     public void TheMicLevelIsWrittenInHalfDecibelsBetweenTheFloorAndTheCap(double db, int expected)
     {
-        var unit = Unit(MicMissing);
+        // XLR 1's path already open, at the +12 dB the archive's 64 plays.
+        byte[] block = Convert.FromHexString(MicMissing);
+        block[12] |= 0x01;
+        var unit = Unit(Convert.ToHexString(block));
         using var pro = new WaveXlrProDevice(unit);
         pro.Connect();
         byte[] before = unit.Blocks[0x0001];
         unit.Calls.Clear();
-        pro.SetHpMixMicLevelDb(db);
+        pro.WriteMix(new ProMixPlan { Mic1 = new(true, db) });
         byte[] after = unit.Blocks[0x0001];
-        Assert.Equal(expected, after[0]);
+        // The cell is written unless it already plays the same level: a
+        // level at or above the cap is the 64 the unit holds at +12 dB.
+        Assert.Equal(ProMixPlan.HalfDb(db) == 24 ? 0x64 : expected, after[0]);
+        Assert.Equal(Math.Min((int)(sbyte)(byte)expected, 24) / 2.0, pro.ReadState().HpMixMicLevelDb);
         for (int i = 1; i < after.Length; i++) Assert.Equal(before[i], after[i]);
         // A level applies at once on the unit: no commit follows.
         Assert.DoesNotContain(unit.Calls, c => c.Type == 0x41 && c.Block == 0x0003);

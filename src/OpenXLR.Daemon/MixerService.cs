@@ -1,4 +1,5 @@
 using OpenXLR.Core;
+using OpenXLR.Core.Devices;
 using OpenXLR.Core.Mixing;
 
 namespace OpenXLR.Daemon;
@@ -202,21 +203,9 @@ public sealed class MixerService : IHostedService, IDisposable
         // The USB Aux port follows the Aux mix, not the monitor selection.
         bool auxDesired = _mixer.AuxPortEnabled;
         bool monitorMuted = _mixer.MonitorMuted;
-        _devices.EnsureOutputSelectors(
-            hp1: AudibleJack("hp1"), hp2: AudibleJack("hp2"),
-            usbAux: auxDesired, lineOut: AudibleJack("lineout"));
 
         bool AudibleJack(string suffix) => _mixer.MonitorOutputs.Any(output =>
             output.EndsWith("#" + suffix, StringComparison.Ordinal) && _mixer.IsMonitorOutputAudible(output));
-
-        // The device latches aux-return routing at playback-stream start, so a
-        // freshly enabled aux output needs the stream bounced once. The bounce
-        // needs any address on the physical sink; derive one from a Pro
-        // pseudo-output or fall back to the aux route's own target.
-        if (auxDesired && !_prevAuxDesired && _mixer.Built)
-            _mixer.BounceAuxTarget();
-        _prevAuxDesired = auxDesired;
-        _ = anyProOutput;
 
         // The Pro's headphone mix (issue #8). The jacks only hear the Monitor
         // stream while USB return pair 2/3 is a member, which Wave Link on
@@ -245,9 +234,27 @@ public sealed class MixerService : IHostedService, IDisposable
         // stays as the unit holds it, which nothing here depends on.
         // The path plays the microphone at the level the send would have, so
         // the send, the channel volume and the mix volume still reach it.
-        if (_devices.EnsureHeadphoneMix(monitorReturn: anyJack ? true : null, micDirect: micDirect,
-                micLevelDb: _mixer.HardwareMicLevelDbOf(1), mic2Direct: mic2Direct, mic2LevelDb: _mixer.HardwareMicLevelDbOf(2))
-            && _mixer.Built)
+        // One plan for block 0x0001 per sweep, with the four selectors: the
+        // device manager writes it at most once, together with any ducking
+        // target waiting to be written.
+        bool membership = _devices.EnsureMix(new ProMixPlan
+        {
+            Hp1 = AudibleJack("hp1"), Hp2 = AudibleJack("hp2"), UsbAux = auxDesired, LineOut = AudibleJack("lineout"),
+            MonitorReturn = anyJack ? true : null,
+            Mic1 = new ProMicPath(micDirect, _mixer.HardwareMicLevelDbOf(1)),
+            Mic2 = new ProMicPath(mic2Direct, _mixer.HardwareMicLevelDbOf(2)),
+        });
+
+        // The device latches aux-return routing at playback-stream start, so a
+        // freshly enabled aux output needs the stream bounced once. The bounce
+        // needs any address on the physical sink; derive one from a Pro
+        // pseudo-output or fall back to the aux route's own target.
+        if (auxDesired && !_prevAuxDesired && _mixer.Built)
+            _mixer.BounceAuxTarget();
+        _prevAuxDesired = auxDesired;
+        _ = anyProOutput;
+
+        if (membership && _mixer.Built)
             _mixer.BounceMonitorHardwareOutput();
     }
 

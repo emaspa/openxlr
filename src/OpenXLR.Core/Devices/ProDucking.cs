@@ -178,8 +178,19 @@ public static class ProDucking
     /// <exception cref="ArgumentException">A block has the wrong length or the target a value the unit does not take.</exception>
     public static void Apply(Span<byte> block8, Span<byte> block1, ProDuckingTarget target)
     {
-        if (block8.Length != Length) throw new ArgumentException($"block 0x0008 is {Length} bytes", nameof(block8));
         if (block1.Length != MixBlockLength) throw new ArgumentException($"block 0x0001 is {MixBlockLength} bytes", nameof(block1));
+        ApplyEntries(block8, target);
+        ApplyFields(block1, target);
+    }
+
+    /// <summary>
+    /// Block 0x0008's part of <see cref="Apply"/>: the target's values in
+    /// every entry while it is on, and each entry's ducked flag.
+    /// </summary>
+    /// <exception cref="ArgumentException">The block has the wrong length or the target a value the unit does not take.</exception>
+    public static void ApplyEntries(Span<byte> block8, ProDuckingTarget target)
+    {
+        if (block8.Length != Length) throw new ArgumentException($"block 0x0008 is {Length} bytes", nameof(block8));
         if (Valid(target) is { } problem) throw new ArgumentException(problem, nameof(target));
         int pairs = WantedPairs(target);
         byte[]? preset = target.Enabled ? SettingBytes(target.Sensitivity, target.Amount, target.Speed) : null;
@@ -191,6 +202,19 @@ public static class ProDucking
             if (wanted) entry[FlagsByte] |= DuckedBit;
             else if ((entry[FlagsByte] & UnknownBit) == 0) entry[FlagsByte] &= unchecked((byte)~DuckedBit);
         }
+    }
+
+    /// <summary>
+    /// Block 0x0001's part of <see cref="Apply"/>, which
+    /// <see cref="ProMixPlan"/> writes with the rest of that block: the pair
+    /// fields of the three mix sections.
+    /// </summary>
+    /// <exception cref="ArgumentException">The block has the wrong length or the target a value the unit does not take.</exception>
+    public static void ApplyFields(Span<byte> block1, ProDuckingTarget target)
+    {
+        if (block1.Length != MixBlockLength) throw new ArgumentException($"block 0x0001 is {MixBlockLength} bytes", nameof(block1));
+        if (Valid(target) is { } problem) throw new ArgumentException(problem, nameof(target));
+        int pairs = WantedPairs(target);
         foreach (int at in MixFieldOffsets)
         {
             int fields = block1[at] | block1[at + 1] << 8;
@@ -292,13 +316,4 @@ public static class ProDucking
             if (before[i] != after[i]) parts.Add($"{i} {before[i]:x2}->{after[i]:x2}");
         return parts.Count == 0 ? "no change" : string.Join(", ", parts);
     }
-}
-
-/// <summary>
-/// What one ducking write did: for each block whether it was written, and
-/// the bytes it changed. Neither written when the unit already held it.
-/// </summary>
-public sealed record DuckingWrite(bool Wrote8, string Change8, bool Wrote1, string Change1)
-{
-    public bool Wrote => Wrote8 || Wrote1;
 }

@@ -160,8 +160,6 @@ public sealed partial class DspAudioIntegrationTests
         public void Disconnect() => Connected = false;
         public void Dispose() => Connected = false;
         public void SetGainDb(int db) => Write(s => s with { GainDb = db });
-        public void SetOutHp1(bool on) { } public void SetOutHp2(bool on) { } public void SetOutUsbAux(bool on) { } public void SetOutLineOut(bool on) { }
-        public void SetHpMixMonitorReturn(bool on) { } public void SetHpMixMicDirect(bool on) { }
         public void SetMute(bool on) { } public void SetLowCut(bool on) { } public void SetExpander(bool on) { }
         public void SetVoiceTune(bool on) { } public void SetVoiceTuneStrength(int value) { } public void SetHpVolumeDb(double db) { }
         public void SetLowImpedance(bool on) { } public void SetCrossfade(int value) { } public void SetPhantom(bool on) { }

@@ -127,35 +127,26 @@ public interface IAudioDevice : IDisposable
     DuckingReadback? ReadDucking() => null;
 
     /// <summary>
-    /// Bring the unit's ducking to a target through a read of each block it
-    /// lives in, an edit of the fields ducking owns and a write of each block
-    /// that changed.
+    /// Wave XLR Pro: bring block 0x0001 to a plan, the one writer of that
+    /// block: the output selectors, the headphone mix's Monitor return and
+    /// microphone paths, the USB Aux port's cells and the ducking fields, in
+    /// one read of the block, one write when it changed and the commit when
+    /// a selector or membership changed; with the plan's ducking, block
+    /// 0x0008 is read and written first. Null on a unit without output
+    /// routing, which has nothing to write.
     /// </summary>
-    /// <exception cref="InvalidOperationException">The unit has no hardware ducking.</exception>
-    DuckingWrite SetDucking(OpenXLR.Core.Mixing.ProDuckingTarget target) => throw new InvalidOperationException("this unit has no hardware ducking");
+    /// <exception cref="InvalidOperationException">The plan carries ducking and the unit has no hardware ducking.</exception>
+    ProMixWrite? WriteMix(ProMixPlan plan)
+        => plan.Ducking is null ? null : throw new InvalidOperationException("this unit has no hardware ducking");
 
-    // Physical output routing and aux input. Default no-ops; devices with
-    // OutputRouting / AuxInput capabilities override them.
+    // Aux input. Default no-ops; devices with the AuxInput capability
+    // override them.
     /// <summary>
     /// Raw vendor state for diagnostics: block name to hex payload. Default
     /// empty for devices without a block protocol.
     /// </summary>
     IReadOnlyDictionary<string, string> DumpBlocks() => new Dictionary<string, string>();
 
-    void SetOutHp1(bool on) { }
-    /// <summary>Wave XLR Pro: whether USB return pair 2/3 (the Monitor stream) is summed into the headphone mix.</summary>
-    void SetHpMixMonitorReturn(bool on) { }
-    /// <summary>Wave XLR Pro: the mic's zero-latency hardware path into the headphone mix.</summary>
-    void SetHpMixMicDirect(bool on) { }
-    /// <summary>Wave XLR Pro: that path's level in the headphone mix, in dB.</summary>
-    void SetHpMixMicLevelDb(double db) { }
-    /// <summary>Wave XLR Pro: XLR 2's zero-latency hardware path into the headphone mix.</summary>
-    void SetHpMixMic2Direct(bool on) { }
-    /// <summary>Wave XLR Pro: that path's level in the headphone mix, in dB.</summary>
-    void SetHpMixMic2LevelDb(double db) { }
-    void SetOutHp2(bool on) { }
-    void SetOutUsbAux(bool on) { }
-    void SetOutLineOut(bool on) { }
     void SetAuxLevelDb(double db) { }
     void SetAuxLevelLock(bool on) { }
 
