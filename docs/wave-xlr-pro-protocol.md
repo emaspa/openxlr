@@ -866,14 +866,15 @@ no step, so a mixer driving these bytes needs no fade of its own.
   matched AUX0 at 0.0 dB with coherence 1.0000. Only section 0 has the
   -21 dB offset of section 12. Byte 14 reads `00` in all five sections,
   so it does not account for that offset.
-- The unit's other inputs behave the same (a second run the same day, a
-  microphone on XLR 2 and a phone playing into Line In). XLR 2 (byte 66
-  bit 1, level byte 55) and Line In (byte 66 bit 3, level byte 57) came
-  back in sections 54 and 72 as exact copies of their own capture, AUX2
-  and AUX6/AUX7: 0.00 dB at `00`, 6.00 dB lower at `f4`, residual below
-  -144 dB, 0 samples of delay. Line In stays stereo: its left reaches only
-  the section's left (AUX14, AUX16) and its right only the right. USB Aux
-  has not been measured.
+- The unit's other inputs behave the same (later runs the same day, a
+  microphone on XLR 2, a phone playing into Line In and audio playing into
+  the USB Aux port). XLR 2 (byte 66 bit 1, level byte 55), USB Aux (bit 2,
+  byte 56) and Line In (bit 3, byte 57) came back in section 54 as exact
+  copies of their own capture, AUX2, AUX4/AUX5 and AUX6/AUX7: 0.00 dB at
+  `00`, 6.00 dB lower at `f4`, residual below -144 dB, 0 samples of delay.
+  XLR 2 and Line In read the same in section 72. The stereo inputs stay
+  stereo: left reaches only the section's left (AUX14, AUX16) and right
+  only the right.
 - A USB playback pair in a section at level `00` comes back 7.9 dB below
   what the computer sent: a 1 kHz tone at -43.0 dBFS RMS on pair 7, played
   with the Pro's sink at 100% and linked port by port, read -51.0 dBFS on
@@ -883,6 +884,26 @@ no step, so a mixer driving these bytes needs no fade of its own.
   correlation of AUX10 and of AUX14 against AUX0 peaks at 0 samples. A
   microphone mixed in the unit reaches the computer as early as its own
   capture does.
+
+### The bottom of the level scale
+
+USB Aux in section 54, every cell from `80` to `a0` written after `c4`,
+then single steps from nine levels:
+
+- Every cell from `89` (-59.5 dB) up gives its value exactly, in 0.5 dB
+  steps. `88` (-60 dB) and below are off: the stream is digital zero, not
+  -60 dB. Section 72 stores `88` for USB Aux on the desk, so that cell is
+  off rather than quiet.
+- A small change near the bottom is not applied. A 0.5 dB step down
+  applied from every level down to -36 dB and was dropped from -42 and
+  -48 dB; `90` to `8a`, `8a` to `90` and `8a` to `89` were dropped too,
+  while a 3.5 dB step applied from -48 dB, and `a0`, `c4` or `00` to `8a`
+  applied. The dropped and applied steps divide at a change in linear gain
+  of about 0.0005: 0.00046 was dropped and 0.00089 applied. A dropped
+  write still reads back from block 0x0001 as written, while the audio
+  stays at the old gain, so a fader moved slowly below about -40 dB can
+  leave the unit at a level the block does not show. This was measured on
+  USB Aux only.
 
 ### Notes for a probe
 
