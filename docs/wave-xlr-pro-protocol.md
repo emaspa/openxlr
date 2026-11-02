@@ -889,7 +889,55 @@ no step, so a mixer driving these bytes needs no fade of its own.
 
 ### Open
 
-- Where the playback pairs' 7.9 dB goes, and whether a level above `00`
-  makes it up without clipping.
+- Where the playback pairs' 7.9 dB goes (section 16 shows it is fixed and
+  uniform, with a limiter above it).
 - Section 0's -21 dB.
 - Per-channel ducking keys other than XLR 1 (section 11).
+
+## 16. USB playback pairs in the mix sections (desk probe of 2026-11-02)
+
+Firmware 1.0.14, the desk unit, the daemon running, writes to section 54
+only, the Pro's sink at 100% for each run and back at its stored 70%
+afterwards. Each tone came from a `pw-play` stream created with
+`node.autoconnect = false` and linked to one pair by hand. Section 54's
+stream (AUX14) was read narrowband, block 0x0001 was polled every 250 ms,
+and blocks 0x0001, 0x0004, 0x0005 and 0x0008 were written back identical
+after each run.
+
+### Live writes
+
+A -30 dBFS tone played on pair 7 for 32 s while its cell (byte 65) and its
+membership (byte 67 bit 3) changed every 3 s:
+
+| Write | AUX14 |
+|---|---|
+| bit set, cell `00` | -7.94 dB against what was sent |
+| cell `f4`, then `e8` | 6.0 dB and 12.0 dB lower |
+| bit clear, then set | silent, then back |
+| the same, each followed by the 0x0003 commit | the same |
+| cell `10` | 8.0 dB higher, so the pair came back at what was sent |
+
+Every change applied within the 250 ms window it was written in, while
+the stream ran, with or without the commit, and no poll read anything but
+the last write. A pair's membership does not latch at stream start.
+
+### Gain and headroom
+
+- The loss is the same on every pair: a -30 dBFS tone on pairs 0, 1, 2, 3,
+  4, 6 and 7 in turn, each alone in section 54 at `00`, came back at
+  -7.94 dB. Pair 0 in section 18 read -7.86 dB; pair 1 in section 0 read
+  -28.94 dB, the same loss plus section 0's 21 dB.
+- The pairs share a ceiling. A -3 dBFS tone on pair 7 came back at
+  -7.94 dB at `00` (a peak of 0.284) and at a peak of 0.382 (-8.4 dBFS) at
+  both `10` and `18`, with its harmonics more than 120 dB down: gain
+  reduction, not clipping. Two tones at -6 dBFS on pairs 6 and 7 (1 kHz
+  and 1.5 kHz) peaked at 0.382 at `00` and did not rise when both cells
+  went to `10`; their intermodulation stayed more than 110 dB down.
+- The microphone does not meet that ceiling: XLR 1 peaks of 0.40 came
+  back on AUX10 at the level of its own capture.
+
+So the unit takes the computer's audio at 0.40 of full scale and holds
+the playback sum near that peak with a clean limiter. A cell above `00`
+lifts quiet material only, and full-scale playback never comes back
+louder than about -8 dBFS. Whether the limiter acts on the jacks as it
+does on the returned streams has not been measured.
