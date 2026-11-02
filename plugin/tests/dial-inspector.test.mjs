@@ -4,7 +4,11 @@ import {readFileSync} from "node:fs";
 import vm from "node:vm";
 
 const html = readFileSync(new URL("../com.emaspa.openxlr.sdPlugin/propertyInspector/dial.html", import.meta.url), "utf8");
-const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+const scriptTag = "<script>";
+const scriptStart = html.indexOf(scriptTag);
+const scriptEnd = html.indexOf("</script>", scriptStart);
+assert.ok(scriptStart >= 0 && scriptEnd > scriptStart, "The inspector must contain its inline script.");
+const script = html.slice(scriptStart + scriptTag.length, scriptEnd);
 
 // Run the shipped inspector, including its host messages, without changing
 // real OpenDeck settings. The target option list is supplied by the fixture.
