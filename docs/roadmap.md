@@ -230,6 +230,18 @@ features wait until the sections above are done.
   which scale past four and carry a microphone strip's controls.
 - Flathub. Its rules do not allow AI-assisted development, so the
   Flatpak stays a bundle to install yourself.
+- A third noise removal engine, or one that runs on the GPU. Checked in
+  November 2026 against DeepFilterNet as shipped. The small models that
+  suit a microphone stage run slower on a GPU than on one CPU core, and
+  under load they missed the 10 ms deadline. The CUDA libraries they need
+  weigh 2.5 GB and are not free software, and ONNX Runtime no longer has
+  a ROCm backend. Two CPU models went through the same recorded voice and
+  were compared by ear. DeepFilterNet's low-latency model cuts the model's
+  delay from 30 ms to 10 ms, but it leaves more noise between words, uses
+  four times the CPU and is a 35 MB model. FastEnhancer has 11 ms of delay
+  and uses less CPU than DeepFilterNet, but it changes the voice more, and
+  the export terms of its training data are unclear. DeepFilterNet as
+  shipped is the better compromise.
 
 ## How a change lands
 
