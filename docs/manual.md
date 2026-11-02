@@ -53,6 +53,9 @@ happen on your system:
   profile while it runs, so the raw multichannel device is available to
   the mixer, and restores the previous profile when it stops. If the
   card is unplugged in the meantime, the daemon leaves it alone.
+- On the other interfaces, a card on an audio profile that only plays
+  gets the profile with the same output and the microphone input
+  ([section 5.11](#card-profile)).
 
 The UI's header shows the connected interface with a green dot. With
 more than one interface attached, the name there is a picker, and the one
@@ -4353,6 +4356,54 @@ when convenient, then let discovery finish. An older, disconnected or busy
 daemon produces an explicit unavailable entry instead of stopping the archive.
 Plugin binaries, presets and Wine registry files are not copied.
 Review plugin names, paths and scanner output before sharing the archive.
+
+<a name="card-profile"></a>
+### 5.11 Microphone silent on an audio profile that only plays
+
+The desktop's sound server picks an audio profile for each sound card. A
+profile can play without recording: on the original Wave XLR,
+`output:analog-stereo` plays to the headphones and gives the computer no
+microphone at all. The interface still connects and its controls work,
+but XLR 1 records nothing. The session manager stores the profile in its own
+state, so reinstalling OpenXLR or restoring a snapshot does not change it.
+
+OpenXLR checks the card when the interface connects. When the profile has
+no microphone input and the card offers one that plays the same way and
+adds the input, OpenXLR switches to it once and writes a line in its log
+(`journalctl --user -u openxlr-daemon`) naming both profiles. On the
+original Wave XLR that is `output:analog-stereo+input:mono-fallback`.
+OpenXLR keeps the new profile when it stops. If something puts the old
+profile back, OpenXLR leaves it there and the UI shows a warning with a
+**Manual** button that opens this section. The same warning appears when
+the card has no such profile or is off. For an additional interface the
+warning and the button are in its entry in Options, INTERFACE,
+**Additional interfaces**.
+
+To choose the profile yourself:
+
+1. In the desktop's sound settings, find the interface's card and pick a
+   profile whose name includes an input, such as "Analog Stereo Output +
+   Mono Input". On KDE Plasma this is System Settings, Sound; on GNOME,
+   Settings, Sound; `pavucontrol` lists it under Configuration.
+2. Or in a terminal, list the cards and their profiles:
+
+   ```sh
+   pactl list cards short
+   pactl list cards | grep -A 12 'Elgato'
+   ```
+
+   then set the profile on the card's name from the first command:
+
+   ```sh
+   pactl set-card-profile alsa_card.usb-Elgato_Systems_Elgato_Wave_XLR_<serial>-00 output:analog-stereo+input:mono-fallback
+   ```
+
+3. Check: `pactl list sources short` lists an `alsa_input.usb-Elgato`
+   source for the interface, the warning in the UI goes away within 30
+   seconds, and the XLR 1 meter moves when you speak.
+
+This section does not apply to the Wave XLR Pro, which runs on the
+`pro-audio` profile OpenXLR sets for it ([First run](#first-run)).
 
 <a name="files"></a>
 ## 6. Files and services

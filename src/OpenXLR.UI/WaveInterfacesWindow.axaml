@@ -47,6 +47,8 @@
                 </StackPanel>
                 <TextBlock Text="{Binding Warning}" TextWrapping="Wrap" Foreground="{DynamicResource Ox.Text.Warning}"
                            IsVisible="{Binding Warning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                <Button Content="{loc:Text Key=Manual}" HorizontalAlignment="Left" IsVisible="{Binding CardProfileProblem}"
+                        Click="OnCardProfileManual" ToolTip.Tip="{loc:Text Key=OpenTheManualSectionOnCardProfiles}"/>
                 <TextBlock Text="{Binding Error}" TextWrapping="Wrap" Foreground="{DynamicResource Ox.Text.Warning}"
                            IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
               </StackPanel>

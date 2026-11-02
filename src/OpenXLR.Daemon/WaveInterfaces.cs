@@ -10,11 +10,12 @@ namespace OpenXLR.Daemon;
 /// PipeWire name fragment of its capture source, with its serial when it has
 /// one; <paramref name="CaptureModelHint"/> is the model fragment to try when
 /// that finds nothing, empty while another attached unit could answer to it.
-/// A client uses both verbatim.
+/// A client uses both verbatim. <paramref name="CardProfile"/> is the unit's
+/// card as its manager last checked it, null while it is not driven.
 /// </summary>
 public sealed record WaveInterfaceState(string Id, string Name, bool Active, bool Enabled,
     bool Connected, string CaptureHint, string CaptureModelHint, DeviceCapabilities Capabilities,
-    DeviceState? State, string? Warning);
+    DeviceState? State, string? Warning, OpenXLR.Core.Mixing.CardProfileStatus? CardProfile = null);
 
 /// <summary>
 /// Interfaces driven next to the primary one. Each enabled unit gets its own
@@ -116,7 +117,7 @@ public sealed class WaveInterfaces : BackgroundService
                 active, enabled.Contains(id), state?.Connected ?? false, device.Info.NodeNameFragment,
                 device.Info.FragmentsAmong(available.Select(d => d.Info)) is [_, string model] ? model : "",
                 state is { Connected: true, Capabilities: { } driven } ? driven : device.Capabilities,
-                state?.State, active ? _primary.Warning : _sessions.GetValueOrDefault(id)?.Warning);
+                state?.State, active ? _primary.Warning : _sessions.GetValueOrDefault(id)?.Warning, state?.CardProfile);
         }).ToList();
         // An enabled unit that is unplugged or moved stays listed, so it can
         // be disabled and its slot freed without plugging it back in.

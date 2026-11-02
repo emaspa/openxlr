@@ -894,12 +894,17 @@ public sealed partial class MainViewModel : ViewModelBase
     /// <summary>A condition the daemon wants the user to see (settings not being saved), or empty.</summary>
     public string DaemonWarning { get => _daemonWarning; private set => Set(ref _daemonWarning, value); }
 
+    private bool _cardProfileProblem;
+    /// <summary>The driven unit's audio card has no microphone input; the warning then offers the manual section.</summary>
+    public bool CardProfileProblem { get => _cardProfileProblem; private set => Set(ref _cardProfileProblem, value); }
+
     /// <summary>Apply a state push from the daemon without echoing it back.</summary>
     private void Apply(JsonNode node)
     {
         _applying = true;
         _client.EqProfiles.Apply(node);
         DaemonWarning = node["warning"]?.GetValue<string>() ?? "";
+        CardProfileProblem = node["cardProfile"]?["problem"] is JsonValue problem && problem.TryGetValue(out string? text) && text.Length > 0;
         MixerWaiting = node["mixerWaiting"]?.GetValue<bool>() ?? false;
         try
         {

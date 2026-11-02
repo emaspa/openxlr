@@ -1368,6 +1368,9 @@
   <data name="OpenTheManualSectionOnSkins" xml:space="preserve">
     <value>Open the manual section on skins</value>
   </data>
+  <data name="OpenTheManualSectionOnCardProfiles" xml:space="preserve">
+    <value>Open the manual section on audio card profiles without a microphone input</value>
+  </data>
   <data name="OpenTheManualSectionOnThePipewirePulse" xml:space="preserve">
     <value>Open the manual section on the pipewire-pulse open-file limit</value>
   </data>

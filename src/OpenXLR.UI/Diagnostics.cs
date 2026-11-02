@@ -63,6 +63,7 @@ public static class Diagnostics
             meta.AppendLine($"uname: {Clean(unameOutput + unameErrors)}");
             meta.AppendLine($"os-release: {TryReadFile("/etc/os-release")}");
             meta.AppendLine($"dotnet: {Environment.Version}");
+            foreach (string line in CardProfileLines(observation.Json)) meta.AppendLine(Clean(line));
             await File.WriteAllTextAsync(Path.Combine(work, "meta.txt"), meta.ToString());
             await File.WriteAllTextAsync(Path.Combine(work, "PRIVACY.txt"), """
                 This archive is created locally and is never uploaded automatically.
@@ -237,6 +238,44 @@ public static class Diagnostics
             if (tab.ContainsKey("site") && tab["channelId"] is null) tab["site"] = "<redacted>";
         }
         return root.ToJsonString(new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
+    }
+
+    /// <summary>
+    /// One line per driven unit's audio card from the daemon's state: the
+    /// card, its profile, whether that profile has a microphone input, a
+    /// switch the daemon made and the problem it reports, so an archive says
+    /// in one line why a microphone has no input. The daemon's check is
+    /// what it last saw; pw-dump.json beside it is the graph at collection.
+    /// </summary>
+    internal static IReadOnlyList<string> CardProfileLines(string? state)
+    {
+        JsonNode? node = null;
+        if (state is not null)
+            try { node = JsonNode.Parse(state); }
+            catch (JsonException) { }
+        List<string> lines = [];
+        void Add(string unit, JsonNode? card)
+        {
+            if (card is not JsonObject) return;
+            bool capture = card["capture"] is JsonValue c && c.TryGetValue(out bool yes) && yes;
+            var line = new StringBuilder($"audio card of {unit} (last checked by the daemon): {Text(card, "card") ?? "unknown"}, " +
+                                         $"profile {Text(card, "profile") ?? "unknown"}, microphone input {(capture ? "yes" : "no")}");
+            if (Text(card, "switchedFrom") is { } from) line.Append($", switched from {from} by OpenXLR");
+            if (Text(card, "problem") is { } problem) line.Append($", problem: {problem}");
+            lines.Add(line.ToString());
+        }
+        if (node is JsonObject root)
+        {
+            if (root["connected"] is JsonValue connected && connected.TryGetValue(out bool on) && on)
+                Add($"{Text(root, "device", "vendor")} {Text(root, "device", "model")}".Trim(), root["cardProfile"]);
+            if (root["waveInterfaces"] is JsonArray units)
+                foreach (JsonObject unit in units.OfType<JsonObject>())
+                    if (unit["active"] is JsonValue active && active.TryGetValue(out bool primary) && !primary)
+                        Add(Text(unit, "name") ?? Text(unit, "id") ?? "an additional interface", unit["cardProfile"]);
+        }
+        if (lines.Count == 0)
+            lines.Add("audio cards: not checked (no unit driven, the software mixer off, or a daemon without the check)");
+        return lines;
     }
 
     /// <summary>One string from a path of object keys, or null if it is not there or is not a string.</summary>

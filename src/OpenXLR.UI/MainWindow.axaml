@@ -275,8 +275,14 @@
     <StackPanel Name="ApplicationNotices">
     <TextBlock Text="{Binding DaemonRestart.Status}" Classes="h" TextWrapping="Wrap"
                Margin="0,0,0,8" IsVisible="{Binding DaemonRestart.Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-    <TextBlock Text="{Binding DaemonWarning}" Classes="alert" TextWrapping="Wrap" FontSize="12"
-               Margin="0,0,0,8" IsVisible="{Binding DaemonWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+    <!-- a card profile without a microphone input is the one warning with a
+         manual section of its own -->
+    <DockPanel Margin="0,0,0,8" IsVisible="{Binding DaemonWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+      <Button Name="CardProfileManual" DockPanel.Dock="Right" Content="{loc:Text Key=Manual}" Padding="10,3" FontSize="12"
+              VerticalAlignment="Center" Margin="12,0,0,0" IsVisible="{Binding CardProfileProblem}" Click="OnCardProfileManual"
+              ToolTip.Tip="{loc:Text Key=OpenTheManualSectionOnCardProfiles}"/>
+      <TextBlock Text="{Binding DaemonWarning}" Classes="alert" TextWrapping="Wrap" FontSize="12" VerticalAlignment="Center"/>
+    </DockPanel>
 
     <Border Classes="card" Margin="0,0,0,8" IsVisible="{Binding Updates.BannerVisible}">
       <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
