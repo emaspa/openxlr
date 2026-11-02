@@ -1041,3 +1041,32 @@ with every threshold at 0 dB (`00`).
   for the inputs, so the unit ducks only USB playback pairs, as far as
   these bytes go.
 
+## 18. Headphones 1 on each section (desk probe of 2026-11-02)
+
+Firmware 1.0.14, the desk unit, the daemon stopped, headphones on
+Headphones 1 only with an ear cup held against a microphone on XLR 2.
+Each section held one USB pair at `00` with its own tone at -12 dBFS:
+section 0 pair 4 at 800 Hz, section 18 pair 2 at 1.2 kHz, section 54 pair
+6 at 1 kHz, section 72 pair 7 at 1.5 kHz. The microphones were taken out
+of section 18 for the run so the jack could not feed XLR 2 back to
+itself. Headphones 1's volume was -18 dB. Blocks 0x0001, 0x0004, 0x0005
+and 0x0008 read back identical afterwards.
+
+| Byte 90 | Heard through XLR 2 |
+|---|---|
+| `23` | none of the tones |
+| `21` | section 54's tone only |
+| `22` | section 72's tone only |
+| `1f` | section 18's tone only |
+| `1e` | section 0's tone only |
+
+- Each selector write played its section within the first second, with
+  or without the 0x0003 commit and with no stream bounce. Clicks were not
+  judged; the measurement was acoustic.
+- Byte 98 (section 17) acts on the jack as on the capture stream. With
+  byte 98 at `00` section 0's stream rose 21.0 dB to the level of the
+  other sections, and its tone on the jack rose at least 13.5 dB, as far
+  above the noise as the cup could show.
+- Headphones 2, Line Out and the USB Aux port were not tested, so whether
+  two outputs can play two sections at once is still open.
+
