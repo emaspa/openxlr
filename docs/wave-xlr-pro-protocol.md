@@ -903,8 +903,15 @@ then single steps from nine levels:
   of about 0.0005: 0.00046 was dropped and 0.00089 applied. A dropped
   write still reads back from block 0x0001 as written, while the audio
   stays at the old gain, so a fader moved slowly below about -40 dB can
-  leave the unit at a level the block does not show. This was measured on
-  USB Aux only.
+  leave the unit at a level the block does not show.
+- XLR 1 (byte 54) and USB pair 7 (byte 65) behave the same, step for step
+  (a later run the same day, both cells written together in section 54):
+  0.5 dB steps applied down to -36 dB and were dropped from -42, -48 and
+  -52 dB, `90` to `8a` and `8a` to `89` were dropped, 3.5 dB steps and
+  steps from `00` applied, `89` was exact and `88` off. The divide is the
+  same for a microphone, a playback pair and USB Aux, although their
+  signals were tens of dB apart, so it belongs to the cell's gain, not to
+  the signal.
 
 ### Notes for a probe
 
@@ -950,6 +957,19 @@ membership (byte 67 bit 3) changed every 3 s:
 Every change applied within the 250 ms window it was written in, while
 the stream ran, with or without the commit, and no poll read anything but
 the last write. A pair's membership does not latch at stream start.
+
+### Round trip
+
+A JACK client under `pw-jack` (block size 256 at 48 kHz, the Pro's ALSA
+nodes at three periods of 256) wrote a single-sample impulse to pair 7
+every 0.5 s, with pair 7 alone in section 54 at `00`, and read section
+54's stream (AUX14). All 23 impulses came back 1012 frames (21.08 ms)
+after the cycle they were written in, as one sample at -17.23 dB: the
+pair's 7.94 dB and the sink's 70% volume (-9.29 dB), with no smearing.
+PipeWire reports one quantum of latency on each of the two ports, 512
+frames together, so 500 frames (10.4 ms) of the round trip are not in
+the reported latencies. The section adds no delay of its own (section
+15), so all of it is the USB and driver path.
 
 ### Gain and headroom
 
