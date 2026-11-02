@@ -41,6 +41,15 @@
     <label style="display:inline"><input type="radio" name="gesture" value="tap" checked> Screen tap</label>
     <label style="display:inline; margin-left:14px"><input type="radio" name="gesture" value="push"> Dial press</label>
   </div>
+  <label for="stepSize" style="margin-top:12px">Step per tick</label>
+  <select id="stepSize" aria-describedby="stepHint">
+    <option value="">Default (per control)</option>
+    <option value="1">1</option>
+    <option value="3">3</option>
+    <option value="5">5</option>
+    <option value="10">10</option>
+  </select>
+  <p id="stepHint" style="color:#8b93a7; line-height:1.4">dB for gain, headphones and Aux In. Percentage points for faders and crossfade. EQ and insert controls keep their own steps.</p>
   <script src="layout-options.js"></script>
   <script>
     let ws = null, piUuid = null, settings = {};
@@ -48,20 +57,22 @@
     function connect(inPort, inPropertyInspectorUUID, inRegisterEvent, inInfo, inActionInfo) {
       piUuid = inPropertyInspectorUUID;
       const actionInfo = JSON.parse(inActionInfo);
-      settings = actionInfo.payload?.settings ?? {};
-      if (!Array.isArray(settings.targets))
-        settings.targets = settings.target ? [settings.target] : [];
       ws = new WebSocket("ws://localhost:" + inPort);
       ws.onopen = () => {
         ws.send(JSON.stringify({ event: inRegisterEvent, uuid: piUuid }));
-        const g = ["tap", "push"].includes(settings.cycleGesture) ? settings.cycleGesture : "tap";
-        document.querySelector('input[name="gesture"][value="' + g + '"]').checked = true;
+        loadSettings(actionInfo.payload?.settings ?? {});
         for (const r of document.querySelectorAll('input[name="gesture"]'))
           r.addEventListener("change", () => {
             settings.cycleGesture = document.querySelector('input[name="gesture"]:checked').value;
             save();
           });
-        render();
+        const step = document.getElementById("stepSize");
+        step.addEventListener("change", () => {
+          const value = Number(step.value);
+          if ([1, 3, 5, 10].includes(value)) settings.stepSize = value;
+          else settings.stepSize = null;
+          save(false);
+        });
         // The plugin lists the loaded inserts' controls from live state.
         for (const request of ["layout", "inserts"])
           ws.send(JSON.stringify({ event: "sendToPlugin", context: actionInfo.context,
@@ -70,6 +81,12 @@
       ws.onmessage = (e) => {
         let m;
         try { m = JSON.parse(e.data); } catch { return; }
+        if (m.event === "didReceiveSettings") {
+          const value = m.payload?.settings;
+          if (m.context === actionInfo.context && value && typeof value === "object" && !Array.isArray(value))
+            loadSettings(value);
+          return;
+        }
         if (m.event !== "sendToPropertyInspector") return;
         if (Array.isArray(m.payload?.levelGroups)) {
           replaceLayoutOptions(m.payload.levelGroups);
@@ -95,9 +112,22 @@
     window.connectElgatoStreamDeckSocket = connect;
     window.connectOpenActionSocket = connect;
 
-    function save() {
-      settings.target = settings.targets[0] ?? "";
-      settings.activeIndex = 0;
+    function loadSettings(value) {
+      settings = value;
+      if (!Array.isArray(settings.targets))
+        settings.targets = settings.target ? [settings.target] : [];
+      const gesture = ["tap", "push"].includes(settings.cycleGesture) ? settings.cycleGesture : "tap";
+      for (const radio of document.querySelectorAll('input[name="gesture"]'))
+        radio.checked = radio.value === gesture;
+      document.getElementById("stepSize").value = [1, 3, 5, 10].includes(settings.stepSize) ? String(settings.stepSize) : "";
+      render();
+    }
+
+    function save(resetTarget = true) {
+      if (resetTarget) {
+        settings.target = settings.targets[0] ?? "";
+        settings.activeIndex = 0;
+      }
       ws.send(JSON.stringify({ event: "setSettings", context: piUuid, payload: settings }));
     }
     function labelFor(v) {

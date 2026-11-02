@@ -3733,8 +3733,8 @@ keeps the target. A missing carrier, an unplugged unit or an unsupported
 control makes it unavailable. An older daemon without `unitInput` offers no
 channel hardware targets; the existing interface targets still work.
 The group also lists a gain dial for each capture input that has a
-[gain of its own](#capture-gain). It turns that gain one dB a tick within
-the source's range with `setCaptureGain`, meters the channel, and on press
+[gain of its own](#capture-gain). By default it turns that gain one dB a
+tick within the source's range with `setCaptureGain`, meters the channel, and on press
 mutes or unmutes the channel in every mix, since OpenXLR does not write the
 source's mute.
 
@@ -3827,6 +3827,23 @@ the daemon hears the first tick immediately and a fast turn as a short
 series of changes. The daemon's own value takes over once the turn has
 settled. After a daemon reconnect, turns start from its newly reported
 values; unsent turns from the previous connection are discarded.
+
+**Step per tick** in the Dial inspector chooses **Default**, **1**, **3**,
+**5** or **10** for that dial's gain and level controls. The number is dB
+for input gain, Line In gain, headphone volume and Aux In level; it is
+percentage points for sends, channel and mix faders, monitor and desktop
+output volume, and the crossfade. For example, a gain dial set to 3 moves
+from 40 to 43 dB on one clockwise tick and back on one counterclockwise
+tick. Each tick in a fast or multi-tick turn counts, within the control's
+range, including the daemon's gain caps and the 150% output-volume limit.
+
+**Default** keeps the original per-control step: 1 dB for gains, 0.6 dB
+for headphone and Aux In levels, one percentage point for faders, and
+five points for the crossfade. EQ bands and insert-plugin parameters
+keep their own steps. The host saves the choice with that dial's action;
+a stack uses the same choice in each target's units. Changing the step
+keeps the currently selected stack target, including a target cycled while
+the inspector is open.
 
 **Clip** (a key) plays one clip of the [soundboard](#play-sound-clips)
 into the SFX channel, or stops every clip. Its settings list the clips by
