@@ -34,6 +34,9 @@ public sealed record Command
     /// <summary>The value: number for levels, bool for toggles.</summary>
     [JsonPropertyName("value")] public System.Text.Json.JsonElement Value { get; init; }
 
+    /// <summary>"setMixing": true asks for a dry run, which changes nothing.</summary>
+    [JsonPropertyName("check")] public System.Text.Json.JsonElement Check { get; init; }
+
     /// <summary>Mixer commands: which channel.</summary>
     [JsonPropertyName("channel")] public string? Channel { get; init; }
 
@@ -564,6 +567,26 @@ public static class ControlNames
     public const string AuxLevelLock = "auxLevelLock";       // bool
     public const string LineInGain = "lineInGain";           // int dB (0..lineInGainMaxDb)
     public const string LineInLevelLock = "lineInLevelLock"; // bool
+}
+
+/// <summary>
+/// Reply to <c>setMixing</c> with <c>check</c>: what the mode would do with
+/// the layout as it stands, without switching (see <see cref="HardwareMixingPlan"/>).
+/// </summary>
+public sealed record MixingPlanMessage(HardwareMixingPlan Plan)
+{
+    [JsonPropertyName("type")] public string Type => "mixingPlan";
+    [JsonPropertyName("wanted")] public bool Wanted => Plan.Wanted;
+    [JsonPropertyName("active")] public bool Active => Plan.Active;
+    [JsonPropertyName("reason")] public string? Reason => Plan.Reason;
+    [JsonPropertyName("note")] public string? Note => Plan.Note;
+    [JsonPropertyName("pairs")] public IReadOnlyDictionary<string, int> Pairs => Plan.Pairs;
+    [JsonPropertyName("sections")] public IReadOnlyDictionary<string, int> Sections => Plan.Sections;
+    [JsonPropertyName("jacks")] public IReadOnlyDictionary<string, int> Jacks => Plan.Jacks;
+    [JsonPropertyName("cells")] public IReadOnlyDictionary<string, string> Cells => HardwareMixingPlanner.ContentHex(Plan);
+    [JsonPropertyName("clamped")] public IReadOnlyList<HardwareMixingClamp> Clamped => Plan.Clamped;
+    [JsonPropertyName("disabled")] public IReadOnlyDictionary<string, string> Disabled => Plan.Disabled;
+    [JsonPropertyName("entryOffsetsDb")] public IReadOnlyDictionary<string, double> EntryOffsetsDb => Plan.EntryOffsetsDb;
 }
 
 /// <summary>Reply to "getDiagnostics": raw vendor blocks for bug reports.</summary>

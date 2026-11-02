@@ -179,8 +179,31 @@ public sealed class MixerService : IHostedService, IDisposable
         lock (_selectorGate) SyncOutputSelectorsLocked();
     }
 
+    /// <summary>
+    /// The plan for hardware mixing from the mixer's model and the driven
+    /// unit as they stand; <paramref name="mixing"/> overrides the saved
+    /// choice for a dry run.
+    /// </summary>
+    private HardwareMixingPlan PlanHardwareMixing(string? mixing = null)
+        => _mixer.PlanHardwareMixing(_devices.HardwareMixingUnit, failed: false, mixing,
+            _devices.ProSection0LevelDb ?? HardwareMixingPlanner.Section0LevelDb);
+
+    /// <summary>
+    /// <c>setMixing</c> with <c>check</c>: what switching to
+    /// <paramref name="mixing"/> would do, without switching.
+    /// </summary>
+    public HardwareMixingPlan DryRunMixing(string mixing)
+    {
+        lock (_selectorGate) return PlanHardwareMixing(mixing);
+    }
+
+    /// <summary>The sentence <c>setMixing</c> answers <c>hardware</c> with until the daemon can run the mode.</summary>
+    internal const string HardwareMixingNotYet =
+        "setMixing: hardware mixing cannot be switched on yet; send \"check\": true for a dry run";
+
     private void SyncOutputSelectorsLocked()
     {
+        if (_mixer.NoteHardwarePlan(PlanHardwareMixing())) Changed?.Invoke();
         if (_devices.ActiveCapabilities?.OutputRouting is not true)
         {
             // A saved Pro jack is not evidence of a live hardware mic path.
@@ -1292,6 +1315,11 @@ public sealed class MixerService : IHostedService, IDisposable
                     break;
                 case "setAuxPortEnabled":
                     _mixer.SetAuxPortEnabled(cmd.Value.GetBoolean());
+                    SyncOutputSelectors();
+                    break;
+                case "setMixing":
+                    // The dry run is answered by the hub; checked by CommandValidation.
+                    if (cmd.Value.GetString() == MixingMode.Hardware) return HardwareMixingNotYet;
                     SyncOutputSelectors();
                     break;
                 case "setLowCutHz":

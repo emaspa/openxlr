@@ -419,6 +419,11 @@ public sealed class WebSocketHub
                 lock (_installGate) error = _mixer.Apply(cmd);
                 stateOnError = true;
                 break;
+            case "setMixing" when cmd.Check.ValueKind == JsonValueKind.True:
+                // A dry run changes nothing and needs no built graph.
+                error = CommandValidation.CheckMixing(cmd);
+                if (error is null) await reply(new MixingPlanMessage(_mixer.DryRunMixing(cmd.Value.GetString()!)));
+                break;
             case "set":
                 error = cmd.Control is null ? "set: missing 'control'" : _devices.Apply(cmd.Control, cmd.Value);  // broadcasts on success
                 break;
@@ -461,6 +466,7 @@ public sealed class WebSocketHub
             case "setOutputVolume":
             case "setEnforcedDefaults":
             case "setAuxPortEnabled":
+            case "setMixing":
             case "setLowCutHz":
             case "setSoftClipGuard":
             case "setMixLatencyCompensation":

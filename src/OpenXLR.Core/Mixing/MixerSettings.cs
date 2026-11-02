@@ -156,6 +156,23 @@ public sealed record MixerSettings
     public Dictionary<string, string> HardwareRestore { get; init; } = [];
 
     /// <summary>
+    /// Where the mixes the Wave XLR Pro's outputs play are built:
+    /// <c>software</c> (the default) or <c>hardware</c> (see
+    /// <see cref="MixingMode"/>). Machine wiring, never profile state.
+    /// </summary>
+    public string Mixing { get; init; } = MixingMode.Software;
+
+    /// <summary>
+    /// The USB playback pair each channel streams on in hardware mixing, by
+    /// channel id, kept across restarts, layout edits and trips through
+    /// software mixing (see <see cref="HardwareMixingPlanner"/>).
+    /// </summary>
+    public Dictionary<string, int> HardwarePairs { get; init; } = [];
+
+    /// <summary>The Wave XLR Pro section each jack feed takes in hardware mixing, by feed, kept like <see cref="HardwarePairs"/>.</summary>
+    public Dictionary<string, int> HardwareSections { get; init; } = [];
+
+    /// <summary>
     /// Noise removal by channel id. A microphone absent here has it off. An
     /// entry for a channel that is not a microphone is kept as it is.
     /// </summary>

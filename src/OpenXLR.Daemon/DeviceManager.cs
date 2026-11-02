@@ -1232,6 +1232,35 @@ public sealed partial class DeviceManager : BackgroundService
         }
     }
 
+    /// <summary>
+    /// What hardware mixing needs to know of the driven unit: whether it is a
+    /// model that can build its outputs' mixes, connected, its firmware, and
+    /// whether the last poll's block 0x0001 decodes; null without a unit.
+    /// </summary>
+    public HardwareMixingUnit? HardwareMixingUnit
+    {
+        get
+        {
+            lock (_gate)
+            {
+                if (_device is not { } dev) return null;
+                byte[]? block = _last?.ProMixBlock is { Length: 2 * ProMixSections.Length } hex ? Convert.FromHexString(hex) : null;
+                return new HardwareMixingUnit
+                {
+                    Pro = dev.Capabilities.HardwareMixing,
+                    Connected = dev.Connected,
+                    Firmware = dev.Firmware,
+                    SectionsDecode = dev.Connected && block is not null && ProMixSections.Decodes(block),
+                };
+            }
+        }
+    }
+
+    /// <summary>Section 0's level as the Pro's last poll read it in byte 98, or null without one.</summary>
+    public double? ProSection0LevelDb
+        => ProMixBlock is { Length: 2 * ProMixSections.Length } hex
+            ? ProMixSections.Section0LevelDb(Convert.FromHexString(hex)[ProMixSections.Section0LevelOffset]) : null;
+
     /// <summary>Vendor block dumps for diagnostics; empty without a device.</summary>
     public IReadOnlyDictionary<string, string> DumpBlocks()
     {

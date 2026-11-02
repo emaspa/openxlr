@@ -58,6 +58,7 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
         XlrInputs = 2, HpOutputs = 2,
         BuiltInDefaults = true,
         Ducking = true,
+        HardwareMixing = true,
     };
 
     private const ushort VIndex = 0x0103;
