@@ -212,11 +212,12 @@ features wait until the sections above are done.
   forbids redistribution and use under an open source licence, so no
   package could carry it. It would fit technically: 48 kHz, 10 ms frames,
   on a worker like DeepFilterNet's.
-- AMD Noise Suppression as an engine for the microphones. To be explored,
-  not a commitment. AMD lists it for Windows 10 and 11 only, as part of
-  its Adrenalin driver software that applications reach through a virtual
-  audio device. Its developer site lists no library for other programs.
-  The first question is whether any form of it can run on Linux.
+- AMD Noise Suppression as an engine for the microphones. Nothing to build
+  on today. It exists only inside AMD's Adrenalin driver software, which
+  runs on Windows 10 and 11, and applications reach it through a virtual
+  audio device. AMD's Linux drivers do not include it and AMD offers no
+  library for other programs on any system, so OpenXLR has nothing to call
+  or ship. Back on the list if AMD publishes one that runs on Linux.
 
 ## Not planned
 
