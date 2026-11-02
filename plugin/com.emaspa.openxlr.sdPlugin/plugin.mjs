@@ -132,7 +132,7 @@ function connectDaemon() {
       }
     } else daemonNotice = null;
     daemonUp = false; daemonState = null;
-    clearEqTurns();
+    clearDialTurns();
     meterLevels = {};
     keyCommands.disconnect();
     // The daemon releases this connection's held clips when it closes.
@@ -726,13 +726,17 @@ function dialTurn(key, value, send) {
   send();
 }
 
+function clearDialTurns() {
+  for (const entry of dialSends.values()) if (entry.timer) clearTimeout(entry.timer);
+  dialSends.clear();
+  dialTurns.clear();
+}
+
 // A recalled profile must follow earlier turns on this connection, and its
 // values must replace the dial's warm local value as soon as state arrives.
 function flushDialTurns() {
   const pending = [...dialSends.values()].filter(entry => entry.timer);
-  for (const entry of pending) clearTimeout(entry.timer);
-  dialSends.clear();
-  dialTurns.clear();
+  clearDialTurns();
   for (const entry of pending) entry.send();
 }
 
