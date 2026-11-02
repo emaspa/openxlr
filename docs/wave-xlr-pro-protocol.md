@@ -1041,7 +1041,7 @@ with every threshold at 0 dB (`00`).
   for the inputs, so the unit ducks only USB playback pairs, as far as
   these bytes go.
 
-## 18. Headphones 1 on each section (desk probe of 2026-11-02)
+## 18. The headphone jacks on each section (desk probe of 2026-11-02)
 
 Firmware 1.0.14, the desk unit, the daemon stopped, headphones on
 Headphones 1 only with an ear cup held against a microphone on XLR 2.
@@ -1067,6 +1067,13 @@ and 0x0008 read back identical afterwards.
   byte 98 at `00` section 0's stream rose 21.0 dB to the level of the
   other sections, and its tone on the jack rose at least 13.5 dB, as far
   above the noise as the cup could show.
-- Headphones 2, Line Out and the USB Aux port were not tested, so whether
-  two outputs can play two sections at once is still open.
+- The two jacks are independent. In a second run the headphones moved to
+  Headphones 2, with byte 98 at `00`. With byte 91 at `22`, Headphones 2
+  played section 72's tone alone and at the same level while byte 90 went
+  through `21`, `1e`, `1f` and `22`. With byte 90 held at `22`, byte 91 at
+  `21`, `1f`, `1e` and `23` played section 54, section 18, section 0 and
+  nothing. So each jack plays its own section at the same time as the
+  other, with no commit.
+- Line Out and the USB Aux port on sections other than their own were not
+  tested.
 
