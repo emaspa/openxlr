@@ -925,6 +925,28 @@ power cycle whether or not the commit followed the write, so a mix
 written to it is still there on the next connect. Whether a write made a
 second before the power goes would survive was not tested.
 
+### Write rate
+
+With the daemon stopped and a steady 1 kHz tone on pair 7, alone in
+section 54 at `00`, block 0x0001 was written 20 times a second for 10 s
+unchanged, then 10 s with section 72's empty cell changing on every
+write, then 10 s sweeping pair 7's cell from `00` to `ec` and back in
+0.5 dB steps, one step a write; after that the 0x0003 commit went 10
+times a second for 5 s.
+
+| Phase | Writes | Time per write | Section 54's stream |
+|---|---|---|---|
+| unchanged block | 201 | 3.4 ms median, 3.6 ms most | the tone untouched, residual -151 dB |
+| another section changing | 201 | 3.5 ms median, 4.0 ms most | untouched |
+| pair 7's cell sweeping | 201 | 3.4 ms median, 4.0 ms most | every step at its written level (mean error 0.003 dB), ramped |
+| commits | 49 | 2.8 ms median, 3.0 ms most | untouched |
+
+No write failed, the unit stayed on the bus with nothing in the kernel
+log, and the stream had no sample-level discontinuity. A write to block
+0x0001 costs about 3.5 ms of the USB control pipe, so 20 a second takes
+about 7% of it, and neither a rewrite of the same block nor a commit
+disturbs audio that the write does not change.
+
 ### Notes for a probe
 
 - pipewire-pulse and pw-play remix a two-channel stream onto the first
