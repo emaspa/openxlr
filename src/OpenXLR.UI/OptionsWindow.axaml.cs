@@ -174,6 +174,30 @@ public partial class OptionsWindow : Window
         if (DataContext is OptionsViewModel vm) DuckingWindow.Open(this, vm.Main.Ducking);
     }
 
+    /// <summary>
+    /// "This unit": the dry run first, then the confirm window that lists what
+    /// this layout loses; only its own button switches. The side already lit
+    /// sends nothing and stays lit.
+    /// </summary>
+    private async void OnHardwareMixingUnit(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not OptionsViewModel vm) return;
+        HardwareMixingViewModel mixing = vm.Main.HardwareMixing;
+        mixing.Reassert();
+        if (mixing.OnUnit || !mixing.CanSwitch) return;
+        await HardwareMixingWindow.ConfirmAsync(this, mixing);
+    }
+
+    /// <summary>"This computer": back to today's mixing, with nothing to confirm; the unit is put back as it was.</summary>
+    private async void OnHardwareMixingComputer(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not OptionsViewModel vm) return;
+        HardwareMixingViewModel mixing = vm.Main.HardwareMixing;
+        mixing.Reassert();
+        if (mixing.OnComputer || !mixing.CanSwitch) return;
+        await mixing.SwitchAsync(hardware: false);
+    }
+
     private void OnSoundboard(object? sender, RoutedEventArgs e)
     {
         // Over Options, owned by neither: the board stays open when Options closes.

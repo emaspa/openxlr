@@ -200,11 +200,30 @@ public sealed class MicSetupViewModel : ViewModelBase
     // --- the session ---
 
     public bool Active => _active;
-    public bool CanRecord => !_detached && !_busy && _mode != "recording";
-    public bool CanLoop => !_detached && !_busy && _active && _seconds >= 0.1;
-    public bool CanLive => !_detached && !_busy;
+    public bool CanRecord => !_detached && !_busy && _unitNote is null && _mode != "recording";
+    public bool CanLoop => !_detached && !_busy && _unitNote is null && _active && _seconds >= 0.1;
+    public bool CanLive => !_detached && !_busy && _unitNote is null;
     public bool CanStop => !_detached && !_busy && (_active || Error is not null);
-    public bool CanSwitch => !_detached && !_busy;
+    public bool CanSwitch => !_detached && !_busy && _unitNote is null;
+
+    private string? _unitNote;
+    /// <summary>
+    /// Why no session can start: the Wave XLR Pro builds the mixes its jacks
+    /// play, and the daemon refuses Mic setup's checks then. Null otherwise.
+    /// The Listen step says it under its buttons; Stop stays, so a session
+    /// already running can still end.
+    /// </summary>
+    public string? UnitNote
+    {
+        get => _unitNote;
+        internal set
+        {
+            if (!Set(ref _unitNote, value)) return;
+            Raise(nameof(HasUnitNote));
+            RaiseButtons();
+        }
+    }
+    public bool HasUnitNote => _unitNote is not null;
     public string Status => _mode switch
     {
         "recording" => Localizer.Format("SoundCheckRecording", _seconds),

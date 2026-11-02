@@ -269,8 +269,14 @@ public partial class SoundboardWindow : Window
         // The entry does what it said when the menu opened, even if the
         // audition ended or started meanwhile.
         bool stopsAudition = clip.Auditioned;
-        Item("SoundClipAudition", stopsAudition ? Localizer.Text("SoundClipStopAudition") : Localizer.Text("SoundClipAudition"),
-            stopsAudition || clip.CanPlay, () => { if (stopsAudition) board.StopAudition(); else board.Audition(clip); });
+        MenuItem audition = Item("SoundClipAudition", stopsAudition ? Localizer.Text("SoundClipStopAudition") : Localizer.Text("SoundClipAudition"),
+            stopsAudition || clip.CanPlay && board.AuditionNote is null, () => { if (stopsAudition) board.StopAudition(); else board.Audition(clip); });
+        // While the Wave XLR Pro builds the mixes its jacks play, the entry says why it is off.
+        if (!stopsAudition && board.AuditionNote is { } why)
+        {
+            ToolTip.SetTip(audition, why);
+            ToolTip.SetShowOnDisabled(audition, true);
+        }
         // Stop ends the clip's voices and its audition alike.
         Item("SoundClipStop", Localizer.Text("SoundClipStop"), clip.Playing || clip.Auditioned, () => board.Stop(clip));
         Item("SoundClipEarlier", Localizer.Text("SoundClipMoveEarlier"), board.CanMove(clip, -1), () => _ = MoveAsync(board, clip, -1));

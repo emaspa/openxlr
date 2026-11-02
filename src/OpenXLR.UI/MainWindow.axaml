@@ -954,6 +954,13 @@
             <Button Classes="ghost reorderHandle" Content="↕" Tag="SubmixerTile" AutomationProperties.Name="{loc:Text Key=MoveSubmixer}"
                     ToolTip.Tip="{loc:Text Key=DragToAnotherSectionArrowKeysMove}"/>
             <TextBlock Text="{loc:Text Key=SUBMIXER}" Classes="h" VerticalAlignment="Center"/>
+            <!-- the Wave XLR Pro builds the mixes its jacks play: the same badge the EQ and Ducking windows wear -->
+            <Border Name="HardwareMixingBadge" IsVisible="{Binding HardwareMixing.Active}" VerticalAlignment="Center"
+                    Background="{DynamicResource Ox.Badge.Background}" CornerRadius="{DynamicResource Ox.Eq.CornerRadius}" Padding="8,2"
+                    ToolTip.Tip="{Binding HardwareMixing.BadgeTip}" AutomationProperties.Name="{Binding HardwareMixing.BadgeTip}">
+              <TextBlock Text="{loc:Text Key=HardwareMixingBadge}" Foreground="{DynamicResource Ox.Text.Info}"
+                         FontSize="{DynamicResource Ox.Eq.LabelFontSize}" FontWeight="{DynamicResource Ox.Label.FontWeight}"/>
+            </Border>
             <Button Name="PopOutMixerButton" Content="{loc:Text Key=PopOutMixer}" Padding="8,1" FontSize="11" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
                     Click="OnPopOutMixer" ToolTip.Tip="{loc:Text Key=PopOutMixerHint}">
               <!-- Hidden with no mixer, and while the mixer is in its own window. -->
@@ -1091,7 +1098,7 @@
                   </Grid>
                   <Button Content="{Binding Inserts.ButtonText}" HorizontalAlignment="Stretch" Classes="fx" Classes.fxOn="{Binding Inserts.IsProcessing}" Classes.fxOff="{Binding Inserts.IsOff}"
                           HorizontalContentAlignment="Center" Padding="8,4" FontSize="12" Click="OnMixInserts"
-                          ToolTip.Tip="{loc:Text Key=StereoPluginsProcessingThisMixBeforeItReaches}"/>
+                          ToolTip.Tip="{Binding Inserts.ButtonTip}"/>
                   <!-- the chain at a glance: LED, name, bypass, controls; adding,
                        ordering and removing live in the chain window -->
                   <ItemsControl ItemsSource="{Binding Inserts.Items}" IsVisible="{Binding Inserts.HasItems}">

@@ -176,11 +176,16 @@
           <TextBlock Text="{loc:Text Key=MicSetupListenHint}" Classes="hint" TextWrapping="Wrap"/>
           <TextBlock Name="MicSetupStatus" Text="{Binding Status}" TextWrapping="Wrap" Foreground="{DynamicResource Ox.Text.Primary}"/>
           <WrapPanel Name="MicSetupActions" ItemSpacing="8" LineSpacing="8">
-            <Button Content="{loc:Text Key=Record}" IsEnabled="{Binding CanRecord}" Click="OnRecord"/>
-            <Button Content="{loc:Text Key=MicSetupLoopTake}" IsEnabled="{Binding CanLoop}" Click="OnLoop"/>
-            <Button Content="{loc:Text Key=MicSetupLiveMic}" IsEnabled="{Binding CanLive}" Click="OnLive"/>
+            <Button Content="{loc:Text Key=Record}" IsEnabled="{Binding CanRecord}" Click="OnRecord"
+                    ToolTip.ShowOnDisabled="True" ToolTip.Tip="{Binding UnitNote}"/>
+            <Button Content="{loc:Text Key=MicSetupLoopTake}" IsEnabled="{Binding CanLoop}" Click="OnLoop"
+                    ToolTip.ShowOnDisabled="True" ToolTip.Tip="{Binding UnitNote}"/>
+            <Button Content="{loc:Text Key=MicSetupLiveMic}" IsEnabled="{Binding CanLive}" Click="OnLive"
+                    ToolTip.ShowOnDisabled="True" ToolTip.Tip="{Binding UnitNote}"/>
             <Button Content="{loc:Text Key=StopAndDiscard}" IsEnabled="{Binding CanStop}" Click="OnStop"/>
           </WrapPanel>
+          <!-- the Wave XLR Pro builds the mixes its jacks play, and the checks wait for this computer -->
+          <TextBlock Name="MicSetupUnitNote" Text="{Binding UnitNote}" Classes="hint" TextWrapping="Wrap" IsVisible="{Binding HasUnitNote}"/>
           <vm:TakeWaveform Name="MicSetupWaveform" Height="96" Peaks="{Binding Peaks}" Position="{Binding Position}"
                            CornerRadius="{DynamicResource Ox.Eq.CornerRadius}" AutomationProperties.Name="{loc:Text Key=MicSetupWaveform}"/>
           <TextBlock Text="{loc:Text Key=MicSetupNoTake}" Classes="hint" TextWrapping="Wrap" IsVisible="{Binding !HasTake}"/>

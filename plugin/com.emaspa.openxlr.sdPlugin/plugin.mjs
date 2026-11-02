@@ -427,6 +427,13 @@ const monitorMuted = () => mixer()?.monitorMuted === true;
 const effectiveMixMuted = mix => mix?.kind === "monitor" && monitorMuted() ? true : mix?.muted ?? null;
 const mixOf = (id) => mixer()?.mixes?.find((x) => x.id === id);
 const chOf = (id) => mixer()?.channels?.find((x) => x.id === id);
+// What hardware mixing on the Wave XLR Pro turns off while it runs, by the
+// daemon's fixed keys (docs/api.md, hardware mixing): the same map the UI
+// and the terminal mixer grey their controls by. The sentence, or null.
+const hardwareMixingOff = (key) => {
+  const mode = mixer()?.hardwareMixing;
+  return mode?.active === true ? mode.disabled?.[key] ?? null : null;
+};
 // The device's highest gain (40 dB on the Wave:3); 80 from a daemon that does not say.
 const gainMaxDb = () => {
   const max = daemonState?.capabilities?.gainMaxDb;
@@ -474,10 +481,13 @@ function toggleValue(target, inst) {
   }
   if (target.startsWith("insert|")) {
     const [, ch, id] = target.split("|");
+    // Grey while the Wave XLR Pro builds the mix for its jacks: no insert runs there.
+    if (hardwareMixingOff(`inserts:${ch}`)) return null;
     const ins = resolveInsert(ch, id, metaOf(inst, target));
     return ins ? !ins.bypass : null;        // ON = the plugin is in the path
   }
   if (target.startsWith("inschain|")) {
+    if (hardwareMixingOff(`inserts:${target.slice(9)}`)) return null;
     const list = insertsOf(target.slice(9));
     return list.length ? list.some((i) => !i.bypass) : null;
   }
@@ -1125,6 +1135,7 @@ function onDialPress(context, inst) {
   } else if (t.startsWith("insparam|")) {
     // the press is the insert's bypass, like a dial's mute
     const [, ch, id] = t.split("|");
+    if (hardwareMixingOff(`inserts:${ch}`)) { send({ event: "showAlert", context }); return; }
     const ins = resolveInsert(ch, id, metaOf(inst, t));
     if (ins) cmd({ cmd: "setInsertBypass", channel: ch, insertId: ins.id, value: !ins.bypass });
   } else if (t.startsWith("send:") || t.startsWith("chvol:") || t === "lineIn" || ownGain) {

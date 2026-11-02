@@ -2706,9 +2706,11 @@ Headphones 2 and Line Out) can be built by the unit instead of this
 computer. Every channel then streams to the unit once, on a USB playback
 pair of its own, and the unit mixes the pairs with its own inputs at zero
 latency. `mixing` in `mixer.json` holds the choice, `software` (the
-default) or `hardware`, and `setMixing` changes it live. No client offers
-the choice yet; it is reached through the API. Nothing of it has been
-heard on a unit yet.
+default) or `hardware`, and `setMixing` changes it live. The UI offers
+the choice in Options (AUDIO, "Mixes on the Pro's outputs") and the
+terminal mixer on its Options tab; both send the dry run first and switch
+only after it. The Deck greys a key on a plugin of a mix the unit builds,
+from `disabled`. Nothing of it has been heard on a unit yet.
 
 **Pairs.** A channel the unit cannot take raw streams on a pair: System on
 pair 0, Game on 1, Music on 2, Browser on 3, Voice Chat on 4 and SFX on 6.

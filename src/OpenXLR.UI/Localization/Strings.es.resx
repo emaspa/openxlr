@@ -2115,7 +2115,7 @@ Selecciona la interfaz que controla OpenXLR</value>
     <value>la sincronización</value>
   </data>
   <data name="MonitorOutputRoutingTip" xml:space="preserve">
-    <value>Marca cada salida que quieras escuchar y elige una o varias mezclas junto a ella. Las mezclas se suman con sus niveles actuales. Mantén al menos una mezcla seleccionada; desmarca la salida para desconectarla. En Wave XLR Pro, los auriculares 1/2 y Line Out comparten una misma mezcla de alimentación. Su puerto USB Aux sigue la mezcla Aux independiente. Los dispositivos predeterminados del sistema para las aplicaciones se eligen en Opciones.</value>
+    <value>Marca cada salida que quieras escuchar y elige una o varias mezclas junto a ella. Las mezclas se suman con sus niveles actuales. Mantén al menos una mezcla seleccionada; desmarca la salida para desconectarla. En Wave XLR Pro, los auriculares 1, los auriculares 2 y Line Out pueden reproducir cada uno su propia mezcla. Su puerto USB Aux sigue la mezcla Aux independiente. Los dispositivos predeterminados del sistema para las aplicaciones se eligen en Opciones.</value>
   </data>
   <data name="TimeNotRecorded" xml:space="preserve">
     <value>hora no registrada</value>
@@ -3816,5 +3816,77 @@ Selecciona la interfaz que controla OpenXLR</value>
   </data>
   <data name="CompressorInputPoint" xml:space="preserve">
     <value>Entrada es el micrófono después de la reducción de ruido, el expansor y el EQ, donde lo oye el compresor.</value>
+  </data>
+  <data name="HardwareMixingLabel" xml:space="preserve">
+    <value>Mezclas en las salidas del Pro</value>
+  </data>
+  <data name="HardwareMixingUnit" xml:space="preserve">
+    <value>Esta unidad</value>
+  </data>
+  <data name="HardwareMixingComputer" xml:space="preserve">
+    <value>Este ordenador</value>
+  </data>
+  <data name="HardwareMixingUnitTip" xml:space="preserve">
+    <value>El Wave XLR Pro construye las mezclas que reproducen sus tomas de auriculares y Line Out, y sus propias entradas llegan a ellas sin retardo. Experimental.</value>
+  </data>
+  <data name="HardwareMixingComputerTip" xml:space="preserve">
+    <value>Este ordenador construye todas las mezclas, y las tomas reproducen lo que envía.</value>
+  </data>
+  <data name="HardwareMixingHint" xml:space="preserve">
+    <value>Experimental. Con Esta unidad, cada canal va una vez al Wave XLR Pro y la unidad lo mezcla para sus tomas. Stream, Chat y las demás salidas siguen en este ordenador.</value>
+  </data>
+  <data name="HardwareMixingWaiting" xml:space="preserve">
+    <value>El Wave XLR Pro construirá las mezclas en cuanto esté listo.</value>
+  </data>
+  <data name="HardwareMixingBadge" xml:space="preserve">
+    <value>En la unidad</value>
+  </data>
+  <data name="HardwareMixingBadgeTip" xml:space="preserve">
+    <value>El Wave XLR Pro construye las mezclas que reproducen sus tomas. Este ordenador, en Audio dentro de Opciones, lo devuelve.</value>
+  </data>
+  <data name="HardwareMixingConfirmTitle" xml:space="preserve">
+    <value>Mezclar en el Wave XLR Pro</value>
+  </data>
+  <data name="HardwareMixingConfirmIntro" xml:space="preserve">
+    <value>El Wave XLR Pro construirá las mezclas que reproducen sus tomas de auriculares y Line Out. Cada canal le llega por un par USB propio, y las entradas de la unidad llegan a esas mezclas sin retardo. Stream, Chat y cualquier mezcla que reproduzca otra salida siguen en este ordenador. Es experimental.</value>
+  </data>
+  <data name="HardwareMixingConfirmLosses" xml:space="preserve">
+    <value>Qué cambia con esta disposición</value>
+  </data>
+  <data name="HardwareMixingConfirmNoLosses" xml:space="preserve">
+    <value>Nada de esta disposición deja de funcionar.</value>
+  </data>
+  <data name="HardwareMixingJackDrop" xml:space="preserve">
+    <value>Primero se baja {0} en {1} dB, para que nada suene más fuerte.</value>
+  </data>
+  <data name="HardwareMixingConfirmLeave" xml:space="preserve">
+    <value>Este ordenador, en Opciones, deja la unidad como estaba y las tomas en sus niveles.</value>
+  </data>
+  <data name="HardwareMixingConfirmSwitch" xml:space="preserve">
+    <value>Mezclar en la unidad</value>
+  </data>
+  <data name="HardwareMixingConfirmWaits" xml:space="preserve">
+    <value>Empieza cuando esto se resuelva: {0}</value>
+  </data>
+  <data name="HardwareMixingChecking" xml:space="preserve">
+    <value>Comprobando esta disposición con el servicio.</value>
+  </data>
+  <data name="HardwareMixingCheckFailed" xml:space="preserve">
+    <value>El servicio no respondió a la comprobación, así que no hay nada en la lista. Cierra esto y vuelve a intentarlo.</value>
+  </data>
+  <data name="HardwareMixingJackHp1" xml:space="preserve">
+    <value>Auriculares 1</value>
+  </data>
+  <data name="HardwareMixingJackHp2" xml:space="preserve">
+    <value>Auriculares 2</value>
+  </data>
+  <data name="HardwareMixingJackLineOut" xml:space="preserve">
+    <value>Line Out</value>
+  </data>
+  <data name="HardwareMixingUnitCard" xml:space="preserve">
+    <value>Wave XLR Pro</value>
+  </data>
+  <data name="FlowUnitMixes" xml:space="preserve">
+    <value>Construye {0}</value>
   </data>
 </root>

@@ -93,6 +93,18 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
     public Task<JsonNode?> RequestDiagnosticsAsync(TimeSpan timeout)
         => QueryAsync("diagnostics", "getDiagnostics", timeout);
 
+    /// <summary>
+    /// The dry run of hardware mixing: what <c>setMixing hardware</c> would do
+    /// with the layout as it stands, as the daemon's <c>mixingPlan</c>
+    /// message. Nothing changes. Null on timeout or from a daemon without it.
+    /// </summary>
+    public Task<JsonNode?> CheckHardwareMixingAsync(TimeSpan timeout)
+        => QueryAsync("mixingPlan", "setMixing", timeout, new() { ["value"] = "hardware", ["check"] = true });
+
+    /// <summary>Where the mixes the Wave XLR Pro's outputs play are built: <c>hardware</c> or <c>software</c>.</summary>
+    public Task<string?> SetMixingAsync(string value)
+        => EditLayoutAsync(new() { ["cmd"] = "setMixing", ["value"] = value });
+
     /// <summary>Request the daemon's plugin catalog (the "plugins" array); null on timeout.</summary>
     public Task<JsonNode?> RequestPluginsAsync(TimeSpan timeout)
         => QueryAsync("plugins", "listPlugins", timeout);
@@ -403,7 +415,7 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
                     BrowserTabActivationReceived?.Invoke(tabId, site);
             }
             else if (type is "pluginSetup" or "pluginInstall" or "pluginDiagnostics" or "windowsPluginFiles" or "nativeEditorRules" or "browserSession" or "clipImport"
-                     or "soundboardExport" or "soundboardImport" or "starterSounds") StoreReply(type, node);
+                     or "soundboardExport" or "soundboardImport" or "starterSounds" or "mixingPlan") StoreReply(type, node);
             else if (type == "commandResult" && node["requestId"]?.GetValue<string>() is string requestId)
             {
                 CompleteQuery(requestId);

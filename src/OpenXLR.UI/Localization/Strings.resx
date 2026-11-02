@@ -2129,7 +2129,7 @@ Select the interface OpenXLR drives</value>
     <value>the sync</value>
   </data>
   <data name="MonitorOutputRoutingTip" xml:space="preserve">
-    <value>Tick every output you want to hear, then choose one or more mixes beside each output. Mixes are summed at their existing levels. Keep at least one mix selected; untick the output to disconnect it. The Wave XLR Pro's Headphones 1/2 and Line Out share one feed. Its USB Aux port follows the separate Aux mix. System default devices for apps are set in Options.</value>
+    <value>Tick every output you want to hear, then choose one or more mixes beside each output. Mixes are summed at their existing levels. Keep at least one mix selected; untick the output to disconnect it. The Wave XLR Pro's Headphones 1, Headphones 2 and Line Out can each play a feed of their own. Its USB Aux port follows the separate Aux mix. System default devices for apps are set in Options.</value>
   </data>
   <data name="TimeNotRecorded" xml:space="preserve">
     <value>time not recorded</value>
@@ -4176,5 +4176,77 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
   </data>
   <data name="CompressorInputPoint" xml:space="preserve">
     <value>Input is the microphone after noise removal, the expander and the EQ, where the compressor hears it.</value>
+  </data>
+  <data name="HardwareMixingLabel" xml:space="preserve">
+    <value>Mixes on the Pro's outputs</value>
+  </data>
+  <data name="HardwareMixingUnit" xml:space="preserve">
+    <value>This unit</value>
+  </data>
+  <data name="HardwareMixingComputer" xml:space="preserve">
+    <value>This computer</value>
+  </data>
+  <data name="HardwareMixingUnitTip" xml:space="preserve">
+    <value>The Wave XLR Pro builds the mixes its headphone jacks and Line Out play, and its own inputs reach them with no delay. Experimental.</value>
+  </data>
+  <data name="HardwareMixingComputerTip" xml:space="preserve">
+    <value>This computer builds every mix, and the jacks play what it sends.</value>
+  </data>
+  <data name="HardwareMixingHint" xml:space="preserve">
+    <value>Experimental. On This unit, each channel streams to the Wave XLR Pro once and the unit mixes it for its jacks. Stream, Chat and the other outputs stay on this computer.</value>
+  </data>
+  <data name="HardwareMixingWaiting" xml:space="preserve">
+    <value>The Wave XLR Pro builds the mixes once it is ready.</value>
+  </data>
+  <data name="HardwareMixingBadge" xml:space="preserve">
+    <value>On the unit</value>
+  </data>
+  <data name="HardwareMixingBadgeTip" xml:space="preserve">
+    <value>The Wave XLR Pro builds the mixes its jacks play. This computer, under Audio in Options, switches it back.</value>
+  </data>
+  <data name="HardwareMixingConfirmTitle" xml:space="preserve">
+    <value>Mix on the Wave XLR Pro</value>
+  </data>
+  <data name="HardwareMixingConfirmIntro" xml:space="preserve">
+    <value>The Wave XLR Pro will build the mixes its headphone jacks and Line Out play. Each channel streams to it on a USB pair of its own, and the unit's own inputs reach those mixes with no delay. Stream, Chat and any mix another output plays stay on this computer. This is experimental.</value>
+  </data>
+  <data name="HardwareMixingConfirmLosses" xml:space="preserve">
+    <value>What changes with this layout</value>
+  </data>
+  <data name="HardwareMixingConfirmNoLosses" xml:space="preserve">
+    <value>Nothing in this layout stops working.</value>
+  </data>
+  <data name="HardwareMixingJackDrop" xml:space="preserve">
+    <value>{0} is turned down by {1} dB first, so nothing gets louder.</value>
+  </data>
+  <data name="HardwareMixingConfirmLeave" xml:space="preserve">
+    <value>This computer, in Options, puts the unit back as it was and the jacks back at their levels.</value>
+  </data>
+  <data name="HardwareMixingConfirmSwitch" xml:space="preserve">
+    <value>Mix on the unit</value>
+  </data>
+  <data name="HardwareMixingConfirmWaits" xml:space="preserve">
+    <value>It starts once this clears: {0}</value>
+  </data>
+  <data name="HardwareMixingChecking" xml:space="preserve">
+    <value>Checking this layout with the daemon.</value>
+  </data>
+  <data name="HardwareMixingCheckFailed" xml:space="preserve">
+    <value>The daemon did not answer the check, so nothing is listed. Close this and try again.</value>
+  </data>
+  <data name="HardwareMixingJackHp1" xml:space="preserve">
+    <value>Headphones 1</value>
+  </data>
+  <data name="HardwareMixingJackHp2" xml:space="preserve">
+    <value>Headphones 2</value>
+  </data>
+  <data name="HardwareMixingJackLineOut" xml:space="preserve">
+    <value>Line Out</value>
+  </data>
+  <data name="HardwareMixingUnitCard" xml:space="preserve">
+    <value>Wave XLR Pro</value>
+  </data>
+  <data name="FlowUnitMixes" xml:space="preserve">
+    <value>Builds {0}</value>
   </data>
 </root>

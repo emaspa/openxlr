@@ -98,6 +98,31 @@ public sealed partial class InsertsViewModel : ViewModelBase
     /// <summary>Label for a compact button that opens the chain window.</summary>
     public string ButtonText => Items.Count == 0 ? Localizer.Text("Inserts") : Localizer.Format("InsertsCount", Items.Count);
 
+    private string? _unitNote;
+    /// <summary>
+    /// Why no plugin can be added to this mix's chain: the Wave XLR Pro
+    /// builds the mix for its jacks and runs no insert there. Null otherwise.
+    /// The chain window says it under its title and keeps Add plugin off.
+    /// </summary>
+    public string? UnitNote
+    {
+        get => _unitNote;
+        internal set
+        {
+            if (!Set(ref _unitNote, value)) return;
+            Raise(nameof(HasUnitNote));
+            Raise(nameof(CanAddPlugins));
+            Raise(nameof(ButtonTip));
+        }
+    }
+    public bool HasUnitNote => _unitNote is not null;
+
+    /// <summary>Add plugin and Presets and A/B: off while the unit builds the mix.</summary>
+    public bool CanAddPlugins => _unitNote is null;
+
+    /// <summary>The tooltip of the button that opens the chain: why it does nothing on the unit, or what a chain is.</summary>
+    public string ButtonTip => _unitNote ?? Localizer.Text("StereoPluginsProcessingThisMixBeforeItReaches");
+
     private PluginChoice? _selectedPlugin;
     public PluginChoice? SelectedPlugin
     {

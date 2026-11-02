@@ -3696,6 +3696,61 @@ a voice; a profile saved before the voice changer leaves it as it is. A
 Inputs tab has the same choice, and `setVoiceChanger` in the
 [control API](api.md#voice-changer) drives it from a script.
 
+<a name="hardware-mixing"></a>
+### 3.16 Mix on the Wave XLR Pro (experimental)
+
+Normally this computer builds every mix and the Wave XLR Pro plays the
+result on its jacks. Hardware mixing hands the mixes the jacks play,
+Headphones 1, Headphones 2 and Line Out, to the unit. Each channel streams
+to the unit once, on a USB pair of its own, and the unit mixes those pairs
+with its own inputs. Your microphones, Line In and Aux In then reach the
+jacks with no delay, and a fader moves a level inside the unit.
+
+It is experimental, and nobody has listened to it on a unit yet. It needs
+a Wave XLR Pro on firmware 1.0.14 or later that OpenXLR drives, with the
+software mixer on.
+
+1. Open **Options**. In the AUDIO card, find **Mixes on the Pro's
+   outputs**. It shows only while a Wave XLR Pro is attached.
+2. Press **This unit**. A window asks the daemon what your layout would
+   lose and lists it, with how far each jack is turned down first. Nothing
+   changes yet.
+3. Press **Mix on the unit**. While the unit builds the mixes, the
+   SUBMIXER header shows **On the unit**.
+
+**This computer**, in the same place, switches back. The unit gets back
+what it held before, and each jack goes back to the level it had, moved by
+any change you made while the unit mixed. The choice is saved with the
+mixer, not in profiles. If the unit is unplugged, the choice waits and the
+unit takes over again when it comes back; a daemon stopped while the unit
+mixes leaves the unit as it is, and the next start carries on.
+
+Stream, Chat, your own virtual microphones and any mix a device other than
+the Pro's jacks plays stay on this computer, with their plugins, ducking
+and processed microphones. Applications, channels, faders, mutes and
+profiles work as before. What changes on the mixes the unit builds:
+
+| What | While the unit builds the jacks' mixes |
+|---|---|
+| How many channels | Seven fit, hidden ones included, each on its own USB pair. XLR 1, XLR 2, Line In and Aux In are the unit's own inputs and need none. A bigger layout is refused, and so is adding an eighth channel. |
+| Headphones when it starts | Turned down 21 dB, or 29 dB while a jack's mix holds Line In, Aux In or a processed microphone, so nothing gets louder. |
+| Output volume of a jack | Turns that jack's headphone volume, or Line Out's level, down. It never goes above where it was. |
+| Balance | Applications sit 7.9 dB under the microphones at equal faders, as they do under Wave Link. |
+| Noise removal, the voice changer, a software EQ and plugins on a microphone | Still heard on Stream and Chat. The jacks get the microphone as it comes into the unit, without them. |
+| Plugins on a mix a jack plays | Not run there, and no plugin can be added. |
+| Ducking on a mix a jack plays | Runs on the unit for each chosen channel, with XLR 1 as the key. The unit never lowers its own inputs. |
+| Latency compensation | Leaves out the mixes the unit builds. |
+| Mic setup's checks and soundboard auditions | Not available. |
+| Exclusive groups and the monitoring pause | Work, by taking channels out of the unit's mix. |
+| The USB Aux port | Keeps the Aux mix, which your output volume no longer turns down. |
+| Mix meters | Read this computer's copy of each mix, at the same faders. |
+
+A greyed control says why in its tooltip. The plugin chain window, Mic
+setup and the Options card say it under the control as well. The terminal
+mixer offers the same choice on its Options tab, and the Deck greys a key
+on a plugin of a mix the unit builds. Scripts use `setMixing` in the
+[control API](api.md#hardware-mixing), which also has the dry run.
+
 <a name="stream-deck"></a>
 ## 4. Stream Deck (OpenDeck)
 
@@ -5336,6 +5391,13 @@ it after chain or native editor rule changes. It keeps the descriptions for
 plugins in the chains. Escape returns to the chain, and `r` restores every
 declared parameter to its default. These edits use the same live parameters
 and persistence as the UI.
+
+On a Wave XLR Pro the Options tab has **Pro output mixes**, the
+[hardware mixing](#hardware-mixing) choice. Right asks the daemon what the
+layout would lose and lists it under the row; **Mix on the unit** with
+Enter switches. Left goes back to this computer. While the unit mixes, the
+Inserts tab says why a mix chain takes no plugin, and an audition on the
+Sounds tab says why it is refused.
 
 The terminal mixer wears the same skins as the UI. It reads the same
 files, in the same order, and the choice in Options is the same choice, so

@@ -719,7 +719,7 @@
                             Classes.fxOn="{Binding Mix.Inserts.IsProcessing}" Classes.fxOff="{Binding Mix.Inserts.IsOff}"
                             Padding="5,2" FontSize="11" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                             Click="OnMixInserts" AutomationProperties.Name="{Binding Mix.Inserts.ButtonText}"
-                            ToolTip.Tip="{loc:Text Key=StereoPluginsProcessingThisMixBeforeItReaches}"/>
+                            ToolTip.Tip="{Binding Mix.Inserts.ButtonTip}"/>
                   </layout:StripPanel>
                   <layout:StripPanel Spec="{Binding TextSpec}" Spacing="1">
                     <Grid layout:StripPanel.Part="identity" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">

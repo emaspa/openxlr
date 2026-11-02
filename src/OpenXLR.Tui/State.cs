@@ -634,6 +634,29 @@ internal sealed record MixerSnapshot
 
     /// <summary>The soundboard, or null from a daemon that predates it.</summary>
     public SoundboardEntry? Soundboard { get; init; }
+
+    /// <summary>Hardware mixing on the Wave XLR Pro, or null from a daemon that has not planned it.</summary>
+    public HardwareMixingEntry? HardwareMixing { get; init; }
+
+    /// <summary>The sentence for one key of what hardware mixing turns off while it runs, or null.</summary>
+    public string? Disabled(string key) =>
+        HardwareMixing is { Active: true } mode && mode.Disabled.TryGetValue(key, out string? sentence) ? sentence : null;
+}
+
+/// <summary>
+/// Hardware mixing as the state and the dry run report it (docs/api.md,
+/// hardware mixing): whether the Wave XLR Pro is wanted to build the mixes
+/// its jacks play, whether it does, why not, what the mode turns off and,
+/// from the dry run, how far each jack is turned down on the way in.
+/// </summary>
+internal sealed record HardwareMixingEntry
+{
+    public bool Wanted { get; init; }
+    public bool Active { get; init; }
+    public string? Reason { get; init; }
+    public string? Note { get; init; }
+    public Dictionary<string, string> Disabled { get; init; } = [];
+    public Dictionary<string, double> EntryOffsetsDb { get; init; } = [];
 }
 
 /// <summary>

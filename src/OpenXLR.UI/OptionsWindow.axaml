@@ -87,6 +87,25 @@
           <Button Name="SoundboardButton" Content="{loc:Text Key=Soundboard}" Padding="14,5"
                   IsVisible="{Binding Main.Soundboard.IsReported}" Click="OnSoundboard" ToolTip.Tip="{loc:Text Key=SoundboardButtonTip}"/>
         </WrapPanel>
+        <!-- experimental: where the mixes the Wave XLR Pro's jacks play are built. Two sides of one switch:
+             the lit side is the daemon's choice; This unit asks for the dry run and a confirm window first -->
+        <StackPanel Name="HardwareMixing" Spacing="4" IsVisible="{Binding Main.HardwareMixing.IsOffered}">
+          <WrapPanel ItemSpacing="6" LineSpacing="4" IsEnabled="{Binding Main.HardwareMixing.CanSwitch}">
+            <TextBlock Text="{loc:Text Key=HardwareMixingLabel}" Classes="h" VerticalAlignment="Center"/>
+            <ToggleButton Name="HardwareMixingUnit" Content="{loc:Text Key=HardwareMixingUnit}"
+                          IsChecked="{Binding Main.HardwareMixing.OnUnit, Mode=OneWay}" Click="OnHardwareMixingUnit"
+                          ToolTip.Tip="{loc:Text Key=HardwareMixingUnitTip}"/>
+            <ToggleButton Name="HardwareMixingComputer" Content="{loc:Text Key=HardwareMixingComputer}"
+                          IsChecked="{Binding Main.HardwareMixing.OnComputer, Mode=OneWay}" Click="OnHardwareMixingComputer"
+                          ToolTip.Tip="{loc:Text Key=HardwareMixingComputerTip}"/>
+          </WrapPanel>
+          <TextBlock Text="{loc:Text Key=HardwareMixingHint}" Classes="hint" TextWrapping="Wrap"/>
+          <!-- why the mode is wanted and not running, and a refused switch -->
+          <TextBlock Name="HardwareMixingNote" Text="{Binding Main.HardwareMixing.Note}" Classes="hint" TextWrapping="Wrap"
+                     IsVisible="{Binding Main.HardwareMixing.HasNote}"/>
+          <TextBlock Name="HardwareMixingRefusal" Text="{Binding Main.HardwareMixing.Refusal}" Classes="warn" TextWrapping="Wrap"
+                     IsVisible="{Binding Main.HardwareMixing.HasRefusal}"/>
+        </StackPanel>
         <!-- what feeds XLR 1 and XLR 2: the interface's jacks or other capture sources, one chip each -->
         <StackPanel Name="InputBindings" Spacing="4" IsVisible="{Binding Main.HasMixer}">
           <TextBlock Text="{loc:Text Key=InputBindings}" Classes="h"/>
@@ -120,6 +139,9 @@
                   ToolTip.Tip="{loc:Text Key=DelayTheOtherMixesSoEachLines}"/>
         <TextBlock Name="MixLatencyError" Text="{Binding Main.MixLatencyError}" Classes="warn" TextWrapping="Wrap"
                    IsVisible="{Binding Main.MixLatencyError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+        <!-- the mixes the Wave XLR Pro builds are left out of the compensation -->
+        <TextBlock Name="MixLatencyUnitNote" Text="{Binding Main.HardwareMixing.LatencyNote}" Classes="hint" TextWrapping="Wrap"
+                   IsVisible="{Binding Main.HardwareMixing.HasLatencyNote}"/>
         <!-- the graph's block size, forced through the meters, or left to PipeWire -->
         <Grid Name="BlockSizeRow" ColumnDefinitions="110,*" IsVisible="{Binding Main.BlockSizeReported}">
           <TextBlock Text="{loc:Text Key=BlockSize}" Classes="h" VerticalAlignment="Center"/>

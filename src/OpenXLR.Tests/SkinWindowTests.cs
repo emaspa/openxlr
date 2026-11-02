@@ -902,6 +902,7 @@ public sealed partial class SkinWindowTests
             ("mic-setup-shape", new MicSetupWindow { DataContext = ShapingSetup(vm, client, eq) }),
             ("updates", new UpdatesWindow { DataContext = vm.Updates }),
             ("wave-interfaces", new WaveInterfacesWindow(vm)),
+            ("hardware-mixing", new HardwareMixingWindow(new HardwareMixingConfirmViewModel(vm.HardwareMixing))),
         ];
         try
         {

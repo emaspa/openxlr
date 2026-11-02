@@ -16,11 +16,15 @@
         <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource Ox.Text.Primary}"
                    TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Title}"/>
         <TextBlock Text="{Binding ChainHint}" Classes="h" FontSize="11" TextWrapping="Wrap"/>
+        <!-- the Wave XLR Pro builds this mix for its jacks and runs no insert there -->
+        <TextBlock Name="MixInsertsUnitNote" Text="{Binding UnitNote}" Classes="hint" FontSize="11" TextWrapping="Wrap"
+                   Margin="0,4,0,0" IsVisible="{Binding HasUnitNote}"/>
       </StackPanel>
       <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Top">
-        <Button Content="{loc:Text Key=AddPlugin}" Padding="12,4" HorizontalAlignment="Stretch" Click="OnAddInsert"/>
+        <Button Name="AddInsert" Content="{loc:Text Key=AddPlugin}" Padding="12,4" HorizontalAlignment="Stretch" Click="OnAddInsert"
+                IsEnabled="{Binding CanAddPlugins}" ToolTip.ShowOnDisabled="True" ToolTip.Tip="{Binding UnitNote}"/>
         <Button Name="EffectWorkflow" Content="{loc:Text Key=PresetsAndAB}" Padding="12,4" HorizontalAlignment="Stretch" Click="OnWorkflow"
-                ToolTip.Tip="{loc:Text Key=CopyAndPasteEffectsCompareTwoSettings}"/>
+                IsEnabled="{Binding CanAddPlugins}" ToolTip.Tip="{loc:Text Key=CopyAndPasteEffectsCompareTwoSettings}"/>
       </StackPanel>
     </Grid>
     <Button DockPanel.Dock="Bottom" Content="{loc:Text Key=Close}" HorizontalAlignment="Right" Padding="18,6" Margin="0,10,0,0" Click="OnClose"/>

@@ -2071,7 +2071,7 @@ Piliin ang interface na kinokontrol ng OpenXLR</value>
     <value>ang pag-sync</value>
   </data>
   <data name="MonitorOutputRoutingTip" xml:space="preserve">
-    <value>Lagyan ng tsek ang bawat output na gusto mong marinig, saka pumili ng isa o higit pang mix sa tabi ng bawat output. Pinagsasama ang mga mix sa dati nilang level. Magpanatili ng hindi bababa sa isang mix; alisin ang tsek ng output upang idiskonekta ito. Iisang feed ang Headphones 1/2 at Line Out ng Wave XLR Pro. Sinusunod ng USB Aux port nito ang hiwalay na Aux mix. Nasa Mga opsyon ang system default device para sa mga app.</value>
+    <value>Lagyan ng tsek ang bawat output na gusto mong marinig, saka pumili ng isa o higit pang mix sa tabi ng bawat output. Pinagsasama ang mga mix sa dati nilang level. Magpanatili ng hindi bababa sa isang mix; alisin ang tsek ng output upang idiskonekta ito. Maaaring may sariling feed ang bawat isa sa Headphones 1, Headphones 2 at Line Out ng Wave XLR Pro. Sinusunod ng USB Aux port nito ang hiwalay na Aux mix. Nasa Mga opsyon ang system default device para sa mga app.</value>
   </data>
   <data name="TimeNotRecorded" xml:space="preserve">
     <value>hindi naitala ang oras</value>
@@ -4123,5 +4123,77 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
   </data>
   <data name="CompressorInputPoint" xml:space="preserve">
     <value>Ang Input ay ang mikropono pagkatapos ng pag-alis ng ingay, ng expander at ng EQ, kung saan ito naririnig ng compressor.</value>
+  </data>
+  <data name="HardwareMixingLabel" xml:space="preserve">
+    <value>Mga mix sa mga output ng Pro</value>
+  </data>
+  <data name="HardwareMixingUnit" xml:space="preserve">
+    <value>Ang unit na ito</value>
+  </data>
+  <data name="HardwareMixingComputer" xml:space="preserve">
+    <value>Ang computer na ito</value>
+  </data>
+  <data name="HardwareMixingUnitTip" xml:space="preserve">
+    <value>Binubuo ng Wave XLR Pro ang mga mix na pinapatugtog ng mga headphone jack at Line Out nito, at walang delay na umaabot sa mga ito ang sarili nitong mga input. Eksperimental.</value>
+  </data>
+  <data name="HardwareMixingComputerTip" xml:space="preserve">
+    <value>Binubuo ng computer na ito ang bawat mix, at pinapatugtog ng mga jack ang ipinapadala nito.</value>
+  </data>
+  <data name="HardwareMixingHint" xml:space="preserve">
+    <value>Eksperimental. Sa Ang unit na ito, minsang ipinapadala ang bawat channel sa Wave XLR Pro at ini-mix ito ng unit para sa mga jack nito. Nananatili sa computer na ito ang Stream, Chat at ang iba pang output.</value>
+  </data>
+  <data name="HardwareMixingWaiting" xml:space="preserve">
+    <value>Bubuuin ng Wave XLR Pro ang mga mix kapag handa na ito.</value>
+  </data>
+  <data name="HardwareMixingBadge" xml:space="preserve">
+    <value>Nasa unit</value>
+  </data>
+  <data name="HardwareMixingBadgeTip" xml:space="preserve">
+    <value>Binubuo ng Wave XLR Pro ang mga mix na pinapatugtog ng mga jack nito. Ibinabalik ito ng Ang computer na ito, sa Audio ng Mga opsyon.</value>
+  </data>
+  <data name="HardwareMixingConfirmTitle" xml:space="preserve">
+    <value>Mag-mix sa Wave XLR Pro</value>
+  </data>
+  <data name="HardwareMixingConfirmIntro" xml:space="preserve">
+    <value>Bubuuin ng Wave XLR Pro ang mga mix na pinapatugtog ng mga headphone jack at Line Out nito. Ipinapadala ang bawat channel sa sarili nitong USB pair, at walang delay na umaabot sa mga mix na iyon ang mga input ng unit. Nananatili sa computer na ito ang Stream, Chat at anumang mix na pinapatugtog ng ibang output. Eksperimental ito.</value>
+  </data>
+  <data name="HardwareMixingConfirmLosses" xml:space="preserve">
+    <value>Ano ang nagbabago sa layout na ito</value>
+  </data>
+  <data name="HardwareMixingConfirmNoLosses" xml:space="preserve">
+    <value>Walang tumitigil sa layout na ito.</value>
+  </data>
+  <data name="HardwareMixingJackDrop" xml:space="preserve">
+    <value>Hihinaan muna ang {0} nang {1} dB, para walang lumakas.</value>
+  </data>
+  <data name="HardwareMixingConfirmLeave" xml:space="preserve">
+    <value>Ibinabalik ng Ang computer na ito, sa Mga opsyon, ang unit sa dati at ang mga jack sa kanilang level.</value>
+  </data>
+  <data name="HardwareMixingConfirmSwitch" xml:space="preserve">
+    <value>Mag-mix sa unit</value>
+  </data>
+  <data name="HardwareMixingConfirmWaits" xml:space="preserve">
+    <value>Magsisimula ito kapag naayos ito: {0}</value>
+  </data>
+  <data name="HardwareMixingChecking" xml:space="preserve">
+    <value>Sinusuri ang layout na ito sa daemon.</value>
+  </data>
+  <data name="HardwareMixingCheckFailed" xml:space="preserve">
+    <value>Hindi sumagot ang daemon sa pagsusuri, kaya walang nakalista. Isara ito at subukan ulit.</value>
+  </data>
+  <data name="HardwareMixingJackHp1" xml:space="preserve">
+    <value>Headphones 1</value>
+  </data>
+  <data name="HardwareMixingJackHp2" xml:space="preserve">
+    <value>Headphones 2</value>
+  </data>
+  <data name="HardwareMixingJackLineOut" xml:space="preserve">
+    <value>Line Out</value>
+  </data>
+  <data name="HardwareMixingUnitCard" xml:space="preserve">
+    <value>Wave XLR Pro</value>
+  </data>
+  <data name="FlowUnitMixes" xml:space="preserve">
+    <value>Binubuo ang {0}</value>
   </data>
 </root>

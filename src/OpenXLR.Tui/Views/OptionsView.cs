@@ -6,7 +6,9 @@ namespace OpenXLR.Tui;
 /// choice is written back to the same file, so picking Gruvbox here is
 /// picking it in the window too. Material's mode is the same shared choice.
 /// What feeds XLR 1 and XLR 2 is chosen on the Inputs tab. The block size
-/// is the daemon's, the same one the window's Options set.
+/// is the daemon's, the same one the window's Options set, and so is where
+/// the Wave XLR Pro's jack mixes are built (hardware mixing), with the same
+/// dry run before the switch to the unit.
 /// </summary>
 internal sealed class OptionsView : View
 {
@@ -50,6 +52,8 @@ internal sealed class OptionsView : View
                 app.Say(frames is int f ? $"Block size {f} samples; the device reopens" : "Block size left to PipeWire");
             }));
         }
+        if (State(app) is { } current && (current.Can("hardwareMixing") || current.Mixer.HardwareMixing is { Wanted: true }))
+            rows.AddRange(HardwareMixingRows(app, current.Mixer.HardwareMixing));
         rows.AddRange(
         [
             new HeadingRow("Appearance"),
@@ -82,6 +86,71 @@ internal sealed class OptionsView : View
 
         return rows;
     }
+
+    private static readonly string[] MixingSides = ["This computer", "This unit"];
+
+    /// <summary>
+    /// Experimental hardware mixing on the Wave XLR Pro, as the window's
+    /// Options offer it: the choice, why a wanted mode waits, and before the
+    /// switch to the unit the dry run's list of what this layout loses, with
+    /// the one row that switches. Back to this computer needs no check.
+    /// </summary>
+    private static IEnumerable<Row> HardwareMixingRows(App app, HardwareMixingEntry? mode)
+    {
+        bool onUnit = mode?.Wanted == true;
+        yield return new HeadingRow("Hardware mixing (experimental)");
+        yield return new ChoiceRow("Pro output mixes", MixingSides, onUnit ? 1 : 0, index =>
+        {
+            if (index == 1 && !onUnit)
+            {
+                app.Link.CheckMixing();
+                app.Say("Checking this layout; the list below says what changes, and Mix on the unit switches");
+            }
+            else if (index == 0 && onUnit)
+            {
+                app.Link.Send("setMixing", body => body["value"] = "software");
+                app.Link.ForgetMixingPlan();
+                app.Say("This computer builds the mixes again, and the unit is put back as it was");
+            }
+        });
+        if (mode is { Active: true })
+            yield return new TextRow("Running", "the Wave XLR Pro builds the mixes its jacks play");
+        else if (onUnit)
+            yield return new TextRow("Waiting", mode?.Note ?? "the Wave XLR Pro builds the mixes once it is ready");
+        if (onUnit) yield break;
+
+        if (app.Link.CheckingMixing)
+        {
+            yield return new TextRow("Check", "asking the daemon");
+            yield break;
+        }
+        if (app.Link.MixingPlan is not { } plan) yield break;
+        foreach ((_, string sentence) in plan.Disabled.OrderBy(entry => entry.Key, StringComparer.Ordinal))
+            yield return new TextRow("Changes", sentence);
+        foreach (string jack in new[] { "hp1", "hp2", "lineout" })
+            if (plan.EntryOffsetsDb.TryGetValue(jack, out double db) && db > 0)
+                yield return new TextRow(JackName(jack), $"turned down {db:0.#} dB first, so nothing gets louder");
+        if (plan.Reason == "budget")
+        {
+            yield return new TextRow("Refused", plan.Note ?? "this layout has more channels than USB pairs");
+            yield break;
+        }
+        if (!plan.Active)
+            yield return new TextRow("Not yet", plan.Note ?? "the Wave XLR Pro is not ready");
+        yield return new ActionRow("Mix on the unit", "switch", () =>
+        {
+            app.Link.Send("setMixing", body => body["value"] = "hardware");
+            app.Link.ForgetMixingPlan();
+            app.Say("The Wave XLR Pro builds the mixes its jacks play; This computer switches back");
+        });
+    }
+
+    private static string JackName(string jack) => jack switch
+    {
+        "hp1" => "Headphones 1",
+        "hp2" => "Headphones 2",
+        _ => "Line Out",
+    };
 
     /// <summary>One skin in the picker.</summary>
     private sealed class SkinRow(SkinEntry skin, App app) : Row(skin.Name)

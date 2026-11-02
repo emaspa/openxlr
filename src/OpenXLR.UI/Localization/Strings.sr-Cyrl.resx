@@ -2071,7 +2071,7 @@
     <value>усклађивање</value>
   </data>
   <data name="MonitorOutputRoutingTip" xml:space="preserve">
-    <value>Означи сваки излаз који желиш да чујеш, па изабери један или више миксева поред сваког излаза. Миксеви се сабирају на постојећим нивоима. Бар један микс мора остати изабран; уклони ознаку излаза да га искључиш. Headphones 1/2 и Line Out на Wave XLR Pro деле један извор. Његов USB Aux порт прати засебни Aux микс. Системски подразумевани уређаји за апликације подешавају се у Опцијама.</value>
+    <value>Означи сваки излаз који желиш да чујеш, па изабери један или више миксева поред сваког излаза. Миксеви се сабирају на постојећим нивоима. Бар један микс мора остати изабран; уклони ознаку излаза да га искључиш. Headphones 1, Headphones 2 и Line Out на Wave XLR Pro могу сваки да пуштају свој извор. Његов USB Aux порт прати засебни Aux микс. Системски подразумевани уређаји за апликације подешавају се у Опцијама.</value>
   </data>
   <data name="TimeNotRecorded" xml:space="preserve">
     <value>време није забележено</value>
@@ -4123,5 +4123,77 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
   </data>
   <data name="CompressorInputPoint" xml:space="preserve">
     <value>Улаз је микрофон после уклањања шума, експандера и EQ-а, где га компресор чује.</value>
+  </data>
+  <data name="HardwareMixingLabel" xml:space="preserve">
+    <value>Миксеви на излазима Pro уређаја</value>
+  </data>
+  <data name="HardwareMixingUnit" xml:space="preserve">
+    <value>Овај уређај</value>
+  </data>
+  <data name="HardwareMixingComputer" xml:space="preserve">
+    <value>Овај рачунар</value>
+  </data>
+  <data name="HardwareMixingUnitTip" xml:space="preserve">
+    <value>Wave XLR Pro прави миксеве које пуштају његови прикључци за слушалице и Line Out, а његови улази стижу до њих без кашњења. Експериментално.</value>
+  </data>
+  <data name="HardwareMixingComputerTip" xml:space="preserve">
+    <value>Овај рачунар прави сваки микс, а прикључци пуштају оно што он шаље.</value>
+  </data>
+  <data name="HardwareMixingHint" xml:space="preserve">
+    <value>Експериментално. Уз Овај уређај сваки канал иде једном до Wave XLR Pro, а уређај га миксује за своје прикључке. Stream, Chat и остали излази остају на овом рачунару.</value>
+  </data>
+  <data name="HardwareMixingWaiting" xml:space="preserve">
+    <value>Wave XLR Pro ће направити миксеве чим буде спреман.</value>
+  </data>
+  <data name="HardwareMixingBadge" xml:space="preserve">
+    <value>На уређају</value>
+  </data>
+  <data name="HardwareMixingBadgeTip" xml:space="preserve">
+    <value>Wave XLR Pro прави миксеве које пуштају његови прикључци. Овај рачунар, под Звук у Опцијама, враћа их назад.</value>
+  </data>
+  <data name="HardwareMixingConfirmTitle" xml:space="preserve">
+    <value>Миксуј на Wave XLR Pro</value>
+  </data>
+  <data name="HardwareMixingConfirmIntro" xml:space="preserve">
+    <value>Wave XLR Pro ће правити миксеве које пуштају његови прикључци за слушалице и Line Out. Сваки канал му стиже на сопственом USB пару, а улази уређаја стижу до тих миксева без кашњења. Stream, Chat и сваки микс који пушта други излаз остају на овом рачунару. Ово је експериментално.</value>
+  </data>
+  <data name="HardwareMixingConfirmLosses" xml:space="preserve">
+    <value>Шта се мења са овим распоредом</value>
+  </data>
+  <data name="HardwareMixingConfirmNoLosses" xml:space="preserve">
+    <value>Ништа у овом распореду не престаје да ради.</value>
+  </data>
+  <data name="HardwareMixingJackDrop" xml:space="preserve">
+    <value>{0} се прво утиша за {1} dB, да ништа не постане гласније.</value>
+  </data>
+  <data name="HardwareMixingConfirmLeave" xml:space="preserve">
+    <value>Овај рачунар, у Опцијама, враћа уређај какав је био и прикључке на њихове нивое.</value>
+  </data>
+  <data name="HardwareMixingConfirmSwitch" xml:space="preserve">
+    <value>Миксуј на уређају</value>
+  </data>
+  <data name="HardwareMixingConfirmWaits" xml:space="preserve">
+    <value>Почиње чим се ово реши: {0}</value>
+  </data>
+  <data name="HardwareMixingChecking" xml:space="preserve">
+    <value>Провера овог распореда са сервисом.</value>
+  </data>
+  <data name="HardwareMixingCheckFailed" xml:space="preserve">
+    <value>Сервис није одговорио на проверу, па ништа није наведено. Затвори ово и покушај поново.</value>
+  </data>
+  <data name="HardwareMixingJackHp1" xml:space="preserve">
+    <value>Headphones 1</value>
+  </data>
+  <data name="HardwareMixingJackHp2" xml:space="preserve">
+    <value>Headphones 2</value>
+  </data>
+  <data name="HardwareMixingJackLineOut" xml:space="preserve">
+    <value>Line Out</value>
+  </data>
+  <data name="HardwareMixingUnitCard" xml:space="preserve">
+    <value>Wave XLR Pro</value>
+  </data>
+  <data name="FlowUnitMixes" xml:space="preserve">
+    <value>Прави {0}</value>
   </data>
 </root>
