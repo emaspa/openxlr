@@ -89,3 +89,33 @@ test("stack edits and host refreshes keep the saved step", () => {
   assert.deepEqual(page.settings(), {targets: ["hp", "gain"], stepSize: 5, activeIndex: 0, target: "hp",
     meta: {gain: {plugin: "fixture", index: 0}}});
 });
+
+
+test("a step edit keeps stack changes received while the inspector is open", () => {
+  const page = inspector({target: "gain", targets: ["gain", "hp"], activeIndex: 0, stepSize: 3});
+  const current = {target: "gain", targets: ["gain", "hp"], activeIndex: 1, stepSize: 5,
+    cycleGesture: "push", meta: {hp: {plugin: "keep"}}};
+  page.socket.onmessage({data: JSON.stringify({event: "didReceiveSettings", context: "dial",
+    payload: {settings: current}})});
+  assert.equal(page.nodes.stepSize.value, "5");
+  assert.equal(page.settings(), undefined, "receiving settings must not write them back");
+  page.nodes.stepSize.change("10");
+  assert.deepEqual(page.settings(), {...current, stepSize: 10});
+});
+
+
+test("host settings refresh legacy targets and ignore malformed or unrelated updates", () => {
+  const page = inspector({target: "gain", stepSize: 3});
+  for (const value of [undefined, null, [], "invalid", 10])
+    page.socket.onmessage({data: JSON.stringify({event: "didReceiveSettings", context: "dial", payload: {settings: value}})});
+  page.socket.onmessage({data: JSON.stringify({event: "didReceiveSettings", context: "other",
+    payload: {settings: {target: "hp", stepSize: 10}}})});
+  assert.equal(page.nodes.stepSize.value, "3");
+  page.socket.onmessage({data: JSON.stringify({event: "didReceiveSettings", context: "dial",
+    payload: {settings: {target: "hp", stepSize: null}}})});
+  assert.equal(page.nodes.stepSize.value, "");
+  assert.equal(page.nodes.stack.children.length, 1);
+  assert.equal(page.settings(), undefined);
+  page.nodes.stepSize.change("5");
+  assert.deepEqual(page.settings(), {target: "hp", targets: ["hp"], stepSize: 5});
+});

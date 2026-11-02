@@ -3841,7 +3841,8 @@ for headphone and Aux In levels, one percentage point for faders, and
 five points for the crossfade. EQ bands and insert-plugin parameters
 keep their own steps. The host saves the choice with that dial's action;
 a stack uses the same choice in each target's units. Changing the step
-keeps the currently selected stack target.
+keeps the currently selected stack target, including a target cycled while
+the inspector is open.
 
 **Clip** (a key) plays one clip of the [soundboard](#play-sound-clips)
 into the SFX channel, or stops every clip. Its settings list the clips by
