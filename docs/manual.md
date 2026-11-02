@@ -224,7 +224,12 @@ a path is on, the channel that carries that input shows a small ⓘ mark
 beside its volume. OpenXLR sets the path's level from the
 microphone's Monitor send, its channel volume and the Monitor mix's
 volume, so these change how loud you hear yourself just as they would
-through the computer. The path cannot carry the channel's software
+through the computer. The interface plays computer audio 7.9 dB below the
+level it is sent at, and the output volume turns down only the computer
+audio, so OpenXLR lowers the path by both. At equal faders your voice then
+sits against the computer audio as it would on a headset, and the output
+volume turns the two down together. Above 100% the output volume raises the
+computer audio only. The path cannot carry the channel's software
 effects, so OpenXLR turns it off while one is on: the EQ in software,
 noise removal, the voice changer, the compressor or expander on this
 computer, the soft low cut, ClipGuard or a plugin insert that is not
