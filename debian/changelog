@@ -1,3 +1,13 @@
+openxlr (0.5.1) resolute; urgency=medium
+
+  * Daemon: a microphone card on a profile without capture is switched to one with capture, or the problem is reported
+  * UI: each profile row saves over that profile, and deleting a profile asks first
+  * Deck: a dial's step per tick is chosen in its settings
+  * Deck: dial turns pending when the daemon disconnects are discarded
+  * Packaging: the companion README explains the 5.1.1.54 label
+
+ -- Emanuele Sparvoli <sparvoli@gmail.com>  Mon, 02 Nov 2026 08:02:23 +0000
+
 openxlr (0.5.0) resolute; urgency=medium
 
   * Mixer: a compressor and an expander per microphone, each with its own window

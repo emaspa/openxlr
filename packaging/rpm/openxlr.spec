@@ -12,7 +12,7 @@
 %global deepfilter_version 0.5.6
 
 Name:           openxlr
-Version: 0.5.0
+Version: 0.5.1
 Release:        1%{?dist}
 Summary:        Linux Wave Link replacement for Elgato XLR interfaces and Wave microphones
 # OpenXLR is GPL-3.0-only. The native helper links RNNoise (BSD-3-Clause),
@@ -246,6 +246,13 @@ MSG
 %{_datadir}/gnome-shell/extensions/openxlr-focus@emaspa.github.com/
 
 %changelog
+* Mon Nov 02 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.5.1-1
+- Daemon: a microphone card on a profile without capture is switched to one with capture, or the problem is reported
+- UI: each profile row saves over that profile, and deleting a profile asks first
+- Deck: a dial's step per tick is chosen in its settings
+- Deck: dial turns pending when the daemon disconnects are discarded
+- Packaging: the companion README explains the 5.1.1.54 label
+
 * Sun Nov 01 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.5.0-1
 - Mixer: a compressor and an expander per microphone, each with its own window
 - Devices: the compressor and expander run on the unit's own processor on the MK.2 units and the Pro
