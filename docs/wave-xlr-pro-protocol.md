@@ -33,6 +33,17 @@ levels, membership and ducking fields, the output selectors, byte 94 and
 byte 98, the cell law with its floor and ceiling, and the small low-level
 changes the unit drops. Diagnostics show the block decoded with it.
 
+OpenXLR writes block 0x0001 in one place,
+`src/OpenXLR.Core/Devices/ProMixPlan.cs`: the output selectors, the USB Aux
+port's cells in section 36, the Monitor return and both microphones' paths
+and levels in section 0, and the ducking fields are one plan, made as edits
+on a fresh read of the block. The device manager posts the mixer's plan
+each sweep together with any ducking target waiting to be written, so the
+block is written once for all of them, block 0x0008 first when ducking
+changed, and the commit follows only when a selector or a membership bit
+changed. At steady state the plan matches the last poll and nothing is
+read or written.
+
 ## 0. HARDWARE-CONFIRMED (2026-08-25, live on the device)
 
 Everything below was validated live against the plugged-in Pro with a ctypes-libusb probe
@@ -275,8 +286,8 @@ bus -> Headphones 1) confirmed by ear.
 
 ### Implemented in OpenXLR (same day, all live-verified)
 
-`WaveXlrProDevice`: output selectors (SetOutHp1/2/UsbAux/LineOut) with `WriteCommitted` (config
-write + block 3 commit), corrected ClipGuard/compressor, aux level + lock. Daemon controls:
+`WaveXlrProDevice`: output selectors with `WriteCommitted` (config write + block 3 commit;
+since written through `ProMixPlan`), corrected ClipGuard/compressor, aux level + lock. Daemon controls:
 outHp1/outHp2/outUsbAux/outLineOut/auxLevelDb/auxLevelLock/compressor (polarity removed). UI:
 MONITOR ROUTING toggles in the HEADPHONES card, USB Aux level+lock row, Compressor button,
 asterisks gone. Mixer: `<proSink>#phones` pseudo-sink "Wave XLR Pro Headphones" in the Monitor

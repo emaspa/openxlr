@@ -101,87 +101,9 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
     private const int HpVolOffset = 0;     // block 0x0005 (headphones 1)
     private const int Hp2VolOffset = 2;    // block 0x0005 (headphones 2)
 
-    // Physical output MIX ASSIGNMENT in block 0x0001 (captures 2-4 + live jack
-    // test): one byte per output, holding a hardware-mix id. 0x1e = the
-    // Personal/monitor mix (feeds the analog outputs; carries USB return pair
-    // 2/3 among others), 0x20 = the aux mix (Wave Link's user-created
-    // "MacBook Mix"), 0x23 = unassigned. A BlockCommit write must follow.
-    private const int OutHp1Offset = 90;
-    private const int OutHp2Offset = 91;
-    private const int OutUsbAuxOffset = 92;
-    private const int OutLineOutOffset = 93;
-    private const byte OutSourceMonitor = 0x1e;
-    private const byte OutSourceAuxMix = 0x20;
-    private const byte OutSourceOff = 0x23;
-    // Headphone-mix membership (section 0 of the block, the mix the jacks
-    // play; see the protocol notes, section 12): byte 12 bit 5 = USB return
-    // pair 2/3 in the jacks' mix, byte 12 bit 0 = XLR 1, the microphone's
-    // zero-latency path. Both measured on the desk unit (2026-10-30) through
-    // the mix's capture stream.
-    private const int HpMixReturnsOffset = 12;
-    private const byte HpMixMonitorReturnMask = 0x20;
-    private const byte HpMixMicDirectMask = 0x01;
-    // XLR 1's level in the jacks' mix, int8 in half dB like every level cell
-    // (desk, 2026-10-30: 00 played the mic at the return's level, f4 6 dB
-    // under it, c8 28 dB under). OpenXLR used to drive this byte as a Mic/PC
-    // crossfade from 0 to 200, which put the centre at the cell's +12 dB cap.
-    // A level write applies at once, with no commit and no stream restart.
-    private const int HpMixMicLevelOffset = 0;
-    private const int HpMixMicLevelFloor = -120;  // 88, -60 dB: Wave Link's floor
-    private const int HpMixMicLevelCeiling = 24;  // 18, +12 dB: the firmware holds anything above
-    // Pair 2/3's level in the jacks' mix, int8 in half dB, 0x00 = 0 dB
-    // (measured +6.2 dB at 0x0c, -6.1 dB at 0xf4). Wave Link keeps its own
-    // fader level here, so a unit that dual-boots plays the Monitor mix that
-    // far down until the cell is put back to unity.
-    private const int HpMixMonitorReturnLevelOffset = 5;
-    // Line In's membership in the same mix: byte 12 bit 3, by the section
-    // layout (source 3). A unit set up elsewhere can hold it set, which plays
-    // the Line In jack straight to the jacks beside the Monitor mix that
-    // already carries the Line In channel (an owner's archive: byte 12 `e8`).
-    private const byte HpMixLineInMask = 0x08;
-    // Byte 13 bit 1 is USB playback pair 5 in the same mix: the Aux mix's
-    // stream on AUX10 and AUX11 (desk, 2026-10-30, a tone on that pair came
-    // and went with the bit, and byte 9 set its level). OpenXLR used to set it
-    // as the microphone's direct path, which played the whole Aux mix on the
-    // jacks beside the Monitor mix, and played nothing where Wave Link had
-    // left byte 9 at its floor. The jacks hear the Aux mix through Monitor A
-    // only, so the bit is cleared with the Monitor return, as Line In's is.
-    private const int HpMixPairsOffset = 13;
-    private const byte HpMixAuxMixMask = 0x02;
-    // The other USB playback pairs in the same mix: pair k is source 4 + k,
-    // so pairs 0, 2 and 3 are byte 12 bits 4, 6 and 7, and pairs 4 to 7 are
-    // byte 13 bits 0 to 3, beside the Aux mix's pair 5. Each measured on the
-    // desk unit (2026-10-31): a tone on the pair reached the mix's capture
-    // with its bit set and not with it clear, at its level cell (bytes 4 to
-    // 11, all 00 there). That unit held pairs 6 and 7 set and an owner's held
-    // pair 0, so anything played to those channels of the Pro's sink reached
-    // the jacks with no control in OpenXLR. Nothing of OpenXLR's plays there:
-    // the jacks hear the Monitor mix on pair 1 only, so the other pairs are
-    // cleared with the Monitor return too. Bit 2, the USB Aux input (desk,
-    // 2026-10-31, a Mac on the port reached the mix at 0 dB), stays as read:
-    // an owner can hear a second computer there with Aux In's send muted.
-    private const byte HpMixReturnsOtherPairsMask = 0xd0;
-    // XLR 2's membership, byte 12 bit 1 (source 1), at the level in byte 1
-    // (desk, 2026-10-31, a microphone on XLR 2: absent with the bit clear,
-    // its capture at 0 dB with it set, 6 dB down at f4, applied at once as
-    // XLR 1's level is). It is XLR 2's zero-latency path, driven like XLR 1's.
-    private const byte HpMixMic2DirectMask = 0x02;
-    private const int HpMixMic2LevelOffset = 1;
-    private const byte HpMixOtherPairsMask = HpMixAuxMixMask | 0x0d;
-
-    // The aux mix's matrix cell for the Music return channel (USB playback
-    // pair 10/11), decoded from capture 4 where music was confirmed flowing to
-    // the aux port: level byte (quarter-dB attenuation, 0 = 0 dB) and its
-    // membership bit. OpenXLR streams the monitor mix on that pair when the
-    // aux output is enabled.
-    private const int AuxMixMusicLevelOffset = 45;
-    private const int AuxMixMusicMemberOffset = 49;
-    private const byte AuxMixMusicMemberMask = 0x02;
-    // Hardware-direct input cells in the aux mix (off48 bit0 = mic, bit3 =
-    // line-in). Cleared when OpenXLR drives the port: all audio then travels
-    // through the software Aux mix, so nothing arrives twice.
-    private const int AuxMixInputMemberOffset = 48;
-    private const byte AuxMixInputMemberMask = 0x09;
+    // Block 0x0001, the unit's mixes and output selectors, is read and
+    // written through ProMixPlan (today's mode) and decoded for
+    // diagnostics by ProMixSections; nothing else here writes it.
 
     // Flag masks in block 0x0004 offset 1 (all confirmed via the logged
     // capture 2 and, for mute, bidirectionally against ALSA).
@@ -351,6 +273,7 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
         // A unit that refuses the ducking block still answers every other control.
         try { _ducking = ProDucking.Decode(Read(ProDucking.Block, ProDucking.Length), b1); }
         catch (IOException) { _ducking = null; }
+        ProMixHeld mix = ProMixPlan.Read(b1);
         byte f = b4[FlagsOffset];
         byte f2 = b4[Xlr2Base + FlagsOffset];
         return new DeviceState
@@ -376,19 +299,16 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
             Phantom2 = (f2 & PhantomMask) != 0,
             ClipGuard2 = (b4[Xlr2Base + ClipGuardOffset] & ClipGuardOffMask) == 0,
             Compressor2 = (f2 & CompressorMask) != 0,
-            OutHp1 = b1[OutHp1Offset] != OutSourceOff,
-            OutHp2 = b1[OutHp2Offset] != OutSourceOff,
-            OutUsbAux = b1[OutUsbAuxOffset] != OutSourceOff,
-            OutLineOut = b1[OutLineOutOffset] != OutSourceOff,
-            HpMixMonitorReturn = (b1[HpMixReturnsOffset] & (HpMixMonitorReturnMask | HpMixLineInMask | HpMixReturnsOtherPairsMask)) == HpMixMonitorReturnMask &&
-                                 (b1[HpMixPairsOffset] & HpMixOtherPairsMask) == 0 &&
-                                 b1[HpMixMonitorReturnLevelOffset] == 0x00,
-            HpMixMicDirect = (b1[HpMixReturnsOffset] & HpMixMicDirectMask) != 0,
-            HpMixMicLevelDb = Math.Min((int)(sbyte)b1[HpMixMicLevelOffset], HpMixMicLevelCeiling) / 2.0,
-            HpMixMic2Direct = (b1[HpMixReturnsOffset] & HpMixMic2DirectMask) != 0,
-            HpMixMic2LevelDb = Math.Min((int)(sbyte)b1[HpMixMic2LevelOffset], HpMixMicLevelCeiling) / 2.0,
-            AuxReturnEnabled = b1[AuxMixMusicLevelOffset] == 0x00 &&
-                               (b1[AuxMixMusicMemberOffset] & AuxMixMusicMemberMask) != 0,
+            OutHp1 = mix.Hp1,
+            OutHp2 = mix.Hp2,
+            OutUsbAux = mix.UsbAux,
+            OutLineOut = mix.LineOut,
+            HpMixMonitorReturn = mix.MonitorReturn,
+            HpMixMicDirect = mix.Mic1Direct,
+            HpMixMicLevelDb = mix.Mic1LevelDb,
+            HpMixMic2Direct = mix.Mic2Direct,
+            HpMixMic2LevelDb = mix.Mic2LevelDb,
+            AuxReturnEnabled = mix.AuxReturnEnabled,
             AuxLevelDb = -b4[AuxLevelOffset] / 4.0,
             AuxLevelLock = (b4[AuxLevelLockOffset] & AuxLevelLockMask) != 0,
             LineInGainDb = b4[LineInGainOffset],
@@ -416,7 +336,7 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
 
     // The Pro has no crossfade to offer: the byte once driven as one is XLR
     // 1's level in the jacks' mix, which follows the Monitor send (see
-    // SetHpMixMicLevelDb), and the capabilities leave the control out.
+    // ProMixPlan), and the capabilities leave the control out.
     public void SetCrossfade(int value) { }
 
     /// <summary>Set HP volume in dB; the hardware byte is -4*dB (0 = loudest).</summary>
@@ -485,83 +405,42 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
         WriteCommitted(BlockSettings, b);
     }
 
-    // --- physical output routing (block 0x0001 off90..93 + commit) ---
-
-    public void SetOutHp1(bool on) => SetOutputSelector(OutHp1Offset, on);
-    public void SetOutHp2(bool on) => SetOutputSelector(OutHp2Offset, on);
-    public void SetOutLineOut(bool on) => SetOutputSelector(OutLineOutOffset, on);
+    // --- block 0x0001, the mixes and output selectors (see ProMixPlan) ---
 
     /// <summary>
-    /// The USB Aux port cannot tap the Personal mix (verified: no USB playback
-    /// pair reaches it under 0x1e); it works assigned to the aux mix with the
-    /// Music return cell open, exactly how Wave Link delivers audio there.
+    /// Bring block 0x0001 to a plan under the lock, so no other write lands
+    /// between the reads and the writes: block 0x0008 read first when the
+    /// plan carries ducking, then block 0x0001; the plan's edits made on
+    /// fresh copies; 0x0008 written first when it changed, as Wave Link
+    /// writes ducking, then 0x0001 once when it changed, then the commit
+    /// Wave Link sends when a selector or a membership bit changed (the
+    /// selectors need it; level cells and ducking fields apply without
+    /// one, and Wave Link sends none for them).
     /// </summary>
-    public void SetOutUsbAux(bool on)
+    public ProMixWrite? WriteMix(ProMixPlan plan)
     {
-        byte[] b = Read(BlockCrossfade, CrossfadeLen);
-        b[OutUsbAuxOffset] = on ? OutSourceAuxMix : OutSourceOff;
-        if (on)
+        lock (_lock)
         {
-            b[AuxMixMusicLevelOffset] = 0x00;                 // 0 dB
-            b[AuxMixMusicMemberOffset] |= AuxMixMusicMemberMask;
-            b[AuxMixInputMemberOffset] &= unchecked((byte)~AuxMixInputMemberMask);
+            byte[]? b8 = null, new8 = null;
+            if (plan.Ducking is { } ducking)
+            {
+                if (ProDucking.Valid(ducking) is { } problem) throw new ArgumentException(problem, nameof(plan));
+                b8 = Read(ProDucking.Block, ProDucking.Length);
+                new8 = (byte[])b8.Clone();
+                ProDucking.ApplyEntries(new8, ducking);
+            }
+            byte[] b1 = Read(BlockCrossfade, CrossfadeLen);
+            var new1 = new byte[CrossfadeLen];
+            ProMixChanges changes = plan.Apply(b1, new1);
+            bool wrote8 = b8 is not null && !new8.AsSpan().SequenceEqual(b8);
+            bool wrote1 = !new1.AsSpan().SequenceEqual(b1);
+            if (wrote8) Write(ProDucking.Block, new8!);
+            bool committed = wrote1 && changes.Commits();
+            if (committed) WriteCommitted(BlockCrossfade, new1);
+            else if (wrote1) Write(BlockCrossfade, new1);
+            if (b8 is not null) _ducking = ProDucking.Decode(new8!, new1);
+            return new ProMixWrite(changes, wrote8, b8 is null ? "not read" : ProDucking.Diff(b8, new8!), wrote1, ProDucking.Diff(b1, new1), committed);
         }
-        WriteCommitted(BlockCrossfade, b);
-    }
-
-    private void SetOutputSelector(int offset, bool on)
-    {
-        byte[] b = Read(BlockCrossfade, CrossfadeLen);
-        b[offset] = on ? OutSourceMonitor : OutSourceOff;
-        WriteCommitted(BlockCrossfade, b);
-    }
-
-    // The headphone mix latches membership changes when the host playback
-    // stream (re)starts, like the aux return; the caller bounces the sink.
-    // Turning the return on also opens its level cell, as the aux return does,
-    // and takes the Line In jack and every other USB playback pair, the Aux
-    // mix's stream among them, out of the mix: the jacks then hear those only
-    // through the Monitor mix, as the aux mix does once OpenXLR drives its
-    // port. The microphones' bits have setters of their own. Turning it off
-    // leaves those bits as they are.
-    public void SetHpMixMonitorReturn(bool on)
-    {
-        byte[] b = Read(BlockCrossfade, CrossfadeLen);
-        if (on)
-        {
-            b[HpMixReturnsOffset] = (byte)((b[HpMixReturnsOffset] | HpMixMonitorReturnMask) & ~(HpMixLineInMask | HpMixReturnsOtherPairsMask));
-            b[HpMixPairsOffset] &= unchecked((byte)~HpMixOtherPairsMask);
-            b[HpMixMonitorReturnLevelOffset] = 0x00;          // 0 dB
-        }
-        else b[HpMixReturnsOffset] &= unchecked((byte)~HpMixMonitorReturnMask);
-        WriteCommitted(BlockCrossfade, b);
-    }
-    public void SetHpMixMicDirect(bool on) => SetBlock1Bit(HpMixReturnsOffset, HpMixMicDirectMask, on);
-    public void SetHpMixMic2Direct(bool on) => SetBlock1Bit(HpMixReturnsOffset, HpMixMic2DirectMask, on);
-
-    /// <summary>XLR 1's level in the jacks' mix, held to -60 to +12 dB in half-dB steps.</summary>
-    public void SetHpMixMicLevelDb(double db) => SetHpMixLevel(HpMixMicLevelOffset, db);
-
-    /// <summary>XLR 2's level in the jacks' mix, as XLR 1's.</summary>
-    public void SetHpMixMic2LevelDb(double db) => SetHpMixLevel(HpMixMic2LevelOffset, db);
-
-    private void SetHpMixLevel(int offset, double db)
-    {
-        byte[] b = Read(BlockCrossfade, CrossfadeLen);
-        b[offset] = HpMixMicLevelByte(db);
-        Write(BlockCrossfade, b);
-    }
-
-    internal static byte HpMixMicLevelByte(double db)
-        => unchecked((byte)(sbyte)(double.IsFinite(db)
-            ? Math.Clamp((int)Math.Round(db * 2, MidpointRounding.AwayFromZero), HpMixMicLevelFloor, HpMixMicLevelCeiling)
-            : HpMixMicLevelFloor));
-
-    private void SetBlock1Bit(int offset, byte mask, bool on)
-    {
-        byte[] b = Read(BlockCrossfade, CrossfadeLen);
-        b[offset] = (byte)(on ? b[offset] | mask : b[offset] & ~mask);
-        WriteCommitted(BlockCrossfade, b);
     }
 
     // --- USB Aux input (block 0x0004 tail) ---
@@ -713,28 +592,8 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
 
     public DuckingReadback? ReadDucking() => _ducking;
 
-    /// <summary>
-    /// Bring the unit's ducking to a target: both blocks read fresh, the
-    /// fields ProDucking owns edited, and each block written back only when
-    /// it changed, 0x0008 first as Wave Link does. No commit: Wave Link sends
-    /// none for ducking and the unit keeps the bits without one.
-    /// </summary>
-    public DuckingWrite SetDucking(OpenXLR.Core.Mixing.ProDuckingTarget target)
-    {
-        // Under the lock, as SetEq's read-modify-write is, so no other write lands between the reads and the writes.
-        lock (_lock)
-        {
-            byte[] b8 = Read(ProDucking.Block, ProDucking.Length);
-            byte[] b1 = Read(BlockCrossfade, CrossfadeLen);
-            byte[] new8 = (byte[])b8.Clone(), new1 = (byte[])b1.Clone();
-            ProDucking.Apply(new8, new1, target);
-            bool wrote8 = !new8.AsSpan().SequenceEqual(b8), wrote1 = !new1.AsSpan().SequenceEqual(b1);
-            if (wrote8) Write(ProDucking.Block, new8);
-            if (wrote1) Write(BlockCrossfade, new1);
-            _ducking = ProDucking.Decode(new8, new1);
-            return new DuckingWrite(wrote8, ProDucking.Diff(b8, new8), wrote1, ProDucking.Diff(b1, new1));
-        }
-    }
+    // Written with block 0x0001 through WriteMix, which takes the plan's
+    // ducking target; block 0x0008 stays with ProDucking's codec.
 
     /// <summary>Every readable vendor block as hex, for tester diagnostics, with the firmware, the mix sections and each input's EQ decoded.</summary>
     public IReadOnlyDictionary<string, string> DumpBlocks()

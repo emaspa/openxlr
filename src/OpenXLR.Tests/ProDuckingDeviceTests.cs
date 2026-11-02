@@ -56,7 +56,7 @@ public sealed class ProDuckingDeviceTests
         Assert.True(pro.Capabilities.Ducking);
         unit.Calls.Clear();
 
-        DuckingWrite write = pro.SetDucking(On(ProReturnPairs.Monitor));
+        ProMixWrite write = pro.WriteMix(new ProMixPlan { Ducking = On(ProReturnPairs.Monitor) })!;
         Assert.True(write.Wrote8 && write.Wrote1);
         // Medium presets in every entry; pairs 5, 6 and 7 (entries 9 to 11, flags at 78, 86, 94) let go.
         Assert.StartsWith("0 fd->f4, 1 06->0c, 2 64->50, 4 d0->b0, 5 07->04, 8 fd->f4", write.Change8);
@@ -71,7 +71,7 @@ public sealed class ProDuckingDeviceTests
         Assert.Equal([1], pro.ReadDucking()!.Pairs);
 
         unit.Calls.Clear();
-        Assert.False(pro.SetDucking(On(ProReturnPairs.Monitor)).Wrote);
+        Assert.False(pro.WriteMix(new ProMixPlan { Ducking = On(ProReturnPairs.Monitor) })!.Wrote);
         Assert.Empty(Writes(unit));
         Assert.Equal(2, unit.Calls.Count);   // the two reads
     }
@@ -82,33 +82,59 @@ public sealed class ProDuckingDeviceTests
         var unit = LeftByWaveLink();
         using var pro = new WaveXlrProDevice(unit);
         pro.Connect();
-        pro.SetDucking(On(ProReturnPairs.Monitor, ProReturnPairs.Aux));
+        pro.WriteMix(new ProMixPlan { Ducking = On(ProReturnPairs.Monitor, ProReturnPairs.Aux) });
         byte[] ducked = Fields(unit.Blocks[0x0001]);
         Assert.Equal(new byte[] { 0x5d, 0x5d, 0x5d, 0x5d, 0x5d, 0x5d }, ducked);
 
-        // Every writer of block 0x0001 the Pro has: the microphone's level in
-        // the jacks' mix, the four selectors with the aux cell, and the
-        // headphone mix membership.
-        Action[] writers =
+        // Every part of a plan without ducking: the microphone's path and
+        // level in the jacks' mix, the four selectors with the aux cell, and
+        // the headphone mix membership.
+        ProMixPlan[] plans =
         [
-            () => pro.SetHpMixMicLevelDb(-6), () => pro.SetOutHp1(true), () => pro.SetOutHp2(true),
-            () => pro.SetOutLineOut(true), () => pro.SetOutUsbAux(true), () => pro.SetOutUsbAux(false),
-            () => pro.SetHpMixMonitorReturn(false), () => pro.SetHpMixMicDirect(false),
+            new() { Mic1 = new(true, -6) }, new() { Hp1 = true }, new() { Hp2 = true },
+            new() { LineOut = true }, new() { UsbAux = true }, new() { UsbAux = false },
+            new() { MonitorReturn = false }, new() { Mic1 = new(false, -6) },
         ];
-        foreach (Action write in writers)
+        foreach (ProMixPlan plan in plans)
         {
-            write();
+            pro.WriteMix(plan);
             Assert.Equal(ducked, Fields(unit.Blocks[0x0001]));
         }
         byte[] routed = unit.Blocks[0x0001];
         Assert.Equal((0xf4, 0x1e, 0x1e, 0x1e), (routed[0], routed[90], routed[91], routed[93]));
 
         // And ducking off keeps what those writers set.
-        pro.SetDucking(ProDuckingTarget.Off);
+        pro.WriteMix(new ProMixPlan { Ducking = ProDuckingTarget.Off });
         byte[] after = unit.Blocks[0x0001];
         for (int i = 0; i < after.Length; i++)
             if (!ProDucking.MixFieldOffsets.Any(at => i == at || i == at + 1)) Assert.Equal(routed[i], after[i]);
         Assert.Equal(new byte[] { 0x55, 0x55, 0x55, 0x55, 0x55, 0x55 }, Fields(after));
+    }
+
+    [Fact]
+    public void APlanWithoutDuckingLeavesBlock0008UnreadAndCommitsOnlyForASelectorOrMembership()
+    {
+        var unit = LeftByWaveLink();
+        using var pro = new WaveXlrProDevice(unit);
+        pro.Connect();
+        // XLR 1's path already open: a level alone is one read and one
+        // write of block 0x0001, with no commit.
+        byte[] block = unit.Blocks[0x0001];
+        block[12] |= 0x01;
+        unit.Blocks[0x0001] = block;
+        unit.Calls.Clear();
+        ProMixWrite level = pro.WriteMix(new ProMixPlan { Mic1 = new(true, -6) })!;
+        Assert.Equal((ProMixChanges.Levels, true, false), (level.Changes, level.Wrote1, level.Committed));
+        Assert.Equal(new ushort[] { 0x0001 }, Writes(unit));
+        Assert.DoesNotContain(unit.Calls, c => c.Block == 0x0008);
+
+        // Two selectors and the return: one write, one commit.
+        unit.Calls.Clear();
+        ProMixWrite routed = pro.WriteMix(new ProMixPlan { Hp1 = true, Hp2 = true, MonitorReturn = false })!;
+        Assert.Equal(ProMixChanges.Selectors | ProMixChanges.MonitorReturn, routed.Changes);
+        Assert.True(routed.Committed);
+        Assert.Equal(new ushort[] { 0x0001, 0x0003 }, Writes(unit));
+        Assert.Equal("90 23->1e, 91 23->1e", routed.Change1[(routed.Change1.IndexOf("90 ", StringComparison.Ordinal))..]);
     }
 
     [Fact]
@@ -233,6 +259,76 @@ public sealed class ProDuckingDeviceTests
         manager.SweepOnce();
         Assert.Empty(manager.DuckingStatus(Unit).Readback!.Pairs);
         Assert.Contains(log.Written, line => line.StartsWith("ducking (update) on Elgato Wave XLR Pro: off. ", StringComparison.Ordinal));
+    });
+
+    [Fact]
+    public void ADuckingTargetWaitingAndASelectorChangeInOneTickAreOneWrite() => WithConfigDir(() =>
+    {
+        var unit = LeftByWaveLink();
+        var log = new DeviceEqWriterTests.Lines();
+        using DeviceManager manager = Manager(new WaveXlrProDevice(unit), new ManualTime(), log);
+        unit.Calls.Clear();
+
+        manager.PostDucking(Unit, On(ProReturnPairs.Monitor), "XLR 1");
+        Assert.False(manager.EnsureMix(new ProMixPlan { Hp1 = true }));
+        // Block 0x0008 first, then block 0x0001 once with the selector and the
+        // fields, then the one commit the selector needs.
+        Assert.Equal(new ushort[] { 0x0008, 0x0001, 0x0003 }, Writes(unit));
+        Assert.Equal(0x1e, unit.Blocks[0x0001][90]);
+        Assert.Equal(new byte[] { 0x5d, 0x55, 0x5d, 0x55, 0x5d, 0x55 }, Fields(unit.Blocks[0x0001]));
+        Assert.Contains(log.Written, line => line.StartsWith(
+            "ducking (update) on Elgato Wave XLR Pro: on, pairs 1, sensitivity medium, amount medium, speed medium, keyed by XLR 1. Block 0x0008 written: ",
+            StringComparison.Ordinal) && line.Contains("Block 0x0001 written: 17 fd->55, 35 fd->55, 53 fd->55, 90 23->1e.", StringComparison.Ordinal));
+
+        // The loop finds nothing left to write, and the poll verifies the target.
+        unit.Calls.Clear();
+        manager.SweepOnce();
+        Assert.Empty(Writes(unit));
+        Assert.Equal(DeviceDuckingPhase.Verified, manager.DuckingStatus(Unit).Phase);
+    });
+
+    [Fact]
+    public void AtSteadyStateTheMixersPlanCostsNoTransfer() => WithConfigDir(() =>
+    {
+        var unit = LeftByWaveLink();
+        using DeviceManager manager = Manager(new WaveXlrProDevice(unit), new ManualTime(), new DeviceEqWriterTests.Lines());
+        var plan = new ProMixPlan
+        {
+            Hp1 = true, Hp2 = false, UsbAux = true, LineOut = false, MonitorReturn = true,
+            Mic1 = new(true, -18.06), Mic2 = new(false, 0),
+        };
+        Assert.True(manager.EnsureMix(plan));
+        Assert.True(manager.Snapshot().State!.HpMixMicDirect);
+        for (int i = 0; i < 3; i++)
+        {
+            manager.SweepOnce();
+            unit.Calls.Clear();
+            Assert.False(manager.EnsureMix(plan));
+            Assert.Empty(unit.Calls);
+        }
+
+        // Another program moving a selector is put back on the next sweep that reads it.
+        byte[] block = unit.Blocks[0x0001];
+        block[90] = 0x23;
+        unit.Blocks[0x0001] = block;
+        manager.SweepOnce();
+        unit.Calls.Clear();
+        Assert.False(manager.EnsureMix(plan));
+        Assert.Equal(new ushort[] { 0x0001, 0x0003 }, Writes(unit));
+        Assert.Equal(0x1e, unit.Blocks[0x0001][90]);
+    });
+
+    [Fact]
+    public void ASetCommandMovesOneSelectorThroughThePlan() => WithConfigDir(() =>
+    {
+        var unit = LeftByWaveLink();
+        using DeviceManager manager = Manager(new WaveXlrProDevice(unit), new ManualTime(), new DeviceEqWriterTests.Lines());
+        byte[] before = unit.Blocks[0x0001];
+        unit.Calls.Clear();
+        Assert.Null(manager.Apply("outLineOut", JsonSerializer.SerializeToElement(true)));
+        Assert.Equal(new ushort[] { 0x0001, 0x0003 }, Writes(unit));
+        Assert.Equal("93 23->1e", ProDucking.Diff(before, unit.Blocks[0x0001]));
+        Assert.True(manager.Snapshot().State!.OutLineOut);
     });
 
     [Fact]

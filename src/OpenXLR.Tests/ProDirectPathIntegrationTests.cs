@@ -178,7 +178,7 @@ public sealed partial class MonitorVolumeIntegrationTests
         {
             ["mixer"] = "true", ["monitorOutput"] = katana,
         }).Build();
-        var pro = new DirectPro(new() { GainDb = 30, HpMixMicDirect = true, HpMixMonitorReturn = false });
+        var pro = new DirectPro(micDirect: true);
         DeviceManager? devices = null;
         MixerService? mixer = null;
         try
@@ -286,38 +286,48 @@ public sealed partial class MonitorVolumeIntegrationTests
     }
 
     /// <summary>
-    /// A Wave XLR Pro as far as the daemon's output routing goes: the
-    /// selectors and the headphone mix hold what was last written.
+    /// A Wave XLR Pro as far as the daemon's output routing goes: block
+    /// 0x0001, which takes each plan's edits as the driver makes them and
+    /// holds what was last written.
     /// </summary>
-    private sealed class DirectPro(DeviceState? initial = null) : IAudioDevice
+    private sealed class DirectPro : IAudioDevice
     {
-        private DeviceState _state = initial ?? new() { GainDb = 30 };
+        private readonly byte[] _block = ProMixPlanTests.Neutral();
+        private int _gainDb = 30;
         public int MicDirectWrites;
+
+        public DirectPro(bool micDirect = false)
+        {
+            if (micDirect) _block[12] |= 0x01;
+        }
+
         public DeviceInfo Info { get; } = new("Elgato", "Wave XLR Pro", 0x0fd9, 0x00b4) { Location = new(1, 52, "1-" + DirectSerial, DirectSerial) };
         public DeviceCapabilities Capabilities { get; } = new()
         {
             Gain = true, Mute = true, LowCut = true, ClipGuard = true, OutputRouting = true, AuxInput = true, XlrInputs = 2, RetainsSettings = true,
         };
         public bool Connected { get; private set; }
-        public bool MicDirect { get { lock (this) return _state.HpMixMicDirect; } }
-        public bool MonitorReturn { get { lock (this) return _state.HpMixMonitorReturn; } }
-        public double MicLevel { get { lock (this) return _state.HpMixMicLevelDb; } }
+        public bool MicDirect { get { lock (this) return ProMixPlan.Read(_block).Mic1Direct; } }
+        public bool MonitorReturn { get { lock (this) return ProMixPlan.Read(_block).MonitorReturn; } }
+        public double MicLevel { get { lock (this) return ProMixPlan.Read(_block).Mic1LevelDb; } }
         /// <summary>What Wave Link does to the unit from elsewhere: the daemon only reads it.</summary>
-        public void LeaveMicDirectOn() => Write(s => s with { HpMixMicDirect = true });
-        public DeviceState ReadState() { lock (this) return _state; }
-        private void Write(Func<DeviceState, DeviceState> change) { lock (this) _state = change(_state); }
+        public void LeaveMicDirectOn() { lock (this) _block[12] |= 0x01; }
+        public DeviceState ReadState() { lock (this) return ProMixPlanTests.StateOf(_block) with { GainDb = _gainDb }; }
         public void Connect() => Connected = true;
         public void Disconnect() => Connected = false;
         public void Dispose() => Connected = false;
-        public void SetOutHp1(bool on) => Write(s => s with { OutHp1 = on });
-        public void SetOutHp2(bool on) => Write(s => s with { OutHp2 = on });
-        public void SetOutUsbAux(bool on) => Write(s => s with { OutUsbAux = on, AuxReturnEnabled = on });
-        public void SetOutLineOut(bool on) => Write(s => s with { OutLineOut = on });
-        public void SetHpMixMonitorReturn(bool on) => Write(s => s with { HpMixMonitorReturn = on });
-        public void SetHpMixMicDirect(bool on) { Interlocked.Increment(ref MicDirectWrites); Write(s => s with { HpMixMicDirect = on }); }
-        public void SetHpMixMicLevelDb(double db)
-            => Write(s => s with { HpMixMicLevelDb = double.IsFinite(db) ? Math.Round(Math.Clamp(db, -60, 12) * 2, MidpointRounding.AwayFromZero) / 2 : -60 });
-        public void SetGainDb(int db) => Write(s => s with { GainDb = db });
+        public ProMixWrite? WriteMix(ProMixPlan plan)
+        {
+            lock (this)
+            {
+                byte[] before = (byte[])_block.Clone();
+                ProMixChanges changes = plan.Apply(before, _block);
+                if (((before[12] ^ _block[12]) & 0x01) != 0) Interlocked.Increment(ref MicDirectWrites);
+                bool wrote = !_block.AsSpan().SequenceEqual(before);
+                return new ProMixWrite(changes, false, "not read", wrote, ProDucking.Diff(before, _block), wrote && changes.Commits());
+            }
+        }
+        public void SetGainDb(int db) { lock (this) _gainDb = db; }
         public void SetMute(bool on) { } public void SetLowCut(bool on) { } public void SetExpander(bool on) { }
         public void SetVoiceTune(bool on) { } public void SetVoiceTuneStrength(int value) { } public void SetHpVolumeDb(double db) { }
         public void SetLowImpedance(bool on) { } public void SetCrossfade(int value) { } public void SetPhantom(bool on) { }

@@ -989,10 +989,10 @@ public sealed partial class DeviceManager : BackgroundService
                         break;
                     case ControlNames.ClipGuard: _device.SetClipGuard(value.GetBoolean()); break;
                     case ControlNames.Compressor: _device.SetCompressor(value.GetBoolean()); break;
-                    case ControlNames.OutHp1: _device.SetOutHp1(value.GetBoolean()); break;
-                    case ControlNames.OutHp2: _device.SetOutHp2(value.GetBoolean()); break;
-                    case ControlNames.OutUsbAux: _device.SetOutUsbAux(value.GetBoolean()); break;
-                    case ControlNames.OutLineOut: _device.SetOutLineOut(value.GetBoolean()); break;
+                    case ControlNames.OutHp1: WriteMixLocked(_device, new ProMixPlan { Hp1 = value.GetBoolean() }, "set"); break;
+                    case ControlNames.OutHp2: WriteMixLocked(_device, new ProMixPlan { Hp2 = value.GetBoolean() }, "set"); break;
+                    case ControlNames.OutUsbAux: WriteMixLocked(_device, new ProMixPlan { UsbAux = value.GetBoolean() }, "set"); break;
+                    case ControlNames.OutLineOut: WriteMixLocked(_device, new ProMixPlan { LineOut = value.GetBoolean() }, "set"); break;
                     case ControlNames.AuxLevelDb: _device.SetAuxLevelDb(value.GetDouble()); break;
                     case ControlNames.AuxLevelLock: _device.SetAuxLevelLock(value.GetBoolean()); break;
                     case ControlNames.LineInGain: lineInWritten = _device.SetLineInGainDb(value.GetInt32()); break;
@@ -1166,94 +1166,56 @@ public sealed partial class DeviceManager : BackgroundService
     }
 
     /// <summary>
-    /// Drive the device's physical-output selectors toward the wanted state,
-    /// writing only the ones that differ (called every mixer sweep, so it must
-    /// be a no-op at steady state). Quietly does nothing without a connected
-    /// device that has output routing.
+    /// Bring the Pro's block 0x0001 toward the mixer's plan for this sweep:
+    /// the output selectors, the headphone mix's Monitor return (issue #8)
+    /// and the microphones' zero-latency paths at the levels the software
+    /// sends would play them at. Called every mixer sweep, so it is a no-op
+    /// at steady state: the plan is checked against the last poll and no
+    /// transfer happens while the unit holds it and no ducking target waits.
+    /// A ducking target posted and not written yet goes into the same write,
+    /// so the block is written once for both. Returns true when a membership
+    /// bit of the jacks' mix was written, so the caller can restart the
+    /// playback stream as before; selectors and levels apply without it.
+    /// Quietly does nothing without a connected device that has output
+    /// routing.
     /// </summary>
-    public void EnsureOutputSelectors(bool hp1, bool hp2, bool usbAux, bool lineOut)
-    {
-        lock (_gate)
-        {
-            if (_device is null || !_device.Connected || !_device.Capabilities.OutputRouting) return;
-            DeviceState? s = _last;
-            if (s is null) return;
-            try
-            {
-                bool changed = false;
-                if (s.OutHp1 != hp1) { _device.SetOutHp1(hp1); changed = true; }
-                if (s.OutHp2 != hp2) { _device.SetOutHp2(hp2); changed = true; }
-                // The aux output needs its matrix cell open besides the
-                // selector, so re-apply when either is missing.
-                if (s.OutUsbAux != usbAux || (usbAux && !s.AuxReturnEnabled))
-                { _device.SetOutUsbAux(usbAux); changed = true; }
-                if (s.OutLineOut != lineOut) { _device.SetOutLineOut(lineOut); changed = true; }
-                if (changed)
-                {
-                    _last = Stamp(_device.ReadState());
-                    RaiseFromLocked();
-                }
-            }
-            catch (Exception ex)
-            {
-                _log.LogDebug("output selector sync: {msg}", ex.Message);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Drive the Pro's headphone-mix membership toward the wanted state (issue
-    /// #8): the Monitor stream's return pair must be a member for the jacks to
-    /// hear the Monitor mix at all, and the mic's hardware direct path follows
-    /// the software mixer, at <paramref name="micLevelDb"/>, the level the
-    /// software send would play it at; XLR 2's path the same way with
-    /// <paramref name="mic2Direct"/> at <paramref name="mic2LevelDb"/>. A null <paramref name="monitorReturn"/>
-    /// leaves the return pair as the unit holds it. Returns true when a
-    /// membership bit was written, so the caller can restart the playback
-    /// stream, which is what latches the change; the level applies at once.
-    /// </summary>
-    public bool EnsureHeadphoneMix(bool? monitorReturn, bool micDirect, double micLevelDb = 0,
-        bool mic2Direct = false, double mic2LevelDb = 0)
+    public bool EnsureMix(ProMixPlan plan)
     {
         lock (_gate)
         {
             if (_device is null || !_device.Connected || !_device.Capabilities.OutputRouting) return false;
             DeviceState? s = _last;
             if (s is null) return false;
+            bool duckWaiting;
+            lock (_duckGate) duckWaiting = _device.Capabilities.Ducking && _duckPending is not null;
+            if (!duckWaiting && plan.Needs(ProMixHeld.Of(s)) == ProMixChanges.None) return false;
             try
             {
-                // Half-dB steps, the cell's own. The level is set before the
-                // path opens, so the jacks never hear a level another program
-                // left.
-                bool level = micDirect && HalfDb(s.HpMixMicLevelDb) != HalfDb(micLevelDb);
-                if (level) _device.SetHpMixMicLevelDb(micLevelDb);
-                bool level2 = mic2Direct && HalfDb(s.HpMixMic2LevelDb) != HalfDb(mic2LevelDb);
-                if (level2) _device.SetHpMixMic2LevelDb(mic2LevelDb);
-                level |= level2;
-                bool changed = false;
-                if (monitorReturn is { } ret && s.HpMixMonitorReturn != ret) { _device.SetHpMixMonitorReturn(ret); changed = true; }
-                if (s.HpMixMicDirect != micDirect) { _device.SetHpMixMicDirect(micDirect); changed = true; }
-                if (s.HpMixMic2Direct != mic2Direct) { _device.SetHpMixMic2Direct(mic2Direct); changed = true; }
-                if (changed)
+                ProMixWrite? write = WriteMixLocked(_device, plan, "update");
+                if (write is null) return false;
+                bool membership = write.Changes.Membership();
+                if (membership)
                     _log.LogInformation("headphone mix: monitor return {ret}, mic direct {mic}, XLR 2 direct {mic2}",
-                        monitorReturn ?? s.HpMixMonitorReturn, micDirect, mic2Direct);
-                if (changed || level)
+                        plan.MonitorReturn ?? s.HpMixMonitorReturn, plan.Mic1?.Direct ?? s.HpMixMicDirect, plan.Mic2?.Direct ?? s.HpMixMic2Direct);
+                if (write.Wrote1)
                 {
                     _last = Stamp(_device.ReadState());
                     RaiseFromLocked();
                 }
-                return changed;
+                return membership;
+            }
+            catch (UsbHungException ex)
+            {
+                NoteHung(ex);
+                return false;
             }
             catch (Exception ex)
             {
-                _log.LogDebug("headphone mix sync: {msg}", ex.Message);
+                _log.LogDebug("block 0x0001 sync: {msg}", ex.Message);
                 return false;
             }
         }
     }
-
-    private static int HalfDb(double db)
-        => double.IsFinite(db) ? (int)Math.Round(Math.Clamp(db, -60, 12) * 2, MidpointRounding.AwayFromZero) : -120;
 
     /// <summary>Vendor block dumps for diagnostics; empty without a device.</summary>
     public IReadOnlyDictionary<string, string> DumpBlocks()
@@ -1481,24 +1443,43 @@ public sealed partial class DeviceManager : BackgroundService
     }
 
     /// <summary>
-    /// Write the pending target, if any. A write that fails counts as a miss,
-    /// as one the unit does not keep; the second fails the target.
+    /// Write the pending ducking target, if any, through the one writer of
+    /// block 0x0001. A write that fails counts as a miss, as one the unit
+    /// does not keep; the second fails the target.
     /// </summary>
     private void WriteDuckingLocked(IAudioDevice dev, string reason)
     {
-        ProDuckingTarget target;
-        string owner;
         lock (_duckGate)
-        {
-            if (_duckPending is not { } pending) return;
-            target = pending;
-            owner = _duckOwner;
-        }
-        DuckingWrite write;
-        try { write = dev.SetDucking(target); }
+            if (_duckPending is null) return;
+        try { WriteMixLocked(dev, ProMixPlan.Nothing, reason); }
+        catch (UsbHungException) { throw; }
+        catch (Exception) { }   // counted and logged by WriteMixLocked
+    }
+
+    /// <summary>
+    /// The one way the device manager writes the Pro's block 0x0001: the
+    /// caller's plan with the ducking target posted and not written yet, if
+    /// the unit runs ducking, in one <see cref="IAudioDevice.WriteMix"/>.
+    /// The ducking's pending, written and failed bookkeeping is the same
+    /// whichever caller carried it. A failed write counts a miss for the
+    /// ducking it carried and is rethrown.
+    /// </summary>
+    private ProMixWrite? WriteMixLocked(IAudioDevice dev, ProMixPlan plan, string reason)
+    {
+        ProDuckingTarget? target = null;
+        string owner = "";
+        if (dev.Capabilities.Ducking)
+            lock (_duckGate)
+            {
+                target = _duckPending;
+                owner = _duckOwner;
+            }
+        ProMixWrite? write;
+        try { write = dev.WriteMix(target is null ? plan : plan with { Ducking = target }); }
         catch (UsbHungException) { throw; }
         catch (Exception ex)
         {
+            if (target is null) throw;
             _log.LogDebug("ducking ({reason}) on {dev}: {msg}", reason, dev.Info.DisplayName, ex.Message);
             bool failed = false;
             lock (_duckGate)
@@ -1515,8 +1496,9 @@ public sealed partial class DeviceManager : BackgroundService
                 _log.LogWarning("{dev} {reason}: {msg}", dev.Info.DisplayName, DuckingNotKept, ex.Message);
                 DuckingStatusChanged?.Invoke();
             }
-            return;
+            throw;
         }
+        if (target is null || write is null) return write;
         lock (_duckGate)
         {
             if (ReferenceEquals(_duckPending, target)) _duckPending = null;
@@ -1526,11 +1508,12 @@ public sealed partial class DeviceManager : BackgroundService
         if (!write.Wrote)
         {
             _log.LogDebug("ducking ({reason}) on {dev}: already held, {target}{key}", reason, dev.Info.DisplayName, target, key);
-            return;
+            return write;
         }
         _log.LogInformation("ducking ({reason}) on {dev}: {target}{key}. Block 0x0008 {b8}. Block 0x0001 {b1}.",
             reason, dev.Info.DisplayName, target, key,
             write.Wrote8 ? "written: " + write.Change8 : "unchanged", write.Wrote1 ? "written: " + write.Change1 : "unchanged");
+        return write;
     }
 
     /// <summary>
