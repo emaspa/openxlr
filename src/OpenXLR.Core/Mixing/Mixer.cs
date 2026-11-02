@@ -2457,9 +2457,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// volume, then the feeding mix's volume, all on the desktop's cubic
     /// scale. For a summed feed the loudest unmuted part counts. Negative
     /// infinity while no part carries it; the device holds that to its floor.
-    /// The level then takes off what the computer audio loses on its way to
-    /// the jacks (<see cref="JackReturnOffsetDb"/>), so the microphone sits
-    /// against the Monitor mix where the faders put it.
+    /// The level then follows the output volume down
+    /// (<see cref="JackOutputVolumeDb"/>), so a dial turns the microphone
+    /// and the Monitor mix down together on the jacks.
     /// This is input 1's; <see cref="HardwareMicLevelDbOf"/> takes either.
     /// </summary>
     public double HardwareMicLevelDb => HardwareMicLevelDbOf(1);
@@ -2475,30 +2475,27 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 .Select(m => SendGain(_levels.GetValueOrDefault(Cell(channel, m), 0.0), ChannelVolumeLocked(channel), 1)
                     * Math.Clamp(_mixVolume.GetValueOrDefault(m, 1.0), 0, MixVolumeMaximumLocked(m)))
                 .DefaultIfEmpty(0).Max();
-            return gain > 0 ? 60 * Math.Log10(gain) + JackReturnOffsetDb(_outputVolume) : double.NegativeInfinity;
+            return gain > 0 ? 60 * Math.Log10(gain) + JackOutputVolumeDb(_outputVolume) : double.NegativeInfinity;
         }
     }
 
     /// <summary>
-    /// What the Monitor mix loses between the computer and the Pro's jacks,
-    /// against the microphone's hardware path, in dB, never above 0: the
-    /// unit plays every USB playback pair <see cref="OpenXLR.Core.Devices.ProReturnPairs.LossDb"/>
-    /// down (protocol notes, section 16), and the output volume, the Pro
-    /// sink's volume while the jacks are the monitor outputs, attenuates the
-    /// pair and not the path. Above 100% it lifts the pair, and the path
-    /// keeps the send's level rather than rising with it, so the voice is
-    /// only ever lowered. An output volume not read yet counts as 100%.
+    /// The output volume's attenuation on the Pro's jacks, in dB, never above
+    /// 0. While the jacks are the monitor outputs the output volume is the
+    /// Pro sink's volume, which acts on the USB playback pair the Monitor
+    /// mix streams on and not on the microphone's hardware path; this
+    /// carries it to the path too. The unit's own 7.94 dB on that pair
+    /// (protocol notes, section 16) is left in, as Wave Link leaves it: it
+    /// is what keeps the voice audible over the computer audio on the
+    /// jacks. Above 100% the sink lifts the pair only, and the path keeps
+    /// the send's level. An output volume not read yet counts as 100%.
     /// </summary>
-    internal static double JackReturnOffsetDb(double? outputVolume)
+    internal static double JackOutputVolumeDb(double? outputVolume) => outputVolume switch
     {
-        double sinkDb = outputVolume switch
-        {
-            null => 0,
-            > 0 and var v => 60 * Math.Log10(v),
-            _ => double.NegativeInfinity,
-        };
-        return Math.Min(0, sinkDb - OpenXLR.Core.Devices.ProReturnPairs.LossDb);
-    }
+        null => 0,
+        > 0 and var v => Math.Min(0, 60 * Math.Log10(v)),
+        _ => double.NegativeInfinity,
+    };
 
     private void SetHardwareMicChannelLocked(int input, string? channel)
     {
