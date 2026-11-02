@@ -48,6 +48,7 @@ public sealed class WindowLayoutTests
                 Dispatcher.UIThread.RunJobs();
                 OutputControlsWindowTests.Check();
                 ProfileSliderWindowTests.Check();
+                ProfileRowWindowTests.Check();
                 EditorRulesReconnectWindowTests.Check();
                 OptionsInteractionWindowTests.Check();
                 UserMonitorWindowTests.Check();

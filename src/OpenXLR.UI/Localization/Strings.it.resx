@@ -573,6 +573,9 @@
   <data name="DeletePreset" xml:space="preserve">
     <value>Elimina preset</value>
   </data>
+  <data name="DeleteProfileTitle" xml:space="preserve">
+    <value>Eliminare il profilo?</value>
+  </data>
   <data name="DeleteThisProfile" xml:space="preserve">
     <value>Elimina questo profilo</value>
   </data>
@@ -1622,6 +1625,9 @@
   <data name="PrimaryInterface" xml:space="preserve">
     <value>Interfaccia principale</value>
   </data>
+  <data name="ProfileDeleteMessage" xml:space="preserve">
+    <value>Eliminare il profilo "{0}" di questo dispositivo? Non si può annullare.</value>
+  </data>
   <data name="ProfileName" xml:space="preserve">
     <value>nome del profilo</value>
   </data>
@@ -1862,6 +1868,9 @@ Il salvataggio lo sostituirà con la scena attuale.</value>
   </data>
   <data name="SaveLoadImportAndExportPresetsFor" xml:space="preserve">
     <value>Salva, carica, importa ed esporta i preset di questo plugin</value>
+  </data>
+  <data name="SaveOverThisProfile" xml:space="preserve">
+    <value>Salva la scena attuale in questo profilo</value>
   </data>
   <data name="SavePreset" xml:space="preserve">
     <value>Salva preset</value>

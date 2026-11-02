@@ -551,6 +551,9 @@
   <data name="DeletePreset" xml:space="preserve">
     <value>Обриши пресет</value>
   </data>
+  <data name="DeleteProfileTitle" xml:space="preserve">
+    <value>Обрисати профил?</value>
+  </data>
   <data name="DeleteThisProfile" xml:space="preserve">
     <value>Обриши овај профил</value>
   </data>
@@ -1570,6 +1573,9 @@
   <data name="PrimaryInterface" xml:space="preserve">
     <value>Главни интерфејс</value>
   </data>
+  <data name="ProfileDeleteMessage" xml:space="preserve">
+    <value>Обрисати профил "{0}" за овај уређај? Ово се не може поништити.</value>
+  </data>
   <data name="ProfileName" xml:space="preserve">
     <value>назив профила</value>
   </data>
@@ -1810,6 +1816,9 @@
   </data>
   <data name="SaveLoadImportAndExportPresetsFor" xml:space="preserve">
     <value>Сачувај, учитај, увези и извези пресете за овај додатак</value>
+  </data>
+  <data name="SaveOverThisProfile" xml:space="preserve">
+    <value>Сачувај тренутну сцену у овај профил</value>
   </data>
   <data name="SavePreset" xml:space="preserve">
     <value>Сачувај пресет</value>

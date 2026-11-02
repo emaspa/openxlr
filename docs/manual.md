@@ -253,7 +253,11 @@ lands in Voice Chat. An app you move to another channel is remembered
 the whole submixer (sends, channel volumes, masters, monitor outputs, aux state, insert
 chains). They are saved per interface. Application routing and the
 system default devices are not part of a profile, so recalling one
-does not rewire the desktop.
+does not rewire the desktop. The **Profiles** button in the header holds
+them. Type a name and press Save to save a new one, or click a name to
+load it. Each saved profile's row has its own Save, which puts the
+current scene over that profile without typing its name, and an ✕, which
+deletes it. Both ask first.
 
 **Inserts** are LV2, CLAP or VST3 effects placed in the signal path: a mono
 chain on each XLR input, a mono or stereo chain on each capture input,
