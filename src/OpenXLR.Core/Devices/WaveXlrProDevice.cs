@@ -736,7 +736,7 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
         }
     }
 
-    /// <summary>Every readable vendor block as hex, for tester diagnostics, with the firmware and each input's EQ decoded.</summary>
+    /// <summary>Every readable vendor block as hex, for tester diagnostics, with the firmware, the mix sections and each input's EQ decoded.</summary>
     public IReadOnlyDictionary<string, string> DumpBlocks()
     {
         var blocks = new Dictionary<string, string>();
@@ -747,6 +747,8 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
             {
                 byte[] read = Read(block, len);
                 blocks[$"0x{block:X4}"] = Convert.ToHexString(read);
+                if (block == ProMixSections.Block)
+                    foreach ((string key, string value) in ProMixSections.Describe(read)) blocks[key] = value;
                 if (block == BlockSettings)
                     for (int input = 1; input <= 2; input++)
                     {
