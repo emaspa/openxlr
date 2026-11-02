@@ -401,6 +401,14 @@ public partial class MainWindow : Window
         ProfileNameBox.Text = "";
     }
 
+    /// <summary>A row's Save: the current scene over that profile, after the same question a typed name gets.</summary>
+    private async void OnProfileSaveOver(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Button)?.Tag is not string name) return;
+        if (await ConfirmAsync(Localizer.Text("OverwriteProfileTitle"), Localizer.Format("ProfileOverwriteMessage", name)))
+            _vm.SaveProfile(name);
+    }
+
     private Task<bool> ConfirmAsync(string title, string message, string? yesLabel = null)
         => Dialogs.ConfirmAsync(this, title, message, yesLabel ?? Localizer.Text("Overwrite"));
 
@@ -409,9 +417,12 @@ public partial class MainWindow : Window
         if ((sender as Button)?.Content is string name) _vm.LoadProfile(name);
     }
 
-    private void OnProfileDelete(object? sender, RoutedEventArgs e)
+    private async void OnProfileDelete(object? sender, RoutedEventArgs e)
     {
-        if ((sender as Button)?.Tag is string name) _vm.DeleteProfile(name);
+        if ((sender as Button)?.Tag is not string name) return;
+        if (await ConfirmAsync(Localizer.Text("DeleteProfileTitle"), Localizer.Format("ProfileDeleteMessage", name),
+                Localizer.Text("Delete")))
+            _vm.DeleteProfile(name);
     }
 
     private void OnPickDevice(object? sender, RoutedEventArgs e)

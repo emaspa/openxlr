@@ -217,12 +217,15 @@
                   <ItemsControl ItemsSource="{Binding Profiles}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="x:String">
-                        <Grid ColumnDefinitions="*,Auto">
+                        <Grid ColumnDefinitions="*,Auto,Auto">
                           <Button Content="{Binding}" HorizontalAlignment="Stretch"
                                   HorizontalContentAlignment="Left" FontSize="12"
                                   Classes="ghost" Click="OnProfileLoad"
                                   ToolTip.Tip="{loc:Text Key=LoadThisProfile}"/>
-                          <Button Grid.Column="1" Content="&#x2715;" FontSize="11" Padding="6,3"
+                          <Button Grid.Column="1" Content="{loc:Text Key=Save}" FontSize="11" Padding="6,3"
+                                  Classes="ghost" Click="OnProfileSaveOver"
+                                  Tag="{Binding}" ToolTip.Tip="{loc:Text Key=SaveOverThisProfile}"/>
+                          <Button Grid.Column="2" Content="&#x2715;" FontSize="11" Padding="6,3"
                                   Classes="ghost" Click="OnProfileDelete"
                                   Tag="{Binding}" ToolTip.Tip="{loc:Text Key=DeleteThisProfile}"/>
                         </Grid>

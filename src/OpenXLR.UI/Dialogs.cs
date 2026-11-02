@@ -1,3 +1,4 @@
+using System;
 using OpenXLR.UI.Localization;
 using System.Threading.Tasks;
 using Avalonia.Controls;
@@ -8,6 +9,9 @@ namespace OpenXLR.UI;
 /// <summary>The window's small confirmation and naming dialogs, shared by every window that asks before acting.</summary>
 internal static class Dialogs
 {
+    /// <summary>Raised with each confirmation dialog before it shows, so window tests can answer it.</summary>
+    internal static event Action<Window>? ConfirmOpening;
+
     /// <summary>
     /// The trimmed new name, or null when the user cancels. An empty name
     /// cannot be submitted. The button says Rename unless <paramref name="okLabel"/> names it.
@@ -167,6 +171,7 @@ internal static class Dialogs
         yes.Click += (_, _) => { done.TrySetResult(true); dialog.Close(); };
         no.Click += (_, _) => { done.TrySetResult(false); dialog.Close(); };
         dialog.Closed += (_, _) => done.TrySetResult(false);
+        ConfirmOpening?.Invoke(dialog);
         await dialog.ShowDialog(owner);
         return await done.Task;
     }

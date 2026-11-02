@@ -571,6 +571,9 @@
   <data name="DeletePreset" xml:space="preserve">
     <value>Voreinstellung löschen</value>
   </data>
+  <data name="DeleteProfileTitle" xml:space="preserve">
+    <value>Profil löschen?</value>
+  </data>
   <data name="DeleteThisProfile" xml:space="preserve">
     <value>Dieses Profil löschen</value>
   </data>
@@ -1621,6 +1624,9 @@
   <data name="PrimaryInterface" xml:space="preserve">
     <value>Primäres Interface</value>
   </data>
+  <data name="ProfileDeleteMessage" xml:space="preserve">
+    <value>Das Profil "{0}" für dieses Gerät löschen? Das lässt sich nicht rückgängig machen.</value>
+  </data>
   <data name="ProfileName" xml:space="preserve">
     <value>Profilname</value>
   </data>
@@ -1861,6 +1867,9 @@ Speichern ersetzt es durch die aktuelle Szene.</value>
   </data>
   <data name="SaveLoadImportAndExportPresetsFor" xml:space="preserve">
     <value>Voreinstellungen für dieses Plugin speichern, laden, importieren und exportieren</value>
+  </data>
+  <data name="SaveOverThisProfile" xml:space="preserve">
+    <value>Die aktuelle Szene in diesem Profil speichern</value>
   </data>
   <data name="SavePreset" xml:space="preserve">
     <value>Voreinstellung speichern</value>

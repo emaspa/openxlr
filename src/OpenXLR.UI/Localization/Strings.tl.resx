@@ -551,6 +551,9 @@
   <data name="DeletePreset" xml:space="preserve">
     <value>Burahin ang preset</value>
   </data>
+  <data name="DeleteProfileTitle" xml:space="preserve">
+    <value>Burahin ang profile?</value>
+  </data>
   <data name="DeleteThisProfile" xml:space="preserve">
     <value>Burahin ang profile na ito</value>
   </data>
@@ -1570,6 +1573,9 @@
   <data name="PrimaryInterface" xml:space="preserve">
     <value>Pangunahing interface</value>
   </data>
+  <data name="ProfileDeleteMessage" xml:space="preserve">
+    <value>Burahin ang profile na "{0}" para sa device na ito? Hindi na ito maibabalik.</value>
+  </data>
   <data name="ProfileName" xml:space="preserve">
     <value>pangalan ng profile</value>
   </data>
@@ -1810,6 +1816,9 @@ Papalitan ito ng kasalukuyang eksena kapag nag-save.</value>
   </data>
   <data name="SaveLoadImportAndExportPresetsFor" xml:space="preserve">
     <value>I-save, i-load, i-import at i-export ang mga preset ng plugin na ito</value>
+  </data>
+  <data name="SaveOverThisProfile" xml:space="preserve">
+    <value>I-save ang kasalukuyang eksena sa profile na ito</value>
   </data>
   <data name="SavePreset" xml:space="preserve">
     <value>I-save ang preset</value>
