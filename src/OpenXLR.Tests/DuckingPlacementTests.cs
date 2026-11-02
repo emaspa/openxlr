@@ -90,16 +90,122 @@ public sealed class DuckingPlacementTests
         Assert.Equal("failed", DuckingPlacement.Evaluate(setup, view, Pro).Reason);
     }
 
+    /// <summary>
+    /// Hardware mixing with the default pairs, Monitor A on section 0 and
+    /// Monitor B on section 18, the jacks' feed outside the mix the unit used
+    /// to duck in, and XLR 1 heard in Monitor A: none of that matters to a
+    /// unit that ducks each channel's pair.
+    /// </summary>
+    private static DuckingView Mode => EditMonitor(View, m => m with
+        {
+            KeyInSoftware = true,
+            OpenChannels = new Dictionary<string, string>(m.OpenChannels) { ["xlr1"] = "XLR 1" },
+        }) with
+        {
+            HardwareMixing = true,
+            SoftwareRunning = true,
+            UnitMixSections = new Dictionary<string, IReadOnlyList<int>> { ["monitor"] = [0], ["monitor2"] = [18] },
+            ChannelPairs = new Dictionary<string, int> { ["system"] = 0, ["game"] = 1, ["music"] = 2, ["browser"] = 3, ["voicechat"] = 4, ["sfx"] = 6 },
+            ChannelNames = MixerConfig.Default().Channels.ToDictionary(c => c.Id, c => c.Name),
+        };
+
+    private static string Sections(DuckingVerdict verdict)
+        => verdict.Sections is null ? "none"
+            : string.Join("; ", verdict.Sections.OrderBy(s => s.Key).Select(s => $"{s.Key}: {string.Join(" ", s.Value.Order())}"));
+
     [Fact]
-    public void WhileTheUnitBuildsTheJacksMixesItDucksNoneOfThem()
+    public void InHardwareMixingTheUnitDucksEachChannelInTheSectionsOfItsMixes()
     {
-        DuckingVerdict verdict = DuckingPlacement.Evaluate(Setup, View with { HardwareMixing = true }, Pro);
+        DuckingSetup setup = Setup with { Channels = ["music", "game"], Mixes = ["monitor", "monitor2", "stream"] };
+        // Voice Chat plays in Monitor A and is not ducked, the key is heard
+        // there, and the jacks' feed is outside section 0's bit 5: all fine.
+        DuckingVerdict verdict = DuckingPlacement.Evaluate(setup, Mode, Pro with { ReachesJacks = false });
+        Assert.True(verdict.Ready);
+        Assert.Null(verdict.Reason);
+        Assert.Null(verdict.Note);
+        Assert.Equal("device", verdict.Backend);
+        Assert.Equal("0: 1 2; 18: 1 2", Sections(verdict));
+        Assert.Equal([1, 2], verdict.Pairs);
+        Assert.Equal(["monitor"], verdict.Outputs);
+        // Stream is the computer's to duck, beside the unit.
+        Assert.Equal(["stream"], verdict.SoftwareMixes!.Order());
+
+        // The unit ducks whatever processing says: nothing here can lower a mix it builds.
+        Assert.Equal("device", DuckingPlacement.Evaluate(setup with { Processing = "software" }, Mode, Pro).Backend);
+    }
+
+    [Fact]
+    public void InHardwareMixingOnlyTheTargetMixesSectionsAreDucked()
+    {
+        DuckingVerdict verdict = DuckingPlacement.Evaluate(Setup with { Mixes = ["monitor"] }, Mode, Pro);
+        Assert.Equal("0: 0 1 2 3 4 6", Sections(verdict));
+        Assert.Empty(verdict.SoftwareMixes!);
+
+        // A summed feed's section holds both its mixes and is ducked for either.
+        DuckingView summed = Mode with { UnitMixSections = new Dictionary<string, IReadOnlyList<int>> { ["monitor"] = [0], ["monitor2"] = [0, 18] } };
+        Assert.Equal("0: 0 1 2 3 4 6; 18: 0 1 2 3 4 6", Sections(DuckingPlacement.Evaluate(Setup with { Mixes = ["monitor2"] }, summed, Pro)));
+    }
+
+    [Fact]
+    public void InHardwareMixingTheUnitsOwnInputsAreSkippedWithANote()
+    {
+        DuckingSetup setup = Setup with { Channels = ["music", "xlr2", "line"] };
+        DuckingVerdict verdict = DuckingPlacement.Evaluate(setup, Mode, Pro);
+        Assert.True(verdict.Ready);
+        Assert.Null(verdict.Reason);
+        Assert.Equal("0: 2", Sections(verdict));
+        Assert.Equal("XLR 2 and Line In are the Wave XLR Pro's own inputs, which it does not duck.", verdict.Note);
+        Assert.Equal("XLR 2 is the Wave XLR Pro's own input, which it does not duck.",
+            DuckingPlacement.Evaluate(setup with { Channels = ["xlr2"] }, Mode, Pro).Note);
+    }
+
+    [Fact]
+    public void InHardwareMixingAComputerCopyHeardElsewhereIsDuckedInSoftwareToo()
+    {
+        DuckingView view = EditMonitor(Mode, m => m with { OtherConsumers = ["Speakers"] });
+        DuckingVerdict verdict = DuckingPlacement.Evaluate(Setup with { Mixes = ["monitor", "auxout"] }, view, Pro);
+        Assert.Equal("device", verdict.Backend);
+        Assert.Equal("0: 0 1 2 3 4 6", Sections(verdict));
+        Assert.Equal(["auxout", "monitor"], verdict.SoftwareMixes!.Order());
+    }
+
+    [Theory]
+    [InlineData("keyNotSupported", "The Wave XLR Pro ducks only with XLR 1 as the key, so the mixes it builds for its jacks are not ducked.")]
+    [InlineData("failed", "The Wave XLR Pro did not keep the ducking written to it. Switch ducking off and on to try again.")]
+    [InlineData("unsupportedBlock", "The Wave XLR Pro's ducking block holds values OpenXLR does not know.")]
+    public void InHardwareMixingAUnitThatCannotDuckLeavesItsMixesUnduckedAndTheRestToSoftware(string reason, string note)
+    {
+        DuckingView view = Mode;
+        UnitDuckingSupport support = Pro;
+        switch (reason)
+        {
+            case "keyNotSupported": view = view with { KeyIsUnitInput1 = false }; break;
+            case "failed": view = view with { Failed = true }; break;
+            case "unsupportedBlock": support = Pro with { Ready = false, Reason = "unsupportedBlock" }; break;
+        }
+        DuckingVerdict verdict = DuckingPlacement.Evaluate(Setup with { Mixes = ["monitor", "stream"] }, view, support);
         Assert.False(verdict.Ready);
-        Assert.Equal("hardwareMixing", verdict.Reason);
-        Assert.Contains("builds the mixes its jacks play", verdict.Note);
-        // A target only other outputs play is not the unit's to build.
-        DuckingView elsewhere = EditMonitor(View, m => m with { OnJacks = false }) with { HardwareMixing = true };
-        Assert.NotEqual("hardwareMixing", DuckingPlacement.Evaluate(Setup, elsewhere, Pro).Reason);
+        Assert.Equal(reason, verdict.Reason);
+        Assert.Equal(note, verdict.Note);
+        Assert.Equal("software", verdict.Backend);
+        Assert.Null(verdict.Sections);
+        Assert.Equal(["stream"], verdict.SoftwareMixes!.Order());
+    }
+
+    [Fact]
+    public void InHardwareMixingATargetTheUnitDoesNotBuildFollowsTheUsualRules()
+    {
+        // Only the Aux mix, which the computer still builds on pair 5.
+        DuckingVerdict verdict = DuckingPlacement.Evaluate(Setup with { Mixes = ["auxout"] }, Mode, Pro);
+        Assert.True(verdict.Ready);
+        Assert.Equal("device", verdict.Backend);
+        Assert.Equal(["aux"], verdict.Outputs);
+        Assert.Null(verdict.Sections);
+        Assert.Null(verdict.SoftwareMixes);
+        // And outside the mode a view with sections is not read.
+        DuckingVerdict software = DuckingPlacement.Evaluate(Setup, View with { UnitMixSections = Mode.UnitMixSections }, Pro);
+        Assert.Null(software.Sections);
+        Assert.Equal([ProReturnPairs.Monitor], software.Pairs);
     }
 
     [Fact]

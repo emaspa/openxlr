@@ -154,7 +154,23 @@ public sealed partial class Mixer
         DuckingVerdict verdict = DuckingPlacement.Evaluate(setup, view, unit is null ? null : _unitDucking);
         bool wantDevice = verdict.Backend == ProDucking.Device && _duckingWriter is not null;
         string owner = _config.Channels.FirstOrDefault(c => c.Id == setup.Key)?.Name ?? setup.Key;
-        ProDuckingTarget target = DuckingTarget(setup, verdict.Pairs);
+        ProDuckingTarget target = DuckingTarget(setup, verdict.Pairs) with { Sections = verdict.Sections };
+        // A custom layout can even lack the fallback xlr1. Pruning keeps
+        // the saved key word but an invalid graph plan must never reach D2.
+        DuckingPlan? plan = _config.Channels.Any(c => c.Id == setup.Key && c.Microphone) ? SoftwarePlan(setup, verdict) : null;
+
+        if (wantDevice && verdict.SoftwareMixes is not null)
+        {
+            // Hardware mixing: the unit ducks the mixes it builds, from the
+            // channels' pairs, and software the computer's mixes, from the
+            // channels' sends. Neither reaches the other's audio, so both run
+            // at once and there is no hand-over to wait for.
+            _duckingReleaseDeadline = null;
+            _duckingWriter!.Apply(target, owner);
+            _duckingOnDevice = true;
+            if (!SameDuckingPlan(_duckPlan, plan)) SetDuckingPlan(plan);
+            return;
+        }
 
         if (wantDevice)
         {
@@ -186,10 +202,22 @@ public sealed partial class Mixer
             if (_duckingWriter?.Status.IsOff != true && NowMs < deadline) return;
             _duckingReleaseDeadline = null;
         }
-        // A custom layout can even lack the fallback xlr1. Pruning keeps
-        // the saved key word but an invalid graph plan must never reach D2.
-        DuckingPlan? plan = _config.Channels.Any(c => c.Id == setup.Key && c.Microphone) ? setup.ToPlan() : null;
         if (!SameDuckingPlan(_duckPlan, plan)) SetDuckingPlan(plan);
+    }
+
+    /// <summary>
+    /// The software stages' plan: the setup's, less the cells of mixes only
+    /// the unit's copy of is heard in hardware mixing (the verdict's
+    /// <see cref="DuckingVerdict.SoftwareMixes"/>).
+    /// </summary>
+    private static DuckingPlan SoftwarePlan(DuckingSetup setup, DuckingVerdict verdict)
+    {
+        DuckingPlan plan = setup.ToPlan();
+        if (verdict.SoftwareMixes is not { } mixes) return plan;
+        return plan with
+        {
+            Cells = plan.Cells.Where(cell => mixes.Contains(cell[(cell.IndexOf('|') + 1)..])).ToFrozenSet(StringComparer.Ordinal),
+        };
     }
 
     private static bool SameDuckingPlan(DuckingPlan? left, DuckingPlan? right)
@@ -236,13 +264,30 @@ public sealed partial class Mixer
                 mix.Kind == MixKind.AuxPort && _auxPortEnabled && _hardwareOutputRouting,
                 consumers, open, keyInSoftware));
         }
+        bool unitBuilds = UnitBuildsJacksLocked && _hardwarePlan is { Active: true };
         return new(_built || _duckingPort is not null, carrier, mixes, feed,
             DuckingStatus.RunningMixes.Count > 0, _duckingUnit is not null && _duckingFailed.Contains(_duckingUnit))
         {
             HardwareMixing = UnitBuildsJacksLocked,
             JackFeeds = jackFeeds.Count == 0 ? null
                 : [.. jackFeeds.Select((f, slot) => new DuckingJackFeed(ProJackFeeds.Pairs[slot], MonitorFeed.Parts(f.Feed)))],
+            UnitMixSections = unitBuilds ? UnitMixSectionsOf(_hardwarePlan!) : new Dictionary<string, IReadOnlyList<int>>(),
+            ChannelPairs = unitBuilds ? _hardwarePlan!.Pairs : new Dictionary<string, int>(),
+            ChannelNames = _config.Channels.ToDictionary(c => c.Id, ChannelNameLocked, StringComparer.Ordinal),
         };
+    }
+
+    /// <summary>Each mix a running hardware mixing plan builds, to the sections of the feeds that hold it.</summary>
+    private static Dictionary<string, IReadOnlyList<int>> UnitMixSectionsOf(HardwareMixingPlan plan)
+    {
+        var sections = new Dictionary<string, List<int>>(StringComparer.Ordinal);
+        foreach ((string feed, int section) in plan.Sections)
+            foreach (string mix in MonitorFeed.Parts(feed))
+            {
+                if (!sections.TryGetValue(mix, out List<int>? list)) sections[mix] = list = [];
+                if (!list.Contains(section)) list.Add(section);
+            }
+        return sections.ToDictionary(p => p.Key, p => (IReadOnlyList<int>)[.. p.Value.Order()], StringComparer.Ordinal);
     }
 
     /// <summary>A detached snapshot. Device is null without hardware ducking on the primary driven unit.</summary>

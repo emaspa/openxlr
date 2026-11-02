@@ -164,9 +164,10 @@ them for a while before more is built on top.
   ([section 15](wave-xlr-pro-protocol.md#15-the-mix-sections-as-a-mixer-desk-probe-of-2026-11-02)):
   the unit takes level and membership changes live and ramps them itself,
   a microphone comes back at its own gain with no added delay, and a
-  playback pair comes back 7.9 dB down. The rest of the Pro's ducking waits on this
-  mode: ducking per channel, and keys other than XLR 1, whose encoding no
-  capture has shown.
+  playback pair comes back 7.9 dB down. The mode is built through the API
+  and ducks per channel on the mixes the unit builds; none of it is heard
+  on a unit yet, and keys other than XLR 1 still wait on a capture that
+  shows their encoding.
 - [ ] The Pro's mix maximizer and channel booster, the onboard effects
   with no mapped control. The booster adds up to 12 dB above the normal
   ceiling on any input; the maximizer is per mix. Both need Wave Link

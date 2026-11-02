@@ -2567,7 +2567,8 @@ device}`:
 
 Live reduction is a meter, not state: while software runs, the `meters`
 message carries `duck:<mix>` for each ducked mix, the reduction in dB. On
-the unit the meters carry nothing for ducking.
+the unit the meters carry nothing for ducking, in hardware mixing too:
+where the unit reports its reduction is not known.
 
 `setDucking` takes `value`, an object with any of `enabled`, `key`,
 `channels`, `mixes`, `sensitivity`, `amount` and `speed`; a field left out
@@ -2634,7 +2635,6 @@ rule that fails gives `reason`:
 |---|---|---|
 | the software mixer runs | `mixerOff` | The software mixer is off, so ducking does not run. |
 | the key carries the unit's input 1 | `keyNotSupported` | The Wave XLR Pro ducks only with XLR 1 as the key. |
-| no target mix is one the unit builds in [hardware mixing](#hardware-mixing) | `hardwareMixing` | The Wave XLR Pro builds the mixes its jacks play, and ducking does not run on them yet. |
 | the unit's ducking is heard on the jacks: no target mix is heard on them while the last read shows the jacks' feed outside the mix they play | `monitorReturn` | The jacks' feed is not in the Wave XLR Pro's headphone mix, where it ducks, so this computer ducks. |
 | every target mix that is heard is heard only on the unit: a monitor mix in the jacks' feed, or the Aux mix on the USB Aux port, and on no other output, virtual microphone or feed | `mixElsewhere` | Monitor A also plays on Speakers, which the Wave XLR Pro cannot duck. |
 | when one mix of a jack's feed is ducked, all of that feed's mixes are; jacks on other feeds are not counted | `sharedOutput` | The jacks play Monitor A and Chat together, and only Monitor A is ducked. |
@@ -2653,6 +2653,31 @@ these rules; a setup whose target mixes nobody hears runs on the unit with
 no pairs ducked. The unit ducks the pairs `outputs` names: for `monitor`,
 the pair of each jack feed that plays a target mix, so a jack on another
 feed keeps its level.
+
+In [hardware mixing](#hardware-mixing) a target mix a jack plays is built
+by the unit from each channel's own pair, and the unit ducks it per
+channel instead, whatever `processing` says, since nothing on this
+computer can lower a mix the unit builds. Each channel in `channels` that
+streams on a pair is ducked in the section of each such target mix (a
+summed feed's section when either of its mixes is a target), and nowhere
+else. The rules above do not apply to these mixes: a channel heard there
+and not in `channels` keeps its level, and so does the key. Only these
+rules do, giving `ready` false and leaving the unit's mixes unducked:
+`keyNotSupported` (the key must carry XLR 1, "The Wave XLR Pro ducks only
+with XLR 1 as the key, so the mixes it builds for its jacks are not
+ducked."), `failed` and `unsupportedBlock`. The unit's own inputs (XLR 2,
+Aux In, Line In) are never lowered by it; one in `channels` is skipped
+and `note` says so with `ready` true: "XLR 2 and Line In are the Wave XLR
+Pro's own inputs, which it does not duck." Every other target mix (Stream,
+Chat, the Aux mix, a monitor mix no jack plays) and the computer's copy of
+a unit-built mix another output also plays are ducked in software at the
+same time, from the channels' sends. The two never meet, since a pair
+carries a channel before its sends, so they need no hand-over. `backend`
+reads `device` while the unit ducks, `outputs` is `["monitor"]`, and
+`readback.pairs` lists every pair ducked in any section. The amount and
+speed are one per unit, so every pair dips by the same depth in every
+section. A setup whose target mixes the unit does not build follows the
+rules above, as outside the mode.
 
 Moving between the two never doubles a duck. From the unit to software,
 the unit is written with ducking off, and the software stages start once
@@ -2765,8 +2790,8 @@ jack plays. `createChannel`, `createCaptureChannel` and a `setInputBinding`
 that would need a pair when none is left are refused with the budget
 sentence. `setMixing` with `hardware` is refused with that sentence while
 the layout has more channels than pairs. Ducking on a mix a jack plays
-gives the reason `hardwareMixing` and runs nowhere; on mixes the computer
-builds it runs as before.
+runs on the unit per channel (see [where ducking runs](#where-ducking-runs));
+on mixes the computer builds it runs as before.
 
 **Eligibility.** `reason` names the first thing in the way, whether or not
 the mode is wanted: `mixerOff`, `notSupported` (the driven unit is not a
@@ -2776,8 +2801,11 @@ is not 17 channels or its capture source not 18), `budget` and `failed`.
 `note` says it in one sentence.
 
 **What the mode turns off.** `disabled` maps fixed keys to the sentence a
-client shows: `inserts:mix:<id>` and `ducking:mix:<id>` for each mix a
-jack plays, since the unit's copy runs neither; `latencyCompensation`;
+client shows: `inserts:mix:<id>` for each mix a jack plays, since the
+unit's copy runs none; while a jack plays a mix, `ducking:key` (the unit
+ducks its mixes only with XLR 1 as the key) and `ducking:channel:<id>`
+for each of the unit's own inputs other than XLR 1, which it never
+lowers; `latencyCompensation`;
 `processedMic:<id>` for a unit input with software processing, which the
 unit's mixes take as it comes in; `soundCheck` and `audition`. Mixes the
 computer builds (Stream, Chat, and any mix only other outputs play) keep

@@ -36,7 +36,10 @@ Wave XLR Pro:
   whole mix on the jacks and Line Out or on the USB Aux port), the Pro
   runs it on its own processor; otherwise this computer does, and the
   state says why ([api.md](api.md#where-ducking-runs)). The unit is written with ducking off while
-  this computer runs it, which clears ducking Wave Link left
+  this computer runs it, which clears ducking Wave Link left. In hardware
+  mixing, where the unit builds the jacks' mixes from a USB pair per
+  channel, it ducks each chosen channel on its own, keyed by XLR 1, and
+  this computer ducks the mixes it builds alongside
 
 Wave XLR MK.2 and XLR Dock MK.2: gain, mute, phantom power, low cut,
 expander, voice tune with strength, ClipGuard, compressor, headphone

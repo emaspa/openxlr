@@ -2,22 +2,41 @@ using OpenXLR.Core.Devices;
 
 namespace OpenXLR.Core.Mixing;
 
-/// <summary>The three values, preset words or numbers, and the USB return pairs the primary unit should duck.</summary>
+/// <summary>
+/// The three values, preset words or numbers, and the USB return pairs the
+/// primary unit should duck. <see cref="Sections"/>, in hardware mixing,
+/// says in which of block 0x0001's sections each pair is ducked; without it
+/// the pairs are ducked as whole outputs (see <see cref="ProDucking"/>).
+/// </summary>
 public sealed record ProDuckingTarget(bool Enabled, DuckingLevel Sensitivity, DuckingLevel Amount, DuckingSpeed Speed, IReadOnlySet<int> Pairs)
 {
+    /// <summary>Section start to the pairs ducked in it, each a subset of <see cref="Pairs"/>; null for whole outputs.</summary>
+    public IReadOnlyDictionary<int, IReadOnlySet<int>>? Sections { get; init; }
+
     public bool Equals(ProDuckingTarget? other)
         => other is not null && Enabled == other.Enabled && Sensitivity == other.Sensitivity
-            && Amount == other.Amount && Speed == other.Speed && Pairs.SetEquals(other.Pairs);
+            && Amount == other.Amount && Speed == other.Speed && Pairs.SetEquals(other.Pairs) && SameSections(Sections, other.Sections);
 
-    public override int GetHashCode() => HashCode.Combine(Enabled, Sensitivity, Amount, Speed, Pairs.Count);
+    private static bool SameSections(IReadOnlyDictionary<int, IReadOnlySet<int>>? a, IReadOnlyDictionary<int, IReadOnlySet<int>>? b)
+        => a is null ? b is null
+            : b is not null && a.Count == b.Count && a.All(p => b.TryGetValue(p.Key, out IReadOnlySet<int>? other) && p.Value.SetEquals(other));
+
+    public override int GetHashCode() => HashCode.Combine(Enabled, Sensitivity, Amount, Speed, Pairs.Count, Sections?.Count);
 
     /// <summary>The unit's ducking switched off, which writes no preset.</summary>
     public static ProDuckingTarget Off { get; } = new(false, ProDucking.Medium, ProDucking.Medium, ProDucking.Medium, new HashSet<int>());
 
-    /// <summary>For the journal: off, or the pairs and values.</summary>
+    /// <summary>For the journal: off, or the pairs (by section, when it has sections) and values.</summary>
     public override string ToString() => Enabled
-        ? $"on, pairs {(Pairs.Count == 0 ? "none" : string.Join(" ", Pairs.Order()))}, sensitivity {Sensitivity}, amount {Amount}, speed {Speed}"
+        ? $"on, pairs {PairsText()}, sensitivity {Sensitivity}, amount {Amount}, speed {Speed}"
         : "off";
+
+    private string PairsText()
+    {
+        static string List(IEnumerable<int> pairs) => pairs.Any() ? string.Join(" ", pairs.Order()) : "none";
+        if (Sections is not { Count: > 0 } sections) return List(Pairs);
+        return string.Join("; ", sections.OrderBy(s => s.Key).Select(s => $"{List(s.Value)} in section {s.Key}"));
+    }
 }
 
 /// <summary>Where the last ducking post stands on the primary unit.</summary>

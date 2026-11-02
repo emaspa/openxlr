@@ -220,12 +220,16 @@ public sealed class HardwareMixingPlanTests
         IReadOnlyDictionary<string, string> disabled = HardwareMixingPlanner.Plan(setup).Disabled;
         Assert.Equal(
         [
-            "audition", "ducking:mix:monitor", "ducking:mix:monitor2", "inserts:mix:monitor", "inserts:mix:monitor2",
-            "latencyCompensation", "processedMic:xlr1", "soundCheck",
+            "audition", "ducking:channel:aux", "ducking:channel:line", "ducking:channel:xlr2", "ducking:key",
+            "inserts:mix:monitor", "inserts:mix:monitor2", "latencyCompensation", "processedMic:xlr1", "soundCheck",
         ], disabled.Keys.Order(StringComparer.Ordinal));
         Assert.All(disabled.Values, sentence => Assert.DoesNotContain("\u2014", sentence));
         Assert.Contains("Monitor A", disabled["inserts:mix:monitor"]);
         Assert.Contains("XLR 1", disabled["processedMic:xlr1"]);
+        Assert.Contains("XLR 1", disabled["ducking:key"]);
+        Assert.Equal("The Wave XLR Pro does not duck Line In, its own input, in the mixes it builds.", disabled["ducking:channel:line"]);
+        // With no jack in the mode, the unit builds no mix and turns no ducking off.
+        Assert.DoesNotContain(HardwareMixingPlanner.Plan(Setup() with { Jacks = [] }).Disabled.Keys, k => k.StartsWith("ducking:", StringComparison.Ordinal));
     }
 
     /// <summary>

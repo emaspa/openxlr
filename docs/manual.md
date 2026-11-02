@@ -793,6 +793,20 @@ and lower at different points:
 
 If a gate on XLR 1 should stop false triggers, choose **This computer**.
 
+**In hardware mixing on the Pro.** When the Pro builds the mixes its jacks
+play ([hardware mixing](api.md#hardware-mixing), API only for now), each
+channel reaches the unit on a USB pair of its own, so the unit ducks
+channel by channel. Only the chosen channels dip in a
+ducked mix the jacks play; anything else in that mix, your voice
+included, keeps its level, and a jack on another mix is not touched. The
+unit does this whatever **Runs on** says, since nothing on this computer
+can lower a mix the unit builds. It still needs XLR 1 as the key; with
+another key the jacks' mixes are not ducked and the state says why. XLR 2,
+Aux In and Line In are the unit's own inputs, and it does not lower them:
+one on the list is skipped, and the state's note says so. Every other ducked mix, such as Stream or Chat, is ducked on this
+computer at the same time. The amount and speed are the same everywhere,
+and the reduction meter stays empty for the unit's mixes.
+
 On the Pro, OpenXLR writes the setting every time the unit connects, which
 clears any ducking Wave Link left on it. If another program changes the
 setting while OpenXLR runs, OpenXLR writes its own back within a few
