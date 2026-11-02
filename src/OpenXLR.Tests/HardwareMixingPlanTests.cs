@@ -304,14 +304,15 @@ public sealed class HardwareMixingPlanTests
             Processed = new HashSet<string> { "xlr1" },
         };
         IReadOnlyDictionary<string, string> disabled = HardwareMixingPlanner.Plan(setup).Disabled;
+        // Pairs 7 and 5 are free: XLR 1's processed audio takes 7 and the cue
+        // 5, so nothing about the microphone, Mic setup or auditions is off.
         Assert.Equal(
         [
-            "audition", "ducking:channel:aux", "ducking:channel:line", "ducking:channel:xlr2", "ducking:key",
-            "inserts:mix:monitor", "inserts:mix:monitor2", "latencyCompensation", "processedMic:xlr1", "soundCheck",
+            "ducking:channel:aux", "ducking:channel:line", "ducking:channel:xlr2", "ducking:key",
+            "inserts:mix:monitor", "inserts:mix:monitor2", "latencyCompensation",
         ], disabled.Keys.Order(StringComparer.Ordinal));
         Assert.All(disabled.Values, sentence => Assert.DoesNotContain("\u2014", sentence));
         Assert.Contains("Monitor A", disabled["inserts:mix:monitor"]);
-        Assert.Contains("XLR 1", disabled["processedMic:xlr1"]);
         Assert.Contains("XLR 1", disabled["ducking:key"]);
         Assert.Equal("The Wave XLR Pro does not duck Line In, its own input, in the mixes it builds.", disabled["ducking:channel:line"]);
         // With no jack in the mode, the unit builds no mix and turns no ducking off.

@@ -102,7 +102,8 @@ public sealed partial class MonitorVolumeIntegrationTests
             Assert.Equal(0x1e, mode[90]);
             Assert.Equal(0x00, mode[98]);
             Assert.Equal(0xf0, mode[12]);                       // pairs 0 to 3; XLR 1, Aux In and Line In muted in Monitor A
-            Assert.Equal(0x05, mode[13]);                       // pairs 4 and 6
+            Assert.Equal(0x0d, mode[13]);                       // pairs 4 and 6, and the cue on pair 7
+            Assert.Equal(7, service.Snapshot()!.HardwareMixing!.CuePair);
             Assert.Equal(unchecked((byte)(sbyte)-36), mode[ProMixSections.SourceOfPair(1)]);   // Game at 0.5
             Assert.Equal(unchecked((byte)(sbyte)-27), mode[ProMixSections.SourceOfPair(0)]);   // System at 0.6
             Assert.Equal(0x00, mode[ProMixSections.SourceOfPair(2)]);
@@ -141,8 +142,42 @@ public sealed partial class MonitorVolumeIntegrationTests
             Run(new() { Cmd = "setChannelMuted", Channel = "game", Mix = "monitor", Value = JsonSerializer.SerializeToElement(true) });
             Sweep();
             Assert.Equal(0, pro.Block[12] & 0x20);
-            // What the mode turns off is refused with its sentence.
-            Assert.Contains("Auditions are not available", service.Apply(new() { Cmd = "auditionClip" }));
+            // With the cue pair free the mode does not refuse an audition.
+            Assert.DoesNotContain("USB pair", service.Apply(new() { Cmd = "auditionClip" }) ?? "");
+
+            // A processed XLR 1 (the soft low cut, the unit having none here):
+            // its channel plays back on pair 7, the first free, and the unit's
+            // mixes take it there instead of the raw input; the cue moves to
+            // pair 5. No write ever holds both, so the voice is never doubled.
+            Run(new() { Cmd = "setChannelMuted", Channel = "xlr1", Mix = "monitor", Value = JsonSerializer.SerializeToElement(false) });
+            for (int i = 0; i < 2; i++) Sweep();
+            Assert.Equal(0x01, pro.Block[12] & 0x01);
+            pro.History.Clear();
+            Run(new() { Cmd = "setLowCutHz", Value = JsonSerializer.SerializeToElement(80) });
+            PrimaryWait(() => { Sweep(); return (pro.Block[13] & 0x08) != 0; });
+            Assert.Equal(new Dictionary<string, int> { ["xlr1"] = 7 }, service.Snapshot()!.HardwareMixing!.ReturnPairs);
+            Assert.Equal(5, service.Snapshot()!.HardwareMixing!.CuePair);
+            Assert.Equal(7, service.Snapshot()!.Channels.Single(c => c.Id == "xlr1").HardwarePair);
+            WaitForRecovery(() => PortsFrom("OpenXLR_ch_xlr1").SequenceEqual(["playback_AUX14", "playback_AUX15"]));
+            byte[] processed = pro.Block;
+            Assert.Equal(0, processed[12] & 0x01);
+            Assert.Equal(0x00, processed[ProMixSections.SourceOfPair(7)]);
+            Assert.Equal(0x0f, processed[13] & 0x0f);          // pairs 4 and 6, XLR 1 on 7, the cue on 5
+            // The cue reaches pair 5 in the same write that moves XLR 1 to 7:
+            // no block ever has the raw input in beside that.
+            Assert.NotEmpty(pro.History);
+            Assert.DoesNotContain(pro.History, b => (b[12] & 0x01) != 0 && (b[13] & 0x02) != 0);
+            Assert.DoesNotContain("processedMic:xlr1", service.Snapshot()!.HardwareMixing!.Disabled.Keys);
+            // Processing off: back to the raw input, the pair unlinked, the cue on 7 again.
+            pro.History.Clear();
+            Run(new() { Cmd = "setLowCutHz", Value = JsonSerializer.SerializeToElement(0) });
+            PrimaryWait(() => { Sweep(); return (pro.Block[12] & 0x01) != 0; });
+            WaitForRecovery(() => PortsFrom("OpenXLR_ch_xlr1").Length == 0);
+            Assert.Equal(7, service.Snapshot()!.HardwareMixing!.CuePair);
+            Assert.Empty(service.Snapshot()!.HardwareMixing!.ReturnPairs);
+            Assert.DoesNotContain(pro.History, b => (b[12] & 0x01) != 0 && (b[13] & 0x02) != 0);
+            Run(new() { Cmd = "setChannelMuted", Channel = "xlr1", Mix = "monitor", Value = JsonSerializer.SerializeToElement(true) });
+            Sweep();
 
             // Ducking: the unit lowers Game and Music in sections 0 and 36
             // only, from their own pairs, keyed by XLR 1; Monitor A and the Aux
@@ -216,11 +251,15 @@ public sealed partial class MonitorVolumeIntegrationTests
         public byte[] Block { get { lock (this) return (byte[])_block.Clone(); } }
         public byte[] Levels { get { lock (this) return (byte[])_levels.Clone(); } }
         public byte[] Ducking { get { lock (this) return (byte[])_ducking.Clone(); } }
+        /// <summary>Block 0x0001 after each write that changed it, oldest first.</summary>
+        public List<byte[]> History { get; } = [];
 
         public DeviceInfo Info { get; } = new("Elgato", "Wave XLR Pro", 0x0fd9, 0x00b4) { Location = new(1, 53, "1-" + MixSerial, MixSerial) };
         public DeviceCapabilities Capabilities { get; } = new()
         {
-            Gain = true, Mute = true, LowCut = true, ClipGuard = true, OutputRouting = true, AuxInput = true, LineInput = true,
+            // No hardware low cut, so XLR 1's soft low cut runs in software
+            // and the test can process the microphone without a plugin host.
+            Gain = true, Mute = true, LowCut = false, ClipGuard = true, OutputRouting = true, AuxInput = true, LineInput = true,
             XlrInputs = 2, RetainsSettings = true, HardwareMixing = true, Ducking = true,
         };
         public DuckingReadback? ReadDucking() { lock (this) return ProDucking.Decode(_ducking, _block); }
@@ -248,6 +287,7 @@ public sealed partial class MonitorVolumeIntegrationTests
                 ProMixChanges changes = plan.Apply(before, _block);
                 if (plan.JackLevels is { } wanted) wanted.All(levels).CopyTo(_levels, 0);
                 bool wrote = !_block.AsSpan().SequenceEqual(before);
+                if (wrote) History.Add((byte[])_block.Clone());
                 return new ProMixWrite(changes, false, "not read", wrote, ProDucking.Diff(before, _block), wrote && changes.Commits())
                 {
                     Change5 = levels.AsSpan().SequenceEqual(_levels) ? "" : ProDucking.Diff(levels, _levels),

@@ -311,7 +311,7 @@ that final acknowledgement (or an `error` without a request id):
 | `getNativeEditorRules` | none | read release defaults and explicit user overrides for native editor compatibility |
 | `setNativeEditorRule` | `kind`, `plugin`, `name?`, `blocked?` | set `blocked:true` to use OpenXLR controls, `false` to allow the native editor, or null/absent to remove the override and follow release defaults. Saved atomically before success; answered with `nativeEditorRules` |
 | `showInsertUi` | `channel`, `insertId` | open an enabled insert's native editor when the optional host is installed and the editor policy allows it; a blocked editor is refused without changing the audio instance |
-| `soundCheck` | `channel`, `action` | Sound Check on any channel whose `microphone` is true: `xlr1`, `xlr2` or a mono capture input. Stereo capture inputs, Aux In, Line In, application channels and mixes are refused. `record` starts a session if none runs and records up to ten seconds, replacing an earlier sample; `loop` plays the sample into the channel in place of the microphone, its last 50 ms crossfaded into its start where it starts over, and needs at least a tenth of a second recorded; `live` goes back to the microphone and keeps the sample, and starts a session with no sample when none runs; `stop` ends the session and discards the sample. One session at a time across all microphones: `record`, `loop` and `live` for another channel are refused with the active channel's name, and its `stop` does nothing. Every action but `stop` is refused at once when the native plugin host is not installed. Never saved. See [Sound Check](#sound-check) |
+| `soundCheck` | `channel`, `action` | Sound Check on any channel whose `microphone` is true: `xlr1`, `xlr2` or a mono capture input. Stereo capture inputs, Aux In, Line In, application channels and mixes are refused. `record` starts a session if none runs and records up to ten seconds, replacing an earlier sample; `loop` plays the sample into the channel in place of the microphone, its last 50 ms crossfaded into its start where it starts over, and needs at least a tenth of a second recorded; `live` goes back to the microphone and keeps the sample, and starts a session with no sample when none runs; `stop` ends the session and discards the sample. One session at a time across all microphones: `record`, `loop` and `live` for another channel are refused with the active channel's name, and its `stop` does nothing. Every action but `stop` is refused at once when the native plugin host is not installed. In [hardware mixing](#hardware-mixing) a session on XLR 1 or XLR 2 plays the take back on the microphone's return pair, and is refused with its `soundCheck:<id>` sentence while no pair is left for it. Never saved. See [Sound Check](#sound-check) |
 | `setSoundCheckRaw` | `channel`, `value` | `true` plays the session's signal, the sample or the live microphone, straight into the channel past its EQ, software processing and inserts; `false` plays it through them again. The helper crossfades between its two outputs in 20 ms and no chain is built again. Starts a session on the live microphone when none runs. The channel and the host rules are those of `soundCheck`. Never saved; the session's end turns it off |
 | `setSoundCheckHearMyself` | `channel`, `value` | `true` opens the channel's send into every monitor mix that plays on a selected monitor output, whatever its mute, for the rest of the session; `false` lets the sends' own mutes decide again. Starts a session on the live microphone when none runs. The channel and the host rules are those of `soundCheck`. Never saved; the session's end turns it off |
 | `watchInputMeter` | `channel` | run the [meter before the chain](#meter-before-the-chain) of a channel whose `microphone` is true for the next 15 seconds, starting it when none runs. Send it again to keep the meter running. Refused at once when the native plugin host is not installed. Nothing in the channel's route changes, and nothing is saved |
@@ -328,7 +328,7 @@ that final acknowledgement (or an `error` without a request id):
 | `releaseClip` | `clip` | the key came up: this connection's hold on the clip ends, and the clip's `hold` voices end unless another open connection still holds it with a voice that plays. A hold whose voice has ended keeps no other connection's release from ending that connection's voice |
 | `stopClip` | `clip` | fade the clip's voices out, its audition included |
 | `stopClips` | none | fade every voice out, the audition included; no error while the board is off |
-| `auditionClip` | `clip` | play the clip once from its start in the monitor mixes the monitor outputs play, and in no other mix. It never plays in SFX, Stream, Chat or Aux, so the headphones hear it and the stream and a call do not. It replaces the audition playing, of any clip. SFX's fader, mutes and sends do not apply; the clip's own `gain` does, and its `mode` and `loop` do not. It is not one of the eight voices, and no press ends it. Refused like `playClip` while the board cannot play or the clip is not `ready`; with "No monitor output is selected, so an audition would not be heard. Select a monitor output first." while none is; with "Listening is paused, so an audition would not be heard. Resume listening first." while the monitor is paused; with "The monitor outputs play no monitor mix, so an audition would not be heard. Have an output play a monitor mix first." while every selected output plays only virtual microphone mixes; with "The soundboard is reconnecting to the monitor mixes. Audition the clip again in a moment." while its links are made again; and, as a press is, while the player's link into SFX is made again, since the player stands still then. Never saved. See [auditions](#auditions) |
+| `auditionClip` | `clip` | play the clip once from its start in the monitor mixes the monitor outputs play, and in no other mix. It never plays in SFX, Stream, Chat or Aux, so the headphones hear it and the stream and a call do not. It replaces the audition playing, of any clip. SFX's fader, mutes and sends do not apply; the clip's own `gain` does, and its `mode` and `loop` do not. It is not one of the eight voices, and no press ends it. Refused like `playClip` while the board cannot play or the clip is not `ready`; with "No monitor output is selected, so an audition would not be heard. Select a monitor output first." while none is; with "Listening is paused, so an audition would not be heard. Resume listening first." while the monitor is paused; with "The monitor outputs play no monitor mix, so an audition would not be heard. Have an output play a monitor mix first." while every selected output plays only virtual microphone mixes; with "The soundboard is reconnecting to the monitor mixes. Audition the clip again in a moment." while its links are made again; and, as a press is, while the player's link into SFX is made again, since the player stands still then. In [hardware mixing](#hardware-mixing) it plays on the cue pair into the jacks' sections, and is refused with the `audition` sentence while no pair is left for the cue. Never saved. See [auditions](#auditions) |
 | `stopAudition` | none | fade the audition out; the clips playing in SFX play on. No error while the board is off or nothing is auditioned |
 | `restoreStarterSounds` | none | add back each [starter sound](#starter-sounds) the library no longer has, after the clips there, which are kept. Answered with `starterSounds`, whose `message` says when none is missing. A starter clip counts as present by its `starter` id, whatever its name and page are now. Each clip is checked by the helper as `importClip` checks a file, and one that fails is left out and named. Refused, with nothing changed, when the starter sounds are not installed, when no missing clip can be added, while a library export or import runs, and without the native plugin host. Runs beside the connection's later commands, as `importClip` does |
 | `getSoundboard` | none | answered with `soundboard`, for a client that wants the board without the whole state |
@@ -2730,6 +2730,24 @@ more is refused, and `note` says how many need a pair: "Hardware mixing on
 the Wave XLR Pro streams at most 8 channels; this layout has 9 that need a
 USB pair."
 
+**Processed inputs and the cue.** The pairs no channel takes are claimed on
+demand, in this order. First each of the unit's inputs that software
+processes (noise removal, the voice changer, a software EQ, an insert, the
+soft low cut or ClipGuard, or Mic setup running on it), in the order XLR 1,
+XLR 2, Aux In, Line In: its channel's audio plays back to the unit on that
+pair, a return pair, and the unit's mixes take the input from there,
+processed, at its sends, instead of the raw input. Then the cue pair, which
+plays soundboard auditions in the jacks' sections only, at the volume of
+the jack's mixes, and never in the Aux mix. Channels come first and keep
+their pairs, so a channel added later takes a pair from a claim; the cue
+gives way first, then the last processed input. An input with no pair left
+reaches the unit's mixes raw, with its `processedMic:<id>` note. A switch
+between the raw input and its return pair is one block write that clears
+the one and opens the other, with the pair linked before, so the voice is
+never heard twice. Neither claim is kept in `hardwarePairs`. On a layout
+of seven channels, one pair is left: a processed XLR 1 takes it and
+auditions are refused.
+
 **Sections.** Each distinct feed a selected jack plays takes one of the
 unit's sections 0, 18 and 54, kept per feed in `hardwareSections`. A feed
 that sums two mixes is a section of its own. While the USB Aux port is on
@@ -2756,7 +2774,7 @@ its ceiling is listed in `clamped` as `{channel, feed, wantedDb, heldDb}`.
 headphone volume or Line Out's level, drops by its `entryOffsetsDb`: 21 dB,
 and 7.94 dB more while the jack's feed holds a unit input it heard through
 the Monitor mix's USB pair before (Line In, Aux In, or a microphone the
-direct path did not carry). No source gets louder on any jack. In the mode
+direct path did not carry and that has no return pair). No source gets louder on any jack. In the mode
 the output volume of a jack lowers its headphone volume and never raises
 it, and the Pro's playback sink stays at 100%. Leaving gives back each
 jack's whole entry offset, so a jack returns to the level it had before
@@ -2793,15 +2811,20 @@ volume, which only moves the jacks. The output volume of the jacks
 (`setOutputVolume`, `adjustOutputVolume`, a desktop key on the Pro's sink)
 moves their levels, and the state's `outputVolume` reads it. A headphone
 volume moved on the unit, by its knob or by `set` with `hpVolumeDb`, is
-taken as the jack's new base. Microphones play as the unit's inputs, so
-the direct path is not used, and the mix meters read the computer's copy
+taken as the jack's new base. Microphones play as the unit's inputs, or
+from their return pairs while processed, so the direct path is not used.
+Mic setup's Hear myself opens the microphone's sends in the unit's mixes
+as it does in the graph. The mix meters read the computer's copy
 of each mix, at the same faders. If the unit does not keep five writes in
 a row, the mode leaves with `failed` until `setMixing` is sent again.
 
 **Refused while it runs.** `soundCheck` (other than `stop`),
-`setSoundCheckHearMyself` with true and `auditionClip` are refused with
-the `disabled` sentence, and so is `setInserts` with a chain for a mix a
-jack plays. `createChannel`, `createCaptureChannel` and a `setInputBinding`
+`setSoundCheckRaw` and `setSoundCheckHearMyself` with true are refused for
+a microphone with no pair for its take, with the `soundCheck:<id>` or
+`soundCheck` sentence, unless a session already runs on it.
+`auditionClip` is refused with the `audition` sentence while there is no
+cue pair, and `setInserts` with a chain for a mix a jack plays with its
+`inserts:mix:<id>` sentence. `createChannel`, `createCaptureChannel` and a `setInputBinding`
 that would need a pair when none is left are refused with the budget
 sentence. `setMixing` with `hardware` is refused with that sentence while
 the layout has more channels than pairs. Ducking on a mix the unit builds,
@@ -2823,16 +2846,19 @@ none; while the unit builds a mix, `ducking:key` (the unit
 ducks its mixes only with XLR 1 as the key) and `ducking:channel:<id>`
 for each of the unit's own inputs other than XLR 1, which it never
 lowers; `latencyCompensation`;
-`processedMic:<id>` for a unit input with software processing, which the
-unit's mixes take as it comes in; `soundCheck` and `audition`. Mixes the
-computer builds (Stream, Chat, and any mix only other outputs play) keep
-everything.
+`processedMic:<id>` for a unit input with software processing and no
+return pair, which the unit's mixes take as it comes in;
+`soundCheck:<id>` for XLR 1 or XLR 2 when no pair is left for its take,
+and `soundCheck` when that holds for both; `audition` while there is no
+cue pair. Mixes the computer builds (Stream, Chat, and any mix only other
+outputs play) keep everything.
 
 **State.** Once the daemon has planned the mode, the mixer state carries
 `hardwareMixing {wanted, active, reason, note}`. While the mode runs it
-also carries `pairs`, `sections`, `jacks`, `clamped` and `disabled`, each
-channel on a pair carries `hardwarePair`, and each mix a jack plays
-carries `hardwareSection`. `capabilities.hardwareMixing` is true on the
+also carries `pairs`, `returnPairs` (each processed unit input to its
+return pair), `cuePair` (or null), `sections`, `jacks`, `clamped` and
+`disabled`, each channel on a pair or a return pair carries
+`hardwarePair`, and each mix a jack plays carries `hardwareSection`. `capabilities.hardwareMixing` is true on the
 Wave XLR Pro.
 
 **Dry run.** `{"cmd":"setMixing","value":"hardware","check":true}` is

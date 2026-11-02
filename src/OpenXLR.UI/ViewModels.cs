@@ -1351,7 +1351,8 @@ public sealed partial class MainViewModel : ViewModelBase
     {
         foreach (MixViewModel mix in Mixes) mix.Inserts.UnitNote = HardwareMixing.DisabledSentence($"inserts:mix:{mix.Id}");
         string? soundCheck = HardwareMixing.DisabledSentence("soundCheck");
-        foreach (MicSetupViewModel setup in MicSetups()) setup.UnitNote = soundCheck;
+        foreach (MicSetupViewModel setup in MicSetups())
+            setup.UnitNote = HardwareMixing.DisabledSentence($"soundCheck:{setup.Channel}") ?? soundCheck;
         Soundboard.AuditionNote = HardwareMixing.DisabledSentence("audition");
     }
 
