@@ -1035,10 +1035,30 @@ Byte 98 is section 0's level in quarter-dB attenuation, dB = -byte/4, and
 Byte 94 at `00` left every mix as it was and changed XLR 1's own capture:
 AUX0 dropped 10.7 dB from 500 Hz to 3 kHz and 2.6 dB at 60 Hz, still
 coherent with XLR 1 in the mixes from 150 Hz up, with 0 samples of delay.
-At `03` AUX0 was the same as at `02`. The unit had XLR 1's low cut, Voice
-Tune, clip guard and compressor on, so `00` may be a tap before the
-unit's processing; that is inferred, not measured. Bytes 94 to 97 read
-`02` each and may hold the same choice for the other inputs.
+At `03` AUX0 was the same as at `02`.
+
+A second run the same day settled what `00` is. With the daemon stopped,
+XLR 1 alone in section 54 at `00` as the processed reference (AUX14), the
+unit's low cut, compressor and Voice Tune (block 0x0004 byte 1 bits 4, 7
+and 6, each with the commit) were switched off and on, first with byte 94
+at `00`, then at `02`:
+
+| Switch | AUX0 at `00` | AUX14 against AUX0 at `00` | at `02` |
+|---|---|---|---|
+| none | -68.7 dBFS | +10.7 dB at 1 kHz, -10.4 dB at 40 Hz | identical |
+| low cut off, on | unchanged | +3.2 dB at 40 Hz, then back | identical |
+| compressor off, on | unchanged | 6.0 dB lower, then back | identical |
+| Voice Tune off, on | unchanged | 4.6 dB lower, then back | identical |
+
+So byte 94 at `00` gives XLR 1's capture before the unit's low cut,
+compressor and Voice Tune, while every mix keeps the processed
+microphone; `01`, `02` and `03` give the processed microphone. Coherence
+stayed 1.000 throughout, with room noise as the signal, so the compressor
+acted as its makeup gain only; the clip guard and the gain stage were not
+tested. Bytes 95 to 97 at `00` changed nothing that could be seen: XLR 2
+and USB Aux carried digital silence during the run and Line In's noise
+floor stayed the same, so whether they hold the same choice for the other
+inputs is still open.
 
 ### Ducking in sections 54 and 72
 
