@@ -773,7 +773,10 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// <summary>
     /// Route the Aux mix into the device's USB Aux port (its dedicated return
     /// pair) when enabled and the device is present. The port selector and
-    /// matrix cell are the daemon's job; this is only the PipeWire leg.
+    /// matrix cell are the daemon's job; this is only the PipeWire leg. In
+    /// hardware mixing, once the graph has entered it, the unit builds the
+    /// Aux mix from the channels' pairs and pair 5 is a channel's, so there
+    /// is no leg.
     /// </summary>
     private void WireAuxRouteLocked()
     {
@@ -781,7 +784,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         {
             if (_auxRoute is not null) { _pw.Unlink(_auxRoute); _auxRoute = null; }
             _auxTargetSink = null;
-            if (!_auxPortEnabled || !_hardwareOutputRouting) return;
+            if (!_auxPortEnabled || !_hardwareOutputRouting || UnitBuildsJacksLocked) return;
             MixDefinition? aux = _config.Mixes.FirstOrDefault(m => m.Kind == MixKind.AuxPort);
             if (aux is null) return;
             string? proSink = HardwareOutputSinkLocked();
@@ -851,7 +854,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     {
         lock (_gate)
         {
-            if (!_built || !_auxPortEnabled) return false;
+            if (!_built || !_auxPortEnabled || UnitBuildsJacksLocked) return false;
             if (_auxRoute is not null)
             {
                 LinkHealth health = _pw.EnsureLinks(_auxRoute);

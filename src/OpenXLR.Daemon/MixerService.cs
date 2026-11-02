@@ -292,7 +292,6 @@ public sealed class MixerService : IHostedService, IDisposable
             JackSections = new ProJackSections(SectionOf("hp1"), SectionOf("hp2"), SectionOf("lineout")),
             UnitSections = sections,
             Section0Level = ProMixSections.Section0LevelByte(0),
-            AuxPairOnly = true,
             JackLevels = levels,
             Restore = restore,
         };
@@ -357,8 +356,12 @@ public sealed class MixerService : IHostedService, IDisposable
         if (_devices.ProMixBlock is not { Length: 2 * ProMixSections.Length } hex) return false;
         byte[] block = Convert.FromHexString(hex);
         var quiet = new Dictionary<int, byte[]>();
-        foreach (int offset in new[] { ProMixSections.SelectorHp1, ProMixSections.SelectorHp2, ProMixSections.SelectorLineOut })
-            if (ProMixSections.SectionOf(block[offset]) is int section && ProJackFeeds.SlotOfSection(section) >= 0)
+        // The jacks' sections, and section 36 while the USB Aux port plays the
+        // Aux mix the unit built there: silent before the graph routes the
+        // computer's mixes to the jacks and pair 5 again.
+        foreach (int offset in new[] { ProMixSections.SelectorHp1, ProMixSections.SelectorHp2, ProMixSections.SelectorLineOut, ProMixSections.SelectorUsbAux })
+            if (ProMixSections.SectionOf(block[offset]) is int section
+                && (ProJackFeeds.SlotOfSection(section) >= 0 || section == HardwareMixingPlanner.AuxSection && offset == ProMixSections.SelectorUsbAux))
             {
                 byte[] bytes = block.AsSpan(section, ProMixPlan.UnitSectionLength).ToArray();
                 bytes[ProMixSections.MaskOffset] = bytes[ProMixSections.MaskOffset + 1] = 0;

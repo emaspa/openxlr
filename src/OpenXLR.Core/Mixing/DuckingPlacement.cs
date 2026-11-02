@@ -143,15 +143,16 @@ public static class DuckingPlacement
         IReadOnlySet<string> softwareMixes = setup.Mixes.Where(id => !unitOnly.Contains(id)).ToHashSet(StringComparer.Ordinal);
         if (!view.KeyIsUnitInput1)
             return Verdict(software, false, "keyNotSupported",
-                $"The {support.Name} ducks only with XLR 1 as the key, so the mixes it builds for its jacks are not ducked.", null, []);
+                $"The {support.Name} ducks only with XLR 1 as the key, so the mixes it builds for its outputs are not ducked.", null, []);
         if (view.Failed || support.Reason == "failed")
             return Verdict(software, false, "failed", $"The {support.Name} did not keep the ducking written to it. Switch ducking off and on to try again.", null, []);
         if (!support.Ready)
             return Verdict(software, false, support.Reason ?? "unsupportedBlock", support.Note
                 ?? $"The {support.Name}'s ducking block holds values OpenXLR does not know.", null, []);
 
-        IReadOnlySet<int> ducked = setup.Channels.Where(view.ChannelPairs.ContainsKey).Select(c => view.ChannelPairs[c])
-            .Where(p => p != ProReturnPairs.Aux).ToHashSet();
+        // Pair 5 is a channel's in the mode like any other: the unit builds
+        // the Aux mix in section 36 from the channels' pairs.
+        IReadOnlySet<int> ducked = setup.Channels.Where(view.ChannelPairs.ContainsKey).Select(c => view.ChannelPairs[c]).ToHashSet();
         var sections = new SortedDictionary<int, IReadOnlySet<int>>();
         foreach (string mix in unitMixes)
             foreach (int section in view.UnitMixSections[mix])
@@ -166,8 +167,19 @@ public static class DuckingPlacement
         };
         return Verdict(ProDucking.Device, true, null, note, new Dictionary<int, IReadOnlySet<int>>(sections), [.. ducked.Order()]);
 
+        // The outputs the unit's ducking is heard on: the jacks for a jack
+        // feed's section, the USB Aux port for the Aux mix's.
+        List<string> Outputs()
+        {
+            IEnumerable<int> held = unitMixes.SelectMany(id => view.UnitMixSections[id]).ToList();
+            var outputs = new List<string>();
+            if (held.Any(s => s != HardwareMixingPlanner.AuxSection)) outputs.Add(ProDucking.TargetMonitor);
+            if (held.Contains(HardwareMixingPlanner.AuxSection)) outputs.Add(ProDucking.TargetAux);
+            return outputs;
+        }
+
         DuckingVerdict Verdict(string? backend, bool ready, string? reason, string? note,
             IReadOnlyDictionary<int, IReadOnlySet<int>>? sections, IReadOnlyList<int> pairs)
-            => new(backend, ready, reason, note, [ProDucking.TargetMonitor]) { Pairs = pairs, Sections = sections, SoftwareMixes = softwareMixes };
+            => new(backend, ready, reason, note, Outputs()) { Pairs = pairs, Sections = sections, SoftwareMixes = softwareMixes };
     }
 }

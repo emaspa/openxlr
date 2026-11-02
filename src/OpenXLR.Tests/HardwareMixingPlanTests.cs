@@ -41,7 +41,7 @@ public sealed class HardwareMixingPlanTests
         => (plan.Content.Single(c => c.Section == section).Members & 1 << source) != 0;
 
     [Fact]
-    public void TheDefaultLayoutTakesTheDefaultPairsAndLeavesPairFiveToTheAuxMix()
+    public void TheDefaultLayoutTakesTheDefaultPairsAndLeavesPairsFiveAndSevenFree()
     {
         HardwareMixingPlan plan = HardwareMixingPlanner.Plan(Setup());
         Assert.True(plan.Active);
@@ -64,13 +64,14 @@ public sealed class HardwareMixingPlanTests
             SavedPairs = new Dictionary<string, int> { ["music"] = 7, ["game"] = 5, ["browser"] = 9 },
         };
         HardwareMixingPlan plan = HardwareMixingPlanner.Plan(setup);
-        // Music keeps its saved pair; pair 5 and pair 9 are not channel
-        // pairs, so Game and Browser take their defaults; Discord, new, takes
-        // the first pair left in the order 7, 0, 1, 2, 3, 4, 6, which is 2.
+        // Music and Game keep their saved pairs (pair 5 is a channel pair since
+        // the unit builds the Aux mix); pair 9 is not one, so Browser takes its
+        // default; Discord, new, takes the first pair left in the order 7, 5,
+        // 0, 1, 2, 3, 4, 6, which is 1.
         Assert.Equal(7, plan.Pairs["music"]);
-        Assert.Equal(1, plan.Pairs["game"]);
+        Assert.Equal(5, plan.Pairs["game"]);
         Assert.Equal(3, plan.Pairs["browser"]);
-        Assert.Equal(2, plan.Pairs["discord"]);
+        Assert.Equal(1, plan.Pairs["discord"]);
         Assert.Equal(plan.Pairs.Count, plan.Pairs.Values.Distinct().Count());
     }
 
@@ -94,12 +95,12 @@ public sealed class HardwareMixingPlanTests
     {
         HardwareMixingSetup setup = Setup() with
         {
-            Channels = [.. Layout.Channels, new ChannelDefinition("u1", "One"), new ChannelDefinition("u2", "Two")],
+            Channels = [.. Layout.Channels, new ChannelDefinition("u1", "One"), new ChannelDefinition("u2", "Two"), new ChannelDefinition("u3", "Three")],
         };
         HardwareMixingPlan plan = HardwareMixingPlanner.Plan(setup);
         Assert.False(plan.Active);
         Assert.Equal("budget", plan.Reason);
-        Assert.Equal("Hardware mixing on the Wave XLR Pro streams at most 7 channels; this layout has 8 that need a USB pair.", plan.Note);
+        Assert.Equal("Hardware mixing on the Wave XLR Pro streams at most 8 channels; this layout has 9 that need a USB pair.", plan.Note);
         Assert.Empty(plan.Pairs);
         Assert.Empty(plan.Content);
     }
@@ -182,6 +183,91 @@ public sealed class HardwareMixingPlanTests
         Assert.Equal(0x0C, CellAt(plan, 18, ProMixSections.Xlr1));
         Assert.Equal(0x00, CellAt(plan, 0, ProMixSections.Xlr1));
         Assert.Equal(unchecked((byte)(sbyte)-24), CellAt(plan, 18, ProMixSections.SourceOfPair(1)));
+    }
+
+    [Fact]
+    public void TwoAddedChannelsTakePairsSevenAndFive()
+    {
+        HardwareMixingSetup setup = Setup() with
+        {
+            Channels = [.. Layout.Channels, new ChannelDefinition("u1", "One"), new ChannelDefinition("u2", "Two")],
+        };
+        HardwareMixingPlan plan = HardwareMixingPlanner.Plan(setup);
+        Assert.True(plan.Active);
+        Assert.Equal(7, plan.Pairs["u1"]);
+        Assert.Equal(5, plan.Pairs["u2"]);
+        Assert.Equal(8, plan.Pairs.Values.Distinct().Count());
+    }
+
+    /// <summary>The default layout's Aux mix, the USB Aux port on: the unit builds it in section 36.</summary>
+    private static HardwareMixingSetup AuxSetup() => Setup(new Dictionary<string, double>
+    {
+        ["xlr1|auxout"] = 0,
+        ["game|auxout"] = -6,
+        ["music|auxout"] = 6,                   // held at 0 dB: a pair's cell stops there
+        ["aux|auxout"] = 0,                     // Aux In: never back to the port
+        ["line|auxout"] = -12,
+        ["xlr1|monitor"] = 0,
+        ["browser|monitor"] = -6,
+    }) with { AuxPort = true };
+
+    [Fact]
+    public void ThePortOnBuildsTheAuxMixInSectionThirtySix()
+    {
+        HardwareMixingPlan plan = HardwareMixingPlanner.Plan(AuxSetup());
+        Assert.Equal(new Dictionary<string, int> { ["monitor"] = 0, ["auxout"] = 36 }, plan.Sections);
+        Assert.Equal(new Dictionary<string, int> { ["hp1"] = 0 }, plan.Jacks);
+        Assert.Equal(0x00, CellAt(plan, 36, ProMixSections.Xlr1));
+        Assert.True(MemberAt(plan, 36, ProMixSections.Xlr1));
+        Assert.Equal(unchecked((byte)(sbyte)-12), CellAt(plan, 36, ProMixSections.SourceOfPair(1)));
+        Assert.True(MemberAt(plan, 36, ProMixSections.SourceOfPair(1)));
+        Assert.Equal(0x00, CellAt(plan, 36, ProMixSections.SourceOfPair(2)));
+        Assert.Equal(unchecked((byte)(sbyte)-24), CellAt(plan, 36, ProMixSections.LineIn));
+        Assert.True(MemberAt(plan, 36, ProMixSections.LineIn));
+        // Aux In has a level in the Aux mix and is still out: it would play
+        // the second computer back to itself.
+        Assert.Equal(ProMixSections.CellOff, CellAt(plan, 36, ProMixSections.UsbAux));
+        Assert.False(MemberAt(plan, 36, ProMixSections.UsbAux));
+        // Browser plays on the jacks only.
+        Assert.False(MemberAt(plan, 36, ProMixSections.SourceOfPair(3)));
+        Assert.True(MemberAt(plan, 0, ProMixSections.SourceOfPair(3)));
+        Assert.Contains(new HardwareMixingClamp("music", "auxout", 6, 0), plan.Clamped);
+        Assert.Equal("The Wave XLR Pro builds Aux for its USB Aux port, so no insert runs on it there.", plan.Disabled["inserts:mix:auxout"]);
+        // No jack's level moves for the Aux mix.
+        Assert.Equal(["hp1"], plan.EntryOffsetsDb.Keys);
+    }
+
+    [Fact]
+    public void ThePortOffLeavesSectionThirtySixAlone()
+    {
+        HardwareMixingPlan plan = HardwareMixingPlanner.Plan(AuxSetup() with { AuxPort = false });
+        Assert.Equal(new Dictionary<string, int> { ["monitor"] = 0 }, plan.Sections);
+        Assert.DoesNotContain(plan.Content, c => c.Section == 36);
+        Assert.DoesNotContain("inserts:mix:auxout", plan.Disabled.Keys);
+    }
+
+    [Fact]
+    public void TheMonitoringPauseLeavesTheAuxMixPlaying()
+    {
+        HardwareMixingPlan plan = HardwareMixingPlanner.Plan(AuxSetup() with { MonitorMuted = true });
+        Assert.Equal(0, plan.Content.Single(c => c.Section == 0).Members);
+        Assert.True(MemberAt(plan, 36, ProMixSections.Xlr1));
+        Assert.True(MemberAt(plan, 36, ProMixSections.SourceOfPair(1)));
+    }
+
+    [Fact]
+    public void AChannelOnPairFiveJoinsTheMixesLikeAnyOther()
+    {
+        HardwareMixingSetup setup = AuxSetup() with
+        {
+            Channels = [.. Layout.Channels, new ChannelDefinition("u1", "One"), new ChannelDefinition("u2", "Two")],
+            LevelsDb = new Dictionary<string, double>(AuxSetup().LevelsDb) { ["u2|monitor"] = -6, ["u2|auxout"] = -12 },
+        };
+        HardwareMixingPlan plan = HardwareMixingPlanner.Plan(setup);
+        Assert.Equal(5, plan.Pairs["u2"]);
+        Assert.True(MemberAt(plan, 0, ProMixSections.SourceOfPair(5)));
+        Assert.Equal(unchecked((byte)(sbyte)-24), CellAt(plan, 36, ProMixSections.SourceOfPair(5)));
+        Assert.True(MemberAt(plan, 36, ProMixSections.SourceOfPair(5)));
     }
 
     [Fact]
@@ -305,7 +391,7 @@ public sealed class HardwareMixingPlanTests
         MixerSettings settings = new MixerSettings() with
         {
             Mixing = "unit",
-            HardwarePairs = new Dictionary<string, int> { ["music"] = 2, ["game"] = 5, ["browser"] = 2, ["system"] = 0 },
+            HardwarePairs = new Dictionary<string, int> { ["music"] = 2, ["game"] = 8, ["browser"] = 2, ["system"] = 0 },
             HardwareSections = new Dictionary<string, int> { ["monitor"] = 36, ["monitor2"] = 54 },
         };
         MixerSettings kept = SavedMixerValidation.Sanitize(settings, out IReadOnlyList<string> dropped);

@@ -69,6 +69,9 @@ public sealed record HardwareMixingSetup
     /// <summary>The monitoring pause is on.</summary>
     public bool MonitorMuted { get; init; }
 
+    /// <summary>The USB Aux port plays the Aux mix (<c>setAuxPortEnabled</c>), so the unit builds it in section 36.</summary>
+    public bool AuxPort { get; init; }
+
     /// <summary>Section 0's level as the unit holds it in byte 98 (-21 dB on every unit read so far).</summary>
     public double Section0LevelDb { get; init; } = HardwareMixingPlanner.Section0LevelDb;
 
@@ -116,7 +119,10 @@ public sealed record HardwareMixingPlan
 
     /// <summary>Channel id to USB playback pair, for every channel that streams on one.</summary>
     public IReadOnlyDictionary<string, int> Pairs { get; init; } = new Dictionary<string, int>();
-    /// <summary>Feed to section start, for every feed a selected jack plays.</summary>
+    /// <summary>
+    /// Feed to section start, for every feed a selected jack plays, and the
+    /// Aux mix to section 36 while the USB Aux port plays it.
+    /// </summary>
     public IReadOnlyDictionary<string, int> Sections { get; init; } = new Dictionary<string, int>();
     /// <summary>Jack (<c>hp1</c>, <c>hp2</c>, <c>lineout</c>) to the section it plays.</summary>
     public IReadOnlyDictionary<string, int> Jacks { get; init; } = new Dictionary<string, int>();
@@ -138,13 +144,17 @@ public sealed record HardwareMixingPlan
 /// (design notes: the hardware mixing plan, sections 3.2, 3.3, 3.7, 3.8 and
 /// 3.11). Nothing here touches the unit or the graph.
 ///
-/// The unit builds only the mixes its jacks play. Every channel the unit
-/// cannot take raw streams on a USB playback pair of its own: pair 0 System,
-/// 1 Game, 2 Music, 3 Browser, 4 Voice Chat, 6 SFX, 7 the first channel
-/// beyond those; pair 5 stays the Aux mix's stream. The unit's own inputs
-/// (XLR 1, XLR 2, USB Aux, Line In) are sources of their own. A channel keeps
-/// its pair across restarts and layout edits (<c>hardwarePairs</c>), a feed
-/// its section (<c>hardwareSections</c>).
+/// The unit builds only the mixes its outputs play: the jacks' feeds, and
+/// the Aux mix in section 36 while the USB Aux port is on. Every channel the
+/// unit cannot take raw streams on a USB playback pair of its own: pair 0
+/// System, 1 Game, 2 Music, 3 Browser, 4 Voice Chat, 6 SFX, then 7 and 5 for
+/// the channels beyond those. Pair 5 carried the Aux mix's stream before the
+/// unit built the Aux mix; in the mode nothing of the computer's plays there.
+/// The unit's own inputs (XLR 1, XLR 2, USB Aux, Line In) are sources of
+/// their own, and Aux In never joins the Aux mix's section, which would send
+/// the second computer its own audio back. A channel keeps its pair across
+/// restarts and layout edits (<c>hardwarePairs</c>), a jack feed its section
+/// (<c>hardwareSections</c>).
 ///
 /// Each level cell is the fader's: the send, the channel volume and the mix
 /// volume, in half-dB steps. A pair plays 7.94 dB below its cell on the unit
@@ -154,11 +164,14 @@ public sealed record HardwareMixingPlan
 /// </summary>
 public static class HardwareMixingPlanner
 {
-    /// <summary>The pair the Aux mix streams on, kept for it until the unit builds the Aux mix.</summary>
+    /// <summary>The pair the Aux mix streams on outside the mode; in it, a channel pair like the others.</summary>
     public const int AuxPair = ProReturnPairs.Aux;
 
     /// <summary>The section starts a jack feed can take, in the order a new feed takes them.</summary>
     public static IReadOnlyList<int> JackSections { get; } = [0, 18, 54];
+
+    /// <summary>The section the USB Aux port plays (selector 20), which the unit builds the Aux mix in.</summary>
+    public const int AuxSection = 36;
 
     /// <summary>Ports of the Pro's raw sink and source in the layout the mode was measured in.</summary>
     public const int SinkPortsNeeded = 17;
@@ -179,7 +192,7 @@ public static class HardwareMixingPlanner
     };
 
     /// <summary>The pairs a channel can take, in the order a channel without a default takes them.</summary>
-    public static IReadOnlyList<int> ChannelPairs { get; } = [7, 0, 1, 2, 3, 4, 6];
+    public static IReadOnlyList<int> ChannelPairs { get; } = [7, 5, 0, 1, 2, 3, 4, 6];
 
     public static string BudgetNote(int needed)
         => $"Hardware mixing on the Wave XLR Pro streams at most {ChannelPairs.Count} channels; this layout has {needed} that need a USB pair.";
@@ -198,6 +211,7 @@ public static class HardwareMixingPlanner
 
         Dictionary<string, int> sections = AllocateSections(setup.Jacks.Select(j => j.Feed).Distinct(), setup.SavedSections);
         var jacks = setup.Jacks.ToDictionary(j => j.Jack, j => sections[j.Feed], StringComparer.Ordinal);
+        if (AuxMixOf(setup) is { } aux) sections[aux.Id] = AuxSection;
         var clamped = new List<HardwareMixingClamp>();
         var content = new List<HardwareSectionContent>();
         if (pairs.Count == needing.Count)
@@ -233,6 +247,10 @@ public static class HardwareMixingPlanner
         if (setup.Failed) return ("failed", "The Wave XLR Pro did not keep the mixes OpenXLR wrote, so hardware mixing stopped for this run.");
         return (null, null);
     }
+
+    /// <summary>The Aux mix the unit builds in section 36: the layout's Aux mix while the USB Aux port is on, else null.</summary>
+    private static MixDefinition? AuxMixOf(HardwareMixingSetup setup)
+        => setup.AuxPort ? setup.Mixes.FirstOrDefault(m => m.Kind == MixKind.AuxPort) : null;
 
     internal static bool FirmwareSupported(string? firmware)
         => firmware is not null && Version.TryParse(firmware, out Version? version) && version >= MinimumFirmware;
@@ -281,8 +299,10 @@ public static class HardwareMixingPlanner
     /// <summary>
     /// A section's cells and mask for one feed. A source plays at the sum of
     /// its levels in the feed's mixes (amplitudes add); it is a member while
-    /// that is at or above the lowest cell that plays and the monitoring pause
-    /// is off. A source no channel carries, and pair 5, are out.
+    /// that is at or above the lowest cell that plays and, on a jack, the
+    /// monitoring pause is off (the pause is the monitor outputs', so the
+    /// Aux mix keeps playing). A source no channel carries is out, and so is
+    /// Aux In in the Aux mix's section.
     /// </summary>
     private static HardwareSectionContent Build(HardwareMixingSetup setup, string feed, int section,
         IReadOnlyDictionary<string, int> pairs, List<HardwareMixingClamp> clamped)
@@ -290,6 +310,8 @@ public static class HardwareMixingPlanner
         var cells = Enumerable.Repeat(ProMixSections.CellOff, ProMixSections.SourceCount).ToArray();
         ushort members = 0;
         IReadOnlyList<string> parts = MonitorFeed.Parts(feed);
+        bool aux = section == AuxSection;
+        bool paused = setup.MonitorMuted && !aux;
         void Source(int source, string channel, double ceilingDb)
         {
             double db = FeedLevelDb(setup, channel, parts);
@@ -298,12 +320,13 @@ public static class HardwareMixingPlanner
             if (Math.Round(db * 2, MidpointRounding.AwayFromZero) > Math.Round(ceilingDb * 2))
                 clamped.Add(new HardwareMixingClamp(channel, feed, Round(db), held));
             cells[source] = ProMixSections.CellOf(held);
-            if (!setup.MonitorMuted && cells[source] != ProMixSections.CellOff) members |= (ushort)(1 << source);
+            if (!paused && cells[source] != ProMixSections.CellOff) members |= (ushort)(1 << source);
         }
         foreach ((int source, string channel) in setup.UnitSources)
-            if (source is >= 0 and < ProMixSections.FirstPair) Source(source, channel, ProMixSections.CellCeiling / 2.0);
+            if (source is >= 0 and < ProMixSections.FirstPair && !(aux && source == ProMixSections.UsbAux))
+                Source(source, channel, ProMixSections.CellCeiling / 2.0);
         foreach ((string channel, int pair) in pairs)
-            if (pair != AuxPair) Source(ProMixSections.SourceOfPair(pair), channel, 0);
+            Source(ProMixSections.SourceOfPair(pair), channel, 0);
         return new HardwareSectionContent(feed, section, cells, members);
     }
 
@@ -366,8 +389,10 @@ public static class HardwareMixingPlanner
         HashSet<string> unitMixes = [.. feeds.SelectMany(MonitorFeed.Parts)];
         foreach (string mix in unitMixes)
         {
-            string name = setup.Mixes.FirstOrDefault(m => m.Id == mix)?.Name ?? mix;
-            disabled[$"inserts:mix:{mix}"] = $"The Wave XLR Pro builds {name} for its jacks, so no insert runs on it there.";
+            MixDefinition? definition = setup.Mixes.FirstOrDefault(m => m.Id == mix);
+            string name = definition?.Name ?? mix;
+            string where = definition?.Kind == MixKind.AuxPort ? "its USB Aux port" : "its jacks";
+            disabled[$"inserts:mix:{mix}"] = $"The Wave XLR Pro builds {name} for {where}, so no insert runs on it there.";
         }
         if (unitMixes.Count > 0)
         {
