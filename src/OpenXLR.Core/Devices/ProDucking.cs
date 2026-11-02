@@ -13,13 +13,6 @@ public static class ProReturnPairs
 
     /// <summary>The Aux mix for the USB Aux port: the aux mix's Music cell takes it (channels 10/11).</summary>
     public const int Aux = 5;
-
-    /// <summary>
-    /// How far below its cell the unit plays a USB playback pair in every mix
-    /// section, in dB: a fixed 7.94 on every pair measured (protocol notes,
-    /// section 16), while the unit's own inputs come back at their cell.
-    /// </summary>
-    public const double LossDb = 7.94;
 }
 
 /// <summary>

@@ -228,36 +228,34 @@ public sealed partial class MonitorVolumeIntegrationTests
             Assert.True(pro.MicDirect);
             Assert.True(pro.MonitorReturn);
 
-            // The path plays the microphone at the send's level less what
-            // the Monitor mix loses on its way to the jacks: the send, the
-            // channel volume and the mix volume reach it on the cubic scale,
-            // the unit's 7.94 dB on its playback pairs and the output volume
-            // below 100% come off it, and none of them writes the membership
-            // again.
+            // The path plays the microphone at the send's level: the send,
+            // the channel volume and the mix volume reach it on the cubic
+            // scale, the output volume below 100% comes off it, and none of
+            // them writes the membership again.
             int opened = pro.MicDirectWrites;
             Run(new() { Cmd = "setOutputVolume", Value = JsonSerializer.SerializeToElement(1.0) });
             Run(new() { Cmd = "setLevel", Channel = "xlr1", Mix = "monitor", Value = JsonSerializer.SerializeToElement(1.0) });
             Run(new() { Cmd = "setMixVolume", Mix = "monitor", Value = JsonSerializer.SerializeToElement(1.0) });
-            Assert.Equal(-8, pro.MicLevel);
+            Assert.Equal(0, pro.MicLevel);
             Run(new() { Cmd = "setLevel", Channel = "xlr1", Mix = "monitor", Value = JsonSerializer.SerializeToElement(0.5) });
-            Assert.Equal(-26, pro.MicLevel);
+            Assert.Equal(-18, pro.MicLevel);
             Run(new() { Cmd = "setChannelVolume", Channel = "xlr1", Value = JsonSerializer.SerializeToElement(0.5) });
-            Assert.Equal(-44, pro.MicLevel);
+            Assert.Equal(-36, pro.MicLevel);
             Run(new() { Cmd = "setMixVolume", Mix = "monitor", Value = JsonSerializer.SerializeToElement(0.0) });
             Assert.Equal(-60, pro.MicLevel);
             Run(new() { Cmd = "setMixVolume", Mix = "monitor", Value = JsonSerializer.SerializeToElement(1.0) });
             Run(new() { Cmd = "setChannelVolume", Channel = "xlr1", Value = JsonSerializer.SerializeToElement(1.0) });
             Run(new() { Cmd = "setLevel", Channel = "xlr1", Mix = "monitor", Value = JsonSerializer.SerializeToElement(1.0) });
-            Assert.Equal(-8, pro.MicLevel);
+            Assert.Equal(0, pro.MicLevel);
             // Half the output volume is 18 dB on the cubic scale, and the
             // voice follows the computer audio down at once; above 100% it
-            // keeps the send's level less nothing.
+            // keeps the send's level.
             Run(new() { Cmd = "setOutputVolume", Value = JsonSerializer.SerializeToElement(0.5) });
-            Assert.Equal(-26, pro.MicLevel);
+            Assert.Equal(-18, pro.MicLevel);
             Run(new() { Cmd = "setOutputVolume", Value = JsonSerializer.SerializeToElement(1.5) });
             Assert.Equal(0, pro.MicLevel);
             Run(new() { Cmd = "setOutputVolume", Value = JsonSerializer.SerializeToElement(1.0) });
-            Assert.Equal(-8, pro.MicLevel);
+            Assert.Equal(0, pro.MicLevel);
             Assert.Equal(opened, pro.MicDirectWrites);
             Assert.True(pro.MicDirect);
 

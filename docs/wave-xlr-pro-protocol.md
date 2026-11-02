@@ -1043,12 +1043,16 @@ lifts quiet material only, and full-scale playback never comes back
 louder than about -8 dBFS. Whether the limiter acts on the jacks as it
 does on the returned streams has not been measured.
 
-The daemon uses the loss on the jacks: the microphone's path in section 0
-plays at the Monitor send's level less 7.94 dB and less the output
-volume's attenuation while it is below 100% (the Pro sink's volume, which
-acts on the pairs and not on the path), so the voice keeps the balance the
-faders set against the Monitor mix (`Mixer.JackReturnOffsetDb`). Before
-that the voice sat 7.94 dB plus the output volume's attenuation above it.
+On the jacks the microphone's path in section 0 plays at the Monitor
+send's level less the output volume's attenuation while it is below 100%
+(the Pro sink's volume, which acts on the pairs and not on the path), so
+the output volume moves the voice with the Monitor mix
+(`Mixer.JackOutputVolumeDb`). The pair's 7.94 dB is left in, as Wave Link
+leaves it with the microphone's cell at `00`: the voice sits that much
+above where the faders put it against the Monitor mix. Taking it off as
+well was tried on the desk on 2026-11-02 (PR #661) and put the voice out of
+hearing under music at equal faders: speech on XLR 1 at -35 dBFS RMS against
+music near -12 dBFS RMS.
 
 ## 17. Section 0's offset, a capture tap and per-pair ducking (desk probe of 2026-11-02)
 
