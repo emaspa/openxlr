@@ -829,3 +829,67 @@ nobody has named; bit 3 reads set on several units) are kept as read.
 OpenXLR writes these fields only on a unit whose EQ it drives (section 10)
 and whose fields hold values inside the limits above, through the same
 read-modify-write path and timing as the EQ ([api.md](api.md#where-the-compressor-and-expander-run)).
+
+## 15. The mix sections as a mixer (desk probe of 2026-11-02)
+
+Firmware 1.0.14, the desk unit, the daemon running. These are the probes
+the roadmap's hardware mixing mode waits on: whether the unit takes level
+and membership changes live, the gain of each section, and the delay of
+the returned mixes. Writes went to section 54 and section 72, which no
+output selector played (bytes 90 to 93 read `23 23 20 23`), so nothing
+reached the jacks or the USB Aux port. Each write was a read-modify-write
+of block 0x0001, and the block was written back identical afterwards. The
+unit's capture source was recorded across every change, all 18 channels,
+and each section's stream (AUX14 for section 54, AUX16 for section 72) was
+compared with XLR 1's own capture on AUX0.
+
+### Live changes
+
+| Time | Write | Section 54's stream |
+|---|---|---|
+| 3 s | byte 66 bit 0 set (XLR 1 in), byte 54 `00`, no commit | XLR 1 at 0.0 dB, coherence 1.000 |
+| 7 s | byte 54 `f4`, no commit | -6.0 dB |
+| 11 s | byte 54 `00`, then the 0x0003 commit | 0.0 dB |
+| 15 s | byte 66 bit 0 clear, no commit | silent |
+| 19 s | byte 66 bit 0 set, then the commit | 0.0 dB |
+
+Every write took effect within the 250 ms window it was written in,
+membership as well as level, with or without the commit and with no
+stream restart. The unit ramps each change itself: the gain moved from
+the old value to the new over 12 to 16 ms, measured in 1 ms steps, with
+no step, so a mixer driving these bytes needs no fade of its own.
+
+### Gain and delay
+
+- A microphone in a section at level `00` comes back at the gain of its
+  own capture: XLR 1 in section 18 (AUX10), section 54 and section 72
+  matched AUX0 at 0.0 dB with coherence 1.0000. Only section 0 has the
+  -21 dB offset of section 12. Byte 14 reads `00` in all five sections,
+  so it does not account for that offset.
+- A USB playback pair in a section at level `00` comes back 7.9 dB below
+  what the computer sent: a 1 kHz tone at -43.0 dBFS RMS on pair 7, played
+  with the Pro's sink at 100% and linked port by port, read -51.0 dBFS on
+  AUX14. With the sink at the 70% WirePlumber had restored on the desk
+  (-9.3 dB of software volume) it read -60.2 dBFS.
+- A section's stream carries no delay over the direct capture: the cross
+  correlation of AUX10 and of AUX14 against AUX0 peaks at 0 samples. A
+  microphone mixed in the unit reaches the computer as early as its own
+  capture does.
+
+### Notes for a probe
+
+- pipewire-pulse and pw-play remix a two-channel stream onto the first
+  two ports of the Pro's 17-channel sink, whatever channel map they are
+  given, and a 17-channel pw-play stream was placed on the default sink.
+  A tone reaches one pair only from a stream created with
+  `node.autoconnect = false` and linked by hand with `pw-link`.
+- The Pro's sink keeps the volume WirePlumber stored for it. On the desk
+  that was 70%, so everything OpenXLR plays to the unit, the Aux mix on
+  pair 5 included, leaves 9.3 dB quieter than the graph sends it.
+
+### Open
+
+- Where the playback pairs' 7.9 dB goes, and whether a level above `00`
+  makes it up without clipping.
+- Section 0's -21 dB.
+- Per-channel ducking keys other than XLR 1 (section 11).
