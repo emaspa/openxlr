@@ -242,6 +242,9 @@ internal static partial class InputBindingWindowTests
             {
                 Layout(surface, width, 900);
                 Border rackXlr1 = RackStrip(surface, "xlr1"), rackMic = RackStrip(surface, "promic");
+                TextBlock rackName = rackXlr1.GetVisualDescendants().OfType<TextBlock>()
+                    .Single(t => t.IsEffectivelyVisible && t.Classes.Contains("strip") && t.Text == xlr1.Name);
+                Assert.Equal(0, rackName.Bounds.X, .1);
                 Assert.DoesNotContain(rackXlr1.GetVisualDescendants().OfType<Slider>(), s => s.IsEffectivelyVisible && s.Name == "RackGain");
                 Assert.False(rackXlr1.GetVisualDescendants().OfType<WrapPanel>().Single(p => p.Name == "RackInputControls").IsEffectivelyVisible);
                 Assert.Equal(Localizer.Format("InputBindingSourcePort", "Webcam", 2), Chip(rackXlr1).GetVisualDescendants().OfType<TextBlock>().Single().Text);

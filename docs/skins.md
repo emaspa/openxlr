@@ -1290,9 +1290,10 @@ two columns shows them one under the other. The default template's chips
 keep the width of their own name and channel.
 
 The input rack draws one strip per channel, in the mixer's channel
-order. The strip of an XLR input holds the parts the INPUTS panel shows for
-it: its gain with the gain lock, its switches and its plugin chain. The
-strip of Aux In holds its level and level lock, and the strip of Line In
+order. When a strip shows only its name, the name starts at the strip's
+edge and uses the whole row width. An XLR input strip shows its gain with
+the gain lock, its switches and its plugin chain, as in the INPUTS panel.
+The strip of Aux In holds its level and level lock, and the strip of Line In
 its gain and level lock, each with a readout that shows the channel's volume while the
 volume fader moves and for a second after. These are the INPUTS
 panel's own controls, so a switch the interface does not have stays
