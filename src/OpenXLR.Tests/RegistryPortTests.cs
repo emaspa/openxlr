@@ -33,4 +33,25 @@ public sealed class RegistryPortTests
         Assert.Equal(["mic:capture_FL", "mic:capture_FR"], PipeWireAdapter.ObservedPorts(objects, true));
         Assert.Equal(["mic:playback_FL"], PipeWireAdapter.ObservedPorts(objects, false));
     }
+
+    [Fact]
+    public void AStreamLinkedIntoOneSinkIsAnsweredFromTheRegistry()
+    {
+        static JsonElement[] Graph(string links) => [.. JsonDocument.Parse($$$$"""
+            [{"id":10,"type":"PipeWire:Interface:Node","info":{"props":{"node.name":"desk","media.class":"Audio/Sink"}}},
+             {"id":11,"type":"PipeWire:Interface:Node","info":{"props":{"node.name":"headset","media.class":"Audio/Sink"}}},
+             {"id":12,"type":"PipeWire:Interface:Node","info":{"props":{"node.name":"filter","media.class":"Stream/Input/Audio"}}},
+             {"id":20,"type":"PipeWire:Interface:Node","info":{"props":{"node.name":"Chromium","media.class":"Stream/Output/Audio","object.serial":"4711"}}}
+             {{{{links}}}}]
+            """).RootElement.EnumerateArray()];
+        const string ToDesk = """,{"id":30,"type":"PipeWire:Interface:Link","info":{"output-node-id":20,"input-node-id":10}}""";
+        Assert.Equal("desk", PipeWireAdapter.LinkedSink(Graph(ToDesk), 4711));
+        // Both channels of a stereo stream land on the same sink.
+        Assert.Equal("desk", PipeWireAdapter.LinkedSink(Graph(ToDesk + ToDesk.Replace("30", "31", StringComparison.Ordinal)), 4711));
+        Assert.Null(PipeWireAdapter.LinkedSink(Graph(ToDesk), 4712));
+        // Unlinked, split across sinks or linked into a filter: pactl answers.
+        Assert.Null(PipeWireAdapter.LinkedSink(Graph(""), 4711));
+        Assert.Null(PipeWireAdapter.LinkedSink(Graph(ToDesk + ToDesk.Replace("30", "31", StringComparison.Ordinal).Replace(":10}", ":11}", StringComparison.Ordinal)), 4711));
+        Assert.Null(PipeWireAdapter.LinkedSink(Graph(ToDesk.Replace(":10}", ":12}", StringComparison.Ordinal)), 4711));
+    }
 }

@@ -1889,8 +1889,51 @@ public sealed class PipeWireAdapter
 
     /// <summary>The sink a stream currently plays into, by name, or null.</summary>
     public string? StreamSinkName(int streamSerial)
-        => StreamSinkName(TryRun("pactl", "list", "sink-inputs", "short") ?? "",
-                          TryRun("pactl", "list", "sinks", "short") ?? "", streamSerial);
+    {
+        // A stream linked into one sink has that sink in the registry. The
+        // sweep asks this for every browser stream it leaves in place, so an
+        // unlinked stream, or one linked elsewhere, is all that reaches pactl.
+        if (LiveObjects() is { } objects && LinkedSink(objects, streamSerial) is { } sink) return sink;
+        return StreamSinkName(TryRun("pactl", "list", "sink-inputs", "short") ?? "",
+                              TryRun("pactl", "list", "sinks", "short") ?? "", streamSerial);
+    }
+
+    /// <summary>
+    /// The one sink a playback stream's links lead into, as pipewire-pulse
+    /// reports it for the sink-input; null when the stream is not linked,
+    /// or is linked to something other than a single sink.
+    /// </summary>
+    internal static string? LinkedSink(IReadOnlyList<JsonElement> objects, int streamSerial)
+    {
+        uint? stream = null;
+        var sinks = new Dictionary<uint, string>();
+        foreach (JsonElement item in objects)
+        {
+            if (!item.TryGetProperty("type", out var type) || !IsString(type, "PipeWire:Interface:Node")
+                || !item.TryGetProperty("id", out var id) || !id.TryGetUInt32(out uint nodeId)
+                || !item.TryGetProperty("info", out var info) || info.ValueKind != JsonValueKind.Object
+                || !info.TryGetProperty("props", out var props) || props.ValueKind != JsonValueKind.Object
+                || !props.TryGetProperty("media.class", out var kind) || kind.ValueKind != JsonValueKind.String) continue;
+            if (IsString(kind, "Stream/Output/Audio") && Serial(props) == streamSerial) stream = nodeId;
+            else if (IsString(kind, "Audio/Sink") && props.TryGetProperty("node.name", out var name)
+                     && name.ValueKind == JsonValueKind.String)
+                sinks[nodeId] = name.GetString()!;
+        }
+        if (stream is null) return null;
+        string? found = null;
+        foreach (JsonElement item in objects)
+        {
+            if (!item.TryGetProperty("type", out var type) || !IsString(type, "PipeWire:Interface:Link")
+                || !item.TryGetProperty("info", out var info) || info.ValueKind != JsonValueKind.Object
+                || !info.TryGetProperty("output-node-id", out var from) || !from.TryGetUInt32(out uint source)
+                || source != stream) continue;
+            if (!info.TryGetProperty("input-node-id", out var to) || !to.TryGetUInt32(out uint target)
+                || !sinks.TryGetValue(target, out string? sink)) return null;
+            if (found is not null && found != sink) return null;
+            found = sink;
+        }
+        return found;
+    }
 
     internal static string? StreamSinkName(string sinkInputs, string sinks, int streamSerial)
     {
