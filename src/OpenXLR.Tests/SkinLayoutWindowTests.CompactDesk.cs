@@ -149,6 +149,14 @@ internal static partial class SkinLayoutWindowTests
             model.ActiveApps.Add(app);
         }
         ApplicationIconWindowTests.Assign(model.Apps);
+        Layout(window, 1600, 800);
+        var matrixView = window.GetVisualDescendants().OfType<OpenXLR.UI.Views.MixMatrixView>().Single(v => v.IsEffectivelyVisible);
+        // Give the four cells and the name column an exact multiple before
+        // the frame is counted. Stretching must leave room for the frame.
+        double exact = (double)window.FindResource("Ox.Matrix.NameWidth")! + 4 * 300 + 3 * SkinLayoutDefaults.MatrixSpacing;
+        Layout(window, window.ClientSize.Width + exact - matrixView.Bounds.Width, 800);
+        Assert.True(matrixView.Scroller.Extent.Width <= matrixView.Scroller.Viewport.Width + .5,
+            "The matrix gained a scrollbar from its own border at a width where the cells fit.");
         foreach (double width in new[] { 640d, 960, 1280, 1600, 2400, 640 })
         {
             Layout(window, width, 800);

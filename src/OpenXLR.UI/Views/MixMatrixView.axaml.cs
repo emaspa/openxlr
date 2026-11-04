@@ -4,6 +4,7 @@ using Avalonia.Data;
 using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
 using OpenXLR.UI.Layout;
 using OpenXLR.UI.Skinning;
 
@@ -41,8 +42,18 @@ public partial class MixMatrixView : UserControl
         double width = minimum;
         if (maximum > minimum && double.IsFinite(availableSize.Width))
         {
-            double available = availableSize.Width - GetValue(NameWidthProperty) - mixes * SkinLayoutDefaults.MatrixSpacing;
-            width = Math.Clamp(Math.Floor(available / (mixes + 1)), minimum, maximum);
+            // The row head is the only tile whose border lies outside its
+            // columns' widths. Leave room for it at the current display scale.
+            Thickness border = MatrixCorner.BorderThickness;
+            double scale = UseLayoutRounding ? TopLevel.GetTopLevel(this)?.RenderScaling ?? 1 : 1;
+            double frame = LayoutHelper.RoundLayoutValue(border.Left, scale)
+                + LayoutHelper.RoundLayoutValue(border.Right, scale);
+            double names = LayoutHelper.RoundLayoutValueUp(GetValue(NameWidthProperty), scale);
+            double available = availableSize.Width - names - frame - mixes * SkinLayoutDefaults.MatrixSpacing;
+            // Divide in display pixels so rounding every cell cannot make
+            // the row wider than the viewport at fractional display scales.
+            double fitted = Math.Floor(available * scale / (mixes + 1)) / scale;
+            width = Math.Clamp(fitted, minimum, maximum);
         }
         if (!Resources.TryGetValue("MatrixCellWidth", out object? previous) || previous is not double old || old != width)
             Resources["MatrixCellWidth"] = width;

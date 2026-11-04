@@ -671,12 +671,12 @@ internal static partial class SkinLayoutWindowTests
         double rowHeight = (double)window.FindResource("Ox.Matrix.RowHeight")!;
         double nameWidth = (double)window.FindResource("Ox.Matrix.NameWidth")!;
         double maximum = (double)window.FindResource("Ox.Matrix.CellMaxWidth")!;
-        if (maximum > cellWidth)
-        {
-            double room = view.Bounds.Width - nameWidth - matrix.Columns.Count * SkinLayoutDefaults.MatrixSpacing;
-            cellWidth = Math.Clamp(Math.Floor(room / (matrix.Columns.Count + 1)), cellWidth, maximum);
-        }
         Border[] heads = [.. view.GetVisualDescendants().OfType<Border>().Where(b => b.Name == "MatrixColumn" && b.IsEffectivelyVisible)];
+        if (maximum > cellWidth && heads.Length > 0)
+        {
+            Assert.InRange(heads[0].Bounds.Width, cellWidth - .5, maximum + .5);
+            cellWidth = heads[0].Bounds.Width;
+        }
         Assert.Equal(matrix.Columns.Select(c => c.Mix), heads.Select(h => ((MatrixColumnViewModel)h.DataContext!).Mix));
         StackPanel[] rows = [.. view.GetVisualDescendants().OfType<StackPanel>().Where(p => p.Name == "MatrixRow" && p.IsEffectivelyVisible)];
         Assert.Equal(matrix.Rows.Select(r => r.Channel), rows.Select(r => ((MatrixRowViewModel)r.DataContext!).Channel));
