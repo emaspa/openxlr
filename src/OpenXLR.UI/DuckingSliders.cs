@@ -384,7 +384,8 @@ public sealed class DuckingMarks : Panel
             InvalidateMeasure();
         }
         foreach ((DuckingMark mark, _, Rectangle tick) in _items)
-            tick.Arrange(new Rect(Math.Round(X(mark, finalSize.Width)), 0, 1, TickLength));
+            // Centre the tick on the thumb's travel and let Avalonia snap it to the display.
+            tick.Arrange(new Rect(X(mark, finalSize.Width) - tick.Width / 2, 0, tick.Width, TickLength));
         double line = LineHeight;
         foreach ((Button label, double left, int index) in Place(finalSize.Width))
             label.Arrange(new Rect(left, TickLength + index * line, label.DesiredSize.Width, label.DesiredSize.Height));

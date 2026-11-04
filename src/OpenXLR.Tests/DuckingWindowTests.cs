@@ -375,7 +375,7 @@ internal static class DuckingWindowTests
                 slider.SetCurrentValue(RangeBase.ValueProperty, mark.Position);
                 slider.UpdateLayout();
                 double thumbCentre = thumb.TranslatePoint(new Point(thumb.Bounds.Width / 2, 0), marks)!.Value.X;
-                double tickAt = tick.Bounds.X + 0.5;
+                double tickAt = tick.Bounds.Center.X;
                 Assert.True(Math.Abs(thumbCentre - tickAt) <= 1.0,
                     $"{where}: {model.Name} {label.Content}: tick at {tickAt:0.0}, thumb at {thumbCentre:0.0}.");
                 double centre = label.Bounds.Center.X;

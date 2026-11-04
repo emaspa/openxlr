@@ -724,8 +724,8 @@ the setup without letting you change it:
 4. Tick the mixes under **In these mixes**.
 5. Set **Sensitivity**, **Amount** and the two **Speed** sliders,
    **Attack** and **Release**. Each slider shows its value on the right,
-   with the presets marked under it. Click a preset's name, such as
-   **Medium**, to set its value exactly. A drag that passes close to a
+   with preset marks centred on the thumb's travel at the current display
+   scale. Click a preset's name, such as **Medium**, to set its value exactly. A drag that passes close to a
    mark stops on it; elsewhere it moves in whole dB or ms. Sensitivity
    rises to the right, so the threshold falls as you drag right. Attack
    and release use a log scale, so 30 ms and 2 s both get room. The arrow
