@@ -27,8 +27,11 @@ is measured over one that is described.
   wherever the EQ does: the byte layout is verified on the Wave:3 MK.2,
   and the Pro, the XLR Dock MK.2 and the Wave XLR MK.2 are driven at the
   same fields but not yet checked. The Pro runs ducking itself for a setup
-  keyed by XLR 1 on its headphone jacks, accepted by ear with the presets;
-  custom ducking values are not yet heard on it. On the maintainer's
+  keyed by XLR 1 on its headphone jacks and its USB Aux port, accepted by
+  ear with the presets; custom ducking values are not yet heard on it. In
+  an experimental hardware mixing mode the Pro also builds the mixes its
+  jacks and USB Aux port play, one USB pair per channel, heard on one unit
+  with Headphones 1 and the USB Aux port. On the maintainer's
   Wave:3 every
   control writes and reads back, and the gain, mute, monitor balance and
   desktop volume controls are verified; a Wave:1 owner confirmed gain,
@@ -67,14 +70,16 @@ is measured over one that is described.
   can activate.
 - [x] Clients. The UI, with seventeen built-in skins, skins that rearrange
   it, Broadcast and Wave among them with the mixer drawn as a matrix,
-  system, light and dark modes, a compact and a large density, the Flow
+  system, light and dark modes, a compact and a large density, five text
+  sizes, the Flow
   window and seven languages. The terminal mixer `openxlr-tui`, drawing the same skins. The
   OpenDeck plugin, with keys and dials drawn like the hardware. Desktop
   keys through the portal and compositor-specific focused application
   routing. The Omarchy bar plugin. A versioned HTTP API beside the WebSocket.
 - [x] Daemon. A systemd notify service with a watchdog; recovery when
   PipeWire, pipewire-pulse, a device or a plugin host misbehaves; an
-  incremental registry view instead of polling; commands validated and
+  incremental registry view and ALSA control events instead of polling,
+  so an idle daemon starts no helper program each second; commands validated and
   budgeted per client; a hard memory limit; an opt-in update notice; an
   installation receipt read back by `openxlr doctor`; a diagnostics
   archive from Options with the whole boot's journals, the kernel's USB
@@ -88,9 +93,10 @@ is measured over one that is described.
 
 The sections below are in the order the maintainer takes them, and so
 are the items inside each. Stability and correctness on real hardware
-come before new features. Input bindings, capture inputs, ducking and the
-EQ on the unit all landed in the last few releases, and users should run
-them for a while before more is built on top.
+come before new features. Input bindings, capture inputs, ducking, the
+EQ on the unit and the Pro's hardware mixing all landed in the last few
+releases, and users should run them for a while before more is built on
+top.
 
 ### Stability and hardware acceptance
 
@@ -113,7 +119,9 @@ them for a while before more is built on top.
   - capture inputs: their insert chain and Mic setup in the UI and the
     terminal mixer, the controls of an additional interface behind one,
     and a source changed in place;
-  - the Pro's ducking on the USB Aux port, by ear;
+  - hardware mixing on the Pro with two jacks on two mixes, and a profile
+    recalled in the mode after a replug, which played the jacks 21 dB too
+    loud until the fix;
   - the Wave:3's dial modes, LED ring, ClipGuard and headphones by ear,
     and a replug; ClipGuard and the mic/PC mix on a Wave:1, from an owner;
   - the Wave:3 MK.2's headphone level by ear, a replug, whether the float
@@ -152,7 +160,7 @@ them for a while before more is built on top.
 
 ### Devices
 
-- [ ] A hardware mixing mode on the Wave XLR Pro. The layout of block
+- [x] A hardware mixing mode on the Wave XLR Pro. The layout of block
   0x0001 is known
   ([protocol notes section 12](wave-xlr-pro-protocol.md#12-the-mix-sections-and-the-jacks-desk-probe-of-2026-10-23)):
   five mix sections, each with a level per source and a membership mask,
@@ -166,9 +174,17 @@ them for a while before more is built on top.
   a microphone comes back at its own gain with no added delay, and a
   playback pair comes back 7.9 dB down. The mode is built, marked
   experimental, chosen in the UI's Options, the terminal mixer and the API,
-  and ducks per channel on the mixes the unit builds; none of it is heard
-  on a unit yet, and keys other than XLR 1 still wait on a capture that
-  shows their encoding.
+  and ducks per channel on the mixes the unit builds. It was heard on one
+  unit on 2026-11-04, with headphones on Headphones 1 and a second
+  computer on the USB Aux port: the faders' balance, mutes, the output
+  volume, ducking, a processed microphone on its return pair, auditions,
+  a replug, a restart and leaving the mode. Keys other than XLR 1 still
+  wait on a capture that shows their encoding.
+- [ ] Hardware mixing, the next steps once the mode has run for a while:
+  meters read from the unit's capture pairs, so the computer stops
+  building its own copy of the mixes the unit builds; section 72 as a
+  fourth feed; XLR 1's raw capture (block 0x0001 byte 94) for the
+  computer's processing; and the unit's own meters in block 0x0002.
 - [ ] The Pro's mix maximizer and channel booster, the onboard effects
   with no mapped control. The booster adds up to 12 dB above the normal
   ceiling on any input; the maximizer is per mix. Both need Wave Link
