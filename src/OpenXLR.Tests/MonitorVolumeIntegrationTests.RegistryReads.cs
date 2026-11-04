@@ -40,8 +40,6 @@ public sealed partial class MonitorVolumeIntegrationTests
                 Assert.False(pw.HasCaptureChannel("test_registry_reads", 2));
             }
             Assert.False(File.Exists(calls), File.Exists(calls) ? File.ReadAllText(calls) : "");
-            pw.SetSinkVolume("test_registry_reads", 1.25);
-            Assert.Equal(1.25, pw.GetSinkVolume("test_registry_reads"));
             // Match pactl's first-channel read without changing stereo balance.
             foreach (var (left, right, expected) in new[] { ("25%", "75%", .25), ("75%", "25%", .75) })
             {
@@ -55,11 +53,15 @@ public sealed partial class MonitorVolumeIntegrationTests
             Assert.True(SpinWait.SpinUntil(() => pw.GetDefaultSink() == "test_registry_other"
                 && pw.GetDefaultSource() == "test_registry_other.monitor", TimeSpan.FromSeconds(3)));
             string[] refreshes = File.ReadAllLines(calls);
-            Assert.InRange(refreshes.Length, 1, 4);
-            Assert.All(refreshes, line => Assert.Equal("--format=json info", line));
+            Assert.InRange(refreshes.Count(line => line == "--format=json info"), 1, 4);
+            // A metadata change during a paired query discards the pair and
+            // reads the requested default directly.
+            Assert.All(refreshes, line => Assert.Contains(line, new[] { "--format=json info", "get-default-sink", "get-default-source" }));
 
             pw.CreateNullSink("test_registry_added", "Added");
             Assert.True(SpinWait.SpinUntil(() => pw.HasCaptureChannel("test_registry_added", 1), TimeSpan.FromSeconds(3)));
+            pw.SetSinkVolume("test_registry_reads", 1.25);
+            Assert.Equal(1.25, pw.GetSinkVolume("test_registry_reads"));
             pw.TearDown();
             Assert.True(SpinWait.SpinUntil(() => !pw.HasCaptureChannel("test_registry_added", 0), TimeSpan.FromSeconds(3)));
 

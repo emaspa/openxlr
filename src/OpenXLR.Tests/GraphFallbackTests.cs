@@ -7,6 +7,93 @@ namespace OpenXLR.Tests;
 public sealed class GraphFallbackTests(ITestOutputHelper output)
 {
     [Fact]
+    public async Task AStalledDefaultQueryLeavesTheRegistryFreeAndCannotOverwriteANewerDefault()
+    {
+        string directory = Directory.CreateTempSubdirectory("openxlr-default-concurrent-").FullName;
+        string? path = Environment.GetEnvironmentVariable("PATH");
+        string started = Path.Combine(directory, "started"), release = Path.Combine(directory, "release");
+        try
+        {
+            ExecutableScript.Write(Path.Combine(directory, "pw-dump"), """
+                echo '[{"id":0,"type":"PipeWire:Interface:Core"},{"id":1,"type":"PipeWire:Interface:Node","info":{"props":{"node.name":"desk","media.class":"Audio/Sink"}}}]'
+                exec /bin/sleep 60
+                """);
+            ExecutableScript.Write(Path.Combine(directory, "pactl"), """
+                dir=${0%/*}
+                case "$1" in
+                    --format=json)
+                        if [ ! -f "$dir/started" ]; then
+                            : > "$dir/started"
+                            while [ ! -f "$dir/release" ]; do /bin/sleep 0.01; done
+                            echo '{"default_sink_name":"desk","default_source_name":"mic"}'
+                        else
+                            echo '{"default_sink_name":"headphones","default_source_name":"mic"}'
+                        fi;;
+                    set-default-sink) :;;
+                    get-default-sink) echo headphones;;
+                    *) exit 1;;
+                esac
+                """);
+            Environment.SetEnvironmentVariable("PATH", directory);
+            var adapter = new PipeWireAdapter();
+            using var watch = adapter.WatchGraph();
+            Task<string?> refresh = Task.Run(adapter.GetDefaultSink);
+            try
+            {
+                Assert.True(SpinWait.SpinUntil(() => File.Exists(started), TimeSpan.FromSeconds(3)));
+                Assert.True(await Task.Run(() => adapter.SinkExists("desk")).WaitAsync(TimeSpan.FromSeconds(2)));
+                await Task.Run(() => adapter.SetDefaultSink("headphones")).WaitAsync(TimeSpan.FromSeconds(2));
+            }
+            finally
+            {
+                File.WriteAllText(release, "");
+                await refresh.WaitAsync(TimeSpan.FromSeconds(6));
+            }
+            Assert.Equal("headphones", await refresh);
+            Assert.Equal("headphones", adapter.GetDefaultSink());
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PATH", path);
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
+    public void APhysicalSinkThatClampsVolumeDoesNotWaitForAnExactEcho()
+    {
+        string directory = Directory.CreateTempSubdirectory("openxlr-volume-clamp-").FullName;
+        string? path = Environment.GetEnvironmentVariable("PATH");
+        try
+        {
+            ExecutableScript.Write(Path.Combine(directory, "pw-dump"), """
+                echo '[{"id":0,"type":"PipeWire:Interface:Core"},{"id":1,"type":"PipeWire:Interface:Node","info":{"props":{"node.name":"headset","media.class":"Audio/Sink"},"params":{"Props":[{"channelVolumes":[0.125]}]}}}]'
+                exec /bin/sleep 60
+                """);
+            ExecutableScript.Write(Path.Combine(directory, "pactl"), """
+                case "$1" in
+                    set-sink-volume) :;;
+                    get-sink-volume) echo 'Volume: front-left: 65536 / 100% / 0.00 dB';;
+                    *) exit 1;;
+                esac
+                """);
+            Environment.SetEnvironmentVariable("PATH", directory);
+            var adapter = new PipeWireAdapter();
+            using var watch = adapter.WatchGraph();
+            Assert.Equal(.5, adapter.GetSinkVolume("headset"));
+            long start = Environment.TickCount64;
+            for (int i = 0; i < 4; i++) adapter.SetSinkVolume("headset", 1.5);
+            Assert.True(Environment.TickCount64 - start < 2500, "Physical writes waited for a volume the sink cannot report.");
+            Assert.Equal(1, adapter.GetSinkVolume("headset"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PATH", path);
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
     public void FailedPairedDefaultsAreBackedOffWhileDirectReadsStayFresh()
     {
         string directory = Directory.CreateTempSubdirectory("openxlr-default-backoff-").FullName;
