@@ -9,8 +9,8 @@
        row with the button at its end, in a rack strip the button on its own; then the
        chain at a glance. Adding, ordering and removing live in the chain window. -->
   <StackPanel Spacing="4" IsVisible="{Binding HasInserts}">
-    <Grid Name="InsertsRow" ColumnDefinitions="90,*,Auto">
-      <TextBlock Name="InsertsLabel" Text="{loc:Text Key=Inserts}" Classes="h" VerticalAlignment="Center"
+    <Grid Name="InsertsRow" ColumnDefinitions="Auto,*,Auto">
+      <TextBlock Name="InsertsLabel" Text="{loc:Text Key=Inserts}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"
                  ToolTip.Tip="{loc:Text Key=InputChainHint}"/>
       <Button Name="CaptureInserts" Grid.Column="2" Content="{Binding Inserts.ButtonText}" Classes="fx"
               Classes.fxOn="{Binding Inserts.IsProcessing, FallbackValue=False}"

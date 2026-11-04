@@ -142,6 +142,15 @@ internal static partial class SkinLayoutWindowTests
                     SkinService.ApplyControlSizing(enlarged);
                     Layout(window, 640, 1400);
                     CheckBroadcastAt(window, model, $"120% text, {(enlarged ? "touch" : "standard")}");
+                    // The name column grows with the text, so the short names that
+                    // fit at Normal, such as Line In, still show whole.
+                    string[] shortNames = ["Aux In", "Line In", "Game", "Music", "Browser", "System", "Voice Chat", "SFX"];
+                    TextBlock[] names = [.. window.GetVisualDescendants().OfType<Border>()
+                        .Where(b => b.Name == "MatrixRowName" && b.IsEffectivelyVisible)
+                        .SelectMany(b => b.GetVisualDescendants().OfType<TextBlock>())
+                        .Where(t => t.IsEffectivelyVisible && t.Classes.Contains("strip") && shortNames.Contains(t.Text))];
+                    Assert.NotEmpty(names);
+                    MainWindowLabelTests.CheckWhole(names, $"Broadcast row names at 120% text, {(enlarged ? "touch" : "standard")}");
                 }
             }
             finally

@@ -51,15 +51,15 @@
     <Border Classes="card">
       <StackPanel Spacing="6">
         <TextBlock Text="{loc:Text Key=WINDOW}" Classes="h"/>
-        <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,8,Auto">
-          <TextBlock Text="{loc:Text Key=OnLaunch}" Classes="h" VerticalAlignment="Center"/>
+        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,8,Auto">
+          <TextBlock Text="{loc:Text Key=OnLaunch}" Classes="h" MinWidth="{DynamicResource UiText.Width110}" VerticalAlignment="Center"/>
           <ComboBox Name="LaunchBehavior" Grid.Column="1" HorizontalAlignment="Stretch"
                     SelectedIndex="{Binding LaunchBehavior, Mode=TwoWay}"
                     AutomationProperties.Name="{loc:Text Key=OnLaunch}">
             <ComboBoxItem Content="{loc:Text Key=ShowMixer}"/>
             <ComboBoxItem Content="{loc:Text Key=TrayOnly}"/>
           </ComboBox>
-          <TextBlock Grid.Row="2" Text="{loc:Text Key=WhenClosing}" Classes="h" VerticalAlignment="Center"/>
+          <TextBlock Grid.Row="2" Text="{loc:Text Key=WhenClosing}" Classes="h" MinWidth="{DynamicResource UiText.Width110}" VerticalAlignment="Center"/>
           <ComboBox Name="CloseBehavior" Grid.Row="2" Grid.Column="1" HorizontalAlignment="Stretch"
                     SelectedIndex="{Binding CloseBehavior, Mode=TwoWay}"
                     AutomationProperties.Name="{loc:Text Key=WhenClosing}">
@@ -112,8 +112,8 @@
           <ItemsControl Name="InputBindingRows" ItemsSource="{Binding Main.BindableStrips}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:ChannelViewModel">
-                <Grid ColumnDefinitions="110,*" Margin="0,0,0,4">
-                  <TextBlock Text="{Binding Name}" Classes="h" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,4">
+                  <TextBlock Text="{Binding Name}" Classes="h" Width="{DynamicResource UiText.Width110}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                              ToolTip.Tip="{Binding Name}"/>
                   <StackPanel Grid.Column="1" Spacing="2">
                     <views:BindingChip HorizontalAlignment="Left"/>
@@ -143,8 +143,8 @@
         <TextBlock Name="MixLatencyUnitNote" Text="{Binding Main.HardwareMixing.LatencyNote}" Classes="hint" TextWrapping="Wrap"
                    IsVisible="{Binding Main.HardwareMixing.HasLatencyNote}"/>
         <!-- the graph's block size, forced through the meters, or left to PipeWire -->
-        <Grid Name="BlockSizeRow" ColumnDefinitions="110,*" IsVisible="{Binding Main.BlockSizeReported}">
-          <TextBlock Text="{loc:Text Key=BlockSize}" Classes="h" VerticalAlignment="Center"/>
+        <Grid Name="BlockSizeRow" ColumnDefinitions="Auto,*" IsVisible="{Binding Main.BlockSizeReported}">
+          <TextBlock Text="{loc:Text Key=BlockSize}" Classes="h" MinWidth="{DynamicResource UiText.Width110}" VerticalAlignment="Center"/>
           <ComboBox Name="BlockSize" Grid.Column="1" HorizontalAlignment="Stretch"
                     ItemsSource="{Binding Main.BlockSizeChoices}" SelectedIndex="{Binding Main.BlockSizeIndex, Mode=TwoWay}"
                     IsEnabled="{Binding Main.HasMixer}" AutomationProperties.Name="{loc:Text Key=BlockSize}"/>
@@ -169,7 +169,7 @@
                    FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
 
         <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,8,Auto">
-          <TextBlock Text="{loc:Text Key=DefaultOutput}" Classes="h" MinWidth="110" VerticalAlignment="Center"/>
+          <TextBlock Text="{loc:Text Key=DefaultOutput}" Classes="h" MinWidth="{DynamicResource UiText.Width110}" VerticalAlignment="Center"/>
           <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
                     ItemsSource="{Binding OutputChoices}"
                     SelectedItem="{Binding EnforcedOutput, Mode=TwoWay}">
@@ -180,7 +180,7 @@
             </ComboBox.ItemTemplate>
           </ComboBox>
 
-          <TextBlock Grid.Row="2" Text="{loc:Text Key=DefaultInput}" Classes="h" MinWidth="110" VerticalAlignment="Center"/>
+          <TextBlock Grid.Row="2" Text="{loc:Text Key=DefaultInput}" Classes="h" MinWidth="{DynamicResource UiText.Width110}" VerticalAlignment="Center"/>
           <ComboBox Grid.Row="2" Grid.Column="1" HorizontalAlignment="Stretch"
                     ItemsSource="{Binding InputChoices}"
                     SelectedItem="{Binding EnforcedInput, Mode=TwoWay}">
@@ -297,8 +297,8 @@
     <Border Classes="card">
       <StackPanel Spacing="6">
         <TextBlock Text="{loc:Text Key=APPEARANCE}" Classes="h"/>
-        <Grid ColumnDefinitions="110,*,Auto">
-          <TextBlock Text="{loc:Text Key=Skin}" Classes="h" VerticalAlignment="Center"/>
+        <Grid ColumnDefinitions="Auto,*,Auto">
+          <TextBlock Text="{loc:Text Key=Skin}" Classes="h" MinWidth="{DynamicResource UiText.Width110}" VerticalAlignment="Center"/>
           <ComboBox Name="SkinPicker" Grid.Column="1" HorizontalAlignment="Stretch"
                     ItemsSource="{Binding SkinChoices}"
                     SelectedItem="{Binding SelectedSkin, Mode=TwoWay}"
@@ -319,8 +319,8 @@
                 ToolTip.Tip="{loc:Text Key=ResetSkinArrangementHint}">
           <TextBlock Text="{loc:Text Key=ResetSkinArrangement}" TextWrapping="Wrap"/>
         </Button>
-        <Grid ColumnDefinitions="110,*">
-          <TextBlock Text="{loc:Text Key=Mode}" Classes="h" VerticalAlignment="Center"/>
+        <Grid ColumnDefinitions="Auto,*">
+          <TextBlock Text="{loc:Text Key=Mode}" Classes="h" MinWidth="{DynamicResource UiText.Width110}" VerticalAlignment="Center"/>
           <ComboBox Name="AppearanceModePicker" Grid.Column="1" HorizontalAlignment="Stretch"
                     ItemsSource="{Binding AppearanceModeChoices}"
                     SelectedItem="{Binding SelectedAppearanceMode, Mode=TwoWay}"
@@ -333,8 +333,8 @@
           </ComboBox>
         </Grid>
         <TextBlock Text="{Binding AppearanceModeNote}" FontSize="{DynamicResource UiText.FontSize11}" Classes="hint" TextWrapping="Wrap"/>
-        <Grid ColumnDefinitions="110,*">
-          <TextBlock Text="{loc:Text Key=TextSize}" Classes="h" TextWrapping="Wrap" VerticalAlignment="Center"/>
+        <Grid ColumnDefinitions="Auto,*">
+          <TextBlock Text="{loc:Text Key=TextSize}" Classes="h" MinWidth="{DynamicResource UiText.Width110}" VerticalAlignment="Center"/>
           <ComboBox Name="TextSizePicker" Grid.Column="1" HorizontalAlignment="Stretch"
                     ItemsSource="{Binding TextSizeChoices}" SelectedItem="{Binding SelectedTextSize, Mode=TwoWay}"
                     AutomationProperties.Name="{loc:Text Key=TextSize}">
@@ -345,8 +345,8 @@
             </ComboBox.ItemTemplate>
           </ComboBox>
         </Grid>
-        <Grid ColumnDefinitions="110,*">
-          <TextBlock Text="{loc:Text Key=Controls}" Classes="h" VerticalAlignment="Center"/>
+        <Grid ColumnDefinitions="Auto,*">
+          <TextBlock Text="{loc:Text Key=Controls}" Classes="h" MinWidth="{DynamicResource UiText.Width110}" VerticalAlignment="Center"/>
           <ComboBox Name="ControlSizingPicker" Grid.Column="1" HorizontalAlignment="Stretch"
                     ItemsSource="{Binding ControlSizingChoices}"
                     SelectedItem="{Binding SelectedControlSizing, Mode=TwoWay}"
@@ -360,7 +360,7 @@
         </Grid>
         <TextBlock Text="{loc:Text Key=TouchGivesTheMixerSButtonsFaders}" FontSize="{DynamicResource UiText.FontSize11}" Classes="hint" TextWrapping="Wrap"/>
         <Grid ColumnDefinitions="Auto,*">
-          <TextBlock Text="{loc:Text Key=MixerView}" Classes="h" MinWidth="110" VerticalAlignment="Center"/>
+          <TextBlock Text="{loc:Text Key=MixerView}" Classes="h" MinWidth="{DynamicResource UiText.Width110}" VerticalAlignment="Center"/>
           <ComboBox Name="MixerViewPicker" Grid.Column="1" HorizontalAlignment="Stretch"
                     ItemsSource="{Binding MixerViewChoices}"
                     SelectedItem="{Binding SelectedMixerView, Mode=TwoWay}" AutomationProperties.Name="{loc:Text Key=MixerView}">
@@ -373,8 +373,8 @@
         </Grid>
         <TextBlock Text="{loc:Text Key=CompactShowsOneChannelStripWithEvery}"
                    FontSize="{DynamicResource UiText.FontSize11}" Classes="hint" TextWrapping="Wrap"/>
-        <Grid ColumnDefinitions="110,*">
-          <TextBlock Text="{loc:Text Key=Language}" Classes="h" VerticalAlignment="Center"/>
+        <Grid ColumnDefinitions="Auto,*">
+          <TextBlock Text="{loc:Text Key=Language}" Classes="h" MinWidth="{DynamicResource UiText.Width110}" VerticalAlignment="Center"/>
           <ComboBox Name="LanguagePicker" Grid.Column="1" HorizontalAlignment="Stretch"
                     ItemsSource="{Binding LanguageChoices}"
                     SelectedItem="{Binding SelectedLanguage, Mode=TwoWay}" AutomationProperties.Name="{loc:Text Key=Language}">

@@ -82,14 +82,21 @@
     <TextBlock DockPanel.Dock="Bottom" Name="DynamicsNote" Text="{Binding Note}" Classes="hint" TextWrapping="Wrap" Margin="0,10,0,0"/>
 
     <!-- The advanced settings, behind the settings button -->
-    <ItemsControl DockPanel.Dock="Bottom" Name="DynamicsAdvanced" ItemsSource="{Binding Advanced}" IsVisible="{Binding ShowsAdvanced}" Margin="0,12,0,0">
+    <ItemsControl DockPanel.Dock="Bottom" Name="DynamicsAdvanced" ItemsSource="{Binding Advanced}" IsVisible="{Binding ShowsAdvanced}" Margin="0,12,0,0"
+                  Grid.IsSharedSizeScope="True">
       <ItemsControl.ItemsPanel>
         <ItemsPanelTemplate><StackPanel Spacing="6"/></ItemsPanelTemplate>
       </ItemsControl.ItemsPanel>
       <ItemsControl.ItemTemplate>
         <DataTemplate x:DataType="vm:DynamicsParameterViewModel">
-          <Grid ColumnDefinitions="120,*,80" ColumnSpacing="10" IsVisible="{Binding Shown}">
-            <TextBlock Text="{Binding Label}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+          <!-- the labels share one width, at least the scaled minimum, so the sliders line up at any text size -->
+          <Grid ColumnSpacing="10" IsVisible="{Binding Shown}">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" SharedSizeGroup="DynamicsLabel"/>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="80"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="{Binding Label}" MinWidth="{DynamicResource UiText.Width120}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
             <Slider Grid.Column="1" Name="DynamicsParameter" Minimum="{Binding Minimum}" Maximum="{Binding Maximum}"
                     SmallChange="{Binding Step}" LargeChange="{Binding Step}" vm:FaderInput.Step="{Binding Step}"
                     Value="{Binding Value, Mode=TwoWay}" AutomationProperties.Name="{Binding Label}" ToolTip.Tip="{Binding Tip}"/>

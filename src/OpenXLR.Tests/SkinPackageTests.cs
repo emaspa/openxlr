@@ -302,6 +302,7 @@ public sealed class SkinPackageTests : IDisposable
         if (SourceDirectory() is not { } source) return;
         var keys = SkinService.TextSizeBases.Select(size => $"UiText.FontSize{size}").ToHashSet();
         keys.Add(SkinService.CrossfadeReadoutWidth);
+        keys.UnionWith(SkinService.LabelWidthBases.Select(width => $"UiText.Width{width}"));
         var missing = new List<string>();
         foreach (string file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories)
             .Where(file => Path.GetExtension(file) is ".axaml" or ".cs")

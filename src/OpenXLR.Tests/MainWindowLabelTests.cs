@@ -154,6 +154,16 @@ internal static class MainWindowLabelTests
         }
     }
 
+    /// <summary>Each label shows its whole text in the width it was given.</summary>
+    internal static void CheckWhole(IEnumerable<TextBlock> labels, string where)
+    {
+        var failures = new List<string>();
+        foreach (TextBlock label in labels)
+            if (TextWidth(label) > label.Bounds.Width + 1)
+                failures.Add($"'{label.Text}' needs {TextWidth(label):F1}px but has {label.Bounds.Width:F1}px");
+        Assert.True(failures.Count == 0, $"{where}: {string.Join("; ", failures)}");
+    }
+
     private static double TextWidth(TextBlock text) => TextWidth(text, text.Text ?? "");
 
     private static double TextWidth(TextBlock text, string value)

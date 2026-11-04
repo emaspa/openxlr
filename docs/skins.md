@@ -524,8 +524,10 @@ the mixer layout, not of a skin
 ### Typography
 
 Options' **Text size** scales typography after the skin is applied. Normal
-(100%) uses the sizes listed here. Matrix rows also grow at the two larger
-sizes so a name and its binding line have room. The preference lives in `ui.json`.
+(100%) uses the sizes listed here. Matrix rows and the matrix's name column
+also grow at the two larger sizes so a name and its binding line have room,
+and label columns grow with the text so the controls beside them stay in
+line. The preference lives in `ui.json`.
 The headphone controls reserve room for translated labels and split the
 remaining fader width to the nearest display pixel.
 

@@ -75,6 +75,8 @@ public static class SkinService
         ? percent : NormalTextSize;
 
     internal static IReadOnlyList<int> TextSizeBases { get; } = [10, 11, 12, 13, 16, 17, 18, 19, 20, 22, 24];
+    /// <summary>The label column widths that grow with the text, as UiText.Width{n}.</summary>
+    internal static IReadOnlyList<int> LabelWidthBases { get; } = [90, 110, 120];
     internal const string CrossfadeReadoutWidth = "UiText.CrossfadeReadoutWidth";
 
     private static double ScaleText(double size) => size * TextSizePercent / NormalTextSize;
@@ -99,7 +101,7 @@ public static class SkinService
             foreach (SkinToken token in SkinTokens.All)
             {
                 bool font = IsFontSize(token);
-                if ((!font && token.Name != "Ox.Matrix.RowHeight") || token.Default is not double basis) continue;
+                if ((!font && token.Name is not ("Ox.Matrix.RowHeight" or "Ox.Matrix.NameWidth")) || token.Default is not double basis) continue;
                 double size = _palette.Tokens.GetValueOrDefault(token.Name) is SkinNumber number ? number.Value : basis;
                 Put(application.Resources, token.Name, font ? ScaleText(size) : Sized(token.Name, size)!);
             }
@@ -112,6 +114,10 @@ public static class SkinService
         var resources = application.Resources;
         foreach (int size in TextSizeBases)
             Put(resources, $"UiText.FontSize{size}", ScaleText(size));
+        // A label column keeps the labels that fit it at Normal fitting at
+        // every size, so rows of a card still line up.
+        foreach (int width in LabelWidthBases)
+            Put(resources, $"UiText.Width{width}", Math.Ceiling(ScaleText(width)));
         // Reserve the endpoint readout's space even in the middle of a drag.
         Put(resources, CrossfadeReadoutWidth, Math.Ceiling(ScaleText(74)));
         // Read the toolkit's unscaled sizes from its styles, outside our
@@ -482,6 +488,10 @@ public static class SkinService
     /// </summary>
     private static object? Sized(string name, object? value)
     {
+        // Matrix rows and the matrix's name column grow at the larger text
+        // sizes, so a name and its binding line keep their room.
+        if (name is "Ox.Matrix.RowHeight" or "Ox.Matrix.NameWidth" && TextSizePercent > NormalTextSize && value is double grown)
+            value = Math.Ceiling(ScaleText(grown));
         if (!SkinTokens.TouchMinimums.TryGetValue(name, out double floor)) return value;
         double minimum = TouchControls ? floor : 0;
         if (name is "Ox.Mixer.SliderMinHeight" or "Ox.Mixer.DeviceSliderHeight")
@@ -491,8 +501,6 @@ public static class SkinService
             if (minimum > 0 && _palette.Tokens.GetValueOrDefault("Ox.Fader.Thumb.Height") is SkinNumber thumb)
                 minimum = Math.Max(minimum, thumb.Value);
         }
-        if (name == "Ox.Matrix.RowHeight" && TextSizePercent > NormalTextSize && value is double height)
-            value = Math.Ceiling(ScaleText(height));
         return minimum > 0 ? Math.Max(value is double size ? size : 0, minimum) : value;
     }
 

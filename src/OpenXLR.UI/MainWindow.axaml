@@ -351,8 +351,8 @@
              microphone, or none does, the input moves under the strip's own
              controls with a heading that says where it plays. -->
         <Grid Name="Xlr1Section" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="4">
-          <Grid Name="Xlr1Binding" ColumnDefinitions="90,*" IsVisible="{Binding HasXlr1Strip}">
-            <TextBlock Text="{Binding Xlr1InputLabel}" Classes="h" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+          <Grid Name="Xlr1Binding" ColumnDefinitions="Auto,*" IsVisible="{Binding HasXlr1Strip}">
+            <TextBlock Text="{Binding Xlr1InputLabel}" Classes="h" Width="{DynamicResource UiText.Width90}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
             <StackPanel Grid.Column="1" Spacing="2">
               <!-- the chip, then the microphone's EQ and noise removal at the chip's height; a grid,
                    so a long source name trims before the buttons leave the row -->
@@ -399,7 +399,7 @@
                the controls the additional interfaces window draws for it -->
           <Grid Name="Xlr1ExtraUnit" Grid.Row="1" ColumnDefinitions="Auto,*"
                 IsVisible="{Binding Xlr1Strip.CarriesExtraUnit, FallbackValue=False}">
-            <TextBlock Text="{loc:Text Key=UnitInputGain}" Classes="h" MinWidth="90" VerticalAlignment="Top" Margin="0,6,0,0"/>
+            <TextBlock Text="{loc:Text Key=UnitInputGain}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Top" Margin="0,6,0,0"/>
             <views:WaveUnitControls Grid.Column="1" DataContext="{Binding Xlr1Strip.ExtraUnitInput}"/>
           </Grid>
           <StackPanel Name="Input1Block" Grid.Row="{Binding UnitInput1.BlockRow}" Spacing="4">
@@ -413,7 +413,7 @@
             </Grid>
             <StackPanel Spacing="4" IsVisible="{Binding UnitInput1.ControlsShown}">
               <Grid ColumnDefinitions="Auto,*,64,Auto">
-                <TextBlock Text="{Binding UnitInput1.GainLabel}" Classes="h" MinWidth="90" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding UnitInput1.GainLabel}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
                 <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="{Binding GainMaxDb}"
                         Value="{Binding GainDb, Mode=TwoWay}" IsEnabled="{Binding !GainLocked}"
                         AutomationProperties.Name="{Binding UnitInput1.GainName}"/>
@@ -437,7 +437,7 @@
                               IsVisible="{Binding CapCompressor}"/>
               </WrapPanel>
               <Grid ColumnDefinitions="Auto,*,64" IsVisible="{Binding VoiceTune}">
-                <TextBlock Text="{loc:Text Key=VTStrength}" Classes="h" MinWidth="90" VerticalAlignment="Center"/>
+                <TextBlock Text="{loc:Text Key=VTStrength}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
                 <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="100"
                         Value="{Binding VoiceTuneStrength, Mode=TwoWay}"/>
                 <TextBlock Grid.Column="2" Text="{Binding VoiceTuneStrengthText}" Classes="val"
@@ -463,8 +463,8 @@
                  window adds, reorders and removes; each plugin's controls open
                  in their own window. -->
             <StackPanel Spacing="4" Margin="0,4,0,0" IsVisible="{Binding HasMixer}">
-              <Grid ColumnDefinitions="90,*,Auto">
-                <TextBlock Text="{loc:Text Key=Inserts}" Classes="h" VerticalAlignment="Center"
+              <Grid ColumnDefinitions="Auto,*,Auto">
+                <TextBlock Text="{loc:Text Key=Inserts}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"
                            ToolTip.Tip="{loc:Text Key=PluginsProcessingXLR1BeforeItReachesThe}"/>
                 <Button Grid.Column="2" Content="{Binding Inserts.ButtonText}" Classes="fx" Classes.fxOn="{Binding Inserts.IsProcessing}" Classes.fxOff="{Binding Inserts.IsOff}"
                         Padding="12,3" FontSize="{DynamicResource UiText.FontSize12}" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
@@ -512,8 +512,8 @@
         <!-- XLR 2: the same, on an interface with a second input, or bound to a source
              so that a one-input interface has a second microphone strip -->
         <Grid Name="Xlr2Section" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="4" Margin="0,2,0,0" IsVisible="{Binding ShowXlr2Section}">
-          <Grid Name="Xlr2Binding" ColumnDefinitions="90,*" IsVisible="{Binding HasXlr2Strip}">
-            <TextBlock Text="{Binding Xlr2InputLabel}" Classes="h" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+          <Grid Name="Xlr2Binding" ColumnDefinitions="Auto,*" IsVisible="{Binding HasXlr2Strip}">
+            <TextBlock Text="{Binding Xlr2InputLabel}" Classes="h" Width="{DynamicResource UiText.Width90}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
             <StackPanel Grid.Column="1" Spacing="2">
               <!-- the chip, then the microphone's EQ and noise removal at the chip's height; a grid,
                    so a long source name trims before the buttons leave the row -->
@@ -560,7 +560,7 @@
                the controls the additional interfaces window draws for it -->
           <Grid Name="Xlr2ExtraUnit" Grid.Row="1" ColumnDefinitions="Auto,*"
                 IsVisible="{Binding Xlr2Strip.CarriesExtraUnit, FallbackValue=False}">
-            <TextBlock Text="{loc:Text Key=UnitInputGain}" Classes="h" MinWidth="90" VerticalAlignment="Top" Margin="0,6,0,0"/>
+            <TextBlock Text="{loc:Text Key=UnitInputGain}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Top" Margin="0,6,0,0"/>
             <views:WaveUnitControls Grid.Column="1" DataContext="{Binding Xlr2Strip.ExtraUnitInput}"/>
           </Grid>
           <StackPanel Name="Input2Block" Grid.Row="{Binding UnitInput2.BlockRow}" Spacing="4" IsVisible="{Binding HasXlr2}">
@@ -574,7 +574,7 @@
             </Grid>
             <StackPanel Spacing="4" IsVisible="{Binding UnitInput2.ControlsShown}">
               <Grid ColumnDefinitions="Auto,*,64">
-                <TextBlock Text="{Binding UnitInput2.GainLabel}" Classes="h" MinWidth="90" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding UnitInput2.GainLabel}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
                 <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="{Binding GainMaxDb}"
                         Value="{Binding Gain2Db, Mode=TwoWay}" IsEnabled="{Binding !GainLocked}"
                         AutomationProperties.Name="{Binding UnitInput2.GainName}"/>
@@ -593,7 +593,7 @@
                 <ToggleButton Content="{loc:Text Key=Compressor}" IsChecked="{Binding Compressor2, Mode=TwoWay}"/>
               </WrapPanel>
               <Grid ColumnDefinitions="Auto,*,64" IsVisible="{Binding VoiceTune2}">
-                <TextBlock Text="{loc:Text Key=VTStrength}" Classes="h" MinWidth="90" VerticalAlignment="Center"/>
+                <TextBlock Text="{loc:Text Key=VTStrength}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
                 <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="100"
                         Value="{Binding VoiceTuneStrength2, Mode=TwoWay}"/>
                 <TextBlock Grid.Column="2" Text="{Binding VoiceTuneStrength2Text}" Classes="val"
@@ -603,8 +603,8 @@
           </StackPanel>
           <!-- XLR 2 plugin inserts: same chain concept, its own mono filter-chain, after its EQ -->
           <StackPanel Grid.Row="2" Spacing="4" Margin="0,4,0,0" IsVisible="{Binding HasMixer}">
-            <Grid ColumnDefinitions="90,*,Auto">
-              <TextBlock Text="{loc:Text Key=Inserts}" Classes="h" VerticalAlignment="Center"
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <TextBlock Text="{loc:Text Key=Inserts}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"
                          ToolTip.Tip="{loc:Text Key=PluginsProcessingXLR2BeforeItReachesThe}"/>
               <Button Grid.Column="2" Content="{Binding Inserts2.ButtonText}" Classes="fx" Classes.fxOn="{Binding Inserts2.IsProcessing}" Classes.fxOff="{Binding Inserts2.IsOff}"
                       Padding="12,3" FontSize="{DynamicResource UiText.FontSize12}" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
@@ -650,7 +650,7 @@
 
         <!-- USB Aux input stage; its readout shows Aux In's volume while that fader moves and for a second after -->
         <Grid Name="AuxInRow" ColumnDefinitions="Auto,*,64,20,110" Margin="0,2,0,0" IsVisible="{Binding CapAuxInput}">
-          <TextBlock Text="{loc:Text Key=USBAuxIn}" Classes="h" MinWidth="90" VerticalAlignment="Center"/>
+          <TextBlock Text="{loc:Text Key=USBAuxIn}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
           <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="-60" Maximum="0"
                   Value="{Binding AuxLevelDb, Mode=TwoWay}" AutomationProperties.Name="{loc:Text Key=USBAuxIn}"/>
           <TextBlock Grid.Column="2" Name="AuxInReadout" Text="{Binding AuxReadout}" Classes="val" VerticalAlignment="Center"
@@ -660,7 +660,7 @@
         <!-- the Wave XLR Pro's analog Line In, an input of its own; its readout shows Line In's
              volume while that fader moves and for a second after -->
         <Grid Name="LineInRow" ColumnDefinitions="Auto,*,64,20,110" Margin="0,2,0,0" IsVisible="{Binding ShowLineInRow}">
-          <TextBlock Text="{loc:Text Key=LineIn}" Classes="h" MinWidth="90" VerticalAlignment="Center"/>
+          <TextBlock Text="{loc:Text Key=LineIn}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
           <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="{Binding LineInGainMaxDb}"
                   Value="{Binding LineInGainSliderDb, Mode=TwoWay}" AutomationProperties.Name="{loc:Text Key=LineInGain}"/>
           <TextBlock Grid.Column="2" Name="LineInReadout" Text="{Binding LineInReadout}" Classes="val" VerticalAlignment="Center"
@@ -721,7 +721,7 @@
                 <!-- the source's own gain, on a source OpenXLR does not drive; its readout shows the
                      channel's volume while that fader moves and for a second after -->
                 <Grid Name="CaptureGainRow" ColumnDefinitions="Auto,*,Auto,64" IsVisible="{Binding ShowsCaptureGain}">
-                  <TextBlock Text="{loc:Text Key=UnitInputGain}" Classes="h" MinWidth="90" VerticalAlignment="Center"/>
+                  <TextBlock Text="{loc:Text Key=UnitInputGain}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
                   <Slider Grid.Column="1" vm:FaderInput.Step="1" Minimum="{Binding CaptureGainMinDb}" Maximum="{Binding CaptureGainMaxDb}"
                           Value="{Binding CaptureGainDb, Mode=TwoWay}"
                           AutomationProperties.Name="{Binding CaptureGainName}" ToolTip.Tip="{Binding CaptureGainTip}"/>
@@ -729,7 +729,7 @@
                              HorizontalAlignment="Right" AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
                 </Grid>
                 <Grid ColumnDefinitions="Auto,*,Auto,64" IsVisible="{Binding HasVolume}">
-                  <TextBlock Text="{loc:Text Key=Volume}" Classes="h" MinWidth="90" VerticalAlignment="Center"/>
+                  <TextBlock Text="{loc:Text Key=Volume}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
                   <Slider Grid.Column="1" vm:FaderInput.Step="0.01" Minimum="0" Maximum="1" Value="{Binding Volume, Mode=TwoWay}"
                           vm:FaderInput.IsAdjusting="{Binding VolumeAdjusting, Mode=OneWayToSource}"
                           AutomationProperties.Name="{Binding Name, StringFormat={loc:Text Key=ChannelVolumeName}}" ToolTip.Tip="{Binding VolumeTip}"/>
@@ -741,7 +741,7 @@
                 <StackPanel Name="CaptureExtraUnit" Spacing="4" IsVisible="{Binding CarriesExtraUnit}">
                   <TextBlock Text="{Binding ExtraUnitInput.Unit.Name}" Classes="h" TextWrapping="Wrap"/>
                   <Grid ColumnDefinitions="Auto,*">
-                    <TextBlock Text="{loc:Text Key=UnitInputGain}" Classes="h" MinWidth="90" VerticalAlignment="Top" Margin="0,6,0,0"/>
+                    <TextBlock Text="{loc:Text Key=UnitInputGain}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Top" Margin="0,6,0,0"/>
                     <views:WaveUnitControls Grid.Column="1" DataContext="{Binding ExtraUnitInput}"/>
                   </Grid>
                 </StackPanel>
@@ -771,7 +771,7 @@
         </StackPanel></Expander.Header>
       <StackPanel Classes="dev" Spacing="4">
         <Grid Name="HeadphoneControls" ColumnDefinitions="Auto,*,64,20,Auto,*,64" Grid.IsSharedSizeScope="True">
-          <Grid Name="Phones1Label" ColumnDefinitions="Auto,*" MinWidth="90" VerticalAlignment="Center" ToolTip.Tip="{loc:Text Key=FrontJack}"
+          <Grid Name="Phones1Label" ColumnDefinitions="Auto,*" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center" ToolTip.Tip="{loc:Text Key=FrontJack}"
                 DataContext="{Binding Phones1Appearance}" x:DataType="vm:LayoutAppearanceViewModel">
             <vm:LayoutIconBlock Icon="{Binding Icon}" Fallback="{Binding DefaultIcon}" Classes="h" Classes.layoutAccent="{Binding HasColour}"
                                 IsVisible="{Binding HasIcon}" Margin="0,0,5,0" VerticalAlignment="Center"/>
@@ -783,7 +783,7 @@
           <TextBlock Grid.Column="2" Text="{Binding HpText}" Classes="val" VerticalAlignment="Center"
                      HorizontalAlignment="Right"/>
           <Panel Grid.Column="4" IsVisible="{Binding HasHp2}" VerticalAlignment="Center">
-            <Grid Name="Phones2Label" ColumnDefinitions="Auto,*" MinWidth="90" ToolTip.Tip="{loc:Text Key=RearJack}"
+            <Grid Name="Phones2Label" ColumnDefinitions="Auto,*" MinWidth="{DynamicResource UiText.Width90}" ToolTip.Tip="{loc:Text Key=RearJack}"
                   DataContext="{Binding Phones2Appearance}" x:DataType="vm:LayoutAppearanceViewModel">
               <vm:LayoutIconBlock Icon="{Binding Icon}" Fallback="{Binding DefaultIcon}" Classes="h" Classes.layoutAccent="{Binding HasColour}"
                                   IsVisible="{Binding HasIcon}" Margin="0,0,5,0" VerticalAlignment="Center"/>
@@ -799,7 +799,7 @@
         <!-- hardware zero-latency blend between mic direct and PC playback;
              the value column can grow for larger text and translated readouts -->
         <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding CapCrossfade}">
-          <TextBlock Text="{loc:Text Key=MicPC}" Classes="h" MinWidth="90" VerticalAlignment="Center"
+          <TextBlock Text="{loc:Text Key=MicPC}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"
                      ToolTip.Tip="{loc:Text Key=DirectMonitorBlendLeftOnlyYourMicRight}"/>
           <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="200"
                   Value="{Binding Crossfade, Mode=TwoWay}"/>
@@ -846,7 +846,7 @@
         <TextBlock Name="MonitorMicrophonePausePendingNote" Text="{loc:Text Key=MicrophonePausePendingNote}"
                    Classes="warn" TextWrapping="Wrap" IsVisible="{Binding MicrophonePausePending}"/>
         <Grid Name="MonitorControls" ColumnDefinitions="Auto,*,20,Auto,*,64" SizeChanged="OnMonitorSizeChanged">
-          <TextBlock Name="MonitorDevicesLabel" Text="{loc:Text Key=Devices}" Classes="h" MinWidth="90" VerticalAlignment="Center"/>
+          <TextBlock Name="MonitorDevicesLabel" Text="{loc:Text Key=Devices}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
           <DropDownButton Name="MonitorDestination" Grid.Column="1" HorizontalAlignment="Stretch"
                           HorizontalContentAlignment="Left" AutomationProperties.Name="{loc:Text Key=Devices}"
                           Content="{Binding MonitorSummary}" ToolTip.Tip="{Binding MonitorSummary}">
@@ -905,7 +905,7 @@
             </DropDownButton.Flyout>
           </DropDownButton>
 
-          <TextBlock Name="MonitorVolumeLabel" Grid.Column="3" Text="{loc:Text Key=Volume}" Classes="h" MinWidth="90" VerticalAlignment="Center"/>
+          <TextBlock Name="MonitorVolumeLabel" Grid.Column="3" Text="{loc:Text Key=Volume}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
           <Slider vm:FaderInput.Step="0.01" Name="OutputVolumeSlider" Grid.Column="4" Minimum="0" Maximum="{Binding OutputVolumeRange.Maximum}" Value="{Binding OutputVolume, Mode=TwoWay}"
                   AutomationProperties.Name="{loc:Text Key=Volume}"/>
           <TextBlock Name="MonitorVolumeReadout" Grid.Column="5" Text="{Binding OutputVolumeText}" Classes="val"

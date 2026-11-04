@@ -706,12 +706,20 @@ public sealed class WindowLayoutTests
             Assert.Equal(normal.Action * scale, action.FontSize, 0.01);
             Assert.Equal(normal.Button * scale, desktopKeys.FontSize, 0.01);
             Assert.Equal(normal.AppName * scale, appName.FontSize, 0.01);
+            Assert.Equal(Math.Ceiling(90d * percent / 100), (double)main.FindResource("UiText.Width90")!);
+            Assert.Equal(Math.Ceiling(110d * percent / 100), (double)main.FindResource("UiText.Width110")!);
             AssertInside(action, main);
             if (percent == 120)
             {
                 MainWindowLabelTests.Check(main);
-                MainWindowLabelTests.CheckAutoColumnTranslations(main, "XLR1Gain", "XLR2Gain", "Devices", "Volume", "USBAuxIn", "MicPC");
-                MainWindowLabelTests.CheckAutoColumnTranslations(options, "DefaultOutput", "DefaultInput", "MixerView");
+                MainWindowLabelTests.CheckAutoColumnTranslations(main, "XLR1Gain", "XLR2Gain", "Devices", "Volume", "USBAuxIn", "MicPC", "Inserts");
+                MainWindowLabelTests.CheckAutoColumnTranslations(options, "DefaultOutput", "DefaultInput", "MixerView",
+                    "OnLaunch", "WhenClosing", "Skin", "Mode", "TextSize", "Controls", "Language");
+                // The input rows' labels hold a channel name, so they keep a
+                // width, and that width grows with the text.
+                foreach (string row in new[] { "Xlr1Binding", "Xlr2Binding" })
+                    Assert.Equal((double)main.FindResource("UiText.Width90")!,
+                        main.FindControl<Grid>(row)!.Children.OfType<TextBlock>().First().Width);
             }
             if (percent is 80 or 120)
             {
