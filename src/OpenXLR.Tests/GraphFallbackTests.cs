@@ -67,7 +67,10 @@ public sealed class GraphFallbackTests(ITestOutputHelper output)
         try
         {
             ExecutableScript.Write(Path.Combine(directory, "pw-dump"), """
-                echo '[{"id":0,"type":"PipeWire:Interface:Core"},{"id":1,"type":"PipeWire:Interface:Node","info":{"props":{"node.name":"headset","media.class":"Audio/Sink"},"params":{"Props":[{"channelVolumes":[0.125]}]}}}]'
+                echo '[{"id":0,"type":"PipeWire:Interface:Core"},
+                  {"id":1,"type":"PipeWire:Interface:Node","info":{"props":{"node.name":"headset","media.class":"Audio/Sink"},"params":{"Props":[{"channelVolumes":[0.125]}]}}},
+                  {"id":2,"type":"PipeWire:Interface:Node","info":{"props":{"node.name":"speaker","media.class":"Audio/Sink"},"params":{"Props":[{"channelVolumes":[0.125]}]}}},
+                  {"id":3,"type":"PipeWire:Interface:Node","info":{"props":{"node.name":"untouched","media.class":"Audio/Sink"},"params":{"Props":[{"channelVolumes":[0.125]}]}}}]'
                 exec /bin/sleep 60
                 """);
             ExecutableScript.Write(Path.Combine(directory, "pactl"), """
@@ -84,7 +87,10 @@ public sealed class GraphFallbackTests(ITestOutputHelper output)
             long start = Environment.TickCount64;
             for (int i = 0; i < 4; i++) adapter.SetSinkVolume("headset", 1.5);
             Assert.True(Environment.TickCount64 - start < 2500, "Physical writes waited for a volume the sink cannot report.");
+            adapter.SetSinkVolume("speaker", 1.5);
             Assert.Equal(1, adapter.GetSinkVolume("headset"));
+            Assert.Equal(1, adapter.GetSinkVolume("speaker"));
+            Assert.Equal(.5, adapter.GetSinkVolume("untouched"));
         }
         finally
         {

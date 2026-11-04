@@ -917,8 +917,9 @@ That query runs independently of registry reads. If it fails, individual
 queries continue reading current defaults while the paired query backs off
 for five seconds. Direct queries also cover an unavailable registry or
 volume reading. After a hardware volume change from OpenXLR, the daemon
-briefly reads the actual level directly so it can handle devices that
-round or cap the requested level. The journal reports outages and recovery.
+briefly reads that output's actual level directly so it can handle devices
+that round or cap the requested level. Other outputs keep using the live
+registry. The journal reports outages and recovery.
 
 1. Change the channel in the dropdown next to the app. The move happens
    immediately and is remembered for that app. The channels also appear

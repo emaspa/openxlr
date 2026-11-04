@@ -88,6 +88,7 @@ public sealed class PipeWireAdapter
                 owner._dumpObjects = null;
                 owner._defaultsRevision = -1;
                 owner._inputPorts = owner._outputPorts = (-1, null);
+                owner._directSinkVolumeUntil.Clear();
             }
             graph.Dispose();
         }
@@ -563,20 +564,28 @@ public sealed class PipeWireAdapter
     internal static string VolumePercent(double volume)
         => $"{(int)Math.Round(Math.Clamp(volume, 0, MaxSinkVolume) * 100)}%";
 
-    private long _directSinkVolumeUntil;
+    private readonly Dictionary<string, long> _directSinkVolumeUntil = new(StringComparer.Ordinal);
 
     /// <summary>Set a sink's volume (0 to <see cref="MaxSinkVolume"/>).</summary>
     public void SetSinkVolume(string sinkName, double volume)
     {
         string bare = BareSink(sinkName);
         Run("pactl", "set-sink-volume", bare, VolumePercent(volume));
-        InvalidateDump();
+        lock (DumpGate)
+        {
+            _dumpObjects = null;
+            if (!IsOwnSink(bare))
+            {
+                // A device can quantize or clamp a write. Read that device
+                // directly during immediate synchronization.
+                long now = Environment.TickCount64;
+                foreach (var (name, until) in _directSinkVolumeUntil)
+                    if (until <= now) _directSinkVolumeUntil.Remove(name);
+                _directSinkVolumeUntil[bare] = now + 1000;
+            }
+        }
         if (IsOwnSink(bare))
             WaitForSinkLevel(bare, level => Math.Abs(level.DesktopVolume - Math.Round(Math.Clamp(volume, 0, MaxSinkVolume) * 100) / 100) < .005);
-        else
-            // A device can quantize or clamp a write. Read its actual level
-            // during immediate synchronization instead of waiting for an exact echo.
-            Volatile.Write(ref _directSinkVolumeUntil, Environment.TickCount64 + 1000);
     }
 
     /// <summary>Mute or unmute a sink.</summary>
@@ -763,8 +772,11 @@ public sealed class PipeWireAdapter
     public double? GetSinkVolume(string sinkName)
     {
         string bare = BareSink(sinkName);
-        bool readRegistry = Environment.TickCount64 >= Volatile.Read(ref _directSinkVolumeUntil) || IsOwnSink(bare);
-        if (readRegistry && LiveObjects() is { } objects)
+        JsonElement[]? observed;
+        lock (DumpGate)
+            observed = _directSinkVolumeUntil.TryGetValue(bare, out long until) && Environment.TickCount64 < until
+                ? null : LiveObjects();
+        if (observed is { } objects)
         {
             if (FindSink(objects, bare) is not { } info) return null;
             if (SinkLevel(info, firstChannel: true) is { } level) return Math.Clamp(level.DesktopVolume, 0, MaxSinkVolume);
