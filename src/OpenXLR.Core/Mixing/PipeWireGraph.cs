@@ -23,6 +23,8 @@ internal sealed class PipeWireGraph : IDisposable
     private JsonElement[]? _snapshot;
     private bool _ready;
     private long _size;
+    private long _defaultRevision;
+    internal long DefaultRevision { get { lock (_gate) return _defaultRevision; } }
 
     internal PipeWireGraph(Action<string>? note = null, string executable = "pw-dump")
     {
@@ -82,6 +84,7 @@ internal sealed class PipeWireGraph : IDisposable
                     // dies is still failing. Do not reset its retry backoff.
                     if (_ready && Environment.TickCount64 - started >= 5000) delay = 250;
                     _ready = false;
+                    _defaultRevision++;
                     _objects.Clear();
                     _snapshot = null;
                     _size = 0;
@@ -104,6 +107,8 @@ internal sealed class PipeWireGraph : IDisposable
             foreach (JsonElement item in batch.EnumerateArray())
             {
                 uint id = PipeWireSnapshot.RegistryId(item);
+                if (IsDefaultMetadata(item) || (_objects.TryGetValue(id, out var previous) && IsDefaultMetadata(previous.Value)))
+                    _defaultRevision++;
                 (JsonElement Value, int Size) old = updates.TryGetValue(id, out var pending)
                     ? pending : _objects.GetValueOrDefault(id);
                 sizeAfter -= old.Size;
@@ -138,6 +143,12 @@ internal sealed class PipeWireGraph : IDisposable
             return _ready;
         }
     }
+
+    private static bool IsDefaultMetadata(JsonElement item)
+        => item.ValueKind == JsonValueKind.Object && item.TryGetProperty("type", out var type)
+            && type.GetString() == "PipeWire:Interface:Metadata"
+            && item.TryGetProperty("props", out var props) && props.ValueKind == JsonValueKind.Object
+            && props.TryGetProperty("metadata.name", out var name) && name.GetString() == "default";
 
     /// <summary>Wait for startup or a specific observed write, never for idle events.</summary>
     internal bool WaitFor(Func<JsonElement[], bool> predicate, TimeSpan timeout)

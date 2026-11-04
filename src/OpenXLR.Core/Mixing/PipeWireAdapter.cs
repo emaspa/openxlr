@@ -86,6 +86,7 @@ public sealed class PipeWireAdapter
             {
                 if (ReferenceEquals(owner._graph, graph)) owner._graph = null;
                 owner._dumpObjects = null;
+                owner._defaults = null;
             }
             graph.Dispose();
         }
@@ -577,12 +578,13 @@ public sealed class PipeWireAdapter
 
     private void WaitForSinkLevel(string sinkName, Func<OwnSinkLevel, bool> matches)
     {
-        if (_graph is null || !_graph.IsReady || !BareSink(sinkName).StartsWith("OpenXLR_", StringComparison.Ordinal)) return;
+        if (_graph is null || !_graph.IsReady) return;
         // pactl and the registry are separate connections. Give the registry a
         // moment to echo the write so the next sweep does not read the old
         // level as a new desktop change. pactl already applied the write, so
         // a late echo is only that: the sweep after it reads the same value.
-        _graph.WaitFor(objects => OwnSinkLevels(objects).Any(level => level.Name == BareSink(sinkName) && matches(level)),
+        _graph.WaitFor(objects => FindSink(objects, BareSink(sinkName)) is { } info && SinkLevel(info) is { } level
+                && matches(new OwnSinkLevel(BareSink(sinkName), level.Volume, level.Muted) { DesktopVolume = level.DesktopVolume }),
             TimeSpan.FromSeconds(1));
     }
 
@@ -703,6 +705,8 @@ public sealed class PipeWireAdapter
     /// <summary>Whether a sink of this name is published right now (null when pactl is unavailable).</summary>
     public bool? SinkExists(string sinkName)
     {
+        if (LiveObjects() is { } objects)
+            return FindSink(objects, BareSink(sinkName)) is not null;
         string? sinks = TryRun("pactl", "list", "sinks", "short");
         if (sinks is null) return null;
         return sinks.Split('\n').Any(line => line.Split('\t') is { Length: >= 2 } columns && columns[1] == sinkName);
@@ -739,9 +743,14 @@ public sealed class PipeWireAdapter
             .Select(columns => int.Parse(columns[0]))];
     }
 
-    /// <summary>Volume of a sink as 0..1, parsed from pactl (first channel).</summary>
+    /// <summary>A sink's desktop volume, within the supported output range.</summary>
     public double? GetSinkVolume(string sinkName)
-        => ParseVolumePercent(TryRun("pactl", "get-sink-volume", BareSink(sinkName)));
+    {
+        if (LiveObjects() is { } objects)
+            return FindSink(objects, BareSink(sinkName)) is { } info && SinkLevel(info) is { } level
+                ? Math.Clamp(level.DesktopVolume, 0, MaxSinkVolume) : null;
+        return ParseVolumePercent(TryRun("pactl", "get-sink-volume", BareSink(sinkName)));
+    }
 
     /// <summary>
     /// Force a sink's hardware stream to close and reopen (brief audio gap on
@@ -850,15 +859,22 @@ public sealed class PipeWireAdapter
 
     /// <summary>The capture device applications record from by default.</summary>
     public void SetDefaultSource(string sourceName)
-        => Run("pactl", "set-default-source", sourceName);
+    {
+        Run("pactl", "set-default-source", sourceName);
+        lock (DumpGate) _defaults = null;
+    }
 
     /// <summary>The playback device applications use by default.</summary>
     public void SetDefaultSink(string sinkName)
-        => Run("pactl", "set-default-sink", sinkName);
+    {
+        Run("pactl", "set-default-sink", sinkName);
+        lock (DumpGate) _defaults = null;
+    }
 
     /// <summary>Current default playback device, or null.</summary>
     public string? GetDefaultSink()
     {
+        if (ReadObservedDefaults() is { } defaults) return defaults.Sink;
         try { return Run("pactl", "get-default-sink").Trim(); }
         catch (InvalidOperationException) { return null; }
     }
@@ -866,6 +882,7 @@ public sealed class PipeWireAdapter
     /// <summary>Current default capture device, or null.</summary>
     public string? GetDefaultSource()
     {
+        if (ReadObservedDefaults() is { } defaults) return defaults.Source;
         try { return Run("pactl", "get-default-source").Trim(); }
         catch (InvalidOperationException) { return null; }
     }
@@ -1953,7 +1970,9 @@ public sealed class PipeWireAdapter
     private List<string> ListPorts(string node, string prefix, bool output)
     {
         var ports = new List<string>();
-        string listing = Run("pw-link", output ? "-o" : "-i");
+        string listing = LiveObjects() is { } objects
+            ? string.Join('\n', ObservedPorts(objects, output))
+            : Run("pw-link", output ? "-o" : "-i");
         foreach (string line in listing.Split('\n'))
         {
             string name = line.Trim();
@@ -2735,6 +2754,86 @@ public sealed class PipeWireAdapter
             _dumpAt = Environment.TickCount64;
             return _dumpObjects;
         }
+    }
+
+    // Only a live subscription is authoritative here. Standalone callers and
+    // a reconnect keep the existing helper reads, rather than a stale cache.
+    private JsonElement[]? LiveObjects()
+    {
+        lock (DumpGate)
+        {
+            if (_graph is null || !_graph.IsReady) return null;
+            try { return _graph.Read(); }
+            catch (IOException) { return null; } // disconnected between the two reads
+        }
+    }
+
+    private static JsonElement? FindSink(IEnumerable<JsonElement> objects, string name)
+    {
+        foreach (JsonElement item in objects)
+            if (item.TryGetProperty("type", out var type) && type.GetString() == "PipeWire:Interface:Node"
+                && item.TryGetProperty("info", out var info) && info.ValueKind == JsonValueKind.Object
+                && info.TryGetProperty("props", out var props)
+                && props.TryGetProperty("media.class", out var kind) && kind.GetString() == "Audio/Sink"
+                && props.TryGetProperty("node.name", out var node) && node.GetString() == name)
+                return info;
+        return null;
+    }
+
+    private (string? Sink, string? Source)? _defaults;
+    private long _defaultsRevision = -1, _defaultsAt;
+
+    private (string? Sink, string? Source)? ReadObservedDefaults()
+    {
+        lock (DumpGate)
+        {
+            if (_graph is null || !_graph.IsReady) return null;
+            long revision = _graph.DefaultRevision;
+            if (_defaults is not null && _defaultsRevision == revision && Environment.TickCount64 - _defaultsAt < 30000)
+                return _defaults;
+            try
+            {
+                // pw-dump emits metadata deltas, but deletes omit the deleted
+                // key. Use those events to invalidate a full Pulse reading,
+                // also refreshed every 30 seconds to catch a missed change.
+                using var doc = JsonDocument.Parse(RunBytes("pactl", "--format=json", "info"));
+                var root = doc.RootElement;
+                if (!root.TryGetProperty("default_sink_name", out var sink) || sink.ValueKind != JsonValueKind.String
+                    || !root.TryGetProperty("default_source_name", out var source) || source.ValueKind != JsonValueKind.String)
+                    return null;
+                _defaults = (sink.GetString(), source.GetString());
+                _defaultsRevision = revision;
+                _defaultsAt = Environment.TickCount64;
+                return _defaults;
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or JsonException) { return null; }
+        }
+    }
+
+    internal static IReadOnlyList<string> ObservedPorts(IEnumerable<JsonElement> objects, bool output)
+    {
+        JsonElement[] snapshot = objects as JsonElement[] ?? objects.ToArray();
+        var nodes = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (JsonElement item in snapshot)
+            if (item.TryGetProperty("type", out var type) && type.GetString() == "PipeWire:Interface:Node"
+                && item.TryGetProperty("id", out var id)
+                && item.TryGetProperty("info", out var info) && info.ValueKind == JsonValueKind.Object
+                && info.TryGetProperty("props", out var props)
+                && props.TryGetProperty("node.name", out var name) && name.ValueKind == JsonValueKind.String)
+                nodes[id.ToString()] = name.GetString()!;
+        var ports = new List<(uint Order, string Name)>();
+        foreach (JsonElement item in snapshot)
+            if (item.TryGetProperty("type", out var type) && type.GetString() == "PipeWire:Interface:Port"
+                && item.TryGetProperty("info", out var info) && info.ValueKind == JsonValueKind.Object
+                && info.TryGetProperty("direction", out var direction) && direction.GetString() == (output ? "output" : "input")
+                && info.TryGetProperty("props", out var props) && props.TryGetProperty("node.id", out var owner)
+                && nodes.TryGetValue(owner.ToString(), out string? node)
+                && props.TryGetProperty("port.name", out var name) && name.ValueKind == JsonValueKind.String)
+            {
+                uint order = props.TryGetProperty("port.id", out var id) && uint.TryParse(id.ToString(), out uint parsed) ? parsed : uint.MaxValue;
+                ports.Add((order, $"{node}:{name.GetString()}"));
+            }
+        return ports.OrderBy(p => p.Order).Select(p => p.Name).ToArray();
     }
 
     private static JsonElement[] ParseObjects(byte[] json)

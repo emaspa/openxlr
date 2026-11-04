@@ -26,6 +26,15 @@ public sealed class GraphFallbackTests
                   "media.class":"Audio/Sink"},"params":{"Props":[{"channelVolumes":[1.0,1.0],"mute":false}]}}},
                  {"id":3,"type":"PipeWire:Interface:Node","info":{"props":{"node.name":"mic","media.class":"Audio/Source","device.api":"alsa"}}}]
                 """);
+            ExecutableScript.Write(Path.Combine(directory, "pactl"), """
+                case "$1" in
+                    get-default-sink) echo desktop;;
+                    get-default-source) echo mic;;
+                    get-sink-volume) echo 'Volume: front-left: 32768 / 50% / -18.06 dB';;
+                    list) printf '1\tdesktop\tdriver\n';;
+                    *) exit 1;;
+                esac
+                """);
             Environment.SetEnvironmentVariable("PATH", directory);
             var adapter = new PipeWireAdapter();
             using IDisposable watch = adapter.WatchGraph();
@@ -40,6 +49,11 @@ public sealed class GraphFallbackTests
             OwnSinkLevel own = Assert.Single(adapter.OwnSinkLevels());
             Assert.Equal("OpenXLR_mix_monitor", own.Name);
             Assert.Equal(1.0, own.DesktopVolume);
+            Assert.True(adapter.SinkExists("desktop"));
+            Assert.False(adapter.SinkExists("missing"));
+            Assert.Equal(.5, adapter.GetSinkVolume("desktop"));
+            Assert.Equal("desktop", adapter.GetDefaultSink());
+            Assert.Equal("mic", adapter.GetDefaultSource());
         }
         finally
         {
