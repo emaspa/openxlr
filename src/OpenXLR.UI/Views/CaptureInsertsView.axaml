@@ -15,7 +15,7 @@
       <Button Name="CaptureInserts" Grid.Column="2" Content="{Binding Inserts.ButtonText}" Classes="fx"
               Classes.fxOn="{Binding Inserts.IsProcessing, FallbackValue=False}"
               Classes.fxOff="{Binding Inserts.IsOff, FallbackValue=False}"
-              Padding="12,3" FontSize="12"
+              Padding="12,3" FontSize="{DynamicResource Ox.Ui.FontSize12}"
               MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" Click="OnInserts"
               AutomationProperties.Name="{Binding Name, StringFormat={loc:Text Key=InsertsTitle}}"
               ToolTip.Tip="{loc:Text Key=InputChainHint}"/>
@@ -28,11 +28,11 @@
                             AutomationProperties.Name="{loc:Text Key=PluginState}"/>
             <Grid Grid.Column="1" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"
                   ColumnSpacing="8" VerticalAlignment="Center" ClipToBounds="True">
-              <TextBlock Text="{Binding Label}" Classes="insertName body" FontSize="12"
+              <TextBlock Text="{Binding Label}" Classes="insertName body" FontSize="{DynamicResource Ox.Ui.FontSize12}"
                          TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
-              <TextBlock Grid.Column="1" Text="{Binding StateText}" Classes="h" FontSize="11"/>
+              <TextBlock Grid.Column="1" Text="{Binding StateText}" Classes="h" FontSize="{DynamicResource Ox.Ui.FontSize11}"/>
               <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Error}" Classes="warn"
-                         FontSize="11" TextWrapping="Wrap" IsVisible="{Binding HasError}"/>
+                         FontSize="{DynamicResource Ox.Ui.FontSize11}" TextWrapping="Wrap" IsVisible="{Binding HasError}"/>
             </Grid>
             <ToggleButton Grid.Column="2" Content="{loc:Text Key=NativeHostLetter}" Classes="insertmini"
                           IsChecked="{Binding NativeHost, Mode=TwoWay}" IsVisible="{Binding CanChooseNativeHost}"

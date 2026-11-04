@@ -144,7 +144,7 @@ public partial class FlowWindow : Window
         {
             var label = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             label.Children.Add(CreateIcon(icon, 15));
-            label.Children.Add(new TextBlock { Text = title, FontSize = 11, FontWeight = FontWeight.SemiBold,
+            label.Children.Add(new TextBlock { Text = title, FontSize = (double)this.FindResource("Ox.Ui.FontSize11")!, FontWeight = FontWeight.SemiBold,
                 Foreground = Brush("Ox.Flow.Text"), VerticalAlignment = VerticalAlignment.Center });
             var header = new Border { Background = Brush("Ox.Flow.Card"), CornerRadius = new CornerRadius(4),
                 Padding = new Thickness(12, 8), Child = label };
@@ -181,13 +181,13 @@ public partial class FlowWindow : Window
             content.Children.Add(CreateIcon(node.Icon, 20));
             var text = new StackPanel { Spacing = 3, Margin = new Thickness(9, 0, 0, 0) };
             Grid.SetColumn(text, 1);
-            text.Children.Add(new TextBlock { Text = node.Label, FontSize = 13, FontWeight = FontWeight.Medium,
+            text.Children.Add(new TextBlock { Text = node.Label, FontSize = (double)this.FindResource("Ox.Ui.FontSize13")!, FontWeight = FontWeight.Medium,
                 Foreground = Brush("Ox.Flow.Text"), TextTrimming = TextTrimming.CharacterEllipsis });
-            text.Children.Add(new TextBlock { Text = node.Detail, FontSize = 11, Foreground = Brush("Ox.Flow.TextDim"),
+            text.Children.Add(new TextBlock { Text = node.Detail, FontSize = (double)this.FindResource("Ox.Ui.FontSize11")!, Foreground = Brush("Ox.Flow.TextDim"),
                 TextTrimming = TextTrimming.CharacterEllipsis });
             if (node.Processing.Length > 0)
                 text.Children.Add(new TextBlock { Text = "FX  " + node.Processing.Replace("\n", " · "),
-                    FontSize = 10, Foreground = Brush("Ox.Flow.Input"), Margin = new Thickness(0, 4, 0, 0),
+                    FontSize = (double)this.FindResource("Ox.Ui.FontSize10")!, Foreground = Brush("Ox.Flow.Input"), Margin = new Thickness(0, 4, 0, 0),
                     TextTrimming = TextTrimming.CharacterEllipsis });
             content.Children.Add(text);
             var card = new Button { Width = cardWidth, Height = node.Height, Content = content };

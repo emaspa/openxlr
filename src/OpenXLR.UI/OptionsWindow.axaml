@@ -23,7 +23,7 @@
     <!-- The one status line for preference files: outside the scroll view,
          so a save that failed is seen whichever card the change came from. -->
     <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,10,Auto" Margin="0,10,0,0">
-      <TextBlock Name="PreferenceError" Text="{Binding PreferenceError}" FontSize="11" Classes="warn"
+      <TextBlock Name="PreferenceError" Text="{Binding PreferenceError}" FontSize="{DynamicResource Ox.Ui.FontSize11}" Classes="warn"
                  TextWrapping="Wrap" VerticalAlignment="Center"
                  IsVisible="{Binding PreferenceError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
       <Button Grid.Column="2" Content="{loc:Text Key=Close}" Padding="18,6" Click="OnClose"/>
@@ -41,9 +41,9 @@
         <CheckBox Content="{loc:Text Key=StartTheOpenXLRApp}"
                   IsEnabled="{Binding CanConfigureStartup}"
                   IsChecked="{Binding OpenWindowAtLogin, Mode=TwoWay}"/>
-        <TextBlock Text="{Binding StartupHint}" FontSize="11" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
+        <TextBlock Text="{Binding StartupHint}" FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
         <TextBlock Text="{Binding FlatpakSetup}" IsVisible="{Binding IsFlatpak}" Classes="hint" TextWrapping="Wrap"/>
-        <TextBlock Text="{Binding StartupError}" FontSize="11" Foreground="{DynamicResource Ox.Text.Warning}" TextWrapping="Wrap"
+        <TextBlock Text="{Binding StartupError}" FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Text.Warning}" TextWrapping="Wrap"
                    IsVisible="{Binding StartupError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
       </StackPanel>
     </Border>
@@ -68,7 +68,7 @@
           </ComboBox>
         </Grid>
         <TextBlock Text="{loc:Text Key=OnLaunchAppliesTheNextTimeTheApp}"
-                   FontSize="11" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
+                   FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
       </StackPanel>
     </Border>
 
@@ -117,14 +117,14 @@
                              ToolTip.Tip="{Binding Name}"/>
                   <StackPanel Grid.Column="1" Spacing="2">
                     <views:BindingChip HorizontalAlignment="Left"/>
-                    <TextBlock Text="{Binding BindingWarning}" Classes="hint" FontSize="11" TextWrapping="Wrap"
+                    <TextBlock Text="{Binding BindingWarning}" Classes="hint" FontSize="{DynamicResource Ox.Ui.FontSize11}" TextWrapping="Wrap"
                                IsVisible="{Binding HasBindingWarning}"/>
                   </StackPanel>
                 </Grid>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
-          <TextBlock Text="{loc:Text Key=InputBindingsHint}" FontSize="11" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
+          <TextBlock Text="{loc:Text Key=InputBindingsHint}" FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
         </StackPanel>
         <CheckBox Name="MonitorMuteMicrophones" IsChecked="{Binding Main.MonitorMuteMicrophones, Mode=TwoWay}"
                   IsEnabled="{Binding Main.CanEditLayout}" AutomationProperties.Name="{loc:Text Key=MuteMicrophoneSendsWithMonitoring}">
@@ -153,10 +153,10 @@
                    IsVisible="{Binding Main.BlockSizeReported}"/>
         <StackPanel Name="SoftwareMixerNotes" Spacing="6">
           <TextBlock Text="{loc:Text Key=ApplicationChannelsMixesVirtualMicrophonesAndInserts}"
-                     FontSize="11" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
+                     FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
           <TextBlock Text="{loc:Text Key=ChangingThisRestartsTheAudioServiceAndBriefly}"
-                     FontSize="11" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
-          <TextBlock Text="{Binding SubmixerNote}" Foreground="{DynamicResource Ox.Text.Secondary}" FontSize="11" TextWrapping="Wrap"
+                     FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
+          <TextBlock Text="{Binding SubmixerNote}" Foreground="{DynamicResource Ox.Text.Secondary}" FontSize="{DynamicResource Ox.Ui.FontSize11}" TextWrapping="Wrap"
                      IsVisible="{Binding SubmixerNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
         </StackPanel>
       </StackPanel>
@@ -166,7 +166,7 @@
       <StackPanel Spacing="6">
         <TextBlock Text="{loc:Text Key=SYSTEMDEFAULTDEVICES}" Classes="h"/>
         <TextBlock Text="{loc:Text Key=WhenSetOpenXLRHoldsTheseAsTheSystem}"
-                   FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
+                   FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
 
         <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,8,Auto">
           <TextBlock Text="{loc:Text Key=DefaultOutput}" Classes="h" VerticalAlignment="Center"/>
@@ -193,7 +193,7 @@
         </Grid>
 
         <TextBlock Text="{loc:Text Key=TipEnforcingOpenXLRChatAsDefaultInputMakes}"
-                   FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
+                   FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
       </StackPanel>
     </Border>
 
@@ -201,7 +201,7 @@
       <StackPanel Spacing="6">
         <TextBlock Text="{loc:Text Key=DESKTOP}" Classes="h"/>
         <TextBlock Text="{loc:Text Key=DesktopKeysNote}"
-                   FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
+                   FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
         <Button Name="DesktopKeysButton" Content="{loc:Text Key=DesktopKeys}" Padding="14,5" HorizontalAlignment="Left"
                 Click="OnDesktopKeys"/>
       </StackPanel>
@@ -211,14 +211,14 @@
       <StackPanel Spacing="6">
         <TextBlock Text="{loc:Text Key=INTERFACE}" Classes="h"/>
         <TextBlock Text="{Binding Main.FirmwareText}" IsVisible="{Binding Main.FirmwareText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                   FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
+                   FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
         <TextBlock Text="{Binding Main.DeviceNote}" IsVisible="{Binding Main.DeviceNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                   FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
+                   FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
         <TextBlock Text="{Binding Main.ResetDescription}" IsVisible="{Binding Main.ShowResetDefaults}"
-                   FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
+                   FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
         <Button Content="{loc:Text Key=ResetDeviceToDefaults}" Padding="14,5" HorizontalAlignment="Left" Click="OnResetDevice" IsVisible="{Binding Main.ShowResetDefaults}"/>
         <TextBlock Text="{loc:Text Key=RecoverMicrophoneNote}" IsVisible="{Binding Main.ShowRecoverCapture}"
-                   FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
+                   FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
         <Button Name="RecoverMicrophone" Content="{loc:Text Key=RecoverMicrophone}" Padding="14,5" HorizontalAlignment="Left" Click="OnRecoverMicrophone"
                 IsVisible="{Binding Main.ShowRecoverCapture}"/>
         <Button Name="AdditionalInterfaces" Content="{loc:Text Key=AdditionalInterfaces}" Padding="14,5" HorizontalAlignment="Left" Click="OnWaveInterfaces"
@@ -232,9 +232,9 @@
     <Border Classes="card">
       <StackPanel Spacing="6">
         <TextBlock Text="{loc:Text Key=PLUGINS}" Classes="h"/>
-        <TextBlock Text="{Binding PluginDirectories}" FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
+        <TextBlock Text="{Binding PluginDirectories}" FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
         <TextBlock Text="{loc:Text Key=PickAPluginYouDownloadedAndOpenXLRPuts}"
-                   FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
+                   FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
         <WrapPanel ItemSpacing="8" LineSpacing="6">
           <Button Name="InstallFile" Content="{loc:Text Key=InstallFile}" Padding="14,5" Click="OnInstallPluginFile"/>
           <Button Name="InstallFolder" Content="{loc:Text Key=InstallFolder}" Padding="14,5" Click="OnInstallPluginFolder"/>
@@ -250,27 +250,27 @@
              text, like the rest of the section: a control of its own would be
              the one thing here a skin has to dress. -->
         <StackPanel Name="SkippedPlugins" Spacing="4" Margin="0,4,0,0">
-          <TextBlock Text="{Binding SkippedPlugins}" FontSize="11"
+          <TextBlock Text="{Binding SkippedPlugins}" FontSize="{DynamicResource Ox.Ui.FontSize11}"
                      Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
           <TextBlock Text="{loc:Text Key=RescanRetriesTheseBundlesAChangedBundleOr}"
-                     IsVisible="{Binding HasSkippedPlugins}" FontSize="11"
+                     IsVisible="{Binding HasSkippedPlugins}" FontSize="{DynamicResource Ox.Ui.FontSize11}"
                      Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
           <ScrollViewer MaxHeight="180" IsVisible="{Binding HasSkippedPlugins}">
             <ItemsControl ItemsSource="{Binding SkippedPluginDetails}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="x:String">
-                  <TextBlock Text="{Binding}" Margin="0,2" TextWrapping="Wrap" FontSize="11"
+                  <TextBlock Text="{Binding}" Margin="0,2" TextWrapping="Wrap" FontSize="{DynamicResource Ox.Ui.FontSize11}"
                              Foreground="{DynamicResource Ox.Text.Muted}"/>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
           </ScrollViewer>
         </StackPanel>
-        <TextBlock Text="{Binding WindowsPlugins}" FontSize="11" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+        <TextBlock Text="{Binding WindowsPlugins}" FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap" Margin="0,4,0,0"/>
         <!-- A pair of versions that leaves a bridged plugin's own editor deaf
              to the mouse. Worth saying before the user spends an evening on it. -->
         <TextBlock Text="{Binding WindowsEditorNote}" IsVisible="{Binding HasWindowsEditorNote}"
-                   FontSize="11" Foreground="{DynamicResource Ox.Text.Alert}" TextWrapping="Wrap"/>
+                   FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Text.Alert}" TextWrapping="Wrap"/>
         <Button Content="{loc:Text Key=FixWindowsEditorInput}" IsVisible="{Binding HasWindowsEditorNote}"
                 HorizontalAlignment="Left" Click="OnWindowsEditorHelp"/>
         <StackPanel IsVisible="{Binding HasMemoryLockNote}" Spacing="4">
@@ -289,7 +289,7 @@
                   ToolTip.Tip="{loc:Text Key=BridgeAgainEveryFolderYabridgeKnowsForWindows}"/>
           <Button Grid.Column="2" Content="{loc:Text Key=Manual}" Padding="10,5" Click="OnPluginsManual"
                   ToolTip.Tip="{loc:Text Key=OpenTheManualSectionOnInstallingPlugins}"/>
-          <TextBlock Grid.Column="4" Name="PluginStatus" FontSize="11" Foreground="{DynamicResource Ox.Text.Secondary}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+          <TextBlock Grid.Column="4" Name="PluginStatus" FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Text.Secondary}" VerticalAlignment="Center" TextWrapping="Wrap"/>
         </Grid>
       </StackPanel>
     </Border>
@@ -313,8 +313,8 @@
                   ToolTip.Tip="{loc:Text Key=ReadTheSkinFoldersAgainForASkin}"/>
         </Grid>
         <!-- what the skin in force arranges, where the mixer goes, and the way back to the skin's own arrangement -->
-        <TextBlock Name="SkinLayoutSummary" Text="{Binding SkinLayoutSummary}" FontSize="11" Classes="hint" TextWrapping="Wrap"/>
-        <TextBlock Name="MixerDockingNote" Text="{Binding MixerDockingNote}" FontSize="11" Classes="hint" TextWrapping="Wrap"/>
+        <TextBlock Name="SkinLayoutSummary" Text="{Binding SkinLayoutSummary}" FontSize="{DynamicResource Ox.Ui.FontSize11}" Classes="hint" TextWrapping="Wrap"/>
+        <TextBlock Name="MixerDockingNote" Text="{Binding MixerDockingNote}" FontSize="{DynamicResource Ox.Ui.FontSize11}" Classes="hint" TextWrapping="Wrap"/>
         <Button Name="ResetSkinArrangementButton" Padding="10,5" HorizontalAlignment="Left" Click="OnResetSkinArrangement"
                 ToolTip.Tip="{loc:Text Key=ResetSkinArrangementHint}">
           <TextBlock Text="{loc:Text Key=ResetSkinArrangement}" TextWrapping="Wrap"/>
@@ -332,7 +332,19 @@
             </ComboBox.ItemTemplate>
           </ComboBox>
         </Grid>
-        <TextBlock Text="{Binding AppearanceModeNote}" FontSize="11" Classes="hint" TextWrapping="Wrap"/>
+        <TextBlock Text="{Binding AppearanceModeNote}" FontSize="{DynamicResource Ox.Ui.FontSize11}" Classes="hint" TextWrapping="Wrap"/>
+        <Grid ColumnDefinitions="110,*">
+          <TextBlock Text="{loc:Text Key=TextSize}" Classes="h" TextWrapping="Wrap" VerticalAlignment="Center"/>
+          <ComboBox Name="TextSizePicker" Grid.Column="1" HorizontalAlignment="Stretch"
+                    ItemsSource="{Binding TextSizeChoices}" SelectedItem="{Binding SelectedTextSize, Mode=TwoWay}"
+                    AutomationProperties.Name="{loc:Text Key=TextSize}">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:TextSizeChoice">
+                <TextBlock Text="{Binding Label}"/>
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+        </Grid>
         <Grid ColumnDefinitions="110,*">
           <TextBlock Text="{loc:Text Key=Controls}" Classes="h" VerticalAlignment="Center"/>
           <ComboBox Name="ControlSizingPicker" Grid.Column="1" HorizontalAlignment="Stretch"
@@ -346,7 +358,7 @@
             </ComboBox.ItemTemplate>
           </ComboBox>
         </Grid>
-        <TextBlock Text="{loc:Text Key=TouchGivesTheMixerSButtonsFaders}" FontSize="11" Classes="hint" TextWrapping="Wrap"/>
+        <TextBlock Text="{loc:Text Key=TouchGivesTheMixerSButtonsFaders}" FontSize="{DynamicResource Ox.Ui.FontSize11}" Classes="hint" TextWrapping="Wrap"/>
         <Grid ColumnDefinitions="110,*">
           <TextBlock Text="{loc:Text Key=MixerView}" Classes="h" VerticalAlignment="Center"/>
           <ComboBox Name="MixerViewPicker" Grid.Column="1" HorizontalAlignment="Stretch"
@@ -360,7 +372,7 @@
           </ComboBox>
         </Grid>
         <TextBlock Text="{loc:Text Key=CompactShowsOneChannelStripWithEvery}"
-                   FontSize="11" Classes="hint" TextWrapping="Wrap"/>
+                   FontSize="{DynamicResource Ox.Ui.FontSize11}" Classes="hint" TextWrapping="Wrap"/>
         <Grid ColumnDefinitions="110,*">
           <TextBlock Text="{loc:Text Key=Language}" Classes="h" VerticalAlignment="Center"/>
           <ComboBox Name="LanguagePicker" Grid.Column="1" HorizontalAlignment="Stretch"
@@ -374,10 +386,10 @@
           </ComboBox>
         </Grid>
         <TextBlock Text="{loc:Text Key=LanguageHint}" Classes="hint" TextWrapping="Wrap"/>
-        <TextBlock Text="{Binding SkinNote}" FontSize="11" Classes="hint" TextWrapping="Wrap"
+        <TextBlock Text="{Binding SkinNote}" FontSize="{DynamicResource Ox.Ui.FontSize11}" Classes="hint" TextWrapping="Wrap"
                    IsVisible="{Binding SkinNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-        <TextBlock Text="{Binding SkinFolderHint}" FontSize="11" Classes="note" TextWrapping="Wrap"/>
-        <TextBlock Text="{Binding SkinError}" FontSize="11" Classes="warn" TextWrapping="Wrap"
+        <TextBlock Text="{Binding SkinFolderHint}" FontSize="{DynamicResource Ox.Ui.FontSize11}" Classes="note" TextWrapping="Wrap"/>
+        <TextBlock Text="{Binding SkinError}" FontSize="{DynamicResource Ox.Ui.FontSize11}" Classes="warn" TextWrapping="Wrap"
                    IsVisible="{Binding HasSkinError}"/>
         <Button Content="{loc:Text Key=Manual}" Padding="10,5" HorizontalAlignment="Left" Click="OnSkinsManual"
                 ToolTip.Tip="{loc:Text Key=OpenTheManualSectionOnSkins}"/>
@@ -392,7 +404,7 @@
         <CheckBox Content="{loc:Text Key=CheckGitHubForStableReleasesAtStartupAt}"
                   IsChecked="{Binding CheckForUpdates, Mode=TwoWay}"/>
         <TextBlock Text="{loc:Text Key=OffByDefaultCheckNowMakesOneExplicit}"
-                   FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
+                   FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
         <TextBlock Text="{Binding Updates.Title}" Foreground="{DynamicResource Ox.Link.Foreground}" TextWrapping="Wrap"/>
         <StackPanel Orientation="Horizontal" Spacing="8">
           <Button Content="{loc:Text Key=CheckNow}" Click="OnCheckUpdates" IsEnabled="{Binding !Updates.Busy}"/>
@@ -408,16 +420,16 @@
                   IsChecked="{Binding PluginWineTrace, Mode=OneWay}"
                   IsEnabled="{Binding CanSetPluginWineTrace}" Click="OnPluginWineTrace"/>
         <TextBlock Text="{loc:Text Key=ForReproducingABridgedPluginFailureForA}"
-                   FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
+                   FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
         <TextBlock Text="{loc:Text Key=DoNotLeaveThisOnTheSwitchIs}"
-                   FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
-        <TextBlock Text="{Binding PluginWineTraceStatus}" FontSize="11"
+                   FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
+        <TextBlock Text="{Binding PluginWineTraceStatus}" FontSize="{DynamicResource Ox.Ui.FontSize11}"
                    Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
         <TextBlock Text="{loc:Text Key=CollectDiagnosticsGathersAppAndDeviceStateThe}"
-                   FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
+                   FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
         <Grid ColumnDefinitions="Auto,10,*">
           <Button Content="{loc:Text Key=CollectDiagnostics}" Padding="14,5" Click="OnCollectDiagnostics"/>
-          <TextBlock Grid.Column="2" Name="DiagStatus" FontSize="11" Foreground="{DynamicResource Ox.Text.Secondary}"
+          <TextBlock Grid.Column="2" Name="DiagStatus" FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Text.Secondary}"
                      VerticalAlignment="Center" TextWrapping="Wrap"/>
         </Grid>
       </StackPanel>

@@ -523,6 +523,9 @@ the mixer layout, not of a skin
 
 ### Typography
 
+Options' **Text size** scales typography after the skin is applied. Normal
+(100%) uses the sizes listed here. The preference lives in `ui.json`.
+
 | Token | Kind | Default | Range | What it sets |
 |---|---|---|---|---|
 | `Ox.Label.FontSize` | number | 12 | 8 to 24 | section headings and labels |

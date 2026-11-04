@@ -89,11 +89,11 @@
                 <ColumnDefinition Width="1.3*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto" SharedSizeGroup="EqDeleteColumn"/>
               </Grid.ColumnDefinitions>
-        <TextBlock Grid.Column="1" Text="{loc:Text Key=EqColumnOn}" Classes="hint" FontSize="11" TextTrimming="CharacterEllipsis"/>
-        <TextBlock Grid.Column="2" Text="{loc:Text Key=EqColumnType}" Classes="hint" FontSize="11" TextTrimming="CharacterEllipsis"/>
-        <TextBlock Grid.Column="3" Text="{loc:Text Key=EqColumnFrequency}" Classes="hint" FontSize="11" TextTrimming="CharacterEllipsis"/>
-        <TextBlock Grid.Column="4" Text="{loc:Text Key=EqColumnGain}" Classes="hint" FontSize="11" TextTrimming="CharacterEllipsis"/>
-        <TextBlock Grid.Column="5" Text="{loc:Text Key=EqColumnQ}" Classes="hint" FontSize="11" TextTrimming="CharacterEllipsis"/>
+        <TextBlock Grid.Column="1" Text="{loc:Text Key=EqColumnOn}" Classes="hint" FontSize="{DynamicResource Ox.Ui.FontSize11}" TextTrimming="CharacterEllipsis"/>
+        <TextBlock Grid.Column="2" Text="{loc:Text Key=EqColumnType}" Classes="hint" FontSize="{DynamicResource Ox.Ui.FontSize11}" TextTrimming="CharacterEllipsis"/>
+        <TextBlock Grid.Column="3" Text="{loc:Text Key=EqColumnFrequency}" Classes="hint" FontSize="{DynamicResource Ox.Ui.FontSize11}" TextTrimming="CharacterEllipsis"/>
+        <TextBlock Grid.Column="4" Text="{loc:Text Key=EqColumnGain}" Classes="hint" FontSize="{DynamicResource Ox.Ui.FontSize11}" TextTrimming="CharacterEllipsis"/>
+        <TextBlock Grid.Column="5" Text="{loc:Text Key=EqColumnQ}" Classes="hint" FontSize="{DynamicResource Ox.Ui.FontSize11}" TextTrimming="CharacterEllipsis"/>
       </Grid>
       <ItemsControl ItemsSource="{Binding Bands}">
         <ItemsControl.ItemsPanel>
@@ -110,7 +110,7 @@
               <!-- the band's number in its colour, as on its handle -->
               <Panel Width="22" Height="22" VerticalAlignment="Center" HorizontalAlignment="Left">
                 <Ellipse Fill="{Binding Number, Converter={x:Static vm:Converters.EqBandColour}}"/>
-                <TextBlock Text="{Binding Number}" FontWeight="Bold" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center"
+                <TextBlock Text="{Binding Number}" FontWeight="Bold" FontSize="{DynamicResource Ox.Ui.FontSize12}" HorizontalAlignment="Center" VerticalAlignment="Center"
                            Foreground="{DynamicResource Ox.Eq.Background}"/>
               </Panel>
               <Button Grid.Column="6" Name="EqRemoveBand" Content="{loc:Text Key=EqRemoveBand}" Click="OnRemoveBand"

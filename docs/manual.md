@@ -3110,6 +3110,12 @@ OPENXLR_SKIN=default openxlr
 which ignores the saved choice for that run, wears dark Material whatever
 the mode says, and lets you pick another one.
 
+Options, APPEARANCE, **Text size** changes the text in OpenXLR windows
+immediately. Choose 80%, 90%, Normal (100%), 110% or 120% of the current
+skin's text sizes. The choice is saved as `textSizePercent` in `ui.json`
+and applies with any skin. It is separate from Touch control sizing and
+the popped-out mixer's zoom. A plugin's own editor uses its own sizing.
+
 <a name="language"></a>
 Options, APPEARANCE, **Language** picks the UI's language. **System
 language**, the default, follows the desktop's message language

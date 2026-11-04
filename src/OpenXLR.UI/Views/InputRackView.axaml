@@ -24,11 +24,11 @@
                         AutomationProperties.Name="{loc:Text Key=PluginState}"/>
         <Grid Grid.Column="1" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"
               ColumnSpacing="8" VerticalAlignment="Center" ClipToBounds="True">
-          <TextBlock Text="{Binding Label}" Classes="insertName body" FontSize="12"
+          <TextBlock Text="{Binding Label}" Classes="insertName body" FontSize="{DynamicResource Ox.Ui.FontSize12}"
                      TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
-          <TextBlock Grid.Column="1" Text="{Binding StateText}" Classes="h" FontSize="11"/>
+          <TextBlock Grid.Column="1" Text="{Binding StateText}" Classes="h" FontSize="{DynamicResource Ox.Ui.FontSize11}"/>
           <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Error}" Classes="warn"
-                     FontSize="11" TextWrapping="Wrap" IsVisible="{Binding HasError}"/>
+                     FontSize="{DynamicResource Ox.Ui.FontSize11}" TextWrapping="Wrap" IsVisible="{Binding HasError}"/>
         </Grid>
         <ToggleButton Grid.Column="2" Content="{loc:Text Key=NativeHostLetter}" Classes="insertmini"
                       IsChecked="{Binding NativeHost, Mode=TwoWay}"
@@ -69,7 +69,7 @@
               <!-- what feeds the strip, the interface's jack or another source, and why it is silent -->
               <StackPanel layout:StripPanel.Part="binding" Spacing="2">
                 <views:BindingChip DataContext="{Binding Channel}" HorizontalAlignment="Left"/>
-                <TextBlock Text="{Binding Channel.BindingWarning}" Classes="hint" FontSize="11" TextWrapping="Wrap"
+                <TextBlock Text="{Binding Channel.BindingWarning}" Classes="hint" FontSize="{DynamicResource Ox.Ui.FontSize11}" TextWrapping="Wrap"
                            IsVisible="{Binding Channel.HasBindingWarning}"/>
               </StackPanel>
               <StackPanel layout:StripPanel.Part="meter" Orientation="{Binding Spec.MeterPairOrientation}" Spacing="1">
@@ -82,7 +82,7 @@
                           Value="{Binding Main.GainDb, Mode=TwoWay}" IsEnabled="{Binding !Main.GainLocked}"
                           AutomationProperties.Name="{Binding Main.UnitInput1.GainName}"/>
                   <TextBlock Grid.Column="1" Text="{Binding Main.GainText}" Classes="val" VerticalAlignment="Center"/>
-                  <ToggleButton Grid.Column="2" Content="{loc:Text Key=Lock}" Classes="mute" FontSize="11" Padding="8,2"
+                  <ToggleButton Grid.Column="2" Content="{loc:Text Key=Lock}" Classes="mute" FontSize="{DynamicResource Ox.Ui.FontSize11}" Padding="8,2"
                                 MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding Main.ShowGainLock}"
                                 IsChecked="{Binding Main.GainLocked, Mode=TwoWay}" VerticalAlignment="Center"
                                 ToolTip.Tip="{loc:Text Key=GainLockTheDaemonRejectsEveryGainChange}"/>
@@ -98,7 +98,7 @@
                           AutomationProperties.Name="{Binding Channel.Name, StringFormat={loc:Text Key=ChannelVolumeName}}"
                           ToolTip.Tip="{Binding Channel.VolumeTip}"/>
                   <TextBlock Grid.Column="1" Text="{Binding Channel.VolumeText}" Classes="val" VerticalAlignment="Center"/>
-                  <TextBlock Grid.Column="2" Name="RackVolumeNote" Text="&#x24D8;" Classes="h" FontSize="12" VerticalAlignment="Center"
+                  <TextBlock Grid.Column="2" Name="RackVolumeNote" Text="&#x24D8;" Classes="h" FontSize="{DynamicResource Ox.Ui.FontSize12}" VerticalAlignment="Center"
                              Cursor="Help" IsVisible="{Binding Channel.DirectMonitored}" ToolTip.Tip="{Binding Channel.VolumeTip}"
                              AutomationProperties.Name="{loc:Text Key=ChannelVolumeMixesOnly}"/>
                 </Grid>
@@ -145,11 +145,11 @@
                   <WrapPanel Name="RackEffects" ItemSpacing="6" LineSpacing="4">
                     <Button Name="RackEq" Content="{loc:Text Key=Eq}" Classes="fx" Classes.fxOn="{Binding Channel.Eq.IsLit, FallbackValue=False}"
                             Classes.fxOff="{Binding Channel.Eq.IsFaulty, FallbackValue=False}"
-                            Padding="12,3" FontSize="12" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                            Padding="12,3" FontSize="{DynamicResource Ox.Ui.FontSize12}" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                             IsVisible="{Binding Channel.HasEq}" Click="OnEq"
                             AutomationProperties.Name="{Binding Channel.Eq.ButtonName, FallbackValue=''}" ToolTip.Tip="{Binding Channel.Eq.ButtonTip, FallbackValue=''}"/>
                     <Button Name="RackNoise" Content="{loc:Text Key=NoiseButton}" Classes="fx"
-                            Padding="12,3" FontSize="12" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                            Padding="12,3" FontSize="{DynamicResource Ox.Ui.FontSize12}" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                             Classes.fxOn="{Binding Channel.Noise.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Channel.Noise.IsFaulty, FallbackValue=False}"
                             IsVisible="{Binding Channel.HasNoise, FallbackValue=False}"
                             AutomationProperties.Name="{Binding Channel.Noise.ButtonName, FallbackValue=''}" ToolTip.Tip="{loc:Text Key=NoiseButtonTip}">
@@ -162,7 +162,7 @@
                       </Button.Flyout>
                     </Button>
                     <Button Name="RackDynamics" Content="{loc:Text Key=Dynamics}" Classes="fx"
-                            Padding="12,3" FontSize="12" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                            Padding="12,3" FontSize="{DynamicResource Ox.Ui.FontSize12}" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                             Classes.fxOn="{Binding Channel.Dynamics.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Channel.Dynamics.IsFaulty, FallbackValue=False}"
                             IsVisible="{Binding Channel.HasDynamics, FallbackValue=False}"
                             AutomationProperties.Name="{Binding Channel.Dynamics.ButtonName, FallbackValue=''}" ToolTip.Tip="{loc:Text Key=DynamicsButtonTip}">
@@ -175,7 +175,7 @@
                       </Button.Flyout>
                     </Button>
                     <Button Content="{Binding Main.Inserts.ButtonText}" Classes="fx" Classes.fxOn="{Binding Main.Inserts.IsProcessing}" Classes.fxOff="{Binding Main.Inserts.IsOff}"
-                            Padding="12,3" FontSize="12"
+                            Padding="12,3" FontSize="{DynamicResource Ox.Ui.FontSize12}"
                             MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                             Click="OnXlrInserts" ToolTip.Tip="{loc:Text Key=PluginsProcessingXLR1BeforeItReachesThe}"/>
                   </WrapPanel>
@@ -207,7 +207,7 @@
               <!-- what feeds the strip, the interface's jack or another source, and why it is silent -->
               <StackPanel layout:StripPanel.Part="binding" Spacing="2">
                 <views:BindingChip DataContext="{Binding Channel}" HorizontalAlignment="Left"/>
-                <TextBlock Text="{Binding Channel.BindingWarning}" Classes="hint" FontSize="11" TextWrapping="Wrap"
+                <TextBlock Text="{Binding Channel.BindingWarning}" Classes="hint" FontSize="{DynamicResource Ox.Ui.FontSize11}" TextWrapping="Wrap"
                            IsVisible="{Binding Channel.HasBindingWarning}"/>
               </StackPanel>
               <StackPanel layout:StripPanel.Part="meter" Orientation="{Binding Spec.MeterPairOrientation}" Spacing="1">
@@ -232,7 +232,7 @@
                           AutomationProperties.Name="{Binding Channel.Name, StringFormat={loc:Text Key=ChannelVolumeName}}"
                           ToolTip.Tip="{Binding Channel.VolumeTip}"/>
                   <TextBlock Grid.Column="1" Text="{Binding Channel.VolumeText}" Classes="val" VerticalAlignment="Center"/>
-                  <TextBlock Grid.Column="2" Name="RackVolumeNote" Text="&#x24D8;" Classes="h" FontSize="12" VerticalAlignment="Center"
+                  <TextBlock Grid.Column="2" Name="RackVolumeNote" Text="&#x24D8;" Classes="h" FontSize="{DynamicResource Ox.Ui.FontSize12}" VerticalAlignment="Center"
                              Cursor="Help" IsVisible="{Binding Channel.DirectMonitored}" ToolTip.Tip="{Binding Channel.VolumeTip}"
                              AutomationProperties.Name="{loc:Text Key=ChannelVolumeMixesOnly}"/>
                 </Grid>
@@ -268,11 +268,11 @@
                   <WrapPanel Name="RackEffects" ItemSpacing="6" LineSpacing="4">
                     <Button Name="RackEq" Content="{loc:Text Key=Eq}" Classes="fx" Classes.fxOn="{Binding Channel.Eq.IsLit, FallbackValue=False}"
                             Classes.fxOff="{Binding Channel.Eq.IsFaulty, FallbackValue=False}"
-                            Padding="12,3" FontSize="12" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                            Padding="12,3" FontSize="{DynamicResource Ox.Ui.FontSize12}" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                             IsVisible="{Binding Channel.HasEq}" Click="OnEq"
                             AutomationProperties.Name="{Binding Channel.Eq.ButtonName, FallbackValue=''}" ToolTip.Tip="{Binding Channel.Eq.ButtonTip, FallbackValue=''}"/>
                     <Button Name="RackNoise" Content="{loc:Text Key=NoiseButton}" Classes="fx"
-                            Padding="12,3" FontSize="12" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                            Padding="12,3" FontSize="{DynamicResource Ox.Ui.FontSize12}" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                             Classes.fxOn="{Binding Channel.Noise.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Channel.Noise.IsFaulty, FallbackValue=False}"
                             IsVisible="{Binding Channel.HasNoise, FallbackValue=False}"
                             AutomationProperties.Name="{Binding Channel.Noise.ButtonName, FallbackValue=''}" ToolTip.Tip="{loc:Text Key=NoiseButtonTip}">
@@ -285,7 +285,7 @@
                       </Button.Flyout>
                     </Button>
                     <Button Name="RackDynamics" Content="{loc:Text Key=Dynamics}" Classes="fx"
-                            Padding="12,3" FontSize="12" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                            Padding="12,3" FontSize="{DynamicResource Ox.Ui.FontSize12}" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                             Classes.fxOn="{Binding Channel.Dynamics.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Channel.Dynamics.IsFaulty, FallbackValue=False}"
                             IsVisible="{Binding Channel.HasDynamics, FallbackValue=False}"
                             AutomationProperties.Name="{Binding Channel.Dynamics.ButtonName, FallbackValue=''}" ToolTip.Tip="{loc:Text Key=DynamicsButtonTip}">
@@ -298,7 +298,7 @@
                       </Button.Flyout>
                     </Button>
                     <Button Content="{Binding Main.Inserts2.ButtonText}" Classes="fx" Classes.fxOn="{Binding Main.Inserts2.IsProcessing}" Classes.fxOff="{Binding Main.Inserts2.IsOff}"
-                            Padding="12,3" FontSize="12"
+                            Padding="12,3" FontSize="{DynamicResource Ox.Ui.FontSize12}"
                             MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                             Click="OnXlrInserts" ToolTip.Tip="{loc:Text Key=PluginsProcessingXLR2BeforeItReachesThe}"/>
                   </WrapPanel>
@@ -346,7 +346,7 @@
                           AutomationProperties.Name="{Binding Channel.Name, StringFormat={loc:Text Key=ChannelVolumeName}}"
                           ToolTip.Tip="{Binding Channel.VolumeTip}"/>
                   <TextBlock Grid.Column="1" Text="{Binding Channel.VolumeText}" Classes="val" VerticalAlignment="Center"/>
-                  <TextBlock Grid.Column="2" Name="RackVolumeNote" Text="&#x24D8;" Classes="h" FontSize="12" VerticalAlignment="Center"
+                  <TextBlock Grid.Column="2" Name="RackVolumeNote" Text="&#x24D8;" Classes="h" FontSize="{DynamicResource Ox.Ui.FontSize12}" VerticalAlignment="Center"
                              Cursor="Help" IsVisible="{Binding Channel.DirectMonitored}" ToolTip.Tip="{Binding Channel.VolumeTip}"
                              AutomationProperties.Name="{loc:Text Key=ChannelVolumeMixesOnly}"/>
                 </Grid>
@@ -394,7 +394,7 @@
                           AutomationProperties.Name="{Binding Channel.Name, StringFormat={loc:Text Key=ChannelVolumeName}}"
                           ToolTip.Tip="{Binding Channel.VolumeTip}"/>
                   <TextBlock Grid.Column="1" Text="{Binding Channel.VolumeText}" Classes="val" VerticalAlignment="Center"/>
-                  <TextBlock Grid.Column="2" Name="RackVolumeNote" Text="&#x24D8;" Classes="h" FontSize="12" VerticalAlignment="Center"
+                  <TextBlock Grid.Column="2" Name="RackVolumeNote" Text="&#x24D8;" Classes="h" FontSize="{DynamicResource Ox.Ui.FontSize12}" VerticalAlignment="Center"
                              Cursor="Help" IsVisible="{Binding Channel.DirectMonitored}" ToolTip.Tip="{Binding Channel.VolumeTip}"
                              AutomationProperties.Name="{loc:Text Key=ChannelVolumeMixesOnly}"/>
                 </Grid>
@@ -425,12 +425,12 @@
                              TextTrimming="CharacterEllipsis" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
                 </Grid>
                 <!-- the connection line, while the skin leaves the source chip out -->
-                <TextBlock Text="{Binding Channel.CaptureLabel}" Classes="h" FontSize="11" TextTrimming="CharacterEllipsis"
+                <TextBlock Text="{Binding Channel.CaptureLabel}" Classes="h" FontSize="{DynamicResource Ox.Ui.FontSize11}" TextTrimming="CharacterEllipsis"
                            IsVisible="{Binding ShowsCaptureLabel}"/>
               </StackPanel>
               <StackPanel layout:StripPanel.Part="binding" Spacing="2">
                 <views:CaptureSourceChip DataContext="{Binding Channel}" HorizontalAlignment="Left"/>
-                <TextBlock Text="{Binding Channel.BindingWarning}" Classes="hint" FontSize="11"
+                <TextBlock Text="{Binding Channel.BindingWarning}" Classes="hint" FontSize="{DynamicResource Ox.Ui.FontSize11}"
                            TextWrapping="Wrap" IsVisible="{Binding Channel.HasBindingWarning}"/>
               </StackPanel>
               <StackPanel layout:StripPanel.Part="meter" Orientation="{Binding Spec.MeterPairOrientation}" Spacing="1">
@@ -444,7 +444,7 @@
                           Value="{Binding Unit.GainDb, Mode=TwoWay}" IsEnabled="{Binding !Unit.GainLocked, FallbackValue=False}"
                           AutomationProperties.Name="{Binding Unit.GainName}"/>
                   <TextBlock Grid.Column="1" Text="{Binding Unit.GainText}" Classes="val" VerticalAlignment="Center"/>
-                  <ToggleButton Grid.Column="2" Content="{loc:Text Key=Lock}" Classes="mute" FontSize="11" Padding="8,2"
+                  <ToggleButton Grid.Column="2" Content="{loc:Text Key=Lock}" Classes="mute" FontSize="{DynamicResource Ox.Ui.FontSize11}" Padding="8,2"
                                 MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding Unit.ShowGainLock, FallbackValue=False}"
                                 IsChecked="{Binding Main.GainLocked, Mode=TwoWay}" VerticalAlignment="Center"
                                 ToolTip.Tip="{loc:Text Key=GainLockTheDaemonRejectsEveryGainChange}"/>
@@ -471,7 +471,7 @@
                           AutomationProperties.Name="{Binding Channel.Name, StringFormat={loc:Text Key=ChannelVolumeName}}"
                           ToolTip.Tip="{Binding Channel.VolumeTip}"/>
                   <TextBlock Grid.Column="1" Text="{Binding Channel.VolumeText}" Classes="val" VerticalAlignment="Center"/>
-                  <TextBlock Grid.Column="2" Name="RackVolumeNote" Text="&#x24D8;" Classes="h" FontSize="12" VerticalAlignment="Center"
+                  <TextBlock Grid.Column="2" Name="RackVolumeNote" Text="&#x24D8;" Classes="h" FontSize="{DynamicResource Ox.Ui.FontSize12}" VerticalAlignment="Center"
                              Cursor="Help" IsVisible="{Binding Channel.DirectMonitored}" ToolTip.Tip="{Binding Channel.VolumeTip}"
                              AutomationProperties.Name="{loc:Text Key=ChannelVolumeMixesOnly}"/>
                 </Grid>
@@ -507,11 +507,11 @@
                 <WrapPanel Name="RackCaptureFx" ItemSpacing="6" LineSpacing="4">
                   <Button Name="RackEq" Content="{loc:Text Key=Eq}" Classes="fx" Classes.fxOn="{Binding Channel.Eq.IsLit, FallbackValue=False}"
                           Classes.fxOff="{Binding Channel.Eq.IsFaulty, FallbackValue=False}"
-                          Padding="12,3" FontSize="12" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                          Padding="12,3" FontSize="{DynamicResource Ox.Ui.FontSize12}" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                           IsVisible="{Binding Channel.HasEq}" Click="OnEq"
                           AutomationProperties.Name="{Binding Channel.Eq.ButtonName, FallbackValue=''}" ToolTip.Tip="{Binding Channel.Eq.ButtonTip, FallbackValue=''}"/>
                   <Button Name="RackNoise" Content="{loc:Text Key=NoiseButton}" Classes="fx"
-                          Padding="12,3" FontSize="12" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                          Padding="12,3" FontSize="{DynamicResource Ox.Ui.FontSize12}" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                           Classes.fxOn="{Binding Channel.Noise.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Channel.Noise.IsFaulty, FallbackValue=False}"
                           IsVisible="{Binding Channel.HasNoise, FallbackValue=False}"
                           AutomationProperties.Name="{Binding Channel.Noise.ButtonName, FallbackValue=''}" ToolTip.Tip="{loc:Text Key=NoiseButtonTip}">
@@ -524,7 +524,7 @@
                     </Button.Flyout>
                   </Button>
                   <Button Name="RackDynamics" Content="{loc:Text Key=Dynamics}" Classes="fx"
-                          Padding="12,3" FontSize="12" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                          Padding="12,3" FontSize="{DynamicResource Ox.Ui.FontSize12}" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                           Classes.fxOn="{Binding Channel.Dynamics.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Channel.Dynamics.IsFaulty, FallbackValue=False}"
                           IsVisible="{Binding Channel.HasDynamics, FallbackValue=False}"
                           AutomationProperties.Name="{Binding Channel.Dynamics.ButtonName, FallbackValue=''}" ToolTip.Tip="{loc:Text Key=DynamicsButtonTip}">

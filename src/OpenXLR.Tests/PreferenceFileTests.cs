@@ -34,6 +34,19 @@ public sealed class PreferenceFileTests : IDisposable
     private static string DaemonJson => Path.Combine(UiSettings.ConfigDir, "daemon.json");
 
     [Theory]
+    [InlineData(-100)]
+    [InlineData(0)]
+    [InlineData(105)]
+    [InlineData(int.MaxValue)]
+    public void InvalidTextSizesKeepTheNormalSizeAndOtherPreferences(int percent)
+    {
+        Assert.Null(new UiSettings { TextSizePercent = percent, StartMinimized = true }.Save());
+        UiSettings saved = UiSettings.Load();
+        Assert.Equal(100, saved.TextSizePercent);
+        Assert.True(saved.StartMinimized);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task DismissingAnUpdateWhileCheckingKeepsOnlyThatReleaseHidden(bool newerRelease)

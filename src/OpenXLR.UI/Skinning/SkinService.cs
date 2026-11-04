@@ -66,6 +66,58 @@ public static class SkinService
     private static Application? _application;
     private static bool _settingVariant;
 
+    internal const int NormalTextSize = 100;
+
+    /// <summary>The current UI text size, including an unsaved choice for this run.</summary>
+    internal static int TextSizePercent { get; private set; } = NormalTextSize;
+
+    internal static int NormalizeTextSize(int percent) => percent is 80 or 90 or 100 or 110 or 120
+        ? percent : NormalTextSize;
+
+    private static double ScaleText(double size) => size * TextSizePercent / NormalTextSize;
+
+    private static bool IsFontSize(SkinToken token) => token.Name.EndsWith("FontSize", StringComparison.Ordinal);
+
+    /// <summary>Save the text size and apply it to open windows, even when the preference cannot be saved.</summary>
+    internal static string? ChooseTextSize(int percent)
+    {
+        percent = NormalizeTextSize(percent);
+        string? error = (UiSettings.Load() with { TextSizePercent = percent }).Save();
+        ApplyTextSize(percent);
+        return error;
+    }
+
+    internal static void ApplyTextSize(int percent)
+    {
+        TextSizePercent = NormalizeTextSize(percent);
+        if (Application.Current is { } application)
+        {
+            ApplyTextResources(application);
+            foreach (SkinToken token in SkinTokens.All)
+                if (IsFontSize(token) && token.Default is double basis)
+                    Put(application.Resources, token.Name, ScaleText(
+                        _palette.Tokens.GetValueOrDefault(token.Name) is SkinNumber size ? size.Value : basis));
+        }
+        Changed?.Invoke();
+    }
+
+    private static void ApplyTextResources(Application application)
+    {
+        var resources = application.Resources;
+        foreach (int size in new[] { 10, 11, 12, 13, 16, 17, 18, 19, 20, 22, 24 })
+            Put(resources, $"Ox.Ui.FontSize{size}", ScaleText(size));
+        // Reserve the endpoint readout's space even in the middle of a drag.
+        Put(resources, "Ox.Ui.CrossfadeReadoutWidth", Math.Ceiling(ScaleText(74)));
+        // Read the toolkit's unscaled sizes from its styles, outside our
+        // overrides, so picking another size cannot scale them twice.
+        foreach (string key in new[] { "ControlContentThemeFontSize", "ToolTipContentThemeFontSize", "TabItemHeaderFontSize" })
+        {
+            if (TextSizePercent == NormalTextSize) resources.Remove(key);
+            else if (application.Styles.TryGetResource(key, application.ActualThemeVariant, out object? value) && value is double size)
+                Put(resources, key, ScaleText(size));
+        }
+    }
+
     /// <summary>The saved Material mode: system, light or dark.</summary>
     public static string Mode { get; private set; } = AppearanceModes.System;
 
@@ -159,6 +211,8 @@ public static class SkinService
     {
         UiSettings settings = UiSettings.Load();
         TouchControls = settings.TouchControls;
+        TextSizePercent = settings.TextSizePercent;
+        if (Application.Current is { } app) ApplyTextResources(app);
         string? id = Environment.GetEnvironmentVariable(OverrideVariable);
         Overridden = id is { Length: > 0 };
         if (!ReferenceEquals(_application, Application.Current))
@@ -256,6 +310,7 @@ public static class SkinService
             // bad image never leaves a hole in the window.
             realized ??= token.Default;
             realized = Sized(token.Name, realized);
+            if (IsFontSize(token) && realized is double size) realized = ScaleText(size);
 
             if (IsLive(token))
             {

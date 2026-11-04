@@ -25,11 +25,11 @@
   <Grid RowDefinitions="Auto,*,Auto" Margin="28,24,28,18">
     <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,20">
       <StackPanel Spacing="5">
-        <TextBlock Text="{loc:Text Key=AudioFlow}" FontSize="24" FontWeight="SemiBold" Foreground="{DynamicResource Ox.Flow.Text}"/>
-        <TextBlock Name="FlowHint" Text="{loc:Text Key=ClickAnyElementToTraceItsSignalPath}" FontSize="12" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
+        <TextBlock Text="{loc:Text Key=AudioFlow}" FontSize="{DynamicResource Ox.Ui.FontSize24}" FontWeight="SemiBold" Foreground="{DynamicResource Ox.Flow.Text}"/>
+        <TextBlock Name="FlowHint" Text="{loc:Text Key=ClickAnyElementToTraceItsSignalPath}" FontSize="{DynamicResource Ox.Ui.FontSize12}" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
       </StackPanel>
       <Button Name="ClearSelection" Grid.Column="1" Content="{loc:Text Key=ClearSelection}" Click="OnClearSelection"
-              VerticalAlignment="Center" FontSize="12" Background="{DynamicResource Ox.Flow.Card}" Foreground="{DynamicResource Ox.Flow.Text}"
+              VerticalAlignment="Center" FontSize="{DynamicResource Ox.Ui.FontSize12}" Background="{DynamicResource Ox.Flow.Card}" Foreground="{DynamicResource Ox.Flow.Text}"
               CornerRadius="4" Padding="12,7" IsEnabled="False"/>
     </Grid>
     <ScrollViewer Name="GraphScroll" Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
@@ -38,23 +38,23 @@
     <WrapPanel Grid.Row="2" Margin="0,18,0,0">
       <StackPanel Orientation="Horizontal" Spacing="7" Margin="0,0,22,8">
         <Path Width="20" Height="3" Data="M0,1 L20,1" Stroke="{DynamicResource Ox.Flow.Input}" StrokeThickness="2"/>
-        <TextBlock Text="{loc:Text Key=InputToChannel}" FontSize="11" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
+        <TextBlock Text="{loc:Text Key=InputToChannel}" FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
       </StackPanel>
       <StackPanel Orientation="Horizontal" Spacing="7" Margin="0,0,22,8">
         <Path Width="20" Height="3" Data="M0,1 L20,1" Stroke="{DynamicResource Ox.Flow.Channel}" StrokeThickness="2"/>
-        <TextBlock Text="{loc:Text Key=ChannelToMix}" FontSize="11" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
+        <TextBlock Text="{loc:Text Key=ChannelToMix}" FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
       </StackPanel>
       <StackPanel Orientation="Horizontal" Spacing="7" Margin="0,0,22,8">
         <Path Width="20" Height="3" Data="M0,1 L20,1" Stroke="{DynamicResource Ox.Flow.Output}" StrokeThickness="2"/>
-        <TextBlock Text="{loc:Text Key=MixToOutput}" FontSize="11" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
+        <TextBlock Text="{loc:Text Key=MixToOutput}" FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
       </StackPanel>
       <StackPanel Orientation="Horizontal" Spacing="7" Margin="0,0,22,8">
         <Path Width="20" Height="3" Data="M0,1 L20,1" Stroke="{DynamicResource Ox.Flow.Muted}" StrokeThickness="2" StrokeDashArray="3,3"/>
-        <TextBlock Text="{loc:Text Key=MutedInactive}" FontSize="11" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
+        <TextBlock Text="{loc:Text Key=MutedInactive}" FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
       </StackPanel>
       <StackPanel Orientation="Horizontal" Spacing="7" Margin="0,0,22,8">
         <Path Width="20" Height="3" Data="M0,1 L20,1" Stroke="{DynamicResource Ox.Flow.Muted}" StrokeThickness="2" Opacity="0.3"/>
-        <TextBlock Text="{loc:Text Key=NotInPath}" FontSize="11" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
+        <TextBlock Text="{loc:Text Key=NotInPath}" FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
       </StackPanel>
     </WrapPanel>
   </Grid>

@@ -1138,6 +1138,8 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   It also holds every sink it created at full volume and unmuted, since
   a desktop applet or the session manager can turn one down and quietly
   cut the mixes it feeds
+- Text size: five settings from 80% to 120% in Options under Appearance.
+  The change reaches open windows immediately and is saved in `ui.json`.
 - Skins: every surface, label, indicator, meter, fader and control in the
   UI reads a named appearance value. A skin is a folder with a
   versioned `skin.json` that replaces some or all of those values and picks,

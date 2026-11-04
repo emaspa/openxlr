@@ -22,6 +22,8 @@ internal static class Dialogs
         var ok = new Button { Content = okLabel ?? Localizer.Text("Rename"), IsDefault = true, Name = "NameOk" };
         var cancel = new Button { Content = Localizer.Text("Cancel"), IsCancel = true };
         string? result = null;
+        var detail = new TextBlock { Text = hint, TextWrapping = TextWrapping.Wrap, MaxWidth = 380, Classes = { "hint" } };
+        detail.Bind(TextBlock.FontSizeProperty, detail.GetResourceObservable("Ox.Ui.FontSize11"));
         var dialog = new Window
         {
             Title = title,
@@ -36,8 +38,7 @@ internal static class Dialogs
                 Children =
                 {
                     input,
-                    new TextBlock { Text = hint, TextWrapping = TextWrapping.Wrap, MaxWidth = 380, FontSize = 11,
-                        Classes = { "hint" } },
+                    detail,
                     new StackPanel
                     {
                         Orientation = Avalonia.Layout.Orientation.Horizontal,
