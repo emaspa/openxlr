@@ -34,8 +34,8 @@ every package has them and there is nothing to install:
   [Layout](#layout).
 - **Compact Desk**, a dark matrix layout with a 600 pixel headphone column
   and a monitor toolbar that takes the remaining width. Wider name columns
-  and faders use the desk's space, muted faders stay readable, application
-  names have more room in the wrapping tiles, and the
+  and faders expand to use the desk's space, muted faders stay readable,
+  application tiles share the available width and give names more room, and the
   header keeps Profiles, Flow and Arrange beside an overflow menu for the
   other actions. It uses the existing controls and does not change Broadcast.
 - **Nyan Pink**, a dark plum palette with candy pink faders, cyan details
@@ -712,6 +712,7 @@ the same in every tile.
 | `Ox.AppIcon.CornerRadius` | radius | 4 | 0 to 48 | that badge's corners |
 | `Ox.AppIcon.FontSize` | number | 11 | 6 to 32 | the size of that initial |
 | `Ox.AppColumns.NameWidth` | number | 128 | 64 to 400 | the width of an application's name in a tile of APPLICATIONS' columns, the same in every tile; a longer name is clipped and scrolls to its end while the pointer is over its tile |
+| `Ox.AppColumns.TileMaxWidth` | number | 0 | 0 to 1000 | the width up to which application tiles can grow to share spare space in each row of columns; 0 keeps their natural width |
 
 ### Audio flow window
 
@@ -825,6 +826,7 @@ controls.
 |---|---|---|---|---|
 | `Ox.Matrix.NameWidth` | number | 140 | 56 to 400 | the width of a row head's name column, which holds the name, the binding line under it, the **Mic** button and the gain under it, or on SFX's row its **Sounds** button |
 | `Ox.Matrix.CellWidth` | number | 168 | 120 to 400 | the width of a cell, of a column head and of a row head's source controls |
+| `Ox.Matrix.CellMaxWidth` | number | 0 | 0 to 1000 | the width up to which matrix cells and source controls grow together; 0 keeps the base cell width |
 | `Ox.Matrix.RowHeight` | number | 40 | 28 to 120 | the height of a row: its head and every cell in it; a row whose head stacks a gain over the channel volume, or the **EQ** button over the chain's, is as tall as the two need, never less |
 | `Ox.Matrix.MutedBackground` | brush | #40a03434 | | the background of a cell whose send is muted, when the matrix tints muted cells. Translucent by default, so the cell's own surface shows through as a red tint |
 | `Ox.Matrix.MutedForeground` | brush | #f6dede | | the lettering of a muted send's mute in a tinted cell |
@@ -1277,8 +1279,9 @@ APPLICATIONS' columns are tiles of one width, in columns: the first
 right, in the order the chips of the default template wrap in. A tile holds
 what a chip holds: its state lamp, its icon, its name and its channel
 picker. Each part is the same width in every tile, so the tiles of a column
-line up and so do their pickers. The name is
-`Ox.AppColumns.NameWidth` wide, 128 by default, which holds about sixteen
+line up and so do their pickers. A skin can set `Ox.AppColumns.TileMaxWidth`
+so each row of columns shares its spare width up to that limit. The name
+starts at `Ox.AppColumns.NameWidth`, 128 by default, which holds about sixteen
 characters such as "Telegram Desktop". A longer name is clipped; while the
 pointer is over its tile it glides once to its end and stays there, and
 glides back when the pointer leaves. Nothing moves at rest, and the tooltip

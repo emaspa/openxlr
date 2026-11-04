@@ -54,7 +54,7 @@
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="Auto"/>
-            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
             <ColumnDefinition Width="Auto" SharedSizeGroup="ApplicationChannel"/>
           </Grid.ColumnDefinitions>
           <skin:StatusLed IsOn="{Binding Active}" VerticalAlignment="Center"
@@ -62,7 +62,7 @@
                           ToolTip.Tip="{Binding StatusText}"/>
           <views:ApplicationIconView Grid.Column="1" Icon="{Binding Icon}" Label="{Binding Label}"/>
           <layout:ScrollingName Grid.Column="2" Name="ApplicationName" VerticalAlignment="Center"
-                                Width="{DynamicResource Ox.AppColumns.NameWidth}"
+                                PreferredWidth="{DynamicResource Ox.AppColumns.NameWidth}"
                                 Scrolls="{Binding $parent[Border].IsPointerOver}" ToolTip.Tip="{Binding Label}">
             <TextBlock Text="{Binding Label}" Classes="body" VerticalAlignment="Center"/>
           </layout:ScrollingName>

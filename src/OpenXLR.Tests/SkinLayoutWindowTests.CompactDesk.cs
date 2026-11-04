@@ -76,7 +76,12 @@ internal static partial class SkinLayoutWindowTests
                         CheckTileParts(window, tiles, where);
                         foreach (Border tile in tiles) AssertInside(tile, Card("ApplicationsTile"));
                         if (width >= 1280 && count == 3)
+                        {
                             Assert.All(tiles, tile => Assert.Equal(0, tile.TranslatePoint(default, panel)!.Value.Y, 0.5));
+                            Assert.All(tiles, tile => Assert.True(tile.Bounds.Width <= panel.MaxTileWidth));
+                            double edge = tiles[^1].TranslatePoint(new Point(tiles[^1].Bounds.Width, 0), panel)!.Value.X;
+                            Assert.True(edge >= Math.Min(panel.Bounds.Width, count * panel.MaxTileWidth) - count * 5, where);
+                        }
                         Assert.NotNull(window.MixMatrix);
                         Assert.Equal(6, window.MixMatrix.Columns.Count);
                         CheckMatrixCells(window, window.MixMatrix, where);
@@ -144,17 +149,17 @@ internal static partial class SkinLayoutWindowTests
             model.ActiveApps.Add(app);
         }
         ApplicationIconWindowTests.Assign(model.Apps);
-        foreach (double width in new[] { 640d, 960, 1280, 1600 })
+        foreach (double width in new[] { 640d, 960, 1280, 1600, 2400, 640 })
         {
             Layout(window, width, 800);
             Assert.Equal(3, window.MixMatrix!.Columns.Count);
             CheckMatrixCells(window, window.MixMatrix, $"Compact Desk, three mixes at {width}");
-            if (width == 1280)
+            if (width >= 1280)
             {
                 var card = (Border)window.FindControl<Expander>("SubmixerTile")!.Parent!;
                 Border last = ColumnHead(window, "chat");
                 double end = last.TranslatePoint(new Point(last.Bounds.Width, 0), card)!.Value.X;
-                Assert.True(end >= card.Bounds.Width * .8, "Three mixes should use the desk instead of leaving half of it empty.");
+                Assert.True(end >= card.Bounds.Width * .95, "Three mixes should use the desk instead of leaving half of it empty.");
             }
             Capture(window, $"skin-compact-desk-three-mixes-{width}");
         }

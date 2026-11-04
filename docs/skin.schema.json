@@ -551,6 +551,13 @@
           "maximum": 400,
           "description": "the width of an application's name in a tile of APPLICATIONS' columns, the same in every tile; a longer name is clipped and scrolls to its end while the pointer is over its tile"
         },
+        "Ox.AppColumns.TileMaxWidth": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000,
+          "default": 0,
+          "description": "the width up to which application tiles can grow to share spare space in each row of columns; 0 keeps their natural width"
+        },
         "Ox.Flow.Background": {
           "$ref": "#/$defs/brush",
           "description": "the ground behind the graph"
@@ -778,6 +785,13 @@
           "minimum": 120,
           "maximum": 400,
           "description": "the width of a cell, of a column head and of a row head's source controls"
+        },
+        "Ox.Matrix.CellMaxWidth": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000,
+          "default": 0,
+          "description": "the width up to which matrix cells and source controls grow together; 0 keeps the base cell width"
         },
         "Ox.Matrix.RowHeight": {
           "type": "number",

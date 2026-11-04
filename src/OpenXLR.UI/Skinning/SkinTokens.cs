@@ -338,6 +338,7 @@ public static class SkinTokens
         // characters of the body text, "Telegram Desktop" or "VLC media
         // player"; a longer name scrolls while the pointer is on its tile.
         Number("Ox.AppColumns.NameWidth", 128, 64, 400),
+        Number("Ox.AppColumns.TileMaxWidth", 0, 0, 1000),
 
         // The audio flow window.
         Brush("Ox.Flow.Background", "#242624"),
@@ -410,6 +411,7 @@ public static class SkinTokens
         // rows across it. Touch sizing raises the three to TouchMinimums.
         Number("Ox.Matrix.NameWidth", 140, 56, 400),
         Number("Ox.Matrix.CellWidth", 168, 120, 400),
+        Number("Ox.Matrix.CellMaxWidth", 0, 0, 1000),
         Number("Ox.Matrix.RowHeight", 40, 28, 120),
         // A muted send's cell: its background, and the lettering of its mute.
         // The background is translucent by default, so the cell's own surface
