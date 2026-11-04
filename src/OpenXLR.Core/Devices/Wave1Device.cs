@@ -35,12 +35,12 @@ public sealed class Wave1Device : Wave3Device
 {
     public new const ushort ProductId = 0x006E;
 
-    public Wave1Device() : this(UsbTransport.Create(), AlsaCards.RunAmixer, null) { }
+    public Wave1Device() : this(UsbTransport.Create(), AlsaCards.RunAmixer, null, events: AlsaControlEvents.Open) { }
 
     /// <summary>Tests substitute the transport; without amixer the card is left alone.</summary>
     internal Wave1Device(IUsbTransport usb) : this(usb, null, null) { }
 
     /// <summary>Tests substitute the transport, amixer, the card lookup and the clock.</summary>
-    internal Wave1Device(IUsbTransport usb, Func<IReadOnlyList<string>, ProcessResult>? amixer, Func<int>? findCard, Func<DateTime>? now = null)
-        : base(ProductId, "Wave:1", usb, amixer, findCard, now) { }
+    internal Wave1Device(IUsbTransport usb, Func<IReadOnlyList<string>, ProcessResult>? amixer, Func<int>? findCard, Func<DateTime>? now = null, Func<int, IAlsaControlEvents?>? events = null)
+        : base(ProductId, "Wave:1", usb, amixer, findCard, now, events) { }
 }

@@ -128,6 +128,7 @@ public class Wave3Device : IAudioDevice
     private const string MuteCtl = "Mic Capture Switch";
     private const string HpCtl = "PCM Playback Volume";
     private static readonly TimeSpan AlsaReadInterval = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan AlsaEventFallback = TimeSpan.FromSeconds(30);
 
     internal const int OffGain = 0;
     internal const int OffMute = 4;
@@ -154,6 +155,8 @@ public class Wave3Device : IAudioDevice
     private readonly IUsbTransport _usb;
     private readonly Func<IReadOnlyList<string>, ProcessResult>? _amixer;
     private readonly Func<int>? _findCard;
+    private readonly Func<int, IAlsaControlEvents?>? _watchControls;
+    private IAlsaControlEvents? _alsaEvents;
     private readonly Func<DateTime> _now;
 
     // The gain last read while the dial was on gain, when every source reads
@@ -174,7 +177,7 @@ public class Wave3Device : IAudioDevice
     // after a connect; when the card was last read; the last mirror failure.
     private int _card = -1;
     private AlsaValues? _mirrored;
-    private DateTime _alsaReadAt;
+    private DateTime _alsaReadAt, _alsaWatchAt;
     private string? _mirrorError;
 
     /// <summary>
@@ -183,25 +186,26 @@ public class Wave3Device : IAudioDevice
     /// </summary>
     internal readonly record struct AlsaValues(int Gain, bool? Mute, int Hp);
 
-    public Wave3Device() : this(UsbTransport.Create(), AlsaCards.RunAmixer, null) { }
+    public Wave3Device() : this(UsbTransport.Create(), AlsaCards.RunAmixer, null, events: AlsaControlEvents.Open) { }
 
     /// <summary>Tests substitute the transport; without amixer the card is left alone.</summary>
     internal Wave3Device(IUsbTransport usb) : this(usb, null, null) { }
 
     /// <summary>Tests substitute the transport, amixer, the card lookup and the clock.</summary>
-    internal Wave3Device(IUsbTransport usb, Func<IReadOnlyList<string>, ProcessResult>? amixer, Func<int>? findCard, Func<DateTime>? now = null)
-        : this(ProductId, "Wave:3", usb, amixer, findCard, now) { }
+    internal Wave3Device(IUsbTransport usb, Func<IReadOnlyList<string>, ProcessResult>? amixer, Func<int>? findCard, Func<DateTime>? now = null, Func<int, IAlsaControlEvents?>? events = null)
+        : this(ProductId, "Wave:3", usb, amixer, findCard, now, events) { }
 
     /// <summary>
     /// A microphone on this block under another product id and name; the
     /// ALSA card is found by that id. The Wave:1 is the one such model.
     /// </summary>
     private protected Wave3Device(ushort productId, string model, IUsbTransport usb,
-        Func<IReadOnlyList<string>, ProcessResult>? amixer, Func<int>? findCard, Func<DateTime>? now)
+        Func<IReadOnlyList<string>, ProcessResult>? amixer, Func<int>? findCard, Func<DateTime>? now, Func<int, IAlsaControlEvents?>? events = null)
     {
         Info = UsbTransport.WithLocation(new("Elgato", model, VendorId, productId));
         _usb = usb;
         _amixer = amixer;
+        _watchControls = events;
         string usbId = $"{VendorId:x4}:{productId:x4}";
         _findCard = amixer is null ? null : findCard ?? (() => AlsaCards.Find("/proc/asound", Info.Location, usbId, Info.Model));
         _now = now ?? (() => DateTime.UtcNow);
@@ -238,7 +242,15 @@ public class Wave3Device : IAudioDevice
     public bool Connected => _usb.IsOpen;
 
     /// <summary>Release the USB transport and its helper process.</summary>
-    public void Dispose() => _usb.Dispose();
+    public void Dispose()
+    {
+        lock (_lock)
+        {
+            _alsaEvents?.Dispose();
+            _alsaEvents = null;
+            _usb.Dispose();
+        }
+    }
 
     public void Connect()
     {
@@ -249,6 +261,8 @@ public class Wave3Device : IAudioDevice
             var info = new byte[DevInfoLen];
             int n = Transfer(RtRead, ReqRead, BlockDevInfo, info, DevInfoLen);
             Firmware = DecodeFirmware(info.AsSpan(0, Math.Max(n, 0)));
+            _alsaEvents?.Dispose();
+            _alsaEvents = null;
             _card = -1;
             _mirrored = null;
             _mirrorError = null;
@@ -256,7 +270,12 @@ public class Wave3Device : IAudioDevice
             if (_findCard is null) return;
             // A unit without its card still works from OpenXLR; only the
             // desktop's controls fall out of step, and the note says so.
-            try { _card = _findCard(); }
+            try
+            {
+                _card = _findCard();
+                if (_card >= 0) _alsaEvents = _watchControls?.Invoke(_card);
+                _alsaWatchAt = _now();
+            }
             catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
             {
                 _mirrorError = ex.Message;
@@ -269,6 +288,8 @@ public class Wave3Device : IAudioDevice
     {
         lock (_lock)
         {
+            _alsaEvents?.Dispose();
+            _alsaEvents = null;
             _usb.Close();
             _gainDb = null;   // a replug may change what the dial was on
             _gainWritten = false;
@@ -383,7 +404,18 @@ public class Wave3Device : IAudioDevice
         if (muteOut && TryAlsa(() => Cset(MuteCtl, block.Mute == true ? "off" : "on"))) next = next with { Mute = block.Mute };
         if (hpOut && TryAlsa(() => Cset(HpCtl, block.Hp.ToString(CultureInfo.InvariantCulture)))) next = next with { Hp = block.Hp };
 
-        if ((!muteOut || !hpOut) && now - _alsaReadAt >= AlsaReadInterval)
+        // A temporarily unavailable control handle need not wait for USB to
+        // reconnect. Keep fast readback while retrying the subscription slowly.
+        if (_watchControls is not null && _alsaEvents?.Available != true && now - _alsaWatchAt >= AlsaEventFallback)
+        {
+            _alsaWatchAt = now;
+            _alsaEvents?.Dispose();
+            _alsaEvents = _watchControls(_card);
+            if (_alsaEvents?.Available == true) _alsaReadAt = now - AlsaEventFallback;
+        }
+        bool controlChanged = _alsaEvents?.Changed() ?? false;
+        TimeSpan interval = _alsaEvents?.Available == true ? AlsaEventFallback : AlsaReadInterval;
+        if ((!muteOut || !hpOut) && (controlChanged || now - _alsaReadAt >= interval))
         {
             _alsaReadAt = now;
             Dictionary<string, string>? card = null;
@@ -406,6 +438,7 @@ public class Wave3Device : IAudioDevice
                 }
                 if (edited) WriteConfigLocked(c);
             }
+            else _alsaReadAt = now - interval + AlsaReadInterval;
         }
         _mirrored = next;
     }
@@ -576,6 +609,7 @@ public class Wave3Device : IAudioDevice
             blocks["alsa"] = _card < 0
                 ? (_mirrorError is string why ? $"not mirrored: {why}" : "not mirrored")
                 : $"card={_card} given={(_mirrored is AlsaValues m ? $"gain={m.Gain} capture={(m.Mute is bool muted ? (muted ? "off" : "on") : "?")} hp={m.Hp}" : "nothing yet")}"
+                    + (_alsaEvents?.Available == true ? " readback=events+30s" : " readback=poll-500ms")
                     + (_mirrorError is string error ? $" last error: {error}" : "");
             blocks["firmware"] = Firmware ?? "not read";
             blocks["gain"] = _gainDb is int g

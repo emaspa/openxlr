@@ -10,7 +10,7 @@ namespace OpenXLR.Tests;
 /// and nothing here shows the protocol is right: the layout under test is
 /// the public research the class cites, and the tests hold the code to it.
 /// </summary>
-public sealed class Wave3DeviceTests
+public sealed partial class Wave3DeviceTests
 {
     /// <summary>A config block behind the transport: reads serve it, writes replace it.</summary>
     internal sealed class FakeUsb : IUsbTransport

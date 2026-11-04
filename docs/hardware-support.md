@@ -424,16 +424,23 @@ caches those values and never reads them back from the device, so the
 backend treats the config block as the one source of truth and keeps the
 card in step with it, as openwave does. When the block changes (the dial,
 the mute pad, a write from OpenXLR), the next poll writes the new value
-to the card. Every half second the backend also reads the card's mute
-and headphone level, and writes a change something else made there into
-the block. The gain only goes from the block to the card.
+to the card. An ALSA control subscription tells the backend when the card
+changes; it then reads the card's mute and headphone level on the next
+device poll and writes an external change into the block. A 30-second
+read catches changes for which no event arrived. If the subscription
+cannot be opened or stops working, the half-second readback remains while
+the subscription is retried every 30 seconds.
+The gain only goes from the block to the card.
 wave3-research found its unit ignoring a gain written through the class
 control. Firmware 1.2.4 does not: with OpenXLR stopped, a change to any
 of the three controls, the gain included, shows in the block and in the
 sound, so a desktop's gain change reaches the backend through the block
 either way. A card gain that differs from the block is a stale cache.
-The half-second readback is what keeps the block in step on firmware
-that does not carry the controls over by itself.
+The readback keeps the block in step on firmware that does not carry the
+controls over by itself. The control subscription and fallback are coded
+and tested with simulated events; event delivery on a Wave:3 and Wave:1
+still needs hardware acceptance. The diagnostics dump's `alsa` line says
+`readback=events+30s` or `readback=poll-500ms`.
 Without its card the microphone is still driven, Options says the
 desktop's controls are not kept in step, and the diagnostics dump gives
 the reason on its `alsa` line.
