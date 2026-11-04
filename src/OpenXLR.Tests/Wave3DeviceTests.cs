@@ -583,6 +583,7 @@ public sealed partial class Wave3DeviceTests
         public string Capture { get; set; } = "on";
         public int Hp { get; set; } = 102;
         public List<(string Name, string Value)> Sets { get; } = [];
+        public Action<string>? AfterSet { get; set; }
         public int Reads { get; private set; }
         public string? Fail { get; set; }
 
@@ -624,6 +625,7 @@ public sealed partial class Wave3DeviceTests
                         case "PCM Playback Volume": Hp = int.Parse(args[4]); break;
                         default: Assert.Fail($"unexpected control {name}"); break;
                     }
+                    AfterSet?.Invoke(name);
                     return new ProcessResult(0, [], "", false, false);
                 default:
                     Assert.Fail($"unexpected amixer {string.Join(' ', args)}");
@@ -632,9 +634,13 @@ public sealed partial class Wave3DeviceTests
         }
     }
 
-    private sealed class Clock
+    private sealed class Clock : TimeProvider
     {
         public DateTime Now { get; set; } = new(2026, 10, 9, 12, 0, 0, DateTimeKind.Utc);
+        public TimeSpan WallClockOffset { get; set; }
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+        public override long GetTimestamp() => Now.Ticks;
+        public override DateTimeOffset GetUtcNow() => Now + WallClockOffset;
     }
 
     private static (Wave3Device Device, FakeUsb Usb, FakeCard Card, Clock Clock) Mirrored(byte[]? block = null)
@@ -642,7 +648,7 @@ public sealed partial class Wave3DeviceTests
         var usb = new FakeUsb { Config = block ?? Block(gainDb: 20, mute: false, hpDb: -12.5) };
         var card = new FakeCard();
         var clock = new Clock();
-        var dev = new Wave3Device(usb, card.Run, () => 3, () => clock.Now);
+        var dev = new Wave3Device(usb, card.Run, () => 3, clock);
         dev.Connect();
         return (dev, usb, card, clock);
     }

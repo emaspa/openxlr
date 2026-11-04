@@ -157,7 +157,7 @@ public class Wave3Device : IAudioDevice
     private readonly Func<int>? _findCard;
     private readonly Func<int, IAlsaControlEvents?>? _watchControls;
     private IAlsaControlEvents? _alsaEvents;
-    private readonly Func<DateTime> _now;
+    private readonly TimeProvider _time;
 
     // The gain last read while the dial was on gain, when every source reads
     // the word at 0 as the gain, or last written by this class and read back
@@ -177,7 +177,8 @@ public class Wave3Device : IAudioDevice
     // after a connect; when the card was last read; the last mirror failure.
     private int _card = -1;
     private AlsaValues? _mirrored;
-    private DateTime _alsaReadAt, _alsaWatchAt;
+    private long _alsaReadAt, _alsaWatchAt;
+    private bool _alsaReadPending, _alsaReadFailed;
     private string? _mirrorError;
 
     /// <summary>
@@ -192,15 +193,15 @@ public class Wave3Device : IAudioDevice
     internal Wave3Device(IUsbTransport usb) : this(usb, null, null) { }
 
     /// <summary>Tests substitute the transport, amixer, the card lookup and the clock.</summary>
-    internal Wave3Device(IUsbTransport usb, Func<IReadOnlyList<string>, ProcessResult>? amixer, Func<int>? findCard, Func<DateTime>? now = null, Func<int, IAlsaControlEvents?>? events = null)
-        : this(ProductId, "Wave:3", usb, amixer, findCard, now, events) { }
+    internal Wave3Device(IUsbTransport usb, Func<IReadOnlyList<string>, ProcessResult>? amixer, Func<int>? findCard, TimeProvider? time = null, Func<int, IAlsaControlEvents?>? events = null)
+        : this(ProductId, "Wave:3", usb, amixer, findCard, time, events) { }
 
     /// <summary>
     /// A microphone on this block under another product id and name; the
     /// ALSA card is found by that id. The Wave:1 is the one such model.
     /// </summary>
     private protected Wave3Device(ushort productId, string model, IUsbTransport usb,
-        Func<IReadOnlyList<string>, ProcessResult>? amixer, Func<int>? findCard, Func<DateTime>? now, Func<int, IAlsaControlEvents?>? events = null)
+        Func<IReadOnlyList<string>, ProcessResult>? amixer, Func<int>? findCard, TimeProvider? time, Func<int, IAlsaControlEvents?>? events = null)
     {
         Info = UsbTransport.WithLocation(new("Elgato", model, VendorId, productId));
         _usb = usb;
@@ -208,7 +209,7 @@ public class Wave3Device : IAudioDevice
         _watchControls = events;
         string usbId = $"{VendorId:x4}:{productId:x4}";
         _findCard = amixer is null ? null : findCard ?? (() => AlsaCards.Find("/proc/asound", Info.Location, usbId, Info.Model));
-        _now = now ?? (() => DateTime.UtcNow);
+        _time = time ?? TimeProvider.System;
     }
 
     public DeviceInfo Info { get; }
@@ -265,6 +266,7 @@ public class Wave3Device : IAudioDevice
             _alsaEvents = null;
             _card = -1;
             _mirrored = null;
+            _alsaReadPending = _alsaReadFailed = false;
             _mirrorError = null;
             ConnectionNote = null;
             if (_findCard is null) return;
@@ -274,7 +276,7 @@ public class Wave3Device : IAudioDevice
             {
                 _card = _findCard();
                 if (_card >= 0) _alsaEvents = _watchControls?.Invoke(_card);
-                _alsaWatchAt = _now();
+                _alsaWatchAt = _time.GetTimestamp();
             }
             catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
             {
@@ -394,7 +396,7 @@ public class Wave3Device : IAudioDevice
         // Right after a connect the card is given all three, and a control
         // the card failed to take is given again: the block holds what the
         // unit is doing, the card only what the kernel cached.
-        DateTime now = _now();
+        long now = _time.GetTimestamp();
         if (_mirrored is null) _alsaReadAt = now;
         AlsaValues seen = _mirrored ?? new(-1, null, -1);
         AlsaValues block = ToAlsa(c, seen);
@@ -406,41 +408,66 @@ public class Wave3Device : IAudioDevice
 
         // A temporarily unavailable control handle need not wait for USB to
         // reconnect. Keep fast readback while retrying the subscription slowly.
-        if (_watchControls is not null && _alsaEvents?.Available != true && now - _alsaWatchAt >= AlsaEventFallback)
+        if (_watchControls is not null && _alsaEvents?.Available != true && _time.GetElapsedTime(_alsaWatchAt, now) >= AlsaEventFallback)
         {
             _alsaWatchAt = now;
             _alsaEvents?.Dispose();
             _alsaEvents = _watchControls(_card);
-            if (_alsaEvents?.Available == true) _alsaReadAt = now - AlsaEventFallback;
-        }
-        bool controlChanged = _alsaEvents?.Changed() ?? false;
-        TimeSpan interval = _alsaEvents?.Available == true ? AlsaEventFallback : AlsaReadInterval;
-        if ((!muteOut || !hpOut) && (controlChanged || now - _alsaReadAt >= interval))
-        {
-            // The event was drained already. Retry a failed card read or USB
-            // write after 500 ms even if there is no further notification.
-            _alsaReadAt = now - interval + AlsaReadInterval;
-            Dictionary<string, string>? card = null;
-            if (TryAlsa(() => card = ParseContents(Amixer("contents"))))
+            if (_alsaEvents?.Available == true)
             {
-                bool edited = false;
-                if (!muteOut && card!.TryGetValue(MuteCtl, out string? sw) && sw is "on" or "off" && (sw == "off") != seen.Mute)
-                {
-                    c[OffMute] = sw == "off" ? (byte)1 : (byte)0;
-                    next = next with { Mute = sw == "off" };
-                    edited = true;
-                }
-                if (!hpOut && card!.TryGetValue(HpCtl, out string? hp)
-                    && int.TryParse(hp.Split(',')[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out int level)
-                    && level is >= 0 and <= 120 && level != seen.Hp)
-                {
-                    WriteHp(c, HpToWord(level / 2.0 + HpMinDb));
-                    next = next with { Hp = level };
-                    edited = true;
-                }
-                if (edited) WriteConfigLocked(c);
-                _alsaReadAt = now;
+                _alsaReadPending = true;
+                _alsaReadFailed = false;
             }
+        }
+        // A notification can arrive during the writes above. If both block
+        // values win this poll, leave it pending for the next eligible read.
+        _alsaReadPending |= _alsaEvents?.Changed() ?? false;
+        TimeSpan interval = _alsaReadFailed || _alsaEvents?.Available != true ? AlsaReadInterval : AlsaEventFallback;
+        if ((!muteOut || !hpOut) && (_alsaReadPending && !_alsaReadFailed || _time.GetElapsedTime(_alsaReadAt, now) >= interval))
+        {
+            _alsaReadPending = false;
+            _alsaReadFailed = true;
+            try
+            {
+                Dictionary<string, string>? card = null;
+                if (TryAlsa(() => card = ParseContents(Amixer("contents"))))
+                {
+                    bool edited = false;
+                    // An outgoing write still wins this poll. If the card
+                    // changed underneath it, recheck that control next poll.
+                    if (card!.TryGetValue(MuteCtl, out string? sw) && sw is "on" or "off")
+                    {
+                        bool muted = sw == "off";
+                        if (muteOut) _alsaReadPending |= muted != block.Mute;
+                        else if (muted != seen.Mute)
+                        {
+                            c[OffMute] = muted ? (byte)1 : (byte)0;
+                            next = next with { Mute = muted };
+                            edited = true;
+                        }
+                    }
+                    if (card.TryGetValue(HpCtl, out string? hp))
+                    {
+                        ReadOnlySpan<char> firstChannel = hp.AsSpan();
+                        int comma = firstChannel.IndexOf(',');
+                        if (comma >= 0) firstChannel = firstChannel[..comma];
+                        if (int.TryParse(firstChannel, NumberStyles.Integer, CultureInfo.InvariantCulture, out int level)
+                            && level is >= 0 and <= 120)
+                        {
+                            if (hpOut) _alsaReadPending |= level != block.Hp;
+                            else if (level != seen.Hp)
+                            {
+                                WriteHp(c, HpToWord(level / 2.0 + HpMinDb));
+                                next = next with { Hp = level };
+                                edited = true;
+                            }
+                        }
+                    }
+                    if (edited) WriteConfigLocked(c);
+                    _alsaReadFailed = false;
+                }
+            }
+            finally { _alsaReadAt = _time.GetTimestamp(); }
         }
         _mirrored = next;
     }

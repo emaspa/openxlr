@@ -41,6 +41,6 @@ public sealed class Wave1Device : Wave3Device
     internal Wave1Device(IUsbTransport usb) : this(usb, null, null) { }
 
     /// <summary>Tests substitute the transport, amixer, the card lookup and the clock.</summary>
-    internal Wave1Device(IUsbTransport usb, Func<IReadOnlyList<string>, ProcessResult>? amixer, Func<int>? findCard, Func<DateTime>? now = null, Func<int, IAlsaControlEvents?>? events = null)
-        : base(ProductId, "Wave:1", usb, amixer, findCard, now, events) { }
+    internal Wave1Device(IUsbTransport usb, Func<IReadOnlyList<string>, ProcessResult>? amixer, Func<int>? findCard, TimeProvider? time = null, Func<int, IAlsaControlEvents?>? events = null)
+        : base(ProductId, "Wave:1", usb, amixer, findCard, time, events) { }
 }

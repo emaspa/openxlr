@@ -19,10 +19,33 @@ public sealed partial class Wave3DeviceTests
         var card = new FakeCard();
         var clock = new Clock();
         var events = new ControlEvents();
-        var dev = new Wave3Device(usb, card.Run, () => 3, () => clock.Now, _ => events);
+        var dev = new Wave3Device(usb, card.Run, () => 3, clock, _ => events);
         dev.Connect();
         dev.ReadState();
         return (dev, usb, card, clock, events);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ADesktopEditDuringAMirrorWriteIsReadOnTheNextPoll(bool alsoMute)
+    {
+        var (dev, usb, card, _, events) = EventMirrored();
+        using (dev)
+        {
+            usb.Config = Block(gainDb: 20, mute: alsoMute, hpDb: -30);
+            card.AfterSet = name =>
+            {
+                if (name != "PCM Playback Volume") return;
+                card.Hp = 100; // Desktop edit after the mirror writes its value.
+                events.Pending = true;
+            };
+            Assert.Equal(-30, dev.ReadState().HpVolumeDb);
+            int reads = alsoMute ? 0 : 1;
+            Assert.Equal(reads, card.Reads);
+            Assert.Equal(-10, dev.ReadState().HpVolumeDb);
+            Assert.Equal(reads + 1, card.Reads);
+        }
     }
 
     [Fact]
@@ -34,6 +57,7 @@ public sealed partial class Wave3DeviceTests
             for (int i = 1; i < 30; i++) { clock.Now += TimeSpan.FromSeconds(1); dev.ReadState(); }
             Assert.Equal(0, card.Reads);
             Assert.Contains("readback=events+30s", dev.DumpBlocks()["alsa"]);
+            clock.WallClockOffset = TimeSpan.FromHours(-1);
             clock.Now += TimeSpan.FromSeconds(1);
             dev.ReadState();
             Assert.Equal(1, card.Reads);
@@ -85,7 +109,11 @@ public sealed partial class Wave3DeviceTests
             dev.ReadState();
             Assert.Empty(usb.Writes);
             card.Fail = null;
-            clock.Now += TimeSpan.FromMilliseconds(500);
+            events.Pending = true;
+            clock.Now += TimeSpan.FromMilliseconds(499);
+            Assert.False(dev.ReadState().Mute);
+            Assert.Equal(0, card.Reads);
+            clock.Now += TimeSpan.FromMilliseconds(1);
             Assert.True(dev.ReadState().Mute);
             Assert.Equal(1, card.Reads);
             Assert.Single(usb.Writes);
@@ -153,7 +181,7 @@ public sealed partial class Wave3DeviceTests
         var clock = new Clock();
         var events = new ControlEvents();
         int attempts = 0;
-        using var dev = new Wave3Device(usb, card.Run, () => 3, () => clock.Now,
+        using var dev = new Wave3Device(usb, card.Run, () => 3, clock,
             _ => ++attempts == 1 ? null : events);
         dev.Connect();
         dev.ReadState();

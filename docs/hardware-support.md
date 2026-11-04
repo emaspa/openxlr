@@ -426,10 +426,15 @@ card in step with it, as openwave does. When the block changes (the dial,
 the mute pad, a write from OpenXLR), the next poll writes the new value
 to the card. An ALSA control subscription tells the backend when the card
 changes; it then reads the card's mute and headphone level on the next
-device poll and writes an external change into the block. A 30-second
-read catches changes for which no event arrived. If the subscription
-cannot be opened or stops working, the half-second readback remains while
-the subscription is retried every 30 seconds.
+device poll that can read the changed controls and writes an external
+change into the block. A notification that arrives during a poll that
+writes both controls to the card remains pending for the next poll.
+A 30-second read catches changes for which no event arrived. If the
+subscription cannot be opened or stops working, half-second readback
+continues while the subscription is retried every 30 seconds. A failed
+card read or microphone write waits half a second before retrying, even
+if more events arrive.
+These intervals use elapsed time and are independent of the system clock.
 The gain only goes from the block to the card.
 wave3-research found its unit ignoring a gain written through the class
 control. Firmware 1.2.4 does not: with OpenXLR stopped, a change to any
@@ -440,9 +445,7 @@ The readback keeps the block in step on firmware that does not carry the
 controls over by itself. The control subscription and fallback are coded
 and tested with simulated events; event delivery on a Wave:3 and Wave:1
 still needs hardware acceptance. The diagnostics dump's `alsa` line says
-`readback=events+30s` or `readback=poll-500ms`. A failed read or a failed
-write to the microphone is retried on the half-second schedule even if no
-further event arrives.
+`readback=events+30s` or `readback=poll-500ms`.
 Without its card the microphone is still driven, Options says the
 desktop's controls are not kept in step, and the diagnostics dump gives
 the reason on its `alsa` line.
