@@ -44,8 +44,10 @@ public sealed class GraphFallbackTests(ITestOutputHelper output)
         }
     }
 
-    [Fact]
-    public void RepeatedRegistryReadsDoNotAllocateForUnrelatedObjects()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RepeatedRegistryReadsDoNotAllocateForUnrelatedObjects(bool volumeUpdates)
     {
         string directory = Directory.CreateTempSubdirectory("openxlr-port-cost-").FullName;
         string? path = Environment.GetEnvironmentVariable("PATH");
@@ -55,7 +57,11 @@ public sealed class GraphFallbackTests(ITestOutputHelper output)
             for (int i = 1; i <= 100; i++)
             {
                 objects.Add(new { id = i, type = "PipeWire:Interface:Node",
-                    info = new { props = new Dictionary<string, object> { ["node.name"] = $"node{i}", ["media.class"] = "Audio/Sink" } } });
+                    info = new
+                    {
+                        props = new Dictionary<string, object> { ["node.name"] = $"node{i}", ["media.class"] = "Audio/Sink" },
+                        @params = new { Props = new[] { new { channelVolumes = new[] { 1.0 } } } }
+                    } });
                 for (int port = 0; port < 10; port++)
                     objects.Add(new { id = 100 + i * 10 + port, type = "PipeWire:Interface:Port",
                         info = new { direction = "output", props = new Dictionary<string, object>
@@ -63,8 +69,13 @@ public sealed class GraphFallbackTests(ITestOutputHelper output)
             }
             File.WriteAllText(Path.Combine(directory, "graph.json"), System.Text.Json.JsonSerializer.Serialize(objects));
             ExecutableScript.Write(Path.Combine(directory, "pw-dump"), """
-                /bin/cat "${0%/*}/graph.json"
-                while :; do /bin/sleep 1; done
+                dir=${0%/*}
+                /bin/cat "$dir/graph.json"
+                for i in $(/bin/seq 1 14); do
+                    while [ ! -f "$dir/update-$i.json" ]; do /bin/sleep 0.01; done
+                    /bin/cat "$dir/update-$i.json"
+                done
+                exec /bin/sleep 60
                 """);
             Environment.SetEnvironmentVariable("PATH", directory);
             var adapter = new PipeWireAdapter();
@@ -75,6 +86,41 @@ public sealed class GraphFallbackTests(ITestOutputHelper output)
                 try
                 {
                     for (int i = 0; i < 10; i++) adapter.ListPorts("node1", "capture", output: true);
+                    if (volumeUpdates)
+                    {
+                        long updateAllocations = 0;
+                        for (int i = 1; i <= 12; i++)
+                        {
+                            int percent = 50 + i;
+                            Publish(i, $$$$"""
+                                [{"id":1,"type":"PipeWire:Interface:Node","info":{
+                                "props":{"node.name":"node1","media.class":"Audio/Sink"},
+                                "params":{"Props":[{"channelVolumes":[{{{{Math.Pow(percent / 100d, 3).ToString(System.Globalization.CultureInfo.InvariantCulture)}}}}]}]}}}]
+                                """);
+                            Assert.True(SpinWait.SpinUntil(() => adapter.GetSinkVolume("node1") == percent / 100d, TimeSpan.FromSeconds(2)));
+                            long updateBefore = GC.GetAllocatedBytesForCurrentThread();
+                            List<string> ports = adapter.ListPorts("node1", "capture", output: true);
+                            updateAllocations += GC.GetAllocatedBytesForCurrentThread() - updateBefore;
+                            Assert.Equal(10, ports.Count);
+                        }
+                        output.WriteLine($"12 port lookups after volume updates allocated {updateAllocations:N0} bytes.");
+                        Assert.True(updateAllocations < 100_000, $"Port lookups after volume updates allocated {updateAllocations:N0} bytes.");
+                        Publish(13, """
+                            [{"id":1,"type":"PipeWire:Interface:Node","info":{
+                              "props":{"node.name":"node1","media.class":"Audio/Sink"},
+                              "params":{"Props":[{"channelVolumes":[1]}]}}},
+                             {"id":110,"info":null}]
+                            """);
+                        Assert.True(SpinWait.SpinUntil(() => adapter.GetSinkVolume("node1") == 1, TimeSpan.FromSeconds(2)));
+                        Assert.Equal(9, adapter.ListPorts("node1", "capture", output: true).Count);
+                        Publish(14, """
+                            [{"id":1,"type":"PipeWire:Interface:Node","info":{"props":{"node.name":"renamed","media.class":"Audio/Sink"}}}]
+                            """);
+                        Assert.True(SpinWait.SpinUntil(() => adapter.SinkExists("renamed") == true, TimeSpan.FromSeconds(2)));
+                        Assert.Empty(adapter.ListPorts("node1", "capture", output: true));
+                        Assert.Equal(9, adapter.ListPorts("renamed", "capture", output: true).Count);
+                        return;
+                    }
                     long before = GC.GetAllocatedBytesForCurrentThread();
                     for (int i = 0; i < 100; i++)
                     {
@@ -91,8 +137,18 @@ public sealed class GraphFallbackTests(ITestOutputHelper output)
             Assert.True(probe.Join(TimeSpan.FromSeconds(10)), "Port allocation probe hung.");
             if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
             Assert.True(adapter.SinkExists("node100"));
-            Assert.Equal(10, adapter.ListPorts("node1", "capture", output: true).Count);
-            Assert.Empty(adapter.ListPorts("node1", "capture", output: false));
+            if (!volumeUpdates)
+            {
+                Assert.Equal(10, adapter.ListPorts("node1", "capture", output: true).Count);
+                Assert.Empty(adapter.ListPorts("node1", "capture", output: false));
+            }
+
+            void Publish(int index, string batch)
+            {
+                string temp = Path.Combine(directory, "pending.json");
+                File.WriteAllText(temp, batch);
+                File.Move(temp, Path.Combine(directory, $"update-{index}.json"));
+            }
         }
         finally
         {

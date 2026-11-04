@@ -87,8 +87,7 @@ public sealed class PipeWireAdapter
                 if (ReferenceEquals(owner._graph, graph)) owner._graph = null;
                 owner._dumpObjects = null;
                 owner._defaultsRevision = -1;
-                owner._portSnapshot = null;
-                owner._inputPorts = owner._outputPorts = null;
+                owner._inputPorts = owner._outputPorts = (-1, null);
             }
             graph.Dispose();
         }
@@ -2825,22 +2824,18 @@ public sealed class PipeWireAdapter
         }
     }
 
-    private JsonElement[]? _portSnapshot;
-    private IReadOnlyList<string>? _inputPorts, _outputPorts;
+    private (long Revision, IReadOnlyList<string>? Names) _inputPorts = (-1, null), _outputPorts = (-1, null);
 
     private IReadOnlyList<string>? ReadObservedPorts(bool output)
     {
         lock (DumpGate)
         {
-            if (LiveObjects() is not { } snapshot) return null;
-            // Graph snapshots are immutable and reused until the next batch.
-            // Resolve owners and channel order once per direction and batch.
-            if (!ReferenceEquals(snapshot, _portSnapshot))
-            {
-                _portSnapshot = snapshot;
-                _inputPorts = _outputPorts = null;
-            }
-            return output ? _outputPorts ??= ObservedPorts(snapshot, true) : _inputPorts ??= ObservedPorts(snapshot, false);
+            ref var cached = ref (output ? ref _outputPorts : ref _inputPorts);
+            if (_graph?.ReadPortSnapshot(cached.Revision) is not { } ports) return null;
+            // Volume, metadata and link updates do not change port names.
+            if (ports.Snapshot is { } snapshot)
+                cached = (ports.Revision, ObservedPorts(snapshot, output));
+            return cached.Names;
         }
     }
 
