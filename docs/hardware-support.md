@@ -418,6 +418,10 @@ grid would swallow the Stream Deck's five-unit crossfade ticks.
 | Firmware version | read | bytes 21 to 23 of the device info block, openwave's offsets; shown in Options under INTERFACE and in the state's `device.firmware`. Two units read 1.2.2 and 1.2.4 there while bytes 6 to 8 read `00 03 07` on both, and bytes 0 and 1 read 5.3 and 5.4, LibreWave's two API versions. Not yet compared with the version Wave Link shows |
 | Device info block (0x000A) | read | 64 bytes on two units, the length openwave requires before it drives a unit (wave3-research read 51); the diagnostics exporter masks the serial wherever it lands |
 
+If the ALSA card appears after USB connects, OpenXLR retries discovery
+every two seconds until it finds the card. A known different USB address
+is never used as a match.
+
 The microphone's ALSA card carries the three controls that a desktop's
 sound settings and WirePlumber's restore at login act on. The kernel
 caches those values and never reads them back from the device, so the

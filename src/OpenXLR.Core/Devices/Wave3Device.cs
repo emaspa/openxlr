@@ -128,6 +128,7 @@ public class Wave3Device : IAudioDevice
     internal const string MuteCtl = "Mic Capture Switch";
     internal const string HpCtl = "PCM Playback Volume";
     private static readonly TimeSpan AlsaReadInterval = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan AlsaCardRetry = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan AlsaEventFallback = TimeSpan.FromSeconds(30);
 
     internal const int OffGain = 0;
@@ -208,7 +209,8 @@ public class Wave3Device : IAudioDevice
         _amixer = amixer;
         _watchControls = events;
         string usbId = $"{VendorId:x4}:{productId:x4}";
-        _findCard = amixer is null ? null : findCard ?? (() => AlsaCards.Find("/proc/asound", Info.Location, usbId, Info.Model));
+        _findCard = amixer is null ? null : findCard ?? (() =>
+            AlsaCards.Find("/proc/asound", Info.Location, usbId, Info.Model, rejectDifferentBus: true));
         _time = time ?? TimeProvider.System;
     }
 
@@ -269,20 +271,29 @@ public class Wave3Device : IAudioDevice
             _alsaReadPending = _alsaReadFailed = false;
             _mirrorError = null;
             ConnectionNote = null;
-            if (_findCard is null) return;
-            // A unit without its card still works from OpenXLR; only the
-            // desktop's controls fall out of step, and the note says so.
-            try
+            FindAlsaCardLocked();
+        }
+    }
+
+    private void FindAlsaCardLocked()
+    {
+        if (_findCard is null) return;
+        _alsaWatchAt = _time.GetTimestamp();
+        // USB can be ready before the kernel has published the ALSA card.
+        try
+        {
+            _card = _findCard();
+            if (_card >= 0)
             {
-                _card = _findCard();
-                if (_card >= 0) _alsaEvents = _watchControls?.Invoke(_card);
-                _alsaWatchAt = _time.GetTimestamp();
+                _alsaEvents = _watchControls?.Invoke(_card);
+                _mirrorError = null;
+                ConnectionNote = null;
             }
-            catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
-            {
-                _mirrorError = ex.Message;
-                ConnectionNote = $"{ex.Message}; the desktop's volume controls are not kept in step with the microphone";
-            }
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            _mirrorError = ex.Message;
+            ConnectionNote = $"{ex.Message}; the desktop's volume controls are not kept in step with the microphone";
         }
     }
 
@@ -376,6 +387,8 @@ public class Wave3Device : IAudioDevice
                 _gainDb = GainFromWord(c);
                 _gainWritten = true;
             }
+            if (_card < 0 && _findCard is not null && _time.GetElapsedTime(_alsaWatchAt) >= AlsaCardRetry)
+                FindAlsaCardLocked();
             if (_card >= 0) MirrorLocked(c);
             return Decode(c, _gainDb);
         }

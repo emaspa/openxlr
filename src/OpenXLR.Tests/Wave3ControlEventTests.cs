@@ -245,6 +245,34 @@ public sealed partial class Wave3DeviceTests
         => Assert.Null(AlsaControlEvents.Open(-1));
 
     [Fact]
+    public void ACardEnumeratedAfterUsbConnectIsMirroredWithoutReplugging()
+    {
+        var usb = new FakeUsb { Config = Block() };
+        var card = new FakeCard();
+        var clock = new Clock();
+        var events = new ControlEvents();
+        int lookups = 0;
+        using var dev = new Wave3Device(usb, card.Run, () =>
+        {
+            if (++lookups == 1) throw new InvalidOperationException("ALSA card was not found");
+            return 3;
+        }, clock, _ => events);
+        dev.Connect();
+        Assert.NotNull(dev.ConnectionNote);
+        clock.Now += TimeSpan.FromMilliseconds(1999);
+        dev.ReadState();
+        Assert.Empty(card.Sets);
+        Assert.Equal(1, lookups);
+
+        clock.Now += TimeSpan.FromMilliseconds(1);
+        dev.ReadState();
+        Assert.Equal(2, lookups);
+        Assert.Equal(3, card.Sets.Count);
+        Assert.Null(dev.ConnectionNote);
+        Assert.Contains("readback=events+30s", dev.DumpBlocks()["alsa"]);
+    }
+
+    [Fact]
     public void AnUnavailableControlHandleIsRetriedAndRecoveryRefreshesTheCard()
     {
         var usb = new FakeUsb { Config = Block() };

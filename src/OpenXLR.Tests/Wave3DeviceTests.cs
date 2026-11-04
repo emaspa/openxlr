@@ -854,6 +854,13 @@ public sealed partial class Wave3DeviceTests
             Assert.Equal(2, AlsaCards.Find(root, new UsbLocation(1, 9, "1-2", null), "0fd9:0070", "Wave:3"));
             var ex = Assert.Throws<InvalidOperationException>(() => AlsaCards.Find(root, null, "0fd9:0070", "Wave:3"));
             Assert.Contains("Several Wave:3s", ex.Message);
+            Directory.Delete(Path.Combine(root, "card4"), recursive: true);
+            var wrongBus = new UsbLocation(3, 2, "3-1", null);
+            Assert.Equal(2, AlsaCards.Find(root, wrongBus, "0fd9:0070", "Wave:3"));
+            Assert.Throws<InvalidOperationException>(() =>
+                AlsaCards.Find(root, wrongBus, "0fd9:0070", "Wave:3", rejectDifferentBus: true));
+            File.Delete(Path.Combine(root, "card2", "usbbus"));
+            Assert.Equal(2, AlsaCards.Find(root, wrongBus, "0fd9:0070", "Wave:3", rejectDifferentBus: true));
         }
         finally { Directory.Delete(root, true); }
     }
