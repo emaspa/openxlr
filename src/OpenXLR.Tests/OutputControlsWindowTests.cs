@@ -27,7 +27,11 @@ internal static class OutputControlsWindowTests
                     $"A single headphone output leaves its second jack's columns reserved at {width}.");
                 model.HasHp2 = true;
                 Layout(window, width, 900);
-                Assert.Equal(faders[0].Bounds.Width, faders[1].Bounds.Width, .5);
+                // The two star columns can split an odd number of display pixels.
+                double scale = window.RenderScaling;
+                int firstPixels = (int)Math.Round(faders[0].Bounds.Width * scale);
+                int secondPixels = (int)Math.Round(faders[1].Bounds.Width * scale);
+                Assert.InRange(Math.Abs(firstPixels - secondPixels), 0, 1);
                 AssertNoOverlap(faders);
                 model.HasHp2 = false;
                 Layout(window, width, 900);

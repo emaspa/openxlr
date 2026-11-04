@@ -526,6 +526,8 @@ the mixer layout, not of a skin
 Options' **Text size** scales typography after the skin is applied. Normal
 (100%) uses the sizes listed here. Matrix rows also grow at the two larger
 sizes so a name and its binding line have room. The preference lives in `ui.json`.
+The headphone controls reserve room for translated labels and split the
+remaining fader width to the nearest display pixel.
 
 | Token | Kind | Default | Range | What it sets |
 |---|---|---|---|---|
