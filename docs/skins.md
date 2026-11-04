@@ -1586,7 +1586,9 @@ interface with two XLR inputs.
 Each column has a head: the mix's icon and name, an outputs line, a thin
 line in the mix's own colour when the layout editor gave it one, and a row
 of controls with the mix's master level, its mute and the button that opens
-its plugin chain. The outputs line says how many outputs ticked in MONITOR
+its plugin chain. While the master moves, and for a second after, the mix's
+volume shows at the right end of the name line, in the same chip a row head
+uses, drawn over the move handle so the head keeps its size. The outputs line says how many outputs ticked in MONITOR
 hear the mix, alone or summed with the other monitor mix. When none does it
 says what the mix is: a monitor mix with no output, a virtual microphone or
 the USB Aux port.
