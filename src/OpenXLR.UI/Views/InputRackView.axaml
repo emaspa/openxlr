@@ -60,9 +60,9 @@
                     ToolTip.Tip="{loc:Text Key=DragOntoAnotherChannelYouCanEdit}"/>
             <layout:StripPanel Spec="{Binding Spec}" Spacing="6">
               <!-- a grid, not a horizontal stack: the name gets what the icon leaves and trims, whatever the font -->
-              <Grid layout:StripPanel.Part="identity" ColumnDefinitions="Auto,*" ColumnSpacing="6">
+              <Grid layout:StripPanel.Part="identity" ColumnDefinitions="Auto,*">
                 <vm:LayoutIconBlock Icon="{Binding Channel.Appearance.Icon}" Fallback="{Binding Channel.Appearance.DefaultIcon}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
-                           IsVisible="{Binding ShowsIcon}" AutomationProperties.Name="{Binding Channel.Name}" ToolTip.Tip="{Binding Channel.Name}"/>
+                           IsVisible="{Binding ShowsIcon}" Margin="0,0,6,0" AutomationProperties.Name="{Binding Channel.Name}" ToolTip.Tip="{Binding Channel.Name}"/>
                 <TextBlock Grid.Column="1" Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
                            TextTrimming="CharacterEllipsis" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
               </Grid>
@@ -198,9 +198,9 @@
                     ToolTip.Tip="{loc:Text Key=DragOntoAnotherChannelYouCanEdit}"/>
             <layout:StripPanel Spec="{Binding Spec}" Spacing="6">
               <!-- a grid, not a horizontal stack: the name gets what the icon leaves and trims, whatever the font -->
-              <Grid layout:StripPanel.Part="identity" ColumnDefinitions="Auto,*" ColumnSpacing="6">
+              <Grid layout:StripPanel.Part="identity" ColumnDefinitions="Auto,*">
                 <vm:LayoutIconBlock Icon="{Binding Channel.Appearance.Icon}" Fallback="{Binding Channel.Appearance.DefaultIcon}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
-                           IsVisible="{Binding ShowsIcon}" AutomationProperties.Name="{Binding Channel.Name}" ToolTip.Tip="{Binding Channel.Name}"/>
+                           IsVisible="{Binding ShowsIcon}" Margin="0,0,6,0" AutomationProperties.Name="{Binding Channel.Name}" ToolTip.Tip="{Binding Channel.Name}"/>
                 <TextBlock Grid.Column="1" Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
                            TextTrimming="CharacterEllipsis" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
               </Grid>
@@ -321,9 +321,9 @@
                     ToolTip.Tip="{loc:Text Key=DragOntoAnotherChannelYouCanEdit}"/>
             <layout:StripPanel Spec="{Binding Spec}" Spacing="6">
               <!-- a grid, not a horizontal stack: the name gets what the icon leaves and trims, whatever the font -->
-              <Grid layout:StripPanel.Part="identity" ColumnDefinitions="Auto,*" ColumnSpacing="6">
+              <Grid layout:StripPanel.Part="identity" ColumnDefinitions="Auto,*">
                 <vm:LayoutIconBlock Icon="{Binding Channel.Appearance.Icon}" Fallback="{Binding Channel.Appearance.DefaultIcon}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
-                           IsVisible="{Binding ShowsIcon}" AutomationProperties.Name="{Binding Channel.Name}" ToolTip.Tip="{Binding Channel.Name}"/>
+                           IsVisible="{Binding ShowsIcon}" Margin="0,0,6,0" AutomationProperties.Name="{Binding Channel.Name}" ToolTip.Tip="{Binding Channel.Name}"/>
                 <TextBlock Grid.Column="1" Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
                            TextTrimming="CharacterEllipsis" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
               </Grid>
@@ -369,9 +369,9 @@
                     ToolTip.Tip="{loc:Text Key=DragOntoAnotherChannelYouCanEdit}"/>
             <layout:StripPanel Spec="{Binding Spec}" Spacing="6">
               <!-- a grid, not a horizontal stack: the name gets what the icon leaves and trims, whatever the font -->
-              <Grid layout:StripPanel.Part="identity" ColumnDefinitions="Auto,*" ColumnSpacing="6">
+              <Grid layout:StripPanel.Part="identity" ColumnDefinitions="Auto,*">
                 <vm:LayoutIconBlock Icon="{Binding Channel.Appearance.Icon}" Fallback="{Binding Channel.Appearance.DefaultIcon}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
-                           IsVisible="{Binding ShowsIcon}" AutomationProperties.Name="{Binding Channel.Name}" ToolTip.Tip="{Binding Channel.Name}"/>
+                           IsVisible="{Binding ShowsIcon}" Margin="0,0,6,0" AutomationProperties.Name="{Binding Channel.Name}" ToolTip.Tip="{Binding Channel.Name}"/>
                 <TextBlock Grid.Column="1" Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
                            TextTrimming="CharacterEllipsis" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
               </Grid>
@@ -418,9 +418,9 @@
                     ToolTip.Tip="{loc:Text Key=DragOntoAnotherChannelYouCanEdit}"/>
             <layout:StripPanel Spec="{Binding Spec}" Spacing="6">
               <StackPanel layout:StripPanel.Part="identity" Spacing="2">
-                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
+                <Grid ColumnDefinitions="Auto,*">
                   <vm:LayoutIconBlock Icon="{Binding Channel.Appearance.Icon}" Fallback="{Binding Channel.Appearance.DefaultIcon}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
-                             IsVisible="{Binding ShowsIcon}" AutomationProperties.Name="{Binding Channel.Name}" ToolTip.Tip="{Binding Channel.Name}"/>
+                             IsVisible="{Binding ShowsIcon}" Margin="0,0,6,0" AutomationProperties.Name="{Binding Channel.Name}" ToolTip.Tip="{Binding Channel.Name}"/>
                   <TextBlock Grid.Column="1" Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
                              TextTrimming="CharacterEllipsis" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
                 </Grid>
