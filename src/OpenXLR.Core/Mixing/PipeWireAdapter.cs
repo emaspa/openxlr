@@ -203,19 +203,28 @@ public sealed class PipeWireAdapter
             "/usr/local/lib/ladspa", "/usr/local/lib64/ladspa",
         ]);
 
-        // Debian multiarch puts LADSPA modules below paths such as
-        // /usr/lib/x86_64-linux-gnu/ladspa. Distribution packages normally set
-        // no LADSPA_PATH, so include those directories explicitly.
-        try
-        {
-            if (Directory.Exists("/usr/lib"))
-                foreach (string multiarch in Directory.EnumerateDirectories("/usr/lib", "*-linux-gnu"))
-                    result.Add(Path.Combine(multiarch, "ladspa"));
-        }
-        catch (IOException) { /* directory changed while enumerating */ }
-        catch (UnauthorizedAccessException) { /* unusual sandbox; standard paths remain */ }
+        result.AddRange(MultiarchLadspaDirectories.Value);
         return result;
     }
+
+    // Debian multiarch puts LADSPA modules below paths such as
+    // /usr/lib/x86_64-linux-gnu/ladspa. Distribution packages normally set
+    // no LADSPA_PATH, so include those directories explicitly. Listed once:
+    // every state snapshot asks whether ClipGuard is available, and /usr/lib
+    // holds thousands of entries on some distributions. A multiarch
+    // directory does not come and go while the daemon runs; the plugin file
+    // inside it is still looked for on every call.
+    private static readonly Lazy<string[]> MultiarchLadspaDirectories = new(() =>
+    {
+        try
+        {
+            return Directory.Exists("/usr/lib")
+                ? [.. Directory.EnumerateDirectories("/usr/lib", "*-linux-gnu").Select(multiarch => Path.Combine(multiarch, "ladspa"))]
+                : [];
+        }
+        catch (IOException) { return []; }                    // directory changed while enumerating
+        catch (UnauthorizedAccessException) { return []; }    // unusual sandbox; standard paths remain
+    });
 
     /// <summary>
     /// Unload leftover modules from a previous instance, identified by our

@@ -51,4 +51,33 @@ public sealed class DeviceRegistryTests
     [Fact]
     public void EveryAttachedUnitGetsItsOwnBackend()
         => Assert.Equal([0x007d, 0x007d, 0x0070], Pids([(0x0fd9, 0x0070), (0x0fd9, 0x007d), (0x0fd9, 0x007d)]));
+
+    [Fact]
+    public void TheSysfsScanReadsDevicesAndPassesOverInterfacesAndHubs()
+    {
+        string root = Directory.CreateTempSubdirectory("openxlr-sysfs-").FullName;
+        try
+        {
+            void Entry(string name, params (string File, string Text)[] files)
+            {
+                string dir = Directory.CreateDirectory(Path.Combine(root, name)).FullName;
+                foreach ((string file, string text) in files) File.WriteAllText(Path.Combine(dir, file), text);
+            }
+            Entry("1-4", ("idVendor", "0fd9\n"), ("idProduct", "00b4\n"), ("busnum", "1\n"), ("devnum", "7\n"), ("serial", "AB12\n"));
+            Entry("1-4:1.0");                                            // an interface: no idVendor at all
+            Entry("1-4:1.1", ("idVendor", "0fd9\n"), ("idProduct", "0070\n"), ("busnum", "1\n"), ("devnum", "7\n"));
+            Entry("usb1", ("idVendor", "1d6b\n"), ("idProduct", "0002\n"), ("busnum", "1\n"), ("devnum", "1\n"));
+            Entry("2-1", ("idVendor", "0fd9\n"), ("idProduct", "0070\n"), ("busnum", "2\n"), ("devnum", "3\n"));
+            Entry("2-2", ("idVendor", "zzzz\n"), ("idProduct", "0070\n"), ("busnum", "2\n"), ("devnum", "4\n"));
+            Entry("2-3", ("idVendor", "046d\n"), ("idProduct", "085e\n"), ("busnum", "2\n"), ("devnum", "5\n"));
+
+            var found = DeviceRegistry.EnumerateUsbLocations(root).ToArray();
+
+            Assert.Equal(
+                [((ushort)0x0fd9, (ushort)0x00b4, new OpenXLR.Core.UsbLocation(1, 7, "1-4", "AB12")),
+                 ((ushort)0x0fd9, (ushort)0x0070, new OpenXLR.Core.UsbLocation(2, 3, "2-1", null))],
+                found);
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
 }

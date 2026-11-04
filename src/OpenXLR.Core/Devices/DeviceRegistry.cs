@@ -36,7 +36,7 @@ public static class DeviceRegistry
     /// <summary>Every supported device currently attached, in the table's order.</summary>
     public static IReadOnlyList<IAudioDevice> DetectAll()
     {
-        var attached = EnumerateUsbLocations().ToArray();
+        var attached = EnumerateUsbLocations(SysfsRoot).ToArray();
         var duplicateSerials = attached.Where(a => !string.IsNullOrEmpty(a.Location.Serial))
             .GroupBy(a => (a.Vid, a.Pid, a.Location.Serial)).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet();
         attached = [.. attached.Select(a => duplicateSerials.Contains((a.Vid, a.Pid, a.Location.Serial))
@@ -72,19 +72,29 @@ public static class DeviceRegistry
         return all[0];
     }
 
-    private static IEnumerable<(ushort Vid, ushort Pid, UsbLocation Location)> EnumerateUsbLocations()
+    private const string SysfsRoot = "/sys/bus/usb/devices";
+
+    /// <summary>
+    /// The supported units under a sysfs USB device directory. The daemon
+    /// scans it ten times a second, so entries that cannot be a unit are
+    /// passed over by name before any file is opened: an interface
+    /// ("1-4:1.0") has no idVendor, and asking for it raised and caught an
+    /// exception per interface per scan.
+    /// </summary>
+    internal static IEnumerable<(ushort Vid, ushort Pid, UsbLocation Location)> EnumerateUsbLocations(string root)
     {
-        const string root = "/sys/bus/usb/devices";
         if (!Directory.Exists(root)) yield break;
         foreach (string dir in Directory.EnumerateDirectories(root).Order(StringComparer.Ordinal))
         {
+            string name = Path.GetFileName(dir);
+            if (name.Contains(':') || name.StartsWith("usb", StringComparison.Ordinal)) continue;   // an interface, or a root hub
             ushort vid, pid;
             byte bus, address;
             string? serial;
             try
             {
-                vid = Convert.ToUInt16(File.ReadAllText(Path.Combine(dir, "idVendor")).Trim(), 16);
-                pid = Convert.ToUInt16(File.ReadAllText(Path.Combine(dir, "idProduct")).Trim(), 16);
+                string vendorPath = Path.Combine(dir, "idVendor");
+                if (!File.Exists(vendorPath) || !TryReadHexId(vendorPath, out vid) || !TryReadHexId(Path.Combine(dir, "idProduct"), out pid)) continue;
                 if (!Factories.Any(f => f.Key == new Key(vid, pid))) continue;
                 bus = byte.Parse(File.ReadAllText(Path.Combine(dir, "busnum")).Trim(), System.Globalization.CultureInfo.InvariantCulture);
                 address = byte.Parse(File.ReadAllText(Path.Combine(dir, "devnum")).Trim(), System.Globalization.CultureInfo.InvariantCulture);
@@ -94,7 +104,23 @@ public static class DeviceRegistry
             }
             catch (Exception ex) when (ex is FormatException or OverflowException or IOException or UnauthorizedAccessException) { continue; }
             if (bus == 0 || address == 0) continue;
-            yield return (vid, pid, new UsbLocation(bus, address, Path.GetFileName(dir), serial));
+            yield return (vid, pid, new UsbLocation(bus, address, name, serial));
         }
+    }
+
+    /// <summary>
+    /// A four-digit hex id file such as idVendor ("0fd9\n"), read into a
+    /// stack buffer: every attached device is read twice per scan, and
+    /// File.ReadAllText allocated a stream and its buffers each time.
+    /// </summary>
+    private static bool TryReadHexId(string path, out ushort id)
+    {
+        id = 0;
+        Span<byte> buffer = stackalloc byte[16];
+        int read;
+        using (Microsoft.Win32.SafeHandles.SafeFileHandle handle = File.OpenHandle(path))
+            read = RandomAccess.Read(handle, buffer, 0);
+        ReadOnlySpan<byte> text = buffer[..read].Trim("\n "u8);
+        return System.Buffers.Text.Utf8Parser.TryParse(text, out id, out int used, 'x') && used == text.Length && text.Length > 0;
     }
 }

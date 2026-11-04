@@ -108,6 +108,30 @@ public sealed class StreamLifecycleTests
         Assert.False(graph.Mixer.SyncStreams());
     }
 
+    [Theory]
+    [InlineData("Steam", "Steam Voice Settings")]
+    [InlineData("Steam Voice Settings", "Steam")]
+    public void AnAppWithSeveralClientsSettlesOnOneLabel(string first, string second)
+    {
+        // Steam registers "Steam" and "Steam Voice Settings" under one
+        // identity. Neither order may swap the label on every sweep: each
+        // swap was a state change, and a full state went to every client
+        // once a second.
+        using var graph = new Graph();
+        string Client(int id, string name) => $$$$"""
+            {"id":{{{{id}}}},"type":"PipeWire:Interface:Client","info":{"props":{
+                "application.process.binary":"steam","application.name":{{{{JsonSerializer.Serialize(name)}}}}
+            }}}
+            """;
+        File.WriteAllText(Path.Combine(graph.Folder, "graph.json"), "[" + Client(20, first) + "," + Client(21, second) + "]");
+        graph.Retire();
+
+        Assert.True(graph.Mixer.SyncStreams());
+        Assert.Equal("Steam", Assert.Single(graph.Mixer.Snapshot().Streams).Label);
+        Assert.False(graph.Mixer.SyncStreams());
+        Assert.False(graph.Mixer.SyncStreams());
+    }
+
     [Fact]
     public void AnAppCarriesTheIconItsDesktopEntryNamesAndKeepsItOnceGone()
     {
