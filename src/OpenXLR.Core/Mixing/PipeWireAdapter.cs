@@ -86,7 +86,7 @@ public sealed class PipeWireAdapter
             {
                 if (ReferenceEquals(owner._graph, graph)) owner._graph = null;
                 owner._dumpObjects = null;
-                owner._defaults = null;
+                owner._defaultsRevision = -1;
                 owner._portSnapshot = null;
                 owner._inputPorts = owner._outputPorts = null;
             }
@@ -871,14 +871,14 @@ public sealed class PipeWireAdapter
     public void SetDefaultSource(string sourceName)
     {
         Run("pactl", "set-default-source", sourceName);
-        lock (DumpGate) _defaults = null;
+        lock (DumpGate) _defaultsRevision = -1;
     }
 
     /// <summary>The playback device applications use by default.</summary>
     public void SetDefaultSink(string sinkName)
     {
         Run("pactl", "set-default-sink", sinkName);
-        lock (DumpGate) _defaults = null;
+        lock (DumpGate) _defaultsRevision = -1;
     }
 
     /// <summary>Current default playback device, or null.</summary>
@@ -2773,17 +2773,20 @@ public sealed class PipeWireAdapter
         }
     }
 
-    private static JsonElement? FindSink(IEnumerable<JsonElement> objects, string name)
+    private static JsonElement? FindSink(JsonElement[] objects, string name)
     {
         foreach (JsonElement item in objects)
-            if (item.TryGetProperty("type", out var type) && type.GetString() == "PipeWire:Interface:Node"
+            if (item.TryGetProperty("type", out var type) && IsString(type, "PipeWire:Interface:Node")
                 && item.TryGetProperty("info", out var info) && info.ValueKind == JsonValueKind.Object
-                && info.TryGetProperty("props", out var props)
-                && props.TryGetProperty("media.class", out var kind) && kind.GetString() == "Audio/Sink"
-                && props.TryGetProperty("node.name", out var node) && node.GetString() == name)
+                && info.TryGetProperty("props", out var props) && props.ValueKind == JsonValueKind.Object
+                && props.TryGetProperty("media.class", out var kind) && IsString(kind, "Audio/Sink")
+                && props.TryGetProperty("node.name", out var node) && IsString(node, name))
                 return info;
         return null;
     }
+
+    private static bool IsString(JsonElement value, string expected)
+        => value.ValueKind == JsonValueKind.String && value.ValueEquals(expected);
 
     private (string? Sink, string? Source)? _defaults;
     private long _defaultsRevision = -1, _defaultsAt;
@@ -2794,8 +2797,12 @@ public sealed class PipeWireAdapter
         {
             if (_graph is null || !_graph.IsReady) return null;
             long revision = _graph.DefaultRevision;
-            if (_defaults is not null && _defaultsRevision == revision && Environment.TickCount64 - _defaultsAt < 30000)
+            // When the paired query fails, direct queries still read current
+            // defaults. Give the paired query a short break between attempts.
+            int refreshMs = _defaults is null ? 5000 : 30000;
+            if (_defaultsRevision == revision && Environment.TickCount64 - _defaultsAt < refreshMs)
                 return _defaults;
+            _defaults = null;
             try
             {
                 // pw-dump emits metadata deltas, but deletes omit the deleted
@@ -2807,11 +2814,14 @@ public sealed class PipeWireAdapter
                     || !root.TryGetProperty("default_source_name", out var source) || source.ValueKind != JsonValueKind.String)
                     return null;
                 _defaults = (sink.GetString(), source.GetString());
-                _defaultsRevision = revision;
-                _defaultsAt = Environment.TickCount64;
                 return _defaults;
             }
             catch (Exception ex) when (ex is InvalidOperationException or JsonException) { return null; }
+            finally
+            {
+                _defaultsRevision = revision;
+                _defaultsAt = Environment.TickCount64;
+            }
         }
     }
 

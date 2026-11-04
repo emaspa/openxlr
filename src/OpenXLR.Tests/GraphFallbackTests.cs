@@ -1,12 +1,51 @@
 using OpenXLR.Core.Mixing;
+using Xunit.Abstractions;
 
 namespace OpenXLR.Tests;
 
 [Collection("xdg-config")]
-public sealed class GraphFallbackTests
+public sealed class GraphFallbackTests(ITestOutputHelper output)
 {
     [Fact]
-    public void RepeatedPortReadsDoNotRebuildTheWholeIdleGraph()
+    public void FailedPairedDefaultsAreBackedOffWhileDirectReadsStayFresh()
+    {
+        string directory = Directory.CreateTempSubdirectory("openxlr-default-backoff-").FullName;
+        string? path = Environment.GetEnvironmentVariable("PATH");
+        try
+        {
+            ExecutableScript.Write(Path.Combine(directory, "pw-dump"), """
+                echo '[{"id":0,"type":"PipeWire:Interface:Core"}]'
+                exec /bin/sleep 60
+                """);
+            ExecutableScript.Write(Path.Combine(directory, "pactl"), """
+                dir=${0%/*}
+                case "$1" in
+                    --format=json) echo attempt >> "$dir/info-calls"; echo '{}';;
+                    get-default-sink) /bin/cat "$dir/sink";;
+                    get-default-source) echo mic;;
+                    *) exit 1;;
+                esac
+                """);
+            string sink = Path.Combine(directory, "sink");
+            File.WriteAllText(sink, "desk");
+            Environment.SetEnvironmentVariable("PATH", directory);
+            var adapter = new PipeWireAdapter();
+            using var watch = adapter.WatchGraph();
+            Assert.Equal("desk", adapter.GetDefaultSink());
+            Assert.Equal("mic", adapter.GetDefaultSource());
+            File.WriteAllText(sink, "headphones");
+            Assert.Equal("headphones", adapter.GetDefaultSink());
+            Assert.Single(File.ReadAllLines(Path.Combine(directory, "info-calls")));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PATH", path);
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
+    public void RepeatedRegistryReadsDoNotAllocateForUnrelatedObjects()
     {
         string directory = Directory.CreateTempSubdirectory("openxlr-port-cost-").FullName;
         string? path = Environment.GetEnvironmentVariable("PATH");
@@ -16,7 +55,7 @@ public sealed class GraphFallbackTests
             for (int i = 1; i <= 100; i++)
             {
                 objects.Add(new { id = i, type = "PipeWire:Interface:Node",
-                    info = new { props = new Dictionary<string, object> { ["node.name"] = $"node{i}" } } });
+                    info = new { props = new Dictionary<string, object> { ["node.name"] = $"node{i}", ["media.class"] = "Audio/Sink" } } });
                 for (int port = 0; port < 10; port++)
                     objects.Add(new { id = 100 + i * 10 + port, type = "PipeWire:Interface:Port",
                         info = new { direction = "output", props = new Dictionary<string, object>
@@ -37,15 +76,21 @@ public sealed class GraphFallbackTests
                 {
                     for (int i = 0; i < 10; i++) adapter.ListPorts("node1", "capture", output: true);
                     long before = GC.GetAllocatedBytesForCurrentThread();
-                    for (int i = 0; i < 100; i++) adapter.ListPorts("node1", "capture", output: true);
+                    for (int i = 0; i < 100; i++)
+                    {
+                        adapter.ListPorts("node1", "capture", output: true);
+                        adapter.SinkExists("node100");
+                    }
                     long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
-                    Assert.True(allocated < 500_000, $"100 idle port reads allocated {allocated} bytes.");
+                    output.WriteLine($"100 paired port and sink lookups allocated {allocated:N0} bytes.");
+                    Assert.True(allocated < 500_000, $"100 paired port and sink lookups allocated {allocated:N0} bytes.");
                 }
                 catch (Exception ex) { failure = ex; }
             }) { IsBackground = true };
             probe.Start();
             Assert.True(probe.Join(TimeSpan.FromSeconds(10)), "Port allocation probe hung.");
             if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+            Assert.True(adapter.SinkExists("node100"));
             Assert.Equal(10, adapter.ListPorts("node1", "capture", output: true).Count);
             Assert.Empty(adapter.ListPorts("node1", "capture", output: false));
         }
