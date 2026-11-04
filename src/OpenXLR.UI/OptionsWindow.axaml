@@ -168,8 +168,8 @@
         <TextBlock Text="{loc:Text Key=WhenSetOpenXLRHoldsTheseAsTheSystem}"
                    FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
 
-        <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,8,Auto">
-          <TextBlock Text="{loc:Text Key=DefaultOutput}" Classes="h" VerticalAlignment="Center"/>
+        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,8,Auto">
+          <TextBlock Text="{loc:Text Key=DefaultOutput}" Classes="h" MinWidth="110" VerticalAlignment="Center"/>
           <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
                     ItemsSource="{Binding OutputChoices}"
                     SelectedItem="{Binding EnforcedOutput, Mode=TwoWay}">
@@ -180,7 +180,7 @@
             </ComboBox.ItemTemplate>
           </ComboBox>
 
-          <TextBlock Grid.Row="2" Text="{loc:Text Key=DefaultInput}" Classes="h" VerticalAlignment="Center"/>
+          <TextBlock Grid.Row="2" Text="{loc:Text Key=DefaultInput}" Classes="h" MinWidth="110" VerticalAlignment="Center"/>
           <ComboBox Grid.Row="2" Grid.Column="1" HorizontalAlignment="Stretch"
                     ItemsSource="{Binding InputChoices}"
                     SelectedItem="{Binding EnforcedInput, Mode=TwoWay}">
@@ -359,8 +359,8 @@
           </ComboBox>
         </Grid>
         <TextBlock Text="{loc:Text Key=TouchGivesTheMixerSButtonsFaders}" FontSize="{DynamicResource UiText.FontSize11}" Classes="hint" TextWrapping="Wrap"/>
-        <Grid ColumnDefinitions="110,*">
-          <TextBlock Text="{loc:Text Key=MixerView}" Classes="h" VerticalAlignment="Center"/>
+        <Grid ColumnDefinitions="Auto,*">
+          <TextBlock Text="{loc:Text Key=MixerView}" Classes="h" MinWidth="110" VerticalAlignment="Center"/>
           <ComboBox Name="MixerViewPicker" Grid.Column="1" HorizontalAlignment="Stretch"
                     ItemsSource="{Binding MixerViewChoices}"
                     SelectedItem="{Binding SelectedMixerView, Mode=TwoWay}" AutomationProperties.Name="{loc:Text Key=MixerView}">

@@ -707,7 +707,12 @@ public sealed class WindowLayoutTests
             Assert.Equal(normal.Button * scale, desktopKeys.FontSize, 0.01);
             Assert.Equal(normal.AppName * scale, appName.FontSize, 0.01);
             AssertInside(action, main);
-            if (percent == 120) MainWindowLabelTests.Check(main);
+            if (percent == 120)
+            {
+                MainWindowLabelTests.Check(main);
+                MainWindowLabelTests.CheckAutoColumnTranslations(main, "XLR1Gain", "XLR2Gain", "Devices", "Volume", "USBAuxIn", "MicPC");
+                MainWindowLabelTests.CheckAutoColumnTranslations(options, "DefaultOutput", "DefaultInput", "MixerView");
+            }
             if (percent is 80 or 120)
             {
                 Capture(main, $"text-size-main-{percent}");

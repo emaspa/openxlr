@@ -231,8 +231,8 @@ public partial class MainWindow : Window
         ToolTip.SetTip(OutputVolumeSlider, toolbar ? Localizer.Text("Volume") : null);
         MonitorControls.ColumnDefinitions = new((toolbar, stacked) switch
         {
-            (false, false) => "90,*,20,90,*,64",
-            (false, true) => "90,*,64",
+            (false, false) => "Auto,*,20,Auto,*,64",
+            (false, true) => "Auto,*,64",
             (true, false) => "*,12,*,64",
             (true, true) => "*,64",
         });

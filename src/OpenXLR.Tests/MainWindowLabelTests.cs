@@ -127,6 +127,33 @@ internal static class MainWindowLabelTests
         Assert.True(failures.Count == 0, string.Join("\n", failures.Distinct()));
     }
 
+    /// <summary>Lay out automatic columns with the widest shipped translation in the active font.</summary>
+    internal static void CheckAutoColumnTranslations(Window window, params string[] keys)
+    {
+        var originals = new List<(TextBlock Block, string Text)>();
+        try
+        {
+            foreach (string key in keys)
+            foreach (TextBlock block in window.GetVisualDescendants().OfType<TextBlock>()
+                .Where(block => block.IsEffectivelyVisible && block.Text == Localizer.Text(key)))
+            {
+                if (block.Parent is not Grid grid || !grid.ColumnDefinitions[Grid.GetColumn(block)].Width.IsAuto) continue;
+                originals.Add((block, block.Text!));
+                string widest = Localizer.Languages.Select(language => Localizer.Get(key, CultureInfo.GetCultureInfo(language.Id!)))
+                    .MaxBy(text => TextWidth(block, text))!;
+                block.SetCurrentValue(TextBlock.TextProperty, widest);
+            }
+            Assert.NotEmpty(originals);
+            window.UpdateLayout();
+            CheckFixedColumnLabels(window, [.. originals.Select(entry => entry.Block.Text!)]);
+        }
+        finally
+        {
+            foreach (var (block, text) in originals) block.SetCurrentValue(TextBlock.TextProperty, text);
+            window.UpdateLayout();
+        }
+    }
+
     private static double TextWidth(TextBlock text) => TextWidth(text, text.Text ?? "");
 
     private static double TextWidth(TextBlock text, string value)

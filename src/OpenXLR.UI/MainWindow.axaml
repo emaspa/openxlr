@@ -397,9 +397,9 @@
           </Grid>
           <!-- an additional interface's input while XLR 1 is bound to it:
                the controls the additional interfaces window draws for it -->
-          <Grid Name="Xlr1ExtraUnit" Grid.Row="1" ColumnDefinitions="90,*"
+          <Grid Name="Xlr1ExtraUnit" Grid.Row="1" ColumnDefinitions="Auto,*"
                 IsVisible="{Binding Xlr1Strip.CarriesExtraUnit, FallbackValue=False}">
-            <TextBlock Text="{loc:Text Key=UnitInputGain}" Classes="h" VerticalAlignment="Top" Margin="0,6,0,0"/>
+            <TextBlock Text="{loc:Text Key=UnitInputGain}" Classes="h" MinWidth="90" VerticalAlignment="Top" Margin="0,6,0,0"/>
             <views:WaveUnitControls Grid.Column="1" DataContext="{Binding Xlr1Strip.ExtraUnitInput}"/>
           </Grid>
           <StackPanel Name="Input1Block" Grid.Row="{Binding UnitInput1.BlockRow}" Spacing="4">
@@ -412,8 +412,8 @@
                             AutomationProperties.Name="{Binding UnitInput1.Heading}"/>
             </Grid>
             <StackPanel Spacing="4" IsVisible="{Binding UnitInput1.ControlsShown}">
-              <Grid ColumnDefinitions="90,*,64,Auto">
-                <TextBlock Text="{Binding UnitInput1.GainLabel}" Classes="h" VerticalAlignment="Center"/>
+              <Grid ColumnDefinitions="Auto,*,64,Auto">
+                <TextBlock Text="{Binding UnitInput1.GainLabel}" Classes="h" MinWidth="90" VerticalAlignment="Center"/>
                 <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="{Binding GainMaxDb}"
                         Value="{Binding GainDb, Mode=TwoWay}" IsEnabled="{Binding !GainLocked}"
                         AutomationProperties.Name="{Binding UnitInput1.GainName}"/>
@@ -436,8 +436,8 @@
                 <ToggleButton Content="{loc:Text Key=Compressor}" IsChecked="{Binding Compressor, Mode=TwoWay}"
                               IsVisible="{Binding CapCompressor}"/>
               </WrapPanel>
-              <Grid ColumnDefinitions="90,*,64" IsVisible="{Binding VoiceTune}">
-                <TextBlock Text="{loc:Text Key=VTStrength}" Classes="h" VerticalAlignment="Center"/>
+              <Grid ColumnDefinitions="Auto,*,64" IsVisible="{Binding VoiceTune}">
+                <TextBlock Text="{loc:Text Key=VTStrength}" Classes="h" MinWidth="90" VerticalAlignment="Center"/>
                 <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="100"
                         Value="{Binding VoiceTuneStrength, Mode=TwoWay}"/>
                 <TextBlock Grid.Column="2" Text="{Binding VoiceTuneStrengthText}" Classes="val"
@@ -558,9 +558,9 @@
           </Grid>
           <!-- an additional interface's input while XLR 2 is bound to it:
                the controls the additional interfaces window draws for it -->
-          <Grid Name="Xlr2ExtraUnit" Grid.Row="1" ColumnDefinitions="90,*"
+          <Grid Name="Xlr2ExtraUnit" Grid.Row="1" ColumnDefinitions="Auto,*"
                 IsVisible="{Binding Xlr2Strip.CarriesExtraUnit, FallbackValue=False}">
-            <TextBlock Text="{loc:Text Key=UnitInputGain}" Classes="h" VerticalAlignment="Top" Margin="0,6,0,0"/>
+            <TextBlock Text="{loc:Text Key=UnitInputGain}" Classes="h" MinWidth="90" VerticalAlignment="Top" Margin="0,6,0,0"/>
             <views:WaveUnitControls Grid.Column="1" DataContext="{Binding Xlr2Strip.ExtraUnitInput}"/>
           </Grid>
           <StackPanel Name="Input2Block" Grid.Row="{Binding UnitInput2.BlockRow}" Spacing="4" IsVisible="{Binding HasXlr2}">
@@ -573,8 +573,8 @@
                             AutomationProperties.Name="{Binding UnitInput2.Heading}"/>
             </Grid>
             <StackPanel Spacing="4" IsVisible="{Binding UnitInput2.ControlsShown}">
-              <Grid ColumnDefinitions="90,*,64">
-                <TextBlock Text="{Binding UnitInput2.GainLabel}" Classes="h" VerticalAlignment="Center"/>
+              <Grid ColumnDefinitions="Auto,*,64">
+                <TextBlock Text="{Binding UnitInput2.GainLabel}" Classes="h" MinWidth="90" VerticalAlignment="Center"/>
                 <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="{Binding GainMaxDb}"
                         Value="{Binding Gain2Db, Mode=TwoWay}" IsEnabled="{Binding !GainLocked}"
                         AutomationProperties.Name="{Binding UnitInput2.GainName}"/>
@@ -592,8 +592,8 @@
                 <ToggleButton Content="{loc:Text Key=ClipGuard}" IsChecked="{Binding ClipGuard2, Mode=TwoWay}"/>
                 <ToggleButton Content="{loc:Text Key=Compressor}" IsChecked="{Binding Compressor2, Mode=TwoWay}"/>
               </WrapPanel>
-              <Grid ColumnDefinitions="90,*,64" IsVisible="{Binding VoiceTune2}">
-                <TextBlock Text="{loc:Text Key=VTStrength}" Classes="h" VerticalAlignment="Center"/>
+              <Grid ColumnDefinitions="Auto,*,64" IsVisible="{Binding VoiceTune2}">
+                <TextBlock Text="{loc:Text Key=VTStrength}" Classes="h" MinWidth="90" VerticalAlignment="Center"/>
                 <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="100"
                         Value="{Binding VoiceTuneStrength2, Mode=TwoWay}"/>
                 <TextBlock Grid.Column="2" Text="{Binding VoiceTuneStrength2Text}" Classes="val"
@@ -659,8 +659,8 @@
         </Grid>
         <!-- the Wave XLR Pro's analog Line In, an input of its own; its readout shows Line In's
              volume while that fader moves and for a second after -->
-        <Grid Name="LineInRow" ColumnDefinitions="90,*,64,20,110" Margin="0,2,0,0" IsVisible="{Binding ShowLineInRow}">
-          <TextBlock Text="{loc:Text Key=LineIn}" Classes="h" VerticalAlignment="Center"/>
+        <Grid Name="LineInRow" ColumnDefinitions="Auto,*,64,20,110" Margin="0,2,0,0" IsVisible="{Binding ShowLineInRow}">
+          <TextBlock Text="{loc:Text Key=LineIn}" Classes="h" MinWidth="90" VerticalAlignment="Center"/>
           <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="{Binding LineInGainMaxDb}"
                   Value="{Binding LineInGainSliderDb, Mode=TwoWay}" AutomationProperties.Name="{loc:Text Key=LineInGain}"/>
           <TextBlock Grid.Column="2" Name="LineInReadout" Text="{Binding LineInReadout}" Classes="val" VerticalAlignment="Center"
@@ -720,16 +720,16 @@
                            TextWrapping="Wrap" IsVisible="{Binding HasBindingWarning}"/>
                 <!-- the source's own gain, on a source OpenXLR does not drive; its readout shows the
                      channel's volume while that fader moves and for a second after -->
-                <Grid Name="CaptureGainRow" ColumnDefinitions="90,*,Auto,64" IsVisible="{Binding ShowsCaptureGain}">
-                  <TextBlock Text="{loc:Text Key=UnitInputGain}" Classes="h" VerticalAlignment="Center"/>
+                <Grid Name="CaptureGainRow" ColumnDefinitions="Auto,*,Auto,64" IsVisible="{Binding ShowsCaptureGain}">
+                  <TextBlock Text="{loc:Text Key=UnitInputGain}" Classes="h" MinWidth="90" VerticalAlignment="Center"/>
                   <Slider Grid.Column="1" vm:FaderInput.Step="1" Minimum="{Binding CaptureGainMinDb}" Maximum="{Binding CaptureGainMaxDb}"
                           Value="{Binding CaptureGainDb, Mode=TwoWay}"
                           AutomationProperties.Name="{Binding CaptureGainName}" ToolTip.Tip="{Binding CaptureGainTip}"/>
                   <TextBlock Grid.Column="3" Name="CaptureGainReadout" Text="{Binding Readout}" Classes="val" VerticalAlignment="Center"
                              HorizontalAlignment="Right" AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
                 </Grid>
-                <Grid ColumnDefinitions="90,*,Auto,64" IsVisible="{Binding HasVolume}">
-                  <TextBlock Text="{loc:Text Key=Volume}" Classes="h" VerticalAlignment="Center"/>
+                <Grid ColumnDefinitions="Auto,*,Auto,64" IsVisible="{Binding HasVolume}">
+                  <TextBlock Text="{loc:Text Key=Volume}" Classes="h" MinWidth="90" VerticalAlignment="Center"/>
                   <Slider Grid.Column="1" vm:FaderInput.Step="0.01" Minimum="0" Maximum="1" Value="{Binding Volume, Mode=TwoWay}"
                           vm:FaderInput.IsAdjusting="{Binding VolumeAdjusting, Mode=OneWayToSource}"
                           AutomationProperties.Name="{Binding Name, StringFormat={loc:Text Key=ChannelVolumeName}}" ToolTip.Tip="{Binding VolumeTip}"/>
@@ -740,8 +740,8 @@
                 </Grid>
                 <StackPanel Name="CaptureExtraUnit" Spacing="4" IsVisible="{Binding CarriesExtraUnit}">
                   <TextBlock Text="{Binding ExtraUnitInput.Unit.Name}" Classes="h" TextWrapping="Wrap"/>
-                  <Grid ColumnDefinitions="90,*">
-                    <TextBlock Text="{loc:Text Key=UnitInputGain}" Classes="h" VerticalAlignment="Top" Margin="0,6,0,0"/>
+                  <Grid ColumnDefinitions="Auto,*">
+                    <TextBlock Text="{loc:Text Key=UnitInputGain}" Classes="h" MinWidth="90" VerticalAlignment="Top" Margin="0,6,0,0"/>
                     <views:WaveUnitControls Grid.Column="1" DataContext="{Binding ExtraUnitInput}"/>
                   </Grid>
                 </StackPanel>
@@ -798,8 +798,8 @@
         </Grid>
         <!-- hardware zero-latency blend between mic direct and PC playback;
              the value column can grow for larger text and translated readouts -->
-        <Grid ColumnDefinitions="90,*,Auto" IsVisible="{Binding CapCrossfade}">
-          <TextBlock Text="{loc:Text Key=MicPC}" Classes="h" VerticalAlignment="Center"
+        <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding CapCrossfade}">
+          <TextBlock Text="{loc:Text Key=MicPC}" Classes="h" MinWidth="90" VerticalAlignment="Center"
                      ToolTip.Tip="{loc:Text Key=DirectMonitorBlendLeftOnlyYourMicRight}"/>
           <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="200"
                   Value="{Binding Crossfade, Mode=TwoWay}"/>
@@ -845,8 +845,8 @@
       <StackPanel Classes="dev" Spacing="4">
         <TextBlock Name="MonitorMicrophonePausePendingNote" Text="{loc:Text Key=MicrophonePausePendingNote}"
                    Classes="warn" TextWrapping="Wrap" IsVisible="{Binding MicrophonePausePending}"/>
-        <Grid Name="MonitorControls" ColumnDefinitions="90,*,20,90,*,64" SizeChanged="OnMonitorSizeChanged">
-          <TextBlock Name="MonitorDevicesLabel" Text="{loc:Text Key=Devices}" Classes="h" VerticalAlignment="Center"/>
+        <Grid Name="MonitorControls" ColumnDefinitions="Auto,*,20,Auto,*,64" SizeChanged="OnMonitorSizeChanged">
+          <TextBlock Name="MonitorDevicesLabel" Text="{loc:Text Key=Devices}" Classes="h" MinWidth="90" VerticalAlignment="Center"/>
           <DropDownButton Name="MonitorDestination" Grid.Column="1" HorizontalAlignment="Stretch"
                           HorizontalContentAlignment="Left" AutomationProperties.Name="{loc:Text Key=Devices}"
                           Content="{Binding MonitorSummary}" ToolTip.Tip="{Binding MonitorSummary}">
@@ -905,7 +905,7 @@
             </DropDownButton.Flyout>
           </DropDownButton>
 
-          <TextBlock Name="MonitorVolumeLabel" Grid.Column="3" Text="{loc:Text Key=Volume}" Classes="h" VerticalAlignment="Center"/>
+          <TextBlock Name="MonitorVolumeLabel" Grid.Column="3" Text="{loc:Text Key=Volume}" Classes="h" MinWidth="90" VerticalAlignment="Center"/>
           <Slider vm:FaderInput.Step="0.01" Name="OutputVolumeSlider" Grid.Column="4" Minimum="0" Maximum="{Binding OutputVolumeRange.Maximum}" Value="{Binding OutputVolume, Mode=TwoWay}"
                   AutomationProperties.Name="{loc:Text Key=Volume}"/>
           <TextBlock Name="MonitorVolumeReadout" Grid.Column="5" Text="{Binding OutputVolumeText}" Classes="val"
