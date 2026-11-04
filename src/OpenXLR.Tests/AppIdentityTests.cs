@@ -241,6 +241,85 @@ public sealed class AppIdentityTests
         Assert.Equal(label, new AudioStream(1, appName, binary, null).Label);
     }
 
+    /// <summary>
+    /// The program behind an ALSA plugin's wrapper name. Anything that is
+    /// not a complete wrapper around a name stays as it was.
+    /// </summary>
+    [Theory]
+    [InlineData("PipeWire ALSA [kded6]", "kded6")]
+    [InlineData("  PipeWire ALSA [kded6]  ", "kded6")]
+    [InlineData("PipeWire ALSA[kded6]", "kded6")]
+    [InlineData("PipeWire ALSA [ speaker-test ]", "speaker-test")]
+    [InlineData("PipeWire ALSA [foo [bar]]", "foo [bar]")]
+    [InlineData("ALSA plug-in [aplay]", "aplay")]
+    [InlineData("PipeWire ALSA []", "PipeWire ALSA []")]
+    [InlineData("PipeWire ALSA [  ]", "PipeWire ALSA [  ]")]
+    [InlineData("PipeWire ALSA [kded6", "PipeWire ALSA [kded6")]
+    [InlineData("PipeWire ALSA [kded6] extra", "PipeWire ALSA [kded6] extra")]
+    [InlineData("PipeWire ALSA", "PipeWire ALSA")]
+    [InlineData("PipeWire ALSA kded6", "PipeWire ALSA kded6")]
+    [InlineData("pipewire alsa [kded6]", "pipewire alsa [kded6]")]
+    [InlineData("Firefox", "Firefox")]
+    [InlineData("", "")]
+    public void AnAlsaClientIsNamedAfterTheProgramInside(string name, string program)
+    {
+        Assert.Equal(program, AudioStream.ProgramName(name));
+        Assert.Null(AudioStream.ProgramName(null));
+    }
+
+    // Reduced from the live desk: kded6 plays through pipewire-alsa. The
+    // node carries only the wrapper name, the client the process binary.
+    private static byte[] AlsaGraph(bool clientKnown = true) => Encoding.UTF8.GetBytes($$$$"""
+        [
+          {"id":629,"type":"PipeWire:Interface:Client","info":{"props":{
+            "application.name":"PipeWire ALSA [kded6]","application.process.binary":"kded6",
+            "media.name":"ALSA Playback","node.name":"alsa_playback.kded6"
+          }}},
+          {"id":630,"type":"PipeWire:Interface:Client","info":{"props":{
+            "application.name":"PipeWire ALSA [recorder]","application.process.binary":"recorder",
+            "media.name":"ALSA Capture","node.name":"alsa_capture.recorder"
+          }}},
+          {"id":791,"type":"PipeWire:Interface:Node","info":{"props":{
+            "application.name":"PipeWire ALSA [kded6]","client.id":{{{{(clientKnown ? 629 : 999)}}}},
+            "media.class":"Stream/Output/Audio","media.name":"ALSA Playback",
+            "node.name":"alsa_playback.kded6","object.serial":5001
+          }}}
+        ]
+        """);
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AnAlsaClientReadsAsItsProgramUnderOneIdentity(bool clientKnown)
+    {
+        var (streams, clients) = PipeWireAdapter.ListApplications(AlsaGraph(clientKnown));
+        AudioStream stream = Assert.Single(streams);
+        Assert.Equal(("kded6", "kded6", "kded6"), (stream.AppName, stream.Identity, stream.Label));
+        // kded6 is a desktop service, left out of the running list; the
+        // recording program behind the capture side is listed by its name.
+        AudioStream recorder = Assert.Single(clients);
+        Assert.Equal(("recorder", "recorder"), (recorder.Identity, recorder.Label));
+    }
+
+    [Fact]
+    public void ASavedAssignmentForAnAlsaClientStillApplies()
+    {
+        AudioStream stream = Assert.Single(PipeWireAdapter.ListStreams(AlsaGraph()));
+        AudioStream bare = Assert.Single(PipeWireAdapter.ListStreams(AlsaGraph(clientKnown: false)));
+        // Keyed by the process binary, as it always was.
+        var matcher = new StreamMatcher();
+        matcher.SetOverride("kded6", "music");
+        Assert.Equal("music", matcher.Match(stream));
+        Assert.Equal("music", matcher.Match(bare));
+        // Keyed by the wrapper name, as a client without its binary was.
+        var migrated = StreamMatcher.MigrateOverrides(new Dictionary<string, string> { ["PipeWire ALSA [kded6]"] = "music" });
+        Assert.Equal("kded6", Assert.Single(migrated).Key);
+        var legacy = new StreamMatcher();
+        foreach ((string identity, string channel) in migrated) legacy.SetOverride(identity, channel);
+        Assert.Equal("music", legacy.Match(stream));
+        Assert.Equal("music", legacy.Match(bare));
+    }
+
     [Fact]
     public void EveryClientOfDiscordShowsOneNameUnderOneIdentity()
     {

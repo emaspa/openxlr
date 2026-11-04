@@ -866,7 +866,16 @@ switch, is one. In both cases the label is the process binary with its
 first letter capitalised (`Discord`), when the binary is the application's
 own and not a Wine or Proton runtime. A
 Windows executable's name loses its `.exe`. A label remembered in
-`mixer.json` from such an identifier is read back the same way. Clients
+`mixer.json` from such an identifier is read back the same way.
+
+A program that plays or records through ALSA reaches PipeWire through an
+ALSA plugin. pipewire-alsa sets its `application.name` to
+`PipeWire ALSA [kded6]`, the PulseAudio plugin to `ALSA plug-in [kded6]`.
+The daemon takes the name inside the brackets, `kded6`, as the program's
+own `application.name`. The label and the routing rules use it, and so
+does the identity when the client has no process binary. A name with
+nothing between the brackets stays as it is. An identity or label saved
+under the wrapper name in `mixer.json` is read back as the program's. Clients
 show `label` and keep `identity` for commands.
 
 ### Application icons

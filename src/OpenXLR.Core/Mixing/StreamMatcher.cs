@@ -125,11 +125,14 @@ public sealed class StreamMatcher
     /// Bring a stored identity from an older scheme onto the current one:
     /// identities carrying a space or an .exe suffix came from the app-name
     /// path and collapse to their game key; plain binary identities pass
-    /// through unchanged.
+    /// through unchanged. An identity saved from an ALSA plugin's wrapper
+    /// name ("PipeWire ALSA [kded6]", a client seen without its process
+    /// binary) becomes the program inside, the key that client has now.
     /// </summary>
     public static string MigrateIdentity(string identity)
     {
         if (identity.EndsWith(" (deleted)", StringComparison.Ordinal)) identity = identity[..^10];
+        identity = AudioStream.ProgramName(identity);
         return identity.Contains(' ') || IsWindowsExecutable(identity) ? GameIdentity(identity) : identity;
     }
 
@@ -201,6 +204,37 @@ public sealed record AudioStream(int Id, string? AppName, string? Binary, string
     private static readonly string[] GenericAppNames =
         ["Chromium", "Chromium input", "Electron", "WEBRTC VoiceEngine", "Wine",
          "ALSA plug-in", "ringrtc", "libcanberra"];
+
+    /// <summary>
+    /// The names ALSA plugins wrap around a program's own: pipewire-alsa
+    /// reports a program that plays or records through ALSA as
+    /// "PipeWire ALSA [kded6]", the PulseAudio ALSA plugin as
+    /// "ALSA plug-in [kded6]".
+    /// </summary>
+    private static readonly string[] AlsaWrappers = ["PipeWire ALSA", "ALSA plug-in"];
+
+    /// <summary>
+    /// The program an ALSA plugin's <c>application.name</c> stands for:
+    /// "PipeWire ALSA [kded6]" reads "kded6", as if the program had named
+    /// itself. Any other name, and a wrapper with nothing between its
+    /// brackets or with text after the closing one, comes back unchanged,
+    /// so the result is empty only when the name was.
+    /// </summary>
+    [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(name))]
+    public static string? ProgramName(string? name)
+    {
+        if (name is null) return null;
+        string text = name.Trim();
+        foreach (string wrapper in AlsaWrappers)
+        {
+            if (!text.StartsWith(wrapper, StringComparison.Ordinal)) continue;
+            string rest = text[wrapper.Length..].TrimStart();
+            if (rest.Length < 2 || rest[0] != '[' || rest[^1] != ']') return name;
+            string program = rest[1..^1].Trim();
+            return program.Length > 0 ? program : name;
+        }
+        return name;
+    }
 
     /// <summary>
     /// True for an <c>application.name</c> that is an identifier rather than

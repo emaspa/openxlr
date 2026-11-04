@@ -1751,7 +1751,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 if (PipeWireAdapter.IsPlumbingIdentity(identity)) continue;   // pre-filter leftovers
                 // A label saved from a helper stream's identifier reads as
                 // the application's own name, as a live stream's now does.
-                string label = Sanitize(app.Label);
+                // So does one saved from an ALSA plugin's wrapper name.
+                string label = AudioStream.ProgramName(Sanitize(app.Label));
                 if (AudioStream.IsTechnicalName(label)) label = new AudioStream(0, label, identity, null).Label;
                 if (!_apps.ContainsKey(identity))
                     _apps[identity] = new StreamAssignment(0, 0, label, identity,
