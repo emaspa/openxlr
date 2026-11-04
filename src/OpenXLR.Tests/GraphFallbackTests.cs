@@ -325,6 +325,53 @@ public sealed class GraphFallbackTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void PwLinkConfirmsAMissingNodeOnceUntilTheRegistryPortsChange()
+    {
+        // A monitor output that is switched off is looked up on every sweep.
+        // pw-link confirms that it has no ports once; the registry lists the
+        // node again when it returns.
+        string directory = Directory.CreateTempSubdirectory("openxlr-absent-ports-").FullName;
+        string? path = Environment.GetEnvironmentVariable("PATH");
+        try
+        {
+            ExecutableScript.Write(Path.Combine(directory, "pw-dump"), """
+                dir=${0%/*}
+                printf '%s\n' '[{"id":0,"type":"PipeWire:Interface:Core"}]'
+                while [ ! -f "$dir/update.json" ]; do /bin/sleep 0.01; done
+                /bin/cat "$dir/update.json"
+                exec /bin/sleep 60
+                """);
+            ExecutableScript.Write(Path.Combine(directory, "pw-link"), """
+                printf '%s\n' "$*" >> "${0%/*}/calls"
+                echo 'fresh:playback_FL'
+                """);
+            Environment.SetEnvironmentVariable("PATH", directory);
+            string calls = Path.Combine(directory, "calls");
+            var adapter = new PipeWireAdapter();
+            using var watch = adapter.WatchGraph();
+            for (int i = 0; i < 5; i++) Assert.Empty(adapter.ListPorts("speaker", "playback", output: false));
+            Assert.Equal(["-i"], File.ReadAllLines(calls));
+            // A node the registry has not echoed yet is still found through pw-link.
+            Assert.Equal(["fresh:playback_FL"], adapter.ListPorts("fresh", "playback", output: false));
+            Assert.Equal(["fresh:playback_FL"], adapter.ListPorts("fresh", "playback", output: false));
+            Assert.Equal(3, File.ReadAllLines(calls).Length);
+            File.WriteAllText(Path.Combine(directory, "pending.json"), """
+                [{"id":5,"type":"PipeWire:Interface:Node","info":{"props":{"node.name":"speaker","media.class":"Audio/Sink"}}},
+                 {"id":6,"type":"PipeWire:Interface:Port","info":{"direction":"input","props":{"node.id":5,"port.id":0,"port.name":"playback_FL"}}}]
+                """);
+            File.Move(Path.Combine(directory, "pending.json"), Path.Combine(directory, "update.json"));
+            Assert.True(SpinWait.SpinUntil(() => adapter.SinkExists("speaker") == true, TimeSpan.FromSeconds(2)));
+            Assert.Equal(["speaker:playback_FL"], adapter.ListPorts("speaker", "playback", output: false));
+            Assert.Equal(3, File.ReadAllLines(calls).Length);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PATH", path);
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
     public void WhileTheSubscriptionIsNotReadyTheAdapterReadsAOneShotDump()
     {
         string directory = Directory.CreateTempSubdirectory("openxlr-fallback-").FullName;

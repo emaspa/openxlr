@@ -88,6 +88,8 @@ public sealed class PipeWireAdapter
                 owner._dumpObjects = null;
                 owner._defaultsRevision = -1;
                 owner._inputPorts = owner._outputPorts = (-1, null);
+                owner._absentPorts.Clear();
+                owner._absentPortsRevision = -1;
                 owner._directSinkVolumeUntil.Clear();
             }
             graph.Dispose();
@@ -2064,15 +2066,28 @@ public sealed class PipeWireAdapter
     /// <summary>Ports of a node whose name starts with a prefix, in pw-link order.</summary>
     internal List<string> ListPorts(string node, string prefix, bool output)
     {
-        if (ReadObservedPorts(output) is { } observed)
+        if (ReadObservedPorts(output) is ({ } observed, long revision))
         {
             List<string> found = MatchPorts(observed, node, prefix);
             if (found.Count > 0) return found;
             // The registry echoes ports a few milliseconds after the node that
             // owns them was created, so a link made right after creating a
-            // sink would find none. pw-link confirms an empty answer.
-            return TryConfirm("pw-link", output ? "-o" : "-i") is { } direct
-                ? MatchPorts(SplitPortListing(direct), node, prefix) : found;
+            // sink would find none. pw-link confirms an empty answer, once
+            // until the registry's ports change: a node that is really gone,
+            // such as a monitor output that is switched off, is asked about
+            // again on every sweep.
+            var key = (node, prefix, output);
+            lock (DumpGate)
+                if (_absentPortsRevision == revision && _absentPorts.Contains(key)) return found;
+            if (TryConfirm("pw-link", output ? "-o" : "-i") is not { } direct) return found;
+            List<string> confirmed = MatchPorts(SplitPortListing(direct), node, prefix);
+            if (confirmed.Count == 0)
+                lock (DumpGate)
+                {
+                    if (_absentPortsRevision != revision) { _absentPorts.Clear(); _absentPortsRevision = revision; }
+                    _absentPorts.Add(key);
+                }
+            return confirmed;
         }
         return MatchPorts(SplitPortListing(Run("pw-link", output ? "-o" : "-i")), node, prefix);
     }
@@ -2959,7 +2974,12 @@ public sealed class PipeWireAdapter
 
     private (long Revision, IReadOnlyList<string>? Names) _inputPorts = (-1, null), _outputPorts = (-1, null);
 
-    private IReadOnlyList<string>? ReadObservedPorts(bool output)
+    // Lookups pw-link found no ports for, at the registry port revision they
+    // were checked at.
+    private readonly HashSet<(string Node, string Prefix, bool Output)> _absentPorts = [];
+    private long _absentPortsRevision = -1;
+
+    private (IReadOnlyList<string>? Names, long Revision)? ReadObservedPorts(bool output)
     {
         lock (DumpGate)
         {
@@ -2968,7 +2988,7 @@ public sealed class PipeWireAdapter
             // Volume, metadata and link updates do not change port names.
             if (ports.Snapshot is { } snapshot)
                 cached = (ports.Revision, ObservedPorts(snapshot, output));
-            return cached.Names;
+            return (cached.Names, cached.Revision);
         }
     }
 
