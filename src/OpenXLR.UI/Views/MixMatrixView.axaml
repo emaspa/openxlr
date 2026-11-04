@@ -167,7 +167,7 @@
                         Name="MatrixBindingLine" IsVisible="{Binding ShowsBinding}" IsHitTestVisible="False">
                     <skin:StatusLed IsOn="{Binding Channel.BindingConnected}" VerticalAlignment="Center"
                                     AutomationProperties.AccessibilityView="Raw"/>
-                    <TextBlock Grid.Column="1" Text="{Binding Channel.BindingLabel}" Classes="hint" FontSize="11"
+                    <TextBlock Grid.Column="1" Text="{Binding Channel.BindingLabel}" Classes="hint" FontSize="{DynamicResource UiText.FontSize11}"
                                TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                   </Grid>
                   <Button Grid.Column="1" Grid.ColumnSpan="2" Grid.RowSpan="2" Name="MatrixBinding" Theme="{StaticResource MatrixBindingTarget}"
@@ -178,7 +178,7 @@
                        one is on, with the interface's phantom power lamp, lit while phantom power is on; under it
                        the input's gain, which reads the channel's volume while the volume fader moves -->
                   <Button Grid.Column="3" Name="MatrixProcessing" Classes="matrixProcessing fx" Classes.fxOn="{Binding ProcessingOn}"
-                          Padding="5,2" FontSize="11" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                          Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                           MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsProcessing}"
                           AutomationProperties.Name="{Binding ProcessingName}" ToolTip.Tip="{loc:Text Key=MatrixProcessingTip}">
                     <StackPanel Orientation="Horizontal" Spacing="4">
@@ -192,7 +192,7 @@
                       </Flyout>
                     </Button.Flyout>
                   </Button>
-                  <TextBlock Grid.Column="3" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="11"
+                  <TextBlock Grid.Column="3" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"
                              Classes.under="{Binding ShowsProcessing}" Classes.centred="{Binding !ShowsProcessing}"
                              HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowsReadout}"
                              AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
@@ -235,19 +235,19 @@
                               AutomationProperties.Name="{Binding Channel.Name, StringFormat={loc:Text Key=ChannelVolumeName}}"
                               ToolTip.Tip="{Binding Channel.VolumeTip}"/>
                     </layout:MeterFader>
-                    <TextBlock Grid.Column="1" Name="MatrixVolumeNote" Text="&#x24D8;" Classes="h" FontSize="12" VerticalAlignment="Center"
+                    <TextBlock Grid.Column="1" Name="MatrixVolumeNote" Text="&#x24D8;" Classes="h" FontSize="{DynamicResource UiText.FontSize12}" VerticalAlignment="Center"
                                Cursor="Help" IsVisible="{Binding Channel.DirectMonitored}" ToolTip.Tip="{Binding Channel.VolumeTip}"
                                AutomationProperties.Name="{loc:Text Key=ChannelVolumeMixesOnly}"/>
                   </Grid>
                 </StackPanel>
                 <Panel layout:StripPanel.Part="mute" VerticalAlignment="Center">
                   <ToggleButton Classes="mute mutemini matrixMute" IsVisible="{Binding CarriesUnit}" IsChecked="{Binding Main.Mute, Mode=TwoWay}"
-                                IsEnabled="{Binding !Main.PhantomSettling}" Padding="5,2" FontSize="11" VerticalAlignment="Center"
+                                IsEnabled="{Binding !Main.PhantomSettling}" Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center"
                                 MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                                 AutomationProperties.Name="{Binding Channel.Name, StringFormat={loc:Text Key=MixMuteName}}"
                                 ToolTip.Tip="{loc:Text Key=TheDeviceMutesThisInputForAbout13}"/>
                   <ToggleButton Name="MatrixExtraMute" Classes="mute mutemini matrixMute" IsChecked="{Binding ExtraUnit.Mute, Mode=TwoWay}"
-                                IsEnabled="{Binding ExtraUnit.CanMute, FallbackValue=False}" Padding="5,2" FontSize="11" VerticalAlignment="Center"
+                                IsEnabled="{Binding ExtraUnit.CanMute, FallbackValue=False}" Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center"
                                 MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding CarriesExtraUnit}"
                                 AutomationProperties.Name="{Binding Channel.Name, StringFormat={loc:Text Key=MixMuteName}}"
                                 ToolTip.Tip="{loc:Text Key=TheDeviceMutesThisInputForAbout13}"/>
@@ -257,12 +257,12 @@
                 <StackPanel layout:StripPanel.Part="effects" Name="MatrixEffectsPart" Spacing="2" VerticalAlignment="Center">
                   <Button Name="MatrixEq" Classes="matrixEq fx" Content="{loc:Text Key=Eq}"
                           Classes.fxOn="{Binding Channel.Eq.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Channel.Eq.IsFaulty, FallbackValue=False}"
-                          Padding="5,2" FontSize="11" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                          Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                           MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsEq}" Click="OnEq"
                           AutomationProperties.Name="{Binding Channel.Eq.ButtonName, FallbackValue=''}" ToolTip.Tip="{Binding Channel.Eq.ButtonTip, FallbackValue=''}"/>
                   <Button Classes="matrixEffects fx" Content="{loc:Text Key=MatrixEffects}"
                           Classes.fxOn="{Binding Main.Inserts.IsProcessing}" Classes.fxOff="{Binding Main.Inserts.IsOff}"
-                          Padding="5,2" FontSize="11" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                          Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                           MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                           IsVisible="{Binding Main.HasMixer}" Click="OnXlrInserts"
                           AutomationProperties.Name="{Binding Main.Inserts.ButtonText}" ToolTip.Tip="{loc:Text Key=PluginsProcessingXLR1BeforeItReachesThe}"/>
@@ -296,7 +296,7 @@
                         Name="MatrixBindingLine" IsVisible="{Binding ShowsBinding}" IsHitTestVisible="False">
                     <skin:StatusLed IsOn="{Binding Channel.BindingConnected}" VerticalAlignment="Center"
                                     AutomationProperties.AccessibilityView="Raw"/>
-                    <TextBlock Grid.Column="1" Text="{Binding Channel.BindingLabel}" Classes="hint" FontSize="11"
+                    <TextBlock Grid.Column="1" Text="{Binding Channel.BindingLabel}" Classes="hint" FontSize="{DynamicResource UiText.FontSize11}"
                                TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                   </Grid>
                   <Button Grid.Column="1" Grid.ColumnSpan="2" Grid.RowSpan="2" Name="MatrixBinding" Theme="{StaticResource MatrixBindingTarget}"
@@ -307,7 +307,7 @@
                        one is on, with the interface's phantom power lamp, lit while phantom power is on; under it
                        the input's gain, which reads the channel's volume while the volume fader moves -->
                   <Button Grid.Column="3" Name="MatrixProcessing" Classes="matrixProcessing fx" Classes.fxOn="{Binding ProcessingOn}"
-                          Padding="5,2" FontSize="11" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                          Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                           MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsProcessing}"
                           AutomationProperties.Name="{Binding ProcessingName}" ToolTip.Tip="{loc:Text Key=MatrixProcessingTip}">
                     <StackPanel Orientation="Horizontal" Spacing="4">
@@ -321,7 +321,7 @@
                       </Flyout>
                     </Button.Flyout>
                   </Button>
-                  <TextBlock Grid.Column="3" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="11"
+                  <TextBlock Grid.Column="3" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"
                              Classes.under="{Binding ShowsProcessing}" Classes.centred="{Binding !ShowsProcessing}"
                              HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowsReadout}"
                              AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
@@ -364,19 +364,19 @@
                               AutomationProperties.Name="{Binding Channel.Name, StringFormat={loc:Text Key=ChannelVolumeName}}"
                               ToolTip.Tip="{Binding Channel.VolumeTip}"/>
                     </layout:MeterFader>
-                    <TextBlock Grid.Column="1" Name="MatrixVolumeNote" Text="&#x24D8;" Classes="h" FontSize="12" VerticalAlignment="Center"
+                    <TextBlock Grid.Column="1" Name="MatrixVolumeNote" Text="&#x24D8;" Classes="h" FontSize="{DynamicResource UiText.FontSize12}" VerticalAlignment="Center"
                                Cursor="Help" IsVisible="{Binding Channel.DirectMonitored}" ToolTip.Tip="{Binding Channel.VolumeTip}"
                                AutomationProperties.Name="{loc:Text Key=ChannelVolumeMixesOnly}"/>
                   </Grid>
                 </StackPanel>
                 <Panel layout:StripPanel.Part="mute" VerticalAlignment="Center">
                   <ToggleButton Classes="mute mutemini matrixMute" IsVisible="{Binding CarriesUnit}" IsChecked="{Binding Main.Mute2, Mode=TwoWay}"
-                                IsEnabled="{Binding !Main.PhantomSettling2}" Padding="5,2" FontSize="11" VerticalAlignment="Center"
+                                IsEnabled="{Binding !Main.PhantomSettling2}" Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center"
                                 MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                                 AutomationProperties.Name="{Binding Channel.Name, StringFormat={loc:Text Key=MixMuteName}}"
                                 ToolTip.Tip="{loc:Text Key=TheDeviceMutesThisInputForAbout13}"/>
                   <ToggleButton Name="MatrixExtraMute" Classes="mute mutemini matrixMute" IsChecked="{Binding ExtraUnit.Mute, Mode=TwoWay}"
-                                IsEnabled="{Binding ExtraUnit.CanMute, FallbackValue=False}" Padding="5,2" FontSize="11" VerticalAlignment="Center"
+                                IsEnabled="{Binding ExtraUnit.CanMute, FallbackValue=False}" Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center"
                                 MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding CarriesExtraUnit}"
                                 AutomationProperties.Name="{Binding Channel.Name, StringFormat={loc:Text Key=MixMuteName}}"
                                 ToolTip.Tip="{loc:Text Key=TheDeviceMutesThisInputForAbout13}"/>
@@ -386,12 +386,12 @@
                 <StackPanel layout:StripPanel.Part="effects" Name="MatrixEffectsPart" Spacing="2" VerticalAlignment="Center">
                   <Button Name="MatrixEq" Classes="matrixEq fx" Content="{loc:Text Key=Eq}"
                           Classes.fxOn="{Binding Channel.Eq.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Channel.Eq.IsFaulty, FallbackValue=False}"
-                          Padding="5,2" FontSize="11" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                          Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                           MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsEq}" Click="OnEq"
                           AutomationProperties.Name="{Binding Channel.Eq.ButtonName, FallbackValue=''}" ToolTip.Tip="{Binding Channel.Eq.ButtonTip, FallbackValue=''}"/>
                   <Button Classes="matrixEffects fx" Content="{loc:Text Key=MatrixEffects}"
                           Classes.fxOn="{Binding Main.Inserts2.IsProcessing}" Classes.fxOff="{Binding Main.Inserts2.IsOff}"
-                          Padding="5,2" FontSize="11" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                          Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                           MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                           IsVisible="{Binding Main.HasMixer}" Click="OnXlrInserts"
                           AutomationProperties.Name="{Binding Main.Inserts2.ButtonText}" ToolTip.Tip="{loc:Text Key=PluginsProcessingXLR2BeforeItReachesThe}"/>
@@ -419,7 +419,7 @@
                   <TextBlock Grid.Column="2" Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
                              TextTrimming="CharacterEllipsis" VerticalAlignment="Center" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
                   <!-- the level, which reads the channel's volume while the volume fader moves and for a second after -->
-                  <TextBlock Grid.Column="3" Grid.RowSpan="2" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="11"
+                  <TextBlock Grid.Column="3" Grid.RowSpan="2" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"
                              HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowsReadout}"
                              AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
                 </Grid>
@@ -440,7 +440,7 @@
                               AutomationProperties.Name="{loc:Text Key=USBAuxIn}"/>
                     </layout:MeterFader>
                     <ToggleButton Grid.Column="1" Content="{loc:Text Key=Lock}" IsChecked="{Binding Main.AuxLevelLock, Mode=TwoWay}"
-                                  Padding="5,2" FontSize="11" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                                  Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                                   AutomationProperties.Name="{loc:Text Key=LevelLock}" ToolTip.Tip="{loc:Text Key=LevelLock}"/>
                   </Grid>
                   <!-- the channel's own volume, under the gain where the row has one, the meter under it
@@ -455,7 +455,7 @@
                               AutomationProperties.Name="{Binding Channel.Name, StringFormat={loc:Text Key=ChannelVolumeName}}"
                               ToolTip.Tip="{Binding Channel.VolumeTip}"/>
                     </layout:MeterFader>
-                    <TextBlock Grid.Column="1" Name="MatrixVolumeNote" Text="&#x24D8;" Classes="h" FontSize="12" VerticalAlignment="Center"
+                    <TextBlock Grid.Column="1" Name="MatrixVolumeNote" Text="&#x24D8;" Classes="h" FontSize="{DynamicResource UiText.FontSize12}" VerticalAlignment="Center"
                                Cursor="Help" IsVisible="{Binding Channel.DirectMonitored}" ToolTip.Tip="{Binding Channel.VolumeTip}"
                                AutomationProperties.Name="{loc:Text Key=ChannelVolumeMixesOnly}"/>
                   </Grid>
@@ -483,7 +483,7 @@
                   <TextBlock Grid.Column="2" Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
                              TextTrimming="CharacterEllipsis" VerticalAlignment="Center" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
                   <!-- the gain, which reads the channel's volume while the volume fader moves and for a second after -->
-                  <TextBlock Grid.Column="3" Grid.RowSpan="2" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="11"
+                  <TextBlock Grid.Column="3" Grid.RowSpan="2" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"
                              HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowsReadout}"
                              AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
                 </Grid>
@@ -504,7 +504,7 @@
                               AutomationProperties.Name="{loc:Text Key=LineInGain}"/>
                     </layout:MeterFader>
                     <ToggleButton Grid.Column="1" Name="MatrixLineInLock" Content="{loc:Text Key=Lock}" IsChecked="{Binding Main.LineInLevelLock, Mode=TwoWay}"
-                                  Padding="5,2" FontSize="11" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                                  Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                                   AutomationProperties.Name="{loc:Text Key=LevelLock}" ToolTip.Tip="{loc:Text Key=LevelLock}"/>
                   </Grid>
                   <!-- the channel's own volume, under the gain where the row has one, the meter under it
@@ -519,7 +519,7 @@
                               AutomationProperties.Name="{Binding Channel.Name, StringFormat={loc:Text Key=ChannelVolumeName}}"
                               ToolTip.Tip="{Binding Channel.VolumeTip}"/>
                     </layout:MeterFader>
-                    <TextBlock Grid.Column="1" Name="MatrixVolumeNote" Text="&#x24D8;" Classes="h" FontSize="12" VerticalAlignment="Center"
+                    <TextBlock Grid.Column="1" Name="MatrixVolumeNote" Text="&#x24D8;" Classes="h" FontSize="{DynamicResource UiText.FontSize12}" VerticalAlignment="Center"
                                Cursor="Help" IsVisible="{Binding Channel.DirectMonitored}" ToolTip.Tip="{Binding Channel.VolumeTip}"
                                AutomationProperties.Name="{loc:Text Key=ChannelVolumeMixesOnly}"/>
                   </Grid>
@@ -554,13 +554,13 @@
                         Name="MatrixCaptureBinding" IsVisible="{Binding ShowsBinding}" IsHitTestVisible="False">
                     <skin:StatusLed IsOn="{Binding Channel.CaptureConnected}" VerticalAlignment="Center"
                                     AutomationProperties.AccessibilityView="Raw"/>
-                    <TextBlock Grid.Column="1" Text="{Binding Channel.BindingLabel}" Classes="hint" FontSize="11"
+                    <TextBlock Grid.Column="1" Text="{Binding Channel.BindingLabel}" Classes="hint" FontSize="{DynamicResource UiText.FontSize11}"
                                TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                   </Grid>
                   <Button Grid.Column="1" Grid.ColumnSpan="2" Grid.RowSpan="2" Name="MatrixBinding" Theme="{StaticResource MatrixBindingTarget}"
                           IsVisible="{Binding ShowsBinding}" Click="OnBinding"
                           AutomationProperties.Name="{Binding Channel.BindingChipName}" ToolTip.Tip="{Binding Channel.BindingTip}"/>
-                  <TextBlock Grid.Column="2" Grid.Row="1" Text="{Binding Channel.CaptureLabel}" Classes="hint" FontSize="11"
+                  <TextBlock Grid.Column="2" Grid.Row="1" Text="{Binding Channel.CaptureLabel}" Classes="hint" FontSize="{DynamicResource UiText.FontSize11}"
                              TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Channel.CaptureLabel}"
                              IsVisible="{Binding ShowsCaptureLabel}"/>
                   <!-- the microphone's switches behind one button at the end of the name column, wherever the
@@ -568,7 +568,7 @@
                        one is on, with the interface's phantom power lamp, lit while phantom power is on; under it
                        the input's gain, which reads the channel's volume while the volume fader moves -->
                   <Button Grid.Column="3" Name="MatrixProcessing" Classes="matrixProcessing fx" Classes.fxOn="{Binding ProcessingOn}"
-                          Padding="5,2" FontSize="11" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                          Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                           MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsProcessing}"
                           AutomationProperties.Name="{Binding ProcessingName}" ToolTip.Tip="{loc:Text Key=MatrixProcessingTip}">
                     <StackPanel Orientation="Horizontal" Spacing="4">
@@ -582,7 +582,7 @@
                       </Flyout>
                     </Button.Flyout>
                   </Button>
-                  <TextBlock Grid.Column="3" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="11"
+                  <TextBlock Grid.Column="3" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"
                              Classes.under="{Binding ShowsProcessing}" Classes.centred="{Binding !ShowsProcessing}"
                              HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowsReadout}"
                              AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
@@ -636,19 +636,19 @@
                               AutomationProperties.Name="{Binding Channel.Name, StringFormat={loc:Text Key=ChannelVolumeName}}"
                               ToolTip.Tip="{Binding Channel.VolumeTip}"/>
                     </layout:MeterFader>
-                    <TextBlock Grid.Column="1" Name="MatrixVolumeNote" Text="&#x24D8;" Classes="h" FontSize="12" VerticalAlignment="Center"
+                    <TextBlock Grid.Column="1" Name="MatrixVolumeNote" Text="&#x24D8;" Classes="h" FontSize="{DynamicResource UiText.FontSize12}" VerticalAlignment="Center"
                                Cursor="Help" IsVisible="{Binding Channel.DirectMonitored}" ToolTip.Tip="{Binding Channel.VolumeTip}"
                                AutomationProperties.Name="{loc:Text Key=ChannelVolumeMixesOnly}"/>
                   </Grid>
                 </StackPanel>
                 <Panel layout:StripPanel.Part="mute" VerticalAlignment="Center">
                   <ToggleButton Classes="mute mutemini matrixMute" IsVisible="{Binding CarriesUnit}" IsChecked="{Binding Unit.Mute, Mode=TwoWay}"
-                                IsEnabled="{Binding !Unit.PhantomSettling, FallbackValue=False}" Padding="5,2" FontSize="11" VerticalAlignment="Center"
+                                IsEnabled="{Binding !Unit.PhantomSettling, FallbackValue=False}" Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center"
                                 MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                                 AutomationProperties.Name="{Binding Channel.Name, StringFormat={loc:Text Key=MixMuteName}}"
                                 ToolTip.Tip="{loc:Text Key=TheDeviceMutesThisInputForAbout13}"/>
                   <ToggleButton Name="MatrixExtraMute" Classes="mute mutemini matrixMute" IsChecked="{Binding ExtraUnit.Mute, Mode=TwoWay}"
-                                IsEnabled="{Binding ExtraUnit.CanMute, FallbackValue=False}" Padding="5,2" FontSize="11" VerticalAlignment="Center"
+                                IsEnabled="{Binding ExtraUnit.CanMute, FallbackValue=False}" Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center"
                                 MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding CarriesExtraUnit}"
                                 AutomationProperties.Name="{Binding Channel.Name, StringFormat={loc:Text Key=MixMuteName}}"
                                 ToolTip.Tip="{loc:Text Key=TheDeviceMutesThisInputForAbout13}"/>
@@ -660,12 +660,12 @@
                 <StackPanel layout:StripPanel.Part="effects" Name="MatrixCaptureEffectsPart" Spacing="2" VerticalAlignment="Center">
                   <Button Name="MatrixEq" Classes="matrixEq fx" Content="{loc:Text Key=Eq}"
                           Classes.fxOn="{Binding Channel.Eq.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Channel.Eq.IsFaulty, FallbackValue=False}"
-                          Padding="5,2" FontSize="11" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                          Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                           MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsEq}" Click="OnEq"
                           AutomationProperties.Name="{Binding Channel.Eq.ButtonName, FallbackValue=''}" ToolTip.Tip="{Binding Channel.Eq.ButtonTip, FallbackValue=''}"/>
                   <Button Name="MatrixCaptureInserts" Classes="matrixEffects fx" Content="{loc:Text Key=MatrixEffects}"
                           Classes.fxOn="{Binding Inserts.IsProcessing, FallbackValue=False}" Classes.fxOff="{Binding Inserts.IsOff, FallbackValue=False}"
-                          Padding="5,2" FontSize="11" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                          Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                           MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                           Click="OnXlrInserts" AutomationProperties.Name="{Binding Channel.Name, StringFormat={loc:Text Key=InsertsTitle}}"
                           ToolTip.Tip="{loc:Text Key=InputChainHint}"/>
@@ -713,11 +713,11 @@
                               Value="{Binding Mix.Volume, Mode=TwoWay}" AutomationProperties.Name="{Binding MasterName}"/>
                     </layout:MeterFader>
                     <ToggleButton layout:StripPanel.Part="mute" Classes="mute mutemini matrixMute" IsChecked="{Binding Mix.Muted, Mode=TwoWay}"
-                                  Padding="5,2" FontSize="11" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                                  Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                                   AutomationProperties.Name="{Binding MuteName}" ToolTip.Tip="{Binding MuteName}"/>
                     <Button layout:StripPanel.Part="effects" Classes="matrixEffects fx" Content="{loc:Text Key=MatrixEffects}"
                             Classes.fxOn="{Binding Mix.Inserts.IsProcessing}" Classes.fxOff="{Binding Mix.Inserts.IsOff}"
-                            Padding="5,2" FontSize="11" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                            Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                             Click="OnMixInserts" AutomationProperties.Name="{Binding Mix.Inserts.ButtonText}"
                             ToolTip.Tip="{Binding Mix.Inserts.ButtonTip}"/>
                   </layout:StripPanel>
@@ -733,7 +733,7 @@
                               AutomationProperties.Name="{Binding Mix.Name, StringFormat={loc:Text Key=MoveItem}}"
                               ToolTip.Tip="{loc:Text Key=DragOntoAnotherChannelYouCanEdit}"/>
                     </Grid>
-                    <TextBlock layout:StripPanel.Part="outputs" Text="{Binding OutputsText}" Classes="hint" FontSize="11"
+                    <TextBlock layout:StripPanel.Part="outputs" Text="{Binding OutputsText}" Classes="hint" FontSize="{DynamicResource UiText.FontSize11}"
                                TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding OutputsText}"/>
                   </layout:StripPanel>
                 </DockPanel>
@@ -767,7 +767,7 @@
                       <Panel>
                       <layout:StripPanel Spec="{Binding Spec}" Spacing="4" VerticalAlignment="Center" IsVisible="{Binding HasSend}">
                         <ToggleButton layout:StripPanel.Part="mute" Classes="mute mutemini matrixMute" IsChecked="{Binding Send.Muted, Mode=TwoWay}"
-                                      Padding="5,2" FontSize="11" VerticalAlignment="Center"
+                                      Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center"
                                       MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                                       AutomationProperties.Name="{Binding MuteName}" ToolTip.Tip="{Binding MuteName}"/>
                         <layout:MeterFader layout:StripPanel.Part="fader" ShowsMeter="{Binding MeterUnderFader}"
@@ -777,7 +777,7 @@
                           <Slider Classes="matrixFader" vm:FaderInput.Step="0.01" vm:FaderInput.IsAdjusting="{Binding Adjusting, Mode=OneWayToSource}" Minimum="0" Maximum="1"
                                   Value="{Binding Send.Level, Mode=TwoWay}" AutomationProperties.Name="{Binding SendName}"/>
                         </layout:MeterFader>
-                        <TextBlock layout:StripPanel.Part="value" Text="{Binding Send.LevelText}" Classes="val" FontSize="11"
+                        <TextBlock layout:StripPanel.Part="value" Text="{Binding Send.LevelText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"
                                    MinWidth="22" TextAlignment="Right" VerticalAlignment="Center"/>
                       </layout:StripPanel>
                       <!-- the send's level over the fader, where the skin puts it there: a chip in the
@@ -786,7 +786,7 @@
                               IsHitTestVisible="False" Padding="5,0" IsVisible="{Binding ShowsValueChip}"
                               Background="{DynamicResource Ox.Control.Background}" BorderBrush="{DynamicResource Ox.Control.BorderBrush}"
                               BorderThickness="{DynamicResource Ox.Control.BorderThickness}" CornerRadius="{DynamicResource Ox.Control.CornerRadius}">
-                        <TextBlock Text="{Binding Send.LevelText}" FontSize="11" Foreground="{DynamicResource Ox.Control.Foreground}"/>
+                        <TextBlock Text="{Binding Send.LevelText}" FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Control.Foreground}"/>
                       </Border>
                       </Panel>
                     </Border>

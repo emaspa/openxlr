@@ -101,7 +101,7 @@
     </Style>
     <Style Selector="StackPanel.dev ToggleButton">
       <Setter Property="Padding" Value="6,3"/>
-      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="FontSize" Value="{DynamicResource UiText.FontSize12}"/>
       <Setter Property="MinHeight" Value="{DynamicResource Ox.Mixer.SmallControlMinSize}"/>
     </Style>
     <!-- collapsible tiles: a flat expander whose header looks like the old card title -->
@@ -140,7 +140,7 @@
       <Setter Property="Padding" Value="6,2"/>
       <Setter Property="MinWidth" Value="{DynamicResource Ox.Mixer.InsertControlMinSize}"/>
       <Setter Property="MinHeight" Value="{DynamicResource Ox.Mixer.InsertControlMinSize}"/>
-      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="FontSize" Value="{DynamicResource UiText.FontSize12}"/>
       <Setter Property="VerticalAlignment" Value="Center"/>
       <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>
@@ -148,7 +148,7 @@
       <Setter Property="Padding" Value="6,2"/>
       <Setter Property="MinWidth" Value="{DynamicResource Ox.Mixer.InsertControlMinSize}"/>
       <Setter Property="MinHeight" Value="{DynamicResource Ox.Mixer.InsertControlMinSize}"/>
-      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="FontSize" Value="{DynamicResource UiText.FontSize12}"/>
       <Setter Property="VerticalAlignment" Value="Center"/>
       <Setter Property="VerticalContentAlignment" Value="Center"/>
       <Setter Property="HorizontalContentAlignment" Value="Center"/>

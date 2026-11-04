@@ -18,6 +18,7 @@ public sealed record MixerViewChoice(string Id, string Label);
 
 /// <summary>Standard or Touch sizing for the mixer's controls; ui.json keeps the flag.</summary>
 public sealed record ControlSizingChoice(bool Touch, string Label);
+public sealed record TextSizeChoice(int Percent, string Label);
 
 /// <summary>
 /// Backs the Options window. Startup toggles apply immediately to the system
@@ -61,6 +62,7 @@ public sealed class OptionsViewModel : ViewModelBase
         {
             SelectedSkin = SkinChoices.FirstOrDefault(c => c.Id == Skinning.SkinService.Current.Id) ?? SkinChoices[0];
             SelectedAppearanceMode = AppearanceModeChoices.First(c => c.Id == Skinning.SkinService.Mode);
+            SelectedTextSize = TextSizeChoices.First(c => c.Percent == Skinning.SkinService.TextSizePercent);
             SelectedControlSizing = ControlSizingChoices.First(c => c.Touch == Skinning.SkinService.TouchControls);
             SelectedMixerView = MixerViewChoices.First(c => c.Id == main.MixerView);
             string? language = string.IsNullOrWhiteSpace(s.Language) || s.Language == "system" ? null
@@ -544,6 +546,26 @@ public sealed class OptionsViewModel : ViewModelBase
             if (!Set(ref _selectedAppearanceMode, value) || _applying || value is null) return;
             ReportSkin(Skinning.SkinService.ChooseMode(value.Id, out string? saveError));
             Report(saveError);
+        }
+    }
+
+    public System.Collections.Generic.IReadOnlyList<TextSizeChoice> TextSizeChoices { get; } =
+    [
+        new(80, Localizer.Text("TextSizeMuchSmaller")),
+        new(90, Localizer.Text("TextSizeSmaller")),
+        new(100, Localizer.Text("TextSizeNormal")),
+        new(110, Localizer.Text("TextSizeLarger")),
+        new(120, Localizer.Text("TextSizeMuchLarger")),
+    ];
+
+    private TextSizeChoice? _selectedTextSize;
+    public TextSizeChoice? SelectedTextSize
+    {
+        get => _selectedTextSize;
+        set
+        {
+            if (!Set(ref _selectedTextSize, value) || _applying || value is null) return;
+            Report(Skinning.SkinService.ChooseTextSize(value.Percent));
         }
     }
 

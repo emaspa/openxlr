@@ -4249,4 +4249,22 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
   <data name="FlowUnitMixes" xml:space="preserve">
     <value>Builds {0}</value>
   </data>
+  <data name="TextSize" xml:space="preserve">
+    <value>Text size</value>
+  </data>
+  <data name="TextSizeMuchSmaller" xml:space="preserve">
+    <value>Much smaller (80%)</value>
+  </data>
+  <data name="TextSizeSmaller" xml:space="preserve">
+    <value>Smaller (90%)</value>
+  </data>
+  <data name="TextSizeNormal" xml:space="preserve">
+    <value>Normal (100%)</value>
+  </data>
+  <data name="TextSizeLarger" xml:space="preserve">
+    <value>Larger (110%)</value>
+  </data>
+  <data name="TextSizeMuchLarger" xml:space="preserve">
+    <value>Much larger (120%)</value>
+  </data>
 </root>

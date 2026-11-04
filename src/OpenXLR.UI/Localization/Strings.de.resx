@@ -3913,4 +3913,22 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="FlowUnitMixes" xml:space="preserve">
     <value>Baut {0}</value>
   </data>
+  <data name="TextSize" xml:space="preserve">
+    <value>Schriftgröße</value>
+  </data>
+  <data name="TextSizeMuchSmaller" xml:space="preserve">
+    <value>Viel kleiner (80 %)</value>
+  </data>
+  <data name="TextSizeSmaller" xml:space="preserve">
+    <value>Kleiner (90 %)</value>
+  </data>
+  <data name="TextSizeNormal" xml:space="preserve">
+    <value>Normal (100 %)</value>
+  </data>
+  <data name="TextSizeLarger" xml:space="preserve">
+    <value>Größer (110 %)</value>
+  </data>
+  <data name="TextSizeMuchLarger" xml:space="preserve">
+    <value>Viel größer (120 %)</value>
+  </data>
 </root>

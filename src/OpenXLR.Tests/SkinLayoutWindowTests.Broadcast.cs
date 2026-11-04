@@ -133,7 +133,31 @@ internal static partial class SkinLayoutWindowTests
                     Capture(window, enlarged ? $"skin-broadcast-touch-{width}" : $"skin-broadcast-{width}");
                 }
             }
-            SkinService.ApplyControlSizing(false);
+            int previousTextSize = SkinService.TextSizePercent;
+            try
+            {
+                SkinService.ApplyTextSize(120);
+                foreach (bool enlarged in new[] { false, true })
+                {
+                    SkinService.ApplyControlSizing(enlarged);
+                    Layout(window, 640, 1400);
+                    CheckBroadcastAt(window, model, $"120% text, {(enlarged ? "touch" : "standard")}");
+                    // The name column grows with the text, so the short names that
+                    // fit at Normal, such as Line In, still show whole.
+                    string[] shortNames = ["Aux In", "Line In", "Game", "Music", "Browser", "System", "Voice Chat", "SFX"];
+                    TextBlock[] names = [.. window.GetVisualDescendants().OfType<Border>()
+                        .Where(b => b.Name == "MatrixRowName" && b.IsEffectivelyVisible)
+                        .SelectMany(b => b.GetVisualDescendants().OfType<TextBlock>())
+                        .Where(t => t.IsEffectivelyVisible && t.Classes.Contains("strip") && shortNames.Contains(t.Text))];
+                    Assert.NotEmpty(names);
+                    MainWindowLabelTests.CheckWhole(names, $"Broadcast row names at 120% text, {(enlarged ? "touch" : "standard")}");
+                }
+            }
+            finally
+            {
+                SkinService.ApplyTextSize(previousTextSize);
+                SkinService.ApplyControlSizing(false);
+            }
             CheckProcessing(window, model, "broadcast");
 
             // XLR 1 bound to a webcam: the daemon names it Mic 1, its row keeps

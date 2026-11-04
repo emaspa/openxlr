@@ -158,7 +158,7 @@
          heads the page; Options in it is always shown, the way back. -->
     <Border Name="HeaderCard" Classes="card" Margin="0,0,0,8">
       <Grid Name="WindowHeader" ColumnDefinitions="Auto,8,Auto,*" RowDefinitions="Auto,Auto">
-        <Button Name="OptionsButton" Grid.RowSpan="2" Content="⚙" FontSize="18" Padding="8,4"
+        <Button Name="OptionsButton" Grid.RowSpan="2" Content="⚙" FontSize="{DynamicResource UiText.FontSize18}" Padding="8,4"
                 VerticalAlignment="Center" Classes="ghost"
                 Click="OnOptions" ToolTip.Tip="{loc:Text Key=Options}"/>
         <TextBlock Grid.Column="2" Text="OpenXLR" Classes="title" VerticalAlignment="Center"/>
@@ -178,7 +178,7 @@
                            TextTrimming="CharacterEllipsis"/>
               </Button>
             </Grid>
-            <DropDownButton Name="DevicePicker" Grid.Column="1" Content="{Binding ActiveDeviceName}" FontSize="11" Padding="6,1"
+            <DropDownButton Name="DevicePicker" Grid.Column="1" Content="{Binding ActiveDeviceName}" FontSize="{DynamicResource UiText.FontSize11}" Padding="6,1"
                             MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center" HorizontalAlignment="Left" Classes="ghost"
                             IsVisible="{Binding HasMultipleDevices}"
                             ToolTip.Tip="{Binding ActiveDeviceName, StringFormat={loc:Text Key=SelectInterfaceTip}}">
@@ -193,7 +193,7 @@
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="vm:DetectedDeviceItem">
                         <Button Content="{Binding Name}" HorizontalAlignment="Stretch"
-                                HorizontalContentAlignment="Left" FontSize="12"
+                                HorizontalContentAlignment="Left" FontSize="{DynamicResource UiText.FontSize12}"
                                 Classes="ghost" Click="OnPickDevice" Tag="{Binding}"/>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
@@ -204,14 +204,14 @@
         </Grid>
         <WrapPanel Name="HeaderActions" Grid.Column="3" ItemSpacing="8" LineSpacing="4" Margin="8,0,0,0"
                    HorizontalAlignment="Right" ItemsAlignment="End" VerticalAlignment="Center">
-          <DropDownButton Name="ProfilesButton" Content="{loc:Text Key=Profiles}" Padding="10,3" FontSize="12" Classes="ghost"
+          <DropDownButton Name="ProfilesButton" Content="{loc:Text Key=Profiles}" Padding="10,3" FontSize="{DynamicResource UiText.FontSize12}" Classes="ghost"
                           ToolTip.Tip="{loc:Text Key=SaveAndRecallCompleteScenesHardwareDSPPlus}">
             <DropDownButton.Flyout>
               <Flyout Placement="BottomEdgeAlignedRight">
                 <StackPanel MinWidth="240" Spacing="6">
                   <Grid ColumnDefinitions="*,Auto">
-                    <TextBox Name="ProfileNameBox" PlaceholderText="{loc:Text Key=ProfileName}" FontSize="12"/>
-                    <Button Grid.Column="1" Content="{loc:Text Key=Save}" Margin="6,0,0,0" FontSize="12"
+                    <TextBox Name="ProfileNameBox" PlaceholderText="{loc:Text Key=ProfileName}" FontSize="{DynamicResource UiText.FontSize12}"/>
+                    <Button Grid.Column="1" Content="{loc:Text Key=Save}" Margin="6,0,0,0" FontSize="{DynamicResource UiText.FontSize12}"
                             Click="OnProfileSave"/>
                   </Grid>
                   <ItemsControl ItemsSource="{Binding Profiles}">
@@ -219,25 +219,25 @@
                       <DataTemplate x:DataType="x:String">
                         <Grid ColumnDefinitions="*,Auto,Auto">
                           <Button Content="{Binding}" HorizontalAlignment="Stretch"
-                                  HorizontalContentAlignment="Left" FontSize="12"
+                                  HorizontalContentAlignment="Left" FontSize="{DynamicResource UiText.FontSize12}"
                                   Classes="ghost" Click="OnProfileLoad"
                                   ToolTip.Tip="{loc:Text Key=LoadThisProfile}"/>
-                          <Button Grid.Column="1" Content="{loc:Text Key=Save}" FontSize="11" Padding="6,3"
+                          <Button Grid.Column="1" Content="{loc:Text Key=Save}" FontSize="{DynamicResource UiText.FontSize11}" Padding="6,3"
                                   Classes="ghost" Click="OnProfileSaveOver"
                                   Tag="{Binding}" ToolTip.Tip="{loc:Text Key=SaveOverThisProfile}"/>
-                          <Button Grid.Column="2" Content="&#x2715;" FontSize="11" Padding="6,3"
+                          <Button Grid.Column="2" Content="&#x2715;" FontSize="{DynamicResource UiText.FontSize11}" Padding="6,3"
                                   Classes="ghost" Click="OnProfileDelete"
                                   Tag="{Binding}" ToolTip.Tip="{loc:Text Key=DeleteThisProfile}"/>
                         </Grid>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
-                  <TextBlock Text="{loc:Text Key=NoProfilesSavedYet}" Classes="h" FontSize="11"
+                  <TextBlock Text="{loc:Text Key=NoProfilesSavedYet}" Classes="h" FontSize="{DynamicResource UiText.FontSize11}"
                              IsVisible="{Binding !Profiles.Count}"/>
                   <Grid ColumnDefinitions="Auto,*" Margin="0,4,0,0" IsVisible="{Binding !!Profiles.Count}"
                         ToolTip.Tip="{loc:Text Key=RecalledWhenTheInterfaceConnectsDaemonStartA}">
-                    <TextBlock Text="{loc:Text Key=OnConnect}" Classes="h" FontSize="11" VerticalAlignment="Center"/>
-                    <ComboBox Grid.Column="1" Margin="8,0,0,0" FontSize="12" HorizontalAlignment="Stretch"
+                    <TextBlock Text="{loc:Text Key=OnConnect}" Classes="h" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center"/>
+                    <ComboBox Grid.Column="1" Margin="8,0,0,0" FontSize="{DynamicResource UiText.FontSize12}" HorizontalAlignment="Stretch"
                               ItemsSource="{Binding RecallChoices}"
                               SelectedItem="{Binding RecallOnConnectChoice}" IsEnabled="{Binding DeviceConnected}"/>
                   </Grid>
@@ -245,20 +245,20 @@
               </Flyout>
             </DropDownButton.Flyout>
           </DropDownButton>
-          <ToggleButton Name="ArrangeButton" Content="{loc:Text Key=Arrange}" Padding="10,3" FontSize="12" Classes="ghost"
+          <ToggleButton Name="ArrangeButton" Content="{loc:Text Key=Arrange}" Padding="10,3" FontSize="{DynamicResource UiText.FontSize12}" Classes="ghost"
                         Click="OnArrange" IsVisible="{Binding !IsMiniView}"
                         ToolTip.Tip="{loc:Text Key=ShowHandlesToMoveSectionsChannelsAnd}"/>
-          <Button Name="FlowButton" Content="{loc:Text Key=Flow}" Padding="10,3" FontSize="12" Classes="ghost"
+          <Button Name="FlowButton" Content="{loc:Text Key=Flow}" Padding="10,3" FontSize="{DynamicResource UiText.FontSize12}" Classes="ghost"
                   Click="OnFlow" ToolTip.Tip="{loc:Text Key=ShowTheLiveAudioRoutingGraph}"/>
-          <Button Name="RestartDaemonButton" Content="{loc:Text Key=RestartDaemon}" Padding="10,3" FontSize="12" Classes="ghost"
+          <Button Name="RestartDaemonButton" Content="{loc:Text Key=RestartDaemon}" Padding="10,3" FontSize="{DynamicResource UiText.FontSize12}" Classes="ghost"
                   IsEnabled="{Binding DaemonRestart.CanRestart}" Click="OnRestartDaemon"
                   ToolTip.Tip="{loc:Text Key=RestartTheOpenXLRUserServiceAudioWillBe}"/>
           <TextBlock Name="HeaderVersion" Text="v0.0.0" Classes="h" VerticalAlignment="Center"/>
-          <Button Name="AboutButton" Content="{loc:Text Key=About}" Padding="10,3" FontSize="12" Classes="ghost"
+          <Button Name="AboutButton" Content="{loc:Text Key=About}" Padding="10,3" FontSize="{DynamicResource UiText.FontSize12}" Classes="ghost"
                   Click="OnAbout"/>
           <!-- the actions a skin puts in its overflow, moved here from the row
                above: the same controls with the same handlers -->
-          <DropDownButton Name="HeaderOverflow" Content="⋯" Padding="10,3" FontSize="12" Classes="ghost" IsVisible="False"
+          <DropDownButton Name="HeaderOverflow" Content="⋯" Padding="10,3" FontSize="{DynamicResource UiText.FontSize12}" Classes="ghost" IsVisible="False"
                           AutomationProperties.Name="{loc:Text Key=MoreActions}" ToolTip.Tip="{loc:Text Key=MoreActions}">
             <DropDownButton.Flyout>
               <Flyout Placement="BottomEdgeAlignedRight">
@@ -278,10 +278,10 @@
     <!-- a card profile without a microphone input is the one warning with a
          manual section of its own -->
     <DockPanel Margin="0,0,0,8" IsVisible="{Binding DaemonWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-      <Button Name="CardProfileManual" DockPanel.Dock="Right" Content="{loc:Text Key=Manual}" Padding="10,3" FontSize="12"
+      <Button Name="CardProfileManual" DockPanel.Dock="Right" Content="{loc:Text Key=Manual}" Padding="10,3" FontSize="{DynamicResource UiText.FontSize12}"
               VerticalAlignment="Center" Margin="12,0,0,0" IsVisible="{Binding CardProfileProblem}" Click="OnCardProfileManual"
               ToolTip.Tip="{loc:Text Key=OpenTheManualSectionOnCardProfiles}"/>
-      <TextBlock Text="{Binding DaemonWarning}" Classes="alert" TextWrapping="Wrap" FontSize="12" VerticalAlignment="Center"/>
+      <TextBlock Text="{Binding DaemonWarning}" Classes="alert" TextWrapping="Wrap" FontSize="{DynamicResource UiText.FontSize12}" VerticalAlignment="Center"/>
     </DockPanel>
 
     <Border Classes="card" Margin="0,0,0,8" IsVisible="{Binding Updates.BannerVisible}">
@@ -296,7 +296,7 @@
     <!-- a daemon left running across an upgrade offers the old version's controls -->
     <Border Classes="card" Margin="0,0,0,8" IsVisible="{Binding DaemonVersionMismatch}">
       <DockPanel>
-        <Button DockPanel.Dock="Right" Content="{loc:Text Key=RestartDaemon}" Padding="10,3" FontSize="12"
+        <Button DockPanel.Dock="Right" Content="{loc:Text Key=RestartDaemon}" Padding="10,3" FontSize="{DynamicResource UiText.FontSize12}"
                 IsEnabled="{Binding DaemonRestart.CanRestart}"
                 VerticalAlignment="Center" Click="OnRestartDaemon"
                 ToolTip.Tip="systemctl --user restart openxlr-daemon"/>
@@ -351,20 +351,20 @@
              microphone, or none does, the input moves under the strip's own
              controls with a heading that says where it plays. -->
         <Grid Name="Xlr1Section" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="4">
-          <Grid Name="Xlr1Binding" ColumnDefinitions="90,*" IsVisible="{Binding HasXlr1Strip}">
-            <TextBlock Text="{Binding Xlr1InputLabel}" Classes="h" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+          <Grid Name="Xlr1Binding" ColumnDefinitions="Auto,*" IsVisible="{Binding HasXlr1Strip}">
+            <TextBlock Text="{Binding Xlr1InputLabel}" Classes="h" Width="{DynamicResource UiText.Width90}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
             <StackPanel Grid.Column="1" Spacing="2">
               <!-- the chip, then the microphone's EQ and noise removal at the chip's height; a grid,
                    so a long source name trims before the buttons leave the row -->
               <Grid Name="Xlr1ChipRow" ColumnDefinitions="*,Auto,Auto,Auto" HorizontalAlignment="Left">
                 <views:BindingChip DataContext="{Binding Xlr1Strip}" HorizontalAlignment="Left"/>
-                <Button Name="Xlr1Eq" Grid.Column="1" Content="{loc:Text Key=Eq}" Classes="fx" Margin="6,0,0,0" Padding="6,1" BorderThickness="0" FontSize="11"
+                <Button Name="Xlr1Eq" Grid.Column="1" Content="{loc:Text Key=Eq}" Classes="fx" Margin="6,0,0,0" Padding="6,1" BorderThickness="0" FontSize="{DynamicResource UiText.FontSize11}"
                         MinWidth="0" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalContentAlignment="Center"
                         Classes.fxOn="{Binding Xlr1Strip.Eq.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Xlr1Strip.Eq.IsFaulty, FallbackValue=False}"
                         IsVisible="{Binding Xlr1Strip.HasEq, FallbackValue=False}" Tag="xlr1" Click="OnEq"
                         AutomationProperties.Name="{Binding Xlr1Strip.Eq.ButtonName, FallbackValue=''}"
                         ToolTip.Tip="{Binding Xlr1Strip.Eq.ButtonTip, FallbackValue=''}"/>
-                <Button Name="Xlr1Noise" Grid.Column="2" Content="{loc:Text Key=NoiseButton}" Classes="fx" Margin="4,0,0,0" Padding="6,1" BorderThickness="0" FontSize="11"
+                <Button Name="Xlr1Noise" Grid.Column="2" Content="{loc:Text Key=NoiseButton}" Classes="fx" Margin="4,0,0,0" Padding="6,1" BorderThickness="0" FontSize="{DynamicResource UiText.FontSize11}"
                         MinWidth="0" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalContentAlignment="Center"
                         Classes.fxOn="{Binding Xlr1Strip.Noise.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Xlr1Strip.Noise.IsFaulty, FallbackValue=False}"
                         IsVisible="{Binding Xlr1Strip.HasNoise, FallbackValue=False}"
@@ -377,7 +377,7 @@
                     </Flyout>
                   </Button.Flyout>
                 </Button>
-                <Button Name="Xlr1Dynamics" Grid.Column="3" Content="{loc:Text Key=Dynamics}" Classes="fx" Margin="4,0,0,0" Padding="6,1" BorderThickness="0" FontSize="11"
+                <Button Name="Xlr1Dynamics" Grid.Column="3" Content="{loc:Text Key=Dynamics}" Classes="fx" Margin="4,0,0,0" Padding="6,1" BorderThickness="0" FontSize="{DynamicResource UiText.FontSize11}"
                         MinWidth="0" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalContentAlignment="Center"
                         Classes.fxOn="{Binding Xlr1Strip.Dynamics.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Xlr1Strip.Dynamics.IsFaulty, FallbackValue=False}"
                         IsVisible="{Binding Xlr1Strip.HasDynamics, FallbackValue=False}"
@@ -391,35 +391,35 @@
                   </Button.Flyout>
                 </Button>
               </Grid>
-              <TextBlock Text="{Binding Xlr1Strip.BindingWarning}" Classes="hint" FontSize="11" TextWrapping="Wrap"
+              <TextBlock Text="{Binding Xlr1Strip.BindingWarning}" Classes="hint" FontSize="{DynamicResource UiText.FontSize11}" TextWrapping="Wrap"
                          IsVisible="{Binding Xlr1Strip.HasBindingWarning, FallbackValue=False}"/>
             </StackPanel>
           </Grid>
           <!-- an additional interface's input while XLR 1 is bound to it:
                the controls the additional interfaces window draws for it -->
-          <Grid Name="Xlr1ExtraUnit" Grid.Row="1" ColumnDefinitions="90,*"
+          <Grid Name="Xlr1ExtraUnit" Grid.Row="1" ColumnDefinitions="Auto,*"
                 IsVisible="{Binding Xlr1Strip.CarriesExtraUnit, FallbackValue=False}">
-            <TextBlock Text="{loc:Text Key=UnitInputGain}" Classes="h" VerticalAlignment="Top" Margin="0,6,0,0"/>
+            <TextBlock Text="{loc:Text Key=UnitInputGain}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Top" Margin="0,6,0,0"/>
             <views:WaveUnitControls Grid.Column="1" DataContext="{Binding Xlr1Strip.ExtraUnitInput}"/>
           </Grid>
           <StackPanel Name="Input1Block" Grid.Row="{Binding UnitInput1.BlockRow}" Spacing="4">
             <Grid Name="Input1Heading" ColumnDefinitions="*,Auto" ColumnSpacing="6" IsVisible="{Binding UnitInput1.Elsewhere}" Margin="0,4,0,0">
               <TextBlock Text="{Binding UnitInput1.Heading}" Classes="h" TextWrapping="Wrap" VerticalAlignment="Center"/>
-              <ToggleButton Name="Input1Fold" Grid.Column="1" Classes="ghost" Padding="6,1" FontSize="11"
+              <ToggleButton Name="Input1Fold" Grid.Column="1" Classes="ghost" Padding="6,1" FontSize="{DynamicResource UiText.FontSize11}"
                             Content="{Binding UnitInput1.Expanded, Converter={x:Static vm:Converters.Chevron}}"
                             MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                             IsChecked="{Binding UnitInput1.Expanded, Mode=TwoWay}" IsVisible="{Binding UnitInput1.CanFold}"
                             AutomationProperties.Name="{Binding UnitInput1.Heading}"/>
             </Grid>
             <StackPanel Spacing="4" IsVisible="{Binding UnitInput1.ControlsShown}">
-              <Grid ColumnDefinitions="90,*,64,Auto">
-                <TextBlock Text="{Binding UnitInput1.GainLabel}" Classes="h" VerticalAlignment="Center"/>
+              <Grid ColumnDefinitions="Auto,*,64,Auto">
+                <TextBlock Text="{Binding UnitInput1.GainLabel}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
                 <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="{Binding GainMaxDb}"
                         Value="{Binding GainDb, Mode=TwoWay}" IsEnabled="{Binding !GainLocked}"
                         AutomationProperties.Name="{Binding UnitInput1.GainName}"/>
                 <TextBlock Grid.Column="2" Text="{Binding GainText}" Classes="val" VerticalAlignment="Center"
                            HorizontalAlignment="Right"/>
-                <ToggleButton Grid.Column="3" Content="{loc:Text Key=Lock}" Classes="mute" FontSize="11" Padding="8,2"
+                <ToggleButton Grid.Column="3" Content="{loc:Text Key=Lock}" Classes="mute" FontSize="{DynamicResource UiText.FontSize11}" Padding="8,2"
                               Margin="6,0,0,0" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowGainLock}"
                               IsChecked="{Binding GainLocked, Mode=TwoWay}" VerticalAlignment="Center"
                               ToolTip.Tip="{loc:Text Key=GainLockTheDaemonRejectsEveryGainChange}"/>
@@ -436,8 +436,8 @@
                 <ToggleButton Content="{loc:Text Key=Compressor}" IsChecked="{Binding Compressor, Mode=TwoWay}"
                               IsVisible="{Binding CapCompressor}"/>
               </WrapPanel>
-              <Grid ColumnDefinitions="90,*,64" IsVisible="{Binding VoiceTune}">
-                <TextBlock Text="{loc:Text Key=VTStrength}" Classes="h" VerticalAlignment="Center"/>
+              <Grid ColumnDefinitions="Auto,*,64" IsVisible="{Binding VoiceTune}">
+                <TextBlock Text="{loc:Text Key=VTStrength}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
                 <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="100"
                         Value="{Binding VoiceTuneStrength, Mode=TwoWay}"/>
                 <TextBlock Grid.Column="2" Text="{Binding VoiceTuneStrengthText}" Classes="val"
@@ -463,11 +463,11 @@
                  window adds, reorders and removes; each plugin's controls open
                  in their own window. -->
             <StackPanel Spacing="4" Margin="0,4,0,0" IsVisible="{Binding HasMixer}">
-              <Grid ColumnDefinitions="90,*,Auto">
-                <TextBlock Text="{loc:Text Key=Inserts}" Classes="h" VerticalAlignment="Center"
+              <Grid ColumnDefinitions="Auto,*,Auto">
+                <TextBlock Text="{loc:Text Key=Inserts}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"
                            ToolTip.Tip="{loc:Text Key=PluginsProcessingXLR1BeforeItReachesThe}"/>
                 <Button Grid.Column="2" Content="{Binding Inserts.ButtonText}" Classes="fx" Classes.fxOn="{Binding Inserts.IsProcessing}" Classes.fxOff="{Binding Inserts.IsOff}"
-                        Padding="12,3" FontSize="12" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                        Padding="12,3" FontSize="{DynamicResource UiText.FontSize12}" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                         Click="OnXlrInserts" ToolTip.Tip="{loc:Text Key=PluginsProcessingXLR1BeforeItReachesThe}"/>
               </Grid>
               <!-- the chain at a glance: LED, name, bypass, controls; adding,
@@ -480,11 +480,11 @@
                                       AutomationProperties.Name="{loc:Text Key=PluginState}"/>
                       <Grid Grid.Column="1" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"
                             ColumnSpacing="8" VerticalAlignment="Center" ClipToBounds="True">
-                        <TextBlock Text="{Binding Label}" Classes="insertName body" FontSize="12"
+                        <TextBlock Text="{Binding Label}" Classes="insertName body" FontSize="{DynamicResource UiText.FontSize12}"
                                    TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
-                        <TextBlock Grid.Column="1" Text="{Binding StateText}" Classes="h" FontSize="11"/>
+                        <TextBlock Grid.Column="1" Text="{Binding StateText}" Classes="h" FontSize="{DynamicResource UiText.FontSize11}"/>
                         <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Error}" Classes="warn"
-                                   FontSize="11" TextWrapping="Wrap" IsVisible="{Binding HasError}"/>
+                                   FontSize="{DynamicResource UiText.FontSize11}" TextWrapping="Wrap" IsVisible="{Binding HasError}"/>
                       </Grid>
                       <ToggleButton Grid.Column="2" Content="{loc:Text Key=NativeHostLetter}" Classes="insertmini"
                                     IsChecked="{Binding NativeHost, Mode=TwoWay}"
@@ -512,20 +512,20 @@
         <!-- XLR 2: the same, on an interface with a second input, or bound to a source
              so that a one-input interface has a second microphone strip -->
         <Grid Name="Xlr2Section" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="4" Margin="0,2,0,0" IsVisible="{Binding ShowXlr2Section}">
-          <Grid Name="Xlr2Binding" ColumnDefinitions="90,*" IsVisible="{Binding HasXlr2Strip}">
-            <TextBlock Text="{Binding Xlr2InputLabel}" Classes="h" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+          <Grid Name="Xlr2Binding" ColumnDefinitions="Auto,*" IsVisible="{Binding HasXlr2Strip}">
+            <TextBlock Text="{Binding Xlr2InputLabel}" Classes="h" Width="{DynamicResource UiText.Width90}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
             <StackPanel Grid.Column="1" Spacing="2">
               <!-- the chip, then the microphone's EQ and noise removal at the chip's height; a grid,
                    so a long source name trims before the buttons leave the row -->
               <Grid Name="Xlr2ChipRow" ColumnDefinitions="*,Auto,Auto,Auto" HorizontalAlignment="Left">
                 <views:BindingChip DataContext="{Binding Xlr2Strip}" HorizontalAlignment="Left"/>
-                <Button Name="Xlr2Eq" Grid.Column="1" Content="{loc:Text Key=Eq}" Classes="fx" Margin="6,0,0,0" Padding="6,1" BorderThickness="0" FontSize="11"
+                <Button Name="Xlr2Eq" Grid.Column="1" Content="{loc:Text Key=Eq}" Classes="fx" Margin="6,0,0,0" Padding="6,1" BorderThickness="0" FontSize="{DynamicResource UiText.FontSize11}"
                         MinWidth="0" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalContentAlignment="Center"
                         Classes.fxOn="{Binding Xlr2Strip.Eq.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Xlr2Strip.Eq.IsFaulty, FallbackValue=False}"
                         IsVisible="{Binding Xlr2Strip.HasEq, FallbackValue=False}" Tag="xlr2" Click="OnEq"
                         AutomationProperties.Name="{Binding Xlr2Strip.Eq.ButtonName, FallbackValue=''}"
                         ToolTip.Tip="{Binding Xlr2Strip.Eq.ButtonTip, FallbackValue=''}"/>
-                <Button Name="Xlr2Noise" Grid.Column="2" Content="{loc:Text Key=NoiseButton}" Classes="fx" Margin="4,0,0,0" Padding="6,1" BorderThickness="0" FontSize="11"
+                <Button Name="Xlr2Noise" Grid.Column="2" Content="{loc:Text Key=NoiseButton}" Classes="fx" Margin="4,0,0,0" Padding="6,1" BorderThickness="0" FontSize="{DynamicResource UiText.FontSize11}"
                         MinWidth="0" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalContentAlignment="Center"
                         Classes.fxOn="{Binding Xlr2Strip.Noise.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Xlr2Strip.Noise.IsFaulty, FallbackValue=False}"
                         IsVisible="{Binding Xlr2Strip.HasNoise, FallbackValue=False}"
@@ -538,7 +538,7 @@
                     </Flyout>
                   </Button.Flyout>
                 </Button>
-                <Button Name="Xlr2Dynamics" Grid.Column="3" Content="{loc:Text Key=Dynamics}" Classes="fx" Margin="4,0,0,0" Padding="6,1" BorderThickness="0" FontSize="11"
+                <Button Name="Xlr2Dynamics" Grid.Column="3" Content="{loc:Text Key=Dynamics}" Classes="fx" Margin="4,0,0,0" Padding="6,1" BorderThickness="0" FontSize="{DynamicResource UiText.FontSize11}"
                         MinWidth="0" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalContentAlignment="Center"
                         Classes.fxOn="{Binding Xlr2Strip.Dynamics.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Xlr2Strip.Dynamics.IsFaulty, FallbackValue=False}"
                         IsVisible="{Binding Xlr2Strip.HasDynamics, FallbackValue=False}"
@@ -552,29 +552,29 @@
                   </Button.Flyout>
                 </Button>
               </Grid>
-              <TextBlock Text="{Binding Xlr2Strip.BindingWarning}" Classes="hint" FontSize="11" TextWrapping="Wrap"
+              <TextBlock Text="{Binding Xlr2Strip.BindingWarning}" Classes="hint" FontSize="{DynamicResource UiText.FontSize11}" TextWrapping="Wrap"
                          IsVisible="{Binding Xlr2Strip.HasBindingWarning, FallbackValue=False}"/>
             </StackPanel>
           </Grid>
           <!-- an additional interface's input while XLR 2 is bound to it:
                the controls the additional interfaces window draws for it -->
-          <Grid Name="Xlr2ExtraUnit" Grid.Row="1" ColumnDefinitions="90,*"
+          <Grid Name="Xlr2ExtraUnit" Grid.Row="1" ColumnDefinitions="Auto,*"
                 IsVisible="{Binding Xlr2Strip.CarriesExtraUnit, FallbackValue=False}">
-            <TextBlock Text="{loc:Text Key=UnitInputGain}" Classes="h" VerticalAlignment="Top" Margin="0,6,0,0"/>
+            <TextBlock Text="{loc:Text Key=UnitInputGain}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Top" Margin="0,6,0,0"/>
             <views:WaveUnitControls Grid.Column="1" DataContext="{Binding Xlr2Strip.ExtraUnitInput}"/>
           </Grid>
           <StackPanel Name="Input2Block" Grid.Row="{Binding UnitInput2.BlockRow}" Spacing="4" IsVisible="{Binding HasXlr2}">
             <Grid Name="Input2Heading" ColumnDefinitions="*,Auto" ColumnSpacing="6" IsVisible="{Binding UnitInput2.Elsewhere}" Margin="0,4,0,0">
               <TextBlock Text="{Binding UnitInput2.Heading}" Classes="h" TextWrapping="Wrap" VerticalAlignment="Center"/>
-              <ToggleButton Name="Input2Fold" Grid.Column="1" Classes="ghost" Padding="6,1" FontSize="11"
+              <ToggleButton Name="Input2Fold" Grid.Column="1" Classes="ghost" Padding="6,1" FontSize="{DynamicResource UiText.FontSize11}"
                             Content="{Binding UnitInput2.Expanded, Converter={x:Static vm:Converters.Chevron}}"
                             MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                             IsChecked="{Binding UnitInput2.Expanded, Mode=TwoWay}" IsVisible="{Binding UnitInput2.CanFold}"
                             AutomationProperties.Name="{Binding UnitInput2.Heading}"/>
             </Grid>
             <StackPanel Spacing="4" IsVisible="{Binding UnitInput2.ControlsShown}">
-              <Grid ColumnDefinitions="90,*,64">
-                <TextBlock Text="{Binding UnitInput2.GainLabel}" Classes="h" VerticalAlignment="Center"/>
+              <Grid ColumnDefinitions="Auto,*,64">
+                <TextBlock Text="{Binding UnitInput2.GainLabel}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
                 <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="{Binding GainMaxDb}"
                         Value="{Binding Gain2Db, Mode=TwoWay}" IsEnabled="{Binding !GainLocked}"
                         AutomationProperties.Name="{Binding UnitInput2.GainName}"/>
@@ -592,8 +592,8 @@
                 <ToggleButton Content="{loc:Text Key=ClipGuard}" IsChecked="{Binding ClipGuard2, Mode=TwoWay}"/>
                 <ToggleButton Content="{loc:Text Key=Compressor}" IsChecked="{Binding Compressor2, Mode=TwoWay}"/>
               </WrapPanel>
-              <Grid ColumnDefinitions="90,*,64" IsVisible="{Binding VoiceTune2}">
-                <TextBlock Text="{loc:Text Key=VTStrength}" Classes="h" VerticalAlignment="Center"/>
+              <Grid ColumnDefinitions="Auto,*,64" IsVisible="{Binding VoiceTune2}">
+                <TextBlock Text="{loc:Text Key=VTStrength}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
                 <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="100"
                         Value="{Binding VoiceTuneStrength2, Mode=TwoWay}"/>
                 <TextBlock Grid.Column="2" Text="{Binding VoiceTuneStrength2Text}" Classes="val"
@@ -603,11 +603,11 @@
           </StackPanel>
           <!-- XLR 2 plugin inserts: same chain concept, its own mono filter-chain, after its EQ -->
           <StackPanel Grid.Row="2" Spacing="4" Margin="0,4,0,0" IsVisible="{Binding HasMixer}">
-            <Grid ColumnDefinitions="90,*,Auto">
-              <TextBlock Text="{loc:Text Key=Inserts}" Classes="h" VerticalAlignment="Center"
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <TextBlock Text="{loc:Text Key=Inserts}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"
                          ToolTip.Tip="{loc:Text Key=PluginsProcessingXLR2BeforeItReachesThe}"/>
               <Button Grid.Column="2" Content="{Binding Inserts2.ButtonText}" Classes="fx" Classes.fxOn="{Binding Inserts2.IsProcessing}" Classes.fxOff="{Binding Inserts2.IsOff}"
-                      Padding="12,3" FontSize="12" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                      Padding="12,3" FontSize="{DynamicResource UiText.FontSize12}" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                       Tag="xlr2" Click="OnXlrInserts" ToolTip.Tip="{loc:Text Key=PluginsProcessingXLR2BeforeItReachesThe}"/>
             </Grid>
             <!-- the chain at a glance: LED, name, bypass, controls; adding,
@@ -620,11 +620,11 @@
                                     AutomationProperties.Name="{loc:Text Key=PluginState}"/>
                     <Grid Grid.Column="1" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"
                           ColumnSpacing="8" VerticalAlignment="Center" ClipToBounds="True">
-                      <TextBlock Text="{Binding Label}" Classes="insertName body" FontSize="12"
+                      <TextBlock Text="{Binding Label}" Classes="insertName body" FontSize="{DynamicResource UiText.FontSize12}"
                                  TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
-                      <TextBlock Grid.Column="1" Text="{Binding StateText}" Classes="h" FontSize="11"/>
+                      <TextBlock Grid.Column="1" Text="{Binding StateText}" Classes="h" FontSize="{DynamicResource UiText.FontSize11}"/>
                       <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Error}" Classes="warn"
-                                 FontSize="11" TextWrapping="Wrap" IsVisible="{Binding HasError}"/>
+                                 FontSize="{DynamicResource UiText.FontSize11}" TextWrapping="Wrap" IsVisible="{Binding HasError}"/>
                     </Grid>
                     <ToggleButton Grid.Column="2" Content="{loc:Text Key=NativeHostLetter}" Classes="insertmini"
                                   IsChecked="{Binding NativeHost, Mode=TwoWay}"
@@ -649,8 +649,8 @@
         </Grid>
 
         <!-- USB Aux input stage; its readout shows Aux In's volume while that fader moves and for a second after -->
-        <Grid Name="AuxInRow" ColumnDefinitions="90,*,64,20,110" Margin="0,2,0,0" IsVisible="{Binding CapAuxInput}">
-          <TextBlock Text="{loc:Text Key=USBAuxIn}" Classes="h" VerticalAlignment="Center"/>
+        <Grid Name="AuxInRow" ColumnDefinitions="Auto,*,64,20,110" Margin="0,2,0,0" IsVisible="{Binding CapAuxInput}">
+          <TextBlock Text="{loc:Text Key=USBAuxIn}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
           <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="-60" Maximum="0"
                   Value="{Binding AuxLevelDb, Mode=TwoWay}" AutomationProperties.Name="{loc:Text Key=USBAuxIn}"/>
           <TextBlock Grid.Column="2" Name="AuxInReadout" Text="{Binding AuxReadout}" Classes="val" VerticalAlignment="Center"
@@ -659,8 +659,8 @@
         </Grid>
         <!-- the Wave XLR Pro's analog Line In, an input of its own; its readout shows Line In's
              volume while that fader moves and for a second after -->
-        <Grid Name="LineInRow" ColumnDefinitions="90,*,64,20,110" Margin="0,2,0,0" IsVisible="{Binding ShowLineInRow}">
-          <TextBlock Text="{loc:Text Key=LineIn}" Classes="h" VerticalAlignment="Center"/>
+        <Grid Name="LineInRow" ColumnDefinitions="Auto,*,64,20,110" Margin="0,2,0,0" IsVisible="{Binding ShowLineInRow}">
+          <TextBlock Text="{loc:Text Key=LineIn}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
           <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="{Binding LineInGainMaxDb}"
                   Value="{Binding LineInGainSliderDb, Mode=TwoWay}" AutomationProperties.Name="{loc:Text Key=LineInGain}"/>
           <TextBlock Grid.Column="2" Name="LineInReadout" Text="{Binding LineInReadout}" Classes="val" VerticalAlignment="Center"
@@ -683,13 +683,13 @@
                      the button letters at the size the chip letters its source in, so they stay level -->
                 <Grid Name="CaptureChipRow" ColumnDefinitions="*,Auto,Auto,Auto" HorizontalAlignment="Left">
                   <views:CaptureSourceChip HorizontalAlignment="Left"/>
-                  <Button Name="CaptureEq" Grid.Column="1" Content="{loc:Text Key=Eq}" Classes="fx" Margin="6,0,0,0" Padding="6,1" BorderThickness="0" FontSize="11"
+                  <Button Name="CaptureEq" Grid.Column="1" Content="{loc:Text Key=Eq}" Classes="fx" Margin="6,0,0,0" Padding="6,1" BorderThickness="0" FontSize="{DynamicResource UiText.FontSize11}"
                           MinWidth="0" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalContentAlignment="Center"
                           Classes.fxOn="{Binding Eq.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Eq.IsFaulty, FallbackValue=False}"
                           IsVisible="{Binding HasEq}" Tag="{Binding Id}" Click="OnEq"
                           AutomationProperties.Name="{Binding Eq.ButtonName, FallbackValue=''}"
                           ToolTip.Tip="{Binding Eq.ButtonTip, FallbackValue=''}"/>
-                  <Button Name="CaptureNoise" Grid.Column="2" Content="{loc:Text Key=NoiseButton}" Classes="fx" Margin="4,0,0,0" Padding="6,1" BorderThickness="0" FontSize="11"
+                  <Button Name="CaptureNoise" Grid.Column="2" Content="{loc:Text Key=NoiseButton}" Classes="fx" Margin="4,0,0,0" Padding="6,1" BorderThickness="0" FontSize="{DynamicResource UiText.FontSize11}"
                           MinWidth="0" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalContentAlignment="Center"
                           Classes.fxOn="{Binding Noise.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Noise.IsFaulty, FallbackValue=False}"
                           IsVisible="{Binding HasNoise, FallbackValue=False}"
@@ -702,7 +702,7 @@
                       </Flyout>
                     </Button.Flyout>
                   </Button>
-                  <Button Name="CaptureDynamics" Grid.Column="3" Content="{loc:Text Key=Dynamics}" Classes="fx" Margin="4,0,0,0" Padding="6,1" BorderThickness="0" FontSize="11"
+                  <Button Name="CaptureDynamics" Grid.Column="3" Content="{loc:Text Key=Dynamics}" Classes="fx" Margin="4,0,0,0" Padding="6,1" BorderThickness="0" FontSize="{DynamicResource UiText.FontSize11}"
                           MinWidth="0" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalContentAlignment="Center"
                           Classes.fxOn="{Binding Dynamics.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Dynamics.IsFaulty, FallbackValue=False}"
                           IsVisible="{Binding HasDynamics, FallbackValue=False}"
@@ -716,32 +716,32 @@
                     </Button.Flyout>
                   </Button>
                 </Grid>
-                <TextBlock Text="{Binding BindingWarning}" Classes="hint" FontSize="11"
+                <TextBlock Text="{Binding BindingWarning}" Classes="hint" FontSize="{DynamicResource UiText.FontSize11}"
                            TextWrapping="Wrap" IsVisible="{Binding HasBindingWarning}"/>
                 <!-- the source's own gain, on a source OpenXLR does not drive; its readout shows the
                      channel's volume while that fader moves and for a second after -->
-                <Grid Name="CaptureGainRow" ColumnDefinitions="90,*,Auto,64" IsVisible="{Binding ShowsCaptureGain}">
-                  <TextBlock Text="{loc:Text Key=UnitInputGain}" Classes="h" VerticalAlignment="Center"/>
+                <Grid Name="CaptureGainRow" ColumnDefinitions="Auto,*,Auto,64" IsVisible="{Binding ShowsCaptureGain}">
+                  <TextBlock Text="{loc:Text Key=UnitInputGain}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
                   <Slider Grid.Column="1" vm:FaderInput.Step="1" Minimum="{Binding CaptureGainMinDb}" Maximum="{Binding CaptureGainMaxDb}"
                           Value="{Binding CaptureGainDb, Mode=TwoWay}"
                           AutomationProperties.Name="{Binding CaptureGainName}" ToolTip.Tip="{Binding CaptureGainTip}"/>
                   <TextBlock Grid.Column="3" Name="CaptureGainReadout" Text="{Binding Readout}" Classes="val" VerticalAlignment="Center"
                              HorizontalAlignment="Right" AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
                 </Grid>
-                <Grid ColumnDefinitions="90,*,Auto,64" IsVisible="{Binding HasVolume}">
-                  <TextBlock Text="{loc:Text Key=Volume}" Classes="h" VerticalAlignment="Center"/>
+                <Grid ColumnDefinitions="Auto,*,Auto,64" IsVisible="{Binding HasVolume}">
+                  <TextBlock Text="{loc:Text Key=Volume}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
                   <Slider Grid.Column="1" vm:FaderInput.Step="0.01" Minimum="0" Maximum="1" Value="{Binding Volume, Mode=TwoWay}"
                           vm:FaderInput.IsAdjusting="{Binding VolumeAdjusting, Mode=OneWayToSource}"
                           AutomationProperties.Name="{Binding Name, StringFormat={loc:Text Key=ChannelVolumeName}}" ToolTip.Tip="{Binding VolumeTip}"/>
-                  <TextBlock Grid.Column="2" Text="&#x24D8;" Classes="h" FontSize="12"
+                  <TextBlock Grid.Column="2" Text="&#x24D8;" Classes="h" FontSize="{DynamicResource UiText.FontSize12}"
                              VerticalAlignment="Center" IsVisible="{Binding DirectMonitored}" ToolTip.Tip="{Binding VolumeTip}"
                              AutomationProperties.Name="{loc:Text Key=ChannelVolumeMixesOnly}"/>
                   <TextBlock Grid.Column="3" Text="{Binding VolumeText}" Classes="val" VerticalAlignment="Center" HorizontalAlignment="Right"/>
                 </Grid>
                 <StackPanel Name="CaptureExtraUnit" Spacing="4" IsVisible="{Binding CarriesExtraUnit}">
                   <TextBlock Text="{Binding ExtraUnitInput.Unit.Name}" Classes="h" TextWrapping="Wrap"/>
-                  <Grid ColumnDefinitions="90,*">
-                    <TextBlock Text="{loc:Text Key=UnitInputGain}" Classes="h" VerticalAlignment="Top" Margin="0,6,0,0"/>
+                  <Grid ColumnDefinitions="Auto,*">
+                    <TextBlock Text="{loc:Text Key=UnitInputGain}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Top" Margin="0,6,0,0"/>
                     <views:WaveUnitControls Grid.Column="1" DataContext="{Binding ExtraUnitInput}"/>
                   </Grid>
                 </StackPanel>
@@ -770,8 +770,8 @@
           <TextBlock Text="{loc:Text Key=HEADPHONES}" Classes="h" VerticalAlignment="Center"/>
         </StackPanel></Expander.Header>
       <StackPanel Classes="dev" Spacing="4">
-        <Grid Name="HeadphoneControls" ColumnDefinitions="90,*,64,20,90,*,64">
-          <Grid Name="Phones1Label" ColumnDefinitions="Auto,*" VerticalAlignment="Center" ToolTip.Tip="{loc:Text Key=FrontJack}"
+        <Grid Name="HeadphoneControls" ColumnDefinitions="Auto,*,64,20,Auto,*,64" Grid.IsSharedSizeScope="True">
+          <Grid Name="Phones1Label" ColumnDefinitions="Auto,*" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center" ToolTip.Tip="{loc:Text Key=FrontJack}"
                 DataContext="{Binding Phones1Appearance}" x:DataType="vm:LayoutAppearanceViewModel">
             <vm:LayoutIconBlock Icon="{Binding Icon}" Fallback="{Binding DefaultIcon}" Classes="h" Classes.layoutAccent="{Binding HasColour}"
                                 IsVisible="{Binding HasIcon}" Margin="0,0,5,0" VerticalAlignment="Center"/>
@@ -783,7 +783,7 @@
           <TextBlock Grid.Column="2" Text="{Binding HpText}" Classes="val" VerticalAlignment="Center"
                      HorizontalAlignment="Right"/>
           <Panel Grid.Column="4" IsVisible="{Binding HasHp2}" VerticalAlignment="Center">
-            <Grid Name="Phones2Label" ColumnDefinitions="Auto,*" ToolTip.Tip="{loc:Text Key=RearJack}"
+            <Grid Name="Phones2Label" ColumnDefinitions="Auto,*" MinWidth="{DynamicResource UiText.Width90}" ToolTip.Tip="{loc:Text Key=RearJack}"
                   DataContext="{Binding Phones2Appearance}" x:DataType="vm:LayoutAppearanceViewModel">
               <vm:LayoutIconBlock Icon="{Binding Icon}" Fallback="{Binding DefaultIcon}" Classes="h" Classes.layoutAccent="{Binding HasColour}"
                                   IsVisible="{Binding HasIcon}" Margin="0,0,5,0" VerticalAlignment="Center"/>
@@ -797,17 +797,17 @@
                      HorizontalAlignment="Right" IsVisible="{Binding HasHp2}"/>
         </Grid>
         <!-- hardware zero-latency blend between mic direct and PC playback;
-             the value column fits the widest readout, "mic +100" -->
-        <Grid ColumnDefinitions="90,*,74" IsVisible="{Binding CapCrossfade}">
-          <TextBlock Text="{loc:Text Key=MicPC}" Classes="h" VerticalAlignment="Center"
+             the value column can grow for larger text and translated readouts -->
+        <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding CapCrossfade}">
+          <TextBlock Text="{loc:Text Key=MicPC}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"
                      ToolTip.Tip="{loc:Text Key=DirectMonitorBlendLeftOnlyYourMicRight}"/>
           <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="200"
                   Value="{Binding Crossfade, Mode=TwoWay}"/>
           <TextBlock x:Name="CrossfadeValue" Grid.Column="2" Text="{Binding CrossfadeText}" Classes="val"
-                     VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                     MinWidth="{DynamicResource UiText.CrossfadeReadoutWidth}" TextAlignment="Right" VerticalAlignment="Center" HorizontalAlignment="Right"/>
         </Grid>
         <!-- the blend mixes the interface's own microphone into its jack, wherever that microphone plays in the mixer -->
-        <TextBlock Name="CrossfadeNote" Text="{Binding CrossfadeNote}" Classes="hint" FontSize="11" TextWrapping="Wrap"
+        <TextBlock Name="CrossfadeNote" Text="{Binding CrossfadeNote}" Classes="hint" FontSize="{DynamicResource UiText.FontSize11}" TextWrapping="Wrap"
                    Margin="90,0,0,0" IsVisible="{Binding HasCrossfadeNote}"/>
         <UniformGrid Columns="7">
           <ToggleButton Content="{loc:Text Key=LowImp}" IsChecked="{Binding LowImpedance, Mode=TwoWay}" Margin="0,0,6,0"
@@ -838,15 +838,15 @@
             <ToggleButton Name="OutputBoost" Content="150%" IsChecked="{Binding OutputVolumeRange.Boost, Mode=TwoWay}"
                           Padding="8,1" FontSize="{DynamicResource Ox.Label.FontSize}" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
                           ToolTip.Tip="{loc:Text Key=AllowOutputVolumeAbove100UpTo}"/>
-            <TextBlock Text="&#x24D8;" Classes="h" FontSize="12" VerticalAlignment="Center" Margin="0,-1,0,0" Cursor="Help"
+            <TextBlock Text="&#x24D8;" Classes="h" FontSize="{DynamicResource UiText.FontSize12}" VerticalAlignment="Center" Margin="0,-1,0,0" Cursor="Help"
                        ToolTip.Tip="{loc:Text Key=MonitorOutputRoutingTip}"/>
           </WrapPanel>
         </Expander.Header>
       <StackPanel Classes="dev" Spacing="4">
         <TextBlock Name="MonitorMicrophonePausePendingNote" Text="{loc:Text Key=MicrophonePausePendingNote}"
                    Classes="warn" TextWrapping="Wrap" IsVisible="{Binding MicrophonePausePending}"/>
-        <Grid Name="MonitorControls" ColumnDefinitions="90,*,20,90,*,64" SizeChanged="OnMonitorSizeChanged">
-          <TextBlock Name="MonitorDevicesLabel" Text="{loc:Text Key=Devices}" Classes="h" VerticalAlignment="Center"/>
+        <Grid Name="MonitorControls" ColumnDefinitions="Auto,*,20,Auto,*,64" SizeChanged="OnMonitorSizeChanged">
+          <TextBlock Name="MonitorDevicesLabel" Text="{loc:Text Key=Devices}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
           <DropDownButton Name="MonitorDestination" Grid.Column="1" HorizontalAlignment="Stretch"
                           HorizontalContentAlignment="Left" AutomationProperties.Name="{loc:Text Key=Devices}"
                           Content="{Binding MonitorSummary}" ToolTip.Tip="{Binding MonitorSummary}">
@@ -905,7 +905,7 @@
             </DropDownButton.Flyout>
           </DropDownButton>
 
-          <TextBlock Name="MonitorVolumeLabel" Grid.Column="3" Text="{loc:Text Key=Volume}" Classes="h" VerticalAlignment="Center"/>
+          <TextBlock Name="MonitorVolumeLabel" Grid.Column="3" Text="{loc:Text Key=Volume}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
           <Slider vm:FaderInput.Step="0.01" Name="OutputVolumeSlider" Grid.Column="4" Minimum="0" Maximum="{Binding OutputVolumeRange.Maximum}" Value="{Binding OutputVolume, Mode=TwoWay}"
                   AutomationProperties.Name="{loc:Text Key=Volume}"/>
           <TextBlock Name="MonitorVolumeReadout" Grid.Column="5" Text="{Binding OutputVolumeText}" Classes="val"
@@ -931,10 +931,10 @@
             <Button Classes="ghost reorderHandle" Content="↕" Tag="ApplicationsTile" AutomationProperties.Name="{loc:Text Key=MoveApplications}"
                     ToolTip.Tip="{loc:Text Key=DragToAnotherSectionArrowKeysMove}"/>
             <TextBlock Text="{loc:Text Key=APPLICATIONS}" Classes="h" VerticalAlignment="Center"/>
-            <Button Name="ManageApps" Content="{loc:Text Key=Manage}" Padding="8,1" FontSize="11" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
+            <Button Name="ManageApps" Content="{loc:Text Key=Manage}" Padding="8,1" FontSize="{DynamicResource UiText.FontSize11}" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
                     IsEnabled="{Binding HasApps}" Click="OnManageApps"/>
             <!-- Enabled whenever shown: the window is also where tab routing is turned on. -->
-            <Button Name="ManageBrowserTabs" Content="{loc:Text Key=BrowserTabs}" Padding="8,1" FontSize="11" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
+            <Button Name="ManageBrowserTabs" Content="{loc:Text Key=BrowserTabs}" Padding="8,1" FontSize="{DynamicResource UiText.FontSize11}" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
                     IsVisible="{Binding BrowserTabSupport}" Click="OnManageBrowserTabs"
                     ToolTip.Tip="{loc:Text Key=BrowserTabsHint}"/>
           </StackPanel>
@@ -961,7 +961,7 @@
               <TextBlock Text="{loc:Text Key=HardwareMixingBadge}" Foreground="{DynamicResource Ox.Text.Info}"
                          FontSize="{DynamicResource Ox.Eq.LabelFontSize}" FontWeight="{DynamicResource Ox.Label.FontWeight}"/>
             </Border>
-            <Button Name="PopOutMixerButton" Content="{loc:Text Key=PopOutMixer}" Padding="8,1" FontSize="11" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
+            <Button Name="PopOutMixerButton" Content="{loc:Text Key=PopOutMixer}" Padding="8,1" FontSize="{DynamicResource UiText.FontSize11}" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
                     Click="OnPopOutMixer" ToolTip.Tip="{loc:Text Key=PopOutMixerHint}">
               <!-- Hidden with no mixer, and while the mixer is in its own window. -->
               <Button.IsVisible>
@@ -971,10 +971,10 @@
                 </MultiBinding>
               </Button.IsVisible>
             </Button>
-            <Button Content="{loc:Text Key=EditLayout}" Padding="8,1" FontSize="11" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
+            <Button Content="{loc:Text Key=EditLayout}" Padding="8,1" FontSize="{DynamicResource UiText.FontSize11}" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
                     IsVisible="{Binding HasMixer}" IsEnabled="{Binding CanEditLayout}" Click="OnEditLayout"
                     ToolTip.Tip="{loc:Text Key=AddRenameReorderAndRemoveApplicationChannelsAnd}"/>
-            <Button Name="MicSetupButton" Content="{loc:Text Key=MicSetup}" Padding="8,1" FontSize="11" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
+            <Button Name="MicSetupButton" Content="{loc:Text Key=MicSetup}" Padding="8,1" FontSize="{DynamicResource UiText.FontSize11}" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
                     Click="OnMicSetup" ToolTip.Tip="{loc:Text Key=MicSetupButtonTip}">
               <Button.IsVisible>
                 <MultiBinding Converter="{x:Static BoolConverters.And}">
@@ -983,7 +983,7 @@
                 </MultiBinding>
               </Button.IsVisible>
             </Button>
-            <Button Name="DuckingButton" Content="{loc:Text Key=Ducking}" Padding="8,1" FontSize="11" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
+            <Button Name="DuckingButton" Content="{loc:Text Key=Ducking}" Padding="8,1" FontSize="{DynamicResource UiText.FontSize11}" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
                     Click="OnDucking" ToolTip.Tip="{loc:Text Key=DuckingButtonTip}">
               <Button.IsVisible>
                 <MultiBinding Converter="{x:Static BoolConverters.And}">
@@ -994,7 +994,7 @@
             </Button>
             <!-- The soundboard, whether or not SFX exists: the window's Turn on creates it.
                  Lit, as an effects button is, while a clip plays. -->
-            <Button Name="SoundboardButton" Content="{loc:Text Key=Soundboard}" Padding="8,1" FontSize="11" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
+            <Button Name="SoundboardButton" Content="{loc:Text Key=Soundboard}" Padding="8,1" FontSize="{DynamicResource UiText.FontSize11}" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
                     Classes="fx" Classes.fxOn="{Binding Soundboard.AnyPlaying}" Click="OnSoundboard" ToolTip.Tip="{loc:Text Key=SoundboardButtonTip}">
               <Button.IsVisible>
                 <MultiBinding Converter="{x:Static BoolConverters.And}">
@@ -1005,7 +1005,7 @@
             </Button>
             <!-- The voice changer, on any microphone the daemon reports it for.
                  Lit, as an effects button is, while a microphone has a voice on. -->
-            <Button Name="VoiceChangerButton" Content="{loc:Text Key=VoiceChanger}" Padding="8,1" FontSize="11" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
+            <Button Name="VoiceChangerButton" Content="{loc:Text Key=VoiceChanger}" Padding="8,1" FontSize="{DynamicResource UiText.FontSize11}" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
                     Classes="fx" Classes.fxOn="{Binding VoiceChanger.AnyOn}" Click="OnVoiceChanger" ToolTip.Tip="{loc:Text Key=VoiceChangerButtonTip}">
               <Button.IsVisible>
                 <MultiBinding Converter="{x:Static BoolConverters.And}">
@@ -1015,7 +1015,7 @@
               </Button.IsVisible>
             </Button>
             <!-- Shown only while something is hidden in the layout editor; a window preference. -->
-            <ToggleButton Name="ShowHiddenButton" Content="{loc:Text Key=ShowHidden}" Padding="8,1" FontSize="11"
+            <ToggleButton Name="ShowHiddenButton" Content="{loc:Text Key=ShowHidden}" Padding="8,1" FontSize="{DynamicResource UiText.FontSize11}"
                           MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center" HorizontalAlignment="Left"
                           IsChecked="{Binding ShowHidden, Mode=TwoWay}" ToolTip.Tip="{loc:Text Key=ShowHiddenHint}">
               <ToggleButton.IsVisible>
@@ -1097,7 +1097,7 @@
                                   ToolTip.Tip="{loc:Text Key=AllowThisMonitorMixAbove100Up}"/>
                   </Grid>
                   <Button Content="{Binding Inserts.ButtonText}" HorizontalAlignment="Stretch" Classes="fx" Classes.fxOn="{Binding Inserts.IsProcessing}" Classes.fxOff="{Binding Inserts.IsOff}"
-                          HorizontalContentAlignment="Center" Padding="8,4" FontSize="12" Click="OnMixInserts"
+                          HorizontalContentAlignment="Center" Padding="8,4" FontSize="{DynamicResource UiText.FontSize12}" Click="OnMixInserts"
                           ToolTip.Tip="{Binding Inserts.ButtonTip}"/>
                   <!-- the chain at a glance: LED, name, bypass, controls; adding,
                        ordering and removing live in the chain window -->
@@ -1108,7 +1108,7 @@
                           <skin:StatusLed IsOn="{Binding IsActive}" Kind="Insert" Margin="0,0,6,0"
                                           AutomationProperties.Name="{loc:Text Key=PluginState}"/>
                           <TextBlock Grid.Column="1" Text="{Binding Label}" Classes="insertName body"
-                                     FontSize="11" VerticalAlignment="Center"
+                                     FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center"
                                      TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
                           <ToggleButton Grid.Column="2" Content="{loc:Text Key=NativeHostLetter}" Classes="insertmini"
                                         IsChecked="{Binding NativeHost, Mode=TwoWay}"
@@ -1186,13 +1186,13 @@
                       </Grid.RowDefinitions>
                       <StackPanel Name="ChannelVolume" Spacing="1" IsVisible="{Binding HasVolume}" Margin="0,0,0,8">
                         <Grid ColumnDefinitions="Auto,*,Auto">
-                          <TextBlock Text="{loc:Text Key=Volume}" Classes="h" FontSize="11"
+                          <TextBlock Text="{loc:Text Key=Volume}" Classes="h" FontSize="{DynamicResource UiText.FontSize11}"
                                      TextTrimming="CharacterEllipsis" Margin="0,0,4,0"/>
-                          <TextBlock Grid.Column="1" Name="ChannelVolumeNote" Text="&#x24D8;" Classes="h" FontSize="12"
+                          <TextBlock Grid.Column="1" Name="ChannelVolumeNote" Text="&#x24D8;" Classes="h" FontSize="{DynamicResource UiText.FontSize12}"
                                      Margin="0,-1,4,0" HorizontalAlignment="Left" VerticalAlignment="Center" Cursor="Help"
                                      IsVisible="{Binding DirectMonitored}" ToolTip.Tip="{Binding VolumeTip}"
                                      AutomationProperties.Name="{loc:Text Key=ChannelVolumeMixesOnly}"/>
-                          <TextBlock Grid.Column="2" Text="{Binding VolumeText}" Classes="val" FontSize="11"/>
+                          <TextBlock Grid.Column="2" Text="{Binding VolumeText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"/>
                         </Grid>
                         <Slider vm:FaderInput.Step="0.01" Minimum="0" Maximum="1" Value="{Binding Volume, Mode=TwoWay}"
                                 vm:FaderInput.IsAdjusting="{Binding VolumeAdjusting, Mode=OneWayToSource}"
@@ -1204,15 +1204,15 @@
                           <DataTemplate x:DataType="vm:SendViewModel">
                             <StackPanel Margin="0,0,0,8" Spacing="1" IsVisible="{Binding DisplayVisible}" Classes.revealed="{Binding MixRevealed}">
                               <Grid ColumnDefinitions="*,Auto">
-                                <TextBlock Text="{Binding MixName}" Classes="h" FontSize="11"
+                                <TextBlock Text="{Binding MixName}" Classes="h" FontSize="{DynamicResource UiText.FontSize11}"
                                            TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding MixName}" Margin="0,0,4,0"/>
-                                <TextBlock Grid.Column="1" Text="{Binding LevelText}" Classes="val" FontSize="11"/>
+                                <TextBlock Grid.Column="1" Text="{Binding LevelText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"/>
                               </Grid>
                               <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
                                 <Slider vm:FaderInput.Step="0.01" Minimum="0" Maximum="1" Value="{Binding Level, Mode=TwoWay}"
                                         VerticalAlignment="Center"/>
                                 <ToggleButton Grid.Column="1" Classes="mute mutemini" IsChecked="{Binding Muted, Mode=TwoWay}"
-                                              Padding="7,2" FontSize="11" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"/>
+                                              Padding="7,2" FontSize="{DynamicResource UiText.FontSize11}" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"/>
                               </Grid>
                             </StackPanel>
                           </DataTemplate>

@@ -12,31 +12,31 @@
     </Style>
     <Style Selector="Button.small">
       <Setter Property="Padding" Value="8,2"/>
-      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="FontSize" Value="{DynamicResource UiText.FontSize12}"/>
       <Setter Property="MinWidth" Value="0"/>
     </Style>
   </Window.Styles>
 
   <DockPanel Margin="16">
     <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12" Spacing="4">
-      <TextBlock Text="{loc:Text Key=MixerLayout}" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource Ox.Text.Primary}"/>
+      <TextBlock Text="{loc:Text Key=MixerLayout}" FontSize="{DynamicResource UiText.FontSize20}" FontWeight="Bold" Foreground="{DynamicResource Ox.Text.Primary}"/>
       <TextBlock Text="{loc:Text Key=ApplicationChannelsAreThePlaybackDevicesYouRoute}"
-                 FontSize="11" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
-      <TextBlock Name="Note" FontSize="11" Foreground="{DynamicResource Ox.Text.Alert}" TextWrapping="Wrap"
+                 FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
+      <TextBlock Name="Note" FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Alert}" TextWrapping="Wrap"
                  IsVisible="False"/>
       <!-- the daemon's own notes for this window: the open-file limit, and a mix renamed since start -->
       <DockPanel IsVisible="{Binding LayoutWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-        <Button DockPanel.Dock="Right" Content="{loc:Text Key=Manual}" Padding="10,3" FontSize="12" VerticalAlignment="Center"
+        <Button DockPanel.Dock="Right" Content="{loc:Text Key=Manual}" Padding="10,3" FontSize="{DynamicResource UiText.FontSize12}" VerticalAlignment="Center"
                 Click="OnFileLimitManual" ToolTip.Tip="{loc:Text Key=OpenTheManualSectionOnThePipewirePulse}"/>
-        <TextBlock Text="{Binding LayoutWarning}" FontSize="11" Foreground="{DynamicResource Ox.Text.Alert}" TextWrapping="Wrap"
+        <TextBlock Text="{Binding LayoutWarning}" FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Alert}" TextWrapping="Wrap"
                    VerticalAlignment="Center" Margin="0,0,12,0"/>
       </DockPanel>
       <DockPanel IsVisible="{Binding RenamedSinceStart}">
-        <Button DockPanel.Dock="Right" Content="{loc:Text Key=RestartDaemon}" Padding="10,3" FontSize="12"
+        <Button DockPanel.Dock="Right" Content="{loc:Text Key=RestartDaemon}" Padding="10,3" FontSize="{DynamicResource UiText.FontSize12}"
                 IsEnabled="{Binding DaemonRestart.CanRestart}" VerticalAlignment="Center"
                 Click="OnRestartDaemon" ToolTip.Tip="systemctl --user restart openxlr-daemon"/>
         <TextBlock Text="{loc:Text Key=ARenamedVirtualMicrophoneKeepsItsOldName}"
-                   FontSize="11" Foreground="{DynamicResource Ox.Text.Alert}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                   FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Alert}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0"/>
       </DockPanel>
     </StackPanel>
     <DockPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
@@ -66,10 +66,10 @@
           <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
             <TextBlock Text="{loc:Text Key=CHANNELS}" Classes="h"/>
             <TextBlock Text="{loc:Text Key=ANewChannelStartsMutedInEvery}"
-                       FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
+                       FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
             <!-- the headphone jacks are hardware, not channels: an icon and a colour, nothing else -->
             <WrapPanel Margin="0,6,0,0">
-              <TextBlock Text="{loc:Text Key=HeadphoneOutputs}" FontSize="11" Foreground="{DynamicResource Ox.Text.Secondary}"
+              <TextBlock Text="{loc:Text Key=HeadphoneOutputs}" FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Secondary}"
                          VerticalAlignment="Center" Margin="0,0,8,4"/>
               <Button Name="Phones1AppearanceButton" Classes="small" Tag="phones1" Click="OnAppearance" Margin="0,0,6,4"
                       AutomationProperties.Name="{loc:Text Key=Phones1Appearance}" ToolTip.Tip="{loc:Text Key=IconAndColour}">
@@ -105,16 +105,16 @@
                           <TextBlock Grid.Column="1" Text="{Binding Name}" Foreground="{DynamicResource Ox.Text.Primary}" FontWeight="SemiBold"
                                      TextTrimming="CharacterEllipsis"/>
                         </Grid>
-                        <TextBlock Text="{Binding Id}" Foreground="{DynamicResource Ox.Text.Muted}" FontFamily="monospace" FontSize="10"/>
+                        <TextBlock Text="{Binding Id}" Foreground="{DynamicResource Ox.Text.Muted}" FontFamily="monospace" FontSize="{DynamicResource UiText.FontSize10}"/>
                         <TextBlock Text="{Binding CaptureLabel}" Foreground="{DynamicResource Ox.Text.Secondary}"
                                    TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding CaptureSource}"
                                    IsVisible="{Binding CaptureSource, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                        <TextBlock Text="{loc:Text Key=HiddenInTheMixer}" Foreground="{DynamicResource Ox.Text.Muted}" FontSize="10"
+                        <TextBlock Text="{loc:Text Key=HiddenInTheMixer}" Foreground="{DynamicResource Ox.Text.Muted}" FontSize="{DynamicResource UiText.FontSize10}"
                                    IsVisible="{Binding Appearance.Hidden}"/>
                         <Button Content="{loc:Text Key=MixerAppearance}" Classes="small" HorizontalAlignment="Left" Margin="0,4,0,0"
                                 Click="OnAppearance" ToolTip.Tip="{loc:Text Key=IconColourAndWhetherTheStripShows}"/>
                       </StackPanel>
-                      <TextBlock Grid.Column="1" Text="{loc:Text Key=HardwareInput}" Foreground="{DynamicResource Ox.Text.Muted}" FontSize="11"
+                      <TextBlock Grid.Column="1" Text="{loc:Text Key=HardwareInput}" Foreground="{DynamicResource Ox.Text.Muted}" FontSize="{DynamicResource UiText.FontSize11}"
                                  VerticalAlignment="Center" IsVisible="{Binding IsHardware}"/>
                       <Button Grid.Column="1" Content="▲" Classes="small" ToolTip.Tip="{loc:Text Key=MoveUp}"
                               IsVisible="{Binding IsEditable}" Click="OnChannelUp"/>
@@ -152,7 +152,7 @@
           <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
             <TextBlock Text="{loc:Text Key=MIXES}" Classes="h"/>
             <TextBlock Text="{loc:Text Key=EachMixHasItsOwnMasterSends}"
-                       FontSize="11" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
+                       FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
           </StackPanel>
           <ScrollViewer VerticalScrollBarVisibility="Auto">
             <ItemsControl ItemsSource="{Binding Mixes}">
@@ -169,13 +169,13 @@
                           <TextBlock Grid.Column="1" Text="{Binding Name}" Foreground="{DynamicResource Ox.Text.Primary}" FontWeight="SemiBold"
                                      TextTrimming="CharacterEllipsis"/>
                         </Grid>
-                        <TextBlock Text="{Binding Id}" Foreground="{DynamicResource Ox.Text.Muted}" FontFamily="monospace" FontSize="10"/>
-                        <TextBlock Text="{loc:Text Key=HiddenInTheMixer}" Foreground="{DynamicResource Ox.Text.Muted}" FontSize="10"
+                        <TextBlock Text="{Binding Id}" Foreground="{DynamicResource Ox.Text.Muted}" FontFamily="monospace" FontSize="{DynamicResource UiText.FontSize10}"/>
+                        <TextBlock Text="{loc:Text Key=HiddenInTheMixer}" Foreground="{DynamicResource Ox.Text.Muted}" FontSize="{DynamicResource UiText.FontSize10}"
                                    IsVisible="{Binding Appearance.Hidden}"/>
                         <Button Content="{loc:Text Key=MixerAppearance}" Classes="small" HorizontalAlignment="Left" Margin="0,4,0,0"
                                 Click="OnAppearance" ToolTip.Tip="{loc:Text Key=IconColourAndWhetherTheMixShows}"/>
                       </StackPanel>
-                      <TextBlock Grid.Column="1" Text="{Binding KindLabel}" Foreground="{DynamicResource Ox.Text.Muted}" FontSize="11"
+                      <TextBlock Grid.Column="1" Text="{Binding KindLabel}" Foreground="{DynamicResource Ox.Text.Muted}" FontSize="{DynamicResource UiText.FontSize11}"
                                  VerticalAlignment="Center" IsVisible="{Binding !IsEditable}"/>
                       <Button Grid.Column="1" Content="▲" Classes="small" ToolTip.Tip="{loc:Text Key=MoveUp}"
                               IsVisible="{Binding IsEditable}" Click="OnMixUp"/>

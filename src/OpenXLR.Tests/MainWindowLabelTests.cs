@@ -127,6 +127,43 @@ internal static class MainWindowLabelTests
         Assert.True(failures.Count == 0, string.Join("\n", failures.Distinct()));
     }
 
+    /// <summary>Lay out automatic columns with the widest shipped translation in the active font.</summary>
+    internal static void CheckAutoColumnTranslations(Window window, params string[] keys)
+    {
+        var originals = new List<(TextBlock Block, string Text)>();
+        try
+        {
+            foreach (string key in keys)
+            foreach (TextBlock block in window.GetVisualDescendants().OfType<TextBlock>()
+                .Where(block => block.IsEffectivelyVisible && block.Text == Localizer.Text(key)))
+            {
+                if (block.Parent is not Grid grid || !grid.ColumnDefinitions[Grid.GetColumn(block)].Width.IsAuto) continue;
+                originals.Add((block, block.Text!));
+                string widest = Localizer.Languages.Select(language => Localizer.Get(key, CultureInfo.GetCultureInfo(language.Id!)))
+                    .MaxBy(text => TextWidth(block, text))!;
+                block.SetCurrentValue(TextBlock.TextProperty, widest);
+            }
+            Assert.NotEmpty(originals);
+            window.UpdateLayout();
+            CheckFixedColumnLabels(window, [.. originals.Select(entry => entry.Block.Text!)]);
+        }
+        finally
+        {
+            foreach (var (block, text) in originals) block.SetCurrentValue(TextBlock.TextProperty, text);
+            window.UpdateLayout();
+        }
+    }
+
+    /// <summary>Each label shows its whole text in the width it was given.</summary>
+    internal static void CheckWhole(IEnumerable<TextBlock> labels, string where)
+    {
+        var failures = new List<string>();
+        foreach (TextBlock label in labels)
+            if (TextWidth(label) > label.Bounds.Width + 1)
+                failures.Add($"'{label.Text}' needs {TextWidth(label):F1}px but has {label.Bounds.Width:F1}px");
+        Assert.True(failures.Count == 0, $"{where}: {string.Join("; ", failures)}");
+    }
+
     private static double TextWidth(TextBlock text) => TextWidth(text, text.Text ?? "");
 
     private static double TextWidth(TextBlock text, string value)

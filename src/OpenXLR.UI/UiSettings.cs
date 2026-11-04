@@ -153,6 +153,9 @@ public sealed record UiSettings
     /// </summary>
     public string? Language { get; init; }
 
+    /// <summary>The OpenXLR windows' text size, in percent of the skin's normal size.</summary>
+    public int TextSizePercent { get; init; } = Skinning.SkinService.NormalTextSize;
+
     /// <summary>
     /// Keys this version does not know, such as a setting written by a newer
     /// window or by the terminal mixer. They are written back unchanged, so a
@@ -191,6 +194,7 @@ public sealed record UiSettings
         {
             CollapsedSections = settings.CollapsedSections ?? [],
             SectionOrder = settings.SectionOrder ?? [],
+            TextSizePercent = Skinning.SkinService.NormalizeTextSize(settings.TextSizePercent),
             SkinArrangements = NormalizeSkinArrangements(settings.SkinArrangements),
             SkinLayoutsSeen = NormalizeSeen(settings.SkinLayoutsSeen),
             SkinBankSelections = NormalizeBankSelections(settings.SkinBankSelections),

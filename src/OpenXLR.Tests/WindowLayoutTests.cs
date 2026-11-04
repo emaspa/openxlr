@@ -463,6 +463,7 @@ public sealed class WindowLayoutTests
                 windows.Add(options);
                 options.Show();
                 Layout(options, 980, 800);
+                CheckTextSize(main, options);
                 // The cards grow as features land, and the window sizes itself
                 // to them. On a tall screen that produced a window the height
                 // of the monitor, so the cap is what the scroll region needs to
@@ -681,6 +682,60 @@ public sealed class WindowLayoutTests
         thread.Start();
         Assert.True(thread.Join(TimeSpan.FromSeconds(600)), "Window layout hung.");
         if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    private static void CheckTextSize(MainWindow main, OptionsWindow options)
+    {
+        var picker = options.FindControl<ComboBox>("TextSizePicker")!;
+        var title = main.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Classes.Contains("title") && t.Text == "OpenXLR");
+        var action = main.FindControl<Button>("ManageApps")!;
+        var desktopKeys = options.FindControl<Button>("DesktopKeysButton")!;
+        var appName = main.GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == "Google Chrome" && t.IsEffectivelyVisible);
+        var normal = (Title: title.FontSize, Action: action.FontSize, Button: desktopKeys.FontSize, AppName: appName.FontSize);
+        Assert.Equal(2, picker.SelectedIndex);
+        int[] percentages = [80, 90, 100, 110, 120];
+        for (int i = 0; i < percentages.Length; i++)
+        {
+            int percent = percentages[i];
+            double scale = percent / 100d;
+            picker.SelectedIndex = i;
+            Layout(main, i == 4 ? 640 : 1280, 900);
+            Settle(options);
+            Assert.Equal(percent, UiSettings.Load().TextSizePercent);
+            Assert.Equal(normal.Title * scale, title.FontSize, 0.01);
+            Assert.Equal(normal.Action * scale, action.FontSize, 0.01);
+            Assert.Equal(normal.Button * scale, desktopKeys.FontSize, 0.01);
+            Assert.Equal(normal.AppName * scale, appName.FontSize, 0.01);
+            Assert.Equal(Math.Ceiling(90d * percent / 100), (double)main.FindResource("UiText.Width90")!);
+            Assert.Equal(Math.Ceiling(110d * percent / 100), (double)main.FindResource("UiText.Width110")!);
+            AssertInside(action, main);
+            if (percent == 120)
+            {
+                MainWindowLabelTests.Check(main);
+                MainWindowLabelTests.CheckAutoColumnTranslations(main, "XLR1Gain", "XLR2Gain", "Devices", "Volume", "USBAuxIn", "MicPC", "Inserts");
+                MainWindowLabelTests.CheckAutoColumnTranslations(options, "DefaultOutput", "DefaultInput", "MixerView",
+                    "OnLaunch", "WhenClosing", "Skin", "Mode", "TextSize", "Controls", "Language");
+                // The input rows' labels hold a channel name, so they keep a
+                // width, and that width grows with the text.
+                foreach (string row in new[] { "Xlr1Binding", "Xlr2Binding" })
+                    Assert.Equal((double)main.FindResource("UiText.Width90")!,
+                        main.FindControl<Grid>(row)!.Children.OfType<TextBlock>().First().Width);
+            }
+            if (percent is 80 or 120)
+            {
+                Capture(main, $"text-size-main-{percent}");
+                Capture(options, $"text-size-options-{percent}");
+            }
+        }
+        PinMaterial(UiSettings.Load());
+        OpenXLR.UI.Skinning.SkinService.Initialize();
+        Assert.Equal(120, OpenXLR.UI.Skinning.SkinService.TextSizePercent);
+        picker.SelectedIndex = 2;
+        Settle(options);
+        Assert.Equal(normal.Title, title.FontSize);
+        Assert.Equal(normal.Action, action.FontSize);
+        Assert.Equal(normal.Button, desktopKeys.FontSize);
+        Assert.Equal(normal.AppName, appName.FontSize);
     }
 
     private static void AssertLiveLayoutOrder(MainWindow main, MainViewModel model)
