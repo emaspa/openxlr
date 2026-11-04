@@ -332,11 +332,11 @@
                 <skin:LevelMeter Orientation="{Binding Spec.MeterOrientation}" Level="{Binding Channel.MeterR}" AutomationProperties.Name="{Binding RightLevelName}"/>
               </StackPanel>
               <StackPanel layout:StripPanel.Part="gain" Classes="dev" Spacing="4">
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6" IsVisible="{Binding Main.CapAuxInput}">
+                <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding Main.CapAuxInput}">
                   <Slider vm:FaderInput.Step="1" Minimum="-60" Maximum="0" Value="{Binding Main.AuxLevelDb, Mode=TwoWay}"
                           AutomationProperties.Name="{loc:Text Key=USBAuxIn}"/>
                   <!-- the level, or the channel's volume while its fader moves and for a second after -->
-                  <TextBlock Grid.Column="1" Name="RackGainReadout" Text="{Binding Channel.Readout}" Classes="val" VerticalAlignment="Center"
+                  <TextBlock Grid.Column="1" Name="RackGainReadout" Text="{Binding Channel.Readout}" Classes="val" VerticalAlignment="Center" Margin="6,0,0,0"
                              AutomationProperties.Name="{Binding Channel.ReadoutName}" ToolTip.Tip="{Binding Channel.ReadoutName}"/>
                 </Grid>
                 <!-- the channel's own volume, after the Aux In level -->
@@ -380,11 +380,11 @@
                 <skin:LevelMeter Orientation="{Binding Spec.MeterOrientation}" Level="{Binding Channel.MeterR}" AutomationProperties.Name="{Binding RightLevelName}"/>
               </StackPanel>
               <StackPanel layout:StripPanel.Part="gain" Classes="dev" Spacing="4">
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6" IsVisible="{Binding Main.CapLineInput}">
+                <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding Main.CapLineInput}">
                   <Slider vm:FaderInput.Step="1" Minimum="0" Maximum="{Binding Main.LineInGainMaxDb}" Value="{Binding Main.LineInGainSliderDb, Mode=TwoWay}"
                           AutomationProperties.Name="{loc:Text Key=LineInGain}"/>
                   <!-- the gain, or the channel's volume while its fader moves and for a second after -->
-                  <TextBlock Grid.Column="1" Name="RackGainReadout" Text="{Binding Channel.Readout}" Classes="val" VerticalAlignment="Center"
+                  <TextBlock Grid.Column="1" Name="RackGainReadout" Text="{Binding Channel.Readout}" Classes="val" VerticalAlignment="Center" Margin="6,0,0,0"
                              AutomationProperties.Name="{Binding Channel.ReadoutName}" ToolTip.Tip="{Binding Channel.ReadoutName}"/>
                 </Grid>
                 <!-- the channel's own volume, after the Line In gain -->
@@ -455,12 +455,12 @@
                 </Panel>
                 <!-- a capture input's own gain, its source's volume, on a source OpenXLR does not drive; the
                      range before the value, so the slider never clamps the gain to a range it is about to leave -->
-                <Grid Name="RackCaptureGain" ColumnDefinitions="*,Auto" ColumnSpacing="6" IsVisible="{Binding ShowsCaptureGain}">
+                <Grid Name="RackCaptureGain" ColumnDefinitions="*,Auto" IsVisible="{Binding ShowsCaptureGain}">
                   <Slider vm:FaderInput.Step="1" Minimum="{Binding Channel.CaptureGainMinDb}" Maximum="{Binding Channel.CaptureGainMaxDb}"
                           Value="{Binding Channel.CaptureGainDb, Mode=TwoWay}"
                           AutomationProperties.Name="{Binding Channel.CaptureGainName}" ToolTip.Tip="{Binding Channel.CaptureGainTip}"/>
                   <!-- the gain, or the channel's volume while its fader moves and for a second after -->
-                  <TextBlock Grid.Column="1" Name="RackGainReadout" Text="{Binding Channel.Readout}" Classes="val" VerticalAlignment="Center"
+                  <TextBlock Grid.Column="1" Name="RackGainReadout" Text="{Binding Channel.Readout}" Classes="val" VerticalAlignment="Center" Margin="6,0,0,0"
                              AutomationProperties.Name="{Binding Channel.ReadoutName}" ToolTip.Tip="{Binding Channel.ReadoutName}"/>
                 </Grid>
                 <!-- the channel's own volume, after the interface's gain; while the Wave XLR Pro's
