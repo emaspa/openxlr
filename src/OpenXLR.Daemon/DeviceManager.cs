@@ -419,6 +419,8 @@ public sealed partial class DeviceManager : BackgroundService
             if (ex.Message != _lastLoopError) _log.LogWarning("device loop: {msg}", ex.Message);
             else _log.LogDebug("device loop: {msg}", ex.Message);
             _lastLoopError = ex.Message;
+            // The last good read is what an unplugged unit was left at.
+            FlushLastState(force: true);
             Drop();
             // A device that opens but answers every read badly would otherwise
             // be dropped and reopened on the next tick, ten times a second,
@@ -619,6 +621,7 @@ public sealed partial class DeviceManager : BackgroundService
             if (dev.Info.InstanceId == awaited) _resetReturn = null;
             _device = dev;
             _last = null;
+            ForgetCardArrivalsLocked();
             ForgetEq();
             ForgetDynamics();
             ForgetDucking();
@@ -720,7 +723,8 @@ public sealed partial class DeviceManager : BackgroundService
     }
 
     // Last-settings memory for devices that have none of their own (see
-    // DeviceCapabilities.RetainsSettings): every change marks the snapshot
+    // DeviceCapabilities.RetainsSettings) and for those the desktop writes
+    // to (see HoldDesktopRestoreLocked): every change marks the snapshot
     // dirty and the poll loop writes it a second later, so a slider drag
     // costs one file write, not hundreds.
     private bool _restorePending;
@@ -729,8 +733,84 @@ public sealed partial class DeviceManager : BackgroundService
 
     private void NoteChangedLocked()
     {
-        if (_device is null || _device.Capabilities.RetainsSettings || _restorePending) return;
+        if (_device is null || _restorePending) return;
+        if (_device.Capabilities.RetainsSettings && !_device.DesktopRestoresControls) return;
         _dirtyAt ??= DateTime.UtcNow;
+    }
+
+    // A unit the desktop writes saved values to when its card appears
+    // (IAudioDevice.DesktopRestoresControls). For a few seconds after each
+    // arrival, a mute or headphone level the unit changes on its own is the
+    // desktop's saved value, and the one OpenXLR had is written back. Its
+    // last settings are kept on disk for this, so the values held after a
+    // daemon start are the ones from before it: WirePlumber also writes them
+    // when it starts, and an audio service restart restarts the daemon.
+    internal static readonly TimeSpan DesktopRestoreHold = TimeSpan.FromSeconds(5);
+    private long _cardArrivalsSeen, _desktopHoldUntil;
+    private DeviceState? _beforeCardLoss;
+    private bool _desktopHoldSaid;
+
+    private void ForgetCardArrivalsLocked()
+    {
+        _cardArrivalsSeen = 0;
+        _desktopHoldUntil = 0;
+        _beforeCardLoss = null;
+    }
+
+    /// <summary>
+    /// The state just read, or the one read after writing back the mute and
+    /// headphone level the desktop replaced. The values held are those from
+    /// before the card went away, else the last read, else the last ones
+    /// saved for the unit; a change made through OpenXLR during the hold
+    /// is in the last read, so it stays.
+    /// </summary>
+    private DeviceState HoldDesktopRestoreLocked(IAudioDevice dev, DeviceState now)
+    {
+        if (!dev.DesktopRestoresControls) return now;
+        // Nothing can write to an absent card; what the unit holds until it
+        // returns is what to keep.
+        if (!dev.HasCard)
+        {
+            _beforeCardLoss ??= _last;
+            return now;
+        }
+        DeviceState? held = _last;
+        long arrivals = dev.CardArrivals;
+        if (arrivals != _cardArrivalsSeen)
+        {
+            _cardArrivalsSeen = arrivals;
+            _desktopHoldUntil = NowMs + (long)DesktopRestoreHold.TotalMilliseconds;
+            _desktopHoldSaid = false;
+            held = _beforeCardLoss ?? _last;
+            _beforeCardLoss = null;
+            if (held is null)
+            {
+                try { held = DeviceStateStore.LoadLast(DevId(dev)); }
+                catch (Exception ex) { _log.LogWarning("loading last settings of {dev}: {msg}", DevId(dev), ex.Message); }
+            }
+        }
+        else if (NowMs >= _desktopHoldUntil) return now;
+        if (held is null) return now;
+        bool mute = held.Mute != now.Mute;
+        bool hp = Math.Abs(held.HpVolumeDb - now.HpVolumeDb) >= 0.25;   // half-dB steps
+        if (!mute && !hp) return now;
+        try
+        {
+            if (mute) dev.SetMute(held.Mute);
+            if (hp) dev.SetHpVolumeDb(held.HpVolumeDb);
+            if (!_desktopHoldSaid)
+            {
+                _desktopHoldSaid = true;
+                _log.LogInformation("{dev}: the desktop restored older values for the card, wrote back mute {mute} and headphones {hp} dB",
+                    dev.Info.DisplayName, held.Mute ? "on" : "off", held.HpVolumeDb.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            }
+            return Stamp(dev.ReadState());
+        }
+        catch (Exception ex) when (ex is not UsbHungException)
+        {
+            _log.LogWarning("{dev}: writing back mute and headphones after the desktop restored older values: {msg}", dev.Info.DisplayName, ex.Message);
+            return now;
+        }
     }
 
     private void FlushLastState(bool force)
@@ -913,6 +993,7 @@ public sealed partial class DeviceManager : BackgroundService
                 throw;   // dropped and reopened after a wait, as any failed poll
             }
             _pollFailures = 0;
+            now = HoldDesktopRestoreLocked(_device, now);
             bool recovered = false;
             if (_unansweredId == _device.Info.InstanceId)
             {

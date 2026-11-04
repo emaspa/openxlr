@@ -10,7 +10,9 @@ namespace OpenXLR.Core;
 /// the last settings it saw, restored on every fresh connect so the device
 /// comes back as it was left, and the firmware defaults read after a power
 /// cycle, so "reset to defaults" has something to write once the daemon
-/// would otherwise restore the last settings for ever. One folder per
+/// would otherwise restore the last settings for ever. A unit the desktop
+/// writes to when its card appears (<see cref="IAudioDevice.DesktopRestoresControls"/>)
+/// keeps its last settings here too, for its mute and headphone level. One folder per
 /// device under the XDG config directory (devices/&lt;vid-pid&gt;/).
 /// </summary>
 public static class DeviceStateStore

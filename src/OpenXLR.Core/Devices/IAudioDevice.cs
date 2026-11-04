@@ -44,6 +44,26 @@ public interface IAudioDevice : IDisposable
     /// </summary>
     DeviceEqSupport? DynamicsSupport => null;
 
+    /// <summary>
+    /// Whether the desktop writes values of its own to this unit's mute and
+    /// headphone level whenever its ALSA card appears. WirePlumber puts back
+    /// the mute and volume it saved for the card's routes, saved only when a
+    /// desktop application changed them, and the unit takes them as its own
+    /// settings. The daemon keeps the unit's last mute and headphone level
+    /// and holds them for a few seconds after every <see cref="CardArrivals"/>.
+    /// </summary>
+    bool DesktopRestoresControls => false;
+
+    /// <summary>Whether the unit's ALSA card is there now. Read after <see cref="ReadState"/>.</summary>
+    bool HasCard => false;
+
+    /// <summary>
+    /// How many times the unit's ALSA card has appeared since the last
+    /// <see cref="Connect"/>, the one found by the connect included: it
+    /// starts again from zero on every connect. Read after <see cref="ReadState"/>.
+    /// </summary>
+    long CardArrivals => 0;
+
     void Connect();
     void Disconnect();
 

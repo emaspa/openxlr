@@ -455,6 +455,21 @@ the unit. Without its card the microphone is still driven, Options says
 the desktop's controls are not kept in step, and the diagnostics dump
 gives the reason on its `alsa` line.
 
+WirePlumber writes the mute and volume it saved for the card's routes to
+a card that appears, and when it starts. It saves them only when a
+desktop application changes them through PipeWire, never after a change
+made through ALSA, so after OpenXLR's changes its saved values are old
+ones. The firmware takes them as the unit's settings (an owner's unit on
+1.2.2 came back unmuted with the headphones at 100% after an audio
+service restart). So the daemon keeps the unit's last settings on disk,
+as it does for units without settings memory, and for five seconds after
+each card arrival writes back the mute and headphone level it had: the
+ones from before the card went away, else the last ones saved. On the
+desk's unit, with OpenXLR at -27 dB and WirePlumber's saved -30 dB, the
+headphones came back at -30 dB before this. A change made through
+OpenXLR in those five seconds stays; one made on the unit or on the
+desktop is undone.
+
 The one input strip is the capsule, not an XLR jack. The capabilities
 say so with `xlrJacks` false, so the mixer names that strip Mic 1 rather
 than XLR 1 and gives it the microphone icon, and the UI calls its
