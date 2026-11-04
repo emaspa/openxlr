@@ -425,4 +425,56 @@ public sealed partial class Wave3DeviceTests
         Assert.Contains("readback=events+30s", dev.DumpBlocks()["alsa"]);
     }
 
+    // The daemon holds the unit's mute and headphone level after each of
+    // these, since WirePlumber writes its saved route to a card that appears.
+    [Fact]
+    public void ACardThatComesBackIsAnArrivalEvenUnderTheSameNumber()
+    {
+        Assert.False(new Wave3Device(new FakeUsb { Config = Block(gainDb: 20, mute: false, hpDb: -12.5) }).DesktopRestoresControls);
+        var usb = new FakeUsb { Config = Block(gainDb: 20, mute: false, hpDb: -12.5) };
+        var card = new FakeCard();
+        var clock = new Clock();
+        int number = 3;
+        var subscriptions = new List<ControlEvents>();
+        var dev = new Wave3Device(usb, card.Run, () => number, clock, _ =>
+        {
+            var events = new ControlEvents();
+            subscriptions.Add(events);
+            return events;
+        });
+        using (dev)
+        {
+            Assert.True(dev.DesktopRestoresControls);
+            dev.Connect();
+            dev.ReadState();
+            Assert.True(dev.HasCard);
+            Assert.Equal(1, dev.CardArrivals);
+
+            // The kernel removes the card and has not made the new one yet.
+            number = -1;
+            subscriptions[^1].Available = false;
+            dev.ReadState();
+            Assert.False(dev.HasCard);
+            Assert.Equal(1, dev.CardArrivals);
+            number = 3;
+            clock.Now += TimeSpan.FromSeconds(2);
+            dev.ReadState();
+            Assert.True(dev.HasCard);
+            Assert.Equal(2, dev.CardArrivals);
+
+            // Removed and made again before the next poll, under the same number.
+            subscriptions[^1].Available = false;
+            dev.ReadState();
+            Assert.Equal(3, dev.CardArrivals);
+
+            // Polls that find the card where it was are not arrivals.
+            clock.Now += TimeSpan.FromMinutes(1);
+            dev.ReadState();
+            Assert.Equal(3, dev.CardArrivals);
+
+            dev.Disconnect();
+            dev.Connect();
+            Assert.Equal(1, dev.CardArrivals);
+        }
+    }
 }

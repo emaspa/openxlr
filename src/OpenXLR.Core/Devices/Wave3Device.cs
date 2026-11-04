@@ -181,6 +181,7 @@ public class Wave3Device : IAudioDevice
     private long _alsaReadAt, _alsaWatchAt;
     private bool _alsaReadPending, _alsaEchoPending, _alsaReadFailed;
     private string? _mirrorError;
+    private long _cardArrivals;
 
     /// <summary>
     /// The three controls in the card's own units: half-dB steps from 0, and
@@ -244,6 +245,15 @@ public class Wave3Device : IAudioDevice
 
     public bool Connected => _usb.IsOpen;
 
+    // WirePlumber writes the routes' saved mute and volume to the card's
+    // UAC controls when the card appears, and the firmware takes them as
+    // the unit's own (an owner's Wave:3 on 1.2.2, the desk's on 1.2.4).
+    public bool DesktopRestoresControls => _findCard is not null;
+
+    public bool HasCard { get { lock (_lock) return _card >= 0; } }
+
+    public long CardArrivals { get { lock (_lock) return _cardArrivals; } }
+
     /// <summary>Release the USB transport and its helper process.</summary>
     public void Dispose()
     {
@@ -271,11 +281,13 @@ public class Wave3Device : IAudioDevice
             _alsaReadPending = _alsaEchoPending = _alsaReadFailed = false;
             _mirrorError = null;
             ConnectionNote = null;
+            _cardArrivals = 0;
             FindAlsaCardLocked();
         }
     }
 
-    private void FindAlsaCardLocked()
+    /// <param name="lost">The card's control events ended: the kernel removed it, so one found now is new even under the same number.</param>
+    private void FindAlsaCardLocked(bool lost = false)
     {
         if (_findCard is null) return;
         _alsaWatchAt = _time.GetTimestamp();
@@ -302,6 +314,7 @@ public class Wave3Device : IAudioDevice
             ConnectionNote = $"{ex.Message}; the desktop's volume controls are not kept in step with the microphone";
         }
 
+        if (_card >= 0 && (_card != previous || lost)) _cardArrivals++;
         if (_card != previous)
         {
             _mirrored = null;
@@ -321,7 +334,7 @@ public class Wave3Device : IAudioDevice
             // This backend's own writes were drained right after it made
             // them, so a change seen here came from somewhere else.
             _alsaReadPending |= events.Changed() != AlsaControls.None;
-            if (!events.Available) FindAlsaCardLocked();
+            if (!events.Available) FindAlsaCardLocked(lost: true);
             return;
         }
 

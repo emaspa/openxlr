@@ -89,7 +89,13 @@ version under INTERFACE on an interface that reports one: the Wave XLR
 Pro, the MK.2 family, the Wave:3, the Wave:3 MK.2 and the Wave:1. On the Wave:3 and Wave:1
 the desktop's sound settings and OpenXLR also
 share the microphone mute and the headphone level, so a change in either
-shows in the other within a second. Wave:3 support is written from
+shows in the other within a second. When the microphone's card appears,
+at a replug, a USB reset or a start of the desktop's audio service,
+WirePlumber puts back the mute and volume it saved for the card, which
+are older than OpenXLR's when only OpenXLR changed them since. For five
+seconds after that OpenXLR writes back the mute and headphone level it
+last had, kept over a daemon restart. A press of the mute pad or a turn
+of the dial in those five seconds is undone too. Wave:3 support is written from
 public protocol research and works on the maintainer's unit: gain,
 mute, headphone volume and the monitor balance. The Wave:1 uses the
 Wave:3's backend: an owner's diagnostics showed the microphone
