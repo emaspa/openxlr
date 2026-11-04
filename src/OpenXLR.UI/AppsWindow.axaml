@@ -27,7 +27,7 @@
       <StackPanel Spacing="6">
         <TextBlock Text="{loc:Text Key=ADDINSTALLEDAPPLICATION}" Classes="h"/>
         <TextBlock Text="{loc:Text Key=PreAssignAChannelToAnAppThat}"
-                   FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
+                   FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
         <Grid ColumnDefinitions="*,8,130,8,Auto">
           <ComboBox Name="InstalledPicker" HorizontalAlignment="Stretch" MaxDropDownHeight="380"
                     PlaceholderText="{loc:Text Key=ChooseAnApplication}"/>
@@ -42,7 +42,7 @@
       <DockPanel LastChildFill="True">
         <TextBlock DockPanel.Dock="Top" Text="{loc:Text Key=KNOWNAPPLICATIONS}" Classes="h" Margin="0,0,0,6"/>
         <TextBlock DockPanel.Dock="Top" Text="{loc:Text Key=EveryAppOpenXLRHasRoutedPlayingOrSilent}"
-                   FontSize="{DynamicResource Ox.Ui.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"
+                   FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"
                    Margin="0,0,0,6"/>
         <ScrollViewer Name="KnownApps" MinHeight="96" VerticalScrollBarVisibility="Auto">
           <StackPanel Spacing="10">
@@ -68,7 +68,7 @@
                               ItemsSource="{Binding Channels}"
                               SelectedItem="{Binding SelectedChannel, Mode=TwoWay}"
                               ToolTip.Tip="{Binding BrowserHeldNote}"/>
-                    <Button Grid.Column="5" Content="{loc:Text Key=Forget}" Padding="10,3" FontSize="{DynamicResource Ox.Ui.FontSize12}"
+                    <Button Grid.Column="5" Content="{loc:Text Key=Forget}" Padding="10,3" FontSize="{DynamicResource UiText.FontSize12}"
                             Click="OnForget"/>
                   </Grid>
                 </DataTemplate>

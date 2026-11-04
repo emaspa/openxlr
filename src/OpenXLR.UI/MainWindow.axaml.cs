@@ -199,8 +199,13 @@ public partial class MainWindow : Window
     private void OnMonitorSizeChanged(object? sender, SizeChangedEventArgs e) => LayOutMonitor(e.NewSize.Width);
 
     private void LayOutHeadphones()
-        => HeadphoneControls.ColumnDefinitions = new(_watchedView?.HasHp2 == true
-            ? "90,*,64,20,90,*,64" : "90,*,64,0,0,0,0");
+    {
+        bool twoJacks = _watchedView?.HasHp2 == true;
+        var columns = new ColumnDefinitions(twoJacks ? "Auto,*,64,20,Auto,*,64" : "Auto,*,64,0,0,0,0");
+        if (twoJacks)
+            columns[0].SharedSizeGroup = columns[4].SharedSizeGroup = "HeadphoneLabel";
+        HeadphoneControls.ColumnDefinitions = columns;
+    }
 
     /// <summary>
     /// Stand MONITOR's controls as its template and its width call for. The

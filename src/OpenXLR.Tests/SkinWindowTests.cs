@@ -697,22 +697,38 @@ public sealed partial class SkinWindowTests
     /// </summary>
     private static void EveryBuiltInSkinKeepsTheMainLabelsReadable(MainWindow main)
     {
-        foreach (SkinEntry entry in new[] { new SkinEntry(SkinPackage.Default, []) }.Concat(SkinCatalog.BuiltIn()))
+        try
         {
-            SkinEntry skin = entry.Package.Layout is null
-                ? entry
-                : entry with { Package = entry.Package with { Id = entry.Id + "-palette", Layout = null } };
-            Assert.Empty(SkinService.Apply(skin));
-            foreach (double width in new[] { 640d, 1040 })
+            foreach (SkinEntry entry in new[] { new SkinEntry(SkinPackage.Default, []) }.Concat(SkinCatalog.BuiltIn()))
             {
-                Layout(main, width, 900);
+                SkinEntry skin = entry.Package.Layout is null
+                    ? entry
+                    : entry with { Package = entry.Package with { Id = entry.Id + "-palette", Layout = null } };
+                SkinService.ApplyTextSize(100);
+                Assert.Empty(SkinService.Apply(skin));
+                double normal = (double)main.FindResource("Ox.Label.FontSize")!;
+                foreach (double width in new[] { 640d, 1040 })
+                {
+                    Layout(main, width, 900);
+                    MainWindowLabelTests.Check(main);
+                    WindowLayoutTests.AssertMonitorMute(main);
+                    if (width == 640) MainWindowLabelTests.CheckLongDeviceLabels(main);
+                    Capture(main, $"labels-{skin.Id}-{width}");
+                }
+                SkinService.ApplyTextSize(80);
+                Assert.Equal(normal * .8, (double)main.FindResource("Ox.Label.FontSize")!, .01);
+                SkinService.ApplyTextSize(120);
+                Layout(main, 640, 900);
+                Assert.Equal(normal * 1.2, (double)main.FindResource("Ox.Label.FontSize")!, .01);
                 MainWindowLabelTests.Check(main);
                 WindowLayoutTests.AssertMonitorMute(main);
-                if (width == 640) MainWindowLabelTests.CheckLongDeviceLabels(main);
-                Capture(main, $"labels-{skin.Id}-{width}");
             }
         }
-        SkinService.Apply(new SkinEntry(SkinPackage.Default, []));
+        finally
+        {
+            SkinService.ApplyTextSize(100);
+            SkinService.Apply(new SkinEntry(SkinPackage.Default, []));
+        }
     }
 
     /// <summary>Keep the smallest measurement of one kind of control per skin.</summary>

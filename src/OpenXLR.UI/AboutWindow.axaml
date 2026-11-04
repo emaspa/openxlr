@@ -33,18 +33,18 @@
     <StackPanel Orientation="Horizontal" Spacing="12">
       <Image Source="avares://OpenXLR.UI/Assets/icon.png" Width="48" Height="48"/>
       <StackPanel VerticalAlignment="Center">
-        <TextBlock Text="OpenXLR" FontSize="{DynamicResource Ox.Ui.FontSize22}" FontWeight="Bold" Foreground="{DynamicResource Ox.Text.Primary}"/>
-        <TextBlock Name="VersionText" Text="v0.0.0" FontSize="{DynamicResource Ox.Ui.FontSize12}" Foreground="{DynamicResource Ox.Text.Secondary}"/>
+        <TextBlock Text="OpenXLR" FontSize="{DynamicResource UiText.FontSize22}" FontWeight="Bold" Foreground="{DynamicResource Ox.Text.Primary}"/>
+        <TextBlock Name="VersionText" Text="v0.0.0" FontSize="{DynamicResource UiText.FontSize12}" Foreground="{DynamicResource Ox.Text.Secondary}"/>
       </StackPanel>
     </StackPanel>
 
-    <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Ox.Text.Detail}" FontSize="{DynamicResource Ox.Ui.FontSize13}"
+    <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Ox.Text.Detail}" FontSize="{DynamicResource UiText.FontSize13}"
                Text="{loc:Text Key=OpenSourceControlSuiteForElgatoXLRInterfaces}"/>
 
-    <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Ox.Text.Muted}" FontSize="{DynamicResource Ox.Ui.FontSize11}"
+    <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Ox.Text.Muted}" FontSize="{DynamicResource UiText.FontSize11}"
                Text="{loc:Text Key=NotAffiliatedWithOrEndorsedByElgatoBuilt}"/>
 
-    <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Ox.Text.Detail}" FontSize="{DynamicResource Ox.Ui.FontSize12}"
+    <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Ox.Text.Detail}" FontSize="{DynamicResource UiText.FontSize12}"
                Text="{loc:Text Key=ThanksToEveryoneWhoContributedCodeTestedOn}"/>
 
     <StackPanel Spacing="2" Margin="0,4,0,0">

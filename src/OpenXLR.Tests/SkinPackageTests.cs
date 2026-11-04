@@ -296,6 +296,24 @@ public sealed class SkinPackageTests : IDisposable
         Assert.Empty(missing);
     }
 
+    [Fact]
+    public void ViewsOnlyNameTextMetricsThatExist()
+    {
+        if (SourceDirectory() is not { } source) return;
+        var keys = SkinService.TextSizeBases.Select(size => $"UiText.FontSize{size}").ToHashSet();
+        keys.Add(SkinService.CrossfadeReadoutWidth);
+        var missing = new List<string>();
+        foreach (string file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories)
+            .Where(file => Path.GetExtension(file) is ".axaml" or ".cs")
+            .Where(file => !file.Contains("/obj/", StringComparison.Ordinal) && !file.Contains("/bin/", StringComparison.Ordinal)))
+        {
+            foreach (System.Text.RegularExpressions.Match match in
+                System.Text.RegularExpressions.Regex.Matches(File.ReadAllText(file), @"UiText\.[A-Za-z0-9]+\b(?!\{)"))
+                if (!keys.Contains(match.Value)) missing.Add($"{Path.GetFileName(file)}: {match.Value}");
+        }
+        Assert.Empty(missing);
+    }
+
     private static string? SourceDirectory()
     {
         // The build tree is src/<project>/bin/... in a plain build and

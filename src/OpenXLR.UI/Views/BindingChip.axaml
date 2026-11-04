@@ -29,7 +29,7 @@
     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
       <skin:StatusLed IsOn="{Binding BindingConnected}" VerticalAlignment="Center"
                       AutomationProperties.AccessibilityView="Raw"/>
-      <TextBlock Name="ChipText" Grid.Column="1" Text="{Binding BindingLabel}" Classes="body" FontSize="{DynamicResource Ox.Ui.FontSize11}"
+      <TextBlock Name="ChipText" Grid.Column="1" Text="{Binding BindingLabel}" Classes="body" FontSize="{DynamicResource UiText.FontSize11}"
                  VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
     </Grid>
   </Button>

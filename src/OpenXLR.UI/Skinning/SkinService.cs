@@ -74,6 +74,9 @@ public static class SkinService
     internal static int NormalizeTextSize(int percent) => percent is 80 or 90 or 100 or 110 or 120
         ? percent : NormalTextSize;
 
+    internal static IReadOnlyList<int> TextSizeBases { get; } = [10, 11, 12, 13, 16, 17, 18, 19, 20, 22, 24];
+    internal const string CrossfadeReadoutWidth = "UiText.CrossfadeReadoutWidth";
+
     private static double ScaleText(double size) => size * TextSizePercent / NormalTextSize;
 
     private static bool IsFontSize(SkinToken token) => token.Name.EndsWith("FontSize", StringComparison.Ordinal);
@@ -104,10 +107,10 @@ public static class SkinService
     private static void ApplyTextResources(Application application)
     {
         var resources = application.Resources;
-        foreach (int size in new[] { 10, 11, 12, 13, 16, 17, 18, 19, 20, 22, 24 })
-            Put(resources, $"Ox.Ui.FontSize{size}", ScaleText(size));
+        foreach (int size in TextSizeBases)
+            Put(resources, $"UiText.FontSize{size}", ScaleText(size));
         // Reserve the endpoint readout's space even in the middle of a drag.
-        Put(resources, "Ox.Ui.CrossfadeReadoutWidth", Math.Ceiling(ScaleText(74)));
+        Put(resources, CrossfadeReadoutWidth, Math.Ceiling(ScaleText(74)));
         // Read the toolkit's unscaled sizes from its styles, outside our
         // overrides, so picking another size cannot scale them twice.
         foreach (string key in new[] { "ControlContentThemeFontSize", "ToolTipContentThemeFontSize", "TabItemHeaderFontSize" })

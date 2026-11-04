@@ -35,15 +35,15 @@
       <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
         <skin:StatusLed IsOn="{Binding IsActive}" Kind="Insert"
                         AutomationProperties.Name="{loc:Text Key=PluginState}"/>
-        <TextBlock Grid.Column="1" Name="PluginTitle" Text="{Binding Label}" FontSize="{DynamicResource Ox.Ui.FontSize16}" FontWeight="Bold"
+        <TextBlock Grid.Column="1" Name="PluginTitle" Text="{Binding Label}" FontSize="{DynamicResource UiText.FontSize16}" FontWeight="Bold"
                    Foreground="{DynamicResource Ox.Text.Primary}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
         <TextBlock Grid.Column="2" Text="{Binding StateText}" Classes="h" VerticalAlignment="Center"/>
       </Grid>
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-        <TextBlock Text="{Binding Plugin}" Classes="h" FontSize="{DynamicResource Ox.Ui.FontSize11}" VerticalAlignment="Center"
+        <TextBlock Text="{Binding Plugin}" Classes="h" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center"
                    TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Plugin}"/>
         <Border Grid.Column="1" Background="{DynamicResource Ox.Badge.Background}" CornerRadius="4" Padding="6,1" VerticalAlignment="Center">
-          <TextBlock Text="{Binding Format}" Foreground="{DynamicResource Ox.Text.Secondary}" FontSize="{DynamicResource Ox.Ui.FontSize10}" FontWeight="SemiBold"/>
+          <TextBlock Text="{Binding Format}" Foreground="{DynamicResource Ox.Text.Secondary}" FontSize="{DynamicResource UiText.FontSize10}" FontWeight="SemiBold"/>
         </Border>
       </Grid>
       <TextBlock Name="PluginLatency" Text="{Binding LatencyText}" Classes="hint" TextWrapping="Wrap"/>
@@ -76,9 +76,9 @@
                       Padding="12,4" Margin="0,0,6,6" IsVisible="{Binding CanChooseOwnBlock}"
                       ToolTip.Tip="{loc:Text Key=RunOnItsOwnBlockTip}"/>
       </WrapPanel>
-      <TextBlock Text="{Binding NativeUiBlockReason}" Foreground="{DynamicResource Ox.Text.Secondary}" FontSize="{DynamicResource Ox.Ui.FontSize11}" TextWrapping="Wrap"
+      <TextBlock Text="{Binding NativeUiBlockReason}" Foreground="{DynamicResource Ox.Text.Secondary}" FontSize="{DynamicResource UiText.FontSize11}" TextWrapping="Wrap"
                  Margin="0,0,0,8" IsVisible="{Binding NativeUiBlocked}"/>
-      <TextBlock Text="{Binding Error}" Foreground="{DynamicResource Ox.Text.Warning}" FontSize="{DynamicResource Ox.Ui.FontSize11}" TextWrapping="Wrap"
+      <TextBlock Text="{Binding Error}" Foreground="{DynamicResource Ox.Text.Warning}" FontSize="{DynamicResource UiText.FontSize11}" TextWrapping="Wrap"
                  Margin="0,0,0,8" IsVisible="{Binding HasError}"/>
       <ItemsControl ItemsSource="{Binding Groups}" Margin="0,0,10,0">
         <ItemsControl.ItemTemplate>
@@ -86,7 +86,7 @@
             <StackPanel Margin="0,0,0,10">
               <Border IsVisible="{Binding ShowHeader}" BorderBrush="{DynamicResource Ox.Divider}" BorderThickness="0,0,0,1"
                       Margin="0,0,0,6" Padding="0,0,0,3">
-                <TextBlock Text="{Binding Name}" Foreground="{DynamicResource Ox.Text.Detail}" FontSize="{DynamicResource Ox.Ui.FontSize12}" FontWeight="SemiBold"/>
+                <TextBlock Text="{Binding Name}" Foreground="{DynamicResource Ox.Text.Detail}" FontSize="{DynamicResource UiText.FontSize12}" FontWeight="SemiBold"/>
               </Border>
               <ItemsControl ItemsSource="{Binding Params}">
                 <ItemsControl.ItemTemplate>
@@ -99,7 +99,7 @@
                               TickFrequency="{Binding Step}" IsSnapToTickEnabled="{Binding Integer}"/>
                       <CheckBox Grid.Column="1" IsChecked="{Binding On, Mode=TwoWay}" IsVisible="{Binding Toggled}"
                                 MinHeight="0" VerticalAlignment="Center"/>
-                      <TextBlock Grid.Column="2" Text="{Binding ValueText}" Classes="val" FontSize="{DynamicResource Ox.Ui.FontSize12}"
+                      <TextBlock Grid.Column="2" Text="{Binding ValueText}" Classes="val" FontSize="{DynamicResource UiText.FontSize12}"
                                  VerticalAlignment="Center" HorizontalAlignment="Right"
                                  TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ValueText}"/>
                     </Grid>

@@ -20,11 +20,11 @@
       <ToggleButton Grid.Column="6" Name="OnlyVst3" Content="VST3" Padding="12,4" VerticalAlignment="Stretch"
                     IsCheckedChanged="OnFormatToggled" ToolTip.Tip="{loc:Text Key=ShowVST3Plugins}"/>
     </Grid>
-    <TextBlock DockPanel.Dock="Top" Text="{Binding Note}" Classes="h" FontSize="{DynamicResource Ox.Ui.FontSize11}" Margin="0,0,0,6"/>
+    <TextBlock DockPanel.Dock="Top" Text="{Binding Note}" Classes="h" FontSize="{DynamicResource UiText.FontSize11}" Margin="0,0,0,6"/>
     <!-- installing: a file (.clap, .vst3, a Windows plugin) or a folder (a .vst3
          or .lv2 bundle, or a folder of plugins); the daemon puts it in place -->
     <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,10,0,0">
-      <TextBlock Name="InstallStatus" Classes="h" FontSize="{DynamicResource Ox.Ui.FontSize11}" TextWrapping="Wrap"
+      <TextBlock Name="InstallStatus" Classes="h" FontSize="{DynamicResource UiText.FontSize11}" TextWrapping="Wrap"
                  IsVisible="{Binding #InstallStatus.Text, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
       <Grid ColumnDefinitions="Auto,6,Auto,*,Auto,8,Auto">
         <Button Name="InstallFile" Content="{loc:Text Key=InstallFile}" Padding="12,6" Click="OnInstallFile"
@@ -41,10 +41,10 @@
         <DataTemplate x:DataType="vm:PluginChoice">
           <StackPanel Orientation="Horizontal" Spacing="10">
             <TextBlock Text="{Binding Name}" Foreground="{DynamicResource Ox.Text.Primary}"/>
-            <TextBlock Text="{Binding Category}" Classes="h" FontSize="{DynamicResource Ox.Ui.FontSize11}" VerticalAlignment="Center"/>
+            <TextBlock Text="{Binding Category}" Classes="h" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center"/>
             <!-- the format: the same plugin often ships as both -->
             <Border Background="{DynamicResource Ox.Badge.Background}" CornerRadius="4" Padding="6,1" VerticalAlignment="Center">
-              <TextBlock Text="{Binding Format}" Foreground="{DynamicResource Ox.Text.Secondary}" FontSize="{DynamicResource Ox.Ui.FontSize10}" FontWeight="SemiBold"/>
+              <TextBlock Text="{Binding Format}" Foreground="{DynamicResource Ox.Text.Secondary}" FontSize="{DynamicResource UiText.FontSize10}" FontWeight="SemiBold"/>
             </Border>
           </StackPanel>
         </DataTemplate>

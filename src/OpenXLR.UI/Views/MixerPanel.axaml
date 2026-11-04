@@ -47,11 +47,11 @@
                         Value="{Binding Send.Level, Mode=TwoWay}" AutomationProperties.Name="{Binding SendName}"/>
               </Panel>
               <Panel layout:StripPanel.Part="value">
-                <TextBlock Text="{Binding Send.LevelText}" Classes="val" FontSize="{DynamicResource Ox.Ui.FontSize11}" HorizontalAlignment="Center"/>
+                <TextBlock Text="{Binding Send.LevelText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Center"/>
               </Panel>
               <Panel layout:StripPanel.Part="mute">
                 <ToggleButton Classes="mute mutemini" IsChecked="{Binding Send.Muted, Mode=TwoWay}"
-                              Padding="7,2" FontSize="{DynamicResource Ox.Ui.FontSize11}" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                              Padding="7,2" FontSize="{DynamicResource UiText.FontSize11}" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                               HorizontalAlignment="Center" AutomationProperties.Name="{Binding MuteName}"
                               ToolTip.Tip="{Binding MuteName}"/>
               </Panel>
@@ -90,11 +90,11 @@
                         Value="{Binding Send.Level, Mode=TwoWay}" AutomationProperties.Name="{Binding SendName}"/>
               </Panel>
               <Panel layout:StripPanel.Part="value" VerticalAlignment="Center" MinWidth="28">
-                <TextBlock Text="{Binding Send.LevelText}" Classes="val" FontSize="{DynamicResource Ox.Ui.FontSize11}" HorizontalAlignment="Right"/>
+                <TextBlock Text="{Binding Send.LevelText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Right"/>
               </Panel>
               <Panel layout:StripPanel.Part="mute" VerticalAlignment="Center">
                 <ToggleButton Classes="mute mutemini" IsChecked="{Binding Send.Muted, Mode=TwoWay}"
-                              Padding="7,2" FontSize="{DynamicResource Ox.Ui.FontSize11}" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                              Padding="7,2" FontSize="{DynamicResource UiText.FontSize11}" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                               AutomationProperties.Name="{Binding MuteName}" ToolTip.Tip="{Binding MuteName}"/>
               </Panel>
             </layout:StripPanel>
@@ -152,7 +152,7 @@
               </Grid>
             </layout:StripPanel>
             <Button Content="{Binding Mix.Inserts.ButtonText}" HorizontalAlignment="Stretch" Classes="fx" Classes.fxOn="{Binding Mix.Inserts.IsProcessing}" Classes.fxOff="{Binding Mix.Inserts.IsOff}"
-                    HorizontalContentAlignment="Center" Padding="8,4" FontSize="{DynamicResource Ox.Ui.FontSize12}" Click="OnMixInserts"
+                    HorizontalContentAlignment="Center" Padding="8,4" FontSize="{DynamicResource UiText.FontSize12}" Click="OnMixInserts"
                     ToolTip.Tip="{Binding Mix.Inserts.ButtonTip}"/>
             <ItemsControl ItemsSource="{Binding Mix.Inserts.Items}" IsVisible="{Binding Mix.Inserts.HasItems}">
               <ItemsControl.ItemTemplate>
@@ -161,7 +161,7 @@
                     <skin:StatusLed IsOn="{Binding IsActive}" Kind="Insert" Margin="0,0,6,0"
                                     AutomationProperties.Name="{loc:Text Key=PluginState}"/>
                     <TextBlock Grid.Column="1" Text="{Binding Label}" Classes="insertName body"
-                               FontSize="{DynamicResource Ox.Ui.FontSize11}" VerticalAlignment="Center"
+                               FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
                     <ToggleButton Grid.Column="2" Content="{loc:Text Key=NativeHostLetter}" Classes="insertmini"
                                   IsChecked="{Binding NativeHost, Mode=TwoWay}"
@@ -223,22 +223,22 @@
                         AutomationProperties.Name="{Binding Mix.Name, StringFormat={loc:Text Key=MixFaderName}}"/>
               </Panel>
               <Panel layout:StripPanel.Part="value">
-                <TextBlock Text="{Binding Mix.VolumeText}" Classes="val" FontSize="{DynamicResource Ox.Ui.FontSize11}" HorizontalAlignment="Center"/>
+                <TextBlock Text="{Binding Mix.VolumeText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Center"/>
               </Panel>
               <Panel layout:StripPanel.Part="mute">
                 <ToggleButton Classes="mute mutemini" IsChecked="{Binding Mix.Muted, Mode=TwoWay}"
-                              Padding="7,2" FontSize="{DynamicResource Ox.Ui.FontSize11}" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                              Padding="7,2" FontSize="{DynamicResource UiText.FontSize11}" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                               HorizontalAlignment="Center"
                               AutomationProperties.Name="{Binding Mix.Name, StringFormat={loc:Text Key=MixMuteName}}"
                               ToolTip.Tip="{Binding Mix.Name, StringFormat={loc:Text Key=MixMuteName}}"/>
               </Panel>
             </layout:StripPanel>
             <ToggleButton Content="150%" IsChecked="{Binding Mix.VolumeRange.Boost, Mode=TwoWay}" IsVisible="{Binding Mix.IsMonitor}"
-                          Padding="4,2" FontSize="{DynamicResource Ox.Ui.FontSize11}" ToolTip.Tip="{loc:Text Key=AllowThisMonitorMixAbove100Up}"/>
+                          Padding="4,2" FontSize="{DynamicResource UiText.FontSize11}" ToolTip.Tip="{loc:Text Key=AllowThisMonitorMixAbove100Up}"/>
             <!-- compact effects access: the chain's button and one lamp per
                  plugin, failing ones lit in the alert colour; bypass and the
                  rest live in the chain window -->
-            <Button Click="OnMixInserts" Padding="4,2" FontSize="{DynamicResource Ox.Ui.FontSize11}" HorizontalAlignment="Stretch" Classes="fx" Classes.fxOn="{Binding Mix.Inserts.IsProcessing}" Classes.fxOff="{Binding Mix.Inserts.IsOff}"
+            <Button Click="OnMixInserts" Padding="4,2" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Stretch" Classes="fx" Classes.fxOn="{Binding Mix.Inserts.IsProcessing}" Classes.fxOff="{Binding Mix.Inserts.IsOff}"
                     HorizontalContentAlignment="Center" ToolTip.Tip="{Binding Mix.Inserts.ButtonTip}">
               <TextBlock Text="{Binding Mix.Inserts.ButtonText}" TextTrimming="CharacterEllipsis"/>
             </Button>
@@ -254,7 +254,7 @@
               </ItemsControl.ItemTemplate>
             </ItemsControl>
             <ToggleButton Content="{loc:Text Key=ToUSBAuxPort}" IsChecked="{Binding Mix.AuxPortEnabled, Mode=TwoWay}"
-                          IsVisible="{Binding Mix.ShowAuxPortToggle}" Padding="4,2" FontSize="{DynamicResource Ox.Ui.FontSize11}"
+                          IsVisible="{Binding Mix.ShowAuxPortToggle}" Padding="4,2" FontSize="{DynamicResource UiText.FontSize11}"
                           ToolTip.Tip="{loc:Text Key=SendThisMixToTheSecondComputerOn}"/>
           </StackPanel>
         </Border>

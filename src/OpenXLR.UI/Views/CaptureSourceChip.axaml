@@ -28,7 +28,7 @@
         <skin:StatusLed IsOn="{Binding CaptureConnected}" VerticalAlignment="Center"
                         AutomationProperties.AccessibilityView="Raw"/>
         <!-- the size XLR 1's chip letters its source in -->
-        <TextBlock Name="ChipText" Grid.Column="1" Text="{Binding BindingLabel}" Classes="body" FontSize="{DynamicResource Ox.Ui.FontSize11}"
+        <TextBlock Name="ChipText" Grid.Column="1" Text="{Binding BindingLabel}" Classes="body" FontSize="{DynamicResource UiText.FontSize11}"
                    VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
       </Grid>
     </Button>

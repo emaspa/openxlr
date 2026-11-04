@@ -23,7 +23,7 @@ internal static class Dialogs
         var cancel = new Button { Content = Localizer.Text("Cancel"), IsCancel = true };
         string? result = null;
         var detail = new TextBlock { Text = hint, TextWrapping = TextWrapping.Wrap, MaxWidth = 380, Classes = { "hint" } };
-        detail.Bind(TextBlock.FontSizeProperty, detail.GetResourceObservable("Ox.Ui.FontSize11"));
+        detail.Bind(TextBlock.FontSizeProperty, detail.GetResourceObservable("UiText.FontSize11"));
         var dialog = new Window
         {
             Title = title,
