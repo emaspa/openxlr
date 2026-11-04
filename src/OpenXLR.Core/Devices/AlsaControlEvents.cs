@@ -3,10 +3,20 @@ using System.Runtime.InteropServices;
 
 namespace OpenXLR.Core.Devices;
 
+/// <summary>The card controls the Wave backends read back.</summary>
+[Flags]
+internal enum AlsaControls
+{
+    None = 0,
+    Mute = 1,
+    Headphones = 2,
+}
+
 internal interface IAlsaControlEvents : IDisposable
 {
     bool Available { get; }
-    bool Changed();
+    /// <summary>The read-back controls whose value changed since the last call.</summary>
+    AlsaControls Changed();
 }
 
 /// <summary>A nonblocking ALSA control subscription, drained by the device poll.</summary>
@@ -34,17 +44,17 @@ internal sealed class AlsaControlEvents : IAlsaControlEvents
         return null;
     }
 
-    public bool Changed()
+    public AlsaControls Changed()
     {
-        bool changed = false;
+        AlsaControls changed = AlsaControls.None;
         // Bound work during a burst. Remaining events are drained next poll.
         for (int i = 0; Available && i < 64; i++)
         {
             int result = snd_ctl_read(_control, _event);
             if (result > 0)
             {
-                if (!changed && snd_ctl_event_get_type(_event) == ElementEvent)
-                    changed = IsReadbackEvent(snd_ctl_event_elem_get_mask(_event),
+                if (snd_ctl_event_get_type(_event) == ElementEvent)
+                    changed |= ReadbackControl(snd_ctl_event_elem_get_mask(_event),
                         Marshal.PtrToStringAnsi(snd_ctl_event_elem_get_name(_event)));
                 continue;
             }
@@ -55,9 +65,14 @@ internal sealed class AlsaControlEvents : IAlsaControlEvents
         return changed;
     }
 
-    internal static bool IsReadbackEvent(uint mask, string? name)
-        => mask != ElementRemoved && (mask & ValueChanged) != 0
-            && name is Wave3Device.MuteCtl or Wave3Device.HpCtl;
+    internal static AlsaControls ReadbackControl(uint mask, string? name)
+        => mask == ElementRemoved || (mask & ValueChanged) == 0 ? AlsaControls.None
+            : name switch
+            {
+                Wave3Device.MuteCtl => AlsaControls.Mute,
+                Wave3Device.HpCtl => AlsaControls.Headphones,
+                _ => AlsaControls.None,
+            };
 
     public void Dispose()
     {

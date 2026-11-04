@@ -179,7 +179,7 @@ public class Wave3Device : IAudioDevice
     private int _card = -1;
     private AlsaValues? _mirrored;
     private long _alsaReadAt, _alsaWatchAt;
-    private bool _alsaReadPending, _alsaReadFailed;
+    private bool _alsaReadPending, _alsaEchoPending, _alsaReadFailed;
     private string? _mirrorError;
 
     /// <summary>
@@ -268,7 +268,7 @@ public class Wave3Device : IAudioDevice
             _alsaEvents = null;
             _card = -1;
             _mirrored = null;
-            _alsaReadPending = _alsaReadFailed = false;
+            _alsaReadPending = _alsaEchoPending = _alsaReadFailed = false;
             _mirrorError = null;
             ConnectionNote = null;
             FindAlsaCardLocked();
@@ -305,7 +305,7 @@ public class Wave3Device : IAudioDevice
         if (_card != previous)
         {
             _mirrored = null;
-            _alsaReadPending = _alsaReadFailed = false;
+            _alsaReadPending = _alsaEchoPending = _alsaReadFailed = false;
         }
         else if (_alsaEvents is not null)
         {
@@ -318,7 +318,9 @@ public class Wave3Device : IAudioDevice
     {
         if (_alsaEvents is { } events)
         {
-            _alsaReadPending |= events.Changed();
+            // This backend's own writes were drained right after it made
+            // them, so a change seen here came from somewhere else.
+            _alsaReadPending |= events.Changed() != AlsaControls.None;
             if (!events.Available) FindAlsaCardLocked();
             return;
         }
@@ -456,15 +458,25 @@ public class Wave3Device : IAudioDevice
 
         // Catch a desktop change that arrived during an outgoing write.
         // A disconnected handle must be rediscovered before another card read.
+        // Each write to the card comes back as an event of its own, so a
+        // change to a control written here may be that echo or a desktop
+        // edit right after it. It waits for the half-second readback, which
+        // keeps a turning dial from reading the card after every write.
         if ((muteOut || hpOut) && _alsaEvents is { } events)
         {
-            _alsaReadPending |= events.Changed();
+            AlsaControls changed = events.Changed();
+            AlsaControls written = (muteWritten ? AlsaControls.Mute : AlsaControls.None)
+                | (hpWritten ? AlsaControls.Headphones : AlsaControls.None);
+            _alsaReadPending |= (changed & ~written) != AlsaControls.None;
+            _alsaEchoPending |= (changed & written) != AlsaControls.None;
             if (!events.Available) return;
         }
         TimeSpan interval = _alsaReadFailed || _alsaEvents?.Available != true ? AlsaReadInterval : AlsaEventFallback;
-        if ((!muteOut || !hpOut) && (_alsaReadPending && !_alsaReadFailed || _time.GetElapsedTime(_alsaReadAt, now) >= interval))
+        TimeSpan sinceRead = _time.GetElapsedTime(_alsaReadAt, now);
+        bool eventDue = !_alsaReadFailed && (_alsaReadPending || _alsaEchoPending && sinceRead >= AlsaReadInterval);
+        if ((!muteOut || !hpOut) && (eventDue || sinceRead >= interval))
         {
-            _alsaReadPending = false;
+            _alsaReadPending = _alsaEchoPending = false;
             _alsaReadFailed = true;
             try
             {

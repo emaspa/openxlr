@@ -7,15 +7,18 @@ public sealed partial class Wave3DeviceTests
     private sealed class ControlEvents : IAlsaControlEvents
     {
         public bool Available { get; set; } = true;
+        /// <summary>A change to both controls, when the test does not care which.</summary>
         public bool Pending { get; set; }
+        public AlsaControls Changes { get; set; }
         public bool Disposed { get; private set; }
         public bool DisconnectOnRead { get; set; }
 
-        public bool Changed()
+        public AlsaControls Changed()
         {
             if (DisconnectOnRead) Available = false;
-            bool value = Pending;
+            AlsaControls value = Changes | (Pending ? AlsaControls.Mute | AlsaControls.Headphones : AlsaControls.None);
             Pending = false;
+            Changes = AlsaControls.None;
             return value;
         }
         public void Dispose() { Disposed = true; Available = false; }
@@ -36,9 +39,9 @@ public sealed partial class Wave3DeviceTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void ADesktopEditDuringAMirrorWriteIsReadOnTheNextPoll(bool alsoMute)
+    public void ADesktopEditOfAControlJustWrittenIsReadWithinHalfASecond(bool alsoMute)
     {
-        var (dev, usb, card, _, events) = EventMirrored();
+        var (dev, usb, card, clock, events) = EventMirrored();
         using (dev)
         {
             usb.Config = Block(gainDb: 20, mute: alsoMute, hpDb: -30);
@@ -46,13 +49,66 @@ public sealed partial class Wave3DeviceTests
             {
                 if (name != "PCM Playback Volume") return;
                 card.Hp = 100; // Desktop edit after the mirror writes its value.
-                events.Pending = true;
+                events.Changes |= AlsaControls.Headphones;
             };
             Assert.Equal(-30, dev.ReadState().HpVolumeDb);
-            int reads = alsoMute ? 0 : 1;
-            Assert.Equal(reads, card.Reads);
+            card.AfterSet = null;
+            clock.Now += TimeSpan.FromMilliseconds(400);
+            Assert.Equal(-30, dev.ReadState().HpVolumeDb);
+            Assert.Equal(0, card.Reads);
+            clock.Now += TimeSpan.FromMilliseconds(100);
             Assert.Equal(-10, dev.ReadState().HpVolumeDb);
-            Assert.Equal(reads + 1, card.Reads);
+            Assert.Equal(1, card.Reads);
+        }
+    }
+
+    [Fact]
+    public void ADesktopEditOfTheOtherControlDuringAMirrorWriteIsReadAtOnce()
+    {
+        var (dev, usb, card, _, events) = EventMirrored();
+        using (dev)
+        {
+            usb.Config = Block(gainDb: 20, mute: false, hpDb: -30);
+            card.AfterSet = name =>
+            {
+                events.Changes |= name == "PCM Playback Volume" ? AlsaControls.Headphones : AlsaControls.Mute;
+                if (name == "PCM Playback Volume") { card.Capture = "off"; events.Changes |= AlsaControls.Mute; }
+            };
+            var state = dev.ReadState();
+            Assert.Equal(-30, state.HpVolumeDb);
+            Assert.True(state.Mute);
+            Assert.Equal(1, card.Reads);
+        }
+    }
+
+    [Fact]
+    public void TurningTheDialReadsTheCardOnlyEveryHalfSecond()
+    {
+        var (dev, usb, card, clock, events) = EventMirrored();
+        using (dev)
+        {
+            // The kernel reports every write, this backend's own included.
+            card.Sets.Clear();
+            card.AfterSet = name => events.Changes |= name == "PCM Playback Volume" ? AlsaControls.Headphones : AlsaControls.Mute;
+            // The dial moves on every other poll: the polls between see no new value.
+            for (int i = 1; i <= 18; i++)
+            {
+                clock.Now += TimeSpan.FromMilliseconds(100);
+                if (i % 2 == 1) usb.Config = Block(gainDb: 20, mute: false, hpDb: -12.5 - i);
+                dev.ReadState();
+            }
+            Assert.Equal(9, card.Sets.Count(s => s.Name == "PCM Playback Volume"));
+            Assert.Equal(3, card.Reads);
+
+            // The last write is read back within half a second of the dial
+            // stopping, and a desktop edit after that at once.
+            for (int i = 0; i < 5; i++) { clock.Now += TimeSpan.FromMilliseconds(100); dev.ReadState(); }
+            Assert.Equal(4, card.Reads);
+            card.Capture = "off";
+            events.Changes = AlsaControls.Mute;
+            clock.Now += TimeSpan.FromMilliseconds(100);
+            Assert.True(dev.ReadState().Mute);
+            Assert.Equal(5, card.Reads);
         }
     }
 
@@ -237,16 +293,16 @@ public sealed partial class Wave3DeviceTests
     }
 
     [Theory]
-    [InlineData(1u, "Mic Capture Switch", true)]
-    [InlineData(1u, "PCM Playback Volume", true)]
-    [InlineData(3u, "PCM Playback Volume", true)]
-    [InlineData(1u, "Mic Capture Volume", false)]
-    [InlineData(1u, "PCM Playback Switch", false)]
-    [InlineData(2u, "Mic Capture Switch", false)]
-    [InlineData(4u, "PCM Playback Volume", false)]
-    [InlineData(uint.MaxValue, "Mic Capture Switch", false)]
-    public void OnlyMuteAndHeadphoneValueEventsTriggerReadback(uint mask, string name, bool expected)
-        => Assert.Equal(expected, AlsaControlEvents.IsReadbackEvent(mask, name));
+    [InlineData(1u, "Mic Capture Switch", 1)]
+    [InlineData(1u, "PCM Playback Volume", 2)]
+    [InlineData(3u, "PCM Playback Volume", 2)]
+    [InlineData(1u, "Mic Capture Volume", 0)]
+    [InlineData(1u, "PCM Playback Switch", 0)]
+    [InlineData(2u, "Mic Capture Switch", 0)]
+    [InlineData(4u, "PCM Playback Volume", 0)]
+    [InlineData(uint.MaxValue, "Mic Capture Switch", 0)]
+    public void OnlyMuteAndHeadphoneValueEventsTriggerReadback(uint mask, string name, int expected)
+        => Assert.Equal((AlsaControls)expected, AlsaControlEvents.ReadbackControl(mask, name));
 
     [Fact]
     public void AControlWatchOnANegativeCardIsUnavailable()
