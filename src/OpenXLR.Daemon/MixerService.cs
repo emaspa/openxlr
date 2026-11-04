@@ -114,6 +114,7 @@ public sealed class MixerService : IHostedService, IDisposable
         EditorPolicy = editorPolicy ?? new NativeEditorPolicy();
         _pipeWire = new PipeWireAdapter(_progress.Mark, note => _log.LogInformation("{msg}", note));
         _mixer = new(_pipeWire) { InputNote = note => _log.LogWarning("hardware input: {note}", note) };
+        _devices.HardwareMixingEntry = () => _mixer.HardwareEntryNow is { Leaving: false } entry ? entry : null;
         _rescue = new CaptureRescue(_log, _mixer, () => _devices.ActiveInfo, () => _devices.ActiveCapabilities, _devices.ResetUnitUsb);
         _eqPort = new DeviceEqPort(devices, waveInterfaces);
         // A unit confirming or refusing an EQ is followed at once, off the

@@ -225,6 +225,12 @@ public sealed partial class Mixer
     /// <summary>What the unit held before hardware mixing, while it runs or is being left; null otherwise.</summary>
     public HardwareEntry? HardwareEntry { get { lock (_gate) return _hardwareEntry; } }
 
+    /// <summary>
+    /// <see cref="HardwareEntry"/> without the mixer's lock, for a caller that
+    /// holds a lock of its own the mixer may wait on (the device manager).
+    /// </summary>
+    public HardwareEntry? HardwareEntryNow => Volatile.Read(ref _hardwareEntry);
+
     // The graph has entered the mode this run: the channels are linked to
     // their pairs and the Pro's sink is held at 100%.
     private bool _hardwareGraphEntered;

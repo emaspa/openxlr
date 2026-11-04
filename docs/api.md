@@ -2853,6 +2853,13 @@ and `soundCheck` when that holds for both; `audition` while there is no
 cue pair. Mixes the computer builds (Stream, Chat, and any mix only other
 outputs play) keep everything.
 
+**Profiles.** A profile's `hpVolumeDb` and `hp2VolumeDb` are the jacks as
+software mixing plays them. `loadProfile` and recall on connect write them
+lowered by each jack's entry offset and the output volume while the mode
+runs, and `saveProfile` stores the levels leaving would give, so a profile
+recalls the same loudness in either mode. The state's `hpVolumeDb` and
+`hp2VolumeDb` stay what the unit holds.
+
 **State.** Once the daemon has planned the mode, the mixer state carries
 `hardwareMixing {wanted, active, reason, note}`. While the mode runs it
 also carries `pairs`, `returnPairs` (each processed unit input to its

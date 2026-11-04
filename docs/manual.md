@@ -800,7 +800,7 @@ and lower at different points:
 If a gate on XLR 1 should stop false triggers, choose **This computer**.
 
 **In hardware mixing on the Pro.** When the Pro builds the mixes its jacks
-play ([hardware mixing](api.md#hardware-mixing), API only for now), each
+play ([hardware mixing](#hardware-mixing)), each
 channel reaches the unit on a USB pair of its own, so the unit ducks
 channel by channel. Only the chosen channels dip in a
 ducked mix the jacks play; anything else in that mix, your voice
@@ -3738,7 +3738,9 @@ to the unit once, on a USB pair of its own, and the unit mixes those pairs
 with its own inputs. Your microphones, Line In and Aux In then reach the
 jacks with no delay, and a fader moves a level inside the unit.
 
-It is experimental, and nobody has listened to it on a unit yet. It needs
+It is experimental: it was heard on one unit, with one pair of headphones
+on Headphones 1 and the USB Aux port, and not yet with two jacks on two
+mixes. It needs
 a Wave XLR Pro on firmware 1.0.14 or later that OpenXLR drives, with the
 software mixer on.
 
@@ -3757,6 +3759,12 @@ mixer, not in profiles. If the unit is unplugged, the choice waits and the
 unit takes over again when it comes back; a daemon stopped while the unit
 mixes leaves the unit as it is, and the next start carries on.
 
+A profile keeps the headphone volumes as this computer's mixing plays them.
+Recalled while the unit mixes, on connect after a replug or a restart too,
+each jack is turned down by the same amount the mode turned it down when it
+started, so it sounds as loud as the profile was. A profile saved while the
+unit mixes keeps the levels the jacks go back to when you switch back.
+
 Stream, Chat, your own virtual microphones and any mix a device other than
 the Pro's jacks and USB Aux port plays stay on this computer, with their plugins, ducking
 and processed microphones. Applications, channels, faders, mutes and
@@ -3773,7 +3781,7 @@ profiles work as before. What changes on the mixes the unit builds:
 | Ducking on a mix the unit builds | Runs on the unit for each chosen channel, with XLR 1 as the key. The unit never lowers its own inputs. |
 | Latency compensation | Leaves out the mixes the unit builds. |
 | Mic setup | Works. The take and Hear myself play back on the microphone's own free USB pair. With none free, Mic setup is refused for that microphone and says why. |
-| Soundboard auditions | Play on a free USB pair, heard on the jacks only, never on the USB Aux port or the stream. With none free they are refused and the Sounds window says why. On a layout of seven channels a processed XLR 1 takes the last pair, so auditions stop until a channel goes or the processing is off. |
+| Soundboard auditions | Play on a free USB pair, heard on the jacks only, never on the USB Aux port or the stream. With none free they are refused and the Soundboard window says why. On a layout of seven channels a processed XLR 1 takes the last pair, so auditions stop until a channel goes or the processing is off. |
 | Exclusive groups and the monitoring pause | Work, by taking channels out of the unit's mix. |
 | The USB Aux port | Plays the Aux mix, which the unit builds too while the port is on, at the same balance as the jacks and without Aux In. Your output volume no longer turns it down, and the monitoring pause leaves it playing. |
 | Mix meters | Read this computer's copy of each mix, at the same faders. |
