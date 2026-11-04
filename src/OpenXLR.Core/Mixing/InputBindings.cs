@@ -331,8 +331,8 @@ public sealed partial class Mixer
     // direct path only runs while the daemon drives one.
     // A unit id that two attached units share matches no saved unit; the
     // strip on the interface and the exact node still carry the inputs.
-    private string? CarrierOfLocked(int input)
-        => UnitInputChannel(_config.Channels, _bindings, _inputDevice, _deviceXlrInputs ?? 1, input,
+    private string? CarrierOfLocked(int input, int? xlrInputs = null)
+        => UnitInputChannel(_config.Channels, _bindings, _inputDevice, xlrInputs ?? _deviceXlrInputs ?? 1, input,
             AmbiguousUnitLocked(_drivenUnit) ? null : _drivenUnit);
 
     /// <inheritdoc cref="UnitInputChannelLocked"/>
