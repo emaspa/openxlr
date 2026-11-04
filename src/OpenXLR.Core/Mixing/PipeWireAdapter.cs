@@ -519,18 +519,19 @@ public sealed class PipeWireAdapter
     /// A sink node's level from its Props param: the quietest channel as
     /// linear amplitude, the loudest as a desktop percentage, and mute.
     /// </summary>
-    private static (double Volume, double DesktopVolume, bool Muted)? SinkLevel(JsonElement info)
+    private static (double Volume, double DesktopVolume, bool Muted)? SinkLevel(JsonElement info, bool firstChannel = false)
     {
         if (!info.TryGetProperty("params", out JsonElement pars) ||
             !pars.TryGetProperty("Props", out JsonElement list) || list.ValueKind != JsonValueKind.Array) return null;
         foreach (JsonElement p in list.EnumerateArray())
         {
             if (!p.TryGetProperty("channelVolumes", out JsonElement cv) || cv.ValueKind != JsonValueKind.Array) continue;
-            double volume = 1.0, maximum = 0.0;
+            double volume = 1.0, maximum = 0.0, first = 0.0;
             bool any = false;
             foreach (JsonElement v in cv.EnumerateArray())
                 if (v.ValueKind == JsonValueKind.Number && v.TryGetDouble(out double d) && double.IsFinite(d) && d >= 0)
                 {
+                    if (!any) first = d;
                     volume = any ? Math.Min(volume, d) : d;
                     maximum = Math.Max(maximum, d);
                     any = true;
@@ -538,9 +539,10 @@ public sealed class PipeWireAdapter
             if (!any) continue;
             bool muted = p.TryGetProperty("mute", out JsonElement mu) && mu.ValueKind == JsonValueKind.True;
             // PipeWire stores linear amplitude; Pulse desktop percentages
-            // use its cube root. Keep the loudest channel, as desktop
-            // master controls do, without flattening channel balance.
-            return (volume, Math.Round(Math.Cbrt(maximum) * 100) / 100, muted);
+            // use its cube root. Device lists keep the loudest channel;
+            // the legacy sink-volume query keeps pactl's first channel.
+            // Neither read changes channel balance.
+            return (volume, Math.Round(Math.Cbrt(firstChannel ? first : maximum) * 100) / 100, muted);
         }
         return null;
     }
@@ -747,7 +749,7 @@ public sealed class PipeWireAdapter
     public double? GetSinkVolume(string sinkName)
     {
         if (LiveObjects() is { } objects)
-            return FindSink(objects, BareSink(sinkName)) is { } info && SinkLevel(info) is { } level
+            return FindSink(objects, BareSink(sinkName)) is { } info && SinkLevel(info, firstChannel: true) is { } level
                 ? Math.Clamp(level.DesktopVolume, 0, MaxSinkVolume) : null;
         return ParseVolumePercent(TryRun("pactl", "get-sink-volume", BareSink(sinkName)));
     }

@@ -42,6 +42,12 @@ public sealed partial class MonitorVolumeIntegrationTests
             Assert.False(File.Exists(calls), File.Exists(calls) ? File.ReadAllText(calls) : "");
             pw.SetSinkVolume("test_registry_reads", 1.25);
             Assert.Equal(1.25, pw.GetSinkVolume("test_registry_reads"));
+            // Match pactl's first-channel read without changing stereo balance.
+            foreach (var (left, right, expected) in new[] { ("25%", "75%", .25), ("75%", "25%", .75) })
+            {
+                Assert.Equal(0, ProcessRunner.Run("pactl", ["set-sink-volume", "test_registry_reads", left, right]).ExitCode);
+                Assert.True(SpinWait.SpinUntil(() => pw.GetSinkVolume("test_registry_reads") == expected, TimeSpan.FromSeconds(3)));
+            }
             Assert.Equal(0, ProcessRunner.Run("pactl", ["set-sink-volume", "test_registry_reads", "200%"]).ExitCode);
             Assert.True(SpinWait.SpinUntil(() => pw.GetSinkVolume("test_registry_reads") == 1.5, TimeSpan.FromSeconds(3)));
             Assert.Equal(0, ProcessRunner.Run("pactl", ["set-default-sink", "test_registry_other"]).ExitCode);
