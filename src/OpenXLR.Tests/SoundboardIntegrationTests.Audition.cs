@@ -195,7 +195,8 @@ public sealed partial class SoundboardIntegrationTests
         string? path = Environment.GetEnvironmentVariable("PATH");
         string real = (path ?? "").Split(Path.PathSeparator).Select(p => Path.GetFullPath(Path.Combine(p, "pw-link"))).First(File.Exists);
         string refused = Path.Combine(directory, "refused");
-        // Refuse the next listing once the pair named in the file `after` is linked.
+        // Refuse audition connections after the prerequisite pair is linked.
+        // A live registry discovers ports without running pw-link listings.
         ExecutableScript.Write(Path.Combine(directory, "pw-link"), $$"""
             #!/bin/sh
             exec python3 - "$@" <<'PY'
@@ -203,8 +204,7 @@ public sealed partial class SoundboardIntegrationTests
             args = sys.argv[1:]
             folder = pathlib.Path({{System.Text.Json.JsonSerializer.Serialize(directory)}})
             armed, refused, after = folder / 'armed', folder / 'refused', folder / 'after'
-            if args in (['-o'], ['-i']) and armed.exists():
-                armed.unlink()
+            if len(args) == 2 and args[0].startswith({{System.Text.Json.JsonSerializer.Serialize(PipeWireAdapter.PlayerNode + ":audition_")}}) and armed.exists():
                 refused.touch()
                 print('pw-link: refused by the test', file=sys.stderr)
                 sys.exit(1)
@@ -216,6 +216,7 @@ public sealed partial class SoundboardIntegrationTests
         void RefuseAfter(string from, string to)
         {
             File.Delete(refused);
+            File.Delete(Path.Combine(directory, "armed"));
             File.WriteAllText(Path.Combine(directory, "after"), from + "\n" + to);
         }
         try
@@ -233,7 +234,7 @@ public sealed partial class SoundboardIntegrationTests
             mixer.UseSoundboard(new SoundboardLibrary { Enabled = false }, _ => null, Path.Combine(_directory, "clips"));
             mixer.ImportClip(wav, "Long");
 
-            // The listing right after the player's link into SFX is the audition's.
+            // The player's next connections after SFX feed the audition.
             RefuseAfter(PipeWireAdapter.PlayerNode + ":capture_1", "OpenXLR_ch_sfx:playback_FR");
             try
             {
@@ -241,7 +242,7 @@ public sealed partial class SoundboardIntegrationTests
                 mixer.SetSoundboard(true, _ => null);
             }
             finally { Environment.SetEnvironmentVariable("PATH", path); }
-            Assert.True(File.Exists(refused), "the audition's listing was refused");
+            Assert.True(File.Exists(refused), "the audition's connection was refused");
             SoundboardPlayer player = Player(mixer)!;
             Assert.NotNull(player);
             Assert.Empty(mixer.AuditionMixes);
@@ -271,7 +272,7 @@ public sealed partial class SoundboardIntegrationTests
             }
             finally { Environment.SetEnvironmentVariable("PATH", path); }
             Assert.Null(feed);
-            Assert.True(File.Exists(refused), "the audition's listing was refused");
+            Assert.True(File.Exists(refused), "the audition's connection was refused");
             Assert.Empty(mixer.AuditionMixes);
             Assert.Equal(Mixer.SoundboardAuditionReconnecting, Assert.Throws<InvalidOperationException>(() => mixer.AuditionClip("long")).Message);
             mixer.EnsureFilterRoutes();
