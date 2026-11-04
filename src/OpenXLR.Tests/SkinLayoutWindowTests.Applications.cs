@@ -268,11 +268,10 @@ internal static partial class SkinLayoutWindowTests
             (double Width, double Name, double PickerX, double PickerWidth) here =
                 (tiles[i].Bounds.Width, name.Bounds.Width, picker.TranslatePoint(default, tiles[i])!.Value.X, picker.Bounds.Width);
             if (i == 0) { first = here; continue; }
-            if (maximum == 0)
-            {
-                Assert.True(Math.Abs(here.Width - first.Width) <= 0.5, $"{tile}: {here.Width:0.#} wide, the first tile {first.Width:0.#}");
-                Assert.True(Math.Abs(here.PickerX - first.PickerX) <= 0.5, $"{tile}: picker at {here.PickerX:0.#}, the first tile's at {first.PickerX:0.#}");
-            }
+            // Tiles that grow into spare width all grow alike, so a short last
+            // band lines up with the bands above it.
+            Assert.True(Math.Abs(here.Width - first.Width) <= 0.5, $"{tile}: {here.Width:0.#} wide, the first tile {first.Width:0.#}");
+            Assert.True(Math.Abs(here.PickerX - first.PickerX) <= 0.5, $"{tile}: picker at {here.PickerX:0.#}, the first tile's at {first.PickerX:0.#}");
             Assert.True(Math.Abs(here.PickerWidth - first.PickerWidth) <= 0.5, $"{tile}: picker {here.PickerWidth:0.#} wide, the first tile's {first.PickerWidth:0.#}");
         }
     }

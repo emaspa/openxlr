@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 
@@ -13,7 +14,8 @@ namespace OpenXLR.UI.Layout;
 /// width and its channel picker a width shared by all the tiles under this
 /// panel, which is their shared size scope. A column starts at the width of
 /// its widest tile. A column that does not fit goes on the next band, whole.
-/// A skin can let columns in each band share the unused width.
+/// A skin can let the columns grow into the unused width, all by the same
+/// amount, so the columns of every band still line up.
 /// </summary>
 public sealed class ApplicationColumnsPanel : Panel
 {
@@ -51,8 +53,12 @@ public sealed class ApplicationColumnsPanel : Panel
 
     private readonly record struct Column(int Start, int End, double Width, double Height);
 
-    // Group whole columns into bands using their measured sizes, then share
-    // the extra width in each band when arranging it.
+    private readonly record struct Band(int First, int End, double Used, double Height);
+
+    // Group whole columns into bands using their measured sizes. Every column
+    // grows by the same amount, the most the fullest band leaves room for, so
+    // a short last band keeps the width and the picker places of the bands
+    // above it instead of spreading its few tiles across the row.
     private Size Place(double width, double? arrange)
     {
         var shown = new List<Control>();
@@ -72,6 +78,7 @@ public sealed class ApplicationColumnsPanel : Panel
             columns.Add(new Column(start, end, columnWidth, columnHeight));
         }
 
+        var bands = new List<Band>();
         double top = 0, widest = 0;
         for (int first = 0; first < columns.Count;)
         {
@@ -83,29 +90,35 @@ public sealed class ApplicationColumnsPanel : Panel
                 height = Math.Max(height, columns[end].Height);
                 end++;
             }
-            if (arrange is { } room)
-            {
-                double extra = MaxTileWidth > 0 ? Math.Max(0, room - used) / (end - first) : 0;
-                double x = 0;
-                for (int col = first; col < end; col++)
-                {
-                    Column column = columns[col];
-                    double tileWidth = column.Width + Math.Min(extra, Math.Max(0, MaxTileWidth - column.Width));
-                    tileWidth = Math.Min(tileWidth, Math.Max(0, room - x));
-                    double y = top;
-                    for (int i = column.Start; i < column.End; i++)
-                    {
-                        double childWidth = MaxTileWidth > 0 ? tileWidth : Math.Min(shown[i].DesiredSize.Width, tileWidth);
-                        double childHeight = shown[i].DesiredSize.Height;
-                        shown[i].Arrange(new Rect(x, y, childWidth, childHeight));
-                        y += childHeight;
-                    }
-                    x += tileWidth;
-                }
-            }
+            bands.Add(new Band(first, end, used, height));
             widest = Math.Max(widest, used);
             top += height;
             first = end;
+        }
+        if (arrange is not { } room) return new Size(widest, top);
+
+        double extra = MaxTileWidth > 0 && bands.Count > 0
+            ? bands.Min(b => Math.Max(0, room - b.Used) / (b.End - b.First)) : 0;
+        double y0 = 0;
+        foreach (Band band in bands)
+        {
+            double x = 0;
+            for (int col = band.First; col < band.End; col++)
+            {
+                Column column = columns[col];
+                double tileWidth = column.Width + Math.Min(extra, Math.Max(0, MaxTileWidth - column.Width));
+                tileWidth = Math.Min(tileWidth, Math.Max(0, room - x));
+                double y = y0;
+                for (int i = column.Start; i < column.End; i++)
+                {
+                    double childWidth = MaxTileWidth > 0 ? tileWidth : Math.Min(shown[i].DesiredSize.Width, tileWidth);
+                    double childHeight = shown[i].DesiredSize.Height;
+                    shown[i].Arrange(new Rect(x, y, childWidth, childHeight));
+                    y += childHeight;
+                }
+                x += tileWidth;
+            }
+            y0 += band.Height;
         }
         return new Size(widest, top);
     }
