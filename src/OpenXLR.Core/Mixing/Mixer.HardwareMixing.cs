@@ -106,11 +106,19 @@ public sealed partial class Mixer
         var unitSources = new Dictionary<int, string>();
         if (_drivenUnit is not null)
         {
-            if (CarrierOfLocked(1) is { } xlr1) unitSources[ProMixSections.Xlr1] = xlr1;
-            if (CarrierOfLocked(2) is { } xlr2 && xlr2 != unitSources.GetValueOrDefault(ProMixSections.Xlr1)) unitSources[ProMixSections.Xlr2] = xlr2;
+            // The mode only runs on a Wave XLR Pro, which has both XLR inputs,
+            // USB Aux and Line In, and only with its full capture layout. Until
+            // the daemon reports the unit's capabilities after a start, those
+            // strips are still the unit's own inputs and need no USB pair: one
+            // that took a pair then cost XLR 1 its processed return on the desk
+            // (2026-11-04), and could push a full layout over the budget.
+            bool pro = unit is { Pro: true };
+            int? xlrInputs = pro ? 2 : null;
+            if (CarrierOfLocked(1, xlrInputs) is { } xlr1) unitSources[ProMixSections.Xlr1] = xlr1;
+            if (CarrierOfLocked(2, xlrInputs) is { } xlr2 && xlr2 != unitSources.GetValueOrDefault(ProMixSections.Xlr1)) unitSources[ProMixSections.Xlr2] = xlr2;
             foreach (ChannelDefinition c in _config.Channels)
                 if (c.InputPair is int pair && pair is ProMixSections.UsbAux or ProMixSections.LineIn
-                    && !_bindings.ContainsKey(c.Id) && ChannelPresentLocked(c))
+                    && !_bindings.ContainsKey(c.Id) && (pro || ChannelPresentLocked(c)))
                     unitSources.TryAdd(pair, c.Id);
         }
         string? proSink = _hardwareOutputRouting ? HardwareOutputSinkLocked() : null;
@@ -216,6 +224,12 @@ public sealed partial class Mixer
 
     /// <summary>What the unit held before hardware mixing, while it runs or is being left; null otherwise.</summary>
     public HardwareEntry? HardwareEntry { get { lock (_gate) return _hardwareEntry; } }
+
+    /// <summary>
+    /// <see cref="HardwareEntry"/> without the mixer's lock, for a caller that
+    /// holds a lock of its own the mixer may wait on (the device manager).
+    /// </summary>
+    public HardwareEntry? HardwareEntryNow => Volatile.Read(ref _hardwareEntry);
 
     // The graph has entered the mode this run: the channels are linked to
     // their pairs and the Pro's sink is held at 100%.

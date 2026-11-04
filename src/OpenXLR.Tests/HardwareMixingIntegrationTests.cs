@@ -25,7 +25,8 @@ public sealed partial class MonitorVolumeIntegrationTests
     /// on, the unit builds the Aux mix in section 36 from the same pairs, Aux
     /// In left out, and the graph's Aux mix leaves pair 5. Leaving puts the
     /// graph, the Aux mix's route, the sink's volume, sections 0 and 36, byte
-    /// 98 and the jack back as they were.
+    /// 98 and the jack back as they were, the jack at a level a profile
+    /// recalled in the mode set.
     /// </summary>
     [MonitorPipeWireFact]
     public async Task HardwareMixingEntersAndLeavesWithTheGraphAndTheUnitAsTheyWere()
@@ -204,6 +205,16 @@ public sealed partial class MonitorVolumeIntegrationTests
             Run(new() { Cmd = "setDucking", Value = JsonSerializer.SerializeToElement(new { enabled = false }) });
             PrimaryWait(() => { Sweep(); return (pro.Block[16] & 0xaa) == 0 && (pro.Block[52] & 0xaa) == 0; });
 
+            // A profile recalled in the mode (recall on connect after a replug
+            // or a restart) holds Headphones 1 as software mixing plays it: the
+            // unit gets it 21 dB and the output volume lower, the mode keeps
+            // it, a profile saved now holds it as recalled, and leaving puts
+            // it there.
+            Assert.Null(devices.ApplyProfile(devices.Snapshot().State! with { HpVolumeDb = -16 }, restoring: true));
+            for (int i = 0; i < 2; i++) Sweep();
+            Assert.Equal(ProJackLevels.ByteOf(-16 - 21 + 60 * Math.Log10(0.5)), pro.Levels[0]);
+            Assert.Equal(-16, devices.SavedState()!.HpVolumeDb, 3);
+
             // Leaving: the graph, the sink, section 0, byte 98 and the jack as before.
             Run(new() { Cmd = "setChannelMuted", Channel = "game", Mix = "monitor", Value = JsonSerializer.SerializeToElement(false) });
             Run(new() { Cmd = "setLevel", Channel = "music", Mix = "monitor", Value = JsonSerializer.SerializeToElement(1.0) });
@@ -218,7 +229,7 @@ public sealed partial class MonitorVolumeIntegrationTests
             Assert.Equal(before[..16], after[..16]);
             Assert.Equal(before[36..52], after[36..52]);
             Assert.Equal(0x20, after[ProMixSections.SelectorUsbAux]);
-            Assert.Equal(ProJackLevels.ByteOf(-10), pro.Levels[0]);
+            Assert.Equal(ProJackLevels.ByteOf(-16), pro.Levels[0]);
             Assert.False(service.Snapshot()!.HardwareMixing!.Active);
         }
         finally
@@ -260,7 +271,7 @@ public sealed partial class MonitorVolumeIntegrationTests
             // No hardware low cut, so XLR 1's soft low cut runs in software
             // and the test can process the microphone without a plugin host.
             Gain = true, Mute = true, LowCut = false, ClipGuard = true, OutputRouting = true, AuxInput = true, LineInput = true,
-            XlrInputs = 2, RetainsSettings = true, HardwareMixing = true, Ducking = true,
+            XlrInputs = 2, RetainsSettings = true, HardwareMixing = true, Ducking = true, HpVolume = true, HpOutputs = 2,
         };
         public DuckingReadback? ReadDucking() { lock (this) return ProDucking.Decode(_ducking, _block); }
         public string? Firmware => "1.0.14";
@@ -298,6 +309,7 @@ public sealed partial class MonitorVolumeIntegrationTests
         public void SetMute(bool on) { } public void SetLowCut(bool on) { } public void SetExpander(bool on) { }
         public void SetVoiceTune(bool on) { } public void SetVoiceTuneStrength(int value) { }
         public void SetHpVolumeDb(double db) { lock (this) _levels[0] = ProJackLevels.ByteOf(db); }
+        public void SetHp2VolumeDb(double db) { lock (this) _levels[2] = ProJackLevels.ByteOf(db); }
         public void SetLowImpedance(bool on) { } public void SetCrossfade(int value) { } public void SetPhantom(bool on) { }
         public void SetClipGuard(bool on) { } public void SetCompressor(bool on) { }
     }

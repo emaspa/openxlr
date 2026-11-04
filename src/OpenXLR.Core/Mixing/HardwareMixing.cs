@@ -449,7 +449,50 @@ public static class HardwareMixingPlanner
     /// before the mode.
     /// </summary>
     public static double LeaveLevelDb(double baseDb, double offsetDb, double? outputVolume)
-        => baseDb + offsetDb - (outputVolume is > 1 and var v ? 60 * Math.Log10(v) : 0);
+        => baseDb + offsetDb - AboveFullDb(outputVolume);
+
+    /// <summary>
+    /// The headphone levels of a saved state (a profile, the last settings,
+    /// a reset's baseline) as the unit plays them in the mode. A saved level
+    /// is the jack as software mixing plays it, with section 0 21 dB down;
+    /// the mode runs section 0 at 0 dB, so a saved level written as it is
+    /// would play the jack louder by the entry offset. This is the level that
+    /// <see cref="LeaveLevelDb"/> turns back into the saved one.
+    /// </summary>
+    public static DeviceState ToUnitJackLevels(DeviceState saved, HardwareEntry entry) => saved with
+    {
+        HpVolumeDb = UnitLevelDb(saved.HpVolumeDb, entry, "hp1"),
+        Hp2VolumeDb = UnitLevelDb(saved.Hp2VolumeDb, entry, "hp2"),
+    };
+
+    /// <summary>
+    /// The headphone levels to save from a unit in the mode: where leaving
+    /// would put them, so a profile saved in the mode recalls the same
+    /// loudness in either mode (see <see cref="ToUnitJackLevels"/>).
+    /// </summary>
+    public static DeviceState ToSavedJackLevels(DeviceState unit, HardwareEntry entry) => unit with
+    {
+        HpVolumeDb = SavedLevelDb(unit.HpVolumeDb, entry, "hp1"),
+        Hp2VolumeDb = SavedLevelDb(unit.Hp2VolumeDb, entry, "hp2"),
+    };
+
+    private static double EntryOffsetDbOf(HardwareEntry entry, string jack)
+        => entry.Offsets?.GetValueOrDefault(jack, -Section0LevelDb) ?? -Section0LevelDb;
+
+    // What the Pro sink's volume above 100% adds to the pairs, in dB.
+    private static double AboveFullDb(double? outputVolume) => outputVolume is > 1 and var v ? 60 * Math.Log10(v) : 0;
+
+    private static double UnitLevelDb(double savedDb, HardwareEntry entry, string jack)
+        => ProJackLevels.DbOf(ProJackLevels.ByteOf(
+            JackLevelDb(savedDb - EntryOffsetDbOf(entry, jack) + AboveFullDb(entry.OutputVolume), entry.OutputVolume)));
+
+    private static double SavedLevelDb(double unitDb, HardwareEntry entry, string jack)
+    {
+        double output = Mixer.JackOutputVolumeDb(entry.OutputVolume);
+        // With the output volume at 0 the unit sits at its floor, and the base says where the jack is.
+        double baseDb = double.IsFinite(output) ? unitDb - output : entry.Jacks.GetValueOrDefault(jack, unitDb);
+        return ProJackLevels.DbOf(ProJackLevels.ByteOf(LeaveLevelDb(baseDb, EntryOffsetDbOf(entry, jack), entry.OutputVolume)));
+    }
 
     /// <summary>The fixed keys of what the mode turns off for this layout, with each sentence.</summary>
     private static Dictionary<string, string> Disabled(HardwareMixingSetup setup, IEnumerable<string> feeds,

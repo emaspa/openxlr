@@ -858,7 +858,7 @@ public sealed class WebSocketHub
                         return "saveProfile: with no interface connected a profile holds only the mixer, which is not running";
                     OpenXLR.Core.ProfileStore.Save(devId, name, new OpenXLR.Core.Profile
                     {
-                        Device = generic ? null : _devices.Snapshot().State,
+                        Device = generic ? null : _devices.SavedState(),
                         AdditionalDevices = !generic && _waveInterfaces?.CaptureProfile() is { Count: > 0 } additional ? additional : null,
                         Mixer = scene,
                     });

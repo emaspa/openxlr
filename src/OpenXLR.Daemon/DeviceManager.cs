@@ -821,7 +821,7 @@ public sealed partial class DeviceManager : BackgroundService
             if (!force && DateTime.UtcNow - since < PersistDelay) return;
             _dirtyAt = null;
             if (_device is null || _last is null) return;
-            try { DeviceStateStore.SaveLast(DevId(_device), _last); }
+            try { DeviceStateStore.SaveLast(DevId(_device), SavedStateLocked(_device, _last)); }
             catch (Exception ex) { _log.LogWarning("saving last settings: {msg}", ex.Message); }
         }
     }
@@ -1188,6 +1188,9 @@ public sealed partial class DeviceManager : BackgroundService
             if (_device is null || !_device.Connected) return "no device connected";
             DeviceState s = _last ?? Stamp(_device.ReadState());
             DeviceCapabilities c = EffectiveCapabilitiesLocked(_device);
+            // A saved state holds the Pro's jacks as software mixing plays them.
+            if (c.OutputRouting && HardwareMixingEntry?.Invoke() is { } entry)
+                p = HardwareMixingPlanner.ToUnitJackLevels(p, entry);
             bool lockApplies = GainIsLocked && !restoring;
             bool gainBlocked = lockApplies &&
                 (c.Gain && s.GainDb != p.GainDb ||
@@ -1356,6 +1359,25 @@ public sealed partial class DeviceManager : BackgroundService
     {
         get { lock (_gate) return _device is { Connected: true } ? _last : null; }
     }
+
+    /// <summary>
+    /// While the Wave XLR Pro builds its jacks' mixes, what it held before the
+    /// mode (the mixer service sets this; it must not take the mixer's lock).
+    /// A saved state then reaches the jacks lowered by the mode's entry
+    /// offset, and one saved from the unit carries the levels leaving would
+    /// give, so a profile means the same loudness in either mode.
+    /// </summary>
+    public Func<HardwareEntry?>? HardwareMixingEntry { get; set; }
+
+    /// <summary>The connected unit's state as a profile saves it, or null.</summary>
+    public DeviceState? SavedState()
+    {
+        lock (_gate) return _device is { Connected: true } && _last is { } last ? SavedStateLocked(_device, last) : null;
+    }
+
+    private DeviceState SavedStateLocked(IAudioDevice device, DeviceState state)
+        => EffectiveCapabilitiesLocked(device).OutputRouting && HardwareMixingEntry?.Invoke() is { } entry
+            ? HardwareMixingPlanner.ToSavedJackLevels(state, entry) : state;
 
     /// <summary>Section 0's level as the Pro's last poll read it in byte 98, or null without one.</summary>
     public double? ProSection0LevelDb

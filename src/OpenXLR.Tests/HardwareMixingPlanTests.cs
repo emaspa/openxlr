@@ -361,6 +361,26 @@ public sealed class HardwareMixingPlanTests
         Assert.Equal(afterLeaving, HardwareMixingPlanner.LeaveLevelDb(baseDb, offsetDb, volume), 3);
     }
 
+    /// <summary>
+    /// Right after a start the daemon has not reported the unit's inputs yet.
+    /// XLR 2, USB Aux and Line In are still the Pro's own inputs then: XLR 2
+    /// took USB pair 5 on the desk (2026-11-04), which XLR 1's processed voice
+    /// needed, and a layout of eight channels would have read as over the
+    /// budget.
+    /// </summary>
+    [Fact]
+    public void BeforeTheUnitsInputsAreKnownItsOwnStripsNeedNoPair()
+    {
+        using var mixer = new Mixer();
+        mixer.SetDrivenUnit("0fd9:00b4@test");
+        HardwareMixingPlan plan = mixer.PlanHardwareMixing(new HardwareMixingUnit { Pro = true, Connected = true });
+        Assert.DoesNotContain("xlr1", plan.Pairs.Keys);
+        Assert.DoesNotContain("xlr2", plan.Pairs.Keys);
+        Assert.Equal(["browser", "game", "music", "sfx", "system", "voicechat"], plan.Pairs.Keys.Order());
+        mixer.SetInputJacks(2, true, true);
+        Assert.Equal(plan.Pairs, mixer.PlanHardwareMixing(new HardwareMixingUnit { Pro = true, Connected = true }).Pairs);
+    }
+
     [Fact]
     public void TheModeIsSavedAndCheckedAndNeverInAProfile()
     {
