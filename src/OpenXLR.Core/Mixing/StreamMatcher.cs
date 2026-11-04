@@ -206,6 +206,23 @@ public sealed record AudioStream(int Id, string? AppName, string? Binary, string
          "ALSA plug-in", "ringrtc", "libcanberra"];
 
     /// <summary>
+    /// Programs whose own name says nothing to a user, by their process
+    /// binary: Steam's web helper reads as Steam, which also matches its
+    /// merged identity, and KDE's service daemon, which plays the desktop's
+    /// notification sounds through pipewire-alsa, as KDE.
+    /// </summary>
+    private static readonly Dictionary<string, string> KnownLabels = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["steamwebhelper"] = "Steam",
+        ["kded5"] = "KDE",
+        ["kded6"] = "KDE",
+    };
+
+    /// <summary>The label a program with a name of no use to a user goes by, or null for any other.</summary>
+    public static string? KnownLabel(string? binary) =>
+        binary is not null && KnownLabels.TryGetValue(binary, out string? label) ? label : null;
+
+    /// <summary>
     /// The names ALSA plugins wrap around a program's own: pipewire-alsa
     /// reports a program that plays or records through ALSA as
     /// "PipeWire ALSA [kded6]", the PulseAudio ALSA plugin as
@@ -261,8 +278,7 @@ public sealed record AudioStream(int Id, string? AppName, string? Binary, string
     {
         get
         {
-            if ((Binary ?? AppName ?? "").Equals("steamwebhelper", StringComparison.OrdinalIgnoreCase))
-                return "Steam";   // matches its merged identity
+            if (KnownLabel(Binary ?? AppName) is { } known) return known;
             bool ownBinary = Binary is { Length: > 1 } && Binary != "paplay" && !StreamMatcher.IsWindowsExecutable(Binary)
                 && !Binary.Contains("wine", StringComparison.OrdinalIgnoreCase)
                 && !Binary.Contains("proton", StringComparison.OrdinalIgnoreCase);

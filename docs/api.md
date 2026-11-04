@@ -873,7 +873,9 @@ ALSA plugin. pipewire-alsa sets its `application.name` to
 `PipeWire ALSA [kded6]`, the PulseAudio plugin to `ALSA plug-in [kded6]`.
 The daemon takes the name inside the brackets, `kded6`, as the program's
 own `application.name`. The label and the routing rules use it, and so
-does the identity when the client has no process binary. A name with
+does the identity when the client has no process binary. KDE's service
+daemon, `kded5` or `kded6`, which plays the desktop's notification sounds
+this way, is labelled `KDE`; its identity stays the binary. A name with
 nothing between the brackets stays as it is. An identity or label saved
 under the wrapper name in `mixer.json` is read back as the program's. Clients
 show `label` and keep `identity` for commands.

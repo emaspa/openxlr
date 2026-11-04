@@ -294,7 +294,8 @@ public sealed class AppIdentityTests
     {
         var (streams, clients) = PipeWireAdapter.ListApplications(AlsaGraph(clientKnown));
         AudioStream stream = Assert.Single(streams);
-        Assert.Equal(("kded6", "kded6", "kded6"), (stream.AppName, stream.Identity, stream.Label));
+        // KDE's service daemon reads as KDE; its identity stays the binary, so rules keep matching.
+        Assert.Equal(("kded6", "kded6", "KDE"), (stream.AppName, stream.Identity, stream.Label));
         // kded6 is a desktop service, left out of the running list; the
         // recording program behind the capture side is listed by its name.
         AudioStream recorder = Assert.Single(clients);
