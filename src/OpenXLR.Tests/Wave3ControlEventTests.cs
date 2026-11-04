@@ -148,6 +148,35 @@ public sealed partial class Wave3DeviceTests
     }
 
     [Fact]
+    public void FailedUsbWriteDoesNotReplaySuccessfulAlsaWrites()
+    {
+        var (dev, usb, card, clock, events) = EventMirrored();
+        using (dev)
+        {
+            card.Sets.Clear();
+            usb.Config = Block(gainDb: 20, mute: true, hpDb: -12.5);
+            card.Hp = 100;
+            card.AfterSet = name =>
+            {
+                if (name != "Mic Capture Switch") return;
+                card.Capture = "on";
+                events.Pending = true;
+            };
+            usb.ConfigWriteAnswer = -7;
+            Assert.Throws<InvalidOperationException>(() => dev.ReadState());
+            Assert.Single(card.Sets);
+
+            card.AfterSet = null;
+            usb.ConfigWriteAnswer = 16;
+            clock.Now += TimeSpan.FromMilliseconds(500);
+            DeviceState state = dev.ReadState();
+            Assert.Single(card.Sets);
+            Assert.False(state.Mute);
+            Assert.Equal(-10, state.HpVolumeDb);
+        }
+    }
+
+    [Fact]
     public void ReconnectingReplacesTheControlSubscriptionAndDisposeReleasesIt()
     {
         var usb = new FakeUsb { Config = Block() };

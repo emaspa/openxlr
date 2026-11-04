@@ -405,6 +405,9 @@ public class Wave3Device : IAudioDevice
         if (gainOut && TryAlsa(() => Cset(GainCtl, block.Gain.ToString(CultureInfo.InvariantCulture)))) next = next with { Gain = block.Gain };
         if (muteOut && TryAlsa(() => Cset(MuteCtl, block.Mute == true ? "off" : "on"))) next = next with { Mute = block.Mute };
         if (hpOut && TryAlsa(() => Cset(HpCtl, block.Hp.ToString(CultureInfo.InvariantCulture)))) next = next with { Hp = block.Hp };
+        // The card already took these writes. Keep them recorded even if
+        // applying an unrelated desktop change to the USB block fails.
+        _mirrored = next;
 
         // A temporarily unavailable control handle need not wait for USB to
         // reconnect. Keep fast readback while retrying the subscription slowly.

@@ -433,7 +433,9 @@ A 30-second read catches changes for which no event arrived. If the
 subscription cannot be opened or stops working, half-second readback
 continues while the subscription is retried every 30 seconds. A failed
 card read or microphone write waits half a second before retrying, even
-if more events arrive.
+if more events arrive. If a microphone write fails, successful writes
+to the card from the same poll stay recorded so a retry preserves newer
+desktop changes.
 These intervals use elapsed time and are independent of the system clock.
 The gain only goes from the block to the card.
 wave3-research found its unit ignoring a gain written through the class
