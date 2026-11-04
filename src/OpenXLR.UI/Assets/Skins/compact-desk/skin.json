@@ -124,11 +124,13 @@
     "Ox.Eq.HandleRing": "#e6e6e6",
     "Ox.Matrix.NameWidth": 168,
     "Ox.Matrix.CellWidth": 220,
+    "Ox.Matrix.CellMaxWidth": 600,
     "Ox.Matrix.RowHeight": 42,
     "Ox.Matrix.MutedBackground": "#4def4444",
     "Ox.Matrix.MutedForeground": "#ffffff",
     "Ox.Matrix.MutedOpacity": 0.55,
-    "Ox.AppColumns.NameWidth": 144
+    "Ox.AppColumns.NameWidth": 144,
+    "Ox.AppColumns.TileMaxWidth": 720
   },
   "layout": {
     "version": 1,

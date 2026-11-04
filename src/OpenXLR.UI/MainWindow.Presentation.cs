@@ -105,14 +105,15 @@ public partial class MainWindow
         }
         string applications = layout?.Applications ?? SkinLayoutTemplates.ApplicationChips;
         int perColumn = layout?.ApplicationsPerColumn ?? SkinFormat.DefaultApplicationsPerColumn;
-        string shape = applications == SkinLayoutTemplates.ApplicationColumns ? $"{applications}:{perColumn}" : applications;
+        double maxTileWidth = (double)this.FindResource("Ox.AppColumns.TileMaxWidth")!;
+        string shape = applications == SkinLayoutTemplates.ApplicationColumns ? $"{applications}:{perColumn}:{maxTileWidth}" : applications;
         if (_applicationsShape != shape)
         {
             _applicationsShape = shape;
             bool list = applications == SkinLayoutTemplates.ApplicationList;
             // Columns hold tiles of one width, so the tiles of a column line up.
             ApplicationRows.ItemsPanel = applications == SkinLayoutTemplates.ApplicationColumns
-                ? new FuncTemplate<Panel?>(() => new ApplicationColumnsPanel { PerColumn = perColumn })
+                ? new FuncTemplate<Panel?>(() => new ApplicationColumnsPanel { PerColumn = perColumn, MaxTileWidth = maxTileWidth })
                 : (ITemplate<Panel?>)this.FindResource(list ? "ApplicationListPanel" : "ApplicationChipsPanel")!;
             ApplicationRows.ItemTemplate = (Avalonia.Controls.Templates.IDataTemplate)this.FindResource(
                 list ? "ApplicationLine" : applications == SkinLayoutTemplates.ApplicationColumns ? "ApplicationTile" : "ApplicationChip")!;

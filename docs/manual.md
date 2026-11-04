@@ -3026,7 +3026,8 @@ copy of the skin to start your own from is in
 [docs/examples/skins](examples/skins/README.md).
 
 **Compact Desk** is an optional dark skin for a denser desk. Choose it in
-Options under APPEARANCE. It keeps the headphone card 600 pixels wide and
+Options under APPEARANCE. Its matrix cells and application tiles grow on wide
+windows and keep their minimum widths when space runs short. It keeps the headphone card 600 pixels wide and
 lets MONITOR use the rest of the row. Applications wrap across the page
 instead of filling six rows first. Longer matrix faders and wider name
 columns keep a three-mix desk from leaving half the card empty; muted

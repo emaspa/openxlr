@@ -76,7 +76,12 @@ internal static partial class SkinLayoutWindowTests
                         CheckTileParts(window, tiles, where);
                         foreach (Border tile in tiles) AssertInside(tile, Card("ApplicationsTile"));
                         if (width >= 1280 && count == 3)
+                        {
                             Assert.All(tiles, tile => Assert.Equal(0, tile.TranslatePoint(default, panel)!.Value.Y, 0.5));
+                            Assert.All(tiles, tile => Assert.True(tile.Bounds.Width <= panel.MaxTileWidth));
+                            double edge = tiles[^1].TranslatePoint(new Point(tiles[^1].Bounds.Width, 0), panel)!.Value.X;
+                            Assert.True(edge >= Math.Min(panel.Bounds.Width, count * panel.MaxTileWidth) - count * 5, where);
+                        }
                         Assert.NotNull(window.MixMatrix);
                         Assert.Equal(6, window.MixMatrix.Columns.Count);
                         CheckMatrixCells(window, window.MixMatrix, where);
@@ -144,17 +149,25 @@ internal static partial class SkinLayoutWindowTests
             model.ActiveApps.Add(app);
         }
         ApplicationIconWindowTests.Assign(model.Apps);
-        foreach (double width in new[] { 640d, 960, 1280, 1600 })
+        Layout(window, 1600, 800);
+        var matrixView = window.GetVisualDescendants().OfType<OpenXLR.UI.Views.MixMatrixView>().Single(v => v.IsEffectivelyVisible);
+        // Give the four cells and the name column an exact multiple before
+        // the frame is counted. Stretching must leave room for the frame.
+        double exact = (double)window.FindResource("Ox.Matrix.NameWidth")! + 4 * 300 + 3 * SkinLayoutDefaults.MatrixSpacing;
+        Layout(window, window.ClientSize.Width + exact - matrixView.Bounds.Width, 800);
+        Assert.True(matrixView.Scroller.Extent.Width <= matrixView.Scroller.Viewport.Width + .5,
+            "The matrix gained a scrollbar from its own border at a width where the cells fit.");
+        foreach (double width in new[] { 640d, 960, 1280, 1600, 2400, 640 })
         {
             Layout(window, width, 800);
             Assert.Equal(3, window.MixMatrix!.Columns.Count);
             CheckMatrixCells(window, window.MixMatrix, $"Compact Desk, three mixes at {width}");
-            if (width == 1280)
+            if (width >= 1280)
             {
                 var card = (Border)window.FindControl<Expander>("SubmixerTile")!.Parent!;
                 Border last = ColumnHead(window, "chat");
                 double end = last.TranslatePoint(new Point(last.Bounds.Width, 0), card)!.Value.X;
-                Assert.True(end >= card.Bounds.Width * .8, "Three mixes should use the desk instead of leaving half of it empty.");
+                Assert.True(end >= card.Bounds.Width * .95, "Three mixes should use the desk instead of leaving half of it empty.");
             }
             Capture(window, $"skin-compact-desk-three-mixes-{width}");
         }

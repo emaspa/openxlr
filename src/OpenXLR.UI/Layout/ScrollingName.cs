@@ -7,20 +7,29 @@ using Avalonia.Threading;
 namespace OpenXLR.UI.Layout;
 
 /// <summary>
-/// A name in a fixed width, as an application tile of APPLICATIONS' columns
-/// shows it. A name that fits stands still. A longer one is clipped at rest
+/// A name in an application tile, clipped to the width the tile gives it. A name that fits stands still. A longer one is clipped at rest
 /// and, while <see cref="Scrolls"/> is on (the pointer is over its tile), glides
 /// left once to show its end and holds there; when <see cref="Scrolls"/> goes
 /// off it glides back to its start. Nothing moves at rest, and the markup puts
 /// the whole name in a tooltip.
 ///
-/// The width comes from the markup, through a skin token; this control only
-/// clips its child, a <see cref="TextBlock"/>, and moves it. Avalonia exposes
+/// The preferred width comes from a skin token. The tile can give the name
+/// more or less room. This control clips its child and moves it. Avalonia exposes
 /// no reduced-motion preference to follow, so the motion is kept to one slow
 /// pass that only the pointer starts.
 /// </summary>
 public sealed class ScrollingName : Decorator
 {
+    public static readonly StyledProperty<double> PreferredWidthProperty =
+        AvaloniaProperty.Register<ScrollingName, double>(nameof(PreferredWidth), double.PositiveInfinity);
+
+    /// <summary>The room requested for the name before the tile shares spare width.</summary>
+    public double PreferredWidth
+    {
+        get => GetValue(PreferredWidthProperty);
+        set => SetValue(PreferredWidthProperty, value);
+    }
+
     public static readonly StyledProperty<bool> ScrollsProperty =
         AvaloniaProperty.Register<ScrollingName, bool>(nameof(Scrolls));
 
@@ -43,6 +52,7 @@ public sealed class ScrollingName : Decorator
 
     static ScrollingName()
     {
+        AffectsMeasure<ScrollingName>(PreferredWidthProperty);
         AffectsArrange<ScrollingName>(OffsetProperty);
         ClipToBoundsProperty.OverrideDefaultValue<ScrollingName>(true);
     }
@@ -78,9 +88,10 @@ public sealed class ScrollingName : Decorator
     protected override Size MeasureOverride(Size availableSize)
     {
         if (Child is not { } child) return default;
-        // The name measures at its full length; the width it is drawn in is the markup's.
+        // Keep the full text measurement for scrolling, even when the tile is narrow.
         child.Measure(new Size(double.PositiveInfinity, availableSize.Height));
-        return new Size(Math.Min(child.DesiredSize.Width, availableSize.Width), child.DesiredSize.Height);
+        double width = double.IsFinite(PreferredWidth) ? PreferredWidth : child.DesiredSize.Width;
+        return new Size(Math.Min(width, availableSize.Width), child.DesiredSize.Height);
     }
 
     protected override Size ArrangeOverride(Size finalSize)

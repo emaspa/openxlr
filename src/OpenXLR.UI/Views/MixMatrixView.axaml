@@ -10,7 +10,7 @@
 
   <!-- The submixer as a matrix: a head per mix across the top, a row per
        channel under it, and in each row the channel's head and one cell per
-       mix. Every cell is Ox.Matrix.CellWidth wide, so the columns line up,
+       mix. Cells share one width, so the columns line up,
        and every row Ox.Matrix.RowHeight tall, except a row whose head stacks
        an input's gain over its volume, which takes what the two faders need,
        its cells with it. The row heads are the
@@ -23,7 +23,7 @@
       <Setter Property="Height" Value="{DynamicResource Ox.Matrix.RowHeight}"/>
     </Style>
     <Style Selector="Border.matrixCell">
-      <Setter Property="Width" Value="{DynamicResource Ox.Matrix.CellWidth}"/>
+      <Setter Property="Width" Value="{DynamicResource MatrixCellWidth}"/>
       <Setter Property="Height" Value="{DynamicResource Ox.Matrix.RowHeight}"/>
       <Setter Property="Padding" Value="4,0"/>
     </Style>
@@ -56,7 +56,7 @@
       <Setter Property="Opacity" Value="{DynamicResource Ox.Mixer.HiddenOpacity}"/>
     </Style>
     <Style Selector="Border.matrixColumn">
-      <Setter Property="Width" Value="{DynamicResource Ox.Matrix.CellWidth}"/>
+      <Setter Property="Width" Value="{DynamicResource MatrixCellWidth}"/>
     </Style>
     <!-- the readout sits under the processing button, or in the middle of the name column when the
          row shows none, as Aux In's and Line In's do -->
@@ -198,7 +198,7 @@
                              AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
                 </Grid>
               </Border>
-            <Border Width="{DynamicResource Ox.Matrix.CellWidth}" Padding="4,0" Name="MatrixSource">
+            <Border Width="{DynamicResource MatrixCellWidth}" Padding="4,0" Name="MatrixSource">
               <layout:StripPanel Spec="{Binding Spec}" Spacing="4" VerticalAlignment="Center">
                 <StackPanel layout:StripPanel.Part="meter" Orientation="Vertical" Spacing="1" VerticalAlignment="Center"
                             ToolTip.Tip="{loc:Text Key=ChannelMeterTip}">
@@ -327,7 +327,7 @@
                              AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
                 </Grid>
               </Border>
-            <Border Width="{DynamicResource Ox.Matrix.CellWidth}" Padding="4,0" Name="MatrixSource">
+            <Border Width="{DynamicResource MatrixCellWidth}" Padding="4,0" Name="MatrixSource">
               <layout:StripPanel Spec="{Binding Spec}" Spacing="4" VerticalAlignment="Center">
                 <StackPanel layout:StripPanel.Part="meter" Orientation="Vertical" Spacing="1" VerticalAlignment="Center"
                             ToolTip.Tip="{loc:Text Key=ChannelMeterTip}">
@@ -424,7 +424,7 @@
                              AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
                 </Grid>
               </Border>
-            <Border Width="{DynamicResource Ox.Matrix.CellWidth}" Padding="4,0" Name="MatrixSource">
+            <Border Width="{DynamicResource MatrixCellWidth}" Padding="4,0" Name="MatrixSource">
               <layout:StripPanel Spec="{Binding Spec}" Spacing="4" VerticalAlignment="Center">
                 <StackPanel layout:StripPanel.Part="meter" Orientation="Vertical" Spacing="1" VerticalAlignment="Center"
                             ToolTip.Tip="{loc:Text Key=ChannelMeterTip}">
@@ -488,7 +488,7 @@
                              AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
                 </Grid>
               </Border>
-            <Border Width="{DynamicResource Ox.Matrix.CellWidth}" Padding="4,0" Name="MatrixSource">
+            <Border Width="{DynamicResource MatrixCellWidth}" Padding="4,0" Name="MatrixSource">
               <layout:StripPanel Spec="{Binding Spec}" Spacing="4" VerticalAlignment="Center">
                 <StackPanel layout:StripPanel.Part="meter" Orientation="Vertical" Spacing="1" VerticalAlignment="Center"
                             ToolTip.Tip="{loc:Text Key=ChannelMeterTip}">
@@ -588,7 +588,7 @@
                              AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
                 </Grid>
               </Border>
-            <Border Width="{DynamicResource Ox.Matrix.CellWidth}" Padding="4,0" Name="MatrixSource">
+            <Border Width="{DynamicResource MatrixCellWidth}" Padding="4,0" Name="MatrixSource">
               <layout:StripPanel Spec="{Binding Spec}" Spacing="4" VerticalAlignment="Center">
                 <StackPanel layout:StripPanel.Part="meter" Orientation="Vertical" Spacing="1" VerticalAlignment="Center"
                             ToolTip.Tip="{loc:Text Key=ChannelMeterTip}">
@@ -688,7 +688,7 @@
         <Border Classes="tile" Name="MatrixCorner" Background="Transparent" BorderBrush="Transparent">
           <StackPanel Orientation="Horizontal">
             <Panel Width="{DynamicResource Ox.Matrix.NameWidth}"/>
-            <Panel Width="{DynamicResource Ox.Matrix.CellWidth}"/>
+            <Panel Width="{DynamicResource MatrixCellWidth}"/>
           </StackPanel>
         </Border>
         <ItemsControl Name="MatrixColumns" ItemsSource="{Binding Columns}">

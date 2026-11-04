@@ -246,13 +246,15 @@ internal static partial class SkinLayoutWindowTests
     private static void CheckTileParts(MainWindow window, Border[] tiles, string where)
     {
         double nameWidth = (double)window.FindResource("Ox.AppColumns.NameWidth")!;
+        double maximum = (double)window.FindResource("Ox.AppColumns.TileMaxWidth")!;
         (double Width, double Name, double PickerX, double PickerWidth) first = default;
         for (int i = 0; i < tiles.Length; i++)
         {
             string tile = $"{((AppStreamViewModel)tiles[i].DataContext!).Label} {where}";
             ScrollingName name = tiles[i].GetVisualDescendants().OfType<ScrollingName>().Single();
             ComboBox picker = tiles[i].GetVisualDescendants().OfType<ComboBox>().Single(c => c.Name == "ApplicationChannel");
-            Assert.Equal(nameWidth, name.Bounds.Width, 0.5);
+            if (maximum > 0) Assert.True(name.Bounds.Width >= nameWidth - 0.5, tile);
+            else Assert.Equal(nameWidth, name.Bounds.Width, 0.5);
             AssertInside(name, tiles[i]);
             AssertInside(picker, tiles[i]);
             ItemsControl sizer = picker.GetVisualDescendants().OfType<ItemsControl>().Single(c => c.Name == "ApplicationChannelSizer");
@@ -266,6 +268,8 @@ internal static partial class SkinLayoutWindowTests
             (double Width, double Name, double PickerX, double PickerWidth) here =
                 (tiles[i].Bounds.Width, name.Bounds.Width, picker.TranslatePoint(default, tiles[i])!.Value.X, picker.Bounds.Width);
             if (i == 0) { first = here; continue; }
+            // Tiles that grow into spare width all grow alike, so a short last
+            // band lines up with the bands above it.
             Assert.True(Math.Abs(here.Width - first.Width) <= 0.5, $"{tile}: {here.Width:0.#} wide, the first tile {first.Width:0.#}");
             Assert.True(Math.Abs(here.PickerX - first.PickerX) <= 0.5, $"{tile}: picker at {here.PickerX:0.#}, the first tile's at {first.PickerX:0.#}");
             Assert.True(Math.Abs(here.PickerWidth - first.PickerWidth) <= 0.5, $"{tile}: picker {here.PickerWidth:0.#} wide, the first tile's {first.PickerWidth:0.#}");
