@@ -9,7 +9,15 @@ public sealed partial class Wave3DeviceTests
         public bool Available { get; set; } = true;
         public bool Pending { get; set; }
         public bool Disposed { get; private set; }
-        public bool Changed() { bool value = Pending; Pending = false; return value; }
+        public bool DisconnectOnRead { get; set; }
+
+        public bool Changed()
+        {
+            if (DisconnectOnRead) Available = false;
+            bool value = Pending;
+            Pending = false;
+            return value;
+        }
         public void Dispose() { Disposed = true; Available = false; }
     }
 
@@ -270,6 +278,69 @@ public sealed partial class Wave3DeviceTests
         Assert.Equal(3, card.Sets.Count);
         Assert.Null(dev.ConnectionNote);
         Assert.Contains("readback=events+30s", dev.DumpBlocks()["alsa"]);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AnAlsaResetRebindsTheNewCardWithoutReconnectingUsb(bool cardArrivesLate)
+    {
+        var usb = new FakeUsb { Config = Block(gainDb: 20, mute: true, hpDb: -30) };
+        var oldCard = new FakeCard();
+        var newCard = new FakeCard();
+        var oldEvents = new ControlEvents();
+        var newEvents = new ControlEvents();
+        var clock = new Clock();
+        var accessed = new List<int>();
+        var subscriptions = new List<int>();
+        int currentCard = 3;
+        using var dev = new Wave3Device(usb, args =>
+        {
+            int card = int.Parse(args[1]);
+            accessed.Add(card);
+            return (card == 3 ? oldCard : newCard).Run(["-c", "3", .. args.Skip(2)]);
+        }, () => currentCard >= 0 ? currentCard : throw new InvalidOperationException("ALSA card was not found"), clock, card =>
+        {
+            subscriptions.Add(card);
+            return card == 3 ? oldEvents : newEvents;
+        });
+
+        dev.Connect();
+        Assert.True(dev.ReadState().Mute);
+        var deviceInfoRead = usb.Transfers[0];
+        accessed.Clear();
+        currentCard = cardArrivesLate ? -1 : 4;
+        oldEvents.DisconnectOnRead = true;
+        usb.Config = Block(gainDb: 20, mute: false, hpDb: -20);
+        clock.Now += TimeSpan.FromMilliseconds(100);
+        Assert.False(dev.ReadState().Mute);
+        Assert.True(oldEvents.Disposed);
+        Assert.DoesNotContain(3, accessed);
+
+        if (cardArrivesLate)
+        {
+            Assert.Empty(accessed);
+            currentCard = 4;
+            clock.Now += TimeSpan.FromMilliseconds(1999);
+            dev.ReadState();
+            Assert.Empty(accessed);
+            clock.Now += TimeSpan.FromMilliseconds(1);
+            dev.ReadState();
+        }
+
+        Assert.Equal([3, 4], subscriptions);
+        Assert.Equal([4, 4, 4], accessed);
+        Assert.Equal("on", newCard.Capture);
+        Assert.Equal(80, newCard.Hp);
+        Assert.Null(dev.ConnectionNote);
+        Assert.True(usb.IsOpen);
+        Assert.Single(usb.Transfers, t => t == deviceInfoRead);
+        Assert.Empty(usb.Writes);
+
+        newCard.Hp = 100;
+        newEvents.Pending = true;
+        Assert.Equal(-10, dev.ReadState().HpVolumeDb);
+        Assert.Single(usb.Writes);
     }
 
     [Fact]

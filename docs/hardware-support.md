@@ -419,8 +419,10 @@ grid would swallow the Stream Deck's five-unit crossfade ticks.
 | Device info block (0x000A) | read | 64 bytes on two units, the length openwave requires before it drives a unit (wave3-research read 51); the diagnostics exporter masks the serial wherever it lands |
 
 If the ALSA card appears after USB connects, OpenXLR retries discovery
-every two seconds until it finds the card. A known different USB address
-is never used as a match.
+every two seconds until it finds the card. If an active subscription
+disconnects, OpenXLR looks up the card again before accessing its
+controls. This lets it recover a new ALSA card number while USB remains
+connected. A known different USB address is never used as a match.
 
 The microphone's ALSA card carries the three controls that a desktop's
 sound settings and WirePlumber's restore at login act on. The kernel

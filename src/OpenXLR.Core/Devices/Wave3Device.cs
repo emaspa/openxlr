@@ -279,13 +279,19 @@ public class Wave3Device : IAudioDevice
     {
         if (_findCard is null) return;
         _alsaWatchAt = _time.GetTimestamp();
-        // USB can be ready before the kernel has published the ALSA card.
+        int previous = _card;
+        _alsaEvents?.Dispose();
+        _alsaEvents = null;
+        _card = -1;
+        // USB can stay available while the kernel replaces the ALSA card.
         try
         {
             _card = _findCard();
             if (_card >= 0)
             {
-                _alsaEvents = _watchControls?.Invoke(_card);
+                var events = _watchControls?.Invoke(_card);
+                if (events?.Available == true) _alsaEvents = events;
+                else events?.Dispose();
                 _mirrorError = null;
                 ConnectionNote = null;
             }
@@ -295,6 +301,31 @@ public class Wave3Device : IAudioDevice
             _mirrorError = ex.Message;
             ConnectionNote = $"{ex.Message}; the desktop's volume controls are not kept in step with the microphone";
         }
+
+        if (_card != previous)
+        {
+            _mirrored = null;
+            _alsaReadPending = _alsaReadFailed = false;
+        }
+        else if (_alsaEvents is not null)
+        {
+            _alsaReadPending = true;
+            _alsaReadFailed = false;
+        }
+    }
+
+    private void PollAlsaCardLocked()
+    {
+        if (_alsaEvents is { } events)
+        {
+            _alsaReadPending |= events.Changed();
+            if (!events.Available) FindAlsaCardLocked();
+            return;
+        }
+
+        TimeSpan elapsed = _time.GetElapsedTime(_alsaWatchAt);
+        if (_card < 0 ? elapsed >= AlsaCardRetry : _watchControls is not null && elapsed >= AlsaEventFallback)
+            FindAlsaCardLocked();
     }
 
     public void Disconnect()
@@ -387,8 +418,7 @@ public class Wave3Device : IAudioDevice
                 _gainDb = GainFromWord(c);
                 _gainWritten = true;
             }
-            if (_card < 0 && _findCard is not null && _time.GetElapsedTime(_alsaWatchAt) >= AlsaCardRetry)
-                FindAlsaCardLocked();
+            if (_findCard is not null) PollAlsaCardLocked();
             if (_card >= 0) MirrorLocked(c);
             return Decode(c, _gainDb);
         }
@@ -424,22 +454,13 @@ public class Wave3Device : IAudioDevice
         // applying an unrelated desktop change to the USB block fails.
         _mirrored = next;
 
-        // A temporarily unavailable control handle need not wait for USB to
-        // reconnect. Keep fast readback while retrying the subscription slowly.
-        if (_watchControls is not null && _alsaEvents?.Available != true && _time.GetElapsedTime(_alsaWatchAt, now) >= AlsaEventFallback)
+        // Catch a desktop change that arrived during an outgoing write.
+        // A disconnected handle must be rediscovered before another card read.
+        if ((muteOut || hpOut) && _alsaEvents is { } events)
         {
-            _alsaWatchAt = now;
-            _alsaEvents?.Dispose();
-            _alsaEvents = _watchControls(_card);
-            if (_alsaEvents?.Available == true)
-            {
-                _alsaReadPending = true;
-                _alsaReadFailed = false;
-            }
+            _alsaReadPending |= events.Changed();
+            if (!events.Available) return;
         }
-        // A notification can arrive during the writes above. If both block
-        // values win this poll, leave it pending for the next eligible read.
-        _alsaReadPending |= _alsaEvents?.Changed() ?? false;
         TimeSpan interval = _alsaReadFailed || _alsaEvents?.Available != true ? AlsaReadInterval : AlsaEventFallback;
         if ((!muteOut || !hpOut) && (_alsaReadPending && !_alsaReadFailed || _time.GetElapsedTime(_alsaReadAt, now) >= interval))
         {
