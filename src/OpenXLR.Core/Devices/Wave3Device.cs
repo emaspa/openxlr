@@ -417,7 +417,9 @@ public class Wave3Device : IAudioDevice
         TimeSpan interval = _alsaEvents?.Available == true ? AlsaEventFallback : AlsaReadInterval;
         if ((!muteOut || !hpOut) && (controlChanged || now - _alsaReadAt >= interval))
         {
-            _alsaReadAt = now;
+            // The event was drained already. Retry a failed card read or USB
+            // write after 500 ms even if there is no further notification.
+            _alsaReadAt = now - interval + AlsaReadInterval;
             Dictionary<string, string>? card = null;
             if (TryAlsa(() => card = ParseContents(Amixer("contents"))))
             {
@@ -437,8 +439,8 @@ public class Wave3Device : IAudioDevice
                     edited = true;
                 }
                 if (edited) WriteConfigLocked(c);
+                _alsaReadAt = now;
             }
-            else _alsaReadAt = now - interval + AlsaReadInterval;
         }
         _mirrored = next;
     }

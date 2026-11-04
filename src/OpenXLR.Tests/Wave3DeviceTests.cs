@@ -18,6 +18,7 @@ public sealed partial class Wave3DeviceTests
         public byte[] Config { get; set; } = new byte[16];
         /// <summary>How many bytes the fake answers for the config block.</summary>
         public int ConfigAnswer { get; set; } = 16;
+        public int ConfigWriteAnswer { get; set; } = 16;
         public byte[]? DevInfo { get; set; }
         /// <summary>A firmware that keeps its own gain word whatever the host writes (wave3-research's reading).</summary>
         public bool DropsGainWrites { get; set; }
@@ -61,6 +62,7 @@ public sealed partial class Wave3DeviceTests
             Assert.Equal(0x05, r);
             Assert.Equal(0, v);
             Assert.Equal(16, len);
+            if (ConfigWriteAnswer != len) return ConfigWriteAnswer;
             short gainWord = BinaryPrimitives.ReadInt16LittleEndian(Config);
             data.AsSpan(0, len).CopyTo(Config);
             if (DropsGainWrites) BinaryPrimitives.WriteInt16LittleEndian(Config, gainWord);

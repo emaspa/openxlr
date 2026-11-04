@@ -440,7 +440,9 @@ The readback keeps the block in step on firmware that does not carry the
 controls over by itself. The control subscription and fallback are coded
 and tested with simulated events; event delivery on a Wave:3 and Wave:1
 still needs hardware acceptance. The diagnostics dump's `alsa` line says
-`readback=events+30s` or `readback=poll-500ms`.
+`readback=events+30s` or `readback=poll-500ms`. A failed read or a failed
+write to the microphone is retried on the half-second schedule even if no
+further event arrives.
 Without its card the microphone is still driven, Options says the
 desktop's controls are not kept in step, and the diagnostics dump gives
 the reason on its `alsa` line.

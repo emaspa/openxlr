@@ -92,6 +92,33 @@ public sealed partial class Wave3DeviceTests
         }
     }
 
+    [Theory]
+    [InlineData(-7)]
+    [InlineData(8)]
+    public void AnEventIsAppliedAfterATemporaryConfigWriteFailure(int failedWrite)
+    {
+        var (dev, usb, card, clock, events) = EventMirrored();
+        using (dev)
+        {
+            card.Capture = "off";
+            card.Hp = 100;
+            events.Pending = true;
+            usb.ConfigWriteAnswer = failedWrite;
+            Assert.Throws<InvalidOperationException>(() => dev.ReadState());
+            Assert.Empty(usb.Writes);
+            usb.ConfigWriteAnswer = 16;
+            clock.Now += TimeSpan.FromMilliseconds(499);
+            Assert.False(dev.ReadState().Mute);
+            Assert.Equal(1, card.Reads);
+            clock.Now += TimeSpan.FromMilliseconds(1);
+            var state = dev.ReadState();
+            Assert.True(state.Mute);
+            Assert.Equal(-10, state.HpVolumeDb);
+            Assert.Equal(2, card.Reads);
+            Assert.Single(usb.Writes);
+        }
+    }
+
     [Fact]
     public void ReconnectingReplacesTheControlSubscriptionAndDisposeReleasesIt()
     {
