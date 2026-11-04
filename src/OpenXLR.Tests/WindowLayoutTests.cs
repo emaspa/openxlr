@@ -244,6 +244,8 @@ public sealed class WindowLayoutTests
                     page.Offset = default;
                 }
 
+                ApplicationIconWindowTests.CheckManage(vm);
+
                 var insert = vm.Inserts.Items[0];
                 var controls = new InsertControlsWindow { DataContext = insert };
                 windows.Add(controls);

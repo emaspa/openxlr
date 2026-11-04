@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:OpenXLR.UI"
         xmlns:skin="using:OpenXLR.UI.Skinning"
+        xmlns:views="using:OpenXLR.UI.Views"
         x:Class="OpenXLR.UI.AppsWindow"
         x:DataType="vm:MainViewModel"
         Title="{loc:Text Key=OpenXLRApplications}" Width="620" SizeToContent="Height" MaxHeight="700" MinHeight="320"
@@ -53,22 +54,26 @@
               </CheckBox>
               <TextBlock Text="{loc:Text Key=RouteAppsByDefaultHint}" Classes="note" TextWrapping="Wrap"/>
             </StackPanel>
-            <!-- the overlay scrollbar would sit on the Forget column -->
+            <!-- the overlay scrollbar would sit on the Forget column. Each row
+                 is the same application object the APPLICATIONS tiles bind,
+                 so it shows the same icon, or the same initial badge for an
+                 app without one, at the tiles' size. -->
             <ItemsControl ItemsSource="{Binding Apps}" Margin="0,0,16,0">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:AppStreamViewModel">
-                  <Grid ColumnDefinitions="10,8,*,130,8,Auto" Margin="0,3">
+                  <Grid Name="ApplicationRow" ColumnDefinitions="10,8,Auto,8,*,130,8,Auto" Margin="0,3">
                     <skin:StatusLed IsOn="{Binding Active}"
                                     AutomationProperties.Name="{loc:Text Key=StreamState}"
                                     ToolTip.Tip="{Binding StatusText}"/>
-                    <TextBlock Grid.Column="2" Text="{Binding Label}" Foreground="{DynamicResource Ox.Text.Primary}"
+                    <views:ApplicationIconView Grid.Column="2" Icon="{Binding Icon}" Label="{Binding Label}"/>
+                    <TextBlock Grid.Column="4" Text="{Binding Label}" Foreground="{DynamicResource Ox.Text.Primary}"
                                VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                                ToolTip.Tip="{Binding Identity}"/>
-                    <ComboBox Grid.Column="3" HorizontalAlignment="Stretch"
+                    <ComboBox Grid.Column="5" HorizontalAlignment="Stretch"
                               ItemsSource="{Binding Channels}"
                               SelectedItem="{Binding SelectedChannel, Mode=TwoWay}"
                               ToolTip.Tip="{Binding BrowserHeldNote}"/>
-                    <Button Grid.Column="5" Content="{loc:Text Key=Forget}" Padding="10,3" FontSize="{DynamicResource UiText.FontSize12}"
+                    <Button Grid.Column="7" Content="{loc:Text Key=Forget}" Padding="10,3" FontSize="{DynamicResource UiText.FontSize12}"
                             Click="OnForget"/>
                   </Grid>
                 </DataTemplate>

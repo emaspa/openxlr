@@ -118,14 +118,17 @@ internal static class ApplicationIconWindowTests
             Assert.True(Expected(app) == view.ShowsPicture, $"{here}: picture {view.ShowsPicture}, expected {Expected(app)}");
             Assert.Equal(size, view.Bounds.Width, 0.5);
             Assert.Equal(size, view.Bounds.Height, 0.5);
-            Border row = view.GetVisualAncestors().OfType<Border>().First(b => b.Name is "ApplicationChip" or "ApplicationLine" or "ApplicationTile");
+            Control row = view.GetVisualAncestors().OfType<Control>()
+                .First(b => b.Name is "ApplicationChip" or "ApplicationLine" or "ApplicationTile" or "ApplicationRow");
+            Assert.Same(app, row.DataContext);
             AssertInside(view, row);
             TextBlock label = row.GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == app.Label && t.IsEffectivelyVisible);
             var led = row.GetVisualDescendants().OfType<OpenXLR.UI.Skinning.StatusLed>().Single();
             var picker = row.GetVisualDescendants().OfType<ComboBox>().Single();
             // A tile's name runs on under its clip; the part that shows is the clip.
             Control shown = label.Parent as OpenXLR.UI.Layout.ScrollingName ?? (Control)label;
-            AssertNoOverlap([led, view, shown, picker]);
+            // The Manage window's rows end with Forget.
+            AssertNoOverlap([led, view, shown, picker, .. row.GetVisualDescendants().OfType<Button>().Where(b => b.IsEffectivelyVisible)]);
             // Before the name, centred on it.
             Point icon = view.TranslatePoint(new Point(0, size / 2), window)!.Value;
             Point name = label.TranslatePoint(new Point(0, label.Bounds.Height / 2), window)!.Value;
@@ -138,6 +141,60 @@ internal static class ApplicationIconWindowTests
                 Assert.Equal(ApplicationIconView.InitialOf(app.Label), initial.Text);
                 AssertInside(initial, view);
             }
+        }
+    }
+
+    /// <summary>
+    /// The Manage window lists every known application with the icon its tile
+    /// shows: one icon per row, bound to that row's application, a remembered
+    /// app that is not running included, and a name too long for its column
+    /// still trimmed inside it, clear of the icon and the channel picker.
+    /// </summary>
+    internal static void CheckManage(MainViewModel vm)
+    {
+        const string longName = "Quiet application with a window title far too long for the Manage window's name column";
+        var channels = new ChannelChoice[] { new("browser", "Browser"), new("game", "Game") };
+        var remembered = new AppStreamViewModel(new DaemonClient(), "signal-desktop", "Signal Desktop", channels);
+        remembered.ApplyFromDaemon("game", false, false);
+        var lengthy = new AppStreamViewModel(new DaemonClient(), "quiet", longName, channels);
+        lengthy.ApplyFromDaemon("browser", false, false);
+        Install();
+        remembered.Icon = "test-discord";
+        vm.Apps.Add(remembered);
+        vm.Apps.Add(lengthy);
+        var window = new AppsWindow { DataContext = vm };
+        try
+        {
+            window.Show();
+            Layout(window, 620, 700);
+            ApplicationIconView[] views = Views(window);
+            Assert.Equal(vm.Apps.Count, views.Length);
+            Assert.Equal(vm.Apps, views.Select(v => v.DataContext));
+            foreach (ApplicationIconView view in views)
+            {
+                var app = (AppStreamViewModel)view.DataContext!;
+                Assert.Equal(app.Icon, view.Icon);
+                Assert.Equal(app.Label, view.Label);
+            }
+            Check(window, "in Manage");
+
+            // The icons sit in one column, so the names start in one too.
+            Assert.Single(views.Select(v => Math.Round(v.TranslatePoint(default, window)!.Value.X, 1)).Distinct());
+
+            TextBlock name = window.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Text == longName);
+            Assert.Equal(TextTrimming.CharacterEllipsis, name.TextTrimming);
+            var whole = new TextBlock { Text = longName, FontFamily = name.FontFamily, FontSize = name.FontSize, FontWeight = name.FontWeight };
+            whole.Measure(Size.Infinity);
+            Assert.True(whole.DesiredSize.Width > name.Bounds.Width + 1, $"the long name is not cut: {name.Bounds.Width} of {whole.DesiredSize.Width}");
+            AssertInside(name, (Control)name.Parent!);
+            AssertInside(name, window);
+        }
+        finally
+        {
+            window.Close();
+            vm.Apps.Remove(remembered);
+            vm.Apps.Remove(lengthy);
+            Dispatcher.UIThread.RunJobs();
         }
     }
 

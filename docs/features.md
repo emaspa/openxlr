@@ -871,8 +871,9 @@ restores the split profile when it stops.
   the name up in the desktop's icon theme, then hicolor and the pixmaps
   directory, and draws a PNG or SVG at its drawn size. An app with no icon
   shows its initial on a badge the skin sizes and colours
-- A Manage dialog shows the full registry, and an installed-application
-  picker pre-assigns channels from `.desktop` entries
+- A Manage dialog shows the full registry, each app with the same icon
+  or initial as its tile, and an installed-application picker pre-assigns
+  channels from `.desktop` entries
 - An app can be set to "Not managed": the mixer hands its streams back to
   the system default output and never touches them again, so a headset
   with separate game and chat sinks keeps its own routing for that app
