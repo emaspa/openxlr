@@ -338,7 +338,7 @@ public sealed class StreamLifecycleTests
             AppOverrides = new() { ["kded6"] = "music" },
             KnownApps = [new("kded6", "PipeWire ALSA [kded6]", "music")],
         });
-        Assert.Equal("kded6", Assert.Single(graph.Mixer.Snapshot().Streams).Label);
+        Assert.Equal("KDE", Assert.Single(graph.Mixer.Snapshot().Streams).Label);
 
         File.WriteAllText(Path.Combine(graph.Folder, "graph.json"), """
             [
@@ -356,7 +356,7 @@ public sealed class StreamLifecycleTests
 
         Assert.Contains("move-sink-input 100 OpenXLR_ch_music", graph.Writes);
         StreamAssignment app = Assert.Single(graph.Mixer.Snapshot().Streams);
-        Assert.Equal(("kded6", "kded6", "music", true), (app.Identity, app.Label, app.ChannelId, app.Active));
+        Assert.Equal(("kded6", "KDE", "music", true), (app.Identity, app.Label, app.ChannelId, app.Active));
         Assert.False(graph.Mixer.SyncStreams());
     }
 }
