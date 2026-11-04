@@ -3309,26 +3309,32 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             // Every running audio-capable app is listed even before it plays:
             // PipeWire clients cover "running", streams cover "playing".
             var runningIdentities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (AudioStream client in clients)
+            foreach (IGrouping<string, AudioStream> app in clients
+                         .Where(c => !PipeWireAdapter.IsPlumbingIdentity(c.Identity))
+                         .GroupBy(c => c.Identity, StringComparer.OrdinalIgnoreCase))
             {
+                // One label per app from all its clients, the shortest:
+                // apps register helper clients like "Google Chrome input"
+                // alongside the real one. Chosen once per sweep, so the
+                // order the clients are listed in cannot swap it back and
+                // forth (Steam's "Steam" and "Steam Voice Settings" did,
+                // reporting a change on every sweep).
+                AudioStream client = app.OrderBy(c => c.Label.Length).ThenBy(c => c.Label, StringComparer.Ordinal).First();
                 string identity = client.Identity;
-                if (PipeWireAdapter.IsPlumbingIdentity(identity)) continue;
                 runningIdentities.Add(identity);
-                if (!_apps.ContainsKey(identity))
+                if (!_apps.TryGetValue(identity, out StreamAssignment? known))
                 {
                     _apps[identity] = new StreamAssignment(0, 0, client.Label, identity,
                         _config.ResolveApplicationChannel(Matcher.Match(client)))
                         { Active = false, Running = true, BrowserHeld = BrowserHeldLocked(identity) };
                     changed = true;
                 }
-                else if (!_apps[identity].Active && _apps[identity].Label != client.Label &&
-                         (client.Label.Length < _apps[identity].Label.Length ||
-                          string.Equals(_apps[identity].Label, identity, StringComparison.OrdinalIgnoreCase)))
+                else if (!known.Active && known.Label != client.Label &&
+                         (client.Label.Length < known.Label.Length ||
+                          string.Equals(known.Label, identity, StringComparison.OrdinalIgnoreCase)))
                 {
-                    // Heal stale or placeholder labels from a live client, but
-                    // prefer the shortest name: apps register helper clients
-                    // like "Google Chrome input" alongside the real one.
-                    _apps[identity] = _apps[identity] with { Label = client.Label };
+                    // Heal a stale or placeholder label from the live clients.
+                    _apps[identity] = known with { Label = client.Label };
                     changed = true;
                 }
             }
