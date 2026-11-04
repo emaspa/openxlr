@@ -60,6 +60,20 @@ function publishLayout() {
   for (const context of layoutInspectors)
     send({ event: "sendToPropertyInspector", context, payload: choices });
 }
+// Toggle inspectors, sent the output devices again whenever they change: an
+// inspector opened while the daemon was still building its graph got an
+// empty list, and nothing refilled it.
+const outputInspectors = new Set();
+let lastOutputs = "";
+function publishOutputs() {
+  if (!outputInspectors.size) return;
+  const outputs = outputDevices();
+  const serialized = JSON.stringify(outputs);
+  if (serialized === lastOutputs) return;
+  lastOutputs = serialized;
+  for (const context of outputInspectors)
+    send({ event: "sendToPropertyInspector", context, payload: { outputs } });
+}
 // Clip key inspectors, sent the library again whenever it changes.
 const clipInspectors = new Set();
 let lastClips = "";
@@ -112,7 +126,7 @@ function connectDaemon() {
     if (daemon !== socket) return;
     let m;
     try { m = JSON.parse(e.data); } catch { return; }
-    if (m.type === "state") { daemonState = m; pruneEqTurns(); refreshAll(); refreshMeters(); publishLayout(); publishClips(); }
+    if (m.type === "state") { daemonState = m; pruneEqTurns(); refreshAll(); refreshMeters(); publishLayout(); publishOutputs(); publishClips(); }
     else if (m.type === "meters") { meterLevels = m.levels; refreshMeters(); }
     else if (m.type === "plugins") {
       catalog = new Map((m.plugins ?? []).map((p) => [p.plugin, p]));
@@ -381,9 +395,12 @@ host.onmessage = (e) => {
         lastLayout = JSON.stringify(choices);
         send({ event: "sendToPropertyInspector", context: m.context, payload: choices });
       }
-      else if (m.payload?.request === "outputs")
-        send({ event: "sendToPropertyInspector", context: m.context,
-               payload: { outputs: outputDevices() } });
+      else if (m.payload?.request === "outputs") {
+        outputInspectors.add(m.context);
+        const outputs = outputDevices();
+        lastOutputs = JSON.stringify(outputs);
+        send({ event: "sendToPropertyInspector", context: m.context, payload: { outputs } });
+      }
       else if (m.payload?.request === "inserts")
         send({ event: "sendToPropertyInspector", context: m.context,
                payload: insertChoices() });
@@ -399,6 +416,7 @@ host.onmessage = (e) => {
       break;
     case "propertyInspectorDidDisappear":
       layoutInspectors.delete(m.context);
+      outputInspectors.delete(m.context);
       clipInspectors.delete(m.context);
       break;
   }

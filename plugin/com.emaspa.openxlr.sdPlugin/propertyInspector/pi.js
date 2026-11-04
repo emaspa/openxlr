@@ -85,9 +85,14 @@ function fillGroup(id, title, items, wanted) {
   if (wanted) sel.value = wanted;
 }
 
+// The plugin sends the outputs again whenever they change, so both groups
+// are rebuilt, keeping the current choice.
 function fillMonitors(outputs, wanted) {
   const sel = document.getElementById("target");
-  if (!sel || document.getElementById("monitor-group")) return;
+  if (!sel) return;
+  const selected = sel.value || wanted || "";
+  document.getElementById("monitor-group")?.remove();
+  document.getElementById("feed-group")?.remove();
   const group = document.createElement("optgroup");
   group.id = "monitor-group";
   group.label = "Monitor output";
@@ -113,7 +118,7 @@ function fillMonitors(outputs, wanted) {
   sel.appendChild(feeds);
   // A previously saved monitor target may not have existed as an <option>
   // until now, so re-apply the selection once the group is present.
-  if (wanted) sel.value = wanted;
+  if (selected) sel.value = selected;
 }
 
 window.connectElgatoStreamDeckSocket = connect;
