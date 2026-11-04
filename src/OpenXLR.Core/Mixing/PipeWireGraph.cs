@@ -161,12 +161,26 @@ internal sealed class PipeWireGraph : IDisposable
 
     private static bool PortInputsChanged(JsonElement previous, JsonElement current)
     {
+        // Ports report latency and format changes many times a second; only
+        // what a port list is built from (direction, owner, name, order)
+        // makes it stale.
         if (IsType(previous, "PipeWire:Interface:Port") || IsType(current, "PipeWire:Interface:Port"))
-            return true;
+            return PortIdentity(previous) != PortIdentity(current);
         JsonElement? before = PortNodeName(previous), after = PortNodeName(current);
         return before is { } oldName
             ? after is not { } newName || !JsonElement.DeepEquals(oldName, newName)
             : after is not null;
+    }
+
+    private static (string? Direction, string? Node, string? Name, string? Order)? PortIdentity(JsonElement item)
+    {
+        if (!IsType(item, "PipeWire:Interface:Port")
+            || !item.TryGetProperty("info", out var info) || info.ValueKind != JsonValueKind.Object) return null;
+        string? Text(JsonElement parent, string key)
+            => parent.ValueKind == JsonValueKind.Object && parent.TryGetProperty(key, out var value)
+                && value.ValueKind is not JsonValueKind.Null and not JsonValueKind.Undefined ? value.ToString() : null;
+        JsonElement props = info.TryGetProperty("props", out var p) ? p : default;
+        return (Text(info, "direction"), Text(props, "node.id"), Text(props, "port.name"), Text(props, "port.id"));
     }
 
     private static bool IsType(JsonElement item, string expected)
