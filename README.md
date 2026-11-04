@@ -21,8 +21,8 @@ and VST3 plugin inserts, and an OpenDeck plugin for Stream Deck control.
 On Elgato hardware it also drives the device itself over
 reverse-engineered USB protocols: gain, mute, phantom power, the onboard
 effects and EQ, the headphone outputs and, on the Wave XLR Pro, output
-routing, a second-computer mix on the USB Aux port and ducking on the
-unit's own processor.
+routing, a second-computer mix on the USB Aux port, ducking on the
+unit's own processor and, as an experiment, mixes built in the unit.
 
 ![OpenXLR mixer](docs/screenshot-mixer-0210.png)
 
@@ -45,7 +45,7 @@ These Elgato devices also get their hardware controls over USB:
 
 | Device | USB id | Status |
 |---|---|---|
-| Wave XLR Pro | 0fd9:00b4 | controls and the EQ on the unit verified on hardware; ducking on the unit accepted by ear on the headphone jacks |
+| Wave XLR Pro | 0fd9:00b4 | controls and the EQ on the unit verified on hardware; ducking on the unit accepted by ear on the headphone jacks and the USB Aux port; hardware mixing (experimental) heard on one unit |
 | XLR Dock (Stream Deck+ module) | 0fd9:00a6 | gain, mute, headphone volume, 48V phantom power, low impedance; verified |
 | Wave XLR | 0fd9:007d | gain, mute, headphone volume, low impedance and phantom power verified by community testers |
 | Wave XLR MK.2 | 0fd9:00b6 | gain, mute, phantom power, low impedance, DSP, ClipGuard, compressor, headphone volume, crossfade, verified by a community tester; the EQ on the unit from firmware 1.0.15, verified |
@@ -65,6 +65,11 @@ untested device, open an issue with a diagnostics archive
   effects, both headphone outputs and the routing of HP1, HP2, Line Out
   and USB Aux. Low cut and ClipGuard run in software where the hardware
   has none.
+- **Hardware mixing** on the Wave XLR Pro (experimental): each channel
+  streams to the unit on a USB pair of its own and the unit builds the
+  mixes its jacks and USB Aux port play, so the microphones reach the
+  headphones with no delay and ducking runs per channel in the unit
+  ([manual](docs/manual.md#hardware-mixing)).
 - **Submixer** built from PipeWire nodes, no kernel modules: channels for
   the XLR inputs, Aux In, application groups and any other capture
   source, monitor mixes on any outputs, virtual microphones other apps
@@ -213,9 +218,12 @@ AI-assisted development.
 
 - Another brand's microphone or interface gets the mixer, not its
   hardware controls.
-- On the Pro, the unit's ducking runs only on the headphone jacks and only
-  keyed by XLR 1; other setups duck in software. The mix maximizer, the
-  channel booster and mixing on the unit itself are not available yet.
+- On the Pro, the unit's ducking runs only on the headphone jacks and the
+  USB Aux port, and only keyed by XLR 1; other setups duck in software.
+  Hardware mixing has room for eight channels beside the unit's own
+  inputs, builds only the mixes the unit plays, and takes no plugin on
+  those mixes. The mix maximizer and the channel booster are not
+  available yet.
 - Routing the focused application needs a compositor the UI can ask which
   window has focus: KWin, Hyprland, Sway, Niri, X11 through `xprop`, or
   GNOME Shell with the optional OpenXLR Focus extension
