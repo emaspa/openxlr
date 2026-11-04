@@ -1975,7 +1975,7 @@ public sealed class PipeWireAdapter
     }
 
     /// <summary>Ports of a node whose name starts with a prefix, in pw-link order.</summary>
-    private List<string> ListPorts(string node, string prefix, bool output)
+    internal List<string> ListPorts(string node, string prefix, bool output)
     {
         var ports = new List<string>();
         string listing = LiveObjects() is { } objects

@@ -45,7 +45,7 @@ public sealed partial class MonitorVolumeIntegrationTests
             modules.Add(LoadModule("module-remap-source", "source_name=direct_cam", "master=direct_cam_signal.monitor",
                 "source_properties=device.description=Webcam-microphone"));
             WaitForRecovery(() => pw.ListDevices().Any(d => d.Name == DirectSource) && pw.ListDevices().Any(d => d.Name == "direct_cam"));
-            WaitForInputPorts(DirectSink, 12);
+            WaitForInputPorts(pw, DirectSink, 12);
 
             devices = new DeviceManager(NullLogger<DeviceManager>.Instance, config, () => [pro]);
             devices.SweepOnce();
@@ -191,7 +191,7 @@ public sealed partial class MonitorVolumeIntegrationTests
                 "channel_map=" + string.Join(',', Enumerable.Range(0, 12).Select(i => "aux" + i)), "sink_properties=device.description=Pro-direct-raw"));
             modules.Add(LoadModule("module-null-sink", $"sink_name={katana}", "sink_properties=device.description=Katana"));
             WaitForRecovery(() => pw.ListDevices().Any(d => d.Name == DirectSource) && pw.ListDevices().Any(d => d.Name == katana));
-            WaitForInputPorts(DirectSink, 12);
+            WaitForInputPorts(pw, DirectSink, 12);
 
             devices = new DeviceManager(NullLogger<DeviceManager>.Instance, config, () => [pro]);
             devices.SweepOnce();
@@ -313,7 +313,7 @@ public sealed partial class MonitorVolumeIntegrationTests
             modules.Add(LoadModule("module-null-sink", $"sink_name={DirectSink}", "channels=12",
                 "channel_map=" + string.Join(',', Enumerable.Range(0, 12).Select(i => "aux" + i)), "sink_properties=device.description=Pro-direct-raw"));
             WaitForRecovery(() => pw.ListDevices().Any(d => d.Name == DirectSource));
-            WaitForInputPorts(DirectSink, 12);
+            WaitForInputPorts(pw, DirectSink, 12);
 
             devices = new DeviceManager(NullLogger<DeviceManager>.Instance, config, () => [pro]);
             devices.SweepOnce();

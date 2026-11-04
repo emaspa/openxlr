@@ -27,8 +27,7 @@ public sealed partial class MonitorVolumeIntegrationTests
             $"channels={ports}", $"channel_map={AuxMap(ports)}", $"master_channel_map={AuxMap(ports)}",
             "source_properties=device.description=Line-pro");
         WaitForRecovery(() => pw.ListDevices().Any(d => d.Name == LinePro && d.Channels == ports));
-        WaitForRecovery(() => ProcessRunner.Run("pw-link", ["-o"]).StdoutText.Split('\n')
-            .Count(line => line.Trim().StartsWith(LinePro + ":", StringComparison.Ordinal)) == ports);
+        WaitForRecovery(() => pw.ListPorts(LinePro, "", true).Count == ports);
         return node;
     }
 

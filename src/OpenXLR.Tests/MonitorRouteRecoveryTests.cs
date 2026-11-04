@@ -19,7 +19,7 @@ public sealed partial class MonitorVolumeIntegrationTests
         uint? mono = null;
         try
         {
-            WaitForRecovery(() => ProcessRunner.Run("pw-link", ["-i"]).StdoutText.Contains(output + ":playback_FR", StringComparison.Ordinal));
+            WaitForRecovery(() => pw.ListPorts(output, "playback", false).Contains(output + ":playback_FR"));
             foreach ((string feed, int links) in new[] { ("monitor", 2), ("monitor+chat", 4) })
             {
                 RejectNextRouteLink("OpenXLR_mix_", output + ":playback_FR", () =>
@@ -39,7 +39,7 @@ public sealed partial class MonitorVolumeIntegrationTests
                 "sink_name=" + output, "channels=1", "channel_map=mono"]);
             Assert.True(loaded.Ok, loaded.Stderr);
             mono = uint.Parse(loaded.StdoutText.Trim());
-            WaitForRecovery(() => ProcessRunner.Run("pw-link", ["-i"]).StdoutText.Contains(output + ":playback_MONO", StringComparison.Ordinal));
+            WaitForRecovery(() => pw.ListPorts(output, "playback", false).Contains(output + ":playback_MONO"));
             WaitForRecovery(() => { mixer.EnsureMonitorRoutes(); return IncomingRouteLinks(output).Length == 2; });
             Stable(() => mixer.EnsureMonitorRoutes(), output, 2); // One link per mix is complete for a genuine mono output.
         }
@@ -64,9 +64,10 @@ public sealed partial class MonitorVolumeIntegrationTests
             // LinkNodes pairs the ports it can list at that moment.
             WaitForRecovery(() =>
             {
-                string outs = ProcessRunner.Run("pw-link", ["-o"]).StdoutText, ins = ProcessRunner.Run("pw-link", ["-i"]).StdoutText;
-                return new[] { "FL", "FR" }.All(side => outs.Contains("link_source:monitor_" + side, StringComparison.Ordinal)
-                    && ins.Contains("link_target:playback_" + side, StringComparison.Ordinal));
+                var outs = pw.ListPorts("link_source", "monitor", true);
+                var ins = pw.ListPorts("link_target", "playback", false);
+                return new[] { "FL", "FR" }.All(side => outs.Contains("link_source:monitor_" + side)
+                    && ins.Contains("link_target:playback_" + side));
             });
             PortLink link = pw.LinkNodes("link_source", "monitor", "link_target", "playback");
             Assert.Equal(2, link.Pairs.Count);
