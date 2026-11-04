@@ -12,7 +12,7 @@
 %global deepfilter_version 0.5.6
 
 Name:           openxlr
-Version: 0.5.1
+Version: 0.6.0
 Release:        1%{?dist}
 Summary:        Linux Wave Link replacement for Elgato XLR interfaces and Wave microphones
 # OpenXLR is GPL-3.0-only. The native helper links RNNoise (BSD-3-Clause),
@@ -246,6 +246,16 @@ MSG
 %{_datadir}/gnome-shell/extensions/openxlr-focus@emaspa.github.com/
 
 %changelog
+* Wed Nov 04 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.6.0-1
+- Pro: hardware mixing (experimental) builds each jack's feed and the Aux mix in the unit, with per-channel ducking, processed microphones on return pairs and a cue pair for auditions
+- Pro: ducking on the unit reaches the USB Aux port
+- Pro: a profile recalled in hardware mixing keeps its headphone levels
+- Wave:3: the mute and headphone level the desktop restores after a replug are written back
+- Daemon: idle work cut (registry reads, ALSA control events, no repeated state broadcasts, cheaper USB scan, pw-link asked once per port change)
+- Mixer: ALSA clients are named after their program, and kded5 and kded6 read KDE
+- UI: five text sizes, Compact Desk fills wide layouts, volume chips on matrix rows and mix columns, application icons in the Manage window
+- Deck: the monitor output keys refill once the outputs arrive
+
 * Mon Nov 02 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.5.1-1
 - Daemon: a microphone card on a profile without capture is switched to one with capture, or the problem is reported
 - UI: each profile row saves over that profile, and deleting a profile asks first
