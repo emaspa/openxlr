@@ -12,9 +12,9 @@ internal static class AlsaCards
     /// control would land on it while the USB controls reach this one. A
     /// card's usbbus file names the bus and device number it sits on, the
     /// pair the USB handle is opened at. A lone card of the model is used even
-    /// when that file does not match, as before more than one unit was driven.
+    /// when that file does not match unless a caller rejects a known mismatch.
     /// </summary>
-    internal static int Find(string root, UsbLocation? location, string usbId, string model)
+    internal static int Find(string root, UsbLocation? location, string usbId, string model, bool rejectDifferentBus = false)
     {
         string? want = location is null ? null : $"{location.Bus:D3}/{location.Address:D3}";
         var cards = new List<(int Card, string? Bus)>();
@@ -35,8 +35,9 @@ internal static class AlsaCards
             catch (UnauthorizedAccessException) { }
         }
         if (want is not null && cards.Where(d => d.Bus == want).Select(d => d.Card).ToList() is [int exact]) return exact;
-        if (cards.Count == 1) return cards[0].Card;
-        throw new InvalidOperationException(cards.Count == 0
+        if (cards.Count == 1 && (!rejectDifferentBus || want is null || string.IsNullOrEmpty(cards[0].Bus)))
+            return cards[0].Card;
+        throw new InvalidOperationException(cards.Count <= 1
             ? $"{model} present on USB but its ALSA card was not found"
             : $"Several {model}s are attached and this unit's ALSA card could not be told apart from the others");
     }

@@ -424,19 +424,36 @@ caches those values and never reads them back from the device, so the
 backend treats the config block as the one source of truth and keeps the
 card in step with it, as openwave does. When the block changes (the dial,
 the mute pad, a write from OpenXLR), the next poll writes the new value
-to the card. Every half second the backend also reads the card's mute
-and headphone level, and writes a change something else made there into
-the block. The gain only goes from the block to the card.
+to the card. The gain only goes from the block to the card.
+
+The mute and the headphone level also go the other way. The backend
+subscribes to the card's control events, and after something else
+changes one of those two controls it reads the card on the next poll and
+writes the change into the block. Its own writes to the card come back
+as events too, so a change to a control it has just written waits for
+the half-second readback; a turning dial would otherwise read the card
+after every write. A read every 30 seconds catches a
+change whose event was missed. If the subscription cannot be opened or
+stops working, the backend reads the card every half second and tries
+the subscription again every 30 seconds. A failed card read or
+microphone write is retried after half a second. The diagnostics dump's
+`alsa` line names the mode in use, `readback=events+30s` or
+`readback=poll-500ms`.
+
 wave3-research found its unit ignoring a gain written through the class
 control. Firmware 1.2.4 does not: with OpenXLR stopped, a change to any
 of the three controls, the gain included, shows in the block and in the
 sound, so a desktop's gain change reaches the backend through the block
 either way. A card gain that differs from the block is a stale cache.
-The half-second readback is what keeps the block in step on firmware
-that does not carry the controls over by itself.
-Without its card the microphone is still driven, Options says the
-desktop's controls are not kept in step, and the diagnostics dump gives
-the reason on its `alsa` line.
+The readback keeps the block in step on firmware that does not carry the
+controls over by itself.
+
+When the card shows up after USB connects, or the kernel replaces it
+while USB stays connected, the backend looks for it again every two
+seconds. It never takes a card that sits at another USB address than
+the unit. Without its card the microphone is still driven, Options says
+the desktop's controls are not kept in step, and the diagnostics dump
+gives the reason on its `alsa` line.
 
 The one input strip is the capsule, not an XLR jack. The capabilities
 say so with `xlrJacks` false, so the mixer names that strip Mic 1 rather

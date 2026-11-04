@@ -10,7 +10,7 @@ namespace OpenXLR.Tests;
 /// and nothing here shows the protocol is right: the layout under test is
 /// the public research the class cites, and the tests hold the code to it.
 /// </summary>
-public sealed class Wave3DeviceTests
+public sealed partial class Wave3DeviceTests
 {
     /// <summary>A config block behind the transport: reads serve it, writes replace it.</summary>
     internal sealed class FakeUsb : IUsbTransport
@@ -18,6 +18,7 @@ public sealed class Wave3DeviceTests
         public byte[] Config { get; set; } = new byte[16];
         /// <summary>How many bytes the fake answers for the config block.</summary>
         public int ConfigAnswer { get; set; } = 16;
+        public int ConfigWriteAnswer { get; set; } = 16;
         public byte[]? DevInfo { get; set; }
         /// <summary>A firmware that keeps its own gain word whatever the host writes (wave3-research's reading).</summary>
         public bool DropsGainWrites { get; set; }
@@ -61,6 +62,7 @@ public sealed class Wave3DeviceTests
             Assert.Equal(0x05, r);
             Assert.Equal(0, v);
             Assert.Equal(16, len);
+            if (ConfigWriteAnswer != len) return ConfigWriteAnswer;
             short gainWord = BinaryPrimitives.ReadInt16LittleEndian(Config);
             data.AsSpan(0, len).CopyTo(Config);
             if (DropsGainWrites) BinaryPrimitives.WriteInt16LittleEndian(Config, gainWord);
@@ -581,8 +583,10 @@ public sealed class Wave3DeviceTests
         public string Capture { get; set; } = "on";
         public int Hp { get; set; } = 102;
         public List<(string Name, string Value)> Sets { get; } = [];
+        public Action<string>? AfterSet { get; set; }
         public int Reads { get; private set; }
         public string? Fail { get; set; }
+        public string? FailedSetName { get; set; }
 
         public ProcessResult Run(IReadOnlyList<string> args)
         {
@@ -615,6 +619,7 @@ public sealed class Wave3DeviceTests
                     Assert.Equal(5, args.Count);
                     string name = args[3]["name=".Length..];
                     Sets.Add((name, args[4]));
+                    if (name == FailedSetName) return new ProcessResult(1, [], "write refused", false, false);
                     switch (name)
                     {
                         case "Mic Capture Volume": Gain = int.Parse(args[4]); break;
@@ -622,6 +627,7 @@ public sealed class Wave3DeviceTests
                         case "PCM Playback Volume": Hp = int.Parse(args[4]); break;
                         default: Assert.Fail($"unexpected control {name}"); break;
                     }
+                    AfterSet?.Invoke(name);
                     return new ProcessResult(0, [], "", false, false);
                 default:
                     Assert.Fail($"unexpected amixer {string.Join(' ', args)}");
@@ -630,9 +636,13 @@ public sealed class Wave3DeviceTests
         }
     }
 
-    private sealed class Clock
+    private sealed class Clock : TimeProvider
     {
         public DateTime Now { get; set; } = new(2026, 10, 9, 12, 0, 0, DateTimeKind.Utc);
+        public TimeSpan WallClockOffset { get; set; }
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+        public override long GetTimestamp() => Now.Ticks;
+        public override DateTimeOffset GetUtcNow() => Now + WallClockOffset;
     }
 
     private static (Wave3Device Device, FakeUsb Usb, FakeCard Card, Clock Clock) Mirrored(byte[]? block = null)
@@ -640,7 +650,7 @@ public sealed class Wave3DeviceTests
         var usb = new FakeUsb { Config = block ?? Block(gainDb: 20, mute: false, hpDb: -12.5) };
         var card = new FakeCard();
         var clock = new Clock();
-        var dev = new Wave3Device(usb, card.Run, () => 3, () => clock.Now);
+        var dev = new Wave3Device(usb, card.Run, () => 3, clock);
         dev.Connect();
         return (dev, usb, card, clock);
     }
@@ -844,6 +854,13 @@ public sealed class Wave3DeviceTests
             Assert.Equal(2, AlsaCards.Find(root, new UsbLocation(1, 9, "1-2", null), "0fd9:0070", "Wave:3"));
             var ex = Assert.Throws<InvalidOperationException>(() => AlsaCards.Find(root, null, "0fd9:0070", "Wave:3"));
             Assert.Contains("Several Wave:3s", ex.Message);
+            Directory.Delete(Path.Combine(root, "card4"), recursive: true);
+            var wrongBus = new UsbLocation(3, 2, "3-1", null);
+            Assert.Equal(2, AlsaCards.Find(root, wrongBus, "0fd9:0070", "Wave:3"));
+            Assert.Throws<InvalidOperationException>(() =>
+                AlsaCards.Find(root, wrongBus, "0fd9:0070", "Wave:3", rejectDifferentBus: true));
+            File.Delete(Path.Combine(root, "card2", "usbbus"));
+            Assert.Equal(2, AlsaCards.Find(root, wrongBus, "0fd9:0070", "Wave:3", rejectDifferentBus: true));
         }
         finally { Directory.Delete(root, true); }
     }
