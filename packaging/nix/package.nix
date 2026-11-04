@@ -14,6 +14,7 @@
 , libx11
 , libice
 , libsm
+, alsa-lib
 , alsa-utils
 , pulseaudio
 , xdg-utils
@@ -112,6 +113,7 @@ buildDotnetModule {
     icu
     libpulseaudio
     libusb1
+    alsa-lib      # the Wave microphone control-event subscription loads libasound
     lilv          # the daemon reads the LV2 plugin catalog through liblilv
     pipewire
     libx11
