@@ -40,7 +40,10 @@ public sealed partial class SoundboardIntegrationTests : IDisposable
             Func<MixerSettings, string?> persist = _ => null;
 
             mixer.SetSoundboard(true, persist);
-            Assert.NotNull(pw.FindNodeId(PipeWireAdapter.PlayerNode));
+            // The link can already exist while the registry monitor is still
+            // receiving the player node.
+            Assert.True(SpinWait.SpinUntil(() => pw.FindNodeId(PipeWireAdapter.PlayerNode) is not null, TimeSpan.FromSeconds(3)),
+                "The soundboard player did not appear in the PipeWire registry.");
             Assert.True(saved[^1].Enabled);
             string wav = Path.Combine(_directory, "tone.wav");
             WriteConstantWav(wav, .1, seconds: 2);
