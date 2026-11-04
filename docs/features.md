@@ -428,7 +428,8 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
   the input gain, mute, microphone switches and plugin chain under the
   INPUTS panel's rules, the switches behind a **Mic** button that shows
   whether one is on and whether phantom power is, the gain written under
-  it (the volume while its fader moves), and
+  it (the volume while its fader moves, and over the fader on a row
+  with no readout), and
   column heads the mix's master, mute, chain and how many outputs hear it.
   A skin orders and hides the parts of the heads and cells. See
   [The mix matrix](skins.md#the-mix-matrix)

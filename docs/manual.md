@@ -206,7 +206,9 @@ In the SUBMIXER tiles the Volume row sits above the sends. In an input
 rack it is under the gain, the Aux In level or the Line In gain. In a mix
 matrix row head it is a second fader under the gain or the level, and the
 row is as tall as the two faders need; a row without a gain, such as a
-bound XLR 1, shows only the volume. Against an older daemon that gives
+bound XLR 1, shows only the volume. While you move a row's volume fader,
+the volume shows as a percentage in the row's readout, or over the fader on
+a row without one, until one second after you let go. Against an older daemon that gives
 application and capture channels a volume and the hardware inputs none,
 the hardware inputs leave an empty space where the Volume row would be, so
 each send row sits at the same height in every tile.
@@ -2998,7 +3000,9 @@ show the level or gain in the name column the same way
 ([readout](#gain-readout)). Each of them also has its [volume](#channel-volume),
 a second fader under the gain or the level, and the row grows to hold
 both. An application or capture channel has its volume, with its meter
-under it.
+under it. While you move the volume fader of a row with no readout, the
+volume shows over the fader as a cell's level does, and stays one second
+after you let go.
 XLR 2 has a row only on an interface with two XLR inputs. The head at the
 top of each column carries the mix's icon and name, how many outputs ticked in
 MONITOR hear it (or what kind of mix it is when none does), a thin line in

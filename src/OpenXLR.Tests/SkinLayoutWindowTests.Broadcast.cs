@@ -158,6 +158,21 @@ internal static partial class SkinLayoutWindowTests
                 SkinService.ApplyTextSize(previousTextSize);
                 SkinService.ApplyControlSizing(false);
             }
+            try
+            {
+                foreach (int percent in new[] { 80, 90, 100, 110, 120 })
+                    foreach (bool enlarged in new[] { false, true })
+                    {
+                        SkinService.ApplyTextSize(percent);
+                        SkinService.ApplyControlSizing(enlarged);
+                        CheckVolumeChip(window, matrix, $"{percent}% text, {(enlarged ? "touch" : "standard")}");
+                    }
+            }
+            finally
+            {
+                SkinService.ApplyTextSize(previousTextSize);
+                SkinService.ApplyControlSizing(false);
+            }
             CheckProcessing(window, model, "broadcast");
 
             // XLR 1 bound to a webcam: the daemon names it Mic 1, its row keeps
@@ -813,6 +828,71 @@ internal static partial class SkinLayoutWindowTests
     private static double RowHeightOf(Window window) => (double)window.FindResource("Ox.Matrix.RowHeight")!;
 
     /// <summary>A channel's row head in the matrix.</summary>
+    /// <summary>
+    /// A row head's volume while its fader moves and for the hold after: over
+    /// the fader, at the top centre of the source column, on rows without a
+    /// readout, an application's and a capture input's; in the readout, in
+    /// place of the gain or level, on XLR 1 and Aux In. Every head, name
+    /// column, source column and cell stays where and as large as it was.
+    /// </summary>
+    private static void CheckVolumeChip(Window window, MixMatrixViewModel matrix, string where)
+    {
+        Layout(window, 1040, 1400);
+        Rect[] Places() => [.. window.GetVisualDescendants().OfType<Border>()
+            .Where(b => b.Name is "MatrixRowHead" or "MatrixRowName" or "MatrixSource" or "MatrixCell" && b.IsEffectivelyVisible)
+            .Select(b => new Rect(b.TranslatePoint(default, window)!.Value, b.Bounds.Size))];
+        Rect[] before = Places();
+        foreach (string id in new[] { "music", "cam", "xlr1", "aux" })
+        {
+            MatrixRowViewModel row = matrix.Rows.Single(r => r.Channel.Id == id);
+            bool chipped = id is "music" or "cam";
+            string at = $"{id} {where}";
+            Border head = RowHead(window, id);
+            Border source = head.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "MatrixSource");
+            Border chip = head.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "MatrixVolumeOverFader");
+            TextBlock? readout = head.GetVisualDescendants().OfType<TextBlock>().SingleOrDefault(t => t.Name == "MatrixReadout" && t.IsEffectivelyVisible);
+            Assert.Equal(chipped, readout is null);
+            Slider volume = head.GetVisualDescendants().OfType<Slider>().Single(s => s.Name == "MatrixVolume");
+            string? rest = readout?.Text;
+            var hold = new ManualHold();
+            Func<TimeSpan, Action, IDisposable> timer = row.Channel.StartReadoutHold;
+            row.Channel.StartReadoutHold = hold.Start;
+            try
+            {
+                Assert.False(chip.IsEffectivelyVisible, at);
+                FaderInput.SetIsAdjusting(volume, true);
+                Layout(window, 1040, 1400);
+                Assert.Equal(chipped, chip.IsEffectivelyVisible);
+                if (chipped)
+                {
+                    TextBlock value = chip.GetVisualDescendants().OfType<TextBlock>().Single();
+                    Assert.Equal(row.Channel.VolumeText, value.Text);
+                    MainWindowLabelTests.CheckWhole([value], $"the volume over the fader, {at}");
+                    AssertInside(chip, source);
+                    AssertInside(chip, head);
+                    Assert.InRange(chip.TranslatePoint(new Point(chip.Bounds.Width / 2, 0), source)!.Value.X - source.Bounds.Width / 2, -1, 1);
+                    Assert.InRange(chip.TranslatePoint(default, source)!.Value.Y, 0, 1);
+                }
+                else Assert.Equal(row.Channel.VolumeText, readout!.Text);
+                Assert.True(before.SequenceEqual(Places()), $"the matrix moved while {at} showed its volume");
+                // The value stays for the hold after the fader stops, then the head is as it was.
+                FaderInput.SetIsAdjusting(volume, false);
+                Layout(window, 1040, 1400);
+                Assert.Equal(chipped, chip.IsEffectivelyVisible);
+                if (!chipped) Assert.Equal(row.Channel.VolumeText, readout!.Text);
+                Assert.Single(hold.Handles).Elapse();
+                Layout(window, 1040, 1400);
+                Assert.False(chip.IsEffectivelyVisible, at);
+                Assert.Equal(rest, readout?.Text);
+                Assert.True(before.SequenceEqual(Places()), $"the matrix moved after {at} showed its volume");
+            }
+            finally
+            {
+                row.Channel.StartReadoutHold = timer;
+            }
+        }
+    }
+
     internal static Border RowHead(Visual root, string channel) =>
         root.GetVisualDescendants().OfType<Border>()
             .Single(b => b.Name == "MatrixRowHead" && b.DataContext is MatrixRowViewModel r && r.Channel.Id == channel);
