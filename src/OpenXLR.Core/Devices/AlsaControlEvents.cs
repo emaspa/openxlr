@@ -14,6 +14,8 @@ internal sealed class AlsaControlEvents : IAlsaControlEvents
 {
     private const int NonBlocking = 0x0001, ReadOnly = 0x0004;
     private const int Again = -11, Interrupted = -4;
+    private const int ElementEvent = 0;
+    private const uint ValueChanged = 1, ElementRemoved = uint.MaxValue;
     private IntPtr _control, _event;
     public bool Available => _control != IntPtr.Zero;
 
@@ -39,13 +41,23 @@ internal sealed class AlsaControlEvents : IAlsaControlEvents
         for (int i = 0; Available && i < 64; i++)
         {
             int result = snd_ctl_read(_control, _event);
-            if (result > 0) { changed = true; continue; }
+            if (result > 0)
+            {
+                if (!changed && snd_ctl_event_get_type(_event) == ElementEvent)
+                    changed = IsReadbackEvent(snd_ctl_event_elem_get_mask(_event),
+                        Marshal.PtrToStringAnsi(snd_ctl_event_elem_get_name(_event)));
+                continue;
+            }
             if (result == Interrupted) continue; // EINTR: retry within the same bounded drain
             if (result != Again) Dispose(); // EAGAIN means no event; EOF or error ends the watch
             break;
         }
         return changed;
     }
+
+    internal static bool IsReadbackEvent(uint mask, string? name)
+        => mask != ElementRemoved && (mask & ValueChanged) != 0
+            && name is Wave3Device.MuteCtl or Wave3Device.HpCtl;
 
     public void Dispose()
     {
@@ -63,6 +75,12 @@ internal sealed class AlsaControlEvents : IAlsaControlEvents
     private static extern void snd_ctl_event_free(IntPtr ev);
     [DllImport("libasound.so.2", CallingConvention = CallingConvention.Cdecl)]
     private static extern int snd_ctl_read(IntPtr control, IntPtr ev);
+    [DllImport("libasound.so.2", CallingConvention = CallingConvention.Cdecl)]
+    private static extern int snd_ctl_event_get_type(IntPtr ev);
+    [DllImport("libasound.so.2", CallingConvention = CallingConvention.Cdecl)]
+    private static extern uint snd_ctl_event_elem_get_mask(IntPtr ev);
+    [DllImport("libasound.so.2", CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr snd_ctl_event_elem_get_name(IntPtr ev);
     [DllImport("libasound.so.2", CallingConvention = CallingConvention.Cdecl)]
     private static extern int snd_ctl_close(IntPtr control);
 }

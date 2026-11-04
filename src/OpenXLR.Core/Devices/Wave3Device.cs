@@ -125,8 +125,8 @@ public class Wave3Device : IAudioDevice
     internal const int OffFirmware = 21;
 
     private const string GainCtl = "Mic Capture Volume";
-    private const string MuteCtl = "Mic Capture Switch";
-    private const string HpCtl = "PCM Playback Volume";
+    internal const string MuteCtl = "Mic Capture Switch";
+    internal const string HpCtl = "PCM Playback Volume";
     private static readonly TimeSpan AlsaReadInterval = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan AlsaEventFallback = TimeSpan.FromSeconds(30);
 
@@ -403,8 +403,10 @@ public class Wave3Device : IAudioDevice
         AlsaValues next = seen;
         bool gainOut = block.Gain != seen.Gain, muteOut = block.Mute != seen.Mute, hpOut = block.Hp != seen.Hp;
         if (gainOut && TryAlsa(() => Cset(GainCtl, block.Gain.ToString(CultureInfo.InvariantCulture)))) next = next with { Gain = block.Gain };
-        if (muteOut && TryAlsa(() => Cset(MuteCtl, block.Mute == true ? "off" : "on"))) next = next with { Mute = block.Mute };
-        if (hpOut && TryAlsa(() => Cset(HpCtl, block.Hp.ToString(CultureInfo.InvariantCulture)))) next = next with { Hp = block.Hp };
+        bool muteWritten = muteOut && TryAlsa(() => Cset(MuteCtl, block.Mute == true ? "off" : "on"));
+        bool hpWritten = hpOut && TryAlsa(() => Cset(HpCtl, block.Hp.ToString(CultureInfo.InvariantCulture)));
+        if (muteWritten) next = next with { Mute = block.Mute };
+        if (hpWritten) next = next with { Hp = block.Hp };
         // The card already took these writes. Keep them recorded even if
         // applying an unrelated desktop change to the USB block fails.
         _mirrored = next;
@@ -437,11 +439,11 @@ public class Wave3Device : IAudioDevice
                 {
                     bool edited = false;
                     // An outgoing write still wins this poll. If the card
-                    // changed underneath it, recheck that control next poll.
+                    // changed after a successful write, recheck next poll.
                     if (card!.TryGetValue(MuteCtl, out string? sw) && sw is "on" or "off")
                     {
                         bool muted = sw == "off";
-                        if (muteOut) _alsaReadPending |= muted != block.Mute;
+                        if (muteOut) _alsaReadPending |= muteWritten && muted != block.Mute;
                         else if (muted != seen.Mute)
                         {
                             c[OffMute] = muted ? (byte)1 : (byte)0;
@@ -457,7 +459,7 @@ public class Wave3Device : IAudioDevice
                         if (int.TryParse(firstChannel, NumberStyles.Integer, CultureInfo.InvariantCulture, out int level)
                             && level is >= 0 and <= 120)
                         {
-                            if (hpOut) _alsaReadPending |= level != block.Hp;
+                            if (hpOut) _alsaReadPending |= hpWritten && level != block.Hp;
                             else if (level != seen.Hp)
                             {
                                 WriteHp(c, HpToWord(level / 2.0 + HpMinDb));

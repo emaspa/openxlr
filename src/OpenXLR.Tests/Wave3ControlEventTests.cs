@@ -147,6 +147,36 @@ public sealed partial class Wave3DeviceTests
         }
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void FailedAlsaWriteDoesNotKeepReadbackPending(bool mute)
+    {
+        var (dev, usb, card, clock, events) = EventMirrored();
+        using (dev)
+        {
+            card.Sets.Clear();
+            card.FailedSetName = mute ? "Mic Capture Switch" : "PCM Playback Volume";
+            usb.Config = Block(gainDb: 20, mute: mute, hpDb: mute ? -12.5 : -30);
+            events.Pending = true;
+            dev.ReadState();
+            Assert.Equal(1, card.Reads);
+
+            for (int i = 0; i < 10; i++)
+            {
+                clock.Now += TimeSpan.FromMilliseconds(100);
+                dev.ReadState();
+            }
+            Assert.Equal(1, card.Reads);
+            Assert.Equal(11, card.Sets.Count);
+
+            card.FailedSetName = null;
+            dev.ReadState();
+            Assert.Equal(mute ? "off" : "on", card.Capture);
+            Assert.Equal(mute ? 95 : 60, card.Hp);
+        }
+    }
+
     [Fact]
     public void FailedUsbWriteDoesNotReplaySuccessfulAlsaWrites()
     {
@@ -197,6 +227,18 @@ public sealed partial class Wave3DeviceTests
         dev.Dispose();
         Assert.True(subscriptions[1].Disposed);
     }
+
+    [Theory]
+    [InlineData(1u, "Mic Capture Switch", true)]
+    [InlineData(1u, "PCM Playback Volume", true)]
+    [InlineData(3u, "PCM Playback Volume", true)]
+    [InlineData(1u, "Mic Capture Volume", false)]
+    [InlineData(1u, "PCM Playback Switch", false)]
+    [InlineData(2u, "Mic Capture Switch", false)]
+    [InlineData(4u, "PCM Playback Volume", false)]
+    [InlineData(uint.MaxValue, "Mic Capture Switch", false)]
+    public void OnlyMuteAndHeadphoneValueEventsTriggerReadback(uint mask, string name, bool expected)
+        => Assert.Equal(expected, AlsaControlEvents.IsReadbackEvent(mask, name));
 
     [Fact]
     public void AControlWatchOnANegativeCardIsUnavailable()

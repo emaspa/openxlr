@@ -586,6 +586,7 @@ public sealed partial class Wave3DeviceTests
         public Action<string>? AfterSet { get; set; }
         public int Reads { get; private set; }
         public string? Fail { get; set; }
+        public string? FailedSetName { get; set; }
 
         public ProcessResult Run(IReadOnlyList<string> args)
         {
@@ -618,6 +619,7 @@ public sealed partial class Wave3DeviceTests
                     Assert.Equal(5, args.Count);
                     string name = args[3]["name=".Length..];
                     Sets.Add((name, args[4]));
+                    if (name == FailedSetName) return new ProcessResult(1, [], "write refused", false, false);
                     switch (name)
                     {
                         case "Mic Capture Volume": Gain = int.Parse(args[4]); break;

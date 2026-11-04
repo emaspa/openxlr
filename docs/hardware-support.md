@@ -424,11 +424,13 @@ caches those values and never reads them back from the device, so the
 backend treats the config block as the one source of truth and keeps the
 card in step with it, as openwave does. When the block changes (the dial,
 the mute pad, a write from OpenXLR), the next poll writes the new value
-to the card. An ALSA control subscription tells the backend when the card
-changes; it then reads the card's mute and headphone level on the next
-device poll that can read the changed controls and writes an external
-change into the block. A notification that arrives during a poll that
-writes both controls to the card remains pending for the next poll.
+to the card. The ALSA subscription reacts to value changes for the
+card's mute and headphone controls. The backend reads those controls on
+the next eligible device poll and writes external changes into the
+block. Gain changes alone do not trigger a read. A notification that
+arrives during a poll that writes both controls to the card remains
+pending for the next poll. A refused card write does not schedule an
+extra readback.
 A 30-second read catches changes for which no event arrived. If the
 subscription cannot be opened or stops working, half-second readback
 continues while the subscription is retried every 30 seconds. A failed
