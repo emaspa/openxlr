@@ -32,6 +32,7 @@ public sealed class WebSocketHub
     private readonly CancellationToken _stopping;
     private readonly IHostApplicationLifetime _lifetime;
     private readonly StateBroadcastQueue _stateBroadcasts;
+    private readonly MeterFrameGate _meterFrames = new(() => Environment.TickCount64);
 
     public WebSocketHub(DeviceManager devices, MixerService mixer, ILogger<WebSocketHub> log,
         IHostApplicationLifetime lifetime, WaveInterfaces? waveInterfaces = null)
@@ -70,7 +71,8 @@ public sealed class WebSocketHub
         {
             if (_clients.IsEmpty) return;                    // nobody watching
             IReadOnlyDictionary<string, double[]>? levels = _mixer.Meters();
-            if (levels is { Count: > 0 }) Broadcast(new MetersMessage(levels));
+            if (levels is { Count: > 0 } && Serialized(new MetersMessage(levels)) is { } frame && _meterFrames.ShouldSend(frame))
+                SendToAll(frame, transient: true, nameof(MetersMessage));
             // A finished take's waveform goes out once; a client that missed
             // it asks with getSoundCheckTake.
             if (_mixer.NewSoundCheckTake() is { } take) Broadcast(SoundCheckTakeMessage.From(take));
@@ -884,23 +886,30 @@ public sealed class WebSocketHub
 
     internal void Broadcast(object message)
     {
-        byte[] text;
-        try { text = Serialize(message); }
+        if (Serialized(message) is { } text) SendToAll(text, transient: message is MetersMessage, message.GetType().Name);
+    }
+
+    private byte[]? Serialized(object message)
+    {
+        try { return Serialize(message); }
         catch (Exception ex)
         {
             // A serialization fault here would otherwise vanish: this runs from a
             // timer callback with nobody awaiting it.
             _log.LogError("cannot serialize {type}: {msg}", message.GetType().Name, ex.Message);
-            return;
+            return null;
         }
+    }
+
+    private void SendToAll(byte[] text, bool transient, string type)
+    {
         foreach (Client c in _clients.Values)
         {
             // Meter frames expire immediately. State and rule changes may be
             // the last update, so a client that misses one must reconnect for
             // a fresh snapshot instead of remaining silently out of sync.
-            if (!c.TrySend(text, transient: message is MetersMessage))
-                _log.LogDebug("client {id} could not queue {type}",
-                    c.Id, message.GetType().Name);
+            if (!c.TrySend(text, transient))
+                _log.LogDebug("client {id} could not queue {type}", c.Id, type);
         }
     }
 

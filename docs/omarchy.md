@@ -204,7 +204,8 @@ The plugin runs `openxlr-control` from the installed native
 package. This client-only adapter connects to the private Unix socket,
 checks the server's user and forwards JSON lines. It does not start an
 audio service. The plugin sends `getState` after the adapter is connected;
-state changes and 15 Hz meter frames arrive without a subscription command.
+state changes and meter frames (15 Hz while levels change) arrive without a
+subscription command.
 Commands are documented in [api.md](api.md). There is no token file, HTTP
 polling or meter polling loop.
 
