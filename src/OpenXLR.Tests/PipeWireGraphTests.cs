@@ -235,6 +235,53 @@ public sealed class PipeWireGraphTests
         finally { Directory.Delete(dir, true); }
     }
 
+    [Fact]
+    public void DevicesArrivingOrLeavingAskForTheDefaultsAgain()
+    {
+        // Pulse picks another default when the default device leaves, and
+        // nothing writes the default metadata for that.
+        string dir = Path.Combine(Path.GetTempPath(), "openxlr-graph-defaults-" + Guid.NewGuid());
+        Directory.CreateDirectory(dir);
+        string script = Path.Combine(dir, "watch"), stage = Path.Combine(dir, "stage");
+        ExecutableScript.Write(script, $$$$"""
+            #!/bin/sh
+            exec python3 - <<'PY'
+            import json, os, time
+            def node(id, name, kind, volume=1.0):
+                return {'id': id, 'type': 'PipeWire:Interface:Node', 'info': {
+                        'props': {'node.name': name, 'media.class': kind},
+                        'params': {'Props': [{'channelVolumes': [volume]}]}}}
+            print(json.dumps([{'id': 0, 'type': 'PipeWire:Interface:Core'}, node(1, 'desk', 'Audio/Sink')]), flush=True)
+            def wait(step):
+                while not os.path.exists('{{{{stage}}}}') or open('{{{{stage}}}}').read() != step: time.sleep(.01)
+            wait('volume'); print(json.dumps([node(1, 'desk', 'Audio/Sink', .5)]), flush=True)
+            wait('stream'); print(json.dumps([node(2, 'Chromium', 'Stream/Output/Audio')]), flush=True)
+            wait('device'); print(json.dumps([node(3, 'headset', 'Audio/Source')]), flush=True)
+            wait('leave'); print(json.dumps([{'id': 1, 'info': None}]), flush=True)
+            while True: time.sleep(1)
+            PY
+            """);
+        try
+        {
+            using var graph = new PipeWireGraph(executable: script);
+            Assert.True(graph.WaitFor(items => items.Length == 2, TimeSpan.FromSeconds(5)));
+            long start = graph.DefaultRevision;
+            File.WriteAllText(stage, "volume");
+            Assert.True(graph.WaitFor(items => items.Any(item => item.ToString().Contains("0.5", StringComparison.Ordinal)), TimeSpan.FromSeconds(5)));
+            File.WriteAllText(stage, "stream");
+            Assert.True(graph.WaitFor(items => items.Length == 3, TimeSpan.FromSeconds(5)));
+            Assert.Equal(start, graph.DefaultRevision);
+            File.WriteAllText(stage, "device");
+            Assert.True(graph.WaitFor(items => items.Length == 4, TimeSpan.FromSeconds(5)));
+            long arrived = graph.DefaultRevision;
+            Assert.NotEqual(start, arrived);
+            File.WriteAllText(stage, "leave");
+            Assert.True(graph.WaitFor(items => items.Length == 3, TimeSpan.FromSeconds(5)));
+            Assert.NotEqual(arrived, graph.DefaultRevision);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
     private sealed class ChunkStream(byte[] bytes, int chunk) : MemoryStream(bytes)
     {
         public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
