@@ -97,9 +97,12 @@ public static class SkinService
         {
             ApplyTextResources(application);
             foreach (SkinToken token in SkinTokens.All)
-                if (IsFontSize(token) && token.Default is double basis)
-                    Put(application.Resources, token.Name, ScaleText(
-                        _palette.Tokens.GetValueOrDefault(token.Name) is SkinNumber size ? size.Value : basis));
+            {
+                bool font = IsFontSize(token);
+                if ((!font && token.Name != "Ox.Matrix.RowHeight") || token.Default is not double basis) continue;
+                double size = _palette.Tokens.GetValueOrDefault(token.Name) is SkinNumber number ? number.Value : basis;
+                Put(application.Resources, token.Name, font ? ScaleText(size) : Sized(token.Name, size)!);
+            }
         }
         Changed?.Invoke();
     }
@@ -488,6 +491,8 @@ public static class SkinService
             if (minimum > 0 && _palette.Tokens.GetValueOrDefault("Ox.Fader.Thumb.Height") is SkinNumber thumb)
                 minimum = Math.Max(minimum, thumb.Value);
         }
+        if (name == "Ox.Matrix.RowHeight" && TextSizePercent > NormalTextSize && value is double height)
+            value = Math.Ceiling(ScaleText(height));
         return minimum > 0 ? Math.Max(value is double size ? size : 0, minimum) : value;
     }
 

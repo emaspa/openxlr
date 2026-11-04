@@ -133,7 +133,22 @@ internal static partial class SkinLayoutWindowTests
                     Capture(window, enlarged ? $"skin-broadcast-touch-{width}" : $"skin-broadcast-{width}");
                 }
             }
-            SkinService.ApplyControlSizing(false);
+            int previousTextSize = SkinService.TextSizePercent;
+            try
+            {
+                SkinService.ApplyTextSize(120);
+                foreach (bool enlarged in new[] { false, true })
+                {
+                    SkinService.ApplyControlSizing(enlarged);
+                    Layout(window, 640, 1400);
+                    CheckBroadcastAt(window, model, $"120% text, {(enlarged ? "touch" : "standard")}");
+                }
+            }
+            finally
+            {
+                SkinService.ApplyTextSize(previousTextSize);
+                SkinService.ApplyControlSizing(false);
+            }
             CheckProcessing(window, model, "broadcast");
 
             // XLR 1 bound to a webcam: the daemon names it Mic 1, its row keeps
