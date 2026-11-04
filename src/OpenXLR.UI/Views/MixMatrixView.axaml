@@ -199,6 +199,7 @@
                 </Grid>
               </Border>
             <Border Width="{DynamicResource MatrixCellWidth}" Padding="4,0" Name="MatrixSource">
+              <Panel>
               <layout:StripPanel Spec="{Binding Spec}" Spacing="4" VerticalAlignment="Center">
                 <StackPanel layout:StripPanel.Part="meter" Orientation="Vertical" Spacing="1" VerticalAlignment="Center"
                             ToolTip.Tip="{loc:Text Key=ChannelMeterTip}">
@@ -268,6 +269,16 @@
                           AutomationProperties.Name="{Binding Main.Inserts.ButtonText}" ToolTip.Tip="{loc:Text Key=PluginsProcessingXLR1BeforeItReachesThe}"/>
                 </StackPanel>
               </layout:StripPanel>
+              <!-- the channel's volume, while its fader moves and for a second after, where the row has no
+                   readout to show it in: a chip in the buttons' own face at the top of the column, as a send's
+                   level is over its cell, drawn over the head so the row keeps its height and widths -->
+              <Border Name="MatrixVolumeOverFader" Classes="matrixValueChip" HorizontalAlignment="Center" VerticalAlignment="Top"
+                      IsHitTestVisible="False" Padding="5,0" IsVisible="{Binding ShowsVolumeChip}"
+                      Background="{DynamicResource Ox.Control.Background}" BorderBrush="{DynamicResource Ox.Control.BorderBrush}"
+                      BorderThickness="{DynamicResource Ox.Control.BorderThickness}" CornerRadius="{DynamicResource Ox.Control.CornerRadius}">
+                <TextBlock Text="{Binding Channel.VolumeText}" FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Control.Foreground}"/>
+              </Border>
+              </Panel>
             </Border>
           </DockPanel>
         </Border>
@@ -328,6 +339,7 @@
                 </Grid>
               </Border>
             <Border Width="{DynamicResource MatrixCellWidth}" Padding="4,0" Name="MatrixSource">
+              <Panel>
               <layout:StripPanel Spec="{Binding Spec}" Spacing="4" VerticalAlignment="Center">
                 <StackPanel layout:StripPanel.Part="meter" Orientation="Vertical" Spacing="1" VerticalAlignment="Center"
                             ToolTip.Tip="{loc:Text Key=ChannelMeterTip}">
@@ -397,6 +409,16 @@
                           AutomationProperties.Name="{Binding Main.Inserts2.ButtonText}" ToolTip.Tip="{loc:Text Key=PluginsProcessingXLR2BeforeItReachesThe}"/>
                 </StackPanel>
               </layout:StripPanel>
+              <!-- the channel's volume, while its fader moves and for a second after, where the row has no
+                   readout to show it in: a chip in the buttons' own face at the top of the column, as a send's
+                   level is over its cell, drawn over the head so the row keeps its height and widths -->
+              <Border Name="MatrixVolumeOverFader" Classes="matrixValueChip" HorizontalAlignment="Center" VerticalAlignment="Top"
+                      IsHitTestVisible="False" Padding="5,0" IsVisible="{Binding ShowsVolumeChip}"
+                      Background="{DynamicResource Ox.Control.Background}" BorderBrush="{DynamicResource Ox.Control.BorderBrush}"
+                      BorderThickness="{DynamicResource Ox.Control.BorderThickness}" CornerRadius="{DynamicResource Ox.Control.CornerRadius}">
+                <TextBlock Text="{Binding Channel.VolumeText}" FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Control.Foreground}"/>
+              </Border>
+              </Panel>
             </Border>
           </DockPanel>
         </Border>
@@ -425,6 +447,7 @@
                 </Grid>
               </Border>
             <Border Width="{DynamicResource MatrixCellWidth}" Padding="4,0" Name="MatrixSource">
+              <Panel>
               <layout:StripPanel Spec="{Binding Spec}" Spacing="4" VerticalAlignment="Center">
                 <StackPanel layout:StripPanel.Part="meter" Orientation="Vertical" Spacing="1" VerticalAlignment="Center"
                             ToolTip.Tip="{loc:Text Key=ChannelMeterTip}">
@@ -461,6 +484,16 @@
                   </Grid>
                 </StackPanel>
               </layout:StripPanel>
+              <!-- the channel's volume, while its fader moves and for a second after, where the row has no
+                   readout to show it in: a chip in the buttons' own face at the top of the column, as a send's
+                   level is over its cell, drawn over the head so the row keeps its height and widths -->
+              <Border Name="MatrixVolumeOverFader" Classes="matrixValueChip" HorizontalAlignment="Center" VerticalAlignment="Top"
+                      IsHitTestVisible="False" Padding="5,0" IsVisible="{Binding ShowsVolumeChip}"
+                      Background="{DynamicResource Ox.Control.Background}" BorderBrush="{DynamicResource Ox.Control.BorderBrush}"
+                      BorderThickness="{DynamicResource Ox.Control.BorderThickness}" CornerRadius="{DynamicResource Ox.Control.CornerRadius}">
+                <TextBlock Text="{Binding Channel.VolumeText}" FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Control.Foreground}"/>
+              </Border>
+              </Panel>
             </Border>
           </DockPanel>
         </Border>
@@ -489,6 +522,7 @@
                 </Grid>
               </Border>
             <Border Width="{DynamicResource MatrixCellWidth}" Padding="4,0" Name="MatrixSource">
+              <Panel>
               <layout:StripPanel Spec="{Binding Spec}" Spacing="4" VerticalAlignment="Center">
                 <StackPanel layout:StripPanel.Part="meter" Orientation="Vertical" Spacing="1" VerticalAlignment="Center"
                             ToolTip.Tip="{loc:Text Key=ChannelMeterTip}">
@@ -525,6 +559,16 @@
                   </Grid>
                 </StackPanel>
               </layout:StripPanel>
+              <!-- the channel's volume, while its fader moves and for a second after, where the row has no
+                   readout to show it in: a chip in the buttons' own face at the top of the column, as a send's
+                   level is over its cell, drawn over the head so the row keeps its height and widths -->
+              <Border Name="MatrixVolumeOverFader" Classes="matrixValueChip" HorizontalAlignment="Center" VerticalAlignment="Top"
+                      IsHitTestVisible="False" Padding="5,0" IsVisible="{Binding ShowsVolumeChip}"
+                      Background="{DynamicResource Ox.Control.Background}" BorderBrush="{DynamicResource Ox.Control.BorderBrush}"
+                      BorderThickness="{DynamicResource Ox.Control.BorderThickness}" CornerRadius="{DynamicResource Ox.Control.CornerRadius}">
+                <TextBlock Text="{Binding Channel.VolumeText}" FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Control.Foreground}"/>
+              </Border>
+              </Panel>
             </Border>
           </DockPanel>
         </Border>
@@ -589,6 +633,7 @@
                 </Grid>
               </Border>
             <Border Width="{DynamicResource MatrixCellWidth}" Padding="4,0" Name="MatrixSource">
+              <Panel>
               <layout:StripPanel Spec="{Binding Spec}" Spacing="4" VerticalAlignment="Center">
                 <StackPanel layout:StripPanel.Part="meter" Orientation="Vertical" Spacing="1" VerticalAlignment="Center"
                             ToolTip.Tip="{loc:Text Key=ChannelMeterTip}">
@@ -671,6 +716,16 @@
                           ToolTip.Tip="{loc:Text Key=InputChainHint}"/>
                 </StackPanel>
               </layout:StripPanel>
+              <!-- the channel's volume, while its fader moves and for a second after, where the row has no
+                   readout to show it in: a chip in the buttons' own face at the top of the column, as a send's
+                   level is over its cell, drawn over the head so the row keeps its height and widths -->
+              <Border Name="MatrixVolumeOverFader" Classes="matrixValueChip" HorizontalAlignment="Center" VerticalAlignment="Top"
+                      IsHitTestVisible="False" Padding="5,0" IsVisible="{Binding ShowsVolumeChip}"
+                      Background="{DynamicResource Ox.Control.Background}" BorderBrush="{DynamicResource Ox.Control.BorderBrush}"
+                      BorderThickness="{DynamicResource Ox.Control.BorderThickness}" CornerRadius="{DynamicResource Ox.Control.CornerRadius}">
+                <TextBlock Text="{Binding Channel.VolumeText}" FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Control.Foreground}"/>
+              </Border>
+              </Panel>
             </Border>
           </DockPanel>
         </Border>

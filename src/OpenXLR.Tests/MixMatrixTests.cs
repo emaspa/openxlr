@@ -184,6 +184,89 @@ public sealed class MixMatrixTests
     }
 
     [Fact]
+    public void ARowWithoutAReadoutShowsItsVolumeOverTheFaderWhileItMovesAndASecondAfter()
+    {
+        var model = new MainViewModel(new DaemonClient());
+        string State(string game) => $$"""
+            {"channels":[{"id":"xlr1","name":"XLR 1","hardware":true,"volume":0.7},{"id":"game","name":"Game","volume":{{game}}}],
+             "mixes":[{"id":"monitor","name":"Monitor A"}]}
+            """;
+        ApplyMixer.Invoke(model, [JsonNode.Parse(State("0.72"))]);
+        model.RefreshBindings();
+        using var matrix = new MixMatrixViewModel(model);
+        MatrixRowViewModel game = matrix.Rows.Single(r => r.Channel.Id == "game");
+        MatrixRowViewModel xlr1 = matrix.Rows.Single(r => r.Channel.Id == "xlr1");
+        var raised = new List<string?>();
+        game.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        var hold = new ManualHold();
+        game.Channel.StartReadoutHold = hold.Start;
+        xlr1.Channel.StartReadoutHold = hold.Start;
+
+        // An application row has no readout, and nothing over its fader at rest.
+        Assert.False(game.ShowsReadout);
+        Assert.False(game.Tall);
+        Assert.False(game.ShowsVolumeChip);
+
+        // The volume over the fader while it moves, following it, and the row
+        // as tall as it was: the value is drawn over the head.
+        game.VolumeAdjusting = true;
+        Assert.True(game.ShowsVolumeChip);
+        Assert.Contains(nameof(MatrixRowViewModel.ShowsVolumeChip), raised);
+        Assert.Equal("72%", game.Channel.VolumeText);
+        Assert.False(game.Tall);
+        Assert.False(game.ShowsReadout);
+        ApplyMixer.Invoke(model, [JsonNode.Parse(State("0.4"))]);
+        Assert.Equal("40%", game.Channel.VolumeText);
+
+        // It stays for the hold after the fader stops, then goes.
+        game.VolumeAdjusting = false;
+        Assert.True(game.ShowsVolumeChip);
+        Assert.Equal(ChannelViewModel.VolumeReadoutHold, Assert.Single(hold.Handles).After);
+        raised.Clear();
+        hold.Handles[0].Elapse();
+        Assert.False(game.ShowsVolumeChip);
+        Assert.Contains(nameof(MatrixRowViewModel.ShowsVolumeChip), raised);
+        Assert.False(game.Tall);
+
+        // XLR 1 shows its volume in the readout it already has, in place of
+        // the gain, and nothing over its fader; the gain comes back after the hold.
+        Assert.True(xlr1.ShowsReadout);
+        xlr1.VolumeAdjusting = true;
+        Assert.False(xlr1.ShowsVolumeChip);
+        Assert.Equal("70%", xlr1.Readout);
+        xlr1.VolumeAdjusting = false;
+        Assert.Equal("70%", xlr1.Readout);
+        hold.Handles[^1].Elapse();
+        Assert.Equal(model.GainText, xlr1.Readout);
+
+        // Bound to another source, XLR 1 loses its readout and its volume shows over the fader.
+        ApplyMixer.Invoke(model, [JsonNode.Parse("""
+            {"channels":[{"id":"xlr1","name":"XLR 1","hardware":true,"volume":0.7,"binding":{"kind":"source","source":"alsa_input.webcam"}},{"id":"game","name":"Game","volume":0.4}],
+             "mixes":[{"id":"monitor","name":"Monitor A"}]}
+            """)]);
+        model.RefreshBindings();
+        Assert.False(xlr1.ShowsReadout);
+        xlr1.VolumeAdjusting = true;
+        Assert.True(xlr1.ShowsVolumeChip);
+        Assert.False(xlr1.Tall);
+        xlr1.VolumeAdjusting = false;
+        hold.Handles[^1].Elapse();
+        Assert.False(xlr1.ShowsVolumeChip);
+
+        // A skin that leaves the gain part out draws no volume fader, so nothing over it.
+        matrix.Configure(SkinMatrixOptions.Default with
+        {
+            RowHead = new SkinMatrixPartOptions(["identity", "meter", "gain"], ["gain"], SkinLabelStyle.Text),
+        });
+        game = matrix.Rows.Single(r => r.Channel.Id == "game");
+        Assert.DoesNotContain(SkinStripParts.Gain, game.Spec.Parts);
+        game.VolumeAdjusting = true;
+        Assert.True(game.Channel.ShowsVolumeReadout);
+        Assert.False(game.ShowsVolumeChip);
+        game.VolumeAdjusting = false;
+    }
+
+    [Fact]
     public void CellsHoldTheChannelsOwnSendsAndColumnsTheMixersOwnMixes()
     {
         var model = new MainViewModel(new DaemonClient());

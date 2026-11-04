@@ -493,6 +493,7 @@ public sealed class MatrixRowViewModel : ViewModelBase
         Raise(nameof(Stacked));
         Raise(nameof(ShowsReadout));
         Raise(nameof(Tall));
+        Raise(nameof(ShowsVolumeChip));
         RaiseReadout();
     }
 
@@ -630,6 +631,16 @@ public sealed class MatrixRowViewModel : ViewModelBase
     public string Readout => ReadsChannelReadout ? Channel.Readout
         : Channel.ShowsVolumeReadout ? Channel.VolumeText : Unit?.GainText ?? ExtraUnit?.GainText ?? "";
 
+    /// <summary>
+    /// The channel's volume shows over its fader now, as a send's level does
+    /// over the cell's: the head draws the volume, has no readout of its own
+    /// to show it in, and the fader is moving or stopped less than
+    /// <see cref="ChannelViewModel.VolumeReadoutHold"/> ago. The value is
+    /// drawn over the head, so the row keeps its height and widths.
+    /// </summary>
+    public bool ShowsVolumeChip => Channel.ShowsVolumeReadout && ShowsVolume && !ShowsReadout
+        && Spec.Parts.Contains(SkinStripParts.Gain, StringComparer.Ordinal);
+
     /// <summary>What the readout shows, for a screen reader and its tooltip.</summary>
     public string ReadoutName => ReadsChannelReadout ? Channel.ReadoutName
         : Channel.ShowsVolumeReadout ? Localizer.Format("ChannelVolumeName", Channel.Name)
@@ -733,6 +744,7 @@ public sealed class MatrixRowViewModel : ViewModelBase
                 break;
             case nameof(ChannelViewModel.Readout) or nameof(ChannelViewModel.ReadoutName): RaiseReadout(); break;
             case nameof(ChannelViewModel.VolumeAdjusting): Raise(nameof(VolumeAdjusting)); break;
+            case nameof(ChannelViewModel.ShowsVolumeReadout): Raise(nameof(ShowsVolumeChip)); break;
             case nameof(ChannelViewModel.VolumeText) when Channel.ShowsVolumeReadout: Raise(nameof(Readout)); break;
             case nameof(ChannelViewModel.HasVolume) or nameof(ChannelViewModel.ShowsCaptureGain): RefreshSpec(); break;
             case nameof(ChannelViewModel.Inserts): Raise(nameof(Inserts)); Raise(nameof(InsertsKey)); RefreshSpec(); break;

@@ -1576,7 +1576,11 @@ in its row. On XLR 1, XLR 2, Aux In and Line In it is a second fader under the g
 or the level, the meter under the gain, and that row is as tall as the two
 faders need, never less than `Ox.Matrix.RowHeight`; its cells follow it.
 An application or capture channel, or a strip bound to another source,
-has the volume alone, with its meter under it. XLR 2 has a row only on an
+has the volume alone, with its meter under it. While a volume fader moves,
+and for a second after, the row's readout shows the volume. A row with no
+readout shows it at the top centre of its controls instead, in the chip
+that `"over-fader"` gives a cell, on `Ox.Control.Background`. The chip is
+drawn over the head, so the row keeps its size. XLR 2 has a row only on an
 interface with two XLR inputs.
 
 Each column has a head: the mix's icon and name, an outputs line, a thin
