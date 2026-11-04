@@ -126,6 +126,11 @@ internal sealed class PipeWireGraph : IDisposable
                 sizeAfter -= old.Size;
                 if (old.Value.ValueKind != JsonValueKind.Undefined) countAfter--;
                 bool removed = PipeWireSnapshot.IsRemoval(item);
+                // Pulse falls back to another device when the default one
+                // leaves, without a metadata write; read the defaults again
+                // whenever a device arrives, leaves or is renamed.
+                if (DeviceName(old.Value) != DeviceName(removed ? default : item))
+                    _defaultRevision++;
                 if (!portsChanged) portsChanged = PortInputsChanged(old.Value, removed ? default : item);
                 if (removed) updates[id] = default;
                 else
@@ -192,6 +197,14 @@ internal sealed class PipeWireGraph : IDisposable
             && item.TryGetProperty("info", out var info) && info.ValueKind == JsonValueKind.Object
             && info.TryGetProperty("props", out var props) && props.ValueKind == JsonValueKind.Object
             && props.TryGetProperty("node.name", out var name) && name.ValueKind == JsonValueKind.String ? name : null;
+
+    // The name of an audio device node (a sink, a source or a duplex unit,
+    // not a stream), or null for anything else.
+    private static string? DeviceName(JsonElement item)
+        => PortNodeName(item) is { } name
+            && item.GetProperty("info").GetProperty("props").TryGetProperty("media.class", out var kind)
+            && kind.ValueKind == JsonValueKind.String && kind.GetString() is { } value
+            && value.StartsWith("Audio/", StringComparison.Ordinal) ? name.GetString() : null;
 
     private static bool IsDefaultMetadata(JsonElement item)
         => IsType(item, "PipeWire:Interface:Metadata")

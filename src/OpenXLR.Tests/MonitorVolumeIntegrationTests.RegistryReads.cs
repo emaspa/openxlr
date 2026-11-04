@@ -80,6 +80,53 @@ public sealed partial class MonitorVolumeIntegrationTests
     }
 
     [MonitorPipeWireFact]
+    public void ABrowserHeldStreamsSinkIsReadFromTheRegistryAndFollowsAMove()
+    {
+        var pw = new PipeWireAdapter();
+        string dir = Directory.CreateTempSubdirectory("openxlr-stream-sink-").FullName;
+        string? path = Environment.GetEnvironmentVariable("PATH");
+        string calls = Path.Combine(dir, "reads");
+        using var stop = new CancellationTokenSource();
+        Task<ProcessResult>? play = null;
+        try
+        {
+            pw.CreateNullSink("test_stream_first", "First");
+            pw.CreateNullSink("test_stream_second", "Second");
+            using var watch = pw.WatchGraph();
+            play = ProcessRunner.RunAsync("python3", ["-c", """
+                import subprocess
+                args = ['--format=f32', '--rate=48000', '--channels=2']
+                if '--raw' in subprocess.check_output(['pw-cat', '--help'], text=True): args.append('--raw')
+                with open('/dev/zero', 'rb') as source:
+                    subprocess.run(['pw-cat', '--playback', *args, '--target', 'test_stream_first',
+                        '--properties={ application.name = stream-sink-test application.process.binary = stream-sink-test }', '-'], stdin=source, check=True)
+                """], TimeSpan.FromSeconds(30), cancel: stop.Token);
+            AudioStream? stream = null;
+            Assert.True(SpinWait.SpinUntil(() =>
+                (stream = pw.ListStreams().FirstOrDefault(s => s.Binary == "stream-sink-test")) is not null
+                && pw.StreamSinkName(stream.Serial) == "test_stream_first", TimeSpan.FromSeconds(5)));
+            ExecutableScript.Write(Path.Combine(dir, "pactl"), $$"""
+                #!/bin/sh
+                case "$1" in list) printf '%s\n' "$*" >> '{{calls}}';; esac
+                exec /usr/bin/pactl "$@"
+                """);
+            Environment.SetEnvironmentVariable("PATH", dir + ":" + path);
+            for (int i = 0; i < 50; i++) Assert.Equal("test_stream_first", pw.StreamSinkName(stream!.Serial));
+            Assert.False(File.Exists(calls), File.Exists(calls) ? File.ReadAllText(calls) : "");
+            pw.MoveStreamToSink(stream!.Serial, "test_stream_second");
+            Assert.True(SpinWait.SpinUntil(() => pw.StreamSinkName(stream.Serial) == "test_stream_second", TimeSpan.FromSeconds(3)));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PATH", path);
+            stop.Cancel();
+            play?.GetAwaiter().GetResult();
+            pw.TearDown();
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [MonitorPipeWireFact]
     public void ASinkCreatedAMomentAgoIsFoundWithItsPortsAtOnce()
     {
         // The registry echoes a new sink a few milliseconds after pactl
