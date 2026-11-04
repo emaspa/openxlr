@@ -4254,4 +4254,22 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
   <data name="FlowUnitMixes" xml:space="preserve">
     <value>Costruisce {0}</value>
   </data>
+  <data name="TextSize" xml:space="preserve">
+    <value>Dimensione del testo</value>
+  </data>
+  <data name="TextSizeMuchSmaller" xml:space="preserve">
+    <value>Molto più piccolo (80%)</value>
+  </data>
+  <data name="TextSizeSmaller" xml:space="preserve">
+    <value>Più piccolo (90%)</value>
+  </data>
+  <data name="TextSizeNormal" xml:space="preserve">
+    <value>Normale (100%)</value>
+  </data>
+  <data name="TextSizeLarger" xml:space="preserve">
+    <value>Più grande (110%)</value>
+  </data>
+  <data name="TextSizeMuchLarger" xml:space="preserve">
+    <value>Molto più grande (120%)</value>
+  </data>
 </root>
