@@ -305,6 +305,7 @@ public sealed class GraphFallbackTests(ITestOutputHelper output)
             ExecutableScript.Write(Path.Combine(directory, "pactl"), """
                 test "$1" = get-sink-volume || exit 1
                 printf '%s\n' "$*" >> "${0%/*}/calls"
+                test "$2" = desktop || exit 1
                 echo 'Volume: front-left: 49152 / 75% / -7.50 dB'
                 """);
             Environment.SetEnvironmentVariable("PATH", directory);
@@ -313,7 +314,8 @@ public sealed class GraphFallbackTests(ITestOutputHelper output)
             Assert.True(adapter.SinkExists("desktop"));
             Assert.Equal(.75, adapter.GetSinkVolume("desktop"));
             Assert.Null(adapter.GetSinkVolume("missing"));
-            Assert.Equal(["get-sink-volume desktop"], File.ReadAllLines(Path.Combine(directory, "calls")));
+            // A sink the registry does not list is confirmed through Pulse.
+            Assert.Equal(["get-sink-volume desktop", "get-sink-volume missing"], File.ReadAllLines(Path.Combine(directory, "calls")));
         }
         finally
         {

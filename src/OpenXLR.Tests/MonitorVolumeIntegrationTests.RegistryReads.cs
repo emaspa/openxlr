@@ -31,15 +31,20 @@ public sealed partial class MonitorVolumeIntegrationTests
             for (int i = 0; i < 100; i++)
             {
                 Assert.True(pw.SinkExists("test_registry_reads"));
-                Assert.False(pw.SinkExists("test_registry_missing"));
                 Assert.Equal(1, pw.GetSinkVolume("test_registry_reads"));
-                Assert.Null(pw.GetSinkVolume("test_registry_missing"));
                 Assert.Equal("test_registry_reads", pw.GetDefaultSink());
                 Assert.Equal("test_registry_reads.monitor", pw.GetDefaultSource());
                 Assert.True(pw.HasCaptureChannel("test_registry_reads", 1));
                 Assert.False(pw.HasCaptureChannel("test_registry_reads", 2));
             }
             Assert.False(File.Exists(calls), File.Exists(calls) ? File.ReadAllText(calls) : "");
+            // An absence can be the registry's echo still on its way, so the
+            // helpers confirm it.
+            Assert.False(pw.SinkExists("test_registry_missing"));
+            Assert.Null(pw.GetSinkVolume("test_registry_missing"));
+            Assert.Empty(pw.ListPorts("test_registry_missing", "playback", output: false));
+            Assert.Equal(["list sinks short", "get-sink-volume test_registry_missing", "-i"], File.ReadAllLines(calls));
+            File.Delete(calls);
             // Match pactl's first-channel read without changing stereo balance.
             foreach (var (left, right, expected) in new[] { ("25%", "75%", .25), ("75%", "25%", .75) })
             {
@@ -72,5 +77,26 @@ public sealed partial class MonitorVolumeIntegrationTests
             pw.TearDown();
             Directory.Delete(dir, true);
         }
+    }
+
+    [MonitorPipeWireFact]
+    public void ASinkCreatedAMomentAgoIsFoundWithItsPortsAtOnce()
+    {
+        // The registry echoes a new sink a few milliseconds after pactl
+        // returns. A link made right after creating a sink must still see it.
+        var pw = new PipeWireAdapter();
+        using var watch = pw.WatchGraph();
+        try
+        {
+            for (int i = 0; i < 20; i++)
+            {
+                string name = $"test_registry_fresh_{i}";
+                pw.CreateNullSink(name, "Fresh");
+                Assert.Equal(2, pw.ListPorts(name, "playback", output: false).Count);
+                Assert.True(pw.SinkExists(name));
+                Assert.Equal(1, pw.GetSinkVolume(name));
+            }
+        }
+        finally { pw.TearDown(); }
     }
 }

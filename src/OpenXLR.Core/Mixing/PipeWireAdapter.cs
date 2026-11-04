@@ -730,9 +730,12 @@ public sealed class PipeWireAdapter
     /// <summary>Whether a sink of this name is published right now (null when pactl is unavailable).</summary>
     public bool? SinkExists(string sinkName)
     {
-        if (LiveObjects() is { } objects)
-            return FindSink(objects, BareSink(sinkName)) is not null;
-        string? sinks = TryRun("pactl", "list", "sinks", "short");
+        // The registry echoes a new sink a few milliseconds after pactl
+        // returns, so it answers for sinks it lists and pactl confirms an
+        // absence. Idle sweeps only ask about sinks that exist.
+        if (LiveObjects() is { } objects && FindSink(objects, BareSink(sinkName)) is not null)
+            return true;
+        string? sinks = TryConfirm("pactl", "list", "sinks", "short");
         if (sinks is null) return null;
         return sinks.Split('\n').Any(line => line.Split('\t') is { Length: >= 2 } columns && columns[1] == sinkName);
     }
@@ -776,14 +779,12 @@ public sealed class PipeWireAdapter
         lock (DumpGate)
             observed = _directSinkVolumeUntil.TryGetValue(bare, out long until) && Environment.TickCount64 < until
                 ? null : LiveObjects();
-        if (observed is { } objects)
-        {
-            if (FindSink(objects, bare) is not { } info) return null;
-            if (SinkLevel(info, firstChannel: true) is { } level) return Math.Clamp(level.DesktopVolume, 0, MaxSinkVolume);
-            // Some sinks expose no readable Props volume. Pulse can still
-            // provide one; keep their controls working through the old query.
-        }
-        return ParseVolumePercent(TryRun("pactl", "get-sink-volume", bare));
+        // A sink the registry has not echoed yet, or one without a readable
+        // Props volume, is read through Pulse.
+        if (observed is { } objects && FindSink(objects, bare) is { } info
+            && SinkLevel(info, firstChannel: true) is { } level)
+            return Math.Clamp(level.DesktopVolume, 0, MaxSinkVolume);
+        return ParseVolumePercent(TryConfirm("pactl", "get-sink-volume", bare));
     }
 
     /// <summary>
@@ -882,6 +883,14 @@ public sealed class PipeWireAdapter
     {
         try { return Run(exe, args); }
         catch (InvalidOperationException) { return null; }
+    }
+
+    // A read that double-checks the registry: a helper that is missing or
+    // fails leaves the question unanswered rather than ending the sweep.
+    private string? TryConfirm(string exe, params string[] args)
+    {
+        try { return Run(exe, args); }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { return null; }
     }
 
     internal static double? ParseVolumePercent(string? pactlOutput)
@@ -2003,9 +2012,25 @@ public sealed class PipeWireAdapter
     /// <summary>Ports of a node whose name starts with a prefix, in pw-link order.</summary>
     internal List<string> ListPorts(string node, string prefix, bool output)
     {
+        if (ReadObservedPorts(output) is { } observed)
+        {
+            List<string> found = MatchPorts(observed, node, prefix);
+            if (found.Count > 0) return found;
+            // The registry echoes ports a few milliseconds after the node that
+            // owns them was created, so a link made right after creating a
+            // sink would find none. pw-link confirms an empty answer.
+            return TryConfirm("pw-link", output ? "-o" : "-i") is { } direct
+                ? MatchPorts(SplitPortListing(direct), node, prefix) : found;
+        }
+        return MatchPorts(SplitPortListing(Run("pw-link", output ? "-o" : "-i")), node, prefix);
+    }
+
+    private static string[] SplitPortListing(string listing)
+        => listing.Split('\n').Select(line => line.Trim()).ToArray();
+
+    private static List<string> MatchPorts(IReadOnlyList<string> listing, string node, string prefix)
+    {
         var ports = new List<string>();
-        IReadOnlyList<string> listing = ReadObservedPorts(output)
-            ?? Run("pw-link", output ? "-o" : "-i").Split('\n').Select(line => line.Trim()).ToArray();
         string requested = $"{node}:{prefix}";
         foreach (string name in listing)
             if (name.StartsWith(requested, StringComparison.Ordinal)) ports.Add(name);
