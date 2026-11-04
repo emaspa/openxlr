@@ -12,6 +12,8 @@ internal interface IAlsaControlEvents : IDisposable
 /// <summary>A nonblocking ALSA control subscription, drained by the device poll.</summary>
 internal sealed class AlsaControlEvents : IAlsaControlEvents
 {
+    private const int NonBlocking = 0x0001, ReadOnly = 0x0004;
+    private const int Again = -11, Interrupted = -4;
     private IntPtr _control, _event;
     public bool Available => _control != IntPtr.Zero;
 
@@ -21,7 +23,7 @@ internal sealed class AlsaControlEvents : IAlsaControlEvents
         var watch = new AlsaControlEvents();
         try
         {
-            if (snd_ctl_open(out watch._control, "hw:" + card.ToString(CultureInfo.InvariantCulture), 1) >= 0
+            if (snd_ctl_open(out watch._control, "hw:" + card.ToString(CultureInfo.InvariantCulture), NonBlocking | ReadOnly) >= 0
                 && snd_ctl_subscribe_events(watch._control, 1) >= 0 && snd_ctl_event_malloc(out watch._event) >= 0)
                 return watch;
         }
@@ -38,8 +40,8 @@ internal sealed class AlsaControlEvents : IAlsaControlEvents
         {
             int result = snd_ctl_read(_control, _event);
             if (result > 0) { changed = true; continue; }
-            if (result == -4) continue; // EINTR: retry within the same bounded drain
-            if (result != -11) Dispose(); // EAGAIN means no event; EOF or error ends the watch
+            if (result == Interrupted) continue; // EINTR: retry within the same bounded drain
+            if (result != Again) Dispose(); // EAGAIN means no event; EOF or error ends the watch
             break;
         }
         return changed;
