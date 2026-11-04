@@ -6,6 +6,37 @@ namespace OpenXLR.Tests;
 public sealed class GraphFallbackTests
 {
     [Fact]
+    public void AVisibleSinkWithoutReadableVolumeKeepsTheDirectQueryFallback()
+    {
+        string directory = Directory.CreateTempSubdirectory("openxlr-unreadable-volume-").FullName;
+        string? path = Environment.GetEnvironmentVariable("PATH");
+        try
+        {
+            ExecutableScript.Write(Path.Combine(directory, "pw-dump"), """
+                printf '%s\n' '[{"id":0,"type":"PipeWire:Interface:Core"},{"id":1,"type":"PipeWire:Interface:Node","info":{"props":{"node.name":"desktop","media.class":"Audio/Sink"}}}]'
+                while :; do /bin/sleep 1; done
+                """);
+            ExecutableScript.Write(Path.Combine(directory, "pactl"), """
+                test "$1" = get-sink-volume || exit 1
+                printf '%s\n' "$*" >> "${0%/*}/calls"
+                echo 'Volume: front-left: 49152 / 75% / -7.50 dB'
+                """);
+            Environment.SetEnvironmentVariable("PATH", directory);
+            var adapter = new PipeWireAdapter();
+            using var watch = adapter.WatchGraph();
+            Assert.True(adapter.SinkExists("desktop"));
+            Assert.Equal(.75, adapter.GetSinkVolume("desktop"));
+            Assert.Null(adapter.GetSinkVolume("missing"));
+            Assert.Equal(["get-sink-volume desktop"], File.ReadAllLines(Path.Combine(directory, "calls")));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PATH", path);
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
     public void WhileTheSubscriptionIsNotReadyTheAdapterReadsAOneShotDump()
     {
         string directory = Directory.CreateTempSubdirectory("openxlr-fallback-").FullName;

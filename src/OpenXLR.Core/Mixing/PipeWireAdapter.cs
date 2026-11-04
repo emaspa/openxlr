@@ -580,12 +580,14 @@ public sealed class PipeWireAdapter
 
     private void WaitForSinkLevel(string sinkName, Func<OwnSinkLevel, bool> matches)
     {
-        if (_graph is null || !_graph.IsReady) return;
+        PipeWireGraph? graph = _graph;
+        if (graph is null || !graph.IsReady) return;
+        if (LiveObjects() is { } observed && FindSink(observed, BareSink(sinkName)) is { } current && SinkLevel(current) is null) return;
         // pactl and the registry are separate connections. Give the registry a
         // moment to echo the write so the next sweep does not read the old
         // level as a new desktop change. pactl already applied the write, so
         // a late echo is only that: the sweep after it reads the same value.
-        _graph.WaitFor(objects => FindSink(objects, BareSink(sinkName)) is { } info && SinkLevel(info) is { } level
+        graph.WaitFor(objects => FindSink(objects, BareSink(sinkName)) is { } info && SinkLevel(info) is { } level
                 && matches(new OwnSinkLevel(BareSink(sinkName), level.Volume, level.Muted) { DesktopVolume = level.DesktopVolume }),
             TimeSpan.FromSeconds(1));
     }
@@ -749,8 +751,12 @@ public sealed class PipeWireAdapter
     public double? GetSinkVolume(string sinkName)
     {
         if (LiveObjects() is { } objects)
-            return FindSink(objects, BareSink(sinkName)) is { } info && SinkLevel(info, firstChannel: true) is { } level
-                ? Math.Clamp(level.DesktopVolume, 0, MaxSinkVolume) : null;
+        {
+            if (FindSink(objects, BareSink(sinkName)) is not { } info) return null;
+            if (SinkLevel(info, firstChannel: true) is { } level) return Math.Clamp(level.DesktopVolume, 0, MaxSinkVolume);
+            // Some sinks expose no readable Props volume. Pulse can still
+            // provide one; keep their controls working through the old query.
+        }
         return ParseVolumePercent(TryRun("pactl", "get-sink-volume", BareSink(sinkName)));
     }
 
