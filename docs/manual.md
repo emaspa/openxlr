@@ -907,6 +907,9 @@ alias, the existing normalized assignment takes precedence.
 The entry shows the application's name, not the name of one of its helper
 streams: Discord's `discord_hardware_mute` client, which it opens to watch
 a headset's mute switch, still reads as Discord.
+PipeWire reports a program that plays or records through ALSA as
+"PipeWire ALSA [kded6]". The app list shows it as kded6, and it keeps the
+channel you gave it before.
 Identity matching ignores letter case, including live channel changes and
 the running and playing indicators. If PipeWire reuses a node id for a new
 stream, or a stream later reports its actual app identity, the next sweep

@@ -2642,7 +2642,9 @@ public sealed class PipeWireAdapter
             string? binary = props.TryGetProperty("application.process.binary", out JsonElement b) ? b.GetString() : null;
             if (binary is not null && binary.EndsWith(" (deleted)", StringComparison.Ordinal))
                 binary = binary[..^10];
-            string? appName = props.TryGetProperty("application.name", out JsonElement an) ? an.GetString() : null;
+            // A program behind an ALSA plugin goes by its own name.
+            string? appName = AudioStream.ProgramName(
+                props.TryGetProperty("application.name", out JsonElement an) ? an.GetString() : null);
             // Chromium registers its capture-side client as "<name> input";
             // it is the same application, so drop the suffix.
             if (appName is not null && appName.EndsWith(" input", StringComparison.Ordinal))
@@ -2732,7 +2734,7 @@ public sealed class PipeWireAdapter
                 binary = binary[..^10];
             found.Add(new AudioStream(
                 o.GetProperty("id").GetInt32(),
-                AppProperty("application.name"),
+                AudioStream.ProgramName(AppProperty("application.name")),
                 binary,
                 Str(props, "media.name"))
             {

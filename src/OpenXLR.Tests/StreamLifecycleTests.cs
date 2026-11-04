@@ -326,4 +326,37 @@ public sealed class StreamLifecycleTests
         Assert.Equal(["Discord", "Firefox"], apps.Select(a => a.Label));
         Assert.All(apps, app => Assert.False(app.Running));
     }
+
+    [Fact]
+    public void AnAlsaClientKeepsItsSavedChannelUnderItsProgramsName()
+    {
+        // Saved before ALSA clients were named after their program: the
+        // entry's label is pipewire-alsa's wrapper name.
+        using var graph = new Graph();
+        graph.Mixer.ApplySettings(new MixerSettings
+        {
+            AppOverrides = new() { ["kded6"] = "music" },
+            KnownApps = [new("kded6", "PipeWire ALSA [kded6]", "music")],
+        });
+        Assert.Equal("kded6", Assert.Single(graph.Mixer.Snapshot().Streams).Label);
+
+        File.WriteAllText(Path.Combine(graph.Folder, "graph.json"), """
+            [
+              {"id":20,"type":"PipeWire:Interface:Client","info":{"props":{
+                "application.name":"PipeWire ALSA [kded6]","application.process.binary":"kded6"}}},
+              {"id":10,"type":"PipeWire:Interface:Node","info":{"props":{
+                "application.name":"PipeWire ALSA [kded6]","client.id":20,"object.serial":100,
+                "media.class":"Stream/Output/Audio","media.name":"ALSA Playback"}}}
+            ]
+            """);
+        File.WriteAllText(Path.Combine(graph.Folder, "inputs"), "100\t3\n");
+        graph.Retire();
+        File.WriteAllText(Path.Combine(graph.Folder, "writes"), "");
+        Assert.True(graph.Mixer.SyncStreams());
+
+        Assert.Contains("move-sink-input 100 OpenXLR_ch_music", graph.Writes);
+        StreamAssignment app = Assert.Single(graph.Mixer.Snapshot().Streams);
+        Assert.Equal(("kded6", "kded6", "music", true), (app.Identity, app.Label, app.ChannelId, app.Active));
+        Assert.False(graph.Mixer.SyncStreams());
+    }
 }
