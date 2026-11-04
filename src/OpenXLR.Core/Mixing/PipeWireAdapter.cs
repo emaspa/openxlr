@@ -87,6 +87,8 @@ public sealed class PipeWireAdapter
                 if (ReferenceEquals(owner._graph, graph)) owner._graph = null;
                 owner._dumpObjects = null;
                 owner._defaults = null;
+                owner._portSnapshot = null;
+                owner._inputPorts = owner._outputPorts = null;
             }
             graph.Dispose();
         }
@@ -1978,23 +1980,18 @@ public sealed class PipeWireAdapter
     internal List<string> ListPorts(string node, string prefix, bool output)
     {
         var ports = new List<string>();
-        string listing = LiveObjects() is { } objects
-            ? string.Join('\n', ObservedPorts(objects, output))
-            : Run("pw-link", output ? "-o" : "-i");
-        foreach (string line in listing.Split('\n'))
-        {
-            string name = line.Trim();
-            if (name.StartsWith($"{node}:{prefix}", StringComparison.Ordinal))
-                ports.Add(name);
-        }
+        IReadOnlyList<string> listing = ReadObservedPorts(output)
+            ?? Run("pw-link", output ? "-o" : "-i").Split('\n').Select(line => line.Trim()).ToArray();
+        string requested = $"{node}:{prefix}";
+        foreach (string name in listing)
+            if (name.StartsWith(requested, StringComparison.Ordinal)) ports.Add(name);
         // Filter-chain streams use input/output ports, while native hosts
         // keep playback/capture. Prefer the requested ports when present.
         if (ports.Count == 0 && node.StartsWith("OpenXLR_", StringComparison.Ordinal)
             && prefix is "playback" or "capture")
         {
-            string streamPrefix = prefix == "playback" ? "input" : "output";
-            ports.AddRange(listing.Split('\n').Select(line => line.Trim())
-                .Where(name => name.StartsWith($"{node}:{streamPrefix}", StringComparison.Ordinal)));
+            string streamPrefix = $"{node}:" + (prefix == "playback" ? "input" : "output");
+            ports.AddRange(listing.Where(name => name.StartsWith(streamPrefix, StringComparison.Ordinal)));
         }
         return ports;
     }
@@ -2815,6 +2812,25 @@ public sealed class PipeWireAdapter
                 return _defaults;
             }
             catch (Exception ex) when (ex is InvalidOperationException or JsonException) { return null; }
+        }
+    }
+
+    private JsonElement[]? _portSnapshot;
+    private IReadOnlyList<string>? _inputPorts, _outputPorts;
+
+    private IReadOnlyList<string>? ReadObservedPorts(bool output)
+    {
+        lock (DumpGate)
+        {
+            if (LiveObjects() is not { } snapshot) return null;
+            // Graph snapshots are immutable and reused until the next batch.
+            // Resolve owners and channel order once per direction and batch.
+            if (!ReferenceEquals(snapshot, _portSnapshot))
+            {
+                _portSnapshot = snapshot;
+                _inputPorts = _outputPorts = null;
+            }
+            return output ? _outputPorts ??= ObservedPorts(snapshot, true) : _inputPorts ??= ObservedPorts(snapshot, false);
         }
     }
 

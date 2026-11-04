@@ -58,6 +58,11 @@ public sealed partial class MonitorVolumeIntegrationTests
             Assert.InRange(refreshes.Length, 1, 4);
             Assert.All(refreshes, line => Assert.Equal("--format=json info", line));
 
+            pw.CreateNullSink("test_registry_added", "Added");
+            Assert.True(SpinWait.SpinUntil(() => pw.HasCaptureChannel("test_registry_added", 1), TimeSpan.FromSeconds(3)));
+            pw.TearDown();
+            Assert.True(SpinWait.SpinUntil(() => !pw.HasCaptureChannel("test_registry_added", 0), TimeSpan.FromSeconds(3)));
+
         }
         finally
         {

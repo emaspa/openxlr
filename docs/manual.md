@@ -909,7 +909,8 @@ The daemon watches PipeWire for graph changes and, while that subscription
 is reconnecting, reads the graph with a one-shot `pw-dump` so routing, default
 enforcement and route repair continue. Sink presence, sink volume and
 port discovery use the live registry rather than starting a helper each
-sweep. Default devices are read together when their metadata changes,
+sweep. Ordered port lists are reused until the next registry update and
+rebuilt after reconnection. Default devices are read together when their metadata changes,
 and checked again every 30 seconds; while the registry or a volume reading
 is unavailable, the direct queries remain available. The journal reports outages and recovery.
 
