@@ -17,6 +17,7 @@ public sealed partial class MonitorVolumeIntegrationTests
         pw.CreateNullSink("test_capture_parent", "Input fixture");
         uint input = pw.CreateVirtualMic(source, "test_capture_parent.monitor", "Hardware input fixture");
         WaitForRecovery(() => pw.ListDevices().Any(d => d.Name == source));
+        WaitForRecovery(() => pw.ListPorts(source, "capture", true).Count == 2);
         mixer.SetInputDeviceHint(source);
         RejectNextRouteLink(source + ":", channel + ":playback_FR", () =>
             mixer.Build(new MixerConfig { Channels = [new("xlr1", "XLR 1") { InputPair = 0 }],
@@ -48,7 +49,7 @@ public sealed partial class MonitorVolumeIntegrationTests
         {
             module = LoadAuxOutput();
             WaitForRecovery(() => pw.FindNodeId(output) is not null);
-            WaitForInputPorts(output, 12);
+            WaitForInputPorts(pw, output, 12);
             mixer.SetInputDeviceHint(output, hardwareOutputRouting: true);
             mixer.Build(new MixerConfig { Channels = [], Mixes = [new("aux", "Aux", MixKind.AuxPort)] });
             WaitForRecovery(() => IncomingRouteLinks(output).Length == 2);
@@ -152,9 +153,8 @@ public sealed partial class MonitorVolumeIntegrationTests
     /// first and the session manager adds its ports afterwards, so a route
     /// made in between finds nothing to link.
     /// </summary>
-    private static void WaitForInputPorts(string node, int count)
-        => WaitForRecovery(() => ProcessRunner.Run("pw-link", ["-i"]).StdoutText.Split('\n')
-            .Count(line => line.Trim().StartsWith(node + ":", StringComparison.Ordinal)) == count);
+    private static void WaitForInputPorts(PipeWireAdapter pw, string node, int count)
+        => WaitForRecovery(() => pw.ListPorts(node, "", false).Count == count);
 
     private static void WaitForRecovery(Func<bool> condition)
         => Assert.True(SpinWait.SpinUntil(condition, TimeSpan.FromSeconds(5)));

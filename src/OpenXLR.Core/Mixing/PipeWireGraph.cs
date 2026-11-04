@@ -23,6 +23,8 @@ internal sealed class PipeWireGraph : IDisposable
     private JsonElement[]? _snapshot;
     private bool _ready;
     private long _size;
+    private long _defaultRevision, _portRevision;
+    internal long DefaultRevision { get { lock (_gate) return _defaultRevision; } }
 
     internal PipeWireGraph(Action<string>? note = null, string executable = "pw-dump")
     {
@@ -40,6 +42,16 @@ internal sealed class PipeWireGraph : IDisposable
         {
             if (!_ready) throw new IOException("PipeWire registry subscription is reconnecting");
             return _snapshot ??= _objects.Values.Select(o => o.Value).ToArray();
+        }
+    }
+
+    // Keep the version and the snapshot in step even during reconnect.
+    internal (long Revision, JsonElement[]? Snapshot)? ReadPortSnapshot(long revision)
+    {
+        lock (_gate)
+        {
+            if (!_ready) return null;
+            return (_portRevision, revision == _portRevision ? null : Read());
         }
     }
 
@@ -82,6 +94,8 @@ internal sealed class PipeWireGraph : IDisposable
                     // dies is still failing. Do not reset its retry backoff.
                     if (_ready && Environment.TickCount64 - started >= 5000) delay = 250;
                     _ready = false;
+                    _defaultRevision++;
+                    _portRevision++;
                     _objects.Clear();
                     _snapshot = null;
                     _size = 0;
@@ -101,14 +115,19 @@ internal sealed class PipeWireGraph : IDisposable
             var updates = new Dictionary<uint, (JsonElement Value, int Size)>();
             long sizeAfter = _size;
             int countAfter = _objects.Count;
+            bool portsChanged = false;
             foreach (JsonElement item in batch.EnumerateArray())
             {
                 uint id = PipeWireSnapshot.RegistryId(item);
+                if (IsDefaultMetadata(item) || (_objects.TryGetValue(id, out var previous) && IsDefaultMetadata(previous.Value)))
+                    _defaultRevision++;
                 (JsonElement Value, int Size) old = updates.TryGetValue(id, out var pending)
                     ? pending : _objects.GetValueOrDefault(id);
                 sizeAfter -= old.Size;
                 if (old.Value.ValueKind != JsonValueKind.Undefined) countAfter--;
-                if (PipeWireSnapshot.IsRemoval(item)) updates[id] = default;
+                bool removed = PipeWireSnapshot.IsRemoval(item);
+                if (!portsChanged) portsChanged = PortInputsChanged(old.Value, removed ? default : item);
+                if (removed) updates[id] = default;
                 else
                 {
                     // The text budget also bounds UTF-16 expansion when decoding
@@ -128,6 +147,7 @@ internal sealed class PipeWireGraph : IDisposable
                 else _objects[id] = update;
             _size = sizeAfter;
             _snapshot = null;
+            if (portsChanged) _portRevision++;
             // Removals can arrive before pw-dump's initial core-sync batch.
             // Only that full batch contains the Core object on a new connection.
             if (!_ready)
@@ -138,6 +158,46 @@ internal sealed class PipeWireGraph : IDisposable
             return _ready;
         }
     }
+
+    private static bool PortInputsChanged(JsonElement previous, JsonElement current)
+    {
+        // Ports report latency and format changes many times a second; only
+        // what a port list is built from (direction, owner, name, order)
+        // makes it stale.
+        if (IsType(previous, "PipeWire:Interface:Port") || IsType(current, "PipeWire:Interface:Port"))
+            return PortIdentity(previous) != PortIdentity(current);
+        JsonElement? before = PortNodeName(previous), after = PortNodeName(current);
+        return before is { } oldName
+            ? after is not { } newName || !JsonElement.DeepEquals(oldName, newName)
+            : after is not null;
+    }
+
+    private static (string? Direction, string? Node, string? Name, string? Order)? PortIdentity(JsonElement item)
+    {
+        if (!IsType(item, "PipeWire:Interface:Port")
+            || !item.TryGetProperty("info", out var info) || info.ValueKind != JsonValueKind.Object) return null;
+        string? Text(JsonElement parent, string key)
+            => parent.ValueKind == JsonValueKind.Object && parent.TryGetProperty(key, out var value)
+                && value.ValueKind is not JsonValueKind.Null and not JsonValueKind.Undefined ? value.ToString() : null;
+        JsonElement props = info.TryGetProperty("props", out var p) ? p : default;
+        return (Text(info, "direction"), Text(props, "node.id"), Text(props, "port.name"), Text(props, "port.id"));
+    }
+
+    private static bool IsType(JsonElement item, string expected)
+        => item.ValueKind == JsonValueKind.Object && item.TryGetProperty("type", out var type)
+            && type.ValueKind == JsonValueKind.String && type.ValueEquals(expected);
+
+    private static JsonElement? PortNodeName(JsonElement item)
+        => IsType(item, "PipeWire:Interface:Node")
+            && item.TryGetProperty("info", out var info) && info.ValueKind == JsonValueKind.Object
+            && info.TryGetProperty("props", out var props) && props.ValueKind == JsonValueKind.Object
+            && props.TryGetProperty("node.name", out var name) && name.ValueKind == JsonValueKind.String ? name : null;
+
+    private static bool IsDefaultMetadata(JsonElement item)
+        => IsType(item, "PipeWire:Interface:Metadata")
+            && item.TryGetProperty("props", out var props) && props.ValueKind == JsonValueKind.Object
+            && props.TryGetProperty("metadata.name", out var name)
+            && name.ValueKind == JsonValueKind.String && name.ValueEquals("default");
 
     /// <summary>Wait for startup or a specific observed write, never for idle events.</summary>
     internal bool WaitFor(Func<JsonElement[], bool> predicate, TimeSpan timeout)

@@ -48,7 +48,7 @@ public sealed partial class MonitorVolumeIntegrationTests
             modules.Add(LoadModule("module-null-sink", $"sink_name={MixSink}", "channels=17",
                 "channel_map=" + string.Join(',', Enumerable.Range(0, 17).Select(i => "aux" + i)), "sink_properties=device.description=Pro-mix-raw"));
             WaitForRecovery(() => pw.ListDevices().Any(d => d.Name == MixSource));
-            WaitForInputPorts(MixSink, 17);
+            WaitForInputPorts(pw, MixSink, 17);
             ProcessRunner.Run("pactl", ["set-sink-volume", MixSink, "50%"]);
 
             devices = new DeviceManager(NullLogger<DeviceManager>.Instance, config, () => [pro]);

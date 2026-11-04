@@ -239,6 +239,7 @@ public sealed partial class MonitorVolumeIntegrationTests
         // default device rather than an OpenXLR API command.
         ProcessResult command = ProcessRunner.Run("pactl", ["set-sink-volume", "@DEFAULT_SINK@", "40%"]);
         Assert.True(command.Ok, command.Stderr);
+        Assert.True(SpinWait.SpinUntil(() => pw.GetSinkVolume("test_headphones") == .4, TimeSpan.FromSeconds(3)));
         Assert.True(mixer.SyncDeviceVolumes());
         Assert.Equal(0.4, mixer.Snapshot().OutputVolume);
         Assert.Equal(0.4, pw.GetSinkVolume("test_speakers"));
@@ -249,6 +250,7 @@ public sealed partial class MonitorVolumeIntegrationTests
         Assert.True(SpinWait.SpinUntil(() => (node = pw.FindNodeId("test_headphones") ?? 0) != 0, TimeSpan.FromSeconds(3)));
         command = ProcessRunner.Run("wpctl", ["set-volume", node.ToString(), "0.3"]);
         Assert.True(command.Ok, command.Stderr);
+        Assert.True(SpinWait.SpinUntil(() => pw.GetSinkVolume("test_headphones") == .3, TimeSpan.FromSeconds(3)));
         Assert.True(mixer.SyncDeviceVolumes());
         Assert.Equal(0.3, mixer.Snapshot().OutputVolume);
         Assert.Equal(0.3, pw.GetSinkVolume("test_speakers"));
@@ -258,6 +260,7 @@ public sealed partial class MonitorVolumeIntegrationTests
         // quieter with the mixer believing both are at 120%.
         command = ProcessRunner.Run("pactl", ["set-sink-volume", "@DEFAULT_SINK@", "120%"]);
         Assert.True(command.Ok, command.Stderr);
+        Assert.True(SpinWait.SpinUntil(() => pw.GetSinkVolume("test_headphones") == 1.2, TimeSpan.FromSeconds(3)));
         Assert.True(mixer.SyncDeviceVolumes());
         Assert.Equal(1.2, mixer.Snapshot().OutputVolume);
         Assert.Equal(1.2, pw.GetSinkVolume("test_speakers"));
@@ -265,6 +268,7 @@ public sealed partial class MonitorVolumeIntegrationTests
 
         command = ProcessRunner.Run("pactl", ["set-sink-volume", "@DEFAULT_SINK@", "150%"]);
         Assert.True(command.Ok, command.Stderr);
+        Assert.True(SpinWait.SpinUntil(() => pw.GetSinkVolume("test_headphones") == 1.5, TimeSpan.FromSeconds(3)));
         Assert.True(mixer.SyncDeviceVolumes());
         Assert.Equal(1.5, mixer.Snapshot().OutputVolume);
         Assert.Equal(1.5, pw.GetSinkVolume("test_speakers"));
@@ -279,6 +283,7 @@ public sealed partial class MonitorVolumeIntegrationTests
         mixer.SetMonitorOutputs(["test_headphones", "test_speakers"]);
         command = ProcessRunner.Run("pactl", ["set-sink-volume", "@DEFAULT_SINK@", "52%"]);
         Assert.True(command.Ok, command.Stderr);
+        Assert.True(SpinWait.SpinUntil(() => pw.GetSinkVolume("test_headphones") == .52, TimeSpan.FromSeconds(3)));
         Assert.True(mixer.SyncDeviceVolumes());
         Assert.Equal(0.52, mixer.Snapshot().OutputVolume);
         Assert.Equal(0.52, pw.GetSinkVolume("test_speakers"));
@@ -321,6 +326,7 @@ public sealed partial class MonitorVolumeIntegrationTests
         Assert.True(SpinWait.SpinUntil(() => pw.GetSinkVolume("retry_second") is null, TimeSpan.FromSeconds(3)));
         ProcessResult command = ProcessRunner.Run("pactl", ["set-sink-volume", "retry_first", "20%"]);
         Assert.True(command.Ok, command.Stderr);
+        Assert.True(SpinWait.SpinUntil(() => pw.GetSinkVolume("retry_first") == .2, TimeSpan.FromSeconds(3)));
         Assert.True(mixer.SyncDeviceVolumes());
         Assert.Equal(0.2, mixer.Snapshot().OutputVolume);
 
@@ -359,6 +365,7 @@ public sealed partial class MonitorVolumeIntegrationTests
         Assert.True(SpinWait.SpinUntil(() => pw.GetSinkVolume("stale_second") is null, TimeSpan.FromSeconds(3)));
         ProcessResult command = ProcessRunner.Run("pactl", ["set-sink-volume", "stale_first", "20%"]);
         Assert.True(command.Ok, command.Stderr);
+        Assert.True(SpinWait.SpinUntil(() => pw.GetSinkVolume("stale_first") == .2, TimeSpan.FromSeconds(3)));
         Assert.True(mixer.SyncDeviceVolumes());
         pw.CreateNullSink("stale_second", "Stale second");
         pw.SetSinkVolume("stale_second", 0.6);

@@ -185,6 +185,56 @@ public sealed class PipeWireGraphTests
         finally { Directory.Delete(dir, true); }
     }
 
+    [Fact]
+    public void PortParamUpdatesKeepThePortListAndRenamesReplaceIt()
+    {
+        // Ports report latency and format changes constantly; rebuilding the
+        // port list for each of them would cost more than the reads it saves.
+        string dir = Path.Combine(Path.GetTempPath(), "openxlr-graph-ports-" + Guid.NewGuid());
+        Directory.CreateDirectory(dir);
+        string script = Path.Combine(dir, "watch"), stage = Path.Combine(dir, "stage");
+        ExecutableScript.Write(script, $$$$"""
+            #!/bin/sh
+            exec python3 - <<'PY'
+            import json, os, time
+            def port(name, latency):
+                return {'id': 2, 'type': 'PipeWire:Interface:Port', 'info': {'direction': 'output',
+                        'props': {'node.id': 1, 'port.id': 0, 'port.name': name},
+                        'params': {'Latency': [{'min-quantum': latency}]}}}
+            print(json.dumps([{'id': 0, 'type': 'PipeWire:Interface:Core'},
+                              {'id': 1, 'type': 'PipeWire:Interface:Node', 'info': {'props': {'node.name': 'mic'}}},
+                              port('capture_FL', 1)]), flush=True)
+            def wait(step):
+                while not os.path.exists('{{{{stage}}}}') or open('{{{{stage}}}}').read() != step: time.sleep(.01)
+            wait('latency'); print(json.dumps([port('capture_FL', 2)]), flush=True)
+            wait('rename'); print(json.dumps([port('capture_MONO', 2)]), flush=True)
+            wait('remove'); print(json.dumps([{'id': 2, 'info': None}]), flush=True)
+            while True: time.sleep(1)
+            PY
+            """);
+        try
+        {
+            using var graph = new PipeWireGraph(executable: script);
+            Assert.True(graph.WaitFor(items => items.Length == 3, TimeSpan.FromSeconds(5)));
+            long first = graph.ReadPortSnapshot(-1)!.Value.Revision;
+            Assert.Null(graph.ReadPortSnapshot(first)!.Value.Snapshot);
+
+            File.WriteAllText(stage, "latency");
+            Assert.True(graph.WaitFor(items => items.Any(item => item.ToString().Contains("\"min-quantum\": 2", StringComparison.Ordinal)), TimeSpan.FromSeconds(5)));
+            Assert.Equal(first, graph.ReadPortSnapshot(first)!.Value.Revision);
+
+            File.WriteAllText(stage, "rename");
+            Assert.True(graph.WaitFor(items => items.Any(item => item.ToString().Contains("capture_MONO", StringComparison.Ordinal)), TimeSpan.FromSeconds(5)));
+            long renamed = graph.ReadPortSnapshot(first)!.Value.Revision;
+            Assert.NotEqual(first, renamed);
+
+            File.WriteAllText(stage, "remove");
+            Assert.True(graph.WaitFor(items => items.Length == 2, TimeSpan.FromSeconds(5)));
+            Assert.NotEqual(renamed, graph.ReadPortSnapshot(renamed)!.Value.Revision);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
     private sealed class ChunkStream(byte[] bytes, int chunk) : MemoryStream(bytes)
     {
         public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)

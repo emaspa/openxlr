@@ -89,6 +89,9 @@ public sealed partial class MonitorVolumeIntegrationTests
 
             try
             {
+                // Exercise direct-helper failures after losing a live registry.
+                // With the subscription up, readiness needs no pw-link read.
+                if (failure != "start") registry.Dispose();
                 Environment.SetEnvironmentVariable("PATH", directory + Path.PathSeparator + originalPath);
                 InvalidOperationException error = Assert.Throws<InvalidOperationException>(() => mixer.SetLowCutHz(120));
                 Assert.Contains(failure switch

@@ -907,8 +907,10 @@ stream, or a stream later reports its actual app identity, the next sweep
 applies that app's routing instead of keeping the previous placement.
 The daemon watches PipeWire for graph changes and, while that subscription
 is reconnecting, reads the graph with a one-shot `pw-dump` so routing, default
-enforcement and route repair continue. The journal reports outages and
-recovery.
+enforcement and route repair continue. It reads outputs, their volumes and
+their ports from that subscription, so an idle daemon starts no helper
+programs. It reads the default devices again when PipeWire reports a change
+to them, and every 30 seconds. The journal reports outages and recovery.
 
 1. Change the channel in the dropdown next to the app. The move happens
    immediately and is remembered for that app. The channels also appear

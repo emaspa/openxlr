@@ -21,7 +21,7 @@ public sealed partial class MonitorVolumeIntegrationTests
         using var links = new LinkLog();
         var pw = new PipeWireAdapter(); using var registry = pw.WatchGraph(); using var mixer = new Mixer(pw);
         pw.CreateNullSink(Wave3Sink, "Wave 3 test output");
-        WaitForInputPorts(Wave3Sink, 2);
+        WaitForInputPorts(pw, Wave3Sink, 2);
         WaveSource(pw, "test_wave3_parent", Wave3Source);
         mixer.SetInputDeviceHint(Wave3Hints, hardwareOutputRouting: false, modelFallback: false);
 
@@ -43,7 +43,7 @@ public sealed partial class MonitorVolumeIntegrationTests
         // The card's sink is published before its capture source, as after a
         // replug or a profile switch.
         pw.CreateNullSink(Wave3Sink, "Wave 3 test output");
-        WaitForInputPorts(Wave3Sink, 2);
+        WaitForInputPorts(pw, Wave3Sink, 2);
         mixer.SetInputDeviceHint(Wave3Hints, hardwareOutputRouting: false, modelFallback: false);
         links.Start();
         mixer.Build(HardwareInputConfig, monitorOutputSink: Wave3Sink);
@@ -71,7 +71,7 @@ public sealed partial class MonitorVolumeIntegrationTests
         var pw = new PipeWireAdapter(); using var registry = pw.WatchGraph();
         using var mixer = new Mixer(pw) { Clock = () => Volatile.Read(ref now), InputNote = notes.Add };
         pw.CreateNullSink(Wave3Sink, "Wave 3 test output");
-        WaitForInputPorts(Wave3Sink, 2);
+        WaitForInputPorts(pw, Wave3Sink, 2);
         mixer.SetInputDeviceHint(Wave3Hints, hardwareOutputRouting: false, modelFallback: false);
         mixer.Build(HardwareInputConfig);
         // The user picks the interface as the monitor output.
@@ -103,7 +103,7 @@ public sealed partial class MonitorVolumeIntegrationTests
         using var links = new LinkLog();
         var pw = new PipeWireAdapter(); using var registry = pw.WatchGraph(); using var mixer = new Mixer(pw) { Clock = () => 0 };
         pw.CreateNullSink(sink, "Bound Wave 3 output");
-        WaitForInputPorts(sink, 2);
+        WaitForInputPorts(pw, sink, 2);
         // The primary is another unit, absent here; XLR 1 is bound to the Wave:3.
         mixer.SetInputDeviceHint(["Wave_XLR_PRIMARYTEST-"], hardwareOutputRouting: false, modelFallback: false);
         mixer.SetInputBindings(new Dictionary<string, SourceBinding> { ["xlr1"] = new(source, 0, 0) { Unit = "0fd9:0070@00000000000000b0" } });
@@ -140,7 +140,7 @@ public sealed partial class MonitorVolumeIntegrationTests
             CaptureProbe = name => name == Wave3Source ? new CaptureRun(1, Alsa: true, NodeRunning: true, Volatile.Read(ref kernel)) : pw.CaptureRunOf(name),
         };
         pw.CreateNullSink(Wave3Sink, "Wave 3 test output");
-        WaitForInputPorts(Wave3Sink, 2);
+        WaitForInputPorts(pw, Wave3Sink, 2);
         WaveSource(pw, "test_wave3_stopped_parent", Wave3Source);
         mixer.SetInputDeviceHint(Wave3Hints, hardwareOutputRouting: false, modelFallback: false);
         links.Start();
@@ -173,7 +173,7 @@ public sealed partial class MonitorVolumeIntegrationTests
             CaptureProbe = name => name == Wave3Source ? new CaptureRun(1, Alsa: true, NodeRunning: true, Volatile.Read(ref kernel)) : pw.CaptureRunOf(name),
         };
         pw.CreateNullSink(Wave3Sink, "Wave 3 test output");
-        WaitForInputPorts(Wave3Sink, 2);
+        WaitForInputPorts(pw, Wave3Sink, 2);
         WaveSource(pw, "test_wave3_relink_parent", Wave3Source);
         mixer.SetInputDeviceHint(Wave3Hints, hardwareOutputRouting: false, modelFallback: false);
         mixer.Build(HardwareInputConfig, monitorOutputSink: Wave3Sink);
@@ -211,7 +211,7 @@ public sealed partial class MonitorVolumeIntegrationTests
             CaptureProbe = name => name == Wave3Source ? new CaptureRun(Volatile.Read(ref node), true, true, true) : pw.CaptureRunOf(name),
         };
         pw.CreateNullSink(Wave3Sink, "Wave 3 test output");
-        WaitForInputPorts(Wave3Sink, 2);
+        WaitForInputPorts(pw, Wave3Sink, 2);
         WaveSource(pw, "test_wave3_recovery_parent", Wave3Source);
         mixer.SetInputDeviceHint(Wave3Hints, hardwareOutputRouting: false, modelFallback: false);
         mixer.Build(HardwareInputConfig, monitorOutputSink: Wave3Sink);
@@ -256,7 +256,7 @@ public sealed partial class MonitorVolumeIntegrationTests
         var pw = new PipeWireAdapter(); using var registry = pw.WatchGraph();
         using var mixer = new Mixer(pw) { Clock = () => 0 };
         pw.CreateNullSink(Wave3Sink, "Wave 3 test output");
-        WaitForInputPorts(Wave3Sink, 2);
+        WaitForInputPorts(pw, Wave3Sink, 2);
         WaveSource(pw, "test_wave3_relink_parent", Wave3Source);
         mixer.SetInputDeviceHint(Wave3Hints, hardwareOutputRouting: false, modelFallback: false);
         mixer.Build(HardwareInputConfig, monitorOutputSink: Wave3Sink);
