@@ -166,6 +166,7 @@ internal static partial class SkinLayoutWindowTests
                         SkinService.ApplyTextSize(percent);
                         SkinService.ApplyControlSizing(enlarged);
                         CheckVolumeChip(window, matrix, $"{percent}% text, {(enlarged ? "touch" : "standard")}");
+                        CheckMasterChip(window, matrix, $"{percent}% text, {(enlarged ? "touch" : "standard")}");
                     }
             }
             finally
@@ -890,6 +891,59 @@ internal static partial class SkinLayoutWindowTests
             {
                 row.Channel.StartReadoutHold = timer;
             }
+        }
+    }
+
+    /// <summary>
+    /// A column head's volume while its master moves and for the hold after:
+    /// whole, at the right end of the name line, opposite the name, inside the
+    /// head. Every head and cell stays where and as large as it was.
+    /// </summary>
+    private static void CheckMasterChip(Window window, MixMatrixViewModel matrix, string where)
+    {
+        Layout(window, 1040, 1400);
+        Rect[] Places() => [.. window.GetVisualDescendants().OfType<Border>()
+            .Where(b => b.Name is "MatrixColumn" or "MatrixRowHead" or "MatrixCell" && b.IsEffectivelyVisible)
+            .Select(b => new Rect(b.TranslatePoint(default, window)!.Value, b.Bounds.Size))];
+        Rect[] before = Places();
+        MatrixColumnViewModel column = matrix.Columns.Single(c => c.Mix.Id == "monitor");
+        string at = $"Monitor A {where}";
+        Border head = ColumnHead(window, "monitor");
+        Border chip = head.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "MatrixMasterChip");
+        Grid identity = (Grid)chip.Parent!;
+        TextBlock name = identity.Children.OfType<TextBlock>().Single(t => Grid.GetColumn(t) == 1);
+        Slider master = head.GetVisualDescendants().OfType<Slider>().Single(s => s.Name == "MatrixMaster");
+        var hold = new ManualHold();
+        Func<TimeSpan, Action, IDisposable> timer = column.StartVolumeHold;
+        column.StartVolumeHold = hold.Start;
+        try
+        {
+            Assert.False(chip.IsEffectivelyVisible, at);
+            FaderInput.SetIsAdjusting(master, true);
+            Layout(window, 1040, 1400);
+            Assert.True(chip.IsEffectivelyVisible, at);
+            TextBlock value = chip.GetVisualDescendants().OfType<TextBlock>().Single();
+            Assert.Equal(column.Mix.VolumeText, value.Text);
+            MainWindowLabelTests.CheckWhole([value], $"the volume opposite the name, {at}");
+            AssertInside(chip, head);
+            // Its right edge on the name line's, and centred on the name's line.
+            Assert.InRange(chip.TranslatePoint(new Point(chip.Bounds.Width, 0), identity)!.Value.X - identity.Bounds.Width, -1, 1);
+            double nameMiddle = name.TranslatePoint(new Point(0, name.Bounds.Height / 2), head)!.Value.Y;
+            double chipMiddle = chip.TranslatePoint(new Point(0, chip.Bounds.Height / 2), head)!.Value.Y;
+            Assert.InRange(chipMiddle - nameMiddle, -1, 1);
+            Assert.True(before.SequenceEqual(Places()), $"the matrix moved while {at} showed its volume");
+            // The value stays for the hold after the fader stops, then the head is as it was.
+            FaderInput.SetIsAdjusting(master, false);
+            Layout(window, 1040, 1400);
+            Assert.True(chip.IsEffectivelyVisible, at);
+            Assert.Single(hold.Handles).Elapse();
+            Layout(window, 1040, 1400);
+            Assert.False(chip.IsEffectivelyVisible, at);
+            Assert.True(before.SequenceEqual(Places()), $"the matrix moved after {at} showed its volume");
+        }
+        finally
+        {
+            column.StartVolumeHold = timer;
         }
     }
 

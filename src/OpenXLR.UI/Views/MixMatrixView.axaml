@@ -764,7 +764,8 @@
                     <layout:MeterFader layout:StripPanel.Part="master" ShowsMeter="{Binding Matrix.MeterUnderFader}"
                                        LeftLevel="{Binding Mix.MeterL}" RightLevel="{Binding Mix.MeterR}"
                                        LeftName="{loc:Text Key=LeftLevel}" RightName="{loc:Text Key=RightLevel}" VerticalAlignment="Center">
-                      <Slider Classes="matrixFader" vm:FaderInput.Step="0.01" Minimum="0" Maximum="{Binding Mix.VolumeRange.Maximum}"
+                      <Slider Name="MatrixMaster" Classes="matrixFader" vm:FaderInput.Step="0.01" Minimum="0" Maximum="{Binding Mix.VolumeRange.Maximum}"
+                              vm:FaderInput.IsAdjusting="{Binding VolumeAdjusting, Mode=OneWayToSource}"
                               Value="{Binding Mix.Volume, Mode=TwoWay}" AutomationProperties.Name="{Binding MasterName}"/>
                     </layout:MeterFader>
                     <ToggleButton layout:StripPanel.Part="mute" Classes="mute mutemini matrixMute" IsChecked="{Binding Mix.Muted, Mode=TwoWay}"
@@ -787,6 +788,15 @@
                               Content="↔" Tag="{Binding Mix}"
                               AutomationProperties.Name="{Binding Mix.Name, StringFormat={loc:Text Key=MoveItem}}"
                               ToolTip.Tip="{loc:Text Key=DragOntoAnotherChannelYouCanEdit}"/>
+                      <!-- the mix's volume while its master moves and for a second after, in the chip a send's
+                           level uses: opposite the name, drawn over the move handle and the end of a long name,
+                           so the head keeps its size -->
+                      <Border Grid.Column="1" Grid.ColumnSpan="2" Name="MatrixMasterChip" Classes="matrixValueChip" IsHitTestVisible="False" Padding="5,0"
+                              HorizontalAlignment="Right" VerticalAlignment="Center" IsVisible="{Binding ShowsVolumeChip}"
+                              Background="{DynamicResource Ox.Control.Background}" BorderBrush="{DynamicResource Ox.Control.BorderBrush}"
+                              BorderThickness="{DynamicResource Ox.Control.BorderThickness}" CornerRadius="{DynamicResource Ox.Control.CornerRadius}">
+                        <TextBlock Text="{Binding Mix.VolumeText}" FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Control.Foreground}"/>
+                      </Border>
                     </Grid>
                     <TextBlock layout:StripPanel.Part="outputs" Text="{Binding OutputsText}" Classes="hint" FontSize="{DynamicResource UiText.FontSize11}"
                                TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding OutputsText}"/>

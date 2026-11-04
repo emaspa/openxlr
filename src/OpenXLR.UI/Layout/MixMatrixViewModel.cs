@@ -366,6 +366,64 @@ public sealed class MatrixColumnViewModel : ViewModelBase
 
     public string MuteName => Localizer.Format("MixMuteName", Mix.Name);
 
+    /// <summary>Starts the hold and calls back when it ends; tests run it by hand.</summary>
+    internal Func<TimeSpan, Action, IDisposable> StartVolumeHold { get; set; } =
+        (after, elapsed) => Avalonia.Threading.DispatcherTimer.RunOnce(elapsed, after);
+
+    private IDisposable? _volumeHold;
+    private bool _volumeAdjusting, _showsVolume;
+
+    /// <summary>
+    /// True while the user moves the mix's master fader; the fader writes it.
+    /// The chip opposite the name then shows the mix's volume, and keeps it for
+    /// <see cref="ChannelViewModel.VolumeReadoutHold"/> after the fader stops,
+    /// as a channel row's does.
+    /// </summary>
+    public bool VolumeAdjusting
+    {
+        get => _volumeAdjusting;
+        set
+        {
+            if (_volumeAdjusting == value) return;
+            _volumeAdjusting = value;
+            Raise(nameof(VolumeAdjusting));
+            _volumeHold?.Dispose();
+            _volumeHold = null;
+            if (value) ShowsVolume = true;
+            else if (_showsVolume && !_detached)
+            {
+                IDisposable? hold = null;
+                hold = StartVolumeHold(ChannelViewModel.VolumeReadoutHold, () =>
+                {
+                    if (!ReferenceEquals(_volumeHold, hold)) return;
+                    _volumeHold = null;
+                    ShowsVolume = false;
+                });
+                _volumeHold = hold;
+            }
+            else ShowsVolume = false;
+        }
+    }
+
+    private bool ShowsVolume
+    {
+        set
+        {
+            if (_showsVolume == value) return;
+            _showsVolume = value;
+            Raise(nameof(ShowsVolumeChip));
+        }
+    }
+
+    /// <summary>
+    /// True when the mix's volume shows at the right end of the name line
+    /// now, opposite the name: the head draws the master, and the fader is
+    /// moving or stopped less than the hold ago. The head has no value of its
+    /// own, so the chip is the only place the volume reads while the fader
+    /// moves.
+    /// </summary>
+    public bool ShowsVolumeChip => _showsVolume && ControlSpec.Parts.Contains(SkinMatrixParts.Master);
+
     internal void RefreshOutputs()
     {
         Raise(nameof(Outputs));
@@ -398,6 +456,8 @@ public sealed class MatrixColumnViewModel : ViewModelBase
     {
         if (_detached) return;
         _detached = true;
+        _volumeHold?.Dispose();
+        _volumeHold = null;
         Mix.PropertyChanged -= OnMixChanged;
         Mix.Appearance.PropertyChanged -= OnAppearanceChanged;
     }

@@ -431,7 +431,8 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
   whether one is on and whether phantom power is, the gain written under
   it (the volume while its fader moves, and over the fader on a row
   with no readout), and
-  column heads the mix's master, mute, chain and how many outputs hear it.
+  column heads the mix's master, mute, chain and how many outputs hear it
+  (the volume opposite the name while the master moves).
   A skin orders and hides the parts of the heads and cells. See
   [The mix matrix](skins.md#the-mix-matrix)
 - The Broadcast skin, shipped with the application: the submixer as a mix

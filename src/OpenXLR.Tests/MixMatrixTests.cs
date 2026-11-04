@@ -267,6 +267,67 @@ public sealed class MixMatrixTests
     }
 
     [Fact]
+    public void AMixShowsItsVolumeOppositeItsNameWhileItsMasterMovesAndASecondAfter()
+    {
+        var model = new MainViewModel(new DaemonClient());
+        string State(string volume) => $$"""
+            {"channels":[{"id":"game","name":"Game"}],
+             "mixes":[{"id":"monitor","name":"Monitor A","volume":{{volume}}},{"id":"stream","name":"Stream"}]}
+            """;
+        ApplyMixer.Invoke(model, [JsonNode.Parse(State("0.8"))]);
+        using var matrix = new MixMatrixViewModel(model);
+        MatrixColumnViewModel monitor = matrix.Columns.Single(c => c.Mix.Id == "monitor");
+        MatrixColumnViewModel stream = matrix.Columns.Single(c => c.Mix.Id == "stream");
+        var raised = new List<string?>();
+        monitor.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        var hold = new ManualHold();
+        monitor.StartVolumeHold = hold.Start;
+
+        // Nothing at rest.
+        Assert.False(monitor.ShowsVolumeChip);
+
+        // The volume while the master moves, following it, and only on the mix being moved.
+        monitor.VolumeAdjusting = true;
+        Assert.True(monitor.ShowsVolumeChip);
+        Assert.False(stream.ShowsVolumeChip);
+        Assert.Contains(nameof(MatrixColumnViewModel.ShowsVolumeChip), raised);
+        Assert.Equal("80%", monitor.Mix.VolumeText);
+        ApplyMixer.Invoke(model, [JsonNode.Parse(State("0.45"))]);
+        Assert.Equal("45%", monitor.Mix.VolumeText);
+
+        // It stays for the hold after the fader stops, then goes.
+        monitor.VolumeAdjusting = false;
+        Assert.True(monitor.ShowsVolumeChip);
+        Assert.Equal(ChannelViewModel.VolumeReadoutHold, Assert.Single(hold.Handles).After);
+        raised.Clear();
+        hold.Handles[0].Elapse();
+        Assert.False(monitor.ShowsVolumeChip);
+        Assert.Contains(nameof(MatrixColumnViewModel.ShowsVolumeChip), raised);
+
+        // Moving again inside the hold cancels it: its late callback leaves the chip up.
+        monitor.VolumeAdjusting = true;
+        monitor.VolumeAdjusting = false;
+        monitor.VolumeAdjusting = true;
+        Assert.True(hold.Handles[^1].Disposed);
+        hold.Handles[^1].Elapse();
+        Assert.True(monitor.ShowsVolumeChip);
+        monitor.VolumeAdjusting = false;
+        hold.Handles[^1].Elapse();
+        Assert.False(monitor.ShowsVolumeChip);
+
+        // A skin whose column heads draw no master has no fader to follow.
+        matrix.Configure(SkinMatrixOptions.Default with
+        {
+            ColumnHead = new SkinMatrixPartOptions(["identity", "mute", "outputs"], [], SkinLabelStyle.Text),
+        });
+        monitor = matrix.Columns.Single(c => c.Mix.Id == "monitor");
+        monitor.StartVolumeHold = hold.Start;
+        monitor.VolumeAdjusting = true;
+        Assert.False(monitor.ShowsVolumeChip);
+        monitor.VolumeAdjusting = false;
+    }
+
+    [Fact]
     public void CellsHoldTheChannelsOwnSendsAndColumnsTheMixersOwnMixes()
     {
         var model = new MainViewModel(new DaemonClient());

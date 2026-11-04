@@ -3012,7 +3012,9 @@ MONITOR hear it (or what kind of mix it is when none does), a thin line in
 the mix's colour when you gave it one in the layout editor, and its mute,
 master level and **FX**, which opens the mix's plugin chain. **FX** is
 green while the chain is processing and red when its plugins are all
-bypassed or failed; an empty chain keeps the plain button.
+bypassed or failed; an empty chain keeps the plain button. While you move
+a column's master, and for a second after, its volume shows at the right
+end of the name line, opposite the mix's name.
 
 HEADPHONES and MONITOR share the row above the matrix: the headphone
 levels and the direct monitor blend on the left, the output picker and its
