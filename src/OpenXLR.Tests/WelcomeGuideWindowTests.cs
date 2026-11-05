@@ -1,5 +1,8 @@
+using System.Reflection;
+using System.Text.Json.Nodes;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using OpenXLR.UI;
 using OpenXLR.UI.Localization;
 using static OpenXLR.Tests.WindowLayoutTests;
@@ -15,12 +18,28 @@ internal static class WelcomeGuideWindowTests
         try
         {
             var main = Start();
-            Assert.True(main.StartsHidden);
-            Assert.Empty(main.OwnedWindows);
-            main.ShowMixer();
-            Settle(main);
-            Assert.Single(main.OwnedWindows.OfType<WelcomeGuideWindow>());
-            main.Quit();
+            try
+            {
+                Assert.True(main.StartsHidden);
+                Assert.Empty(main.OwnedWindows);
+                main.ShowMixer();
+                Settle(main);
+                var firstGuide = Assert.Single(main.OwnedWindows.OfType<WelcomeGuideWindow>());
+                Click(firstGuide.FindControl<Button>("GuideNext")!);
+                main.Close();
+                Dispatcher.UIThread.RunJobs();
+                Assert.False(main.IsVisible);
+                Assert.False(firstGuide.IsVisible);
+                main.ShowMixer();
+                Settle(main);
+                Assert.Same(firstGuide, Assert.Single(main.OwnedWindows.OfType<WelcomeGuideWindow>()));
+                Assert.True(firstGuide.IsVisible);
+                Assert.Equal(2, firstGuide.FindControl<ProgressBar>("GuideProgress")!.Value);
+            }
+            finally
+            {
+                main.Quit();
+            }
             Assert.False(UiSettings.Load().WelcomeGuideCompleted);
 
             main = Start();
@@ -49,7 +68,22 @@ internal static class WelcomeGuideWindowTests
                 var reopen = options.FindControl<Button>("WelcomeGuideButton")!;
                 Click(reopen);
                 Assert.Same(guide, Assert.Single(main.OwnedWindows.OfType<WelcomeGuideWindow>()));
-                Click(back);
+
+                typeof(MainViewModel).GetMethod("ApplyMixer", BindingFlags.NonPublic | BindingFlags.Instance)!
+                    .Invoke(main.DataContext, [JsonNode.Parse("""{"mixes":[],"channels":[]}""")]);
+                var monitor = main.FindControl<Expander>("MonitorTile")!;
+                var submixer = main.FindControl<Expander>("SubmixerTile")!;
+                monitor.IsExpanded = false;
+                submixer.IsExpanded = false;
+                Settle(main);
+
+                Click(next);
+                Click(action);
+                Assert.True(monitor.IsExpanded);
+                Click(next);
+                Click(action);
+                Assert.True(submixer.IsExpanded);
+                while (progress.Value > 1) Click(back);
                 Assert.Equal(1, progress.Value);
                 Assert.False(back.IsEnabled);
 

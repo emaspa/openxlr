@@ -1,5 +1,6 @@
 using System;
 using Avalonia.Controls;
+using Avalonia.Threading;
 
 namespace OpenXLR.UI;
 
@@ -32,8 +33,11 @@ public partial class MainWindow
     internal void ShowGuideMonitor()
     {
         ShowMixer();
-        MonitorTile.BringIntoView();
-        if (MonitorDestination.IsEffectivelyVisible) MonitorDestination.Focus();
+        RevealGuideSection(MonitorTile);
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (MonitorDestination.IsEffectivelyVisible) MonitorDestination.Focus();
+        }, DispatcherPriority.Loaded);
     }
 
     internal void ShowGuideMixer()
@@ -44,6 +48,13 @@ public partial class MainWindow
             if (detached.WindowState == WindowState.Minimized) detached.WindowState = WindowState.Normal;
             detached.Activate();
         }
-        else SubmixerTile.BringIntoView();
+        else RevealGuideSection(SubmixerTile);
+    }
+
+    private static void RevealGuideSection(Expander section)
+    {
+        if (!section.IsEffectivelyVisible) return;
+        section.IsExpanded = true;
+        section.BringIntoView();
     }
 }

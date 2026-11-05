@@ -157,6 +157,7 @@ public partial class MainWindow : Window
             _hideToTrayPending = false;
             _mixerWindow?.Close();
             _options?.Close();
+            _welcomeGuide?.Close();
             SoundboardWindow.Current?.Close();
             VoiceChangerWindow.Current?.Close();
             _lifetime.Cancel();
@@ -188,6 +189,7 @@ public partial class MainWindow : Window
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
         Activate();
         ApplyPendingPopOut();
+        if (_welcomeGuide is { IsVisible: false } guide) guide.Show(this);
     }
 
     internal void Quit()
