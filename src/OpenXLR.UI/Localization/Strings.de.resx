@@ -3931,4 +3931,22 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="TextSizeMuchLarger" xml:space="preserve">
     <value>Viel größer (120 %)</value>
   </data>
+  <data name="MicSetupPresetPodcast" xml:space="preserve">
+    <value>Podcast</value>
+  </data>
+  <data name="MicSetupPresetPodcastTip" xml:space="preserve">
+    <value>Gleicht den Bass bei naher Mikrofonposition aus und hebt die Sprachverständlichkeit leicht an.</value>
+  </data>
+  <data name="MicSetupPresetDeepVoice" xml:space="preserve">
+    <value>Tiefe Stimme</value>
+  </data>
+  <data name="MicSetupPresetDeepVoiceTip" xml:space="preserve">
+    <value>Reduziert Dröhnen bei tiefen Stimmen und macht Konsonanten deutlicher.</value>
+  </data>
+  <data name="MicSetupPresetSoftSibilants" xml:space="preserve">
+    <value>Sanfte S-Laute</value>
+  </data>
+  <data name="MicSetupPresetSoftSibilantsTip" xml:space="preserve">
+    <value>Senkt einen festen Frequenzbereich um scharfe S-Laute ab und mildert helle Höhen.</value>
+  </data>
 </root>

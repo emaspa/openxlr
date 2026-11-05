@@ -64,8 +64,8 @@ public sealed class EqProfileStoreTests : IDisposable
     {
         EqProfilesState state = EqProfileStore.State();
         Assert.Null(state.Problem);
-        Assert.Equal(["builtin:clear", "builtin:warm", "builtin:broadcast"], state.Profiles.Select(p => p.Id));
-        Assert.Equal(["Clear", "Warm", "Broadcast"], state.Profiles.Select(p => p.Name));
+        Assert.Equal(EqPresets.All.Select(p => p.Id), state.Profiles.Select(p => p.Id));
+        Assert.Equal(EqPresets.All.Select(p => p.Name), state.Profiles.Select(p => p.Name));
         Assert.All(state.Profiles, p => Assert.True(p.Builtin));
         // Mic setup offers the same table, not a copy of it.
         Assert.Equal(EqPresets.All.Select(p => p.Key), OpenXLR.UI.MicSetupPresets.All.Select(p => p.Id));
@@ -115,8 +115,8 @@ public sealed class EqProfileStoreTests : IDisposable
 
         // The state lists them after the built-in ones, under saved: ids.
         EqProfilesState state = EqProfileStore.State();
-        Assert.Equal(["builtin:clear", "builtin:warm", "builtin:broadcast", "saved:Voice", "saved:Bright"], state.Profiles.Select(p => p.Id));
-        Assert.False(state.Profiles[3].Builtin);
+        Assert.Equal(EqPresets.All.Select(p => p.Id).Concat(["saved:Voice", "saved:Bright"]), state.Profiles.Select(p => p.Id));
+        Assert.False(state.Profiles[EqPresets.All.Count].Builtin);
 
         // The file is private and holds the bands as setEq carries them, in the UI's format.
         if (!OperatingSystem.IsWindows())
@@ -271,7 +271,7 @@ public sealed class EqProfileStoreTests : IDisposable
         {
             EqProfilesState state = await read.WaitAsync(TimeSpan.FromSeconds(3));
             Assert.Equal("failed", state.Problem!.Reason);
-            Assert.Equal(3, state.Profiles.Count);
+            Assert.Equal(EqPresets.All.Count, state.Profiles.Count);
         }
         finally
         {
@@ -347,7 +347,7 @@ public sealed class EqProfileStoreTests : IDisposable
         var hub = new WebSocketHub(devices, mixer, NullLogger<WebSocketHub>.Instance, new Lifetime());
 
         StateMessage state = hub.Snapshot();
-        Assert.Equal(3, state.EqProfiles!.Count);
+        Assert.Equal(EqPresets.All.Count, state.EqProfiles!.Count);
         Assert.Null(state.EqProfileProblem);
         string band = """{"enabled":true,"type":"peak","frequency":1000,"gain":3,"q":1}""";
         Assert.True((await hub.ExecuteForApiAsync($$"""{"cmd":"saveEqProfile","name":"Podcast","bands":[{{band}},{{band}}]}""")).Ok);

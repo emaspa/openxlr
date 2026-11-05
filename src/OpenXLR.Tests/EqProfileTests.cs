@@ -172,13 +172,12 @@ public sealed class EqProfileTests : IDisposable
         using MicEqViewModel eq = Eq(daemon, "guest", variable: true);
         using var profiles = new EqProfilesViewModel(eq, daemon.Library);
         Assert.True(await profiles.Save("Mine", false));
-        Assert.Equal(["builtin:clear", "builtin:warm", "builtin:broadcast", "saved:Mine"], profiles.Profiles.Select(p => p.Id));
-        Assert.Equal([Localizer.Format("EqProfileBuiltInName", Localizer.Text("MicSetupPresetClear")),
-            Localizer.Format("EqProfileBuiltInName", Localizer.Text("MicSetupPresetWarm")),
-            Localizer.Format("EqProfileBuiltInName", Localizer.Text("MicSetupPresetBroadcast")), "Mine"],
+        Assert.Equal(MicSetupPresets.All.Select(p => EqProfileIds.Builtin(p.Id)).Append("saved:Mine"),
+            profiles.Profiles.Select(p => p.Id));
+        Assert.Equal(MicSetupPresets.All.Select(p => Localizer.Format("EqProfileBuiltInName", p.Name)).Append("Mine"),
             profiles.Profiles.Select(p => p.ToString()));
         // Mic setup's presets, the same table.
-        Assert.Equal(MicSetupPresets.All.Select(p => p.Eq.Bands), profiles.Profiles.Take(3).Select(p => p.Bands), new BandsComparer());
+        Assert.Equal(MicSetupPresets.All.Select(p => p.Eq.Bands), profiles.Profiles.Take(MicSetupPresets.All.Count).Select(p => p.Bands), new BandsComparer());
         // Saved with the EQ off: an EQ that is off holds no profile, so the list stays on its placeholder.
         Assert.Null(profiles.Selected);
 
@@ -264,7 +263,7 @@ public sealed class EqProfileTests : IDisposable
         await daemon.ListEqProfilesAsync();
         profiles.Reread();
         Assert.Equal("builtin:broadcast", profiles.Selected?.Id);
-        Assert.Equal(4, profiles.Profiles.Count);
+        Assert.Equal(MicSetupPresets.All.Count + 1, profiles.Profiles.Count);
         Assert.Empty(daemon.Sent);
     }
 
@@ -428,7 +427,7 @@ public sealed class EqProfileTests : IDisposable
         await daemon.ListEqProfilesAsync();
         Assert.Equal(Localizer.Format("EqProfileFileDamaged", Store.FilePath), profiles.Error);
         Assert.DoesNotContain("\n", profiles.Error!, StringComparison.Ordinal);
-        Assert.Equal(3, profiles.Profiles.Count);
+        Assert.Equal(MicSetupPresets.All.Count, profiles.Profiles.Count);
         Assert.Null(profiles.Selected);
         Assert.False(await profiles.Save("New", false));
         Assert.Equal("not json", File.ReadAllText(Store.FilePath));

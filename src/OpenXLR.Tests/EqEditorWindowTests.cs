@@ -1224,7 +1224,7 @@ public sealed class EqEditorWindowTests
         string path = OpenXLR.Core.Mixing.EqProfileStore.FilePath;
         if (File.Exists(path)) File.Delete(path);
         foreach (EqWindow editor in new[] { first, second }) editor.Profiles!.Reread();
-        await Until(() => first.Profiles!.Profiles.Count == 3 && second.Profiles!.Profiles.Count == 3);
+        await Until(() => first.Profiles!.Profiles.Count == MicSetupPresets.All.Count && second.Profiles!.Profiles.Count == MicSetupPresets.All.Count);
         CheckProfileRow(first, "profiles");
         ComboBox list1 = first.FindControl<ComboBox>("EqProfileList")!, list2 = second.FindControl<ComboBox>("EqProfileList")!;
         Assert.Equal(Localizer.Text("EqProfileChoose"), list1.PlaceholderText);
@@ -1243,7 +1243,7 @@ public sealed class EqEditorWindowTests
         Assert.Equal(Localizer.Text("Save"), first.FindControl<Button>("EqProfileSave")!.Content);
 
         // The built-in profiles: Mic setup's presets, first, in the UI's language and marked as built in.
-        Assert.Equal(["builtin:clear", "builtin:warm", "builtin:broadcast"], first.Profiles!.Profiles.Select(p => p.Id));
+        Assert.Equal(MicSetupPresets.All.Select(p => EqProfileIds.Builtin(p.Id)), first.Profiles!.Profiles.Select(p => p.Id));
         Assert.Equal(MicSetupPresets.All.Select(p => Localizer.Format("EqProfileBuiltInName", p.Name)),
             list1.Items.Cast<EqProfile>().Select(p => p.ToString()));
         // Picking one in the list is the load: one loadEqProfile, and nothing more as the state comes back.
@@ -1282,21 +1282,21 @@ public sealed class EqEditorWindowTests
         Assert.Equal("saveEqProfile", sent["cmd"]!.GetValue<string>());
         Assert.Equal("Podcast", sent["name"]!.GetValue<string>());
         Assert.False(sent["replace"]!.GetValue<bool>());
-        await Until(() => first.Profiles!.Profiles.Count == 4 && first.Profiles.Selected is { Builtin: false });
-        EqProfile saved = first.Profiles!.Profiles[3];
+        await Until(() => first.Profiles!.Profiles.Count == MicSetupPresets.All.Count + 1 && first.Profiles.Selected is { Builtin: false });
+        EqProfile saved = first.Profiles!.Profiles[MicSetupPresets.All.Count];
         Assert.Equal("Podcast", saved.Name);
         Assert.Equal("saved:Podcast", saved.Id);
         Assert.Equal(eq1.Current.Bands, saved.Bands);
         Assert.Same(saved, list1.SelectedItem);
         Assert.True(first.FindControl<Button>("EqProfileRename")!.IsEnabled);
         // XLR 2's editor lists it and keeps the profile its EQ holds.
-        Assert.Equal(4, second.Profiles!.Profiles.Count);
+        Assert.Equal(MicSetupPresets.All.Count + 1, second.Profiles!.Profiles.Count);
         Assert.Equal("builtin:broadcast", ((EqProfile)list2.SelectedItem!).Id);
         Pump(60);
         Assert.Empty(daemon.Commands);
 
         // Pick it on XLR 2: one loadEqProfile, and XLR 2 takes XLR 1's bands with the EQ on.
-        list2.SelectedItem = second.Profiles!.Profiles[3];
+        list2.SelectedItem = second.Profiles!.Profiles[MicSetupPresets.All.Count];
         sent = (await Sent(daemon, 1))[0];
         Assert.Equal("loadEqProfile", sent["cmd"]!.GetValue<string>());
         Assert.Equal("xlr2", sent["channel"]!.GetValue<string>());
@@ -1322,7 +1322,7 @@ public sealed class EqEditorWindowTests
         Assert.Equal("Podcast", dialog.GetVisualDescendants().OfType<TextBox>().Single().Text);
         Click(dialog.GetVisualDescendants().OfType<Button>().Single(b => b.IsCancel));
         await Until(() => !dialog.IsVisible);
-        list2.SelectedItem = second.Profiles!.Profiles[3];
+        list2.SelectedItem = second.Profiles!.Profiles[MicSetupPresets.All.Count];
         sent = (await Sent(daemon, 1))[0];
         Assert.Equal("loadEqProfile", sent["cmd"]!.GetValue<string>());
         Assert.Equal("saved:Podcast", sent["profile"]!.GetValue<string>());
@@ -1367,7 +1367,7 @@ public sealed class EqEditorWindowTests
         Window confirm = await Dialog(second);
         Assert.Equal(Localizer.Text("EqProfileDeleteTitle"), confirm.Title);
         Click(confirm.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("danger")));
-        await Until(() => first.Profiles!.Profiles.Count == 3 && second.Profiles!.Profiles.Count == 3);
+        await Until(() => first.Profiles!.Profiles.Count == MicSetupPresets.All.Count && second.Profiles!.Profiles.Count == MicSetupPresets.All.Count);
         Assert.Null(list1.SelectedItem);
         Assert.Null(list2.SelectedItem);
         Assert.False(second.FindControl<Button>("EqProfileDelete")!.IsEnabled);
@@ -1394,8 +1394,8 @@ public sealed class EqEditorWindowTests
         string band = "{\"enabled\":true,\"type\":\"peak\",\"frequency\":1000,\"gain\":0,\"q\":1}";
         File.WriteAllText(path, "{\"version\":1,\"profiles\":[{\"name\":\"Six\",\"bands\":[" + string.Join(",", Enumerable.Repeat(band, 6)) + "]}]}");
         first.Profiles!.Reread();
-        await Until(() => !error.IsVisible && first.Profiles!.Profiles.Count == 4);
-        list1.SelectedItem = first.Profiles!.Profiles[3];
+        await Until(() => !error.IsVisible && first.Profiles!.Profiles.Count == MicSetupPresets.All.Count + 1);
+        list1.SelectedItem = first.Profiles!.Profiles[MicSetupPresets.All.Count];
         Pump(20);
         string refused = Localizer.Format("EqProfileBandCount", "Six", 6, 4, 4);
         Assert.Equal(refused, error.Text);
@@ -1409,7 +1409,7 @@ public sealed class EqEditorWindowTests
 
         File.Delete(path);
         first.Profiles!.Reread();
-        await Until(() => !error.IsVisible && first.Profiles!.Profiles.Count == 3);
+        await Until(() => !error.IsVisible && first.Profiles!.Profiles.Count == MicSetupPresets.All.Count);
         Assert.Null(list1.SelectedItem);
         Assert.Empty(daemon.Commands);
 
