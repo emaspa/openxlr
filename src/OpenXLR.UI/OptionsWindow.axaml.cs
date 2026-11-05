@@ -298,6 +298,14 @@ public partial class OptionsWindow : Window
         if (DataContext is OptionsViewModel vm) new WaveInterfacesWindow(vm.Main).Show(this);
     }
 
+    /// <summary>Restart WirePlumber so the chosen audio clock applies, after a confirm that says the audio stops.</summary>
+    private async void OnRestartAudio(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not OptionsViewModel vm) return;
+        if (await Dialogs.ConfirmAsync(this, Localizer.Text("RestartAudioTitle"), Localizer.Text("RestartAudioConfirm"), Localizer.Text("RestartAudioNow")))
+            await vm.Main.RestartAudioAsync();
+    }
+
     private async void OnResetDevice(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not OptionsViewModel vm) return;

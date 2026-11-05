@@ -173,6 +173,17 @@ graph stays as it is. Tested with pw-dump fixtures from an owner's archive
 and from the maintainer's desk, and on a private PipeWire server where the
 driver changes hands.
 
+The audio clock can be chosen in Options → Audio → AUDIO, or from the
+warning with **Make *interface* the clock**: Automatic, or one of the
+mixer's hardware inputs and outputs. The daemon writes the choice as a
+WirePlumber rule in the user's configuration and reads it back from
+there, and the state says while it waits for WirePlumber to restart.
+**Restart audio now** restarts WirePlumber after a confirm, and the mixer
+comes back without a daemon restart. Not in the Flatpak, which keeps the
+manual's hand-written rule. Tested with a supervised WirePlumber on a
+private PipeWire server that restarts it and makes the devices again, not
+yet on hardware.
+
 ## Software controls
 
 These run on the computer. The microphone EQ is on XLR 1 and XLR 2

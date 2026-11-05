@@ -369,6 +369,8 @@ that final acknowledgement (or an `error` without a request id):
 | `setDuckingProcessing` | `value` | where [ducking](#ducking) should run: `device` (the default) on the unit when the setup fits it, or `software` on this computer. On the Wave XLR Pro `device` runs ducking on the unit when the setup fits it, and in software otherwise, with the reason in `ducking.device.reason` (see [where ducking runs](#ducking)). Saved in `mixer.json`, never in a profile |
 | `resetDevice` | none | write the recorded defaults back to a device using connect-time restoration and forget its last settings (an error until the daemon has seen the device connect after a power cycle once); on the Wave XLR Pro, which keeps its own settings, write OpenXLR's baseline instead: gain 30 dB on both inputs, every processing stage and phantom off, headphones and aux level at half, routing, the microphone's level in the jacks' mix and the Line In gain and level lock untouched, refused while the gain lock is on. The capabilities say `builtInDefaults` when a model has a baseline |
 | `recoverCapture` | none | bring back the driven unit's microphone. First every link OpenXLR made out of the unit's capture is removed and made again, which leaves the mixes on the unit's own output playing; after 2 seconds the daemon asks the kernel whether the capture runs, and stops there when it does. Only a capture still stopped or missing goes on to the reset: every mix comes off the unit's own output, the unit is reset on USB, and the mixes go back once the reconnected unit's capture runs, or after 30 seconds without it. Only on a unit whose capabilities say `captureRecovery`; an error otherwise, while a recovery is under way, or when the reset fails, in which case the mixes go straight back. The daemon resets the unit by itself, without the relink, when the kernel keeps the capture stopped for 3 seconds while PipeWire runs it and a mix plays into the unit, at most once every 2 minutes and 3 times in 30 minutes |
+| `setAudioClock` | `value` | make one ALSA device the audio clock by its node name, or with `null` or no `value` go back to Automatic. The node must be one of `mixer.clockChoice.options` or the one already chosen; a name other than `alsa_input.` or `alsa_output.` followed by letters, digits, `_`, `-` and `.` is refused. Writes `~/.config/wireplumber/wireplumber.conf.d/57-openxlr-clock.conf`, or for Automatic deletes it, and restarts nothing; the rule applies when WirePlumber next starts. A file of that name OpenXLR did not write is neither replaced nor deleted. Refused in the Flatpak. See [audio clock](#audio-clock) |
+| `restartAudioServices` | none | restart WirePlumber (`systemctl --user restart wireplumber.service`) so the audio clock rule applies. PipeWire and pipewire-pulse keep running. Every device stops for a moment while WirePlumber makes its nodes again, and the daemon links its graph to them without restarting itself. One at a time; a failed `systemctl` is the error. Refused in the Flatpak |
 | `restartDaemon` | none | stop cleanly with exit code 75, so a service manager with `Restart=on-failure` or `Restart=always` starts the daemon again; a daemon run by hand just stops. The Flatpak UI sends it to a daemon running as a user service ([Flatpak](flatpak.md)) |
 | `getDiagnostics` | none | vendor block dump for bug reports |
 | `getRuntimeDiagnostics` | none | reply `runtimeDiagnostics` with `daemonBuildVersion`, `daemonBuildId` and a numerical `snapshot` from the daemon that answers. See [runtime snapshot](#runtime-snapshot) |
@@ -1284,6 +1286,25 @@ in no graph and is not listed.
 While `micResampled` is true, `warning` carries one sentence naming the
 microphone's interface and the driver, and the journal has a warning; each
 change of driver or of a resampled follower gets one journal line.
+
+`mixer.clockChoice` is the audio clock the user picked with
+`setAudioClock`. It is absent from an older daemon and from the Flatpak's,
+which cannot change the host's WirePlumber.
+
+| field | meaning |
+|---|---|
+| `node` | the node the rule makes the clock, or null for Automatic. Read back from `57-openxlr-clock.conf` on every sweep, so a deleted or edited file shows here |
+| `pending` | the choice waits for WirePlumber to restart: the chosen node runs in the mixer's graph, as the driver or a follower, without `priority.driver` 3000. For Automatic, a node in the graph still has 3000 after this daemon deleted its rule. A chosen node that is not in the graph is not pending |
+| `active` | the chosen node drives the mixer's graph |
+| `options` | the devices `setAudioClock` takes, each `{node, description, kind}`, `kind` `input` or `output`: the driven unit's input, then the driver and followers of `mixer.clock` that are ALSA nodes, inputs before outputs, and the chosen node when the graph does not show it |
+| `problem` | why the file cannot be used, when it cannot: not written by OpenXLR, a symbolic link, unreadable, or not naming one node |
+
+The rule is a WirePlumber 0.5 `monitor.alsa.rules` entry that matches the
+node's `node.name` exactly and sets `priority.driver = 3000`, above the 2200
+of the packaged rules and the 2600 of a pro-audio input. WirePlumber sets
+the property when its ALSA monitor creates the node and PipeWire does not
+take a new `priority.driver` on a node that exists, so the rule applies
+after `restartAudioServices` or at the next login.
 
 ## Browser tabs
 
