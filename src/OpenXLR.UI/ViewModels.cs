@@ -1027,6 +1027,7 @@ public sealed partial class MainViewModel : ViewModelBase
             Status = DeviceConnected ? Localizer.Text("StatusReady") : Localizer.Text("StatusNoDevice");
         }
         finally { _applying = false; }
+        _ = DaemonRestart.CheckForUpgradeAsync(DaemonVersion);
         StateApplied?.Invoke();
     }
 

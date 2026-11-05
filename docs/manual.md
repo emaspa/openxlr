@@ -3160,9 +3160,12 @@ release keeps running after an upgrade. If the UI was open before the
 upgrade, quit it from the tray and open it again first. The old UI keeps
 talking to the old daemon and cannot reach the new one.
 
-When the UI can connect but the daemon is another version, it shows a
-banner naming the daemon's version and its own, with a Restart daemon
-button, and offers only the controls the old daemon reports.
+When a newly opened native UI connects to an older daemon, it tries once
+to restart the active `openxlr-daemon` user service. Audio can briefly
+drop while the service comes back. The UI reconnects automatically. If
+the daemon still differs, the version banner offers **Restart daemon**.
+Flatpak and older daemons that cannot report their version use the same
+manual restart controls.
 
 Releases before 0.3.0 served their clients on a loopback port with a
 token. Since 0.3.0 the daemon uses a private Unix socket instead, authenticated by

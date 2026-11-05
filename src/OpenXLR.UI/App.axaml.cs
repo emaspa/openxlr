@@ -51,6 +51,8 @@ public partial class App : Application
             {
                 desktop.MainWindow = window;
             }
+
+            if (!FlatpakEnvironment.IsFlatpak) window.EnableAutomaticDaemonRestart();
         }
 
         base.OnFrameworkInitializationCompleted();

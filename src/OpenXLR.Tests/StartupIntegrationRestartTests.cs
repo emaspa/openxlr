@@ -49,4 +49,39 @@ public sealed class StartupIntegrationRestartTests
             Directory.Delete(directory, recursive: true);
         }
     }
+
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(3, 0)]
+    [InlineData(0, 1)]
+    public void AutomaticRestartOnlyTriesAnActiveDaemonService(int activeExit, int restartExit)
+    {
+        string directory = Directory.CreateTempSubdirectory("openxlr-restart-upgrade-").FullName;
+        string log = Path.Combine(directory, "calls");
+        string? previousPath = Environment.GetEnvironmentVariable("PATH");
+        try
+        {
+            ExecutableScript.Write(Path.Combine(directory, "systemctl"), $$"""
+                #!/bin/sh
+                printf '%s\n' "$*" >> {{InstallationDoctor.Quote(log)}}
+                case "$*" in
+                  '--user is-active --quiet openxlr-daemon.service') exit {{activeExit}} ;;
+                  '--user try-restart openxlr-daemon.service') exit {{restartExit}} ;;
+                  *) exit 99 ;;
+                esac
+                """);
+            Environment.SetEnvironmentVariable("PATH", directory);
+
+            Assert.Equal(activeExit == 0 && restartExit == 0, StartupIntegration.TryRestartRunningDaemonService());
+            string[] expected = activeExit == 0
+                ? ["--user is-active --quiet openxlr-daemon.service", "--user try-restart openxlr-daemon.service"]
+                : ["--user is-active --quiet openxlr-daemon.service"];
+            Assert.Equal(expected, File.ReadAllLines(log));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PATH", previousPath);
+            Directory.Delete(directory, recursive: true);
+        }
+    }
 }

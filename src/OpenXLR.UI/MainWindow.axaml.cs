@@ -152,6 +152,7 @@ public partial class MainWindow : Window
         Closed += async (_, _) =>
         {
             Skinning.SkinService.Changed -= UpdateControlSizing;
+            _vm.DaemonRestart.AutomaticRestart = null;
             _reallyExit = true;
             _hideToTrayPending = false;
             _mixerWindow?.Close();
@@ -178,6 +179,9 @@ public partial class MainWindow : Window
 
     /// <summary>True when the window should stay unshown until the tray asks for it.</summary>
     public bool StartsHidden { get; }
+
+    internal void EnableAutomaticDaemonRestart()
+        => _vm.DaemonRestart.AutomaticRestart = () => Task.Run(StartupIntegration.TryRestartRunningDaemonService);
 
     internal void ShowMixer()
     {

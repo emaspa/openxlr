@@ -9,6 +9,7 @@ public sealed class DaemonRestartViewModel : ViewModelBase
 {
     private readonly Func<Task<bool>> _restart;
     private bool _busy;
+    private bool _upgradeChecked;
     private bool _reconnected;
     private string? _status;
 
@@ -16,6 +17,8 @@ public sealed class DaemonRestartViewModel : ViewModelBase
         : this(() => Task.Run(StartupIntegration.RestartDaemon)) { }
 
     internal DaemonRestartViewModel(Func<Task<bool>> restart) => _restart = restart;
+
+    internal Func<Task<bool>>? AutomaticRestart { get; set; }
 
     public bool CanRestart => !_busy;
     public string? Status { get => _status; private set => Set(ref _status, value); }
@@ -34,7 +37,24 @@ public sealed class DaemonRestartViewModel : ViewModelBase
     /// Run systemctl off the UI thread. Only one restart runs at a time, and a
     /// failed request leaves the buttons usable for another attempt.
     /// </summary>
-    public async Task<bool> RestartAsync()
+    public Task<bool> RestartAsync()
+    {
+        _upgradeChecked = true;
+        return RestartAsync(_restart);
+    }
+
+    internal Task CheckForUpgradeAsync(string? daemonVersion)
+    {
+        if (_upgradeChecked || AutomaticRestart is not { } restart || daemonVersion is null)
+            return Task.CompletedTask;
+
+        // Use the first reported version. A reconnect or an unsuccessful
+        // replacement must not keep interrupting audio in this UI session.
+        _upgradeChecked = true;
+        return UpdateChecker.Newer(AppVersion.Current, daemonVersion) ? RestartAsync(restart) : Task.CompletedTask;
+    }
+
+    private async Task<bool> RestartAsync(Func<Task<bool>> restart)
     {
         if (_busy) return false;
         _reconnected = false;
@@ -43,7 +63,7 @@ public sealed class DaemonRestartViewModel : ViewModelBase
         Status = Localizer.Text("RestartingDaemon");
         try
         {
-            bool restarted = await _restart();
+            bool restarted = await restart();
             Status = restarted
                 ? _reconnected ? null : Localizer.Text("ServiceRestartedWaiting")
                 : Localizer.Text("RestartFailedManualDaemon");

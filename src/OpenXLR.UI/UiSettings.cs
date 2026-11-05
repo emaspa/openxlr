@@ -1118,6 +1118,11 @@ public static class StartupIntegration
     /// </summary>
     internal static Func<bool>? AttachedRestart { get; set; }
 
+    /// <summary>Only replace an active user service during an automatic upgrade.</summary>
+    internal static bool TryRestartRunningDaemonService()
+        => Systemctl("is-active", "--quiet", "openxlr-daemon.service")
+            && Systemctl("try-restart", "openxlr-daemon.service");
+
     private static bool Systemctl(params string[] args)
     {
         try
