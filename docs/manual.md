@@ -698,10 +698,11 @@ each listening device gets the mix you choose.
 
 1. Connect the second headset so it appears as a Linux playback device.
    In **MONITOR → Devices**, tick it and the output you already use.
-2. Open the feed picker beside the original output and select **Monitor A**
-   alone. Open the picker beside the second headset and select **Monitor B**
-   alone. If both devices should hear the same blend, select **Monitor A**
-   on both.
+2. Open the feed picker beside the original output and leave only
+   **Monitor A** ticked. Open the picker beside the second headset, tick
+   **Monitor B** first, then untick **Monitor A** and any other mixes.
+   The picker keeps at least one mix selected. If both devices should
+   hear the same blend, leave only Monitor A ticked on both.
 3. In **SUBMIXER**, unmute Monitor B and open the sends you want to hear in
    that mix. Its master and sends control the blend for the second headset.
 4. Open [**Flow**](#audio-flow) and click the second headset to trace its
@@ -712,8 +713,8 @@ output in **Devices**. Your microphone and app assignments still apply.
 
 To use **Monitor C** instead, open **SUBMIXER → Edit layout**. Under
 **MIXES**, enter the name, select **Monitor mix** and press **Add mix**.
-Choose Monitor C in the headset's feed picker, then open its sends. A new
-mix starts silent until you give it a send.
+Tick Monitor C in the headset's feed picker before unticking its old
+feed. A new mix starts silent until you open its sends.
 
 **Check that the output reconnects.** At a low listening level, play a
 sound through an app already assigned to an OpenXLR channel. Open that
