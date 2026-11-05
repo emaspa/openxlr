@@ -199,6 +199,8 @@ internal static partial class MixerPopOutWindowTests
                 Assert.Null((UiSettings.Load() with { MixerScale = savedScale }).Save());
             }
 
+            CheckMatrixFit(main, panel);
+
             // A switch while the main window is hidden in the tray, with the mixer detached.
             MixerWindow tray = main.PopOutMixer();
             main.Hide();
@@ -258,6 +260,67 @@ internal static partial class MixerPopOutWindowTests
             Environment.SetEnvironmentVariable("XDG_DATA_DIRS", dataDirs);
             Directory.Delete(data, true);
             outer.Show();
+        }
+    }
+
+    private static void CheckMatrixFit(MainWindow main, MixerPanel panel)
+    {
+        string? savedScale = UiSettings.Load().MixerScale;
+        bool touch = SkinService.TouchControls;
+        Layout(main, 1040, 900);
+        Wear("switch-matrix");
+        SkinService.ApplyControlSizing(true);
+        Layout(main, 1040, 900);
+        MixerWindow popped = main.PopOutMixer();
+        try
+        {
+            var picker = popped.FindControl<ComboBox>("MixerScalePicker")!;
+            picker.SelectedIndex = 1;
+            Layout(popped, 1400, 340);
+            MixMatrixView matrix = panel.MatrixItems;
+            var lines = matrix.FindControl<StackPanel>("MatrixLines")!;
+            Slider master = matrix.GetVisualDescendants().OfType<Slider>().First(s => s.Name == "MatrixMaster");
+            Slider send = matrix.GetVisualDescendants().OfType<Slider>().First(s => s.DataContext is MatrixCellViewModel);
+            double normalWidth = lines.Bounds.Width;
+            double normalMaster = master.Bounds.Width;
+            double normalSend = send.Bounds.Width;
+            Assert.True(matrix.Scroller.Viewport.Width - normalWidth > 100);
+            Capture(popped, "popout-matrix-100-wide");
+
+            picker.SelectedIndex = 0;
+            Layout(popped, 1400, 340);
+            double gap = matrix.Scroller.Viewport.Width - lines.Bounds.Width;
+            Capture(popped, "popout-matrix-fit-wide");
+            Assert.InRange(gap, -0.5, 6);
+            Assert.True(master.Bounds.Width > normalMaster, "spare width should lengthen the master fader");
+            Assert.True(send.Bounds.Width > normalSend, "spare width should lengthen the send fader");
+            Assert.True(matrix.Scroller.Extent.Width <= matrix.Scroller.Viewport.Width + 0.5);
+            Assert.True(popped.FindControl<ScrollViewer>("MixerScroll")!.Extent.Width
+                <= popped.FindControl<ScrollViewer>("MixerScroll")!.Viewport.Width + 0.5);
+
+            Layout(popped, 340, 280);
+            Assert.Equal(1, popped.Scale);
+            Assert.True(popped.FindControl<ScrollViewer>("MixerScroll")!.Extent.Width > 340);
+            Assert.Equal(normalWidth, lines.Bounds.Width, 0.5);
+
+            picker.SelectedIndex = 1;
+            Layout(popped, 1400, 340);
+            Assert.Equal(normalWidth, lines.Bounds.Width, 0.5);
+            picker.SelectedIndex = 0;
+            Layout(popped, 1400, 340);
+            popped.Close();
+            Dispatcher.UIThread.RunJobs();
+            Layout(main, 1400, 900);
+            Assert.Equal(normalWidth, lines.Bounds.Width, 0.5);
+        }
+        finally
+        {
+            popped.Close();
+            Dispatcher.UIThread.RunJobs();
+            Layout(main, 1040, 900);
+            SkinService.ApplyControlSizing(touch);
+            Wear(SkinPackage.DefaultId);
+            Assert.Null((UiSettings.Load() with { MixerScale = savedScale }).Save());
         }
     }
 

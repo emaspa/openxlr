@@ -22,8 +22,13 @@ public partial class MixMatrixView : UserControl
     private static readonly StyledProperty<int> ColumnCountProperty =
         AvaloniaProperty.Register<MixMatrixView, int>("ColumnCount");
 
+    private static readonly StyledProperty<bool> FillWidthProperty =
+        AvaloniaProperty.Register<MixMatrixView, bool>(nameof(FillWidth));
+
     static MixMatrixView() => AffectsMeasure<MixMatrixView>(
-        BaseCellWidthProperty, MaxCellWidthProperty, NameWidthProperty, ColumnCountProperty);
+        BaseCellWidthProperty, MaxCellWidthProperty, NameWidthProperty, ColumnCountProperty, FillWidthProperty);
+
+    internal bool FillWidth { get => GetValue(FillWidthProperty); set => SetValue(FillWidthProperty, value); }
 
     public MixMatrixView()
     {
@@ -37,7 +42,8 @@ public partial class MixMatrixView : UserControl
     protected override Size MeasureOverride(Size availableSize)
     {
         double minimum = GetValue(BaseCellWidthProperty);
-        double maximum = GetValue(MaxCellWidthProperty);
+        // The detached mixer's Fit mode can use all the available width.
+        double maximum = FillWidth ? double.PositiveInfinity : GetValue(MaxCellWidthProperty);
         int mixes = GetValue(ColumnCountProperty);
         double width = minimum;
         if (maximum > minimum && double.IsFinite(availableSize.Width))

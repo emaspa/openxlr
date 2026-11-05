@@ -118,6 +118,7 @@ public partial class MixerWindow : Window
         PanelScale.LayoutTransform = null;
         _scale = 1;
         _panel = null;
+        if (panel is Views.MixerPanel mixer) mixer.SetMatrixFillWidth(false);
         panel.ClearValue(WidthProperty);
         panel.ClearValue(RenderTransformProperty);
         panel.ClearValue(RenderTransformOriginProperty);
@@ -158,6 +159,8 @@ public partial class MixerWindow : Window
         {
             double minimum = Minimum() + 8;
             bool fit = _scaleChoice == MixerScale.Fit;
+            if (_panel is Views.MixerPanel mixer)
+                mixer.SetMatrixFillWidth(fit && MixerScroll.Viewport.Width >= minimum);
             double scale = fit ? FitScale(_panel, minimum) : MixerScale.Factor(_scaleChoice);
             _panel.Width = Math.Max(WrapWidth(scale), minimum);
             ApplyScale(scale);
