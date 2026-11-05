@@ -65,6 +65,9 @@ internal static class WelcomeGuideWindowTests
                 var options = Assert.Single(main.OwnedWindows.OfType<OptionsWindow>());
                 Settle(options);
                 Assert.True(options.IsVisible);
+                // The microphone step opens Options on the tab with its card.
+                Assert.Equal(OptionsTab.Audio, options.SelectedTab);
+                Assert.True(options.FindControl<TextBlock>("GuideAudio")!.IsEffectivelyVisible);
                 var reopen = options.FindControl<Button>("WelcomeGuideButton")!;
                 Click(reopen);
                 Assert.Same(guide, Assert.Single(main.OwnedWindows.OfType<WelcomeGuideWindow>()));
@@ -102,6 +105,16 @@ internal static class WelcomeGuideWindowTests
                     AssertInside(next, guide);
                     AssertInside(skip, guide);
                     Capture(guide, $"welcome-guide-{step}");
+                    // A step that opens Options shows the tab its card is on,
+                    // whichever tab Options had on show.
+                    if (OptionsSteps.TryGetValue(step, out var shortcut))
+                    {
+                        options.SelectedTab = shortcut.Tab == OptionsTab.Plugins ? OptionsTab.General : OptionsTab.Plugins;
+                        Click(action);
+                        Settle(options);
+                        Assert.Equal(shortcut.Tab, options.SelectedTab);
+                        Assert.True(options.FindControl<TextBlock>(shortcut.Section)!.IsEffectivelyVisible, $"step {step}");
+                    }
                     if (step < progress.Maximum) Click(next);
                 }
 
@@ -149,6 +162,16 @@ internal static class WelcomeGuideWindowTests
             Assert.Null(initial.Save());
         }
     }
+
+    /// <summary>The guide's steps that open Options, the card each names and the tab that card is on.</summary>
+    private static readonly Dictionary<int, (string Section, OptionsTab Tab)> OptionsSteps = new()
+    {
+        [2] = ("GuideAudio", OptionsTab.Audio),
+        [6] = ("GuideDefaults", OptionsTab.Audio),
+        [9] = ("GuideAppearance", OptionsTab.Appearance),
+        [10] = ("GuideStartup", OptionsTab.General),
+        [11] = ("GuideSupport", OptionsTab.Support),
+    };
 
     private static MainWindow Start() => new(new DaemonClient("ws://127.0.0.1:1/ws"),
         showWelcomeGuide: UiSettings.PrepareWelcomeGuide());

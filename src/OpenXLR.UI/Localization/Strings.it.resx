@@ -1416,6 +1416,21 @@
   <data name="Options" xml:space="preserve">
     <value>Opzioni</value>
   </data>
+  <data name="OptionsTabGeneral" xml:space="preserve">
+    <value>Generale</value>
+  </data>
+  <data name="OptionsTabAudio" xml:space="preserve">
+    <value>Audio</value>
+  </data>
+  <data name="OptionsTabPlugins" xml:space="preserve">
+    <value>Plugin</value>
+  </data>
+  <data name="OptionsTabAppearance" xml:space="preserve">
+    <value>Aspetto</value>
+  </data>
+  <data name="OptionsTabSupport" xml:space="preserve">
+    <value>Supporto</value>
+  </data>
   <data name="OutputMixesHeading" xml:space="preserve">
     <value>MIX DI USCITA</value>
   </data>

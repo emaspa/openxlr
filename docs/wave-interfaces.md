@@ -94,7 +94,7 @@ in the mixer.
 
 ## Additional interfaces
 
-Options, INTERFACE, **Additional interfaces** lists every attached unit, and
+Options → Audio → **Additional interfaces** lists every attached unit, and
 every unit enabled before that is not attached now. The button shows once
 more than one unit is attached or one is enabled. Tick **Drive as an
 additional interface** to enable a unit. The choice is kept in

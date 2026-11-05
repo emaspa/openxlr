@@ -166,14 +166,15 @@ internal static partial class InputBindingWindowTests
 
             // From Options: one row per bindable strip, each with its chip.
             options.Show();
-            Layout(options, 980, 800);
+            OptionsTabsWindowTests.Show(options, OptionsTab.Audio);
+            Layout(options, OptionsWindow.DesignWidth, 800);
             ItemsControl rows = options.FindControl<ItemsControl>("InputBindingRows")!;
             Button[] chips = [.. rows.GetVisualDescendants().OfType<Button>().Where(b => b.Name == "Chip")];
             Assert.Equal(2, chips.Length);
             Assert.Equal(Localizer.Format("InputBindingChipName", "XLR 1", Localizer.Text("Xlr1Jack")), AutomationProperties.GetName(chips[0]));
             foreach (Button chip in chips) AssertInside(chip, options);
             options.FindControl<StackPanel>("InputBindings")!.BringIntoView();
-            Layout(options, 980, 800);
+            Layout(options, OptionsWindow.DesignWidth, 800);
             Capture(options, "binding-options");
             chips[0].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Window dialog = await Owned(options);
@@ -232,7 +233,7 @@ internal static partial class InputBindingWindowTests
             await Until(() => xlr1.IsSourceBound && main.UnitInput1.Carrier?.Id == "promic");
             Assert.True(main.DeviceConnected);
             Assert.True(led.IsOn);   // still the interface's light
-            Layout(options, 980, 800);
+            Layout(options, OptionsWindow.DesignWidth, 800);
             Assert.Equal(Localizer.Format("InputBindingSourcePort", "Webcam", 2),
                 Chip(rows).GetVisualDescendants().OfType<TextBlock>().Single().Text);
 
@@ -278,7 +279,7 @@ internal static partial class InputBindingWindowTests
             Assert.Contains("Webcam is not connected.", ToolTip.GetTip(Chip(offline)) as string, StringComparison.Ordinal);
             Assert.Contains("Webcam is not connected.", ToolTip.GetTip(SkinLayoutWindowTests.RowHead(surface, "xlr1")
                 .GetVisualDescendants().OfType<Button>().Single(b => b.Name == "MatrixBinding")) as string, StringComparison.Ordinal);
-            Layout(options, 980, 800);
+            Layout(options, OptionsWindow.DesignWidth, 800);
             Assert.Contains(rows.GetVisualDescendants().OfType<TextBlock>(), t => t.IsEffectivelyVisible && t.Text == "Webcam is not connected.");
             Capture(surface, "binding-rack-offline-640");
 
@@ -371,7 +372,7 @@ internal static partial class InputBindingWindowTests
             ApplyState(main, daemon.State().ToJsonString()
                 .Replace("\"xlrInputs\":2", "\"xlrInputs\":1,\"xlrJacks\":false", StringComparison.Ordinal)
                 .Replace("\"name\":\"XLR 1\"", "\"name\":\"Mic 1\"", StringComparison.Ordinal));
-            Layout(options, 980, 800);
+            Layout(options, OptionsWindow.DesignWidth, 800);
             Assert.Equal(Localizer.Text("UnitCapsule"), Chip(rows).GetVisualDescendants().OfType<TextBlock>().Single().Text);
             Chip(rows).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             dialog = await Owned(options);

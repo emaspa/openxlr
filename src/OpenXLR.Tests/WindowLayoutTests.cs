@@ -466,32 +466,38 @@ public sealed class WindowLayoutTests
 
                 new UiSettings { StartMinimized = true, MinimizeToTray = true }.Save();
                 var optionsVm = new OptionsViewModel(new DaemonClient(), vm);
+                OptionsWindow.ForgetLastTab();
                 var options = new OptionsWindow { DataContext = optionsVm };
                 windows.Add(options);
                 options.Show();
-                Layout(options, 980, 800);
+                Settle(options);
+                // The window opens at its own size, which is the size every
+                // tab has to fit, on the tab a new run opens on.
+                Avalonia.Platform.Screen screen = options.Screens.ScreenFromWindow(options)!;
+                Size fitted = OptionsWindow.FitTo(screen.WorkingArea.Size.ToSize(screen.Scaling));
+                Assert.Equal(fitted, options.ClientSize);
+                Assert.True(options.ClientSize.Height * screen.Scaling <= screen.WorkingArea.Height,
+                    $"Options is {options.ClientSize} on a screen of {screen.WorkingArea} at {screen.Scaling}");
+                Assert.Equal(OptionsTab.General, options.SelectedTab);
+                OptionsTabsWindowTests.Check(options);
                 CheckTextSize(main, options);
                 var deepTrace = options.FindControl<CheckBox>("DeepDiagnostics")!;
                 Assert.False(deepTrace.IsChecked);
                 Assert.Equal(Localizer.Text("DeepDiagnostics"), Assert.IsType<TextBlock>(deepTrace.Content).Text);
-                // The cards grow as features land, and the window sizes itself
-                // to them. On a tall screen that produced a window the height
-                // of the monitor, so the cap is what the scroll region needs to
-                // do anything at all: it is the one that has to hold.
-                var cards = options.GetVisualDescendants().OfType<ScrollViewer>()
-                    .First(v => v.GetVisualDescendants().OfType<Grid>().Any(g => g.ColumnDefinitions.Count == 3));
-                Assert.True(cards.Extent.Height > OptionsWindow.Comfortable - 200,
-                    $"the cards are {cards.Extent.Height} tall, so this no longer tests a capped window");
-                Layout(options, 980, OptionsWindow.Comfortable);
-                Assert.True(cards.Viewport.Height < cards.Extent.Height,
-                    $"at the cap the cards ({cards.Extent.Height}) must not all fit the viewport ({cards.Viewport.Height})");
-                Assert.True(cards.VerticalScrollBarVisibility == Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
-                    "the capped page must be able to show a scrollbar");
-                Layout(options, 980, 800);
-                MainWindowLabelTests.CheckFixedColumnLabels(options, Localizer.Text("DefaultInput"),
-                    Localizer.Text("DefaultOutput"), Localizer.Text("MixerView"));
-                MainWindowLabelTests.CheckFixedColumnTranslations(options, "DefaultInput", "DefaultOutput", "MixerView");
+                // Every page scrolls inside the window when it has more than
+                // the window has room for: the window never grows to fit one.
+                foreach (OptionsTab tab in Enum.GetValues<OptionsTab>())
+                    Assert.Equal(Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+                        OptionsTabsWindowTests.Page(options, tab).VerticalScrollBarVisibility);
+                OptionsTabsWindowTests.Show(options, OptionsTab.Audio);
+                MainWindowLabelTests.CheckFixedColumnLabels(options, Localizer.Text("DefaultInput"), Localizer.Text("DefaultOutput"));
+                MainWindowLabelTests.CheckFixedColumnTranslations(options, "DefaultInput", "DefaultOutput");
+                OptionsTabsWindowTests.Show(options, OptionsTab.Appearance);
+                MainWindowLabelTests.CheckFixedColumnLabels(options, Localizer.Text("MixerView"));
+                MainWindowLabelTests.CheckFixedColumnTranslations(options, "MixerView");
+                OptionsTabsWindowTests.Show(options, OptionsTab.Plugins);
                 LocalizationRenderingTests.CheckPluginActions(options);
+                OptionsTabsWindowTests.Show(options, OptionsTab.General);
                 Assert.Equal(Localizer.Text("DesktopKeys"), options.FindControl<Button>("DesktopKeysButton")!.Content);
                 var launch = options.FindControl<ComboBox>("LaunchBehavior")!;
                 var close = options.FindControl<ComboBox>("CloseBehavior")!;
@@ -504,8 +510,10 @@ public sealed class WindowLayoutTests
                     AssertInside(picker, options);
                     AssertNoOverlap(((Grid)picker.Parent!).Children.Where(c => c.IsVisible).ToArray());
                 }
-                foreach (string heading in new[] { "ATLOGIN", "WINDOW", "AUDIO" }.Select(Localizer.Text))
+                foreach (string heading in new[] { "ATLOGIN", "WINDOW" }.Select(Localizer.Text))
                     Assert.Single(options.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == heading);
+                Capture(options, "options-startup");
+                OptionsTabsWindowTests.Show(options, OptionsTab.Audio);
                 var notes = options.FindControl<StackPanel>("SoftwareMixerNotes")!;
                 var audioHeading = options.GetVisualDescendants().OfType<TextBlock>()
                     .Single(t => t.Text == Localizer.Text("AUDIO"));
@@ -524,7 +532,6 @@ public sealed class WindowLayoutTests
                 Assert.False(UiSettings.Load().StartMinimized);
                 Assert.False(UiSettings.Load().MinimizeToTray);
                 Assert.False(vm.MinimizeToTray);
-                Capture(options, "options-startup");
 
                 optionsVm.ApplyPluginSetup(new JsonObject
                 {
@@ -539,7 +546,8 @@ public sealed class WindowLayoutTests
                         ["path"] = "/plugins/Skipped.vst3", ["reason"] = "timed out", ["failedAt"] = "2026-09-17T10:00:00Z",
                     }),
                 });
-                Layout(options, 980, 800);
+                OptionsTabsWindowTests.Show(options, OptionsTab.Plugins);
+                Settle(options);
                 var skippedPlugins = options.FindControl<StackPanel>("SkippedPlugins")!;
                 Assert.Contains(skippedPlugins.GetVisualDescendants().OfType<TextBlock>(),
                     b => b.Text == Localizer.Format("SkippedBundlesAfterFailedScan", 1));
@@ -552,13 +560,14 @@ public sealed class WindowLayoutTests
                 Assert.Single(options.GetVisualDescendants().OfType<Button>(),
                     b => b.IsEffectivelyVisible && Equals(b.Content, Localizer.Text("MemoryLockSetup")));
                 memoryWarning.BringIntoView();
-                Layout(options, 980, 800);
+                Settle(options);
                 Capture(options, "options-plugin-runtime");
+                OptionsTabsWindowTests.Show(options, OptionsTab.Support);
                 var trace = options.FindControl<CheckBox>("WineTrace")!;
                 Assert.True(trace.IsChecked);
                 Assert.True(trace.IsEnabled);
                 trace.BringIntoView();
-                Layout(options, 980, 800);
+                Settle(options);
                 AssertInside(trace, (Control)trace.Parent!);
                 optionsVm.ApplyPluginSetup(JsonNode.Parse("""{"wineTrace":false}"""));
                 Assert.False(trace.IsChecked);
@@ -570,7 +579,8 @@ public sealed class WindowLayoutTests
                 Assert.Null(trace.IsChecked);
                 Assert.False(trace.IsEnabled);
                 optionsVm.ApplyPluginSetup(JsonNode.Parse("{}"));
-                Layout(options, 980, 800);
+                OptionsTabsWindowTests.Show(options, OptionsTab.Plugins);
+                Settle(options);
                 Assert.False(memoryWarning.IsEffectivelyVisible);
                 Assert.Null(trace.IsChecked);
                 Assert.False(trace.IsEnabled);
@@ -723,8 +733,13 @@ public sealed class WindowLayoutTests
             {
                 MainWindowLabelTests.Check(main);
                 MainWindowLabelTests.CheckAutoColumnTranslations(main, "XLR1Gain", "XLR2Gain", "Devices", "Volume", "USBAuxIn", "MicPC", "Inserts");
-                MainWindowLabelTests.CheckAutoColumnTranslations(options, "DefaultOutput", "DefaultInput", "MixerView",
-                    "OnLaunch", "WhenClosing", "Skin", "Mode", "TextSize", "Controls", "Language");
+                OptionsTabsWindowTests.Show(options, OptionsTab.General);
+                MainWindowLabelTests.CheckAutoColumnTranslations(options, "OnLaunch", "WhenClosing");
+                OptionsTabsWindowTests.CheckTranslations(options);
+                OptionsTabsWindowTests.Show(options, OptionsTab.Audio);
+                MainWindowLabelTests.CheckAutoColumnTranslations(options, "DefaultOutput", "DefaultInput");
+                OptionsTabsWindowTests.Show(options, OptionsTab.Appearance);
+                MainWindowLabelTests.CheckAutoColumnTranslations(options, "MixerView", "Skin", "Mode", "TextSize", "Controls", "Language");
                 // The input rows' labels hold a channel name, so they keep a
                 // width, and that width grows with the text.
                 foreach (string row in new[] { "Xlr1Binding", "Xlr2Binding" })
@@ -734,7 +749,12 @@ public sealed class WindowLayoutTests
             if (percent is 80 or 120)
             {
                 Capture(main, $"text-size-main-{percent}");
-                Capture(options, $"text-size-options-{percent}");
+                foreach (OptionsTab tab in Enum.GetValues<OptionsTab>())
+                {
+                    OptionsTabsWindowTests.Show(options, tab);
+                    Capture(options, $"text-size-options-{percent}-{tab.ToString().ToLowerInvariant()}");
+                }
+                OptionsTabsWindowTests.Show(options, OptionsTab.Appearance);
             }
         }
         PinMaterial(UiSettings.Load());

@@ -309,7 +309,8 @@ internal static class SoundboardWindowTests
             // Options, AUDIO: the button beside Ducking raises the same window, which stays the mixer's,
             // so closing Options never closes the board.
             options.Show(window);
-            Layout(options, 980, 900);
+            OptionsTabsWindowTests.Show(options, OptionsTab.Audio);
+            Layout(options, OptionsWindow.DesignWidth, 900);
             Button fromOptions = options.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "SoundboardButton");
             Assert.True(fromOptions.IsEffectivelyVisible);
             Assert.Equal(Localizer.Text("Soundboard"), fromOptions.Content);

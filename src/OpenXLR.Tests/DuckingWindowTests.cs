@@ -137,7 +137,8 @@ internal static class DuckingWindowTests
             Assert.Same(main.Ducking, window.OwnedWindows.OfType<DuckingWindow>().Single().DataContext);
 
             // Options: the interface card's group is gone, and AUDIO opens the window.
-            Layout(options, 980, 900);
+            OptionsTabsWindowTests.Show(options, OptionsTab.Audio);
+            Layout(options, OptionsWindow.DesignWidth, 900);
             foreach (string gone in new[] { "Ducking", "DuckingEnabled", "DuckingSensitivity", "DuckingStatus", "DuckingHardwareBadge" })
                 Assert.DoesNotContain(options.GetVisualDescendants().OfType<Control>(), c => c.Name == gone);
             Button fromOptions = Find<Button>(options, "DuckingButton");

@@ -83,6 +83,7 @@ internal static class HardwareMixingWindowTests
             Layout(main, 1040, 900);
             main.FindControl<Button>("OptionsButton")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             OptionsWindow options = Assert.Single(main.OwnedWindows.OfType<OptionsWindow>());
+            OptionsTabsWindowTests.Show(options, OptionsTab.Audio);
             Settle(options);
             Assert.False(options.FindControl<StackPanel>("HardwareMixing")!.IsEffectivelyVisible);
 

@@ -10,7 +10,7 @@ development.
 The Flatpak UI owns its daemon unless the daemon runs as a user service
 (see [Audio in Game Mode](#audio-in-game-mode)): closing to the tray
 keeps audio running; Quit stops both. For that reason the close button
-keeps the Flatpak in the tray unless "When closing" in Options says
+keeps the Flatpak in the tray unless "When closing" in Options → General says
 "Quit app". Stop the packaged daemon before launching the Flatpak, since
 they use the same private control socket. Disable the native installation's login
 options before enabling Flatpak login startup.
@@ -65,7 +65,7 @@ it, run the service script's `remove` if you used it, then
 `55-openxlr-wave3-mk2-playback.conf`.
 
 On GNOME the tray icon needs an AppIndicator extension enabled. Without
-a tray, set "When closing" to "Quit app" in Options.
+a tray, set "When closing" to "Quit app" in Options → General.
 
 ## Audio in Game Mode
 

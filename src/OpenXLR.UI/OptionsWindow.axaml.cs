@@ -1,40 +1,107 @@
 using OpenXLR.UI.Localization;
 using System;
 using System.Linq;
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.LogicalTree;
 using Avalonia.Threading;
 
 namespace OpenXLR.UI;
 
+/// <summary>The tabs of Options, in the order the strip shows them.</summary>
+internal enum OptionsTab { General, Audio, Plugins, Appearance, Support }
+
 public partial class OptionsWindow : Window
 {
     /// <summary>
-    /// As tall as this window is worth making on a screen with room to spare.
-    /// Past this the eye travels further than the scroll would have, and the
-    /// two columns of cards stop reading as one page.
+    /// Wide enough for the widest card in one column, with the longest
+    /// translation at the largest text size, and for the row of tabs.
     /// </summary>
-    internal const double Comfortable = 860;
+    internal const double DesignWidth = 640;
+
+    /// <summary>
+    /// How tall the window is on a screen with room to spare: about the
+    /// height of the Audio tab, the tallest, in English at Normal text. A
+    /// tab taller than this scrolls inside it, and a shorter one leaves room
+    /// below its last card.
+    /// </summary>
+    internal const double Comfortable = 760;
+
+    /// <summary>
+    /// The tab the last Options window of this run was showing, so Options
+    /// opens again where the user left it. It is kept in memory only: a new
+    /// run opens on General.
+    /// </summary>
+    private static OptionsTab _lastTab = OptionsTab.General;
 
     public OptionsWindow()
     {
         InitializeComponent();
-        // The window sizes itself to its cards, so without a cap it grows
-        // until it runs out of desktop. Two caps, because each answers a
-        // different screen: the screen's own working area keeps the bottom on
-        // a short display, and Comfortable keeps a tall one from handing back
-        // a window the height of the monitor. Whichever is smaller wins, and
-        // the cards scroll inside it.
+        // One size whichever tab is shown, so the window does not jump as the
+        // tabs change: a window that sized itself to its content would grow
+        // and shrink under the pointer with every tab. On a screen too small
+        // for that size the window takes what the screen has and the tab
+        // scrolls inside it.
+        Width = DesignWidth;
+        Height = Comfortable;
         Opened += (_, _) =>
         {
-            double cap = Comfortable;
-            if (Screens.ScreenFromWindow(this) is { } screen)
-            {
-                double usable = screen.WorkingArea.Height / screen.Scaling;
-                if (usable > 200) cap = Math.Min(cap, usable - 60);
-            }
-            MaxHeight = cap;
+            if (Screens.ScreenFromWindow(this) is not { } screen) return;
+            Size size = FitTo(screen.WorkingArea.Size.ToSize(screen.Scaling));
+            Width = size.Width;
+            Height = size.Height;
         };
+        OptionsTabs.SelectedIndex = (int)_lastTab;
+        OptionsTabs.PropertyChanged += (_, e) =>
+        {
+            if (e.Property == SelectingItemsControl.SelectedIndexProperty && OptionsTabs.SelectedIndex >= 0)
+                _lastTab = (OptionsTab)OptionsTabs.SelectedIndex;
+        };
+        // Ctrl+Tab and Ctrl+Page Down move to the next tab from anywhere in
+        // the window, as they do in a browser; the arrow keys move along the
+        // row of tabs once it has the focus.
+        AddHandler(KeyDownEvent, OnTabKeys, RoutingStrategies.Tunnel);
+    }
+
+    /// <summary>
+    /// The window's size on a screen with this much room, in device
+    /// independent units: its own size, or less where the screen is smaller,
+    /// leaving room for a panel and the window's title bar. A screen that
+    /// reports almost nothing is not believed.
+    /// </summary>
+    internal static Size FitTo(Size usable) => new(
+        usable.Width > 200 ? Math.Min(DesignWidth, usable.Width - 32) : DesignWidth,
+        usable.Height > 200 ? Math.Min(Comfortable, usable.Height - 60) : Comfortable);
+
+    /// <summary>The tab on show. Setting it shows that tab.</summary>
+    internal OptionsTab SelectedTab
+    {
+        get => (OptionsTab)Math.Max(0, OptionsTabs.SelectedIndex);
+        set => OptionsTabs.SelectedIndex = (int)value;
+    }
+
+    /// <summary>Forget the tab this run last showed, for a test that opens Options as a new run would.</summary>
+    internal static void ForgetLastTab() => _lastTab = OptionsTab.General;
+
+    private void OnTabKeys(object? sender, KeyEventArgs e)
+    {
+        if ((e.KeyModifiers & KeyModifiers.Control) == 0) return;
+        int step = e.Key switch
+        {
+            Key.Tab => (e.KeyModifiers & KeyModifiers.Shift) != 0 ? -1 : 1,
+            Key.PageDown => 1,
+            Key.PageUp => -1,
+            _ => 0,
+        };
+        if (step == 0) return;
+        int count = OptionsTabs.ItemCount;
+        OptionsTabs.SelectedIndex = (OptionsTabs.SelectedIndex + step + count) % count;
+        // The control that had the focus went with the tab it was on.
+        OptionsTabs.ContainerFromIndex(OptionsTabs.SelectedIndex)?.Focus(NavigationMethod.Tab);
+        e.Handled = true;
     }
 
     private readonly DesktopKeys? _desktopKeys;
@@ -57,8 +124,18 @@ public partial class OptionsWindow : Window
 
     private void OnWelcomeGuide(object? sender, RoutedEventArgs e) => WelcomeGuideRequested?.Invoke();
 
+    /// <summary>
+    /// Show the tab that holds a card and bring the card into view: the
+    /// welcome guide's shortcuts name the card's heading.
+    /// </summary>
     internal void ShowGuideSection(string heading)
-        => Dispatcher.UIThread.Post(() => this.FindControl<TextBlock>(heading)?.BringIntoView(), DispatcherPriority.Loaded);
+    {
+        if (this.FindControl<Control>(heading) is not { } section) return;
+        if (section.FindLogicalAncestorOfType<TabItem>() is { } tab) OptionsTabs.SelectedItem = tab;
+        // The tab's content joins the window on the next layout pass, and
+        // only then does it have a scroll view to be brought into view in.
+        Dispatcher.UIThread.Post(() => section.BringIntoView(), DispatcherPriority.Loaded);
+    }
 
     // Plugins: the same install flow as the picker, plus yabridge's sync and a rescan.
     private async void OnInstallPluginFile(object? sender, RoutedEventArgs e)
