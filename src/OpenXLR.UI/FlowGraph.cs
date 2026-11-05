@@ -58,8 +58,12 @@ internal sealed record FlowGraph(IReadOnlyList<FlowNode> Nodes, IReadOnlyList<Fl
                     "xlr1" => Localizer.Text("Xlr1Jack"), "xlr2" => Localizer.Text("Xlr2Jack"),
                     "line" => Localizer.Text("LineInJack"), _ => Localizer.Text("USBAuxIn"),
                 }, Localizer.Text("FlowHardware"), FlowIcon.Microphone, true));
+            // A capture input shows its device's name, as its source chip does;
+            // the node name only while the device list has none.
             if (channel.CaptureSource is { } capture)
-                sources.Add(($"capture:{channel.Id}", capture, channel.CaptureLabel,
+                sources.Add(($"capture:{channel.Id}",
+                    vm.Inputs.FirstOrDefault(i => i.Name == capture)?.Description is { Length: > 0 } device ? device : capture,
+                    channel.CaptureLabel,
                     FlowIcon.Microphone, channel.CaptureConnected));
             // A source on another device's clock says so on its card.
             if (vm.Clock?.ResampledFor(channel.Id) is not null)
