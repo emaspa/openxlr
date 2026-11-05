@@ -196,7 +196,7 @@ physical gain dial.
   the graph is a row of fields per band, and above it the EQ switch, a
   bypass to compare, copy and paste between microphones and a reset. EQ
   profiles save the bands under a name and load them on any microphone;
-  Mic setup's four presets are listed first as built-in profiles. The
+  Mic setup's presets are listed first as built-in profiles. The
   daemon keeps them in one private file, does not write it while an entry
   in it fails to read, and lists them in its state, so the UI, a Deck key
   and the API load the same ones ([manual](manual.md#eq-profiles)). The
@@ -773,8 +773,8 @@ crossfade and no chain rebuilt, and **Hear myself** puts the processed
 microphone in the monitor mix for the session only, and the window says
 how much latency that adds. **Shape** holds the microphone EQ's graph,
 edited in place, the unit's and XLR 1's software low cut and ClipGuard, the
-insert chain with bypass, editor and add effect, and four starting
-presets of OpenXLR's own (Clear, Warm, Broadcast and Voice Boost), each applied as one
+insert chain with bypass, editor and add effect, and eight starting
+presets for speech, each applied as one
 EQ change with a one-step undo and lit while the EQ holds it, all heard
 live while the take loops. On
 the Wave XLR Pro the session turns the zero-latency

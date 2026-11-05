@@ -78,8 +78,37 @@ public static class EqPresets
         Band(MicEq.Peak, 2800, 3, 0.9),
         Band(MicEq.HighShelf, 8000, 0)));
 
+    /// <summary>Clearer higher voices with a moderate presence lift and a restrained top end.</summary>
+    public static EqPreset FemaleVoiceBoost { get; } = new("female-voice-boost", "Female Voice Boost", Eq(
+        Band(MicEq.LowCut, 95),
+        Band(MicEq.Peak, 420, -2, 1.2),
+        Band(MicEq.Peak, 2400, 2.25, 1.0),
+        Band(MicEq.HighShelf, 7500, -0.75)));
+
+    /// <summary>Balance the extra bass of close speech and add a gentle lift for words.</summary>
+    public static EqPreset Podcast { get; } = new("podcast", "Podcast", Eq(
+        Band(MicEq.LowCut, 65),
+        Band(MicEq.LowShelf, 140, -2),
+        Band(MicEq.Peak, 1900, 1.75, 0.8),
+        Band(MicEq.HighShelf, 7000, -1.5)));
+
+    /// <summary>Reduce boom and muddiness on deep voices while keeping their low fundamentals.</summary>
+    public static EqPreset DeepVoiceClarity { get; } = new("deep-voice-clarity", "Deep Voice Clarity", Eq(
+        Band(MicEq.LowCut, 70),
+        Band(MicEq.Peak, 170, -2.5, 1.2),
+        Band(MicEq.Peak, 500, -1.5, 0.9),
+        Band(MicEq.HighShelf, 3200, 2)));
+
+    /// <summary>A static dip around sharp consonants with a soft top end.</summary>
+    public static EqPreset SoftSibilants { get; } = new("soft-sibilants", "Soft Sibilants", Eq(
+        Band(MicEq.LowCut, 75),
+        Band(MicEq.LowShelf, 180, 1),
+        Band(MicEq.Peak, 6600, -3, 2.0),
+        Band(MicEq.HighShelf, 9500, -1.5)));
+
     /// <summary>The presets in the order every client shows them.</summary>
-    public static IReadOnlyList<EqPreset> All { get; } = [Clear, Warm, Broadcast, VoiceBoost];
+    public static IReadOnlyList<EqPreset> All { get; } =
+        [Clear, Warm, Broadcast, VoiceBoost, FemaleVoiceBoost, Podcast, DeepVoiceClarity, SoftSibilants];
 
     /// <summary>The preset with this id (<c>builtin:</c> and its key), or null.</summary>
     public static EqPreset? FindId(string? id) => All.FirstOrDefault(p => string.Equals(p.Id, id, StringComparison.Ordinal));

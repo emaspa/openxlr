@@ -66,6 +66,15 @@ test("built-in profiles are named in the plugin's language, an unknown one by th
   assert.equal(eqProfileName(saved), "My voice");
 });
 
+test("the new speech presets keep readable labels while the daemon is offline", () => {
+  for (const [id, name] of [
+    ["female-voice-boost", "Female Voice Boost"], ["podcast", "Podcast"],
+    ["deep-voice-clarity", "Deep Voice Clarity"], ["soft-sibilants", "Soft Sibilants"],
+  ]) {
+    assert.equal(eqProfileLabel(null, `eqprofile:xlr1:builtin:${id}`), `EQ profile\n${name}`);
+  }
+});
+
 test("a press is one loadEqProfile, refused for a band count the microphone does not take", () => {
   const s = state();
   assert.deepEqual(eqProfilePress(eqProfileTarget(s, "eqprofile:xlr1:builtin:clear")),

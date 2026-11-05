@@ -52,7 +52,7 @@ is measured over one that is described.
   a full microphone strip: its own insert chain, the microphone EQ, noise
   removal and Mic setup when mono, and the controls of the unit behind
   it. Each microphone with the EQ also has noise removal, a compressor,
-  an expander and a voice changer. EQ profiles, four of them built in,
+  an expander and a voice changer. EQ profiles, including built-in speech presets,
   load from the UI, a Deck key or the API. Exclusive channel groups,
   ducking on every device with presets or custom values, profiles with
   one recalled on connect, and browser tabs routed to channels through the Chromium

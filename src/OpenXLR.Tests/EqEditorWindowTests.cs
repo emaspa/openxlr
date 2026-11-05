@@ -1243,7 +1243,7 @@ public sealed class EqEditorWindowTests
         Assert.Equal(Localizer.Text("Save"), first.FindControl<Button>("EqProfileSave")!.Content);
 
         // The built-in profiles: Mic setup's presets, first, in the UI's language and marked as built in.
-        Assert.Equal(["builtin:clear", "builtin:warm", "builtin:broadcast", "builtin:voice-boost"], first.Profiles!.Profiles.Select(p => p.Id));
+        Assert.Equal(MicSetupPresets.All.Select(p => EqProfileIds.Builtin(p.Id)), first.Profiles!.Profiles.Select(p => p.Id));
         Assert.Equal(MicSetupPresets.All.Select(p => Localizer.Format("EqProfileBuiltInName", p.Name)),
             list1.Items.Cast<EqProfile>().Select(p => p.ToString()));
         // Picking one in the list is the load: one loadEqProfile, and nothing more as the state comes back.

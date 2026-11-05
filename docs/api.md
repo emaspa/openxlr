@@ -2141,7 +2141,9 @@ profiles first:
 Each band is `{enabled, type, frequency, gain, q}` as `setEq` takes it.
 
 - The built-in profiles are Mic setup's starting presets: `builtin:clear`,
-  `builtin:warm`, `builtin:broadcast` and `builtin:voice-boost`, four bands each, in that order.
+  `builtin:warm`, `builtin:broadcast`, `builtin:voice-boost`,
+  `builtin:female-voice-boost`, `builtin:podcast`, `builtin:deep-voice-clarity`
+  and `builtin:soft-sibilants`, four bands each, in that order.
   Their ids never change, and their `name` is English. A client names them
   in its own language from the key after `builtin:`, and shows `name` for
   a key it does not know. They cannot be renamed or deleted.

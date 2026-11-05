@@ -172,11 +172,9 @@ public sealed class EqProfileTests : IDisposable
         using MicEqViewModel eq = Eq(daemon, "guest", variable: true);
         using var profiles = new EqProfilesViewModel(eq, daemon.Library);
         Assert.True(await profiles.Save("Mine", false));
-        Assert.Equal(["builtin:clear", "builtin:warm", "builtin:broadcast", "builtin:voice-boost", "saved:Mine"], profiles.Profiles.Select(p => p.Id));
-        Assert.Equal([Localizer.Format("EqProfileBuiltInName", Localizer.Text("MicSetupPresetClear")),
-            Localizer.Format("EqProfileBuiltInName", Localizer.Text("MicSetupPresetWarm")),
-            Localizer.Format("EqProfileBuiltInName", Localizer.Text("MicSetupPresetBroadcast")),
-            Localizer.Format("EqProfileBuiltInName", Localizer.Text("MicSetupPresetVoiceBoost")), "Mine"],
+        Assert.Equal(MicSetupPresets.All.Select(p => EqProfileIds.Builtin(p.Id)).Append("saved:Mine"),
+            profiles.Profiles.Select(p => p.Id));
+        Assert.Equal(MicSetupPresets.All.Select(p => Localizer.Format("EqProfileBuiltInName", p.Name)).Append("Mine"),
             profiles.Profiles.Select(p => p.ToString()));
         // Mic setup's presets, the same table.
         Assert.Equal(MicSetupPresets.All.Select(p => p.Eq.Bands), profiles.Profiles.Take(MicSetupPresets.All.Count).Select(p => p.Bands), new BandsComparer());
