@@ -239,6 +239,12 @@ public static class CommandValidation
             case "setMixMuted":
                 if (cmd.Mix is not null && !layout.HasMix(cmd.Mix)) return $"{cmd.Cmd}: unknown mix '{Short(cmd.Mix)}'";
                 return cmd.Cmd == "setMixVolume" ? Finite(cmd, "value") : null;
+            case "setMonitorEqPreset":
+                if (cmd.Mix is null || TooLong(cmd.Mix, 36) || !layout.HasMix(cmd.Mix))
+                    return "setMonitorEqPreset: need a monitor mix";
+                return cmd.Value.ValueKind == JsonValueKind.Null
+                    || cmd.Value.ValueKind == JsonValueKind.String && MonitorEqPresets.Find(cmd.Value.GetString()) is not null
+                    ? null : "setMonitorEqPreset: need null or a known listening preset";
             case "setOutputVolume":
                 return Finite(cmd, "value");
             case "adjustOutputVolume":

@@ -1175,6 +1175,24 @@
   <data name="MonitorMix" xml:space="preserve">
     <value>Monitor-Mix</value>
   </data>
+  <data name="MonitorEqualizer" xml:space="preserve">
+    <value>Monitor-EQ</value>
+  </data>
+  <data name="MonitorEqOff" xml:space="preserve">
+    <value>Aus (neutral)</value>
+  </data>
+  <data name="MonitorEqVoiceBoost" xml:space="preserve">
+    <value>Stimmen hervorheben</value>
+  </data>
+  <data name="MonitorEqFps" xml:space="preserve">
+    <value>FPS</value>
+  </data>
+  <data name="MonitorEqBassBoost" xml:space="preserve">
+    <value>Bass betonen</value>
+  </data>
+  <data name="MonitorEqSoftTreble" xml:space="preserve">
+    <value>Sanfte Höhen</value>
+  </data>
   <data name="MonitorMixKind" xml:space="preserve">
     <value>Monitor-Mix</value>
   </data>

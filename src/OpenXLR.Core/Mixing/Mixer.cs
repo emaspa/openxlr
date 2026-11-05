@@ -1028,25 +1028,56 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         if (_mixTaps.Remove(key, out PortLink? tap)) _pw.Unlink(tap);
         if (_chains.Remove(key, out FilterHandle? old)) _pw.StopFilter(old);
         _insertErrors.Remove(key);
+        _monitorEqErrors.Remove(mix.Id);
         _chainStructures[key] = MixChainLocked(key).Structure;
 
         List<InsertDefinition> inserts = InsertsFor(key);
         bool anyInsert = inserts.Any(i => !i.Bypass && PluginCatalog.Find(i) is { } p && p.Fits(2));
-        if (anyInsert && _restarts.Blocked(key)) _insertErrors[key] = _restarts.Message(key);
-        else if (anyInsert)
+        var eq = MonitorEqPresets.Find(_monitorEqPresets.GetValueOrDefault(mix.Id));
+        if ((anyInsert || eq is not null) && _restarts.Blocked(key))
         {
-            try
-            {
-                FilterHandle chain = _pw.CreateMixChain(mix.Id, $"OpenXLR {mix.Name} Inserts", inserts);
-                _chains[key] = chain;
-                _mixTaps[key] = _pw.LinkNodes(mix.SinkName, "monitor", chain.SinkName, "playback");
-            }
+            string error = _restarts.Message(key);
+            if (anyInsert) _insertErrors[key] = error;
+            if (eq is not null) _monitorEqErrors[mix.Id] = error;
+        }
+        else if (anyInsert || eq is not null)
+        {
+            try { Build(eq); }
             catch (Exception ex)
             {
-                _insertErrors[key] = ex.Message;   // the mix keeps flowing without its inserts
+                if (eq is not null)
+                {
+                    _monitorEqErrors[mix.Id] = ex.Message;
+                    // The listening curve is optional. Keep working inserts
+                    // when only the EQ stage failed to start.
+                    if (anyInsert)
+                        try { Build(null); }
+                        catch (Exception fallback) { _insertErrors[key] = fallback.Message; }
+                }
+                else _insertErrors[key] = ex.Message;
             }
         }
         RewireMixConsumersLocked(mix);
+
+        void Build(MonitorEqPreset? preset)
+        {
+            string description = $"OpenXLR {mix.Name} Inserts";
+            FilterHandle chain = preset is null
+                ? _pw.CreateMixChain(mix.Id, description, inserts)
+                : _pw.CreateMonitorEqChain(mix.Id, description, inserts, preset);
+            try
+            {
+                PortLink tap = _pw.LinkNodes(mix.SinkName, "monitor", chain.SinkName, "playback");
+                if (preset is not null && (!tap.Complete || tap.Pairs.Count < 2))
+                {
+                    _pw.Unlink(tap);
+                    throw new InvalidOperationException("The stereo link to the monitor EQ could not be made.");
+                }
+                _mixTaps[key] = tap;
+                _chains[key] = chain;
+            }
+            catch { _pw.StopFilter(chain); throw; }
+        }
     }
 
     /// <summary>
@@ -1624,6 +1655,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 // A release still pending for a deselected output is saved too.
                 MonitorOutputMutes = new Dictionary<string, bool>(_monitorOutputMutes),
                 MonitorFeeds = new Dictionary<string, string>(_monitorFeeds),
+                MonitorEqPresets = _monitorEqPresets.Count == 0 ? null : new(_monitorEqPresets, StringComparer.Ordinal),
                 MonitorOutputLabels = new Dictionary<string, string>(_monitorOutputLabels, StringComparer.Ordinal),
                 AppOverrides = new Dictionary<string, string>(Matcher.Overrides),
                 RouteAppsByDefault = Matcher.RouteByDefault,
@@ -1848,6 +1880,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             // chain whose structure changed is built again.
             if (chainsChanged || rebuildAll || s.Inserts.Count > 0)
                 ApplyChainsLocked(s.Inserts.Count > 0 ? s.Inserts : null, absentMixesEmpty: false, rebuildAll);
+            RestoreMonitorEqLocked(s.MonitorEqPresets);
             SyncEqStagesLocked();
             UpdateMixLatencyLocked();
             SyncDuckingLocked();
@@ -2480,6 +2513,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             on &= !_monitorMuted && channel is not null && GroupForChannelLocked(channel) is null && _soundCheckChannel != channel
                 && !ProcessedInSoftwareLocked(channel)
                 && (input == 1 || channel != DirectPathChannelLocked(1))
+                && (whenHeardIn is null || !MonitorFeed.Parts(whenHeardIn).Any(_monitorEqPresets.ContainsKey))
                 && (whenHeardIn is null || MonitorFeed.Parts(whenHeardIn).Any(m => !_mixMuted.Contains(m) && !_muted.Contains(Cell(channel, m))));
             SetHardwareMicChannelLocked(input, on ? channel : null);
             return on;
@@ -3529,7 +3563,11 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                     m.Id, m.Name,
                     _mixVolume.GetValueOrDefault(m.Id, 1.0),
                     _mixMuted.Contains(m.Id), KindName(m.Kind), m.IsEditable)
-                    { Deletable = m.IsEditable && (m.Kind != MixKind.Monitor || monitorCount > 1) })],
+                    {
+                        Deletable = m.IsEditable && (m.Kind != MixKind.Monitor || monitorCount > 1),
+                        MonitorEq = m.Kind == MixKind.Monitor
+                            ? new(_monitorEqPresets.GetValueOrDefault(m.Id), _monitorEqErrors.GetValueOrDefault(m.Id)) : null,
+                    })],
                 Channels = [.. _config.Channels.Select(c => new ChannelStatus(
                     c.Id, ChannelNameLocked(c),
                     _config.Mixes.ToDictionary(m => m.Id, m => _levels.GetValueOrDefault(Cell(c.Id, m.Id), 0.0)),

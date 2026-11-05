@@ -497,6 +497,24 @@ strip. A bound strip keeps its sends and send mutes everywhere.
 <a name="monitor"></a>
 ### 3.2 Choose what you hear and how loud
 
+**Listening EQ.** Open **FX** on a monitor mix and choose its **Monitor EQ**.
+**Voice Boost** emphasizes speech, **FPS** reduces lows and sharp highs,
+**Bass Boost** emphasizes the low end, and **Soft Treble** reduces bright
+highs. **Off (flat)** removes the listening curve. The curves cut other
+frequencies to preserve headroom. Every output following the mix hears
+its stereo curve after its inserts. Other mixes, the microphone EQ and
+virtual microphones keep their own processing.
+
+To add another listening mix, open **SUBMIXER → Edit layout**, add a
+**Monitor mix**, then select it in the feed picker next to the output under
+**MONITOR → Devices**. The preset follows the mix across a rename or restart
+and is kept apart from profiles. Changing a preset rebuilds that mix's
+effects, which can briefly interrupt playback and close native plugin editors.
+The Wave XLR Pro's hardware
+mixing mode builds its jack feeds on the device, where the listening EQ
+cannot run. For a jack feed with listening EQ in software mixing mode,
+the microphone also goes through the software mix instead of its direct path.
+
 The level meters show the newest reading available. If the UI is
 temporarily busy, it keeps one pending meter update and resumes with the
 current levels instead of replaying a backlog of older readings. This

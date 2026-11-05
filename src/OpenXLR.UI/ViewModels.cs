@@ -1850,6 +1850,7 @@ public sealed class MixViewModel : ViewModelBase, IHasId
     public void ApplyFromDaemon(JsonNode n, bool monitorMuted = false)
     {
         Appearance.Apply(n["appearance"]);
+        Inserts.ApplyMonitorEq(n["monitorEq"]);
         bool? editable = n["editable"]?.GetValue<bool>();
         if (_editable != editable) { _editable = editable; Raise(nameof(IsEditable)); Raise(nameof(IsDeletable)); }
         bool? deletable = n["deletable"]?.GetValue<bool>();

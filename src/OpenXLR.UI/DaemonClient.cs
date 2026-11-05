@@ -157,6 +157,9 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
     public Task<string?> SetPreserveBrowserOutputsAsync(bool value)
         => EditLayoutAsync(new() { ["cmd"] = "setPreserveBrowserOutputs", ["value"] = value });
 
+    internal Task<string?> SetMonitorEqPresetAsync(string mix, string? preset)
+        => EditLayoutAsync(new() { ["cmd"] = "setMonitorEqPreset", ["mix"] = mix, ["value"] = preset! });
+
     /// <summary>Latest scan evidence and effective bridge status; null on timeout or an older daemon.</summary>
     public Task<JsonNode?> RequestPluginDiagnosticsAsync(TimeSpan timeout)
         => QueryAsync("pluginDiagnostics", "getPluginDiagnostics", timeout);

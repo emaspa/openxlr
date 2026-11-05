@@ -10,13 +10,30 @@ internal static class OutputControlsWindowTests
 {
     internal static void Check()
     {
-        var window = new MainWindow(new DaemonClient("ws://127.0.0.1:1/ws"));
+        var client = new DaemonClient("ws://127.0.0.1:1/ws");
+        var window = new MainWindow(client);
         try
         {
             var model = (MainViewModel)window.DataContext!;
             typeof(MainViewModel).GetMethod("ApplyMixer", BindingFlags.NonPublic | BindingFlags.Instance)!
                 .Invoke(model, [JsonNode.Parse("""{"mixes":[],"channels":[]}""")]);
             window.Show();
+            var mix = new MixViewModel(client, "monitor", "Monitor A");
+            mix.ApplyFromDaemon(JsonNode.Parse("""{"kind":"monitor","monitorEq":{"preset":"fps"}}""")!);
+            var editor = new MixInsertsWindow { DataContext = mix.Inserts };
+            try
+            {
+                editor.Show(window);
+                Layout(editor, 440, 270);
+                var picker = editor.FindControl<ComboBox>("MonitorEqPreset")!;
+                Assert.True(picker.IsEffectivelyVisible);
+                Assert.Equal("fps", Assert.IsType<MonitorEqOption>(picker.SelectedItem).Id);
+                AssertInside(picker, editor);
+                mix.ApplyFromDaemon(JsonNode.Parse("""{"kind":"monitor"}""")!);
+                Layout(editor, 440, 270);
+                Assert.False(picker.IsEffectivelyVisible);
+            }
+            finally { editor.Close(); }
             foreach (double width in new[] { 640d, 1280, 1600 })
             {
                 model.HasHp2 = false;

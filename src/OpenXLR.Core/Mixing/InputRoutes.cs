@@ -95,7 +95,8 @@ public sealed partial class Mixer
     private (ChainStructure Structure, bool Chained) MixChainLocked(string key)
     {
         List<InsertDefinition> inserts = InsertsFor(key);
-        return (ChainStructure.Of(inserts), inserts.Any(i => !i.Bypass && PluginCatalog.Find(i) is { } p && p.Fits(2)));
+        return (ChainStructure.Of(inserts), (MixForKey(key) is { } mix && _monitorEqPresets.ContainsKey(mix.Id))
+            || inserts.Any(i => !i.Bypass && PluginCatalog.Find(i) is { } p && p.Fits(2)));
     }
 
     /// <summary>

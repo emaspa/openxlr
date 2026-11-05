@@ -83,6 +83,9 @@ public sealed record MixerSettings
     /// <summary>Output name to the monitor mix feeding it; absent = the stable default monitor mix.</summary>
     public Dictionary<string, string> MonitorFeeds { get; init; } = [];
 
+    /// <summary>Listening EQ presets by monitor mix id. Machine state, never profile state.</summary>
+    public Dictionary<string, string>? MonitorEqPresets { get; init; }
+
     /// <summary>
     /// Selected output name to the description it last had in the device
     /// list, so an output that is away can still be named. Only selected

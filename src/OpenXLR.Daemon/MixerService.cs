@@ -399,6 +399,8 @@ public sealed class MixerService : IHostedService, IDisposable
             "auditionClip" => Disabled("audition"),
             "setInserts" when cmd.Channel is { } key && key.StartsWith("mix:", StringComparison.Ordinal) && cmd.Inserts is { Count: > 0 }
                 => Disabled($"inserts:{key}"),
+            "setMonitorEqPreset" when cmd.Value.ValueKind == System.Text.Json.JsonValueKind.String
+                => Disabled($"inserts:mix:{cmd.Mix}"),
             "createChannel" or "createCaptureChannel" => Budget(),
             // A strip bound to another source streams on a pair of its own.
             "setInputBinding" when cmd.Source is not null && cmd.Channel is { } strip && !plan.Pairs.ContainsKey(strip) => Budget(),
@@ -1611,6 +1613,11 @@ public sealed class MixerService : IHostedService, IDisposable
                     _mixer.SetInserts(cmd.Channel!, cmd.Inserts!);   // both checked by CommandValidation
                     SyncOutputSelectors();   // software processing moves the Pro's mic between its hardware path and the send
                     break;
+                case "setMonitorEqPreset":
+                    _saves.RunSaved(() => _mixer.SetMonitorEqPreset(cmd.Mix!, cmd.Value.GetString(), s => s.Save()));
+                    SyncOutputSelectors();
+                    Changed?.Invoke();
+                    return null;
                 case "setInsertBypass":
                     if (cmd.Channel is null || cmd.InsertId is null) return "setInsertBypass: need 'channel' and 'insertId'";
                     _mixer.SetInsertBypass(cmd.Channel, cmd.InsertId, cmd.Value.GetBoolean());

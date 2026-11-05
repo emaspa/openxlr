@@ -288,6 +288,7 @@ public sealed partial record MixStatus(string Id, string Name, double Volume, bo
 {
     /// <summary>Editable, and not the last remaining monitor mix.</summary>
     public bool Deletable { get; init; }
+    public MonitorEqStatus? MonitorEq { get; init; }
 }
 
 /// <param name="Present">

@@ -397,6 +397,7 @@ public sealed partial class Mixer
             bool wasDefault = PrimaryMonitorLocked()?.Id == id;
             _config = _config.WithoutMix(id);
             _inserts.Remove(key, out List<InsertDefinition>? savedInserts);
+            _monitorEqPresets.Remove(id, out string? savedEq);
             string? previousSource = _enforcedSource;
             string? previousSink = _enforcedSink;
             if (_enforcedSink == mix.SinkName) _enforcedSink = null;
@@ -431,6 +432,7 @@ public sealed partial class Mixer
                 _monitorMuted = wasPaused;
                 cells.Restore(this);
                 if (savedInserts is not null) _inserts[key] = savedInserts;
+                if (savedEq is not null) _monitorEqPresets[id] = savedEq;
                 _enforcedSource = previousSource;
                 _enforcedSink = previousSink;
                 _monitorFeeds.Clear();
@@ -447,6 +449,7 @@ public sealed partial class Mixer
                 SetMonitorOutputsLocked([.. _monitorOutputs]);
             SyncDuckingLocked();
             RemoveMixChainLocked(key);
+            _monitorEqErrors.Remove(id);
             _appearance.Remove("mix:" + id);
             _meters.Remove($"mix:{id}");
             var errors = new List<string>();

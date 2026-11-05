@@ -32,6 +32,16 @@
                Foreground="{DynamicResource Ox.Text.Warning}"
                IsVisible="{Binding WorkflowError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
     <Button DockPanel.Dock="Top" Name="MicSetup" Content="{loc:Text Key=MicSetup}" IsVisible="{Binding CanMicSetup}" HorizontalAlignment="Left" Margin="0,0,0,8" Click="OnMicSetup"/>
+    <StackPanel DockPanel.Dock="Top" IsVisible="{Binding HasMonitorEq}" Spacing="4" Margin="0,0,0,10">
+      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+        <TextBlock VerticalAlignment="Center" Text="{loc:Text Key=MonitorEqualizer}"/>
+        <ComboBox Grid.Column="1" Name="MonitorEqPreset" HorizontalAlignment="Stretch"
+                  AutomationProperties.Name="{loc:Text Key=MonitorEqualizer}" ItemsSource="{Binding MonitorEqOptions}"
+                  SelectedItem="{Binding SelectedMonitorEq, Mode=TwoWay}" IsEnabled="{Binding !MonitorEqBusy}"/>
+      </Grid>
+      <TextBlock Text="{Binding MonitorEqError}" TextWrapping="Wrap" Foreground="{DynamicResource Ox.Text.Warning}"
+                 IsVisible="{Binding MonitorEqError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+    </StackPanel>
     <TextBlock DockPanel.Dock="Top" Text="{loc:Text Key=NoInsertsYet}" Classes="h" IsVisible="{Binding !HasItems}"/>
     <ScrollViewer VerticalScrollBarVisibility="Auto" AllowAutoHide="False">
       <ItemsControl ItemsSource="{Binding Items}" Margin="0,0,10,0">
