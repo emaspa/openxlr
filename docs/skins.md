@@ -828,7 +828,8 @@ other windows and the plugins' own editors keep their sizes.
 These draw the `"mix-matrix"` template (see [The mix matrix](#the-mix-matrix)).
 Every cell is the same size, so the columns line up down the matrix and the
 rows across it; a row head is a name column and one cell's width of source
-controls.
+controls. In the detached mixer, **Fit to window** can grow the cells
+past the skin's maximum to fill the available width.
 
 | Token | Kind | Default | Range | What it paints |
 |---|---|---|---|---|

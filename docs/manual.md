@@ -2878,8 +2878,10 @@ channel, or change the view, the skin or Touch sizing. It never goes below
 the skin sets them. A window too small for the panel at 100% scrolls. For a
 smaller mixer, use the compact or mini view, or Standard sizing.
 
-Fit keeps the panel's proportions. An ultrawide window can still have space
-beside it; choose a larger fixed or custom size if you prefer bigger controls
+Fit scales text and control targets together. In the mix matrix it also
+shares spare width between the columns, giving the faders longer tracks
+when the window is wide and short. Channel tiles and mix banks keep their
+proportions. Choose a larger fixed or custom size for bigger controls
 with scrolling.
 
 **Custom** shows a percentage box beside the picker, or under it in a narrow

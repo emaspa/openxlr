@@ -96,6 +96,24 @@ OPENXLR_TEST_EQ=1 xvfb-run -a -s '-screen 0 2560x1440x24' dotnet test src/OpenXL
 OPENXLR_TEST_CAPTURE=1 xvfb-run -a -s '-screen 0 2560x1440x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~CaptureInputWindowTests
 ```
 
+Use `python3 tools/test-mixer-fit.py` to check the detached mixer's
+**Fit to window** mode across physical window sizes and display scales.
+It builds once, then starts one Xvfb session per scale. The default sweep
+uses nine window sizes, including portrait, ultrawide and 4K, at 100%,
+110%, 125%, 133%, 150%, 175%, 200% and 250%. It covers Wave, Broadcast and
+Compact Desk in Standard and Touch sizing. The layout CI runs this sweep.
+Its assertions report the skin, sizing mode, scale and requested size.
+
+To repeat a particular case with a screenshot, run:
+
+```sh
+python3 tools/test-mixer-fit.py --no-build --scale 150 --size 1273x500 --captures /tmp/openxlr-fit
+```
+
+Repeat `--scale` and `--size` to check multiple values. The sizes are
+physical pixels, with requests below the window's minimum clamped to
+that minimum. Omit `--no-build` to restore and build first.
+
 The monitor gain test plays a constant 0.1 signal, not a sine. On PipeWire
 1.0.x the two combine legs of a summed monitor feed are not sample-aligned,
 so a 1 kHz sine summed from Monitor A and B reads below the expected level

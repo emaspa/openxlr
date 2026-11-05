@@ -313,6 +313,10 @@ jobs:
         if: matrix.group == 'layout'
         run: OPENXLR_TEST_LAYOUT=1 xvfb-run -a -s '-screen 0 2560x1440x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~WindowLayoutTests
 
+      - name: Detached mixer fit at different display scales
+        if: matrix.group == 'layout'
+        run: python3 tools/test-mixer-fit.py --no-build
+
       - name: A tooltip at a screen edge does not take the click
         if: matrix.group == 'layout'
         run: OPENXLR_TEST_TOOLTIP=1 xvfb-run -a -s '-screen 0 1600x1000x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~ToolTipInputTests
