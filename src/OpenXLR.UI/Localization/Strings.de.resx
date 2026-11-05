@@ -3937,6 +3937,136 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="TextSizeMuchLarger" xml:space="preserve">
     <value>Viel größer (120 %)</value>
   </data>
+  <data name="GuideAppearanceBody" xml:space="preserve">
+    <value>Unter Optionen → Darstellung änderst du Skin, Schriftgröße, Bedienelemente und Mixer-Ansicht. Im Touch-Modus lassen sich die Regler leichter greifen. Über Anordnen in der Kopfzeile verschiebst du die Bereiche.
+
+Über die Schaltfläche zum Abdocken in der Mixer-Kopfzeile öffnest du den Mixer in einem eigenen Fenster. Dort kannst du seine Größe an das Fenster anpassen.</value>
+  </data>
+  <data name="GuideAppearanceTitle" xml:space="preserve">
+    <value>Den Mixer an deinen Arbeitsplatz anpassen</value>
+  </data>
+  <data name="GuideBack" xml:space="preserve">
+    <value>Zurück</value>
+  </data>
+  <data name="GuideEffectsBody" xml:space="preserve">
+    <value>Öffne EQ am Mikrofonkanal, um den Klang zu ändern oder ein Preset auszuprobieren. Ändere jeweils nur eine Einstellung. Im Mikrofon-Setup kannst du dieselbe Aufnahme mit und ohne Bearbeitung vergleichen.
+
+Über FX am Kanal oder Mix kannst du Effekte hinzufügen oder auf Bypass stellen. Unter Einstellungen → Plugins findest du die Suchordner von OpenXLR und kannst nach einer Installation neu suchen.</value>
+  </data>
+  <data name="GuideEffectsTitle" xml:space="preserve">
+    <value>Den Mikrofonklang bearbeiten</value>
+  </data>
+  <data name="GuideFinish" xml:space="preserve">
+    <value>Fertig</value>
+  </data>
+  <data name="GuideHelpBody" xml:space="preserve">
+    <value>Falls du nichts hörst, spiele Ton in einer App ab. Prüfe den Kanalpegel, den Regler und die Stummschaltung im Abhörmix. Schau danach, ob der Mix dem richtigen Ausgang zugewiesen ist. Der Signalfluss zeigt den Weg.
+
+Wenn OpenXLR den Audiodienst nicht erreicht, prüfe die Installationsanleitung für dein Paket. Hilfe findest du im Handbuch und im OpenXLR-Discord. Unter Einstellungen → Support kannst du ein Diagnosearchiv erstellen. Prüfe es vor dem Teilen.</value>
+  </data>
+  <data name="GuideHelpTitle" xml:space="preserve">
+    <value>Hilfe finden, wenn etwas fehlt</value>
+  </data>
+  <data name="GuideMicBody" xml:space="preserve">
+    <value>Schließ dein Mikrofon an. Oben im Fenster siehst du das verbundene Elgato-Interface. Falls es nach der Installation von OpenXLR fehlt, trenn es einmal und steck es wieder ein.
+
+Wähle ein anderes Mikrofon, ein Headset oder eine Webcam unter Einstellungen → Audio → Eingangszuordnung als Quelle für XLR 1. Sprich in normaler Lautstärke und prüfe den Pegel am Kanal. Im Mikrofon-Setup kannst du eine kurze Aufnahme machen und den Klang mit und ohne Bearbeitung vergleichen.</value>
+  </data>
+  <data name="GuideMicTitle" xml:space="preserve">
+    <value>Mikrofon anschließen und prüfen</value>
+  </data>
+  <data name="GuideMixerBody" xml:space="preserve">
+    <value>Kanäle tragen Quellen wie Musik oder XLR 1. Ein Mix kombiniert diese Kanäle für ein Ziel. Such im Submixer einen Kanal und bewege seinen Regler unter Monitor A. So änderst du, was du an den Ausgängen dieses Mixes hörst. Derselbe Kanal kann in Chat einen anderen Pegel haben.
+
+Unter Layout bearbeiten kannst du einen Mix anlegen oder umbenennen. Der Signalfluss oben im Fenster zeigt den Weg vom Eingang oder der App bis zum Ausgang.</value>
+  </data>
+  <data name="GuideMixerTitle" xml:space="preserve">
+    <value>Den Pegel in jedem Mix einstellen</value>
+  </data>
+  <data name="GuideMonitorBody" xml:space="preserve">
+    <value>Dreh die Lautstärke zuerst herunter. Aktiviere unter Monitor → Geräte den gewünschten Ausgang, etwa die Kopfhörerbuchse am Interface, dein USB-Headset oder deine Lautsprecher. Wähle Monitor A als Mix. Spiele etwas ab und erhöhe die Lautstärke langsam.
+
+Der Bereich Kopfhörer regelt bei unterstützten Interfaces die Lautstärke der Buchse. Soll ein zweiter Ausgang anders klingen, aktiviere ihn ebenfalls und weise ihm Monitor B oder einen eigenen Monitor-Mix zu.</value>
+  </data>
+  <data name="GuideMonitorTitle" xml:space="preserve">
+    <value>Den Mixer im Kopfhörer hören</value>
+  </data>
+  <data name="GuideNext" xml:space="preserve">
+    <value>Weiter</value>
+  </data>
+  <data name="GuideOpenAppearance" xml:space="preserve">
+    <value>Darstellung öffnen</value>
+  </data>
+  <data name="GuideOpenAudio" xml:space="preserve">
+    <value>Audio-Optionen öffnen</value>
+  </data>
+  <data name="GuideOpenDefaults" xml:space="preserve">
+    <value>Standardgeräte öffnen</value>
+  </data>
+  <data name="GuideOpenMixer" xml:space="preserve">
+    <value>Mixer zeigen</value>
+  </data>
+  <data name="GuideOpenMonitor" xml:space="preserve">
+    <value>Abhörbereich zeigen</value>
+  </data>
+  <data name="GuideOpenSupport" xml:space="preserve">
+    <value>Hilfe-Optionen öffnen</value>
+  </data>
+  <data name="GuideSkip" xml:space="preserve">
+    <value>Einführung überspringen</value>
+  </data>
+  <data name="GuideStep" xml:space="preserve">
+    <value>Schritt {0} von {1}</value>
+  </data>
+  <data name="GuideVirtualBody" xml:space="preserve">
+    <value>Wähle in OBS oder einer Aufnahme-App OpenXLR Stream als Audioeingang. In Discord, Zoom oder einer anderen Anruf-App wählst du OpenXLR Chat als Mikrofon. Über die Regler in Stream und Chat stellst du ein, was die jeweilige App empfängt.
+
+Wenn der Anruf über den Kanal Voice Chat läuft, schalte dessen Signal für die Chat-Mischung stumm, damit Gesprächspartner sich nicht selbst hören. Die systemweiten Ein- und Ausgabegeräte kannst du separat in den Optionen wählen.</value>
+  </data>
+  <data name="GuideVirtualTitle" xml:space="preserve">
+    <value>Ton an OBS oder einen Anruf senden</value>
+  </data>
+  <data name="GuideWelcomeBody" xml:space="preserve">
+    <value>Mit OpenXLR legst du fest, was du selbst hörst, was im Anruf ankommt und was in den Stream geht. Fang mit einem Mikrofon, einem Ausgabegerät und einer App an. Du kannst den Mixer bedienen, während die Anleitung geöffnet ist.
+
+Bei einer neuen Einrichtung öffnet sich die Tour einmal. Mit Weiter und Zurück wechselst du den Schritt. Du kannst die Anleitung jederzeit überspringen und später unter Einstellungen → Support erneut öffnen, auch nach einem Update.</value>
+  </data>
+  <data name="GuideWelcomeTitle" xml:space="preserve">
+    <value>Willkommen bei OpenXLR</value>
+  </data>
+  <data name="WelcomeGuide" xml:space="preserve">
+    <value>Einführung</value>
+  </data>
+  <data name="GuideAppsTitle" xml:space="preserve">
+    <value>Einer App einen Kanal zuweisen</value>
+  </data>
+  <data name="GuideAppsBody" xml:space="preserve">
+    <value>Spiele Ton im Browser, einem Spiel oder einer Musik-App ab. Such die App unter Anwendungen und wähle etwa Browser oder Musik als Kanal. OpenXLR merkt sich die Zuordnung. Unter Verwalten findest du die gespeicherten Regeln.
+
+In den Audioeinstellungen deines Desktops kannst du ebenfalls einen OpenXLR-Kanal als App-Ausgabe wählen. Wähle Nicht verwaltet, wenn Linux den Ausgang bestimmen soll.</value>
+  </data>
+  <data name="GuideOpenApps" xml:space="preserve">
+    <value>Anwendungen anzeigen</value>
+  </data>
+  <data name="GuideProfilesTitle" xml:space="preserve">
+    <value>Eine Einrichtung als Profil speichern</value>
+  </data>
+  <data name="GuideProfilesBody" xml:space="preserve">
+    <value>Öffne oben im Fenster Profile und speichere die aktuelle Einrichtung unter einem Namen wie Anrufe oder Streaming. Wähle das Profil später aus, um die gespeicherten Mixer-Einstellungen zu laden. Speichere erneut, wenn du Änderungen behalten willst.
+
+Darstellung und Fensterverhalten änderst du in den Einstellungen unabhängig von deinen Audioprofilen.</value>
+  </data>
+  <data name="GuideStartupTitle" xml:space="preserve">
+    <value>Beim Anmelden starten und den Tray nutzen</value>
+  </data>
+  <data name="GuideStartupBody" xml:space="preserve">
+    <value>Unter Einstellungen → Beim Anmelden wählst du, ob Audio im Hintergrund startet und ob die App geöffnet wird. Im Bereich Fenster legst du fest, ob beim Start der Mixer erscheint und ob Schließen die App in den Tray legt oder beendet.
+
+Aus dem Tray holst du den Mixer über das OpenXLR-Symbol oder dein App-Menü zurück. Das Symbol braucht einen System-Tray. Bei Flatpak findest du die nötigen Hintergrundberechtigungen im Handbuch.</value>
+  </data>
+  <data name="GuideOpenStartup" xml:space="preserve">
+    <value>Startoptionen öffnen</value>
+  </data>
   <data name="MicSetupPresetPodcast" xml:space="preserve">
     <value>Podcast</value>
   </data>

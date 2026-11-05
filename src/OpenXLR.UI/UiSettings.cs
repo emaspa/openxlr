@@ -16,6 +16,10 @@ namespace OpenXLR.UI;
 /// </summary>
 public sealed record UiSettings
 {
+    /// <summary>Null for a pre-guide installation, false while the first-launch guide is pending.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? WelcomeGuideCompleted { get; init; }
+
     public bool StartDaemonAtLogin { get; init; }
     public bool OpenWindowAtLogin { get; init; }
     /// <summary>On by default in the Flatpak, whose UI owns the daemon: closing it would stop audio.</summary>
@@ -175,6 +179,22 @@ public sealed record UiSettings
     public static string ConfigDir => OpenXlrPaths.ConfigDir;
 
     private static string FilePath => Path.Combine(ConfigDir, "ui.json");
+
+    /// <summary>
+    /// Remember a clean first launch before the window can save other preferences.
+    /// A UI that ran before may never have written ui.json, but it left the Deck
+    /// palette, so that file marks an upgrade too.
+    /// </summary>
+    internal static bool PrepareWelcomeGuide()
+    {
+        UiSettings settings = Load(out string? problem);
+        if (settings.WelcomeGuideCompleted is bool completed) return !completed;
+        if (problem is not null || File.Exists(FilePath)
+            || File.Exists(Path.Combine(ConfigDir, "deck-palette.json"))) return false;
+        if ((settings with { WelcomeGuideCompleted = false }).Save() is { } error)
+            Console.Error.WriteLine(error);
+        return true;
+    }
 
     /// <summary>The saved preferences, or the defaults when the file is missing or cannot be read.</summary>
     public static UiSettings Load() => Load(out _);

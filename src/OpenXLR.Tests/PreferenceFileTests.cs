@@ -33,6 +33,39 @@ public sealed class PreferenceFileTests : IDisposable
     private static string UiJson => Path.Combine(UiSettings.ConfigDir, "ui.json");
     private static string DaemonJson => Path.Combine(UiSettings.ConfigDir, "daemon.json");
 
+    [Fact]
+    public void WelcomeGuideStaysPendingAcrossPreferenceSavesUntilDismissed()
+    {
+        Assert.False(File.Exists(UiJson));
+        Assert.True(UiSettings.PrepareWelcomeGuide());
+        Assert.False(UiSettings.Load().WelcomeGuideCompleted);
+        Assert.Null((UiSettings.Load() with { StartMinimized = true }).Save());
+        Assert.True(UiSettings.PrepareWelcomeGuide());
+
+        Assert.Null((UiSettings.Load() with { WelcomeGuideCompleted = true }).Save());
+        Assert.False(UiSettings.PrepareWelcomeGuide());
+        Assert.True(UiSettings.Load().StartMinimized);
+    }
+
+    [Theory]
+    [InlineData("""{"startMinimized":true,"futureSetting":13}""")]
+    [InlineData("""{"welcomeGuideCompleted":true,"dismissedUpdate":"0.1.0","futureSetting":13}""")]
+    [InlineData("""{"startMinimized":""")]
+    public void WelcomeGuideDoesNotTreatExistingPreferencesAsAFirstLaunch(string text)
+    {
+        File.WriteAllText(UiJson, text);
+        Assert.False(UiSettings.PrepareWelcomeGuide());
+        Assert.Equal(text, File.ReadAllText(UiJson));
+    }
+
+    [Fact]
+    public void WelcomeGuideTreatsAnEarlierUiWithoutPreferencesAsAnUpgrade()
+    {
+        File.WriteAllText(Path.Combine(UiSettings.ConfigDir, "deck-palette.json"), "{\"schema\":1}");
+        Assert.False(UiSettings.PrepareWelcomeGuide());
+        Assert.False(File.Exists(UiJson));
+    }
+
     [Theory]
     [InlineData(-100)]
     [InlineData(0)]

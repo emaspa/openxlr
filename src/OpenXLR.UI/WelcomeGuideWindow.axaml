@@ -1,0 +1,35 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:loc="using:OpenXLR.UI.Localization"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="OpenXLR.UI.WelcomeGuideWindow"
+        Title="{loc:Text Key=WelcomeGuide}" Width="620" Height="450" MinWidth="330" MinHeight="240"
+        WindowStartupLocation="CenterOwner" Background="{DynamicResource Ox.Window.Background}">
+  <Grid RowDefinitions="Auto,*,Auto" RowSpacing="12" Margin="16">
+    <StackPanel Spacing="4">
+      <TextBlock Name="GuideProgressText" Classes="hint" TextWrapping="Wrap"/>
+      <ProgressBar Name="GuideProgress" Minimum="0" AutomationProperties.Name="{loc:Text Key=WelcomeGuide}"/>
+    </StackPanel>
+
+    <ScrollViewer Grid.Row="1" Name="GuideScroll" HorizontalScrollBarVisibility="Disabled">
+      <Border Classes="card" Padding="16">
+        <StackPanel Spacing="12">
+          <TextBlock Name="GuideHeading" Classes="title" TextWrapping="Wrap"/>
+          <TextBlock Name="GuideBody" Classes="body" TextWrapping="Wrap"/>
+          <WrapPanel ItemSpacing="8" LineSpacing="6">
+            <Button Name="GuideAction" Click="OnAction" Padding="12,6">
+              <TextBlock Name="GuideActionText" TextWrapping="Wrap"/>
+            </Button>
+            <Button Name="GuideDiscord" Content="{loc:Text Key=DiscordCommunity}" Click="OnDiscord" Padding="12,6"/>
+            <Button Name="GuideManual" Content="{loc:Text Key=Manual}" Click="OnManual" Padding="12,6"/>
+          </WrapPanel>
+        </StackPanel>
+      </Border>
+    </ScrollViewer>
+
+    <WrapPanel Grid.Row="2" HorizontalAlignment="Right" ItemSpacing="8" LineSpacing="6">
+      <Button Name="GuideSkip" Content="{loc:Text Key=GuideSkip}" Click="OnClose" IsCancel="True" Padding="12,6"/>
+      <Button Name="GuideBack" Content="{loc:Text Key=GuideBack}" Click="OnBack" Padding="12,6"/>
+      <Button Name="GuideNext" Click="OnNext" IsDefault="True" Padding="16,6"/>
+    </WrapPanel>
+  </Grid>
+</Window>

@@ -10,6 +10,11 @@ says what a microphone of another brand gets and what it does not.
 The experimental [Flatpak mode](flatpak.md) runs the daemon with the UI
 and requests login startup through the desktop portal.
 
+The graphical mixer has a [first-launch guide](getting-started.md) for
+microphone setup, monitoring, app routing, streams and calls, effects and
+profiles, appearance, and troubleshooting. Reopen it in **Options →
+Support**.
+
 ## Hardware control
 
 Elgato devices are controlled over each device's USB protocol; the

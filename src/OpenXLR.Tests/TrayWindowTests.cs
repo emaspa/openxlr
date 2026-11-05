@@ -49,6 +49,7 @@ public sealed class TrayWindowTests
                 Environment.SetEnvironmentVariable("XDG_RUNTIME_DIR", config);
                 WindowLayoutTests.PinMaterial(new UiSettings { MinimizeToTray = true });
                 AppBuilder.Configure<App>().UseSkia().UseHarfBuzz().UseX11().SetupWithoutStarting();
+                WelcomeGuideWindowTests.Check();
                 TrayRegistrationSurvivesHidingAndIsRemovedOnQuit();
                 MeterBurstsApplyOnlyTheNewestFrame();
                 window = NewWindow();

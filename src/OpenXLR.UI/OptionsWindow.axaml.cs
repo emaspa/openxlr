@@ -3,6 +3,7 @@ using System;
 using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 
 namespace OpenXLR.UI;
 
@@ -51,6 +52,13 @@ public partial class OptionsWindow : Window
     {
         _desktopKeys = desktopKeys;
     }
+
+    internal event Action? WelcomeGuideRequested;
+
+    private void OnWelcomeGuide(object? sender, RoutedEventArgs e) => WelcomeGuideRequested?.Invoke();
+
+    internal void ShowGuideSection(string heading)
+        => Dispatcher.UIThread.Post(() => this.FindControl<TextBlock>(heading)?.BringIntoView(), DispatcherPriority.Loaded);
 
     // Plugins: the same install flow as the picker, plus yabridge's sync and a rescan.
     private async void OnInstallPluginFile(object? sender, RoutedEventArgs e)

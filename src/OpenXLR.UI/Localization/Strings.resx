@@ -4291,4 +4291,134 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
   <data name="TextSizeMuchLarger" xml:space="preserve">
     <value>Much larger (120%)</value>
   </data>
+  <data name="GuideAppearanceBody" xml:space="preserve">
+    <value>Options → Appearance changes the skin, text size, control sizing and mixer view. Touch sizing makes controls easier to grab. Use Arrange in the header to change where sections sit.
+
+Use the pop-out button in the mixer header to move the mixer into its own window. The mixer size picker there can fit the panel to that window.</value>
+  </data>
+  <data name="GuideAppearanceTitle" xml:space="preserve">
+    <value>Make the mixer fit your desk</value>
+  </data>
+  <data name="GuideBack" xml:space="preserve">
+    <value>Back</value>
+  </data>
+  <data name="GuideEffectsBody" xml:space="preserve">
+    <value>Open EQ on the microphone strip to adjust its tone or try a preset. Try one change at a time. In Mic setup, use the same recorded take to compare the raw and processed sound.
+
+Use FX on a channel or mix to add or bypass an insert. Options → Plugins shows where OpenXLR searches and lets you rescan after installing a plugin.</value>
+  </data>
+  <data name="GuideEffectsTitle" xml:space="preserve">
+    <value>Shape your microphone sound</value>
+  </data>
+  <data name="GuideFinish" xml:space="preserve">
+    <value>Finish</value>
+  </data>
+  <data name="GuideHelpBody" xml:space="preserve">
+    <value>If you hear nothing, start with one playing app. Check its channel meter, its fader and mute in the listening mix, then check that the mix feeds the correct output. Use Flow to follow the route.
+
+If OpenXLR cannot connect to the audio service, follow the installation steps for your package. For more help, use the manual or the OpenXLR Discord. Options → Support can collect a diagnostic archive. Review the archive before sharing it.</value>
+  </data>
+  <data name="GuideHelpTitle" xml:space="preserve">
+    <value>Find help when something is missing</value>
+  </data>
+  <data name="GuideMicBody" xml:space="preserve">
+    <value>Plug in your microphone. The header shows the connected Elgato interface. If you just installed OpenXLR and a supported interface is missing, reconnect it once.
+
+For another microphone, headset or webcam, choose its source under Options → Audio → Input bindings for XLR 1. Speak at your normal level and look for movement on that channel's meter. Open Mic setup to record a short take and compare raw and processed sound.</value>
+  </data>
+  <data name="GuideMicTitle" xml:space="preserve">
+    <value>Connect and check your microphone</value>
+  </data>
+  <data name="GuideMixerBody" xml:space="preserve">
+    <value>Channels carry sources such as Music or XLR 1. Mixes combine those channels for a destination. In the submixer, find a channel and move its fader under Monitor A. This changes what you hear on outputs following Monitor A. The same channel can have a different level in Chat.
+
+Use Edit layout to add or rename a mix. Use Flow in the header to follow audio from an input or app through the mixer to its output.</value>
+  </data>
+  <data name="GuideMixerTitle" xml:space="preserve">
+    <value>Adjust what each mix hears</value>
+  </data>
+  <data name="GuideMonitorBody" xml:space="preserve">
+    <value>Turn down the volume first. In Monitor → Devices, tick the output you want to hear, such as the interface headphone jack, your USB headset or your speakers. Choose Monitor A as its feed. Play audio, then raise the volume slowly.
+
+The Headphones card adjusts the jack's own level on supported interfaces. To send a different blend to another output, select that output too and assign it Monitor B or a monitor mix you created.</value>
+  </data>
+  <data name="GuideMonitorTitle" xml:space="preserve">
+    <value>Hear the mixer in your headphones</value>
+  </data>
+  <data name="GuideNext" xml:space="preserve">
+    <value>Next</value>
+  </data>
+  <data name="GuideOpenAppearance" xml:space="preserve">
+    <value>Open appearance options</value>
+  </data>
+  <data name="GuideOpenAudio" xml:space="preserve">
+    <value>Open audio options</value>
+  </data>
+  <data name="GuideOpenDefaults" xml:space="preserve">
+    <value>Open default devices</value>
+  </data>
+  <data name="GuideOpenMixer" xml:space="preserve">
+    <value>Show mixer</value>
+  </data>
+  <data name="GuideOpenMonitor" xml:space="preserve">
+    <value>Show monitoring</value>
+  </data>
+  <data name="GuideOpenSupport" xml:space="preserve">
+    <value>Open support options</value>
+  </data>
+  <data name="GuideSkip" xml:space="preserve">
+    <value>Skip guide</value>
+  </data>
+  <data name="GuideStep" xml:space="preserve">
+    <value>Step {0} of {1}</value>
+  </data>
+  <data name="GuideVirtualBody" xml:space="preserve">
+    <value>Choose OpenXLR Stream as the audio input in OBS or a recording app. In Discord, Zoom or another call app, choose OpenXLR Chat as the microphone. Use the Stream and Chat faders in OpenXLR to control what each app receives.
+
+If the call plays into the Voice Chat channel, mute its send to the Chat mix so callers do not hear themselves. You can choose system-wide input and output devices separately in Options.</value>
+  </data>
+  <data name="GuideVirtualTitle" xml:space="preserve">
+    <value>Send audio to OBS or a call</value>
+  </data>
+  <data name="GuideWelcomeBody" xml:space="preserve">
+    <value>OpenXLR lets you choose what you hear, what callers hear, and what goes to a stream. Start with one microphone, one listening device and one app. You can use the mixer while the guide is open.
+
+This tour appears once for a fresh setup. Use Next and Back to move at your own pace, or Skip guide at any time. You can reopen it from Options → Support, including after an update.</value>
+  </data>
+  <data name="GuideWelcomeTitle" xml:space="preserve">
+    <value>Welcome to OpenXLR</value>
+  </data>
+  <data name="WelcomeGuide" xml:space="preserve">
+    <value>Welcome guide</value>
+  </data>
+  <data name="GuideAppsTitle" xml:space="preserve">
+    <value>Put an app on a channel</value>
+  </data>
+  <data name="GuideAppsBody" xml:space="preserve">
+    <value>Start playing audio in a browser, game or music app. Find it under Applications and choose a channel such as Browser or Music. OpenXLR remembers that choice. Use Manage to see and change saved rules.
+
+You can also choose an OpenXLR channel as an app's playback device in your desktop sound settings. Choose Not managed if Linux should pick the output.</value>
+  </data>
+  <data name="GuideOpenApps" xml:space="preserve">
+    <value>Show applications</value>
+  </data>
+  <data name="GuideProfilesTitle" xml:space="preserve">
+    <value>Save a setup you can recall</value>
+  </data>
+  <data name="GuideProfilesBody" xml:space="preserve">
+    <value>Open Profiles in the header and save the current setup under a name, for example Calls or Streaming. Choose that profile later to recall the saved mixer settings. Save again when you want to keep changes.
+
+Appearance and window behaviour are configured in Options. You can change them independently of your audio profiles.</value>
+  </data>
+  <data name="GuideStartupTitle" xml:space="preserve">
+    <value>Start at login and use the tray</value>
+  </data>
+  <data name="GuideStartupBody" xml:space="preserve">
+    <value>In Options → At login, choose whether to start audio in the background and whether to open the app. In the Window card, choose Show mixer or Tray only for launch, and Keep running in tray or Quit app for closing.
+
+When the window is in the tray, open it again from the OpenXLR icon or your app menu. Your desktop needs a tray to show the icon. For Flatpak, check the background permissions described in the manual.</value>
+  </data>
+  <data name="GuideOpenStartup" xml:space="preserve">
+    <value>Open startup options</value>
+  </data>
 </root>

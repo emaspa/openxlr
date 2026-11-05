@@ -7,8 +7,13 @@ namespace OpenXLR.UI;
 
 public partial class App : Application
 {
+    private bool _showWelcomeGuide;
+
     public override void Initialize()
     {
+        // Read before the skin publishes the Deck palette, which every earlier
+        // UI wrote on its first start.
+        _showWelcomeGuide = UiSettings.PrepareWelcomeGuide();
         // The language is chosen before any markup reads its text.
         Localization.Localizer.Initialize();
         AvaloniaXamlLoader.Load(this);
@@ -32,7 +37,7 @@ public partial class App : Application
             // kept, and Options reports anything the user should know.
             if (!FlatpakEnvironment.IsFlatpak) StartupIntegration.RepairWindowAutostart();
 
-            var window = new MainWindow();
+            var window = new MainWindow(new DaemonClient(), syncDesktopVolume: true, showWelcomeGuide: _showWelcomeGuide);
             // A later launch asks for the window through the single-instance
             // socket: bring it up, from the tray or from behind other windows.
             if (Program.Instance is { } instance)
