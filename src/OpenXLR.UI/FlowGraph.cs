@@ -61,6 +61,11 @@ internal sealed record FlowGraph(IReadOnlyList<FlowNode> Nodes, IReadOnlyList<Fl
             if (channel.CaptureSource is { } capture)
                 sources.Add(($"capture:{channel.Id}", capture, channel.CaptureLabel,
                     FlowIcon.Microphone, channel.CaptureConnected));
+            // A source on another device's clock says so on its card.
+            if (vm.Clock?.ResampledFor(channel.Id) is not null)
+                for (int i = 0; i < sources.Count; i++)
+                    sources[i] = (sources[i].Key, sources[i].Label, Localizer.Format("FlowResampledTo", vm.Clock.DriverName),
+                        sources[i].Icon, sources[i].Active);
             sources.AddRange(vm.ActiveApps.Where(a => a.ChannelId == channel.Id)
                 .Select(a => ($"app:{a.Identity}", a.Label, a.Active ? Localizer.Text("FlowSoftware") : a.StatusText,
                     FlowIcon.Application, a.Active)));
@@ -163,8 +168,9 @@ internal sealed record FlowGraph(IReadOnlyList<FlowNode> Nodes, IReadOnlyList<Fl
             string[] feeds = (output.Feed?.Id ?? vm.DefaultMonitorMix).Split('+', StringSplitOptions.RemoveEmptyEntries);
             // A jack the unit feeds hears its card; every other output the mixes this computer builds.
             if (IsJack(output) && feeds.Any(unitMixes.Contains)) feeds = [UnitMixKey[4..]];
-            Output($"out:{output.Name}", output.Label, output.Feed?.Name ?? Localizer.Text("MonitorOutput"),
-                feeds, output.IsPresent, FlowIcon.Speaker);
+            string detail = vm.Clock?.ResampledOutput(output.Name) is not null
+                ? Localizer.Format("FlowResampledTo", vm.Clock.DriverName) : output.Feed?.Name ?? Localizer.Text("MonitorOutput");
+            Output($"out:{output.Name}", output.Label, detail, feeds, output.IsPresent, FlowIcon.Speaker);
         }
         foreach (MixViewModel mix in vm.Mixes)
         {

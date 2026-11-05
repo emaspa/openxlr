@@ -275,12 +275,16 @@
     <StackPanel Name="ApplicationNotices">
     <TextBlock Text="{Binding DaemonRestart.Status}" Classes="h" TextWrapping="Wrap"
                Margin="0,0,0,8" IsVisible="{Binding DaemonRestart.Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-    <!-- a card profile without a microphone input is the one warning with a
-         manual section of its own -->
+    <!-- a card profile without a microphone input and a microphone resampled
+         to another device's clock are the warnings with a manual section of
+         their own; the card profile wins when both are there -->
     <DockPanel Margin="0,0,0,8" IsVisible="{Binding DaemonWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
       <Button Name="CardProfileManual" DockPanel.Dock="Right" Content="{loc:Text Key=Manual}" Padding="10,3" FontSize="{DynamicResource UiText.FontSize12}"
               VerticalAlignment="Center" Margin="12,0,0,0" IsVisible="{Binding CardProfileProblem}" Click="OnCardProfileManual"
               ToolTip.Tip="{loc:Text Key=OpenTheManualSectionOnCardProfiles}"/>
+      <Button Name="ClockManual" DockPanel.Dock="Right" Content="{loc:Text Key=Manual}" Padding="10,3" FontSize="{DynamicResource UiText.FontSize12}"
+              VerticalAlignment="Center" Margin="12,0,0,0" IsVisible="{Binding ClockProblem}" Click="OnClockManual"
+              ToolTip.Tip="{loc:Text Key=OpenTheManualSectionOnAGarbledMicrophone}"/>
       <TextBlock Text="{Binding DaemonWarning}" Classes="alert" TextWrapping="Wrap" FontSize="{DynamicResource UiText.FontSize12}" VerticalAlignment="Center"/>
     </DockPanel>
 

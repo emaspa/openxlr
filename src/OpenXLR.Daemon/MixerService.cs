@@ -608,6 +608,7 @@ public sealed class MixerService : IHostedService, IDisposable
         return state with
         {
             LayoutWarning = ResourceWarning,
+            Clock = NamedClock(state.Clock),
             Inserts = state.Inserts.ToDictionary(e => e.Key, e => (IReadOnlyList<InsertStatus>)e.Value.Select(insert =>
             {
                 string? reason = EditorPolicy.BlockReason(insert.Insert.Kind, insert.Insert.Plugin);
@@ -1068,6 +1069,13 @@ public sealed class MixerService : IHostedService, IDisposable
             // current: the unit when the setup fits it, software otherwise.
             // EnsureFilterRoutes above keeps repairing its buses and stages.
             changed |= SyncUnitDucking() | _mixer.SyncDucking();
+            // Which device drives the graph: one pw-dump once the graph has
+            // settled after a change, nothing while it stays as it is.
+            if (_mixer.SyncClock())
+            {
+                changed = true;
+                NoteClock(NamedClock(_mixer.GraphClock));
+            }
             if (changed) Changed?.Invoke();
             stop.ThrowIfCancellationRequested();
             SyncOutputSelectors();
@@ -1837,6 +1845,41 @@ public sealed class MixerService : IHostedService, IDisposable
 
     private int _sweepCount;
     private string? _resourceWarning;
+    private string? _clockNoted;
+
+    /// <summary>
+    /// The clock with the driven units' names in place of their node
+    /// descriptions, as clients and the journal show it.
+    /// </summary>
+    private MixerClock? NamedClock(MixerClock? clock)
+    {
+        if (clock is null) return null;
+        ClockDriver? driver = clock.Driver is { } d && _devices.SupportedUnitFor(d.Name) is { } owner
+            ? d with { Description = owner.Name, DrivenUnit = owner.Id } : clock.Driver;
+        return clock with
+        {
+            Driver = driver,
+            Followers = [.. clock.Followers.Select(f => _devices.SupportedUnitFor(f.Name) is { } unit
+                ? f with { Description = unit.Name, DrivenUnit = unit.Id } : f)],
+        };
+    }
+
+    // One journal line each time the driver or a microphone's resampling
+    // changes, a warning while a microphone is resampled.
+    private void NoteClock(MixerClock? clock)
+    {
+        string? line = clock?.Driver is { } driver
+            ? $"audio clock: {driver.Name} drives the mixer's graph (priority.driver {driver.PriorityDriver?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "unset"})"
+              + string.Concat(clock.Followers.Where(f => f.Resampled).Select(f => $"; {f.Name} follows it resampled"))
+            : null;
+        if (line is null || line == _clockNoted) return;
+        _clockNoted = line;
+        if (clock!.MicResampled) _log.LogWarning("{line}", line);
+        else _log.LogInformation("{line}", line);
+    }
+
+    /// <summary>A microphone's interface follows another device's clock, in one sentence, or null.</summary>
+    public string? ClockWarning => _mixer.Built ? NamedClock(_mixer.GraphClock)?.Warning() : null;
 
     /// <summary>Why the hardware input channels are silent although a source is present, or null.</summary>
     public string? InputWarning => _mixer.InputWarning;

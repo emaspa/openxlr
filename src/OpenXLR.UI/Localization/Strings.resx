@@ -816,6 +816,15 @@
   <data name="Flow" xml:space="preserve">
     <value>Flow</value>
   </data>
+  <data name="FlowClock" xml:space="preserve">
+    <value>Audio clock: {0}</value>
+  </data>
+  <data name="FlowClockResampled" xml:space="preserve">
+    <value>{0} follows this clock and is resampled. A microphone that sounds garbled or robotic can come from this.</value>
+  </data>
+  <data name="FlowResampledTo" xml:space="preserve">
+    <value>Resampled to the clock of {0}</value>
+  </data>
   <data name="FlowDaemonDisconnected" xml:space="preserve">
     <value>Daemon disconnected. Waiting for live routing.</value>
   </data>
@@ -1373,6 +1382,9 @@
   </data>
   <data name="OpenTheManualSectionOnPluginEditors" xml:space="preserve">
     <value>Open the manual section on plugin editors</value>
+  </data>
+  <data name="OpenTheManualSectionOnAGarbledMicrophone" xml:space="preserve">
+    <value>Open the manual section on a microphone that sounds garbled or robotic</value>
   </data>
   <data name="OpenTheManualSectionOnSkins" xml:space="preserve">
     <value>Open the manual section on skins</value>

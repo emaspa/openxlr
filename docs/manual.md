@@ -908,6 +908,13 @@ Outputs follow the selected monitor feeds, including outputs where both
 Monitor A and Monitor B are ticked, and the current virtual microphones.
 See [Give a second headset its own mix](#second-monitor-output) for an
 example with two hardware outputs.
+Under the title, **Audio clock** names the device whose timing the
+mixer's graph runs on. PipeWire takes the timing from one device and
+resamples every device with a clock of its own to it. The card of an input
+or output that is resampled says "Resampled to the clock of" that device.
+When it is a microphone's interface, a warning line under the clock names
+it; see [The microphone sounds garbled, robotic or crackly](#garbled-mic).
+
 Apps left to desktop routing appear without an OpenXLR connection. The Flow window sizes itself to the graph when it opens, or when
 the first routing state arrives, up to the screen's usable area. Larger layouts
 scroll horizontally and vertically. Resizing the window manually turns off automatic sizing.
@@ -4663,6 +4670,66 @@ To choose the profile yourself:
 This section does not apply to the Wave XLR Pro, which runs on the
 `pro-audio` profile OpenXLR sets for it ([First run](#first-run)).
 
+<a name="garbled-mic"></a>
+### 5.12 The microphone sounds garbled, robotic or crackly
+
+PipeWire runs the devices of one audio graph on one clock. It takes the
+timing from the device with the highest `priority.driver` and resamples
+every other device to it, since no two devices tick at exactly the same
+rate. A capture card or a webcam that OpenXLR records can end up as that
+device. The microphone's interface then follows it, and the microphone is
+resampled all the time. On one owner's machine an Elgato 4K X capture card
+drove the graph and a Wave XLR microphone turned into a garbled, robotic
+mess. Taking the card out of OpenXLR brought the microphone back at once,
+with nothing restarted.
+
+To check, open **Flow** ([Audio flow](#audio-flow)) and read the line
+under the title. **Audio clock** names the device the graph follows. If the
+interface of XLR 1 or XLR 2 follows another device, a warning line names it and
+its card in the graph says "Resampled to the clock of" that device. The UI
+shows the same warning above the mixer, with a **Manual** button that
+opens this section. A diagnostics archive states it in `meta.txt`, on the
+lines that start with `audio clock` and `microphone`. The journal has a
+line each time the clock changes (`journalctl --user -u openxlr-daemon`).
+
+The packaged rules make the original Wave XLR, the XLR Dock and both Wave:3
+models the clock when they are off the pro-audio profile
+([section 5.2](#dock-silent)). WirePlumber reads them when it starts, so
+restart it after installing or upgrading. To make another interface the
+clock, give its capture node a higher `priority.driver` with a rule of
+your own:
+
+1. Find the node name of the interface's input with
+   `pactl list sources short`, for example
+   `alsa_input.usb-Elgato_Systems_Elgato_Wave_XLR_<serial>-00.mono-fallback`.
+2. Save this as `~/.config/wireplumber/wireplumber.conf.d/56-openxlr-clock.conf`,
+   with that name in place of the example:
+
+   ```
+   monitor.alsa.rules = [
+     {
+       matches = [ { node.name = "alsa_input.usb-Elgato_Systems_Elgato_Wave_XLR_<serial>-00.mono-fallback" } ]
+       actions = { update-props = { priority.driver = 3000 } }
+     }
+   ]
+   ```
+
+3. Restart WirePlumber, then the daemon. Every audio device stops for a
+   moment while WirePlumber restarts:
+
+   ```sh
+   systemctl --user restart wireplumber
+   systemctl --user restart openxlr-daemon
+   ```
+
+4. Check: **Audio clock** in Flow names the interface, and the warning is
+   gone. With this rule the capture card or webcam is the one resampled, so
+   listen to its audio too.
+
+3000 is above every number WirePlumber gives a device, the 2600 of a
+pro-audio input such as the Wave XLR Pro's included. Delete the file and
+restart WirePlumber to go back.
+
 <a name="files"></a>
 ## 6. Files and services
 
@@ -4708,6 +4775,7 @@ settings. See
 | `openxlr-daemon.service` (systemd user unit) | the daemon; `journalctl --user -u openxlr-daemon` for its log |
 | `/usr/lib/systemd/user/pipewire-pulse.service.d/openxlr.conf` | installed by the packages: raises pipewire-pulse's open-file limit ([section 5.8](#open-files)) |
 | `/usr/share/wireplumber/wireplumber.conf.d/50-xlr-dock-capture-hold.conf`, `52-openxlr-mk1-capture-hold.conf`, `53-openxlr-wave3-capture-hold.conf` | installed by the packages: keep the capture of the XLR Dock, the original Wave XLR, the Wave:3 and the Wave:3 MK.2 running, and make it the audio clock off pro-audio ([section 5.2](#dock-silent)) |
+| `~/.config/wireplumber/wireplumber.conf.d/56-openxlr-clock.conf` | not installed: a rule you write to make an interface the audio clock ([section 5.12](#garbled-mic)) |
 | `/usr/share/wireplumber/wireplumber.conf.d/55-openxlr-wave3-mk2-playback.conf` | installed by the packages: opens the Wave:3 MK.2's headphones in the unit's float format ([section 5.2](#dock-silent)) |
 | `/usr/share/wireplumber/wireplumber.conf.d/51-openxlr-pro-raw-names.conf` | installed by the packages: names the Wave XLR Pro's raw multichannel nodes for what they are, so volume applets do not list them like OpenXLR's mixes |
 | `/usr/share/wireplumber/main.lua.d/54-openxlr-owned-state.lua` | installed by the `.deb` where WirePlumber is 0.4: keeps desktop state off OpenXLR's own nodes ([section 5.9](#quiet-mixes)) |

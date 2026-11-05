@@ -2901,6 +2901,23 @@ public sealed class PipeWireAdapter
         }
     }
 
+    /// <summary>
+    /// The registry subscription's clock revision (see
+    /// <see cref="PipeWireGraph.ClockRevision"/>), or null without a live
+    /// subscription. Reading it starts nothing.
+    /// </summary>
+    internal long? ClockRevision
+    {
+        get { lock (DumpGate) return _graph?.ClockRevision; }
+    }
+
+    /// <summary>
+    /// The whole registry from one pw-dump, for what a subscriber is not told:
+    /// PipeWire keeps node.driver-id current in a node's properties but does
+    /// not send the change to clients that already hold the node.
+    /// </summary>
+    internal JsonElement[] ReadGraphOnce() => ParseObjects(RunBytes("pw-dump"));
+
     private static JsonElement? FindSink(JsonElement[] objects, string name)
     {
         foreach (JsonElement item in objects)
