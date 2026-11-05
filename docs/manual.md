@@ -689,6 +689,60 @@ microphone's send to that mix are both unmuted. With the jacks on different
 feeds, each jack hears the path when its own feed carries the microphone,
 at that feed's send level.
 
+<a name="second-monitor-output"></a>
+#### Give a second headset its own mix
+
+You can keep a Wave:3 as your microphone and listen through USB or
+Bluetooth headphones. Apps keep playing into their OpenXLR channels while
+each listening device gets the mix you choose.
+
+1. Connect the second headset so it appears as a Linux playback device.
+   In **MONITOR → Devices**, tick it and the output you already use.
+2. Open the feed picker beside the original output and select **Monitor A**
+   alone. Open the picker beside the second headset and select **Monitor B**
+   alone. If both devices should hear the same blend, select **Monitor A**
+   on both.
+3. In **SUBMIXER**, unmute Monitor B and open the sends you want to hear in
+   that mix. Its master and sends control the blend for the second headset.
+4. Open [**Flow**](#audio-flow) and click the second headset to trace its
+   connection. It should have one incoming mix route from Monitor B.
+
+For listening only on the second headset, untick the first playback
+output in **Devices**. Your microphone and app assignments still apply.
+
+To use **Monitor C** instead, open **SUBMIXER → Edit layout**. Under
+**MIXES**, enter the name, select **Monitor mix** and press **Add mix**.
+Choose Monitor C in the headset's feed picker, then open its sends. A new
+mix starts silent until you give it a send.
+
+**Check that the output reconnects.** At a low listening level, play a
+sound through an app already assigned to an OpenXLR channel. Open that
+channel's send to Monitor B and mute its send to Monitor A for the test.
+Verify that the test sound plays only in the second headset, then
+disconnect it while playback continues. Leave it ticked when it appears as
+**(not connected)**. On reconnect, the same PipeWire playback device
+should resume the saved feed on the next sweep. Check **Flow** and confirm
+the app still shows the same channel under **APPLICATIONS**. Restore any
+send mutes you changed for the test.
+
+For a USB headset with an input-only card profile, you can also exercise
+playback-node recovery with the receiver still plugged in. Find its
+card name, active profile and input-only profile in `pactl list cards`.
+Use those values for the shell variables below. The sink listing should
+show the playback node disappear and return, and the last command should
+show its restored mix links.
+
+```sh
+pactl set-card-profile "$card" "$input_only_profile"
+pactl list short sinks
+pactl set-card-profile "$card" "$original_profile"
+pactl list short sinks
+pw-link -l
+```
+
+If a different profile exposes a different playback device, select its
+entry and set its feed.
+
 <a name="ducking"></a>
 #### Lower what you hear while you speak
 
@@ -859,6 +913,8 @@ Input and mix processing appears in an FX row inside its card. Hover over the
 card for the full chain in signal order, including bypass and error states.
 Outputs follow the selected monitor feeds, including outputs where both
 Monitor A and Monitor B are ticked, and the current virtual microphones.
+See [Give a second headset its own mix](#second-monitor-output) for an
+example with two hardware outputs.
 Apps left to desktop routing appear without an OpenXLR connection. The Flow window sizes itself to the graph when it opens, or when
 the first routing state arrives, up to the screen's usable area. Larger layouts
 scroll horizontally and vertically. Resizing the window manually turns off automatic sizing.
