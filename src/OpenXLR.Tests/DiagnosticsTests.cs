@@ -412,7 +412,8 @@ public sealed class DiagnosticsTests
         const string plain = """{"type":"state","mixer":{"browserTabs":[]}}""";
         Assert.Equal(plain, Diagnostics.StateForArchive(plain));
         Assert.Equal("not json", Diagnostics.StateForArchive("not json"));
-        Assert.StartsWith("no state received", Diagnostics.StateForArchive(null), StringComparison.Ordinal);
+        using var report = System.Text.Json.JsonDocument.Parse(Diagnostics.StateForArchive(null));
+        Assert.Equal("No daemon state was received.", report.RootElement.GetProperty("unavailable").GetString());
     }
 
     [Fact]
@@ -464,9 +465,10 @@ public sealed class DiagnosticsTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task TheLoginNameAndHostNamesAppearNowhereInTheArchive(bool commandWarning)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task TheLoginNameAndHostNamesAppearNowhereInTheArchive(bool commandWarning, bool runtimeSupported)
     {
         if (!OperatingSystem.IsLinux()) return;
         // Neither is this machine's: the fake helpers below print them, the
@@ -481,6 +483,7 @@ public sealed class DiagnosticsTests
         string output = Directory.CreateDirectory(Path.Combine(root, "output")).FullName;
         string? path = Environment.GetEnvironmentVariable("PATH");
         string? configHome = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
+        string? dataDirs = Environment.GetEnvironmentVariable("XDG_DATA_DIRS");
         try
         {
             ExecutableScript.Write(Path.Combine(bin, "uname"), $"echo 'Linux {machine} 6.18.0 #1 SMP x86_64 GNU/Linux'\n");
@@ -496,11 +499,13 @@ public sealed class DiagnosticsTests
                 esac
                 """);
             ExecutableScript.Write(Path.Combine(bin, "pactl"), $$"""
-                if [ "$1" = info ]; then
+                if [ "$1" = --version ]; then
+                  printf '%s\n' 'pactl fixture 17.0'
+                elif [ "$1" = info ]; then
                   printf '%s\n' 'Server String: /run/user/1000/pulse/native' 'User Name: {{login}}' \
                     'Host Name: {{otherHost}}' 'Server Name: PulseAudio (on PipeWire 1.6.9)' 'Default Sink: OpenXLR_mix_monitor'
                 elif [ "$1" = --format=json ]; then
-                  {{(commandWarning ? "if [ \"$3\" = source-outputs ]; then printf '%s\\n' '{\"note\":\"/home/" + login + "/audio\"'; exit 7; fi" : "")}}
+                  {{(commandWarning ? "if [ \"$3\" = source-outputs ]; then printf '%s\\n' '{\"note\":\"/home/" + login + "/private malformed value\"'; exit 7; fi" : "")}}
                   printf '%s\n' '[{"index":47,"sample_specification":"float32le 2ch 48000Hz","buffer_latency_usec":1024,"properties":{"application.process.user":"{{login}}","application.process.host":"{{otherHost}}","application.process.id":123456} }]'
                 else
                   printf '%s\n' '1	OpenXLR_mix_monitor	PipeWire	float32le 2ch 48000Hz	RUNNING'
@@ -515,12 +520,17 @@ public sealed class DiagnosticsTests
             string warning = commandWarning ? $"printf '%s\\n' 'warning for {login}@{machine}: optional metadata unavailable' >&2\n" : "";
             ExecutableScript.Write(Path.Combine(bin, "pw-dump"), warning + $$"""
                 cat <<'JSON'
-                [{"id":0,"type":"PipeWire:Interface:Core","info":{"user-name":"{{login}}","host-name":"{{otherHost}}","name":"pipewire-0",
+                [{"id":0,"type":"PipeWire:Interface:Core","info":{"version":"1.6.9","user-name":"{{login}}","host-name":"{{otherHost}}","name":"pipewire-0",
                   "props":{"core.name":"pipewire-{{login}}-1655","default.clock.max-quantum":2048} } },
                  {"id":32,"type":"PipeWire:Interface:Client","info":{"props":{"application.process.user":"{{login}}",
                   "application.process.host":"{{otherHost}}","core.name":"pipewire-{{login}}-1585","application.name":"WirePlumber"} } },
                  {"id":60,"type":"PipeWire:Interface:Node","info":{"props":{"node.name":"OpenXLR_mix_monitor",
-                  "media.name":"/run/media/{{login}}/Samples/take.wav","clock.max-quantum":8192} } }]
+                  "media.name":"/run/media/{{login}}/Samples/take.wav","clock.max-quantum":8192} } },
+                 {"id":61,"type":"PipeWire:Interface:Node","info":{"state":"running","props":{"media.class":"Stream/Output/Audio",
+                  "application.name":"Player","application.process.binary":"/home/{{login}}/player","media.name":"private fixture title",
+                  "application.process.args":"private fixture arguments","application.process.id":"private\"id"},
+                  "params":{"Tag":[{"info":{"title":"private fixture tag"},"info":{"title":"second tag"} }]} } },
+                 {"id":63,"type":"PipeWire:Interface:Link","info":{"output-node-id":61,"input-node-id":60} }]
                 JSON
                 {{(commandWarning ? "printf '%s\\n' '[{\"id\":62,\"type\":\"PipeWire:Interface:Node\",\"info\":{\"state\":\"error\",\"error\":\"fixture graph error\",\"props\":{\"node.name\":\"OpenXLR_fixture\",\"media.class\":\"Audio/Source\"} } }]'" : "")}}
                 """);
@@ -544,15 +554,38 @@ public sealed class DiagnosticsTests
             Directory.CreateDirectory(UiSettings.ConfigDir);
             File.WriteAllText(Path.Combine(UiSettings.ConfigDir, "ui.json"),
                 "{\"examplePath\":\"/home/" + login + "/capture\",\"numericValue\":1024}");
+            File.WriteAllText(Path.Combine(UiSettings.ConfigDir, "mixer.json"),
+                "{\"path\":\"\\u002fhome\\u002f" + login + "\\u002fprivate malformed config\"");
+            File.WriteAllText(Path.Combine(UiSettings.ConfigDir, "daemon.json"),
+                """{"submixer":true,"futureCredential":"never copy unknown preferences"}""");
+            string share = Path.Combine(root, "share");
+            string receipts = Directory.CreateDirectory(Path.Combine(share, "openxlr", "installations")).FullName;
+            string receiptPath = Path.Combine(receipts, "openxlr.json");
+            var receipt = new OpenXLR.UI.InstallationReceipt
+            {
+                Package = "openxlr", Manager = "arch", Version = "1.2.3-test", Prefix = root,
+                Commit = new string('b', 40), Files = [new() { Kind = "receipt", Path = receiptPath }],
+            };
+            File.WriteAllText(receiptPath, System.Text.Json.JsonSerializer.Serialize(receipt, OpenXLR.UI.InstallationReceipt.Json));
+            File.WriteAllText(Path.Combine(receipts, "openxlr-yabridge.json"), "malformed receipt with private marker");
+            Environment.SetEnvironmentVariable("XDG_DATA_DIRS", share);
+            OpenXLR.UI.InstallationHistory.Remember(receiptPath);
+            File.WriteAllText(Path.Combine(OpenXLR.UI.InstallationHistory.DirectoryPath, "broken.json"), "private history marker");
 
+            int runtimeRequests = 0;
             await using var server = await SocketTestServer.Start(async (socket, stop) =>
             {
                 var initial = new System.Text.Json.Nodes.JsonObject
                 {
                     ["type"] = "state", ["note"] = $"/home/{login}/Music"
                 };
+                initial["device"] = new System.Text.Json.Nodes.JsonObject
+                    { ["vendor"] = "Elgato", ["model"] = "Wave:3", ["usbId"] = "0fd9:0070", ["firmware"] = "1.2.4" };
+                initial["detected"] = new System.Text.Json.Nodes.JsonArray(new System.Text.Json.Nodes.JsonObject
+                    { ["name"] = "Wave:3", ["usbId"] = "0fd9:0070", ["active"] = true });
                 if (commandWarning)
                 {
+                    initial["daemonVersion"] = "0.2.3";
                     initial["daemonBuildVersion"] = "0.2.3+" + new string('a', 40);
                     initial["daemonBuildId"] = "12345678-1234-1234-1234-123456789012";
                 }
@@ -561,14 +594,22 @@ public sealed class DiagnosticsTests
                 {
                     var command = await SocketTestServer.Receive(socket, stop);
                     string cmd = command["cmd"]!.GetValue<string>();
-                    object reply = cmd switch
+                    object? reply = cmd switch
                     {
+                        "getRuntimeDiagnostics" when runtimeSupported => new
+                        {
+                            type = "runtimeDiagnostics",
+                            daemonBuildId = "22345678-1234-1234-1234-123456789012",
+                            snapshot = new { workingSetBytes = 4096 },
+                        },
+                        "getRuntimeDiagnostics" => null,
                         "listPlugins" => new { type = "plugins", plugins = Array.Empty<object>() },
                         "getPluginSetup" => new { type = "pluginSetup", windowsDirectories = new[] { $"/run/media/{login}/VST3" } },
                         "getPluginDiagnostics" => new { type = "pluginDiagnostics", discovery = new { scans = Array.Empty<object>() } },
                         _ => new { type = "diagnostics", blocks = new { } },
                     };
-                    await SocketTestServer.Send(socket, reply, stop);
+                    if (cmd == "getRuntimeDiagnostics") Interlocked.Increment(ref runtimeRequests);
+                    if (reply is not null) await SocketTestServer.Send(socket, reply, stop);
                     await SocketTestServer.Send(socket, new { type = "commandResult", requestId = command["requestId"]!.GetValue<string>() }, stop);
                 }
             });
@@ -578,7 +619,8 @@ public sealed class DiagnosticsTests
             client.Start();
             await state.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-            string archive = await Diagnostics.CollectAsync(client, login, output);
+            string archive = await Diagnostics.CollectAsync(client, login, output, deepTrace: commandWarning);
+            Assert.Equal(commandWarning ? 1 : 0, Volatile.Read(ref runtimeRequests));
 
             var entries = new Dictionary<string, string>();
             await using (var file = File.OpenRead(archive))
@@ -657,9 +699,39 @@ public sealed class DiagnosticsTests
             Assert.DoesNotContain("audio-graph.json", entries.Keys);
             using var preferences = System.Text.Json.JsonDocument.Parse(entries["ui.json"]);
             Assert.Equal(1024, preferences.RootElement.GetProperty("numericValue").GetInt32());
+            using var mixer = System.Text.Json.JsonDocument.Parse(entries["mixer.json"]);
+            Assert.True(mixer.RootElement.TryGetProperty("unavailable", out _));
+            Assert.DoesNotContain("private malformed config", entries["mixer.json"]);
             using var streams = System.Text.Json.JsonDocument.Parse(entries["sink-inputs.json"]);
             Assert.Equal(1024, streams.RootElement[0].GetProperty("buffer_latency_usec").GetInt32());
             Assert.Equal("<redacted>", streams.RootElement[0].GetProperty("properties").GetProperty("application.process.id").GetString());
+            using var runtime = System.Text.Json.JsonDocument.Parse(entries["system-info.json"]);
+            Assert.Equal(buildVersion, runtime.RootElement.GetProperty("window").GetProperty("buildVersion").GetString());
+            var daemon = runtime.RootElement.GetProperty("daemon");
+            Assert.True(daemon.GetProperty("connected").GetBoolean());
+            Assert.Equal(commandWarning ? "0.2.3" : null, daemon.GetProperty("version").GetString());
+            Assert.Equal(commandWarning ? "0.2.3+" + new string('a', 40) : null, daemon.GetProperty("buildVersion").GetString());
+            var runtimeAudio = runtime.RootElement.GetProperty("audio");
+            Assert.Equal("1.6.9", runtimeAudio.GetProperty("pipeWireServerVersion").GetString());
+            var pactl = Assert.Single(runtimeAudio.GetProperty("tools").EnumerateArray(),
+                tool => tool.GetProperty("tool").GetString() == "pactl");
+            Assert.Equal("pactl fixture 17.0", pactl.GetProperty("version").GetString());
+            var hardware = runtime.RootElement.GetProperty("hardware");
+            Assert.Equal("1.2.4", hardware.GetProperty("primary").GetProperty("firmware").GetString());
+            var unit = Assert.Single(hardware.GetProperty("detected").EnumerateArray());
+            Assert.Equal("0fd9:0070", unit.GetProperty("usbId").GetString());
+            Assert.True(unit.GetProperty("active").GetBoolean());
+            using var applications = System.Text.Json.JsonDocument.Parse(entries["audio-applications.json"]);
+            Assert.True(applications.RootElement.GetProperty("available").GetBoolean());
+            var playback = Assert.Single(applications.RootElement.GetProperty("streams").EnumerateArray());
+            Assert.Equal("Player", playback.GetProperty("name").GetString());
+            Assert.Equal("player", playback.GetProperty("executable").GetString());
+            Assert.Equal("OpenXLR_mix_monitor", Assert.Single(playback.GetProperty("connectedNodes").EnumerateArray()).GetString());
+            Assert.DoesNotContain("private fixture title", entries["audio-applications.json"]);
+            Assert.DoesNotContain("private fixture title", entries["pw-dump.json"]);
+            Assert.DoesNotContain("private fixture arguments", entries["pw-dump.json"]);
+            Assert.DoesNotContain("private fixture tag", entries["pw-dump.json"]);
+            Assert.DoesNotContain("private", entries["source-outputs.json"]);
             Assert.StartsWith("ALSA sound cards and their open PCM devices", entries["alsa-pcm.txt"]);
             Assert.DoesNotContain("pw-top.txt", entries.Keys);
             Assert.DoesNotContain("collection.json", entries.Keys);
@@ -667,6 +739,34 @@ public sealed class DiagnosticsTests
             {
                 Assert.Contains("exited with status 7", entries["source-outputs-errors.txt"]);
                 Assert.Contains("did not return complete valid JSON", entries["source-outputs-errors.txt"]);
+                Assert.Contains("could not be safely decoded", entries["source-outputs.json"]);
+                using var deep = System.Text.Json.JsonDocument.Parse(entries["deep-trace.json"]);
+                Assert.True(deep.RootElement.GetProperty("savedDaemonPreferences").GetProperty("submixer").GetBoolean());
+                var installed = Assert.Single(deep.RootElement.GetProperty("installedBuilds").EnumerateArray(),
+                    build => build.GetProperty("version").GetString() == receipt.Version);
+                Assert.Equal(receipt.Commit, installed.GetProperty("commit").GetString());
+                Assert.False(installed.TryGetProperty("prefix", out _));
+                Assert.DoesNotContain("malformed receipt with private marker", entries["deep-trace.json"]);
+                Assert.DoesNotContain("private history marker", entries["deep-trace.json"]);
+                var history = deep.RootElement.GetProperty("installationHistory");
+                Assert.Equal(1, history.GetProperty("unreadable").GetInt32());
+                Assert.Equal(receipt.Version, Assert.Single(history.GetProperty("builds").EnumerateArray()).GetProperty("version").GetString());
+                Assert.True(deep.RootElement.GetProperty("windowRuntime").GetProperty("managed")
+                    .GetProperty("totalAllocatedBytes").GetInt64() > 0);
+                var live = deep.RootElement.GetProperty("daemonRuntime");
+                if (runtimeSupported)
+                {
+                    Assert.Equal("22345678-1234-1234-1234-123456789012", live.GetProperty("daemonBuildId").GetString());
+                    Assert.Equal(4096, live.GetProperty("snapshot").GetProperty("workingSetBytes").GetInt64());
+                }
+                else Assert.Equal(System.Text.Json.JsonValueKind.Null, live.ValueKind);
+                Assert.DoesNotContain("never copy unknown preferences", entries["deep-trace.json"]);
+                Assert.Contains("Deep Trace was selected", entries["PRIVACY.txt"]);
+            }
+            else
+            {
+                Assert.DoesNotContain("deep-trace.json", entries.Keys);
+                Assert.DoesNotContain("Deep Trace was selected", entries["PRIVACY.txt"]);
             }
             Assert.Contains("login name", entries["PRIVACY.txt"]);
             Assert.Contains("audio-server", entries["PRIVACY.txt"]);
@@ -676,6 +776,7 @@ public sealed class DiagnosticsTests
         {
             Environment.SetEnvironmentVariable("PATH", path);
             Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", configHome);
+            Environment.SetEnvironmentVariable("XDG_DATA_DIRS", dataDirs);
             Directory.Delete(root, recursive: true);
         }
     }

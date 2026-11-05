@@ -471,6 +471,9 @@ public sealed class WindowLayoutTests
                 options.Show();
                 Layout(options, 980, 800);
                 CheckTextSize(main, options);
+                var deepTrace = options.FindControl<CheckBox>("DeepDiagnostics")!;
+                Assert.False(deepTrace.IsChecked);
+                Assert.Equal(Localizer.Text("DeepDiagnostics"), Assert.IsType<TextBlock>(deepTrace.Content).Text);
                 // The cards grow as features land, and the window sizes itself
                 // to them. On a tall screen that produced a window the height
                 // of the monitor, so the cap is what the scroll region needs to

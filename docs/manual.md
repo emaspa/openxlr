@@ -4421,7 +4421,10 @@ source it read, or quotes what both said when neither worked.
 The Flatpak sandbox keeps collecting its own daemon logs and does not read
 host journals or the kernel log. Warnings and command failure notes for the graph dump
 are kept in `pw-dump-errors.txt`, when present, instead of being appended
-to `pw-dump.json`. Plugin evidence includes the
+to `pw-dump.json`. The graph and JSON stream listings mask media names,
+titles, paths and URLs, tag metadata and process arguments. They keep
+executable basenames and audio node names for routing diagnosis. Invalid
+or incomplete JSON is replaced with an omission notice. Plugin evidence includes the
 catalogue, effective bridge setup and latest native scan results. The home path, host name
 and the serial numbers of attached USB devices are redacted, in the
 text files and inside the hex dump of the vendor blocks (the XLR Dock
@@ -4458,9 +4461,61 @@ connection discards the previous connection's state until its first update
 arrives. The graph and vendor blocks are collected separately and can
 describe a later moment.
 
+Start with `system-info.json` to compare the window and daemon builds and
+see the distribution, kernel, CPU architectures, .NET runtime, desktop and
+session type. A Flatpak report describes the window's sandbox and the
+kernel it runs on. The file also lists the running PipeWire server version,
+the graph's sample rate and quantum settings, and the versions reported by
+the available PipeWire, WirePlumber, PulseAudio and ALSA tools. A version
+probe that fails leaves its outcome beside the tool's name.
+Its hardware section lists the interfaces the daemon detected and the
+primary unit's firmware when the device reports it. See
+`daemon-state.json` for the effective controls, mixer and profile state,
+`mixer.json` for the saved mixer layout and routing, and `ui.json` for
+window preferences.
+
+`audio-applications.json` lists playback and capture streams in the same
+PipeWire snapshot as `pw-dump.json`. It shows application names, executable
+basenames, stream state and the audio nodes each stream is actually linked
+to, including OpenXLR channels. Streams can be idle, disconnected or
+running. Internal audio links and meters are omitted from this summary.
+The summary reads the existing snapshot and collects no process list,
+command lines or media titles. It shows when the graph was unavailable and
+when the limit of 512 streams or 32 linked nodes per stream was reached.
+
+In **Options → Support**, select **Include Deep Trace** before collecting
+an archive to add `deep-trace.json`. This is a one-export choice. It lists
+the process names and counts visible to OpenXLR under your Linux user,
+including programs that have no audio streams. Names come from the kernel
+and may be shortened. It also records system RAM and swap totals and
+availability, and the window's and common audio processes' resident,
+peak, locked and swapped memory, thread counts and task state when
+available. Daemon processes are listed by name, so a daemon and its USB
+worker can both appear. A sandbox reports only what it can see, and a
+process that exits during collection can be missed. The snapshot examines
+at most 4,096 processes and reports when a limit is reached. It contains
+no process IDs, command lines, environment variables or memory contents.
+Review the process list before sharing the archive.
+
+Deep Trace also reports the saved daemon submixer preference and versions
+and commits from available OpenXLR and companion package receipts.
+`installationHistory` lists archived receipt metadata separately. An
+archived receipt is evidence of a past installation. Use `system-info.json`
+to identify the builds that were running.
+
+`windowRuntime` and `daemonRuntime` contain a numerical memory snapshot
+from the window and the daemon that replied. They include the managed heap
+size, committed bytes, fragmentation and collection counts, plus the
+proportional and private RAM usage when the kernel supplies those counters.
+The daemon reply carries its own build ID and collection time. A daemon
+that is disconnected, too old to answer or times out leaves
+`daemonRuntime` empty. The rest of the report still works. Collection does
+not force a garbage collection. **Deep Wine trace for plugin scans** is
+a separate setting for reproducing Windows plugin scan failures.
+
 Configuration copies are limited to 4 MiB per file, the preference reader's
-limit. Symbolic links, non-regular files and files that cannot be read are
-replaced with an omission notice. An unavailable configuration does not stop
+limit. Symbolic links, non-regular files, unreadable files and malformed JSON
+are replaced with an omission notice. An unavailable configuration does not stop
 the rest of the collection. The Flatpak daemon logs keep their separate size
 limit and use the same file checks.
 

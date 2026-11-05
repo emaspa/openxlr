@@ -19,6 +19,7 @@
     <Compile Include="../OpenXLR.Core/InstallationHistory.cs" Link="InstallationHistory.cs" />
     <Compile Include="../OpenXLR.Core/RegularFile.cs" Link="RegularFile.cs" />
     <Compile Include="../OpenXLR.Core/Mixing/PipeWireSnapshot.cs" Link="PipeWireSnapshot.cs" />
+    <Compile Include="../OpenXLR.Core/RuntimeSnapshot.cs" Link="RuntimeSnapshot.cs" />
     <!-- Shared with the daemon: Wine's USB driver stays off in a prefix we start. -->
     <Compile Include="../OpenXLR.Core/WineDllOverrides.cs" Link="WineDllOverrides.cs" />
     <!-- Shared with the terminal mixer: the saved Material mode. -->

@@ -427,6 +427,11 @@
                    Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
         <TextBlock Text="{loc:Text Key=CollectDiagnosticsGathersAppAndDeviceStateThe}"
                    FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
+        <CheckBox Name="DeepDiagnostics">
+          <TextBlock Text="{loc:Text Key=DeepDiagnostics}" TextWrapping="Wrap"/>
+        </CheckBox>
+        <TextBlock Text="{loc:Text Key=DeepDiagnosticsHint}"
+                   FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
         <Grid ColumnDefinitions="Auto,10,*">
           <Button Content="{loc:Text Key=CollectDiagnostics}" Padding="14,5" Click="OnCollectDiagnostics"/>
           <TextBlock Grid.Column="2" Name="DiagStatus" FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Secondary}"

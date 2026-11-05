@@ -63,6 +63,10 @@ scan plugins or start helpers, so they share the one HTTP command slot: while
 a command or another of these reads is in flight they answer 429.
 Changes still go through `/commands`.
 
+Send `{"cmd":"getRuntimeDiagnostics"}` through `/commands` for the
+daemon's [runtime snapshot](api.md#runtime-snapshot). The ordinary
+`diagnostics` resource still returns the USB vendor blocks.
+
 The mixer resource reports `routeAppsByDefault`. Send
 `{"cmd":"setRouteAppsByDefault","value":false}` through `/commands` to leave
 unassigned apps not managed. Explicit assignments still apply. This is a

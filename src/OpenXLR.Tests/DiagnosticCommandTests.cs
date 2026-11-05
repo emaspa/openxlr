@@ -74,7 +74,9 @@ public sealed class DiagnosticCommandTests
             [{"id":1,"type":"PipeWire:Interface:Node","info":{"props":{"node.name":"updated"}}},
              {"id":2,"info":null}]
             """;
-        using var graph = JsonDocument.Parse(Diagnostics.GraphForArchive(raw));
+        var result = Diagnostics.AudioJsonForArchive(raw, pipeWire: true, text => text);
+        Assert.True(result.Valid);
+        using var graph = JsonDocument.Parse(result.Text);
         var node = Assert.Single(graph.RootElement.EnumerateArray());
         Assert.Equal("updated", node.GetProperty("info").GetProperty("props").GetProperty("node.name").GetString());
     }
@@ -82,8 +84,41 @@ public sealed class DiagnosticCommandTests
     [Theory]
     [InlineData("[] [")]
     [InlineData("[] {}")]
-    public void AnInterruptedGraphIsKeptForTheErrorSidecar(string json)
-        => Assert.Equal(json, Diagnostics.GraphForArchive(json));
+    [InlineData("[{\"note\":\"private-metadata\\uD800\"}]")]
+    [InlineData("[{\"note\":\"private-metadata\"}")]
+    public void AnInvalidGraphIsOmittedWithoutEchoingPrivateMetadata(string json)
+    {
+        var report = Diagnostics.AudioJsonForArchive(json, pipeWire: true, text => text);
+        Assert.False(report.Valid);
+        Assert.Null(report.Graph);
+        Assert.DoesNotContain("private-metadata", report.Text);
+        using var omission = JsonDocument.Parse(report.Text);
+        Assert.True(omission.RootElement.TryGetProperty("unavailable", out _));
+    }
+
+    [Fact]
+    public void RepeatedFieldsKeepTheirRoutingValuesAndMaskEveryPrivateValue()
+    {
+        var report = Diagnostics.AudioJsonForArchive("""
+            [{"id":1,"type":"PipeWire:Interface:Node","info":{"props":{
+                "application.process.id":"secret\"identifier",
+                "application.process.id":{"nested":"another private identifier"},
+                "application.process.args":"private args",
+                "application.process.binary":"C:\\Users\\private\\player.exe",
+                "node.name":"openxlr_route", "clock.rate":48000,
+                "clock.rate":96000}}}]
+            """, pipeWire: true, text => text);
+        Assert.True(report.Valid);
+        Assert.DoesNotContain("private", report.Text);
+        Assert.DoesNotContain("secret", report.Text);
+        using var saved = JsonDocument.Parse(report.Text);
+        var properties = saved.RootElement[0].GetProperty("info").GetProperty("props");
+        Assert.Equal("openxlr_route", properties.GetProperty("node.name").GetString());
+        Assert.Equal("player.exe", properties.GetProperty("application.process.binary").GetString());
+        Assert.Equal([48000, 96000], properties.EnumerateObject().Where(p => p.Name == "clock.rate").Select(p => p.Value.GetInt32()));
+        Assert.Equal(["<redacted>", "<redacted>"], properties.EnumerateObject()
+            .Where(p => p.Name == "application.process.id").Select(p => p.Value.GetString()));
+    }
 
     [Fact]
     public async Task AMissingHelperIsUnknownRatherThanASuccessfulEmptyReport()
@@ -138,11 +173,16 @@ public sealed class DiagnosticCommandTests
     [Theory]
     [InlineData("{\"x\":1,\"x\":2,\"path\":\"/home/alice/a\"}")]
     [InlineData("{\"path\":\"/home/alice/a\"")]
-    public void IncompleteAndDuplicateJsonIsMarkedInvalidAndStillRedacted(string input)
+    [InlineData("{\"path\":\"\\u002fhome\\u002falice\\u002fprivate-name\"")]
+    [InlineData("{\"path\":\"private-name\\uD800\"}")]
+    public void InvalidConfigurationJsonIsOmitted(string input)
     {
         string text = Diagnostics.RedactJsonText(input, [], "alice", out bool valid);
         Assert.False(valid);
         Assert.DoesNotContain("alice", text);
+        Assert.DoesNotContain("private-name", text);
+        using var report = JsonDocument.Parse(text);
+        Assert.True(report.RootElement.TryGetProperty("unavailable", out _));
     }
 
     [Fact]

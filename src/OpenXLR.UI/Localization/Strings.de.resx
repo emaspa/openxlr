@@ -517,6 +517,12 @@
   <data name="DaemonVersionNote" xml:space="preserve">
     <value>Der Daemon ist v{0}, dieses Fenster v{1}. Starte den Daemon neu, um die installierte Version zu verwenden.</value>
   </data>
+  <data name="DeepDiagnostics" xml:space="preserve">
+    <value>Deep Trace einschließen</value>
+  </data>
+  <data name="DeepDiagnosticsHint" xml:space="preserve">
+    <value>Fügt diesem Export laufende Programme und Speicherkennzahlen hinzu. Prüfe das Archiv, bevor du es weitergibst.</value>
+  </data>
   <data name="DeepWineTraceForPluginScans" xml:space="preserve">
     <value>Detaillierte Wine-Protokollierung für die Plugin-Suche</value>
   </data>

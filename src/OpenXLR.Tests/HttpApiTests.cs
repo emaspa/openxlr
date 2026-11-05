@@ -151,7 +151,22 @@ public sealed class HttpApiTests
             using var valid = await http.PostAsync("/api/v1/commands",
                 new StringContent("{\"cmd\":\"getDiagnostics\"}", Encoding.UTF8, "application/json"));
             Assert.Equal(HttpStatusCode.OK, valid.StatusCode);
-            Assert.Contains("\"ok\":true", await valid.Content.ReadAsStringAsync());
+            string blocks = await valid.Content.ReadAsStringAsync();
+            Assert.Contains("\"ok\":true", blocks);
+            Assert.DoesNotContain("runtimeDiagnostics", blocks);
+            using (var response = await http.PostAsync("/api/v1/commands",
+                new StringContent("{\"cmd\":\"getRuntimeDiagnostics\"}", Encoding.UTF8, "application/json")))
+            {
+                Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+                using var document = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+                var runtime = Assert.Single(document.RootElement.GetProperty("messages").EnumerateArray());
+                Assert.Equal("runtimeDiagnostics", runtime.GetProperty("type").GetString());
+                Assert.Equal(DaemonVersion.BuildId, runtime.GetProperty("daemonBuildId").GetString());
+                var snapshot = runtime.GetProperty("snapshot");
+                Assert.True(snapshot.GetProperty("workingSetBytes").GetInt64() > 0);
+                Assert.True(snapshot.GetProperty("managed").GetProperty("totalAllocatedBytes").GetInt64() > 0);
+                Assert.Equal(System.Text.Json.JsonValueKind.Object, snapshot.GetProperty("memoryKiB").ValueKind);
+            }
             foreach (string command in new[] { "addWindowsPluginFolder", "removeWindowsPluginFolder", "getWindowsPluginFiles", "removeWindowsPluginInserts", "setWindowsPluginEnabled", "deleteWindowsPlugin" })
             {
                 using var folder = await http.PostAsync("/api/v1/commands",

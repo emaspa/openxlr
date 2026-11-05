@@ -93,6 +93,9 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
     public Task<JsonNode?> RequestDiagnosticsAsync(TimeSpan timeout)
         => QueryAsync("diagnostics", "getDiagnostics", timeout);
 
+    internal Task<JsonNode?> RequestRuntimeDiagnosticsAsync(TimeSpan timeout)
+        => QueryAsync("runtimeDiagnostics", "getRuntimeDiagnostics", timeout);
+
     /// <summary>
     /// The dry run of hardware mixing: what <c>setMixing hardware</c> would do
     /// with the layout as it stands, as the daemon's <c>mixingPlan</c>
@@ -405,7 +408,7 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
                 _lastState = new(text, DateTimeOffset.UtcNow, true);
                 StateReceived?.Invoke(node);
             }
-            else if (type == "diagnostics") StoreReply(type, node);
+            else if (type is "diagnostics" or "runtimeDiagnostics") StoreReply(type, node);
             else if (type == "plugins") StoreReply(type, node["plugins"]);
             else if (type == "nativeEditorRulesChanged") NativeEditorRulesChanged?.Invoke();
             else if (type == "browserTabActivation")
