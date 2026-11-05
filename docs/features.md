@@ -773,7 +773,7 @@ crossfade and no chain rebuilt, and **Hear myself** puts the processed
 microphone in the monitor mix for the session only, and the window says
 how much latency that adds. **Shape** holds the microphone EQ's graph,
 edited in place, the unit's and XLR 1's software low cut and ClipGuard, the
-insert chain with bypass, editor and add effect, and eight starting
+insert chain with bypass, editor and add effect, and six starting
 presets for speech, each applied as one
 EQ change with a one-step undo and lit while the EQ holds it, all heard
 live while the take loops. On

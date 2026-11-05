@@ -57,8 +57,8 @@ public sealed class MicSetupModelTests
     [Fact]
     public void ThePresetsAreGentleValidEqsWithALowCutFirst()
     {
-        Assert.Equal(["clear", "warm", "broadcast", "voice-boost", "female-voice-boost", "podcast",
-            "deep-voice-clarity", "soft-sibilants"], MicSetupPresets.All.Select(p => p.Id));
+        Assert.Equal(["clear", "warm", "broadcast", "podcast", "deep-voice", "soft-sibilants"],
+            MicSetupPresets.All.Select(p => p.Id));
         Assert.Equal(MicSetupPresets.All.Count, MicSetupPresets.All.Select(p => p.Name).Distinct().Count());
         foreach (MicSetupPreset preset in MicSetupPresets.All)
         {
@@ -82,9 +82,8 @@ public sealed class MicSetupModelTests
     }
 
     [Theory]
-    [InlineData("female-voice-boost", 2400, 420, 3)]
     [InlineData("podcast", 1900, 120, 3)]
-    [InlineData("deep-voice-clarity", 4800, 170, 3)]
+    [InlineData("deep-voice", 4800, 170, 3)]
     [InlineData("soft-sibilants", 2000, 6600, 2)]
     public void NewPresetsShapeTheIntendedRange(string id, int featuredHz, int reducedHz, double minimumDifference)
     {

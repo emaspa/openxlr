@@ -8,9 +8,8 @@
 // Built-in profiles by key, in the plugin's language; a key it does not know
 // keeps the daemon's English name.
 const BUILTIN_NAMES = {
-  clear: "Clear", warm: "Warm", broadcast: "Broadcast", "voice-boost": "Voice Boost",
-  "female-voice-boost": "Female Voice Boost", podcast: "Podcast",
-  "deep-voice-clarity": "Deep Voice Clarity", "soft-sibilants": "Soft Sibilants",
+  clear: "Clear", warm: "Warm", broadcast: "Broadcast", podcast: "Podcast",
+  "deep-voice": "Deep voice", "soft-sibilants": "Soft sibilants",
 };
 const PREFIX = "eqprofile:";
 

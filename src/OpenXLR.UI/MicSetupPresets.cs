@@ -21,10 +21,8 @@ public sealed record MicSetupPreset(string Id, MicEq Eq)
         "clear" => Localizer.Text("MicSetupPresetClear"),
         "warm" => Localizer.Text("MicSetupPresetWarm"),
         "broadcast" => Localizer.Text("MicSetupPresetBroadcast"),
-        "voice-boost" => Localizer.Text("MicSetupPresetVoiceBoost"),
-        "female-voice-boost" => Localizer.Text("MicSetupPresetFemaleVoiceBoost"),
         "podcast" => Localizer.Text("MicSetupPresetPodcast"),
-        "deep-voice-clarity" => Localizer.Text("MicSetupPresetDeepVoiceClarity"),
+        "deep-voice" => Localizer.Text("MicSetupPresetDeepVoice"),
         "soft-sibilants" => Localizer.Text("MicSetupPresetSoftSibilants"),
         _ => null,
     };
@@ -34,10 +32,8 @@ public sealed record MicSetupPreset(string Id, MicEq Eq)
     {
         "warm" => Localizer.Text("MicSetupPresetWarmTip"),
         "broadcast" => Localizer.Text("MicSetupPresetBroadcastTip"),
-        "voice-boost" => Localizer.Text("MicSetupPresetVoiceBoostTip"),
-        "female-voice-boost" => Localizer.Text("MicSetupPresetFemaleVoiceBoostTip"),
         "podcast" => Localizer.Text("MicSetupPresetPodcastTip"),
-        "deep-voice-clarity" => Localizer.Text("MicSetupPresetDeepVoiceClarityTip"),
+        "deep-voice" => Localizer.Text("MicSetupPresetDeepVoiceTip"),
         "soft-sibilants" => Localizer.Text("MicSetupPresetSoftSibilantsTip"),
         _ => Localizer.Text("MicSetupPresetClearTip"),
     };

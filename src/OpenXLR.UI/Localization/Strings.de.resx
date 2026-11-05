@@ -3931,22 +3931,16 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="TextSizeMuchLarger" xml:space="preserve">
     <value>Viel größer (120 %)</value>
   </data>
-  <data name="MicSetupPresetFemaleVoiceBoost" xml:space="preserve">
-    <value>Frauenstimme hervorheben</value>
-  </data>
-  <data name="MicSetupPresetFemaleVoiceBoostTip" xml:space="preserve">
-    <value>Reduziert dumpfe Mitten und hebt höhere Stimmen mit sanften Höhen hervor.</value>
-  </data>
   <data name="MicSetupPresetPodcast" xml:space="preserve">
     <value>Podcast</value>
   </data>
   <data name="MicSetupPresetPodcastTip" xml:space="preserve">
     <value>Gleicht den Bass bei naher Mikrofonposition aus und hebt die Sprachverständlichkeit leicht an.</value>
   </data>
-  <data name="MicSetupPresetDeepVoiceClarity" xml:space="preserve">
-    <value>Tiefe Stimme klarer</value>
+  <data name="MicSetupPresetDeepVoice" xml:space="preserve">
+    <value>Tiefe Stimme</value>
   </data>
-  <data name="MicSetupPresetDeepVoiceClarityTip" xml:space="preserve">
+  <data name="MicSetupPresetDeepVoiceTip" xml:space="preserve">
     <value>Reduziert Dröhnen bei tiefen Stimmen und macht Konsonanten deutlicher.</value>
   </data>
   <data name="MicSetupPresetSoftSibilants" xml:space="preserve">
@@ -3954,11 +3948,5 @@ Von OpenXLR gesteuertes Interface wählen</value>
   </data>
   <data name="MicSetupPresetSoftSibilantsTip" xml:space="preserve">
     <value>Senkt einen festen Frequenzbereich um scharfe S-Laute ab und mildert helle Höhen.</value>
-  </data>
-  <data name="MicSetupPresetVoiceBoost" xml:space="preserve">
-    <value>Stimme hervorheben</value>
-  </data>
-  <data name="MicSetupPresetVoiceBoostTip" xml:space="preserve">
-    <value>Reduziert Rumpeln und tiefe Mitten und hebt die Stimme hervor.</value>
   </data>
 </root>
