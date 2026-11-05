@@ -689,6 +689,36 @@ microphone's send to that mix are both unmuted. With the jacks on different
 feeds, each jack hears the path when its own feed carries the microphone,
 at that feed's send level.
 
+<a name="second-monitor-output"></a>
+#### Give a second headset its own mix
+
+You can keep a Wave:3 as your microphone and listen through USB or
+Bluetooth headphones. Apps keep playing into their OpenXLR channels while
+each listening device gets the mix you choose.
+
+1. Connect the second headset so it appears as a Linux playback device.
+   In **MONITOR → Devices**, tick it and the output you already use.
+2. Open the feed picker beside the original output and leave only
+   **Monitor A** ticked. Open the picker beside the second headset, tick
+   **Monitor B** first, then untick **Monitor A** and any other mixes.
+   The picker keeps at least one mix selected. If both devices should
+   hear the same blend, leave only Monitor A ticked on both.
+3. In **SUBMIXER**, unmute Monitor B and open the sends you want to hear in
+   that mix. Its master and sends control the blend for the second headset.
+4. Open [**Flow**](#audio-flow) and click the second headset to trace its
+   connection. It should have one incoming mix route from Monitor B.
+
+For listening only on the second headset, untick the first playback
+output in **Devices**. Your microphone and app assignments still apply.
+
+To use **Monitor C** instead, open **SUBMIXER → Edit layout**. Under
+**MIXES**, enter the name, select **Monitor mix** and press **Add mix**.
+Tick Monitor C in the headset's feed picker before unticking its old
+feed. A new mix starts silent until you open its sends.
+
+If the headset disconnects, leave it ticked. It shows as **(not
+connected)** and gets its feed back when it returns.
+
 <a name="ducking"></a>
 #### Lower what you hear while you speak
 
@@ -859,6 +889,8 @@ Input and mix processing appears in an FX row inside its card. Hover over the
 card for the full chain in signal order, including bypass and error states.
 Outputs follow the selected monitor feeds, including outputs where both
 Monitor A and Monitor B are ticked, and the current virtual microphones.
+See [Give a second headset its own mix](#second-monitor-output) for an
+example with two hardware outputs.
 Apps left to desktop routing appear without an OpenXLR connection. The Flow window sizes itself to the graph when it opens, or when
 the first routing state arrives, up to the screen's usable area. Larger layouts
 scroll horizontally and vertically. Resizing the window manually turns off automatic sizing.
