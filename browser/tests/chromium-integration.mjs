@@ -256,6 +256,16 @@ try {
     return result.result?.value;
   };
 
+  async function actionPopup(page) {
+    await page.bringToFront();
+    const target = (await cdp.send('Target.getTargets', { filter: [{}] })).targetInfos
+      .find(target => target.type === 'tab' && target.url === page.url());
+    assert.ok(target, 'The active fixture must expose a browser tab target.');
+    await cdp.send('Extensions.triggerAction', { id: extensionId, targetId: target.targetId });
+    return until(async () => (await cdp.send('Target.getTargets')).targetInfos
+      .find(target => target.url === `chrome-extension://${extensionId}/popup.html`), 'extension action popup');
+  }
+
   const control = await context.newPage();
   await control.goto(`chrome-extension://${extensionId}/popup.html`);
   await until(() => control.evaluate(() => chrome.runtime.sendMessage({ target: 'worker', type: 'snapshot' }))
@@ -278,12 +288,7 @@ try {
   await until(async () => (await devices.locator('#status').textContent()).startsWith('Found '), 'OpenXLR output access');
   await devices.close();
   for (const { page, site } of [musicTab, chatTab]) {
-    await page.bringToFront();
-    const target = (await cdp.send('Target.getTargets', { filter: [{}] })).targetInfos.find(target => target.type === 'tab' && target.url === page.url());
-    assert.ok(target, 'The active fixture must expose a browser tab target.');
-    await cdp.send('Extensions.triggerAction', { id: extensionId, targetId: target.targetId });
-    const popup = await until(async () => (await cdp.send('Target.getTargets')).targetInfos
-      .find(target => target.url === `chrome-extension://${extensionId}/popup.html`), 'extension action popup');
+    const popup = await actionPopup(page);
     await until(() => evaluate(popup.targetId, "document.getElementById('channel').disabled === false"), 'tab channel picker is available');
     const channel = site === musicTab.site ? 'music' : 'voicechat';
     await evaluate(popup.targetId, `
@@ -308,7 +313,8 @@ try {
   const chat = await sample('OpenXLR_ch_voicechat');
   assert.ok(music.low > .025 && music.high < music.low / 8, 'Only the 440 Hz tab reaches Music.');
   assert.ok(chat.high > .025 && chat.low < chat.high / 8, 'Only the 880 Hz tab reaches Voice Chat.');
-  console.log('PASS native bridge, two user-activated tabs and isolated 440/880 Hz channel audio');
+  assert.equal(await worker.evaluate(() => chrome.action.getBadgeText({})), '2');
+  console.log('PASS native bridge, two user-activated tabs, toolbar count and isolated 440/880 Hz channel audio');
 
   await api('POST', 'commands', { cmd: 'assignBrowserTab', session, tabId: musicId, site: musicTab.site, channel: 'game', remember: false });
   await delay(1000);
@@ -316,7 +322,7 @@ try {
   const oldMusic = await sample('OpenXLR_ch_music');
   assert.ok(game.low > .025 && game.high < game.low / 8, 'A live tab channel change reaches Game.');
   assert.ok(oldMusic.low < .003, 'The old Music route is silent.');
-  await musicTab.page.goto(chatTab.site);
+  await musicTab.page.goto(chatTab.site + "/from-music");
   await until(async () => {
     const tabs = (await api('GET', 'state')).mixer.browserTabs;
     const navigated = tabs.find(tab => tab.id === musicId);
@@ -329,8 +335,37 @@ try {
   assert.equal((await api('GET', 'state')).mixer.browserTabs.find(tab => tab.id === musicId).channelId, 'voicechat');
   console.log('PASS live channel change, cross-origin navigation and independent capture lifetime');
 
+  const overview = await actionPopup(musicTab.page);
+  await until(() => evaluate(overview.targetId, "document.querySelectorAll('#route-list li').length === 1"),
+    'the popup lists the other captured tab');
+  assert.equal(await worker.evaluate(() => chrome.action.getBadgeText({})), '1');
+  await evaluate(overview.targetId, "document.querySelector('#route-list .route-tab').click()");
+  await until(() => worker.evaluate(id => chrome.tabs.get(id).then(tab => tab.active), chatId),
+    'the route row selects the captured tab');
+  await cdp.send('Target.closeTarget', { targetId: overview.targetId }).catch(() => {});
+  const stop = await actionPopup(chatTab.page);
+  await until(() => evaluate(stop.targetId, "document.getElementById('routes').hidden === false"),
+    'the stop-all controls are available');
+  await evaluate(stop.targetId, "document.getElementById('stop-all').click()");
+  await until(async () => (await api('GET', 'state')).mixer.browserTabs.every(tab => !tab.capturing),
+    'Stop all releases every captured tab');
+  await until(() => worker.evaluate(async () => (await chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'] })).length === 0),
+    'Stop all closes the offscreen audio document');
+  assert.equal(await worker.evaluate(() => chrome.action.getBadgeText({})), '');
+  await cdp.send('Target.closeTarget', { targetId: stop.targetId }).catch(() => {});
+  console.log('PASS cross-tab popup overview, tab selection, Stop all and released audio context');
+
+  const resume = await actionPopup(chatTab.page);
+  await until(() => evaluate(resume.targetId, "document.getElementById('start').disabled === false"),
+    'a stopped tab can be explicitly activated again');
+  await evaluate(resume.targetId, "document.getElementById('start').click()");
+  await until(async () => (await api('GET', 'state')).mixer.browserTabs.find(tab => tab.id === chatId)?.capturing,
+    'a capture is active before the daemon disconnects');
+  await cdp.send('Target.closeTarget', { targetId: resume.targetId });
   await stopDaemon();
-  await until(() => worker.evaluate(async () => !await chrome.offscreen.hasDocument()), 'daemon disconnect closes the audio stages');
+  await until(() => worker.evaluate(async () => (await chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'] })).length === 0),
+    'daemon disconnect closes the audio stages');
+  assert.equal(await worker.evaluate(() => chrome.action.getBadgeText({})), '');
   await startDaemon();
   const restored = await until(async () => {
     const mixer = (await api('GET', 'state')).mixer;

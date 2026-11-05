@@ -166,5 +166,17 @@
   },
   "outputGone": {
     "message": "Nawala ang napiling OpenXLR output. Normal na muling nagpe-play ang tab."
+  },
+  "popupActiveRoutes": {
+    "message": "Mga aktibong ruta"
+  },
+  "popupStopAll": {
+    "message": "Ihinto ang lahat ng ruta"
+  },
+  "popupShowRoute": {
+    "message": "Ipakita ang tab na $1"
+  },
+  "popupStopRoute": {
+    "message": "Ihinto ang ruta para sa $1"
   }
 }

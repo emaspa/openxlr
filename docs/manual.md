@@ -706,6 +706,36 @@ microphone's send to that mix are both unmuted. With the jacks on different
 feeds, each jack hears the path when its own feed carries the microphone,
 at that feed's send level.
 
+<a name="second-monitor-output"></a>
+#### Give a second headset its own mix
+
+You can keep a Wave:3 as your microphone and listen through USB or
+Bluetooth headphones. Apps keep playing into their OpenXLR channels while
+each listening device gets the mix you choose.
+
+1. Connect the second headset so it appears as a Linux playback device.
+   In **MONITOR → Devices**, tick it and the output you already use.
+2. Open the feed picker beside the original output and leave only
+   **Monitor A** ticked. Open the picker beside the second headset, tick
+   **Monitor B** first, then untick **Monitor A** and any other mixes.
+   The picker keeps at least one mix selected. If both devices should
+   hear the same blend, leave only Monitor A ticked on both.
+3. In **SUBMIXER**, unmute Monitor B and open the sends you want to hear in
+   that mix. Its master and sends control the blend for the second headset.
+4. Open [**Flow**](#audio-flow) and click the second headset to trace its
+   connection. It should have one incoming mix route from Monitor B.
+
+For listening only on the second headset, untick the first playback
+output in **Devices**. Your microphone and app assignments still apply.
+
+To use **Monitor C** instead, open **SUBMIXER → Edit layout**. Under
+**MIXES**, enter the name, select **Monitor mix** and press **Add mix**.
+Tick Monitor C in the headset's feed picker before unticking its old
+feed. A new mix starts silent until you open its sends.
+
+If the headset disconnects, leave it ticked. It shows as **(not
+connected)** and gets its feed back when it returns.
+
 <a name="ducking"></a>
 #### Lower what you hear while you speak
 
@@ -876,6 +906,8 @@ Input and mix processing appears in an FX row inside its card. Hover over the
 card for the full chain in signal order, including bypass and error states.
 Outputs follow the selected monitor feeds, including outputs where both
 Monitor A and Monitor B are ticked, and the current virtual microphones.
+See [Give a second headset its own mix](#second-monitor-output) for an
+example with two hardware outputs.
 Apps left to desktop routing appear without an OpenXLR connection. The Flow window sizes itself to the graph when it opens, or when
 the first routing state arrives, up to the screen's usable area. Larger layouts
 scroll horizontally and vertically. Resizing the window manually turns off automatic sizing.
@@ -1412,6 +1444,9 @@ take or on the live microphone:
   | Clear | high pass 80 Hz | bell 300 Hz -2 dB, Q 1.02 | bell 3.5 kHz +2 dB, Q 1.02 | high shelf 10 kHz +1 dB |
   | Warm | high pass 60 Hz | low shelf 200 Hz +2 dB | bell 3 kHz +1 dB, Q 1.02 | high shelf 8 kHz -2 dB |
   | Broadcast | high pass 100 Hz | bell 400 Hz -3 dB, Q 1.42 | bell 4 kHz +3 dB, Q 0.79 | high shelf 12 kHz +2 dB |
+  | Podcast | high pass 65 Hz | low shelf 140 Hz -2 dB | bell 1.9 kHz +1.75 dB, Q 0.79 | high shelf 7 kHz -1.5 dB |
+  | Deep voice | high pass 70 Hz | bell 170 Hz -2.5 dB, Q 1.18 | bell 500 Hz -1.5 dB, Q 0.91 | high shelf 3.2 kHz +2 dB |
+  | Soft sibilants | high pass 80 Hz | bell 300 Hz -2 dB, Q 1.02 | bell 6.6 kHz -3 dB, Q 1.98 | high shelf 9.5 kHz -1.5 dB |
 
   The high pass and the shelves keep the EQ's default Q of 0.70. Every
   band is on.
@@ -1723,8 +1758,8 @@ clicking **EQ** again brings it to the front.
   then puts the four bands back where they start and leaves the EQ on or
   off.
 - The **Profile** row under them keeps EQs by name. The list starts with
-  the three built-in profiles, Clear, Warm and Broadcast, marked "(built
-  in)". They are Mic setup's starting presets. Your saved profiles follow.
+  the built-in profiles from Mic setup, marked "(built in)". Your saved
+  profiles follow.
   Picking a profile in the list loads it at once: its bands go on this
   microphone and its EQ switches on. The list shows the profile the EQ
   holds, so it goes back to "Choose a profile" when you change a band, and
@@ -1791,8 +1826,10 @@ every microphone's EQ with the rest of the mixer.
   profile". **Compare** leaves the list as it is. Only a pick in the list
   loads a profile; the list changing by itself sends nothing.
 - The built-in profiles are the presets Mic setup's Shape step offers,
-  with the same bands: Clear, Warm and Broadcast. They come first in the
-  list, named in the UI's language, and cannot be renamed or deleted.
+  with the same bands. Podcast balances the extra bass of close speech,
+  Deep voice reduces boom, and Soft sibilants uses a fixed EQ cut for sharp
+  S sounds. The built-in profiles come first, use the UI language, and
+  cannot be renamed or deleted.
   A profile you save may share a built-in one's name.
 - The daemon keeps your profiles in `~/.config/openxlr/eq-profiles.json`,
   readable by you alone, and writes the whole file at once. Up to 64
@@ -2895,8 +2932,10 @@ channel, or change the view, the skin or Touch sizing. It never goes below
 the skin sets them. A window too small for the panel at 100% scrolls. For a
 smaller mixer, use the compact or mini view, or Standard sizing.
 
-Fit keeps the panel's proportions. An ultrawide window can still have space
-beside it; choose a larger fixed or custom size if you prefer bigger controls
+Fit scales text and control targets together. In the mix matrix it also
+shares spare width between the columns, giving the faders longer tracks
+when the window is wide and short. Channel tiles and mix banks keep their
+proportions. Choose a larger fixed or custom size for bigger controls
 with scrolling.
 
 **Custom** shows a percentage box beside the picker, or under it in a narrow

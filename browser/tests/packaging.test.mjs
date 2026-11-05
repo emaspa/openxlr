@@ -46,3 +46,13 @@ test('the NixOS module exposes both generated manifests under /etc', () => {
     assert.ok(source.includes(`"\${cfg.package}/etc/${browser}/${manifest}"`));
   }
 });
+
+test('the companion stays MV3 with a strict packaged-code policy and unchanged permissions', () => {
+  const manifest = JSON.parse(readFileSync(join(root, 'browser/chromium/manifest.json'), 'utf8'));
+  assert.equal(manifest.manifest_version, 3);
+  assert.deepEqual(manifest.permissions, ['activeTab', 'tabs', 'tabCapture', 'offscreen', 'storage', 'nativeMessaging']);
+  assert.deepEqual(manifest.content_security_policy, { extension_pages: "script-src 'self'; object-src 'none'" });
+  assert.equal(manifest.host_permissions, undefined);
+  assert.equal(manifest.content_scripts, undefined);
+  assert.equal(manifest.externally_connectable, undefined);
+});

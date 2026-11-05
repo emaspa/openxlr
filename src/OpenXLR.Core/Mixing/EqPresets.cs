@@ -71,8 +71,29 @@ public static class EqPresets
         Band(MicEq.Peak, 4000, 3, 0.8),
         Band(MicEq.HighShelf, 12000, 2)));
 
+    /// <summary>Balance the extra bass of close speech and add a gentle lift for words.</summary>
+    public static EqPreset Podcast { get; } = new("podcast", "Podcast", Eq(
+        Band(MicEq.LowCut, 65),
+        Band(MicEq.LowShelf, 140, -2),
+        Band(MicEq.Peak, 1900, 1.75, 0.8),
+        Band(MicEq.HighShelf, 7000, -1.5)));
+
+    /// <summary>Less boom and mud on a deep voice, keeping its low fundamentals.</summary>
+    public static EqPreset DeepVoice { get; } = new("deep-voice", "Deep voice", Eq(
+        Band(MicEq.LowCut, 70),
+        Band(MicEq.Peak, 170, -2.5, 1.2),
+        Band(MicEq.Peak, 500, -1.5, 0.9),
+        Band(MicEq.HighShelf, 3200, 2)));
+
+    /// <summary>Clear's low end with a static dip around sharp S sounds and a soft top end.</summary>
+    public static EqPreset SoftSibilants { get; } = new("soft-sibilants", "Soft sibilants", Eq(
+        Band(MicEq.LowCut, 80),
+        Band(MicEq.Peak, 300, -2, 1.0),
+        Band(MicEq.Peak, 6600, -3, 2.0),
+        Band(MicEq.HighShelf, 9500, -1.5)));
+
     /// <summary>The presets in the order every client shows them.</summary>
-    public static IReadOnlyList<EqPreset> All { get; } = [Clear, Warm, Broadcast];
+    public static IReadOnlyList<EqPreset> All { get; } = [Clear, Warm, Broadcast, Podcast, DeepVoice, SoftSibilants];
 
     /// <summary>The preset with this id (<c>builtin:</c> and its key), or null.</summary>
     public static EqPreset? FindId(string? id) => All.FirstOrDefault(p => string.Equals(p.Id, id, StringComparison.Ordinal));

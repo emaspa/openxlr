@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Net.WebSockets;
 using System.Reflection;
 using System.Text.Json.Nodes;
@@ -478,15 +479,14 @@ public sealed class BrowserTabViewModelTests
         Assert.False(model.PreserveBrowserOutputs);
         Assert.False(model.BrowserTabs[0].CanEdit);
         Report(model, false, new JsonArray(Tab()));
-        await Reply(first, "routing unavailable");
-        await Until(() => model.CanSetBrowserRouting);
+        await ReplyAndWait(first, "routing unavailable");
         Assert.False(model.PreserveBrowserOutputs);
         Assert.Equal("routing unavailable", model.Status);
         model.PreserveBrowserOutputs = true;
         JsonNode second = await commands.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(3));
         Report(model, true, new JsonArray(Tab()));
-        await Reply(second);
-        await Until(() => model.PreserveBrowserOutputs);
+        await ReplyAndWait(second);
+        Assert.True(model.PreserveBrowserOutputs);
         Assert.True(model.BrowserTabs[0].CanEdit);
         Assert.False(commands.Reader.TryRead(out _));
 
@@ -495,15 +495,31 @@ public sealed class BrowserTabViewModelTests
         JsonNode third = await commands.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(3));
         Report(model, false, new JsonArray(Tab()));
         Report(model, true, new JsonArray(Tab()));
-        await Reply(third);
-        await Until(() => model.CanSetBrowserRouting);
+        await ReplyAndWait(third);
         Assert.True(model.PreserveBrowserOutputs);
         Report(model, false, new JsonArray(Tab()));
         Assert.False(model.PreserveBrowserOutputs);
         Assert.False(model.BrowserTabs[0].CanEdit);
 
-        Task Reply(JsonNode command, string? error = null) => SocketTestServer.Send(socket,
-            new { type = "commandResult", requestId = command["requestId"]!.GetValue<string>(), error }, CancellationToken.None);
+        async Task ReplyAndWait(JsonNode command, string? error = null)
+        {
+            var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            // The view model announces that the control is ready after updating the status and tabs.
+            void OnPropertyChanged(object? sender, PropertyChangedEventArgs change)
+            {
+                if (change.PropertyName == nameof(MainViewModel.CanSetBrowserRouting) && model.CanSetBrowserRouting)
+                    completed.TrySetResult();
+            }
+
+            model.PropertyChanged += OnPropertyChanged;
+            try
+            {
+                await SocketTestServer.Send(socket,
+                    new { type = "commandResult", requestId = command["requestId"]!.GetValue<string>(), error }, CancellationToken.None);
+                await completed.Task.WaitAsync(TimeSpan.FromSeconds(3));
+            }
+            finally { model.PropertyChanged -= OnPropertyChanged; }
+        }
     }
 
     internal static JsonObject Tab(string session = Session, int id = 7, string title = "A browser tab", string? channel = null,

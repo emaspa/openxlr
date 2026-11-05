@@ -25,7 +25,7 @@ function fixture({ existing = [], recovery } = {}) {
     tabs: [1, 2].map(id => ({ id, windowId: id * 10, active: id === 1, url: `https://site${id}.example/watch`, title: `Tab ${id}` })),
     active: new Map(existing.map(session => [session.id, session])), document: existing.length > 0,
     calls: [], tokens: [], ports: [], posts: [], timers: new Map(), timerDelays: new Map(), bindings: {}, startGates: [],
-    focused: [], popups: [],
+    focused: [], popups: [], badges: [], queries: 0,
     state: { type: 'state', preserveBrowserOutputs: true,
       channels: [{ id: 'music', label: 'OpenXLR Music' }, { id: 'chat', label: 'OpenXLR Chat' }],
       tabs: [1, 2].map(id => ({ id, site: `https://site${id}.example`, channelId: id === 1 ? 'chat' : 'music', remember: false })) },
@@ -38,7 +38,12 @@ function fixture({ existing = [], recovery } = {}) {
   });
   f.status = (id, capturing, error = null) => f.request('audioStatus', { id, capturing, error }, { id: extensionId, url: url('offscreen.html') });
   const chrome = {
-    runtime: { id: extensionId, getURL: url, onMessage: listeners, onStartup: event(), onInstalled: event(),
+    runtime: { id: extensionId, getURL: url,
+      async getContexts(filter) {
+        assert.deepEqual(Array.from(filter.contextTypes), ['OFFSCREEN_DOCUMENT']);
+        assert.deepEqual(Array.from(filter.documentUrls), [url('offscreen.html')]);
+        return await chrome.offscreen.hasDocument() ? [{ contextType: 'OFFSCREEN_DOCUMENT' }] : [];
+      }, onMessage: listeners, onStartup: event(), onInstalled: event(),
       connectNative(host) {
         assert.equal(host, HOST);
         const port = { onMessage: event(), onDisconnect: event(), postMessage(message) { f.posts.push(message); } };
@@ -75,13 +80,13 @@ function fixture({ existing = [], recovery } = {}) {
           default: throw new Error(`Unexpected offscreen message ${message.type}`);
         }
       } },
-    tabs: { onCreated: event(), onUpdated: event(), onRemoved: event(),
+    tabs: { onCreated: event(), onUpdated: event(), onRemoved: event(), onActivated: event(), onReplaced: event(),
       async create(options) { (f.opened ??= []).push(options.url); },
-      async get(id) { const tab = f.tabs.find(item => item.id === id); if (!tab) throw new Error(`No tab with id: ${id}.`); return { ...tab }; },
+      async get(id) { if (f.tabGate) await f.tabGate.promise; const tab = f.tabs.find(item => item.id === id); if (!tab) throw new Error(`No tab with id: ${id}.`); return { ...tab }; },
       async update(id, changes) { if (changes.active) f.activate(id); return { ...f.tabs.find(item => item.id === id) }; },
-      async query(query) { return query.active ? f.tabs.filter(tab => tab.active) : [...f.tabs]; } },
+      async query(query) { f.queries++; return query.active ? f.tabs.filter(tab => tab.active) : [...f.tabs]; } },
     windows: { async update(id, changes) { if (changes.focused) f.focused.push(id); return { id }; } },
-    action: { async openPopup(options) { if (f.popupError) throw new Error(f.popupError); f.popups.push(options?.windowId); } },
+    action: { async setBadgeText({ text }) { f.badges.push(text); }, async openPopup(options) { if (f.popupError) throw new Error(f.popupError); f.popups.push(options?.windowId); } },
     offscreen: { async hasDocument() { return f.document; },
       async createDocument() { f.document = true; f.created = (f.created ?? 0) + 1; },
       async closeDocument() { f.document = false; f.active.clear(); f.closed = (f.closed ?? 0) + 1; } },
@@ -591,3 +596,79 @@ for (const change of ['disconnect', 'channel removal']) {
     assert.equal(f.active.size, 0);
   });
 }
+
+test('the active route list and toolbar badge follow local audio state', async () => {
+  const f = await readyFixture();
+  await f.request('start', { id: 1 });
+  f.activate(2);
+  await f.request('start', { id: 2 });
+  const snapshot = (await f.request('snapshot')).value;
+  assert.deepEqual(Array.from(snapshot.activeRoutes, route => [route.id, route.title, route.channel]),
+    [[1, 'Tab 1', 'OpenXLR Chat'], [2, 'Tab 2', 'OpenXLR Music']]);
+  assert.equal(f.badges.at(-1), '2');
+  await f.request('stop', { id: 1 });
+  assert.equal(f.badges.at(-1), '1');
+  await f.request('stopAll');
+  assert.equal(f.badges.at(-1), '');
+  assert.equal(f.active.size, 0);
+  assert.equal(f.document, false);
+  assert.equal((await f.request('snapshot')).value.activeRoutes.length, 0);
+});
+
+test('showing a routed tab focuses its window without starting another capture', async () => {
+  const f = await readyFixture();
+  await f.request('start', { id: 1 });
+  f.activate(2);
+  assert.equal((await f.request('showTab', { id: 1, site: 'https://site1.example' })).error, undefined);
+  assert.equal(f.tabs.find(tab => tab.id === 1).active, true);
+  assert.deepEqual(f.focused, [10]);
+  assert.deepEqual(f.tokens, [1]);
+  assert.match((await f.request('showTab', { id: 2, site: 'https://site2.example' })).error, /no longer registered/);
+  assert.match((await f.request('showTab', { id: 1, site: 'https://other.example' })).error, /no longer registered/);
+});
+
+test('Stop all cancels an OpenXLR activation waiting for its first tab lookup', async () => {
+  const f = await readyFixture();
+  f.tabGate = deferred();
+  f.ports.at(-1).onMessage.emit({ type: 'activate', tabId: 2, site: 'https://site2.example' });
+  await tick();
+  assert.equal((await f.request('snapshot')).value.requestedTabs.length, 1);
+  await f.request('stopAll');
+  f.tabGate.resolve();
+  await settle();
+  assert.equal(f.tokens.length, 0);
+  assert.equal(f.focused.length, 0);
+  assert.equal(f.popups.length, 0);
+  assert.equal((await f.request('snapshot')).value.requestedTabs.length, 0);
+});
+
+test('stopping one pending activation prevents a late start', async () => {
+  const f = await readyFixture();
+  f.tabGate = deferred();
+  f.ports.at(-1).onMessage.emit({ type: 'activate', tabId: 2, site: 'https://site2.example' });
+  await tick();
+  await f.request('stop', { id: 2 });
+  f.tabGate.resolve();
+  await settle();
+  assert.equal(f.tokens.length, 0);
+});
+
+test('a prerendered replacement releases the old tab capture', async () => {
+  const f = await readyFixture();
+  await f.request('start', { id: 1 });
+  f.chrome.tabs.onReplaced.emit(3, 1);
+  await settle();
+  assert.equal(f.active.size, 0);
+  assert.equal(f.badges.at(-1), '');
+});
+
+test('favicon and loading updates do not query every tab', async () => {
+  const f = await readyFixture();
+  const before = f.queries;
+  for (let i = 0; i < 50; i++) f.chrome.tabs.onUpdated.emit(1, { favIconUrl: 'https://site1.example/icon', status: 'complete' });
+  await f.refresh();
+  assert.equal(f.queries, before);
+  f.chrome.tabs.onActivated.emit({ tabId: 2, windowId: 20 });
+  await f.refresh();
+  assert.equal(f.queries, before + 1);
+});

@@ -166,5 +166,17 @@
   },
   "outputGone": {
     "message": "Изабрани OpenXLR излаз је нестао. Картица поново нормално репродукује звук."
+  },
+  "popupActiveRoutes": {
+    "message": "Активна усмеравања"
+  },
+  "popupStopAll": {
+    "message": "Заустави сва усмеравања"
+  },
+  "popupShowRoute": {
+    "message": "Прикажи картицу $1"
+  },
+  "popupStopRoute": {
+    "message": "Заустави усмеравање за $1"
   }
 }

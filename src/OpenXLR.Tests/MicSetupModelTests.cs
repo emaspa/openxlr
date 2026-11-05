@@ -57,8 +57,9 @@ public sealed class MicSetupModelTests
     [Fact]
     public void ThePresetsAreGentleValidEqsWithALowCutFirst()
     {
-        Assert.Equal(["clear", "warm", "broadcast"], MicSetupPresets.All.Select(p => p.Id));
-        Assert.Equal(3, MicSetupPresets.All.Select(p => p.Name).Distinct().Count());
+        Assert.Equal(["clear", "warm", "broadcast", "podcast", "deep-voice", "soft-sibilants"],
+            MicSetupPresets.All.Select(p => p.Id));
+        Assert.Equal(MicSetupPresets.All.Count, MicSetupPresets.All.Select(p => p.Name).Distinct().Count());
         foreach (MicSetupPreset preset in MicSetupPresets.All)
         {
             Assert.Null(MicEq.Check(preset.Eq));
@@ -80,6 +81,22 @@ public sealed class MicSetupModelTests
         Assert.All(held.Bands, b => Assert.InRange(b.Frequency, 100, 10000));
     }
 
+    [Theory]
+    [InlineData("podcast", 1900, 120, 3)]
+    [InlineData("deep-voice", 4800, 170, 3)]
+    [InlineData("soft-sibilants", 2000, 6600, 2)]
+    public void NewPresetsShapeTheIntendedRange(string id, int featuredHz, int reducedHz, double minimumDifference)
+    {
+        MicEq eq = Assert.Single(MicSetupPresets.All, preset => preset.Id == id).Eq;
+        foreach (int rate in new[] { 44100, 48000, 96000 })
+        {
+            double featured = EqResponse.MagnitudeDb(eq, rate, featuredHz);
+            double reduced = EqResponse.MagnitudeDb(eq, rate, reducedHz);
+            Assert.InRange(featured - reduced, minimumDifference, 8);
+            Assert.InRange(featured, -1, 3);
+        }
+    }
+
     /// <summary>The manual's table is the presets as the code holds them, band by band.</summary>
     [Fact]
     public void TheManualListsThePresetsAsTheyAre()
@@ -87,7 +104,8 @@ public sealed class MicSetupModelTests
         string manual = File.ReadAllText(Path.Combine(MicEqTests.RepoRoot, "docs", "manual.md"));
         foreach (MicSetupPreset preset in MicSetupPresets.All)
         {
-            string row = $"| {preset.Name} | " + string.Join(" | ", preset.Eq.Bands.Select(Describe)) + " |";
+            string name = EqPresets.FindId(EqProfileIds.Builtin(preset.Id))!.Name;
+            string row = $"| {name} | " + string.Join(" | ", preset.Eq.Bands.Select(Describe)) + " |";
             Assert.Contains(row, manual);
         }
 

@@ -166,5 +166,17 @@
   },
   "outputGone": {
     "message": "L'uscita OpenXLR scelta è scomparsa. La scheda torna a riprodurre normalmente."
+  },
+  "popupActiveRoutes": {
+    "message": "Instradamenti attivi"
+  },
+  "popupStopAll": {
+    "message": "Interrompi tutti gli instradamenti"
+  },
+  "popupShowRoute": {
+    "message": "Mostra scheda $1"
+  },
+  "popupStopRoute": {
+    "message": "Interrompi instradamento di $1"
   }
 }

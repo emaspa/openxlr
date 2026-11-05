@@ -12,3 +12,9 @@ button:disabled { cursor: default; }
 #error { white-space: pre-wrap; }
 .notice { border-inline-start: 3px solid Mark; padding-inline-start: 10px; margin: 12px 0; }
 .notice p { margin: 0 0 6px; }
+#routes { margin-top: 14px; border-top: 1px solid GrayText; }
+#routes h2 { font-size: 1rem; }
+#route-list { list-style: none; margin: 0; padding: 0; max-height: 180px; overflow-y: auto; }
+#route-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 6px; }
+.route-tab { text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.route-channel { color: GrayText; grid-column: 1 / -1; padding-inline-start: 8px; overflow-wrap: anywhere; }

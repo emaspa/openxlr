@@ -21,6 +21,9 @@
     "nativeMessaging"
   ],
   "incognito": "not_allowed",
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'"
+  },
   "background": {
     "service_worker": "worker.mjs",
     "type": "module"

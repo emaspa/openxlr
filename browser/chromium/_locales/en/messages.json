@@ -166,5 +166,17 @@
   },
   "outputGone": {
     "message": "The selected OpenXLR output disappeared. Normal tab playback has resumed."
+  },
+  "popupActiveRoutes": {
+    "message": "Active routes"
+  },
+  "popupStopAll": {
+    "message": "Stop all routing"
+  },
+  "popupShowRoute": {
+    "message": "Show tab $1"
+  },
+  "popupStopRoute": {
+    "message": "Stop routing for $1"
   }
 }
