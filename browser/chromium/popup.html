@@ -12,6 +12,11 @@
 <label><input id="remember" type="checkbox" checked> <span data-i18n="popupRemember">Remember for this website</span></label>
 <button id="enable" hidden data-i18n="popupEnable">Let the browser choose its outputs</button>
 <button id="start" disabled data-i18n="popupStart">Activate this tab</button><button id="stop" disabled data-i18n="popupStop">Stop routing</button>
+<section id="routes" hidden aria-labelledby="routes-heading">
+<h2 id="routes-heading" data-i18n="popupActiveRoutes">Active routes</h2>
+<ul id="route-list"></ul>
+<button id="stop-all" data-i18n="popupStopAll">Stop all routing</button>
+</section>
 <button id="devices" data-i18n="popupDevices">Output access</button><button id="retry" data-i18n="popupRetry">Reconnect</button>
 <button id="forget" data-i18n="popupForget">Forget website default</button>
 <p data-i18n="popupHelp">Choose channels here or in OpenXLR. Activate each tab in the browser first. Stopping restores normal browser playback.</p>
