@@ -78,6 +78,46 @@ public sealed class WirePlumberRuleTests
         Assert.Contains("node.always-process = true", text);
     }
 
+    // WirePlumber's own priority.driver for a USB capture node off pro-audio
+    // is 2100, or 2109 on an analog- profile: what a capture card or a webcam
+    // gets too. A pro-audio input, the Wave XLR Pro's among them, gets 2600.
+    private const int UsbInputDefaultMax = 2109;
+    private const int ProAudioInput = 2600;
+
+    [Theory]
+    [InlineData(Dock)]
+    [InlineData(Mk1)]
+    [InlineData(Wave3)]
+    public void CaptureHoldRulesHandTheClockToTheUnitOffProAudio(string file)
+    {
+        string text = File.ReadAllText(Path.Combine(Root(), "packaging", file));
+        MatchCollection priorities = Regex.Matches(text, @"priority\.driver = (\d+)");
+        int priority = Assert.Single(priorities.Select(m => int.Parse(m.Groups[1].Value)).Distinct());
+        Assert.Equal(2200, priority);
+        Assert.InRange(priority, UsbInputDefaultMax + 1, ProAudioInput - 1);
+        // Only the capture node is lifted, and only off pro-audio, where the
+        // unit has 2600 already and a lower number would hand the clock away.
+        string block = PriorityBlock(text);
+        MatchCollection matches = Regex.Matches(block, @"\{ node\.name = ""~([^""]+)"", device\.profile\.name = ""!~\^pro-\.\*"" \}");
+        Assert.NotEmpty(matches);
+        Assert.All(matches, m => Assert.StartsWith(@"alsa_input\\.", m.Groups[1].Value));
+        Assert.Equal(matches.Count, Regex.Matches(block, @"node\.name").Count);
+        Assert.DoesNotContain("priority.session =", text);
+        // The clock rule names the same devices as the hold rule above it.
+        Assert.Equal(
+            [.. Regex.Matches(text[..text.IndexOf(block, StringComparison.Ordinal)], @"node\.name = ""(~[^""]+)""").Select(m => m.Groups[1].Value)],
+            matches.Select(m => "~" + m.Groups[1].Value));
+    }
+
+    private static string PriorityBlock(string text)
+    {
+        int at = Regex.Match(text, @"priority\.driver = \d").Index;
+        Assert.True(at > 0);
+        int start = text.LastIndexOf("matches = [", at, StringComparison.Ordinal);
+        Assert.True(start > 0);
+        return text[start..at];
+    }
+
     [Fact]
     public void EveryRuleIsInstalledEverywhere()
     {

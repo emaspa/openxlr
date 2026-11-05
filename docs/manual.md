@@ -4148,6 +4148,16 @@ or XLR 2 takes its microphone from, and again whenever the interface
 comes back after a replug or a reset. Programs that play straight to the
 interface can still start playback first, which is why the rules matter.
 
+The three capture rules also make the unit the clock of the audio graph.
+PipeWire takes its timing from one device in a graph and resamples the
+others to it, and the device with the higher `priority.driver` wins. Off
+the pro-audio profile WirePlumber gives a USB input 2100, or 2109 on an
+analog profile, so a capture card or a webcam can win and leave the
+microphone resampled. That made one Wave XLR sound garbled. The rules give
+the unit's input 2200, so the other device is resampled instead. A unit on
+pro-audio and the Wave XLR Pro already have 2600 and keep it. Like the
+other rules, this one takes effect when WirePlumber restarts.
+
 On the Wave:3 MK.2 OpenXLR also watches the microphone while a mix plays
 into its headphones, and brings it back when it stalls. The sign it acts
 on is the kernel keeping the capture stopped for 3 seconds while PipeWire
@@ -4695,7 +4705,7 @@ settings. See
 | `~/.local/share/openxlr/skins/<id>/skin.json` | a skin you installed; system skins come from `$XDG_DATA_DIRS` ([skins.md](skins.md)) |
 | `openxlr-daemon.service` (systemd user unit) | the daemon; `journalctl --user -u openxlr-daemon` for its log |
 | `/usr/lib/systemd/user/pipewire-pulse.service.d/openxlr.conf` | installed by the packages: raises pipewire-pulse's open-file limit ([section 5.8](#open-files)) |
-| `/usr/share/wireplumber/wireplumber.conf.d/50-xlr-dock-capture-hold.conf`, `52-openxlr-mk1-capture-hold.conf`, `53-openxlr-wave3-capture-hold.conf` | installed by the packages: keep the capture of the XLR Dock, the original Wave XLR, the Wave:3 and the Wave:3 MK.2 running ([section 5.2](#dock-silent)) |
+| `/usr/share/wireplumber/wireplumber.conf.d/50-xlr-dock-capture-hold.conf`, `52-openxlr-mk1-capture-hold.conf`, `53-openxlr-wave3-capture-hold.conf` | installed by the packages: keep the capture of the XLR Dock, the original Wave XLR, the Wave:3 and the Wave:3 MK.2 running, and make it the audio clock off pro-audio ([section 5.2](#dock-silent)) |
 | `/usr/share/wireplumber/wireplumber.conf.d/55-openxlr-wave3-mk2-playback.conf` | installed by the packages: opens the Wave:3 MK.2's headphones in the unit's float format ([section 5.2](#dock-silent)) |
 | `/usr/share/wireplumber/wireplumber.conf.d/51-openxlr-pro-raw-names.conf` | installed by the packages: names the Wave XLR Pro's raw multichannel nodes for what they are, so volume applets do not list them like OpenXLR's mixes |
 | `/usr/share/wireplumber/main.lua.d/54-openxlr-owned-state.lua` | installed by the `.deb` where WirePlumber is 0.4: keeps desktop state off OpenXLR's own nodes ([section 5.9](#quiet-mixes)) |
