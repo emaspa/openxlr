@@ -45,15 +45,24 @@ export function channelUnitControl(state, channel, control) {
 }
 
 // A capture input's own gain, its source's volume, as {value, min, max,
-// hardware}, or null. The daemon reports captureGain only on a capture input
-// whose source no Wave unit drives; a channel that carries a unit's input
-// has the unit's gain instead, through channelUnitControl.
+// hardware, muted}, or null. The daemon reports captureGain only on a capture
+// input whose source no Wave unit drives; a channel that carries a unit's
+// input has the unit's gain instead, through channelUnitControl. muted is the
+// source's own mute, null from a daemon that does not report it.
 export function captureGainOf(state, channel) {
   const c = state?.mixer?.channels?.find(ch => ch.id === channel);
   const g = c?.captureGain;
   if (!c || c.unitInput || !g || typeof g !== "object") return null;
   if (![g.gainDb, g.minDb, g.maxDb].every(Number.isFinite) || g.maxDb <= g.minDb) return null;
-  return { value: g.gainDb, min: g.minDb, max: g.maxDb, hardware: g.hardware === true };
+  return { value: g.gainDb, min: g.minDb, max: g.maxDb, hardware: g.hardware === true,
+    muted: typeof g.muted === "boolean" ? g.muted : null };
+}
+
+// A capture input's source mute, true or false, or null where the channel
+// has none: it carries a unit's input, whose mute is the unit's, or the
+// daemon reports no mute beside the gain.
+export function captureMuteOf(state, channel) {
+  return captureGainOf(state, channel)?.muted ?? null;
 }
 
 // The input a unit control acts on, 1 or 2, or null for any other target.

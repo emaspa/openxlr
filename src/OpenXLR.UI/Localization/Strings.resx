@@ -266,6 +266,9 @@
   <data name="CaptureGainSoftwareTip" xml:space="preserve">
     <value>The source's level in PipeWire; at 0 dB the sound passes as the device sends it. Other programs can change it too; the channel follows them.</value>
   </data>
+  <data name="CaptureMuteTip" xml:space="preserve">
+    <value>Mutes the source for every program that records it, as the desktop's sound settings do. Other programs can change it too; the channel follows them.</value>
+  </data>
   <data name="CaptureOfflinePair" xml:space="preserve">
     <value>Offline · pair {0}</value>
   </data>

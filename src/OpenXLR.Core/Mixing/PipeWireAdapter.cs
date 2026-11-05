@@ -841,6 +841,16 @@ public sealed class PipeWireAdapter
     }
 
     /// <summary>
+    /// Set a source's own mute, as a desktop panel does. An explicit value
+    /// rather than pactl's toggle, so the write says what the caller read.
+    /// </summary>
+    public void SetSourceMute(string sourceName, bool muted)
+    {
+        Run("pactl", "set-source-mute", sourceName, muted ? "1" : "0");
+        InvalidateDump();
+    }
+
+    /// <summary>
     /// The named sources' channel volumes and mutes as the registry holds
     /// them, one line per source, for telling cheaply whether one changed;
     /// null while the registry cannot be read.

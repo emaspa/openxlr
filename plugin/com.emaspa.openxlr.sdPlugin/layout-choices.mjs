@@ -135,13 +135,18 @@ export function layoutChoices(mixer, devices = [], eqProfiles = []) {
     label: "Channel volumes",
     items: volumes.map((channel) => option(`chvol:${channel.id}`, `${channel.name} volume`)),
   });
-  const microphones = channels.filter(channel => channel.unitInput);
+  // A channel carrying a unit's input has the unit's switches; a capture
+  // input with a gain of its own has its source's mute, where the daemon
+  // reports one, on the same mute key.
+  const microphones = channels.filter(channel => channel.unitInput || typeof channel.captureGain?.muted === "boolean");
   if (microphones.length)
     toggleGroups.push({id:"layout-microphone-controls", label:"Microphone controls", items:microphones.flatMap(channel => [
       option(`chmute:${channel.id}`, `${channel.name} mute`),
-      option(`chphantom:${channel.id}`, `${channel.name} phantom power`),
-      option(`chlowcut:${channel.id}`, `${channel.name} low cut`),
-      option(`chclipguard:${channel.id}`, `${channel.name} ClipGuard`),
+      ...channel.unitInput ? [
+        option(`chphantom:${channel.id}`, `${channel.name} phantom power`),
+        option(`chlowcut:${channel.id}`, `${channel.name} low cut`),
+        option(`chclipguard:${channel.id}`, `${channel.name} ClipGuard`),
+      ] : [],
     ])});
   // A gain dial turns a unit's gain on the channel carrying its input, and a
   // capture input's own gain, its source's volume, where the daemon reports one.

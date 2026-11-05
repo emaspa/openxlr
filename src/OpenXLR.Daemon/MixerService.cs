@@ -1485,6 +1485,15 @@ public sealed class MixerService : IHostedService, IDisposable
                     _mixer.SetCaptureGain(cmd.Channel!, cmd.Value.GetDouble());
                     Changed?.Invoke();
                     return null;
+                case "setCaptureMuted":
+                    // The source's own mute, which the audio server keeps like its volume.
+                    _mixer.SetCaptureMuted(cmd.Channel!, cmd.Value.GetBoolean());
+                    Changed?.Invoke();
+                    return null;
+                case "toggleCaptureMuted":
+                    _mixer.ToggleCaptureMuted(cmd.Channel!);
+                    Changed?.Invoke();
+                    return null;
                 case "setMixVolume":
                     if (cmd.Mix is null) return "setMixVolume: need 'mix'";
                     _mixer.SetMixVolume(cmd.Mix, cmd.Value.GetDouble());

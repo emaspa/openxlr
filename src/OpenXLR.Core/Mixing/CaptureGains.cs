@@ -7,7 +7,9 @@ namespace OpenXLR.Core.Mixing;
 /// it again whenever the registry shows the source's volume moved, so a
 /// change made by another program (a voice chat's automatic gain, a
 /// browser, a desktop volume applet) is reported and never written back.
-/// Only <see cref="SetCaptureGain"/> writes it.
+/// Only <see cref="SetCaptureGain"/> writes it. The source's own mute is read
+/// and written the same way, beside the gain: only
+/// <see cref="SetCaptureMuted"/> and <see cref="ToggleCaptureMuted"/> write it.
 /// </summary>
 public sealed partial class Mixer
 {
@@ -89,15 +91,7 @@ public sealed partial class Mixer
         if (!double.IsFinite(gainDb)) throw new ArgumentException("setCaptureGain: the gain must be a finite number of dB.");
         lock (_gate)
         {
-            ChannelDefinition channel = _config.Channels.FirstOrDefault(c => c.Id == channelId && c.CaptureSource is not null)
-                ?? throw new ArgumentException($"'{channelId}' is not a capture input.");
-            string source = CaptureGainSource(channel, UnitInputsLocked())
-                ?? throw new InvalidOperationException(
-                    $"{ChannelNameLocked(channel)} takes its sound from a Wave unit, whose gain is set through the unit's controls.");
-            IReadOnlyDictionary<string, SourceVolume> volumes = _pw.GetSourceVolumes(new HashSet<string>([source], StringComparer.Ordinal))
-                ?? throw new InvalidOperationException($"The volume of {source} could not be read.");
-            if (!volumes.TryGetValue(source, out SourceVolume? volume))
-                throw new InvalidOperationException($"{source} is not connected.");
+            (string source, SourceVolume volume) = CaptureSourceLocked(channelId, "gain");
             double? minimum = HardwareMinimumLocked(volume, out _);
             long raw = CaptureGain.RawFor(volume, CaptureGain.Status(volume, minimum), gainDb);
             _pw.SetSourceVolume(source, raw);
@@ -105,6 +99,61 @@ public sealed partial class Mixer
             _captureGains[channelId] = CaptureGain.Status(volume with { Volume = raw }, minimum);
             _captureGainKey = null;
         }
+    }
+
+    /// <summary>
+    /// Mute or unmute a capture input's source, for every program that
+    /// records it, as a desktop panel would. Refused where
+    /// <see cref="SetCaptureGain"/> is: on a channel whose input belongs to a
+    /// Wave unit, on a source OpenXLR never writes, and while the source is
+    /// missing.
+    /// </summary>
+    public void SetCaptureMuted(string channelId, bool muted)
+    {
+        lock (_gate) SetCaptureMutedLocked(CaptureSourceLocked(channelId, "mute"), muted);
+    }
+
+    /// <summary>
+    /// Flip a capture input's source mute from what the audio server reports
+    /// now, under the mixer lock, so each accepted command flips it once
+    /// however fast a key repeats it.
+    /// </summary>
+    public void ToggleCaptureMuted(string channelId)
+    {
+        lock (_gate)
+        {
+            (string Source, SourceVolume Volume) found = CaptureSourceLocked(channelId, "mute");
+            SetCaptureMutedLocked(found, !found.Volume.Muted);
+        }
+    }
+
+    private void SetCaptureMutedLocked((string Source, SourceVolume Volume) found, bool muted)
+    {
+        _pw.SetSourceMute(found.Source, muted);
+        // Report it at once on every input on the source, which shares the
+        // one mute; the next sweep reads the source again.
+        CaptureGainStatus status = CaptureGain.Status(found.Volume with { Muted = muted }, HardwareMinimumLocked(found.Volume, out _));
+        Dictionary<string, UnitInputStatus> carried = UnitInputsLocked();
+        foreach (ChannelDefinition channel in _config.Channels)
+            if (CaptureGainSource(channel, carried) == found.Source) _captureGains[channel.Id] = status;
+        _captureGainKey = null;
+    }
+
+    /// <summary>
+    /// The source a capture input's gain and mute are written to, read now.
+    /// <paramref name="what"/> names the control in the refusal.
+    /// </summary>
+    private (string Source, SourceVolume Volume) CaptureSourceLocked(string channelId, string what)
+    {
+        ChannelDefinition channel = _config.Channels.FirstOrDefault(c => c.Id == channelId && c.CaptureSource is not null)
+            ?? throw new ArgumentException($"'{channelId}' is not a capture input.");
+        string source = CaptureGainSource(channel, UnitInputsLocked())
+            ?? throw new InvalidOperationException(
+                $"{ChannelNameLocked(channel)} takes its sound from a Wave unit, whose {what} is set through the unit's controls.");
+        IReadOnlyDictionary<string, SourceVolume> volumes = _pw.GetSourceVolumes(new HashSet<string>([source], StringComparer.Ordinal))
+            ?? throw new InvalidOperationException($"The volume of {source} could not be read.");
+        return volumes.TryGetValue(source, out SourceVolume? volume) ? (source, volume)
+            : throw new InvalidOperationException($"{source} is not connected.");
     }
 
     /// <summary>

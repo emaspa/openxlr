@@ -384,13 +384,18 @@ internal sealed record DuckingDeviceEntry
 internal sealed record UnitControl(string? Device, string Control);
 
 /// <summary>Which input stage of which driven unit a channel carries.</summary>
-/// <summary>A capture input's gain in dB and its range; with Hardware, the device's own capture control.</summary>
+/// <summary>
+/// A capture input's gain in dB and its range; with Hardware, the device's own
+/// capture control. Muted is the source's own mute, null from a daemon that
+/// does not report it.
+/// </summary>
 internal sealed record CaptureGainEntry
 {
     public double GainDb { get; init; }
     public double MinDb { get; init; }
     public double MaxDb { get; init; }
     public bool Hardware { get; init; }
+    public bool? Muted { get; init; }
 }
 
 internal sealed record UnitInputEntry

@@ -235,6 +235,12 @@ public static class CommandValidation
                 if (cmd.Channel is null || TooLong(cmd.Channel, 36) || !layout.HasCaptureChannel(cmd.Channel))
                     return "setCaptureGain: need a capture input channel";
                 return Finite(cmd, "value");
+            case "setCaptureMuted":
+            case "toggleCaptureMuted":
+                if (cmd.Channel is null || TooLong(cmd.Channel, 36) || !layout.HasCaptureChannel(cmd.Channel))
+                    return $"{cmd.Cmd}: need a capture input channel";
+                return cmd.Cmd == "toggleCaptureMuted" || cmd.Value.ValueKind is JsonValueKind.True or JsonValueKind.False
+                    ? null : "setCaptureMuted: value must be a boolean";
             case "setMixVolume":
             case "setMixMuted":
                 if (cmd.Mix is not null && !layout.HasMix(cmd.Mix)) return $"{cmd.Cmd}: unknown mix '{Short(cmd.Mix)}'";

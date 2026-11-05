@@ -450,7 +450,9 @@ volume of its source, which the audio server keeps, so nothing is added to
 the layout or a profile. The state reports it in the channel's
 `captureGain`, on a source that OpenXLR does not drive; a capture input on
 a Wave unit has the unit's gain instead
-([api.md](api.md#capture-input-gain)).
+([api.md](api.md#capture-input-gain)). `setCaptureMuted {channel, value}`
+and `toggleCaptureMuted {channel}` set and flip the same source's own mute,
+which the state reports as `captureGain.muted`. Neither is saved.
 
 Disconnected sources retain their exact binding and faders. They reconnect
 when that node and pair return. With `captureUnit`, a missing exact name

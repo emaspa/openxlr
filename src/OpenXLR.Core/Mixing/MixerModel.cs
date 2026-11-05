@@ -328,9 +328,10 @@ public sealed partial record ChannelStatus(string Id, string Name,
     public double? Volume { get; init; }
 
     /// <summary>
-    /// A capture input's gain, its source's volume, on a source OpenXLR does
-    /// not drive; null on every other channel, on a capture input that takes
-    /// a Wave unit's input, and while the source is missing.
+    /// A capture input's gain, its source's volume, and the source's own
+    /// mute, on a source OpenXLR does not drive; null on every other channel,
+    /// on a capture input that takes a Wave unit's input, and while the
+    /// source is missing.
     /// </summary>
     public CaptureGainStatus? CaptureGain { get; init; }
 

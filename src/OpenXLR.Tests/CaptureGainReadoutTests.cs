@@ -154,4 +154,94 @@ public sealed class CaptureGainReadoutTests
         Assert.False(row.ShowsCaptureGain);
         Assert.False(rack.Strips.Single(s => s.Channel.Id == "brio").ShowsCaptureGain);
     }
+
+    private const string Muted = """{"gainDb":36,"minDb":18,"maxDb":54,"hardware":true,"muted":true}""";
+
+    [Fact]
+    public void TheSourcesMuteIsDrawnWhereverItsGainIs()
+    {
+        MainViewModel model = Model(Muted);
+        using var rack = new InputRackViewModel(model);
+        using var matrix = new MixMatrixViewModel(model);
+        InputStripViewModel strip = rack.Strips.Single(s => s.Channel.Id == "brio");
+        MatrixRowViewModel row = matrix.Rows.Single(r => r.Channel.Id == "brio");
+        ChannelViewModel channel = strip.Channel;
+
+        Assert.True(channel.HasCaptureMute);
+        Assert.True(channel.ShowsCaptureMute);
+        Assert.True(channel.CaptureMuted);
+        Assert.Equal(Localizer.Format("MixMuteName", "Brio"), channel.CaptureMuteName);
+        // The rack draws it in the switches part, the matrix in the mute part, where a carried unit's mute would be.
+        Assert.True(strip.ShowsCaptureMute);
+        Assert.Contains(SkinStripParts.HardwareControls, strip.Spec.Parts);
+        Assert.True(row.ShowsCaptureMute);
+        Assert.Contains(SkinStripParts.Mute, row.Spec.Parts);
+
+        // Unmuted elsewhere: the state says so and the button follows.
+        ApplyMixer.Invoke(model, [JsonNode.Parse(State(Hardware.Replace("}", ",\"muted\":false}", StringComparison.Ordinal)))]);
+        Assert.False(channel.CaptureMuted);
+        Assert.True(channel.ShowsCaptureMute);
+
+        // An older daemon reports the gain alone: no mute, and the switches part goes with it.
+        ApplyMixer.Invoke(model, [JsonNode.Parse(State(Hardware))]);
+        Assert.True(channel.ShowsCaptureGain);
+        Assert.False(channel.HasCaptureMute);
+        Assert.False(strip.ShowsCaptureMute);
+        Assert.DoesNotContain(SkinStripParts.HardwareControls, strip.Spec.Parts);
+        Assert.False(row.ShowsCaptureMute);
+        Assert.DoesNotContain(SkinStripParts.Mute, row.Spec.Parts);
+
+        // A strip that draws a unit's mute never draws the source's beside it.
+        ApplyMixer.Invoke(model, [JsonNode.Parse(State(Muted))]);
+        Assert.True(row.ShowsCaptureMute);
+        channel.ShownUnitInput = 1;
+        Assert.False(channel.ShowsCaptureMute);
+        Assert.False(row.ShowsCaptureMute);
+        Assert.False(strip.ShowsCaptureMute);
+        channel.ShownUnitInput = 0;
+        // Nor does a strip without a gain.
+        ApplyMixer.Invoke(model, [JsonNode.Parse(State(null))]);
+        Assert.False(channel.ShowsCaptureMute);
+        Assert.False(strip.ShowsCaptureMute);
+    }
+
+    [Fact]
+    public async Task PressingTheMuteSendsItAndARefusalPutsItBack()
+    {
+        var connected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var commands = System.Threading.Channels.Channel.CreateUnbounded<JsonNode>();
+        await using SocketTestServer server = await SocketTestServer.Start(async (socket, stop) =>
+        {
+            connected.TrySetResult();
+            while (!stop.IsCancellationRequested)
+            {
+                JsonNode command = await SocketTestServer.Receive(socket, stop);
+                if (command["cmd"]?.GetValue<string>() is "setCaptureMuted") commands.Writer.TryWrite(command);
+            }
+        });
+        await using var client = new DaemonClient(server.Url);
+        var online = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.ConnectionChanged += up => { if (up) online.TrySetResult(); };
+        client.Start();
+        await online.Task.WaitAsync(TimeSpan.FromSeconds(3));
+        await connected.Task.WaitAsync(TimeSpan.FromSeconds(3));
+
+        var model = new MainViewModel(client);
+        ApplyMixer.Invoke(model, [JsonNode.Parse(State(Hardware.Replace("}", ",\"muted\":false}", StringComparison.Ordinal)))]);
+        ChannelViewModel channel = model.Channels.Single(c => c.Id == "brio");
+        Assert.False(channel.CaptureMuted);
+        // The state's own mute is not sent back.
+        ApplyMixer.Invoke(model, [JsonNode.Parse(State(Muted))]);
+        Assert.True(channel.CaptureMuted);
+        channel.CaptureMuted = false;
+        JsonNode sent = await commands.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(3));
+        Assert.Equal("brio", sent["channel"]!.GetValue<string>());
+        Assert.False(sent["value"]!.GetValue<bool>());
+        Assert.False(channel.CaptureMuted);
+        // The daemon refuses and sends its state: the button goes back, and nothing more is sent.
+        ApplyMixer.Invoke(model, [JsonNode.Parse(State(Muted))]);
+        Assert.True(channel.CaptureMuted);
+        await Task.Delay(100);
+        Assert.False(commands.Reader.TryRead(out _));
+    }
 }

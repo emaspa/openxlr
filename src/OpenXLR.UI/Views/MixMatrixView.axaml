@@ -697,6 +697,11 @@
                                 MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding CarriesExtraUnit}"
                                 AutomationProperties.Name="{Binding Channel.Name, StringFormat={loc:Text Key=MixMuteName}}"
                                 ToolTip.Tip="{loc:Text Key=TheDeviceMutesThisInputForAbout13}"/>
+                  <!-- a capture input's own mute, its source's, on a row that draws the source's gain -->
+                  <ToggleButton Name="MatrixCaptureMute" Classes="mute mutemini matrixMute" IsChecked="{Binding Channel.CaptureMuted, Mode=TwoWay}"
+                                Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center"
+                                MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsCaptureMute}"
+                                AutomationProperties.Name="{Binding Channel.CaptureMuteName}" ToolTip.Tip="{loc:Text Key=CaptureMuteTip}"/>
                 </Panel>
                 <!-- a capture input's plugin chain, the button an XLR row has, with the microphone's
                      EQ over it on a capture input the daemon reports one for, as on XLR 1.

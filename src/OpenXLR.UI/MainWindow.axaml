@@ -728,6 +728,10 @@
                   <TextBlock Grid.Column="3" Name="CaptureGainReadout" Text="{Binding Readout}" Classes="val" VerticalAlignment="Center"
                              HorizontalAlignment="Right" AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
                 </Grid>
+                <!-- the source's own mute, under its gain, as XLR 1's mute sits under the interface's gain -->
+                <ToggleButton Name="CaptureMute" Content="{loc:Text Key=Mute}" Classes="mute" HorizontalAlignment="Left"
+                              IsChecked="{Binding CaptureMuted, Mode=TwoWay}" IsVisible="{Binding ShowsCaptureMute}"
+                              AutomationProperties.Name="{Binding CaptureMuteName}" ToolTip.Tip="{loc:Text Key=CaptureMuteTip}"/>
                 <Grid ColumnDefinitions="Auto,*,Auto,64" IsVisible="{Binding HasVolume}">
                   <TextBlock Text="{loc:Text Key=Volume}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
                   <Slider Grid.Column="1" vm:FaderInput.Step="0.01" Minimum="0" Maximum="1" Value="{Binding Volume, Mode=TwoWay}"

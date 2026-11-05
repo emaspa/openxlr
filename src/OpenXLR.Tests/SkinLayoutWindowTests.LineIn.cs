@@ -22,6 +22,8 @@ namespace OpenXLR.Tests;
 /// a gain of its own is drawn the same way in the rack and the matrix. Each
 /// strip's readout sits inside its strip or name column, reads the gain, and
 /// reads the volume while that fader moves, back to the gain after the hold.
+/// The capture input's own mute sits in the rack's switches part and the
+/// matrix head's mute part, inside the strip at every width.
 /// </summary>
 internal static partial class SkinLayoutWindowTests
 {
@@ -41,7 +43,7 @@ internal static partial class SkinLayoutWindowTests
                              {"id":"aux","name":"Aux In","hardware":true,"levels":{"monitor":1,"stream":1},"mutedIn":["monitor"],"volume":0.8},
                              {"id":"line","name":"Line In","hardware":true,"levels":{"monitor":1,"stream":1},"mutedIn":["monitor"],"volume":0.6},
                              {"id":"brio","name":"Brio","captureSource":"alsa_input.usb-webcam","captureConnected":true,"microphone":false,"chainWidth":2,
-                              "levels":{"monitor":1,"stream":1},"mutedIn":["monitor"],"volume":0.7,"captureGain":{"gainDb":36,"minDb":18,"maxDb":54,"hardware":true}},
+                              "levels":{"monitor":1,"stream":1},"mutedIn":["monitor"],"volume":0.7,"captureGain":{"gainDb":36,"minDb":18,"maxDb":54,"hardware":true,"muted":true}},
                              {"id":"music","name":"Music","levels":{"monitor":1,"stream":1},"volume":1}],
                  "inserts":{}}
                 """)]);
@@ -94,7 +96,7 @@ internal static partial class SkinLayoutWindowTests
                              {"id":"aux","name":"Aux In","hardware":true,"levels":{"monitor":1,"stream":1},"mutedIn":["monitor"],"volume":0.8},
                              {"id":"line","name":"Line In","hardware":true,"present":false,"levels":{"monitor":1,"stream":1},"mutedIn":["monitor"],"volume":0.6},
                              {"id":"brio","name":"Brio","captureSource":"alsa_input.usb-webcam","captureConnected":true,"microphone":false,"chainWidth":2,
-                              "levels":{"monitor":1,"stream":1},"mutedIn":["monitor"],"volume":0.7,"captureGain":{"gainDb":36,"minDb":18,"maxDb":54,"hardware":true}},
+                              "levels":{"monitor":1,"stream":1},"mutedIn":["monitor"],"volume":0.7,"captureGain":{"gainDb":36,"minDb":18,"maxDb":54,"hardware":true,"muted":true}},
                              {"id":"music","name":"Music","levels":{"monitor":1,"stream":1},"volume":1}],
                  "inserts":{}}
                 """)]);
@@ -108,7 +110,7 @@ internal static partial class SkinLayoutWindowTests
                              {"id":"aux","name":"Aux In","hardware":true,"levels":{"monitor":1,"stream":1},"mutedIn":["monitor"],"volume":0.8},
                              {"id":"line","name":"Line In","hardware":true,"levels":{"monitor":1,"stream":1},"mutedIn":["monitor"],"volume":0.6},
                              {"id":"brio","name":"Brio","captureSource":"alsa_input.usb-webcam","captureConnected":true,"microphone":false,"chainWidth":2,
-                              "levels":{"monitor":1,"stream":1},"mutedIn":["monitor"],"volume":0.7,"captureGain":{"gainDb":36,"minDb":18,"maxDb":54,"hardware":true}},
+                              "levels":{"monitor":1,"stream":1},"mutedIn":["monitor"],"volume":0.7,"captureGain":{"gainDb":36,"minDb":18,"maxDb":54,"hardware":true,"muted":true}},
                              {"id":"music","name":"Music","levels":{"monitor":1,"stream":1},"volume":1}],
                  "inserts":{}}
                 """)]);
@@ -143,6 +145,10 @@ internal static partial class SkinLayoutWindowTests
                     ToggleButton lockButton = Assert.Single(RackStrip(rack, id).GetVisualDescendants().OfType<ToggleButton>(), t => t.IsEffectivelyVisible);
                     AssertInside(lockButton, Part(RackStrip(rack, id), OpenXLR.UI.Skinning.SkinStripParts.HardwareControls));
                 }
+                ToggleButton rackMute = RackStrip(rack, "brio").GetVisualDescendants().OfType<ToggleButton>().Single(t => t.Name == "RackCaptureMute");
+                Assert.True(rackMute.IsEffectivelyVisible, $"brio mute {where}");
+                Assert.True(rackMute.IsChecked);
+                AssertInside(rackMute, Part(RackStrip(rack, "brio"), OpenXLR.UI.Skinning.SkinStripParts.HardwareControls));
             }
             Slider rackVolume = RackStrip(rack, "line").GetVisualDescendants().OfType<Grid>().Single(g => g.Name == "RackVolume")
                 .GetVisualDescendants().OfType<Slider>().Single();
@@ -181,6 +187,10 @@ internal static partial class SkinLayoutWindowTests
                     CheckLevels(head, row, where);
                     CheckProcessingPlace(head, row, where);
                 }
+                ToggleButton matrixMute = RowHead(window, "brio").GetVisualDescendants().OfType<ToggleButton>().Single(t => t.Name == "MatrixCaptureMute");
+                Assert.True(matrixMute.IsEffectivelyVisible, $"brio mute {where}");
+                Assert.True(matrixMute.IsChecked);
+                AssertInside(matrixMute, RowHead(window, "brio"));
                 // Line In's lock sits at the end of its gain's line, inside the head.
                 ToggleButton lineLock = RowHead(window, "line").GetVisualDescendants().OfType<ToggleButton>().Single(t => t.Name == "MatrixLineInLock");
                 Assert.True(lineLock.IsEffectivelyVisible, where);

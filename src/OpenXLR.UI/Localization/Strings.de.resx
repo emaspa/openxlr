@@ -264,6 +264,9 @@
   <data name="CaptureGainSoftwareTip" xml:space="preserve">
     <value>Der Pegel der Quelle in PipeWire; bei 0 dB bleibt der Klang, wie das Gerät ihn sendet. Andere Programme können ihn ebenfalls ändern; der Kanal folgt ihnen.</value>
   </data>
+  <data name="CaptureMuteTip" xml:space="preserve">
+    <value>Schaltet die Quelle für jedes Programm stumm, das sie aufnimmt, wie es die Toneinstellungen des Desktops tun. Andere Programme können das ebenfalls ändern; der Kanal folgt ihnen.</value>
+  </data>
   <data name="CaptureOfflinePair" xml:space="preserve">
     <value>Nicht verbunden · Paar {0}</value>
   </data>
