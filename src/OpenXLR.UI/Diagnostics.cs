@@ -54,7 +54,7 @@ public static partial class Diagnostics
             DateTimeOffset observedAt = DateTimeOffset.UtcNow;
             if (deepTrace)
             {
-                string trace = await Task.Run(CollectDeepTrace);
+                string trace = await CollectDeepTraceAsync(client);
                 await File.WriteAllTextAsync(Path.Combine(work, "deep-trace.json"), CleanJson(trace).Text);
             }
             string osRelease = TryReadFile("/etc/os-release");
@@ -104,7 +104,8 @@ public static partial class Diagnostics
                 and common audio services. Process names may reveal applications
                 unrelated to audio. The snapshot contains no process ids, command
                 lines, environment variables or memory contents. It also includes
-                saved daemon preferences and installed package build metadata.
+                saved daemon preferences, current and historical package build
+                metadata and managed heap statistics for the window and daemon.
                 """ : ""));
 
             // Keep the saved state and its receive time from one observation.

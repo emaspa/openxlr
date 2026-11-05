@@ -464,9 +464,10 @@ public sealed class DiagnosticsTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task TheLoginNameAndHostNamesAppearNowhereInTheArchive(bool commandWarning)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task TheLoginNameAndHostNamesAppearNowhereInTheArchive(bool commandWarning, bool runtimeSupported)
     {
         if (!OperatingSystem.IsLinux()) return;
         // Neither is this machine's: the fake helpers below print them, the
@@ -563,7 +564,10 @@ public sealed class DiagnosticsTests
             File.WriteAllText(receiptPath, System.Text.Json.JsonSerializer.Serialize(receipt, OpenXLR.UI.InstallationReceipt.Json));
             File.WriteAllText(Path.Combine(receipts, "openxlr-yabridge.json"), "malformed receipt with private marker");
             Environment.SetEnvironmentVariable("XDG_DATA_DIRS", share);
+            OpenXLR.UI.InstallationHistory.Remember(receiptPath);
+            File.WriteAllText(Path.Combine(OpenXLR.UI.InstallationHistory.DirectoryPath, "broken.json"), "private history marker");
 
+            int runtimeRequests = 0;
             await using var server = await SocketTestServer.Start(async (socket, stop) =>
             {
                 var initial = new System.Text.Json.Nodes.JsonObject
@@ -585,14 +589,22 @@ public sealed class DiagnosticsTests
                 {
                     var command = await SocketTestServer.Receive(socket, stop);
                     string cmd = command["cmd"]!.GetValue<string>();
-                    object reply = cmd switch
+                    object? reply = cmd switch
                     {
+                        "getRuntimeDiagnostics" when runtimeSupported => new
+                        {
+                            type = "runtimeDiagnostics",
+                            daemonBuildId = "22345678-1234-1234-1234-123456789012",
+                            snapshot = new { workingSetBytes = 4096 },
+                        },
+                        "getRuntimeDiagnostics" => null,
                         "listPlugins" => new { type = "plugins", plugins = Array.Empty<object>() },
                         "getPluginSetup" => new { type = "pluginSetup", windowsDirectories = new[] { $"/run/media/{login}/VST3" } },
                         "getPluginDiagnostics" => new { type = "pluginDiagnostics", discovery = new { scans = Array.Empty<object>() } },
                         _ => new { type = "diagnostics", blocks = new { } },
                     };
-                    await SocketTestServer.Send(socket, reply, stop);
+                    if (cmd == "getRuntimeDiagnostics") Interlocked.Increment(ref runtimeRequests);
+                    if (reply is not null) await SocketTestServer.Send(socket, reply, stop);
                     await SocketTestServer.Send(socket, new { type = "commandResult", requestId = command["requestId"]!.GetValue<string>() }, stop);
                 }
             });
@@ -603,6 +615,7 @@ public sealed class DiagnosticsTests
             await state.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
             string archive = await Diagnostics.CollectAsync(client, login, output, deepTrace: commandWarning);
+            Assert.Equal(commandWarning ? 1 : 0, Volatile.Read(ref runtimeRequests));
 
             var entries = new Dictionary<string, string>();
             await using (var file = File.OpenRead(archive))
@@ -721,6 +734,19 @@ public sealed class DiagnosticsTests
                 Assert.Equal(receipt.Commit, installed.GetProperty("commit").GetString());
                 Assert.False(installed.TryGetProperty("prefix", out _));
                 Assert.DoesNotContain("malformed receipt with private marker", entries["deep-trace.json"]);
+                Assert.DoesNotContain("private history marker", entries["deep-trace.json"]);
+                var history = deep.RootElement.GetProperty("installationHistory");
+                Assert.Equal(1, history.GetProperty("unreadable").GetInt32());
+                Assert.Equal(receipt.Version, Assert.Single(history.GetProperty("builds").EnumerateArray()).GetProperty("version").GetString());
+                Assert.True(deep.RootElement.GetProperty("windowRuntime").GetProperty("managed")
+                    .GetProperty("totalAllocatedBytes").GetInt64() > 0);
+                var live = deep.RootElement.GetProperty("daemonRuntime");
+                if (runtimeSupported)
+                {
+                    Assert.Equal("22345678-1234-1234-1234-123456789012", live.GetProperty("daemonBuildId").GetString());
+                    Assert.Equal(4096, live.GetProperty("snapshot").GetProperty("workingSetBytes").GetInt64());
+                }
+                else Assert.Equal(System.Text.Json.JsonValueKind.Null, live.ValueKind);
                 Assert.DoesNotContain("never copy unknown preferences", entries["deep-trace.json"]);
                 Assert.Contains("Deep Trace was selected", entries["PRIVACY.txt"]);
             }

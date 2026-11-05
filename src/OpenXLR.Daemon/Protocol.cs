@@ -597,6 +597,13 @@ public sealed record DiagnosticsMessage(IReadOnlyDictionary<string, string> Bloc
     [System.Text.Json.Serialization.JsonPropertyName("type")] public string Type => "diagnostics";
 }
 
+internal sealed record RuntimeDiagnosticsMessage(OpenXLR.Core.RuntimeSnapshot Snapshot)
+{
+    public string Type => "runtimeDiagnostics";
+    public string DaemonBuildVersion => DaemonVersion.BuildVersion;
+    public string DaemonBuildId => DaemonVersion.BuildId;
+}
+
 /// <summary>The daemon's version as stamped by the build (Directory.Build.props).</summary>
 public static class DaemonVersion
 {

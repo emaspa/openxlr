@@ -257,6 +257,9 @@ public sealed class WebSocketHub
             case "getDiagnostics":
                 await reply(new DiagnosticsMessage(_devices.DumpBlocks()));
                 break;
+            case "getRuntimeDiagnostics":
+                await reply(new RuntimeDiagnosticsMessage(OpenXLR.Core.RuntimeSnapshot.Capture()));
+                break;
             case "getSoundCheckTake":
                 await reply(SoundCheckTakeMessage.From(_mixer.CurrentSoundCheckTake()));
                 break;

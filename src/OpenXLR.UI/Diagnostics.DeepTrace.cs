@@ -16,8 +16,6 @@ public static partial class Diagnostics
 
     private static readonly string[] SystemMemoryFields =
         ["MemTotal", "MemAvailable", "SwapTotal", "SwapFree", "Shmem"];
-    private static readonly string[] ProcessMemoryFields =
-        ["VmRSS", "VmHWM", "VmSize", "VmSwap", "VmLck", "RssAnon", "RssFile", "RssShmem"];
 
     internal sealed record ProgramCount(string Name, int Instances);
     internal sealed record ProcessMemory(string Name, char? State, int? Threads, Dictionary<string, long> MemoryKiB);
@@ -26,31 +24,42 @@ public static partial class Diagnostics
         ProgramCount[] Programs);
 
     private sealed record InstalledBuild(string Package, string Manager, string Version, string? Commit, bool Dirty);
+    private sealed record BuildHistory(InstalledBuild[] Builds, int Unreadable, bool Truncated, bool Available);
 
-    private static string CollectDeepTrace()
+    private static Task<string> CollectDeepTraceAsync(DaemonClient client)
     {
         DateTimeOffset collectedAt = DateTimeOffset.UtcNow;
-        ProcessContext? processes = OperatingSystem.IsLinux()
-            ? ReadProcessContext("/proc", UnixPeerCredentials.User, Environment.ProcessId) : null;
-        DaemonPrefs saved = DaemonPrefs.Load(out string? problem);
-        return JsonSerializer.Serialize(new
+        var daemon = client.RequestRuntimeDiagnosticsAsync(TimeSpan.FromSeconds(5));
+        return Task.Run(async () =>
         {
-            collectedAt,
-            processView = FlatpakEnvironment.IsFlatpak ? "sandbox" : "local",
-            logicalProcessors = Environment.ProcessorCount,
-            processes,
-            savedDaemonPreferences = new { readError = problem is not null, saved.Submixer },
-            installedBuilds = ReadInstalledBuilds(),
-        }, ReportJson);
+            RuntimeSnapshot window = RuntimeSnapshot.Capture();
+            ProcessContext? processes = OperatingSystem.IsLinux()
+                ? ReadProcessContext("/proc", UnixPeerCredentials.User, Environment.ProcessId) : null;
+            DaemonPrefs saved = DaemonPrefs.Load(out string? problem);
+            var installedBuilds = ReadInstalledBuilds();
+            var installationHistory = ReadBuildHistory();
+            return JsonSerializer.Serialize(new
+            {
+                collectedAt,
+                processView = FlatpakEnvironment.IsFlatpak ? "sandbox" : "local",
+                logicalProcessors = Environment.ProcessorCount,
+                processes,
+                windowRuntime = window,
+                daemonRuntime = await daemon.ConfigureAwait(false),
+                savedDaemonPreferences = new { readError = problem is not null, saved.Submixer },
+                installedBuilds,
+                installationHistory,
+            }, ReportJson);
+        });
     }
 
     internal static ProcessContext ReadProcessContext(string proc, uint user, int windowPid)
     {
         var programs = new Dictionary<string, int>(StringComparer.Ordinal);
         var audio = new List<ProcessMemory>();
-        var system = ReadKiB(ReadProcFile(Path.Combine(proc, "meminfo")), SystemMemoryFields);
+        var system = RuntimeSnapshot.ReadKiB(RuntimeSnapshot.ReadProcFields(Path.Combine(proc, "meminfo")), SystemMemoryFields);
         string windowId = windowPid.ToString(CultureInfo.InvariantCulture);
-        var windowStatus = ReadProcFile(Path.Combine(proc, windowId, "status"));
+        var windowStatus = RuntimeSnapshot.ReadProcFields(Path.Combine(proc, windowId, "status"));
         var window = OwnedProcessName(windowStatus, user) is { } name ? ReadProcessMemory(windowStatus, name) : null;
         bool available = false, truncated = false;
         int reads = 0, unreadable = 0;
@@ -62,7 +71,7 @@ public static partial class Diagnostics
                 if (!int.TryParse(id, NumberStyles.None, CultureInfo.InvariantCulture, out int pid) || pid <= 0) continue;
                 available = true;
                 if (++reads > MaxProcessReads) { truncated = true; break; }
-                var status = pid == windowPid ? windowStatus : ReadProcFile(Path.Combine(dir, "status"));
+                var status = pid == windowPid ? windowStatus : RuntimeSnapshot.ReadProcFields(Path.Combine(dir, "status"));
                 if (status.Count == 0) { unreadable++; continue; }
                 if (OwnedProcessName(status, user) is not { } program) continue;
                 if (programs.TryGetValue(program, out int count)) programs[program] = count + 1;
@@ -103,32 +112,33 @@ public static partial class Diagnostics
         int? threads = int.TryParse(status.GetValueOrDefault("Threads"), NumberStyles.None, CultureInfo.InvariantCulture,
             out int count) ? count : null;
         return new(name, state is { Length: > 0 } && char.IsAsciiLetter(state[0]) ? state[0] : null, threads,
-            ReadKiB(status, ProcessMemoryFields));
+            RuntimeSnapshot.ReadKiB(status, RuntimeSnapshot.StatusMemoryFields));
     }
 
-    private static Dictionary<string, long> ReadKiB(Dictionary<string, string> fields, string[] keys)
+    private static BuildHistory ReadBuildHistory()
     {
-        var values = new Dictionary<string, long>(StringComparer.Ordinal);
-        foreach (string key in keys)
-            if (fields.TryGetValue(key, out string? value) && value.EndsWith(" kB", StringComparison.Ordinal)
-                && long.TryParse(value.AsSpan(0, value.Length - 3).Trim(), NumberStyles.None,
-                    CultureInfo.InvariantCulture, out long size))
-                values.Add(key, size);
-        return values;
-    }
-
-    private static Dictionary<string, string> ReadProcFile(string path)
-    {
-        var fields = new Dictionary<string, string>(StringComparer.Ordinal);
-        string text;
-        try { text = RegularFile.ReadText(path, 16 * 1024); }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return fields; }
-        foreach (ReadOnlySpan<char> line in text.AsSpan().EnumerateLines())
+        const long budget = 16 * 1024 * 1024;
+        var builds = new HashSet<InstalledBuild>();
+        bool truncated = false;
+        int unreadable = 0;
+        long bytes = 0;
+        try
         {
-            int separator = line.IndexOf(':');
-            if (separator > 0) fields.TryAdd(line[..separator].ToString(), line[(separator + 1)..].Trim().ToString());
+            foreach (string path in InstallationHistory.ArchivedReceipts())
+            {
+                try
+                {
+                    long size = new FileInfo(path).Length;
+                    if (size > InstallationReceipt.MaxBytes) { unreadable++; continue; }
+                    if ((bytes += size) > budget) { truncated = true; break; }
+                    builds.Add(ReadBuild(path, archived: true));
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+                { unreadable++; }
+            }
         }
-        return fields;
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return new([], 0, false, false); }
+        return new(OrderBuilds(builds), unreadable, truncated, true);
     }
 
     private static InstalledBuild[] ReadInstalledBuilds()
@@ -136,14 +146,20 @@ public static partial class Diagnostics
         var builds = new HashSet<InstalledBuild>();
         foreach (string path in InstallationHistory.PackageReceipts(AppContext.BaseDirectory).Distinct(StringComparer.Ordinal).Take(8))
         {
-            try
-            {
-                InstallationReceipt receipt = InstallationReceipt.Read(path);
-                builds.Add(new(receipt.Package, receipt.Manager, receipt.Version, receipt.Commit, receipt.Dirty));
-            }
+            try { builds.Add(ReadBuild(path)); }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
             { /* A missing or malformed receipt cannot identify an installed build. */ }
         }
-        return [.. builds.OrderBy(b => b.Package, StringComparer.Ordinal).ThenBy(b => b.Version, StringComparer.Ordinal)];
+        return OrderBuilds(builds);
     }
+
+    private static InstalledBuild ReadBuild(string path, bool archived = false)
+    {
+        InstallationReceipt receipt = InstallationReceipt.Read(path, archived: archived);
+        return new(receipt.Package, receipt.Manager, receipt.Version, receipt.Commit, receipt.Dirty);
+    }
+
+    private static InstalledBuild[] OrderBuilds(HashSet<InstalledBuild> builds)
+        => [.. builds.OrderBy(b => b.Package, StringComparer.Ordinal).ThenBy(b => b.Version, StringComparer.Ordinal)
+            .ThenBy(b => b.Manager, StringComparer.Ordinal).ThenBy(b => b.Commit, StringComparer.Ordinal).ThenBy(b => b.Dirty)];
 }

@@ -4456,10 +4456,20 @@ no process IDs, command lines, environment variables or memory contents.
 Review the process list before sharing the archive.
 
 Deep Trace also reports the saved daemon submixer preference and versions
-and commits from available OpenXLR and companion package receipts. A
-receipt describes a package on disk. Use `system-info.json` to identify
-the builds that were running. **Deep Wine trace for plugin scans** is a
-separate setting for reproducing Windows plugin scan failures.
+and commits from available OpenXLR and companion package receipts.
+`installationHistory` lists archived receipt metadata separately. An
+archived receipt is evidence of a past installation. Use `system-info.json`
+to identify the builds that were running.
+
+`windowRuntime` and `daemonRuntime` contain a numerical memory snapshot
+from the window and the daemon that replied. They include the managed heap
+size, committed bytes, fragmentation and collection counts, plus the
+proportional and private RAM usage when the kernel supplies those counters.
+The daemon reply carries its own build ID and collection time. A daemon
+that is disconnected, too old to answer or times out leaves
+`daemonRuntime` empty. The rest of the report still works. Collection does
+not force a garbage collection. **Deep Wine trace for plugin scans** is
+a separate setting for reproducing Windows plugin scan failures.
 
 Configuration copies are limited to 4 MiB per file, the preference reader's
 limit. Symbolic links, non-regular files and files that cannot be read are
