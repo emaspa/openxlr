@@ -107,6 +107,7 @@ internal sealed class InputsView : View
         NoiseRemovals(rows, app.Link, state);
         Dynamics(rows, app.Link, state);
         VoiceChangers(rows, app.Link, state);
+        MonitorDry(rows, app.Link, state);
 
         // The software low cut and ClipGuard run in the mixer, so they act on
         // any microphone on XLR 1; the gain lock guards the interface's gain.
@@ -405,6 +406,27 @@ internal sealed class InputsView : View
             rows.Add(Number("comp release", compressor.Release, MicCompressor.ReleaseRange, 10, Ms, "setCompressor"));
             rows.Add(Number("comp knee", compressor.Knee, MicCompressor.KneeRange, 1, Db, "setCompressor"));
             rows.Add(Number("comp make-up", compressor.Makeup, MicCompressor.MakeupRange, 1, Db, "setCompressor"));
+        }
+    }
+
+    /// <summary>
+    /// Each microphone's dry monitor switch, sent with setMonitorDry: on, the
+    /// monitor mixes hear the microphone before its effects, earlier, and
+    /// every other mix keeps the processed voice.
+    /// </summary>
+    private static void MonitorDry(List<Row> rows, DaemonLink link, Snapshot state)
+    {
+        List<ChannelEntry> microphones = [.. state.Mixer.Shown.Where(channel => channel.MonitorDry is not null)];
+        if (microphones.Count == 0) return;
+        rows.Add(new HeadingRow("Monitor"));
+        foreach (ChannelEntry channel in microphones)
+        {
+            string id = channel.Id;
+            rows.Add(new ToggleRow($"{channel.Name} hear it dry", channel.MonitorDry!.Value, value => link.Send("setMonitorDry", body =>
+            {
+                body["channel"] = id;
+                body["value"] = value;
+            })));
         }
     }
 

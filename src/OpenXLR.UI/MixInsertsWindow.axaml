@@ -31,7 +31,13 @@
     <TextBlock DockPanel.Dock="Top" Text="{Binding WorkflowError}" TextWrapping="Wrap" Margin="0,0,0,8"
                Foreground="{DynamicResource Ox.Text.Warning}"
                IsVisible="{Binding WorkflowError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-    <Button DockPanel.Dock="Top" Name="MicSetup" Content="{loc:Text Key=MicSetup}" IsVisible="{Binding CanMicSetup}" HorizontalAlignment="Left" Margin="0,0,0,8" Click="OnMicSetup"/>
+    <!-- A microphone's chain: Mic setup, and the switch that has the monitor mixes hear it before these effects. -->
+    <WrapPanel DockPanel.Dock="Top" ItemSpacing="8" LineSpacing="6">
+      <Button Name="MicSetup" Content="{loc:Text Key=MicSetup}" IsVisible="{Binding CanMicSetup}" Margin="0,0,0,8" Click="OnMicSetup"/>
+      <ToggleButton Name="MonitorDry" Content="{loc:Text Key=MonitorDry}" IsVisible="{Binding HasMonitorDry}" Margin="0,0,0,8"
+                    IsChecked="{Binding MonitorDry, Mode=TwoWay}"
+                    ToolTip.Tip="{loc:Text Key=MonitorDryTip}" AutomationProperties.HelpText="{loc:Text Key=MonitorDryTip}"/>
+    </WrapPanel>
     <TextBlock DockPanel.Dock="Top" Text="{loc:Text Key=NoInsertsYet}" Classes="h" IsVisible="{Binding !HasItems}"/>
     <ScrollViewer VerticalScrollBarVisibility="Auto" AllowAutoHide="False">
       <ItemsControl ItemsSource="{Binding Items}" Margin="0,0,10,0">
