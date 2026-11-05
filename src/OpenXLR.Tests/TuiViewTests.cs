@@ -1722,6 +1722,45 @@ public sealed class TuiViewTests
     }
 
     [Fact]
+    public void ACaptureInputsOwnMuteIsARowUnderItsGain()
+    {
+        // The webcam's source is muted, the USB microphone's is not, and a
+        // stereo input from an older daemon reports its gain without a mute.
+        var root = System.Text.Json.Nodes.JsonNode.Parse(StateJson)!;
+        var channels = (System.Text.Json.Nodes.JsonArray)root["mixer"]!["channels"]!;
+        foreach (string json in new[]
+        {
+            """{"id":"brio","name":"Brio","captureSource":"alsa_input.usb-webcam","captureConnected":true,"microphone":false,"levels":{"monitor":1},"mutedIn":[],"captureGain":{"gainDb":36,"minDb":18,"maxDb":54,"hardware":true,"muted":true}}""",
+            """{"id":"usbmic","name":"USB mic","captureSource":"alsa_input.usb-mic","captureMonoChannel":0,"captureConnected":true,"microphone":true,"levels":{"monitor":1},"mutedIn":[],"captureGain":{"gainDb":-6,"minDb":-60,"maxDb":10,"hardware":false,"muted":false}}""",
+            """{"id":"older","name":"Older","captureSource":"alsa_input.usb-older","captureConnected":true,"microphone":false,"levels":{"monitor":1},"mutedIn":[],"captureGain":{"gainDb":0,"minDb":-60,"maxDb":10,"hardware":false}}""",
+        }) channels.Add(System.Text.Json.Nodes.JsonNode.Parse(json));
+        string state = root.ToJsonString();
+
+        // Step down the tab until a press sends a capture mute, for each input in turn.
+        var found = new Dictionary<string, bool>();
+        for (int downs = 0; downs < 90; downs++)
+        {
+            DaemonLink link = new();
+            List<string> sent = [];
+            link.Sent += json => sent.Add(json);
+            link.Receive(state);
+            App app = new(link, Theme.Material);
+            app.ShowTab(2);
+            Screen screen = new(150, 42);
+            app.Draw(screen);
+            for (int i = 0; i < downs; i++) app.Handle(new KeyPress(Key.Down));
+            app.Draw(screen);
+            sent.Clear();
+            app.Handle(new KeyPress(Key.Char, ' '));
+            if (sent.Count != 1) continue;
+            JsonElement command = JsonDocument.Parse(sent[0]).RootElement;
+            if (Text(command, "cmd") != "setCaptureMuted") continue;
+            found.TryAdd(Text(command, "channel")!, command.GetProperty("value").GetBoolean());
+        }
+        Assert.Equal(new Dictionary<string, bool> { ["brio"] = false, ["usbmic"] = true }, found);
+    }
+
+    [Fact]
     public void FineBracketsAlsoWorkOnHardwareAndOutputFaders()
     {
         (App app, List<string> sent) = Ready(3);

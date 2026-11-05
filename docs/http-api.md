@@ -131,6 +131,8 @@ one, `xlr1`, `xlr2`, `aux` and `line` included.
 gain to +36 dB, its source's volume, and `GET /api/v1/channels/brio` reads it
 back as `captureGain` with its range and whether it is the device's own
 control (see [capture input gain](api.md#capture-input-gain)).
+`{"cmd":"setCaptureMuted","channel":"brio","value":true}` mutes that
+input's source, and the same read reports it as `captureGain.muted`.
 
 A capture channel reports `microphone` and `chainWidth` through
 `GET /api/v1/channels/{id}`. For a mono capture channel named `brio`,

@@ -10,8 +10,10 @@ namespace OpenXLR.Core.Mixing;
 /// hardware gain. With <see cref="Hardware"/> the numbers read as the
 /// device's capture control does in alsamixer; without it they are the
 /// software level PipeWire applies to the source, 0 dB being unity.
+/// <see cref="Muted"/> is the source's own mute, which silences it for every
+/// program that records it.
 /// </summary>
-public sealed record CaptureGainStatus(double GainDb, double MinDb, double MaxDb, bool Hardware);
+public sealed record CaptureGainStatus(double GainDb, double MinDb, double MaxDb, bool Hardware, bool Muted = false);
 
 /// <summary>One PipeWire source's volume as pipewire-pulse reports it.</summary>
 /// <param name="Name">The source's node name.</param>
@@ -19,7 +21,8 @@ public sealed record CaptureGainStatus(double GainDb, double MinDb, double MaxDb
 /// <param name="BaseVolume">The volume at which the hardware control sits at 0 dB (65536 without one).</param>
 /// <param name="HardwareVolume">The source sets its volume on the device's own capture control.</param>
 /// <param name="AlsaCard">The ALSA card number behind the source, or null.</param>
-public sealed record SourceVolume(string Name, long Volume, long BaseVolume, bool HardwareVolume, string? AlsaCard);
+/// <param name="Muted">The source's own mute.</param>
+public sealed record SourceVolume(string Name, long Volume, long BaseVolume, bool HardwareVolume, string? AlsaCard, bool Muted = false);
 
 /// <summary>
 /// How a capture input's source volume maps to a gain in dB, and which
@@ -73,11 +76,11 @@ public static class CaptureGain
     public static CaptureGainStatus Status(SourceVolume source, double? hardwareMinDb)
     {
         if (!IsHardware(source))
-            return new(Round(Math.Max(VolumeDb(source.Volume), -120)), SoftwareMinDb, SoftwareMaxDb, false);
+            return new(Round(Math.Max(VolumeDb(source.Volume), -120)), SoftwareMinDb, SoftwareMaxDb, false, source.Muted);
         double offset = Offset(source);
         double max = offset;
         double min = hardwareMinDb is double low && low < max ? Round(low) : max - FallbackSpanDb;
-        return new(Round(Math.Max(VolumeDb(source.Volume), -120) + offset), min, max, true);
+        return new(Round(Math.Max(VolumeDb(source.Volume), -120) + offset), min, max, true, source.Muted);
     }
 
     /// <summary>The Pulse volume that puts the source's gain at <paramref name="gainDb"/>, clamped to the range.</summary>
@@ -100,7 +103,8 @@ public static class CaptureGain
     /// <summary>
     /// The sources in <c>pactl --format=json list sources</c> output that
     /// <paramref name="names"/> lists. A source named twice is left out,
-    /// since neither can be told to be the right one.
+    /// since neither can be told to be the right one. A source without a
+    /// mute flag reads as unmuted.
     /// </summary>
     public static IReadOnlyDictionary<string, SourceVolume> ParseSources(ReadOnlySpan<byte> json, IReadOnlySet<string> names)
     {
@@ -123,7 +127,8 @@ public static class CaptureGain
                 && props.TryGetProperty("alsa.card", out JsonElement c) && c.ValueKind == JsonValueKind.String
                 && int.TryParse(c.GetString(), NumberStyles.None, CultureInfo.InvariantCulture, out int number)
                     ? number.ToString(CultureInfo.InvariantCulture) : null;
-            if (!found.TryAdd(name, new(name, volume.Value, baseVolume, hardware, card))) twice.Add(name);
+            bool muted = source.TryGetProperty("mute", out JsonElement mute) && mute.ValueKind == JsonValueKind.True;
+            if (!found.TryAdd(name, new(name, volume.Value, baseVolume, hardware, card, muted))) twice.Add(name);
         }
         foreach (string name in twice) found.Remove(name);
         return found;

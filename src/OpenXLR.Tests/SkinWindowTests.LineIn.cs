@@ -20,8 +20,19 @@ public sealed partial class SkinWindowTests
     /// place they are drawn, the input rack, the mix matrix and the classic
     /// INPUTS panel: their lettering takes the skin's value colour, a screen
     /// reader reads what they show, and a moving volume fader turns them to
-    /// the volume. A capture input's gain is a fader over its own range.
+    /// the volume. A capture input's gain is a fader over its own range, with
+    /// its source's mute beside it in each of the three.
     /// </summary>
+    /// <summary>The source's mute: drawn as the microphone's mute is, and checked while the state says the source is muted.</summary>
+    private static void CaptureMute(ToggleButton mute)
+    {
+        Assert.True(mute.IsEffectivelyVisible, mute.Name);
+        Assert.True(mute.IsChecked, mute.Name);
+        Assert.Contains("mute", mute.Classes);
+        Assert.Equal(Localizer.Format("MixMuteName", "Brio"), AutomationProperties.GetName(mute));
+        Assert.Equal(Localizer.Text("CaptureMuteTip"), ToolTip.GetTip(mute));
+    }
+
     private static void TheInputReadoutsWearTheSkin()
     {
         string data = Path.Combine(Path.GetTempPath(), "openxlr-skinreadout-" + Guid.NewGuid());
@@ -55,7 +66,7 @@ public sealed partial class SkinWindowTests
                              {"id":"line","name":"Line In","hardware":true,"levels":{"monitor":1},"volume":0.6},
                              {"id":"brio","name":"Brio","captureSource":"alsa_input.usb-webcam","captureConnected":true,
                               "microphone":false,"chainWidth":2,"levels":{"monitor":1},"volume":0.7,
-                              "captureGain":{"gainDb":36,"minDb":18,"maxDb":54,"hardware":true}},
+                              "captureGain":{"gainDb":36,"minDb":18,"maxDb":54,"hardware":true,"muted":true}},
                              {"id":"music","name":"Music","levels":{"monitor":1},"volume":1}],
                  "inserts":{}}
                 """)]);
@@ -144,6 +155,12 @@ public sealed partial class SkinWindowTests
                 Assert.Equal(Localizer.Text("CaptureGainHardwareTip"), ToolTip.GetTip(gain));
             }
             Assert.False(SliderSync.RecentlyTouched("capgain:brio"));
+            ToggleButton[] mutes =
+            [
+                brio.GetVisualDescendants().OfType<ToggleButton>().Single(t => t.Name == "RackCaptureMute"),
+                SkinLayoutWindowTests.RowHead(window, "brio").GetVisualDescendants().OfType<ToggleButton>().Single(t => t.Name == "MatrixCaptureMute"),
+            ];
+            foreach (ToggleButton mute in mutes) CaptureMute(mute);
 
             // The classic INPUTS panel, under the same value colour.
             SkinEntry classic = Assert.Single(SkinCatalog.Discover(), e => e.Id == "readouts-classic");
@@ -162,6 +179,7 @@ public sealed partial class SkinWindowTests
             Assert.Equal((18, 54, 36), captureRow.GetVisualDescendants().OfType<Slider>().Select(s => (s.Minimum, s.Maximum, s.Value)).Single());
             Wears(captureRow.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "CaptureGainReadout"), "36 dB",
                 Localizer.Format("CaptureGainName", "Brio"), "classic capture");
+            CaptureMute(window.GetVisualDescendants().OfType<ToggleButton>().Single(t => t.Name == "CaptureMute"));
             Assert.False(SliderSync.RecentlyTouched("capgain:brio"));
         }
         finally

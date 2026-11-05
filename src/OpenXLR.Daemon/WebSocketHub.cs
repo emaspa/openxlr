@@ -446,6 +446,8 @@ public sealed class WebSocketHub
             case "setChannelMuted":
             case "setChannelVolume":
             case "setCaptureGain":
+            case "setCaptureMuted":
+            case "toggleCaptureMuted":
             case "setMixVolume":
             case "setMixMuted":
             case "adjustOutputVolume":

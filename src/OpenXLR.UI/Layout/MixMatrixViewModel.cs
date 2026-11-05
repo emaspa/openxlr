@@ -521,7 +521,8 @@ public sealed class MatrixRowViewModel : ViewModelBase
     /// Whether this channel has the part now. The gain, the mute and the
     /// switches belong to the interface's input: an XLR row bound to another
     /// source has none of them, and a capture channel carrying the
-    /// interface's microphone has them all. The switches also need an
+    /// interface's microphone has them all. A capture input with a gain of
+    /// its own has its source's mute in the mute part. The switches also need an
     /// interface that has one, and XLR 1 keeps the part for its software low
     /// cut and ClipGuard, whatever feeds it, as the INPUTS panel does.
     /// The gain part also holds the channel's own volume, which every channel
@@ -530,7 +531,7 @@ public sealed class MatrixRowViewModel : ViewModelBase
     /// </summary>
     private bool Available(string part) => (Kind, part) switch
     {
-        (InputStripKind.Xlr1 or InputStripKind.Xlr2 or InputStripKind.Capture, SkinStripParts.Mute) => CarriesUnit || CarriesExtraUnit,
+        (InputStripKind.Xlr1 or InputStripKind.Xlr2 or InputStripKind.Capture, SkinStripParts.Mute) => CarriesUnit || CarriesExtraUnit || ShowsCaptureMute,
         (InputStripKind.Xlr1 or InputStripKind.Xlr2 or InputStripKind.Capture, SkinMatrixParts.Processing) =>
             Unit is { HasSwitches: true } || ExtraUnit is { HasSwitches: true } || ShowsSoftware || ShowsNoise || ShowsDynamics,
         (InputStripKind.AuxIn, SkinStripParts.Gain) => Main.CapAuxInput || Channel.HasVolume,
@@ -547,6 +548,7 @@ public sealed class MatrixRowViewModel : ViewModelBase
         Spec = CreateSpec();
         Raise(nameof(Spec));
         Raise(nameof(ShowsCaptureGain));
+        Raise(nameof(ShowsCaptureMute));
         Raise(nameof(HasGainFader));
         Raise(nameof(ShowsVolume));
         Raise(nameof(VolumeShowsMeter));
@@ -627,6 +629,9 @@ public sealed class MatrixRowViewModel : ViewModelBase
     /// unit's input, whose gain the head draws instead.
     /// </summary>
     public bool ShowsCaptureGain => Kind == InputStripKind.Capture && Channel.ShowsCaptureGain;
+
+    /// <summary>The head's mute part draws a capture input's own mute, its source's, beside that gain.</summary>
+    public bool ShowsCaptureMute => Kind == InputStripKind.Capture && Channel.ShowsCaptureMute;
 
     /// <summary>The head's gain part draws the channel's own volume: the daemon reports one.</summary>
     public bool ShowsVolume => Channel.HasVolume;
@@ -806,7 +811,7 @@ public sealed class MatrixRowViewModel : ViewModelBase
             case nameof(ChannelViewModel.VolumeAdjusting): Raise(nameof(VolumeAdjusting)); break;
             case nameof(ChannelViewModel.ShowsVolumeReadout): Raise(nameof(ShowsVolumeChip)); break;
             case nameof(ChannelViewModel.VolumeText) when Channel.ShowsVolumeReadout: Raise(nameof(Readout)); break;
-            case nameof(ChannelViewModel.HasVolume) or nameof(ChannelViewModel.ShowsCaptureGain): RefreshSpec(); break;
+            case nameof(ChannelViewModel.HasVolume) or nameof(ChannelViewModel.ShowsCaptureGain) or nameof(ChannelViewModel.ShowsCaptureMute): RefreshSpec(); break;
             case nameof(ChannelViewModel.Inserts): Raise(nameof(Inserts)); Raise(nameof(InsertsKey)); RefreshSpec(); break;
             case nameof(ChannelViewModel.HasEq): Raise(nameof(ShowsEq)); Raise(nameof(Tall)); break;
             case nameof(ChannelViewModel.Noise): WatchUnits(); Raise(nameof(ShowsNoise)); RaiseSwitches(); break;

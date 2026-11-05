@@ -489,6 +489,10 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
     public Task SetCaptureGainAsync(string channel, double gainDb)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setCaptureGain", ["channel"] = channel, ["value"] = gainDb });
 
+    /// <summary>Mute or unmute a capture input's source, for every program that records it.</summary>
+    public Task SetCaptureMutedAsync(string channel, bool muted)
+        => SendAsync(new Dictionary<string, object> { ["cmd"] = "setCaptureMuted", ["channel"] = channel, ["value"] = muted });
+
     public Task SetMixVolumeAsync(string mix, double value)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setMixVolume", ["mix"] = mix, ["value"] = value });
 

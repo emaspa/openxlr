@@ -523,7 +523,9 @@ internal sealed class InputsView : View
     /// <summary>
     /// A capture input's own gain, its source's volume, which setCaptureGain
     /// sends: the device's capture control where it has one, its software
-    /// level otherwise. A channel that takes a Wave unit's input has none.
+    /// level otherwise; then the source's own mute, which setCaptureMuted
+    /// sends, from a daemon that reports it. A channel that takes a Wave
+    /// unit's input has neither.
     /// </summary>
     private static void CaptureGainRow(List<Row> rows, DaemonLink link, ChannelEntry channel)
     {
@@ -536,6 +538,12 @@ internal sealed class InputsView : View
                 body["value"] = Math.Round(value, 1);
             }))
         { FineStep = 0.5 });
+        if (gain.Muted is bool muted)
+            rows.Add(new ToggleRow("Mute", muted, value => link.Send("setCaptureMuted", body =>
+            {
+                body["channel"] = id;
+                body["value"] = value;
+            })));
     }
 
     /// <summary>The headphone scale the window shows: -60 dB is 0% and 0 dB is 100%.</summary>

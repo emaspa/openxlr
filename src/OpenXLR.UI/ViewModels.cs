@@ -1903,6 +1903,7 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
             if (!Set(ref _name, value)) return;
             Raise(nameof(BindingChipName));
             Raise(nameof(CaptureGainName));
+            Raise(nameof(CaptureMuteName));
             RefreshCaptureReadout();
             if (_showsVolumeReadout) Raise(nameof(ReadoutName));
             if (_eq is not null) _eq.ChannelName = value;
@@ -2099,7 +2100,7 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
     /// <see cref="UnitInput"/>, with the strips on the interface standing in
     /// while no unit reports one.
     /// </summary>
-    public int ShownUnitInput { get => _shownUnitInput; internal set { if (Set(ref _shownUnitInput, value)) Raise(nameof(ShowsCaptureGain)); } }
+    public int ShownUnitInput { get => _shownUnitInput; internal set { if (Set(ref _shownUnitInput, value)) RaiseCaptureControls(); } }
 
     private WaveUnitInputViewModel? _extraUnitInput;
     /// <summary>
@@ -2111,7 +2112,7 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
     public WaveUnitInputViewModel? ExtraUnitInput
     {
         get => _extraUnitInput;
-        internal set { if (Set(ref _extraUnitInput, value)) { Raise(nameof(CarriesExtraUnit)); Raise(nameof(ShowsCaptureGain)); } }
+        internal set { if (Set(ref _extraUnitInput, value)) { Raise(nameof(CarriesExtraUnit)); RaiseCaptureControls(); } }
     }
 
     /// <summary>The channel draws an additional unit's gain and switches.</summary>
@@ -2255,7 +2256,7 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
 
     // --- a capture input's gain: its source's volume, on a source OpenXLR does not drive ---
 
-    private bool _hasCaptureGain, _captureGainHardware, _applyingCaptureGain;
+    private bool _hasCaptureGain, _captureGainHardware, _applyingCaptureGain, _hasCaptureMute, _captureMuted;
     private double _captureGainDb, _captureGainMinDb = -60, _captureGainMaxDb = 10;
 
     /// <summary>
@@ -2263,13 +2264,47 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
     /// Wave unit's, the channel does not carry a unit's input, and the source
     /// is present. The strip then draws the gain and its readout.
     /// </summary>
-    public bool HasCaptureGain { get => _hasCaptureGain; private set { if (Set(ref _hasCaptureGain, value)) Raise(nameof(ShowsCaptureGain)); } }
+    public bool HasCaptureGain { get => _hasCaptureGain; private set { if (Set(ref _hasCaptureGain, value)) RaiseCaptureControls(); } }
 
     /// <summary>
     /// The strip draws the capture input's own gain: it has one, and the
     /// strip draws no Wave unit's gain, which the daemon never pairs with one.
     /// </summary>
     public bool ShowsCaptureGain => _hasCaptureGain && _shownUnitInput == 0 && _extraUnitInput is null;
+
+    private void RaiseCaptureControls()
+    {
+        Raise(nameof(ShowsCaptureGain));
+        Raise(nameof(ShowsCaptureMute));
+    }
+
+    /// <summary>
+    /// The daemon reports the source's own mute beside the gain. An older
+    /// daemon sends the gain alone, and the strip then draws no mute.
+    /// </summary>
+    public bool HasCaptureMute { get => _hasCaptureMute; private set { if (Set(ref _hasCaptureMute, value)) Raise(nameof(ShowsCaptureMute)); } }
+
+    /// <summary>The strip draws the source's mute: wherever it draws the capture input's own gain, from a daemon that reports one.</summary>
+    public bool ShowsCaptureMute => _hasCaptureMute && ShowsCaptureGain;
+
+    /// <summary>
+    /// The source's own mute, which silences it for every program that
+    /// records it, as the interface's mute does on XLR 1. Pressing it sends
+    /// setCaptureMuted at once; the next state confirms it, or puts it back
+    /// when the daemon refuses.
+    /// </summary>
+    public bool CaptureMuted
+    {
+        get => _captureMuted;
+        set
+        {
+            if (!Set(ref _captureMuted, value) || _applyingCaptureGain || _detached || !_hasCaptureMute) return;
+            _ = _client.SetCaptureMutedAsync(Id, value);
+        }
+    }
+
+    /// <summary>The mute button's name for a screen reader.</summary>
+    public string CaptureMuteName => Localizer.Format("MixMuteName", Name);
 
     /// <summary>The gain is the device's own capture control; otherwise the source's software level.</summary>
     public bool CaptureGainHardware
@@ -2324,6 +2359,10 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
                 CaptureGainHardware = gain["hardware"]?.GetValue<bool>() ?? false;
                 if (!SliderSync.RecentlyTouched($"capgain:{Id}")) CaptureGainDb = gain["gainDb"]!.GetValue<double>();
             }
+            // The mute arrives inside the gain, from a daemon that has one.
+            bool hasMute = has && gain!["muted"] is JsonValue muted && muted.GetValueKind() is System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False;
+            if (hasMute) CaptureMuted = gain!["muted"]!.GetValue<bool>();
+            HasCaptureMute = hasMute;
             HasCaptureGain = has;
         }
         finally { _applyingCaptureGain = false; }

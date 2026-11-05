@@ -25,19 +25,19 @@ public sealed class CaptureGainTests
     private const string ProRaw = "alsa_input.usb-Elgato_Elgato_Wave_XLR_Pro_AAY3H5481241GS-00.pro-input-0";
     private const string Dock = "alsa_input.usb-Elgato_Elgato_Wave_XLR_Dock_MK.2_AB2JA536121KPI-00.analog-stereo";
 
-    private static string Source(string name, long volume, long baseVolume, bool hardware, string card)
+    private static string Source(string name, long volume, long baseVolume, bool hardware, string card, bool muted = false)
     {
         string flags = hardware ? "\"HW_MUTE_CTRL\",\"HW_VOLUME_CTRL\"," : "";
         string Level(long value) => "{\"value\":" + value + ",\"value_percent\":\"x\",\"db\":\"x\"}";
-        return "{\"index\":1,\"state\":\"RUNNING\",\"name\":\"" + name + "\",\"driver\":\"PipeWire\",\"mute\":false,"
+        return "{\"index\":1,\"state\":\"RUNNING\",\"name\":\"" + name + "\",\"driver\":\"PipeWire\",\"mute\":" + (muted ? "true" : "false") + ","
             + "\"volume\":{\"front-left\":" + Level(volume) + ",\"front-right\":" + Level(volume - 100) + "},"
             + "\"balance\":0.0,\"base_volume\":" + Level(baseVolume) + ","
             + "\"flags\":[\"HARDWARE\"," + flags + "\"DECIBEL_VOLUME\",\"LATENCY\"],"
             + "\"properties\":{\"alsa.card\":\"" + card + "\",\"node.name\":\"" + name + "\"}}";
     }
 
-    private static string Sources(long brio = 65536) => "[" + string.Join(",",
-        Source(Brio, brio, 8250, true, "3"), Source(Onboard, 32846, 65536, false, "2"),
+    private static string Sources(long brio = 65536, bool brioMuted = false) => "[" + string.Join(",",
+        Source(Brio, brio, 8250, true, "3", brioMuted), Source(Onboard, 32846, 65536, false, "2"),
         Source(ProRaw, 48316, 65536, false, "6"), Source(Dock, 65536, 65536, false, "1")) + "]";
 
     private const string BrioControls = """
@@ -117,6 +117,11 @@ public sealed class CaptureGainTests
         // No card number, no card.
         Assert.Null(Parse(Sources().Replace("\"alsa.card\":\"3\"", "\"alsa.card\":\"x\"", StringComparison.Ordinal), Brio)[Brio].AlsaCard);
         Assert.Empty(Parse("{}", Brio));
+        // The source's own mute is read beside its volume; no flag reads as unmuted.
+        Assert.False(Parse(Sources(), Brio)[Brio].Muted);
+        Assert.True(Parse(Sources(brioMuted: true), Brio)[Brio].Muted);
+        Assert.True(CaptureGain.Status(Parse(Sources(brioMuted: true), Brio)[Brio], 18).Muted);
+        Assert.False(Parse(Sources().Replace("\"mute\":false,", "", StringComparison.Ordinal), Brio)[Brio].Muted);
     }
 
     [Fact]
@@ -158,6 +163,7 @@ public sealed class CaptureGainTests
         Assert.True(fake.Mixer.SyncCaptureGains());
         Dictionary<string, ChannelStatus> channels = fake.Mixer.Snapshot().Channels.ToDictionary(c => c.Id);
         Assert.Equal(new CaptureGainStatus(54, 18, 54, true), channels["brio"].CaptureGain);
+        Assert.Equal(channels["brio"].CaptureGain, channels["brio-left"].CaptureGain);
         Assert.Equal(new CaptureGainStatus(-18, -60, 10, false), channels["onboard"].CaptureGain);
         // The Pro's raw source, a dock's node and a capture input that remembers a unit report no gain of their own.
         Assert.Null(channels["pro"].CaptureGain);
@@ -350,6 +356,101 @@ public sealed class CaptureGainTests
     }
 
     [Fact]
+    public void SettingTheMuteWritesTheSourcesMuteForEveryInputOnIt()
+    {
+        using var fake = new FakeAudio();
+        fake.Mixer.SyncCaptureGains();
+        fake.Clear();
+        fake.Mixer.SetCaptureMuted("brio", true);
+        Assert.Contains($"pactl set-source-mute {Brio} 1", fake.Calls);
+        Assert.DoesNotContain(fake.Calls, c => c.StartsWith("pactl set-source-volume", StringComparison.Ordinal));
+        Dictionary<string, ChannelStatus> channels = fake.Mixer.Snapshot().Channels.ToDictionary(c => c.Id);
+        // Two inputs on one source share its mute, and the gain stays as it was.
+        Assert.Equal(new CaptureGainStatus(54, 18, 54, true, true), channels["brio"].CaptureGain);
+        Assert.Equal(new CaptureGainStatus(54, 18, 54, true, true), channels["brio-left"].CaptureGain);
+        Assert.False(channels["onboard"].CaptureGain!.Muted);
+        fake.Mixer.SetCaptureMuted("brio-left", false);
+        Assert.Contains($"pactl set-source-mute {Brio} 0", fake.Calls);
+        Assert.False(fake.Mixer.Snapshot().Channels.Single(c => c.Id == "brio").CaptureGain!.Muted);
+
+        fake.Clear();
+        foreach (string unit in new[] { "pro", "dock", "unit" })
+        {
+            Assert.Throws<InvalidOperationException>(() => fake.Mixer.SetCaptureMuted(unit, true));
+            Assert.Throws<InvalidOperationException>(() => fake.Mixer.ToggleCaptureMuted(unit));
+        }
+        Assert.Throws<ArgumentException>(() => fake.Mixer.SetCaptureMuted("music", true));
+        Assert.Throws<ArgumentException>(() => fake.Mixer.ToggleCaptureMuted("xlr1"));
+        Assert.DoesNotContain(fake.Calls, c => c.StartsWith("pactl set-", StringComparison.Ordinal));
+        // A missing source is refused too.
+        fake.Gone();
+        Assert.Throws<InvalidOperationException>(() => fake.Mixer.SetCaptureMuted("brio", true));
+        Assert.Throws<InvalidOperationException>(() => fake.Mixer.ToggleCaptureMuted("brio"));
+        Assert.DoesNotContain(fake.Calls, c => c.StartsWith("pactl set-", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void TheToggleFlipsWhatTheAudioServerReportsNow()
+    {
+        using var fake = new FakeAudio();
+        fake.Mixer.SyncCaptureGains();
+        // Another program muted the source since the last sweep: the toggle unmutes it.
+        File.WriteAllText(fake.SourcesPath, Sources(brioMuted: true));
+        fake.Clear();
+        fake.Mixer.ToggleCaptureMuted("brio");
+        Assert.Equal([$"pactl set-source-mute {Brio} 0"], fake.Calls.Where(c => c.StartsWith("pactl set-", StringComparison.Ordinal)));
+        Assert.False(fake.Mixer.Snapshot().Channels.Single(c => c.Id == "brio").CaptureGain!.Muted);
+        File.WriteAllText(fake.SourcesPath, Sources());
+        fake.Clear();
+        fake.Mixer.ToggleCaptureMuted("brio-left");
+        Assert.Equal([$"pactl set-source-mute {Brio} 1"], fake.Calls.Where(c => c.StartsWith("pactl set-", StringComparison.Ordinal)));
+        Assert.True(fake.Mixer.Snapshot().Channels.Single(c => c.Id == "brio").CaptureGain!.Muted);
+    }
+
+    [Fact]
+    public void AMuteMadeElsewhereIsReportedAndNeverWrittenBack()
+    {
+        using var fake = new FakeAudio();
+        fake.Mixer.SyncCaptureGains();
+        fake.Clear();
+        // A desktop panel mutes the BRIO: the registry's mute moves, pactl reads it.
+        fake.MuteBrio(true);
+        Assert.True(fake.Mixer.SyncCaptureGains());
+        Assert.True(fake.Mixer.Snapshot().Channels.Single(c => c.Id == "brio").CaptureGain!.Muted);
+        Assert.True(fake.Mixer.Snapshot().Channels.Single(c => c.Id == "brio-left").CaptureGain!.Muted);
+        Assert.Contains("pactl --format=json list sources", fake.Calls);
+        Assert.DoesNotContain(fake.Calls, c => c.StartsWith("pactl set-", StringComparison.Ordinal));
+        fake.Clear();
+        Assert.False(fake.Mixer.SyncCaptureGains());
+        Assert.Empty(fake.Calls);
+        fake.MuteBrio(false);
+        Assert.True(fake.Mixer.SyncCaptureGains());
+        Assert.False(fake.Mixer.Snapshot().Channels.Single(c => c.Id == "brio").CaptureGain!.Muted);
+        Assert.DoesNotContain(fake.Calls, c => c.StartsWith("pactl set-", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("setCaptureMuted", "brio", "true", null)]
+    [InlineData("setCaptureMuted", "brio", "false", null)]
+    [InlineData("setCaptureMuted", "brio", "1", "setCaptureMuted: value must be a boolean")]
+    [InlineData("setCaptureMuted", "brio", null, "setCaptureMuted: value must be a boolean")]
+    [InlineData("setCaptureMuted", "music", "true", "setCaptureMuted: need a capture input channel")]
+    [InlineData("setCaptureMuted", "xlr1", "true", "setCaptureMuted: need a capture input channel")]
+    [InlineData("setCaptureMuted", null, "true", "setCaptureMuted: need a capture input channel")]
+    [InlineData("toggleCaptureMuted", "brio", null, null)]
+    [InlineData("toggleCaptureMuted", "music", null, "toggleCaptureMuted: need a capture input channel")]
+    [InlineData("toggleCaptureMuted", "xlr1", null, "toggleCaptureMuted: need a capture input channel")]
+    [InlineData("toggleCaptureMuted", null, null, "toggleCaptureMuted: need a capture input channel")]
+    public void TheMuteCommandsNeedACaptureInput(string name, string? channel, string? value, string? error)
+    {
+        string fields = (channel is null ? "" : $",\"channel\":\"{channel}\"") + (value is null ? "" : $",\"value\":{value}");
+        var command = System.Text.Json.JsonSerializer.Deserialize<Command>($"{{\"cmd\":\"{name}\"{fields}}}",
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!;
+        string? result = CommandValidation.Check(command, new Layout(), _ => null);
+        Assert.Equal(error, result);
+    }
+
+    [Fact]
     public void ACaptureInputCarryingAUnitsInputHasNoGainOfItsOwn()
     {
         MethodInfo source = typeof(Mixer).GetMethod("CaptureGainSource", BindingFlags.Static | BindingFlags.NonPublic)!;
@@ -397,6 +498,7 @@ public sealed class CaptureGainTests
         private readonly string _dir = Directory.CreateTempSubdirectory("openxlr-capture-gain-").FullName;
         private readonly string? _path = Environment.GetEnvironmentVariable("PATH");
         public Mixer Mixer { get; }
+        public string SourcesPath => Path.Combine(_dir, "sources");
         public string[] Calls => File.Exists(Path.Combine(_dir, "calls")) ? File.ReadAllLines(Path.Combine(_dir, "calls")) : [];
         public void Clear() => File.WriteAllText(Path.Combine(_dir, "calls"), "");
         public void FailProbe(bool fail)
@@ -437,6 +539,7 @@ public sealed class CaptureGainTests
             {
                 Channels = [new("xlr1", "Mic 1") { InputPair = 0 },
                     new("brio", "Brio") { CaptureSource = Brio },
+                    new("brio-left", "Brio left") { CaptureSource = Brio, CaptureMonoChannel = 0 },
                     new("onboard", "Onboard") { CaptureSource = Onboard },
                     new("pro", "Pro raw") { CaptureSource = ProRaw, CaptureMonoChannel = 2 },
                     new("dock", "Dock") { CaptureSource = Dock },
@@ -447,15 +550,24 @@ public sealed class CaptureGainTests
             Clear();
         }
 
-        /// <summary>The registry's view of the BRIO's volume, linear as PipeWire keeps it.</summary>
-        private void Graph(double brio)
+        /// <summary>The registry's view of the BRIO's volume, linear as PipeWire keeps it, and its mute.</summary>
+        private void Graph(double brio, bool muted = false)
         {
-            static string Node(int id, string name, string level) =>
+            static string Node(int id, string name, string level, bool muted) =>
                 "{\"id\":" + id + ",\"type\":\"PipeWire:Interface:Node\",\"info\":{\"props\":{\"node.name\":\"" + name
-                + "\",\"media.class\":\"Audio/Source\"},\"params\":{\"Props\":[{\"volume\":1.0,\"mute\":false,\"channelVolumes\":["
-                + level + "," + level + "]}]}}}";
-            File.WriteAllText(Path.Combine(_dir, "graph"), "[" + Node(50, Brio, brio.ToString(System.Globalization.CultureInfo.InvariantCulture))
-                + "," + Node(51, Onboard, "0.125895") + "]");
+                + "\",\"media.class\":\"Audio/Source\"},\"params\":{\"Props\":[{\"volume\":1.0,\"mute\":" + (muted ? "true" : "false")
+                + ",\"channelVolumes\":[" + level + "," + level + "]}]}}}";
+            File.WriteAllText(Path.Combine(_dir, "graph"), "[" + Node(50, Brio, brio.ToString(System.Globalization.CultureInfo.InvariantCulture), muted)
+                + "," + Node(51, Onboard, "0.125895", false) + "]");
+        }
+
+        /// <summary>Another program mutes or unmutes the BRIO, at full volume.</summary>
+        public void MuteBrio(bool muted)
+        {
+            File.WriteAllText(SourcesPath, Sources(brioMuted: muted));
+            Graph(1.0, muted);
+            // The adapter keeps a one-shot dump for a moment, as in MoveBrio.
+            Thread.Sleep(450);
         }
 
         /// <summary>Another program moves the BRIO's volume to a raw Pulse value.</summary>

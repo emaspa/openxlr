@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {controlFixture} from "./control-fixture.mjs";
 import { layoutChoices } from "../com.emaspa.openxlr.sdPlugin/layout-choices.mjs";
-import { captureGainOf, unitMeterKey } from "../com.emaspa.openxlr.sdPlugin/unit-inputs.mjs";
+import { captureGainOf, captureMuteOf, unitMeterKey } from "../com.emaspa.openxlr.sdPlugin/unit-inputs.mjs";
 
 const gain = {gainDb: 36, minDb: 18, maxDb: 54, hardware: true};
 
@@ -19,7 +19,9 @@ test("a capture input's own gain is offered on a gain dial, and a unit's input k
     .map(i => i.target.split(":")[1]).filter((v, i, a) => a.indexOf(v) === i), ["dock"]);
 
   const state = {mixer};
-  assert.deepEqual(captureGainOf(state, "brio"), {value: 36, min: 18, max: 54, hardware: true});
+  assert.deepEqual(captureGainOf(state, "brio"), {value: 36, min: 18, max: 54, hardware: true, muted: null});
+  // An older daemon reports no source mute, so no mute key is offered for it.
+  assert.equal(captureMuteOf(state, "brio"), null);
   assert.equal(captureGainOf(state, "dock"), null);
   assert.equal(captureGainOf(state, "music"), null);
   // A gain beside a unit's input, a broken range or missing numbers are not a gain.
@@ -28,6 +30,26 @@ test("a capture input's own gain is offered on a gain dial, and a unit's input k
   assert.equal(captureGainOf({mixer: {channels: [{id: "x", captureGain: gain, unitInput: {unit: "u", input: 1}}]}}, "x"), null);
   assert.equal(unitMeterKey(mixer, "chgain:brio"), "ch:brio");
   assert.equal(unitMeterKey(mixer, "chgain:music"), null);
+});
+
+test("a capture input's source mute is offered on the microphone mute key", () => {
+  const mixer = {channels: [
+    {id: "brio", name: "Brio", captureSource: "alsa_input.usb-webcam", captureGain: {...gain, muted: true}},
+    {id: "dock", name: "Dock mic", captureSource: "alsa_input.usb-Elgato_dock", unitInput: {unit: "0fd9:0070", input: 1, primary: true},
+     captureGain: {...gain, muted: false}},
+    {id: "music", name: "Music"},
+  ], mixes: [{id: "monitor", name: "Monitor A", kind: "monitor"}]};
+  // The capture input gets the mute alone; the unit's input keeps all of its switches.
+  assert.deepEqual(layoutChoices(mixer).toggleGroups.find(g => g.id === "layout-microphone-controls").items.map(i => i.target),
+    ["chmute:brio", "chmute:dock", "chphantom:dock", "chlowcut:dock", "chclipguard:dock"]);
+  const state = {mixer};
+  assert.equal(captureGainOf(state, "brio").muted, true);
+  assert.equal(captureMuteOf(state, "brio"), true);
+  // A unit's input has the unit's mute, never the source's.
+  assert.equal(captureMuteOf(state, "dock"), null);
+  assert.equal(captureMuteOf(state, "music"), null);
+  for (const bad of ["true", 1, null])
+    assert.equal(captureMuteOf({mixer: {channels: [{id: "x", captureGain: {...gain, muted: bad}}]}}, "x"), null);
 });
 
 test("the gain dial turns a capture input's own gain within its range and a press mutes the channel", async () => {
@@ -99,6 +121,34 @@ test("the gain dial turns a capture input's own gain within its range and a pres
     // It meters the capture input's channel.
     daemon.receive({type: "meters", levels: {"ch:xlr1": [0, 0], "ch:brio": [0.8, 0.8]}});
     assert.match(svg(meter("brio-dial")), /<rect width="104" height="6"/);
+
+    // A daemon that reports the source's mute: the dial shows it and a press flips it.
+    state.mixer.channels[1].captureGain = {...gain, gainDb: 53, muted: true};
+    state.mixer.channels[1].mutedIn = [];
+    daemon.receive(state);
+    assert.equal(feedback("brio-dial").value, "MUTED");
+    const pressed = daemon.messages.length;
+    host.receive({event: "dialDown", context: "brio-dial"});
+    assert.deepEqual(daemon.messages.slice(pressed), [{cmd: "toggleCaptureMuted", channel: "brio"}]);
+
+    // The microphone mute key on the capture input: lit while the source is muted, a press sends one toggle.
+    host.receive({event: "willAppear", context: "brio-key", action: "com.emaspa.openxlr.toggle", payload: {settings: {target: "chmute:brio"}}});
+    const keyed = daemon.messages.length;
+    host.receive({event: "keyDown", context: "brio-key"});
+    const toggle = daemon.messages.slice(keyed);
+    assert.equal(toggle.length, 1);
+    assert.deepEqual({...toggle[0], requestId: undefined}, {cmd: "toggleCaptureMuted", channel: "brio", requestId: undefined});
+    assert.equal(typeof toggle[0].requestId, "string");
+    daemon.receive({type: "commandResult", requestId: toggle[0].requestId, error: null});
+    // An older daemon again: the press falls back to the channel's sends, and the key has nothing to flip.
+    state.mixer.channels[1].captureGain = {...gain, gainDb: 53};
+    daemon.receive(state);
+    const fallback = daemon.messages.length;
+    host.receive({event: "dialDown", context: "brio-dial"});
+    assert.deepEqual(daemon.messages.slice(fallback).map(m => m.cmd), ["setChannelMuted", "setChannelMuted"]);
+    const idle = daemon.messages.length;
+    host.receive({event: "keyDown", context: "brio-key"});
+    assert.ok(!daemon.messages.slice(idle).some(m => m.cmd === "toggleCaptureMuted"));
 
     // A channel with no gain of its own: the dial says so and sends nothing.
     delete state.mixer.channels[1].captureGain;

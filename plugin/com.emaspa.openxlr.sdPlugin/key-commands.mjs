@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
 
 // Output volume and mute presses go through one ordered queue, across keys,
-// so a burst at a volume limit applies in the order it was pressed. Focus
+// so a burst at a volume limit applies in the order it was pressed, and each
+// press of a toggle flips once. Focus
 // routing and output selection are sent at once beside the queue: holding
 // them back would apply them later to whatever application or output is
 // current by then.
-const ORDERED = new Set(["adjustOutputVolume", "toggleOutputMute", "toggleMonitorMuted"]);
+const ORDERED = new Set(["adjustOutputVolume", "toggleOutputMute", "toggleMonitorMuted", "toggleCaptureMuted"]);
 // A soundboard press is answered only when it fails: a check mark over a clip
 // key would hide its progress bar for as long as a short clip plays.
 const QUIET = new Set(["playClip", "stopClips"]);

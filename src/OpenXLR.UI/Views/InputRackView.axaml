@@ -501,6 +501,10 @@
                 <Panel IsVisible="{Binding CarriesExtraUnit}">
                   <views:WaveUnitControls Name="RackExtraSwitches" Part="Switches" DataContext="{Binding ExtraUnit}"/>
                 </Panel>
+                <!-- a capture input's own mute, its source's, on a strip that draws the source's gain -->
+                <ToggleButton Name="RackCaptureMute" Content="{loc:Text Key=Mute}" Classes="mute" HorizontalAlignment="Left"
+                              IsChecked="{Binding Channel.CaptureMuted, Mode=TwoWay}" IsVisible="{Binding ShowsCaptureMute}"
+                              AutomationProperties.Name="{Binding Channel.CaptureMuteName}" ToolTip.Tip="{loc:Text Key=CaptureMuteTip}"/>
               </StackPanel>
               <!-- the microphone's EQ and noise removal, on a capture input the daemon reports them for, then its plugin chain -->
               <StackPanel layout:StripPanel.Part="effects" Name="RackCaptureEffects" Spacing="4">
