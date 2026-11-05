@@ -798,13 +798,20 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
 
     /// <summary>
     /// The Pro's raw sink. It is hidden from pickers, so it is derived from
-    /// any Pro pseudo-output's bare name.
+    /// a Pro pseudo-output's bare name.
     /// </summary>
-    private string? HardwareOutputSinkLocked()
-        => _pw.ListDevices(true, _inputHints)
-            .Where(d => d.Kind == AudioNodeKind.Sink &&
-                        d.Name.Contains("Wave_XLR", StringComparison.OrdinalIgnoreCase))
-            .Select(d => { int m = d.Name.IndexOf('#'); return m < 0 ? d.Name : d.Name[..m]; })
+    private string? HardwareOutputSinkLocked() => ProSinkOf(_pw.ListDevices(true, _inputHints));
+
+    /// <summary>
+    /// The sink behind the jack outputs in a device listing: the bare name of
+    /// the first "#hp1"-style entry, which the listing makes for the driven
+    /// Pro only. Another Wave XLR attached beside it has "Wave_XLR" in its
+    /// sink's name too, and its two channels once stood in for the Pro's 17,
+    /// which stopped hardware mixing and could aim the Aux mix at that unit.
+    /// </summary>
+    internal static string? ProSinkOf(IEnumerable<AudioNode> devices)
+        => devices.Where(d => d.Kind == AudioNodeKind.Sink && d.Name.IndexOf('#') > 0)
+            .Select(d => d.Name[..d.Name.IndexOf('#')])
             .FirstOrDefault();
 
     /// <summary>
