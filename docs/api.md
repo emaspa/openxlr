@@ -1255,8 +1255,10 @@ A follower's `role` is `unitInput` (the driven unit's capture node),
 source), `unitOutput` (a selected output, or the Aux port's sink, on the
 driven unit's card) or `output` (any other selected output). `channels`
 lists the strips the device feeds, empty for an output. `microphone` is
-true when one of them carries the microphone EQ (`xlr1`, `xlr2` and a
-capture input whose `microphone` is true). Followers come unit input
+true when one of them is a microphone strip, `xlr1` or `xlr2`, whatever
+source it is bound to. A capture input on another device is listed and can
+be `resampled` without setting `microphone`, since an extra microphone
+follows the unit's clock in a normal setup. Followers come unit input
 first, then capture inputs, the unit's outputs and other outputs.
 
 The daemon reads this from one `pw-dump` after the graph changes: once

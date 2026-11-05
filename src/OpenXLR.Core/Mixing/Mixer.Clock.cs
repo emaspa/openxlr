@@ -101,7 +101,9 @@ public sealed partial class Mixer
             if (source is null) continue;
             if (!channels.TryGetValue(source, out List<string>? strips)) channels[source] = strips = [];
             strips.Add(channel.Id);
-            if (CarriesEq(channel)) microphone.Add(source);
+            // Only the microphone strips warn: an extra mic on a capture input
+            // follows the unit's clock in a normal setup and is shown, not flagged.
+            if (channel.Id is "xlr1" or "xlr2" && CarriesEq(channel)) microphone.Add(source);
         }
         var devices = new List<ClockCandidate>();
         foreach ((string source, List<string> strips) in channels)

@@ -4684,8 +4684,8 @@ mess. Taking the card out of OpenXLR brought the microphone back at once,
 with nothing restarted.
 
 To check, open **Flow** ([Audio flow](#audio-flow)) and read the line
-under the title. **Audio clock** names the device the graph follows. If a
-microphone's interface follows another device, a warning line names it and
+under the title. **Audio clock** names the device the graph follows. If the
+interface of XLR 1 or XLR 2 follows another device, a warning line names it and
 its card in the graph says "Resampled to the clock of" that device. The UI
 shows the same warning above the mixer, with a **Manual** button that
 opens this section. A diagnostics archive states it in `meta.txt`, on the

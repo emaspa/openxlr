@@ -15,7 +15,7 @@ public sealed partial class MonitorVolumeIntegrationTests
     /// above the card's, the roles turn round.
     /// </summary>
     [MonitorPipeWireFact]
-    public void TheMixerReportsWhichDeviceDrivesAndWhichMicrophoneIsResampled()
+    public void TheMixerReportsWhichDeviceDrivesAndWhichCaptureIsResampled()
     {
         var pw = new PipeWireAdapter();
         using var registry = pw.WatchGraph();
@@ -62,8 +62,11 @@ public sealed partial class MonitorVolumeIntegrationTests
             Assert.Equal("capture", clock.Driver.Role);
             ClockFollower follower = Assert.Single(clock.Followers);
             Assert.Equal("test_clock_mic", follower.Name);
-            Assert.True(follower.Microphone && follower.Resampled);
-            Assert.True(clock.MicResampled);
+            Assert.True(follower.Resampled);
+            // A microphone on a capture input is shown resampled but does not
+            // warn: only XLR 1 and XLR 2 do, whatever source they are bound to.
+            Assert.False(follower.Microphone);
+            Assert.False(clock.MicResampled);
 
             // The same microphone at 2200, as the packaged rules give a
             // unit's input: it drives, and the card is the one resampled.
