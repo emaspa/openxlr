@@ -196,6 +196,20 @@ string and are not touched. The Debian, RPM and Nix packages install
 it; a source install copies it by hand. A
 community tester found the bug and verified the rule on their unit.
 
+The same rule makes the MK.1's input the clock of the audio graph, and
+the XLR Dock's and the Wave:3's rules do the same for theirs. Off the
+pro-audio profile WirePlumber gives a USB input a `priority.driver` of
+2100, or 2109 on an analog profile, and the highest number in a graph
+drives it. On one owner's machine an Elgato 4K X capture card at 2109
+drove the graph, the Wave XLR at 2100 followed it resampled, and its
+microphone garbled until the card left the graph
+([issue #474](https://github.com/emaspa/openxlr/issues/474)). The rules
+give the unit's input 2200, above those inputs and below the 2600 of a
+pro-audio input such as the Wave XLR Pro's; a unit on pro-audio keeps its
+2600. On that owner's machine a user copy of the MK.1 rule moved the clock
+to the Wave XLR; whether the microphone and the card's audio both stay
+clean with it has not been confirmed yet.
+
 The MK.1's ALSA card carries 'Mic Capture Volume', 'Mic Capture Switch'
 and 'PCM Playback Volume', the controls a desktop's sound settings and
 WirePlumber's restore at login act on. The kernel caches their values and

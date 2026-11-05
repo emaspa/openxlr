@@ -138,7 +138,13 @@ copies, and leaves that directory's permissions as they were. Cancel
 writes nothing and asks again at the next launch. Identical files
 are kept. Different files and symbolic links are reported and never
 overwritten. Configuration directory links are refused too. These include the capture-hold rule that prevents a silent
-Wave:3 microphone after playback starts. The rules take effect at the next login. For a custom host
+Wave:3 microphone after playback starts. The rules take effect at the next login.
+Set up runs at the first launch only, so a rule that a later release
+changes is not copied over the one already installed. To take the newer
+copy, delete the old file from `~/.config/wireplumber/wireplumber.conf.d`
+and copy it from
+`"$(flatpak info --show-location io.github.emaspa.openxlr)/files/share/openxlr/"`,
+then restart WirePlumber. For a custom host
 `XDG_CONFIG_HOME`, grant its `wireplumber/wireplumber.conf.d` directory and set
 `OPENXLR_HOST_CONFIG_HOME` to that host `XDG_CONFIG_HOME` with a Flatpak override. App
 preferences and profiles stay in Flatpak's private XDG directories.
