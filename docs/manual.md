@@ -4475,8 +4475,8 @@ not force a garbage collection. **Deep Wine trace for plugin scans** is
 a separate setting for reproducing Windows plugin scan failures.
 
 Configuration copies are limited to 4 MiB per file, the preference reader's
-limit. Symbolic links, non-regular files and files that cannot be read are
-replaced with an omission notice. An unavailable configuration does not stop
+limit. Symbolic links, non-regular files, unreadable files and malformed JSON
+are replaced with an omission notice. An unavailable configuration does not stop
 the rest of the collection. The Flatpak daemon logs keep their separate size
 limit and use the same file checks.
 

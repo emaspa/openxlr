@@ -412,7 +412,8 @@ public sealed class DiagnosticsTests
         const string plain = """{"type":"state","mixer":{"browserTabs":[]}}""";
         Assert.Equal(plain, Diagnostics.StateForArchive(plain));
         Assert.Equal("not json", Diagnostics.StateForArchive("not json"));
-        Assert.StartsWith("no state received", Diagnostics.StateForArchive(null), StringComparison.Ordinal);
+        using var report = System.Text.Json.JsonDocument.Parse(Diagnostics.StateForArchive(null));
+        Assert.Equal("No daemon state was received.", report.RootElement.GetProperty("unavailable").GetString());
     }
 
     [Fact]
@@ -553,6 +554,8 @@ public sealed class DiagnosticsTests
             Directory.CreateDirectory(UiSettings.ConfigDir);
             File.WriteAllText(Path.Combine(UiSettings.ConfigDir, "ui.json"),
                 "{\"examplePath\":\"/home/" + login + "/capture\",\"numericValue\":1024}");
+            File.WriteAllText(Path.Combine(UiSettings.ConfigDir, "mixer.json"),
+                "{\"path\":\"\\u002fhome\\u002f" + login + "\\u002fprivate malformed config\"");
             File.WriteAllText(Path.Combine(UiSettings.ConfigDir, "daemon.json"),
                 """{"submixer":true,"futureCredential":"never copy unknown preferences"}""");
             string share = Path.Combine(root, "share");
@@ -696,6 +699,9 @@ public sealed class DiagnosticsTests
             Assert.DoesNotContain("audio-graph.json", entries.Keys);
             using var preferences = System.Text.Json.JsonDocument.Parse(entries["ui.json"]);
             Assert.Equal(1024, preferences.RootElement.GetProperty("numericValue").GetInt32());
+            using var mixer = System.Text.Json.JsonDocument.Parse(entries["mixer.json"]);
+            Assert.True(mixer.RootElement.TryGetProperty("unavailable", out _));
+            Assert.DoesNotContain("private malformed config", entries["mixer.json"]);
             using var streams = System.Text.Json.JsonDocument.Parse(entries["sink-inputs.json"]);
             Assert.Equal(1024, streams.RootElement[0].GetProperty("buffer_latency_usec").GetInt32());
             Assert.Equal("<redacted>", streams.RootElement[0].GetProperty("properties").GetProperty("application.process.id").GetString());

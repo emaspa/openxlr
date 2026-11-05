@@ -173,11 +173,16 @@ public sealed class DiagnosticCommandTests
     [Theory]
     [InlineData("{\"x\":1,\"x\":2,\"path\":\"/home/alice/a\"}")]
     [InlineData("{\"path\":\"/home/alice/a\"")]
-    public void IncompleteAndDuplicateJsonIsMarkedInvalidAndStillRedacted(string input)
+    [InlineData("{\"path\":\"\\u002fhome\\u002falice\\u002fprivate-name\"")]
+    [InlineData("{\"path\":\"private-name\\uD800\"}")]
+    public void InvalidConfigurationJsonIsOmitted(string input)
     {
         string text = Diagnostics.RedactJsonText(input, [], "alice", out bool valid);
         Assert.False(valid);
         Assert.DoesNotContain("alice", text);
+        Assert.DoesNotContain("private-name", text);
+        using var report = JsonDocument.Parse(text);
+        Assert.True(report.RootElement.TryGetProperty("unavailable", out _));
     }
 
     [Fact]

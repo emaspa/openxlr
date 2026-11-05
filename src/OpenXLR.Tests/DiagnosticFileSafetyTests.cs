@@ -36,7 +36,8 @@ public sealed class DiagnosticFileSafetyTests : IDisposable
         File.WriteAllText(secret, "sensitive target contents");
         File.CreateSymbolicLink(Path.Combine(Source, "ui.json"), secret);
         Copy();
-        Assert.Contains("symbolic links", Saved());
+        using var report = System.Text.Json.JsonDocument.Parse(Saved());
+        Assert.Contains("symbolic links", report.RootElement.GetProperty("unavailable").GetString(), StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("sensitive target", Saved());
     }
 

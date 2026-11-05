@@ -37,11 +37,7 @@ public static partial class Diagnostics
         string[] secrets = DefaultSecrets().ToArray();
         var clean = CreateRedactor(secrets, login);
         string Clean(string text) => clean(text);
-        (string Text, bool Valid) CleanJson(string text)
-        {
-            string redacted = RedactJsonText(text, secrets, login, out bool valid);
-            return (redacted, valid);
-        }
+        string CleanJson(string text) => RedactJsonText(text, secrets, login, out _);
         string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
         string work = Directory.CreateTempSubdirectory("openxlr-diag-").FullName;
         if (!OperatingSystem.IsWindows())
@@ -56,7 +52,7 @@ public static partial class Diagnostics
             if (deepTrace)
             {
                 string trace = await CollectDeepTraceAsync(client);
-                await File.WriteAllTextAsync(Path.Combine(work, "deep-trace.json"), CleanJson(trace).Text);
+                await File.WriteAllTextAsync(Path.Combine(work, "deep-trace.json"), CleanJson(trace));
             }
             string osRelease = TryReadFile("/etc/os-release");
             var meta = new StringBuilder();
@@ -93,11 +89,11 @@ public static partial class Diagnostics
                 files or API token are collected. The home
                 path, the login name, the host name, the serial numbers of
                 attached USB devices (including inside PipeWire node names, but not a USB controller's PCI address) and
-                process-id fields are redacted, and so are browser tab titles
+                structured process-id fields are redacted, and so are browser tab titles
                 and the addresses of browser tabs not routed to a channel.
                 The audio graph and stream listings mask media names, tags,
                 URLs and process arguments. They retain executable basenames
-                and audio node names. Invalid audio JSON is omitted.
+                and audio node names. Invalid JSON is omitted.
                 Files in the archive carry no
                 owner name or id. Review the archive before attaching it to a
                 public issue.
@@ -115,10 +111,11 @@ public static partial class Diagnostics
             // Keep the saved state and its receive time from one observation.
             // The vendor blocks are a separate fresh query.
             await File.WriteAllTextAsync(Path.Combine(work, "daemon-state.json"),
-                CleanJson(StateForArchive(observation.Json)).Text);
+                CleanJson(StateForArchive(observation.Json)));
             var blocks = await client.RequestDiagnosticsAsync(TimeSpan.FromSeconds(5));
             await File.WriteAllTextAsync(Path.Combine(work, "device-blocks.json"),
-                RedactHex(blocks?.ToJsonString() ?? "unavailable (daemon not running or no device)", secrets));
+                blocks is null ? JsonOmission("No reply from the daemon.")
+                    : CleanJson(RedactHex(blocks.ToJsonString(), secrets)));
 
             await WritePluginDataAsync(client, work, TimeSpan.FromSeconds(15), login);
 
@@ -132,8 +129,8 @@ public static partial class Diagnostics
                 graph.Truncated,
                 graph.Streams,
             }, ReportJson);
-            await File.WriteAllTextAsync(Path.Combine(work, "audio-applications.json"), CleanJson(applications).Text);
-            await WriteSystemInfoAsync(work, observation, observedAt, osRelease, graph, text => CleanJson(text).Text);
+            await File.WriteAllTextAsync(Path.Combine(work, "audio-applications.json"), CleanJson(applications));
+            await WriteSystemInfoAsync(work, observation, observedAt, osRelease, graph, CleanJson);
             await Capture("pactl-info.txt", "pactl", "info");
             await Capture("wpctl-status.txt", "wpctl", "status");
             await Capture("sinks.txt", "pactl", "list", "short", "sinks");
@@ -157,8 +154,8 @@ public static partial class Diagnostics
 
             // Configs may include remembered application identities and device
             // names; redact common personal fields and disclose them above.
-            CopyRedactedIfExists(text => CleanJson(text).Text, UiSettings.ConfigDir, "mixer.json", work);
-            CopyRedactedIfExists(text => CleanJson(text).Text, UiSettings.ConfigDir, "ui.json", work);
+            CopyRedactedIfExists(CleanJson, UiSettings.ConfigDir, "mixer.json", work);
+            CopyRedactedIfExists(CleanJson, UiSettings.ConfigDir, "ui.json", work);
             return await WriteArchiveAsync(work, destination, stamp);
         }
         finally
@@ -259,7 +256,7 @@ public static partial class Diagnostics
     /// </summary>
     internal static string StateForArchive(string? state)
     {
-        if (state is null) return "no state received (daemon not running?)";
+        if (state is null) return JsonOmission("No daemon state was received.");
         JsonNode? node;
         try { node = JsonNode.Parse(state); }
         catch (JsonException) { return state; }
@@ -522,12 +519,14 @@ public static partial class Diagnostics
             valid = true;
             return data?.ToJsonString(ReportJson) ?? "null";
         }
-        catch (Exception ex) when (ex is JsonException or ArgumentException)
+        catch (Exception ex) when (ex is JsonException or ArgumentException or InvalidOperationException)
         {
             valid = false;
-            return Redact(text, secrets, login);
+            return JsonOmission("JSON could not be safely decoded.");
         }
     }
+
+    private static string JsonOmission(string reason) => JsonSerializer.Serialize(new { unavailable = reason }, ReportJson);
 
     private static async Task<AudioGraphSummary?> WriteCmd(Func<string, string> clean, string dir, string file, string exe, string[] args)
     {
@@ -948,16 +947,19 @@ public static partial class Diagnostics
     internal static void CopyRedactedIfExists(Func<string, string> clean, string dir, string file, string dest, int? maximum = null)
     {
         string src = Path.Combine(dir, file);
-        string text;
+        string text = "";
+        string? problem = null;
         try
         {
             if (new FileInfo(src).LinkTarget is not null)
-                text = "File unavailable: symbolic links are not collected.";
+                problem = "Symbolic links are not collected.";
             else if (!File.Exists(src)) return;
             else text = RegularFile.ReadText(src, maximum ?? OpenXlrPaths.MaxPreferenceBytes);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        { text = "File unavailable: " + ex.Message; }
+        { problem = ex.Message; }
+        if (problem is not null)
+            text = file.EndsWith(".json", StringComparison.Ordinal) ? JsonOmission(problem) : "File unavailable: " + problem;
         File.WriteAllText(Path.Combine(dest, file), clean(text));
     }
 }

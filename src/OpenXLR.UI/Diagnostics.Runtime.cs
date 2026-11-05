@@ -60,7 +60,7 @@ public static partial class Diagnostics
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or ArgumentException)
         {
             // A partial or undecodable string can hide private fields from a text redactor.
-            return ("""{"unavailable":"Audio helper output could not be safely decoded."}""", false, null);
+            return (JsonOmission("Audio helper output could not be safely decoded."), false, null);
         }
     }
 
