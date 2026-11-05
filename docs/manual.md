@@ -4426,6 +4426,11 @@ kernel it runs on. The file also lists the running PipeWire server version,
 the graph's sample rate and quantum settings, and the versions reported by
 the available PipeWire, WirePlumber, PulseAudio and ALSA tools. A version
 probe that fails leaves its outcome beside the tool's name.
+Its hardware section lists the interfaces the daemon detected and the
+primary unit's firmware when the device reports it. See
+`daemon-state.json` for the effective controls, mixer and profile state,
+`mixer.json` for the saved mixer layout and routing, and `ui.json` for
+window preferences.
 
 `audio-applications.json` lists playback and capture streams in the same
 PipeWire snapshot as `pw-dump.json`. It shows application names, executable
@@ -4435,6 +4440,26 @@ running. Internal audio links and meters are omitted from this summary.
 The summary reads the existing snapshot and collects no process list,
 command lines or media titles. It shows when the graph was unavailable and
 when the limit of 512 streams or 32 linked nodes per stream was reached.
+
+In **Options → Support**, select **Include Deep Trace** before collecting
+an archive to add `deep-trace.json`. This is a one-export choice. It lists
+the process names and counts visible to OpenXLR under your Linux user,
+including programs that have no audio streams. Names come from the kernel
+and may be shortened. It also records system RAM and swap totals and
+availability, and the window's and common audio processes' resident,
+peak, locked and swapped memory, thread counts and task state when
+available. Daemon processes are listed by name, so a daemon and its USB
+worker can both appear. A sandbox reports only what it can see, and a
+process that exits during collection can be missed. The snapshot examines
+at most 4,096 processes and reports when a limit is reached. It contains
+no process IDs, command lines, environment variables or memory contents.
+Review the process list before sharing the archive.
+
+Deep Trace also reports the saved daemon submixer preference and versions
+and commits from available OpenXLR and companion package receipts. A
+receipt describes a package on disk. Use `system-info.json` to identify
+the builds that were running. **Deep Wine trace for plugin scans** is a
+separate setting for reproducing Windows plugin scan failures.
 
 Configuration copies are limited to 4 MiB per file, the preference reader's
 limit. Symbolic links, non-regular files and files that cannot be read are

@@ -25,14 +25,14 @@ public static partial class Diagnostics
 {
     private static readonly JsonSerializerOptions ReportJson = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
-    public static Task<string> CollectAsync(DaemonClient client)
-        => CollectAsync(client, Environment.UserName, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+    public static Task<string> CollectAsync(DaemonClient client, bool deepTrace = false)
+        => CollectAsync(client, Environment.UserName, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), deepTrace);
 
     /// <summary>
     /// Collect into <paramref name="destination"/>, masking <paramref name="login"/>
     /// wherever it appears as a login name (see <see cref="Redact(string, IEnumerable{string}, string?)"/>).
     /// </summary>
-    internal static async Task<string> CollectAsync(DaemonClient client, string? login, string destination)
+    internal static async Task<string> CollectAsync(DaemonClient client, string? login, string destination, bool deepTrace = false)
     {
         string[] secrets = DefaultSecrets().ToArray();
         string Clean(string text) => Redact(text, secrets, login);
@@ -52,6 +52,11 @@ public static partial class Diagnostics
         {
             var observation = client.StateForDiagnostics;
             DateTimeOffset observedAt = DateTimeOffset.UtcNow;
+            if (deepTrace)
+            {
+                string trace = await Task.Run(CollectDeepTrace);
+                await File.WriteAllTextAsync(Path.Combine(work, "deep-trace.json"), CleanJson(trace).Text);
+            }
             string osRelease = TryReadFile("/etc/os-release");
             var meta = new StringBuilder();
             meta.AppendLine($"OpenXLR diagnostics {stamp}");
@@ -92,7 +97,15 @@ public static partial class Diagnostics
                 Files in the archive carry no
                 owner name or id. Review the archive before attaching it to a
                 public issue.
-                """);
+                """ + (deepTrace ? "\n\n" + """
+                Deep Trace was selected for this export. It also includes the
+                process names and counts visible to OpenXLR for this user, memory
+                totals for the system, and memory and thread counts for OpenXLR
+                and common audio services. Process names may reveal applications
+                unrelated to audio. The snapshot contains no process ids, command
+                lines, environment variables or memory contents. It also includes
+                saved daemon preferences and installed package build metadata.
+                """ : ""));
 
             // Keep the saved state and its receive time from one observation.
             // The vendor blocks are a separate fresh query.

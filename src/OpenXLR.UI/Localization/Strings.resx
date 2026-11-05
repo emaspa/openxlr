@@ -519,6 +519,12 @@
   <data name="DaemonVersionNote" xml:space="preserve">
     <value>The daemon is v{0}; this window is v{1}. Restart the daemon to run the installed version.</value>
   </data>
+  <data name="DeepDiagnostics" xml:space="preserve">
+    <value>Include Deep Trace</value>
+  </data>
+  <data name="DeepDiagnosticsHint" xml:space="preserve">
+    <value>Adds running program names and memory statistics to this export. Review the archive before sharing it.</value>
+  </data>
   <data name="DeepWineTraceForPluginScans" xml:space="preserve">
     <value>Deep Wine trace for plugin scans</value>
   </data>

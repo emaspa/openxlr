@@ -57,6 +57,22 @@ public static partial class Diagnostics
                 flatpak = FlatpakEnvironment.IsFlatpak,
             },
             audio = new { pipeWireServerVersion = graph.ServerVersion, graph.Clock, tools },
+            hardware = new
+            {
+                primary = daemon?["device"] is JsonObject device ? new
+                {
+                    vendor = Limited(Text(device, "vendor")),
+                    model = Limited(Text(device, "model")),
+                    usbId = Limited(Text(device, "usbId")),
+                    firmware = Limited(Text(device, "firmware")),
+                } : null,
+                detected = (daemon?["detected"] as JsonArray)?.OfType<JsonObject>().Take(64).Select(unit => new
+                {
+                    name = Limited(Text(unit, "name")),
+                    usbId = Limited(Text(unit, "usbId")),
+                    active = unit["active"] is JsonValue flag && flag.TryGetValue(out bool active) ? active : (bool?)null,
+                }).ToArray(),
+            },
         };
         await File.WriteAllTextAsync(Path.Combine(work, "system-info.json"), cleanJson(JsonSerializer.Serialize(report, ReportJson)));
     }

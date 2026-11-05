@@ -147,10 +147,13 @@ public partial class OptionsWindow : Window
         if (DataContext is not OptionsViewModel vm) return;
         var button = sender as Button;
         if (button is not null) button.IsEnabled = false;
+        bool deepTrace = DeepDiagnostics.IsChecked == true;
+        DeepDiagnostics.IsChecked = false;
+        DeepDiagnostics.IsEnabled = false;
         DiagStatus.Text = Localizer.Text("Collecting");
         try
         {
-            string path = await Diagnostics.CollectAsync(vm.Client);
+            string path = await Diagnostics.CollectAsync(vm.Client, deepTrace);
             DiagStatus.Text = Localizer.Format("DiagnosticsSavedTo", path);
         }
         catch (Exception ex)
@@ -159,6 +162,7 @@ public partial class OptionsWindow : Window
         }
         finally
         {
+            DeepDiagnostics.IsEnabled = true;
             if (button is not null) button.IsEnabled = true;
         }
     }

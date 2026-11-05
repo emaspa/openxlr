@@ -481,6 +481,7 @@ public sealed class DiagnosticsTests
         string output = Directory.CreateDirectory(Path.Combine(root, "output")).FullName;
         string? path = Environment.GetEnvironmentVariable("PATH");
         string? configHome = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
+        string? dataDirs = Environment.GetEnvironmentVariable("XDG_DATA_DIRS");
         try
         {
             ExecutableScript.Write(Path.Combine(bin, "uname"), $"echo 'Linux {machine} 6.18.0 #1 SMP x86_64 GNU/Linux'\n");
@@ -549,6 +550,19 @@ public sealed class DiagnosticsTests
             Directory.CreateDirectory(UiSettings.ConfigDir);
             File.WriteAllText(Path.Combine(UiSettings.ConfigDir, "ui.json"),
                 "{\"examplePath\":\"/home/" + login + "/capture\",\"numericValue\":1024}");
+            File.WriteAllText(Path.Combine(UiSettings.ConfigDir, "daemon.json"),
+                """{"submixer":true,"futureCredential":"never copy unknown preferences"}""");
+            string share = Path.Combine(root, "share");
+            string receipts = Directory.CreateDirectory(Path.Combine(share, "openxlr", "installations")).FullName;
+            string receiptPath = Path.Combine(receipts, "openxlr.json");
+            var receipt = new OpenXLR.UI.InstallationReceipt
+            {
+                Package = "openxlr", Manager = "arch", Version = "1.2.3-test", Prefix = root,
+                Commit = new string('b', 40), Files = [new() { Kind = "receipt", Path = receiptPath }],
+            };
+            File.WriteAllText(receiptPath, System.Text.Json.JsonSerializer.Serialize(receipt, OpenXLR.UI.InstallationReceipt.Json));
+            File.WriteAllText(Path.Combine(receipts, "openxlr-yabridge.json"), "malformed receipt with private marker");
+            Environment.SetEnvironmentVariable("XDG_DATA_DIRS", share);
 
             await using var server = await SocketTestServer.Start(async (socket, stop) =>
             {
@@ -556,6 +570,10 @@ public sealed class DiagnosticsTests
                 {
                     ["type"] = "state", ["note"] = $"/home/{login}/Music"
                 };
+                initial["device"] = new System.Text.Json.Nodes.JsonObject
+                    { ["vendor"] = "Elgato", ["model"] = "Wave:3", ["usbId"] = "0fd9:0070", ["firmware"] = "1.2.4" };
+                initial["detected"] = new System.Text.Json.Nodes.JsonArray(new System.Text.Json.Nodes.JsonObject
+                    { ["name"] = "Wave:3", ["usbId"] = "0fd9:0070", ["active"] = true });
                 if (commandWarning)
                 {
                     initial["daemonVersion"] = "0.2.3";
@@ -584,7 +602,7 @@ public sealed class DiagnosticsTests
             client.Start();
             await state.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-            string archive = await Diagnostics.CollectAsync(client, login, output);
+            string archive = await Diagnostics.CollectAsync(client, login, output, deepTrace: commandWarning);
 
             var entries = new Dictionary<string, string>();
             await using (var file = File.OpenRead(archive))
@@ -677,6 +695,11 @@ public sealed class DiagnosticsTests
             var pactl = Assert.Single(runtimeAudio.GetProperty("tools").EnumerateArray(),
                 tool => tool.GetProperty("tool").GetString() == "pactl");
             Assert.Equal("pactl fixture 17.0", pactl.GetProperty("version").GetString());
+            var hardware = runtime.RootElement.GetProperty("hardware");
+            Assert.Equal("1.2.4", hardware.GetProperty("primary").GetProperty("firmware").GetString());
+            var unit = Assert.Single(hardware.GetProperty("detected").EnumerateArray());
+            Assert.Equal("0fd9:0070", unit.GetProperty("usbId").GetString());
+            Assert.True(unit.GetProperty("active").GetBoolean());
             using var applications = System.Text.Json.JsonDocument.Parse(entries["audio-applications.json"]);
             Assert.True(applications.RootElement.GetProperty("available").GetBoolean());
             var playback = Assert.Single(applications.RootElement.GetProperty("streams").EnumerateArray());
@@ -691,6 +714,20 @@ public sealed class DiagnosticsTests
             {
                 Assert.Contains("exited with status 7", entries["source-outputs-errors.txt"]);
                 Assert.Contains("did not return complete valid JSON", entries["source-outputs-errors.txt"]);
+                using var deep = System.Text.Json.JsonDocument.Parse(entries["deep-trace.json"]);
+                Assert.True(deep.RootElement.GetProperty("savedDaemonPreferences").GetProperty("submixer").GetBoolean());
+                var installed = Assert.Single(deep.RootElement.GetProperty("installedBuilds").EnumerateArray(),
+                    build => build.GetProperty("version").GetString() == receipt.Version);
+                Assert.Equal(receipt.Commit, installed.GetProperty("commit").GetString());
+                Assert.False(installed.TryGetProperty("prefix", out _));
+                Assert.DoesNotContain("malformed receipt with private marker", entries["deep-trace.json"]);
+                Assert.DoesNotContain("never copy unknown preferences", entries["deep-trace.json"]);
+                Assert.Contains("Deep Trace was selected", entries["PRIVACY.txt"]);
+            }
+            else
+            {
+                Assert.DoesNotContain("deep-trace.json", entries.Keys);
+                Assert.DoesNotContain("Deep Trace was selected", entries["PRIVACY.txt"]);
             }
             Assert.Contains("login name", entries["PRIVACY.txt"]);
             Assert.Contains("audio-server", entries["PRIVACY.txt"]);
@@ -700,6 +737,7 @@ public sealed class DiagnosticsTests
         {
             Environment.SetEnvironmentVariable("PATH", path);
             Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", configHome);
+            Environment.SetEnvironmentVariable("XDG_DATA_DIRS", dataDirs);
             Directory.Delete(root, recursive: true);
         }
     }
