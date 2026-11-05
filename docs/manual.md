@@ -716,33 +716,8 @@ To use **Monitor C** instead, open **SUBMIXER → Edit layout**. Under
 Tick Monitor C in the headset's feed picker before unticking its old
 feed. A new mix starts silent until you open its sends.
 
-**Check that the output reconnects.** At a low listening level, play a
-sound through an app already assigned to an OpenXLR channel. Open that
-channel's send to Monitor B and mute its send to Monitor A for the test.
-Verify that the test sound plays only in the second headset, then
-disconnect it while playback continues. Leave it ticked when it appears as
-**(not connected)**. On reconnect, the same PipeWire playback device
-should resume the saved feed on the next sweep. Check **Flow** and confirm
-the app still shows the same channel under **APPLICATIONS**. Restore any
-send mutes you changed for the test.
-
-For a USB headset with an input-only card profile, you can also exercise
-playback-node recovery with the receiver still plugged in. Find its
-card name, active profile and input-only profile in `pactl list cards`.
-Use those values for the shell variables below. The sink listing should
-show the playback node disappear and return, and the last command should
-show its restored mix links.
-
-```sh
-pactl set-card-profile "$card" "$input_only_profile"
-pactl list short sinks
-pactl set-card-profile "$card" "$original_profile"
-pactl list short sinks
-pw-link -l
-```
-
-If a different profile exposes a different playback device, select its
-entry and set its feed.
+If the headset disconnects, leave it ticked. It shows as **(not
+connected)** and gets its feed back when it returns.
 
 <a name="ducking"></a>
 #### Lower what you hear while you speak
