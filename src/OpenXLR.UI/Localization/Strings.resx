@@ -4267,4 +4267,104 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
   <data name="TextSizeMuchLarger" xml:space="preserve">
     <value>Much larger (120%)</value>
   </data>
+  <data name="GuideAppearanceBody" xml:space="preserve">
+    <value>Options → Appearance changes the skin, text size, control sizing and mixer view. Touch sizing makes controls easier to grab. Use Arrange in the header to change where sections sit.
+
+Use the pop-out button in the mixer header to move the mixer into its own window. The mixer size picker there can fit the panel to that window.</value>
+  </data>
+  <data name="GuideAppearanceTitle" xml:space="preserve">
+    <value>Make the mixer fit your desk</value>
+  </data>
+  <data name="GuideBack" xml:space="preserve">
+    <value>Back</value>
+  </data>
+  <data name="GuideEffectsBody" xml:space="preserve">
+    <value>Open EQ on the microphone strip to shape its sound. Use the microphone's processing controls for features such as noise removal, or use FX on a channel or mix to manage plugin inserts. Options → Plugins shows installed plugin locations and rescan controls.
+
+Save a named profile in the header when you have a setup you want to recall, for example one for calls and one for streaming.</value>
+  </data>
+  <data name="GuideEffectsTitle" xml:space="preserve">
+    <value>Shape the sound and save a profile</value>
+  </data>
+  <data name="GuideFinish" xml:space="preserve">
+    <value>Finish</value>
+  </data>
+  <data name="GuideHelpBody" xml:space="preserve">
+    <value>If the header says the daemon is not running, check the installation. For a native package, check the OpenXLR user service. For Flatpak, follow the Flatpak startup steps in the manual. If the mixer works but you hear nothing, check the selected monitor device, its feed, and the mutes on the channel and mix.
+
+Use the Manual button on any step for details. Options → Support has this guide and Collect diagnostics, which saves an archive you can attach to a GitHub issue.</value>
+  </data>
+  <data name="GuideHelpTitle" xml:space="preserve">
+    <value>Find help when something is missing</value>
+  </data>
+  <data name="GuideMicBody" xml:space="preserve">
+    <value>The header shows the connected Elgato interface. If a supported interface is missing after installation, unplug it and plug it back in once.
+
+For a USB headset, webcam or other microphone, open Options → Audio → Input bindings and choose the source for XLR 1. You can also use the microphone link in the header when no Elgato interface is attached. Speak and check that the input meter moves. Open Mic setup on the microphone strip to check the level and compare raw and processed sound.</value>
+  </data>
+  <data name="GuideMicTitle" xml:space="preserve">
+    <value>Connect and check your microphone</value>
+  </data>
+  <data name="GuideMixerBody" xml:space="preserve">
+    <value>A channel carries a source such as Game, Music or your microphone. A mix combines channels for one destination. The fader for a channel in Monitor A changes what you hear. The fader for the same channel in Stream changes what goes to the stream.
+
+Play audio from an app, then find it in Applications and pick a channel. Manage opens automatic routing rules. You can also choose an OpenXLR channel as the app's output in your desktop sound settings. Flow in the header shows where the audio goes.</value>
+  </data>
+  <data name="GuideMixerTitle" xml:space="preserve">
+    <value>Route apps and adjust each mix</value>
+  </data>
+  <data name="GuideMonitorBody" xml:space="preserve">
+    <value>Open Devices in the Monitor section and tick the headphones or speakers you want to hear. Choose Monitor A as their feed to get started. Play some audio and turn the monitor volume up slowly.
+
+Monitor A and Monitor B can carry different blends. Select a feed for each output when you want your speakers and headphones to hear different things.</value>
+  </data>
+  <data name="GuideMonitorTitle" xml:space="preserve">
+    <value>Hear the mixer in your headphones</value>
+  </data>
+  <data name="GuideNext" xml:space="preserve">
+    <value>Next</value>
+  </data>
+  <data name="GuideOpenAppearance" xml:space="preserve">
+    <value>Open appearance options</value>
+  </data>
+  <data name="GuideOpenAudio" xml:space="preserve">
+    <value>Open audio options</value>
+  </data>
+  <data name="GuideOpenDefaults" xml:space="preserve">
+    <value>Open default devices</value>
+  </data>
+  <data name="GuideOpenMixer" xml:space="preserve">
+    <value>Show mixer</value>
+  </data>
+  <data name="GuideOpenMonitor" xml:space="preserve">
+    <value>Show monitoring</value>
+  </data>
+  <data name="GuideOpenSupport" xml:space="preserve">
+    <value>Open support options</value>
+  </data>
+  <data name="GuideSkip" xml:space="preserve">
+    <value>Skip guide</value>
+  </data>
+  <data name="GuideStep" xml:space="preserve">
+    <value>Step {0} of {1}</value>
+  </data>
+  <data name="GuideVirtualBody" xml:space="preserve">
+    <value>Choose OpenXLR Stream as the audio input in OBS or a recording app. In Discord, Zoom or another call app, choose OpenXLR Chat as the microphone. Use the Stream and Chat faders in OpenXLR to control what each app receives.
+
+If the call plays into the Voice Chat channel, mute its send to the Chat mix so callers do not hear themselves. You can choose system-wide input and output devices separately in Options.</value>
+  </data>
+  <data name="GuideVirtualTitle" xml:space="preserve">
+    <value>Send audio to OBS or a call</value>
+  </data>
+  <data name="GuideWelcomeBody" xml:space="preserve">
+    <value>OpenXLR lets you choose what you hear, what callers hear, and what goes to a stream. It works with any microphone or headset that PipeWire can see. Supported Elgato interfaces also get their own gain, mute and headphone controls.
+
+The mixer runs in an audio service. This window shows its state and lets you change it. You can use the mixer while reading the guide, or find this guide again under Options → Support.</value>
+  </data>
+  <data name="GuideWelcomeTitle" xml:space="preserve">
+    <value>Welcome to OpenXLR</value>
+  </data>
+  <data name="WelcomeGuide" xml:space="preserve">
+    <value>Welcome guide</value>
+  </data>
 </root>

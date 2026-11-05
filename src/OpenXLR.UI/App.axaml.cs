@@ -21,6 +21,8 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            bool showWelcomeGuide = UiSettings.PrepareWelcomeGuide();
+
             // An earlier version wrote a user unit with a build-tree path on
             // packaged installs; fix it before the user has to notice.
             if (!FlatpakEnvironment.IsFlatpak && UiSettings.Load().StartDaemonAtLogin)
@@ -32,7 +34,7 @@ public partial class App : Application
             // kept, and Options reports anything the user should know.
             if (!FlatpakEnvironment.IsFlatpak) StartupIntegration.RepairWindowAutostart();
 
-            var window = new MainWindow();
+            var window = new MainWindow(new DaemonClient(), syncDesktopVolume: true, showWelcomeGuide: showWelcomeGuide);
             // A later launch asks for the window through the single-instance
             // socket: bring it up, from the tray or from behind other windows.
             if (Program.Instance is { } instance)

@@ -37,7 +37,7 @@ public partial class MainWindow : Window
     /// so a developer's running daemon is not part of the test. They also
     /// leave the desktop's volume range alone.
     /// </summary>
-    internal MainWindow(DaemonClient client, bool syncDesktopVolume = false)
+    internal MainWindow(DaemonClient client, bool syncDesktopVolume = false, bool showWelcomeGuide = false)
     {
         _client = client;
         InitializeComponent();
@@ -106,6 +106,7 @@ public partial class MainWindow : Window
                     else await Dialogs.ConfirmAsync(this, "OpenXLR Flatpak", problem, Localizer.Text("Close"));
                 }
             }
+            if (showWelcomeGuide && IsVisible && !_reallyExit) OpenWelcomeGuide(firstLaunch: true);
             await _vm.Updates.CheckAsync(manual: false, cancellation: _lifetime.Token);
         };
 
@@ -317,7 +318,9 @@ public partial class MainWindow : Window
     private OptionsWindow? _options;
 
     /// <summary>One owned Options window, leaving the mixer available while settings are changed.</summary>
-    private void OnOptions(object? sender, RoutedEventArgs e)
+    private void OnOptions(object? sender, RoutedEventArgs e) => OpenOptions();
+
+    internal OptionsWindow OpenOptions()
     {
         if (_options is { } open)
         {
@@ -325,12 +328,14 @@ public partial class MainWindow : Window
             if (!open.IsVisible) open.Show(this);
             if (open.WindowState == WindowState.Minimized) open.WindowState = WindowState.Normal;
             open.Activate();
-            return;
+            return open;
         }
         var window = new OptionsWindow(new OptionsViewModel(_client, _vm) { ResetArrangement = ResetSkinArrangement }, _desktopKeys);
         _options = window;
+        window.WelcomeGuideRequested += () => OpenWelcomeGuide();
         window.Closed += (_, _) => { if (_options == window) _options = null; };
         window.Show(this);
+        return window;
     }
 
     private void OnManageApps(object? sender, RoutedEventArgs e)

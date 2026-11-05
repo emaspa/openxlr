@@ -74,7 +74,7 @@
 
     <Border Classes="card">
       <StackPanel Spacing="6">
-        <TextBlock Text="{loc:Text Key=AUDIO}" Classes="h"/>
+        <TextBlock Name="GuideAudio" Text="{loc:Text Key=AUDIO}" Classes="h"/>
         <CheckBox Content="{loc:Text Key=EnableSoftwareMixer}"
                   IsChecked="{Binding Submixer, Mode=TwoWay}"
                   IsEnabled="{Binding Main.DaemonRestart.CanRestart}"
@@ -164,7 +164,7 @@
 
     <Border Classes="card">
       <StackPanel Spacing="6">
-        <TextBlock Text="{loc:Text Key=SYSTEMDEFAULTDEVICES}" Classes="h"/>
+        <TextBlock Name="GuideDefaults" Text="{loc:Text Key=SYSTEMDEFAULTDEVICES}" Classes="h"/>
         <TextBlock Text="{loc:Text Key=WhenSetOpenXLRHoldsTheseAsTheSystem}"
                    FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
 
@@ -296,7 +296,7 @@
 
     <Border Classes="card">
       <StackPanel Spacing="6">
-        <TextBlock Text="{loc:Text Key=APPEARANCE}" Classes="h"/>
+        <TextBlock Name="GuideAppearance" Text="{loc:Text Key=APPEARANCE}" Classes="h"/>
         <Grid ColumnDefinitions="Auto,*,Auto">
           <TextBlock Text="{loc:Text Key=Skin}" Classes="h" MinWidth="{DynamicResource UiText.Width110}" VerticalAlignment="Center"/>
           <ComboBox Name="SkinPicker" Grid.Column="1" HorizontalAlignment="Stretch"
@@ -415,7 +415,9 @@
 
     <Border Classes="card">
       <StackPanel Spacing="6">
-        <TextBlock Text="{loc:Text Key=SUPPORT}" Classes="h"/>
+        <TextBlock Name="GuideSupport" Text="{loc:Text Key=SUPPORT}" Classes="h"/>
+        <Button Name="WelcomeGuideButton" Content="{loc:Text Key=WelcomeGuide}" Padding="14,5"
+                HorizontalAlignment="Left" Click="OnWelcomeGuide"/>
         <CheckBox Name="WineTrace" Content="{loc:Text Key=DeepWineTraceForPluginScans}"
                   IsChecked="{Binding PluginWineTrace, Mode=OneWay}"
                   IsEnabled="{Binding CanSetPluginWineTrace}" Click="OnPluginWineTrace"/>

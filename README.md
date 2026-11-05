@@ -130,6 +130,10 @@ feature or the active monitor output.
 
 ## Install
 
+After installing, follow [Getting started](docs/getting-started.md) to
+connect a microphone, choose a listening output and route your first app.
+The graphical mixer also opens a welcome guide on a clean first launch.
+
 Packages exist for Arch Linux, CachyOS and Omarchy (AUR), Ubuntu (PPA),
 Fedora (COPR) and NixOS (flake). Every release also carries a `.deb` and
 an `.rpm`, with SHA-256 checksums and a build provenance attestation

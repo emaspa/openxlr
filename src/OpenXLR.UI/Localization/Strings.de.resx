@@ -3931,4 +3931,104 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="TextSizeMuchLarger" xml:space="preserve">
     <value>Viel größer (120 %)</value>
   </data>
+  <data name="GuideAppearanceBody" xml:space="preserve">
+    <value>Unter Optionen → Darstellung änderst du Skin, Schriftgröße, Bedienelemente und Mixer-Ansicht. Im Touch-Modus lassen sich die Regler leichter greifen. Über Anordnen in der Kopfzeile verschiebst du die Bereiche.
+
+Über die Schaltfläche zum Abdocken in der Mixer-Kopfzeile öffnest du den Mixer in einem eigenen Fenster. Dort kannst du seine Größe an das Fenster anpassen.</value>
+  </data>
+  <data name="GuideAppearanceTitle" xml:space="preserve">
+    <value>Den Mixer an deinen Arbeitsplatz anpassen</value>
+  </data>
+  <data name="GuideBack" xml:space="preserve">
+    <value>Zurück</value>
+  </data>
+  <data name="GuideEffectsBody" xml:space="preserve">
+    <value>Öffne den EQ am Mikrofonkanal, um den Klang anzupassen. In den Mikrofon-Einstellungen findest du Funktionen wie Rauschunterdrückung. Über FX an einem Kanal oder einer Mischung verwaltest du die Effektkette. Unter Optionen → Plugins findest du die Plugin-Verzeichnisse und kannst sie neu einlesen.
+
+Speichere über die Kopfzeile ein benanntes Profil, wenn du deine Einstellungen später wieder abrufen möchtest, etwa je eines für Anrufe und Streaming.</value>
+  </data>
+  <data name="GuideEffectsTitle" xml:space="preserve">
+    <value>Klang bearbeiten und Profil speichern</value>
+  </data>
+  <data name="GuideFinish" xml:space="preserve">
+    <value>Fertig</value>
+  </data>
+  <data name="GuideHelpBody" xml:space="preserve">
+    <value>Wenn die Kopfzeile meldet, dass der Audiodienst nicht läuft, prüfe die Installation. Bei einem nativen Paket prüfst du den OpenXLR-Benutzerdienst. Für Flatpak findest du die Startanleitung im Handbuch. Wenn der Mixer läuft, du aber nichts hörst, prüfe das Abhörgerät, seine Signalquelle und die Stummschaltung von Kanal und Mischung.
+
+Über Handbuch findest du zu jedem Schritt weitere Details. Unter Optionen → Hilfe findest du diese Einführung und kannst ein Diagnosearchiv für einen GitHub-Fehlerbericht speichern.</value>
+  </data>
+  <data name="GuideHelpTitle" xml:space="preserve">
+    <value>Hilfe finden, wenn etwas fehlt</value>
+  </data>
+  <data name="GuideMicBody" xml:space="preserve">
+    <value>In der Kopfzeile steht das verbundene Elgato-Gerät. Wenn ein unterstütztes Gerät nach der Installation fehlt, zieh es einmal ab und steck es wieder ein.
+
+Für ein USB-Headset, eine Webcam oder ein anderes Mikrofon wählst du unter Optionen → Audio → Eingangszuordnung die Quelle für XLR 1. Ohne Elgato-Gerät findest du dafür auch einen Link in der Kopfzeile. Sprich ins Mikrofon und prüfe den Eingangspegel. Im Mikrofon-Setup kannst du den Pegel prüfen und den unbearbeiteten mit dem bearbeiteten Klang vergleichen.</value>
+  </data>
+  <data name="GuideMicTitle" xml:space="preserve">
+    <value>Mikrofon anschließen und prüfen</value>
+  </data>
+  <data name="GuideMixerBody" xml:space="preserve">
+    <value>Ein Kanal führt eine Quelle wie Game, Music oder dein Mikrofon. Eine Mischung fasst Kanäle für ein Ziel zusammen. Der Kanalregler in Monitor A bestimmt, was du hörst. Der Regler für denselben Kanal in Stream bestimmt, was im Stream ankommt.
+
+Starte die Wiedergabe in einer App, suche sie unter Anwendungen und wähle einen Kanal. Über Verwalten findest du die Regeln für die automatische Zuweisung. Du kannst einen OpenXLR-Kanal auch in den Audioeinstellungen des Desktops als App-Ausgang wählen. Über den Signalfluss in der Kopfzeile siehst du, wohin der Ton geht.</value>
+  </data>
+  <data name="GuideMixerTitle" xml:space="preserve">
+    <value>Apps zuweisen und Mischungen einstellen</value>
+  </data>
+  <data name="GuideMonitorBody" xml:space="preserve">
+    <value>Öffne Geräte im Bereich Monitor und wähle deine Kopfhörer oder Lautsprecher aus. Wähle für den Einstieg Monitor A als Signalquelle. Starte eine Audiowiedergabe und erhöhe langsam die Abhörlautstärke.
+
+Monitor A und Monitor B können unterschiedlich gemischt werden. Wähle für jeden Ausgang eine eigene Signalquelle, wenn du auf Lautsprechern und Kopfhörern Unterschiedliches hören möchtest.</value>
+  </data>
+  <data name="GuideMonitorTitle" xml:space="preserve">
+    <value>Den Mixer im Kopfhörer hören</value>
+  </data>
+  <data name="GuideNext" xml:space="preserve">
+    <value>Weiter</value>
+  </data>
+  <data name="GuideOpenAppearance" xml:space="preserve">
+    <value>Darstellung öffnen</value>
+  </data>
+  <data name="GuideOpenAudio" xml:space="preserve">
+    <value>Audio-Optionen öffnen</value>
+  </data>
+  <data name="GuideOpenDefaults" xml:space="preserve">
+    <value>Standardgeräte öffnen</value>
+  </data>
+  <data name="GuideOpenMixer" xml:space="preserve">
+    <value>Mixer zeigen</value>
+  </data>
+  <data name="GuideOpenMonitor" xml:space="preserve">
+    <value>Abhörbereich zeigen</value>
+  </data>
+  <data name="GuideOpenSupport" xml:space="preserve">
+    <value>Hilfe-Optionen öffnen</value>
+  </data>
+  <data name="GuideSkip" xml:space="preserve">
+    <value>Einführung überspringen</value>
+  </data>
+  <data name="GuideStep" xml:space="preserve">
+    <value>Schritt {0} von {1}</value>
+  </data>
+  <data name="GuideVirtualBody" xml:space="preserve">
+    <value>Wähle in OBS oder einer Aufnahme-App OpenXLR Stream als Audioeingang. In Discord, Zoom oder einer anderen Anruf-App wählst du OpenXLR Chat als Mikrofon. Über die Regler in Stream und Chat stellst du ein, was die jeweilige App empfängt.
+
+Wenn der Anruf über den Kanal Voice Chat läuft, schalte dessen Signal für die Chat-Mischung stumm, damit Gesprächspartner sich nicht selbst hören. Die systemweiten Ein- und Ausgabegeräte kannst du separat in den Optionen wählen.</value>
+  </data>
+  <data name="GuideVirtualTitle" xml:space="preserve">
+    <value>Ton an OBS oder einen Anruf senden</value>
+  </data>
+  <data name="GuideWelcomeBody" xml:space="preserve">
+    <value>Mit OpenXLR stellst du ein, was du selbst, deine Gesprächspartner und dein Stream hören. Es funktioniert mit jedem Mikrofon oder Headset, das PipeWire erkennt. Bei unterstützten Elgato-Geräten kommen Regler für Eingangsverstärkung, Stummschaltung und Kopfhörer hinzu.
+
+Der Mixer läuft in einem Audiodienst. Die App zeigt den aktuellen Zustand an und lässt dich Einstellungen ändern. Du kannst den Mixer während der Einführung benutzen. Unter Optionen → Hilfe findest du die Einführung jederzeit wieder.</value>
+  </data>
+  <data name="GuideWelcomeTitle" xml:space="preserve">
+    <value>Willkommen bei OpenXLR</value>
+  </data>
+  <data name="WelcomeGuide" xml:space="preserve">
+    <value>Einführung</value>
+  </data>
 </root>
