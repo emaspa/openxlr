@@ -40,6 +40,12 @@ public partial class MainWindow
         }, DispatcherPriority.Loaded);
     }
 
+    internal void ShowGuideApplications()
+    {
+        ShowMixer();
+        RevealGuideSection(ApplicationsTile);
+    }
+
     internal void ShowGuideMixer()
     {
         ShowMixer();

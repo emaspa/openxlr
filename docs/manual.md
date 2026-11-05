@@ -20,8 +20,8 @@ keeps working when sections are renumbered.
 Start with [Getting started](getting-started.md) for the installation and
 first audio checks. The **Welcome guide** opens when the mixer window is
 first shown with a fresh UI configuration. It covers the microphone,
-monitoring, application routing, virtual microphones, processing, mixer
-appearance and support. Its shortcuts open the relevant mixer or Options
+monitoring, application routing, mixes, virtual microphones, processing,
+profiles, appearance, startup and support. Its shortcuts open the relevant mixer or Options
 section. The Monitor and docked submixer shortcuts unfold their sections
 when they are collapsed. You can use the controls while the guide stays
 open.
@@ -29,7 +29,8 @@ open.
 **Finish**, **Skip guide**, or closing the guide dismisses the automatic
 welcome. Quitting the app while the welcome is open leaves it pending for
 the next launch. A trip to the tray keeps your place in the open guide.
-An existing UI configuration keeps its normal startup.
+OpenXLR remembers completion in the UI settings across app updates. An
+existing UI configuration keeps its normal startup.
 Open **Options → Support → Welcome guide** to repeat the tour at any time.
 
 OpenXLR is two programs. The daemon (`openxlr-daemon`, a systemd user

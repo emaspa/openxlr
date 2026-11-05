@@ -73,7 +73,9 @@ internal static class WelcomeGuideWindowTests
                     .Invoke(main.DataContext, [JsonNode.Parse("""{"mixes":[],"channels":[]}""")]);
                 var monitor = main.FindControl<Expander>("MonitorTile")!;
                 var submixer = main.FindControl<Expander>("SubmixerTile")!;
+                var applications = main.FindControl<Expander>("ApplicationsTile")!;
                 monitor.IsExpanded = false;
+                applications.IsExpanded = false;
                 submixer.IsExpanded = false;
                 Settle(main);
 
@@ -82,15 +84,21 @@ internal static class WelcomeGuideWindowTests
                 Assert.True(monitor.IsExpanded);
                 Click(next);
                 Click(action);
+                Assert.True(applications.IsExpanded);
+                Click(next);
+                Click(action);
                 Assert.True(submixer.IsExpanded);
                 while (progress.Value > 1) Click(back);
                 Assert.Equal(1, progress.Value);
                 Assert.False(back.IsEnabled);
 
+                var discord = guide.FindControl<Button>("GuideDiscord")!;
+                Assert.Equal(11, progress.Maximum);
                 for (int step = 1; step <= progress.Maximum; step++)
                 {
                     Settle(guide);
                     Assert.Equal(step, progress.Value);
+                    Assert.Equal(step == progress.Maximum, discord.IsVisible);
                     AssertInside(next, guide);
                     AssertInside(skip, guide);
                     Capture(guide, $"welcome-guide-{step}");
@@ -105,6 +113,7 @@ internal static class WelcomeGuideWindowTests
                 Assert.True(UiSettings.Load().ShowHiddenItems);
                 Assert.False(UiSettings.PrepareWelcomeGuide());
 
+                Assert.Equal(Localizer.Text("DiscordCommunity"), discord.Content);
                 Click(reopen);
                 var replay = Assert.Single(main.OwnedWindows.OfType<WelcomeGuideWindow>());
                 Assert.NotSame(guide, replay);

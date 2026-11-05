@@ -9,9 +9,11 @@ namespace OpenXLR.UI;
 /// <summary>A modeless guide so the mixer stays usable while the user follows a step.</summary>
 public partial class WelcomeGuideWindow : Window
 {
+    private const string DiscordInvite = "https://discord.gg/4GwWqUbTdN";
     private const string Manual = "https://github.com/emaspa/openxlr/blob/main/docs/manual.md#";
 
-    private sealed record Page(string Title, string Body, string ManualAnchor, string? ActionTitle = null, Action<MainWindow>? Open = null);
+    private sealed record Page(string Title, string Body, string ManualAnchor, string? ActionTitle = null,
+        Action<MainWindow>? Open = null, bool ShowCommunity = false);
 
     private readonly Page[] _pages;
     private int _step;
@@ -26,15 +28,20 @@ public partial class WelcomeGuideWindow : Window
                 Localizer.Text("GuideOpenAudio"), owner => owner.OpenOptions().ShowGuideSection("GuideAudio")),
             new(Localizer.Text("GuideMonitorTitle"), Localizer.Text("GuideMonitorBody"), "monitor",
                 Localizer.Text("GuideOpenMonitor"), owner => owner.ShowGuideMonitor()),
+            new(Localizer.Text("GuideAppsTitle"), Localizer.Text("GuideAppsBody"), "apps",
+                Localizer.Text("GuideOpenApps"), owner => owner.ShowGuideApplications()),
             new(Localizer.Text("GuideMixerTitle"), Localizer.Text("GuideMixerBody"), "concepts",
                 Localizer.Text("GuideOpenMixer"), owner => owner.ShowGuideMixer()),
             new(Localizer.Text("GuideVirtualTitle"), Localizer.Text("GuideVirtualBody"), "default-devices",
                 Localizer.Text("GuideOpenDefaults"), owner => owner.OpenOptions().ShowGuideSection("GuideDefaults")),
             new(Localizer.Text("GuideEffectsTitle"), Localizer.Text("GuideEffectsBody"), "plugins"),
+            new(Localizer.Text("GuideProfilesTitle"), Localizer.Text("GuideProfilesBody"), "profiles"),
             new(Localizer.Text("GuideAppearanceTitle"), Localizer.Text("GuideAppearanceBody"), "skins",
                 Localizer.Text("GuideOpenAppearance"), owner => owner.OpenOptions().ShowGuideSection("GuideAppearance")),
+            new(Localizer.Text("GuideStartupTitle"), Localizer.Text("GuideStartupBody"), "autostart",
+                Localizer.Text("GuideOpenStartup"), owner => owner.OpenOptions().ShowGuideSection("GuideStartup")),
             new(Localizer.Text("GuideHelpTitle"), Localizer.Text("GuideHelpBody"), "troubleshooting",
-                Localizer.Text("GuideOpenSupport"), owner => owner.OpenOptions().ShowGuideSection("GuideSupport")),
+                Localizer.Text("GuideOpenSupport"), owner => owner.OpenOptions().ShowGuideSection("GuideSupport"), ShowCommunity: true),
         ];
         GuideProgress.Maximum = _pages.Length;
         ShowStep();
@@ -62,6 +69,7 @@ public partial class WelcomeGuideWindow : Window
         GuideBody.Text = Current.Body;
         GuideAction.IsVisible = Current.Open is not null;
         GuideActionText.Text = Current.ActionTitle;
+        GuideDiscord.IsVisible = Current.ShowCommunity;
         GuideBack.IsEnabled = _step > 0;
         GuideNext.Content = _step == _pages.Length - 1 ? Localizer.Text("GuideFinish") : Localizer.Text("GuideNext");
         GuideScroll.Offset = default;
@@ -86,5 +94,6 @@ public partial class WelcomeGuideWindow : Window
         if (Owner is MainWindow owner) Current.Open?.Invoke(owner);
     }
     private void OnManual(object? sender, RoutedEventArgs e) => ExternalLink.Open(Manual + Current.ManualAnchor);
+    private void OnDiscord(object? sender, RoutedEventArgs e) => ExternalLink.Open(DiscordInvite);
     private void OnClose(object? sender, RoutedEventArgs e) => Close();
 }

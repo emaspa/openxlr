@@ -19,6 +19,7 @@
             <Button Name="GuideAction" Click="OnAction" Padding="12,6">
               <TextBlock Name="GuideActionText" TextWrapping="Wrap"/>
             </Button>
+            <Button Name="GuideDiscord" Content="{loc:Text Key=DiscordCommunity}" Click="OnDiscord" Padding="12,6"/>
             <Button Name="GuideManual" Content="{loc:Text Key=Manual}" Click="OnManual" Padding="12,6"/>
           </WrapPanel>
         </StackPanel>

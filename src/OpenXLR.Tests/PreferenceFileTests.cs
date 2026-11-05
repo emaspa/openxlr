@@ -49,6 +49,7 @@ public sealed class PreferenceFileTests : IDisposable
 
     [Theory]
     [InlineData("""{"startMinimized":true,"futureSetting":13}""")]
+    [InlineData("""{"welcomeGuideCompleted":true,"dismissedUpdate":"0.1.0","futureSetting":13}""")]
     [InlineData("""{"startMinimized":""")]
     public void WelcomeGuideDoesNotTreatExistingPreferencesAsAFirstLaunch(string text)
     {

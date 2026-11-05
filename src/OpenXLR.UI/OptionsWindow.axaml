@@ -34,7 +34,7 @@
 
     <Border Classes="card">
       <StackPanel Spacing="6">
-        <TextBlock Text="{loc:Text Key=ATLOGIN}" Classes="h"/>
+        <TextBlock Name="GuideStartup" Text="{loc:Text Key=ATLOGIN}" Classes="h"/>
         <CheckBox Content="{loc:Text Key=StartAudioInTheBackground}"
                   IsEnabled="{Binding CanConfigureStartup}"
                   IsChecked="{Binding StartDaemonAtLogin, Mode=TwoWay}"/>
