@@ -1169,7 +1169,10 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   headroom left; the packages raise that limit with a systemd drop-in.
   It also holds every sink it created at full volume and unmuted, since
   a desktop applet or the session manager can turn one down and quietly
-  cut the mixes it feeds
+  cut the mixes it feeds. A WirePlumber restart needs no daemon restart:
+  WirePlumber links what names a target again, the sweep links the
+  devices as after a replug, and a channel whose send stream ended or was
+  left unlinked has its sink reloaded, at most three times in ten minutes
 - Text size: five settings from 80% to 120% in Options under Appearance.
   The change reaches open windows immediately and is saved in `ui.json`.
 - Skins: every surface, label, indicator, meter, fader and control in the
