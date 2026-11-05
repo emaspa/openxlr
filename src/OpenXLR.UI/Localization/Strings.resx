@@ -3405,6 +3405,12 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
   <data name="MicSetupPresetClearTip" xml:space="preserve">
     <value>Low cut at 80 Hz, a little less boxiness around 300 Hz and a small lift for presence and air.</value>
   </data>
+  <data name="MicSetupPresetVoiceBoost" xml:space="preserve">
+    <value>Voice Boost</value>
+  </data>
+  <data name="MicSetupPresetVoiceBoostTip" xml:space="preserve">
+    <value>Reduce rumble and low mids and bring speech forward.</value>
+  </data>
   <data name="MicSetupPresetWarm" xml:space="preserve">
     <value>Warm</value>
   </data>

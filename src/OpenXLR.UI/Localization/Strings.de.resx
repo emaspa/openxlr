@@ -3931,4 +3931,10 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="TextSizeMuchLarger" xml:space="preserve">
     <value>Viel größer (120 %)</value>
   </data>
+  <data name="MicSetupPresetVoiceBoost" xml:space="preserve">
+    <value>Stimme hervorheben</value>
+  </data>
+  <data name="MicSetupPresetVoiceBoostTip" xml:space="preserve">
+    <value>Reduziert Rumpeln und tiefe Mitten und hebt die Stimme hervor.</value>
+  </data>
 </root>

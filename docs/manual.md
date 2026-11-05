@@ -1395,6 +1395,7 @@ take or on the live microphone:
   | Clear | high pass 80 Hz | bell 300 Hz -2 dB, Q 1.02 | bell 3.5 kHz +2 dB, Q 1.02 | high shelf 10 kHz +1 dB |
   | Warm | high pass 60 Hz | low shelf 200 Hz +2 dB | bell 3 kHz +1 dB, Q 1.02 | high shelf 8 kHz -2 dB |
   | Broadcast | high pass 100 Hz | bell 400 Hz -3 dB, Q 1.42 | bell 4 kHz +3 dB, Q 0.79 | high shelf 12 kHz +2 dB |
+  | Voice Boost | high pass 90 Hz | bell 250 Hz -2.5 dB, Q 1.02 | bell 2.8 kHz +3 dB, Q 0.91 | high shelf 8 kHz 0 dB |
 
   The high pass and the shelves keep the EQ's default Q of 0.70. Every
   band is on.
@@ -1706,7 +1707,7 @@ clicking **EQ** again brings it to the front.
   then puts the four bands back where they start and leaves the EQ on or
   off.
 - The **Profile** row under them keeps EQs by name. The list starts with
-  the three built-in profiles, Clear, Warm and Broadcast, marked "(built
+  the built-in profiles Clear, Warm, Broadcast and Voice Boost, marked "(built
   in)". They are Mic setup's starting presets. Your saved profiles follow.
   Picking a profile in the list loads it at once: its bands go on this
   microphone and its EQ switches on. The list shows the profile the EQ
@@ -1774,7 +1775,7 @@ every microphone's EQ with the rest of the mixer.
   profile". **Compare** leaves the list as it is. Only a pick in the list
   loads a profile; the list changing by itself sends nothing.
 - The built-in profiles are the presets Mic setup's Shape step offers,
-  with the same bands: Clear, Warm and Broadcast. They come first in the
+  with the same bands: Clear, Warm, Broadcast and Voice Boost. They come first in the
   list, named in the UI's language, and cannot be renamed or deleted.
   A profile you save may share a built-in one's name.
 - The daemon keeps your profiles in `~/.config/openxlr/eq-profiles.json`,

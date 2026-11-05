@@ -57,8 +57,8 @@ public sealed class MicSetupModelTests
     [Fact]
     public void ThePresetsAreGentleValidEqsWithALowCutFirst()
     {
-        Assert.Equal(["clear", "warm", "broadcast"], MicSetupPresets.All.Select(p => p.Id));
-        Assert.Equal(3, MicSetupPresets.All.Select(p => p.Name).Distinct().Count());
+        Assert.Equal(["clear", "warm", "broadcast", "voice-boost"], MicSetupPresets.All.Select(p => p.Id));
+        Assert.Equal(MicSetupPresets.All.Count, MicSetupPresets.All.Select(p => p.Name).Distinct().Count());
         foreach (MicSetupPreset preset in MicSetupPresets.All)
         {
             Assert.Null(MicEq.Check(preset.Eq));

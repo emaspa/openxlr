@@ -71,8 +71,15 @@ public static class EqPresets
         Band(MicEq.Peak, 4000, 3, 0.8),
         Band(MicEq.HighShelf, 12000, 2)));
 
+    /// <summary>Bring consonants forward and reduce the low mids without raising the whole microphone.</summary>
+    public static EqPreset VoiceBoost { get; } = new("voice-boost", "Voice Boost", Eq(
+        Band(MicEq.LowCut, 90),
+        Band(MicEq.Peak, 250, -2.5, 1.0),
+        Band(MicEq.Peak, 2800, 3, 0.9),
+        Band(MicEq.HighShelf, 8000, 0)));
+
     /// <summary>The presets in the order every client shows them.</summary>
-    public static IReadOnlyList<EqPreset> All { get; } = [Clear, Warm, Broadcast];
+    public static IReadOnlyList<EqPreset> All { get; } = [Clear, Warm, Broadcast, VoiceBoost];
 
     /// <summary>The preset with this id (<c>builtin:</c> and its key), or null.</summary>
     public static EqPreset? FindId(string? id) => All.FirstOrDefault(p => string.Equals(p.Id, id, StringComparison.Ordinal));

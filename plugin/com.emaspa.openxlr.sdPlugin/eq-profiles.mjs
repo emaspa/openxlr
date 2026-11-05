@@ -7,7 +7,7 @@
 
 // Built-in profiles by key, in the plugin's language; a key it does not know
 // keeps the daemon's English name.
-const BUILTIN_NAMES = {clear: "Clear", warm: "Warm", broadcast: "Broadcast"};
+const BUILTIN_NAMES = {clear: "Clear", warm: "Warm", broadcast: "Broadcast", "voice-boost": "Voice Boost"};
 const PREFIX = "eqprofile:";
 
 const channels = mixer => Array.isArray(mixer?.channels) ? mixer.channels : [];

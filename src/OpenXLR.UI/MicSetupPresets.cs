@@ -21,6 +21,7 @@ public sealed record MicSetupPreset(string Id, MicEq Eq)
         "clear" => Localizer.Text("MicSetupPresetClear"),
         "warm" => Localizer.Text("MicSetupPresetWarm"),
         "broadcast" => Localizer.Text("MicSetupPresetBroadcast"),
+        "voice-boost" => Localizer.Text("MicSetupPresetVoiceBoost"),
         _ => null,
     };
 
@@ -29,6 +30,7 @@ public sealed record MicSetupPreset(string Id, MicEq Eq)
     {
         "warm" => Localizer.Text("MicSetupPresetWarmTip"),
         "broadcast" => Localizer.Text("MicSetupPresetBroadcastTip"),
+        "voice-boost" => Localizer.Text("MicSetupPresetVoiceBoostTip"),
         _ => Localizer.Text("MicSetupPresetClearTip"),
     };
 
