@@ -521,6 +521,16 @@
           "$ref": "#/$defs/flatColour",
           "description": "the tick in a checkbox and the selection in a list; must be flat, since the theme reads it as a colour"
         },
+        "Ox.Tab.FontSize": {
+          "type": "number",
+          "minimum": 8,
+          "maximum": 32,
+          "description": "the label on a tab"
+        },
+        "Ox.Tab.Indicator": {
+          "$ref": "#/$defs/brush",
+          "description": "the bar under the chosen tab; the framework draws it in the accent"
+        },
         "Ox.AppIcon.Size": {
           "type": "number",
           "minimum": 12,

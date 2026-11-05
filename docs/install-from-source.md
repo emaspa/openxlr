@@ -214,7 +214,7 @@ The header dot turns green when the daemon has the device. If it says
 
 ## 6. Make it permanent
 
-The Options window (the gear button) has two checkboxes that install a
+Options (the gear button) → General → AT LOGIN has two checkboxes that install a
 systemd user unit for the daemon and an autostart entry for the UI.
 On a source build the unit points at the build output; on a packaged
 install it enables the package's unit instead.

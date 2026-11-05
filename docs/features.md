@@ -83,8 +83,8 @@ the EQ, low cut, compressor and voice tune were measured on the capsule's
 noise. The low cut sits where the XLR MK.2 keeps phantom power. A replug
 is not yet checked. Like the Wave:3, the daemon
 drives it only when no XLR interface is attached or when picked from the
-header. Its microphone can stall while its own headphones play. Options,
-INTERFACE, has **Recover microphone**, which links the microphone into
+header. Its microphone can stall while its own headphones play. Options →
+Audio → INTERFACE has **Recover microphone**, which links the microphone into
 its strips again and, if the unit's capture is still stopped, resets the
 unit on USB and puts its mixes back once it records. OpenXLR does the
 reset by itself when the kernel keeps the capture stopped for three
@@ -1115,6 +1115,11 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
 
 - Options stays open beside the mixer without blocking its controls. The
   header's gear returns to the same window, including when it is minimized.
+- Options is split into five tabs, General, Audio, Plugins, Appearance and
+  Support, one column of cards each, in a window that keeps its size from
+  tab to tab. Ctrl+Tab and Ctrl+Page Down move between the tabs, and
+  Options opens again on the tab it showed last while the UI runs. The
+  welcome guide's shortcuts open the tab that holds their card.
 - Enforced defaults: the daemon re-asserts the chosen system default
   sink and source on its one-second sweep, undoing WirePlumber's
   auto-switch to newly created nodes. The defaults to restore are read

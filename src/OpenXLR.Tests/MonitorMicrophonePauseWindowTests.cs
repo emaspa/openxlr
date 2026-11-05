@@ -24,6 +24,7 @@ internal static class MonitorMicrophonePauseWindowTests
         {
             main.Show();
             options.Show();
+            OptionsTabsWindowTests.Show(options, OptionsTab.Audio);
             var checkbox = options.FindControl<CheckBox>("MonitorMuteMicrophones")!;
             var caption = (TextBlock)checkbox.Content!;
             var hint = options.FindControl<TextBlock>("MonitorMuteMicrophonesHint")!;

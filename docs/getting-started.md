@@ -74,7 +74,7 @@ how these virtual microphones work.
 - Set [appearance and control sizing](manual.md#skins) under
   **Options → Appearance**. Use **Arrange** in the header to move
   sections, or **Pop out** to put the submixer in a separate window.
-- Set [startup and tray behaviour](manual.md#autostart) under **Options**.
+- Set [startup and tray behaviour](manual.md#autostart) under **Options → General**.
   **At login** controls whether audio and the app start when you sign in.
   **Window** controls whether the app opens in the tray or hides there
   when you close it. If your desktop has no tray, choose **Show mixer**

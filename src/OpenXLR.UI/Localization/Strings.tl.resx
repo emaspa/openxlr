@@ -1364,6 +1364,21 @@
   <data name="Options" xml:space="preserve">
     <value>Mga opsyon</value>
   </data>
+  <data name="OptionsTabGeneral" xml:space="preserve">
+    <value>Pangkalahatan</value>
+  </data>
+  <data name="OptionsTabAudio" xml:space="preserve">
+    <value>Audio</value>
+  </data>
+  <data name="OptionsTabPlugins" xml:space="preserve">
+    <value>Mga plugin</value>
+  </data>
+  <data name="OptionsTabAppearance" xml:space="preserve">
+    <value>Hitsura</value>
+  </data>
+  <data name="OptionsTabSupport" xml:space="preserve">
+    <value>Tulong</value>
+  </data>
   <data name="OutputMixesHeading" xml:space="preserve">
     <value>MGA OUTPUT MIX</value>
   </data>

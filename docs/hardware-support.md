@@ -159,7 +159,7 @@ block reads the live register, and with a microphone attached the capture
 level moved by the same 70 dB whether gain was set through ALSA or through
 the word, and an ALSA write shows up in the block at once. On such a unit
 the daemon drives the missing control through the block and says so in
-its journal on connect and in the UI's Options, under INTERFACE.
+its journal on connect and in the UI's Options → Audio → INTERFACE.
 Each control uses one path only, because the
 kernel caches mixer values and would not see a block write behind its
 back. A control the card lacks while the USB handle is not open (the
@@ -429,7 +429,7 @@ grid would swallow the Stream Deck's five-unit crossfade ticks.
 | Dial target | read | byte 12: 1 gain, 2 headphones, 3 monitor mix; named in the diagnostics dump, with where the reported gain came from |
 | Mute ring colour, LED brightness | unmapped | wave3-research's bytes 10, 11, 13 and 15; carried as read where no setter owns them |
 | Desktop volume controls | verified on hardware | the kernel's 'Mic Capture Volume', 'Mic Capture Switch' and 'PCM Playback Volume' kept in step with the block, as openwave does on the hardware; a change to the sink volume or the source mute in the desktop reached the block within a second. See below |
-| Firmware version | read | bytes 21 to 23 of the device info block, openwave's offsets; shown in Options under INTERFACE and in the state's `device.firmware`. Two units read 1.2.2 and 1.2.4 there while bytes 6 to 8 read `00 03 07` on both, and bytes 0 and 1 read 5.3 and 5.4, LibreWave's two API versions. Not yet compared with the version Wave Link shows |
+| Firmware version | read | bytes 21 to 23 of the device info block, openwave's offsets; shown in Options → Audio → INTERFACE and in the state's `device.firmware`. Two units read 1.2.2 and 1.2.4 there while bytes 6 to 8 read `00 03 07` on both, and bytes 0 and 1 read 5.3 and 5.4, LibreWave's two API versions. Not yet compared with the version Wave Link shows |
 | Device info block (0x000A) | read | 64 bytes on two units, the length openwave requires before it drives a unit (wave3-research read 51); the diagnostics exporter masks the serial wherever it lands |
 
 The microphone's ALSA card carries the three controls that a desktop's
@@ -763,7 +763,7 @@ hand: mixes off the headphones, a USB reset, the mixes back once the
 capture runs again. It does not look for the buzz. Recoveries are at
 least two minutes apart; after three in 30 minutes the daemon stops
 resetting and its journal asks for a replug. **Recover microphone** in
-Options, INTERFACE, removes the capture's links and makes them again
+Options → Audio → INTERFACE removes the capture's links and makes them again
 first, and resets the unit on USB only when the kernel still has the
 capture stopped 2 seconds later. That the relink cures the buzz
 rests on the one observation above. The capability is
@@ -981,7 +981,7 @@ the order that risks least, each result with the diagnostics archive:
     desktop's sound settings: within a second the headphones and the
     mute ring follow, and so does the UI. Then turn the dial in
     headphone mode: the desktop's slider follows.
-11. Options, under INTERFACE, shows a firmware version. Say whether it
+11. Options → Audio → INTERFACE shows a firmware version. Say whether it
     matches the one Wave Link shows for the microphone.
 
 An owner of two supported units confirms driving them together with the
@@ -996,7 +996,7 @@ following, each result with the diagnostics archive:
    microphone, never the other's, and the daemon log names no fallback
    to the model name. If it does, include the `pactl list short sources`
    output; it shows how udev spelled the serial.
-3. Enable the other unit under Options, INTERFACE, Additional
+3. Enable the other unit under Options → Audio → Additional
    interfaces. Its gain, mute and phantom power move that unit only, and
    the primary's controls move the primary only.
 4. Add its microphone with Add input channel in the Additional

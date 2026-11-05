@@ -1436,6 +1436,21 @@
   <data name="Options" xml:space="preserve">
     <value>Einstellungen</value>
   </data>
+  <data name="OptionsTabGeneral" xml:space="preserve">
+    <value>Allgemein</value>
+  </data>
+  <data name="OptionsTabAudio" xml:space="preserve">
+    <value>Audio</value>
+  </data>
+  <data name="OptionsTabPlugins" xml:space="preserve">
+    <value>Plugins</value>
+  </data>
+  <data name="OptionsTabAppearance" xml:space="preserve">
+    <value>Darstellung</value>
+  </data>
+  <data name="OptionsTabSupport" xml:space="preserve">
+    <value>Hilfe</value>
+  </data>
   <data name="OutputMixesHeading" xml:space="preserve">
     <value>AUSGANGSMIXE</value>
   </data>
@@ -3977,7 +3992,7 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="GuideHelpBody" xml:space="preserve">
     <value>Falls du nichts hörst, spiele Ton in einer App ab. Prüfe den Kanalpegel, den Regler und die Stummschaltung im Abhörmix. Schau danach, ob der Mix dem richtigen Ausgang zugewiesen ist. Der Signalfluss zeigt den Weg.
 
-Wenn OpenXLR den Audiodienst nicht erreicht, prüfe die Installationsanleitung für dein Paket. Hilfe findest du im Handbuch und im OpenXLR-Discord. Unter Einstellungen → Support kannst du ein Diagnosearchiv erstellen. Prüfe es vor dem Teilen.</value>
+Wenn OpenXLR den Audiodienst nicht erreicht, prüfe die Installationsanleitung für dein Paket. Hilfe findest du im Handbuch und im OpenXLR-Discord. Unter Einstellungen → Hilfe kannst du ein Diagnosearchiv erstellen. Prüfe es vor dem Teilen.</value>
   </data>
   <data name="GuideHelpTitle" xml:space="preserve">
     <value>Hilfe finden, wenn etwas fehlt</value>
@@ -4044,7 +4059,7 @@ Wenn der Anruf über den Kanal Voice Chat läuft, schalte dessen Signal für die
   <data name="GuideWelcomeBody" xml:space="preserve">
     <value>Mit OpenXLR legst du fest, was du selbst hörst, was im Anruf ankommt und was in den Stream geht. Fang mit einem Mikrofon, einem Ausgabegerät und einer App an. Du kannst den Mixer bedienen, während die Anleitung geöffnet ist.
 
-Bei einer neuen Einrichtung öffnet sich die Tour einmal. Mit Weiter und Zurück wechselst du den Schritt. Du kannst die Anleitung jederzeit überspringen und später unter Einstellungen → Support erneut öffnen, auch nach einem Update.</value>
+Bei einer neuen Einrichtung öffnet sich die Tour einmal. Mit Weiter und Zurück wechselst du den Schritt. Du kannst die Anleitung jederzeit überspringen und später unter Einstellungen → Hilfe erneut öffnen, auch nach einem Update.</value>
   </data>
   <data name="GuideWelcomeTitle" xml:space="preserve">
     <value>Willkommen bei OpenXLR</value>
@@ -4075,7 +4090,7 @@ Darstellung und Fensterverhalten änderst du in den Einstellungen unabhängig vo
     <value>Beim Anmelden starten und den Tray nutzen</value>
   </data>
   <data name="GuideStartupBody" xml:space="preserve">
-    <value>Unter Einstellungen → Beim Anmelden wählst du, ob Audio im Hintergrund startet und ob die App geöffnet wird. Im Bereich Fenster legst du fest, ob beim Start der Mixer erscheint und ob Schließen die App in den Tray legt oder beendet.
+    <value>Unter Einstellungen → Allgemein → Beim Anmelden wählst du, ob Audio im Hintergrund startet und ob die App geöffnet wird. Im Bereich Fenster legst du fest, ob beim Start der Mixer erscheint und ob Schließen die App in den Tray legt oder beendet.
 
 Aus dem Tray holst du den Mixer über das OpenXLR-Symbol oder dein App-Menü zurück. Das Symbol braucht einen System-Tray. Bei Flatpak findest du die nötigen Hintergrundberechtigungen im Handbuch.</value>
   </data>

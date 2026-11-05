@@ -21,8 +21,8 @@ Start with [Getting started](getting-started.md) for the installation and
 first audio checks. The **Welcome guide** opens when the mixer window is
 first shown with a fresh UI configuration. It covers the microphone,
 monitoring, application routing, mixes, virtual microphones, processing,
-profiles, appearance, startup and support. Its shortcuts open the relevant mixer or Options
-section. The Monitor and docked submixer shortcuts unfold their sections
+profiles, appearance, startup and support. Its shortcuts open the relevant mixer section, or the Options tab
+and card. The Monitor and docked submixer shortcuts unfold their sections
 when they are collapsed. You can use the controls while the guide stays
 open.
 
@@ -46,6 +46,17 @@ using the mixer while adjusting settings. Pressing the gear again brings
 the same Options window forward, restoring it if minimized. Closing
 Options leaves the mixer running; quitting OpenXLR closes both windows.
 
+Options has five tabs. **General** holds AT LOGIN, WINDOW, which sets
+what the UI does when it starts and when it is closed, DESKTOP and
+UPDATES. **Audio** holds AUDIO, with the software mixer and **Input
+bindings**, then SYSTEM DEFAULT DEVICES and INTERFACE. **Plugins**,
+**Appearance** and **Support** each hold the card of the same name.
+Ctrl+Tab and Ctrl+Page Down show the next tab, Ctrl+Shift+Tab and
+Ctrl+Page Up the one before, and the arrow keys move along the tabs once
+one of them has the focus. Options opens on the tab it showed last while
+the UI has been running, and on General after the UI starts again. It
+keeps one size on every tab; a tab with more than fits scrolls.
+
 When the daemon starts with the submixer on (the default), these things
 happen on your system:
 
@@ -65,7 +76,7 @@ happen on your system:
   daemon reads them before it touches anything and puts them back if
   the session manager switches to one of the new devices in the
   following seconds.
-  If you set defaults in Options ([section 3.7](#default-devices)), those are held instead.
+  If you set defaults in Options → Audio ([section 3.7](#default-devices)), those are held instead.
 - On the Wave XLR Pro the daemon parks the card on its pro-audio
   profile while it runs, so the raw multichannel device is available to
   the mixer, and restores the previous profile when it stops. If the
@@ -101,8 +112,8 @@ Gain controls in the UI, the terminal mixer and the Stream Deck dials
 cover the connected interface's own range: 0 to 80 dB on the Wave XLR Pro
 and the MK.2 family, 0 to 75 dB on the original Wave XLR and the first
 XLR Dock, 0 to 40 dB on the Wave:3, Wave:3 MK.2 and Wave:1. The Wave XLR Pro's Line In
-gain stops at 40 dB ([Line In](#line-in)). Options shows the firmware
-version under INTERFACE on an interface that reports one: the Wave XLR
+gain stops at 40 dB ([Line In](#line-in)). Options → Audio shows the
+firmware version under INTERFACE on an interface that reports one: the Wave XLR
 Pro, the MK.2 family, the Wave:3, the Wave:3 MK.2 and the Wave:1. On the Wave:3 and Wave:1
 the desktop's sound settings and OpenXLR also
 share the microphone mute and the headphone level, so a change in either
@@ -131,15 +142,15 @@ desktop's capture and playback volume in step with its gain and headphone
 level by itself. It has no phantom power and no low impedance mode. Nobody has checked yet
 whether it keeps its settings when unplugged, so OpenXLR writes nothing to
 it on connect. Its microphone can stall while its own headphones play,
-giving silence or a buzz: OpenXLR resets it by itself, and Options,
-INTERFACE, has **Recover microphone** for a stall it misses
+giving silence or a buzz: OpenXLR resets it by itself, and Options →
+Audio → INTERFACE has **Recover microphone** for a stall it misses
 ([section 5.2](#dock-silent)).
 
 If you only want hardware control and no mixer, turn off "Enable software
 mixer" in Options, AUDIO ([section 3.8](#hardware-only)). The daemon restarts in hardware-control mode
 and the `OpenXLR …` devices disappear.
 
-Update checks are also controlled in Options. They are off by default. You can
+Update checks are also controlled in Options → General → UPDATES. They are off by default. You can
 make one explicit check with **Check now**, or opt into a background check at
 startup; opted-in checks run at most once per 24 hours. A notice contains the
 upstream stable release notes as plain text and a link to GitHub. OpenXLR never
@@ -460,8 +471,8 @@ Wave:3's capsule while a Wave XLR Pro is the primary interface. The dialog
 lists every attached interface's sources except the primary's own, which
 is the first entry. When you choose one that OpenXLR does not drive yet,
 the dialog offers **Also drive this interface**, ticked. Save then binds the
-strip and enables that unit as an additional interface, as Options,
-INTERFACE, **Additional interfaces** does. If enabling it fails, the strip
+strip and enables that unit as an additional interface, as Options →
+Audio → **Additional interfaces** does. If enabling it fails, the strip
 stays bound and the dialog says so. While the unit is driven, its gain,
 mute, low cut, ClipGuard and phantom power, whichever it has, are on the
 strip, in the input rack's gain and switch rows, in a mix matrix row's gain
@@ -588,7 +599,7 @@ that was the default.
    "Monitor" (often HDMI audio) is a separate output device, not a third mix.
 4. The Volume slider sets the level of the selected devices. To control this
    same level with a keyboard volume wheel, media keys or the Linux audio
-   applet, open Options, SYSTEM DEFAULT DEVICES, and choose **Follow MONITOR
+   applet, open Options → Audio → SYSTEM DEFAULT DEVICES and choose **Follow MONITOR
    output (system volume controls)** as Default output. Linux then uses the
    first selected monitor device as its default playback device. Changing
    the MONITOR selection updates that default on the next sweep (about one
@@ -2660,7 +2671,7 @@ daemon remembers changes and writes them back whenever the
 interface connects fresh, so a reboot or a replug leaves you where you
 were, with no profile needed. The picker shows "(last settings)" in
 place of "(none)" on these devices; a chosen profile takes precedence.
-"Reset device to defaults", in Options under INTERFACE (away from the
+"Reset device to defaults", in Options → Audio → INTERFACE (away from the
 profile picker, where a slip would be costly), writes the firmware
 defaults back and forgets the remembered settings (saved profiles
 stay). The defaults are recorded the first time the interface connects
@@ -2683,8 +2694,8 @@ In gain and saved profiles stay. The gain lock has to be off.
 ### 3.7 Hold the system default devices
 
 Session managers like to switch the system default output to a newly
-appeared device, and some applications follow that default. In Options,
-SYSTEM DEFAULT DEVICES, choose the output and input OpenXLR should
+appeared device, and some applications follow that default. In Options →
+Audio → SYSTEM DEFAULT DEVICES, choose the output and input OpenXLR should
 hold; it re-asserts them once a second and reverts any outside change.
 "(don't enforce)" leaves the system alone.
 
@@ -2707,7 +2718,7 @@ again the same way.
 <a name="autostart"></a>
 ### 3.9 Start at login, tray
 
-Options separates login startup from how the UI behaves.
+Options → General separates login startup from how the UI behaves.
 
 Under AT LOGIN:
 
@@ -3733,7 +3744,7 @@ them names each clip's source, its author and how it was trimmed and
 levelled; in the distribution packages it is
 `/usr/lib/openxlr/daemon/starter-sounds/CREDITS`.
 
-To play clips from the keyboard, tick them in Options, DESKTOP,
+To play clips from the keyboard, tick them in Options → General →
 **Desktop keys**. Each one gets a global shortcut of its own, and a Hold
 clip plays while its key is down on desktops that report the key coming
 up. See [soundboard keys](#soundboard-keys).
@@ -4177,7 +4188,7 @@ seconds. You hear the headphones drop for about 12 seconds. It does this
 at most once every 2 minutes and 3 times in 30 minutes; after that the
 journal asks you to replug the microphone.
 
-**Recover microphone** in Options, under INTERFACE, is for a stall the
+**Recover microphone** in Options → Audio → INTERFACE is for a stall the
 watch does not catch, such as a steady buzz in place of your voice. It
 first removes the microphone's links into its strips and makes them
 again, which leaves the headphones playing. If the kernel still has the
@@ -4195,7 +4206,7 @@ microphone sound dead rather than quiet.
 The dock's gain, mute and headphone volume are controls of its ALSA
 card. When the card lacks one of them, OpenXLR drives that control
 through the dock's own config block instead and says so in the daemon's
-log when the dock connects and in Options, under INTERFACE. If the USB
+log when the dock connects and in Options → Audio → INTERFACE. If the USB
 handle is not open either, because the udev rule has not applied yet
 ([section 5.1](#no-device)), the daemon reports that control unavailable
 until the dock connects again.
@@ -4204,7 +4215,7 @@ and which one follows its firmware: 1.0.0 answers on `0x0103`, 1.0.15 on
 `0x0203`. OpenXLR probes the first and falls back to the second every
 time the dock connects, and changes no microphone setting doing it. A
 dock on 1.0.15 therefore carries a connection note naming the bank it
-selected, in Options under INTERFACE; a dock that answers on neither
+selected, in Options → Audio → INTERFACE; a dock that answers on neither
 bank gets a note too and still connects. The same note says when a
 1.0.15 settings block did not decode and the microphone EQ stays in
 software. With a dock that answers on neither bank, press **Collect
@@ -4217,7 +4228,7 @@ diagnostics** in Options and open an issue with the archive.
   in a restart loop means a stale unit in
   `~/.config/systemd/user/openxlr-daemon.service` written by a version
   before 0.1.9. Opening the UI repairs it when **Start audio in the
-  background** (Options, AT LOGIN) is on and OpenXLR can prove it wrote
+  background** (Options → General → AT LOGIN) is on and OpenXLR can prove it wrote
   the unit; otherwise run
   `openxlr installation repair-startup`, or remove the file,
   `systemctl --user daemon-reload`, then
@@ -4265,7 +4276,7 @@ Copying the generated Linux wrapper cannot restore the Windows plugin.
 ### 5.5 Sound comes out of the wrong device
 
 The session manager switched the system default when a new device
-appeared. Set the defaults in Options ([section 3.7](#default-devices)), or pick the device
+appeared. Set the defaults in Options → Audio ([section 3.7](#default-devices)), or pick the device
 you want in your desktop's sound settings once; the daemon defends the
 defaults it saw at start only for about half a minute after the mixer is
 built.
@@ -4304,7 +4315,7 @@ An older user unit can fail before starting the daemon with
 and run `systemctl --user daemon-reload` followed by
 `systemctl --user restart openxlr-daemon`. Source installs can regenerate
 their owned unit by turning **Start audio in the background** off and on
-again in Options, AT LOGIN.
+again in Options → General → AT LOGIN.
 That includes a unit you copied by hand from the reference file v0.1.37
 to v0.1.70 shipped, as long as you changed only its `ExecStart` line.
 The current unit keeps its other restrictions but no longer carries
@@ -4641,7 +4652,7 @@ OpenXLR keeps the new profile when it stops. If something puts the old
 profile back, OpenXLR leaves it there and the UI shows a warning with a
 **Manual** button that opens this section. The same warning appears when
 the card has no such profile or is off. For an additional interface the
-warning and the button are in its entry in Options, INTERFACE,
+warning and the button are in its entry in Options → Audio →
 **Additional interfaces**.
 
 To choose the profile yourself:
@@ -4919,7 +4930,7 @@ strip has them back and the capture channel keeps only its volume.
 Several Wave interfaces can supply capture audio at once. The header picker
 chooses the primary interface, whose controls the UI shows and whose
 microphone feeds the XLR strips. Only the picker changes it: enabling or
-disabling an additional interface leaves the primary where it is. Options, INTERFACE, **Additional
+disabling an additional interface leaves the primary where it is. Options → Audio → **Additional
 interfaces** drives up to four more units with their own gain, mute and
 phantom power, and adds each one's microphone as a capture channel; see
 [Multiple Wave interfaces](wave-interfaces.md). A capture input carrying an
@@ -4994,7 +5005,7 @@ inserts also need Wine and the documented locked-memory allowance.
 <a name="desktop-keys"></a>
 ## Desktop keys and focused application routing
 
-Open Options, DESKTOP, then **Desktop keys**, and enable desktop
+Open Options → General → **Desktop keys** and enable desktop
 integration. For PC shortcuts, select
 the application channels you want, then choose **Apply and configure keys**.
 The desktop portal asks for the shortcuts and permission to use them. For an

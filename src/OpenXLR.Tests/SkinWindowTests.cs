@@ -6,6 +6,7 @@ using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.LogicalTree;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Styling;
@@ -56,7 +57,7 @@ public sealed partial class SkinWindowTests
             EveryKeyIsDrawnLikeTheMuteKey();
             TheApplicationsWindowKeepsItsBottomControlsReachable();
             ThePluginBypassKeyIsLegibleInBothAppearances();
-            TheOptionsColumnsCarryABalancedShareOfTheCards(options);
+            TheOptionsTabsWearTheSkin(options);
             TheWindowActuallyRepaintsWhenTheSkinChanges(main);
             ASkinCanLeaveTheBindingOut();
             TheInputReadoutsWearTheSkin();
@@ -674,7 +675,12 @@ public sealed partial class SkinWindowTests
                 Assert.True(focusable.IsFocused, $"focus was refused in {id}");
 
                 Capture(main, $"mixer-{id}");
-                Capture(options, $"options-{id}");
+                foreach (OptionsTab tab in Enum.GetValues<OptionsTab>())
+                {
+                    OptionsTabsWindowTests.Show(options, tab);
+                    Pump(options);
+                    Capture(options, $"options-{id}-{tab.ToString().ToLowerInvariant()}");
+                }
                 Capture(flow, $"flow-{id}");
             }
             SkinService.Apply(new SkinEntry(SkinPackage.Default, []));
@@ -960,6 +966,7 @@ public sealed partial class SkinWindowTests
     /// </summary>
     private static void ACheckBoxLabelTakesItsOwnToken(OptionsWindow options)
     {
+        OptionsTabsWindowTests.Show(options, OptionsTab.General);
         CheckBox box = options.GetVisualDescendants().OfType<CheckBox>().First();
         Color shipped = ((ISolidColorBrush)box.Foreground!).Color;
         try
@@ -1402,19 +1409,19 @@ public sealed partial class SkinWindowTests
 
         SkinService.Apply(new SkinEntry(SkinPackage.Default, []));
         Layout(main, 1040, 900);
-        Layout(options, 980, options.Height);
-        foreach (Control control in Rectangular(main).Concat(Rectangular(options)))
+        Layout(options, OptionsWindow.DesignWidth, options.Height);
+        foreach (Control control in Rectangular(main).Concat(OptionsTabsWindowTests.InEveryTab(options, Rectangular)))
             Assert.True(Gloss(control) is null,
                 $"the shipped appearance gave a {control.GetType().Name} a raised face");
 
         SkinService.Apply(SkinCatalog.Find("opendeck")!);
         Layout(main, 1040, 900);
-        Layout(options, 980, options.Height);
+        Layout(options, OptionsWindow.DesignWidth, options.Height);
 
         var kinds = new HashSet<string>();
         var flat = new List<string>();
         IBrush? shared = null;
-        foreach (Control control in Rectangular(main).Concat(Rectangular(options)))
+        foreach (Control control in Rectangular(main).Concat(OptionsTabsWindowTests.InEveryTab(options, Rectangular)))
         {
             string what = $"{control.GetType().Name} \"{(control as ContentControl)?.Content}\"";
             IBrush? gloss = Gloss(control);
@@ -1740,47 +1747,55 @@ public sealed partial class SkinWindowTests
     }
 
     /// <summary>
-    /// Options lays its cards out in two columns. One column running half a
-    /// screen longer than the other is what the appearance card caused when it
-    /// was added to the left, so the split is checked rather than eyeballed.
+    /// The tabs Options is split into are the application's own drawing, so
+    /// they follow the skin: the labels in the heading and readout colours,
+    /// the bar under the chosen tab in the accent or the skin's own
+    /// Ox.Tab.Indicator, and the label at Ox.Tab.FontSize. Each tab keeps its
+    /// cards whichever skin is worn.
     /// </summary>
-    private static void TheOptionsColumnsCarryABalancedShareOfTheCards(OptionsWindow options)
+    private static void TheOptionsTabsWearTheSkin(OptionsWindow options)
     {
-        foreach (string id in new[] { "default", "opendeck" })
+        try
         {
-            // Options is a fixed width that cannot be resized and sizes its
-            // height to its content, so the width it has is the width to check.
-            // Resizing it here put the window and its own sizing against each
-            // other, and a machine slow enough to let the platform's resize
-            // land mid-pass then arranged a card the pass had not measured.
-            SkinService.Apply(SkinCatalog.Find(id)!);
+            foreach (string id in new[] { "default", "opendeck", "catppuccin-latte" })
+            {
+                SkinService.Apply(SkinCatalog.Find(id)!);
+                Pump(options);
+                OptionsTabsWindowTests.CheckAppearance(options, id);
+                foreach (var (tab, headings) in OptionsTabsWindowTests.Cards)
+                {
+                    OptionsTabsWindowTests.Show(options, tab);
+                    Pump(options);
+                    Assert.Equal(headings.Select(Localizer.Text), Cards(options)
+                        .Select(card => card.GetLogicalDescendants().OfType<TextBlock>().First(t => t.Classes.Contains("h")).Text));
+                    foreach (Border card in Cards(options).Where(c => c.IsEffectivelyVisible))
+                        AssertInside(card, options, $"{id}, {tab}");
+                }
+            }
+
+            // A skin that names the tab's own values.
+            SkinReadResult read = SkinReader.Read("probe",
+                """{"schema":1,"name":"Probe","tokens":{"Ox.Tab.Indicator":"#ff00ff","Ox.Tab.FontSize":20,"Ox.Text.Secondary":"#00ff00"}}""",
+                SkinOrigin.BuiltIn, null);
+            Assert.Empty(read.Errors);
+            SkinService.Apply(new SkinEntry(read.Package!, []));
             Pump(options);
-            options.UpdateLayout();
-
-            StackPanel[] columns = [.. options.GetVisualDescendants().OfType<Grid>()
-                .Where(g => g.ColumnDefinitions.Count == 3)
-                .SelectMany(g => g.Children.OfType<StackPanel>())];
-            Assert.Equal(2, columns.Length);
-
-            string[] Headings(StackPanel column) =>
-                [.. column.GetVisualDescendants().OfType<TextBlock>()
-                    .Where(t => t.Classes.Contains("h") && t.Text is { Length: > 0 } s
-                                && s == s.ToUpperInvariant())
-                    .Select(t => t.Text!)];
-
-            // The appearance card sits with the plugin card, not on the long
-            // side with the startup and device cards.
-            Assert.Equal(new[] { "ATLOGIN", "WINDOW", "AUDIO", "SYSTEMDEFAULTDEVICES", "DESKTOP", "INTERFACE" }
-                .Select(Localizer.Text), Headings(columns[0]));
-            Assert.Equal(new[] { "PLUGINS", "APPEARANCE", "UPDATES", "SUPPORT" }.Select(Localizer.Text), Headings(columns[1]));
-
-            double tall = Math.Max(columns[0].Bounds.Height, columns[1].Bounds.Height);
-            double shortSide = Math.Min(columns[0].Bounds.Height, columns[1].Bounds.Height);
-            Assert.True(tall - shortSide <= tall * 0.25,
-                $"{id}: the columns are {columns[0].Bounds.Height} and "
-                + $"{columns[1].Bounds.Height} tall, which is not a balanced split");
+            OptionsTabsWindowTests.CheckAppearance(options, "probe");
+            TabItem chosen = OptionsTabsWindowTests.Tabs(options)[(int)OptionsTab.Audio];
+            Assert.Equal(20, chosen.FontSize);
+            Assert.Equal(Color.Parse("#ff00ff"), ((ISolidColorBrush)chosen.GetVisualDescendants().OfType<Border>()
+                .Single(b => b.Name == "PART_SelectedPipe").Background!).Color);
+            Assert.Equal(Color.Parse("#00ff00"),
+                ((ISolidColorBrush)OptionsTabsWindowTests.Tabs(options)[(int)OptionsTab.General].Foreground!).Color);
         }
-        SkinService.Apply(new SkinEntry(SkinPackage.Default, []));
+        finally
+        {
+            SkinService.Apply(new SkinEntry(SkinPackage.Default, []));
+            Pump(options);
+        }
+        // And the shipped appearance comes back.
+        OptionsTabsWindowTests.CheckAppearance(options, "default again");
+        Assert.Equal(14, OptionsTabsWindowTests.Tabs(options)[0].FontSize);
     }
 
     // --- fixture ---

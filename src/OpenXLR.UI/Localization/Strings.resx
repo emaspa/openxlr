@@ -1431,6 +1431,21 @@
   <data name="Options" xml:space="preserve">
     <value>Options</value>
   </data>
+  <data name="OptionsTabGeneral" xml:space="preserve">
+    <value>General</value>
+  </data>
+  <data name="OptionsTabAudio" xml:space="preserve">
+    <value>Audio</value>
+  </data>
+  <data name="OptionsTabPlugins" xml:space="preserve">
+    <value>Plugins</value>
+  </data>
+  <data name="OptionsTabAppearance" xml:space="preserve">
+    <value>Appearance</value>
+  </data>
+  <data name="OptionsTabSupport" xml:space="preserve">
+    <value>Support</value>
+  </data>
   <data name="OutputMixesHeading" xml:space="preserve">
     <value>OUTPUT MIXES</value>
   </data>
@@ -4429,7 +4444,7 @@ Appearance and window behaviour are configured in Options. You can change them i
     <value>Start at login and use the tray</value>
   </data>
   <data name="GuideStartupBody" xml:space="preserve">
-    <value>In Options → At login, choose whether to start audio in the background and whether to open the app. In the Window card, choose Show mixer or Tray only for launch, and Keep running in tray or Quit app for closing.
+    <value>In Options → General → At login, choose whether to start audio in the background and whether to open the app. In the Window card, choose Show mixer or Tray only for launch, and Keep running in tray or Quit app for closing.
 
 When the window is in the tray, open it again from the OpenXLR icon or your app menu. Your desktop needs a tray to show the icon. For Flatpak, check the background permissions described in the manual.</value>
   </data>

@@ -325,6 +325,14 @@ public static class SkinTokens
             new SkinBridge("CheckBoxCheckBackgroundFillChecked"),
         ], SolidOnly: true),
 
+        // The tabs Options is split into. Their labels take the heading and
+        // readout colours, Ox.Text.Secondary and Ox.Text.Primary, so a skin
+        // that colours its text has coloured its tabs. The bar under the
+        // chosen tab is the framework's pipe, which follows the accent until
+        // a skin names a brush of its own.
+        Number("Ox.Tab.FontSize", 14, 8, 32),
+        Brush("Ox.Tab.Indicator", null, new SkinBridge("TabItemHeaderSelectedPipeFill")),
+
         // An application's icon in APPLICATIONS: the size it is drawn at,
         // and the badge with the name's initial that stands in for an icon
         // the desktop does not have, at the same size so the rows line up.

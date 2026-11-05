@@ -704,6 +704,19 @@ whichever button variant is chosen.
 A control token a skin does not set keeps the framework's own value, so a
 skin that only recolours the cards leaves buttons exactly as they are.
 
+### Tabs
+
+Options is split into tabs: General, Audio, Plugins, Appearance and
+Support. A tab's label is drawn in `Ox.Text.Secondary` and turns
+`Ox.Text.Primary` under the pointer and when chosen, in the weight of
+`Ox.Label.FontWeight`, so a skin that colours its text has coloured its
+tabs. A line in `Ox.Divider` runs under the row of tabs.
+
+| Token | Kind | Default | Range | What it paints |
+|---|---|---|---|---|
+| `Ox.Tab.FontSize` | number | 14 | 8 to 32 | the label on a tab |
+| `Ox.Tab.Indicator` | brush | framework |  | the bar under the chosen tab; the framework draws it in the accent |
+
 ### Application icons
 
 Each application in APPLICATIONS shows its icon before its name, found in

@@ -1364,6 +1364,21 @@
   <data name="Options" xml:space="preserve">
     <value>Опције</value>
   </data>
+  <data name="OptionsTabGeneral" xml:space="preserve">
+    <value>Опште</value>
+  </data>
+  <data name="OptionsTabAudio" xml:space="preserve">
+    <value>Звук</value>
+  </data>
+  <data name="OptionsTabPlugins" xml:space="preserve">
+    <value>Додаци</value>
+  </data>
+  <data name="OptionsTabAppearance" xml:space="preserve">
+    <value>Изглед</value>
+  </data>
+  <data name="OptionsTabSupport" xml:space="preserve">
+    <value>Подршка</value>
+  </data>
   <data name="OutputMixesHeading" xml:space="preserve">
     <value>ИЗЛАЗНИ МИКСЕВИ</value>
   </data>

@@ -414,6 +414,83 @@
     </Style>
   </ControlTheme>
 
+  <!-- ==== tabs ==== -->
+
+  <!--
+    The tabs Options is split into. The framework's own tab is a 24 pixel
+    title on a 48 pixel row in the framework's greys, which no skin reaches,
+    so the application draws its own: a label in the heading colour that
+    turns to the readout colour when chosen, with a bar under the chosen one.
+
+    The bar is the framework's pipe colour, which Ox.Tab.Indicator is bridged
+    to, so a skin that does not name it gets the accent its checkboxes have.
+    The parts keep the framework's names. Selection, the arrow keys and the
+    single tab stop of the strip are TabControl's own, not ours.
+  -->
+  <ControlTheme x:Key="{x:Type TabControl}" TargetType="TabControl">
+    <Setter Property="Padding" Value="0,10,0,0"/>
+    <Setter Property="Template">
+      <ControlTemplate TargetType="TabControl">
+        <DockPanel>
+          <Panel DockPanel.Dock="Top">
+            <Border Height="1" VerticalAlignment="Bottom" Background="{DynamicResource Ox.Divider}"/>
+            <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}"/>
+          </Panel>
+          <Panel ClipToBounds="True">
+            <ContentPresenter Name="PART_SelectedContentHost2" Margin="{TemplateBinding Padding}"
+                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                              IsVisible="False"/>
+            <ContentPresenter Name="PART_SelectedContentHost" Margin="{TemplateBinding Padding}"
+                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"/>
+          </Panel>
+        </DockPanel>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+
+  <ControlTheme x:Key="{x:Type TabItem}" TargetType="TabItem">
+    <Setter Property="FontSize" Value="{DynamicResource Ox.Tab.FontSize}"/>
+    <Setter Property="FontWeight" Value="{DynamicResource Ox.Label.FontWeight}"/>
+    <Setter Property="Foreground" Value="{DynamicResource Ox.Text.Secondary}"/>
+    <Setter Property="Padding" Value="12,7,12,9"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+    <Setter Property="Template">
+      <ControlTemplate TargetType="TabItem">
+        <Panel>
+          <!-- Transparent so the whole tab takes the click, not only its letters. -->
+          <Border Name="PART_LayoutRoot" Background="Transparent" Padding="{TemplateBinding Padding}">
+            <ContentPresenter Name="PART_ContentPresenter"
+                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                              Content="{TemplateBinding Header}"
+                              ContentTemplate="{TemplateBinding HeaderTemplate}"
+                              Foreground="{TemplateBinding Foreground}"
+                              RecognizesAccessKey="True"/>
+          </Border>
+          <Border Name="PART_SelectedPipe" Height="{DynamicResource TabItemPipeThickness}"
+                  VerticalAlignment="Bottom" HorizontalAlignment="Stretch"
+                  Background="{DynamicResource TabItemHeaderSelectedPipeFill}"
+                  CornerRadius="{DynamicResource ControlCornerRadius}"
+                  IsVisible="False"/>
+        </Panel>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:pointerover">
+      <Setter Property="Foreground" Value="{DynamicResource Ox.Text.Primary}"/>
+    </Style>
+    <Style Selector="^:selected">
+      <Setter Property="Foreground" Value="{DynamicResource Ox.Text.Primary}"/>
+    </Style>
+    <Style Selector="^:selected /template/ Border#PART_SelectedPipe">
+      <Setter Property="IsVisible" Value="True"/>
+    </Style>
+    <Style Selector="^:disabled">
+      <Setter Property="Opacity" Value="{DynamicResource Ox.Control.DisabledOpacity}"/>
+    </Style>
+  </ControlTheme>
+
   <!-- ==== mute buttons ==== -->
 
   <ControlTheme x:Key="Ox.MuteButton.Cap" TargetType="ToggleButton"
