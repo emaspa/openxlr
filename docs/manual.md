@@ -30,7 +30,8 @@ open.
 welcome. Quitting the app while the welcome is open leaves it pending for
 the next launch. A trip to the tray keeps your place in the open guide.
 OpenXLR remembers completion in the UI settings across app updates. An
-existing UI configuration keeps its normal startup.
+installation that ran an earlier version keeps its normal startup, even
+when no UI preference was ever changed.
 Open **Options → Support → Welcome guide** to repeat the tour at any time.
 
 OpenXLR is two programs. The daemon (`openxlr-daemon`, a systemd user

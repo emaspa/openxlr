@@ -9,7 +9,7 @@ namespace OpenXLR.UI;
 /// <summary>A modeless guide so the mixer stays usable while the user follows a step.</summary>
 public partial class WelcomeGuideWindow : Window
 {
-    private const string DiscordInvite = "https://discord.gg/4GwWqUbTdN";
+    private const string DiscordInvite = "https://discord.gg/4bswtnGPW4";
     private const string Manual = "https://github.com/emaspa/openxlr/blob/main/docs/manual.md#";
 
     private sealed record Page(string Title, string Body, string ManualAnchor, string? ActionTitle = null,

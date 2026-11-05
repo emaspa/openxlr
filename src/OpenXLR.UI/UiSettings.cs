@@ -180,12 +180,17 @@ public sealed record UiSettings
 
     private static string FilePath => Path.Combine(ConfigDir, "ui.json");
 
-    /// <summary>Remember a clean first launch before the window can save other preferences.</summary>
+    /// <summary>
+    /// Remember a clean first launch before the window can save other preferences.
+    /// A UI that ran before may never have written ui.json, but it left the Deck
+    /// palette, so that file marks an upgrade too.
+    /// </summary>
     internal static bool PrepareWelcomeGuide()
     {
         UiSettings settings = Load(out string? problem);
         if (settings.WelcomeGuideCompleted is bool completed) return !completed;
-        if (problem is not null || File.Exists(FilePath)) return false;
+        if (problem is not null || File.Exists(FilePath)
+            || File.Exists(Path.Combine(ConfigDir, "deck-palette.json"))) return false;
         if ((settings with { WelcomeGuideCompleted = false }).Save() is { } error)
             Console.Error.WriteLine(error);
         return true;

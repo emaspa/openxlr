@@ -94,6 +94,6 @@ how these virtual microphones work.
   For a Flatpak or source build, use the launch instructions for that
   installation. See [troubleshooting](manual.md#troubleshooting) for
   missing devices and audio service problems.
-- Ask the [OpenXLR Discord community](https://discord.gg/4GwWqUbTdN) for
+- Ask the [OpenXLR Discord community](https://discord.gg/4bswtnGPW4) for
   help. **Options → Support → Collect diagnostics** saves a diagnostic
   archive. Review it before attaching it to an issue.

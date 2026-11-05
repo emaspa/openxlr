@@ -58,6 +58,14 @@ public sealed class PreferenceFileTests : IDisposable
         Assert.Equal(text, File.ReadAllText(UiJson));
     }
 
+    [Fact]
+    public void WelcomeGuideTreatsAnEarlierUiWithoutPreferencesAsAnUpgrade()
+    {
+        File.WriteAllText(Path.Combine(UiSettings.ConfigDir, "deck-palette.json"), "{\"schema\":1}");
+        Assert.False(UiSettings.PrepareWelcomeGuide());
+        Assert.False(File.Exists(UiJson));
+    }
+
     [Theory]
     [InlineData(-100)]
     [InlineData(0)]
