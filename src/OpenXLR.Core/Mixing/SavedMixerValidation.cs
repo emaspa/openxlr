@@ -62,10 +62,19 @@ internal static class SavedMixerValidation
             VoiceChanger = VoiceChanger(settings.VoiceChanger, notes),
             Compressor = Dynamics(settings.Compressor, "compressor", MicCompressor.Check, MicCompressor.Snap, notes),
             Expander = Dynamics(settings.Expander, "expander", MicExpander.Check, MicExpander.Snap, notes),
+            MonitorDry = MonitorDry(settings.MonitorDry, notes),
             Ducking = Ducking(settings, notes),
             Appearance = Appearance(settings.Appearance, notes),
             BlockSize = BlockSize(settings.BlockSize, notes),
         };
+    }
+
+    /// <summary>The dry monitor switches; a null map, which a hand edit can leave, reads as none on.</summary>
+    private static Dictionary<string, bool> MonitorDry(Dictionary<string, bool>? entries, List<string> notes)
+    {
+        if (entries is not null) return entries;
+        notes.Add($"monitorDry: {NullEntry}");
+        return [];
     }
 
     private static int? BlockSize(int? frames, List<string> notes)

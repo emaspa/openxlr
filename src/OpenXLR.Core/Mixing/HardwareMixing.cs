@@ -65,6 +65,13 @@ public sealed record HardwareMixingSetup
     public IReadOnlySet<string> Processed { get; init; } = new HashSet<string>();
 
     /// <summary>
+    /// Unit inputs the monitor mixes hear dry (<c>setMonitorDry</c>): the
+    /// jacks' sections take them from the unit's own input even while they
+    /// are processed, and only the Aux mix's section plays their return pair.
+    /// </summary>
+    public IReadOnlySet<string> MonitorDry { get; init; } = new HashSet<string>();
+
+    /// <summary>
     /// Each mix's volume in dB on the desktop's cubic scale, negative infinity
     /// while it is muted: what an audition, which plays into the mixes the
     /// monitor outputs play, is heard at on the cue pair.
@@ -252,7 +259,9 @@ public static class HardwareMixingPlanner
             Content = content,
             Clamped = clamped,
             Disabled = Disabled(setup, sections.Keys, pairs, returns, cue),
-            EntryOffsetsDb = setup.Jacks.ToDictionary(j => j.Jack, j => EntryOffsetDb(setup, j.Feed, returns.Keys), StringComparer.Ordinal),
+            // A dry input plays raw on the jacks, so it gains what any unit input does.
+            EntryOffsetsDb = setup.Jacks.ToDictionary(j => j.Jack,
+                j => EntryOffsetDb(setup, j.Feed, returns.Keys.Where(c => !setup.MonitorDry.Contains(c))), StringComparer.Ordinal),
         };
     }
 
@@ -308,16 +317,22 @@ public static class HardwareMixingPlanner
     /// its processed audio; then the cue, for auditions. Channels come first
     /// and keep their pairs, so a channel added later takes a pair from these
     /// claims, and the claim it takes falls back (the input raw, auditions
-    /// refused) with a note.
+    /// refused) with a note. An input the monitor mixes hear dry needs its
+    /// return only for the Aux mix's section, so it claims none while the
+    /// unit builds no Aux mix.
     /// </summary>
     internal static (Dictionary<string, int> Returns, int? Cue) Claim(HardwareMixingSetup setup, IReadOnlyDictionary<string, int> pairs)
     {
         Queue<int> free = new(FreePairs(pairs.Values));
         var returns = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach ((int _, string channel) in setup.UnitSources.OrderBy(s => s.Key))
-            if (setup.Processed.Contains(channel) && !returns.ContainsKey(channel) && free.TryDequeue(out int pair)) returns[channel] = pair;
+            if (NeedsReturn(setup, channel) && !returns.ContainsKey(channel) && free.TryDequeue(out int pair)) returns[channel] = pair;
         return (returns, free.TryDequeue(out int cue) ? cue : null);
     }
+
+    /// <summary>Whether a unit input's processed audio has a section to play in: it is processed, and heard processed on the jacks or in the Aux mix.</summary>
+    private static bool NeedsReturn(HardwareMixingSetup setup, string channel)
+        => setup.Processed.Contains(channel) && (!setup.MonitorDry.Contains(channel) || AuxMixOf(setup) is not null);
 
     /// <summary>The channel pairs not in <paramref name="taken"/>, in <see cref="ChannelPairs"/> order.</summary>
     internal static IEnumerable<int> FreePairs(IEnumerable<int> taken)
@@ -351,7 +366,8 @@ public static class HardwareMixingPlanner
     /// Aux mix keeps playing). A source no channel carries is out, and so is
     /// Aux In in the Aux mix's section. A unit input with a return pair plays
     /// from that pair, processed, and its own source stays out, so the voice
-    /// is never heard twice. The cue pair is in the jacks' sections only, at
+    /// is never heard twice; on a jack's section a dry input plays from its
+    /// own source instead, and its pair stays out. The cue pair is in the jacks' sections only, at
     /// the volume of the feed's mixes, as an audition into those mixes is.
     /// </summary>
     private static HardwareSectionContent Build(HardwareMixingSetup setup, string feed, int section,
@@ -375,7 +391,8 @@ public static class HardwareMixingPlanner
         foreach ((int source, string channel) in setup.UnitSources)
         {
             if (source is < 0 or >= ProMixSections.FirstPair || aux && source == ProMixSections.UsbAux) continue;
-            if (returns.TryGetValue(channel, out int back)) Source(ProMixSections.SourceOfPair(back), channel, 0);
+            if (returns.TryGetValue(channel, out int back) && (aux || !setup.MonitorDry.Contains(channel)))
+                Source(ProMixSections.SourceOfPair(back), channel, 0);
             else Source(source, channel, ProMixSections.CellCeiling / 2.0);
         }
         foreach ((string channel, int pair) in pairs)
@@ -520,7 +537,7 @@ public static class HardwareMixingPlanner
             }
         }
         string NameOf(string channel) => setup.Channels.FirstOrDefault(c => c.Id == channel)?.Name ?? channel;
-        foreach (string channel in setup.UnitSources.Values.Where(c => setup.Processed.Contains(c) && !returns.ContainsKey(c)))
+        foreach (string channel in setup.UnitSources.Values.Where(c => NeedsReturn(setup, c) && !returns.ContainsKey(c)))
             disabled[$"processedMic:{channel}"] =
                 $"The Wave XLR Pro's mixes take {NameOf(channel)} as it comes in, without the processing on this computer: no USB pair is free to play it back.";
         // Mic setup plays the take back through the channel, so a unit

@@ -1682,6 +1682,10 @@ public sealed class MixerService : IHostedService, IDisposable
                     _mixer.SetDynamicsProcessing(cmd.Channel!, cmd.Value.GetString()!);   // checked by CommandValidation
                     SyncOutputSelectors();   // software processing moves the Pro's mic between its hardware path and the send
                     break;
+                case "setMonitorDry":
+                    _mixer.SetMonitorDry(cmd.Channel!, cmd.Value.GetBoolean());   // checked by CommandValidation
+                    SyncOutputSelectors();   // a dry microphone keeps the Pro's hardware path with its effects on
+                    break;
                 case "setDucking":
                 case "setDuckingProcessing":
                     // Saved in mixer.json before it applies; a failed save

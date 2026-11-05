@@ -199,6 +199,13 @@ public sealed record MixerSettings
     /// </summary>
     public Dictionary<string, MicExpander> Expander { get; init; } = [];
 
+    /// <summary>
+    /// The microphones the monitor mixes hear dry, before their software
+    /// effects, by channel id. A microphone absent here, or false, is heard
+    /// through its effects as every other mix hears it.
+    /// </summary>
+    public Dictionary<string, bool> MonitorDry { get; init; } = [];
+
     /// <summary>The ducking setup and processing choice. Absent takes the layout's default targets, switched off.</summary>
     public DuckingSetup? Ducking { get; init; }
 
