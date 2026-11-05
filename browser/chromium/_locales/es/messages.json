@@ -166,5 +166,17 @@
   },
   "outputGone": {
     "message": "La salida de OpenXLR seleccionada desapareció. La pestaña vuelve a reproducirse con normalidad."
+  },
+  "popupActiveRoutes": {
+    "message": "Rutas activas"
+  },
+  "popupStopAll": {
+    "message": "Detener todas las rutas"
+  },
+  "popupShowRoute": {
+    "message": "Mostrar pestaña $1"
+  },
+  "popupStopRoute": {
+    "message": "Detener la ruta de $1"
   }
 }

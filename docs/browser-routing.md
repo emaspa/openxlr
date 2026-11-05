@@ -16,6 +16,21 @@ It does not record an audio file. A call still uses the microphone chosen
 in the browser or website. Check a real call's echo cancellation and delay
 with your headset before relying on this for meetings.
 
+## Firefox
+
+Firefox can use OpenXLR's browser-wide channel routing. Play audio in
+Firefox, find it in OpenXLR's **Applications** section and choose a channel,
+or select an OpenXLR channel as Firefox's output in the desktop audio
+settings. This sends that Firefox playback stream to the chosen channel.
+
+The repository's companion uses Chromium's `tabCapture` API and an
+offscreen document for per-tab audio. Firefox has a different Manifest V3
+background model and does not implement those capture APIs. Changing the
+manifest does not supply that audio path. There is currently no Firefox
+companion package. See Mozilla's
+[WebExtension API compatibility](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Chrome_incompatibilities)
+and [background configuration](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/background).
+
 ## Install the companion
 
 Until its Chrome Web Store listing is published, the companion is loaded
@@ -134,10 +149,9 @@ Chrome has no Cebuano, so a browser set to it shows English.
    moves made in pavucontrol. Choosing a channel for the whole browser,
    from that list, an OpenDeck key or a desktop key, saves it for later
    and moves nothing while the option is on.
-2. Allow output access once per browser profile. The companion opens the
-   Output access page by itself right after it is installed, and until
-   access is granted its popup says so, offers the page, and keeps Activate
-   unavailable. Chromium requires microphone permission to reveal
+2. Allow output access once per browser profile. Open the companion's
+   popup and choose **Allow output access**. Until access is granted, the
+   popup offers this setup and keeps Activate unavailable. Chromium requires microphone permission to reveal
    non-default output devices. Press the setup button to grant it; the
    companion immediately stops the temporary microphone stream and neither
    records nor forwards it.
@@ -173,6 +187,19 @@ Chrome has no Cebuano, so a browser set to it shows English.
    to another origin, disabling browser output selection or losing the
    daemon connection releases the takeover. Normal browser playback can
    then resume. Reconnection restores the list, not capture permission.
+
+### Active routes in the popup
+
+The toolbar badge counts the tabs currently routed through OpenXLR. The
+popup lists them even when the tab you opened it on is not routed. Each
+entry shows the tab's title and current channel. Choose its title to
+bring that tab and its window forward, or **Stop routing** beside it to
+release just that tab.
+
+**Stop all routing** releases all tab captures and the offscreen audio
+document. It also cancels waiting activation requests, so an old request
+cannot begin capture after the stop. Website channel defaults stay saved.
+Each tab needs explicit activation to start again.
 
 Control requests already waiting when the daemon connection is lost are
 discarded, rather than replayed after reconnection. An old error cannot

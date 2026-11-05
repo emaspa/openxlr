@@ -13,6 +13,8 @@ let creating = null;
 let refreshing = null;
 let refreshAgain = false;
 let lastTabs = '';
+let reportedTabs = new Map();
+let badgeText;
 let refreshTimer;
 let bindingOperation = Promise.resolve();
 let recovering = true;
@@ -24,6 +26,24 @@ const starts = new Map();
 const stops = new Map();
 const assignments = new Map();
 const requests = new Map();
+
+function updateBadge() {
+  const count = [...captures.values()].filter(capture => capture.capturing).length;
+  const text = count ? String(count) : '';
+  if (text === badgeText) return;
+  badgeText = text;
+  void chrome.action.setBadgeText({ text }).catch(() => { if (badgeText === text) badgeText = undefined; });
+}
+
+function activeRoutes() {
+  return [...captures].flatMap(([id, capture]) => {
+    const tab = reportedTabs.get(id);
+    if (!capture.capturing || !tab) return [];
+    const selected = state?.tabs.find(candidate => candidate.id === id && candidate.site === tab.site);
+    const channel = state?.channels.find(candidate => candidate.id === (capture.channelId ?? selected?.channelId));
+    return [{ id, site: tab.site, title: tab.title, channel: channel?.name ?? channel?.label ?? null }];
+  });
+}
 
 function clearAssignment(id) {
   const pending = assignments.get(id);
@@ -80,7 +100,7 @@ function connect() {
       clearRequests();
       void stopAll(bridgeError);
     });
-    void refreshTabs();
+    void refreshTabs().catch(error => { if (native === port) bridgeError = errorText(error); });
   } catch {
     native = null;
     clearAssignments();
@@ -93,9 +113,15 @@ function post(message) {
   native.postMessage(message);
 }
 
+async function hasOffscreen() {
+  const contexts = await chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'],
+    documentUrls: [chrome.runtime.getURL('offscreen.html')] });
+  return contexts.length !== 0;
+}
+
 async function ensureOffscreen() {
   creating ??= (async () => {
-    if (await chrome.offscreen.hasDocument()) return;
+    if (await hasOffscreen()) return;
     await chrome.offscreen.createDocument({ url: 'offscreen.html', reasons: ['USER_MEDIA'],
       justification: 'Route user-activated tab audio to its selected OpenXLR output without recording it.' });
   })();
@@ -105,7 +131,7 @@ async function ensureOffscreen() {
 
 async function audio(message, create = false, validate = () => true) {
   if (create) await ensureOffscreen();
-  else if (!await chrome.offscreen.hasDocument()) return null;
+  else if (!await hasOffscreen()) return null;
   if (validate() !== true) return null;
   const reply = await chrome.runtime.sendMessage({ ...message, target: 'offscreen' });
   if (reply?.error) throw new Error(reply.error);
@@ -128,7 +154,9 @@ function cancelStart(id) {
 
 function stopTab(id, error = null) {
   cancelStart(id);
+  clearRequest(id);
   if (captures.has(id)) captures.set(id, { capturing: false, error });
+  updateBadge();
   const task = (stops.get(id) ?? Promise.resolve()).catch(() => {}).then(() => audio({ type: 'stop', id, error }));
   stops.set(id, task);
   void task.finally(() => { if (stops.get(id) === task) stops.delete(id); }).catch(() => {});
@@ -137,6 +165,7 @@ function stopTab(id, error = null) {
 }
 
 function stopAll(error = null) {
+  clearRequests();
   for (const pending of starts.values()) pending.cancelled = true;
   starts.clear();
   const task = (stopping ?? Promise.resolve()).then(async () => {
@@ -148,7 +177,8 @@ function stopAll(error = null) {
     catch (failure) { bridgeError = errorText(failure); }
     finally {
       for (const [id] of captures) captures.set(id, { capturing: false, error });
-      try { if (await chrome.offscreen.hasDocument()) await chrome.offscreen.closeDocument(); }
+      updateBadge();
+      try { if (await hasOffscreen()) await chrome.offscreen.closeDocument(); }
       catch (failure) { bridgeError = errorText(failure); }
       scheduleRefresh();
     }
@@ -169,22 +199,23 @@ async function refreshTabs() {
     do {
       refreshAgain = false;
       const tabs = await chrome.tabs.query({});
-      const alive = new Set(tabs.map(tab => tab.id));
-      for (const id of captures.keys()) if (!alive.has(id)) captures.delete(id);
+      const liveSites = new Map(tabs.map(tab => [tab.id, siteOf(tab.url)]));
+      for (const id of captures.keys()) if (!liveSites.has(id)) captures.delete(id);
       for (const [id, pending] of assignments)
-        if (!alive.has(id) || siteOf(tabs.find(tab => tab.id === id)?.url) !== pending.site) clearAssignment(id);
+        if (liveSites.get(id) !== pending.site) clearAssignment(id);
       for (const [id, request] of requests)
-        if (!alive.has(id) || siteOf(tabs.find(tab => tab.id === id)?.url) !== request.site) clearRequest(id);
+        if (liveSites.get(id) !== request.site) clearRequest(id);
       for (const [id, previous] of sites) {
-        const tab = tabs.find(candidate => candidate.id === id);
-        if (!alive.has(id) || siteOf(tab?.url) !== previous) {
+        if (liveSites.get(id) !== previous) {
           await stopTab(id);
           captures.delete(id);
           sites.delete(id);
         }
       }
       const records = tabRecords(tabs, captures, requests);
+      reportedTabs = new Map(records.map(tab => [tab.id, tab]));
       for (const tab of records) sites.set(tab.id, tab.site);
+      updateBadge();
       const encoded = JSON.stringify(records);
       if (native && encoded !== lastTabs) { post({ type: 'tabs', tabs: records }); lastTabs = encoded; }
     } while (refreshAgain);
@@ -292,9 +323,8 @@ async function activateRequest(message) {
   // Only a tab this browser registered, on the origin OpenXLR showed.
   if (!Number.isSafeInteger(id) || !listed || listed.site !== message.site || !state.preserveBrowserOutputs || !listed.channelId) return;
   if (requests.has(id) || starts.has(id) || assignments.has(id) || captures.get(id)?.capturing) return;
-  let tab;
-  try { tab = await chrome.tabs.get(id); } catch { return; }
-  if (!tab || tab.incognito || siteOf(tab.url) !== message.site || requests.has(id)) return;
+  // Register before the first asynchronous tab lookup so a Stop can cancel
+  // even a request that has not yet focused its tab.
   const request = { site: message.site, stage: 'starting', timer: null };
   requests.set(id, request);
   request.timer = setTimeout(() => { if (requests.get(id) === request && clearRequest(id)) scheduleRefresh(); }, REQUEST_TIMEOUT);
@@ -302,8 +332,17 @@ async function activateRequest(message) {
   if (captures.get(id)?.error) captures.set(id, { ...captures.get(id), error: null });
   scheduleRefresh();
   const current = () => requests.get(id) === request;
+  let tab;
+  try { tab = await chrome.tabs.get(id); } catch { /* The tab may have closed. */ }
+  if (!current()) return;
+  if (!tab || tab.incognito || siteOf(tab.url) !== request.site) {
+    clearRequest(id);
+    scheduleRefresh();
+    return;
+  }
   try {
     await chrome.windows.update(tab.windowId, { focused: true });
+    if (!current()) return;
     await chrome.tabs.update(id, { active: true });
     const shown = await chrome.tabs.get(id);
     if (!current()) return;
@@ -325,7 +364,7 @@ async function activateRequest(message) {
 async function handle(message) {
   switch (message.type) {
     case 'snapshot': return { state, error: bridgeError, startingTabs: [...starts.keys()], pendingTabs: [...assignments.keys()],
-      requestedTabs: [...requests.keys()] };
+      requestedTabs: [...requests.keys()], activeRoutes: activeRoutes() };
     case 'retry': connect(); await refreshTabs(); return { state, error: bridgeError };
     case 'enable': post({ type: 'enable', value: message.value === true }); return null;
     case 'assign': {
@@ -367,13 +406,26 @@ async function handle(message) {
         throw error;
       }
     }
-    case 'stop': {
-      return stopTab(message.id);
+    case 'stop':
+      if (Number.isSafeInteger(message.id)) await stopTab(message.id);
+      return null;
+    case 'stopAll': await stopAll(); return null;
+    case 'showTab': {
+      const route = reportedTabs.get(message.id);
+      if (!route || route.site !== message.site || !captures.get(message.id)?.capturing)
+        throw new Error(t('tabUnregistered'));
+      const tab = await chrome.tabs.get(route.id);
+      if (tab.incognito || siteOf(tab.url) !== route.site || !captures.get(route.id)?.capturing)
+        throw new Error(t('siteChanged'));
+      await chrome.tabs.update(tab.id, { active: true });
+      await chrome.windows.update(tab.windowId, { focused: true });
+      return null;
     }
     case 'audioStatus':
       if (!Number.isSafeInteger(message.id)) return null;
       captures.set(message.id, { capturing: message.capturing === true, error: message.error ? errorText(message.error) : null });
       if (message.capturing === true) clearRequest(message.id);
+      updateBadge();
       scheduleRefresh();
       return null;
     case 'devicesChanged': await reconcile(); return null;
@@ -389,6 +441,7 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
 });
 
 chrome.tabs.onCreated.addListener(scheduleRefresh);
+chrome.tabs.onActivated.addListener(scheduleRefresh);
 chrome.tabs.onUpdated.addListener((id, changes) => {
   const previous = assignments.get(id)?.site ?? starts.get(id)?.site ?? requests.get(id)?.site ?? sites.get(id);
   if (changes.url && previous && siteOf(changes.url) !== previous) {
@@ -396,20 +449,19 @@ chrome.tabs.onUpdated.addListener((id, changes) => {
     clearRequest(id);
     void stopTab(id).catch(error => { bridgeError = errorText(error); });
   }
-  scheduleRefresh();
+  if ('url' in changes || 'title' in changes || 'audible' in changes) scheduleRefresh();
 });
-chrome.tabs.onRemoved.addListener(id => {
+function removeTab(id) {
   clearAssignment(id);
   clearRequest(id);
-  void stopTab(id).catch(error => { bridgeError = errorText(error); });
+  if (captures.get(id)?.capturing || starts.has(id))
+    void stopTab(id).catch(error => { bridgeError = errorText(error); });
   scheduleRefresh();
-});
+}
+chrome.tabs.onRemoved.addListener(removeTab);
+chrome.tabs.onReplaced.addListener((_, removed) => removeTab(removed));
 chrome.runtime.onStartup.addListener(connect);
-chrome.runtime.onInstalled.addListener(details => {
-  connect();
-  // Output access is the one step Chrome asks for once; offer it straight after installing.
-  if (details?.reason === 'install') void chrome.tabs.create({ url: chrome.runtime.getURL('devices.html') }).catch(() => {});
-});
+chrome.runtime.onInstalled.addListener(connect);
 
 // A service worker can sleep while its offscreen audio continues. Recover the
 // active sessions before publishing a replacement provider to the daemon.
@@ -421,6 +473,7 @@ void (async () => {
     await stopAll(errorText(error));
   } finally {
     recovering = false;
+    updateBadge();
     connect();
   }
 })().catch(error => { bridgeError = errorText(error); });

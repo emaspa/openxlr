@@ -843,6 +843,8 @@ restores the split profile when it stops.
 - The optional [Chromium companion](browser-routing.md) lists individual
   tabs in a Browser tabs window, opened from the button beside Manage in
   APPLICATIONS, which also holds the option that turns tab routing on.
+  The popup lists active routes, can bring a routed tab forward and can
+  stop one or all captures. Its toolbar badge counts the routed tabs.
   User-activated tab audio can follow
   separate application channels, with saved website defaults. Activate
   in a tab's row brings the tab forward in the browser and starts it, or

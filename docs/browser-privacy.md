@@ -17,15 +17,17 @@ tracking, and it does not sell or share data with anyone.
 
 ## What the extension reads
 
-- **Open tabs.** For each tab in a normal window whose address is an HTTP
-  or HTTPS page, up to 128 tabs, it reads the browser's tab id, the
-  address and the page title. The address is reduced to its origin, the
-  scheme, host and port, so the path, query, fragment and any credentials
-  in it are dropped. The title is cut to 160 characters. Whether a tab is
-  active or playing sound is used only to order the list.
-- **Tab audio, for tabs you activate.** When you press Activate this tab
-  in the extension's popup, or use its keyboard shortcut, the browser
-  hands the extension that tab's audio. The extension plays it through
+- **Open tabs.** The browser provides the open tab list. The extension
+  uses it to report up to 128 HTTP or HTTPS tabs from normal windows. For
+  those tabs, it includes the browser's tab id, the origin and the page
+  title cut to 160 characters. It drops paths, query strings, fragments
+  and credentials. Whether a tab is active or playing sound is used to
+  order the list. The popup uses the same titles for its active routes,
+  and the toolbar badge shows only their count.
+- **Tab audio, for tabs you activate.** The toolbar button or keyboard
+  shortcut opens the popup and gives the extension access to the current
+  tab. When you choose Activate this tab, the browser hands the extension
+  that tab's audio. The extension plays it through
   the browser's own audio engine into the OpenXLR output you chose, on
   the same computer. The audio samples are not read by the extension's
   code, recorded, stored or sent anywhere. Audio of tabs you have not
@@ -35,8 +37,9 @@ tracking, and it does not sell or share data with anyone.
   that matches the OpenXLR channel you chose.
 - **Microphone permission, once.** The browser shows the names of audio
   outputs other than the default only after it has been given microphone
-  permission. The Output access page asks for that permission, opens the
-  microphone and stops it immediately. No microphone audio is recorded,
+  permission. Open Output access from the popup and choose Allow device
+  discovery to request it. The extension opens the microphone and stops
+  it immediately. No microphone audio is recorded,
   stored, sent to OpenXLR or routed.
 
 ## Where it goes
@@ -71,6 +74,19 @@ The extension keeps one entry in the browser's local extension storage:
 | `deviceBindings` | For each OpenXLR channel the extension has routed to, the browser device id of the matching audio output. Entries for channels that no longer exist are removed. |
 
 It stores no tab addresses, titles, history or audio.
+
+## Browser permissions
+
+- `tabs` supplies the titles and origins for the channel picker in OpenXLR.
+- `activeTab` and `tabCapture` let the companion route a tab after you
+  invoke the action and choose to activate it.
+- `offscreen` keeps the browser's audio playback running with the popup
+  closed.
+- `storage` remembers the output device bindings in this browser profile.
+- `nativeMessaging` connects the extension to the local OpenXLR host.
+
+The extension uses the data exposed by these APIs for the routing and
+controls described here. Its code is bundled with the extension.
 
 ## Private browsing
 
