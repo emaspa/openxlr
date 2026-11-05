@@ -46,6 +46,11 @@ public sealed class WindowLayoutTests
                 ((DaemonClient)typeof(MainWindow).GetField("_client", BindingFlags.Instance | BindingFlags.NonPublic)!
                     .GetValue(main)!).DisposeAsync().AsTask().GetAwaiter().GetResult();
                 Dispatcher.UIThread.RunJobs();
+                if (Environment.GetEnvironmentVariable("OPENXLR_MIXER_FIT_SIZES") is { Length: > 0 } sizes)
+                {
+                    MixerPopOutWindowTests.CheckPixelSizes(main, sizes);
+                    return;
+                }
                 OutputControlsWindowTests.Check();
                 ProfileSliderWindowTests.Check();
                 ProfileRowWindowTests.Check();

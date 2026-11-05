@@ -55,6 +55,9 @@ public partial class MainWindow
         // Keep inherited bindings alive while the panel has no parent.
         panel.DataContext = DataContext;
         MixerHost.Content = null;
+        // Finish the old window's layout while the panel has no parent.
+        // Pending work there must not arrange it under the new window.
+        UpdateLayout();
         var window = new MixerWindow();
         _mixerWindow = window;
         window.Attach(panel, DataContext, this);

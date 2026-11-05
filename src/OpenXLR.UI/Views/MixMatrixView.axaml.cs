@@ -55,7 +55,12 @@ public partial class MixMatrixView : UserControl
             double frame = LayoutHelper.RoundLayoutValue(border.Left, scale)
                 + LayoutHelper.RoundLayoutValue(border.Right, scale);
             double names = LayoutHelper.RoundLayoutValueUp(GetValue(NameWidthProperty), scale);
-            double available = availableSize.Width - names - frame - mixes * SkinLayoutDefaults.MatrixSpacing;
+            // The outer gap and the gaps inside the items panel are measured
+            // by different stacks, each of which rounds its width up.
+            double gap = SkinLayoutDefaults.MatrixSpacing;
+            double spacing = mixes == 0 ? 0 : LayoutHelper.RoundLayoutValueUp(gap, scale)
+                + LayoutHelper.RoundLayoutValueUp((mixes - 1) * gap, scale);
+            double available = availableSize.Width - names - frame - spacing;
             // Divide in display pixels so rounding every cell cannot make
             // the row wider than the viewport at fractional display scales.
             double fitted = Math.Floor(available * scale / (mixes + 1)) / scale;
