@@ -5,10 +5,13 @@ namespace OpenXLR.Tests;
 
 public sealed class DiagnosticRuntimeTests
 {
+    private static Diagnostics.AudioGraphSummary? ReadGraph(string? json)
+        => Diagnostics.AudioJsonForArchive(json ?? "", pipeWire: true, text => text).Graph;
+
     [Fact]
     public void TheGraphReportsPlaybackAndCaptureWithTheirActualEndpoints()
     {
-        var report = Diagnostics.ReadAudioGraph("""
+        var report = ReadGraph("""
             [
               {"id":0,"type":"PipeWire:Interface:Core","info":{"version":"1.6.10"}},
               {"id":10,"type":"PipeWire:Interface:Node","info":{"state":"running","props":{
@@ -35,6 +38,7 @@ public sealed class DiagnosticRuntimeTests
                 {"subject":0,"key":"unrelated","value":55}]}
             ]
             """);
+        Assert.NotNull(report);
         Assert.True(report.Available);
         Assert.False(report.Truncated);
         Assert.Equal("1.6.10", report.ServerVersion);
@@ -70,10 +74,10 @@ public sealed class DiagnosticRuntimeTests
     [InlineData("{}")]
     public void AFailedDumpIsDistinguishedFromAnEmptyGraph(string? json)
     {
-        var report = Diagnostics.ReadAudioGraph(json);
-        Assert.False(report.Available);
-        Assert.Empty(report.Streams);
-        Assert.True(Diagnostics.ReadAudioGraph("[]").Available);
+        Assert.Null(ReadGraph(json));
+        var empty = Assert.IsType<Diagnostics.AudioGraphSummary>(ReadGraph("[]"));
+        Assert.True(empty.Available);
+        Assert.Empty(empty.Streams);
     }
 
     [Fact]
@@ -93,10 +97,21 @@ public sealed class DiagnosticRuntimeTests
                 },
             },
         }));
-        var report = Diagnostics.ReadAudioGraph(graph);
+        var report = Assert.IsType<Diagnostics.AudioGraphSummary>(ReadGraph(graph));
         Assert.True(report.Truncated);
         Assert.Equal(512, report.Streams.Length);
         Assert.Equal("running", report.Streams[0].State);
         Assert.Equal(256, report.Streams[0].Name!.Length);
+    }
+
+    [Fact]
+    public void WindowsExecutablePathsKeepOnlyTheBasename()
+    {
+        var report = ReadGraph("""
+            [{"id":1,"type":"PipeWire:Interface:Node","info":{"props":{
+              "media.class":"Stream/Output/Audio","application.process.binary":"C:\\Users\\Private\\player.exe"}}}]
+            """);
+        Assert.NotNull(report);
+        Assert.Equal("player.exe", Assert.Single(report.Streams).Executable);
     }
 }

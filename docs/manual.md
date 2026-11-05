@@ -4382,7 +4382,10 @@ source it read, or quotes what both said when neither worked.
 The Flatpak sandbox keeps collecting its own daemon logs and does not read
 host journals or the kernel log. Warnings and command failure notes for the graph dump
 are kept in `pw-dump-errors.txt`, when present, instead of being appended
-to `pw-dump.json`. Plugin evidence includes the
+to `pw-dump.json`. The graph and JSON stream listings mask media names,
+titles, paths and URLs, tag metadata and process arguments. They keep
+executable basenames and audio node names for routing diagnosis. Invalid
+or incomplete JSON is replaced with an omission notice. Plugin evidence includes the
 catalogue, effective bridge setup and latest native scan results. The home path, host name
 and the serial numbers of attached USB devices are redacted, in the
 text files and inside the hex dump of the vendor blocks (the XLR Dock

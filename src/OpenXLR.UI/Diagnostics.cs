@@ -35,7 +35,8 @@ public static partial class Diagnostics
     internal static async Task<string> CollectAsync(DaemonClient client, string? login, string destination, bool deepTrace = false)
     {
         string[] secrets = DefaultSecrets().ToArray();
-        string Clean(string text) => Redact(text, secrets, login);
+        var clean = CreateRedactor(secrets, login);
+        string Clean(string text) => clean(text);
         (string Text, bool Valid) CleanJson(string text)
         {
             string redacted = RedactJsonText(text, secrets, login, out bool valid);
@@ -46,8 +47,8 @@ public static partial class Diagnostics
         if (!OperatingSystem.IsWindows())
             File.SetUnixFileMode(work, UnixFileMode.UserRead | UnixFileMode.UserWrite |
                                        UnixFileMode.UserExecute);
-        Task<string?> Capture(string file, string program, params string[] args)
-            => WriteCmd(Clean, CleanJson, work, file, program, args);
+        Task<AudioGraphSummary?> Capture(string file, string program, params string[] args)
+            => WriteCmd(Clean, work, file, program, args);
         try
         {
             var observation = client.StateForDiagnostics;
@@ -94,6 +95,9 @@ public static partial class Diagnostics
                 attached USB devices (including inside PipeWire node names, but not a USB controller's PCI address) and
                 process-id fields are redacted, and so are browser tab titles
                 and the addresses of browser tabs not routed to a channel.
+                The audio graph and stream listings mask media names, tags,
+                URLs and process arguments. They retain executable basenames
+                and audio node names. Invalid audio JSON is omitted.
                 Files in the archive carry no
                 owner name or id. Review the archive before attaching it to a
                 public issue.
@@ -120,7 +124,7 @@ public static partial class Diagnostics
 
             // Audio stack.
             DateTimeOffset graphAt = DateTimeOffset.UtcNow;
-            AudioGraphSummary graph = ReadAudioGraph(await Capture("pw-dump.json", "pw-dump"));
+            AudioGraphSummary graph = await Capture("pw-dump.json", "pw-dump") ?? UnavailableAudioGraph;
             string applications = JsonSerializer.Serialize(new
             {
                 collectedAt = graphAt,
@@ -525,18 +529,17 @@ public static partial class Diagnostics
         }
     }
 
-    private static async Task<string?> WriteCmd(Func<string, string> clean, Func<string, (string Text, bool Valid)> cleanJson,
-        string dir, string file, string exe, string[] args)
+    private static async Task<AudioGraphSummary?> WriteCmd(Func<string, string> clean, string dir, string file, string exe, string[] args)
     {
         var (output, errors, exitCode, complete) = await RunHelperAsync(exe, args);
         bool json = file.EndsWith(".json", StringComparison.Ordinal);
-        string? jsonInput = null;
+        AudioGraphSummary? graph = null;
         string saved;
         if (json)
         {
-            jsonInput = file == "pw-dump.json" ? GraphForArchive(output) : output;
-            var result = cleanJson(jsonInput);
+            var result = await Task.Run(() => AudioJsonForArchive(output, file == "pw-dump.json", clean));
             saved = result.Text;
+            graph = result.Graph;
             if (!result.Valid) errors += $"\n[{exe} did not return complete valid JSON]";
         }
         else saved = clean(output);
@@ -544,17 +547,7 @@ public static partial class Diagnostics
         await File.WriteAllTextAsync(Path.Combine(dir, file), json ? saved : saved + separator + clean(errors));
         if (json && errors.Length > 0)
             await File.WriteAllTextAsync(Path.Combine(dir, Path.GetFileNameWithoutExtension(file) + "-errors.txt"), clean(errors));
-        return complete && exitCode == 0 ? jsonInput : null;
-    }
-
-    internal static string GraphForArchive(string output)
-    {
-        try
-        {
-            using JsonDocument snapshot = PipeWireSnapshot.Parse(Encoding.UTF8.GetBytes(output));
-            return snapshot.RootElement.GetRawText();
-        }
-        catch (JsonException) { return output; }
+        return complete && exitCode == 0 ? graph : null;
     }
 
     internal static string CommandNotes(string exe, ProcessResult result)
@@ -818,7 +811,7 @@ public static partial class Diagnostics
 
     private static string TryReadFile(string path)
     {
-        try { return File.ReadAllText(path).ReplaceLineEndings(" | "); }
+        try { return RegularFile.ReadText(path, 64 * 1024).ReplaceLineEndings(" | "); }
         catch (IOException) { return "unreadable"; }
         catch (UnauthorizedAccessException) { return "unreadable"; }
     }

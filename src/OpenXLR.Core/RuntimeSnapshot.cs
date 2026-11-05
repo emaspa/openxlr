@@ -26,8 +26,8 @@ internal sealed record RuntimeSnapshot(DateTimeOffset CollectedAt, string Runtim
         Dictionary<string, long> memory = [];
         if (OperatingSystem.IsLinux())
         {
-            memory = ReadKiB(ReadProcFields("/proc/self/status"), StatusMemoryFields);
-            foreach (var field in ReadKiB(ReadProcFields("/proc/self/smaps_rollup"), RollupMemoryFields))
+            memory = ReadKiB(ReadProcFields("/proc/self/status", StatusMemoryFields), StatusMemoryFields);
+            foreach (var field in ReadKiB(ReadProcFields("/proc/self/smaps_rollup", RollupMemoryFields), RollupMemoryFields))
                 memory.Add(field.Key, field.Value);
         }
 
@@ -51,16 +51,30 @@ internal sealed record RuntimeSnapshot(DateTimeOffset CollectedAt, string Runtim
         return values;
     }
 
-    internal static Dictionary<string, string> ReadProcFields(string path)
+    internal static Dictionary<string, string> ReadProcFields(string path, ReadOnlySpan<string> keys)
     {
         var fields = new Dictionary<string, string>(StringComparer.Ordinal);
-        string text;
-        try { text = RegularFile.ReadText(path, 16 * 1024); }
+        Span<char> text = stackalloc char[16 * 1024];
+        int length;
+        try
+        {
+            RegularFile.Require(path);
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete, bufferSize: 1);
+            using var reader = new StreamReader(stream);
+            length = reader.ReadBlock(text);
+            if (length == text.Length && reader.Read() != -1) return fields;
+        }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return fields; }
-        foreach (ReadOnlySpan<char> line in text.AsSpan().EnumerateLines())
+        foreach (ReadOnlySpan<char> line in text[..length].EnumerateLines())
         {
             int separator = line.IndexOf(':');
-            if (separator > 0) fields.TryAdd(line[..separator].ToString(), line[(separator + 1)..].Trim().ToString());
+            if (separator <= 0) continue;
+            foreach (string key in keys)
+                if (line[..separator].SequenceEqual(key))
+                {
+                    fields.TryAdd(key, line[(separator + 1)..].Trim().ToString());
+                    break;
+                }
         }
         return fields;
     }

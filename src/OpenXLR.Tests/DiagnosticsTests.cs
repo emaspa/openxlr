@@ -504,7 +504,7 @@ public sealed class DiagnosticsTests
                   printf '%s\n' 'Server String: /run/user/1000/pulse/native' 'User Name: {{login}}' \
                     'Host Name: {{otherHost}}' 'Server Name: PulseAudio (on PipeWire 1.6.9)' 'Default Sink: OpenXLR_mix_monitor'
                 elif [ "$1" = --format=json ]; then
-                  {{(commandWarning ? "if [ \"$3\" = source-outputs ]; then printf '%s\\n' '{\"note\":\"/home/" + login + "/audio\"'; exit 7; fi" : "")}}
+                  {{(commandWarning ? "if [ \"$3\" = source-outputs ]; then printf '%s\\n' '{\"note\":\"/home/" + login + "/private malformed value\"'; exit 7; fi" : "")}}
                   printf '%s\n' '[{"index":47,"sample_specification":"float32le 2ch 48000Hz","buffer_latency_usec":1024,"properties":{"application.process.user":"{{login}}","application.process.host":"{{otherHost}}","application.process.id":123456} }]'
                 else
                   printf '%s\n' '1	OpenXLR_mix_monitor	PipeWire	float32le 2ch 48000Hz	RUNNING'
@@ -526,7 +526,9 @@ public sealed class DiagnosticsTests
                  {"id":60,"type":"PipeWire:Interface:Node","info":{"props":{"node.name":"OpenXLR_mix_monitor",
                   "media.name":"/run/media/{{login}}/Samples/take.wav","clock.max-quantum":8192} } },
                  {"id":61,"type":"PipeWire:Interface:Node","info":{"state":"running","props":{"media.class":"Stream/Output/Audio",
-                  "application.name":"Player","application.process.binary":"/home/{{login}}/player","media.name":"private fixture title"} } },
+                  "application.name":"Player","application.process.binary":"/home/{{login}}/player","media.name":"private fixture title",
+                  "application.process.args":"private fixture arguments","application.process.id":"private\"id"},
+                  "params":{"Tag":[{"info":{"title":"private fixture tag"},"info":{"title":"second tag"} }]} } },
                  {"id":63,"type":"PipeWire:Interface:Link","info":{"output-node-id":61,"input-node-id":60} }]
                 JSON
                 {{(commandWarning ? "printf '%s\\n' '[{\"id\":62,\"type\":\"PipeWire:Interface:Node\",\"info\":{\"state\":\"error\",\"error\":\"fixture graph error\",\"props\":{\"node.name\":\"OpenXLR_fixture\",\"media.class\":\"Audio/Source\"} } }]'" : "")}}
@@ -720,6 +722,10 @@ public sealed class DiagnosticsTests
             Assert.Equal("player", playback.GetProperty("executable").GetString());
             Assert.Equal("OpenXLR_mix_monitor", Assert.Single(playback.GetProperty("connectedNodes").EnumerateArray()).GetString());
             Assert.DoesNotContain("private fixture title", entries["audio-applications.json"]);
+            Assert.DoesNotContain("private fixture title", entries["pw-dump.json"]);
+            Assert.DoesNotContain("private fixture arguments", entries["pw-dump.json"]);
+            Assert.DoesNotContain("private fixture tag", entries["pw-dump.json"]);
+            Assert.DoesNotContain("private", entries["source-outputs.json"]);
             Assert.StartsWith("ALSA sound cards and their open PCM devices", entries["alsa-pcm.txt"]);
             Assert.DoesNotContain("pw-top.txt", entries.Keys);
             Assert.DoesNotContain("collection.json", entries.Keys);
@@ -727,6 +733,7 @@ public sealed class DiagnosticsTests
             {
                 Assert.Contains("exited with status 7", entries["source-outputs-errors.txt"]);
                 Assert.Contains("did not return complete valid JSON", entries["source-outputs-errors.txt"]);
+                Assert.Contains("could not be safely decoded", entries["source-outputs.json"]);
                 using var deep = System.Text.Json.JsonDocument.Parse(entries["deep-trace.json"]);
                 Assert.True(deep.RootElement.GetProperty("savedDaemonPreferences").GetProperty("submixer").GetBoolean());
                 var installed = Assert.Single(deep.RootElement.GetProperty("installedBuilds").EnumerateArray(),

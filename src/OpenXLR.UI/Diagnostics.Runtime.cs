@@ -1,8 +1,10 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
@@ -22,6 +24,80 @@ public static partial class Diagnostics
 
     internal sealed record AudioGraphSummary(bool Available, bool Truncated, string? ServerVersion,
         IReadOnlyDictionary<string, int> Clock, AudioApplication[] Streams);
+
+    private static readonly AudioGraphSummary UnavailableAudioGraph = new(false, false, null, new Dictionary<string, int>(), []);
+
+    private static readonly HashSet<string> PrivateAudioFields = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "application.process.args", "media.name", "media.title", "media.artist", "media.filename", "media.uri", "Tag",
+    };
+
+    /// <summary>Read one snapshot for both reports, keeping duplicate graph properties while redacting each value.</summary>
+    internal static (string Text, bool Valid, AudioGraphSummary? Graph) AudioJsonForArchive(
+        string output, bool pipeWire, Func<string, string> clean)
+    {
+        try
+        {
+            using JsonDocument document = pipeWire
+                ? PipeWireSnapshot.Parse(Encoding.UTF8.GetBytes(output))
+                : JsonDocument.Parse(output);
+            // Graph objects repeat the same field names and property values.
+            // Bound the cache so distinct labels cannot grow it with the dump.
+            var cleaned = new Dictionary<string, string>(StringComparer.Ordinal);
+            string CleanValue(string value)
+            {
+                if (cleaned.TryGetValue(value, out string? cached)) return cached;
+                string result = clean(value);
+                if (cleaned.Count < 2048 && value.Length <= 256) cleaned.Add(value, result);
+                return result;
+            }
+            var buffer = new ArrayBufferWriter<byte>();
+            using (var writer = new Utf8JsonWriter(buffer, new JsonWriterOptions { Indented = true }))
+                WriteAudioJson(writer, document.RootElement, CleanValue);
+            return (Encoding.UTF8.GetString(buffer.WrittenSpan), true,
+                pipeWire ? ReadAudioGraph(document.RootElement) : null);
+        }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException or ArgumentException)
+        {
+            // A partial or undecodable string can hide private fields from a text redactor.
+            return ("""{"unavailable":"Audio helper output could not be safely decoded."}""", false, null);
+        }
+    }
+
+    private static void WriteAudioJson(Utf8JsonWriter writer, JsonElement value, Func<string, string> clean)
+    {
+        switch (value.ValueKind)
+        {
+            case JsonValueKind.Object:
+                writer.WriteStartObject();
+                foreach (JsonProperty property in value.EnumerateObject())
+                {
+                    string name = property.Name;
+                    writer.WritePropertyName(clean(name));
+                    if (PrivateJsonFields.Contains(name) || PrivateAudioFields.Contains(name))
+                        writer.WriteStringValue("<redacted>");
+                    else if (name.Equals("application.process.binary", StringComparison.OrdinalIgnoreCase)
+                             && property.Value.ValueKind == JsonValueKind.String)
+                        writer.WriteStringValue(clean(ExecutableName(property.Value.GetString()!)));
+                    else WriteAudioJson(writer, property.Value, clean);
+                }
+                writer.WriteEndObject();
+                break;
+            case JsonValueKind.Array:
+                writer.WriteStartArray();
+                foreach (JsonElement item in value.EnumerateArray()) WriteAudioJson(writer, item, clean);
+                writer.WriteEndArray();
+                break;
+            case JsonValueKind.String:
+                writer.WriteStringValue(clean(value.GetString()!));
+                break;
+            default:
+                value.WriteTo(writer);
+                break;
+        }
+    }
+
+    private static string ExecutableName(string path) => path[(path.AsSpan().LastIndexOfAny('/', '\\') + 1)..];
 
     private static async Task WriteSystemInfoAsync(string work, DaemonClient.StateObservation observation,
         DateTimeOffset observedAt, string osRelease, AudioGraphSummary graph, Func<string, string> cleanJson)
@@ -99,16 +175,14 @@ public static partial class Diagnostics
     }
 
     /// <summary>Summarize the same graph snapshot saved in the archive.</summary>
-    internal static AudioGraphSummary ReadAudioGraph(string? json)
+    private static AudioGraphSummary ReadAudioGraph(JsonElement snapshot)
     {
         var clock = new Dictionary<string, int>(StringComparer.Ordinal);
-        using JsonDocument? snapshot = ParseDiagnosticGraph(json);
-        if (snapshot?.RootElement.ValueKind != JsonValueKind.Array) return new(false, false, null, clock, []);
         string? serverVersion = null;
         var nodes = new Dictionary<int, JsonElement>();
         var clients = new Dictionary<int, JsonElement>();
         var links = new List<(int From, int To)>();
-        foreach (JsonElement item in snapshot.RootElement.EnumerateArray())
+        foreach (JsonElement item in snapshot.EnumerateArray())
         {
             if (Number(Property(item, "id")) is not int id || id < 0) continue;
             JsonElement info = Property(item, "info");
@@ -169,19 +243,10 @@ public static partial class Diagnostics
                 truncated = true;
                 endpoints = endpoints[..32];
             }
-            streams.Add(new(Limited(name), binary is null ? null : Limited(Path.GetFileName(binary)),
+            streams.Add(new(Limited(name), binary is null ? null : Limited(ExecutableName(binary)),
                 playback ? "playback" : "capture", Limited(GraphText(info, "state")), endpoints));
         }
         return new(true, truncated, Limited(serverVersion), clock, streams.ToArray());
-    }
-
-    private static JsonDocument? ParseDiagnosticGraph(string? json)
-    {
-        if (json is null) return null;
-        // PipeWire emits repeated "info" properties inside SPA Tag params.
-        // Those params are outside the summary's allowlist.
-        try { return JsonDocument.Parse(json); }
-        catch (JsonException) { return null; }
     }
 
     private static JsonElement Property(JsonElement obj, string key)

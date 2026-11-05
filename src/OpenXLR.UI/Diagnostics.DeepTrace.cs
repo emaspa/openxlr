@@ -16,6 +16,8 @@ public static partial class Diagnostics
 
     private static readonly string[] SystemMemoryFields =
         ["MemTotal", "MemAvailable", "SwapTotal", "SwapFree", "Shmem"];
+    private static readonly string[] ProcessStatusFields =
+        ["Uid", "Name", "Threads", "State", .. RuntimeSnapshot.StatusMemoryFields];
 
     internal sealed record ProgramCount(string Name, int Instances);
     internal sealed record ProcessMemory(string Name, char? State, int? Threads, Dictionary<string, long> MemoryKiB);
@@ -57,9 +59,9 @@ public static partial class Diagnostics
     {
         var programs = new Dictionary<string, int>(StringComparer.Ordinal);
         var audio = new List<ProcessMemory>();
-        var system = RuntimeSnapshot.ReadKiB(RuntimeSnapshot.ReadProcFields(Path.Combine(proc, "meminfo")), SystemMemoryFields);
+        var system = RuntimeSnapshot.ReadKiB(RuntimeSnapshot.ReadProcFields(Path.Combine(proc, "meminfo"), SystemMemoryFields), SystemMemoryFields);
         string windowId = windowPid.ToString(CultureInfo.InvariantCulture);
-        var windowStatus = RuntimeSnapshot.ReadProcFields(Path.Combine(proc, windowId, "status"));
+        var windowStatus = RuntimeSnapshot.ReadProcFields(Path.Combine(proc, windowId, "status"), ProcessStatusFields);
         var window = OwnedProcessName(windowStatus, user) is { } name ? ReadProcessMemory(windowStatus, name) : null;
         bool available = false, truncated = false;
         int reads = 0, unreadable = 0;
@@ -71,7 +73,7 @@ public static partial class Diagnostics
                 if (!int.TryParse(id, NumberStyles.None, CultureInfo.InvariantCulture, out int pid) || pid <= 0) continue;
                 available = true;
                 if (++reads > MaxProcessReads) { truncated = true; break; }
-                var status = pid == windowPid ? windowStatus : RuntimeSnapshot.ReadProcFields(Path.Combine(dir, "status"));
+                var status = pid == windowPid ? windowStatus : RuntimeSnapshot.ReadProcFields(Path.Combine(dir, "status"), ProcessStatusFields);
                 if (status.Count == 0) { unreadable++; continue; }
                 if (OwnedProcessName(status, user) is not { } program) continue;
                 if (programs.TryGetValue(program, out int count)) programs[program] = count + 1;

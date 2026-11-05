@@ -22,6 +22,7 @@ public sealed class DiagnosticDeepTraceTests : IDisposable
         WriteStatus("109", "token\\nprivate");
         WriteStatus("ignored", "non-numeric-directory");
         Directory.CreateDirectory(Path.Combine(_proc, "110")); // Process exited before status could be read.
+        WriteStatus("111", "oversized-status", metrics: "extra: " + new string('x', 17 * 1024));
         File.WriteAllText(Path.Combine(_proc, "103", "cmdline"), "private command line");
         File.WriteAllText(Path.Combine(_proc, "103", "environ"), "private environment");
 
@@ -29,7 +30,7 @@ public sealed class DiagnosticDeepTraceTests : IDisposable
 
         Assert.True(context.Available);
         Assert.False(context.Truncated);
-        Assert.Equal(1, context.Unreadable);
+        Assert.Equal(2, context.Unreadable);
         Assert.Equal(3, context.SystemMemoryKiB.Count);
         Assert.Equal(64000, context.SystemMemoryKiB["MemAvailable"]);
         Assert.NotNull(context.Window);
