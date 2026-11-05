@@ -68,6 +68,7 @@ public static partial class Diagnostics
             meta.AppendLine($"os-release: {Clean(osRelease)}");
             meta.AppendLine($"dotnet: {Environment.Version}");
             foreach (string line in CardProfileLines(observation.Json)) meta.AppendLine(Clean(line));
+            foreach (string line in ClockLines(observation.Json)) meta.AppendLine(Clean(line));
             await File.WriteAllTextAsync(Path.Combine(work, "meta.txt"), meta.ToString());
             await File.WriteAllTextAsync(Path.Combine(work, "PRIVACY.txt"), """
                 This archive is created locally and is never uploaded automatically.
@@ -305,6 +306,33 @@ public static partial class Diagnostics
         }
         if (lines.Count == 0)
             lines.Add("audio cards: not checked (no unit driven, the software mixer off, or a daemon without the check)");
+        return lines;
+    }
+
+    /// <summary>
+    /// The audio clock from the daemon's state in plain lines: the node that
+    /// drives the mixer's graph, then each of the mixer's devices that follows
+    /// it and whether it is resampled, microphones first, so an archive says
+    /// at a glance when a microphone runs on another device's clock.
+    /// </summary>
+    internal static IReadOnlyList<string> ClockLines(string? state)
+    {
+        JsonNode? node = null;
+        if (state is not null)
+            try { node = JsonNode.Parse(state); }
+            catch (JsonException) { }
+        if (AudioClock.From(node?["mixer"]) is not { } clock)
+            return ["audio clock: not reported (the software mixer off, no driver in the graph, or a daemon without the readout)"];
+        string? priority = node?["mixer"]?["clock"]?["driver"]?["priorityDriver"]?.ToJsonString();
+        List<string> lines = [$"audio clock (last read by the daemon): {clock.DriverName} drives the mixer's graph ({clock.Driver}, priority.driver {(priority is null or "null" ? "unset" : priority)})"];
+        foreach (AudioClockFollower follower in clock.Followers.OrderByDescending(f => f.Microphone).ThenByDescending(f => f.Resampled))
+        {
+            string kind = follower.Microphone ? "microphone" : follower.Role switch
+            {
+                "capture" => "capture input", "unitInput" => "interface input", "unitOutput" => "interface output", _ => "output",
+            };
+            lines.Add($"{kind} {follower.Description} follows {clock.DriverName} ({(follower.Resampled ? "resampled" : "same clock")}), node {follower.Name}");
+        }
         return lines;
     }
 

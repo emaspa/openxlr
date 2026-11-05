@@ -161,6 +161,18 @@ driven card's profile and whether it has an input. The Wave XLR Pro keeps
 its pro-audio rule. Tested with pw-dump fixtures in the shape of an
 owner's archive, not yet on an original Wave XLR.
 
+The daemon reports the audio clock: the device that drives the mixer's
+graph and which of the mixer's devices follow it resampled. Flow shows it
+under its title and on the cards of resampled inputs and outputs. When a
+microphone's interface follows another device, such as a capture card,
+the UI shows a warning with a link to the
+[manual](manual.md#garbled-mic), the journal logs it, and the diagnostics
+archive names the microphone and the device it follows. The daemon reads
+it with one pw-dump after the graph changes and starts nothing while the
+graph stays as it is. Tested with pw-dump fixtures from an owner's archive
+and from the maintainer's desk, and on a private PipeWire server where the
+driver changes hands.
+
 ## Software controls
 
 These run on the computer. The microphone EQ is on XLR 1 and XLR 2

@@ -904,6 +904,14 @@ public sealed partial class MainViewModel : ViewModelBase
     /// <summary>The driven unit's audio card has no microphone input; the warning then offers the manual section.</summary>
     public bool CardProfileProblem { get => _cardProfileProblem; private set => Set(ref _cardProfileProblem, value); }
 
+    private AudioClock? _clock;
+    /// <summary>The node that drives the mixer's graph and the devices that follow it, or null.</summary>
+    internal AudioClock? Clock { get => _clock; private set => Set(ref _clock, value); }
+
+    private bool _clockProblem;
+    /// <summary>A microphone's interface follows another device's clock; the warning then offers the manual section.</summary>
+    public bool ClockProblem { get => _clockProblem; private set => Set(ref _clockProblem, value); }
+
     /// <summary>Apply a state push from the daemon without echoing it back.</summary>
     private void Apply(JsonNode node)
     {
@@ -911,6 +919,9 @@ public sealed partial class MainViewModel : ViewModelBase
         _client.EqProfiles.Apply(node);
         DaemonWarning = node["warning"]?.GetValue<string>() ?? "";
         CardProfileProblem = node["cardProfile"]?["problem"] is JsonValue problem && problem.TryGetValue(out string? text) && text.Length > 0;
+        Clock = AudioClock.From(node["mixer"]);
+        // A card without a microphone input is the bigger problem and keeps its own button.
+        ClockProblem = !CardProfileProblem && Clock is { MicResampled: true };
         MixerWaiting = node["mixerWaiting"]?.GetValue<bool>() ?? false;
         try
         {

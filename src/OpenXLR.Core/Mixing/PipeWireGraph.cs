@@ -23,7 +23,7 @@ internal sealed class PipeWireGraph : IDisposable
     private JsonElement[]? _snapshot;
     private bool _ready;
     private long _size;
-    private long _defaultRevision, _portRevision;
+    private long _defaultRevision, _portRevision, _clockRevision;
     internal long DefaultRevision { get { lock (_gate) return _defaultRevision; } }
 
     internal PipeWireGraph(Action<string>? note = null, string executable = "pw-dump")
@@ -54,6 +54,13 @@ internal sealed class PipeWireGraph : IDisposable
             return (_portRevision, revision == _portRevision ? null : Read());
         }
     }
+
+    /// <summary>
+    /// Moves when a node arrives, leaves, changes state or changes a property
+    /// the mixer's clock is read from, and when a link arrives or leaves:
+    /// what can hand a graph to another driver. Null while reconnecting.
+    /// </summary>
+    internal long? ClockRevision { get { lock (_gate) return _ready ? _clockRevision : null; } }
 
     private async Task RunAsync()
     {
@@ -96,6 +103,7 @@ internal sealed class PipeWireGraph : IDisposable
                     _ready = false;
                     _defaultRevision++;
                     _portRevision++;
+                    _clockRevision++;
                     _objects.Clear();
                     _snapshot = null;
                     _size = 0;
@@ -115,7 +123,7 @@ internal sealed class PipeWireGraph : IDisposable
             var updates = new Dictionary<uint, (JsonElement Value, int Size)>();
             long sizeAfter = _size;
             int countAfter = _objects.Count;
-            bool portsChanged = false;
+            bool portsChanged = false, clockChanged = false;
             foreach (JsonElement item in batch.EnumerateArray())
             {
                 uint id = PipeWireSnapshot.RegistryId(item);
@@ -132,6 +140,7 @@ internal sealed class PipeWireGraph : IDisposable
                 if (DeviceName(old.Value) != DeviceName(removed ? default : item))
                     _defaultRevision++;
                 if (!portsChanged) portsChanged = PortInputsChanged(old.Value, removed ? default : item);
+                if (!clockChanged) clockChanged = ClockChanged(old.Value, removed ? default : item);
                 if (removed) updates[id] = default;
                 else
                 {
@@ -153,6 +162,7 @@ internal sealed class PipeWireGraph : IDisposable
             _size = sizeAfter;
             _snapshot = null;
             if (portsChanged) _portRevision++;
+            if (clockChanged) _clockRevision++;
             // Removals can arrive before pw-dump's initial core-sync batch.
             // Only that full batch contains the Core object on a new connection.
             if (!_ready)
@@ -163,6 +173,38 @@ internal sealed class PipeWireGraph : IDisposable
             return _ready;
         }
     }
+
+    // A node's params and latency change many times a second; only what the
+    // mixer's clock is read from (MixerClock.Read), a node's state and links
+    // coming and going can move it. PipeWire does not announce a changed
+    // node.driver-id to subscribers, so these are the signs to read it again.
+    private static readonly string[] ClockKeys =
+        ["node.name", "node.description", "node.driver-id", "priority.driver", "clock.name", "device.id", "device.api"];
+
+    private static bool ClockChanged(JsonElement previous, JsonElement current)
+    {
+        if (IsType(previous, "PipeWire:Interface:Link") || IsType(current, "PipeWire:Interface:Link"))
+            return IsType(previous, "PipeWire:Interface:Link") != IsType(current, "PipeWire:Interface:Link");
+        JsonElement? before = NodeInfo(previous), after = NodeInfo(current);
+        if (before is not { } old) return after is not null;
+        if (after is not { } now) return true;
+        if (!Same(old, now, "state")) return true;
+        if (!old.TryGetProperty("props", out JsonElement a) || !now.TryGetProperty("props", out JsonElement b)
+            || a.ValueKind != JsonValueKind.Object || b.ValueKind != JsonValueKind.Object) return true;
+        foreach (string key in ClockKeys)
+            if (!Same(a, b, key)) return true;
+        return false;
+    }
+
+    private static bool Same(JsonElement a, JsonElement b, string key)
+    {
+        bool had = a.TryGetProperty(key, out JsonElement x), has = b.TryGetProperty(key, out JsonElement y);
+        return had == has && (!had || JsonElement.DeepEquals(x, y));
+    }
+
+    private static JsonElement? NodeInfo(JsonElement item)
+        => IsType(item, "PipeWire:Interface:Node")
+            && item.TryGetProperty("info", out var info) && info.ValueKind == JsonValueKind.Object ? info : null;
 
     private static bool PortInputsChanged(JsonElement previous, JsonElement current)
     {

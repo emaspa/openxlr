@@ -3581,6 +3581,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 RouteAppsByDefault = Matcher.RouteByDefault,
                 BlockSize = _blockSize,
                 BrowserTabs = BrowserTabsLocked(),
+                Clock = _clock,
             }));
         }
     }
@@ -3839,6 +3840,10 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         _inputDevice = null;
         _inputWarning = null;
         _stripSources.Clear();
+        _clock = null;
+        _clockRevision = null;
+        _clockDueAt = null;
+        _clockDevices = "";
         _stripWarnings.Clear();
         _captureWarnings.Clear();
         _wiredBindings.Clear();

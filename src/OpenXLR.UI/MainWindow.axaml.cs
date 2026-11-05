@@ -30,6 +30,9 @@ public partial class MainWindow : Window
     /// <summary>The manual section on a card profile without a microphone input.</summary>
     internal const string CardProfileManualLink = "https://github.com/emaspa/openxlr/blob/main/docs/manual.md#card-profile";
 
+    /// <summary>The manual section on a microphone that sounds garbled, which starts with the audio clock.</summary>
+    internal const string GarbledMicrophoneManualLink = "https://github.com/emaspa/openxlr/blob/main/docs/manual.md#garbled-mic";
+
     public MainWindow() : this(new DaemonClient(), syncDesktopVolume: true) { }
 
     /// <summary>
@@ -348,6 +351,8 @@ public partial class MainWindow : Window
     private void OnManageBrowserTabs(object? sender, RoutedEventArgs e) => OpenBrowserTabs();
 
     private void OnCardProfileManual(object? sender, RoutedEventArgs e) => ExternalLink.Open(CardProfileManualLink);
+
+    private void OnClockManual(object? sender, RoutedEventArgs e) => ExternalLink.Open(GarbledMicrophoneManualLink);
 
     /// <summary>
     /// Opens the browser tabs dialog the way Manage opens its window, owned by

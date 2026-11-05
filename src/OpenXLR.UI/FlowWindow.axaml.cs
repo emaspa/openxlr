@@ -87,6 +87,7 @@ public partial class FlowWindow : Window
         if (_vm is null) return;
         FlowGraph next = FlowGraph.From(_vm);
         UpdateHint();
+        UpdateClock();
         if (_graph.Nodes.SequenceEqual(next.Nodes) && _graph.Routes.SequenceEqual(next.Routes)) return;
         _graph = next;
         if (_selected is not null && !_graph.Nodes.Any(n => n.Key == _selected)) _selected = null;
@@ -98,6 +99,17 @@ public partial class FlowWindow : Window
         FlowHint.Text = _vm is { DaemonConnected: false } ? Localizer.Text("FlowDaemonDisconnected")
             : _vm is { HasMixer: false } ? Localizer.Text("FlowSubmixerOff")
             : Localizer.Text("ClickAnyElementToTraceItsSignalPath");
+    }
+
+    /// <summary>The clock lines under the hint: the driver, and each microphone resampled to it.</summary>
+    private void UpdateClock()
+    {
+        AudioClock? clock = _vm is { DaemonConnected: true, HasMixer: true } ? _vm.Clock : null;
+        FlowClock.IsVisible = clock is not null;
+        FlowClock.Text = clock is null ? "" : Localizer.Format("FlowClock", clock.DriverName);
+        string[] resampled = clock is null ? [] : [.. clock.Followers.Where(f => f.Microphone && f.Resampled).Select(f => f.Description).Distinct()];
+        FlowClockWarning.IsVisible = resampled.Length > 0;
+        FlowClockWarning.Text = resampled.Length == 0 ? "" : Localizer.Format("FlowClockResampled", string.Join(", ", resampled));
     }
 
     private void ConstrainToScreen()

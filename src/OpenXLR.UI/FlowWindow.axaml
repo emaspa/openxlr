@@ -27,6 +27,11 @@
       <StackPanel Spacing="5">
         <TextBlock Text="{loc:Text Key=AudioFlow}" FontSize="{DynamicResource UiText.FontSize24}" FontWeight="SemiBold" Foreground="{DynamicResource Ox.Flow.Text}"/>
         <TextBlock Name="FlowHint" Text="{loc:Text Key=ClickAnyElementToTraceItsSignalPath}" FontSize="{DynamicResource UiText.FontSize12}" Foreground="{DynamicResource Ox.Flow.TextDim}"/>
+        <!-- the device whose clock the mixer's graph runs on, and a
+             microphone resampled to it -->
+        <TextBlock Name="FlowClock" FontSize="{DynamicResource UiText.FontSize12}" Foreground="{DynamicResource Ox.Flow.TextDim}" IsVisible="False"/>
+        <TextBlock Name="FlowClockWarning" FontSize="{DynamicResource UiText.FontSize12}" Foreground="{DynamicResource Ox.Text.Warning}"
+                   TextWrapping="Wrap" IsVisible="False"/>
       </StackPanel>
       <Button Name="ClearSelection" Grid.Column="1" Content="{loc:Text Key=ClearSelection}" Click="OnClearSelection"
               VerticalAlignment="Center" FontSize="{DynamicResource UiText.FontSize12}" Background="{DynamicResource Ox.Flow.Card}" Foreground="{DynamicResource Ox.Flow.Text}"

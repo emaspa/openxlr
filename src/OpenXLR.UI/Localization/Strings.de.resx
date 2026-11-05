@@ -823,6 +823,15 @@
   <data name="Flow" xml:space="preserve">
     <value>Signalfluss</value>
   </data>
+  <data name="FlowClock" xml:space="preserve">
+    <value>Audiotakt: {0}</value>
+  </data>
+  <data name="FlowClockResampled" xml:space="preserve">
+    <value>{0} folgt diesem Takt und wird umgerechnet. Ein verzerrt oder roboterhaft klingendes Mikrofon kann daher kommen.</value>
+  </data>
+  <data name="FlowResampledTo" xml:space="preserve">
+    <value>Auf den Takt von {0} umgerechnet</value>
+  </data>
   <data name="FlowDaemonDisconnected" xml:space="preserve">
     <value>Daemon nicht verbunden. Auf aktuelles Routing warten.</value>
   </data>
@@ -1381,6 +1390,9 @@
   </data>
   <data name="OpenTheManualSectionOnPluginEditors" xml:space="preserve">
     <value>Handbuch zu Plugin-Editoren öffnen</value>
+  </data>
+  <data name="OpenTheManualSectionOnAGarbledMicrophone" xml:space="preserve">
+    <value>Handbuch zu einem verzerrt oder roboterhaft klingenden Mikrofon öffnen</value>
   </data>
   <data name="OpenTheManualSectionOnSkins" xml:space="preserve">
     <value>Handbuch zu Skins öffnen</value>
