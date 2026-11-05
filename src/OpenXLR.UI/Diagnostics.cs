@@ -21,7 +21,7 @@ namespace OpenXLR.UI;
 /// graph, daemon logs, configs and system info. Nothing is uploaded anywhere;
 /// the file lands in the user's home directory.
 /// </summary>
-public static class Diagnostics
+public static partial class Diagnostics
 {
     private static readonly JsonSerializerOptions ReportJson = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
@@ -46,14 +46,16 @@ public static class Diagnostics
         if (!OperatingSystem.IsWindows())
             File.SetUnixFileMode(work, UnixFileMode.UserRead | UnixFileMode.UserWrite |
                                        UnixFileMode.UserExecute);
-        Task Capture(string file, string program, params string[] args)
+        Task<string?> Capture(string file, string program, params string[] args)
             => WriteCmd(Clean, CleanJson, work, file, program, args);
         try
         {
             var observation = client.StateForDiagnostics;
+            DateTimeOffset observedAt = DateTimeOffset.UtcNow;
+            string osRelease = TryReadFile("/etc/os-release");
             var meta = new StringBuilder();
             meta.AppendLine($"OpenXLR diagnostics {stamp}");
-            meta.AppendLine($"state collected at: {DateTimeOffset.UtcNow:O}");
+            meta.AppendLine($"state collected at: {observedAt:O}");
             meta.AppendLine($"version: {AppVersion.Current}");
             meta.AppendLine($"window build version: {Clean(AppVersion.BuildVersion)}");
             meta.AppendLine($"window build id: {typeof(AppVersion).Assembly.ManifestModule.ModuleVersionId:D}");
@@ -61,7 +63,7 @@ public static class Diagnostics
             meta.AppendLine($"daemon state received at: {observation.ReceivedAt?.ToString("O") ?? "unavailable"}");
             var (unameOutput, unameErrors) = await RunCommandAsync("uname", ["-a"]);
             meta.AppendLine($"uname: {Clean(unameOutput + unameErrors)}");
-            meta.AppendLine($"os-release: {TryReadFile("/etc/os-release")}");
+            meta.AppendLine($"os-release: {Clean(osRelease)}");
             meta.AppendLine($"dotnet: {Environment.Version}");
             foreach (string line in CardProfileLines(observation.Json)) meta.AppendLine(Clean(line));
             await File.WriteAllTextAsync(Path.Combine(work, "meta.txt"), meta.ToString());
@@ -72,6 +74,9 @@ public static class Diagnostics
                 native audio-server and session-manager journal entries from the current boot,
                 kernel messages about USB, sound and power management from the current boot,
                 the status of open ALSA devices, application audio metadata,
+                a summary of playback and recording streams and their connected
+                audio nodes, system and desktop session details, and the
+                versions reported by local audio tools,
                 configuration files, plugin names and paths, the plugin catalogue,
                 Wine/yabridge versions and status, latest scan results, the saved
                 output of plugin scans that failed, and system
@@ -100,7 +105,17 @@ public static class Diagnostics
             await WritePluginDataAsync(client, work, TimeSpan.FromSeconds(15), login);
 
             // Audio stack.
-            await Capture("pw-dump.json", "pw-dump");
+            DateTimeOffset graphAt = DateTimeOffset.UtcNow;
+            AudioGraphSummary graph = ReadAudioGraph(await Capture("pw-dump.json", "pw-dump"));
+            string applications = JsonSerializer.Serialize(new
+            {
+                collectedAt = graphAt,
+                graph.Available,
+                graph.Truncated,
+                graph.Streams,
+            }, ReportJson);
+            await File.WriteAllTextAsync(Path.Combine(work, "audio-applications.json"), CleanJson(applications).Text);
+            await WriteSystemInfoAsync(work, observation, observedAt, osRelease, graph, text => CleanJson(text).Text);
             await Capture("pactl-info.txt", "pactl", "info");
             await Capture("wpctl-status.txt", "wpctl", "status");
             await Capture("sinks.txt", "pactl", "list", "short", "sinks");
@@ -496,15 +511,17 @@ public static class Diagnostics
         }
     }
 
-    private static async Task WriteCmd(Func<string, string> clean, Func<string, (string Text, bool Valid)> cleanJson,
+    private static async Task<string?> WriteCmd(Func<string, string> clean, Func<string, (string Text, bool Valid)> cleanJson,
         string dir, string file, string exe, string[] args)
     {
-        var (output, errors) = await RunCommandAsync(exe, args);
+        var (output, errors, exitCode, complete) = await RunHelperAsync(exe, args);
         bool json = file.EndsWith(".json", StringComparison.Ordinal);
+        string? jsonInput = null;
         string saved;
         if (json)
         {
-            var result = cleanJson(file == "pw-dump.json" ? GraphForArchive(output) : output);
+            jsonInput = file == "pw-dump.json" ? GraphForArchive(output) : output;
+            var result = cleanJson(jsonInput);
             saved = result.Text;
             if (!result.Valid) errors += $"\n[{exe} did not return complete valid JSON]";
         }
@@ -513,6 +530,7 @@ public static class Diagnostics
         await File.WriteAllTextAsync(Path.Combine(dir, file), json ? saved : saved + separator + clean(errors));
         if (json && errors.Length > 0)
             await File.WriteAllTextAsync(Path.Combine(dir, Path.GetFileNameWithoutExtension(file) + "-errors.txt"), clean(errors));
+        return complete && exitCode == 0 ? jsonInput : null;
     }
 
     internal static string GraphForArchive(string output)
@@ -538,7 +556,7 @@ public static class Diagnostics
 
     internal static async Task<(string Output, string Errors)> RunCommandAsync(string exe, string[] args)
     {
-        var (output, errors, _) = await RunHelperAsync(exe, args);
+        var (output, errors, _, _) = await RunHelperAsync(exe, args);
         return (output, errors);
     }
 
@@ -546,7 +564,7 @@ public static class Diagnostics
     /// <see cref="RunCommandAsync"/> with the helper's exit status as well:
     /// -1 when it could not be started or did not finish on its own.
     /// </summary>
-    private static async Task<(string Output, string Errors, int ExitCode)> RunHelperAsync(string exe, string[] args)
+    private static async Task<(string Output, string Errors, int ExitCode, bool Complete)> RunHelperAsync(string exe, string[] args)
     {
         try
         {
@@ -554,9 +572,10 @@ public static class Diagnostics
             // killed with its children and the archive says so.
             ProcessResult r = await ProcessRunner.RunAsync(exe, args, TimeSpan.FromSeconds(15),
                 stdoutCap: 8 * 1024 * 1024, stderrCap: 64 * 1024);
-            return (r.StdoutText, r.Stderr + CommandNotes(exe, r), r.TimedOut || r.Cancelled ? -1 : r.ExitCode);
+            return (r.StdoutText, r.Stderr + CommandNotes(exe, r), r.TimedOut || r.Cancelled ? -1 : r.ExitCode,
+                !r.TimedOut && !r.Cancelled && !r.Truncated && !r.Incomplete);
         }
-        catch (Exception ex) { return ("", $"failed to run {exe}: {ex.Message}", -1); }
+        catch (Exception ex) { return ("", $"failed to run {exe}: {ex.Message}", -1, false); }
     }
 
     /// <summary>
@@ -589,7 +608,7 @@ public static class Diagnostics
         // One line more than is kept: when it arrives, something was left out.
         string[] args = [.. selection, "-b", "-o", "short-iso-precise", "--no-pager",
             "-n", (JournalLineLimit + 1).ToString(CultureInfo.InvariantCulture)];
-        var (output, errors, _) = await RunHelperAsync(journalctl, args);
+        var (output, errors, _, _) = await RunHelperAsync(journalctl, args);
         string kept = KeepNewest(output, out string? cut);
         var text = new StringBuilder();
         if (cut is not null) text.Append(cut).Append('\n');
@@ -611,7 +630,7 @@ public static class Diagnostics
         var text = new StringBuilder();
         // No line limit here: journalctl lists a grep with --lines newest
         // first on some versions, and the filter already keeps this small.
-        var (output, errors, status) = await RunHelperAsync(journalctl,
+        var (output, errors, status, _) = await RunHelperAsync(journalctl,
             ["-k", "-b", "-o", "short-iso-precise", "--no-pager", "--case-sensitive=false", "-g", KernelLogPattern]);
         string body;
         if (JournalRefused(output, errors))
@@ -620,7 +639,7 @@ public static class Diagnostics
                 .Append("distributions members of the systemd-journal, adm or wheel group can. `journalctl -k -b`\n")
                 .Append("run as such a member, or with sudo, shows it. What journalctl said:\n")
                 .Append(errors.TrimEnd()).Append("\n\n");
-            var (kernel, dmesgErrors, dmesgStatus) = await RunHelperAsync(dmesg, ["--time-format=iso"]);
+            var (kernel, dmesgErrors, dmesgStatus, _) = await RunHelperAsync(dmesg, ["--time-format=iso"]);
             if (dmesgStatus != 0 || !HasLogLines(kernel))
             {
                 text.Append("The kernel's own buffer could not be read either (dmesg; kernel.dmesg_restrict is\n")
@@ -638,7 +657,7 @@ public static class Diagnostics
         {
             // A journalctl built without pattern matching: take the newest
             // kernel lines and filter them here.
-            var (all, allErrors, _) = await RunHelperAsync(journalctl,
+            var (all, allErrors, _, _) = await RunHelperAsync(journalctl,
                 ["-k", "-b", "-o", "short-iso-precise", "--no-pager", "-n", (JournalLineLimit + 1).ToString(CultureInfo.InvariantCulture)]);
             text.Append($"This journalctl cannot filter by pattern, so the newest {JournalLineLimit} kernel lines were\n")
                 .Append("filtered here for USB, sound and power management lines.\n");

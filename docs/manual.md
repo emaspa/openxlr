@@ -4419,6 +4419,23 @@ connection discards the previous connection's state until its first update
 arrives. The graph and vendor blocks are collected separately and can
 describe a later moment.
 
+Start with `system-info.json` to compare the window and daemon builds and
+see the distribution, kernel, CPU architectures, .NET runtime, desktop and
+session type. A Flatpak report describes the window's sandbox and the
+kernel it runs on. The file also lists the running PipeWire server version,
+the graph's sample rate and quantum settings, and the versions reported by
+the available PipeWire, WirePlumber, PulseAudio and ALSA tools. A version
+probe that fails leaves its outcome beside the tool's name.
+
+`audio-applications.json` lists playback and capture streams in the same
+PipeWire snapshot as `pw-dump.json`. It shows application names, executable
+basenames, stream state and the audio nodes each stream is actually linked
+to, including OpenXLR channels. Streams can be idle, disconnected or
+running. Internal audio links and meters are omitted from this summary.
+The summary reads the existing snapshot and collects no process list,
+command lines or media titles. It shows when the graph was unavailable and
+when the limit of 512 streams or 32 linked nodes per stream was reached.
+
 Configuration copies are limited to 4 MiB per file, the preference reader's
 limit. Symbolic links, non-regular files and files that cannot be read are
 replaced with an omission notice. An unavailable configuration does not stop

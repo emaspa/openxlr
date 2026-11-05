@@ -496,7 +496,9 @@ public sealed class DiagnosticsTests
                 esac
                 """);
             ExecutableScript.Write(Path.Combine(bin, "pactl"), $$"""
-                if [ "$1" = info ]; then
+                if [ "$1" = --version ]; then
+                  printf '%s\n' 'pactl fixture 17.0'
+                elif [ "$1" = info ]; then
                   printf '%s\n' 'Server String: /run/user/1000/pulse/native' 'User Name: {{login}}' \
                     'Host Name: {{otherHost}}' 'Server Name: PulseAudio (on PipeWire 1.6.9)' 'Default Sink: OpenXLR_mix_monitor'
                 elif [ "$1" = --format=json ]; then
@@ -515,12 +517,15 @@ public sealed class DiagnosticsTests
             string warning = commandWarning ? $"printf '%s\\n' 'warning for {login}@{machine}: optional metadata unavailable' >&2\n" : "";
             ExecutableScript.Write(Path.Combine(bin, "pw-dump"), warning + $$"""
                 cat <<'JSON'
-                [{"id":0,"type":"PipeWire:Interface:Core","info":{"user-name":"{{login}}","host-name":"{{otherHost}}","name":"pipewire-0",
+                [{"id":0,"type":"PipeWire:Interface:Core","info":{"version":"1.6.9","user-name":"{{login}}","host-name":"{{otherHost}}","name":"pipewire-0",
                   "props":{"core.name":"pipewire-{{login}}-1655","default.clock.max-quantum":2048} } },
                  {"id":32,"type":"PipeWire:Interface:Client","info":{"props":{"application.process.user":"{{login}}",
                   "application.process.host":"{{otherHost}}","core.name":"pipewire-{{login}}-1585","application.name":"WirePlumber"} } },
                  {"id":60,"type":"PipeWire:Interface:Node","info":{"props":{"node.name":"OpenXLR_mix_monitor",
-                  "media.name":"/run/media/{{login}}/Samples/take.wav","clock.max-quantum":8192} } }]
+                  "media.name":"/run/media/{{login}}/Samples/take.wav","clock.max-quantum":8192} } },
+                 {"id":61,"type":"PipeWire:Interface:Node","info":{"state":"running","props":{"media.class":"Stream/Output/Audio",
+                  "application.name":"Player","application.process.binary":"/home/{{login}}/player","media.name":"private fixture title"} } },
+                 {"id":63,"type":"PipeWire:Interface:Link","info":{"output-node-id":61,"input-node-id":60} }]
                 JSON
                 {{(commandWarning ? "printf '%s\\n' '[{\"id\":62,\"type\":\"PipeWire:Interface:Node\",\"info\":{\"state\":\"error\",\"error\":\"fixture graph error\",\"props\":{\"node.name\":\"OpenXLR_fixture\",\"media.class\":\"Audio/Source\"} } }]'" : "")}}
                 """);
@@ -553,6 +558,7 @@ public sealed class DiagnosticsTests
                 };
                 if (commandWarning)
                 {
+                    initial["daemonVersion"] = "0.2.3";
                     initial["daemonBuildVersion"] = "0.2.3+" + new string('a', 40);
                     initial["daemonBuildId"] = "12345678-1234-1234-1234-123456789012";
                 }
@@ -660,6 +666,24 @@ public sealed class DiagnosticsTests
             using var streams = System.Text.Json.JsonDocument.Parse(entries["sink-inputs.json"]);
             Assert.Equal(1024, streams.RootElement[0].GetProperty("buffer_latency_usec").GetInt32());
             Assert.Equal("<redacted>", streams.RootElement[0].GetProperty("properties").GetProperty("application.process.id").GetString());
+            using var runtime = System.Text.Json.JsonDocument.Parse(entries["system-info.json"]);
+            Assert.Equal(buildVersion, runtime.RootElement.GetProperty("window").GetProperty("buildVersion").GetString());
+            var daemon = runtime.RootElement.GetProperty("daemon");
+            Assert.True(daemon.GetProperty("connected").GetBoolean());
+            Assert.Equal(commandWarning ? "0.2.3" : null, daemon.GetProperty("version").GetString());
+            Assert.Equal(commandWarning ? "0.2.3+" + new string('a', 40) : null, daemon.GetProperty("buildVersion").GetString());
+            var runtimeAudio = runtime.RootElement.GetProperty("audio");
+            Assert.Equal("1.6.9", runtimeAudio.GetProperty("pipeWireServerVersion").GetString());
+            var pactl = Assert.Single(runtimeAudio.GetProperty("tools").EnumerateArray(),
+                tool => tool.GetProperty("tool").GetString() == "pactl");
+            Assert.Equal("pactl fixture 17.0", pactl.GetProperty("version").GetString());
+            using var applications = System.Text.Json.JsonDocument.Parse(entries["audio-applications.json"]);
+            Assert.True(applications.RootElement.GetProperty("available").GetBoolean());
+            var playback = Assert.Single(applications.RootElement.GetProperty("streams").EnumerateArray());
+            Assert.Equal("Player", playback.GetProperty("name").GetString());
+            Assert.Equal("player", playback.GetProperty("executable").GetString());
+            Assert.Equal("OpenXLR_mix_monitor", Assert.Single(playback.GetProperty("connectedNodes").EnumerateArray()).GetString());
+            Assert.DoesNotContain("private fixture title", entries["audio-applications.json"]);
             Assert.StartsWith("ALSA sound cards and their open PCM devices", entries["alsa-pcm.txt"]);
             Assert.DoesNotContain("pw-top.txt", entries.Keys);
             Assert.DoesNotContain("collection.json", entries.Keys);
