@@ -1090,8 +1090,9 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
 
 ## Other
 
-- After an upgrade, a newly opened native window tries once to restart an
-  active daemon user service that reports an older version. The version
+- After an upgrade, a newly opened native window can restart its daemon
+  user service when it reports an older version. The user session keeps
+  one automatic attempt per UI version. The version
   banner offers a manual restart when needed.
 - Options stays open beside the mixer without blocking its controls. The
   header's gear returns to the same window, including when it is minimized.

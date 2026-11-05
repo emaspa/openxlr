@@ -18,7 +18,7 @@ public sealed class DaemonRestartViewModel : ViewModelBase
 
     internal DaemonRestartViewModel(Func<Task<bool>> restart) => _restart = restart;
 
-    internal Func<Task<bool>>? AutomaticRestart { get; set; }
+    internal Func<int, Task<bool?>>? AutomaticRestart { get; set; }
 
     public bool CanRestart => !_busy;
     public string? Status { get => _status; private set => Set(ref _status, value); }
@@ -40,10 +40,10 @@ public sealed class DaemonRestartViewModel : ViewModelBase
     public Task<bool> RestartAsync()
     {
         _upgradeChecked = true;
-        return RestartAsync(_restart);
+        return RestartAsync(async () => await _restart());
     }
 
-    internal Task CheckForUpgradeAsync(string? daemonVersion)
+    internal Task CheckForUpgradeAsync(string? daemonVersion, int peerPid)
     {
         if (_upgradeChecked || AutomaticRestart is not { } restart || daemonVersion is null)
             return Task.CompletedTask;
@@ -51,10 +51,10 @@ public sealed class DaemonRestartViewModel : ViewModelBase
         // Use the first reported version. A reconnect or an unsuccessful
         // replacement must not keep interrupting audio in this UI session.
         _upgradeChecked = true;
-        return UpdateChecker.Newer(AppVersion.Current, daemonVersion) ? RestartAsync(restart) : Task.CompletedTask;
+        return UpdateChecker.Newer(AppVersion.Current, daemonVersion) ? RestartAsync(() => restart(peerPid)) : Task.CompletedTask;
     }
 
-    private async Task<bool> RestartAsync(Func<Task<bool>> restart)
+    private async Task<bool> RestartAsync(Func<Task<bool?>> restart)
     {
         if (_busy) return false;
         _reconnected = false;
@@ -63,11 +63,14 @@ public sealed class DaemonRestartViewModel : ViewModelBase
         Status = Localizer.Text("RestartingDaemon");
         try
         {
-            bool restarted = await restart();
-            Status = restarted
-                ? _reconnected ? null : Localizer.Text("ServiceRestartedWaiting")
-                : Localizer.Text("RestartFailedManualDaemon");
-            return restarted;
+            bool? restarted = await restart();
+            Status = restarted switch
+            {
+                true when !_reconnected => Localizer.Text("ServiceRestartedWaiting"),
+                false => Localizer.Text("RestartFailedManualDaemon"),
+                _ => null,
+            };
+            return restarted == true;
         }
         catch (Exception)
         {

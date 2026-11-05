@@ -3160,9 +3160,10 @@ release keeps running after an upgrade. If the UI was open before the
 upgrade, quit it from the tray and open it again first. The old UI keeps
 talking to the old daemon and cannot reach the new one.
 
-When a newly opened native UI connects to an older daemon, it tries once
-to restart the active `openxlr-daemon` user service. Audio can briefly
-drop while the service comes back. The UI reconnects automatically. If
+When a newly opened native UI connects to an older daemon that belongs to
+the `openxlr-daemon` user service, it tries to restart it. One automatic
+attempt per UI version is kept for the lifetime of the user runtime
+directory. Audio can briefly drop while the service comes back. The UI reconnects automatically. If
 the daemon still differs, the version banner offers **Restart daemon**.
 Flatpak and older daemons that cannot report their version use the same
 manual restart controls.

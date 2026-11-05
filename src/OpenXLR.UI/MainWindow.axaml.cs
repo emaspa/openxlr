@@ -181,7 +181,8 @@ public partial class MainWindow : Window
     public bool StartsHidden { get; }
 
     internal void EnableAutomaticDaemonRestart()
-        => _vm.DaemonRestart.AutomaticRestart = () => Task.Run(StartupIntegration.TryRestartRunningDaemonService);
+        => _vm.DaemonRestart.AutomaticRestart = pid =>
+            Task.Run(() => StartupIntegration.TryRestartRunningDaemonService(pid, () => _client.IsConnectedTo(pid)));
 
     internal void ShowMixer()
     {

@@ -46,11 +46,15 @@ internal static class OlderDaemonWindowTests
         string log = Path.Combine(bin, "calls");
         string? previousPath = Environment.GetEnvironmentVariable("PATH");
         string? previousFlatpak = Environment.GetEnvironmentVariable("FLATPAK_ID");
-        ExecutableScript.Write(Path.Combine(bin, "systemctl"),
-            "#!/bin/sh\nprintf '%s\\n' \"$*\" >> " + InstallationDoctor.Quote(log) + "\nexit 0\n");
+        ExecutableScript.Write(Path.Combine(bin, "systemctl"), $$"""
+            #!/bin/sh
+            printf '%s\n' "$*" >> {{InstallationDoctor.Quote(log)}}
+            if [ "$2" = show ]; then printf '%s\n' {{Environment.ProcessId}}; fi
+            exit 0
+            """);
         Environment.SetEnvironmentVariable("PATH", bin);
         Environment.SetEnvironmentVariable("FLATPAK_ID", null);
-        string restartVerb = automatic ? "try-restart" : "restart";
+        string restartVerb = automatic ? "--job-mode=fail try-restart" : "restart";
         bool Restarted() => File.Exists(log) &&
             File.ReadAllLines(log).Contains($"--user {restartVerb} openxlr-daemon.service");
         // For the legacy case the probe stands in for the old loopback port.
@@ -90,7 +94,7 @@ internal static class OlderDaemonWindowTests
 
             await WaitFor(() => Restarted() && vm.DaemonRestart.CanRestart, "The service did not restart.");
             Assert.Equal(automatic
-                ? ["--user is-active --quiet openxlr-daemon.service", "--user try-restart openxlr-daemon.service"]
+                ? ["--user show --property=MainPID --value openxlr-daemon.service", "--user --job-mode=fail try-restart openxlr-daemon.service"]
                 : ["--user reset-failed openxlr-daemon.service", "--user restart openxlr-daemon.service"], File.ReadAllLines(log));
 
             if (daemon is not null) await StopDaemon(daemon);

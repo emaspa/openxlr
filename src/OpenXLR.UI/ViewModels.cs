@@ -67,7 +67,15 @@ public sealed partial class MainViewModel : ViewModelBase
         OutputVolumeRange.Changed += RequestDesktopVolumeBoost;
         Inserts = new InsertsViewModel(client, "xlr1", 1, "XLR 1");
         Inserts2 = new InsertsViewModel(client, "xlr2", 1, "XLR 2");
-        _client.StateReceived += node => Dispatcher.UIThread.Post(() => Apply(node));
+        _client.StateReceived += node =>
+        {
+            int peerPid = _client.StateForDiagnostics.PeerProcessId;
+            Dispatcher.UIThread.Post(() =>
+            {
+                Apply(node);
+                if (_client.IsConnectedTo(peerPid)) _ = DaemonRestart.CheckForUpgradeAsync(DaemonVersion, peerPid);
+            });
+        };
         _client.ConnectionChanged += up => Dispatcher.UIThread.Post(() =>
         {
             DaemonConnected = up;
@@ -1027,7 +1035,6 @@ public sealed partial class MainViewModel : ViewModelBase
             Status = DeviceConnected ? Localizer.Text("StatusReady") : Localizer.Text("StatusNoDevice");
         }
         finally { _applying = false; }
-        _ = DaemonRestart.CheckForUpgradeAsync(DaemonVersion);
         StateApplied?.Invoke();
     }
 

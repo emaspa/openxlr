@@ -29,28 +29,30 @@ public sealed class DaemonRestartTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task OlderDaemonIsRestartedOnceAndManualRetryStaysAvailable(bool succeeds)
+    [InlineData(null)]
+    public async Task OlderDaemonIsRestartedOnceAndManualRetryStaysAvailable(bool? succeeds)
     {
-        var finish = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finish = new TaskCompletionSource<bool?>(TaskCreationOptions.RunContinuationsAsynchronously);
         int automatic = 0, manual = 0;
         var model = new DaemonRestartViewModel(() => { manual++; return Task.FromResult(true); })
         {
-            AutomaticRestart = () => { automatic++; return finish.Task; },
+            AutomaticRestart = _ => { automatic++; return finish.Task; },
         };
 
-        await model.CheckForUpgradeAsync(null);
+        await model.CheckForUpgradeAsync(null, 42);
         Assert.Equal(0, automatic);
-        Task upgrade = model.CheckForUpgradeAsync("0.1.0");
+        Task upgrade = model.CheckForUpgradeAsync("0.1.0", 42);
         Assert.False(model.CanRestart);
         Assert.False(await model.RestartAsync());
-        await model.CheckForUpgradeAsync("0.1.0");
+        await model.CheckForUpgradeAsync("0.1.0", 42);
         finish.SetResult(succeeds);
         await upgrade;
-        Assert.Contains(succeeds ? "Service restarted" : "Restart failed", model.Status);
+        if (succeeds is null) Assert.Null(model.Status);
+        else Assert.Contains(succeeds.Value ? "Service restarted" : "Restart failed", model.Status);
 
         model.ConnectionChanged(false);
         model.ConnectionChanged(true);
-        await model.CheckForUpgradeAsync("0.1.0");
+        await model.CheckForUpgradeAsync("0.1.0", 42);
         Assert.Equal(1, automatic);
         Assert.Equal(0, manual);
         Assert.True(await model.RestartAsync());
@@ -66,11 +68,11 @@ public sealed class DaemonRestartTests
         int automatic = 0;
         var model = new DaemonRestartViewModel(() => Task.FromResult(true))
         {
-            AutomaticRestart = () => { automatic++; return Task.FromResult(true); },
+            AutomaticRestart = _ => { automatic++; return Task.FromResult<bool?>(true); },
         };
 
-        await model.CheckForUpgradeAsync(version == "current" ? AppVersion.Current : version);
-        await model.CheckForUpgradeAsync("0.1.0");
+        await model.CheckForUpgradeAsync(version == "current" ? AppVersion.Current : version, 42);
+        await model.CheckForUpgradeAsync("0.1.0", 42);
         Assert.Equal(0, automatic);
     }
 
@@ -80,11 +82,11 @@ public sealed class DaemonRestartTests
         int automatic = 0;
         var model = new DaemonRestartViewModel(() => Task.FromResult(true))
         {
-            AutomaticRestart = () => { automatic++; return Task.FromResult(true); },
+            AutomaticRestart = _ => { automatic++; return Task.FromResult<bool?>(true); },
         };
 
         await model.RestartAsync();
-        await model.CheckForUpgradeAsync("0.1.0");
+        await model.CheckForUpgradeAsync("0.1.0", 42);
         Assert.Equal(0, automatic);
     }
 

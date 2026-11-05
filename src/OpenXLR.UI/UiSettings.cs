@@ -1,6 +1,9 @@
 using OpenXLR.UI.Localization;
 using System;
 using System.Diagnostics;
+using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -1118,20 +1121,43 @@ public static class StartupIntegration
     /// </summary>
     internal static Func<bool>? AttachedRestart { get; set; }
 
-    /// <summary>Only replace an active user service during an automatic upgrade.</summary>
-    internal static bool TryRestartRunningDaemonService()
-        => Systemctl("is-active", "--quiet", "openxlr-daemon.service")
-            && Systemctl("try-restart", "openxlr-daemon.service");
+    /// <summary>Try once per UI version in the runtime directory. Null means no restart was requested.</summary>
+    internal static bool? TryRestartRunningDaemonService(int peerPid, Func<bool> isCurrent)
+    {
+        const string unit = "openxlr-daemon.service";
+        if (peerPid <= 0 || !isCurrent() ||
+            RunSystemctl("show", "--property=MainPID", "--value", unit) is not { Ok: true } service ||
+            !int.TryParse(service.StdoutText.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int mainPid) ||
+            mainPid != peerPid || !isCurrent())
+            return null;
 
-    private static bool Systemctl(params string[] args)
+        // Publish the attempt before asking systemd so concurrent launches or
+        // relaunches cannot keep restarting a daemon that stays on the old build.
+        string version = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(AppVersion.Current)));
+        string path = Path.Combine(OpenXlrPaths.RuntimeDir, $"upgrade-restart-{version}");
+        try
+        {
+            using var attempt = OpenXlrPaths.CreatePrivate(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+
+        return isCurrent() ? Systemctl("--job-mode=fail", "try-restart", unit) : null;
+    }
+
+    private static bool Systemctl(params string[] args) => RunSystemctl(args)?.Ok == true;
+
+    private static ProcessResult? RunSystemctl(params string[] args)
     {
         try
         {
             // Bounded: a systemctl that hangs (a stuck user manager) is
             // killed after 15 s instead of being left behind.
             return ProcessRunner.Run("systemctl", ["--user", .. args], TimeSpan.FromSeconds(15),
-                stdoutCap: 64 * 1024, stderrCap: 64 * 1024).Ok;
+                stdoutCap: 64 * 1024, stderrCap: 64 * 1024);
         }
-        catch (Exception) { return false; }
+        catch (Exception) { return null; }
     }
 }
