@@ -463,12 +463,12 @@ test('only the offscreen document can report capture state', { timeout: 2000 }, 
   assert.equal(f.posts.at(-1).tabs.find(tab => tab.id === 1).capturing, false);
 });
 
-test('installation and update leave output access setup to the user', { timeout: 2000 }, async () => {
+test('a fresh install opens the output access page and an update does not', { timeout: 2000 }, async () => {
   const f = fixture(); await f.ready;
   f.chrome.runtime.onInstalled.emit({ reason: 'update' }); await tick();
   assert.equal(f.opened, undefined);
   f.chrome.runtime.onInstalled.emit({ reason: 'install' }); await tick();
-  assert.equal(f.opened, undefined);
+  assert.deepEqual(f.opened, ['chrome-extension://openxlr-test/devices.html']);
 });
 
 test('OpenXLR activation brings the tab forward and starts it while Chrome still holds the grant', { timeout: 2000 }, async () => {

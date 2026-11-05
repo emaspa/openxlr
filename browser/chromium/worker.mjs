@@ -461,7 +461,11 @@ function removeTab(id) {
 chrome.tabs.onRemoved.addListener(removeTab);
 chrome.tabs.onReplaced.addListener((_, removed) => removeTab(removed));
 chrome.runtime.onStartup.addListener(connect);
-chrome.runtime.onInstalled.addListener(connect);
+chrome.runtime.onInstalled.addListener(details => {
+  connect();
+  // Output access is the one step Chrome asks for once; offer it straight after installing.
+  if (details?.reason === 'install') void chrome.tabs.create({ url: chrome.runtime.getURL('devices.html') }).catch(() => {});
+});
 
 // A service worker can sleep while its offscreen audio continues. Recover the
 // active sessions before publishing a replacement provider to the daemon.

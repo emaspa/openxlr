@@ -149,9 +149,10 @@ Chrome has no Cebuano, so a browser set to it shows English.
    moves made in pavucontrol. Choosing a channel for the whole browser,
    from that list, an OpenDeck key or a desktop key, saves it for later
    and moves nothing while the option is on.
-2. Allow output access once per browser profile. Open the companion's
-   popup and choose **Allow output access**. Until access is granted, the
-   popup offers this setup and keeps Activate unavailable. Chromium requires microphone permission to reveal
+2. Allow output access once per browser profile. The companion opens the
+   Output access page by itself right after it is installed, and until
+   access is granted its popup says so, offers the page, and keeps Activate
+   unavailable. Chromium requires microphone permission to reveal
    non-default output devices. Press the setup button to grant it; the
    companion immediately stops the temporary microphone stream and neither
    records nor forwards it.

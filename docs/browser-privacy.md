@@ -37,8 +37,9 @@ tracking, and it does not sell or share data with anyone.
   that matches the OpenXLR channel you chose.
 - **Microphone permission, once.** The browser shows the names of audio
   outputs other than the default only after it has been given microphone
-  permission. Open Output access from the popup and choose Allow device
-  discovery to request it. The extension opens the microphone and stops
+  permission. The Output access page opens once after the extension is
+  installed, and the popup offers it until access is granted; choose Allow
+  device discovery there to request it. The extension opens the microphone and stops
   it immediately. No microphone audio is recorded,
   stored, sent to OpenXLR or routed.
 
