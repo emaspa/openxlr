@@ -2516,7 +2516,7 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
     <value>EQ ng mikropono, sa simula ng input bago ang low cut, ClipGuard at mga plugin. Nakailaw kapag naka-on, pula kapag hindi gumagana. Binubuksan ang editor.</value>
   </data>
   <data name="EqButtonTipCapture" xml:space="preserve">
-    <value>EQ ng mikropono, sa computer na ito sa simula ng input bago ang mga plugin. Nakailaw kapag naka-on, pula kapag hindi gumagana. Binubuksan ang editor.</value>
+    <value>EQ ng input, sa computer na ito sa simula ng input bago ang mga plugin. Nakailaw kapag naka-on, pula kapag hindi gumagana. Binubuksan ang editor.</value>
   </data>
   <data name="EqButtonNameOn" xml:space="preserve">
     <value>EQ ng {0}, on</value>

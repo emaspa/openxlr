@@ -2580,7 +2580,7 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
     <value>L'EQ del microfono, all'inizio dell'ingresso prima del taglio basse, di ClipGuard e dei plugin. Acceso quando è attivo, rosso quando non può funzionare. Apre l'editor.</value>
   </data>
   <data name="EqButtonTipCapture" xml:space="preserve">
-    <value>L'EQ del microfono, su questo computer all'inizio dell'ingresso prima dei plugin. Acceso quando è attivo, rosso quando non può funzionare. Apre l'editor.</value>
+    <value>L'EQ dell'ingresso, su questo computer all'inizio dell'ingresso prima dei plugin. Acceso quando è attivo, rosso quando non può funzionare. Apre l'editor.</value>
   </data>
   <data name="EqButtonNameOn" xml:space="preserve">
     <value>EQ di {0}, acceso</value>

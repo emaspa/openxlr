@@ -2539,7 +2539,7 @@ Selecciona la interfaz que controla OpenXLR</value>
     <value>El ecualizador del micrófono, al principio de la entrada, antes del corte de graves, ClipGuard y los plugins. Se ilumina mientras está activo y se pone rojo si no puede funcionar. Abre el editor.</value>
   </data>
   <data name="EqButtonTipCapture" xml:space="preserve">
-    <value>El ecualizador del micrófono, en este ordenador al principio de la entrada, antes de los plugins. Se ilumina mientras está activo y se pone rojo si no puede funcionar. Abre el editor.</value>
+    <value>El ecualizador de la entrada, en este ordenador al principio de la entrada, antes de los plugins. Se ilumina mientras está activo y se pone rojo si no puede funcionar. Abre el editor.</value>
   </data>
   <data name="EqButtonNameOn" xml:space="preserve">
     <value>EQ de {0}, activo</value>

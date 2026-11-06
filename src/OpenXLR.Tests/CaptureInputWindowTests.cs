@@ -38,9 +38,9 @@ public sealed class CaptureInputWindowTests
         state["daemonVersion"] = AppVersion.Current;
         state["capabilities"]!["auxInput"] = true;
         state["devices"]!.AsArray().Add(JsonNode.Parse("""{"name":"usb.guest","description":"USB microphone with a long source description that must fit beside its connection light","kind":1,"channels":1}"""));
-        // The daemon reports an EQ on the two mono microphones, none on the stereo pair.
+        // The daemon reports an EQ on every capture input, the two mono microphones and the stereo pair.
         foreach (JsonNode? channel in state["mixer"]!["channels"]!.AsArray())
-            if (channel!["id"]!.GetValue<string>() is "guest" or "offline") channel["eq"] = CaptureEq(enabled: channel["id"]!.GetValue<string>() == "guest");
+            if (channel!["id"]!.GetValue<string>() is "guest" or "offline" or "camera") channel["eq"] = CaptureEq(enabled: channel["id"]!.GetValue<string>() == "guest");
         state["mixer"]!["inserts"]!["guest"] = JsonNode.Parse("""
             [{"insert":{"id":"compressor","plugin":"mono","kind":"lv2","label":"Guest compressor with a long label","params":{}},"latencyMilliseconds":2.5}]
             """);
@@ -89,11 +89,11 @@ public sealed class CaptureInputWindowTests
                     Assert.All(block.GetVisualDescendants().OfType<Control>().Where(c => c.IsEffectivelyVisible
                         && c is (Button and not RepeatButton) or Slider or TextBlock or CaptureSourceChip), c => AssertInside(c, block));
                     Assert.Single(block.GetVisualDescendants().OfType<Button>(), b => b.Name == "CaptureInserts" && b.IsEffectivelyVisible);
-                    // A mono microphone's EQ sits right after its source chip, level with it; the stereo pair has none.
+                    // A capture input's EQ, on a mono port or a stereo pair, sits right after its source chip, level with it.
                     var input = (ChannelViewModel)block.DataContext!;
                     Button eq = block.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "CaptureEq");
-                    Assert.Equal(input.Id != "camera", eq.IsEffectivelyVisible);
-                    if (eq.IsEffectivelyVisible) CheckCaptureEq(block, eq, $"{input.Id} at {width}");
+                    Assert.True(eq.IsEffectivelyVisible, input.Id);
+                    CheckCaptureEq(block, eq, $"{input.Id} at {width}");
                     // A name without an icon starts where the chip and the labels under it start.
                     TextBlock name = block.GetVisualDescendants().OfType<TextBlock>().First(t => t.Classes.Contains("strip") && t.IsEffectivelyVisible);
                     CaptureSourceChip chip = block.GetVisualDescendants().OfType<CaptureSourceChip>().Single();
@@ -390,15 +390,19 @@ public sealed class CaptureInputWindowTests
     /// The guest microphone's EQ chip in classic INPUTS opens the editor XLR 1
     /// uses, on the guest's own EQ, with no switch between the unit and this
     /// computer, no hardware badge and no unit note, and a status line that
-    /// names no low cut or ClipGuard. The stereo pair has no chip. Its switch
-    /// sends setEqEnabled for the guest.
+    /// names no low cut or ClipGuard. Its switch sends setEqEnabled for the
+    /// guest. The stereo pair's chip, off, opens the same editor on its own EQ,
+    /// whose switch sends setEqEnabled for the stereo pair.
     /// </summary>
     private static async Task CaptureEqEditor(MainWindow window, MainViewModel main, ConcurrentQueue<JsonNode> eqCommands)
     {
         Layout(window, 1040, 900);
         Button Chip(string id) => window.GetVisualDescendants().OfType<Button>()
             .Single(b => b.Name == "CaptureEq" && b.DataContext is ChannelViewModel c && c.Id == id);
-        Assert.False(Chip("camera").IsEffectivelyVisible);
+        Button stereo = Chip("camera");
+        Assert.True(stereo.IsEffectivelyVisible);
+        Assert.DoesNotContain("fxOn", stereo.Classes);
+        Assert.Equal(Localizer.Text("EqButtonTipCapture"), ToolTip.GetTip(stereo));
         Button button = Chip("guest");
         Assert.True(button.IsEffectivelyVisible);
         Assert.Contains("fxOn", button.Classes);
@@ -433,6 +437,25 @@ public sealed class CaptureInputWindowTests
             Assert.DoesNotContain("fxOn", button.Classes);
         }
         finally { editor.Close(); }
+
+        while (eqCommands.TryDequeue(out _)) { }
+        stereo.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        await Until(() => window.OwnedWindows.OfType<EqWindow>().Any(w => w.IsVisible));
+        EqWindow pair = window.OwnedWindows.OfType<EqWindow>().Single(w => w.IsVisible);
+        try
+        {
+            Assert.Same(main.CaptureInputs.Single(c => c.Id == "camera").Eq, pair.DataContext);
+            Assert.Equal(Localizer.Format("EqWindowTitle", "Stereo capture card"), pair.Title);
+            Assert.False(pair.FindControl<WrapPanel>("EqProcessing")!.IsEffectivelyVisible);
+            Assert.Equal(Localizer.Text("EqStatusOff"), pair.FindControl<TextBlock>("EqStatus")!.Text);
+            pair.FindControl<ToggleButton>("EqSwitch")!.IsChecked = true;
+            await Until(() => eqCommands.Any(), () => "no EQ command");
+            JsonNode sent = Assert.Single(eqCommands);
+            Assert.Equal("setEqEnabled", sent["cmd"]!.GetValue<string>());
+            Assert.Equal("camera", sent["channel"]!.GetValue<string>());
+            Assert.True(sent["value"]!.GetValue<bool>());
+        }
+        finally { pair.Close(); }
     }
 
     private static async Task Until(Func<bool> ready, Func<string>? describe = null)

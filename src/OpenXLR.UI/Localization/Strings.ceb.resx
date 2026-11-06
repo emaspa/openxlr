@@ -2516,7 +2516,7 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
     <value>EQ sa mikropono, sa sinugdanan sa input sa dili pa ang low cut, ClipGuard ug mga plugin. Mosiga kon naka-on, pula kon dili makadagan. Ablihan ang editor.</value>
   </data>
   <data name="EqButtonTipCapture" xml:space="preserve">
-    <value>EQ sa mikropono, niining computer sa sinugdanan sa input sa dili pa ang mga plugin. Mosiga kon naka-on, pula kon dili makadagan. Ablihan ang editor.</value>
+    <value>EQ sa input, niining computer sa sinugdanan sa input sa dili pa ang mga plugin. Mosiga kon naka-on, pula kon dili makadagan. Ablihan ang editor.</value>
   </data>
   <data name="EqButtonNameOn" xml:space="preserve">
     <value>EQ sa {0}, on</value>

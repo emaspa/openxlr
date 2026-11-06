@@ -783,8 +783,8 @@ public sealed class EqEditorModelTests
     /// the Flow card show it ahead of the input's plugins, and the editor
     /// offers no unit, no choice and no badge even from a state that named
     /// one, and says the EQ runs at the head of the input before the plugins.
-    /// A capture input on a stereo pair, which the daemon reports no EQ for,
-    /// gets none.
+    /// A capture input on a stereo pair has the same EQ; one an older daemon
+    /// reports no EQ for gets none.
     /// </summary>
     [Fact]
     public void ACaptureInputHasTheSameEqRunningOnThisComputer()
@@ -796,7 +796,9 @@ public sealed class EqEditorModelTests
         string mixer = """
             {"channels":[{"id":"guest","name":"Guest","captureSource":"usb.guest","captureMonoChannel":0,"captureConnected":true,
                           "microphone":true,"chainWidth":1,"volume":1,"eq":EQ},
-                         {"id":"camera","name":"Camera","captureSource":"usb.camera","captureConnected":true,"chainWidth":2,"volume":1}],
+                         {"id":"camera","name":"Camera","captureSource":"usb.camera","captureConnected":true,
+                          "microphone":false,"chainWidth":2,"volume":1,"eq":EQ},
+                         {"id":"older","name":"Older","captureSource":"usb.older","captureConnected":true,"chainWidth":2,"volume":1}],
              "mixes":[{"id":"monitor","name":"Monitor A"}],
              "inserts":{"guest":[{"insert":{"id":"comp","plugin":"urn:comp","kind":"lv2","label":"Compressor","params":{}}}]}}
             """.Replace("EQ", software.ToJsonString());
@@ -804,9 +806,14 @@ public sealed class EqEditorModelTests
         using var matrix = new MixMatrixViewModel(model);
         ChannelViewModel guest = model.Channels.Single(c => c.Id == "guest");
         MicEqViewModel eq = Assert.IsType<MicEqViewModel>(guest.Eq);
-        Assert.Null(model.Channels.Single(c => c.Id == "camera").Eq);
+        MicEqViewModel stereo = Assert.IsType<MicEqViewModel>(model.Channels.Single(c => c.Id == "camera").Eq);
+        Assert.True(stereo.IsCaptureInput);
+        Assert.False(stereo.HasProcessingChoice);
+        Assert.Equal(Localizer.Text("EqStatusSoftwareCapture"), stereo.Status);
+        Assert.Null(model.Channels.Single(c => c.Id == "older").Eq);
         Assert.True(matrix.Rows.Single(r => r.Channel.Id == "guest").ShowsEq);
-        Assert.False(matrix.Rows.Single(r => r.Channel.Id == "camera").ShowsEq);
+        Assert.True(matrix.Rows.Single(r => r.Channel.Id == "camera").ShowsEq);
+        Assert.False(matrix.Rows.Single(r => r.Channel.Id == "older").ShowsEq);
         Assert.Equal("guest", eq.Channel);
         Assert.True(eq.IsCaptureInput);
         Assert.False(eq.HasProcessingChoice);
