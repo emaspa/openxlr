@@ -3905,7 +3905,7 @@ Selecciona la interfaz que controla OpenXLR</value>
     <value>Construye {0}</value>
   </data>
   <data name="DaemonUpgradeTitle" xml:space="preserve"><value>¿Reiniciar OpenXLR después de la actualización?</value></data>
-  <data name="DaemonUpgradeQuestion" xml:space="preserve"><value>Sigue en ejecución una versión anterior del servicio de audio. ¿Reiniciar el servicio y esta ventana ahora? El audio se interrumpirá brevemente. Elige Más tarde para mantener el audio en funcionamiento.</value></data>
+  <data name="DaemonUpgradeQuestion" xml:space="preserve"><value>Sigue en ejecución una versión anterior del servicio de audio. ¿Reiniciar el servicio y la interfaz ahora? El audio se interrumpirá brevemente. Elige Más tarde para mantener el audio en funcionamiento.</value></data>
   <data name="Restart" xml:space="preserve"><value>Reiniciar</value></data>
   <data name="Later" xml:space="preserve"><value>Más tarde</value></data>
 </root>

@@ -4452,7 +4452,7 @@ When the window is in the tray, open it again from the OpenXLR icon or your app 
     <value>Open startup options</value>
   </data>
   <data name="DaemonUpgradeTitle" xml:space="preserve"><value>Restart OpenXLR after the update?</value></data>
-  <data name="DaemonUpgradeQuestion" xml:space="preserve"><value>An older daemon is still running. Restart the daemon and this window now? Audio stops briefly. Choose Later to keep your audio running.</value></data>
+  <data name="DaemonUpgradeQuestion" xml:space="preserve"><value>An older daemon is still running. Restart the daemon and the UI now? Audio stops briefly. Choose Later to keep your audio running.</value></data>
   <data name="Restart" xml:space="preserve"><value>Restart</value></data>
   <data name="Later" xml:space="preserve"><value>Later</value></data>
 </root>

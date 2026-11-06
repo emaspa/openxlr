@@ -4212,7 +4212,7 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
     <value>Binubuo ang {0}</value>
   </data>
   <data name="DaemonUpgradeTitle" xml:space="preserve"><value>I-restart ang OpenXLR pagkatapos ng update?</value></data>
-  <data name="DaemonUpgradeQuestion" xml:space="preserve"><value>Tumatakbo pa ang mas lumang audio daemon. I-restart ngayon ang daemon at ang window na ito? Sandaling mapuputol ang audio. Piliin ang Mamaya para tuloy ang audio.</value></data>
+  <data name="DaemonUpgradeQuestion" xml:space="preserve"><value>Tumatakbo pa ang mas lumang audio daemon. I-restart ngayon ang daemon at ang UI? Sandaling mapuputol ang audio. Piliin ang Mamaya para tuloy ang audio.</value></data>
   <data name="Restart" xml:space="preserve"><value>I-restart</value></data>
   <data name="Later" xml:space="preserve"><value>Mamaya</value></data>
 </root>

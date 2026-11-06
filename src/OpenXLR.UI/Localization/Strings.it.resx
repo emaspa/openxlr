@@ -4288,7 +4288,7 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
     <value>Molto più grande (120%)</value>
   </data>
   <data name="DaemonUpgradeTitle" xml:space="preserve"><value>Riavviare OpenXLR dopo l'aggiornamento?</value></data>
-  <data name="DaemonUpgradeQuestion" xml:space="preserve"><value>È ancora in esecuzione una versione precedente del servizio audio. Riavviare il servizio e questa finestra adesso? L'audio si interromperà brevemente. Scegli Più tardi per mantenere l'audio attivo.</value></data>
+  <data name="DaemonUpgradeQuestion" xml:space="preserve"><value>È ancora in esecuzione una versione precedente del servizio audio. Riavviare il servizio e l'interfaccia adesso? L'audio si interromperà brevemente. Scegli Più tardi per mantenere l'audio attivo.</value></data>
   <data name="Restart" xml:space="preserve"><value>Riavvia</value></data>
   <data name="Later" xml:space="preserve"><value>Più tardi</value></data>
 </root>

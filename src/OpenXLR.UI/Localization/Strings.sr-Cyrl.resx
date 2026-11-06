@@ -4212,7 +4212,7 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
     <value>Прави {0}</value>
   </data>
   <data name="DaemonUpgradeTitle" xml:space="preserve"><value>Поново покренути OpenXLR после ажурирања?</value></data>
-  <data name="DaemonUpgradeQuestion" xml:space="preserve"><value>Старија верзија аудио сервиса још ради. Поново покренути сервис и овај прозор сада? Звук ће се накратко прекинути. Изаберите Касније да звук настави да ради.</value></data>
+  <data name="DaemonUpgradeQuestion" xml:space="preserve"><value>Старија верзија аудио сервиса још ради. Поново покренути сервис и кориснички интерфејс сада? Звук ће се накратко прекинути. Изаберите Касније да звук настави да ради.</value></data>
   <data name="Restart" xml:space="preserve"><value>Поново покрени</value></data>
   <data name="Later" xml:space="preserve"><value>Касније</value></data>
 </root>
