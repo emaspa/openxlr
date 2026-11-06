@@ -68,14 +68,47 @@ public sealed partial class Mixer
             _config = _config with { Channels = [.. _config.Channels.Select(c => c.Id == channel ? next : c)] };
             try { PersistLocked(save); }
             catch { _config = before; throw; }
-            _clockBridgeErrors.Remove(channel);
-            if (!_built) return;
-            // Sound Check holds the old path; it ends rather than play from a
-            // node that is about to change.
-            if (_soundCheckChannel == channel)
-                StopSoundCheckLocked(restore: false, error: "Sound Check stopped because the capture input's clock changed.");
-            RebindCaptureFeedLocked(next);
-            if (!on) RemoveClockBridgeLocked(channel);
+            RewireOwnClockLocked(next);
+        }
+    }
+
+    /// <summary>
+    /// Rewire a capture input whose own clock just changed in the layout:
+    /// the device to its bridge or back to the channel.
+    /// </summary>
+    private void RewireOwnClockLocked(ChannelDefinition next)
+    {
+        _clockBridgeErrors.Remove(next.Id);
+        if (!_built) return;
+        // Sound Check holds the old path; it ends rather than play from a
+        // node that is about to change.
+        if (_soundCheckChannel == next.Id)
+            StopSoundCheckLocked(restore: false, error: "Sound Check stopped because the capture input's clock changed.");
+        RebindCaptureFeedLocked(next);
+        if (!next.CaptureOwnClock) RemoveClockBridgeLocked(next.Id);
+    }
+
+    /// <summary>The own clock a profile keeps: every capture input, on or off.</summary>
+    private Dictionary<string, bool> SceneCaptureOwnClockLocked()
+        => _config.Channels.Where(c => c.CaptureSource is not null)
+            .ToDictionary(c => c.Id, c => c.CaptureOwnClock, StringComparer.Ordinal);
+
+    /// <summary>
+    /// Recall a profile's own clocks. Each capture input the profile names
+    /// takes its value and is rewired when it changes; an input it does not
+    /// name, or a channel that is no longer a capture input, is left alone.
+    /// The daemon saves the layout after a recall, so the value stays.
+    /// </summary>
+    private void RecallCaptureOwnClockLocked(IReadOnlyDictionary<string, bool>? recalled)
+    {
+        if (recalled is null) return;
+        foreach ((string channel, bool on) in recalled)
+        {
+            ChannelDefinition? previous = _config.Channels.FirstOrDefault(c => c.Id == channel && c.CaptureSource is not null);
+            if (previous is null || previous.CaptureOwnClock == on) continue;
+            ChannelDefinition next = previous with { CaptureOwnClock = on };
+            _config = _config with { Channels = [.. _config.Channels.Select(c => c.Id == channel ? next : c)] };
+            RewireOwnClockLocked(next);
         }
     }
 

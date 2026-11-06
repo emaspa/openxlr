@@ -1931,6 +1931,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 MonitorDry = SceneMonitorDryLocked(),
                 MixEq = SceneMixEqLocked(),
                 CaptureGains = SceneCaptureGainsLocked(),
+                CaptureOwnClock = SceneCaptureOwnClockLocked(),
                 Ducking = DuckingSetupLocked().ToScene(),
             };
         }
@@ -2057,6 +2058,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             }
             // A capture input's gain and mute too, written once its source is there.
             RecallCaptureGainsLocked(s.CaptureGains);
+            // And its own clock: a profile saved before it leaves every input's clock alone.
+            RecallCaptureOwnClockLocked(s.CaptureOwnClock);
             SyncDuckingLocked();
             SyncDryRoutesLocked();
         }
