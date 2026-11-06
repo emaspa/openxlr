@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The microphone EQ backend driven directly with deterministic signals and
-// no audio server: its response against tools/eq-reference.py's table, the
-// size of a step while a value moves, the crossfades and the silence after
-// a loud burst.
+// The EQ backend driven directly with deterministic signals and no audio
+// server: its response against tools/eq-reference.py's table, mono and on
+// both channels of the stereo stage an output mix runs, the size of a step
+// while a value moves, the crossfades and the silence after a loud burst.
 #define main host_program_main
 #include "../host.c"
 #undef main
@@ -25,14 +25,16 @@ typedef struct {
   double frequency, gain, q;
 } Setting;
 
-static Host *fresh(uint32_t rate) {
+static Host *fresh_with(uint32_t rate, unsigned channels) {
   Host *h = calloc(1, sizeof(*h));
   assert(h);
   h->rate = rate;
-  h->channels = 1;
+  h->channels = channels;
   assert(eq_load(h, NULL));
   return h;
 }
+
+static Host *fresh(uint32_t rate) { return fresh_with(rate, 1); }
 
 static void release(Host *h) {
   eq_unload(h);
@@ -58,18 +60,30 @@ static void set_band(Host *h, int band, Setting s) {
 }
 
 // One configured, activated EQ with every band given and the EQ on.
-static Host *configured(uint32_t rate, const Setting bands[EQ_BANDS]) {
-  Host *h = fresh(rate);
+static Host *configured_with(uint32_t rate, unsigned channels, const Setting bands[EQ_BANDS]) {
+  Host *h = fresh_with(rate, channels);
   set(h, "enabled", 1);
   for (int i = 0; i < EQ_BANDS; i++) set_band(h, i + 1, bands[i]);
   assert(eq_activate(h));
   return h;
 }
 
+static Host *configured(uint32_t rate, const Setting bands[EQ_BANDS]) { return configured_with(rate, 1, bands); }
+
 static void run(Host *h, const float *input, float *output, size_t count, uint32_t block) {
   for (size_t at = 0; at < count; at += block) {
     uint32_t frames = (uint32_t)(count - at < block ? count - at : block);
     float *in[] = {(float *)input + at}, *out[] = {output + at};
+    eq_process(h, frames, in, out);
+  }
+}
+
+// A stereo stage over two inputs, block by block.
+static void run2(Host *h, const float *left, const float *right, float *out_left, float *out_right,
+                 size_t count, uint32_t block) {
+  for (size_t at = 0; at < count; at += block) {
+    uint32_t frames = (uint32_t)(count - at < block ? count - at : block);
+    float *in[] = {(float *)left + at, (float *)right + at}, *out[] = {out_left + at, out_right + at};
     eq_process(h, frames, in, out);
   }
 }
@@ -85,7 +99,25 @@ static double db(double ratio) { return 20 * log10(ratio); }
 
 // --- the response against the reference table -------------------------------
 
-enum { POINTS = 64, IMPULSE = 1 << 18 };
+enum { POINTS = 64, IMPULSE = 1 << 18, RIGHT_AT = 1000 };
+
+// The magnitude, in dB, of a response's spectrum at one frequency.
+static double response_db(const float *response, uint32_t rate, double frequency) {
+  double angle = -2 * EQ_PI * frequency / rate;
+  double wr = cos(angle), wi = sin(angle), pr = 1, pi = 0, re = 0, im = 0;
+  for (size_t n = 0; n < IMPULSE; n++) {
+    re += response[n] * pr;
+    im += response[n] * pi;
+    double next = pr * wr - pi * wi;
+    pi = pr * wi + pi * wr;
+    pr = next;
+    if ((n & 4095) == 4095) {  // keep the phasor on the unit circle
+      double norm = hypot(pr, pi);
+      pr /= norm, pi /= norm;
+    }
+  }
+  return db(hypot(re, im));
+}
 
 static void check_reference(const char *path) {
   FILE *file = fopen(path, "r");
@@ -97,8 +129,14 @@ static void check_reference(const char *path) {
   double frequencies[POINTS];
   bool have_frequencies = false;
   float *impulse = calloc(IMPULSE, sizeof(float)), *response = calloc(IMPULSE, sizeof(float));
-  assert(impulse && response);
+  // The stereo stage hears the impulse on the left at once and on the right
+  // RIGHT_AT samples later: a delay leaves the magnitude alone, and a state
+  // shared between the two channels would show on both.
+  float *late = calloc(IMPULSE, sizeof(float));
+  float *left = calloc(IMPULSE, sizeof(float)), *right = calloc(IMPULSE, sizeof(float));
+  assert(impulse && response && late && left && right);
   impulse[0] = 1;
+  late[RIGHT_AT] = 1;
   int rows = 0, compared = 0;
   double worst = 0;
   while (fgets(line, sizeof(line), file)) {
@@ -122,33 +160,26 @@ static void check_reference(const char *path) {
     Host *h = configured(rate, bands);
     run(h, impulse, response, IMPULSE, 1024);
     release(h);
+    Host *stereo = configured_with(rate, 2, bands);
+    run2(stereo, impulse, late, left, right, IMPULSE, 1024);
+    release(stereo);
     for (int i = 0; i < POINTS; i++) {
       double expected = strtod(strtok(NULL, " \n"), NULL);
-      // The spectrum of the impulse response at this one frequency.
-      double angle = -2 * EQ_PI * frequencies[i] / rate;
-      double wr = cos(angle), wi = sin(angle), pr = 1, pi = 0, re = 0, im = 0;
-      for (size_t n = 0; n < IMPULSE; n++) {
-        re += response[n] * pr;
-        im += response[n] * pi;
-        double next = pr * wr - pi * wi;
-        pi = pr * wi + pi * wr;
-        pr = next;
-        if ((n & 4095) == 4095) {  // keep the phasor on the unit circle
-          double norm = hypot(pr, pi);
-          pr /= norm, pi /= norm;
-        }
-      }
-      double measured = db(hypot(re, im));
       // Far below the signal a float output's rounding is all there is
       // to measure; the table is held to 0.05 dB down to -90 dB.
       if (expected < -90) continue;
-      double error = fabs(measured - expected);
-      if (error > worst) worst = error;
-      compared++;
-      if (error > 0.05) {
-        fprintf(stderr, "row %d at %u Hz: %.2f Hz measured %.4f dB, expected %.4f dB\n",
-                rows, rate, frequencies[i], measured, expected);
-        exit(1);
+      const float *responses[] = {response, left, right};
+      const char *which[] = {"mono", "stereo left", "stereo right"};
+      for (int k = 0; k < 3; k++) {
+        double measured = response_db(responses[k], rate, frequencies[i]);
+        double error = fabs(measured - expected);
+        if (error > worst) worst = error;
+        compared++;
+        if (error > 0.05) {
+          fprintf(stderr, "row %d at %u Hz, %s: %.2f Hz measured %.4f dB, expected %.4f dB\n",
+                  rows, rate, which[k], frequencies[i], measured, expected);
+          exit(1);
+        }
       }
     }
     rows++;
@@ -156,9 +187,12 @@ static void check_reference(const char *path) {
   fclose(file);
   free(impulse);
   free(response);
+  free(late);
+  free(left);
+  free(right);
   assert(rows >= 60);
-  printf("response: %d settings, %d points within 0.05 dB of the cookbook (worst %.5f dB)\n",
-         rows, compared, worst);
+  printf("response: %d settings, %d points, mono and both stereo channels, within 0.05 dB of the cookbook "
+         "(worst %.5f dB)\n", rows, compared, worst);
 }
 
 // --- a value moving while a tone plays --------------------------------------
@@ -188,7 +222,7 @@ static double step_error(Setting before, Setting after, bool clear) {
   if (clear) {
     eq_follow(h->impl, RATE);
     EqBand *b = &((Eq *)h->impl)->bands[1];
-    b->live.s1 = b->live.s2 = 0;
+    b->live[0].s1 = b->live[0].s2 = 0;
   }
   run(h, input + SETTLE, moved + SETTLE, AFTER, BLOCK);
   run(reference, input, ideal, SETTLE + AFTER, BLOCK);
@@ -322,8 +356,8 @@ static bool subnormal(double value) { return fpclassify(value) == FP_SUBNORMAL; 
 static void check_states(const Eq *e) {
   for (int i = 0; i < EQ_BANDS; i++) {
     const EqBand *b = &e->bands[i];
-    assert(!subnormal(b->live.s1) && !subnormal(b->live.s2));
-    assert(!subnormal(b->fading.s1) && !subnormal(b->fading.s2));
+    assert(!subnormal(b->live[0].s1) && !subnormal(b->live[0].s2));
+    assert(!subnormal(b->fading[0].s1) && !subnormal(b->fading[0].s2));
   }
 }
 
@@ -351,7 +385,7 @@ static void check_silence(void) {
   }
   const Eq *e = h->impl;
   for (int i = 0; i < EQ_BANDS; i++)
-    assert(e->bands[i].live.s1 == 0 && e->bands[i].live.s2 == 0);
+    assert(e->bands[i].live[0].s1 == 0 && e->bands[i].live[0].s2 == 0);
   for (int n = 0; n < 512; n++) assert(output[n] == 0);
   release(h);
   puts("silence: no subnormal state or sample, and every filter at rest, after a minute of silence");
@@ -415,8 +449,8 @@ static void check_nonfinite_state(void) {
     set(h, "enabled", on), set(reference, "enabled", on);
     assert(eq_activate(h) && eq_activate(reference));
     run(h, input, output, SPLIT, BLOCK);
-    ((Eq *)h->impl)->bands[1].live.s1 = NAN;
-    ((Eq *)h->impl)->bands[3].live.s2 = INFINITY;  // a band that is off holds it too
+    ((Eq *)h->impl)->bands[1].live[0].s1 = NAN;
+    ((Eq *)h->impl)->bands[3].live[0].s2 = INFINITY;  // a band that is off holds it too
     run(h, input + SPLIT, output + SPLIT, COUNT - SPLIT, BLOCK);
     all_finite(output, COUNT);
     assert(output[SPLIT] == input[SPLIT]);
@@ -433,11 +467,20 @@ static void check_nonfinite_state(void) {
 
 static void check_controls(void) {
   assert(backend_named("eq") == &eq_backend);
-  Host *two = calloc(1, sizeof(*two));
-  two->rate = RATE, two->channels = 2;
-  assert(!eq_load(two, NULL));
-  eq_unload(two);
-  free(two);
+  Host *three = calloc(1, sizeof(*three));
+  three->rate = RATE, three->channels = 3;
+  assert(!eq_load(three, NULL));
+  eq_unload(three);
+  free(three);
+  // The stereo stage has the EQ's controls and the two meters, and nothing
+  // of noise removal, the dynamics or the voice changer.
+  Host *two = fresh_with(RATE, 2);
+  assert(two->control_count == 1 + 5 * EQ_BANDS + STAGE_METERS);
+  assert(set_control(two, "band4_qlog10", 0) && set_control(two, "enabled", 1));
+  assert(!set_control(two, "denoise_enabled", 1) && !set_control(two, "voice_enabled", 1)
+         && !set_control(two, "comp_enabled", 1) && !set_control(two, "exp_enabled", 1));
+  assert(eq_activate(two) && eq_latency(two) == 0);
+  release(two);
   Host *h = fresh(RATE);
   assert(h->control_count == 1 + 5 * EQ_BANDS + DENOISE_CONTROLS + VOICE_CONTROLS + DYNAMICS_CONTROLS + STAGE_METERS);
   const char *names[] = {"enabled", "type", "frequency", "gain", "qlog10"};
@@ -512,6 +555,95 @@ static void measure_cost(void) {
   release(h);
 }
 
+// --- two channels ----------------------------------------------------------------
+
+// The same edits at the same block boundaries: a gain step, a type change, a
+// band switched off and the EQ switched off and on.
+static void stereo_edits(Host *h, int step) {
+  switch (step) {
+  case 1: set(h, "band2_gain", 9.25); break;
+  case 2: set(h, "band3_type", LOW_SHELF); break;
+  case 3: set(h, "band1_enabled", 0); break;
+  case 4: set(h, "enabled", 0); break;
+  case 5: set(h, "enabled", 1); break;
+  default: break;
+  }
+}
+
+static void run_edited(Host *h, const float *left, const float *right, float *out_left, float *out_right,
+                       size_t count) {
+  enum { STEPS = 6 };
+  size_t part = count / STEPS;
+  for (int step = 0; step < STEPS; step++) {
+    stereo_edits(h, step);
+    size_t at = step * part, frames = step == STEPS - 1 ? count - at : part;
+    run2(h, left + at, right + at, out_left + at, out_right + at, frames, BLOCK);
+  }
+}
+
+// Each channel of the stereo stage is the EQ on its own input: through live
+// value changes, a type change and the switches, a channel's output is the
+// one it gives with the same input on both sides, sample for sample, and a
+// silent channel stays silent beside a loud one. The left channel of a stage
+// fed the same input on both sides is the mono EQ's output with noise
+// removal, the dynamics and the voice changer off. A filter whose state turns
+// non-finite on one channel plays that sample dry on both, then both run as
+// a fresh stage does.
+static void check_stereo(void) {
+  enum { COUNT = RATE * 2 };
+  static float a[COUNT], b[COUNT], silent[COUNT];
+  static float out_l[COUNT], out_r[COUNT], same_l[COUNT], same_r[COUNT], mono[COUNT];
+  tone(a, COUNT, 200);
+  tone(b, COUNT, 3000);
+  Setting bands[EQ_BANDS] = {{1, LOW_CUT, 80, 0, 0.7}, {1, PEAK, 310, 6, 2},
+                             {1, HIGH_SHELF, 6000, -4, 0.7}, {1, NOTCH, 2172, 0, 4}};
+  Host *h = configured_with(RATE, 2, bands), *left = configured_with(RATE, 2, bands),
+       *right = configured_with(RATE, 2, bands), *one = configured(RATE, bands);
+  run_edited(h, a, b, out_l, out_r, COUNT);
+  run_edited(left, a, a, same_l, same_r, COUNT);
+  assert(!memcmp(out_l, same_l, sizeof(out_l)) && !memcmp(same_l, same_r, sizeof(same_l)));
+  run_edited(right, b, b, same_l, same_r, COUNT);
+  assert(!memcmp(out_r, same_r, sizeof(out_r)));
+  // The mono stage, its other parts off, with the same edits.
+  enum { STEPS = 6 };
+  size_t part = COUNT / STEPS;
+  for (int step = 0; step < STEPS; step++) {
+    stereo_edits(one, step);
+    size_t at = step * part, frames = step == STEPS - 1 ? COUNT - at : part;
+    run(one, a + at, mono + at, frames, BLOCK);
+  }
+  release(h), release(left), release(right), release(one);
+  Host *again = configured_with(RATE, 2, bands), *quiet = configured_with(RATE, 2, bands);
+  run_edited(again, a, a, same_l, same_r, COUNT);
+  assert(!memcmp(same_l, mono, sizeof(same_l)));
+  run_edited(quiet, a, silent, out_l, out_r, COUNT);
+  for (size_t n = 0; n < COUNT; n++) assert(out_r[n] == 0);
+  assert(!memcmp(out_l, same_l, sizeof(out_l)));
+  release(again), release(quiet);
+
+  // A state turned non-finite on the right channel only.
+  enum { SPLIT = 16 * BLOCK };
+  for (int on = 0; on <= 1; on++) {
+    Host *s = fresh_with(RATE, 2), *reference = fresh_with(RATE, 2);
+    for (int i = 0; i < EQ_BANDS; i++) set_band(s, i + 1, bands[i]), set_band(reference, i + 1, bands[i]);
+    set(s, "enabled", on), set(reference, "enabled", on);
+    assert(eq_activate(s) && eq_activate(reference));
+    run2(s, a, b, out_l, out_r, SPLIT, BLOCK);
+    ((Eq *)s->impl)->bands[1].live[1].s1 = NAN;
+    run2(s, a + SPLIT, b + SPLIT, out_l + SPLIT, out_r + SPLIT, COUNT - SPLIT, BLOCK);
+    all_finite(out_l, COUNT), all_finite(out_r, COUNT);
+    assert(out_l[SPLIT] == a[SPLIT] && out_r[SPLIT] == b[SPLIT]);
+    run2(reference, a + SPLIT + 1, b + SPLIT + 1, same_l, same_r, COUNT - SPLIT - 1, BLOCK);
+    assert(!memcmp(out_l + SPLIT + 1, same_l, (COUNT - SPLIT - 1) * sizeof(float)));
+    assert(!memcmp(out_r + SPLIT + 1, same_r, (COUNT - SPLIT - 1) * sizeof(float)));
+    eq_main_thread(s);
+    assert(stage_meter(s, "stage_resets") == 1 && stage_meter(s, "stage_nonfinite") == 0);
+    release(s), release(reference);
+  }
+  puts("stereo: each channel is the EQ on its own input through every edit, a silent side stays silent, "
+       "the left side is the mono EQ, and a non-finite state plays one sample dry on both sides");
+}
+
 int main(int argc, char **argv) {
   setvbuf(stdout, NULL, _IOLBF, 0);
   const char *reference = argc > 1 ? argv[1] : "tests/eq-reference.txt";
@@ -523,7 +655,8 @@ int main(int argc, char **argv) {
   check_silence();
   check_nonfinite_input();
   check_nonfinite_state();
+  check_stereo();
   measure_cost();
-  puts("PASS: response, steps, crossfades, silence and non-finite recovery");
+  puts("PASS: response, steps, crossfades, silence, non-finite recovery and two channels");
   return 0;
 }

@@ -544,6 +544,13 @@ on the command line and changes them with `set` lines.
 16 bands, N running from 1 to the count; `eq` is the four-band form, kept
 for older daemons.
 
+`openxlr-lv2-host eq-bands COUNT NODE 2 RATE` is an output mix's EQ: the
+same bands on a stereo pair and nothing else, with no noise removal,
+dynamics or voice changer and none of their controls or meters. Each band
+has one set of coefficients and its own filter state and history on each
+channel; a switch or a type change moves on both channels at the same
+sample. Its trace line reads `trace: mix EQ: ...`.
+
 The audio thread reads the controls at the start of a block. A frequency,
 gain or Q change recomputes that band and keeps its filter state, which is
 what keeps a drag free of clicks. Every band's filter runs whether the band

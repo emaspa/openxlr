@@ -1369,7 +1369,7 @@ int main(int argc, char **argv) {
           "CHANNELS RATE [SYMBOL=VALUE ...]\n"
           "       openxlr-lv2-host soundcheck NODE 1 RATE\n"
           "       openxlr-lv2-host eq NODE 1 RATE [SYMBOL=VALUE ...]\n"
-          "       openxlr-lv2-host eq-bands COUNT NODE 1 RATE [SYMBOL=VALUE ...]\n"
+          "       openxlr-lv2-host eq-bands COUNT NODE 1|2 RATE [SYMBOL=VALUE ...]\n"
           "       openxlr-lv2-host duck NODE 2 RATE [SYMBOL=VALUE ...]\n"
           "       openxlr-lv2-host level NODE 1 RATE\n"
           "       openxlr-lv2-host player NODE 2 RATE [SYMBOL=VALUE ...]\n"
