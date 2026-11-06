@@ -1310,6 +1310,8 @@ extern int denoise_print_engines(void) __attribute__((weak));
 // The soundboard's decoders and its one-shot probe (player.c).
 extern int player_print_formats(void) __attribute__((weak));
 extern int player_probe_main(const char *path) __attribute__((weak));
+// The clock bridge (bridge.c), a process of its own with two nodes.
+extern int bridge_main(int argc, char **argv) __attribute__((weak));
 
 static const Backend *backend_named(const char *name) {
   if (!strcmp(name, "soundcheck"))
@@ -1351,6 +1353,8 @@ int main(int argc, char **argv) {
     return player_print_formats();
   if (argc == 3 && !strcmp(argv[1], "probe") && player_probe_main)
     return player_probe_main(argv[2]);
+  if (argc >= 2 && !strcmp(argv[1], "bridge") && bridge_main)
+    return bridge_main(argc - 1, argv + 1);
   // `--own-block` before a plugin format runs the plugin on its own block.
   bool own_block = argc >= 2 && !strcmp(argv[1], "--own-block");
   if (own_block) {
@@ -1377,7 +1381,8 @@ int main(int argc, char **argv) {
           "       openxlr-lv2-host scan-vst3 BUNDLE\n"
           "       openxlr-lv2-host engines\n"
           "       openxlr-lv2-host formats\n"
-          "       openxlr-lv2-host probe PATH\n",
+          "       openxlr-lv2-host probe PATH\n"
+          "       openxlr-lv2-host bridge NODE 1|2 RATE [quanta=N] [margin=MS]\n",
           stderr);
     return 2;
   }

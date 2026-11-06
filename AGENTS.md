@@ -78,6 +78,7 @@ make -C native test-duck  # duck detector, gain depth and timing, no audio serve
 make -C native test-denoise  # noise removal, RNNoise and DeepFilterNet when built (cargo), no audio server
 make -C native test-voice  # voice changer: every voice bounded and near the input level, exact when off, clean switches, no audio server
 make -C native test-player  # soundboard player: decoding, limits, press modes and ramps, libsndfile, no audio server
+make -C native test-bridge  # clock bridge: ring, drift loop and resampler between two simulated clocks, no audio server
 python3 tools/eq-reference.py --check  # regenerate with no flag after changing the EQ reference settings
 python3 tools/starter-sounds.py --check  # the soundboard's starter sounds; regenerate with no flag after changing their table
 OPENXLR_TEST_DESKTOP=1 xvfb-run -a dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~TrayWindowTests

@@ -13,7 +13,8 @@ nothing for existing LV2 inserts: they use filter-chain until explicitly
 switched in the controls window. CLAP and VST3 always use this helper, and
 so do OpenXLR's own stages: Sound Check, the level meter, the microphone EQ
 with noise removal, the expander, the compressor and the voice changer,
-ducking and the soundboard player, each described below.
+ducking, the soundboard player and a capture input's clock bridge, each
+described below.
 
 ## Build
 
@@ -1069,6 +1070,57 @@ blocks; a second load refused while one runs; an unload cancelling a load
 still decoding; the token in every answer; and a press reached 300 ms late
 dropped. Every process call counts the allocations made on its own thread
 through a wrapped allocator and must make none; the worker's are its own.
+
+## Clock bridge
+
+`openxlr-lv2-host bridge NODE 1|2 RATE [quanta=N] [margin=MS]` carries a
+capture device on a clock of its own into the mixer's graph (`bridge.c`).
+It loads no plugin and has no editor. It is one client with two nodes,
+never linked to each other. `NODE_in` has input ports `playback_N` and is linked
+only to the device, so PipeWire runs it in the device's graph, which the
+device drives. `NODE` has output ports `capture_N` and is linked into the
+mixer's channel, so it runs in the mixer's graph. A link always puts both
+ends under one driver, and the two halves of a loopback share one too, so
+two nodes joined only inside one process are the way to keep two clocks
+apart. The daemon starts one for a capture input on its own clock
+(`setCaptureOwnClock`, see [api.md](../docs/api.md#own-clock)).
+
+The device's node writes each cycle into a lock-free ring, with its frame
+count, the cycle's time and the next cycle's time. The mixer's node reads
+the ring through a resampler: a 64-tap Kaiser-windowed sinc in 256 phases,
+interpolated between phases, with its cutoff at 0.92 of the Nyquist
+frequency. A delay-locked loop, PipeWire's `spa_dll`, sets the resampler's
+ratio from the ring's fill against its target. The fill counts the device's
+frames as if they arrived one at a time, from the device's last cycle time,
+so the sawtooth of two cycles sliding past each other does not move the
+ratio, and a device cycle that comes late is covered by the headroom rather
+than read as drift. The loop starts wide and narrows over 15 seconds to
+`SPA_DLL_BW_MIN`. The correction is held within 0.5 %, and the nominal
+ratio of two different rates (from 1/4 to 4) is applied on top.
+
+The target is the device's cycle plus `quanta` of the mixer's cycles (2 by
+default), the resampler's 32 frames and `margin` milliseconds (10 by
+default): 1280 frames, 26.7 ms, at 48 kHz with both cycles at 256 frames.
+That holds a device cycle late by one mixer cycle plus the margin. When the
+reader runs dry it plays what there is, then silence, counts an underrun
+and waits for the target again. When the ring holds twice the target, or is
+full because the mixer stopped reading, it counts an overrun and drops back
+to the target. Once a second the helper writes `heartbeat` and, each when
+it changed, the meters `running` (1 while it carries audio), `delay` and
+`target` in the mixer's frames, `underruns`, `overruns`, `drift` (the loop's
+correction in parts per million), `in_rate` and `in_quantum`. It prints
+`ready` once both nodes are up, and exits when its standard input closes.
+
+`make test-bridge` drives the ring, the loop and the resampler between two
+simulated clocks with no audio server: one clock and no jitter, a device
+120 ppm fast whose cycles come up to 2 ms late and every 3 seconds 12 ms
+late, with and without late cycle times, -350 ppm with a 1024-frame device
+cycle, a 1024-frame mixer cycle, a device 2000 ppm off, a device that stops
+for 200 ms and a mixer that stops for 2 seconds. Each must settle at its
+target with no underrun or overrun after 20 seconds, find the true drift
+within a part per million and hold it within 5, carry a 1 kHz tone with a
+residual under -70 dB and a steady level exactly; the stops must cost
+exactly one counted event each and recover.
 
 ## Scope
 

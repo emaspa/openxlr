@@ -225,6 +225,7 @@ jobs:
           make -C native test-denoise
           make -C native test-voice
           make -C native test-player
+          make -C native test-bridge
           dotnet restore src/OpenXLR.slnx --locked-mode
           dotnet build src/OpenXLR.slnx -c Release --no-restore -warnaserror -p:EnableNativeLv2Host=true
           test -x native/openxlr-lv2-host

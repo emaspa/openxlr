@@ -56,8 +56,8 @@ DF_LINK = -Wl,--gc-sections $(DEEPFILTER_LIB) -lgcc_s -lutil -lrt
 endif
 
 OBJECTS = host.o measure.o lv2.o clap.o vst3.o sound-check.o eq.o duck.o level.o player.o denoise.o \
-          voice.o voice-stretch.o dynamics.o $(RNN_OBJECTS)
-HEADERS = host.h measure.h icon.h denoise.h dynamics.h eq.h voice.h $(wildcard clap/include/clap/*.h clap/include/clap/*/*.h) \
+          voice.o voice-stretch.o dynamics.o bridge.o $(RNN_OBJECTS)
+HEADERS = host.h measure.h icon.h denoise.h dynamics.h eq.h voice.h bridge.h $(wildcard clap/include/clap/*.h clap/include/clap/*/*.h) \
           $(wildcard vst3/pluginterfaces/*/*.h)
 # The stages and their tests link these beside the noise removal objects.
 DENOISE_OBJECTS = denoise.o $(RNN_OBJECTS)
@@ -351,3 +351,17 @@ test-player: tests/player openxlr-lv2-host
 clean: clean-player
 clean-player:
 	rm -f tests/player tests/player.o
+
+# The clock bridge: its ring, loop and resampler between two simulated
+# clocks a known distance apart, with jitter, stalls and no audio server.
+tests/bridge: tests/bridge.c bridge.c $(HEADERS)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $< -o $@ $(LDFLAGS) $(LDLIBS)
+
+.PHONY: test-bridge clean-bridge
+test: test-bridge
+test-bridge: tests/bridge
+	./tests/bridge
+
+clean: clean-bridge
+clean-bridge:
+	rm -f tests/bridge
