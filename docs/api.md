@@ -2310,27 +2310,36 @@ A mix's `eq` in the mixer state has a microphone's fields: `enabled`,
 
 The stage is one stereo node, `OpenXLR_mixeq_<id>_<n>`, the native helper's
 EQ on two channels with nothing else in it: no noise removal, dynamics or
-voice changer. It sits after the mix's inserts and before everything that
-reads the mix: the outputs that play it, the post sink behind a virtual
-microphone, the USB Aux port, and the latency delay when one runs. A mix
-without inserts feeds it from its own monitor.
+voice changer. It sits at the head of the mix, as the microphone EQ sits
+before a microphone's inserts: it always reads the mix's own monitor, and
+the mix's insert chain reads it, so a limiter among the inserts catches
+what the EQ boosts. Everything that reads the mix comes after both: the
+outputs that play it, the post sink behind a virtual microphone, the USB
+Aux port, and the latency delay when one runs. A mix without inserts has
+those read the stage itself.
 
-Switching a mix's EQ on starts its stage and points the mix's readers at it;
-nothing else is touched, so the insert chain keeps running and no plugin
-restarts. Every other change is written to the running stage, live: a
-band's values, a band on or off, the EQ's own switch. Switching the EQ off
-bypasses inside the stage, which stays until the mix is next built or the
-daemon restarts. A mix whose EQ is off when it is built gets no stage. Only
-a change in the number of bands starts a new stage in place of the old.
-When the insert chain is built again for its own reasons, the stage keeps
-running and takes its input from the new chain; a chain the mixer gave up
-on stays off, and the stage takes the mix itself. A stage that dies is
-started again by the sweep, on the restart policy the microphone EQ has
-(three failures in five minutes, keyed per mix); while it cannot run, the
-mix plays without its EQ, never silent. Nothing here moves a microphone's
-route, so the Wave XLR Pro's zero-latency path stays as it was; the
-microphone it carries reaches the jacks before any mix, and so without the
-output EQ.
+```
+OpenXLR_mix_<id> -> OpenXLR_mixeq_<id>_<n> -> [inserts] -> [latency delay] -> outputs, post sink, USB Aux
+```
+
+Switching a mix's EQ on starts its stage and points the mix's insert chain
+at it, or the mix's readers when no chain runs. The new link is made before
+the old one goes and nothing else is touched, so the insert chain keeps
+running and no plugin restarts. Every other change is written to the
+running stage, live: a band's values, a band on or off, the EQ's own
+switch. Switching the EQ off bypasses inside the stage, which stays until
+the mix is next built or the daemon restarts. A mix whose EQ is off when it
+is built gets no stage. Only a change in the number of bands starts a new
+stage in place of the old, and the running chain is then linked from the
+new one. When the insert chain is built again for its own reasons, the
+stage keeps running and the new chain is linked from it; a chain the mixer
+gave up on stays off, and the mix's readers take the stage itself. A stage
+that dies is started again by the sweep, on the restart policy the
+microphone EQ has (three failures in five minutes, keyed per mix); while it
+cannot run, the mix plays without its EQ, never silent. Nothing here moves
+a microphone's route, so the Wave XLR Pro's zero-latency path stays as it
+was; the microphone it carries reaches the jacks before any mix, and so
+without the output EQ.
 
 The EQ is saved in `mixer.json` under `mixEq`, by mix id. A mix absent there
 has the defaults with the EQ off, and an id that is no mix of the layout is

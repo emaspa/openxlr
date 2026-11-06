@@ -3,24 +3,27 @@ namespace OpenXLR.Core.Mixing;
 /// <summary>
 /// The output EQ: the microphone EQ's model (<see cref="MicEq"/>) on every
 /// mix, run by the native helper's <c>eq</c> backend on two channels, which
-/// runs the EQ alone. The stage sits after the mix's inserts and before
-/// anything that reads the mix:
+/// runs the EQ alone. The stage sits at the head of the mix, before its
+/// inserts, as the microphone EQ sits before a microphone's, so a limiter
+/// among the inserts catches what the EQ boosts:
 ///
-///   OpenXLR_mix_&lt;id&gt; -> [inserts] -> OpenXLR_mixeq_&lt;id&gt;_&lt;gen&gt; -> [latency delay] -> outputs, post sink, Aux
+///   OpenXLR_mix_&lt;id&gt; -> OpenXLR_mixeq_&lt;id&gt;_&lt;gen&gt; -> [inserts] -> [latency delay] -> outputs, post sink, Aux
 ///
 /// It is one persistent node. Every value, the switch included, goes to it
 /// live through the helper's command pipe, and it keeps its filter state, so
 /// a band change builds nothing. A mix whose EQ is off when its route is built
-/// gets no stage; switching the EQ on starts one and points the mix's
-/// readers at it once, and switching it off bypasses inside the stage, which
-/// stays until the mix is next built. Only a change in the number of bands
-/// starts a fresh stage.
+/// gets no stage; switching the EQ on starts one and points the mix's chain,
+/// or its readers without one, at it once, and switching it off bypasses
+/// inside the stage, which stays until the mix is next built. Only a change
+/// in the number of bands starts a fresh stage.
 ///
-/// The stage never touches the mix's insert chain: a chain rebuilt for its
-/// own reasons has the stage's input linked again from the new chain, and
-/// the stage keeps running. A chain the mixer gave up on stays off; the EQ
-/// then takes the mix's own monitor. Nothing here moves a microphone's
-/// route, so the Wave XLR Pro's direct path is left as it is.
+/// The stage always reads the mix's own monitor and never touches the mix's
+/// insert chain: a chain rebuilt for its own reasons is linked from the
+/// running stage, which keeps running, and a stage started or replaced has
+/// the running chain's input linked again from it, so no plugin restarts. A
+/// chain the mixer gave up on stays off; the mix's readers then take the
+/// stage itself. Nothing here moves a microphone's route, so the Wave XLR
+/// Pro's direct path is left as it is.
 ///
 /// While hardware mixing runs, the Wave XLR Pro builds the mixes its jacks
 /// and its USB Aux port play, and the EQ of each of them is held off (the
@@ -43,8 +46,8 @@ public sealed partial class Mixer
 
     // Saved values by mix id. A mix absent here has the defaults with the EQ off.
     private readonly Dictionary<string, MicEq> _mixEq = new(StringComparer.Ordinal);
-    // The running stages by mix id, the link from the mix (or its chain) into
-    // each, and why a stage could not start.
+    // The running stages by mix id, the link from the mix into each, and why
+    // a stage could not start.
     private readonly Dictionary<string, SoftwareEqBackend> _mixEqStages = new(StringComparer.Ordinal);
     private readonly Dictionary<string, PortLink> _mixEqInputs = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _mixEqErrors = new(StringComparer.Ordinal);
@@ -179,9 +182,25 @@ public sealed partial class Mixer
         foreach (MixDefinition mix in _config.Mixes.ToList()) ApplyMixEqLocked(mix.Id);
     }
 
-    /// <summary>Where a mix's EQ takes its input: the mix's insert chain while one runs, else the mix's own monitor.</summary>
-    private (string Node, string Prefix) MixEqUpstreamLocked(MixDefinition mix)
-        => _chains.TryGetValue(MixKey(mix), out FilterHandle? chain) ? (chain.SourceName, "capture") : (mix.SinkName, "monitor");
+    /// <summary>Where a mix's insert chain takes its input: the mix's EQ stage while one runs, else the mix's own monitor.</summary>
+    private (string Node, string Prefix) MixChainUpstreamLocked(MixDefinition mix)
+        => _mixEqStages.TryGetValue(mix.Id, out SoftwareEqBackend? eq) ? (eq.Node, "capture") : (mix.SinkName, "monitor");
+
+    /// <summary>
+    /// Link a running chain's input again from the mix's upstream, after its
+    /// EQ stage came, went or was replaced: the new link is made before the
+    /// old one goes, as a microphone's EQ is spliced, and the plugins keep
+    /// running.
+    /// </summary>
+    private void RelinkMixChainInputLocked(MixDefinition mix)
+    {
+        string key = MixKey(mix);
+        if (!_chains.TryGetValue(key, out FilterHandle? chain)) return;
+        (string node, string prefix) = MixChainUpstreamLocked(mix);
+        PortLink fresh = _pw.LinkNodes(node, prefix, chain.SinkName, "playback");
+        if (_mixTaps.Remove(key, out PortLink? old)) _pw.Unlink(new PortLink([.. old.Pairs.Except(fresh.Pairs)]));
+        _mixTaps[key] = fresh;
+    }
 
     /// <summary>
     /// Start a mix's EQ stage and link the mix into it. Null when it cannot
@@ -198,8 +217,7 @@ public sealed partial class Mixer
         {
             filter = _pw.CreateMixEq($"{mix.Id}_{++_mixEqGeneration}", SoftwareEqBackend.Controls(eq), eq.Bands.Count);
             var stage = new SoftwareEqBackend(_pw, filter, eq);
-            (string node, string prefix) = MixEqUpstreamLocked(mix);
-            into = _pw.LinkNodes(node, prefix, stage.Node, "playback");
+            into = _pw.LinkNodes(mix.SinkName, "monitor", stage.Node, "playback");
             if (into.Pairs.Count != 2) throw new InvalidOperationException("The mix could not be linked into its EQ.");
             _mixEqErrors.Remove(mix.Id);
             return stage;
@@ -218,9 +236,9 @@ public sealed partial class Mixer
 
     /// <summary>
     /// Put a mix's EQ stage right without touching its chain: start a fresh
-    /// stage when the EQ is on, point everything that reads the mix at it (or
-    /// at the chain or the mix again without one), then stop the old stage.
-    /// False when nothing changed.
+    /// stage when the EQ is on, point the running chain's input at it (or at
+    /// the mix again without one), or everything that reads the mix while no
+    /// chain runs, then stop the old stage. False when nothing changed.
     /// </summary>
     private bool ReplaceMixEqLocked(MixDefinition mix)
     {
@@ -235,19 +253,22 @@ public sealed partial class Mixer
             _mixEqStages[mix.Id] = stage;
             _mixEqInputs[mix.Id] = into!;
         }
-        RewireMixConsumersLocked(mix);
+        // Behind a running chain the readers take the chain (or its delay),
+        // which this leaves running.
+        if (_chains.ContainsKey(MixKey(mix))) RelinkMixChainInputLocked(mix);
+        else RewireMixConsumersLocked(mix);
         old?.Release();
         return true;
     }
 
     /// <summary>
-    /// The mix's EQ as its chain is (re)built: a running stage has its input
-    /// linked again from the mix's new upstream and keeps running; a stage
-    /// that died goes; an EQ that is on with no stage gets one. Called by
-    /// <see cref="WireMixChainLocked"/> before it points the mix's readers at
-    /// the mix's tap, so they read the stage.
+    /// The mix's EQ as its chain is (re)built: a running stage keeps running
+    /// on its link from the mix; a stage that died goes; an EQ that is on
+    /// with no stage gets one. Called by <see cref="WireMixChainLocked"/>
+    /// before it builds the chain, so the chain is linked from the stage and
+    /// the mix's readers read the chain, or the stage without one.
     /// </summary>
-    private void WireMixEqInputLocked(MixDefinition mix)
+    private void PrepareMixEqLocked(MixDefinition mix)
     {
         if (_mixEqStages.TryGetValue(mix.Id, out SoftwareEqBackend? stage) && !stage.IsAlive)
         {
@@ -266,20 +287,14 @@ public sealed partial class Mixer
             }
             return;
         }
-        if (_mixEqInputs.Remove(mix.Id, out PortLink? old)) _pw.Unlink(old);
-        (string node, string prefix) = MixEqUpstreamLocked(mix);
-        PortLink link = _pw.LinkNodes(node, prefix, stage.Node, "playback");
-        _mixEqInputs[mix.Id] = link;
-        if (link.Pairs.Count != 2) _mixEqErrors[mix.Id] = "The mix could not be linked into its EQ.";
-        else _mixEqErrors.Remove(mix.Id);
+        EnsureMixEqLinkLocked(mix);
     }
 
     /// <summary>The link into a running stage, repaired by the sweep like the mix's other legs. True when it changed.</summary>
     private bool EnsureMixEqLinkLocked(MixDefinition mix)
     {
         if (!_mixEqStages.TryGetValue(mix.Id, out SoftwareEqBackend? stage) || !stage.IsAlive) return false;
-        (string node, string prefix) = MixEqUpstreamLocked(mix);
-        return EnsureMixLinkLocked(_mixEqInputs, mix.Id, node, prefix, stage.Node);
+        return EnsureMixLinkLocked(_mixEqInputs, mix.Id, mix.SinkName, "monitor", stage.Node);
     }
 
     /// <summary>
