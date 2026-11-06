@@ -33,7 +33,7 @@ const invocationHint = async () => {
   return t('popupInvokeNoShortcut');
 };
 const start = async () => {
-  try { await send({ type: 'start', id: tab.id }); }
+  try { await send({ type: 'start', id: tab.id, site: siteOf(tab.url) }); }
   catch (error) { throw notInvoked(error.message) ? new Error(await invocationHint()) : error; }
 };
 const act = operation => {

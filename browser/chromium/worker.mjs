@@ -273,35 +273,42 @@ async function reconcile() {
 }
 
 /** Start routing a tab that is active in its window. Chrome decides whether it may be captured. */
-async function startCapture(active) {
-  if (assignments.has(active.id)) throw new Error(ASSIGNMENT_PENDING);
-  const selected = state?.tabs.find(tab => tab.id === active.id && tab.site === siteOf(active.url));
-  const channel = state?.channels.find(channel => channel.id === selected?.channelId);
+async function startCapture(id, site, active = null) {
+  if (assignments.has(id)) throw new Error(ASSIGNMENT_PENDING);
   if (!state?.preserveBrowserOutputs) throw new Error(t('enableOutputsFirst'));
+  const selected = state.tabs.find(tab => tab.id === id);
+  if (!selected || !site) throw new Error(t('activateFromTab'));
+  if (selected.site !== site) throw new Error(t('siteChanged'));
+  const channel = state.channels.find(channel => channel.id === selected.channelId);
   if (!channel) throw new Error(t('chooseChannelFirst'));
-  if (starts.has(active.id)) throw new Error(t('alreadyStarting'));
-  const pending = { site: selected.site, channel: channel.id, cancelled: false };
-  starts.set(active.id, pending);
+  if (starts.has(id)) throw new Error(t('alreadyStarting'));
+  if (captures.get(id)?.capturing) return null;
+  // The popup's tab lookup is part of the activation and must be cancellable.
+  const pending = { site, channel: channel.id, cancelled: false };
+  starts.set(id, pending);
   const check = () => {
-    const latest = state?.tabs.find(candidate => candidate.id === active.id);
-    if (assignments.has(active.id)) throw new Error(ASSIGNMENT_PENDING);
-    if (pending.cancelled || !state?.preserveBrowserOutputs || latest?.site !== pending.site || latest?.channelId !== pending.channel)
+    const latest = state?.tabs.find(candidate => candidate.id === id);
+    if (assignments.has(id)) throw new Error(ASSIGNMENT_PENDING);
+    if (pending.cancelled || !state?.preserveBrowserOutputs || latest?.site !== site || latest?.channelId !== pending.channel)
       throw new Error(t('changedWhileStarting'));
     return true;
   };
   try {
+    active ??= (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
+    check();
+    if (!active || active.id !== id || active.incognito || siteOf(active.url) !== site) throw new Error(t('activateFromTab'));
     await stopping;
-    await stops.get(active.id);
+    await stops.get(id);
     check();
     const deviceId = await outputFor(channel);
     check();
     // The browser grants this only for a user-activated tab. Never reuse ids.
-    const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: active.id });
+    const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: id });
     check();
-    await audio({ type: 'start', id: active.id, streamId, deviceId }, true, check);
-    if (!pending.cancelled && captures.get(active.id)?.capturing) captures.get(active.id).channelId = channel.id;
+    await audio({ type: 'start', id, streamId, deviceId }, true, check);
+    if (!pending.cancelled && captures.get(id)?.capturing) captures.get(id).channelId = channel.id;
     return null;
-  } finally { if (starts.get(active.id) === pending) starts.delete(active.id); }
+  } finally { if (starts.get(id) === pending) starts.delete(id); }
 }
 
 async function openPopup(windowId) {
@@ -347,7 +354,9 @@ async function activateRequest(message) {
     const shown = await chrome.tabs.get(id);
     if (!current()) return;
     if (!shown?.active || shown.incognito || siteOf(shown.url) !== request.site) throw new Error(t('changedWhileStarting'));
-    await startCapture(shown);
+    // The popup may have picked up this request while Chrome was focusing the tab.
+    if (starts.has(id)) return;
+    await startCapture(id, request.site, shown);
   } catch (error) {
     if (!current()) return;
     if (notInvoked(error)) {
@@ -389,17 +398,17 @@ async function handle(message) {
       return null;
     }
     case 'start': {
-      if (assignments.has(message.id)) throw new Error(ASSIGNMENT_PENDING);
-      const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!active || active.id !== message.id || active.incognito || !siteOf(active.url)) throw new Error(t('activateFromTab'));
-      try { return await startCapture(active); }
+      const id = message.id;
+      const request = requests.get(id);
+      try { return await startCapture(id, message.site); }
       catch (error) {
-        // An activation OpenXLR asked for: tell its row what happened.
-        if (requests.has(active.id) && !starts.has(active.id)) {
-          if (notInvoked(error)) requests.get(active.id).stage = 'browser';
+        // An activation OpenXLR asked for: tell its row what happened. A
+        // popup still showing an earlier website leaves the request alone.
+        if (request && request.site === message.site && requests.get(id) === request && !starts.has(id)) {
+          if (notInvoked(error)) request.stage = 'browser';
           else {
-            clearRequest(active.id);
-            if (!captures.get(active.id)?.capturing) captures.set(active.id, { capturing: false, error: errorText(error) });
+            clearRequest(id);
+            if (!captures.get(id)?.capturing) captures.set(id, { capturing: false, error: errorText(error) });
           }
           scheduleRefresh();
         }
