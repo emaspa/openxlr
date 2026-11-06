@@ -402,8 +402,9 @@ async function handle(message) {
       const request = requests.get(id);
       try { return await startCapture(id, message.site); }
       catch (error) {
-        // An activation OpenXLR asked for: tell its row what happened.
-        if (request && requests.get(id) === request && !starts.has(id)) {
+        // An activation OpenXLR asked for: tell its row what happened. A
+        // popup still showing an earlier website leaves the request alone.
+        if (request && request.site === message.site && requests.get(id) === request && !starts.has(id)) {
           if (notInvoked(error)) request.stage = 'browser';
           else {
             clearRequest(id);

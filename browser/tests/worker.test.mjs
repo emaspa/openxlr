@@ -534,6 +534,21 @@ test('without the grant the popup opens on the tab, and a refused press there as
   assert.equal((await f.request('snapshot')).value.requestedTabs.length, 0);
 });
 
+test('a popup still showing an earlier website leaves an OpenXLR activation waiting', { timeout: 2000 }, async () => {
+  const f = await readyFixture(); f.permissionError = NOT_INVOKED;
+  await f.native({ type: 'activate', tabId: 2, site: 'https://site2.example' });
+  assert.equal((await f.refresh()).find(tab => tab.id === 2).activation, 'popup');
+  assert.match((await f.request('start', { id: 2, site: 'https://earlier.example' })).error ?? '', /website changed/i);
+  assert.deepEqual(f.tokens, [2], 'only the refused OpenXLR attempt asked for a token');
+  assert.deepEqual(Array.from((await f.request('snapshot')).value.requestedTabs), [2]);
+  const listed = (await f.refresh()).find(tab => tab.id === 2);
+  assert.equal(listed.activation, 'popup'); assert.equal(listed.error, null);
+  f.permissionError = null;
+  assert.equal((await f.request('start', { id: 2 })).error, undefined);
+  assert.equal(f.active.get(2).deviceId, 'music-device');
+  assert.equal((await f.request('snapshot')).value.requestedTabs.length, 0);
+});
+
 test('a browser that cannot open the popup leaves the activation to the user there', { timeout: 2000 }, async () => {
   for (const missing of [true, false]) {
     const f = await readyFixture(); f.permissionError = NOT_INVOKED;
