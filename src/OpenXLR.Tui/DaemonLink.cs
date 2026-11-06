@@ -449,13 +449,16 @@ internal sealed class DaemonLink : IAsyncDisposable
             case "state":
                 if (Snapshot.Parse(json) is { } snapshot)
                 {
-                    var channels = snapshot.Mixer.Channels.Select(c => c.Id).ToHashSet(StringComparer.Ordinal);
+                    // A mix's EQ is kept beside the channels' under "mix:" and its id.
+                    var eqs = snapshot.Mixer.Channels.Select(c => (Key: c.Id, c.Eq))
+                        .Concat(snapshot.Mixer.Mixes.Select(m => (Key: "mix:" + m.Id, m.Eq))).ToList();
+                    var channels = eqs.Select(e => e.Key).ToHashSet(StringComparer.Ordinal);
                     foreach (string removed in _channelRevisions.Keys)
                         if (!channels.Contains(removed)) _channelRevisions.TryRemove(removed, out _);
-                    foreach (ChannelEntry channel in snapshot.Mixer.Channels)
+                    foreach ((string key, EqEntry? eq) in eqs)
                     {
-                        int bands = channel.Eq?.Bands?.Count ?? 0;
-                        _channelRevisions.AddOrUpdate(channel.Id,
+                        int bands = eq?.Bands?.Count ?? 0;
+                        _channelRevisions.AddOrUpdate(key,
                             _ => (Interlocked.Increment(ref _nextChannelRevision), bands),
                             (_, prior) => prior.Bands == bands ? prior : (Interlocked.Increment(ref _nextChannelRevision), bands));
                     }

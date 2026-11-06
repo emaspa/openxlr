@@ -1152,7 +1152,7 @@ function onDialPress(context, inst) {
   if (!t) return;
   if (isEqTarget(t)) {
     const eq = eqTarget(mixer(), t);
-    const target = eq?.band ? `eqband:${eq.channel.id}:${eq.band}` : t;
+    const target = eq?.band ? `eqband:${eq.key}:${eq.band}` : t;
     const toggle = eqTarget(mixer(), target);
     if (!toggle || toggle.field !== "enabled") { send({event: "showAlert", context}); return; }
     turnEq(context, inst, target, !dialNow(target, toggle.value));
@@ -1436,7 +1436,7 @@ function meterKeyFor(t) {
   if (!t) return null;
   if (isEqTarget(t)) {
     const eq = eqTarget(mixer(), t);
-    return eq ? `ch:${eq.channel.id}` : null;
+    return eq ? eq.meter : null;
   }
   if (t.startsWith("send:") || t.startsWith("chvol:")) return `ch:${t.split(":")[1]}`;
   if (t.startsWith("mixvol:")) return `mix:${t.slice(7)}`;
