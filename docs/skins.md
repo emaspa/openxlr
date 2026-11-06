@@ -29,7 +29,7 @@ every package has them and there is nothing to install:
   with each channel's send into each mix where its row crosses the mix's
   column. HEADPHONES and MONITOR's toolbar share the row above it, INPUTS
   is hidden because the matrix's row heads carry the input gain, mute,
-  microphone switches and plugins, and APPLICATIONS is under the matrix in columns of six, on a dark neutral
+  microphone switches and plugins, and APPLICATIONS is under the matrix in columns of four, on a dark neutral
   palette. It is the reference for writing a layout skin; see
   [Layout](#layout).
 - **Compact Desk**, a dark matrix layout with a 600 pixel headphone column
@@ -45,7 +45,7 @@ every package has them and there is nothing to install:
   cards with a thin border, grey faders and green meters, and a wider name
   column in the matrix. HEADPHONES and MONITOR's toolbar share the row
   above the matrix, INPUTS is hidden, and APPLICATIONS is under the matrix
-  in columns of six. Its cards sit 8 pixels apart where Broadcast's sit 12.
+  in columns of four. Its cards sit 8 pixels apart where Broadcast's sit 12.
   It uses the same routing and controls as the other skins; no Elgato
   artwork or additional software is needed.
 

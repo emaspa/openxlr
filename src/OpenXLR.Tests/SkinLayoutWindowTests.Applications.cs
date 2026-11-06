@@ -15,8 +15,8 @@ namespace OpenXLR.Tests;
 /// <summary>
 /// APPLICATIONS in columns, as the shipped Broadcast and Wave skins draw it:
 /// with 1, 6, 7 and 13 applications, at 640, 1600 and 2560 pixels, in
-/// Standard and Touch sizing, the tiles stand in columns of at most six in
-/// the applications' order, the seventh starting the next column, and a
+/// Standard and Touch sizing, the tiles stand in columns of at most four in
+/// the applications' order, the fifth starting the next column, and a
 /// column that does not fit goes on below, whole, with nothing scrolling
 /// sideways. Every tile is the same width whatever its name and channel: its
 /// name is the skin's name width and its picker one width in every tile, wide
@@ -44,7 +44,7 @@ internal static partial class SkinLayoutWindowTests
                 skin = JsonNode.Parse(stream)!;
             JsonNode applications = skin["layout"]!["regions"]!["applications"]!;
             Assert.Equal(SkinLayoutTemplates.ApplicationColumns, applications["template"]!.GetValue<string>());
-            Assert.Equal(6, applications["perColumn"]!.GetValue<int>());
+            Assert.Equal(4, applications["perColumn"]!.GetValue<int>());
         }
 
         var window = new MainWindow(new DaemonClient("ws://127.0.0.1:1/ws"));
@@ -175,10 +175,10 @@ internal static partial class SkinLayoutWindowTests
         foreach (AppStreamViewModel app in all.Take(count)) model.ActiveApps.Add(app);
     }
 
-    /// <summary>The tiles in columns of six, in order, all one width with their names and pickers lined up, whole columns side by side or below.</summary>
+    /// <summary>The tiles in columns of four, in order, all one width with their names and pickers lined up, whole columns side by side or below.</summary>
     private static void CheckColumnsAt(MainWindow window, MainViewModel model, string where)
     {
-        const int perColumn = 6;
+        const int perColumn = 4;
         var rows = window.FindControl<ItemsControl>("ApplicationRows")!;
         ApplicationColumnsPanel panel = Assert.IsType<ApplicationColumnsPanel>(rows.ItemsPanelRoot);
         Assert.Equal(perColumn, panel.PerColumn);

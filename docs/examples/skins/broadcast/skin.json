@@ -177,7 +177,7 @@
         "popOut": { "default": "docked" }
       },
       "inputs": { "visibility": "hidden" },
-      "applications": { "template": "application-columns", "perColumn": 6 }
+      "applications": { "template": "application-columns", "perColumn": 4 }
     }
   }
 }

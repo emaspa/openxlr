@@ -251,7 +251,7 @@
       },
       "applications": {
         "template": "application-columns",
-        "perColumn": 6
+        "perColumn": 4
       }
     }
   }
