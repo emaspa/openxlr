@@ -72,7 +72,7 @@ public static partial class Diagnostics
             await File.WriteAllTextAsync(Path.Combine(work, "meta.txt"), meta.ToString());
             await File.WriteAllTextAsync(Path.Combine(work, "PRIVACY.txt"), """
                 This archive is created locally and is never uploaded automatically.
-                It contains OpenXLR state, USB control blocks and topology, PipeWire topology,
+                It contains OpenXLR state, USB control blocks and topology, the USB controllers, PipeWire topology,
                 openxlr-daemon journal entries from the current boot or Flatpak logs,
                 native audio-server and session-manager journal entries from the current boot,
                 kernel messages about USB, sound and power management from the current boot,
@@ -139,6 +139,9 @@ public static partial class Diagnostics
             await Capture("modules.txt", "pactl", "list", "short", "modules");
             await Capture("lsusb.txt", "lsusb");
             await Capture("usb-topology.txt", "lsusb", "-t");
+            // Which chip runs each USB controller and the driver bound to it:
+            // a USB interface's audio can depend on the controller, not only the port.
+            await Capture("usb-controllers.txt", "lspci", "-nnk", "-d", "::0c03");
             await File.WriteAllTextAsync(Path.Combine(work, "alsa-pcm.txt"), Clean(AlsaSnapshot()));
             await Capture("sink-inputs.json", "pactl", "--format=json", "list", "sink-inputs");
             await Capture("source-outputs.json", "pactl", "--format=json", "list", "source-outputs");

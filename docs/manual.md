@@ -4708,6 +4708,11 @@ audio, recording samples or starting plugins. The extra reports are:
   drivers and connection speeds. Match bus and device numbers with
   `lsusb.txt` to locate the interface; the tree's indentation shows which
   port or hub it is attached to.
+- `usb-controllers.txt`: `lspci -nnk` for the USB controllers, naming the
+  chip behind each one and the driver it uses. Its first column is the PCI
+  address that `kernel-log.txt` and the audio device names carry, as in
+  `usb-0000:77:00.0`. A capture card's audio can crackle on some USB4 and
+  10 Gbps controllers, and this file shows which chip an interface is on.
 - `alsa-pcm.txt`: every sound card and its open devices as the kernel
   reports them. It has the rate, period and buffer size the audio server
   opened each device with, how full the buffer is, and for a USB interface
