@@ -139,6 +139,43 @@ public sealed class ReliabilityFixesTests
     // --- the last save before the graph goes ------------------------------------
 
     [Fact]
+    public async Task ChangesArrivingFasterThanTheDebounceAreStillWritten()
+    {
+        // The one-second sweep scheduled a save on every tick while the Wave
+        // XLR Pro's hardware entry differed from the last one saved, so the
+        // two-second debounce never elapsed and no change reached the disk.
+        int writes = 0;
+        using var saver = new SettingsSaver(() => { Interlocked.Increment(ref writes); return null; }, _ => { });
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        while (Volatile.Read(ref writes) == 0 && watch.Elapsed < SettingsSaver.MaxSaveWait + TimeSpan.FromSeconds(5))
+        {
+            saver.Schedule();
+            await Task.Delay(TimeSpan.FromMilliseconds(500));
+        }
+        Assert.True(Volatile.Read(ref writes) > 0, $"nothing written in {watch.Elapsed.TotalSeconds:F1} s of changes every 0.5 s");
+        Assert.True(watch.Elapsed <= SettingsSaver.MaxSaveWait + TimeSpan.FromSeconds(2), $"the first write took {watch.Elapsed.TotalSeconds:F1} s");
+    }
+
+    [Fact]
+    public async Task AFailingWriteKeepsItsBackoffUnderRepeatedChanges()
+    {
+        // The cap must not turn a failing disk into a write attempt per change.
+        int attempts = 0;
+        using var saver = new SettingsSaver(() => { Interlocked.Increment(ref attempts); return "disk full"; }, _ => { });
+        saver.Schedule();
+        saver.Flush();
+        Assert.Equal(1, attempts);
+        Assert.NotNull(saver.Error);
+        for (int i = 0; i < 6; i++)
+        {
+            saver.Schedule();
+            await Task.Delay(TimeSpan.FromMilliseconds(250));
+        }
+        // Each change restarts the two-second wait, so none elapsed.
+        Assert.Equal(1, Volatile.Read(ref attempts));
+    }
+
+    [Fact]
     public void NothingIsWrittenOnceTheWriterIsClosed()
     {
         // The graph is torn down right after the final save, and a torn-down

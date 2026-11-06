@@ -285,6 +285,10 @@
       <Button Name="ClockManual" DockPanel.Dock="Right" Content="{loc:Text Key=Manual}" Padding="10,3" FontSize="{DynamicResource UiText.FontSize12}"
               VerticalAlignment="Center" Margin="12,0,0,0" IsVisible="{Binding ClockProblem}" Click="OnClockManual"
               ToolTip.Tip="{loc:Text Key=OpenTheManualSectionOnAGarbledMicrophone}"/>
+      <!-- the microphone's interface as the audio clock, through the daemon's WirePlumber rule -->
+      <Button Name="MakeClock" DockPanel.Dock="Right" Content="{Binding ClockActionText}" Padding="10,3" FontSize="{DynamicResource UiText.FontSize12}"
+              VerticalAlignment="Center" Margin="12,0,0,0" IsVisible="{Binding HasClockAction}" Click="OnMakeClock"
+              ToolTip.Tip="{loc:Text Key=MakeDeviceTheClockTip}"/>
       <TextBlock Text="{Binding DaemonWarning}" Classes="alert" TextWrapping="Wrap" FontSize="{DynamicResource UiText.FontSize12}" VerticalAlignment="Center"/>
     </DockPanel>
 

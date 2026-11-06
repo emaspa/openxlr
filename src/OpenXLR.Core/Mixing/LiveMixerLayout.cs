@@ -238,6 +238,7 @@ public sealed partial class Mixer
             // board is off, its player unlinked before the sink goes.
             if (id == SoundboardChannel) SoundboardChannelDeletedLocked();
             RemoveCaptureFeedLocked(id);
+            RemoveDryRouteLocked(id);
             if (_soundCheckChannel == id)
                 StopSoundCheckLocked(restore: false, error: "Sound Check stopped because the capture input was deleted.");
             bool chained = _chains.ContainsKey(id);
@@ -350,6 +351,8 @@ public sealed partial class Mixer
             }
             _meters.Add($"mix:{id}", mix.SinkName);
             SyncDuckingLocked();
+            // A dry route names the monitor mixes it feeds; a new one needs it loaded again.
+            if (kind == MixKind.Monitor) SyncDryRoutesLocked();
         }
     }
 
@@ -410,6 +413,7 @@ public sealed partial class Mixer
                 else _monitorFeeds[output] = remaining;
             }
             CellSnapshot cells = TakeMixCellsLocked(id);
+            bool wasDry = _dryMonitors.Remove(id);
             bool wasPaused = _monitorMuted;
             // The unmuted monitor ids are the selection a pause will resume.
             // Deleting its last member clears the pause, never the other mutes.
@@ -429,6 +433,7 @@ public sealed partial class Mixer
             {
                 _config = previous;
                 _monitorMuted = wasPaused;
+                if (wasDry) _dryMonitors.Add(id);
                 cells.Restore(this);
                 if (savedInserts is not null) _inserts[key] = savedInserts;
                 _enforcedSource = previousSource;
@@ -456,6 +461,7 @@ public sealed partial class Mixer
                     try { _pw.UnloadModule(module); }
                     catch (Exception ex) { errors.Add(ex.Message); }
                 }
+            if (mix.Kind == MixKind.Monitor) SyncDryRoutesLocked();
             if (errors.Count > 0)
                 throw new InvalidOperationException(
                     $"the mix was removed, but a PipeWire node could not be unloaded ({string.Join("; ", errors)}); it disappears when the daemon restarts");
@@ -517,10 +523,10 @@ public sealed partial class Mixer
         _meters.Remove($"ch:{id}");
         if (_combineModules.Remove(id, out uint old)) _pw.UnloadModule(old);
         uint fresh;
-        try { fresh = _pw.CreateCombineSink(channel.SinkName, MixSinkPattern, $"OpenXLR {channel.Name}"); }
+        try { fresh = _pw.CreateCombineSink(channel.SinkName, MixSinkPattern, $"OpenXLR {channel.Name}", visible: channel.IsApplication); }
         catch (Exception renameError)
         {
-            try { fresh = _pw.CreateCombineSink(channel.SinkName, MixSinkPattern, oldDescription); }
+            try { fresh = _pw.CreateCombineSink(channel.SinkName, MixSinkPattern, oldDescription, visible: channel.IsApplication); }
             catch (Exception restoreError)
             { throw new AggregateException("the channel's sink could not be reloaded or restored", renameError, restoreError); }
             FinishReloadLocked(channel, fresh, onIt);

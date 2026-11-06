@@ -412,6 +412,8 @@ public sealed class MatrixColumnViewModel : ViewModelBase
             if (_showsVolume == value) return;
             _showsVolume = value;
             Raise(nameof(ShowsVolumeChip));
+            Raise(nameof(ShowsVolumeOnlyChip));
+            Raise(nameof(DryChipText));
         }
     }
 
@@ -423,6 +425,20 @@ public sealed class MatrixColumnViewModel : ViewModelBase
     /// moves.
     /// </summary>
     public bool ShowsVolumeChip => _showsVolume && ControlSpec.Parts.Contains(SkinMatrixParts.Master);
+
+    /// <summary>
+    /// The volume-only chip: every mix but a monitor mix with the dry switch,
+    /// whose own chip shows the volume in its place while the fader moves.
+    /// </summary>
+    public bool ShowsVolumeOnlyChip => ShowsVolumeChip && !ShowsDryChip;
+
+    /// <summary>A monitor mix's head carries the dry switch, from a daemon that reports it, always visible.</summary>
+    public bool ShowsDryChip => Mix.IsMonitor && Mix.HasMonitorDry;
+
+    /// <summary>The dry switch's face: "Dry", or the mix's volume while the fader moves and for the hold after.</summary>
+    public string DryChipText => ShowsVolumeChip ? Mix.VolumeText : Localizer.Text("MonitorDry");
+
+    public string DryName => Localizer.Format("MonitorDryName", Mix.Name);
 
     internal void RefreshOutputs()
     {
@@ -437,11 +453,21 @@ public sealed class MatrixColumnViewModel : ViewModelBase
             case nameof(MixViewModel.Name):
                 Raise(nameof(MasterName));
                 Raise(nameof(MuteName));
+                Raise(nameof(DryName));
                 foreach (MatrixRowViewModel row in Matrix.Rows) row.RefreshNames(this);
                 break;
             case nameof(MixViewModel.Kind) or nameof(MixViewModel.IsEditable):
                 Raise(nameof(HandleHidden));
                 RefreshOutputs();
+                Raise(nameof(ShowsDryChip));
+                Raise(nameof(ShowsVolumeOnlyChip));
+                break;
+            case nameof(MixViewModel.HasMonitorDry):
+                Raise(nameof(ShowsDryChip));
+                Raise(nameof(ShowsVolumeOnlyChip));
+                break;
+            case nameof(MixViewModel.VolumeText):
+                if (ShowsVolumeChip) Raise(nameof(DryChipText));
                 break;
         }
     }

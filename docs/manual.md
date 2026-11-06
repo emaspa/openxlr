@@ -272,7 +272,40 @@ computer, the soft low cut, ClipGuard or a plugin insert that is not
 bypassed. The headphones then hear the microphone
 through its Monitor send with the effects, a few milliseconds later, and
 the ⓘ mark goes away. Turn the last effect off and the path comes back.
-An EQ the unit runs keeps the path.
+An EQ the unit runs keeps the path. When
+[Dry](#hear-it-dry) is on for every monitor mix the jacks play, the path
+stays on whatever effects run. You hear yourself raw and at once on the
+jacks, and Stream, Chat and recordings keep the processed voice.
+
+<a name="hear-it-dry"></a>
+**Hear it dry.** Each effect on the computer delays your voice a little on
+its way to a monitor mix. Noise removal, the voice changer and plugins that
+work in blocks add the most. On an interface without a direct monitor, such
+as the first XLR Dock, you hear that delay in your headphones. Each monitor
+mix has a **Dry** chip at the top right of its head in the mix matrix,
+opposite its name, and beside 150% on its strip in the other layouts. Grey
+means off. Click it and it turns green, and that monitor mix now hears
+XLR 1, XLR 2 and every microphone capture input before their effects, so
+you hear your voice raw and earlier. While you move the monitor's fader the
+chip turns grey and shows its volume, then reads Dry again. Each monitor
+mix has its own chip, so Monitor A can be dry while Monitor B keeps the
+effects, and a profile saves and recalls each chip on its own. Stream, Chat, the other
+virtual microphones and the Aux mix always get the processed voice. The
+send's level and mute, the channel volume and the monitor's master work as
+before. Switching moves only the microphones' sends into that monitor mix;
+the other mixes and the plugins keep running. When a dry send is missing,
+the mixer uses the processed send until the dry route is ready. While
+Sound Check plays a take, you hear it through the effects. On the MK.2
+units, the Wave:3, the Wave:3 MK.2 and the Wave:1 the chip changes the
+monitor mix only; the unit's own direct monitor and the Mic ↔ PC crossfade
+are as before. On the Wave XLR Pro in [hardware mixing](#hardware-mixing) a
+jack that plays only dry monitor mixes plays the microphones from the
+unit's own inputs. A jack that also plays a monitor mix that is not dry
+keeps the processed voice, and so does the Aux mix. The chips are saved
+with the mixer and in profiles; a profile saved before them leaves them as
+they are. The terminal mixer's Outputs tab has them too, and
+`setMonitorDry` in the [control API](api.md#dry-monitor) sets one from a
+script.
 
 ### Submixer categories
 
@@ -295,7 +328,7 @@ lands in Voice Chat. An app you move to another channel is remembered
 
 **Profiles** are named scenes: the interface's hardware settings plus
 the whole submixer (sends, channel volumes, masters, monitor outputs, aux state, insert
-chains). They are saved per interface. Application routing and the
+chains, and each capture input's own gain and mute). They are saved per interface. Application routing and the
 system default devices are not part of a profile, so recalling one
 does not rewire the desktop. The **Profiles** button in the header holds
 them. Type a name and press Save to save a new one, or click a name to
@@ -1290,6 +1323,11 @@ short gap. A size forced for the whole system with
 `pw-metadata -n settings 0 clock.force-quantum` still wins over this one.
 The choice is saved with the mixer, stays as it is when a profile is
 loaded, and is on the terminal mixer's Options tab too.
+
+Block size also sets part of how late you hear yourself through a monitor
+mix, since the audio waits for more than one block between the microphone
+and your headphones. 256 shortens that wait, and a monitor mix's
+[Dry](#hear-it-dry) chip takes the effects' own delay out of that mix.
 
 <a name="mic-setup"></a>
 <a name="sound-check"></a>
@@ -3806,7 +3844,9 @@ monitor mix that carries the microphone. Turn the Mic ↔ PC crossfade
 towards PC to hear it as your listeners do. On the Wave XLR Pro OpenXLR
 turns the [zero-latency path](#volume-direct-monitor) off while a voice is
 on, so the jacks play the changed voice, late by the voice's 33 ms and
-the computer's own path.
+the computer's own path. When the monitor mixes the jacks play are
+[Dry](#hear-it-dry), the path stays on and the jacks play your own voice
+unchanged, while your listeners hear the changed one.
 
 The voice is saved with the mixer and in profiles, so a profile can recall
 a voice; a profile saved before the voice changer leaves it as it is. A
@@ -4699,7 +4739,9 @@ under the title. **Audio clock** names the device the graph follows. If the
 interface of XLR 1 or XLR 2 follows another device, a warning line names it and
 its card in the graph says "Resampled to the clock of" that device. The UI
 shows the same warning above the mixer, with a **Manual** button that
-opens this section. A diagnostics archive states it in `meta.txt`, on the
+opens this section, and a button that makes the interface the clock, as
+the steps below describe.
+A diagnostics archive states it in `meta.txt`, on the
 lines that start with `audio clock` and `microphone`. The journal has a
 line each time the clock changes (`journalctl --user -u openxlr-daemon`).
 
@@ -4707,8 +4749,37 @@ The packaged rules make the original Wave XLR, the XLR Dock and both Wave:3
 models the clock when they are off the pro-audio profile
 ([section 5.2](#dock-silent)). WirePlumber reads them when it starts, so
 restart it after installing or upgrading. To make another interface the
-clock, give its capture node a higher `priority.driver` with a rule of
-your own:
+clock, pick it in the UI:
+
+1. Press **Make *interface* the clock** in the warning above the mixer, or
+   open Options → Audio → AUDIO and pick the interface's input under
+   **Audio clock**. The list holds the mixer's inputs and outputs that run
+   in its graph and the driven unit's input. **Automatic**, the default,
+   leaves the choice to the packaged rules and shows in brackets the
+   device that is the clock now.
+2. Restart the audio. The warning's button asks, and **Restart audio now**
+   restarts WirePlumber at once. **Later** saves the choice, and Options →
+   Audio → AUDIO then says "Applies after the audio restarts" with a
+   **Restart audio now** button. The next login applies it too. While
+   WirePlumber restarts, every audio device stops for a moment, in every
+   application. OpenXLR links its mixer to the devices again by itself; the
+   daemon does not restart.
+3. Check: **Audio clock** in Flow names the interface, and the warning is
+   gone. The capture card or webcam is now the one resampled, so listen to
+   its audio too.
+
+The choice is a WirePlumber rule that the daemon writes to
+`~/.config/wireplumber/wireplumber.conf.d/57-openxlr-clock.conf`. It gives
+the input's node `priority.driver` 3000, above every number WirePlumber
+gives a device, the 2600 of a pro-audio input such as the Wave XLR Pro's
+included. The rule names the node exactly, and a node's name changes with
+the card's profile, so pick the clock again after changing the profile.
+**Automatic** deletes the file. The daemon never replaces or deletes a file
+of that name it did not write, and Options shows why it cannot use one.
+
+The Flatpak cannot write the host's WirePlumber configuration, so it has no
+**Audio clock** choice. There, or to keep the rule by hand, write it
+yourself:
 
 1. Find the node name of the interface's input with
    `pactl list sources short`, for example
@@ -4725,21 +4796,16 @@ your own:
    ]
    ```
 
-3. Restart WirePlumber, then the daemon. Every audio device stops for a
-   moment while WirePlumber restarts:
+3. Restart WirePlumber. Every audio device stops for a moment:
 
    ```sh
    systemctl --user restart wireplumber
-   systemctl --user restart openxlr-daemon
    ```
 
 4. Check: **Audio clock** in Flow names the interface, and the warning is
-   gone. With this rule the capture card or webcam is the one resampled, so
-   listen to its audio too.
+   gone.
 
-3000 is above every number WirePlumber gives a device, the 2600 of a
-pro-audio input such as the Wave XLR Pro's included. Delete the file and
-restart WirePlumber to go back.
+Delete the file and restart WirePlumber to go back.
 
 <a name="files"></a>
 ## 6. Files and services
@@ -4786,7 +4852,8 @@ settings. See
 | `openxlr-daemon.service` (systemd user unit) | the daemon; `journalctl --user -u openxlr-daemon` for its log |
 | `/usr/lib/systemd/user/pipewire-pulse.service.d/openxlr.conf` | installed by the packages: raises pipewire-pulse's open-file limit ([section 5.8](#open-files)) |
 | `/usr/share/wireplumber/wireplumber.conf.d/50-xlr-dock-capture-hold.conf`, `52-openxlr-mk1-capture-hold.conf`, `53-openxlr-wave3-capture-hold.conf` | installed by the packages: keep the capture of the XLR Dock, the original Wave XLR, the Wave:3 and the Wave:3 MK.2 running, and make it the audio clock off pro-audio ([section 5.2](#dock-silent)) |
-| `~/.config/wireplumber/wireplumber.conf.d/56-openxlr-clock.conf` | not installed: a rule you write to make an interface the audio clock ([section 5.12](#garbled-mic)) |
+| `~/.config/wireplumber/wireplumber.conf.d/57-openxlr-clock.conf` | the audio clock picked in Options → Audio → AUDIO, written and deleted by the daemon; not in the Flatpak ([section 5.12](#garbled-mic)) |
+| `~/.config/wireplumber/wireplumber.conf.d/56-openxlr-clock.conf` | not installed: a rule you write by hand to make an interface the audio clock, the Flatpak's way ([section 5.12](#garbled-mic)) |
 | `/usr/share/wireplumber/wireplumber.conf.d/55-openxlr-wave3-mk2-playback.conf` | installed by the packages: opens the Wave:3 MK.2's headphones in the unit's float format ([section 5.2](#dock-silent)) |
 | `/usr/share/wireplumber/wireplumber.conf.d/51-openxlr-pro-raw-names.conf` | installed by the packages: names the Wave XLR Pro's raw multichannel nodes for what they are, so volume applets do not list them like OpenXLR's mixes |
 | `/usr/share/wireplumber/main.lua.d/54-openxlr-owned-state.lua` | installed by the `.deb` where WirePlumber is 0.4: keeps desktop state off OpenXLR's own nodes ([section 5.9](#quiet-mixes)) |
@@ -4900,7 +4967,9 @@ the volume in a mix matrix row, and as a Gain row above Volume in the
 classic INPUTS block. Its readout shows the volume while you move the
 volume fader, as Aux In's does ([gain readout](#gain-readout)). The
 terminal mixer has it on the Inputs tab, and a Stream Deck dial can turn
-it. Two capture inputs on one source share its gain.
+it. Two capture inputs on one source share its gain. A profile keeps the
+gain and the mute; one recalled while the device is unplugged sets them
+when it comes back.
 
 A **Mute** button goes with the gain: under the strip's controls in an
 input rack, in the row head's mute place in a mix matrix, and under the

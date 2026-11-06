@@ -73,6 +73,23 @@ public sealed record MixerScene
     /// </summary>
     public Dictionary<string, MicExpander>? Expander { get; init; }
 
+    /// <summary>
+    /// Whether each monitor mix hears the microphones dry, by mix id, saved
+    /// as <c>dryMonitors</c>; absent in older profiles, which leave it as it
+    /// is. A recall sets each monitor mix named here. An older profile's
+    /// per-microphone <c>monitorDry</c> map is not read.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("dryMonitors")]
+    public Dictionary<string, bool>? MonitorDry { get; init; }
+
+    /// <summary>
+    /// The gain and source mute of each capture input that has a gain of its
+    /// own, by channel; absent in older profiles, which leave both as they
+    /// are. A recall writes each channel named here once its source is
+    /// connected.
+    /// </summary>
+    public Dictionary<string, CaptureGainScene>? CaptureGains { get; init; }
+
     /// <summary>The ducking setup without machine processing. Absent in older profiles, which leave it alone.</summary>
     public DuckingScene? Ducking { get; init; }
 }

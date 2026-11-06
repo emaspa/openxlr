@@ -183,6 +183,30 @@
                 </Grid>
                 <TextBlock Name="BlockSizeHint" Text="{loc:Text Key=BlockSizeHint}" Classes="hint" TextWrapping="Wrap"
                            IsVisible="{Binding Main.BlockSizeReported}"/>
+                <!-- the device whose clock the graph runs on: a WirePlumber rule the daemon writes,
+                     applied when WirePlumber restarts; absent from the Flatpak's daemon -->
+                <StackPanel Name="AudioClockChoice" Spacing="4" IsVisible="{Binding Main.ClockChoiceReported}">
+                  <Grid ColumnDefinitions="Auto,*">
+                    <TextBlock Text="{loc:Text Key=AudioClock}" Classes="h" MinWidth="{DynamicResource UiText.Width110}" VerticalAlignment="Center"/>
+                    <ComboBox Name="AudioClock" Grid.Column="1" HorizontalAlignment="Stretch"
+                              ItemsSource="{Binding Main.ClockChoices}" SelectedItem="{Binding Main.ClockChoice, Mode=TwoWay}"
+                              AutomationProperties.Name="{loc:Text Key=AudioClock}">
+                      <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:AudioClockOptionItem">
+                          <TextBlock Text="{Binding Label}"/>
+                        </DataTemplate>
+                      </ComboBox.ItemTemplate>
+                    </ComboBox>
+                  </Grid>
+                  <TextBlock Name="AudioClockHint" Text="{loc:Text Key=AudioClockHint}" Classes="hint" TextWrapping="Wrap"/>
+                  <WrapPanel Name="AudioClockPending" ItemSpacing="8" LineSpacing="4" IsVisible="{Binding Main.ClockPending}">
+                    <TextBlock Text="{loc:Text Key=AudioClockPending}" Classes="warn" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                    <Button Name="RestartAudio" Content="{loc:Text Key=RestartAudioNow}" Padding="14,5" Click="OnRestartAudio"
+                            IsEnabled="{Binding Main.CanRestartAudio}" ToolTip.Tip="{loc:Text Key=RestartAudioNowTip}"/>
+                  </WrapPanel>
+                  <TextBlock Name="AudioClockProblem" Text="{Binding Main.ClockRuleProblem}" Classes="warn" TextWrapping="Wrap"
+                             IsVisible="{Binding Main.ClockRuleProblem, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                </StackPanel>
                 <StackPanel Name="SoftwareMixerNotes" Spacing="6">
                   <TextBlock Text="{loc:Text Key=ApplicationChannelsMixesVirtualMicrophonesAndInserts}"
                              FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>

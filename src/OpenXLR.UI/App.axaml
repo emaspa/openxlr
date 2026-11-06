@@ -240,6 +240,49 @@
             <Setter Property="Foreground" Value="{DynamicResource Ox.Danger.Foreground}"/>
         </Style>
 
+        <!-- A monitor mix's dry switch in the matrix head: a chip the size of the
+             volume chip, in the control colours while off and in the lamp green
+             of a processing chain (text and border) while on. -->
+        <Style Selector="ToggleButton.dryChip">
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="Background" Value="{DynamicResource Ox.Control.Background}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Text.Secondary}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Ox.Control.BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="{DynamicResource Ox.Control.BorderThickness}"/>
+            <Setter Property="CornerRadius" Value="{DynamicResource Ox.Control.CornerRadius}"/>
+        </Style>
+        <Style Selector="ToggleButton.dryChip /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Ox.Control.Background}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Text.Secondary}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Ox.Control.BorderBrush}"/>
+        </Style>
+        <Style Selector="ToggleButton.dryChip:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Ox.Control.BackgroundPointerOver}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Ox.Control.BorderBrushPointerOver}"/>
+        </Style>
+        <Style Selector="ToggleButton.dryChip:checked">
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Led.On}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Ox.Led.On}"/>
+        </Style>
+        <Style Selector="ToggleButton.dryChip:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Ox.Control.Background}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Led.On}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Ox.Led.On}"/>
+        </Style>
+        <Style Selector="ToggleButton.dryChip:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Ox.Control.BackgroundPointerOver}"/>
+        </Style>
+        <!-- While it shows the volume the chip is the plain volume chip, grey whether dry or not. -->
+        <Style Selector="ToggleButton.dryChip.showsVolume:checked">
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Control.Foreground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Ox.Control.BorderBrush}"/>
+        </Style>
+        <Style Selector="ToggleButton.dryChip.showsVolume /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Control.Foreground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Ox.Control.BorderBrush}"/>
+        </Style>
+
         <!-- The button that opens a plugin chain wears the chain's state in the
              lamp colours: green while a plugin is processing, red when the chain
              has plugins and none is. An empty chain keeps the plain button. -->

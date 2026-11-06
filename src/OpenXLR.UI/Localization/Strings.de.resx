@@ -3180,6 +3180,15 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="MicSetup" xml:space="preserve">
     <value>Mikrofon-Setup</value>
   </data>
+  <data name="MonitorDry" xml:space="preserve">
+    <value>Trocken</value>
+  </data>
+  <data name="MonitorDryName" xml:space="preserve">
+    <value>Mikrofone in {0} trocken hören</value>
+  </data>
+  <data name="MonitorDryTip" xml:space="preserve">
+    <value>Hör deine Mikrofone in diesem Monitor-Mix vor ihren Effekten, so kommt deine eigene Stimme früher im Kopfhörer an. Stream, Chat, die virtuellen Mikrofone, Aufnahmen und die anderen Monitor-Mixe behalten die bearbeitete Stimme.</value>
+  </data>
   <data name="MicSetupButtonTip" xml:space="preserve">
     <value>Ein Mikrofon Schritt für Schritt einrichten: Position, Pegel, eine Aufnahme roh und bearbeitet anhören, EQ und Plugins. Öffnet sich auf XLR 1 oder dem ersten Mikrofon im Mixer.</value>
   </data>
@@ -4114,5 +4123,53 @@ Aus dem Tray holst du den Mixer über das OpenXLR-Symbol oder dein App-Menü zur
   </data>
   <data name="MicSetupPresetSoftSibilantsTip" xml:space="preserve">
     <value>Senkt einen festen Frequenzbereich um scharfe S-Laute ab und mildert helle Höhen.</value>
+  </data>
+  <data name="AudioClock" xml:space="preserve">
+    <value>Audiotakt</value>
+  </data>
+  <data name="AudioClockAutomatic" xml:space="preserve">
+    <value>Automatisch</value>
+  </data>
+  <data name="AudioClockAutomaticDriver" xml:space="preserve">
+    <value>Automatisch ({0})</value>
+  </data>
+  <data name="AudioClockInput" xml:space="preserve">
+    <value>{0} (Eingang)</value>
+  </data>
+  <data name="AudioClockOutput" xml:space="preserve">
+    <value>{0} (Ausgang)</value>
+  </data>
+  <data name="AudioClockHint" xml:space="preserve">
+    <value>Das Gerät, nach dessen Takt PipeWire den Graphen von OpenXLR laufen lässt. Jedes andere Gerät im Graphen wird darauf umgerechnet. Automatisch überlässt die Wahl den mitgelieferten Regeln. Eine Wahl ist eine WirePlumber-Regel und gilt, sobald das Audio neu startet, oder bei der nächsten Anmeldung.</value>
+  </data>
+  <data name="AudioClockPending" xml:space="preserve">
+    <value>Gilt, sobald das Audio neu startet.</value>
+  </data>
+  <data name="RestartAudioNow" xml:space="preserve">
+    <value>Audio jetzt neu starten</value>
+  </data>
+  <data name="RestartAudioNowTip" xml:space="preserve">
+    <value>WirePlumber neu starten, damit der Audiotakt gilt</value>
+  </data>
+  <data name="RestartAudioTitle" xml:space="preserve">
+    <value>Audio neu starten</value>
+  </data>
+  <data name="RestartAudioConfirm" xml:space="preserve">
+    <value>WirePlumber startet neu und legt jedes Audiogerät neu an. Alles Audio setzt für einen Moment aus, in jeder Anwendung. OpenXLR verbindet seinen Mixer danach selbst wieder mit den Geräten.</value>
+  </data>
+  <data name="AudioRestarted" xml:space="preserve">
+    <value>WirePlumber wurde neu gestartet.</value>
+  </data>
+  <data name="MakeDeviceTheClock" xml:space="preserve">
+    <value>{0} zum Takt machen</value>
+  </data>
+  <data name="MakeDeviceTheClockTip" xml:space="preserve">
+    <value>Das Interface des Mikrofons zum Audiotakt machen, damit das andere Gerät umgerechnet wird</value>
+  </data>
+  <data name="MakeClockConfirm" xml:space="preserve">
+    <value>OpenXLR schreibt eine WirePlumber-Regel, die {0} zum Audiotakt macht; dann wird das andere Gerät im Graphen umgerechnet. Die Regel gilt, sobald das Audio neu startet. Ein Neustart jetzt lässt alles Audio für einen Moment aussetzen. Später wartet auf die nächste Anmeldung oder auf Audio jetzt neu starten in Optionen, Audio.</value>
+  </data>
+  <data name="MakeClockLater" xml:space="preserve">
+    <value>Später</value>
   </data>
 </root>

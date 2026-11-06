@@ -43,6 +43,12 @@ public static class CommandValidation
             : cmd.Check.ValueKind is JsonValueKind.Undefined or JsonValueKind.True or JsonValueKind.False ? null
             : "setMixing: check must be a boolean";
 
+    /// <summary><c>setAudioClock</c>: a value null or absent for Automatic, or an ALSA node name (<see cref="AudioClockRule.IsValidNode"/>).</summary>
+    internal static string? CheckAudioClock(Command cmd)
+        => cmd.Value.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null
+            || cmd.Value.ValueKind == JsonValueKind.String && AudioClockRule.IsValidNode(cmd.Value.GetString())
+            ? null : "setAudioClock: value must be null or the node name of an ALSA device, alsa_input. or alsa_output. followed by letters, digits, '_', '-' and '.'";
+
     public const int MaxText = 256;          // identities, labels, device names, symbols
     public const int MaxUri = 512;
     public const int MaxDevices = 16;
@@ -127,6 +133,8 @@ public static class CommandValidation
                 return CheckExpander(cmd, layout, nativeHostInstalled ?? PluginCatalog.HostInstalled);
             case "setDynamicsProcessing":
                 return CheckDynamicsProcessing(cmd, layout);
+            case "setMonitorDry":
+                return CheckMonitorDry(cmd, layout);
             case "watchDynamics":
                 if (cmd.Channel is null || TooLong(cmd.Channel, 36) || !layout.IsMicrophoneChannel(cmd.Channel))
                     return "watchDynamics: need a microphone channel";
@@ -302,6 +310,10 @@ public static class CommandValidation
             case "recoverCapture":
                 return null;   // no arguments; the driven unit's capabilities decide
             case "restartDaemon":
+                return null;   // no arguments
+            case "setAudioClock":
+                return CheckAudioClock(cmd);
+            case "restartAudioServices":
                 return null;   // no arguments
             case "setMonitorFeed":
                 if (TooLong(cmd.Device, MaxText)) return "setMonitorFeed: device name too long";
@@ -691,6 +703,18 @@ public static class CommandValidation
            || cmd.Name is { Length: > 200 } || cmd.Name?.Any(char.IsControl) == true
             ? "setNativeEditorRule: need a valid kind, plugin id and optional name"
             : null;
+
+    /// <summary>
+    /// <c>setMonitorDry</c>: a monitor mix and a boolean <c>value</c>. It
+    /// needs no native helper: each dry route is a combine and a port link.
+    /// </summary>
+    internal static string? CheckMonitorDry(Command cmd, ILayoutInfo layout)
+    {
+        if (cmd.Mix is null) return "setMonitorDry: need 'mix'";
+        if (TooLong(cmd.Mix, 36) || !layout.IsMonitorMix(cmd.Mix))
+            return $"setMonitorDry: '{Short(cmd.Mix)}' is not a monitor mix";
+        return cmd.Value.ValueKind is JsonValueKind.True or JsonValueKind.False ? null : "setMonitorDry: value must be a boolean";
+    }
 
     internal static string? CheckPluginWineTrace(Command cmd)
         => cmd.Value.ValueKind is JsonValueKind.True or JsonValueKind.False

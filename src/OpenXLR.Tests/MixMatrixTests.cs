@@ -267,6 +267,57 @@ public sealed class MixMatrixTests
     }
 
     [Fact]
+    public void AMonitorMixsChipIsItsDrySwitchAndShowsTheVolumeWhileTheMasterMoves()
+    {
+        var model = new MainViewModel(new DaemonClient());
+        string State(string dry, string volume = "0.8") => $$"""
+            {"channels":[{"id":"xlr1","name":"XLR 1"}],
+             "mixes":[{"id":"monitor","name":"Monitor A","kind":"monitor","volume":{{volume}},"monitorDry":{{dry}}},
+                      {"id":"stream","name":"Stream","kind":"virtualMic"}]}
+            """;
+        ApplyMixer.Invoke(model, [JsonNode.Parse(State("false"))]);
+        using var matrix = new MixMatrixViewModel(model);
+        MatrixColumnViewModel monitor = matrix.Columns.Single(c => c.Mix.Id == "monitor");
+        MatrixColumnViewModel stream = matrix.Columns.Single(c => c.Mix.Id == "stream");
+        var hold = new ManualHold();
+        monitor.StartVolumeHold = hold.Start;
+
+        // Always shown on the monitor mix, off, reading Dry; never on the virtual microphone.
+        Assert.True(monitor.ShowsDryChip);
+        Assert.False(monitor.Mix.MonitorDry);
+        Assert.Equal(Localizer.Text("MonitorDry"), monitor.DryChipText);
+        Assert.Equal(Localizer.Format("MonitorDryName", "Monitor A"), monitor.DryName);
+        Assert.False(stream.ShowsDryChip);
+        Assert.False(stream.Mix.HasMonitorDry);
+
+        // The daemon's state turns it on.
+        ApplyMixer.Invoke(model, [JsonNode.Parse(State("true"))]);
+        Assert.True(monitor.Mix.MonitorDry);
+
+        // While the master moves the same chip reads the volume, and the
+        // volume-only chip stays hidden on this mix.
+        var raised = new List<string?>();
+        monitor.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        monitor.VolumeAdjusting = true;
+        Assert.True(monitor.ShowsVolumeChip);
+        Assert.False(monitor.ShowsVolumeOnlyChip);
+        Assert.Equal("80%", monitor.DryChipText);
+        Assert.Contains(nameof(MatrixColumnViewModel.DryChipText), raised);
+        // The daemon's state, not the fader, so no slider hold leaks into other tests.
+        ApplyMixer.Invoke(model, [JsonNode.Parse(State("true", "0.5"))]);
+        Assert.Equal("50%", monitor.DryChipText);
+        monitor.VolumeAdjusting = false;
+        hold.Handles[^1].Elapse();
+        Assert.Equal(Localizer.Text("MonitorDry"), monitor.DryChipText);
+
+        // The virtual microphone keeps the volume-only chip.
+        stream.StartVolumeHold = hold.Start;
+        stream.VolumeAdjusting = true;
+        Assert.True(stream.ShowsVolumeOnlyChip);
+        stream.VolumeAdjusting = false;
+    }
+
+    [Fact]
     public void AMixShowsItsVolumeOppositeItsNameWhileItsMasterMovesAndASecondAfter()
     {
         var model = new MainViewModel(new DaemonClient());

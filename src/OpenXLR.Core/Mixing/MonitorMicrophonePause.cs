@@ -35,6 +35,8 @@ public sealed partial class Mixer
         {
             if (available) available = ApplyMicrophonePauseLocked(channel.SinkName);
         }
+        // A dry monitor send has no channel sink to mute; its legs follow the pause.
+        foreach (string dry in _dryRoutes.Keys.ToList()) ReapplyDryCellsLocked(dry);
         PushDuckKeyOpenLocked();
         if (MicrophonesPausedLocked && _soundCheck is not null)
             StopSoundCheckLocked(restore: true, error: "Sound Check stopped because microphones are included in the monitoring pause.");

@@ -789,15 +789,25 @@
                                  AutomationProperties.Name="{Binding Mix.Name}" ToolTip.Tip="{Binding Mix.Name}"/>
                       <TextBlock Grid.Column="1" Text="{Binding Mix.Name}" Classes="strip" VerticalAlignment="Center"
                                  TextTrimming="CharacterEllipsis" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Mix.Name}"/>
-                      <Button Grid.Column="2" Classes="ghost reorderHandle" Classes.fixedPlace="{Binding HandleHidden}"
-                              Content="↔" Tag="{Binding Mix}"
-                              AutomationProperties.Name="{Binding Mix.Name, StringFormat={loc:Text Key=MoveItem}}"
-                              ToolTip.Tip="{loc:Text Key=DragOntoAnotherChannelYouCanEdit}"/>
+                      <!-- A monitor mix's dry switch, at the head's right edge as the FX button below sits
+                           at the strip's, and before the move handle while that shows: grey while off, green
+                           while on, and the volume in place of "Dry" while the master moves. -->
+                      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <ToggleButton Name="MatrixDryChip" Classes="dryChip" Classes.showsVolume="{Binding ShowsVolumeChip}" Padding="5,0"
+                                      VerticalAlignment="Center" IsVisible="{Binding ShowsDryChip}"
+                                      IsChecked="{Binding Mix.MonitorDry, Mode=TwoWay}" Content="{Binding DryChipText}"
+                                      FontSize="{DynamicResource UiText.FontSize11}"
+                                      AutomationProperties.Name="{Binding DryName}" ToolTip.Tip="{loc:Text Key=MonitorDryTip}"/>
+                        <Button Classes="ghost reorderHandle" Classes.fixedPlace="{Binding HandleHidden}"
+                                Content="↔" Tag="{Binding Mix}"
+                                AutomationProperties.Name="{Binding Mix.Name, StringFormat={loc:Text Key=MoveItem}}"
+                                ToolTip.Tip="{loc:Text Key=DragOntoAnotherChannelYouCanEdit}"/>
+                      </StackPanel>
                       <!-- the mix's volume while its master moves and for a second after, in the chip a send's
                            level uses: opposite the name, drawn over the move handle and the end of a long name,
                            so the head keeps its size -->
                       <Border Grid.Column="1" Grid.ColumnSpan="2" Name="MatrixMasterChip" Classes="matrixValueChip" IsHitTestVisible="False" Padding="5,0"
-                              HorizontalAlignment="Right" VerticalAlignment="Center" IsVisible="{Binding ShowsVolumeChip}"
+                              HorizontalAlignment="Right" VerticalAlignment="Center" IsVisible="{Binding ShowsVolumeOnlyChip}"
                               Background="{DynamicResource Ox.Control.Background}" BorderBrush="{DynamicResource Ox.Control.BorderBrush}"
                               BorderThickness="{DynamicResource Ox.Control.BorderThickness}" CornerRadius="{DynamicResource Ox.Control.CornerRadius}">
                         <TextBlock Text="{Binding Mix.VolumeText}" FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Control.Foreground}"/>

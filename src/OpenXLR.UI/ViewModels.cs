@@ -922,6 +922,7 @@ public sealed partial class MainViewModel : ViewModelBase
         Clock = AudioClock.From(node["mixer"]);
         // A card without a microphone input is the bigger problem and keeps its own button.
         ClockProblem = !CardProfileProblem && Clock is { MicResampled: true };
+        ApplyClockChoice(node["mixer"]);
         MixerWaiting = node["mixerWaiting"]?.GetValue<bool>() ?? false;
         try
         {
@@ -1874,8 +1875,37 @@ public sealed class MixViewModel : ViewModelBase, IHasId
             Muted = (n["muted"]?.GetValue<bool>() ?? false) || IsMonitor && monitorMuted;
             if (n["name"]?.GetValue<string>() is { Length: > 0 } name) Name = name;
             HardwareSection = n["hardwareSection"] is JsonValue section && section.TryGetValue(out int start) ? start : null;
+            bool? dry = n["monitorDry"] is JsonValue d && d.TryGetValue(out bool on) ? on : null;
+            if (dry != _monitorDry)
+            {
+                bool had = _monitorDry is not null;
+                _monitorDry = dry;
+                Raise(nameof(MonitorDry));
+                if (had != dry is not null) Raise(nameof(HasMonitorDry));
+            }
         }
         finally { _applying = false; }
+    }
+
+    private bool? _monitorDry;
+    /// <summary>The daemon reports the dry switch on this mix: a monitor mix, from a daemon that has it.</summary>
+    public bool HasMonitorDry => _monitorDry is not null;
+
+    /// <summary>
+    /// The mix hears the microphones before their effects. A change from the
+    /// matrix goes to the daemon as <c>setMonitorDry</c>; the next state push
+    /// confirms it.
+    /// </summary>
+    public bool MonitorDry
+    {
+        get => _monitorDry ?? false;
+        set
+        {
+            if (_monitorDry is null || _monitorDry == value) return;
+            _monitorDry = value;
+            Raise();
+            if (!_applying && !Detached) _ = _client.SetMonitorDryAsync(Id, value);
+        }
     }
 
     private int? _hardwareSection;

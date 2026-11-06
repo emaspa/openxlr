@@ -506,6 +506,39 @@ public sealed class PipeWireAdapter
     /// </summary>
     public IReadOnlyDictionary<int, (int Percent, bool Muted)> CombineLegLevels() => CombineLegLevels(GraphObjects());
 
+    /// <summary>
+    /// The level and mute of every OpenXLR combine leg, by sink-input index,
+    /// and the indices of the legs no link leaves: one registry read, no helper.
+    /// </summary>
+    public (IReadOnlyDictionary<int, (int Percent, bool Muted)> Levels, IReadOnlySet<int> Unlinked) CombineLegs()
+    {
+        JsonElement[] objects = GraphObjects();
+        return (CombineLegLevels(objects), UnlinkedCombineLegs(objects));
+    }
+
+    internal static IReadOnlySet<int> UnlinkedCombineLegs(IEnumerable<JsonElement> objects)
+    {
+        var legs = new Dictionary<uint, int>();   // node id -> serial
+        var linked = new HashSet<uint>();
+        foreach (JsonElement o in objects)
+        {
+            if (!o.TryGetProperty("type", out JsonElement t) || !o.TryGetProperty("info", out JsonElement info)
+                || info.ValueKind != JsonValueKind.Object) continue;
+            if (t.ValueEquals("PipeWire:Interface:Link"))
+            {
+                if (info.TryGetProperty("output-node-id", out JsonElement from) && from.TryGetUInt32(out uint node)) linked.Add(node);
+                continue;
+            }
+            if (!t.ValueEquals("PipeWire:Interface:Node") || !o.TryGetProperty("id", out JsonElement id) || !id.TryGetUInt32(out uint nodeId)
+                || !info.TryGetProperty("props", out JsonElement props)) continue;
+            string? name = props.TryGetProperty("node.name", out JsonElement n) ? n.GetString() : null;
+            if (name is null || !name.StartsWith("output.OpenXLR_", StringComparison.Ordinal)) continue;
+            if (!props.TryGetProperty("media.class", out JsonElement m) || m.GetString() != "Stream/Output/Audio") continue;
+            if (Serial(props) is int serial) legs[nodeId] = serial;
+        }
+        return legs.Where(leg => !linked.Contains(leg.Key)).Select(leg => leg.Value).ToHashSet();
+    }
+
     internal static IReadOnlyDictionary<int, (int Percent, bool Muted)> CombineLegLevels(byte[] json)
         => CombineLegLevels(ParseObjects(json));
 
