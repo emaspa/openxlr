@@ -80,6 +80,14 @@ public sealed record MixerScene
     /// </summary>
     public Dictionary<string, bool>? MonitorDry { get; init; }
 
+    /// <summary>
+    /// The gain and source mute of each capture input that has a gain of its
+    /// own, by channel; absent in older profiles, which leave both as they
+    /// are. A recall writes each channel named here once its source is
+    /// connected.
+    /// </summary>
+    public Dictionary<string, CaptureGainScene>? CaptureGains { get; init; }
+
     /// <summary>The ducking setup without machine processing. Absent in older profiles, which leave it alone.</summary>
     public DuckingScene? Ducking { get; init; }
 }

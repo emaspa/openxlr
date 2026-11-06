@@ -257,8 +257,8 @@ that final acknowledgement (or an `error` without a request id):
 | `setMixLatencyCompensation` | `value` | boolean; delay the other mixes to line up with the mix whose inserts take longest (see [plugin latency](#plugin-latency)). Off by default. Either way every insert chain is rebuilt, which briefly interrupts audio |
 | `setLevel` | `channel`, `mix`, `value` | one send fader |
 | `setChannelVolume` | `channel`, `value` | a channel's own volume, 0 to 1 (values outside are clamped), which scales every send of the channel at once; see [channel volume](#channel-volume). Any channel takes one, `xlr1`, `xlr2`, `aux` and `line` included, where it comes after the interface's gain and leaves the gain alone; an unknown channel is refused |
-| `setCaptureGain` | `channel`, `value` | a capture input's gain in dB, the volume of its source; see [capture input gain](#capture-input-gain). Clamped to the channel's `captureGain.minDb` to `maxDb`. Refused on any channel that is not a capture input, on a capture input that takes a Wave unit's input or remembers a unit (its gain is the unit's, set with `set` or `setWaveControl`), on a source of an Elgato Wave interface, XLR Dock or OpenXLR itself, and while the source is missing. Nothing is saved: the audio server keeps the source's volume |
-| `setCaptureMuted` | `channel`, `value` | boolean only; mute or unmute a capture input's source, for every program that records it, as a desktop sound panel does; see [capture input gain](#capture-input-gain). The state reports it as `captureGain.muted`. Refused where `setCaptureGain` is. Nothing is saved: the audio server keeps the source's mute |
+| `setCaptureGain` | `channel`, `value` | a capture input's gain in dB, the volume of its source; see [capture input gain](#capture-input-gain). Clamped to the channel's `captureGain.minDb` to `maxDb`. Refused on any channel that is not a capture input, on a capture input that takes a Wave unit's input or remembers a unit (its gain is the unit's, set with `set` or `setWaveControl`), on a source of an Elgato Wave interface, XLR Dock or OpenXLR itself, and while the source is missing. Not in `mixer.json`: the audio server keeps the source's volume. A profile keeps it ([capture input gain](#capture-input-gain)) |
+| `setCaptureMuted` | `channel`, `value` | boolean only; mute or unmute a capture input's source, for every program that records it, as a desktop sound panel does; see [capture input gain](#capture-input-gain). The state reports it as `captureGain.muted`. Refused where `setCaptureGain` is. Not in `mixer.json`: the audio server keeps the source's mute. A profile keeps it |
 | `toggleCaptureMuted` | `channel` | atomically flip the same source mute from what the audio server reports at that moment. Use this for keys and repeated presses instead of reading `captureGain.muted` and sending its inverse; each accepted command flips once. Refused where `setCaptureGain` is |
 | `createCaptureChannel` | `name`, `source`, optional `capturePair`, `captureMonoChannel` | add an external PipeWire capture input, muted in every mix; exact source name of up to 256 characters, zero-based stereo pair 0 to 31 (default 0). `captureMonoChannel`, 0 to 63 and only with pair 0, takes that one port of the source and feeds it to both sides. A source named `OpenXLR...` or ending in `.monitor` is refused, and so is a source that is not present. Capture inputs count against the 32 application channels. See [capture inputs](mixer-layout.md#capture-inputs) |
 | `setCaptureSource` | `channel`, `source`, optional `capturePair`, `captureMonoChannel` | change an existing capture input's source in place. The source and port rules are those of `createCaptureChannel`, but an offline source is accepted. The channel keeps its id, name, send levels, volume, inserts, group and appearance. Its monitor sends are muted and its Sound Check session ends; other sends keep their mutes. A mono/stereo width change is refused while any insert remains, bypassed inserts included. Saves the binding and mutes before acknowledging; a failed save restores them and leaves Sound Check running. The selected source's supported unit is learned, or the old `captureUnit` is cleared when selecting another source; see [capture inputs](mixer-layout.md#capture-inputs). No new state fields. Older daemons reject this command |
@@ -783,6 +783,15 @@ sends `captureGain` without `muted`, and a client then draws no mute.
 mute are the unit's. It is also absent on a source of an Elgato Wave interface, an
 XLR Dock or OpenXLR itself, which OpenXLR never writes, the Wave XLR Pro's
 raw source among them.
+
+A profile saved now carries `mixer.captureGains`: channel id to
+`{gainDb, muted}` for every capture input with a gain of its own whose
+source the daemon has read. A recall writes each one the next time the
+daemon finds that channel's source connected, so a profile recalled with
+the camera unplugged takes effect when it is plugged in. A profile
+without the field, as every older one is, leaves the gain and the mute
+alone. A recall clamps the gain to the source's range, as `setCaptureGain`
+does.
 
 ### Capture input chains
 

@@ -1897,6 +1897,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 Compressor = SceneCompressorLocked(),
                 Expander = SceneExpanderLocked(),
                 MonitorDry = SceneMonitorDryLocked(),
+                CaptureGains = SceneCaptureGainsLocked(),
                 Ducking = DuckingSetupLocked().ToScene(),
             };
         }
@@ -2015,6 +2016,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 || s.Expander is not null) SyncEqStagesLocked();
             // The dry monitor switch the same way: a profile without it leaves it alone.
             if (s.MonitorDry is not null) RecallMonitorDryLocked(s.MonitorDry);
+            // A capture input's gain and mute too, written once its source is there.
+            RecallCaptureGainsLocked(s.CaptureGains);
             SyncDuckingLocked();
             SyncDryRoutesLocked();
         }
