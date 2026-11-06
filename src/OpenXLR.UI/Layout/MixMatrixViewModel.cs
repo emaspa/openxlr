@@ -624,6 +624,28 @@ public sealed class MatrixRowViewModel : ViewModelBase
     public bool ShowsOwnClock => Kind == InputStripKind.Capture && Channel.HasOwnClock;
 
     /// <summary>
+    /// The processing part holds the Own clock switch and nothing else, no
+    /// interface switches, noise removal or dynamics. The head then draws
+    /// the switch itself, a button that turns it on and off, instead of a
+    /// Mic button with a flyout.
+    /// </summary>
+    public bool OwnClockOnly => ShowsOwnClock && !CarriesUnit && !CarriesExtraUnit && !ShowsSoftware && !ShowsNoise && !ShowsDynamics;
+
+    /// <summary>The head draws the Mic button and its flyout: the processing part shows and holds more than the Own clock switch.</summary>
+    public bool ShowsSwitchesButton => ShowsProcessing && !OwnClockOnly;
+
+    /// <summary>The head draws the Own clock button in the processing part's place: the part shows and the switch is all it holds.</summary>
+    public bool ShowsOwnClockButton => ShowsProcessing && OwnClockOnly;
+
+    /// <summary>The Own clock button's name for a screen reader, with the channel's name.</summary>
+    public string OwnClockName => Localizer.Format("MatrixOwnClockName", Channel.Name);
+
+    /// <summary>The Own clock button's tooltip: what the switch does, and under it what the bridge does while it runs.</summary>
+    public string OwnClockTip => Channel.OwnClockStatus is { } status
+        ? Localizer.Text("CaptureOwnClockTip") + "\n\n" + status
+        : Localizer.Text("CaptureOwnClockTip");
+
+    /// <summary>
     /// The processing button is lit: a switch the input's interface has is
     /// on, XLR 1's software low cut or ClipGuard is, noise removal runs, or
     /// a capture input runs on its own clock.
@@ -836,6 +858,7 @@ public sealed class MatrixRowViewModel : ViewModelBase
                 Raise(nameof(LeftLevelName));
                 Raise(nameof(RightLevelName));
                 Raise(nameof(ProcessingName));
+                Raise(nameof(OwnClockName));
                 foreach (MatrixCellViewModel cell in Cells) cell.RefreshNames();
                 break;
             case nameof(ChannelViewModel.Readout) or nameof(ChannelViewModel.ReadoutName): RaiseReadout(); break;
@@ -848,6 +871,7 @@ public sealed class MatrixRowViewModel : ViewModelBase
             case nameof(ChannelViewModel.Noise): WatchUnits(); Raise(nameof(ShowsNoise)); RaiseSwitches(); break;
             case nameof(ChannelViewModel.Dynamics): WatchUnits(); Raise(nameof(ShowsDynamics)); RaiseSwitches(); break;
             case nameof(ChannelViewModel.HasOwnClock) or nameof(ChannelViewModel.OwnClock): Raise(nameof(ShowsOwnClock)); RaiseSwitches(); break;
+            case nameof(ChannelViewModel.OwnClockStatus): Raise(nameof(OwnClockTip)); break;
             case nameof(ChannelViewModel.ShownUnitInput):
                 Raise(nameof(Unit)); Raise(nameof(CarriesUnit)); WatchUnits(); RefreshSpec(); RaiseSwitches();
                 break;
@@ -931,6 +955,9 @@ public sealed class MatrixRowViewModel : ViewModelBase
         Raise(nameof(PhantomOn));
         Raise(nameof(HasPhantom));
         Raise(nameof(ProcessingName));
+        Raise(nameof(OwnClockOnly));
+        Raise(nameof(ShowsSwitchesButton));
+        Raise(nameof(ShowsOwnClockButton));
     }
 
     private void OnSendsChanged(object? sender, NotifyCollectionChangedEventArgs e)

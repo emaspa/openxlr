@@ -186,7 +186,7 @@
                        the input's gain, which reads the channel's volume while the volume fader moves -->
                   <Button Grid.Column="3" Name="MatrixProcessing" Classes="matrixProcessing fx" Classes.fxOn="{Binding ProcessingOn}"
                           Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
-                          MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsProcessing}"
+                          MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsSwitchesButton}"
                           AutomationProperties.Name="{Binding ProcessingName}" ToolTip.Tip="{loc:Text Key=MatrixProcessingTip}">
                     <StackPanel Orientation="Horizontal" Spacing="4">
                       <skin:StatusLed Name="MatrixPhantom" Kind="Power" IsOn="{Binding PhantomOn}" IsVisible="{Binding HasPhantom}"
@@ -199,6 +199,11 @@
                       </Flyout>
                     </Button.Flyout>
                   </Button>
+                  <!-- a capture input whose only switch is Own clock: the switch itself, lit while it is on, no flyout -->
+                  <Button Grid.Column="3" Name="MatrixOwnClockButton" Classes="matrixProcessing fx" Classes.fxOn="{Binding Channel.OwnClock}"
+                          Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                          MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsOwnClockButton}" Click="OnToggleOwnClock"
+                          Content="{loc:Text Key=CaptureOwnClock}" AutomationProperties.Name="{Binding OwnClockName}" ToolTip.Tip="{Binding OwnClockTip}"/>
                   <TextBlock Grid.Column="3" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"
                              Classes.under="{Binding ShowsProcessing}" Classes.centred="{Binding !ShowsProcessing}"
                              HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowsReadout}"
@@ -326,7 +331,7 @@
                        the input's gain, which reads the channel's volume while the volume fader moves -->
                   <Button Grid.Column="3" Name="MatrixProcessing" Classes="matrixProcessing fx" Classes.fxOn="{Binding ProcessingOn}"
                           Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
-                          MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsProcessing}"
+                          MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsSwitchesButton}"
                           AutomationProperties.Name="{Binding ProcessingName}" ToolTip.Tip="{loc:Text Key=MatrixProcessingTip}">
                     <StackPanel Orientation="Horizontal" Spacing="4">
                       <skin:StatusLed Name="MatrixPhantom" Kind="Power" IsOn="{Binding PhantomOn}" IsVisible="{Binding HasPhantom}"
@@ -339,6 +344,11 @@
                       </Flyout>
                     </Button.Flyout>
                   </Button>
+                  <!-- a capture input whose only switch is Own clock: the switch itself, lit while it is on, no flyout -->
+                  <Button Grid.Column="3" Name="MatrixOwnClockButton" Classes="matrixProcessing fx" Classes.fxOn="{Binding Channel.OwnClock}"
+                          Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                          MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsOwnClockButton}" Click="OnToggleOwnClock"
+                          Content="{loc:Text Key=CaptureOwnClock}" AutomationProperties.Name="{Binding OwnClockName}" ToolTip.Tip="{Binding OwnClockTip}"/>
                   <TextBlock Grid.Column="3" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"
                              Classes.under="{Binding ShowsProcessing}" Classes.centred="{Binding !ShowsProcessing}"
                              HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowsReadout}"
@@ -620,7 +630,7 @@
                        the input's gain, which reads the channel's volume while the volume fader moves -->
                   <Button Grid.Column="3" Name="MatrixProcessing" Classes="matrixProcessing fx" Classes.fxOn="{Binding ProcessingOn}"
                           Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
-                          MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsProcessing}"
+                          MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsSwitchesButton}"
                           AutomationProperties.Name="{Binding ProcessingName}" ToolTip.Tip="{loc:Text Key=MatrixProcessingTip}">
                     <StackPanel Orientation="Horizontal" Spacing="4">
                       <skin:StatusLed Name="MatrixPhantom" Kind="Power" IsOn="{Binding PhantomOn}" IsVisible="{Binding HasPhantom}"
@@ -633,6 +643,11 @@
                       </Flyout>
                     </Button.Flyout>
                   </Button>
+                  <!-- a capture input whose only switch is Own clock: the switch itself, lit while it is on, no flyout -->
+                  <Button Grid.Column="3" Name="MatrixOwnClockButton" Classes="matrixProcessing fx" Classes.fxOn="{Binding Channel.OwnClock}"
+                          Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                          MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsOwnClockButton}" Click="OnToggleOwnClock"
+                          Content="{loc:Text Key=CaptureOwnClock}" AutomationProperties.Name="{Binding OwnClockName}" ToolTip.Tip="{Binding OwnClockTip}"/>
                   <TextBlock Grid.Column="3" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"
                              Classes.under="{Binding ShowsProcessing}" Classes.centred="{Binding !ShowsProcessing}"
                              HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowsReadout}"
