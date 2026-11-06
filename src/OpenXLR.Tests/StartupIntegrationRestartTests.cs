@@ -84,11 +84,15 @@ public sealed class StartupIntegrationRestartTests
             bool?[] results = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => Task.Run(() =>
             {
                 int checks = 0;
-                return StartupIntegration.ClaimDaemonUpgradePrompt(42, () => ++checks == 1 || remainsConnected)
+                return StartupIntegration.IsRunningDaemonService(42, () => ++checks == 1 || remainsConnected)
+                    && StartupIntegration.ClaimDaemonUpgradePrompt()
                     ? StartupIntegration.RestartRunningDaemonService(42, () => remainsConnected) : (bool?)null;
             })));
             Assert.Equal(expected is null ? [] : new[] { expected }, results.Where(result => result is not null));
-            Assert.False(StartupIntegration.ClaimDaemonUpgradePrompt(42, () => remainsConnected));
+            if (expected is null)
+                Assert.Empty(Directory.GetFiles(OpenXlrPaths.RuntimeDir, "upgrade-prompt-*"));
+            else
+                Assert.False(StartupIntegration.ClaimDaemonUpgradePrompt());
             if (expected is null) Assert.False(File.Exists(log));
             else Assert.Equal(["restart"], File.ReadAllLines(log));
         }
@@ -122,7 +126,8 @@ public sealed class StartupIntegrationRestartTests
             Environment.SetEnvironmentVariable("PATH", directory);
             Environment.SetEnvironmentVariable("XDG_RUNTIME_DIR", directory);
             File.WriteAllText(pidFile, "42\n");
-            Assert.True(StartupIntegration.ClaimDaemonUpgradePrompt(42, () => true));
+            Assert.True(StartupIntegration.IsRunningDaemonService(42, () => true));
+            Assert.True(StartupIntegration.ClaimDaemonUpgradePrompt());
             File.WriteAllText(pidFile, "43\n");
             Assert.False(StartupIntegration.RestartRunningDaemonService(42, () => true));
             Assert.False(File.Exists(log));

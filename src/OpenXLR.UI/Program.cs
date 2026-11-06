@@ -11,13 +11,16 @@ class Program
     /// <summary>The listening single-instance guard, or null in a process that handed off and exits.</summary>
     internal static SingleInstance? Instance { get; private set; }
 
+    private const string ShowMixerArgument = "--show-mixer";
     internal static bool RelaunchRequested { get; set; }
+    internal static bool ShowMixerOnLaunch { get; private set; }
 
     [STAThread]
     public static void Main(string[] args)
     {
         if (BrowserNativeHost.TryRun(args)) return;
         if (InstallationCommands.TryRun(args)) return;
+        ShowMixerOnLaunch = Array.IndexOf(args, ShowMixerArgument) >= 0;
         // A window is already open: it shows itself, this process is done.
         Instance = SingleInstance.TryBecomePrimary();
         if (Instance is null) return;
@@ -30,6 +33,7 @@ class Program
     private static void Relaunch(string[] args)
     {
         string executable = Environment.ProcessPath ?? throw new InvalidOperationException("The UI executable is unavailable.");
+        if (!ShowMixerOnLaunch) args = [.. args, ShowMixerArgument];
         string[] launchArgs = System.IO.Path.GetFileNameWithoutExtension(executable) == "dotnet"
             ? [typeof(Program).Assembly.Location, .. args] : args;
         // RunInteractiveAsync starts the user-owned child before its first

@@ -3240,8 +3240,9 @@ button, and offers only the controls the old daemon reports.
 
 When the native UI connects to an older daemon managed by the user service,
 it asks whether to restart OpenXLR. Restart briefly stops audio, restarts
-the daemon and reopens the UI. Later, Escape and closing the question leave
-the daemon and audio running. The question appears once per UI version in
+the daemon and reopens the mixer, including when the UI normally starts
+minimized. Later, Escape and closing the question leave the daemon and
+audio running. The question appears once per UI version in
 the runtime directory (the configuration directory when no runtime directory
 is set); the banner's Restart daemon button remains available.
 A disconnected or replaced daemon is not restarted by an answer to an old

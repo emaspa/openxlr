@@ -86,7 +86,6 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
     private long _connection;
     private volatile StateObservation _lastState = new(null, null, false);
     internal StateObservation StateForDiagnostics => _lastState;
-    internal bool IsConnectedTo(int pid) => pid > 0 && _lastState is { Connected: true } state && state.PeerProcessId == pid;
 
     /// <summary>The last state of this connection, retained after disconnection for diagnostics.</summary>
     public string? LastStateJson => _lastState.Json;

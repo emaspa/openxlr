@@ -188,19 +188,25 @@ public partial class MainWindow : Window
     internal void EnableDaemonUpgradePrompt()
     {
         _daemonUpgradePrompt = new DaemonUpgradePrompt(
-            (pid, current) => Task.Run(() => StartupIntegration.ClaimDaemonUpgradePrompt(pid, current)),
+            (pid, current) => Task.Run(() => StartupIntegration.IsRunningDaemonService(pid, current)),
+            StartupIntegration.ClaimDaemonUpgradePrompt,
             () => Dialogs.ConfirmAsync(this, Localizer.Text("DaemonUpgradeTitle"),
                 Localizer.Text("DaemonUpgradeQuestion"), Localizer.Text("Restart"), Localizer.Text("Later")),
             (pid, current) => _vm.DaemonRestart.RestartAsync(() =>
                 Task.Run(() => StartupIntegration.RestartRunningDaemonService(pid, current))),
             () =>
             {
+                if (_reallyExit) return;
                 Program.RelaunchRequested = true;
                 Quit();
             },
             () => _vm.DaemonRestart.ReportFailure());
         _client.StateReceived += OnUpgradeState;
         Opened += (_, _) => CheckLatestUpgradeState();
+        PropertyChanged += (_, e) =>
+        {
+            if (e.Property == WindowStateProperty && WindowState != WindowState.Minimized) CheckLatestUpgradeState();
+        };
         Closed += (_, _) => _client.StateReceived -= OnUpgradeState;
     }
 
@@ -217,14 +223,17 @@ public partial class MainWindow : Window
     private void QueueUpgradeState(System.Text.Json.Nodes.JsonNode node, DaemonClient.StateObservation observation)
     {
         int pid = observation.PeerProcessId;
-        string? version = node["daemonVersion"]?.GetValue<string>();
-        Dispatcher.UIThread.Post(() =>
+        string? version = node["daemonVersion"] is System.Text.Json.Nodes.JsonValue value &&
+            value.TryGetValue<string>(out var reported) ? reported : null;
+        Dispatcher.UIThread.Post(async () =>
         {
-            if (!IsVisible || _reallyExit) return;
-            _ = _daemonUpgradePrompt?.CheckAsync(version, pid,
-                () => !_lifetime.IsCancellationRequested && _client.IsConnectedTo(pid) &&
-                    _client.StateForDiagnostics.Connection == observation.Connection);
+            if (_daemonUpgradePrompt is not { } prompt || !CanAsk()) return;
+            bool IsCurrent() => !_lifetime.IsCancellationRequested && _client.StateForDiagnostics is
+                { Connected: true } current && current.PeerProcessId == pid && current.Connection == observation.Connection;
+            await prompt.CheckAsync(version, pid, observation.Connection, IsCurrent, CanAsk);
+            if (CanAsk() && _client.StateForDiagnostics.Connection != observation.Connection) CheckLatestUpgradeState();
         });
+        bool CanAsk() => IsVisible && !_reallyExit && WindowState != WindowState.Minimized;
     }
 
     internal void ShowMixer()

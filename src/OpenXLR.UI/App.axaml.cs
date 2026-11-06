@@ -43,7 +43,7 @@ public partial class App : Application
             // socket: bring it up, from the tray or from behind other windows.
             if (Program.Instance is { } instance)
                 instance.ShowRequested = () => Avalonia.Threading.Dispatcher.UIThread.Post(window.ShowMixer);
-            if (window.StartsHidden)
+            if (window.StartsHidden && !Program.ShowMixerOnLaunch)
             {
                 // Starting in the tray means the window must never be
                 // mapped: showing it and hiding it a moment later leaves a

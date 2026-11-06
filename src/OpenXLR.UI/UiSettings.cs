@@ -1147,16 +1147,15 @@ public static class StartupIntegration
     }
 
     /// <summary>Claim the question, including Later, once per UI version and login session.</summary>
-    internal static bool ClaimDaemonUpgradePrompt(int peerPid, Func<bool> isCurrent)
+    internal static bool ClaimDaemonUpgradePrompt()
     {
-        if (!IsRunningDaemonService(peerPid, isCurrent)) return false;
         string version = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
             System.Text.Encoding.UTF8.GetBytes(AppVersion.Current)));
         try
         {
             OpenXlrPaths.EnsurePrivateDir(OpenXlrPaths.RuntimeDir);
             using var marker = OpenXlrPaths.CreatePrivate(Path.Combine(OpenXlrPaths.RuntimeDir, $"upgrade-prompt-{version}"));
-            return isCurrent();
+            return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return false; }
     }
