@@ -1112,11 +1112,11 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
 - Capture microphones in Inputs show their source, connection and carried
   unit controls. Inserts includes mono and stereo capture chains, using the
   width the daemon reports; an older daemon keeps XLR and mix chains only
-- Microphone EQ in Inputs: open a microphone's or a capture input's bands
+- Input EQ in Inputs: open a microphone's or a capture input's bands
   to edit each band's switch, type, frequency, gain and Q, plus the EQ's
   own switch. Enter on a number asks for an exact value. The shared EQ model
   supplies the ranges, steps and defaults; reset keeps the EQ's on/off
-  state and changes only that microphone
+  state and changes only that input
 - Output EQ in Outputs: each mix's EQ status and the same band editor,
   whose commands name the mix; a mix whose EQ hardware mixing holds off
   shows the reason and no editor

@@ -5497,7 +5497,7 @@ The terminal retries when the daemon is unavailable or restarts. A connection
 that accepts the socket but never completes its handshake is abandoned after
 five seconds, so it cannot prevent the next attempt.
 
-In Inputs, **Microphone EQ** lists each microphone and every capture
+In Inputs, **Input EQ** lists each microphone and every capture
 input, on a mono port or a stereo pair. Open its **bands** row for the
 band editor. Up and Down select
 a control, Space toggles a switch, Left and Right change the type or value,
