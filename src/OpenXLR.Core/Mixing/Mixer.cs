@@ -960,6 +960,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     // ILayoutInfo, for command validation ahead of the mixer methods.
     public bool HasChannel(string id) { lock (_gate) return _config.Channels.Any(c => c.Id == id); }
     public bool HasMix(string id) { lock (_gate) return _config.Mixes.Any(m => m.Id == id); }
+    public bool IsMonitorMix(string id) { lock (_gate) return MonitorMixLocked(id) is not null; }
     public bool HasApplicationChannel(string id) { lock (_gate) return _config.Channels.Any(c => c.Id == id && c.IsApplication); }
     public bool HasEditableChannel(string id) { lock (_gate) return _config.Channels.Any(c => c.Id == id && c.InputPair is null); }
     public bool HasCaptureChannel(string id) { lock (_gate) return _config.Channels.Any(c => c.Id == id && c.CaptureSource is not null); }
@@ -2493,8 +2494,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// must hear the loop the send carries. Never while software changes the
     /// channel's audio (see <see cref="ProcessedInSoftwareLocked"/>): the
     /// direct path would play the voice unchanged, so the send carries the
-    /// processed one instead, a few milliseconds later; unless the monitor
-    /// mixes hear the channel dry (<see cref="SetMonitorDry"/>), where the
+    /// processed one instead, a few milliseconds later; unless every monitor
+    /// mix the jacks play is dry (<see cref="SetMonitorDry"/>), where the
     /// unchanged voice is what the owner asked for. Input 2 never takes
     /// the channel that already carries input 1.
     /// </summary>
@@ -2505,7 +2506,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         {
             string? channel = DirectPathChannelLocked(input);
             on &= !_monitorMuted && channel is not null && GroupForChannelLocked(channel) is null && _soundCheckChannel != channel
-                && (!ProcessedInSoftwareLocked(channel) || _monitorDry.Contains(channel))
+                && (!ProcessedInSoftwareLocked(channel) || DryHeardInLocked(channel, whenHeardIn))
                 && (input == 1 || channel != DirectPathChannelLocked(1))
                 && (whenHeardIn is null || MonitorFeed.Parts(whenHeardIn).Any(m => !_mixMuted.Contains(m) && !_muted.Contains(Cell(channel, m))));
             SetHardwareMicChannelLocked(input, on ? channel : null);
@@ -3556,7 +3557,10 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                     m.Id, m.Name,
                     _mixVolume.GetValueOrDefault(m.Id, 1.0),
                     _mixMuted.Contains(m.Id), KindName(m.Kind), m.IsEditable)
-                    { Deletable = m.IsEditable && (m.Kind != MixKind.Monitor || monitorCount > 1) })],
+                    {
+                        Deletable = m.IsEditable && (m.Kind != MixKind.Monitor || monitorCount > 1),
+                        MonitorDry = m.Kind == MixKind.Monitor ? _dryMonitors.Contains(m.Id) : null,
+                    })],
                 Channels = [.. _config.Channels.Select(c => new ChannelStatus(
                     c.Id, ChannelNameLocked(c),
                     _config.Mixes.ToDictionary(m => m.Id, m => _levels.GetValueOrDefault(Cell(c.Id, m.Id), 0.0)),
@@ -3578,7 +3582,6 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                     Voice = CarriesEq(c) ? VoiceStateLocked(c.Id) : null,
                     Compressor = CarriesEq(c) ? CompressorStateLocked(c.Id, unitInputs) : null,
                     Expander = CarriesEq(c) ? ExpanderStateLocked(c.Id, unitInputs) : null,
-                    MonitorDry = CarriesEq(c) ? _monitorDry.Contains(c.Id) : null,
                 })],
                 RenamedSinceStart = _renamedSinceBuild,
                 DefaultMonitorMix = PrimaryMonitorLocked()?.Id,

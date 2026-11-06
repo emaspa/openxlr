@@ -193,7 +193,6 @@ public sealed partial class Mixer
             _voice.Remove(id, out MicVoice? previousVoice);
             _compressor.Remove(id, out MicCompressor? previousCompressor);
             _expander.Remove(id, out MicExpander? previousExpander);
-            bool previousDry = _monitorDry.Remove(id);
             CellSnapshot cells = TakeChannelCellsLocked(id, previous.Mixes);
             _config = next;
             foreach (string identity in movedOverrides) Matcher.SetOverride(identity, fallback.Id);
@@ -209,7 +208,6 @@ public sealed partial class Mixer
                 if (previousVoice is not null) _voice[id] = previousVoice;
                 if (previousCompressor is not null) _compressor[id] = previousCompressor;
                 if (previousExpander is not null) _expander[id] = previousExpander;
-                if (previousDry) _monitorDry.Add(id);
                 cells.Restore(this);
                 foreach (string identity in movedOverrides) Matcher.SetOverride(identity, id);
                 foreach ((string identity, StreamAssignment app) in movedApps) _apps[identity] = app;
@@ -415,6 +413,7 @@ public sealed partial class Mixer
                 else _monitorFeeds[output] = remaining;
             }
             CellSnapshot cells = TakeMixCellsLocked(id);
+            bool wasDry = _dryMonitors.Remove(id);
             bool wasPaused = _monitorMuted;
             // The unmuted monitor ids are the selection a pause will resume.
             // Deleting its last member clears the pause, never the other mutes.
@@ -434,6 +433,7 @@ public sealed partial class Mixer
             {
                 _config = previous;
                 _monitorMuted = wasPaused;
+                if (wasDry) _dryMonitors.Add(id);
                 cells.Restore(this);
                 if (savedInserts is not null) _inserts[key] = savedInserts;
                 _enforcedSource = previousSource;

@@ -74,10 +74,12 @@ public sealed record MixerScene
     public Dictionary<string, MicExpander>? Expander { get; init; }
 
     /// <summary>
-    /// Whether the monitor mixes hear each microphone dry, by channel; absent
-    /// in older profiles, which leave it as it is. A recall sets each channel
-    /// named here.
+    /// Whether each monitor mix hears the microphones dry, by mix id, saved
+    /// as <c>dryMonitors</c>; absent in older profiles, which leave it as it
+    /// is. A recall sets each monitor mix named here. An older profile's
+    /// per-microphone <c>monitorDry</c> map is not read.
     /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("dryMonitors")]
     public Dictionary<string, bool>? MonitorDry { get; init; }
 
     /// <summary>

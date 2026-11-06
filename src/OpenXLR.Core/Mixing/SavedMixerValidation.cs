@@ -73,7 +73,7 @@ internal static class SavedMixerValidation
     private static Dictionary<string, bool> MonitorDry(Dictionary<string, bool>? entries, List<string> notes)
     {
         if (entries is not null) return entries;
-        notes.Add($"monitorDry: {NullEntry}");
+        notes.Add($"dryMonitors: {NullEntry}");
         return [];
     }
 

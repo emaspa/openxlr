@@ -1693,8 +1693,8 @@ public sealed partial class MixerService : IHostedService, IDisposable
                     SyncOutputSelectors();   // software processing moves the Pro's mic between its hardware path and the send
                     break;
                 case "setMonitorDry":
-                    _mixer.SetMonitorDry(cmd.Channel!, cmd.Value.GetBoolean());   // checked by CommandValidation
-                    SyncOutputSelectors();   // a dry microphone keeps the Pro's hardware path with its effects on
+                    _mixer.SetMonitorDry(cmd.Mix!, cmd.Value.GetBoolean());   // checked by CommandValidation
+                    SyncOutputSelectors();   // a dry monitor on the jacks keeps the Pro's hardware path with effects on
                     break;
                 case "setDucking":
                 case "setDuckingProcessing":

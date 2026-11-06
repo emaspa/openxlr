@@ -200,10 +200,13 @@ public sealed record MixerSettings
     public Dictionary<string, MicExpander> Expander { get; init; } = [];
 
     /// <summary>
-    /// The microphones the monitor mixes hear dry, before their software
-    /// effects, by channel id. A microphone absent here, or false, is heard
-    /// through its effects as every other mix hears it.
+    /// The monitor mixes that hear the microphones dry, before their software
+    /// effects, by mix id. A monitor mix absent here, or false, hears them
+    /// through their effects as every other mix does. Saved as
+    /// <c>dryMonitors</c>; an older file's per-microphone <c>monitorDry</c>
+    /// map is not read.
     /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("dryMonitors")]
     public Dictionary<string, bool> MonitorDry { get; init; } = [];
 
     /// <summary>The ducking setup and processing choice. Absent takes the layout's default targets, switched off.</summary>

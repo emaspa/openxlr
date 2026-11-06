@@ -295,6 +295,12 @@ public sealed partial record MixStatus(string Id, string Name, double Volume, bo
 {
     /// <summary>Editable, and not the last remaining monitor mix.</summary>
     public bool Deletable { get; init; }
+
+    /// <summary>
+    /// Whether this monitor mix hears the microphones dry, before their
+    /// software effects (<c>setMonitorDry</c>); null on every other mix.
+    /// </summary>
+    public bool? MonitorDry { get; init; }
 }
 
 /// <param name="Present">
@@ -356,13 +362,6 @@ public sealed partial record ChannelStatus(string Id, string Name,
 
     /// <summary>The expander on this computer, on every channel that carries the EQ; null on every other channel.</summary>
     public MicExpanderState? Expander { get; init; }
-
-    /// <summary>
-    /// Whether the monitor mixes hear this microphone dry, before its software
-    /// effects (<c>setMonitorDry</c>), on every channel that carries the EQ;
-    /// null on every other channel.
-    /// </summary>
-    public bool? MonitorDry { get; init; }
 }
 
 
