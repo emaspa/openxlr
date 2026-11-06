@@ -487,17 +487,19 @@ internal sealed class InputsView : View
                 rows.Add(new TextRow("Connection", channel.BindingWarning is { Length: > 0 } warning ? warning
                     : channel.CaptureConnected ? "linked" : "not linked"));
                 CaptureGainRow(rows, link, channel);
+                OwnClockRow(rows, link, channel);
                 if (channel.UnitInput is { Primary: true } primary)
                 {
                     rows.Add(new HeadingRow($"{state.Device?.Model ?? "Interface"} input {primary.Input} on {channel.Name}") { Dial = state.Can("gain") });
                     PrimaryInput(rows, link, state, primary.Input, primary.Unit);
                 }
             }
-            else if (channel.CaptureSource is not null && channel.CaptureGain is not null)
+            else if (channel.CaptureSource is not null && (channel.CaptureGain is not null || channel.OwnClock is not null))
             {
-                // A stereo capture input has no microphone group of its own; its gain does.
+                // A stereo capture input has no microphone group of its own; its gain and its clock do.
                 rows.Add(new HeadingRow(channel.Name));
                 CaptureGainRow(rows, link, channel);
+                OwnClockRow(rows, link, channel);
             }
             if (channel.UnitInput is not { Primary: false } carried || state.Additional(carried.Unit) is not { Driven: true } unit)
                 continue;
@@ -544,6 +546,26 @@ internal sealed class InputsView : View
                 body["channel"] = id;
                 body["value"] = value;
             })));
+    }
+
+    /// <summary>
+    /// A capture input's own clock, which setCaptureOwnClock switches, and
+    /// while it is on the delay its bridge adds and its dropouts.
+    /// </summary>
+    private static void OwnClockRow(List<Row> rows, DaemonLink link, ChannelEntry channel)
+    {
+        if (channel.OwnClock is not { } clock) return;
+        string id = channel.Id;
+        rows.Add(new ToggleRow("Own clock", clock.On, value => link.Send("setCaptureOwnClock", body =>
+        {
+            body["channel"] = id;
+            body["value"] = value;
+        })));
+        if (!clock.On) return;
+        long dropouts = clock.Underruns + clock.Overruns;
+        rows.Add(new TextRow("Bridge", clock is { Running: true, DelayMs: double delay }
+            ? $"{delay:0.#} ms delay" + (dropouts > 0 ? $", {dropouts} dropouts" : "")
+            : "waiting for the device"));
     }
 
     /// <summary>The headphone scale the window shows: -60 dB is 0% and 0 dB is 100%.</summary>

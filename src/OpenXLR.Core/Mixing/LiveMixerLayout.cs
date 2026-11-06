@@ -243,6 +243,7 @@ public sealed partial class Mixer
                 StopSoundCheckLocked(restore: false, error: "Sound Check stopped because the capture input was deleted.");
             bool chained = _chains.ContainsKey(id);
             RemoveCaptureRouteLocked(id);
+            RemoveClockBridgeLocked(id);
             // A bridged plugin in the deleted chain may have been the last
             // one holding Wine up.
             if (chained) EndUnusedWineLocked();

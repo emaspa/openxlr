@@ -267,6 +267,21 @@
   <data name="CaptureMuteTip" xml:space="preserve">
     <value>Schaltet die Quelle für jedes Programm stumm, das sie aufnimmt, wie es die Toneinstellungen des Desktops tun. Andere Programme können das ebenfalls ändern; der Kanal folgt ihnen.</value>
   </data>
+  <data name="CaptureOwnClock" xml:space="preserve">
+    <value>Eigener Takt</value>
+  </data>
+  <data name="CaptureOwnClockDropouts" xml:space="preserve">
+    <value>Im eigenen Takt, {0} ms Verzögerung, {1} Aussetzer</value>
+  </data>
+  <data name="CaptureOwnClockRunning" xml:space="preserve">
+    <value>Im eigenen Takt, {0} ms Verzögerung</value>
+  </data>
+  <data name="CaptureOwnClockTip" xml:space="preserve">
+    <value>Lässt dieses Gerät in einem eigenen Takt laufen statt im Takt des Mixers. Für ein Gerät, dessen Klang verzerrt oder das aussetzt, solange es dem Takt eines anderen Geräts folgt. Fügt eine kurze Verzögerung hinzu.</value>
+  </data>
+  <data name="CaptureOwnClockWaiting" xml:space="preserve">
+    <value>Im eigenen Takt, wartet auf das Gerät</value>
+  </data>
   <data name="CaptureOfflinePair" xml:space="preserve">
     <value>Nicht verbunden · Paar {0}</value>
   </data>
@@ -828,6 +843,9 @@
   </data>
   <data name="FlowClockResampled" xml:space="preserve">
     <value>{0} folgt diesem Takt und wird umgerechnet. Ein verzerrt oder roboterhaft klingendes Mikrofon kann daher kommen.</value>
+  </data>
+  <data name="FlowOwnClock" xml:space="preserve">
+    <value>Im eigenen Takt, in den Mixer überbrückt</value>
   </data>
   <data name="FlowResampledTo" xml:space="preserve">
     <value>Auf den Takt von {0} umgerechnet</value>

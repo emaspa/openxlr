@@ -1372,6 +1372,53 @@ public sealed class PipeWireAdapter
         return new ClipProbe(extension, channels, rate, frames);
     }
 
+    /// <summary>The clock bridge's helper; null uses the installed helper beside the daemon.</summary>
+    internal string? BridgeHost { get; set; }
+
+    /// <summary>The meters the clock bridge reports (see native/bridge.c).</summary>
+    internal static readonly IReadOnlySet<string> ClockBridgeMeters = new HashSet<string>(
+        ["running", "delay", "target", "underruns", "overruns", "drift", "in_rate", "in_quantum"], StringComparer.Ordinal);
+
+    /// <summary>
+    /// A capture input's clock bridge: the native helper's <c>bridge</c> mode,
+    /// two nodes in one process. <c>OpenXLR_bridge_&lt;id&gt;_in</c> takes the
+    /// device's ports on <c>playback_N</c> and runs in the device's graph,
+    /// <c>OpenXLR_bridge_&lt;id&gt;</c> gives the audio back on <c>capture_N</c>
+    /// in the graph it is linked into, and the two meet only in the helper's
+    /// ring (see native/bridge.c). Refused at once without the helper.
+    /// </summary>
+    internal FilterHandle CreateClockBridge(string id, int channels)
+    {
+        string executable = BridgeHost ?? NativePluginHost.Executable;
+        if (!File.Exists(executable)) throw new InvalidOperationException(Mixer.OwnClockNeedsHost);
+        int rate = ParseGraphSampleRate(Run("pw-metadata", "-n", "settings"));
+        string node = "OpenXLR_bridge_" + id;
+        NativePluginHost host;
+        try
+        {
+            host = new NativePluginHost(new() { Id = id, Kind = "bridge", Plugin = "bridge" },
+                node, channels, rate, executable, [], meterSymbols: ClockBridgeMeters);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or System.ComponentModel.Win32Exception)
+        {
+            throw new InvalidOperationException($"The own clock could not start the native helper. {ex.Message}", ex);
+        }
+        _nativeHosts.Add(host);
+        var filter = new FilterHandle(id, node + "_in", node, host.Process) { NativeHost = host };
+        try
+        {
+            if (!WaitForPorts(filter.SinkName, "playback", false, TimeSpan.FromSeconds(3), host.Process, count: channels)
+                || !WaitForPorts(filter.SourceName, "capture", true, TimeSpan.FromSeconds(3), host.Process, count: channels))
+                throw new InvalidOperationException("The own clock's audio ports did not appear.");
+            return filter;
+        }
+        catch
+        {
+            StopFilter(filter);
+            throw;
+        }
+    }
+
     /// <summary>The duck stage's helper; null uses the installed helper beside the daemon.</summary>
     internal string? DuckHost { get; set; }
 

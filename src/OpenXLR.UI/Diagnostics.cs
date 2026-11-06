@@ -336,7 +336,30 @@ public static partial class Diagnostics
             };
             lines.Add($"{kind} {follower.Description} follows {clock.DriverName} ({(follower.Resampled ? "resampled" : "same clock")}), node {follower.Name}");
         }
+        // A device on its own clock, and what its bridge measured, so a
+        // report shows whether the bridge holds.
+        JsonArray? channels = node?["mixer"]?["channels"] as JsonArray;
+        foreach (AudioClockBridged bridged in clock.Bridged)
+        {
+            lines.Add($"capture input {bridged.Description} runs on its own clock, bridged into the mixer's graph"
+                + (bridged.Separate ? "" : " (but it runs in the mixer's graph: something else links it there)") + $", node {bridged.Name}");
+            foreach (string id in bridged.Channels)
+                if (channels?.OfType<JsonObject>().FirstOrDefault(c => Text(c, "id") == id)?["ownClock"] is JsonObject own)
+                    lines.Add($"  {id}: {OwnClockFigures(own)}");
+        }
         return lines;
+    }
+
+    /// <summary>A bridge's figures in one line: running or waiting, delay, target, underruns, overruns and drift.</summary>
+    internal static string OwnClockFigures(JsonObject own)
+    {
+        static string Number(JsonNode? node, string unit)
+            => node is JsonValue value && value.TryGetValue(out double number)
+                ? number.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + unit : "unknown";
+        bool running = own["running"] is JsonValue r && r.TryGetValue(out bool on) && on;
+        return $"{(running ? "running" : "waiting for the device")}, delay {Number(own["delayMs"], " ms")}, target {Number(own["targetMs"], " ms")}, "
+            + $"{Number(own["underruns"], "")} underruns, {Number(own["overruns"], "")} overruns, drift {Number(own["driftPpm"], " ppm")}"
+            + (Text(own, "error") is { } error ? $", error: {error}" : "");
     }
 
     /// <summary>One string from a path of object keys, or null if it is not there or is not a string.</summary>

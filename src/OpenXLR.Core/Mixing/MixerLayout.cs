@@ -195,6 +195,7 @@ public sealed partial record MixerConfig
             UserChannelDefinition? saved = SavedChannel(c);
             return Normalize(saved?.CaptureSource is { } source
                 ? new ChannelDefinition(c.Id, c.Name) { CaptureSource = source, CapturePair = saved.CapturePair, CaptureMonoChannel = saved.CaptureMonoChannel, CaptureUnit = saved.CaptureUnit,
+                    CaptureOwnClock = saved.CaptureOwnClock,
                     MutedIn = mixes.Select(m => m.Id).ToHashSet() }
                 : (defaults.Channels.FirstOrDefault(d => d.Id == c.Id) ?? new ChannelDefinition(c.Id, c.Name))
                     with { Name = c.Name });

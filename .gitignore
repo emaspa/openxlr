@@ -27,6 +27,7 @@ native/tests/denoise-recovery
 native/tests/voice
 native/tests/dynamics
 native/tests/player
+native/tests/bridge
 native/build-config.h
 native/rnnoise/src/*.o
 native/rnnoise/src/x86/*.o

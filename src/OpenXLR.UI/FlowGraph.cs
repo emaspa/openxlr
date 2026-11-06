@@ -65,8 +65,12 @@ internal sealed record FlowGraph(IReadOnlyList<FlowNode> Nodes, IReadOnlyList<Fl
                     vm.Inputs.FirstOrDefault(i => i.Name == capture)?.Description is { Length: > 0 } device ? device : capture,
                     channel.CaptureLabel,
                     FlowIcon.Microphone, channel.CaptureConnected));
-            // A source on another device's clock says so on its card.
-            if (vm.Clock?.ResampledFor(channel.Id) is not null)
+            // A source on another device's clock says so on its card, as
+            // does one on its own clock, bridged into the mixer.
+            if (vm.Clock?.BridgedFor(channel.Id) is not null)
+                for (int i = 0; i < sources.Count; i++)
+                    sources[i] = (sources[i].Key, sources[i].Label, Localizer.Text("FlowOwnClock"), sources[i].Icon, sources[i].Active);
+            else if (vm.Clock?.ResampledFor(channel.Id) is not null)
                 for (int i = 0; i < sources.Count; i++)
                     sources[i] = (sources[i].Key, sources[i].Label, Localizer.Format("FlowResampledTo", vm.Clock.DriverName),
                         sources[i].Icon, sources[i].Active);
