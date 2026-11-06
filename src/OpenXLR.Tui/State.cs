@@ -45,6 +45,9 @@ internal sealed record MixEntry
 
     /// <summary>A monitor mix goes to 150%, everything else to 100%.</summary>
     public double Ceiling => Kind == "monitor" ? 1.5 : 1.0;
+
+    /// <summary>Whether a monitor mix hears the microphones before their effects; null on every other mix and from a daemon that predates it.</summary>
+    public bool? MonitorDry { get; init; }
 }
 
 /// <summary>One channel strip and its send into every mix.</summary>
@@ -120,9 +123,6 @@ internal sealed record ChannelEntry
 
     /// <summary>A microphone's expander on the computer, or null for a channel that has none and from a daemon that predates it.</summary>
     public ExpanderEntry? Expander { get; init; }
-
-    /// <summary>Whether the monitor mixes hear a microphone before its effects; null for a channel that is not one and from a daemon that predates it.</summary>
-    public bool? MonitorDry { get; init; }
 
     /// <summary>XLR 1 or XLR 2, the strips a binding can move to another source.</summary>
     public bool Bindable => Hardware && Id is "xlr1" or "xlr2";

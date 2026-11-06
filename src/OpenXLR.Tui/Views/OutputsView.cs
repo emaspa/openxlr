@@ -155,6 +155,17 @@ internal sealed class OutputsView : View
                     ? "microphone sends paused" : "mic sends also pause"
                 : "recording and streaming continue",
         });
+        // Each monitor mix's dry switch: on, it hears the microphones before
+        // their effects, earlier, and every other mix keeps the processed voice.
+        foreach (MixEntry mix in state.Mixer.Mixes.Where(mix => mix.MonitorDry is not null))
+        {
+            string id = mix.Id;
+            rows.Add(new ToggleRow($"{mix.Name} hears mics dry", mix.MonitorDry!.Value, value => link.Send("setMonitorDry", body =>
+            {
+                body["mix"] = id;
+                body["value"] = value;
+            })));
+        }
 
         rows.Add(new HeadingRow("Outputs"));
         if (sinks.Count == 0) rows.Add(new TextRow("None found", "is PipeWire running"));

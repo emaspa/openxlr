@@ -3208,10 +3208,13 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
     <value>Mic setup</value>
   </data>
   <data name="MonitorDry" xml:space="preserve">
-    <value>Hear it dry</value>
+    <value>Dry</value>
+  </data>
+  <data name="MonitorDryName" xml:space="preserve">
+    <value>Hear the microphones dry in {0}</value>
   </data>
   <data name="MonitorDryTip" xml:space="preserve">
-    <value>Hear this microphone in your monitor mixes before its effects, so your own voice reaches your headphones earlier. Stream, Chat, the virtual microphones and recordings keep the processed voice.</value>
+    <value>Hear your microphones in this monitor mix before their effects, so your own voice reaches your headphones earlier. Stream, Chat, the virtual microphones, recordings and the other monitor mixes keep the processed voice.</value>
   </data>
   <data name="MicSetupButtonTip" xml:space="preserve">
     <value>Set up a microphone step by step: where it goes, its level, a take heard raw and processed, and its EQ and plugins. Opens on XLR 1, or the first microphone in the mixer.</value>

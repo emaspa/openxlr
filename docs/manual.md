@@ -272,33 +272,40 @@ computer, the soft low cut, ClipGuard or a plugin insert that is not
 bypassed. The headphones then hear the microphone
 through its Monitor send with the effects, a few milliseconds later, and
 the ⓘ mark goes away. Turn the last effect off and the path comes back.
-An EQ the unit runs keeps the path. With
-[Hear it dry](#hear-it-dry) on, the path stays on whatever effects run.
-You hear yourself raw and at once on the jacks, and Stream, Chat and
-recordings keep the processed voice.
+An EQ the unit runs keeps the path. When
+[Dry](#hear-it-dry) is on for every monitor mix the jacks play, the path
+stays on whatever effects run. You hear yourself raw and at once on the
+jacks, and Stream, Chat and recordings keep the processed voice.
 
 <a name="hear-it-dry"></a>
 **Hear it dry.** Each effect on the computer delays your voice a little on
 its way to a monitor mix. Noise removal, the voice changer and plugins that
 work in blocks add the most. On an interface without a direct monitor, such
-as the first XLR Dock, you hear that delay in your headphones. **Hear it
-dry** in the chain window of XLR 1, XLR 2 or a microphone capture input
-gives the monitor mixes that microphone before its effects, so you hear
-your voice raw and earlier. That covers Monitor A, Monitor B and every
-monitor mix you added. Stream, Chat, the other virtual microphones and the
-Aux mix still get the processed voice. The send's level and mute,
-the channel volume and the monitor's master work as before. Switching it
-moves only that microphone's monitor sends; the other mixes and the
-plugins keep running. When a dry send is missing, the mixer uses the
-processed send until the dry route is ready. While Sound Check plays a
-take, you hear it through the effects. On the MK.2 units, the Wave:3, the Wave:3 MK.2 and
-the Wave:1 the switch changes the monitor mix only; the unit's own direct
-monitor and the Mic ↔ PC crossfade are as before. On the Wave XLR Pro in
-[hardware mixing](#hardware-mixing) the jacks play the microphone from its
-own input, and the Aux mix keeps the processed voice. The switch is saved
-with the mixer and in profiles; a profile saved before it leaves it as it
-is. The terminal mixer's Inputs tab has it too, and `setMonitorDry` in the
-[control API](api.md#dry-monitor) sets it from a script.
+as the first XLR Dock, you hear that delay in your headphones. Each monitor
+mix has a **Dry** chip at the top right of its head in the mix matrix,
+opposite its name, and beside 150% on its strip in the other layouts. Grey
+means off. Click it and it turns green, and that monitor mix now hears
+XLR 1, XLR 2 and every microphone capture input before their effects, so
+you hear your voice raw and earlier. While you move the monitor's fader the
+chip turns grey and shows its volume, then reads Dry again. Each monitor
+mix has its own chip, so Monitor A can be dry while Monitor B keeps the
+effects, and a profile saves and recalls each chip on its own. Stream, Chat, the other
+virtual microphones and the Aux mix always get the processed voice. The
+send's level and mute, the channel volume and the monitor's master work as
+before. Switching moves only the microphones' sends into that monitor mix;
+the other mixes and the plugins keep running. When a dry send is missing,
+the mixer uses the processed send until the dry route is ready. While
+Sound Check plays a take, you hear it through the effects. On the MK.2
+units, the Wave:3, the Wave:3 MK.2 and the Wave:1 the chip changes the
+monitor mix only; the unit's own direct monitor and the Mic ↔ PC crossfade
+are as before. On the Wave XLR Pro in [hardware mixing](#hardware-mixing) a
+jack that plays only dry monitor mixes plays the microphones from the
+unit's own inputs. A jack that also plays a monitor mix that is not dry
+keeps the processed voice, and so does the Aux mix. The chips are saved
+with the mixer and in profiles; a profile saved before them leaves them as
+they are. The terminal mixer's Outputs tab has them too, and
+`setMonitorDry` in the [control API](api.md#dry-monitor) sets one from a
+script.
 
 ### Submixer categories
 
@@ -1319,9 +1326,8 @@ loaded, and is on the terminal mixer's Options tab too.
 
 Block size also sets part of how late you hear yourself through a monitor
 mix, since the audio waits for more than one block between the microphone
-and your headphones. 256 shortens that wait, and
-[Hear it dry](#hear-it-dry) takes the effects' own delay out of the
-monitor mixes.
+and your headphones. 256 shortens that wait, and a monitor mix's
+[Dry](#hear-it-dry) chip takes the effects' own delay out of that mix.
 
 <a name="mic-setup"></a>
 <a name="sound-check"></a>
@@ -3838,9 +3844,9 @@ monitor mix that carries the microphone. Turn the Mic ↔ PC crossfade
 towards PC to hear it as your listeners do. On the Wave XLR Pro OpenXLR
 turns the [zero-latency path](#volume-direct-monitor) off while a voice is
 on, so the jacks play the changed voice, late by the voice's 33 ms and
-the computer's own path. With [Hear it dry](#hear-it-dry) on, the path
-stays on and the jacks play your own voice unchanged, while your listeners
-hear the changed one.
+the computer's own path. When the monitor mixes the jacks play are
+[Dry](#hear-it-dry), the path stays on and the jacks play your own voice
+unchanged, while your listeners hear the changed one.
 
 The voice is saved with the mixer and in profiles, so a profile can recall
 a voice; a profile saved before the voice changer leaves it as it is. A

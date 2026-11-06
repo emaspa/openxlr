@@ -143,12 +143,16 @@
               <Panel layout:StripPanel.Part="value">
                 <TextBlock Text="{Binding Mix.VolumeText}" Classes="val" HorizontalAlignment="Right"/>
               </Panel>
-              <Grid layout:StripPanel.Part="mute" ColumnDefinitions="*,Auto">
+              <Grid layout:StripPanel.Part="mute" ColumnDefinitions="*,Auto,Auto">
                 <ToggleButton Content="{loc:Text Key=Mute}" Classes="mute" IsChecked="{Binding Mix.Muted, Mode=TwoWay}"
                               AutomationProperties.Name="{Binding Mix.Name, StringFormat={loc:Text Key=MixMuteName}}"/>
                 <ToggleButton Grid.Column="1" Content="150%" IsChecked="{Binding Mix.VolumeRange.Boost, Mode=TwoWay}"
                               IsVisible="{Binding Mix.IsMonitor}" Margin="6,0,0,0"
                               ToolTip.Tip="{loc:Text Key=AllowThisMonitorMixAbove100Up}"/>
+                <!-- the monitor mix's dry switch, as the matrix head has it -->
+                <ToggleButton Grid.Column="2" Name="MixDry" Classes="dryChip" Content="{loc:Text Key=MonitorDry}" Padding="5,0" Margin="6,0,0,0"
+                              VerticalAlignment="Stretch" IsChecked="{Binding Mix.MonitorDry, Mode=TwoWay}" IsVisible="{Binding Mix.HasMonitorDry}"
+                              AutomationProperties.Name="{Binding Mix.Name, StringFormat={loc:Text Key=MonitorDryName}}" ToolTip.Tip="{loc:Text Key=MonitorDryTip}"/>
               </Grid>
             </layout:StripPanel>
             <Button Content="{Binding Mix.Inserts.ButtonText}" HorizontalAlignment="Stretch" Classes="fx" Classes.fxOn="{Binding Mix.Inserts.IsProcessing}" Classes.fxOff="{Binding Mix.Inserts.IsOff}"

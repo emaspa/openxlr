@@ -3181,10 +3181,13 @@ Von OpenXLR gesteuertes Interface wählen</value>
     <value>Mikrofon-Setup</value>
   </data>
   <data name="MonitorDry" xml:space="preserve">
-    <value>Trocken hören</value>
+    <value>Trocken</value>
+  </data>
+  <data name="MonitorDryName" xml:space="preserve">
+    <value>Mikrofone in {0} trocken hören</value>
   </data>
   <data name="MonitorDryTip" xml:space="preserve">
-    <value>Hör dieses Mikrofon in deinen Monitor-Mixen vor seinen Effekten, so kommt deine eigene Stimme früher im Kopfhörer an. Stream, Chat, die virtuellen Mikrofone und Aufnahmen behalten die bearbeitete Stimme.</value>
+    <value>Hör deine Mikrofone in diesem Monitor-Mix vor ihren Effekten, so kommt deine eigene Stimme früher im Kopfhörer an. Stream, Chat, die virtuellen Mikrofone, Aufnahmen und die anderen Monitor-Mixe behalten die bearbeitete Stimme.</value>
   </data>
   <data name="MicSetupButtonTip" xml:space="preserve">
     <value>Ein Mikrofon Schritt für Schritt einrichten: Position, Pegel, eine Aufnahme roh und bearbeitet anhören, EQ und Plugins. Öffnet sich auf XLR 1 oder dem ersten Mikrofon im Mixer.</value>
