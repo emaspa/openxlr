@@ -3,8 +3,8 @@ using OpenXLR.Core.Devices;
 namespace OpenXLR.Core.Mixing;
 
 /// <summary>
-/// The microphone EQ on XLR 1, XLR 2 and every capture input on one mono
-/// port. On XLR 1 and XLR 2 it runs on the unit's own DSP when
+/// The microphone EQ on XLR 1, XLR 2 and every capture input, on one mono
+/// port or a stereo pair. On XLR 1 and XLR 2 it runs on the unit's own DSP when
 /// the channel carries a unit input whose unit runs it (the Wave XLR MK.2 and
 /// the XLR Dock MK.2 from firmware 1.0.15, the Wave:3 MK.2 from 0.2.3, each
 /// of the Wave XLR Pro's two inputs from 1.0.14), the
@@ -20,6 +20,11 @@ namespace OpenXLR.Core.Mixing;
 /// low cut, ClipGuard and inserts (a capture input has only its inserts):
 ///
 ///   source -> OpenXLR_eq_&lt;id&gt;_&lt;gen&gt; -> OpenXLR_lc_&lt;id&gt;_&lt;gen&gt; (when a chain runs) -> OpenXLR_ch_&lt;id&gt;
+///
+/// A capture input on a stereo pair has the same stage on two channels, the
+/// native helper's stereo <c>eq</c>, which runs the EQ alone: noise removal,
+/// the compressor, the expander and the voice changer stay with the
+/// microphones (<see cref="CarriesMicrophoneStage"/>).
 ///
 /// The stage is spliced in and out by relinking the head, so the chain
 /// behind it keeps running and no plugin restarts. Every value change, the
@@ -44,23 +49,38 @@ public sealed partial class Mixer
     public static bool IsMicrophoneId(string? id) => id is "xlr1" or "xlr2";
 
     /// <summary>
-    /// Whether a channel carries the microphone EQ: XLR 1, XLR 2, or a
-    /// capture input on one mono port. The software stage is mono, so a
-    /// capture input on a stereo pair has none.
+    /// Whether a channel is a microphone, whose stage also runs noise
+    /// removal, the compressor, the expander and the voice changer: XLR 1,
+    /// XLR 2, or a capture input on one mono port.
     /// </summary>
-    public static bool CarriesEq(ChannelDefinition channel)
+    public static bool CarriesMicrophoneStage(ChannelDefinition channel)
         => IsMicrophoneId(channel.Id) || channel.CaptureSource is not null && channel.Microphone;
 
-    /// <summary>A microphone input of this layout: a channel that carries the EQ.</summary>
-    public bool IsMicrophoneChannel(string id) { lock (_gate) return _config.Channels.Any(c => c.Id == id && CarriesEq(c)); }
+    /// <summary>
+    /// Whether a channel carries the EQ: a microphone, or a capture input on
+    /// a stereo pair, whose stage runs on two channels and has the EQ alone.
+    /// </summary>
+    public static bool CarriesEq(ChannelDefinition channel)
+        => CarriesMicrophoneStage(channel) || channel.CaptureSource is not null;
 
-    /// <summary>A microphone whose EQ only ever runs on this computer: a capture input, which has no device choice.</summary>
+    /// <summary>A microphone input of this layout: a channel whose stage carries noise removal and the dynamics too.</summary>
+    public bool IsMicrophoneChannel(string id) { lock (_gate) return CarriesMicrophoneStageLocked(id); }
+
+    /// <summary>A channel of this layout that carries the EQ: a microphone or any capture input.</summary>
+    public bool CarriesEqChannel(string id) { lock (_gate) return CarriesEqLocked(id); }
+
+    /// <summary>A channel whose EQ only ever runs on this computer: a capture input, which has no device choice.</summary>
     public bool EqRunsInSoftwareOnly(string id)
     {
         lock (_gate) return !IsMicrophoneId(id) && _config.Channels.Any(c => c.Id == id && CarriesEq(c));
     }
 
     private bool CarriesEqLocked(string id) => _config.Channels.Any(c => c.Id == id && CarriesEq(c));
+
+    private bool CarriesMicrophoneStageLocked(string id) => _config.Channels.Any(c => c.Id == id && CarriesMicrophoneStage(c));
+
+    /// <summary>How many channels a channel's stage runs on: two on a capture input's stereo pair, else one.</summary>
+    private int EqWidthLocked(string id) => _config.Channels.FirstOrDefault(c => c.Id == id)?.ChainWidth ?? 1;
 
     private static string EqKey(string channel) => "eq:" + channel;
 
@@ -176,7 +196,7 @@ public sealed partial class Mixer
         if (!MicEqProcessing.IsValid(value)) throw new ArgumentException("setEqProcessing: value must be 'device' or 'software'");
         lock (_gate)
         {
-            RequireMicrophoneLocked(channel);
+            RequireEqChannelLocked(channel);
             if (!IsMicrophoneId(channel)) throw new ArgumentException(EqSoftwareOnly(channel));
             if (value == MicEqProcessing.Device) _eqProcessing.Remove(channel);
             else _eqProcessing[channel] = value;
@@ -366,7 +386,7 @@ public sealed partial class Mixer
         if (MicEq.Check(eq) is string problem) throw new ArgumentException($"setEq: {problem}");
         lock (_gate)
         {
-            RequireMicrophoneLocked(channel);
+            RequireEqChannelLocked(channel);
             bool switchedOn = eq.Enabled && !EqLocked(channel).Enabled;
             _eq[channel] = MicEq.Snap(eq);
             if (switchedOn)
@@ -383,7 +403,7 @@ public sealed partial class Mixer
     {
         lock (_gate)
         {
-            RequireMicrophoneLocked(channel);
+            RequireEqChannelLocked(channel);
             MicEq eq = EqLocked(channel);
             if (on)
             {
@@ -402,7 +422,7 @@ public sealed partial class Mixer
         if (change.IsEmpty) throw new ArgumentException("setEqBand: need at least one of 'enabled', 'type', 'frequency', 'gain' and 'q'");
         lock (_gate)
         {
-            RequireMicrophoneLocked(channel);
+            RequireEqChannelLocked(channel);
             MicEq eq = EqLocked(channel);
             if (band > eq.Bands.Count) throw new ArgumentException("setEqBand: the band does not exist");
             EqBand next = change.ApplyTo(eq.Bands[band - 1]);
@@ -414,8 +434,16 @@ public sealed partial class Mixer
 
     private void RequireMicrophoneLocked(string channel)
     {
-        if (!CarriesEqLocked(channel))
+        if (!CarriesMicrophoneStageLocked(channel))
             throw new ArgumentException($"'{channel}' is not a microphone input");
+    }
+
+    /// <summary>What an EQ command on a channel without the EQ is refused with.</summary>
+    public static string NoEq(string channel) => $"'{channel}' is not a microphone or capture input";
+
+    private void RequireEqChannelLocked(string channel)
+    {
+        if (!CarriesEqLocked(channel)) throw new ArgumentException(NoEq(channel));
     }
 
     /// <summary>
@@ -435,26 +463,29 @@ public sealed partial class Mixer
     /// any is on (the EQ running in software) and no stage runs. A stage that
     /// refuses a value is replaced. A stage whose unit took the EQ over is
     /// switched off and kept until the route is next built, as is one whose
-    /// parts were all switched off.
+    /// parts were all switched off. A capture input's stereo stage takes the
+    /// EQ alone, and one whose input changed width is replaced.
     /// </summary>
     private void ApplySoftwareEqLocked(string channel)
     {
         if (!_built) return;
         MicEq eq = SoftwareEqLocked(channel);
-        MicNoise noise = NoiseLocked(channel);
-        MicVoice voice = VoiceLocked(channel);
+        bool microphone = CarriesMicrophoneStageLocked(channel);
         if (_eqStages.TryGetValue(channel, out SoftwareEqBackend? stage))
         {
-            if (stage.IsAlive && (!eq.Enabled || stage.BandCount == eq.Bands.Count))
+            if (stage.IsAlive && stage.Channels == EqWidthLocked(channel) && (!eq.Enabled || stage.BandCount == eq.Bands.Count))
             {
                 try
                 {
                     if (stage.BandCount == eq.Bands.Count) stage.Apply(eq);
                     else stage.SetEnabled(false);
-                    stage.ApplyNoise(noise);
-                    stage.ApplyExpander(SoftwareExpanderLocked(channel));
-                    stage.ApplyCompressor(SoftwareCompressorLocked(channel));
-                    stage.ApplyVoice(voice);
+                    if (microphone)
+                    {
+                        stage.ApplyNoise(NoiseLocked(channel));
+                        stage.ApplyExpander(SoftwareExpanderLocked(channel));
+                        stage.ApplyCompressor(SoftwareCompressorLocked(channel));
+                        stage.ApplyVoice(VoiceLocked(channel));
+                    }
                     return;
                 }
                 catch (InvalidOperationException ex)
@@ -465,7 +496,7 @@ public sealed partial class Mixer
             SpliceEqLocked(channel, replace: true);
             return;
         }
-        if (!eq.Enabled && !noise.Enabled && !voice.Enabled && !DynamicsWantedLocked(channel)) return;
+        if (!StageWantedLocked(channel)) return;
         // A capture input without inserts plays on its direct feed, which
         // has no head to splice into: it moves to its own route, with the
         // stage at the head, as an insert would move it. A source that is
@@ -529,19 +560,29 @@ public sealed partial class Mixer
         string key = EqKey(ch.Id);
         if (_restarts.Blocked(key)) return null;
         MicEq eq = SoftwareEqLocked(ch.Id);
-        MicNoise noise = NoiseLocked(ch.Id);
         FilterHandle? filter = null;
         try
         {
-            filter = _pw.CreateMicEq($"{ch.Id}_{++_eqGeneration}", SoftwareEqBackend.Controls(eq, noise), eq.Bands.Count);
-            var stage = new SoftwareEqBackend(_pw, filter, eq, noise);
-            // The voice, the expander and the compressor go in live, before
-            // the microphone is linked in, and their levels when a client
-            // shows them.
-            stage.ApplyExpander(SoftwareExpanderLocked(ch.Id));
-            stage.ApplyCompressor(SoftwareCompressorLocked(ch.Id));
-            stage.ApplyVoice(VoiceLocked(ch.Id));
-            if (_dynamicsWatch.ContainsKey(ch.Id)) stage.SetDynamicsMeters(true);
+            SoftwareEqBackend stage;
+            if (CarriesMicrophoneStage(ch))
+            {
+                MicNoise noise = NoiseLocked(ch.Id);
+                filter = _pw.CreateMicEq($"{ch.Id}_{++_eqGeneration}", SoftwareEqBackend.Controls(eq, noise), eq.Bands.Count);
+                stage = new SoftwareEqBackend(_pw, filter, eq, noise);
+                // The voice, the expander and the compressor go in live, before
+                // the microphone is linked in, and their levels when a client
+                // shows them.
+                stage.ApplyExpander(SoftwareExpanderLocked(ch.Id));
+                stage.ApplyCompressor(SoftwareCompressorLocked(ch.Id));
+                stage.ApplyVoice(VoiceLocked(ch.Id));
+                if (_dynamicsWatch.ContainsKey(ch.Id)) stage.SetDynamicsMeters(true);
+            }
+            else
+            {
+                // A stereo pair: the EQ alone, on both sides.
+                filter = _pw.CreateMicEq($"{ch.Id}_{++_eqGeneration}", SoftwareEqBackend.Controls(eq), eq.Bands.Count, channels: 2);
+                stage = new SoftwareEqBackend(_pw, filter, eq) { Channels = 2 };
+            }
             into = RouteInputLocked(upstream, stage.Node, ch, upstreamProcessed);
             if (into.Pairs.Count == 0) throw new InvalidOperationException("The microphone could not be linked into its EQ.");
             _eqErrors.Remove(ch.Id);
@@ -603,7 +644,7 @@ public sealed partial class Mixer
         if (stage is not null)
         {
             _eqStages[channel] = stage;
-            if (_dynamicsWatch.ContainsKey(channel)) _dynamicsMeterHosts[channel] = stage.Stage.NativeHost!;
+            if (_dynamicsWatch.ContainsKey(channel) && stage.Channels == 1) _dynamicsMeterHosts[channel] = stage.Stage.NativeHost!;
             _eqInputs[channel] = into!;
             _eqUpstreams[channel] = upstream;
             // A direct link from the microphone that this daemon does not

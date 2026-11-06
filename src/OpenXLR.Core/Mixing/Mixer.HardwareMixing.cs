@@ -147,7 +147,7 @@ public sealed partial class Mixer
             // A jack whose monitor mixes are dry hears a microphone from the
             // unit's own input, as the software monitor sends take it; Mic
             // setup's take is heard processed, as it is in the graph.
-            MonitorDry = unitSources.Values.Where(c => CarriesEqLocked(c) && !(_soundCheck is not null && _soundCheckChannel == c))
+            MonitorDry = unitSources.Values.Where(c => CarriesMicrophoneStageLocked(c) && !(_soundCheck is not null && _soundCheckChannel == c))
                 .ToHashSet(StringComparer.Ordinal),
             DryMixes = DryMonitorsLocked(),
             MixVolumesDb = _config.Mixes.ToDictionary(m => m.Id, m => HardwareMixVolumeDbLocked(m.Id), StringComparer.Ordinal),

@@ -94,7 +94,7 @@ public sealed partial class Mixer
     }
 
     /// <summary>Whether a route built now would run the channel's compressor or expander in its software stage.</summary>
-    internal bool DynamicsWantsSoftwareStage(string channel) { lock (_gate) return CarriesEqLocked(channel) && DynamicsWantedLocked(channel); }
+    internal bool DynamicsWantsSoftwareStage(string channel) { lock (_gate) return CarriesMicrophoneStageLocked(channel) && DynamicsWantedLocked(channel); }
 
     /// <summary>Whether a channel's compressor and expander are software's to run: no unit runs them and none is still letting them go.</summary>
     private bool DynamicsInSoftwareLocked(string channel) => !_dynamicsDevices.ContainsKey(channel) && !_dynamicsReleasing.ContainsKey(channel);

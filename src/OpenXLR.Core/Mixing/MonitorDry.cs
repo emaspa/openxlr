@@ -109,11 +109,11 @@ public sealed partial class Mixer
 
     /// <summary>
     /// Whether a microphone should have its dry route now: a monitor mix is
-    /// dry, the channel carries the EQ and is present, and Sound Check is not
+    /// dry, the channel is a microphone and is present, and Sound Check is not
     /// playing its take through it, which the monitor must hear processed.
     /// </summary>
     private bool DryWantedLocked(ChannelDefinition channel)
-        => _built && _dryMonitors.Any(m => MonitorMixLocked(m) is not null) && CarriesEq(channel) && ChannelPresentLocked(channel)
+        => _built && _dryMonitors.Any(m => MonitorMixLocked(m) is not null) && CarriesMicrophoneStage(channel) && ChannelPresentLocked(channel)
             && !(_soundCheck is not null && _soundCheckChannel == channel.Id);
 
     /// <summary>Whether the dry route carries this channel's send into this mix, and the channel's own send is held closed for it.</summary>
@@ -129,7 +129,7 @@ public sealed partial class Mixer
     /// </summary>
     private bool DryHeardInLocked(string channel, string? feed)
     {
-        if (!CarriesEqLocked(channel)) return false;
+        if (!CarriesMicrophoneStageLocked(channel)) return false;
         IReadOnlyList<string> parts = feed is null
             ? [.. _config.Mixes.Where(m => m.Kind == MixKind.Monitor).Select(m => m.Id)]
             : MonitorFeed.Parts(feed);

@@ -296,7 +296,7 @@ public sealed class EqProfileStoreTests : IDisposable
     [InlineData("""{"cmd":"listEqProfiles"}""", null)]
     [InlineData("""{"cmd":"loadEqProfile","channel":"xlr1","profile":"builtin:clear"}""", null)]
     [InlineData("""{"cmd":"loadEqProfile","channel":"guest","profile":"saved:My voice"}""", null)]
-    [InlineData("""{"cmd":"loadEqProfile","channel":"aux","profile":"builtin:clear"}""", "loadEqProfile: 'aux' is not a microphone input")]
+    [InlineData("""{"cmd":"loadEqProfile","channel":"aux","profile":"builtin:clear"}""", "loadEqProfile: 'aux' is not a microphone or capture input")]
     [InlineData("""{"cmd":"loadEqProfile","profile":"builtin:clear"}""", "loadEqProfile: need 'channel' or 'mix'")]
     [InlineData("""{"cmd":"loadEqProfile","channel":"xlr1"}""", "loadEqProfile: need 'profile'")]
     [InlineData("""{"cmd":"loadEqProfile","channel":"xlr1","profile":"Clear"}""", "loadEqProfile: 'profile' must start with 'builtin:' or 'saved:'")]

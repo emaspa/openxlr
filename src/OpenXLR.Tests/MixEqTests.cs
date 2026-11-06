@@ -45,7 +45,7 @@ public sealed class MixEqTests
     [InlineData("""{"cmd":"loadEqProfile","channel":"xlr1","profile":"builtin:bass-boost"}""", null)]
     [InlineData("""{"cmd":"setEqEnabled","mix":"nope","value":true}""", "setEqEnabled: 'nope' is not a mix")]
     [InlineData("""{"cmd":"setEqEnabled","mix":"xlr1","value":true}""", "setEqEnabled: 'xlr1' is not a mix")]
-    [InlineData("""{"cmd":"setEqEnabled","channel":"stream","value":true}""", "setEqEnabled: 'stream' is not a microphone input")]
+    [InlineData("""{"cmd":"setEqEnabled","channel":"stream","value":true}""", "setEqEnabled: 'stream' is not a microphone or capture input")]
     [InlineData("""{"cmd":"setEqEnabled","channel":"xlr1","mix":"stream","value":true}""", "setEqEnabled: give 'channel' or 'mix', not both")]
     [InlineData("""{"cmd":"setEqEnabled","mix":"stream","value":1}""", "setEqEnabled: value must be a boolean")]
     [InlineData("""{"cmd":"setEqBand","mix":"stream","band":0,"gain":3}""", "setEqBand: need 'band' from 1 to 16")]

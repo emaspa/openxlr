@@ -80,7 +80,7 @@ public sealed partial class Mixer
 
     /// <summary>Every microphone's voice changer, for a profile: a recall then names every microphone.</summary>
     private Dictionary<string, MicVoice> SceneVoiceLocked()
-        => _config.Channels.Where(CarriesEq).ToDictionary(c => c.Id, c => VoiceLocked(c.Id), StringComparer.Ordinal);
+        => _config.Channels.Where(CarriesMicrophoneStage).ToDictionary(c => c.Id, c => VoiceLocked(c.Id), StringComparer.Ordinal);
 
     /// <summary>
     /// A microphone's voice changer for the state: the setting, the voice

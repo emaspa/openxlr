@@ -1746,12 +1746,13 @@ values the unit holds, and the choice of where they run is made in the
 UI.
 
 <a name="microphone-eq"></a>
-**Microphone EQ.** XLR 1, XLR 2 and every capture input on one mono port
-each have an EQ with one to sixteen bands and the same band types, ranges
-and steps as Wave Link's, and the same curves. It comes first on the input, before the low
-cut, ClipGuard and your plugins, so ClipGuard also catches a boost, and
-Mic setup's loop goes through it. A capture input has no low cut or
-ClipGuard, so its EQ comes straight before its plugins.
+**Microphone EQ.** XLR 1, XLR 2 and every capture input, on one mono port
+or a stereo pair, each have an EQ with one to sixteen bands and the same
+band types, ranges and steps as Wave Link's, and the same curves. It comes
+first on the input, before the low cut, ClipGuard and your plugins, so
+ClipGuard also catches a boost, and Mic setup's loop goes through it. A
+capture input has no low cut or ClipGuard, so its EQ comes straight before
+its plugins.
 
 The existing four-band setup stays the default. **Add band** adds a neutral
 bell in a gap between the existing frequencies; **Remove** beside a band
@@ -1923,18 +1924,22 @@ every microphone's EQ with the rest of the mixer.
   }
   ```
 
-**EQ on a capture input.** A capture input on one mono port gets the same
-EQ button and editor as XLR 1, in INPUTS after its source chip, in an
-input rack and in the matrix. Its EQ always runs on this computer, at the
+**EQ on a capture input.** Every capture input, on one mono port or a
+stereo pair, gets the same EQ button and editor as XLR 1, in INPUTS after
+its source chip, and in an input rack and in the matrix before its effects
+button. Its EQ always runs on this computer, at the
 head of the input before its plugins, even when the input carries another
 Wave interface's microphone, so the editor shows no **Where the EQ runs**
 switch and no **Hardware processing** badge, and its bottom line says it
 runs on this computer. Switching it on moves the input onto its own route,
 the way adding a plugin does, without a gap in the sound. It is saved with
-the mixer and in profiles like XLR 1's. Changing the input's source keeps
-it; deleting the input deletes it. A capture input on a stereo pair has no
-EQ, and one moved from a mono port to a stereo pair keeps its EQ settings
-for when it goes back to a mono port.
+the mixer and in profiles like XLR 1's, and the same EQ profiles load on
+it. Changing the input's source keeps it, and so does a source that is
+unplugged and comes back; deleting the input deletes it. On a stereo pair
+the EQ runs the same curve on both sides, each side kept apart, and the
+input has no noise removal, compressor, expander or voice changer, which
+stay with the microphones. Settings for those made while the input was on a
+mono port are kept for when it goes back to one.
 
 <a name="output-eq"></a>
 **Output EQ.** Every mix has an EQ of its own: Monitor A and B and any
@@ -4059,7 +4064,9 @@ source mute the group has no mute key for it, and a press on the dial
 mutes or unmutes the channel in every mix instead.
 
 Each microphone with a complete EQ report has a **Microphone EQ** group,
-including mono capture microphones. Keys switch the whole EQ or one band
+including mono capture microphones, and a capture input on a stereo pair
+has an **Input EQ** group with the same keys and dials and no noise
+removal key. Keys switch the whole EQ or one band
 on/off, or cycle one band's filter type. Dials adjust a band's frequency,
 gain, Q or type. Turning a frequency dial moves in 24 steps per octave,
 rounded to whole hertz; gain moves by the reported step, normally 0.25 dB,
@@ -5000,7 +5007,8 @@ choose an available microphone, capture card or another Wave interface, and
 select one mono port or a stereo pair. The picker names ports when PipeWire
 reports their positions, such as FL and FR. A mono source starts on port 1;
 one port gives the input a mono chain and Mic setup. A stereo pair gives it
-a stereo chain.
+a stereo chain. Either way the input has the [microphone EQ](#microphone-eq)
+ahead of its chain.
 The new channel starts muted in every mix. Open only the sends you need.
 
 Capture channels can be renamed, reordered and deleted like application
@@ -5079,8 +5087,8 @@ additional unit shows its gain and switches under its own name in classic
 INPUTS too, labelled with the unit's name. The primary unit keeps its
 "plays on" heading because those controls belong to the header's unit.
 The software low cut and ClipGuard stay on the XLR strips. A capture input
-on one mono port has the [microphone EQ](#microphone-eq) too, and it runs
-on this computer, never on the unit.
+has the [microphone EQ](#microphone-eq) too, on a mono port or a stereo
+pair, and it runs on this computer, never on the unit.
 
 Capture inputs on supported Elgato units follow the unit when driving it,
 switching its card profile or replugging it renames the source. The channel
@@ -5480,8 +5488,9 @@ The terminal retries when the daemon is unavailable or restarts. A connection
 that accepts the socket but never completes its handshake is abandoned after
 five seconds, so it cannot prevent the next attempt.
 
-In Inputs, **Microphone EQ** lists each microphone, including mono capture
-inputs. Open its **bands** row for the band editor. Up and Down select
+In Inputs, **Microphone EQ** lists each microphone and every capture
+input, on a mono port or a stereo pair. Open its **bands** row for the
+band editor. Up and Down select
 a control, Space toggles a switch, Left and Right change the type or value,
 and Escape returns to Inputs. Frequency moves by a sixth of an octave, with `[`
 and `]` or Ctrl+Left/Right moving a twenty-fourth, as a Deck dial does. Gain moves by 0.25 dB; Q moves one

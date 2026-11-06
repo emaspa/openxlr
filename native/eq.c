@@ -15,8 +15,9 @@
 // belongs to another filter: the new filter is first run over the band's
 // recent input, then faded in over 5 ms while the old one fades out.
 //
-// Two channels. A stereo stage is an output mix's EQ and runs the EQ alone:
-// no noise removal, dynamics or voice changer, and none of their controls.
+// Two channels. A stereo stage is an output mix's EQ or a capture input's on
+// a stereo pair, and runs the EQ alone: no noise removal, dynamics or voice
+// changer, and none of their controls.
 // Each band has one set of coefficients and, per channel, its own filter
 // state and history; its switch and its type fade move once a sample for
 // both, so the two sides follow the same curve from the same sample.
@@ -85,7 +86,7 @@ typedef struct {
 
 typedef struct {
   Control *enabled;
-  unsigned channels;       // 1: a microphone's stage; 2: a mix's EQ alone
+  unsigned channels;       // 1: a microphone's stage; 2: the EQ alone, on a stereo pair
   // The microphone stage's parts, all NULL on a stereo stage.
   Denoise *denoise;
   float *cleaned;          // noise removal's output, the EQ's input
@@ -437,7 +438,7 @@ static void eq_report(Eq *e) {
             "%u EQ, %u noise removal, %u voice\n",
             (unsigned long long)replaced, filters, noise, voice);
   else
-    fprintf(stderr, "trace: mix EQ: %llu non-finite input samples replaced; states cleared: %u EQ\n",
+    fprintf(stderr, "trace: stereo EQ: %llu non-finite input samples replaced; states cleared: %u EQ\n",
             (unsigned long long)replaced, filters);
 }
 

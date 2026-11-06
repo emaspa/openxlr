@@ -1412,14 +1412,17 @@ public sealed class PipeWireAdapter
     }
 
     /// <summary>
-    /// One microphone's EQ stage: the native helper's mono "eq" backend under
-    /// <c>OpenXLR_eq_&lt;id&gt;</c>, started with every control at
-    /// <paramref name="controls"/>, so it plays the right curve from its
-    /// first block. Refused at once when the helper is not installed.
+    /// One input's EQ stage under <c>OpenXLR_eq_&lt;id&gt;</c>, started with
+    /// every control at <paramref name="controls"/>, so it plays the right
+    /// curve from its first block: the native helper's mono "eq" backend for
+    /// a microphone, or with <paramref name="channels"/> 2 its stereo one for
+    /// a capture input on a stereo pair, which runs the EQ alone. Refused at
+    /// once when the helper is not installed.
     /// </summary>
-    internal FilterHandle CreateMicEq(string id, IReadOnlyDictionary<string, double> controls, int bands = MicEq.BandCount)
+    internal FilterHandle CreateMicEq(string id, IReadOnlyDictionary<string, double> controls, int bands = MicEq.BandCount, int channels = 1)
     {
         if (bands is < MicEq.MinimumBands or > MicEq.MaximumBands) throw new ArgumentOutOfRangeException(nameof(bands));
+        if (channels is not (1 or 2)) throw new ArgumentOutOfRangeException(nameof(channels));
         string executable = EqHost ?? NativePluginHost.Executable;
         if (!File.Exists(executable)) throw new InvalidOperationException(Mixer.EqNeedsHost);
         int rate = ParseGraphSampleRate(Run("pw-metadata", "-n", "settings"));
@@ -1428,7 +1431,8 @@ public sealed class PipeWireAdapter
         try
         {
             host = new NativePluginHost(new() { Id = id, Kind = "eq", Plugin = bands.ToString(CultureInfo.InvariantCulture), Params = new(controls) },
-                node, 1, rate, executable, [], meterSymbols: SoftwareEqBackend.Meters,
+                node, channels, rate, executable, [],
+                meterSymbols: channels == 1 ? SoftwareEqBackend.Meters : new HashSet<string>(StringComparer.Ordinal),
                 // The stage's trace lines say when it replaced non-finite
                 // samples or cleared a state; they belong in the journal.
                 note: _note);
@@ -1439,8 +1443,8 @@ public sealed class PipeWireAdapter
         }
         _nativeHosts.Add(host);
         var filter = new FilterHandle(node, node, node, host.Process) { NativeHost = host };
-        if (!WaitForPorts(node, "playback", false, TimeSpan.FromSeconds(3), host.Process)
-            || !WaitForPorts(node, "capture", true, TimeSpan.FromSeconds(3), host.Process))
+        if (!WaitForPorts(node, "playback", false, TimeSpan.FromSeconds(3), host.Process, count: channels)
+            || !WaitForPorts(node, "capture", true, TimeSpan.FromSeconds(3), host.Process, count: channels))
         {
             StopFilter(filter);
             throw new InvalidOperationException("The microphone EQ's audio ports did not appear.");

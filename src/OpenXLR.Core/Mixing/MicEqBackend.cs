@@ -88,6 +88,13 @@ internal sealed class SoftwareEqBackend(PipeWireAdapter pw, FilterHandle stage, 
     public bool IsAlive => Stage.IsAlive;
     public int BandCount => _applied.Bands.Count;
 
+    /// <summary>
+    /// The channels the stage runs on: one for a microphone, two for a
+    /// capture input's stereo pair, whose stage has the EQ alone and is never
+    /// written another part's controls.
+    /// </summary>
+    public int Channels { get; init; } = 1;
+
     /// <summary>The helper's controls for an EQ, by the symbols native/eq.c declares.</summary>
     public static Dictionary<string, double> Controls(MicEq eq)
     {

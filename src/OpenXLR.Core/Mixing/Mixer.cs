@@ -434,7 +434,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 SoftwareEqBackend? stage = null;
                 if (route.Eq)
                 {
-                    if (_eqStages.TryGetValue(ch.Id, out SoftwareEqBackend? running) && running.IsAlive)
+                    // A stage for the other width, left from a source that
+                    // moved between a mono port and a stereo pair, is replaced.
+                    if (_eqStages.TryGetValue(ch.Id, out SoftwareEqBackend? running) && running.IsAlive && running.Channels == route.Width)
                     {
                         if (sameInput && _eqUpstreams.GetValueOrDefault(ch.Id) == upstream
                             && _eqInputs.TryGetValue(ch.Id, out PortLink? keptInto) && _pw.EnsureLinks(keptInto) != LinkHealth.Broken)
@@ -3597,10 +3599,10 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                     Volume = ChannelVolumeLocked(c.Id),
                     CaptureGain = CaptureGainLocked(c, unitInputs),
                     Eq = CarriesEq(c) ? EqStateLocked(c.Id, unitInputs) : null,
-                    Noise = CarriesEq(c) ? NoiseStateLocked(c.Id) : null,
-                    Voice = CarriesEq(c) ? VoiceStateLocked(c.Id) : null,
-                    Compressor = CarriesEq(c) ? CompressorStateLocked(c.Id, unitInputs) : null,
-                    Expander = CarriesEq(c) ? ExpanderStateLocked(c.Id, unitInputs) : null,
+                    Noise = CarriesMicrophoneStage(c) ? NoiseStateLocked(c.Id) : null,
+                    Voice = CarriesMicrophoneStage(c) ? VoiceStateLocked(c.Id) : null,
+                    Compressor = CarriesMicrophoneStage(c) ? CompressorStateLocked(c.Id, unitInputs) : null,
+                    Expander = CarriesMicrophoneStage(c) ? ExpanderStateLocked(c.Id, unitInputs) : null,
                 })],
                 RenamedSinceStart = _renamedSinceBuild,
                 DefaultMonitorMix = PrimaryMonitorLocked()?.Id,
