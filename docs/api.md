@@ -1279,12 +1279,12 @@ changes. The registry changes it watches are new or removed nodes and
 links, node state, and changes to `node.name`, `node.description`,
 `node.driver-id`, `priority.driver`, `clock.name`, `device.id` or
 `device.api`. Reads are at least 5 seconds apart. A failed or empty read
-is retried after the minimum gap, even if the graph keeps changing. If the mixer's device
-selection changes during the read, the next sweep schedules a read for
-the new selection. After a successful read, a graph that stays unchanged
-starts no further helper. PipeWire keeps a
-node's `node.driver-id` current but does not send that change to
-subscribers, which is why the dump is needed. Every node that runs in a
+is retried after the minimum gap, even if the graph keeps changing. If
+the mixer's device selection changes during the read, the next sweep
+schedules a read for the new selection. After a successful read, a graph
+that stays unchanged starts no further helper. PipeWire keeps a node's
+`node.driver-id` current but does not send that change to subscribers,
+which is why the dump is needed. Every node that runs in a
 graph carries `node.driver-id`, the registry id of its driver, and a
 running driver carries its own id or none. The mixer's graph is the one
 its mix sinks (`OpenXLR_mix_*`) follow, or, before they run, the one its

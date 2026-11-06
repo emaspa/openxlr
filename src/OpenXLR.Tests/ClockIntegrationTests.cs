@@ -107,6 +107,7 @@ public sealed partial class MonitorVolumeIntegrationTests
                   {"id":3,"type":"PipeWire:Interface:Node","info":{"props":{"node.name":"test_clock_selection","device.api":"test","node.driver-id":1}}}
                 ]
                 EOF
+                touch "$dir/done"
                 """);
             Environment.SetEnvironmentVariable("PATH", directory + Path.PathSeparator + path);
             read = Task.Run(mixer.SyncClock);
@@ -114,6 +115,9 @@ public sealed partial class MonitorVolumeIntegrationTests
             mixer.SetMonitorOutput(output);
             File.WriteAllText(release, "");
             Assert.False(await read);
+            // The dump ran to the end, so the read was discarded for the new
+            // selection rather than lost to the helper timeout.
+            Assert.True(File.Exists(Path.Combine(directory, "done")));
             Assert.Null(mixer.GraphClock);
             Assert.True(mixer.SyncClock());
             Assert.Equal(output, Assert.Single(mixer.GraphClock!.Followers).Name);
