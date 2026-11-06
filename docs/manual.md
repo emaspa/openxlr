@@ -3193,7 +3193,7 @@ levels and the direct monitor blend on the left, the output picker and its
 volume in a toolbar on the right. INPUTS is hidden, since the row heads
 carry the input gain, mute, switches and plugins; **Arrange** lists it with a button
 that shows it again, under the matrix. APPLICATIONS sits under the matrix,
-its applications in columns of six: the seventh starts the next column to
+its applications in columns of four: the fifth starts the next column to
 the right, and columns that do not fit the UI's width continue below.
 Every application's tile is the same width, with its channel picker lined
 up with the ones above and below it. A name too long for its tile is cut

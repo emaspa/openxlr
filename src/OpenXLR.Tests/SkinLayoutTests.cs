@@ -148,9 +148,9 @@ public sealed class SkinLayoutTests
             Assert.Contains(part, layout.Submixer.Matrix.RowHead.Shown);
         foreach (string part in new[] { "identity", "outputs", "master", "mute", "effects" })
             Assert.Contains(part, layout.Submixer.Matrix.ColumnHead.Shown);
-        // Its applications in columns of six across the window's width, as Broadcast's.
+        // Its applications in columns of four across the window's width, as Broadcast's.
         Assert.Equal(SkinLayoutTemplates.ApplicationColumns, layout.Applications);
-        Assert.Equal(6, layout.ApplicationsPerColumn);
+        Assert.Equal(4, layout.ApplicationsPerColumn);
     }
 
     [Fact]
