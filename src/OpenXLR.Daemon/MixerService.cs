@@ -1081,6 +1081,9 @@ public sealed partial class MixerService : IHostedService, IDisposable
             // reported, never written back.
             stop.ThrowIfCancellationRequested();
             changed |= _mixer.SyncCaptureGains();
+            // A capture input's own clock: its bridge started or stopped
+            // carrying audio, or counted an underrun or an overrun.
+            changed |= _mixer.SyncClockBridges();
             stop.ThrowIfCancellationRequested();
             // Where ducking runs, after routing and the device status are
             // current: the unit when the setup fits it, software otherwise.
@@ -1518,6 +1521,11 @@ public sealed partial class MixerService : IHostedService, IDisposable
                     _mixer.SetCaptureMuted(cmd.Channel!, cmd.Value.GetBoolean());
                     Changed?.Invoke();
                     return null;
+                case "setCaptureOwnClock":
+                    // Saved before the graph changes, as a layout command is.
+                    _saves.RunSaved(() => _mixer.SetCaptureOwnClock(cmd.Channel!, cmd.Value.GetBoolean(), settings => settings.Save()));
+                    Changed?.Invoke();
+                    return null;
                 case "toggleCaptureMuted":
                     _mixer.ToggleCaptureMuted(cmd.Channel!);
                     Changed?.Invoke();
@@ -1908,6 +1916,8 @@ public sealed partial class MixerService : IHostedService, IDisposable
         string? line = clock?.Driver is { } driver
             ? $"audio clock: {driver.Name} drives the mixer's graph (priority.driver {driver.PriorityDriver?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "unset"})"
               + string.Concat(clock.Followers.Where(f => f.Resampled).Select(f => $"; {f.Name} follows it resampled"))
+              + string.Concat(clock.Bridged.Select(b => b.Separate ? $"; {b.Name} runs on its own clock, bridged"
+                  : $"; {b.Name} is set to its own clock but runs in the mixer's graph"))
             : null;
         if (line is null || line == _clockNoted) return;
         _clockNoted = line;

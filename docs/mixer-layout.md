@@ -407,7 +407,8 @@ same id and display name.
 
 Bindings are stored in `userChannels`, for example
 `{"id":"second-mic","name":"Second microphone","captureSource":"alsa_input.usb-headset","capturePair":0}`.
-An entry may also carry `captureMonoChannel` and `captureUnit`.
+An entry may also carry `captureMonoChannel`, `captureUnit` and
+`captureOwnClock`.
 `captureUnit` is null, an instance id such as `0fd9:0070@0123456789abcdef`,
 or a bare model id such as `0fd9:0070`, validated by `SourceBinding.IsUnitId`.
 The daemon writes it when creating a capture on a node marked with
@@ -455,6 +456,14 @@ a Wave unit has the unit's gain instead
 ([api.md](api.md#capture-input-gain)). `setCaptureMuted {channel, value}`
 and `toggleCaptureMuted {channel}` set and flip the same source's own mute,
 which the state reports as `captureGain.muted`. Neither is saved.
+
+`setCaptureOwnClock {channel, value}` puts a capture input's device on a
+clock of its own, carried into the mixer by a clock bridge, or with `false`
+back on the mixer's clock ([api.md](api.md#own-clock)). It is saved in the
+entry as `captureOwnClock: true`, written only while on, and like the
+binding it belongs to the layout, not a profile. The command saves before
+it rewires the input; a failed save changes nothing. The state reports it
+in the channel's `ownClock`.
 
 Disconnected sources retain their exact binding and faders. They reconnect
 when that node and pair return. With `captureUnit`, a missing exact name

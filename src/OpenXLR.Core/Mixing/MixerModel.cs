@@ -151,6 +151,13 @@ public sealed record ChannelDefinition(string Id, string Name)
     public int CapturePair { get; init; }
     /// <summary>One zero-based port of the source, fed to both sides of the channel; null takes the pair.</summary>
     public int? CaptureMonoChannel { get; init; }
+
+    /// <summary>
+    /// The capture input's device runs on its own clock: it drives a graph of
+    /// its own and a clock bridge carries its audio into the mixer's graph,
+    /// instead of following the mixer's clock. See <see cref="Mixer.SetCaptureOwnClock"/>.
+    /// </summary>
+    public bool CaptureOwnClock { get; init; }
     public bool IsApplication => InputPair is null && CaptureSource is null;
 
     /// <summary>XLR strips and capture inputs bound to one mono port.</summary>
@@ -350,6 +357,9 @@ public sealed partial record ChannelStatus(string Id, string Name,
     /// source is missing.
     /// </summary>
     public CaptureGainStatus? CaptureGain { get; init; }
+
+    /// <summary>The own clock (<c>setCaptureOwnClock</c>) on a capture input; null on every other channel.</summary>
+    public CaptureClockStatus? OwnClock { get; init; }
 
     /// <summary>The microphone EQ, on a microphone channel; null on every other channel.</summary>
     public MicEqState? Eq { get; init; }

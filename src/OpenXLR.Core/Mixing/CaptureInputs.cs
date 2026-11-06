@@ -152,10 +152,20 @@ public sealed partial class Mixer
             || _soundCheck is not null && _soundCheckChannel == channel.Id;
     }
 
+    /// <summary>
+    /// The node a capture input's audio comes from now, or null with the
+    /// reason noted: its device, or on its own clock the device's bridge.
+    /// </summary>
+    private string? ResolveCaptureSourceLocked(ChannelDefinition channel, IReadOnlyList<AudioNode> sources)
+    {
+        string? device = ResolveCaptureDeviceLocked(channel, sources);
+        return channel.CaptureOwnClock ? BridgedSourceLocked(channel, device) : device;
+    }
+
     // The exact name wins, as before, without asking for its ports on every
     // sweep. Only while it is missing does a capture input on a supported
     // unit follow the unit's card, through the bound strips' rule.
-    private string? ResolveCaptureSourceLocked(ChannelDefinition channel, IReadOnlyList<AudioNode> sources)
+    private string? ResolveCaptureDeviceLocked(ChannelDefinition channel, IReadOnlyList<AudioNode> sources)
     {
         List<AudioNode> candidates = [.. sources.Where(s => s.Kind == AudioNodeKind.Source && !s.IsOwn)];
         int matches = candidates.Count(s => s.Name == channel.CaptureSource);
@@ -279,8 +289,9 @@ public sealed partial class Mixer
             if (captureSource is null) continue;
             // External sources need not use the hardware driver's capture_
             // prefix. Direction and the exact node name identify their ports.
+            bool bridged = IsClockBridgeLocked(channel.Id, captureSource);
             PortLink feed = _pw.LinkNodes(captureSource, "", channel.SinkName, "playback",
-                fromPairOffset: channel.CapturePair, fromChannel: channel.CaptureMonoChannel);
+                fromPairOffset: bridged ? 0 : channel.CapturePair, fromChannel: bridged ? null : channel.CaptureMonoChannel);
             // Capture channels have stereo sinks; mono sources also need a
             // link to each side. Do not retain a partial route as healthy.
             if (!feed.Complete || feed.Pairs.Count < 2)

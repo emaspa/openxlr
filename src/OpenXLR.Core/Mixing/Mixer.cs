@@ -1636,7 +1636,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 InputBindings = _bindings.Count == 0 ? null : new Dictionary<string, SourceBinding>(_bindings),
                 ExclusiveGroups = ExclusiveGroupsModel.Copy(_config.ExclusiveGroups),
                 UserChannels = [.. _config.Channels.Where(c => c.InputPair is null)
-                    .Select(c => new UserChannelDefinition(c.Id, c.Name, c.CaptureSource, c.CapturePair, c.CaptureMonoChannel, c.CaptureUnit))],
+                    .Select(c => new UserChannelDefinition(c.Id, c.Name, c.CaptureSource, c.CapturePair, c.CaptureMonoChannel, c.CaptureUnit)
+                        { CaptureOwnClock = c.CaptureOwnClock })],
                 Mixes = [.. _config.Mixes.Where(m => m.IsEditable)
                     .Select(m => new UserMixDefinition(m.Id, m.Name) { Kind = KindName(m.Kind) })],
                 // 0.2.0 reads only this list, with Monitor A and B fixed ahead of
@@ -3615,6 +3616,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                     UnitInput = unitInputs.GetValueOrDefault(c.Id),
                     Volume = ChannelVolumeLocked(c.Id),
                     CaptureGain = CaptureGainLocked(c, unitInputs),
+                    OwnClock = c.CaptureSource is null ? null : CaptureClockStateLocked(c),
                     Eq = CarriesEq(c) ? EqStateLocked(c.Id, unitInputs) : null,
                     Noise = CarriesMicrophoneStage(c) ? NoiseStateLocked(c.Id) : null,
                     Voice = CarriesMicrophoneStage(c) ? VoiceStateLocked(c.Id) : null,
@@ -3928,6 +3930,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         foreach (PortLink feed in _inputFeeds.Values) _pw.Unlink(feed);
         _inputFeeds.Clear();
         foreach (string id in _captureFeeds.Keys.ToArray()) RemoveCaptureFeedLocked(id);
+        RemoveClockBridgesLocked();
         StopPlayerLocked();
         RemoveEqStagesLocked();
         RemoveDuckBusesLocked();

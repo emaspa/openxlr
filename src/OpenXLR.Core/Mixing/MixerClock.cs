@@ -35,19 +35,45 @@ public sealed record ClockFollower(string Name, string Description, string Role,
 }
 
 /// <summary>
+/// A capture input's device on its own clock: it is not one of the
+/// followers, since a clock bridge, not PipeWire, carries its audio into the
+/// mixer's graph (see <see cref="Mixer.SetCaptureOwnClock"/>).
+/// </summary>
+/// <param name="Name">The device's node.name.</param>
+/// <param name="Description">A name for people.</param>
+/// <param name="Channels">The capture inputs that take it through a bridge, by channel id.</param>
+/// <param name="Driver">The node that drives the device's graph when it is another node, or null when the device drives it itself or is idle.</param>
+/// <param name="Separate">The device is outside the mixer's graph, as it should be. False when something else links it into the mixer's graph, which puts it back on the mixer's clock.</param>
+public sealed record ClockBridged(string Name, string Description, IReadOnlyList<string> Channels, string? Driver, bool Separate)
+{
+    /// <summary>The <see cref="ClockCandidate.Role"/> of a device a bridge takes.</summary>
+    public const string Role = "bridged";
+
+    public bool Equals(ClockBridged? other)
+        => other is not null && Name == other.Name && Description == other.Description && Driver == other.Driver
+            && Separate == other.Separate && Channels.SequenceEqual(other.Channels, StringComparer.Ordinal);
+
+    public override int GetHashCode() => HashCode.Combine(Name, Driver, Separate);
+}
+
+/// <summary>
 /// Which node drives the mixer's graph and which of the mixer's devices
 /// follow it, read from the registry's node properties (see
 /// <see cref="Read"/>). Null in the state until the graph shows a driver.
 /// </summary>
 public sealed record MixerClock(ClockDriver? Driver, IReadOnlyList<ClockFollower> Followers)
 {
+    /// <summary>The devices on their own clock, carried into the mixer's graph by a bridge.</summary>
+    public IReadOnlyList<ClockBridged> Bridged { get; init; } = [];
+
     /// <summary>A microphone's interface follows another device's clock and is resampled.</summary>
     public bool MicResampled => Followers.Any(f => f.Microphone && f.Resampled);
 
     public bool Equals(MixerClock? other)
         => other is not null && Driver == other.Driver && Followers.Count == other.Followers.Count
             && Followers.Zip(other.Followers).All(pair => pair.First with { Channels = NoChannels } == pair.Second with { Channels = NoChannels }
-                && pair.First.Channels.SequenceEqual(pair.Second.Channels, StringComparer.Ordinal));
+                && pair.First.Channels.SequenceEqual(pair.Second.Channels, StringComparer.Ordinal))
+            && Bridged.SequenceEqual(other.Bridged);
 
     private static readonly string[] NoChannels = [];
 
@@ -88,11 +114,12 @@ public sealed record MixerClock(ClockDriver? Driver, IReadOnlyList<ClockFollower
             .Where(n => n.Name.StartsWith(MixDefinition.SinkPrefix, StringComparison.Ordinal) && n.DriverId is not null)
             .GroupBy(n => n.DriverId!.Value).OrderByDescending(g => g.Count()).ThenBy(g => g.Key)
             .Select(g => (uint?)g.Key).FirstOrDefault();
-        driverId ??= devices.Select(d => byName.GetValueOrDefault(d.Node)?.DriverId).FirstOrDefault(id => id is not null);
+        driverId ??= devices.Where(d => d.Role != ClockBridged.Role)
+            .Select(d => byName.GetValueOrDefault(d.Node)?.DriverId).FirstOrDefault(id => id is not null);
         if (driverId is not uint id || !nodes.TryGetValue(id, out ClockNode? driver)) return null;
 
         Dictionary<string, ClockCandidate> roles = new(StringComparer.Ordinal);
-        foreach (ClockCandidate device in devices) roles.TryAdd(device.Node, device);
+        foreach (ClockCandidate device in devices.Where(d => d.Role != ClockBridged.Role)) roles.TryAdd(device.Node, device);
 
         var followers = new List<ClockFollower>();
         foreach (ClockCandidate device in roles.Values)
@@ -102,9 +129,22 @@ public sealed record MixerClock(ClockDriver? Driver, IReadOnlyList<ClockFollower
             followers.Add(new ClockFollower(node.Name, node.Description, device.Role, device.Channels,
                 device.Microphone, node.PriorityDriver, !node.SharesClockWith(driver)));
         }
+        // A bridged device should run in a graph of its own: driving it, or
+        // following a node other than the mixer's driver.
+        var bridged = new List<ClockBridged>();
+        foreach (ClockCandidate device in devices.Where(d => d.Role == ClockBridged.Role).DistinctBy(d => d.Node))
+        {
+            if (!byName.TryGetValue(device.Node, out ClockNode? node)) continue;
+            string? own = node.DriverId is uint other && nodes.TryGetValue(other, out ClockNode? leader) ? leader.Name : null;
+            bridged.Add(new ClockBridged(node.Name, node.Description, device.Channels, own,
+                node.Id != driver.Id && node.DriverId != driver.Id));
+        }
         return new MixerClock(
             new ClockDriver(driver.Name, driver.Description, driver.PriorityDriver) { Role = roles.GetValueOrDefault(driver.Name)?.Role },
-            [.. followers.OrderBy(f => RoleOrder(f.Role)).ThenBy(f => f.Name, StringComparer.Ordinal)]);
+            [.. followers.OrderBy(f => RoleOrder(f.Role)).ThenBy(f => f.Name, StringComparer.Ordinal)])
+        {
+            Bridged = [.. bridged.OrderBy(b => b.Name, StringComparer.Ordinal)],
+        };
     }
 
     private static int RoleOrder(string role) => role switch
@@ -167,5 +207,9 @@ public sealed record MixerClock(ClockDriver? Driver, IReadOnlyList<ClockFollower
     }
 }
 
-/// <summary>One of the mixer's devices for <see cref="MixerClock.Read"/>: its node.name and what it is to the mixer.</summary>
+/// <summary>
+/// One of the mixer's devices for <see cref="MixerClock.Read"/>: its node.name
+/// and what it is to the mixer, a <see cref="ClockFollower.Role"/> or
+/// <see cref="ClockBridged.Role"/> for a device a clock bridge takes.
+/// </summary>
 public sealed record ClockCandidate(string Node, string Role, IReadOnlyList<string> Channels, bool Microphone);

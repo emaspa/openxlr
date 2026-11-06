@@ -106,7 +106,8 @@ public sealed partial class Mixer
     /// <summary>
     /// The mixer's devices, by node name: each strip's source while it is
     /// linked (the driven unit's capture, a capture input's source, a bound
-    /// strip's source), each selected output and the Aux port's sink.
+    /// strip's source), each device a capture input on its own clock takes
+    /// through its bridge, each selected output and the Aux port's sink.
     /// </summary>
     private List<ClockCandidate> ClockCandidatesLocked()
     {
@@ -121,7 +122,9 @@ public sealed partial class Mixer
                 && (_captureFeeds.GetValueOrDefault(channel.Id) ?? _inputFeeds.GetValueOrDefault(channel.Id)) is { Pairs: [var first, ..] }
                 && first.From.LastIndexOf(':') is int colon and > 0)
                 source = first.From[..colon];
-            if (source is null) continue;
+            // A capture input on its own clock is fed from its bridge, not
+            // its device; the device is listed below as bridged.
+            if (source is null || IsClockBridgeLocked(channel.Id, source)) continue;
             if (!channels.TryGetValue(source, out List<string>? strips)) channels[source] = strips = [];
             strips.Add(channel.Id);
             // Only the microphone strips warn: an extra mic on a capture input
@@ -131,6 +134,8 @@ public sealed partial class Mixer
         var devices = new List<ClockCandidate>();
         foreach ((string source, List<string> strips) in channels)
             devices.Add(new ClockCandidate(source, source == _inputDevice ? "unitInput" : "capture", strips, microphone.Contains(source)));
+        foreach (IGrouping<string, (string Channel, string Device)> bridged in BridgedDevicesLocked().GroupBy(b => b.Device, StringComparer.Ordinal))
+            devices.Add(new ClockCandidate(bridged.Key, ClockBridged.Role, [.. bridged.Select(b => b.Channel)], false));
         var outputs = new HashSet<string>(StringComparer.Ordinal);
         foreach (string output in _monitorOutputs.Append(_auxTargetSink ?? ""))
         {

@@ -243,6 +243,11 @@ public static class CommandValidation
                 if (cmd.Channel is null || TooLong(cmd.Channel, 36) || !layout.HasCaptureChannel(cmd.Channel))
                     return "setCaptureGain: need a capture input channel";
                 return Finite(cmd, "value");
+            case "setCaptureOwnClock":
+                if (cmd.Channel is null || TooLong(cmd.Channel, 36) || !layout.HasCaptureChannel(cmd.Channel))
+                    return "setCaptureOwnClock: need a capture input channel";
+                return cmd.Value.ValueKind is JsonValueKind.True or JsonValueKind.False
+                    ? null : "setCaptureOwnClock: value must be a boolean";
             case "setCaptureMuted":
             case "toggleCaptureMuted":
                 if (cmd.Channel is null || TooLong(cmd.Channel, 36) || !layout.HasCaptureChannel(cmd.Channel))

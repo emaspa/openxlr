@@ -505,10 +505,13 @@ public sealed partial class Mixer
         // The loop helper's tap goes past the chain on a link of its own, so
         // only its main output feeds what follows it.
         string fromPrefix = _soundCheck is not null && source == _soundCheck.SourceName ? "capture" : "";
+        // A capture input on its own clock is fed from its bridge, which
+        // carries only the ports the input takes.
+        bool bridged = !processed && channel.CaptureSource is not null && IsClockBridgeLocked(channel.Id, source);
         PortLink route = channel.CaptureSource is not null
             ? _pw.LinkNodes(source, fromPrefix, target, "playback",
-                fromPairOffset: processed ? 0 : channel.CapturePair,
-                fromChannel: processed ? null : channel.CaptureMonoChannel)
+                fromPairOffset: processed || bridged ? 0 : channel.CapturePair,
+                fromChannel: processed || bridged ? null : channel.CaptureMonoChannel)
             : binding is not null && !processed
             ? _pw.LinkNodes(source, "", target, "playback", fromChannel: binding.Port)
             : _pw.RouteInputToChannel(source, target, processed ? 0 : channel.InputPair!.Value);
