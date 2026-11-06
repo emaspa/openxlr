@@ -70,6 +70,63 @@ public sealed partial class MonitorVolumeIntegrationTests
         }
     }
 
+    [MonitorPipeWireFact]
+    public async Task AClockReadDoesNotPublishTheOutputsFromBeforeASelectionChange()
+    {
+        var pw = new PipeWireAdapter();
+        using var registry = pw.WatchGraph();
+        using var mixer = new Mixer(pw) { ClockSettle = TimeSpan.Zero, ClockMinGap = TimeSpan.Zero };
+        mixer.Build(new MixerConfig
+        {
+            Channels = [new("system", "System")],
+            Mixes = [new("monitor", "Monitor", MixKind.Monitor)],
+        });
+        const string output = "test_clock_selection";
+        pw.CreateNullSink(output, "Clock output");
+        Assert.True(SpinWait.SpinUntil(() => pw.ListDevices().Any(d => d.Name == output), TimeSpan.FromSeconds(5)));
+        string directory = Path.Combine(Path.GetTempPath(), "openxlr-clock-selection-" + Guid.NewGuid());
+        Directory.CreateDirectory(directory);
+        string? path = Environment.GetEnvironmentVariable("PATH");
+        string started = Path.Combine(directory, "started");
+        string release = Path.Combine(directory, "release");
+        Task<bool>? read = null;
+        try
+        {
+            ExecutableScript.Write(Path.Combine(directory, "pw-dump"), """
+                #!/bin/sh
+                dir=$(dirname "$0")
+                touch "$dir/started"
+                while [ ! -f "$dir/release" ]; do sleep 0.01; done
+                cat <<'EOF'
+                [
+                  {"id":1,"type":"PipeWire:Interface:Node","info":{"props":{"node.name":"test_driver"}}},
+                  {"id":2,"type":"PipeWire:Interface:Node","info":{"props":{"node.name":"OpenXLR_mix_monitor","node.driver-id":1}}},
+                  {"id":3,"type":"PipeWire:Interface:Node","info":{"props":{"node.name":"test_clock_selection","device.api":"test","node.driver-id":1}}}
+                ]
+                EOF
+                """);
+            Environment.SetEnvironmentVariable("PATH", directory + Path.PathSeparator + path);
+            read = Task.Run(mixer.SyncClock);
+            Assert.True(SpinWait.SpinUntil(() => File.Exists(started), TimeSpan.FromSeconds(3)));
+            mixer.SetMonitorOutput(output);
+            File.WriteAllText(release, "");
+            Assert.False(await read);
+            Assert.Null(mixer.GraphClock);
+            Assert.True(mixer.SyncClock());
+            Assert.Equal(output, Assert.Single(mixer.GraphClock!.Followers).Name);
+        }
+        finally
+        {
+            if (read is { IsCompleted: false })
+            {
+                File.WriteAllText(release, "");
+                await read;
+            }
+            Environment.SetEnvironmentVariable("PATH", path);
+            Directory.Delete(directory, true);
+        }
+    }
+
     /// <summary>
     /// The clock on a private PipeWire server: two capture devices that each
     /// have a clock of their own (null sources standing in for a USB

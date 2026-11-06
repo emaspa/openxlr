@@ -41,15 +41,16 @@ public sealed partial class Mixer
     {
         IReadOnlyList<ClockCandidate> devices;
         string signature;
+        long? revision;
         long now = Clock();
         long minGap = (long)ClockMinGap.TotalMilliseconds;
         lock (_gate)
         {
             if (!_built) return false;
-            devices = ClockCandidatesLocked();
-            signature = string.Join("\n", devices.Select(d => $"{d.Node}|{d.Role}|{d.Microphone}|{string.Join(',', d.Channels)}"));
-            long? revision = _pw.ClockRevision;
+            revision = _pw.ClockRevision;
             if (revision is null) return false;
+            devices = ClockCandidatesLocked();
+            signature = ClockDeviceSignature(devices);
             if (revision != _clockRevision || signature != _clockDevices)
             {
                 _clockRevision = revision;
@@ -66,20 +67,26 @@ public sealed partial class Mixer
         JsonElement[] objects;
         try { objects = _pw.ReadGraphOnce(); }
         catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { objects = []; }
-        if (objects.Length == 0)
-        {
-            // An empty or failed dump does not consume the pending read.
-            lock (_gate) _clockDueAt ??= now;
-            return false;
-        }
-        MixerClock? clock = MixerClock.Read(objects, devices);
+        MixerClock? clock = objects.Length == 0 ? null : MixerClock.Read(objects, devices);
         lock (_gate)
         {
-            if (Equals(clock, _clock)) return false;
+            if (!_built || _clockRevision != revision || _pw.ClockRevision is null) return false;
+            if (objects.Length == 0)
+            {
+                // An empty or failed dump does not consume the pending read.
+                _clockDueAt ??= now;
+                return false;
+            }
+            // The dump runs outside the mixer lock. A route command can change
+            // the devices while it runs, which the next sweep will pick up.
+            if (signature != ClockDeviceSignature(ClockCandidatesLocked()) || Equals(clock, _clock)) return false;
             _clock = clock;
             return true;
         }
     }
+
+    private static string ClockDeviceSignature(IReadOnlyList<ClockCandidate> devices)
+        => string.Join("\n", devices.Select(d => $"{d.Node}|{d.Role}|{d.Microphone}|{string.Join(',', d.Channels)}"));
 
     /// <summary>The clock as the last read found it.</summary>
     public MixerClock? GraphClock { get { lock (_gate) return _clock; } }

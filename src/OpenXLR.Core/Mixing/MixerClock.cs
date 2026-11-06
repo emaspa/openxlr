@@ -138,7 +138,8 @@ public sealed record MixerClock(ClockDriver? Driver, IReadOnlyList<ClockFollower
             if (item.ValueKind != JsonValueKind.Object
                 || !item.TryGetProperty("type", out JsonElement type) || type.ValueKind != JsonValueKind.String
                 || !type.ValueEquals("PipeWire:Interface:Node")
-                || !item.TryGetProperty("id", out JsonElement key) || !key.TryGetUInt32(out uint id)
+                || !item.TryGetProperty("id", out JsonElement key) || key.ValueKind != JsonValueKind.Number
+                || !key.TryGetUInt32(out uint id)
                 || !item.TryGetProperty("info", out JsonElement info) || info.ValueKind != JsonValueKind.Object
                 || !info.TryGetProperty("props", out JsonElement props) || props.ValueKind != JsonValueKind.Object
                 || Text(props, "node.name") is not { } name) return null;
