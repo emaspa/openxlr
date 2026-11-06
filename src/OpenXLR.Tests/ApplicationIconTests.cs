@@ -70,6 +70,16 @@ public sealed class ApplicationIconTests : IDisposable
         => ApplicationIconResolver.Resolve(Index(), new ApplicationIconHints(iconName, appId, binary, appName));
 
     [Fact]
+    public void ANameIsSpelledAsItsDesktopEntrySpellsIt()
+    {
+        DesktopEntryIndex index = Index();
+        Assert.Equal("Google Chrome", ApplicationIconResolver.DisplayName(index, "google chrome"));
+        Assert.Equal("Google Chrome", ApplicationIconResolver.DisplayName(index, "Google Chrome"));
+        Assert.Equal("chrome", ApplicationIconResolver.DisplayName(index, "chrome"));
+        Assert.Equal("nothing installed", ApplicationIconResolver.DisplayName(index, "nothing installed"));
+    }
+
+    [Fact]
     public void EntriesAreReadInSearchOrderWithTheirMainGroupOnly()
     {
         DesktopEntryIndex index = Index();

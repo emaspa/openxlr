@@ -1781,12 +1781,24 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 // one saved before a program got a name of its own ("KDE").
                 string label = AudioStream.KnownLabel(identity) ?? AudioStream.ProgramName(Sanitize(app.Label));
                 if (AudioStream.IsTechnicalName(label)) label = new AudioStream(0, label, identity, null).Label;
+                // Saved before WebKitGTK applications were told apart: the
+                // shared web process was the identity, and the label names
+                // the application that was playing. The choice goes with it.
+                if (StreamMatcher.IsWebKitProcess(identity) && label.Length > 0 && !StreamMatcher.IsWebKitProcess(label))
+                {
+                    if (Matcher.Overrides.TryGetValue(identity, out string? shared)) Matcher.SetOverride(label, shared);
+                    identity = label;
+                }
                 if (!_apps.ContainsKey(identity))
                     _apps[identity] = new StreamAssignment(0, 0, label, identity,
                         Matcher.Overrides.TryGetValue(identity, out string? pinned)
                             ? pinned
                             : Matcher.RouteByDefault ? _config.ResolveApplicationChannel(app.ChannelId) : StreamMatcher.Ignore) { Active = false, Running = false };
             }
+
+            // The shared web process names no one application any more.
+            foreach (string shared in Matcher.Overrides.Keys.Where(StreamMatcher.IsWebKitProcess).ToArray())
+                Matcher.RemoveOverride(shared);
 
             static string Sanitize(string v) => v.EndsWith(" (deleted)", StringComparison.Ordinal) ? v[..^10] : v;
 
@@ -3626,6 +3638,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 EnforcedDefaultSource = _enforcedSource,
                 AuxPortEnabled = _auxPortEnabled,
                 Streams = [.. _apps.Values
+                    .Select(a => a with { Label = _icons.DisplayName(a.Label) })
                     .OrderByDescending(a => a.Active).ThenBy(a => a.Label, StringComparer.OrdinalIgnoreCase)],
                 PreserveBrowserOutputs = _preserveBrowserOutputs,
                 RouteAppsByDefault = Matcher.RouteByDefault,

@@ -610,7 +610,12 @@ one runs and the send carries the processed microphone instead.
 Application identities use playback-node metadata, falling back to the
 owning PipeWire client's application name and process binary when absent.
 Windows executable names normalize to the same key as their Wine/Proton
-client, for example `Balatro.exe` becomes `balatro`. `assignApp` and
+client, for example `Balatro.exe` becomes `balatro`. A WebKitGTK or WPE
+application plays from the shared `WebKitWebProcess` or `WPEWebProcess`
+binary, so its identity is its application name; an override or remembered
+app saved under the shared binary moves to that name on load. A stream's
+`label` takes the spelling of an installed desktop entry whose name matches
+it but for letter case. `assignApp` and
 `forgetApp` also accept those legacy executable-name identities. When
 loading conflicting old and normalized overrides, the normalized key wins.
 Identity comparisons ignore letter case for live routing as well as saved

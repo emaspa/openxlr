@@ -16,6 +16,9 @@ public sealed record ApplicationIconHints(string? IconName, string? AppId, strin
         string? binary = stream.Binary is { Length: > 0 } b ? Path.GetFileName(b) : null;
         // Steam's audio comes from its browser helper; the identity is Steam's.
         if (string.Equals(binary, "steamwebhelper", StringComparison.OrdinalIgnoreCase)) binary = "steam";
+        // Every WebKitGTK application plays from the same web process, which
+        // names no one of them; its name leads to its entry instead.
+        if (StreamMatcher.IsWebKitProcess(binary)) binary = null;
         // Every Wine and Proton game shares the runtime's binary, which
         // names the runtime and not the game.
         if (binary is not null && (binary.Contains("wine", StringComparison.OrdinalIgnoreCase) ||
@@ -228,6 +231,7 @@ public sealed class ApplicationIconResolver
     private readonly TimeSpan _checkInterval;
     private readonly Lock _refresh = new();
     private readonly ConcurrentDictionary<ApplicationIconHints, IconMatch?> _cache = new();
+    private readonly ConcurrentDictionary<string, string> _names = new(StringComparer.Ordinal);
     private DesktopEntryIndex _index = DesktopEntryIndex.Empty;
     private string? _stamp;
     private long _checkedAt;
@@ -264,6 +268,7 @@ public sealed class ApplicationIconResolver
             {
                 Volatile.Write(ref _index, DesktopEntryIndex.Scan(dirs));
                 _cache.Clear();
+                _names.Clear();
                 _stamp = stamp;
             }
             Interlocked.Exchange(ref _checkedAt, Environment.TickCount64);
@@ -273,6 +278,17 @@ public sealed class ApplicationIconResolver
 
     /// <summary>The icon for these hints from the entries already read, or null. Never touches the disk.</summary>
     public IconMatch? Resolve(ApplicationIconHints hints) => _cache.GetOrAdd(hints, h => Resolve(Index, h));
+
+    /// <summary>
+    /// The name as the application's desktop entry spells it, when an entry's
+    /// name is this one but for letter case: a WebKitGTK client that names
+    /// itself "whatrust" is listed as its entry's "whatRust". Any other name
+    /// comes back as it is. Never touches the disk.
+    /// </summary>
+    public string DisplayName(string label) => _names.GetOrAdd(label, l => DisplayName(Index, l));
+
+    internal static string DisplayName(DesktopEntryIndex index, string label)
+        => index.First(e => e.Name is { Length: > 0 } name && string.Equals(name, label, StringComparison.OrdinalIgnoreCase))?.Name ?? label;
 
     internal static IconMatch? Resolve(DesktopEntryIndex index, ApplicationIconHints hints)
     {

@@ -44,13 +44,15 @@ public sealed class StreamMatcher
     /// <summary>
     /// Defaults carried over from the user's Wave Link setup: browsers to
     /// Browser, Spotify and friends to Music, games and launchers to Game,
-    /// chat apps to Voice Chat, everything else to System.
+    /// chat apps, the WhatsApp desktop clients among them, to Voice Chat,
+    /// everything else to System.
     /// </summary>
     public static IReadOnlyList<Rule> DefaultRules() =>
     [
         new("browser", ["chrome", "chromium", "firefox", "librewolf", "brave", "vivaldi", "edge", "epiphany"]),
         new("music", ["spotify", "youtube music", "ytmdesktop", "tidal", "rhythmbox", "elisa", "lollypop", "mpv", "vlc"]),
-        new("voicechat", ["discord", "vesktop", "teamspeak", "mumble", "element", "signal", "telegram", "zoom", "slack"]),
+        new("voicechat", ["discord", "vesktop", "teamspeak", "mumble", "element", "signal", "telegram", "zoom", "slack",
+            "whatsapp", "whatrust", "zapzap", "whatsie", "karere", "wasistlos"]),
         new("game", ["steam", "gamescope", "lutris", "heroic", "bottles", "minecraft", "hearthstone", "kingdomcome", "bloodlines", "expedition"]),
         new("sfx", ["soundboard", "sfx"]),
     ];
@@ -103,6 +105,11 @@ public sealed class StreamMatcher
 
     private static bool IsWineLike(string? s) =>
         s is not null && WineLike.Any(w => s.Contains(w, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>The web process every WebKitGTK and WPE application plays its sound from.</summary>
+    internal static bool IsWebKitProcess(string? name)
+        => name is not null && (name.Equals("WebKitWebProcess", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("WPEWebProcess", StringComparison.OrdinalIgnoreCase));
 
     internal static bool IsWindowsExecutable(string? name)
         => name?.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) == true;
@@ -181,6 +188,11 @@ public sealed record AudioStream(int Id, string? AppName, string? Binary, string
             // person both are "Steam", so they share one identity and one
             // channel assignment.
             if (bin.Equals("steamwebhelper", StringComparison.OrdinalIgnoreCase)) return "steam";
+            // Every WebKitGTK and WPE application plays from the same web
+            // process binary, so it names no one application; the application
+            // name the process carries does.
+            if (StreamMatcher.IsWebKitProcess(bin) && AppName is { Length: > 0 } app
+                && !StreamMatcher.IsWebKitProcess(app)) return app;
             // The executable can be reported directly, or as the app name
             // while the playback node omits its runtime binary entirely.
             if (StreamMatcher.IsWindowsExecutable(bin)) return StreamMatcher.GameIdentity(bin);
