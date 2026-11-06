@@ -3249,6 +3249,9 @@ A disconnected or replaced daemon is not restarted by an answer to an old
 question. A failed restart leaves the UI open with an error. Flatpak and
 daemons started by hand keep the existing restart controls.
 
+The UI reopens itself with `openxlr --show-mixer`, which shows the
+mixer at launch even when Options says to start in the tray.
+
 Releases before 0.3.0 served their clients on a loopback port with a
 token. Since 0.3.0 the daemon uses a private Unix socket instead, authenticated by
 Linux peer credentials ([section 6](#files)), so the new UI cannot talk to
