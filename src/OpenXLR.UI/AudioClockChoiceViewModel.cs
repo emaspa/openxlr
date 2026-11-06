@@ -9,14 +9,16 @@ namespace OpenXLR.UI;
 
 /// <summary>
 /// One entry of the audio clock picker: a device the daemon's
-/// <c>mixer.clockChoice.options</c> lists, or Automatic with no node.
+/// <c>mixer.clockChoice.options</c> lists, or Automatic with no node. Automatic
+/// carries the name of the device that drives the graph now, when there is one.
 /// </summary>
 public sealed record AudioClockOptionItem(string? Node, string Description, bool Input)
 {
-    public string Label => Node is null ? Localizer.Text("AudioClockAutomatic")
+    public string Label => Node is null
+        ? Description.Length > 0 ? Localizer.Format("AudioClockAutomaticDriver", Description) : Localizer.Text("AudioClockAutomatic")
         : Input ? Localizer.Format("AudioClockInput", Description) : Localizer.Format("AudioClockOutput", Description);
 
-    internal static readonly AudioClockOptionItem Automatic = new(null, "", false);
+    internal static AudioClockOptionItem Automatic(string? driver) => new(null, driver ?? "", false);
 }
 
 public sealed partial class MainViewModel
@@ -29,13 +31,13 @@ public sealed partial class MainViewModel
     /// <summary>The daemon offers the choice: not an older daemon, and not the Flatpak's.</summary>
     public bool ClockChoiceReported { get; private set; }
 
-    /// <summary>Automatic, then the devices.</summary>
+    /// <summary>Automatic with the current driver's name, then the devices.</summary>
     public IReadOnlyList<AudioClockOptionItem> ClockChoices { get; private set; } = [];
 
     /// <summary>The picker's entry: Automatic or the chosen device. Picking another one writes the rule.</summary>
     public AudioClockOptionItem? ClockChoice
     {
-        get => _clockNode is null ? (ClockChoices.Count > 0 ? AudioClockOptionItem.Automatic : null)
+        get => _clockNode is null ? ClockChoices.FirstOrDefault()
             : _clockOptions.FirstOrDefault(o => o.Node == _clockNode);
         set
         {
@@ -113,10 +115,13 @@ public sealed partial class MainViewModel
             : [];
         bool reported = choice is not null;
         if (reported != ClockChoiceReported) { ClockChoiceReported = reported; Raise(nameof(ClockChoiceReported)); }
-        if (!options.SequenceEqual(_clockOptions))
+        // Automatic names the device that drives now, so the list is rebuilt
+        // when the driver changes as well as when the devices do.
+        AudioClockOptionItem automatic = AudioClockOptionItem.Automatic(Clock?.DriverName);
+        if (!options.SequenceEqual(_clockOptions) || ClockChoices.FirstOrDefault() != automatic && reported)
         {
             _clockOptions = options;
-            ClockChoices = reported ? [AudioClockOptionItem.Automatic, .. options] : [];
+            ClockChoices = reported ? [automatic, .. options] : [];
             Raise(nameof(ClockChoices));
         }
         _clockNode = choice is null ? null : Text(choice, "node");

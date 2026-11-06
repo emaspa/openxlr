@@ -80,12 +80,13 @@ internal static class AudioClockWindowTests
         Assert.Equal(Localizer.Format("MakeDeviceTheClock", "Wave XLR"), Assert.IsType<Window>(asked).Title);
         Assert.Contains(Localizer.Format("MakeClockConfirm", "Wave XLR"), asked!.GetLogicalDescendants().OfType<TextBlock>().Select(t => t.Text));
 
-        // Options, Audio: Automatic, then the devices, in the AUDIO card, nothing waiting.
+        // Options, Audio: Automatic naming the device that drives now, then
+        // the devices, in the AUDIO card, nothing waiting.
         OptionsTabsWindowTests.Show(options, OptionsTab.Audio);
         Dispatcher.UIThread.RunJobs();
         ComboBox picker = options.FindControl<ComboBox>("AudioClock")!;
         Assert.True(picker.IsEffectivelyVisible);
-        Assert.Equal([Localizer.Text("AudioClockAutomatic"), Localizer.Format("AudioClockInput", "Wave XLR"),
+        Assert.Equal([Localizer.Format("AudioClockAutomaticDriver", "Elgato 4K X"), Localizer.Format("AudioClockInput", "Wave XLR"),
             Localizer.Format("AudioClockInput", "Elgato 4K X")], picker.Items.OfType<AudioClockOptionItem>().Select(o => o.Label));
         Assert.Equal(0, picker.SelectedIndex);
         Assert.False(options.FindControl<WrapPanel>("AudioClockPending")!.IsVisible);
