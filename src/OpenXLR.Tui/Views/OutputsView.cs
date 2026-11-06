@@ -111,12 +111,41 @@ internal sealed class OutputsView : View
         _pendingFeeds[output] = (next, request, session);
     }
 
+    /// <summary>
+    /// Each mix's output EQ: what runs it, or why hardware mixing holds it
+    /// off, and its band editor, the microphone EQ's own, whose commands name
+    /// the mix.
+    /// </summary>
+    private void OutputEqs(List<Row> rows, App app, Snapshot state)
+    {
+        List<MixEntry> mixes = [.. state.Mixer.Mixes.Where(mix => mix.Eq is not null)];
+        if (mixes.Count == 0) return;
+        rows.Add(new HeadingRow("Output EQ"));
+        foreach (MixEntry mix in mixes)
+        {
+            string id = mix.Id;
+            rows.Add(new TextRow($"{mix.Name} EQ", state.Mixer.Disabled("eq:mix:" + id) ?? mix.Eq!.Status));
+            if (EqEditor.CanEdit(mix, state.Mixer))
+                rows.Add(new ActionRow($"{mix.Name} bands", "edit EQ",
+                    () => _eqEditor = new EqEditor(id, app.Link.SessionRevision, mix: true)));
+        }
+    }
+
     public override string Title => "Outputs";
 
-    public override string Keys => "Space select  Left/Right feed  Enter main output  -/+ volume  m mute";
+    // A mix's output EQ, open over the list until Esc.
+    private EqEditor? _eqEditor;
+
+    public override string Keys => _eqEditor?.Keys ?? "Space select  Left/Right feed  Enter main output  -/+ volume  m mute";
 
     public override void Draw(Screen screen, Rect area, App app)
     {
+        if (_eqEditor is { } editor)
+        {
+            if (editor.Draw(screen, area, app)) return;
+            _eqEditor = null;
+            app.Say("That mix no longer has an editable EQ");
+        }
         Snapshot? state = State(app);
         if (state is null)
         {
@@ -128,6 +157,11 @@ internal sealed class OutputsView : View
 
     public override bool Handle(KeyPress key, App app)
     {
+        if (_eqEditor is { } editor)
+        {
+            if (key.Key == Key.Escape) { _eqEditor = null; return true; }
+            return editor.Handle(key, app);
+        }
         Snapshot? state = State(app);
         return state is not null && _list.Handle(key, Build(app, state));
     }
@@ -166,6 +200,8 @@ internal sealed class OutputsView : View
                 body["value"] = value;
             })));
         }
+
+        OutputEqs(rows, app, state);
 
         rows.Add(new HeadingRow("Outputs"));
         if (sinks.Count == 0) rows.Add(new TextRow("None found", "is PipeWire running"));

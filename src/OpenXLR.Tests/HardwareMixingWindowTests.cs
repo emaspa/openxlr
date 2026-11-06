@@ -28,6 +28,8 @@ internal static class HardwareMixingWindowTests
     private const string InsertSentence = "The Wave XLR Pro builds Monitor A for its jacks, so no insert runs on it there.";
     private const string SoundCheckSentence = "Mic setup's checks are not available while the Wave XLR Pro builds the mixes.";
     private const string AuditionSentence = "Auditions are not available while the Wave XLR Pro builds the mixes.";
+    private const string EqSentence = "The Wave XLR Pro builds Monitor A for its jacks, so its EQ is off while hardware mixing runs. It comes back with software mixing.";
+    private const string MixEq = """, "eq": { "enabled": true, "bands": [{ "enabled": true, "type": "highShelf", "frequency": 4500, "gain": -4, "q": 0.707 }], "backend": "software", "available": true, "processing": "software" }""";
 
     private static JsonNode State(bool capable, JsonObject? mode, bool built = false) => JsonNode.Parse($$"""
         {
@@ -38,8 +40,8 @@ internal static class HardwareMixingWindowTests
           "devices": [], "profiles": [],
           "mixer": {
             "mixes": [
-              { "id": "monitor", "name": "Monitor A", "volume": 1, "muted": false, "kind": "monitor", "hardwareSection": {{(built ? "0" : "null")}} },
-              { "id": "stream", "name": "Stream", "volume": 1, "muted": false, "kind": "virtualMic" }
+              { "id": "monitor", "name": "Monitor A", "volume": 1, "muted": false, "kind": "monitor", "hardwareSection": {{(built ? "0" : "null")}}{{MixEq}} },
+              { "id": "stream", "name": "Stream", "volume": 1, "muted": false, "kind": "virtualMic"{{MixEq}} }
             ],
             "channels": [
               { "id": "xlr1", "name": "XLR 1", "hardware": true, "microphone": true, "levels": { "monitor": 1, "stream": 1 }, "mutedIn": [] },
@@ -61,7 +63,7 @@ internal static class HardwareMixingWindowTests
         ["wanted"] = true, ["active"] = true, ["reason"] = null, ["note"] = null,
         ["disabled"] = new JsonObject
         {
-            ["inserts:mix:monitor"] = InsertSentence, ["latencyCompensation"] = LatencySentence,
+            ["inserts:mix:monitor"] = InsertSentence, ["eq:mix:monitor"] = EqSentence, ["latencyCompensation"] = LatencySentence,
             ["soundCheck"] = SoundCheckSentence, ["audition"] = AuditionSentence,
         },
     };
@@ -168,6 +170,18 @@ internal static class HardwareMixingWindowTests
             Assert.Equal(InsertSentence, monitor.Inserts.ButtonTip);
             Assert.False(monitor.Inserts.CanAddPlugins);
             Assert.Null(vm.Mixes.Single(m => m.Id == "stream").Inserts.UnitNote);
+            // The mix's EQ is held off: its button greyed and dark, the sentence as its tip and status.
+            MicEqViewModel monitorEq = monitor.Eq!, streamEq = vm.Mixes.Single(m => m.Id == "stream").Eq!;
+            Assert.Equal(EqSentence, monitorEq.UnitNote);
+            Assert.Equal(EqSentence, monitorEq.ButtonTip);
+            Assert.Equal(EqSentence, monitorEq.Status);
+            Assert.False(monitorEq.CanOpen);
+            Assert.False(monitorEq.IsLit);
+            Assert.True(monitorEq.Enabled);
+            Assert.Null(streamEq.UnitNote);
+            Assert.True(streamEq.CanOpen);
+            Assert.True(streamEq.IsLit);
+            Assert.Equal(Localizer.Text("EqButtonTipMix"), streamEq.ButtonTip);
             Assert.All(vm.MicSetups(), setup => Assert.Equal(SoundCheckSentence, setup.UnitNote));
             Assert.False(vm.Inserts.MicSetup.CanRecord);
             Assert.Equal(AuditionSentence, vm.Soundboard.AuditionNote);
@@ -189,6 +203,10 @@ internal static class HardwareMixingWindowTests
             Push(State(capable: true, mode: new JsonObject { ["wanted"] = false, ["active"] = false }));
             Assert.Null(monitor.Inserts.UnitNote);
             Assert.True(monitor.Inserts.CanAddPlugins);
+            Assert.Null(monitorEq.UnitNote);
+            Assert.True(monitorEq.CanOpen);
+            Assert.True(monitorEq.IsLit);
+            Assert.Equal(Localizer.Text("EqStatusSoftwareMix"), monitorEq.Status);
             Assert.Null(vm.Soundboard.AuditionNote);
             Assert.All(vm.MicSetups(), setup => Assert.Null(setup.UnitNote));
             Assert.Null(monitor.HardwareSection);

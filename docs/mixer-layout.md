@@ -235,6 +235,7 @@ every save. Every field is optional on read; an absent one is empty or off.
 | `noiseRemoval` | channel id to `{enabled, engine, strength}`, the microphone's [noise removal](api.md#noise-removal); a microphone absent here has it off |
 | `voiceChanger` | channel id to `{enabled, voice, pitch, formant}`, the microphone's [voice changer](api.md#voice-changer); a microphone absent here has it off |
 | `dryMonitors` | mix id to `true` for each monitor mix that hears the microphones [dry](api.md#dry-monitor), before their effects; a monitor mix absent here, or false, hears them processed |
+| `mixEq` | mix id to `{enabled, bands}`, the mix's [output EQ](api.md#output-eq) in the microphone EQ's shape; a mix absent here has the defaults with the EQ off, and an id that is no mix of the layout is dropped |
 | `compressor` | channel id to `{enabled, threshold, ratio, attack, release, knee, makeup}`, the microphone's [compressor](api.md#compressor-and-expander) on this computer; a microphone absent here has it off |
 | `expander` | channel id to `{enabled, threshold, ratio, range, attack, release, hold}`, the microphone's [expander](api.md#compressor-and-expander) on this computer; a microphone absent here has it off |
 | `eqProcessing` | channel id to `device` or `software`, where that microphone's EQ runs; machine wiring, never in a profile |

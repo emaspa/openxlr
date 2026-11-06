@@ -12,7 +12,7 @@ namespace OpenXLR.Core.Mixing;
 
 /// <summary>
 /// A built-in EQ profile: a stable key, its English name, and the EQ with
-/// four bands and the switch on. Clients name it in their own language from
+/// its bands and the switch on. Clients name it in their own language from
 /// the key; the English name is what the daemon reports.
 /// </summary>
 public sealed record EqPreset(string Key, string Name, MicEq Eq)
@@ -36,12 +36,15 @@ public static class EqProfileIds
 }
 
 /// <summary>
-/// OpenXLR's own starting points for a speaking voice, written down here and
-/// nowhere else in code: Mic setup offers them, the EQ editor and the deck
-/// list them as built-in profiles, and the manual's table is checked against
-/// them. Each one keeps the low end out with the first band and shapes the
-/// voice with the other three, gently enough to be a starting point rather
-/// than a sound.
+/// OpenXLR's own built-in EQ profiles, written down here and nowhere else in
+/// code, and the manual's tables are checked against them. The voice curves
+/// are starting points for a speaking voice: Mic setup offers them, and each
+/// keeps the low end out with the first band and shapes the voice with the
+/// other three, gently enough to be a starting point rather than a sound.
+/// The listening curves are for what an output plays: shelves only, every one
+/// cutting rather than boosting, so a curve never pushes a mix into clipping.
+/// The EQ editor and the deck list every one of them on every EQ, a
+/// microphone's or a mix's, and their keys never change.
 /// </summary>
 public static class EqPresets
 {
@@ -92,8 +95,32 @@ public static class EqPresets
         Band(MicEq.Peak, 6600, -3, 2.0),
         Band(MicEq.HighShelf, 9500, -1.5)));
 
-    /// <summary>The presets in the order every client shows them.</summary>
-    public static IReadOnlyList<EqPreset> All { get; } = [Clear, Warm, Broadcast, Podcast, DeepVoice, SoftSibilants];
+    /// <summary>Voices in a game or a call a little ahead of the rest: less low end, a softer top.</summary>
+    public static EqPreset VoicesForward { get; } = new("voices-forward", "Voices forward", Eq(
+        Band(MicEq.LowShelf, 380, -4),
+        Band(MicEq.HighShelf, 6200, -2)));
+
+    /// <summary>Footsteps for shooters: much less low rumble, so the steps in the upper mids stand out.</summary>
+    public static EqPreset Footsteps { get; } = new("footsteps", "Footsteps", Eq(
+        Band(MicEq.LowShelf, 240, -6),
+        Band(MicEq.HighShelf, 7200, -2)));
+
+    /// <summary>More bass by cutting everything above it, so the mix gains no level.</summary>
+    public static EqPreset BassBoost { get; } = new("bass-boost", "Bass boost", Eq(
+        Band(MicEq.HighShelf, 170, -5)));
+
+    /// <summary>A softer top end for bright or harsh audio.</summary>
+    public static EqPreset SoftTreble { get; } = new("soft-treble", "Soft treble", Eq(
+        Band(MicEq.HighShelf, 4500, -4)));
+
+    /// <summary>The voice curves, in the order Mic setup offers them.</summary>
+    public static IReadOnlyList<EqPreset> Voices { get; } = [Clear, Warm, Broadcast, Podcast, DeepVoice, SoftSibilants];
+
+    /// <summary>The listening curves, for what an output plays.</summary>
+    public static IReadOnlyList<EqPreset> Listening { get; } = [VoicesForward, Footsteps, BassBoost, SoftTreble];
+
+    /// <summary>Every built-in profile in the order every client lists them: the voice curves, then the listening curves.</summary>
+    public static IReadOnlyList<EqPreset> All { get; } = [.. Voices, .. Listening];
 
     /// <summary>The preset with this id (<c>builtin:</c> and its key), or null.</summary>
     public static EqPreset? FindId(string? id) => All.FirstOrDefault(p => string.Equals(p.Id, id, StringComparison.Ordinal));

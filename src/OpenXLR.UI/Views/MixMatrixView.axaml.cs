@@ -107,4 +107,11 @@ public partial class MixMatrixView : UserControl
         if ((sender as Control)?.DataContext is MatrixColumnViewModel column && TopLevel.GetTopLevel((Control)sender!) is Window window)
             InsertWindows.OpenChain(window, column.Mix.Inserts, $"mix:{column.Mix.Id}");
     }
+
+    private void OnMixEq(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is MatrixColumnViewModel { Mix.Eq: { CanOpen: true } eq }
+            && TopLevel.GetTopLevel((Control)sender!) is Window window)
+            EqWindows.Show(window, eq);
+    }
 }

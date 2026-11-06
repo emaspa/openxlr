@@ -2,11 +2,17 @@
 // ranges. There is no second EQ, preset table or hardware backend here.
 // A microphone's noise removal switch (noise:<id>) rides along: it lives on
 // the same channels and acts like the EQ's own switch.
+// A mix's output EQ takes the same targets with "mix" before the mix's id
+// (eq:mix:<id>, eqgain:mix:<id>:<band>, ...), which the part count keeps
+// apart from a channel called "mix"; its commands name the mix. While
+// hardware mixing on the Wave XLR Pro holds a mix's EQ off, the keys and
+// dials show it and send nothing.
 const FIELDS = {eq: "enabled", noise: "enabled", eqband: "enabled", eqtype: "type", eqfreq: "frequency", eqgain: "gain", eqq: "q"};
 const TYPE_NAMES = {lowCut: "High pass", lowShelf: "Low shelf", peak: "Bell", notch: "Notch", highShelf: "High shelf", highCut: "Low pass"};
 const typeName = (type, compact = false) => compact && type === "highShelf" ? "Hi shelf"
   : Object.hasOwn(TYPE_NAMES, type) ? TYPE_NAMES[type] : type;
 const channels = mixer => Array.isArray(mixer?.channels) ? mixer.channels : [];
+const mixes = mixer => Array.isArray(mixer?.mixes) ? mixer.mixes : [];
 const nameOf = channel => typeof channel.name === "string" && channel.name ? channel.name : channel.id;
 const usesGain = type => ["lowShelf", "peak", "highShelf"].includes(type);
 const finite = value => typeof value === "number" && Number.isFinite(value);
@@ -23,12 +29,29 @@ function validRange(range, logarithmic = false, step = "step") {
     && finite(range[step]) && range[step] > 0;
 }
 
+// A target's parts: a mix's when "mix" comes second and the count is a mix
+// target's, else a channel's.
+function parts(target) {
+  const [kind, ...rest] = target.split(":");
+  const banded = !(kind === "eq" || kind === "noise");
+  const mix = rest[0] === "mix" && rest.length === (banded ? 3 : 2);
+  const [id, number, ...extra] = mix ? rest.slice(1) : rest;
+  return {kind, mix, id, number, extra};
+}
+
+// The daemon's sentence while hardware mixing holds a mix's EQ off, or null.
+export function eqHeldByUnit(mixer, id) {
+  const mode = mixer?.hardwareMixing;
+  const sentence = mode?.active === true ? mode.disabled?.[`eq:mix:${id}`] : undefined;
+  return typeof sentence === "string" ? sentence : null;
+}
+
 export function eqTarget(mixer, target) {
   if (!isEqTarget(target) || target.length > 128) return null;
-  const [kind, id, number, ...extra] = target.split(":");
-  if (!id || id.length > 64 || !/^[a-zA-Z0-9_-]+$/.test(id) || extra.length
+  const {kind, mix, id, number, extra} = parts(target);
+  if (!id || id.length > 64 || !/^[a-zA-Z0-9_-]+$/.test(id) || extra.length || mix && kind === "noise"
       || (kind === "eq" || kind === "noise" ? number !== undefined : !/^[1-9][0-9]?$/.test(number ?? ""))) return null;
-  const channel = channels(mixer).find(c => c?.id === id && c.present !== false
+  const channel = mix ? mixes(mixer).find(m => m?.id === id) : channels(mixer).find(c => c?.id === id && c.present !== false
     && (c.microphone === true || c.microphone !== false && (id === "xlr1" || id === "xlr2")));
   const eq = channel?.eq, limits = mixer?.eqLimits;
   const min = limits?.minBands ?? limits?.bands, max = limits?.maxBands ?? limits?.bands;
@@ -44,15 +67,18 @@ export function eqTarget(mixer, target) {
         || !["frequency", "gain", "q"].every(field => finite(band[field])
           && band[field] >= limits[field].min && band[field] <= limits[field].max)) return null;
   }
-  const noise = channel.noise;
+  const noise = mix ? undefined : channel.noise;
   if (kind === "noise" && (!noise || typeof noise.enabled !== "boolean")) return null;
   const band = kind === "eq" || kind === "noise" ? 0 : Number(number);
   if (band > eq.bands.length) return null;
   const field = FIELDS[kind], state = kind === "noise" ? noise : band ? eq.bands[band - 1] : eq;
   const value = field === "type" ? limits.types.indexOf(state.type) : state[field];
   // Whether the switch can be turned on: the EQ's, or noise removal's.
-  const available = (kind === "noise" ? noise.available : eq.available) !== false;
-  return {kind, channel, eq, limits, band, field, value, available,
+  const held = mix ? eqHeldByUnit(mixer, id) : null;
+  const available = !held && (kind === "noise" ? noise.available : eq.available) !== false;
+  // What the targets name it by, and the meter its dial shows.
+  const key = mix ? `mix:${id}` : id, meter = mix ? `mix:${id}` : `ch:${id}`;
+  return {kind, mix, key, meter, channel, eq, limits, band, field, value, available, held,
     usable: field !== "gain" || usesGain(state.type)};
 }
 
@@ -76,6 +102,21 @@ export function eqChoices(mixer) {
     toggleGroups.push({id: `layout-eq-keys-${channel.id}`, label: `Microphone EQ: ${name}`, items: toggles});
     levelGroups.push({id: `layout-eq-dials-${channel.id}`, label: `Microphone EQ: ${name}`, items: levels});
   }
+  for (const mix of mixes(mixer)) {
+    if (typeof mix?.id !== "string") continue;
+    const entry = eqTarget(mixer, `eq:mix:${mix.id}`);
+    if (!entry) continue;
+    const name = nameOf(mix), key = `mix:${mix.id}`;
+    const toggles = [{target: `eq:${key}`, label: `${name} EQ on/off`}], levels = [];
+    for (let band = 1; band <= entry.eq.bands.length; band++) {
+      toggles.push({target: `eqband:${key}:${band}`, label: `${name} EQ band ${band} on/off`},
+        {target: `eqtype:${key}:${band}`, label: `${name} EQ band ${band} next type`});
+      for (const [prefix, label] of [["eqfreq", "frequency"], ["eqgain", "gain"], ["eqq", "Q"], ["eqtype", "type"]])
+        levels.push({target: `${prefix}:${key}:${band}`, label: `${name} EQ band ${band} ${label}`});
+    }
+    toggleGroups.push({id: `layout-eq-keys-mix-${mix.id}`, label: `Output EQ: ${name}`, items: toggles});
+    levelGroups.push({id: `layout-eq-dials-mix-${mix.id}`, label: `Output EQ: ${name}`, items: levels});
+  }
   return {toggleGroups, levelGroups};
 }
 
@@ -97,19 +138,20 @@ export function eqStep(entry, current, ticks) {
 }
 
 export function eqCommand(entry, value) {
-  if (!entry) return null;
+  if (!entry || entry.held) return null;
   const {field, band, channel, limits} = entry;
+  const where = entry.mix ? {mix: channel.id} : {channel: channel.id};
   if (field === "enabled") {
     if (typeof value !== "boolean" || !band && value && !entry.available) return null;
-    if (entry.kind === "noise") return {cmd: "setNoiseRemoval", channel: channel.id, enabled: value};
-    return band ? {cmd: "setEqBand", channel: channel.id, band, enabled: value}
-      : {cmd: "setEqEnabled", channel: channel.id, value};
+    if (entry.kind === "noise") return {cmd: "setNoiseRemoval", ...where, enabled: value};
+    return band ? {cmd: "setEqBand", ...where, band, enabled: value}
+      : {cmd: "setEqEnabled", ...where, value};
   }
   if (field === "type") {
     if (!Number.isInteger(value) || value < 0 || value >= limits.types.length) return null;
     value = limits.types[value];
   } else if (!entry.usable || !finite(value) || value < limits[field].min || value > limits[field].max) return null;
-  return {cmd: "setEqBand", channel: channel.id, band, [field]: value};
+  return {cmd: "setEqBand", ...where, band, [field]: value};
 }
 
 export function eqLabel(entry, value = entry?.value) {
@@ -132,7 +174,7 @@ export function eqDial(entry, value) {
   const text = !entry.usable ? "n/a" : entry.field === "type" ? typeName(entry.limits.types[value], true)
     : entry.field === "frequency" ? `${Math.round(value)} Hz` : entry.field === "gain" ? `${Number(value.toFixed(2))} dB`
     : `Q ${Number(value.toFixed(4))}`;
-  const status = entry.eq.available === false ? " (unavailable)" : !entry.eq.enabled ? " (EQ off)"
+  const status = entry.held ? " (held by the unit)" : entry.eq.available === false ? " (unavailable)" : !entry.eq.enabled ? " (EQ off)"
     : !entry.eq.bands[entry.band - 1].enabled ? " (band off)" : "";
   return {pin: nameOf(entry.channel), scroll: `EQ ${entry.band} ${entry.field}${status}`, pct: clamp(pct, 0, 100), text, muted: false};
 }

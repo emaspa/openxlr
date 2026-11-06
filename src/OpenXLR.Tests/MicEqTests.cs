@@ -148,7 +148,7 @@ public sealed class MicEqTests
     [InlineData("""{"cmd":"setEqEnabled","channel":"aux","value":true}""", "setEqEnabled: 'aux' is not a microphone input")]
     [InlineData("""{"cmd":"setEqEnabled","channel":"system","value":true}""", "is not a microphone input")]
     [InlineData("""{"cmd":"setEqEnabled","channel":"xlr3","value":true}""", "is not a microphone input")]
-    [InlineData("""{"cmd":"setEqEnabled","value":true}""", "setEqEnabled: need 'channel'")]
+    [InlineData("""{"cmd":"setEqEnabled","value":true}""", "setEqEnabled: need 'channel' or 'mix'")]
     [InlineData("""{"cmd":"setEqEnabled","channel":"xlr1","value":1}""", "value must be a boolean")]
     [InlineData("""{"cmd":"setEqBand","channel":"aux","band":1,"gain":3}""", "setEqBand: 'aux' is not a microphone input")]
     [InlineData("""{"cmd":"setEqBand","channel":"xlr1","band":2,"gain":3}""", null)]

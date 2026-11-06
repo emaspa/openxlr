@@ -24,6 +24,10 @@ public sealed record MicSetupPreset(string Id, MicEq Eq)
         "podcast" => Localizer.Text("MicSetupPresetPodcast"),
         "deep-voice" => Localizer.Text("MicSetupPresetDeepVoice"),
         "soft-sibilants" => Localizer.Text("MicSetupPresetSoftSibilants"),
+        "voices-forward" => Localizer.Text("EqPresetVoicesForward"),
+        "footsteps" => Localizer.Text("EqPresetFootsteps"),
+        "bass-boost" => Localizer.Text("EqPresetBassBoost"),
+        "soft-treble" => Localizer.Text("EqPresetSoftTreble"),
         _ => null,
     };
 
@@ -54,14 +58,14 @@ public sealed record MicSetupPreset(string Id, MicEq Eq)
 }
 
 /// <summary>
-/// The presets Mic setup offers: the built-in EQ profiles of
-/// <see cref="EqPresets"/>, the one table the daemon and the EQ editor use
-/// too, in the same order.
+/// The presets Mic setup offers: the voice curves of <see cref="EqPresets"/>,
+/// the one table the daemon and the EQ editor use too, in the same order.
+/// The listening curves are for outputs and are not offered here.
 /// </summary>
 public static class MicSetupPresets
 {
     /// <summary>The presets in the order the Shape step shows them.</summary>
-    public static IReadOnlyList<MicSetupPreset> All { get; } = [.. EqPresets.All.Select(p => new MicSetupPreset(p.Key, p.Eq))];
+    public static IReadOnlyList<MicSetupPreset> All { get; } = [.. EqPresets.Voices.Select(p => new MicSetupPreset(p.Key, p.Eq))];
 
     public static MicSetupPreset Clear => All[0];
 

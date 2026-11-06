@@ -72,7 +72,9 @@ public sealed partial class Mixer
         lock (_gate)
         {
             bool changed = _hardwarePlan is null || !SameState(HardwareMixingState.Of(_hardwarePlan), HardwareMixingState.Of(plan));
+            HashSet<string> held = MixEqsHeldLocked();
             _hardwarePlan = plan;
+            SyncMixEqAfterLocked(held);
             return changed;
         }
     }
@@ -262,9 +264,11 @@ public sealed partial class Mixer
     {
         lock (_gate)
         {
+            HashSet<string> held = MixEqsHeldLocked();
             _hardwareEntry = entry with { Leaving = false };
             _hardwareGraphEntered = false;
             if (_built) SetMonitorOutputsLocked([.. _monitorOutputs]);
+            SyncMixEqAfterLocked(held);
         }
     }
 
@@ -425,9 +429,12 @@ public sealed partial class Mixer
             if (_hardwareEntry is not { Leaving: false } entry) return;
             UnlinkHardwarePairsLocked();
             UnlinkCueLocked();
+            HashSet<string> held = MixEqsHeldLocked();
             _hardwareEntry = entry with { Leaving = true };
             _hardwareGraphEntered = false;
             if (!_built) return;
+            // The mixes the unit built play their EQ again.
+            SyncMixEqAfterLocked(held);
             if (JackSinkLocked() is { } pro)
             {
                 try { _pw.SetSinkVolume(pro, entry.OutputVolume ?? 1.0); }
@@ -443,8 +450,10 @@ public sealed partial class Mixer
     {
         lock (_gate)
         {
+            HashSet<string> held = MixEqsHeldLocked();
             _hardwareEntry = null;
             _hardwareGraphEntered = false;
+            SyncMixEqAfterLocked(held);
         }
     }
 

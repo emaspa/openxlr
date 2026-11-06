@@ -507,20 +507,29 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
     public Task SetMixMutedAsync(string mix, bool muted)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setMixMuted", ["mix"] = mix, ["value"] = muted });
 
-    /// <summary>Replace a microphone's whole EQ: its switch and four bands, every field.</summary>
+    /// <summary>
+    /// An EQ command's target: <c>channel</c> for a microphone, or <c>mix</c>
+    /// for an output EQ, which the editor names as <c>mix:</c> and the mix's id.
+    /// </summary>
+    private static Dictionary<string, object> EqCommand(string cmd, string target)
+        => target.StartsWith(MicEqViewModel.MixPrefix, StringComparison.Ordinal)
+            ? new Dictionary<string, object> { ["cmd"] = cmd, ["mix"] = target[MicEqViewModel.MixPrefix.Length..] }
+            : new Dictionary<string, object> { ["cmd"] = cmd, ["channel"] = target };
+
+    /// <summary>Replace a microphone's or a mix's whole EQ: its switch and bands, every field.</summary>
     public Task SetEqAsync(string channel, MicEq eq)
-        => SendAsync(new Dictionary<string, object>
+    {
+        Dictionary<string, object> payload = EqCommand("setEq", channel);
+        payload["eq"] = new Dictionary<string, object>
         {
-            ["cmd"] = "setEq", ["channel"] = channel,
-            ["eq"] = new Dictionary<string, object>
+            ["enabled"] = eq.Enabled,
+            ["bands"] = eq.Bands.Select(b => new Dictionary<string, object>
             {
-                ["enabled"] = eq.Enabled,
-                ["bands"] = eq.Bands.Select(b => new Dictionary<string, object>
-                {
-                    ["enabled"] = b.Enabled, ["type"] = b.Type, ["frequency"] = b.Frequency, ["gain"] = b.Gain, ["q"] = b.Q,
-                }).ToArray(),
-            },
-        });
+                ["enabled"] = b.Enabled, ["type"] = b.Type, ["frequency"] = b.Frequency, ["gain"] = b.Gain, ["q"] = b.Q,
+            }).ToArray(),
+        };
+        return SendAsync(payload);
+    }
 
     public Task<string?> SaveEqProfileAsync(string name, IReadOnlyList<EqBand> bands, bool replace)
         => EditLayoutAsync(new Dictionary<string, object>
@@ -539,14 +548,22 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
         => EditLayoutAsync(new Dictionary<string, object> { ["cmd"] = "deleteEqProfile", ["name"] = name });
 
     public Task<string?> LoadEqProfileAsync(string channel, string profile)
-        => EditLayoutAsync(new Dictionary<string, object> { ["cmd"] = "loadEqProfile", ["channel"] = channel, ["profile"] = profile });
+    {
+        Dictionary<string, object> payload = EqCommand("loadEqProfile", channel);
+        payload["profile"] = profile;
+        return EditLayoutAsync(payload);
+    }
 
     public Task ListEqProfilesAsync()
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "listEqProfiles" }, reportErrors: false);
 
-    /// <summary>A microphone EQ's own switch.</summary>
+    /// <summary>A microphone's or a mix's EQ switch.</summary>
     public Task SetEqEnabledAsync(string channel, bool enabled)
-        => SendAsync(new Dictionary<string, object> { ["cmd"] = "setEqEnabled", ["channel"] = channel, ["value"] = enabled });
+    {
+        Dictionary<string, object> payload = EqCommand("setEqEnabled", channel);
+        payload["value"] = enabled;
+        return SendAsync(payload);
+    }
 
     /// <summary>Where a microphone's EQ runs: <c>device</c> on the unit's own processor, or <c>software</c>.</summary>
     public Task SetEqProcessingAsync(string channel, string value)
@@ -601,7 +618,8 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
     /// <summary>The fields of one band (1 to 4) that the change carries; the others keep their values.</summary>
     public Task SetEqBandAsync(string channel, int band, EqBandChange change)
     {
-        var payload = new Dictionary<string, object> { ["cmd"] = "setEqBand", ["channel"] = channel, ["band"] = band };
+        Dictionary<string, object> payload = EqCommand("setEqBand", channel);
+        payload["band"] = band;
         if (change.Enabled is bool enabled) payload["enabled"] = enabled;
         if (change.Type is string type) payload["type"] = type;
         if (change.Frequency is double frequency) payload["frequency"] = frequency;

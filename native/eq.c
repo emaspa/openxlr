@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The microphone EQ: one to sixteen biquads in cascade at the head of a microphone's
-// route. The coefficients are the ones in Robert Bristow-Johnson's Audio EQ
+// The EQ: one to sixteen biquads in cascade, at the head of a microphone's
+// route (mono) or after a mix's inserts (stereo). The coefficients are the ones in Robert Bristow-Johnson's Audio EQ
 // Cookbook (https://www.w3.org/TR/audio-eq-cookbook/), the same formulas the
 // daemon's EqResponse draws the curve from and tools/eq-reference.py checks
 // both against.
@@ -15,7 +15,13 @@
 // belongs to another filter: the new filter is first run over the band's
 // recent input, then faded in over 5 ms while the old one fades out.
 //
-// The stage runs, in order: noise removal (denoise.c), the expander
+// Two channels. A stereo stage is an output mix's EQ and runs the EQ alone:
+// no noise removal, dynamics or voice changer, and none of their controls.
+// Each band has one set of coefficients and, per channel, its own filter
+// state and history; its switch and its type fade move once a sample for
+// both, so the two sides follow the same curve from the same sample.
+//
+// The mono stage runs, in order: noise removal (denoise.c), the expander
 // (dynamics.c), the EQ, the compressor (dynamics.c) and the voice changer
 // (voice.c). The EQ shapes the cleaned voice, the expander closes on the
 // noise that noise removal left, the compressor evens out the shaped voice,
@@ -69,22 +75,25 @@ typedef struct {
   // The audio thread's own: what the filter was built from.
   int type_now;
   float frequency_now, gain_now, qlog10_now;
-  EqFilter live, fading;   // fading runs only while a type change fades out
+  // One per channel; fading runs only while a type change fades out.
+  EqFilter live[MAX_CHANNELS], fading[MAX_CHANNELS];
   uint32_t change_left;    // samples of that fade still to go
   double mix, mix_target;  // the band's on switch: 0 dry, 1 filtered
-  double history[EQ_HISTORY];  // the band's recent input, for a new filter
+  double history[MAX_CHANNELS][EQ_HISTORY];  // the band's recent input, for a new filter
   uint32_t history_at;
 } EqBand;
 
 typedef struct {
   Control *enabled;
+  unsigned channels;       // 1: a microphone's stage; 2: a mix's EQ alone
+  // The microphone stage's parts, all NULL on a stereo stage.
   Denoise *denoise;
   float *cleaned;          // noise removal's output, the EQ's input
   Voice *voice;
   float *shaped;           // the EQ's output, the voice changer's input
   Dynamics *expander;      // in place on cleaned, before the EQ
   Dynamics *compressor;    // in place on shaped, after the EQ
-  float *guarded;          // the input with non-finite samples replaced, when it had any
+  float *guarded[MAX_CHANNELS];  // the input with non-finite samples replaced, when it had any
   _Atomic uint64_t nonfinite;  // input samples replaced; audio thread writes
   _Atomic uint32_t resets;     // times the filters were cleared; audio thread writes
   Control *nonfinite_meter, *resets_meter;
@@ -166,30 +175,37 @@ static int eq_type_of(float value) {
   return type < 0 ? 0 : type >= EQ_TYPES ? EQ_TYPES - 1 : (int)type;
 }
 
-// The band's filter from its controls as they are now.
-static void eq_build(EqBand *b, uint32_t rate, EqFilter *f) {
+// The band's filter from its controls as they are now: the same
+// coefficients on each channel's filter.
+static void eq_build(EqBand *b, uint32_t rate, EqFilter *f, unsigned channels) {
   b->type_now = eq_type_of(atomic_load(&b->type->desired));
   b->frequency_now = atomic_load(&b->frequency->desired);
   b->gain_now = atomic_load(&b->gain->desired);
   b->qlog10_now = atomic_load(&b->qlog10->desired);
-  eq_coefficients(b->type_now, rate, b->frequency_now, b->gain_now,
-                  pow(10, b->qlog10_now), &f->c);
+  EqCoefficients c;
+  eq_coefficients(b->type_now, rate, b->frequency_now, b->gain_now, pow(10, b->qlog10_now), &c);
+  for (unsigned k = 0; k < channels; k++) f[k].c = c;
 }
 
 static bool eq_on(const Control *c) { return atomic_load(&c->desired) >= 0.5f; }
 
 static bool eq_load_count(Host *h, unsigned bands) {
-  if (h->channels != 1 || bands < 1 || bands > EQ_MAX_BANDS) return false;
+  if (h->channels < 1 || h->channels > MAX_CHANNELS || bands < 1 || bands > EQ_MAX_BANDS) return false;
   Eq *e = calloc(1, sizeof(*e) + bands * sizeof(EqBand));
   if (!e) return false;
   h->impl = e;
   e->band_count = bands;
-  e->cleaned = calloc(MAX_FRAMES, sizeof(float));
-  e->shaped = calloc(MAX_FRAMES, sizeof(float));
-  e->guarded = calloc(MAX_FRAMES, sizeof(float));
-  e->denoise = denoise_load(h);
-  e->voice = voice_load(h);
-  if (!e->cleaned || !e->shaped || !e->guarded || !e->denoise || !e->voice) return false;
+  e->channels = h->channels;
+  bool microphone = e->channels == 1;
+  for (unsigned k = 0; k < e->channels; k++)
+    if (!(e->guarded[k] = calloc(MAX_FRAMES, sizeof(float)))) return false;
+  if (microphone) {
+    e->cleaned = calloc(MAX_FRAMES, sizeof(float));
+    e->shaped = calloc(MAX_FRAMES, sizeof(float));
+    e->denoise = denoise_load(h);
+    e->voice = voice_load(h);
+    if (!e->cleaned || !e->shaped || !e->denoise || !e->voice) return false;
+  }
   e->fade = (uint32_t)lrint(h->rate * 0.005);
   if (e->fade == 0) e->fade = 1;
   e->step = 1.0 / e->fade;
@@ -217,11 +233,14 @@ static bool eq_load_count(Host *h, unsigned bands) {
   }
   // Last, so every control above keeps its place, and the non-finite
   // meters after them for the same reason.
-  e->expander = dynamics_load(h, DYNAMICS_EXPANDER);
-  e->compressor = dynamics_load(h, DYNAMICS_COMPRESSOR);
+  if (microphone) {
+    e->expander = dynamics_load(h, DYNAMICS_EXPANDER);
+    e->compressor = dynamics_load(h, DYNAMICS_COMPRESSOR);
+    if (!e->expander || !e->compressor) return false;
+  }
   e->nonfinite_meter = host_add_control(h, "stage_nonfinite", 0, 1e9f, 0, true, NULL);
   e->resets_meter = host_add_control(h, "stage_resets", 0, 1e9f, 0, true, NULL);
-  return e->expander && e->compressor && e->nonfinite_meter && e->resets_meter;
+  return e->nonfinite_meter && e->resets_meter;
 }
 
 // Keep the original four-band invocation compatible with older daemons.
@@ -241,14 +260,14 @@ static bool eq_load_bands(Host *h, char **arguments) {
 // without any fade, as if the EQ had always been set this way.
 static bool eq_activate(Host *h) {
   Eq *e = h->impl;
-  if (!denoise_activate(e->denoise) || !voice_activate(e->voice) || !dynamics_activate(e->expander)
-      || !dynamics_activate(e->compressor))
+  if (e->channels == 1 && (!denoise_activate(e->denoise) || !voice_activate(e->voice)
+                           || !dynamics_activate(e->expander) || !dynamics_activate(e->compressor)))
     return false;
   e->mix = e->mix_target = eq_on(e->enabled);
   for (unsigned i = 0; i < e->band_count; i++) {
     EqBand *b = &e->bands[i];
-    eq_build(b, h->rate, &b->live);
-    b->live.s1 = b->live.s2 = 0;
+    eq_build(b, h->rate, b->live, e->channels);
+    for (unsigned k = 0; k < e->channels; k++) b->live[k].s1 = b->live[k].s2 = 0;
     b->change_left = 0;
     b->mix = b->mix_target = eq_on(b->enabled);
   }
@@ -269,7 +288,7 @@ static void eq_unload(Host *h) {
   dynamics_unload(e->compressor);
   free(e->cleaned);
   free(e->shaped);
-  free(e->guarded);
+  for (unsigned k = 0; k < MAX_CHANNELS; k++) free(e->guarded[k]);
   free(e);
   h->impl = NULL;
 }
@@ -287,16 +306,18 @@ static void eq_follow(Eq *e, uint32_t rate) {
     if (type != b->type_now) {
       // One type change at a time: a second one waits for the first fade.
       if (b->change_left) continue;
-      b->fading = b->live;
-      eq_build(b, rate, &b->live);
+      for (unsigned c = 0; c < e->channels; c++) b->fading[c] = b->live[c];
+      eq_build(b, rate, b->live, e->channels);
       // Bring the new filter up to date on what the band heard lately.
-      b->live.s1 = b->live.s2 = 0;
-      for (uint32_t k = 0; k < EQ_HISTORY; k++)
-        eq_run(&b->live, b->history[(b->history_at + k) % EQ_HISTORY]);
+      for (unsigned c = 0; c < e->channels; c++) {
+        b->live[c].s1 = b->live[c].s2 = 0;
+        for (uint32_t k = 0; k < EQ_HISTORY; k++)
+          eq_run(&b->live[c], b->history[c][(b->history_at + k) % EQ_HISTORY]);
+      }
       b->change_left = e->fade;
     } else if (frequency != b->frequency_now || gain != b->gain_now ||
                qlog10 != b->qlog10_now)
-      eq_build(b, rate, &b->live);  // the state stays
+      eq_build(b, rate, b->live, e->channels);  // the state stays
   }
 }
 
@@ -309,13 +330,14 @@ static inline double eq_ramp(double mix, double target, double step) {
 // The input as the stage may hear it: unchanged, or a copy with every
 // non-finite sample at 0. The host's buffer is not written; other nodes
 // may read it.
-static const float *eq_guard(Eq *e, const float *in, uint32_t frames) {
+static const float *eq_guard(Eq *e, unsigned channel, const float *in, uint32_t frames) {
   uint32_t bad = 0;
   for (uint32_t n = 0; n < frames; n++) bad += !isfinite(in[n]);
   if (!bad) return in;
-  for (uint32_t n = 0; n < frames; n++) e->guarded[n] = isfinite(in[n]) ? in[n] : 0.0f;
+  float *guarded = e->guarded[channel];
+  for (uint32_t n = 0; n < frames; n++) guarded[n] = isfinite(in[n]) ? in[n] : 0.0f;
   atomic_fetch_add_explicit(&e->nonfinite, bad, memory_order_relaxed);
-  return e->guarded;
+  return guarded;
 }
 
 // Clear every band's filters after one turned non-finite. A band's history
@@ -324,43 +346,70 @@ static const float *eq_guard(Eq *e, const float *in, uint32_t frames) {
 static void eq_reset(Eq *e) {
   for (unsigned i = 0; i < e->band_count; i++) {
     EqBand *b = &e->bands[i];
-    b->live.s1 = b->live.s2 = b->fading.s1 = b->fading.s2 = 0;
-    double *newest = &b->history[(b->history_at + EQ_HISTORY - 1) % EQ_HISTORY];
-    if (!isfinite(*newest)) *newest = 0;
+    for (unsigned c = 0; c < e->channels; c++) {
+      b->live[c].s1 = b->live[c].s2 = b->fading[c].s1 = b->fading[c].s2 = 0;
+      double *newest = &b->history[c][(b->history_at + EQ_HISTORY - 1) % EQ_HISTORY];
+      if (!isfinite(*newest)) *newest = 0;
+    }
   }
   atomic_fetch_add_explicit(&e->resets, 1, memory_order_relaxed);
 }
 
-static void eq_process(Host *h, uint32_t frames, float *const *in, float *const *out) {
-  Eq *e = h->impl;
-  denoise_process(e->denoise, eq_guard(e, in[0], frames), e->cleaned, frames);
-  dynamics_process(e->expander, e->cleaned, e->cleaned, frames);
-  eq_follow(e, h->rate);
+// The bands in cascade over every channel. A band's switch and type fade,
+// and the EQ's switch, move once a sample, the same on each channel.
+static void eq_shape(Eq *e, const float *const *in, float *const *out, uint32_t frames) {
+  const unsigned channels = e->channels;
   for (uint32_t n = 0; n < frames; n++) {
-    double x = e->cleaned[n], u = x;
+    double x[MAX_CHANNELS], u[MAX_CHANNELS];
+    for (unsigned c = 0; c < channels; c++) x[c] = u[c] = in[c][n];
     for (unsigned i = 0; i < e->band_count; i++) {
       EqBand *b = &e->bands[i];
-      b->history[b->history_at] = u;
-      b->history_at = (b->history_at + 1) % EQ_HISTORY;
-      double y = eq_run(&b->live, u);
-      if (b->change_left) {
-        double old = eq_run(&b->fading, u);
-        double t = 1.0 - (double)b->change_left / e->fade;
-        y = old + (y - old) * t;
-        b->change_left--;
+      double y[MAX_CHANNELS];
+      double t = b->change_left ? 1.0 - (double)b->change_left / e->fade : 1.0;
+      for (unsigned c = 0; c < channels; c++) {
+        b->history[c][b->history_at] = u[c];
+        y[c] = eq_run(&b->live[c], u[c]);
+        if (b->change_left) {
+          double old = eq_run(&b->fading[c], u[c]);
+          y[c] = old + (y[c] - old) * t;
+        }
       }
+      b->history_at = (b->history_at + 1) % EQ_HISTORY;
+      if (b->change_left) b->change_left--;
       b->mix = eq_ramp(b->mix, b->mix_target, e->step);
-      u += (y - u) * b->mix;
+      for (unsigned c = 0; c < channels; c++) u[c] += (y[c] - u[c]) * b->mix;
     }
-    if (!isfinite(u)) {
-      // This sample plays dry; the next one runs through clean filters.
+    bool finite = true;
+    for (unsigned c = 0; c < channels; c++) finite = finite && isfinite(u[c]);
+    if (!finite) {
+      // This sample plays dry on every channel; the next one runs through clean filters.
       eq_reset(e);
-      if (!isfinite(x)) x = 0;
-      u = x;
+      for (unsigned c = 0; c < channels; c++) {
+        if (!isfinite(x[c])) x[c] = 0;
+        u[c] = x[c];
+      }
     }
     e->mix = eq_ramp(e->mix, e->mix_target, e->step);
-    e->shaped[n] = (float)(x + (u - x) * e->mix);
+    for (unsigned c = 0; c < channels; c++) out[c][n] = (float)(x[c] + (u[c] - x[c]) * e->mix);
   }
+}
+
+static void eq_process(Host *h, uint32_t frames, float *const *in, float *const *out) {
+  Eq *e = h->impl;
+  if (e->channels != 1) {
+    // A mix's EQ: the guarded input straight through the bands.
+    const float *guarded[MAX_CHANNELS];
+    for (unsigned c = 0; c < e->channels; c++) guarded[c] = eq_guard(e, c, in[c], frames);
+    eq_follow(e, h->rate);
+    eq_shape(e, guarded, out, frames);
+    return;
+  }
+  denoise_process(e->denoise, eq_guard(e, 0, in[0], frames), e->cleaned, frames);
+  dynamics_process(e->expander, e->cleaned, e->cleaned, frames);
+  eq_follow(e, h->rate);
+  const float *cleaned[] = {e->cleaned};
+  float *shaped[] = {e->shaped};
+  eq_shape(e, cleaned, shaped, frames);
   dynamics_process(e->compressor, e->shaped, e->shaped, frames);
   voice_process(e->voice, e->shaped, out[0], frames);
 }
@@ -370,7 +419,8 @@ static void eq_process(Host *h, uint32_t frames, float *const *in, float *const 
 static void eq_report(Eq *e) {
   uint64_t replaced = atomic_load_explicit(&e->nonfinite, memory_order_relaxed);
   uint32_t filters = atomic_load_explicit(&e->resets, memory_order_relaxed);
-  uint32_t noise = denoise_resets(e->denoise), voice = voice_resets(e->voice);
+  bool microphone = e->channels == 1;
+  uint32_t noise = microphone ? denoise_resets(e->denoise) : 0, voice = microphone ? voice_resets(e->voice) : 0;
   uint32_t resets = filters + noise + voice;
   atomic_store(&e->nonfinite_meter->observed, (float)replaced);
   atomic_store(&e->resets_meter->observed, (float)resets);
@@ -381,24 +431,31 @@ static void eq_report(Eq *e) {
   e->traced_at = now;
   e->traced_nonfinite = replaced;
   e->traced_resets = resets;
-  fprintf(stderr,
-          "trace: microphone stage: %llu non-finite input samples replaced; states cleared: "
-          "%u EQ, %u noise removal, %u voice\n",
-          (unsigned long long)replaced, filters, noise, voice);
+  if (microphone)
+    fprintf(stderr,
+            "trace: microphone stage: %llu non-finite input samples replaced; states cleared: "
+            "%u EQ, %u noise removal, %u voice\n",
+            (unsigned long long)replaced, filters, noise, voice);
+  else
+    fprintf(stderr, "trace: mix EQ: %llu non-finite input samples replaced; states cleared: %u EQ\n",
+            (unsigned long long)replaced, filters);
 }
 
 static void eq_main_thread(Host *h) {
   Eq *e = h->impl;
-  denoise_main_thread(e->denoise);
-  voice_main_thread(e->voice);
-  dynamics_main_thread(e->expander);
-  dynamics_main_thread(e->compressor);
+  if (e->channels == 1) {
+    denoise_main_thread(e->denoise);
+    voice_main_thread(e->voice);
+    dynamics_main_thread(e->expander);
+    dynamics_main_thread(e->compressor);
+  }
   eq_report(e);
 }
 
+// A stereo stage runs nothing that delays its output.
 static uint32_t eq_latency(Host *h) {
   Eq *e = h->impl;
-  return denoise_latency(e->denoise) + voice_latency(e->voice);
+  return e->channels == 1 ? denoise_latency(e->denoise) + voice_latency(e->voice) : 0;
 }
 
 const Backend eq_backend = {

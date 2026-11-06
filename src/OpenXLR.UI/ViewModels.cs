@@ -1355,13 +1355,17 @@ public sealed partial class MainViewModel : ViewModelBase
 
     /// <summary>
     /// Hand what hardware mixing turns off to the controls it greys: the
-    /// chain of each mix a Pro jack plays, Mic setup's checks and the
-    /// soundboard's auditions. Each takes the daemon's sentence, or null
+    /// chain and the EQ of each mix the Pro builds, Mic setup's checks and
+    /// the soundboard's auditions. Each takes the daemon's sentence, or null
     /// while the mode leaves it alone.
     /// </summary>
     private void ApplyHardwareMixingNotes()
     {
-        foreach (MixViewModel mix in Mixes) mix.Inserts.UnitNote = HardwareMixing.DisabledSentence($"inserts:mix:{mix.Id}");
+        foreach (MixViewModel mix in Mixes)
+        {
+            mix.Inserts.UnitNote = HardwareMixing.DisabledSentence($"inserts:mix:{mix.Id}");
+            if (mix.Eq is { } eq) eq.UnitNote = HardwareMixing.DisabledSentence($"eq:mix:{mix.Id}");
+        }
         string? soundCheck = HardwareMixing.DisabledSentence("soundCheck");
         foreach (MicSetupViewModel setup in MicSetups())
             setup.UnitNote = HardwareMixing.DisabledSentence($"soundCheck:{setup.Channel}") ?? soundCheck;
@@ -1506,10 +1510,15 @@ public sealed partial class MainViewModel : ViewModelBase
         if (mixer["mixes"] is JsonArray mixes)
         {
             SyncList(Mixes, mixes, m => m["id"]!.GetValue<string>(),
-                (m, vm) => vm.ApplyFromDaemon(m, MonitorMuted),
+                (m, vm) =>
+                {
+                    vm.ApplyFromDaemon(m, MonitorMuted);
+                    vm.ApplyEq(m["eq"], mixer["eqLimits"]);
+                },
                 CreateMix, removed =>
                 {
                     removed.Detach();
+                    removed.DetachEq();
                     removed.Inserts.Detach();
                     InsertWindows.CloseChain(removed.Inserts, $"mix:{removed.Id}");
                 });
@@ -1788,8 +1797,40 @@ public sealed class MixViewModel : ViewModelBase, IHasId
         get => _name;
         set
         {
-            if (Set(ref _name, value)) Inserts.Title = Localizer.Format("MixInsertsTitle", value);
+            if (!Set(ref _name, value)) return;
+            Inserts.Title = Localizer.Format("MixInsertsTitle", value);
+            if (_eq is not null) _eq.ChannelName = value;
         }
+    }
+
+    private MicEqViewModel? _eq;
+    /// <summary>
+    /// The mix's output EQ, edited in the same editor as a microphone's; null
+    /// from a daemon without it, so no client draws an EQ button there.
+    /// </summary>
+    public MicEqViewModel? Eq { get => _eq; private set { if (Set(ref _eq, value)) Raise(nameof(HasEq)); } }
+
+    public bool HasEq => _eq is not null;
+
+    /// <summary>Take the mix's <c>eq</c> and the mixer's <c>eqLimits</c> from a state push.</summary>
+    internal void ApplyEq(JsonNode? eq, JsonNode? limits)
+    {
+        if (eq is not JsonObject)
+        {
+            DetachEq();
+            return;
+        }
+        if (_eq is null) Eq = new MicEqViewModel(_client, MicEqViewModel.MixPrefix + Id, Name) { ProfileLibrary = _client.EqProfiles };
+        _eq!.Apply(eq, limits);
+    }
+
+    /// <summary>Drop the EQ and close its editor, as the mix or the daemon's report of it goes.</summary>
+    internal void DetachEq()
+    {
+        if (_eq is not { } gone) return;
+        Eq = null;
+        gone.Dispose();
+        EqWindows.Close(gone);
     }
 
     private bool? _editable;

@@ -554,6 +554,8 @@ public static class HardwareMixingPlanner
             string name = definition?.Name ?? mix;
             string where = definition?.Kind == MixKind.AuxPort ? "its USB Aux port" : "its jacks";
             disabled[$"inserts:mix:{mix}"] = $"The Wave XLR Pro builds {name} for {where}, so no insert runs on it there.";
+            disabled[Mixer.MixEqDisabledKey(mix)] =
+                $"The Wave XLR Pro builds {name} for {where}, so its EQ is off while hardware mixing runs. It comes back with software mixing.";
         }
         if (unitMixes.Count > 0)
         {

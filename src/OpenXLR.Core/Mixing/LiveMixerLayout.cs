@@ -414,6 +414,7 @@ public sealed partial class Mixer
             }
             CellSnapshot cells = TakeMixCellsLocked(id);
             bool wasDry = _dryMonitors.Remove(id);
+            _mixEq.Remove(id, out MicEq? savedEq);
             bool wasPaused = _monitorMuted;
             // The unmuted monitor ids are the selection a pause will resume.
             // Deleting its last member clears the pause, never the other mutes.
@@ -434,6 +435,7 @@ public sealed partial class Mixer
                 _config = previous;
                 _monitorMuted = wasPaused;
                 if (wasDry) _dryMonitors.Add(id);
+                if (savedEq is not null) _mixEq[id] = savedEq;
                 cells.Restore(this);
                 if (savedInserts is not null) _inserts[key] = savedInserts;
                 _enforcedSource = previousSource;
@@ -653,6 +655,7 @@ public sealed partial class Mixer
     private void RemoveMixChainLocked(string key)
     {
         RemoveMixDelayLocked(key["mix:".Length..]);
+        RemoveMixEqLocked(key["mix:".Length..]);
         if (_mixTaps.Remove(key, out PortLink? tap)) _pw.Unlink(tap);
         if (_mixPostLinks.Remove(key, out PortLink? post)) _pw.Unlink(post);
         if (_chains.Remove(key, out FilterHandle? chain)) _pw.StopFilter(chain);

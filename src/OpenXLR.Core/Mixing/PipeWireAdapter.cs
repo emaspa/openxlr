@@ -1448,6 +1448,40 @@ public sealed class PipeWireAdapter
         return filter;
     }
 
+    /// <summary>
+    /// One output mix's EQ: the native helper's <c>eq</c> backend on two
+    /// channels under <c>OpenXLR_mixeq_&lt;id&gt;</c>, which runs the EQ alone,
+    /// started with every control at <paramref name="controls"/>. Refused at
+    /// once when the helper is not installed.
+    /// </summary>
+    internal FilterHandle CreateMixEq(string id, IReadOnlyDictionary<string, double> controls, int bands)
+    {
+        if (bands is < MicEq.MinimumBands or > MicEq.MaximumBands) throw new ArgumentOutOfRangeException(nameof(bands));
+        string executable = EqHost ?? NativePluginHost.Executable;
+        if (!File.Exists(executable)) throw new InvalidOperationException(Mixer.MixEqNeedsHost);
+        int rate = ParseGraphSampleRate(Run("pw-metadata", "-n", "settings"));
+        string node = "OpenXLR_mixeq_" + id;
+        NativePluginHost host;
+        try
+        {
+            host = new NativePluginHost(new() { Id = id, Kind = "eq", Plugin = bands.ToString(CultureInfo.InvariantCulture), Params = new(controls) },
+                node, 2, rate, executable, [], meterSymbols: new HashSet<string>(StringComparer.Ordinal), note: _note);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or System.ComponentModel.Win32Exception)
+        {
+            throw new InvalidOperationException($"The mix EQ could not start the native plugin host. {ex.Message}", ex);
+        }
+        _nativeHosts.Add(host);
+        var filter = new FilterHandle(node, node, node, host.Process) { NativeHost = host };
+        if (!WaitForPorts(node, "playback", false, TimeSpan.FromSeconds(3), host.Process, count: 2)
+            || !WaitForPorts(node, "capture", true, TimeSpan.FromSeconds(3), host.Process, count: 2))
+        {
+            StopFilter(filter);
+            throw new InvalidOperationException("The mix EQ's audio ports did not appear.");
+        }
+        return filter;
+    }
+
     /// <summary>A stereo insert chain for a mix, spliced between the mix and its consumers.</summary>
     public FilterHandle CreateMixChain(string id, string description, IReadOnlyList<InsertDefinition> inserts)
         => CreateFilterChain($"OpenXLR_ins_{id}_in", $"OpenXLR_ins_{id}_out", description, 2, 0, false, inserts);

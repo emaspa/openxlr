@@ -414,56 +414,91 @@ public static class CommandValidation
     }
 
     /// <summary>
-    /// The microphone EQ commands: a microphone channel (XLR 1, XLR 2 or a
-    /// capture input on one mono port), and values inside
-    /// the EQ's ranges. A value outside a range is refused, not clamped; the
-    /// mixer snaps what it takes onto the EQ's steps. Switching the EQ on is
-    /// refused at once when the native helper is not installed and no unit
-    /// runs the channel's EQ, since nothing could run it; values can still be
-    /// set. Where the EQ runs is <c>device</c> or <c>software</c>, and is
+    /// The EQ commands: either a microphone channel (XLR 1, XLR 2 or a
+    /// capture input on one mono port) as <c>channel</c>, or any mix as
+    /// <c>mix</c>, never both, and values inside the EQ's ranges. A value
+    /// outside a range is refused, not clamped; the mixer snaps what it takes
+    /// onto the EQ's steps. Switching the EQ on is refused at once when the
+    /// native helper is not installed and no unit runs the channel's EQ, since
+    /// nothing could run it; values can still be set. Where the EQ runs is
+    /// <c>device</c> or <c>software</c>, takes a microphone only, and is
     /// refused on a capture input, whose EQ always runs on this computer.
     /// </summary>
     internal static string? CheckEq(Command cmd, ILayoutInfo layout, bool hostInstalled)
     {
-        if (cmd.Channel is null) return $"{cmd.Cmd}: need 'channel'";
-        if (TooLong(cmd.Channel, 36) || !layout.IsMicrophoneChannel(cmd.Channel))
-            return $"{cmd.Cmd}: '{Short(cmd.Channel)}' is not a microphone input";
+        if (EqTarget(cmd, layout, mixAllowed: cmd.Cmd != "setEqProcessing") is { } bad) return bad;
+        if (cmd.Mix is not null)
+        {
+            switch (cmd.Cmd)
+            {
+                case "setEqEnabled":
+                    if (cmd.Value.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return "setEqEnabled: value must be a boolean";
+                    return cmd.Value.GetBoolean() && !hostInstalled ? Mixer.MixEqNeedsHost : null;
+                case "setEq":
+                    if (MicEq.Read(cmd.Eq, out string? mixError) is not { } mixEq) return $"setEq: {mixError}";
+                    return mixEq.Enabled && !hostInstalled ? Mixer.MixEqNeedsHost : null;
+                default:
+                    return CheckEqBand(cmd);
+            }
+        }
         switch (cmd.Cmd)
         {
             case "setEqEnabled":
                 if (cmd.Value.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return "setEqEnabled: value must be a boolean";
-                return cmd.Value.GetBoolean() && !hostInstalled && !layout.EqRunsOnDevice(cmd.Channel) ? Mixer.EqNeedsHost : null;
+                return cmd.Value.GetBoolean() && !hostInstalled && !layout.EqRunsOnDevice(cmd.Channel!) ? Mixer.EqNeedsHost : null;
             case "setEq":
                 if (MicEq.Read(cmd.Eq, out string? error) is not { } eq) return $"setEq: {error}";
-                return eq.Enabled && !hostInstalled && !layout.CanRunEqOnDevice(cmd.Channel, eq.Bands.Count) ? Mixer.EqNeedsHost : null;
+                return eq.Enabled && !hostInstalled && !layout.CanRunEqOnDevice(cmd.Channel!, eq.Bands.Count) ? Mixer.EqNeedsHost : null;
             case "setEqProcessing":
-                if (layout.EqRunsInSoftwareOnly(cmd.Channel)) return Mixer.EqSoftwareOnly(Short(cmd.Channel));
+                if (layout.EqRunsInSoftwareOnly(cmd.Channel!)) return Mixer.EqSoftwareOnly(Short(cmd.Channel!));
                 return cmd.Value.ValueKind == JsonValueKind.String && MicEqProcessing.IsValid(cmd.Value.GetString())
                     ? null : "setEqProcessing: value must be 'device' or 'software'";
             default:
-                if (cmd.Band is not int band || band is < 1 or > MicEq.MaximumBands) return $"setEqBand: need 'band' from 1 to {MicEq.MaximumBands}";
-                var change = new EqBandChange(cmd.Enabled, cmd.Type, cmd.Frequency, cmd.Gain, cmd.Q);
-                if (change.IsEmpty) return "setEqBand: need at least one of 'enabled', 'type', 'frequency', 'gain' and 'q'";
-                if (change.Type is not null && MicEq.TypeIndex(change.Type) < 0)
-                    return $"setEqBand: type must be one of {string.Join(", ", MicEq.Types)}";
-                // Each present field is checked on a band that is valid
-                // otherwise, so the message names the field at fault.
-                EqBand probe = change.ApplyTo(MicEq.Default.Bands[0] with { Type = change.Type ?? MicEq.Peak });
-                return MicEq.Check(probe) is string problem ? $"setEqBand: {problem}" : null;
+                return CheckEqBand(cmd);
         }
     }
 
     /// <summary>
-    /// <c>loadEqProfile</c>: a microphone channel, as <c>setEq</c> takes it,
-    /// and a profile id. Whether the profile exists, and whether the EQ can
-    /// be switched on, is decided when it loads, as the <c>setEq</c> it
-    /// becomes.
+    /// What an EQ command acts on: a microphone as <c>channel</c>, or, where
+    /// <paramref name="mixAllowed"/>, any mix of the layout as <c>mix</c>.
+    /// Exactly one of the two. Null when the target is right.
+    /// </summary>
+    private static string? EqTarget(Command cmd, ILayoutInfo layout, bool mixAllowed)
+    {
+        if (cmd.Channel is not null && cmd.Mix is not null) return $"{cmd.Cmd}: give 'channel' or 'mix', not both";
+        if (cmd.Mix is { } mix)
+        {
+            if (!mixAllowed) return $"{cmd.Cmd}: takes a microphone 'channel'; a mix's EQ always runs on this computer";
+            return TooLong(mix, 36) || !layout.HasMix(mix) ? $"{cmd.Cmd}: '{Short(mix)}' is not a mix" : null;
+        }
+        if (cmd.Channel is null) return mixAllowed ? $"{cmd.Cmd}: need 'channel' or 'mix'" : $"{cmd.Cmd}: need 'channel'";
+        return TooLong(cmd.Channel, 36) || !layout.IsMicrophoneChannel(cmd.Channel)
+            ? $"{cmd.Cmd}: '{Short(cmd.Channel)}' is not a microphone input" : null;
+    }
+
+    /// <summary><c>setEqBand</c>'s band and fields, the same for a microphone and a mix.</summary>
+    private static string? CheckEqBand(Command cmd)
+    {
+        if (cmd.Band is not int band || band is < 1 or > MicEq.MaximumBands) return $"setEqBand: need 'band' from 1 to {MicEq.MaximumBands}";
+        var change = new EqBandChange(cmd.Enabled, cmd.Type, cmd.Frequency, cmd.Gain, cmd.Q);
+        if (change.IsEmpty) return "setEqBand: need at least one of 'enabled', 'type', 'frequency', 'gain' and 'q'";
+        if (change.Type is not null && MicEq.TypeIndex(change.Type) < 0)
+            return $"setEqBand: type must be one of {string.Join(", ", MicEq.Types)}";
+        // Each present field is checked on a band that is valid
+        // otherwise, so the message names the field at fault.
+        EqBand probe = change.ApplyTo(MicEq.Default.Bands[0] with { Type = change.Type ?? MicEq.Peak });
+        return MicEq.Check(probe) is string problem ? $"setEqBand: {problem}" : null;
+    }
+
+    /// <summary>
+    /// <c>loadEqProfile</c>: a microphone channel or a mix, as <c>setEq</c>
+    /// takes them, and a profile id. Whether the profile exists, and whether
+    /// the EQ can be switched on, is decided when it loads, as the
+    /// <c>setEq</c> it becomes.
     /// </summary>
     internal static string? CheckLoadEqProfile(Command cmd, ILayoutInfo layout)
     {
-        if (cmd.Channel is null) return "loadEqProfile: need 'channel'";
-        if (TooLong(cmd.Channel, 36) || !layout.IsMicrophoneChannel(cmd.Channel))
-            return $"loadEqProfile: '{Short(cmd.Channel)}' is not a microphone input";
+        if (EqTarget(cmd, layout, mixAllowed: true) is { } bad) return bad;
         return EqProfileStore.CheckId(cmd.Profile) is { } error ? $"loadEqProfile: {error}" : null;
     }
 

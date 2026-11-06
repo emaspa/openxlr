@@ -2571,6 +2571,9 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="EqButtonTipCapture" xml:space="preserve">
     <value>Der EQ des Mikrofons, auf diesem Computer am Anfang des Eingangs vor den Plugins. Leuchtet, solange er an ist, rot, wenn er nicht laufen kann. Öffnet den Editor.</value>
   </data>
+  <data name="EqButtonTipMix" xml:space="preserve">
+    <value>Der EQ des Mixes, auf diesem Computer nach seinen Plugins und vor seinen Ausgängen. Leuchtet, solange er an ist, rot, wenn er nicht laufen kann. Öffnet den Editor.</value>
+  </data>
   <data name="EqButtonNameOn" xml:space="preserve">
     <value>{0} EQ, an</value>
   </data>
@@ -2723,6 +2726,9 @@ Von OpenXLR gesteuertes Interface wählen</value>
   </data>
   <data name="EqStatusSoftwareCapture" xml:space="preserve">
     <value>An, läuft auf diesem Computer am Anfang des Eingangs, vor den Plugins.</value>
+  </data>
+  <data name="EqStatusSoftwareMix" xml:space="preserve">
+    <value>An, läuft auf diesem Computer nach den Plugins des Mixes, vor seinen Ausgängen.</value>
   </data>
   <data name="EqStatusDevice" xml:space="preserve">
     <value>An, läuft auf dem Interface noch vor USB, also vor den Plugins und allem anderen auf diesem Computer.</value>
@@ -4123,6 +4129,18 @@ Aus dem Tray holst du den Mixer über das OpenXLR-Symbol oder dein App-Menü zur
   </data>
   <data name="MicSetupPresetSoftSibilantsTip" xml:space="preserve">
     <value>Senkt einen festen Frequenzbereich um scharfe S-Laute ab und mildert helle Höhen.</value>
+  </data>
+  <data name="EqPresetSoftTreble" xml:space="preserve">
+    <value>Sanfte Höhen</value>
+  </data>
+  <data name="EqPresetBassBoost" xml:space="preserve">
+    <value>Mehr Bass</value>
+  </data>
+  <data name="EqPresetFootsteps" xml:space="preserve">
+    <value>Schritte</value>
+  </data>
+  <data name="EqPresetVoicesForward" xml:space="preserve">
+    <value>Stimmen nach vorn</value>
   </data>
   <data name="AudioClock" xml:space="preserve">
     <value>Audiotakt</value>

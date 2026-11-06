@@ -192,6 +192,12 @@ now in `voice.active`.
 the microphones [dry](api.md#dry-monitor), before their effects, while Stream
 and Chat keep the processed voice; `GET /api/v1/mixes/monitor` reads it back
 as `monitorDry`.
+The EQ commands take a mix in place of a microphone for its
+[output EQ](api.md#output-eq):
+`{"cmd":"loadEqProfile","mix":"stream","profile":"builtin:footsteps"}` puts
+the Footsteps curve on the Stream mix with its EQ on,
+`{"cmd":"setEqBand","mix":"stream","band":1,"gain":-4}` changes one band of
+it live, and `GET /api/v1/mixes/stream` reads it back as `eq`.
 The [compressor and expander](api.md#compressor-and-expander) take the
 same shape:
 `{"cmd":"setCompressor","channel":"xlr1","enabled":true,"threshold":-24,"makeup":4}`

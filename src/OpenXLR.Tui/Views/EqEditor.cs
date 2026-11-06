@@ -3,8 +3,12 @@ using System.Text.Json;
 
 namespace OpenXLR.Tui;
 
-/// <summary>A microphone's bands, using the daemon's model and partial band commands.</summary>
-internal sealed class EqEditor(string channel, long session, TimeProvider? time = null)
+/// <summary>
+/// A microphone's or a mix's bands, using the daemon's model and partial band
+/// commands. A microphone is named by its channel id; with <paramref name="mix"/>
+/// the id is a mix's, and every command names it as <c>mix</c>.
+/// </summary>
+internal sealed class EqEditor(string channel, long session, TimeProvider? time = null, bool mix = false)
 {
     private static readonly JsonSerializerOptions WriteOptions = new(JsonSerializerDefaults.Web);
     private readonly RowList _rows = new();
@@ -20,14 +24,39 @@ internal sealed class EqEditor(string channel, long session, TimeProvider? time 
 
     internal static bool CanEdit(ChannelEntry channel) => Settings(channel) is not null;
 
+    /// <summary>A mix's EQ can be edited: a complete one, while hardware mixing does not hold it off.</summary>
+    internal static bool CanEdit(MixEntry mix, MixerSnapshot mixer) => Settings(mix, mixer) is not null;
+
     private static MicEq? Settings(ChannelEntry? channel)
+        => channel is { Present: true } ? Settings(channel.Eq) : null;
+
+    private static MicEq? Settings(MixEntry? mix, MixerSnapshot mixer)
+        => mix is not null && mixer.Disabled("eq:mix:" + mix.Id) is null ? Settings(mix.Eq) : null;
+
+    private static MicEq? Settings(EqEntry? entry)
     {
-        if (channel is not { Present: true, Eq.Bands: { } bands }) return null;
-        var eq = new MicEq { Enabled = channel.Eq.Enabled, Bands = bands };
+        if (entry is not { Bands: { } bands }) return null;
+        var eq = new MicEq { Enabled = entry.Enabled, Bands = bands };
         return MicEq.Check(eq) is null ? eq : null;
     }
 
-    private (ChannelEntry Channel, MicEq Eq)? Read(App app)
+    // What the daemon's revisions and the state name this EQ by.
+    private string Key => mix ? "mix:" + channel : channel;
+
+    private void Target(System.Text.Json.Nodes.JsonObject body) => body[mix ? "mix" : "channel"] = channel;
+
+    private (string Name, EqEntry Entry, MicEq Eq)? Reported(Snapshot state)
+    {
+        if (mix)
+        {
+            MixEntry? output = state.Mixer.Mixes.FirstOrDefault(m => m.Id == channel);
+            return Settings(output, state.Mixer) is { } eq ? (output!.Name, output.Eq!, eq) : null;
+        }
+        ChannelEntry? input = state.Mixer.Channels.FirstOrDefault(c => c.Id == channel);
+        return Settings(input) is { } micEq ? (input!.Name, input.Eq!, micEq) : null;
+    }
+
+    private (string Name, EqEntry Entry, MicEq Eq)? Read(App app)
     {
         if (_session != app.Link.SessionRevision)
         {
@@ -35,15 +64,15 @@ internal sealed class EqEditor(string channel, long session, TimeProvider? time 
             _edits.Clear();
         }
         if (app.Link.LastError is not null) _edits.Clear();
-        long revision = app.Link.ChannelRevision(channel);
+        long revision = app.Link.ChannelRevision(Key);
         if (_channelRevision != revision)
         {
             _channelRevision = revision;
             _edits.Clear();
         }
-        if (!app.Link.Connected) return null;
-        ChannelEntry? input = app.Link.State?.Mixer.Channels.FirstOrDefault(c => c.Id == channel);
-        if (Settings(input) is not { } reported) return null;
+        if (!app.Link.Connected || app.Link.State is not { } state) return null;
+        if (Reported(state) is not { } found) return null;
+        MicEq reported = found.Eq;
         if (_bandCount != reported.Bands.Count) { _edits.Clear(); _bandCount = reported.Bands.Count; }
         MicEq current = reported;
         foreach (var (key, edit) in _edits.ToArray())
@@ -54,7 +83,7 @@ internal sealed class EqEditor(string channel, long session, TimeProvider? time 
                 _edits.Remove(key);
             else current = Apply(current, key.Band, key.Field, edit.Value);
         }
-        return (input!, current);
+        return (found.Name, found.Entry, current);
     }
 
     internal bool Draw(Screen screen, Rect area, App app)
@@ -62,21 +91,21 @@ internal sealed class EqEditor(string channel, long session, TimeProvider? time 
         if (!app.Link.Connected || app.Link.State is null)
         {
             _edits.Clear();
-            screen.Text(area.X + 2, area.Y + 1, "Waiting for the daemon. Esc returns to Inputs.", app.Theme.TextMuted, app.Theme.Card,
+            screen.Text(area.X + 2, area.Y + 1, $"Waiting for the daemon. Esc returns to {(mix ? "Outputs" : "Inputs")}.", app.Theme.TextMuted, app.Theme.Card,
                 maxWidth: Math.Max(0, area.Width - 4));
             return true;
         }
         if (Read(app) is not { } edit) return false;
-        _rows.Draw(screen, area, app.Theme, Build(app, edit.Channel, edit.Eq));
+        _rows.Draw(screen, area, app.Theme, Build(app, edit.Name, edit.Entry, edit.Eq));
         return true;
     }
 
     internal bool Handle(KeyPress key, App app)
-        => Read(app) is { } edit && _rows.Handle(key, Build(app, edit.Channel, edit.Eq));
+        => Read(app) is { } edit && _rows.Handle(key, Build(app, edit.Name, edit.Entry, edit.Eq));
 
-    private List<Row> Build(App app, ChannelEntry input, MicEq eq)
+    private List<Row> Build(App app, string name, EqEntry entry, MicEq eq)
     {
-        List<Row> rows = [new HeadingRow($"{input.Name} / microphone EQ"), new TextRow("Status", input.Eq!.Status),
+        List<Row> rows = [new HeadingRow($"{name} / {(mix ? "output" : "microphone")} EQ"), new TextRow("Status", entry.Status),
             new ToggleRow("EQ enabled", eq.Enabled, value => Set(app, 0, "enabled", value))];
         for (int index = 0; index < eq.Bands.Count; index++)
         {
@@ -111,7 +140,7 @@ internal sealed class EqEditor(string channel, long session, TimeProvider? time 
             for (int number = 1; number <= MicEq.BandCount; number++)
                 foreach (string field in new[] { "enabled", "type", "frequency", "gain", "q" })
                     _edits[(number, field)] = (BandValue(defaults.Bands[number - 1], field), now);
-            app.Link.Send("setEq", body => { body["channel"] = channel; body["eq"] = JsonSerializer.SerializeToNode(defaults, WriteOptions); });
+            app.Link.Send("setEq", body => { Target(body); body["eq"] = JsonSerializer.SerializeToNode(defaults, WriteOptions); });
         }));
         return rows;
     }
@@ -119,12 +148,12 @@ internal sealed class EqEditor(string channel, long session, TimeProvider? time 
     private void Ask(App app, int band, string field, double value, double minimum, double maximum)
     {
         long revision = app.Link.SessionRevision;
-        long channelRevision = app.Link.ChannelRevision(channel);
+        long channelRevision = app.Link.ChannelRevision(Key);
         int bands = Read(app)?.Eq.Bands.Count ?? 0;
         app.Ask($"Band {band} {field}: {value:0.####} now, {minimum} to {maximum} (decimal point)", "", text =>
         {
-            if (app.Link.SessionRevision != revision || app.Link.ChannelRevision(channel) != channelRevision || Read(app) is not { } current || current.Eq.Bands.Count != bands)
-            { app.Say("The microphone changed or disconnected. Enter the value again."); return; }
+            if (app.Link.SessionRevision != revision || app.Link.ChannelRevision(Key) != channelRevision || Read(app) is not { } current || current.Eq.Bands.Count != bands)
+            { app.Say($"The {(mix ? "mix" : "microphone")} changed or disconnected. Enter the value again."); return; }
             if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double number)
                 || !double.IsFinite(number) || number < minimum || number > maximum)
             { app.Say($"Use a finite number from {minimum} to {maximum}, with a decimal point"); return; }
@@ -139,7 +168,7 @@ internal sealed class EqEditor(string channel, long session, TimeProvider? time 
         _edits[(band, field)] = (value, _time.GetTimestamp());
         app.Link.Send(band == 0 ? "setEqEnabled" : "setEqBand", body =>
         {
-            body["channel"] = channel;
+            Target(body);
             if (band != 0) body["band"] = band;
             body[band == 0 ? "value" : field] = JsonSerializer.SerializeToNode(value);
         });

@@ -63,6 +63,7 @@ internal static class SavedMixerValidation
             Compressor = Dynamics(settings.Compressor, "compressor", MicCompressor.Check, MicCompressor.Snap, notes),
             Expander = Dynamics(settings.Expander, "expander", MicExpander.Check, MicExpander.Snap, notes),
             MonitorDry = MonitorDry(settings.MonitorDry, notes),
+            MixEq = Eq(settings.MixEq, notes, "mixEq"),
             Ducking = Ducking(settings, notes),
             Appearance = Appearance(settings.Appearance, notes),
             BlockSize = BlockSize(settings.BlockSize, notes),
@@ -95,6 +96,7 @@ internal static class SavedMixerValidation
         if (scene.MonitorFeeds is not null) Mapping(scene.MonitorFeeds, "monitorFeeds");
         if (scene.Inserts is not null) Inserts(scene.Inserts);
         if (scene.Eq is not null) Eq(scene.Eq);
+        if (scene.MixEq is not null) Eq(scene.MixEq, "mixEq");
         if (scene.NoiseRemoval is not null) NoiseRemoval(scene.NoiseRemoval);
         if (scene.VoiceChanger is not null) VoiceChanger(scene.VoiceChanger);
         if (scene.Compressor is not null) Dynamics(scene.Compressor, "compressor", MicCompressor.Check);
@@ -282,17 +284,18 @@ internal static class SavedMixerValidation
     }
 
     /// <summary>
-    /// Microphone EQs, each checked and snapped onto the EQ's steps. An entry
-    /// that cannot be read is dropped and named; the others, including one
-    /// for a channel that is not a microphone today, are kept.
+    /// Microphone EQs (<c>eq</c>) or output EQs (<c>mixEq</c>), each checked
+    /// and snapped onto the EQ's steps. An entry that cannot be read is
+    /// dropped and named; the others, including one for a channel that is
+    /// not a microphone today, are kept.
     /// </summary>
-    private static Dictionary<string, MicEq> Eq(Dictionary<string, MicEq>? entries, List<string> notes)
+    private static Dictionary<string, MicEq> Eq(Dictionary<string, MicEq>? entries, List<string> notes, string field = "eq")
     {
-        if (entries is null) { notes.Add($"eq: {NullEntry}"); return []; }
+        if (entries is null) { notes.Add($"{field}: {NullEntry}"); return []; }
         var kept = new Dictionary<string, MicEq>();
         foreach ((string channel, MicEq eq) in entries)
         {
-            if (MicEq.Check(eq) is string problem) notes.Add($"eq.{channel}: {problem}");
+            if (MicEq.Check(eq) is string problem) notes.Add($"{field}.{channel}: {problem}");
             else kept[channel] = MicEq.Snap(eq);
         }
         return kept;
@@ -473,10 +476,10 @@ internal static class SavedMixerValidation
         }
     }
 
-    private static void Eq(IReadOnlyDictionary<string, MicEq> entries)
+    private static void Eq(IReadOnlyDictionary<string, MicEq> entries, string field = "eq")
     {
         foreach ((string channel, MicEq eq) in entries)
-            if (MicEq.Check(eq) is string problem) throw new JsonException($"Invalid saved mixer field 'eq.{channel}': {problem}.");
+            if (MicEq.Check(eq) is string problem) throw new JsonException($"Invalid saved mixer field '{field}.{channel}': {problem}.");
     }
 
     private static void NoiseRemoval(IReadOnlyDictionary<string, MicNoise> entries)

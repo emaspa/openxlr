@@ -65,16 +65,51 @@ public sealed class MicEqViewModel : ViewModelBase, IDisposable
         EqClipboard.Changed += OnClipboardChanged;
     }
 
-    /// <summary>The channel id the commands name: <c>xlr1</c>, <c>xlr2</c> or a capture input's id.</summary>
+    /// <summary>
+    /// What the commands name: <c>xlr1</c>, <c>xlr2</c> or a capture input's
+    /// id, or <c>mix:</c> and a mix's id for an output EQ, which the daemon
+    /// client sends as the command's <c>mix</c>.
+    /// </summary>
     public string Channel { get; }
+
+    /// <summary>The prefix of <see cref="Channel"/> for a mix's output EQ.</summary>
+    public const string MixPrefix = "mix:";
+
+    /// <summary>An output mix's EQ: no unit, no choice of where, after the mix's plugins.</summary>
+    public bool IsMix => Channel.StartsWith(MixPrefix, StringComparison.Ordinal);
+
+    private string? _unitNote;
+    /// <summary>
+    /// Why the EQ is held off while hardware mixing runs, the daemon's
+    /// sentence for a mix the Wave XLR Pro builds; null while the computer
+    /// builds it. The button is greyed with it as its tooltip, and the saved
+    /// EQ applies again when software mixing returns.
+    /// </summary>
+    public string? UnitNote
+    {
+        get => _unitNote;
+        set
+        {
+            if (_unitNote == value) return;
+            _unitNote = value;
+            Raise(nameof(HasUnitNote));
+            Raise(nameof(CanOpen));
+            RaiseState();
+        }
+    }
+
+    public bool HasUnitNote => _unitNote is not null;
+
+    /// <summary>The EQ button opens the editor: always, but while the unit builds the mix.</summary>
+    public bool CanOpen => _unitNote is null;
 
     /// <summary>The EQ profiles the editor lists and loads, the daemon's; null shows no profile row.</summary>
     public EqProfileLibrary? ProfileLibrary { get; init; }
 
     /// <summary>
-    /// A capture input's EQ, which always runs on this computer: the editor
-    /// offers no unit, no choice of where and no hardware badge, and names no
-    /// low cut or ClipGuard, which a capture input does not have.
+    /// A capture input's EQ, or a mix's, which always runs on this computer:
+    /// the editor offers no unit, no choice of where and no hardware badge,
+    /// and names no low cut or ClipGuard, which neither has.
     /// </summary>
     public bool IsCaptureInput => Channel is not ("xlr1" or "xlr2");
 
@@ -270,10 +305,10 @@ public sealed class MicEqViewModel : ViewModelBase, IDisposable
     public bool HasEditorNote => EditorNote is not null;
 
     /// <summary>The EQ button's tooltip, which says where the EQ runs.</summary>
-    public string ButtonTip => OnDevice
+    public string ButtonTip => _unitNote ?? (IsMix ? Localizer.Text("EqButtonTipMix") : null) ?? (OnDevice
         ? Localizer.Format("EqButtonTipDevice", _deviceName ?? Localizer.Text("EqTheInterface"))
         : IsCaptureInput ? Localizer.Text("EqButtonTipCapture")
-        : HasDeviceNote ? Localizer.Text("EqButtonTip") + " " + DeviceNote : Localizer.Text("EqButtonTip");
+        : HasDeviceNote ? Localizer.Text("EqButtonTip") + " " + DeviceNote : Localizer.Text("EqButtonTip"));
 
     /// <summary>False when the EQ cannot run, and <see cref="Error"/> says why.</summary>
     public bool Available => _available;
@@ -283,7 +318,7 @@ public sealed class MicEqViewModel : ViewModelBase, IDisposable
     public bool HasError => _error is not null || !_available;
 
     /// <summary>The EQ is on and its stage runs: the button is lit.</summary>
-    public bool IsLit => _enabled && !_comparing && _available && _error is null && _backend is not null;
+    public bool IsLit => _enabled && !_comparing && _available && _error is null && _backend is not null && _unitNote is null;
 
     /// <summary>The EQ cannot run: the button takes the alert colour.</summary>
     public bool IsFaulty => !_available || _error is not null;
@@ -294,12 +329,14 @@ public sealed class MicEqViewModel : ViewModelBase, IDisposable
 
     /// <summary>The editor's footer: what runs the EQ, or why nothing does.</summary>
     public string Status => _error is { } error ? error
+        : _unitNote is { } held ? held
         : !_available ? Localizer.Text("EqUnavailable")
         : _comparing ? Localizer.Text("EqStatusComparing")
         : !_enabled ? Localizer.Text("EqStatusOff")
         : _backend switch
         {
-            "software" => IsCaptureInput ? Localizer.Text("EqStatusSoftwareCapture") : Localizer.Text("EqStatusSoftware"),
+            "software" => IsMix ? Localizer.Text("EqStatusSoftwareMix")
+                : IsCaptureInput ? Localizer.Text("EqStatusSoftwareCapture") : Localizer.Text("EqStatusSoftware"),
             "device" => _deviceName is { } name ? Localizer.Format("EqStatusDeviceNamed", name) : Localizer.Text("EqStatusDevice"),
             _ => Localizer.Text("EqStatusStarting"),
         };

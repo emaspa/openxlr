@@ -223,8 +223,9 @@ physical gain dial.
   double click switches the band and a right click picks its type. Under
   the graph is a row of fields per band, and above it the EQ switch, a
   bypass to compare, copy and paste between microphones and a reset. EQ
-  profiles save the bands under a name and load them on any microphone;
-  Mic setup's presets are listed first as built-in profiles. The
+  profiles save the bands under a name and load them on any microphone or
+  mix; the built-in profiles come first, Mic setup's voice curves and
+  then four listening curves for outputs, every one listed on every EQ. The
   daemon keeps them in one private file, does not write it while an entry
   in it fails to read, and lists them in its state, so the UI, a Deck key
   and the API load the same ones ([manual](manual.md#eq-profiles)). The
@@ -289,6 +290,25 @@ physical gain dial.
   are dry, and hardware mixing plays the microphones raw on those jacks.
   Saved with the mixer and in profiles, in the terminal mixer's Outputs
   tab, and set by [`setMonitorDry`](api.md#dry-monitor).
+- Output EQ: the microphone EQ on every mix, Monitor A and B, user
+  monitor mixes, Stream, Chat, the other virtual microphones and Aux, with
+  the same editor, one to sixteen bands, values and profiles. It is one
+  stereo stage in the native plugin host after the mix's inserts and
+  before its outputs, the post sink and the USB Aux port, running the EQ
+  alone. Switching it on splices it in once without restarting the
+  plugins; every later change reaches the running filters live, and off
+  bypasses inside the stage. Only a new number of bands starts a new
+  stage. A chain rebuilt for its own reasons keeps the EQ running, and a
+  chain the mixer gave up on stays off. Four listening curves come with it
+  as built-in profiles: Voices forward, Footsteps, Bass boost and Soft
+  treble, each only cutting. Opened from **EQ** under a mix's **FX** in
+  the matrix head and the mix strips, and in the terminal mixer's Outputs
+  tab; Deck keys and dials drive it; saved with the mixer under `mixEq`
+  and in profiles, where an older profile leaves it alone. The Wave XLR
+  Pro's zero-latency path stays on, and in hardware mixing the EQ of each
+  mix the unit builds is held off with a tooltip and kept for software
+  mixing. The [control API](api.md#output-eq) takes the EQ commands with
+  `mix` in place of `channel` ([manual](manual.md#output-eq)).
 - Compressor and expander on this computer: on the same microphones, in
   the same native stage, the expander after noise removal and the
   compressor after the EQ. The compressor has a threshold, ratio, attack,
@@ -994,8 +1014,8 @@ an output's feed through Monitor A, Monitor B, Monitor A+B and then every other 
 output's volume in 5% steps and its mute (red while muted), the enforced
 system output, routing the focused application to a channel, the
 next member of an exclusive group, ducking on or off on any device, and
-loading an EQ profile on a microphone, lit while its EQ holds that
-profile. Each key
+loading an EQ profile on a microphone or a mix, lit while its EQ holds
+that profile. Each key
 can pick its icon, and a typed title replaces the built-in label. A key or
 dial on a channel or mix shows the icon and colour that channel or mix was
 given in the layout editor, unless the key has its own icon; a group key
@@ -1014,6 +1034,8 @@ steps, retain stable channel ids through renames, and use the channel's
 icon and colour. Quick turns lead locally and coalesce through the
 existing dial sender; removal, rebinding and reconnection discard stale
 unsent EQ edits. Changes use the same EQ and saved state as the UI.
+Output EQ groups offer the same keys and dials for each mix's EQ, which
+send nothing while hardware mixing holds that EQ off.
 
 ![Keys](plugin-keys.png)
 
@@ -1088,6 +1110,9 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   switch. Enter on a number asks for an exact value. The shared EQ model
   supplies the ranges, steps and defaults; reset keeps the EQ's on/off
   state and changes only that microphone
+- Output EQ in Outputs: each mix's EQ status and the same band editor,
+  whose commands name the mix; a mix whose EQ hardware mixing holds off
+  shows the reason and no editor
 - The soundboard in Sounds: the board's switch, SFX's volume as its
   master, and a row per clip with its length, mode, loop, gain, status or
   reason, and a bar while it plays. Keys play, audition, stop, stop all,

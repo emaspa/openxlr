@@ -301,6 +301,9 @@ public sealed partial record MixStatus(string Id, string Name, double Volume, bo
     /// software effects (<c>setMonitorDry</c>); null on every other mix.
     /// </summary>
     public bool? MonitorDry { get; init; }
+
+    /// <summary>The mix's output EQ, reported as a microphone's EQ is, with processing <c>software</c>.</summary>
+    public MicEqState? Eq { get; init; }
 }
 
 /// <param name="Present">

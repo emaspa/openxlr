@@ -103,6 +103,13 @@ public partial class MixerPanel : UserControl
             InsertWindows.OpenChain(window, master.Mix.Inserts, $"mix:{master.Mix.Id}");
     }
 
+    private void OnMixEq(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is BankMasterViewModel { Mix.Eq: { CanOpen: true } eq }
+            && TopLevel.GetTopLevel((Control)sender!) is Window window)
+            EqWindows.Show(window, eq);
+    }
+
     private async void OnInsertControls(object? sender, RoutedEventArgs e)
     {
         if ((sender as Control)?.DataContext is not InsertViewModel insert) return;

@@ -48,6 +48,9 @@ internal sealed record MixEntry
 
     /// <summary>Whether a monitor mix hears the microphones before their effects; null on every other mix and from a daemon that predates it.</summary>
     public bool? MonitorDry { get; init; }
+
+    /// <summary>The mix's output EQ, in a microphone EQ's shape, or null from a daemon that predates it.</summary>
+    public EqEntry? Eq { get; init; }
 }
 
 /// <summary>One channel strip and its send into every mix.</summary>
