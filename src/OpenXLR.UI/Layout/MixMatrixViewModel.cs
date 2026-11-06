@@ -559,7 +559,7 @@ public sealed class MatrixRowViewModel : ViewModelBase
     {
         (InputStripKind.Xlr1 or InputStripKind.Xlr2 or InputStripKind.Capture, SkinStripParts.Mute) => CarriesUnit || CarriesExtraUnit || ShowsCaptureMute,
         (InputStripKind.Xlr1 or InputStripKind.Xlr2 or InputStripKind.Capture, SkinMatrixParts.Processing) =>
-            Unit is { HasSwitches: true } || ExtraUnit is { HasSwitches: true } || ShowsSoftware || ShowsNoise || ShowsDynamics,
+            Unit is { HasSwitches: true } || ExtraUnit is { HasSwitches: true } || ShowsSoftware || ShowsNoise || ShowsDynamics || ShowsOwnClock,
         (InputStripKind.AuxIn, SkinStripParts.Gain) => Main.CapAuxInput || Channel.HasVolume,
         (InputStripKind.LineIn, SkinStripParts.Gain) => Main.CapLineInput || Channel.HasVolume,
         (_, SkinStripParts.Gain) => CarriesUnit || CarriesExtraUnit || Channel.HasVolume || ShowsCaptureGain,
@@ -620,14 +620,19 @@ public sealed class MatrixRowViewModel : ViewModelBase
     /// <summary>The processing part holds the microphone's expander and compressor on this computer, as it holds noise removal.</summary>
     public bool ShowsDynamics => Channel.HasDynamics && Main.HasMixer;
 
+    /// <summary>The processing part holds a capture input's Own clock switch: the daemon reports one for it.</summary>
+    public bool ShowsOwnClock => Kind == InputStripKind.Capture && Channel.HasOwnClock;
+
     /// <summary>
     /// The processing button is lit: a switch the input's interface has is
-    /// on, XLR 1's software low cut or ClipGuard is, or noise removal runs.
+    /// on, XLR 1's software low cut or ClipGuard is, noise removal runs, or
+    /// a capture input runs on its own clock.
     /// </summary>
     public bool ProcessingOn => Unit is { SwitchesOn: true } || ExtraUnit is { SwitchesOn: true }
         || ShowsSoftware && (Main.ShowSoftLowCut && Main.SoftLowCutOn || Main.ShowSoftClipGuard && Main.SoftClipGuard)
         || ShowsNoise && Channel.Noise is { IsLit: true }
-        || ShowsDynamics && Channel.Dynamics is { IsLit: true };
+        || ShowsDynamics && Channel.Dynamics is { IsLit: true }
+        || ShowsOwnClock && Channel.OwnClock;
 
     /// <summary>The processing button says that phantom power is on, or settling, without being opened.</summary>
     public bool PhantomOn => Unit is { PhantomShown: true } || ExtraUnit is { PhantomShown: true };
@@ -842,6 +847,7 @@ public sealed class MatrixRowViewModel : ViewModelBase
             case nameof(ChannelViewModel.HasEq): Raise(nameof(ShowsEq)); Raise(nameof(Tall)); break;
             case nameof(ChannelViewModel.Noise): WatchUnits(); Raise(nameof(ShowsNoise)); RaiseSwitches(); break;
             case nameof(ChannelViewModel.Dynamics): WatchUnits(); Raise(nameof(ShowsDynamics)); RaiseSwitches(); break;
+            case nameof(ChannelViewModel.HasOwnClock) or nameof(ChannelViewModel.OwnClock): Raise(nameof(ShowsOwnClock)); RaiseSwitches(); break;
             case nameof(ChannelViewModel.ShownUnitInput):
                 Raise(nameof(Unit)); Raise(nameof(CarriesUnit)); WatchUnits(); RefreshSpec(); RaiseSwitches();
                 break;

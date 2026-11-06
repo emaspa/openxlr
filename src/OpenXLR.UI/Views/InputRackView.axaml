@@ -505,6 +505,12 @@
                 <ToggleButton Name="RackCaptureMute" Content="{loc:Text Key=Mute}" Classes="mute" HorizontalAlignment="Left"
                               IsChecked="{Binding Channel.CaptureMuted, Mode=TwoWay}" IsVisible="{Binding ShowsCaptureMute}"
                               AutomationProperties.Name="{Binding Channel.CaptureMuteName}" ToolTip.Tip="{loc:Text Key=CaptureMuteTip}"/>
+                <!-- the device on a clock of its own, with what the bridge does under it -->
+                <CheckBox Name="RackOwnClock" Content="{loc:Text Key=CaptureOwnClock}" HorizontalAlignment="Left"
+                          IsChecked="{Binding Channel.OwnClock, Mode=TwoWay}" IsVisible="{Binding ShowsOwnClock}"
+                          ToolTip.Tip="{loc:Text Key=CaptureOwnClockTip}"/>
+                <TextBlock Name="RackOwnClockStatus" Text="{Binding Channel.OwnClockStatus}" Classes="hint" FontSize="{DynamicResource UiText.FontSize11}"
+                           TextWrapping="Wrap" IsVisible="{Binding Channel.HasOwnClockStatus}"/>
               </StackPanel>
               <!-- the microphone's EQ and noise removal, on a capture input the daemon reports them for, then its plugin chain -->
               <StackPanel layout:StripPanel.Part="effects" Name="RackCaptureEffects" Spacing="4">

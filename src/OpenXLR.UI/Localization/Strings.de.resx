@@ -2464,7 +2464,7 @@ Von OpenXLR gesteuertes Interface wählen</value>
     <value>Mikrofonschalter von {0}, Phantomspeisung an</value>
   </data>
   <data name="MatrixProcessingTip" xml:space="preserve">
-    <value>Die Schalter des Mikrofons: Hochpass, Expander, Voice Tune, Phantomspeisung, ClipGuard und Kompressor, soweit das Interface sie hat. Leuchtet, solange einer an ist. Die Lampe leuchtet rot, solange die Phantomspeisung an ist.</value>
+    <value>Die Schalter des Mikrofons: Hochpass, Expander, Voice Tune, Phantomspeisung, ClipGuard und Kompressor, soweit das Interface sie hat, und bei einem Aufnahmeeingang der eigene Takt. Leuchtet, solange einer an ist. Die Lampe leuchtet rot, solange die Phantomspeisung an ist.</value>
   </data>
   <data name="IconDefaultNamed" xml:space="preserve">
     <value>Standard ({0})</value>
