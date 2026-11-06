@@ -25,7 +25,8 @@ test("a press plays in the clip's mode unless the key gives its own, and only ho
   assert.equal(clipPress(hold, {mode: "overlap"}).hold, false);
   assert.deepEqual(clipPress(clipKey(mixer(), {target: "stopClips"}), {mode: "hold"}), {payload: {cmd: "stopClips"}, hold: false});
   const unknown = clipKey(mixer({clips: [clip("airhorn", {mode: "unknown"})]}), {target: "clip:airhorn"});
-  assert.deepEqual(clipPress(unknown, {}), {payload: {cmd: "playClip", clip: "airhorn", mode: "overlap"}, hold: false});
+  assert.deepEqual(clipPress(unknown, {}), {payload: {cmd: "playClip", clip: "airhorn"}, hold: false},
+    "a library mode the plugin does not know is left to the daemon");
   // Inside a multi-action the key up follows 100 ms later: hold plays as overlap.
   assert.deepEqual(clipPress(hold, {}, true), {payload: {cmd: "playClip", clip: "airhorn", mode: "overlap"}, hold: false});
   assert.deepEqual(clipPress(key, {mode: "hold"}, true), {payload: {cmd: "playClip", clip: "cheer", mode: "overlap"}, hold: false});

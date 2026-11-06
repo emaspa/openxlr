@@ -59,15 +59,15 @@ export function clipKey(mixer, settings) {
 // Send the effective mode so the daemon and the key agree on whether this
 // press needs a release, even if the library mode changes before it arrives.
 // Inside a multi-action OpenDeck sends the key up after 100 ms, so hold
-// plays as overlap there.
+// plays as overlap there. A library mode this plugin does not know is left
+// out, so the daemon plays the clip in its own mode and needs no release.
 export function clipPress(key, settings, inMultiAction = false) {
   if (key.stop) return { payload: { cmd: STOP_ALL }, hold: false };
   const override = settings?.mode;
   const libraryMode = key.clip?.mode;
-  let mode = MODES.includes(libraryMode) ? libraryMode : "overlap";
-  if (MODES.includes(override)) mode = override;
+  let mode = MODES.includes(override) ? override : MODES.includes(libraryMode) ? libraryMode : null;
   if (mode === "hold" && inMultiAction) mode = "overlap";
-  return { payload: { cmd: "playClip", clip: key.id, mode }, hold: mode === "hold" };
+  return { payload: { cmd: "playClip", clip: key.id, ...(mode ? { mode } : {}) }, hold: mode === "hold" };
 }
 
 // Where the clip is, from the meters frame: {position, voices}, or null
