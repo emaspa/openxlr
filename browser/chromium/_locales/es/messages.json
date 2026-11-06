@@ -119,6 +119,9 @@
   "siteChanged": {
     "message": "El sitio web de esta pestaña cambió. Vuelve a abrir el selector de canal antes de asignarla."
   },
+  "siteChangedReopen": {
+    "message": "El sitio web de esta pestaña cambió. Vuelve a abrir OpenXLR en la pestaña."
+  },
   "channelUnavailable": {
     "message": "Este canal de OpenXLR no está disponible."
   },

@@ -119,6 +119,9 @@
   "siteChanged": {
     "message": "This tab's website changed. Reopen the channel picker before assigning it."
   },
+  "siteChangedReopen": {
+    "message": "This tab's website changed. Open OpenXLR on the tab again."
+  },
   "channelUnavailable": {
     "message": "This OpenXLR channel is unavailable."
   },

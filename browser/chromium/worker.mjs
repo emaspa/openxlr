@@ -278,7 +278,7 @@ async function startCapture(id, site, active = null) {
   if (!state?.preserveBrowserOutputs) throw new Error(t('enableOutputsFirst'));
   const selected = state.tabs.find(tab => tab.id === id);
   if (!selected || !site) throw new Error(t('activateFromTab'));
-  if (selected.site !== site) throw new Error(t('siteChanged'));
+  if (selected.site !== site) throw new Error(t('siteChangedReopen'));
   const channel = state.channels.find(channel => channel.id === selected.channelId);
   if (!channel) throw new Error(t('chooseChannelFirst'));
   if (starts.has(id)) throw new Error(t('alreadyStarting'));
@@ -425,7 +425,7 @@ async function handle(message) {
         throw new Error(t('tabUnregistered'));
       const tab = await chrome.tabs.get(route.id);
       if (tab.incognito || siteOf(tab.url) !== route.site || !captures.get(route.id)?.capturing)
-        throw new Error(t('siteChanged'));
+        throw new Error(t('siteChangedReopen'));
       await chrome.tabs.update(tab.id, { active: true });
       await chrome.windows.update(tab.windowId, { focused: true });
       return null;
