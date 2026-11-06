@@ -1928,8 +1928,8 @@ EQ button and editor as XLR 1, in INPUTS after its source chip, in an
 input rack and in the matrix. Its EQ always runs on this computer, at the
 head of the input before its plugins, even when the input carries another
 Wave interface's microphone, so the editor shows no **Where the EQ runs**
-switch and no **Hardware processing** badge, and its bottom line says it
-runs on this computer. Switching it on moves the input onto its own route,
+switch, its header shows **Software processing**, and its bottom line says
+it runs on this computer. Switching it on moves the input onto its own route,
 the way adding a plugin does, without a gap in the sound. It is saved with
 the mixer and in profiles like XLR 1's. Changing the input's source keeps
 it; deleting the input deletes it. A capture input on a stereo pair has no
@@ -1947,7 +1947,8 @@ computer, after the mix's plugins and before its outputs.
 - Open it with **EQ** under the mix's **FX**: in the matrix column head,
   and in the mix strips of the other layouts. **EQ** turns green while the
   EQ runs and red when it cannot run. The editor is named after the mix and
-  has no **Where the EQ runs** switch or **Hardware processing** badge.
+  has no **Where the EQ runs** switch, and its header shows **Software
+  processing**.
 - Everything in the editor works as on a microphone: the graph, the band
   rows, **EQ on**, **Compare**, **Copy** and **Paste**, **Reset**, **Add
   band** and the **Profile** row. Copy on a microphone and Paste on a mix
@@ -1994,9 +1995,9 @@ or later, a Wave:3 MK.2 on firmware 0.2.3 or later, and a Wave XLR Pro on
 firmware 1.0.14 or later run the EQ on their own processor, before USB,
 the way Wave Link 3.5 does. On the Pro, XLR
 1 and XLR 2 each have their own EQ on the unit, with their own switch and
-their own choice of where it runs. The editor then shows **Hardware processing** in its header and
-names the unit in the line at the bottom, and the **EQ** button's tooltip
-says the same. Everything else stays as described above: the same values,
+their own choice of where it runs. The editor's header then shows
+**Hardware processing** in place of **Software processing**, the line at
+the bottom names the unit, and the **EQ** button's tooltip says the same. Everything else stays as described above: the same values,
 the same curve, **Compare**, Copy and Paste, profiles. Nothing is added to
 the input's route, and the plugin host is not needed.
 

@@ -2747,6 +2747,12 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
   <data name="EqHardwareBadgeTipUnnamed" xml:space="preserve">
     <value>Questo EQ funziona sul processore interno dell'interfaccia, prima dell'USB.</value>
   </data>
+  <data name="EqSoftwareBadge" xml:space="preserve">
+    <value>Elaborazione software</value>
+  </data>
+  <data name="EqSoftwareBadgeTip" xml:space="preserve">
+    <value>Questo EQ funziona su questo computer.</value>
+  </data>
   <data name="EqTheInterface" xml:space="preserve">
     <value>questa interfaccia</value>
   </data>

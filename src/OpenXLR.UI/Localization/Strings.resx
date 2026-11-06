@@ -2760,6 +2760,12 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
   <data name="EqHardwareBadgeTipUnnamed" xml:space="preserve">
     <value>This EQ runs on the interface's own processor, before USB.</value>
   </data>
+  <data name="EqSoftwareBadge" xml:space="preserve">
+    <value>Software processing</value>
+  </data>
+  <data name="EqSoftwareBadgeTip" xml:space="preserve">
+    <value>This EQ runs on this computer.</value>
+  </data>
   <data name="EqTheInterface" xml:space="preserve">
     <value>interface</value>
   </data>

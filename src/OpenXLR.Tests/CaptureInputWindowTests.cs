@@ -416,6 +416,7 @@ public sealed class CaptureInputWindowTests
                 Assert.Equal(Localizer.Format("EqWindowTitle", "Guest microphone with a long name"), editor.Title);
                 Assert.False(editor.FindControl<WrapPanel>("EqProcessing")!.IsEffectivelyVisible);
                 Assert.False(editor.FindControl<Border>("EqHardwareBadge")!.IsEffectivelyVisible);
+                Assert.True(editor.FindControl<Border>("EqSoftwareBadge")!.IsEffectivelyVisible);
                 Assert.False(editor.FindControl<TextBlock>("EqDeviceNote")!.IsEffectivelyVisible);
                 TextBlock status = editor.FindControl<TextBlock>("EqStatus")!;
                 Assert.Equal(Localizer.Text("EqStatusSoftwareCapture"), status.Text);

@@ -2683,6 +2683,12 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
   <data name="EqHardwareBadgeTipUnnamed" xml:space="preserve">
     <value>Овај EQ ради на процесору интерфејса, пре USB-а.</value>
   </data>
+  <data name="EqSoftwareBadge" xml:space="preserve">
+    <value>Софтверска обрада</value>
+  </data>
+  <data name="EqSoftwareBadgeTip" xml:space="preserve">
+    <value>Овај EQ ради на овом рачунару.</value>
+  </data>
   <data name="EqTheInterface" xml:space="preserve">
     <value>интерфејс</value>
   </data>

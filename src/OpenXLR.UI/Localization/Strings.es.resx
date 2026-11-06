@@ -2706,6 +2706,12 @@ Selecciona la interfaz que controla OpenXLR</value>
   <data name="EqHardwareBadgeTipUnnamed" xml:space="preserve">
     <value>Este EQ funciona en el procesador propio de la interfaz, antes del USB.</value>
   </data>
+  <data name="EqSoftwareBadge" xml:space="preserve">
+    <value>Procesamiento en software</value>
+  </data>
+  <data name="EqSoftwareBadgeTip" xml:space="preserve">
+    <value>Este EQ funciona en este ordenador.</value>
+  </data>
   <data name="EqTheInterface" xml:space="preserve">
     <value>la interfaz</value>
   </data>

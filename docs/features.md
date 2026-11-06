@@ -240,7 +240,8 @@ physical gain dial.
   ten a second, read back by the next poll. Moving between the unit and
   software switches the leaving one off first, so a voice is never
   equalised twice. The editor shows a Hardware processing badge while the
-  unit runs it, and a note when the unit's firmware is older than the
+  unit runs it and a Software processing badge while this computer does,
+  and a note when the unit's firmware is older than the
   version its model needs.
   A switch in its footer, **On the unit** or **In software**, sets where
   each microphone's EQ runs. The terminal mixer's Inputs tab offers the
