@@ -34,7 +34,8 @@ function fixture({ existing = [], recovery } = {}) {
   const extensionId = 'openxlr-test';
   const url = path => `chrome-extension://${extensionId}/${path}`;
   f.request = (type, data = {}, sender = { id: extensionId, url: url('popup.html') }) => new Promise(resolve => {
-    listeners.emit({ target: 'worker', type, ...data }, sender, resolve);
+    const site = type === 'start' ? siteOf(f.tabs.find(tab => tab.id === data.id)?.url) : undefined;
+    listeners.emit({ target: 'worker', type, site, ...data }, sender, resolve);
   });
   f.status = (id, capturing, error = null) => f.request('audioStatus', { id, capturing, error }, { id: extensionId, url: url('offscreen.html') });
   const chrome = {
@@ -84,7 +85,11 @@ function fixture({ existing = [], recovery } = {}) {
       async create(options) { (f.opened ??= []).push(options.url); },
       async get(id) { if (f.tabGate) await f.tabGate.promise; const tab = f.tabs.find(item => item.id === id); if (!tab) throw new Error(`No tab with id: ${id}.`); return { ...tab }; },
       async update(id, changes) { if (changes.active) f.activate(id); return { ...f.tabs.find(item => item.id === id) }; },
-      async query(query) { f.queries++; return query.active ? f.tabs.filter(tab => tab.active) : [...f.tabs]; } },
+      async query(query) {
+        f.queries++;
+        if (query.active && f.activeTabGate) await f.activeTabGate.promise;
+        return query.active ? f.tabs.filter(tab => tab.active) : [...f.tabs];
+      } },
     windows: { async update(id, changes) { if (changes.focused) f.focused.push(id); return { id }; } },
     action: { async setBadgeText({ text }) { f.badges.push(text); }, async openPopup(options) { if (f.popupError) throw new Error(f.popupError); f.popups.push(options?.windowId); } },
     offscreen: { async hasDocument() { return f.document; },
@@ -651,6 +656,31 @@ test('stopping one pending activation prevents a late start', async () => {
   f.tabGate.resolve();
   await settle();
   assert.equal(f.tokens.length, 0);
+});
+
+for (const action of ['stop', 'stopAll']) {
+  test(`a popup activation waiting for its active tab lookup is cancelled by ${action}`, { timeout: 2000 }, async () => {
+    const f = await readyFixture();
+    f.activeTabGate = deferred();
+    const start = f.request('start', { id: 1 });
+    await tick();
+    await f.request(action, { id: 1 });
+    f.activeTabGate.resolve();
+    assert.match((await start).error ?? '', /changed while/i);
+    assert.deepEqual(f.tokens, []);
+    assert.equal(f.active.size, 0);
+    assert.equal((await f.request('start', { id: 1 })).error, undefined);
+    assert.deepEqual(f.tokens, [1]);
+  });
+}
+
+test('a popup showing an earlier site cannot capture a new site in the same tab', { timeout: 2000 }, async () => {
+  const f = await readyFixture();
+  f.update(1, 'https://replacement.example/watch');
+  await f.publish({ tabs: f.state.tabs.map(tab => tab.id === 1 ? { ...tab, site: 'https://replacement.example' } : tab) });
+  assert.match((await f.request('start', { id: 1, site: 'https://site1.example' })).error ?? '', /website changed/i);
+  assert.deepEqual(f.tokens, []);
+  assert.equal((await f.request('start', { id: 1 })).error, undefined);
 });
 
 test('a prerendered replacement releases the old tab capture', async () => {
