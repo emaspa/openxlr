@@ -100,6 +100,39 @@ public sealed class MonitorDryLegTests : IDisposable
         Assert.DoesNotContain(writes, w => w.Contains(" 30 ", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RediscoveringTheDryLegRecalculatesTheProcessedSend(bool dryLegPresent)
+    {
+        const string cell = "xlr1|monitor";
+        // The processed leg must be rediscovered too, so ApplyCell performs a
+        // fresh discovery before writing. The dry leg changes in that round.
+        Field<Dictionary<string, int>>("_legIndex").Remove(cell);
+        if (dryLegPresent)
+            Field<Dictionary<string, int>>("_dryLegIndex").Remove(cell);
+        else
+        {
+            string file = Path.Combine(_dir, "legs");
+            string legs = File.ReadAllText(file);
+            File.WriteAllText(file, legs[..legs.IndexOf("Sink Input #30", StringComparison.Ordinal)]);
+        }
+
+        _mixer.SetChannelMuted("xlr1", "monitor", false);
+        string[] writes = Writes();
+        if (dryLegPresent)
+        {
+            int closed = Array.IndexOf(writes, "set-sink-input-mute 10 1");
+            int opened = Array.IndexOf(writes, "set-sink-input-mute 30 0");
+            Assert.True(closed >= 0 && opened > closed, string.Join(" | ", writes));
+        }
+        else
+        {
+            Assert.Contains("set-sink-input-mute 10 0", writes);
+            Assert.DoesNotContain("set-sink-input-mute 30 0", writes);
+        }
+    }
+
     [Fact]
     public void SwitchingOffUnlinksTheDryFeedBeforeTheProcessedSendOpens()
     {

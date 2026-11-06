@@ -32,9 +32,16 @@ public sealed partial class MonitorVolumeIntegrationTests
             mixer.EnsureInputFeeds();
             return mixer.Snapshot().Channels.Single().BindingConnected;
         });
-        pw.CreateNullSink("test_dry_output", "Output");
-        CaptureChainFixture.Wait(() => pw.FindNodeId("test_dry_output") is not null);
-        mixer.SetMonitorOutputs(["test_dry_output"]);
+        // The output can arrive after selection. Like the daemon, retry the
+        // route until both playback links exist, rather than waiting for the
+        // node alone, which PipeWire can announce before its ports.
+        const string output = "test_dry_output";
+        var monitorRoute = new PortLink([
+            ("OpenXLR_mix_monitor:monitor_FL", output + ":playback_FL"),
+            ("OpenXLR_mix_monitor:monitor_FR", output + ":playback_FR"),
+        ]);
+        mixer.SetMonitorOutputs([output]);
+        pw.CreateNullSink(output, "Output");
         mixer.SetInserts("xlr1", [CaptureChainFixture.Gain(1, .25)]);
         Assert.Null(Assert.Single(mixer.Snapshot().Inserts["xlr1"]).Error);
 
@@ -42,7 +49,11 @@ public sealed partial class MonitorVolumeIntegrationTests
         Recorded(.025);
 
         mixer.SetMonitorDry("xlr1", true);
-        Assert.Contains("xlr1", mixer.DryCarrying);
+        CaptureChainFixture.Wait(() =>
+        {
+            mixer.EnsureFilterRoutes();
+            return mixer.DryCarrying.Contains("xlr1");
+        });
         Assert.True(mixer.Snapshot().Channels.Single().MonitorDry);
         // Only the monitor mix has a leg from the dry route.
         IReadOnlyDictionary<string, int> legs = CombineLegs(pw, "OpenXLR_ch_xlr1.dry");
@@ -92,8 +103,13 @@ public sealed partial class MonitorVolumeIntegrationTests
 
         void Monitor(double expected)
         {
+            CaptureChainFixture.Wait(() =>
+            {
+                mixer.EnsureMonitorRoutes();
+                return pw.LinksPresent(monitorRoute);
+            });
             mixer.EnsureCellLevels();
-            CaptureLevel(expected, "dry_signal", "test_dry_output");
+            CaptureLevel(expected, "dry_signal", output);
         }
 
         void Recorded(double expected) => CaptureLevel(expected, "dry_signal", stream.VirtualMicName, virtualMicrophone: true);

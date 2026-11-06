@@ -3649,7 +3649,6 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     private void ApplyCellLocked(string channelId, string mixId)
     {
         string cell = Cell(channelId, mixId);
-        var targets = CellLegTargetsLocked(channelId, mixId, out bool waiting);
         bool bus = _duckBuses.ContainsKey(mixId);
         if (!_legIndex.ContainsKey(cell) || bus && !_duckLegIndex.ContainsKey(cell)) DiscoverLegsLocked();
         try
@@ -3672,6 +3671,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 MarkCellPendingLocked(cell);
                 return;
             }
+            // Discovery can add or remove the dry leg. Use the current
+            // routing for both the first write and a retry after rediscovery.
+            var targets = CellLegTargetsLocked(channelId, mixId, out bool waiting);
             // A dry leg the cell does not use closes before the channel's own
             // legs open, and one it uses opens after they closed.
             bool dry = DryCarriesLocked(channelId, mixId);

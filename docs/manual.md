@@ -289,8 +289,9 @@ monitor mix you added. Stream, Chat, the other virtual microphones and the
 Aux mix still get the processed voice. The send's level and mute,
 the channel volume and the monitor's master work as before. Switching it
 moves only that microphone's monitor sends; the other mixes and the
-plugins keep running. While Sound Check plays a take, you hear the take
-through the effects. On the MK.2 units, the Wave:3, the Wave:3 MK.2 and
+plugins keep running. When a dry send is missing, the mixer uses the
+processed send until the dry route is ready. While Sound Check plays a
+take, you hear it through the effects. On the MK.2 units, the Wave:3, the Wave:3 MK.2 and
 the Wave:1 the switch changes the monitor mix only; the unit's own direct
 monitor and the Mic ↔ PC crossfade are as before. On the Wave XLR Pro in
 [hardware mixing](#hardware-mixing) the jacks play the microphone from its
