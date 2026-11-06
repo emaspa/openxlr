@@ -199,8 +199,8 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
-    # A cold DeepFilterNet build plus the native tests can use most of 15
-    # minutes before the final .NET build and catalogue checks start.
+    # Package mirror retries and a cold DeepFilterNet build take time
+    # before the native tests and the final .NET and catalogue checks.
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -242,7 +242,9 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Mirror retries alone can use most of 20 minutes before the native
+    # build and the private PipeWire suite have a chance to run.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
