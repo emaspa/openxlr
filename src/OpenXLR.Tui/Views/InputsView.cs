@@ -276,7 +276,7 @@ internal sealed class InputsView : View
     }
 
     /// <summary>
-    /// Each microphone's EQ: what runs it, and where a unit that runs the EQ
+    /// Each input's EQ, microphone or capture input: what runs it, and where a unit that runs the EQ
     /// itself carries the microphone, the choice between the unit and this
     /// computer, which setEqProcessing sends. Each complete EQ opens its band editor.
     /// </summary>
@@ -285,7 +285,7 @@ internal sealed class InputsView : View
         DaemonLink link = app.Link;
         List<ChannelEntry> microphones = [.. state.Mixer.Shown.Where(channel => channel.Eq is not null)];
         if (microphones.Count == 0) return;
-        rows.Add(new HeadingRow("Microphone EQ"));
+        rows.Add(new HeadingRow("Input EQ"));
         string[] places = ["on the unit", "in software"];
         foreach (ChannelEntry channel in microphones)
         {

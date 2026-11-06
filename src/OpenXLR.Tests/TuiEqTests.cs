@@ -124,7 +124,7 @@ public sealed class TuiEqTests
 
         string[] frame = Draw(Ready(DockJson).App);
         string all = string.Join('\n', frame);
-        Assert.Contains("Microphone EQ", all, StringComparison.Ordinal);
+        Assert.Contains("Input EQ", all, StringComparison.Ordinal);
         Assert.Contains(frame, line => line.Contains("XLR 1 EQ", StringComparison.Ordinal) && line.Contains("on, on the XLR Dock MK.2", StringComparison.Ordinal));
         Assert.Contains(frame, line => line.Contains("XLR 1 EQ runs", StringComparison.Ordinal) && line.Contains("on the unit", StringComparison.Ordinal));
         // XLR 2 is not on this unit, so it is not listed; a channel without an EQ never is.
@@ -272,7 +272,7 @@ public sealed class TuiEqTests
         {
             foreach (JsonNode? channel in root["mixer"]!["channels"]!.AsArray()) channel!.AsObject().Remove("eq");
         }));
-        Assert.DoesNotContain("Microphone EQ", string.Join('\n', Draw(older)), StringComparison.Ordinal);
+        Assert.DoesNotContain("Input EQ", string.Join('\n', Draw(older)), StringComparison.Ordinal);
     }
 
     /// <summary>
