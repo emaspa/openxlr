@@ -4211,8 +4211,6 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
   <data name="FlowUnitMixes" xml:space="preserve">
     <value>Binubuo ang {0}</value>
   </data>
-  <data name="AutoRestartDaemonAfterUpdate" xml:space="preserve"><value>Awtomatikong i-restart ang daemon pagkatapos ng update</value></data>
-  <data name="AutoRestartDaemonAfterUpdateHint" xml:space="preserve"><value>Kung kumonekta ang mixer sa mas lumang audio service ng systemd pagkatapos ng update, ire-restart nito ang service at bubuksan ulit ang mixer nang hindi nagtatanong. Sandaling mapuputol ang audio, kahit may tawag o stream.</value></data>
   <data name="DaemonUpgradeTitle" xml:space="preserve"><value>I-restart ang OpenXLR pagkatapos ng update?</value></data>
   <data name="DaemonUpgradeQuestion" xml:space="preserve"><value>Tumatakbo pa ang mas lumang audio daemon. I-restart ngayon ang daemon at ang window na ito? Sandaling mapuputol ang audio. Piliin ang Mamaya para tuloy ang audio.</value></data>
   <data name="Restart" xml:space="preserve"><value>I-restart</value></data>

@@ -4287,8 +4287,6 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
   <data name="TextSizeMuchLarger" xml:space="preserve">
     <value>Molto più grande (120%)</value>
   </data>
-  <data name="AutoRestartDaemonAfterUpdate" xml:space="preserve"><value>Riavvia automaticamente il servizio audio dopo gli aggiornamenti</value></data>
-  <data name="AutoRestartDaemonAfterUpdateHint" xml:space="preserve"><value>Se dopo un aggiornamento il mixer si connette a un servizio audio systemd di una versione precedente, riavvia il servizio e riapre il mixer senza chiedere. L'audio si interrompe brevemente, anche durante chiamate o dirette.</value></data>
   <data name="DaemonUpgradeTitle" xml:space="preserve"><value>Riavviare OpenXLR dopo l'aggiornamento?</value></data>
   <data name="DaemonUpgradeQuestion" xml:space="preserve"><value>È ancora in esecuzione una versione precedente del servizio audio. Riavviare il servizio e questa finestra adesso? L'audio si interromperà brevemente. Scegli Più tardi per mantenere l'audio attivo.</value></data>
   <data name="Restart" xml:space="preserve"><value>Riavvia</value></data>

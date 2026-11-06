@@ -3239,8 +3239,8 @@ banner naming the daemon's version and its own, with a Restart daemon
 button, and offers only the controls the old daemon reports.
 
 When the native UI connects to an older daemon managed by the user service,
-it asks by default whether to restart OpenXLR. Restart briefly stops audio,
-restarts the daemon and reopens the mixer, including when the UI normally starts
+it asks whether to restart OpenXLR. Restart briefly stops audio, restarts
+the daemon and reopens the mixer, including when the UI normally starts
 minimized. Later, Escape and closing the question leave the daemon and
 audio running. The question appears once per UI version in
 the runtime directory (the configuration directory when no runtime directory
@@ -3248,14 +3248,6 @@ is set); the banner's Restart daemon button remains available.
 A disconnected or replaced daemon is not restarted by an answer to an old
 question. A failed restart leaves the UI open with an error. Flatpak and
 daemons started by hand keep the existing restart controls.
-
-In **Options > General > Updates**, **Automatically restart the daemon
-after updates** lets you give consent in advance. It is off by default.
-Turning it on saves the preference. When the visible mixer next finds an
-eligible older daemon, it restarts the service and reopens the mixer without asking,
-which can briefly interrupt a call or stream. The same process ID checks
-and once-per-version limit apply. Turn the option off to ask again on
-future updates.
 
 Releases before 0.3.0 served their clients on a loopback port with a
 token. Since 0.3.0 the daemon uses a private Unix socket instead, authenticated by

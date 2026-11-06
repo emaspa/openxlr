@@ -4119,6 +4119,4 @@ Aus dem Tray holst du den Mixer über das OpenXLR-Symbol oder dein App-Menü zur
   <data name="DaemonUpgradeQuestion" xml:space="preserve"><value>Ein älterer Daemon läuft noch. Daemon und dieses Fenster jetzt neu starten? Audio wird kurz unterbrochen. Mit Später läuft dein Audio weiter.</value></data>
   <data name="Restart" xml:space="preserve"><value>Neu starten</value></data>
   <data name="Later" xml:space="preserve"><value>Später</value></data>
-  <data name="AutoRestartDaemonAfterUpdate" xml:space="preserve"><value>Daemon nach Updates automatisch neu starten</value></data>
-  <data name="AutoRestartDaemonAfterUpdateHint" xml:space="preserve"><value>Verbindet sich der Mixer nach einem Update mit einem älteren systemd-Audiodienst, startet er den Dienst ohne Rückfrage neu und öffnet den Mixer erneut. Dabei wird der Ton kurz unterbrochen, auch in Anrufen oder Streams.</value></data>
 </root>

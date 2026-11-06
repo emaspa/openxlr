@@ -27,8 +27,6 @@ public sealed record UiSettings
     public bool StartMinimized { get; init; }
     /// <summary>Opt-in only. False means the UI performs no startup network request.</summary>
     public bool CheckForUpdates { get; init; }
-    /// <summary>Opt in to restarting an older systemd daemon and reopening the mixer after an update.</summary>
-    public bool AutoRestartDaemonAfterUpdate { get; init; }
     /// <summary>Successful or failed automatic checks are limited to once per day.</summary>
     public DateTimeOffset? LastUpdateCheckUtc { get; init; }
     /// <summary>Release tag whose banner the user dismissed.</summary>

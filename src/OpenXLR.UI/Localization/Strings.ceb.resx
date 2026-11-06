@@ -4211,8 +4211,6 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
   <data name="FlowUnitMixes" xml:space="preserve">
     <value>Nagtukod sa {0}</value>
   </data>
-  <data name="AutoRestartDaemonAfterUpdate" xml:space="preserve"><value>Awtomatikong i-restart ang daemon human sa update</value></data>
-  <data name="AutoRestartDaemonAfterUpdateHint" xml:space="preserve"><value>Kon mokonekta ang mixer sa mas karaang serbisyo sa audio sa systemd human sa update, i-restart niini ang serbisyo ug ablihan pag-usab ang mixer nga dili mangutana. Mabalda kadiyot ang audio bisan panahon sa tawag o stream.</value></data>
   <data name="DaemonUpgradeTitle" xml:space="preserve"><value>I-restart ang OpenXLR human sa update?</value></data>
   <data name="DaemonUpgradeQuestion" xml:space="preserve"><value>Nagdagan pa ang mas karaang audio daemon. I-restart karon ang daemon ug kining bintana? Mabalda kadiyot ang audio. Pilia ang Unya aron magpadayon ang audio.</value></data>
   <data name="Restart" xml:space="preserve"><value>I-restart</value></data>

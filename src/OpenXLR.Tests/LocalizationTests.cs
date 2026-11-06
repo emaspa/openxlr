@@ -144,10 +144,9 @@ public sealed class LocalizationTests
     }
 
     [Fact]
-    public void EveryTranslationCoversTheUpgradeQuestionAndAutomaticRestartSetting()
+    public void EveryTranslationCoversTheUpgradeQuestion()
     {
-        string[] keys = ["DaemonUpgradeTitle", "DaemonUpgradeQuestion", "Restart", "Later",
-            "AutoRestartDaemonAfterUpdate", "AutoRestartDaemonAfterUpdateHint"];
+        string[] keys = ["DaemonUpgradeTitle", "DaemonUpgradeQuestion", "Restart", "Later"];
         foreach (var language in Localizer.Languages.Skip(1))
         {
             var translated = Read($"Strings.{language.Id}.resx");

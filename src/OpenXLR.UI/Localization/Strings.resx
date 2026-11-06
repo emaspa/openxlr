@@ -4455,6 +4455,4 @@ When the window is in the tray, open it again from the OpenXLR icon or your app 
   <data name="DaemonUpgradeQuestion" xml:space="preserve"><value>An older daemon is still running. Restart the daemon and this window now? Audio stops briefly. Choose Later to keep your audio running.</value></data>
   <data name="Restart" xml:space="preserve"><value>Restart</value></data>
   <data name="Later" xml:space="preserve"><value>Later</value></data>
-  <data name="AutoRestartDaemonAfterUpdate" xml:space="preserve"><value>Automatically restart the daemon after updates</value></data>
-  <data name="AutoRestartDaemonAfterUpdateHint" xml:space="preserve"><value>If the mixer connects to an older systemd audio service after an update, it restarts the service and reopens the mixer without asking. Audio stops briefly, including during calls or streams.</value></data>
 </root>
