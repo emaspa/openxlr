@@ -446,8 +446,8 @@ public sealed class EqEditorWindowTests
     private static string Sizing(bool touch) => touch ? "touch" : "standard";
 
     /// <summary>
-    /// A mix's EQ: the button under each mix's plugin chain in the matrix
-    /// head, inside the head at every width; the same editor, named for the
+    /// A mix's EQ: the button over each mix's plugin chain in the matrix
+    /// head, as the signal meets them, inside the head at every width; the same editor, named for the
     /// mix, with no unit and no choice of where; its commands name the mix
     /// and no channel; and its profile list holds every built-in profile, the
     /// voice curves and the listening curves alike.
@@ -471,6 +471,11 @@ public sealed class EqEditorWindowTests
                 {
                     Border head = button.GetVisualAncestors().OfType<Border>().First(b => b.Name == "MatrixColumn");
                     AssertInside(button, head);
+                    // Over the chain, as the signal meets them.
+                    Button chain = head.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("matrixEffects"));
+                    AssertNoOverlap([button, chain]);
+                    Assert.True(button.TranslatePoint(new Point(0, button.Bounds.Height), head)!.Value.Y
+                        <= chain.TranslatePoint(default, head)!.Value.Y + 0.5, where);
                     Assert.Equal(Localizer.Text("Eq"), button.Content);
                     Assert.DoesNotContain("fxOn", button.Classes);
                     Assert.Equal(Localizer.Text("EqButtonTipMix"), ToolTip.GetTip(button));

@@ -1942,9 +1942,11 @@ monitor mix you add, Stream, Chat, the other virtual microphones and Aux.
 It shapes what that mix plays, such as your headphones or what your stream
 hears, and leaves the other mixes alone. It is the microphone EQ with the
 same editor, bands, values and profiles, and it always runs on this
-computer, after the mix's plugins and before its outputs.
+computer. It comes first in the mix, before the mix's plugins and its
+outputs, as a microphone's EQ comes before its plugins, so a limiter in
+the mix's chain also catches what the EQ boosts.
 
-- Open it with **EQ** under the mix's **FX**: in the matrix column head,
+- Open it with **EQ** over the mix's **FX**: in the matrix column head,
   and in the mix strips of the other layouts. **EQ** turns green while the
   EQ runs and red when it cannot run. The editor is named after the mix and
   has no **Where the EQ runs** switch or **Hardware processing** badge.
@@ -3183,10 +3185,10 @@ MONITOR hear it (or what kind of mix it is when none does), a thin line in
 the mix's colour when you gave it one in the layout editor, and its mute,
 master level and **FX**, which opens the mix's plugin chain. **FX** is
 green while the chain is processing and red when its plugins are all
-bypassed or failed; an empty chain keeps the plain button. Under **FX**,
-**EQ** opens the mix's [output EQ](#output-eq). While you move
-a column's master, and for a second after, its volume shows at the right
-end of the name line, opposite the mix's name.
+bypassed or failed; an empty chain keeps the plain button. Over **FX**,
+**EQ** opens the mix's [output EQ](#output-eq), which comes before its
+plugins. While you move a column's master, and for a second after, its
+volume shows at the right end of the name line, opposite the mix's name.
 
 HEADPHONES and MONITOR share the row above the matrix: the headphone
 levels and the direct monitor blend on the left, the output picker and its

@@ -776,21 +776,21 @@
                     <ToggleButton layout:StripPanel.Part="mute" Classes="mute mutemini matrixMute" IsChecked="{Binding Mix.Muted, Mode=TwoWay}"
                                   Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                                   AutomationProperties.Name="{Binding MuteName}" ToolTip.Tip="{Binding MuteName}"/>
-                    <!-- the mix's plugin chain over its EQ, in the order the signal meets them, one over
+                    <!-- the mix's EQ over its plugin chain, in the order the signal meets them, one over
                          the other as a microphone row has them, so the part keeps the chain's width -->
                     <StackPanel layout:StripPanel.Part="effects" Name="MatrixMixEffectsPart" Spacing="2" VerticalAlignment="Center">
-                      <Button Classes="matrixEffects fx" Content="{loc:Text Key=MatrixEffects}"
-                              Classes.fxOn="{Binding Mix.Inserts.IsProcessing}" Classes.fxOff="{Binding Mix.Inserts.IsOff}"
-                              Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                              MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
-                              Click="OnMixInserts" AutomationProperties.Name="{Binding Mix.Inserts.ButtonText}"
-                              ToolTip.Tip="{Binding Mix.Inserts.ButtonTip}"/>
                       <Button Name="MatrixMixEq" Classes="matrixEq fx" Content="{loc:Text Key=Eq}"
                               Classes.fxOn="{Binding Mix.Eq.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Mix.Eq.IsFaulty, FallbackValue=False}"
                               Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                               MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding Mix.HasEq}"
                               IsEnabled="{Binding Mix.Eq.CanOpen, FallbackValue=False}" ToolTip.ShowOnDisabled="True" Click="OnMixEq"
                               AutomationProperties.Name="{Binding Mix.Eq.ButtonName, FallbackValue=''}" ToolTip.Tip="{Binding Mix.Eq.ButtonTip, FallbackValue=''}"/>
+                      <Button Classes="matrixEffects fx" Content="{loc:Text Key=MatrixEffects}"
+                              Classes.fxOn="{Binding Mix.Inserts.IsProcessing}" Classes.fxOff="{Binding Mix.Inserts.IsOff}"
+                              Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                              MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                              Click="OnMixInserts" AutomationProperties.Name="{Binding Mix.Inserts.ButtonText}"
+                              ToolTip.Tip="{Binding Mix.Inserts.ButtonTip}"/>
                     </StackPanel>
                   </layout:StripPanel>
                   <layout:StripPanel Spec="{Binding TextSpec}" Spacing="1">

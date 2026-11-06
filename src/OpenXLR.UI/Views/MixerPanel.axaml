@@ -155,6 +155,12 @@
                               AutomationProperties.Name="{Binding Mix.Name, StringFormat={loc:Text Key=MonitorDryName}}" ToolTip.Tip="{loc:Text Key=MonitorDryTip}"/>
               </Grid>
             </layout:StripPanel>
+            <!-- the mix's EQ, before its plugins as the signal meets them -->
+            <Button Name="MixEq" Content="{loc:Text Key=Eq}" HorizontalAlignment="Stretch" Classes="fx"
+                    Classes.fxOn="{Binding Mix.Eq.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Mix.Eq.IsFaulty, FallbackValue=False}"
+                    HorizontalContentAlignment="Center" Padding="8,4" FontSize="{DynamicResource UiText.FontSize12}" Click="OnMixEq"
+                    IsVisible="{Binding Mix.HasEq}" IsEnabled="{Binding Mix.Eq.CanOpen, FallbackValue=False}" ToolTip.ShowOnDisabled="True"
+                    AutomationProperties.Name="{Binding Mix.Eq.ButtonName, FallbackValue=''}" ToolTip.Tip="{Binding Mix.Eq.ButtonTip, FallbackValue=''}"/>
             <Button Content="{Binding Mix.Inserts.ButtonText}" HorizontalAlignment="Stretch" Classes="fx" Classes.fxOn="{Binding Mix.Inserts.IsProcessing}" Classes.fxOff="{Binding Mix.Inserts.IsOff}"
                     HorizontalContentAlignment="Center" Padding="8,4" FontSize="{DynamicResource UiText.FontSize12}" Click="OnMixInserts"
                     ToolTip.Tip="{Binding Mix.Inserts.ButtonTip}"/>
@@ -186,12 +192,6 @@
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
-            <!-- the mix's EQ, after its plugins as the signal meets them -->
-            <Button Name="MixEq" Content="{loc:Text Key=Eq}" HorizontalAlignment="Stretch" Classes="fx"
-                    Classes.fxOn="{Binding Mix.Eq.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Mix.Eq.IsFaulty, FallbackValue=False}"
-                    HorizontalContentAlignment="Center" Padding="8,4" FontSize="{DynamicResource UiText.FontSize12}" Click="OnMixEq"
-                    IsVisible="{Binding Mix.HasEq}" IsEnabled="{Binding Mix.Eq.CanOpen, FallbackValue=False}" ToolTip.ShowOnDisabled="True"
-                    AutomationProperties.Name="{Binding Mix.Eq.ButtonName, FallbackValue=''}" ToolTip.Tip="{Binding Mix.Eq.ButtonTip, FallbackValue=''}"/>
             <ToggleButton Content="{loc:Text Key=ToUSBAuxPort}" IsChecked="{Binding Mix.AuxPortEnabled, Mode=TwoWay}"
                           IsVisible="{Binding Mix.ShowAuxPortToggle}"
                           ToolTip.Tip="{loc:Text Key=SendThisMixToTheSecondComputerOn}"/>
@@ -245,6 +245,12 @@
             </layout:StripPanel>
             <ToggleButton Content="150%" IsChecked="{Binding Mix.VolumeRange.Boost, Mode=TwoWay}" IsVisible="{Binding Mix.IsMonitor}"
                           Padding="4,2" FontSize="{DynamicResource UiText.FontSize11}" ToolTip.Tip="{loc:Text Key=AllowThisMonitorMixAbove100Up}"/>
+            <!-- the mix's EQ, before its plugins as the signal meets them -->
+            <Button Name="MixEqCompact" Content="{loc:Text Key=Eq}" Padding="4,2" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Stretch" Classes="fx"
+                    Classes.fxOn="{Binding Mix.Eq.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Mix.Eq.IsFaulty, FallbackValue=False}"
+                    HorizontalContentAlignment="Center" Click="OnMixEq"
+                    IsVisible="{Binding Mix.HasEq}" IsEnabled="{Binding Mix.Eq.CanOpen, FallbackValue=False}" ToolTip.ShowOnDisabled="True"
+                    AutomationProperties.Name="{Binding Mix.Eq.ButtonName, FallbackValue=''}" ToolTip.Tip="{Binding Mix.Eq.ButtonTip, FallbackValue=''}"/>
             <!-- compact effects access: the chain's button and one lamp per
                  plugin, failing ones lit in the alert colour; bypass and the
                  rest live in the chain window -->
@@ -263,11 +269,6 @@
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
-            <Button Name="MixEqCompact" Content="{loc:Text Key=Eq}" Padding="4,2" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Stretch" Classes="fx"
-                    Classes.fxOn="{Binding Mix.Eq.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Mix.Eq.IsFaulty, FallbackValue=False}"
-                    HorizontalContentAlignment="Center" Click="OnMixEq"
-                    IsVisible="{Binding Mix.HasEq}" IsEnabled="{Binding Mix.Eq.CanOpen, FallbackValue=False}" ToolTip.ShowOnDisabled="True"
-                    AutomationProperties.Name="{Binding Mix.Eq.ButtonName, FallbackValue=''}" ToolTip.Tip="{Binding Mix.Eq.ButtonTip, FallbackValue=''}"/>
             <ToggleButton Content="{loc:Text Key=ToUSBAuxPort}" IsChecked="{Binding Mix.AuxPortEnabled, Mode=TwoWay}"
                           IsVisible="{Binding Mix.ShowAuxPortToggle}" Padding="4,2" FontSize="{DynamicResource UiText.FontSize11}"
                           ToolTip.Tip="{loc:Text Key=SendThisMixToTheSecondComputerOn}"/>
