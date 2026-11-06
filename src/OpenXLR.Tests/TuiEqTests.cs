@@ -274,4 +274,33 @@ public sealed class TuiEqTests
         }));
         Assert.DoesNotContain("Microphone EQ", string.Join('\n', Draw(older)), StringComparison.Ordinal);
     }
+
+    /// <summary>
+    /// A capture input on a stereo pair, which the daemon reports with an EQ
+    /// that runs on this computer and no noise removal: it is listed with its
+    /// status and its band editor, without a choice of where it runs.
+    /// </summary>
+    [Fact]
+    public void AStereoCaptureInputsEqIsListedWithItsBands()
+    {
+        string json = Edit(root => root["mixer"]!["channels"]!.AsArray().Add(JsonNode.Parse($$"""
+            { "id": "camera", "name": "Camera", "levels": { "monitor": 1 }, "mutedIn": [], "hardware": false,
+              "captureSource": "usb_camera", "capturePair": 0, "captureConnected": true, "microphone": false, "chainWidth": 2,
+              "eq": { "enabled": true, "bands": {{JsonSerializer.Serialize(OpenXLR.Core.Mixing.MicEq.Default.Bands, new JsonSerializerOptions(JsonSerializerDefaults.Web))}},
+                      "backend": "software", "available": true, "error": null, "processing": "software", "device": null } }
+            """)));
+        ChannelEntry camera = Snapshot.Parse(json)!.Mixer.Channels.Single(c => c.Id == "camera");
+        Assert.False(camera.Eq!.Offered);
+        Assert.Null(camera.Noise);
+        Assert.True(EqEditor.CanEdit(camera));
+
+        (App app, List<string> sent) = Ready(json);
+        string[] frame = Draw(app);
+        string all = string.Join('\n', frame);
+        Assert.Contains(frame, line => line.Contains("Camera EQ", StringComparison.Ordinal) && line.Contains("on, in software", StringComparison.Ordinal));
+        Assert.DoesNotContain("Camera EQ runs", all, StringComparison.Ordinal);
+        Assert.DoesNotContain("Camera noise removal", all, StringComparison.Ordinal);
+        Assert.Contains("edit EQ", Select(app, "Camera bands"), StringComparison.Ordinal);
+        Assert.Empty(sent);
+    }
 }

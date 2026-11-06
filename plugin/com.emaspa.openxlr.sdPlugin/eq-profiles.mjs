@@ -7,7 +7,7 @@
 // profile's bands, as the daemon reports them. Every built-in profile, the
 // voice curves and the listening curves, is offered on every EQ.
 
-import { eqHeldByUnit } from "./microphone-eq.mjs";
+import { carriesEq, eqHeldByUnit } from "./microphone-eq.mjs";
 
 // Built-in profiles by key, in the plugin's language; a key it does not know
 // keeps the daemon's English name.
@@ -91,8 +91,7 @@ export function eqProfileTarget(state, target) {
   if (!parts) return null;
   const mixer = state?.mixer;
   const channel = parts.mix ? mixes(mixer).find(m => m?.id === parts.channel)
-    : channels(mixer).find(c => c?.id === parts.channel && c.present !== false
-      && (c.microphone === true || c.microphone !== false && (c.id === "xlr1" || c.id === "xlr2")));
+    : channels(mixer).find(c => c?.id === parts.channel && c.present !== false && carriesEq(c));
   if (!channel || !channel.eq || typeof channel.eq.enabled !== "boolean") return null;
   const listed = profileList(state).filter(validProfile);
   const lower = parts.profile.toLowerCase();
@@ -123,15 +122,14 @@ export function eqProfileLabel(entry, target) {
   return `EQ profile\n${name}`;
 }
 
-// The inspector's groups: one per microphone with an EQ, a key per profile,
-// the built-in ones first and marked as built in.
+// The inspector's groups: one per microphone or capture input with an EQ, a
+// key per profile, the built-in ones first and marked as built in.
 export function eqProfileChoices(state) {
   const toggleGroups = [];
   const listed = profileList(state).filter(validProfile);
   if (!listed.length) return {toggleGroups};
   for (const channel of channels(state?.mixer)) {
-    if (typeof channel?.id !== "string" || !channel.eq || channel.present === false
-        || !(channel.microphone === true || channel.microphone !== false && (channel.id === "xlr1" || channel.id === "xlr2"))) continue;
+    if (typeof channel?.id !== "string" || !channel.eq || channel.present === false || !carriesEq(channel)) continue;
     const name = nameOf(channel);
     toggleGroups.push({id: `layout-eq-profiles-${channel.id}`, label: `Load EQ profile: ${name}`,
       items: listed.map(p => ({target: `${PREFIX}${channel.id}:${p.id}`,
