@@ -740,6 +740,12 @@
                 <ToggleButton Name="CaptureMute" Content="{loc:Text Key=Mute}" Classes="mute" HorizontalAlignment="Left"
                               IsChecked="{Binding CaptureMuted, Mode=TwoWay}" IsVisible="{Binding ShowsCaptureMute}"
                               AutomationProperties.Name="{Binding CaptureMuteName}" ToolTip.Tip="{loc:Text Key=CaptureMuteTip}"/>
+                <!-- the device on a clock of its own, for one that misbehaves while it follows the mixer's -->
+                <CheckBox Name="CaptureOwnClock" Content="{loc:Text Key=CaptureOwnClock}" HorizontalAlignment="Left"
+                          IsChecked="{Binding OwnClock, Mode=TwoWay}" IsVisible="{Binding HasOwnClock}"
+                          ToolTip.Tip="{loc:Text Key=CaptureOwnClockTip}"/>
+                <TextBlock Name="CaptureOwnClockStatus" Text="{Binding OwnClockStatus}" Classes="hint" FontSize="{DynamicResource UiText.FontSize11}"
+                           TextWrapping="Wrap" IsVisible="{Binding HasOwnClockStatus}"/>
                 <Grid ColumnDefinitions="Auto,*,Auto,64" IsVisible="{Binding HasVolume}">
                   <TextBlock Text="{loc:Text Key=Volume}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
                   <Slider Grid.Column="1" vm:FaderInput.Step="0.01" Minimum="0" Maximum="1" Value="{Binding Volume, Mode=TwoWay}"

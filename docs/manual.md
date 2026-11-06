@@ -4856,6 +4856,15 @@ clock, pick it in the UI:
    gone. The capture card or webcam is now the one resampled, so listen to
    its audio too.
 
+If the capture card or webcam then misbehaves as the one resampled, its
+sound garbled or the device dropping off USB, turn on **Own clock** for its
+capture input ([Own clock](#own-clock)). The card then keeps its own clock
+and the interface keeps the mixer's, at the cost of a short delay on the
+card's audio. Flow shows the card's input as "On its own clock, bridged into
+the mixer", and a diagnostics archive lists it on a line that starts with
+`capture input`, followed by the bridge's delay, underruns, overruns and
+drift.
+
 The choice is a WirePlumber rule that the daemon writes to
 `~/.config/wireplumber/wireplumber.conf.d/57-openxlr-clock.conf`. It gives
 the input's node `priority.driver` 3000, above every number WirePlumber
@@ -5075,6 +5084,29 @@ the new value within a second and does not set it back. A capture input on a Wav
 interface or an XLR Dock has no gain of this kind; it shows the unit's own
 gain while OpenXLR drives the unit. OpenXLR never changes the volume of
 those units' sources, the Wave XLR Pro's included.
+
+<a name="own-clock"></a>
+**Own clock**, under the Mute button in the classic INPUTS block and as a
+row on the terminal mixer's Inputs tab, puts the capture input's device on a
+clock of its own. Normally every device that feeds the mixer runs on one
+clock, the one the microphone's interface gives the graph, and PipeWire
+resamples the others to it. Some devices do not survive that. An Elgato
+4K X on some USB4 controllers garbles and then drops off USB within
+seconds. With **Own clock** on, the device keeps its own timing and a
+bridge inside OpenXLR's native helper carries its sound into the mixer,
+correcting the drift between the two clocks itself. The microphone's clock
+is not touched. The input's sound arrives about 27 ms later when the
+audio server runs 256-frame blocks, about 75 ms later at 1024. The line under the
+switch shows the delay once the bridge carries sound, and how many dropouts
+it had, if any. A few dropouts after plugging the device in or waking the
+computer are normal; a count that keeps climbing means the device's timing
+is worse than the bridge's margin. Mic setup ends when you switch it.
+
+Switch it on for every capture input on that device. An input on the same
+device left on the mixer's clock links the device into the mixer again, and
+the bridge cannot keep it apart; **Flow** and a diagnostics archive say so.
+The setting is saved with the input in the layout, not in a profile. It
+needs the native helper; without it the input stays silent and says why.
 
 A capture channel on the primary interface's own source, at the first port
 or pair for its first microphone or the third port or second pair for its

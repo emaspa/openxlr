@@ -112,6 +112,9 @@ internal sealed record ChannelEntry
     /// </summary>
     public CaptureGainEntry? CaptureGain { get; init; }
 
+    /// <summary>A capture input's own clock, or null on every other channel and from a daemon that predates it.</summary>
+    public OwnClockEntry? OwnClock { get; init; }
+
     /// <summary>A microphone's EQ, or null for a channel that has none and from a daemon that predates it.</summary>
     public EqEntry? Eq { get; init; }
 
@@ -402,6 +405,16 @@ internal sealed record CaptureGainEntry
     public double MaxDb { get; init; }
     public bool Hardware { get; init; }
     public bool? Muted { get; init; }
+}
+
+/// <summary>A capture input's own clock: on or off, and while on, whether its bridge carries audio and the delay it adds.</summary>
+internal sealed record OwnClockEntry
+{
+    public bool On { get; init; }
+    public bool Running { get; init; }
+    public double? DelayMs { get; init; }
+    public long Underruns { get; init; }
+    public long Overruns { get; init; }
 }
 
 internal sealed record UnitInputEntry

@@ -2388,6 +2388,60 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
     /// <summary>The mute button's name for a screen reader.</summary>
     public string CaptureMuteName => Localizer.Format("MixMuteName", Name);
 
+    private bool _hasOwnClock, _ownClock, _applyingOwnClock;
+    private string? _ownClockStatus;
+
+    /// <summary>The daemon reports an own clock for this capture input; an older daemon does not, and the strip draws no switch.</summary>
+    public bool HasOwnClock { get => _hasOwnClock; private set => Set(ref _hasOwnClock, value); }
+
+    /// <summary>
+    /// The capture input's device runs on its own clock, bridged into the
+    /// mixer. Switching it sends setCaptureOwnClock at once; the next state
+    /// confirms it, or puts it back when the daemon refuses.
+    /// </summary>
+    public bool OwnClock
+    {
+        get => _ownClock;
+        set
+        {
+            if (!Set(ref _ownClock, value) || _applyingOwnClock || _detached || !_hasOwnClock) return;
+            _ = _client.SetCaptureOwnClockAsync(Id, value);
+        }
+    }
+
+    /// <summary>What the bridge does, under the switch while it is on: the delay it adds, or that it waits for the device.</summary>
+    public string? OwnClockStatus { get => _ownClockStatus; private set { if (Set(ref _ownClockStatus, value)) Raise(nameof(HasOwnClockStatus)); } }
+
+    public bool HasOwnClockStatus => _ownClockStatus is not null;
+
+    /// <summary>Take the daemon's ownClock, or its absence.</summary>
+    private void ApplyOwnClock(JsonNode? clock)
+    {
+        _applyingOwnClock = true;
+        try
+        {
+            HasOwnClock = CaptureSource is not null && clock is JsonObject;
+            OwnClock = clock?["on"] is JsonValue on && on.TryGetValue(out bool value) && value;
+            OwnClockStatus = OwnClockText(clock);
+        }
+        finally { _applyingOwnClock = false; }
+    }
+
+    /// <summary>The status line for an own clock that is on: the delay and any dropouts, or that it waits; null while off or failed.</summary>
+    internal static string? OwnClockText(JsonNode? clock)
+    {
+        if (clock is not JsonObject || clock["on"] is not JsonValue on || !on.TryGetValue(out bool isOn) || !isOn
+            || clock["error"] is JsonValue) return null;
+        bool running = clock["running"] is JsonValue r && r.TryGetValue(out bool flag) && flag;
+        if (!running || clock["delayMs"] is not JsonValue delayNode || !delayNode.TryGetValue(out double delay))
+            return Localizer.Text("CaptureOwnClockWaiting");
+        long dropouts = Count(clock["underruns"]) + Count(clock["overruns"]);
+        string ms = delay.ToString("0.#", System.Globalization.CultureInfo.CurrentCulture);
+        return dropouts > 0 ? Localizer.Format("CaptureOwnClockDropouts", ms, dropouts) : Localizer.Format("CaptureOwnClockRunning", ms);
+
+        static long Count(JsonNode? node) => node is JsonValue v && v.TryGetValue(out long n) ? n : 0;
+    }
+
     /// <summary>The gain is the device's own capture control; otherwise the source's software level.</summary>
     public bool CaptureGainHardware
     {
@@ -2545,6 +2599,7 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
                 ? CaptureConnected ? Localizer.Format("CaptureConnectedPort", port + 1) : Localizer.Format("CaptureOfflinePort", port + 1)
                 : CaptureConnected ? Localizer.Format("CaptureConnectedPair", capturePair) : Localizer.Format("CaptureOfflinePair", capturePair);
         ApplyCaptureGain(n["captureGain"]);
+        ApplyOwnClock(n["ownClock"]);
         double? volume = n["volume"]?.GetValue<double>();
         HasVolume = volume is not null;
         _applyingVolume = true;

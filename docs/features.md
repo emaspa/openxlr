@@ -649,6 +649,18 @@ desktop panel's mute, shows up within a second and is never written back.
 A capture input on a Wave unit has the unit's gain instead,
 and OpenXLR never writes the volume of a Wave unit's source.
 
+A capture input can run its device on its own clock (`setCaptureOwnClock`,
+**Own clock** in classic INPUTS and the terminal mixer). The device then
+drives a small graph of its own and a clock bridge in the native helper
+carries its audio into the mixer through a ring buffer, with a delay-locked
+loop and a resampler that correct the drift between the two clocks. It is
+for a device that misbehaves as a resampled follower, such as an Elgato 4K
+X on some USB4 controllers (issue #474), and costs about 27 ms of delay at
+a 256-frame block. The state reports the bridge's delay, underruns,
+overruns and drift, the clock readout lists the device as bridged rather
+than as a follower, and Flow and diagnostics archives show both. See
+[own clock](api.md#own-clock) and [Own clock](manual.md#own-clock).
+
 Capture inputs host insert chains, set in the UI or through the API:
 a mono chain on an input that takes one port, a stereo chain on a pair. An
 empty input on the first pair of a one-channel source becomes mono, with
