@@ -319,7 +319,15 @@ public sealed partial class MixerService : IHostedService, IDisposable
             byte now = ProJackLevels.ByteOf(db);
             _jackWritten[jack] = _jackWritten.TryGetValue(jack, out var was) ? was.Now == now ? was : (now, was.Now) : (now, now);
         }
-        if (_mixer.HardwareEntry != _savedEntry) ScheduleSave();
+        // A changed entry is saved once. Comparing against an entry that only
+        // SaveEntryNow updates scheduled a save on every one-second sweep after
+        // the output volume moved in the mode, which kept the debounce from
+        // ever writing.
+        if (_mixer.HardwareEntry is var current && current != _savedEntry)
+        {
+            _savedEntry = current;
+            ScheduleSave();
+        }
     }
 
     /// <summary>
