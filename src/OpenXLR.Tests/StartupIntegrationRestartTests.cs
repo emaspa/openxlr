@@ -140,4 +140,37 @@ public sealed class StartupIntegrationRestartTests
         }
     }
 
+    [Fact]
+    public void AClaimRemovesEarlierVersionsMarkersFromTheConfigurationFallback()
+    {
+        string directory = Directory.CreateTempSubdirectory("ox-upgrade-markers-").FullName;
+        string? previousConfig = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
+        string? previousRuntime = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
+        try
+        {
+            Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", directory);
+            Environment.SetEnvironmentVariable("XDG_RUNTIME_DIR", null);
+            Assert.Equal(OpenXlrPaths.ConfigDir, OpenXlrPaths.RuntimeDir);
+            OpenXlrPaths.EnsurePrivateDir(OpenXlrPaths.RuntimeDir);
+            string[] stale = ["upgrade-prompt-0000", "upgrade-prompt-1111"];
+            foreach (string name in stale) File.WriteAllText(Path.Combine(OpenXlrPaths.RuntimeDir, name), "");
+            string unrelated = Path.Combine(OpenXlrPaths.RuntimeDir, "ui.json");
+            File.WriteAllText(unrelated, "{}");
+
+            Assert.True(StartupIntegration.ClaimDaemonUpgradePrompt());
+            string current = Assert.Single(Directory.GetFiles(OpenXlrPaths.RuntimeDir, "upgrade-prompt-*"));
+            Assert.DoesNotContain(Path.GetFileName(current), stale);
+            Assert.True(File.Exists(unrelated));
+
+            // A second claim in the same version still finds its own marker.
+            Assert.False(StartupIntegration.ClaimDaemonUpgradePrompt());
+            Assert.Equal([current], Directory.GetFiles(OpenXlrPaths.RuntimeDir, "upgrade-prompt-*"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", previousConfig);
+            Environment.SetEnvironmentVariable("XDG_RUNTIME_DIR", previousRuntime);
+            Directory.Delete(directory, true);
+        }
+    }
 }

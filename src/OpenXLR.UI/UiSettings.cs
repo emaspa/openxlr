@@ -1154,10 +1154,31 @@ public static class StartupIntegration
         try
         {
             OpenXlrPaths.EnsurePrivateDir(OpenXlrPaths.RuntimeDir);
-            using var marker = OpenXlrPaths.CreatePrivate(Path.Combine(OpenXlrPaths.RuntimeDir, $"upgrade-prompt-{version}"));
+            string path = Path.Combine(OpenXlrPaths.RuntimeDir, $"upgrade-prompt-{version}");
+            using (OpenXlrPaths.CreatePrivate(path)) { }
+            RemoveOtherUpgradePromptMarkers(path);
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return false; }
+    }
+
+    /// <summary>
+    /// Without XDG_RUNTIME_DIR the markers live in the configuration
+    /// directory, which nothing clears, so each update would leave one more.
+    /// An earlier version's marker is never needed again.
+    /// </summary>
+    private static void RemoveOtherUpgradePromptMarkers(string current)
+    {
+        try
+        {
+            foreach (string marker in Directory.EnumerateFiles(OpenXlrPaths.RuntimeDir, "upgrade-prompt-*"))
+            {
+                if (marker == current) continue;
+                try { File.Delete(marker); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 
     internal static bool RestartRunningDaemonService(int peerPid, Func<bool> isCurrent)
