@@ -73,6 +73,13 @@ public sealed record MixerScene
     /// </summary>
     public Dictionary<string, MicExpander>? Expander { get; init; }
 
+    /// <summary>
+    /// Whether the monitor mixes hear each microphone dry, by channel; absent
+    /// in older profiles, which leave it as it is. A recall sets each channel
+    /// named here.
+    /// </summary>
+    public Dictionary<string, bool>? MonitorDry { get; init; }
+
     /// <summary>The ducking setup without machine processing. Absent in older profiles, which leave it alone.</summary>
     public DuckingScene? Ducking { get; init; }
 }

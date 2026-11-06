@@ -133,6 +133,8 @@ public static class CommandValidation
                 return CheckExpander(cmd, layout, nativeHostInstalled ?? PluginCatalog.HostInstalled);
             case "setDynamicsProcessing":
                 return CheckDynamicsProcessing(cmd, layout);
+            case "setMonitorDry":
+                return CheckMonitorDry(cmd, layout);
             case "watchDynamics":
                 if (cmd.Channel is null || TooLong(cmd.Channel, 36) || !layout.IsMicrophoneChannel(cmd.Channel))
                     return "watchDynamics: need a microphone channel";
@@ -701,6 +703,19 @@ public static class CommandValidation
            || cmd.Name is { Length: > 200 } || cmd.Name?.Any(char.IsControl) == true
             ? "setNativeEditorRule: need a valid kind, plugin id and optional name"
             : null;
+
+    /// <summary>
+    /// <c>setMonitorDry</c>: a microphone channel (one that carries the EQ)
+    /// and a boolean <c>value</c>. It needs no native helper: the dry route
+    /// is a combine and a port link.
+    /// </summary>
+    internal static string? CheckMonitorDry(Command cmd, ILayoutInfo layout)
+    {
+        if (cmd.Channel is null) return "setMonitorDry: need 'channel'";
+        if (TooLong(cmd.Channel, 36) || !layout.IsMicrophoneChannel(cmd.Channel))
+            return $"setMonitorDry: '{Short(cmd.Channel)}' is not a microphone input";
+        return cmd.Value.ValueKind is JsonValueKind.True or JsonValueKind.False ? null : "setMonitorDry: value must be a boolean";
+    }
 
     internal static string? CheckPluginWineTrace(Command cmd)
         => cmd.Value.ValueKind is JsonValueKind.True or JsonValueKind.False

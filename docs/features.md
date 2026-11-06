@@ -276,6 +276,15 @@ physical gain dial.
   terminal mixer, a Deck key with toggle and hold modes and
   [`setVoiceChanger`](api.md#voice-changer) control it, and it is saved
   with the mixer and in profiles.
+- Hear it dry: a switch per microphone, in its chain window and the
+  terminal mixer's Inputs tab, that has the monitor mixes hear it before
+  its software effects, so your own voice arrives earlier, while Stream,
+  Chat, the virtual microphones and recordings keep the processed voice.
+  The send level, the mutes and the channel volume work on it as before,
+  and nothing else in the graph restarts. On the Wave XLR Pro the
+  zero-latency path stays on with effects running, and hardware mixing
+  plays the microphone raw on the jacks. Saved with the mixer and in
+  profiles, and set by [`setMonitorDry`](api.md#dry-monitor).
 - Compressor and expander on this computer: on the same microphones, in
   the same native stage, the expander after noise removal and the
   compressor after the EQ. The compressor has a threshold, ratio, attack,
@@ -515,7 +524,7 @@ microphone with no delay; muted, you do not. With another device in the
 monitor set, with the microphone in an exclusive group, or while it runs a
 software effect (EQ in software, noise removal, the voice changer, the soft
 low cut, ClipGuard or a plugin), the software send carries it instead,
-effects included.
+effects included, unless the microphone is set to be heard dry.
 
 Channels appear as playback devices in the desktop's audio applet, and
 the virtual microphones (Stream and Chat by default) as recording
@@ -1084,6 +1093,8 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   since a terminal sends no key-up ([manual](manual.md#terminal-sounds))
 - The voice changer in Inputs: a choice of Off or a voice per microphone,
   and the custom voice's pitch and formant
+- Hear it dry in Inputs: each microphone's switch for hearing it in the
+  monitor mixes before its effects
 - The compressor and expander in Inputs: each microphone's switches and
   thresholds, and every other setting while one is on
 - Insert editing opens the plugin's native editor. A blocked or refused

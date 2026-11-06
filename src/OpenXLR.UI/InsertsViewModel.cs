@@ -55,6 +55,47 @@ public sealed partial class InsertsViewModel : ViewModelBase
     public bool CanMicSetup { get => _canMicSetup; internal set => Set(ref _canMicSetup, value); }
     public MicSetupViewModel MicSetup { get; }
 
+    private bool? _monitorDry;
+    private bool _applyingMonitorDry;
+    /// <summary>The daemon reports the dry monitor switch for this chain's microphone; null from an older daemon and on every other chain.</summary>
+    public bool HasMonitorDry => _monitorDry is not null;
+
+    /// <summary>
+    /// The monitor mixes hear the microphone before its effects. A change from
+    /// the window goes to the daemon as <c>setMonitorDry</c>; the next state
+    /// push confirms it.
+    /// </summary>
+    public bool MonitorDry
+    {
+        get => _monitorDry ?? false;
+        set
+        {
+            if (_monitorDry is null || _monitorDry == value) return;
+            _monitorDry = value;
+            Raise();
+            if (!_applyingMonitorDry && !IsDetached) _ = _client.SetMonitorDryAsync(_channel, value);
+        }
+    }
+
+    /// <summary>Take the channel's <c>monitorDry</c> from a state push.</summary>
+    internal void ApplyMonitorDry(JsonNode? value)
+    {
+        bool? next = value is JsonValue v && v.TryGetValue(out bool on) ? on : null;
+        bool had = _monitorDry is not null;
+        _applyingMonitorDry = true;
+        try
+        {
+            if (next is bool known && _monitorDry is not null) MonitorDry = known;
+            else if (_monitorDry != next)
+            {
+                _monitorDry = next;
+                Raise(nameof(MonitorDry));
+            }
+        }
+        finally { _applyingMonitorDry = false; }
+        if (had != (_monitorDry is not null)) Raise(nameof(HasMonitorDry));
+    }
+
     public Task ShowNativeEditorAsync(InsertViewModel insert)
         => insert.IsDetached ? Task.CompletedTask : _client.ShowInsertUiAsync(_channel, insert.Id);
 

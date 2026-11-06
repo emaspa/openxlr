@@ -193,6 +193,7 @@ public sealed partial class Mixer
             _voice.Remove(id, out MicVoice? previousVoice);
             _compressor.Remove(id, out MicCompressor? previousCompressor);
             _expander.Remove(id, out MicExpander? previousExpander);
+            bool previousDry = _monitorDry.Remove(id);
             CellSnapshot cells = TakeChannelCellsLocked(id, previous.Mixes);
             _config = next;
             foreach (string identity in movedOverrides) Matcher.SetOverride(identity, fallback.Id);
@@ -208,6 +209,7 @@ public sealed partial class Mixer
                 if (previousVoice is not null) _voice[id] = previousVoice;
                 if (previousCompressor is not null) _compressor[id] = previousCompressor;
                 if (previousExpander is not null) _expander[id] = previousExpander;
+                if (previousDry) _monitorDry.Add(id);
                 cells.Restore(this);
                 foreach (string identity in movedOverrides) Matcher.SetOverride(identity, id);
                 foreach ((string identity, StreamAssignment app) in movedApps) _apps[identity] = app;
@@ -238,6 +240,7 @@ public sealed partial class Mixer
             // board is off, its player unlinked before the sink goes.
             if (id == SoundboardChannel) SoundboardChannelDeletedLocked();
             RemoveCaptureFeedLocked(id);
+            RemoveDryRouteLocked(id);
             if (_soundCheckChannel == id)
                 StopSoundCheckLocked(restore: false, error: "Sound Check stopped because the capture input was deleted.");
             bool chained = _chains.ContainsKey(id);
@@ -350,6 +353,8 @@ public sealed partial class Mixer
             }
             _meters.Add($"mix:{id}", mix.SinkName);
             SyncDuckingLocked();
+            // A dry route names the monitor mixes it feeds; a new one needs it loaded again.
+            if (kind == MixKind.Monitor) SyncDryRoutesLocked();
         }
     }
 
@@ -456,6 +461,7 @@ public sealed partial class Mixer
                     try { _pw.UnloadModule(module); }
                     catch (Exception ex) { errors.Add(ex.Message); }
                 }
+            if (mix.Kind == MixKind.Monitor) SyncDryRoutesLocked();
             if (errors.Count > 0)
                 throw new InvalidOperationException(
                     $"the mix was removed, but a PipeWire node could not be unloaded ({string.Join("; ", errors)}); it disappears when the daemon restarts");

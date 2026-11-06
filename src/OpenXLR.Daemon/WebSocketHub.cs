@@ -493,6 +493,7 @@ public sealed class WebSocketHub
             case "setVoiceChanger":
             case "setCompressor":
             case "setExpander":
+            case "setMonitorDry":
             case "setDynamicsProcessing":
             case "watchDynamics":
             case "setDucking":

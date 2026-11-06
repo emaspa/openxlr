@@ -188,6 +188,10 @@ picks the custom voice four semitones down, and
 `{"cmd":"setVoiceChanger","channel":"xlr1","enabled":false}` switches it off.
 `GET /api/v1/channels/xlr1` reads it back as `voice`, with the voice heard
 now in `voice.active`.
+`{"cmd":"setMonitorDry","channel":"xlr1","value":true}` has the monitor
+mixes hear XLR 1 [dry](api.md#dry-monitor), before its effects, while Stream
+and Chat keep the processed voice; `GET /api/v1/channels/xlr1` reads it back
+as `monitorDry`.
 The [compressor and expander](api.md#compressor-and-expander) take the
 same shape:
 `{"cmd":"setCompressor","channel":"xlr1","enabled":true,"threshold":-24,"makeup":4}`

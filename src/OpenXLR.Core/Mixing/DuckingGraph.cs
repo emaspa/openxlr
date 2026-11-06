@@ -121,11 +121,16 @@ public sealed partial class Mixer
     private bool UsesDuckBusLocked(string cell, string mix)
         => _duckBuses.ContainsKey(mix) && _duckPlan?.Cells.Contains(cell) == true;
 
-    /// <summary>The two paths of one cell, both using the existing fader and mute calculation.</summary>
+    /// <summary>
+    /// The two paths of one cell, both using the existing fader and mute
+    /// calculation; both closed while the microphone's dry route carries the
+    /// cell instead (see <see cref="DryLegTargetLocked"/>).
+    /// </summary>
     private ((double Level, bool Muted) Direct, (double Level, bool Muted) Bus) CellLegTargetsLocked(
         string channel, string mix, out bool waiting)
     {
         var target = CellTargetLocked(channel, mix, out waiting);
+        if (DryCarriesLocked(channel, mix)) return ((0, true), (0, true));
         return UsesDuckBusLocked(Cell(channel, mix), mix) ? ((0, true), target) : (target, (0, true));
     }
 

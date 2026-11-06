@@ -1542,6 +1542,8 @@ public sealed partial class MainViewModel : ViewModelBase
                     vm.ApplyEq(c["eq"], mixer["eqLimits"]);
                     vm.ApplyNoise(c["noise"]);
                     vm.ApplyDynamics(c["compressor"], c["expander"]);
+                    // XLR 1 and XLR 2 keep their chains on the main model.
+                    (vm.Id switch { "xlr1" => Inserts, "xlr2" => Inserts2, _ => vm.Inserts })?.ApplyMonitorDry(c["monitorDry"]);
                     vm.Inserts?.Apply(mixer["inserts"]?[vm.Id]);
                     vm.Inserts?.MicSetup.Apply(mixer["soundCheck"]);
                     vm.Inserts?.EnsurePluginsLoaded();
