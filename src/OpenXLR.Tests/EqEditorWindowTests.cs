@@ -53,7 +53,11 @@ public sealed class EqEditorWindowTests
     private sealed class EqDaemon
     {
         private readonly object _gate = new();
-        public readonly Dictionary<string, DaemonEq> Eqs = new() { ["xlr1"] = DaemonEq.Default, ["xlr2"] = DaemonEq.Default };
+        /// <summary>Every EQ by what the editor names it: the microphones, and each mix as <c>mix:</c> and its id.</summary>
+        public readonly Dictionary<string, DaemonEq> Eqs = new()
+        {
+            ["xlr1"] = DaemonEq.Default, ["xlr2"] = DaemonEq.Default, ["mix:monitor"] = DaemonEq.Default, ["mix:stream"] = DaemonEq.Default,
+        };
         public bool WithEq = true;
         public bool VariableBands;
         /// <summary>XLR 1's unit: null for none, <c>unit</c> when its DSP can run the EQ, <c>old</c> when it cannot.</summary>
@@ -88,6 +92,10 @@ public sealed class EqEditorWindowTests
                 if (Xlr2Source is not null)
                     state["devices"]!.AsArray().Add(new JsonObject { ["name"] = "longmic", ["description"] = Xlr2Source, ["kind"] = 1, ["channels"] = 1 });
                 state["mixer"]!["mixes"]!.AsArray().Add(JsonNode.Parse("""{"id":"stream","name":"Stream","kind":"virtualMic"}"""));
+                // Each mix's output EQ, which always runs on this computer.
+                foreach (JsonNode? mix in state["mixer"]!["mixes"]!.AsArray())
+                    if (WithEq && Eqs.TryGetValue("mix:" + mix!["id"]!.GetValue<string>(), out DaemonEq? mixEq))
+                        mix["eq"] = Json(mixEq, null, "software", Reason);
                 foreach (JsonNode? channel in state["mixer"]!["channels"]!.AsArray())
                 {
                     channel!["volume"] = 0.8;
@@ -149,7 +157,7 @@ public sealed class EqEditorWindowTests
             string name = cmd["cmd"]!.GetValue<string>();
             if (ProfileCommands.Contains(name)) return HandleProfile(name, cmd);
             if (!EqCommands.Contains(name)) return null;
-            string channel = cmd["channel"]!.GetValue<string>();
+            string channel = Target(cmd);
             lock (_gate)
             {
                 DaemonEq eq = Eqs[channel];
@@ -180,6 +188,14 @@ public sealed class EqEditorWindowTests
             return null;
         }
 
+        /// <summary>What an EQ command names: exactly one of a microphone's <c>channel</c> and a <c>mix</c>, never both.</summary>
+        private static string Target(JsonNode cmd)
+        {
+            string? channel = cmd["channel"]?.GetValue<string>(), mix = cmd["mix"]?.GetValue<string>();
+            Assert.True(channel is null != mix is null, "an EQ command names a channel or a mix: " + cmd.ToJsonString());
+            return channel ?? "mix:" + mix;
+        }
+
         /// <summary>The EQ profile commands, on the daemon's own store; a load becomes the setEq it is.</summary>
         private string? HandleProfile(string name, JsonNode cmd)
         {
@@ -203,10 +219,14 @@ public sealed class EqEditorWindowTests
                         OpenXLR.Core.Mixing.EqProfileStore.State(reread: true);
                         return null;
                     default:
-                        var load = new OpenXLR.Daemon.Command { Cmd = name, Channel = cmd["channel"]!.GetValue<string>(), Profile = cmd["profile"]!.GetValue<string>() };
+                        var load = new OpenXLR.Daemon.Command
+                        {
+                            Cmd = name, Channel = cmd["channel"]?.GetValue<string>(), Mix = cmd["mix"]?.GetValue<string>(),
+                            Profile = cmd["profile"]!.GetValue<string>(),
+                        };
                         OpenXLR.Daemon.Command setEq = OpenXLR.Daemon.MixerService.ProfileEq(load, OpenXLR.Core.Mixing.EqLimits.Instance, out string? refused)
                             ?? throw new InvalidDataException(refused);
-                        lock (_gate) Eqs[load.Channel!] = DaemonEq.Read(setEq.Eq, out _)!;
+                        lock (_gate) Eqs[Target(cmd)] = DaemonEq.Read(setEq.Eq, out _)!;
                         return null;
                 }
             }
@@ -387,6 +407,7 @@ public sealed class EqEditorWindowTests
             await ProHardware(window, second, daemon, eq2);
             await LongSource(window, daemon, main);
             await VariableBandEditor(editor, daemon, eq1);
+            editors.Add(await MixEqEditor(window, daemon, main));
             Assert.DoesNotContain(daemon.Commands, c => !EqCommands.Contains(c.Command["cmd"]!.GetValue<string>()));
 
             // A state without the EQ, from an older daemon: no button anywhere, and the editors go.
@@ -397,7 +418,7 @@ public sealed class EqEditorWindowTests
             daemon.Commands.Clear();
             daemon.WithEq = false;
             daemon.Pushes.Release();
-            await Until(() => main.Channels.All(c => !c.HasEq));
+            await Until(() => main.Channels.All(c => !c.HasEq) && main.Mixes.All(m => !m.HasEq));
             Pump(50);
             Assert.False(editor.IsVisible);
             Assert.False(second.IsVisible);
@@ -408,7 +429,7 @@ public sealed class EqEditorWindowTests
             Assert.False(window.FindControl<WrapPanel>("SoftwareControls")!.IsEffectivelyVisible);
             SkinLayoutWindowTests.Wear("broadcast");
             Layout(window, 1040, 1100);
-            Assert.DoesNotContain(window.GetVisualDescendants().OfType<Button>(), b => b.Name == "MatrixEq" && b.IsEffectivelyVisible);
+            Assert.DoesNotContain(window.GetVisualDescendants().OfType<Button>(), b => b.Name is "MatrixEq" or "MatrixMixEq" && b.IsEffectivelyVisible);
             Assert.All(window.MixMatrix!.Rows, r => Assert.False(r.ShowsEq));
             SkinLayoutWindowTests.CheckMatrixCells(window, window.MixMatrix!, "broadcast without an EQ");
         }
@@ -423,6 +444,87 @@ public sealed class EqEditorWindowTests
     }
 
     private static string Sizing(bool touch) => touch ? "touch" : "standard";
+
+    /// <summary>
+    /// A mix's EQ: the button under each mix's plugin chain in the matrix
+    /// head, inside the head at every width; the same editor, named for the
+    /// mix, with no unit and no choice of where; its commands name the mix
+    /// and no channel; and its profile list holds every built-in profile, the
+    /// voice curves and the listening curves alike.
+    /// </summary>
+    private static async Task<EqWindow> MixEqEditor(MainWindow window, EqDaemon daemon, MainViewModel main)
+    {
+        MixViewModel stream = main.Mixes.Single(m => m.Id == "stream");
+        MicEqViewModel eq = stream.Eq!;
+        Assert.True(eq.IsMix);
+        Assert.Equal("mix:stream", eq.Channel);
+        foreach (string skin in new[] { "broadcast", "wave" })
+        {
+            SkinLayoutWindowTests.Wear(skin);
+            foreach (double width in new[] { 1040d, 2400 })
+            {
+                Layout(window, width, 1100);
+                string where = $"{skin} at {width}";
+                Button[] buttons = [.. window.GetVisualDescendants().OfType<Button>().Where(b => b.Name == "MatrixMixEq" && b.IsEffectivelyVisible)];
+                Assert.Equal(main.Mixes.Count(m => m.HasEq && m.DisplayVisible && m.Visible), buttons.Length);
+                foreach (Button button in buttons)
+                {
+                    Border head = button.GetVisualAncestors().OfType<Border>().First(b => b.Name == "MatrixColumn");
+                    AssertInside(button, head);
+                    Assert.Equal(Localizer.Text("Eq"), button.Content);
+                    Assert.DoesNotContain("fxOn", button.Classes);
+                    Assert.Equal(Localizer.Text("EqButtonTipMix"), ToolTip.GetTip(button));
+                }
+                SkinLayoutWindowTests.CheckMatrixCells(window, window.MixMatrix!, "mix EQ " + where);
+            }
+        }
+        Layout(window, 1040, 1100);
+        Button open = window.GetVisualDescendants().OfType<Button>()
+            .Single(b => b.Name == "MatrixMixEq" && b.DataContext is OpenXLR.UI.Layout.MatrixColumnViewModel { Mix.Id: "stream" });
+        Assert.Equal(Localizer.Format("EqButtonNameOff", "Stream"), AutomationProperties.GetName(open));
+        Click(open);
+        EqWindow editor = await Editor(window, eq);
+        Assert.Equal(Localizer.Format("EqWindowTitle", "Stream"), editor.Title);
+        Assert.False(editor.FindControl<WrapPanel>("EqProcessing")!.IsVisible);
+        Assert.False(editor.FindControl<Border>("EqHardwareBadge")!.IsVisible);
+        ComboBox list = editor.FindControl<ComboBox>("EqProfileList")!;
+        string[] listed = [.. list.Items.OfType<EqProfile>().Select(p => p.Id)];
+        Assert.Equal(EqPresets.All.Select(p => p.Id), listed.Where(id => id.StartsWith("builtin:", StringComparison.Ordinal)));
+
+        daemon.Commands.Clear();
+        eq.Enabled = true;
+        JsonNode on = Assert.Single(await Sent(daemon, 1));
+        Assert.Equal("setEqEnabled", on["cmd"]!.GetValue<string>());
+        Assert.Equal("stream", on["mix"]!.GetValue<string>());
+        Assert.Null(on["channel"]);
+        await Until(() => daemon.Eqs["mix:stream"].Enabled && eq.IsLit);
+        Assert.Contains("fxOn", open.Classes);
+        Assert.Equal(Localizer.Text("EqStatusSoftwareMix"), eq.Status);
+        eq.Bands[1].SetGain(-3);
+        JsonNode band = Assert.Single(await Sent(daemon, 1));
+        Assert.Equal("stream", band["mix"]!.GetValue<string>());
+        Assert.Equal(2, band["band"]!.GetValue<int>());
+        await Until(() => daemon.Eqs["mix:stream"].Bands[1].Gain == -3);
+        // A listening curve, two bands, loads on the mix as one loadEqProfile
+        // that names it, from a daemon whose EQ takes 1 to 16 bands.
+        bool variable = daemon.VariableBands;
+        daemon.VariableBands = true;
+        daemon.Pushes.Release();
+        await Until(() => eq.VariableBands);
+        daemon.Commands.Clear();
+        list.SelectedItem = list.Items.OfType<EqProfile>().Single(p => p.Id == "builtin:footsteps");
+        JsonNode load = Assert.Single(await Sent(daemon, 1));
+        Assert.Equal("loadEqProfile", load["cmd"]!.GetValue<string>());
+        Assert.Equal("stream", load["mix"]!.GetValue<string>());
+        await Until(() => daemon.Eqs["mix:stream"].Bands.Count == 2 && eq.Bands.Count == 2);
+        // The other mix's EQ was not touched.
+        Assert.Equal(DaemonEq.Default.Bands, daemon.Eqs["mix:monitor"].Bands);
+        daemon.VariableBands = variable;
+        daemon.Pushes.Release();
+        await Until(() => eq.VariableBands == variable);
+        daemon.Commands.Clear();
+        return editor;
+    }
 
     /// <summary>
     /// XLR 2 bound to a source with a long description: the chip trims its
@@ -1224,7 +1326,7 @@ public sealed class EqEditorWindowTests
         string path = OpenXLR.Core.Mixing.EqProfileStore.FilePath;
         if (File.Exists(path)) File.Delete(path);
         foreach (EqWindow editor in new[] { first, second }) editor.Profiles!.Reread();
-        await Until(() => first.Profiles!.Profiles.Count == MicSetupPresets.All.Count && second.Profiles!.Profiles.Count == MicSetupPresets.All.Count);
+        await Until(() => first.Profiles!.Profiles.Count == EqPresets.All.Count && second.Profiles!.Profiles.Count == EqPresets.All.Count);
         CheckProfileRow(first, "profiles");
         ComboBox list1 = first.FindControl<ComboBox>("EqProfileList")!, list2 = second.FindControl<ComboBox>("EqProfileList")!;
         Assert.Equal(Localizer.Text("EqProfileChoose"), list1.PlaceholderText);
@@ -1243,8 +1345,8 @@ public sealed class EqEditorWindowTests
         Assert.Equal(Localizer.Text("Save"), first.FindControl<Button>("EqProfileSave")!.Content);
 
         // The built-in profiles: Mic setup's presets, first, in the UI's language and marked as built in.
-        Assert.Equal(MicSetupPresets.All.Select(p => EqProfileIds.Builtin(p.Id)), first.Profiles!.Profiles.Select(p => p.Id));
-        Assert.Equal(MicSetupPresets.All.Select(p => Localizer.Format("EqProfileBuiltInName", p.Name)),
+        Assert.Equal(EqPresets.All.Select(p => p.Id), first.Profiles!.Profiles.Select(p => p.Id));
+        Assert.Equal(EqPresets.All.Select(p => Localizer.Format("EqProfileBuiltInName", MicSetupPreset.NameOf(p.Key)!)),
             list1.Items.Cast<EqProfile>().Select(p => p.ToString()));
         // Picking one in the list is the load: one loadEqProfile, and nothing more as the state comes back.
         daemon.Commands.Clear();
@@ -1282,21 +1384,21 @@ public sealed class EqEditorWindowTests
         Assert.Equal("saveEqProfile", sent["cmd"]!.GetValue<string>());
         Assert.Equal("Podcast", sent["name"]!.GetValue<string>());
         Assert.False(sent["replace"]!.GetValue<bool>());
-        await Until(() => first.Profiles!.Profiles.Count == MicSetupPresets.All.Count + 1 && first.Profiles.Selected is { Builtin: false });
-        EqProfile saved = first.Profiles!.Profiles[MicSetupPresets.All.Count];
+        await Until(() => first.Profiles!.Profiles.Count == EqPresets.All.Count + 1 && first.Profiles.Selected is { Builtin: false });
+        EqProfile saved = first.Profiles!.Profiles[EqPresets.All.Count];
         Assert.Equal("Podcast", saved.Name);
         Assert.Equal("saved:Podcast", saved.Id);
         Assert.Equal(eq1.Current.Bands, saved.Bands);
         Assert.Same(saved, list1.SelectedItem);
         Assert.True(first.FindControl<Button>("EqProfileRename")!.IsEnabled);
         // XLR 2's editor lists it and keeps the profile its EQ holds.
-        Assert.Equal(MicSetupPresets.All.Count + 1, second.Profiles!.Profiles.Count);
+        Assert.Equal(EqPresets.All.Count + 1, second.Profiles!.Profiles.Count);
         Assert.Equal("builtin:broadcast", ((EqProfile)list2.SelectedItem!).Id);
         Pump(60);
         Assert.Empty(daemon.Commands);
 
         // Pick it on XLR 2: one loadEqProfile, and XLR 2 takes XLR 1's bands with the EQ on.
-        list2.SelectedItem = second.Profiles!.Profiles[MicSetupPresets.All.Count];
+        list2.SelectedItem = second.Profiles!.Profiles[EqPresets.All.Count];
         sent = (await Sent(daemon, 1))[0];
         Assert.Equal("loadEqProfile", sent["cmd"]!.GetValue<string>());
         Assert.Equal("xlr2", sent["channel"]!.GetValue<string>());
@@ -1322,7 +1424,7 @@ public sealed class EqEditorWindowTests
         Assert.Equal("Podcast", dialog.GetVisualDescendants().OfType<TextBox>().Single().Text);
         Click(dialog.GetVisualDescendants().OfType<Button>().Single(b => b.IsCancel));
         await Until(() => !dialog.IsVisible);
-        list2.SelectedItem = second.Profiles!.Profiles[MicSetupPresets.All.Count];
+        list2.SelectedItem = second.Profiles!.Profiles[EqPresets.All.Count];
         sent = (await Sent(daemon, 1))[0];
         Assert.Equal("loadEqProfile", sent["cmd"]!.GetValue<string>());
         Assert.Equal("saved:Podcast", sent["profile"]!.GetValue<string>());
@@ -1367,7 +1469,7 @@ public sealed class EqEditorWindowTests
         Window confirm = await Dialog(second);
         Assert.Equal(Localizer.Text("EqProfileDeleteTitle"), confirm.Title);
         Click(confirm.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("danger")));
-        await Until(() => first.Profiles!.Profiles.Count == MicSetupPresets.All.Count && second.Profiles!.Profiles.Count == MicSetupPresets.All.Count);
+        await Until(() => first.Profiles!.Profiles.Count == EqPresets.All.Count && second.Profiles!.Profiles.Count == EqPresets.All.Count);
         Assert.Null(list1.SelectedItem);
         Assert.Null(list2.SelectedItem);
         Assert.False(second.FindControl<Button>("EqProfileDelete")!.IsEnabled);
@@ -1394,8 +1496,8 @@ public sealed class EqEditorWindowTests
         string band = "{\"enabled\":true,\"type\":\"peak\",\"frequency\":1000,\"gain\":0,\"q\":1}";
         File.WriteAllText(path, "{\"version\":1,\"profiles\":[{\"name\":\"Six\",\"bands\":[" + string.Join(",", Enumerable.Repeat(band, 6)) + "]}]}");
         first.Profiles!.Reread();
-        await Until(() => !error.IsVisible && first.Profiles!.Profiles.Count == MicSetupPresets.All.Count + 1);
-        list1.SelectedItem = first.Profiles!.Profiles[MicSetupPresets.All.Count];
+        await Until(() => !error.IsVisible && first.Profiles!.Profiles.Count == EqPresets.All.Count + 1);
+        list1.SelectedItem = first.Profiles!.Profiles[EqPresets.All.Count];
         Pump(20);
         string refused = Localizer.Format("EqProfileBandCount", "Six", 6, 4, 4);
         Assert.Equal(refused, error.Text);
@@ -1409,7 +1511,7 @@ public sealed class EqEditorWindowTests
 
         File.Delete(path);
         first.Profiles!.Reread();
-        await Until(() => !error.IsVisible && first.Profiles!.Profiles.Count == MicSetupPresets.All.Count);
+        await Until(() => !error.IsVisible && first.Profiles!.Profiles.Count == EqPresets.All.Count);
         Assert.Null(list1.SelectedItem);
         Assert.Empty(daemon.Commands);
 

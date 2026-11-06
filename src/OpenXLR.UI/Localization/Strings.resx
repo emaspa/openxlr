@@ -2589,6 +2589,9 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
   <data name="EqButtonTipCapture" xml:space="preserve">
     <value>The microphone's EQ, on this computer at the head of the input before the plugins. Lit while it is on, red when it cannot run. Opens the editor.</value>
   </data>
+  <data name="EqButtonTipMix" xml:space="preserve">
+    <value>The mix's EQ, on this computer after its plugins and before its outputs. Lit while it is on, red when it cannot run. Opens the editor.</value>
+  </data>
   <data name="EqButtonNameOn" xml:space="preserve">
     <value>{0} EQ, on</value>
   </data>
@@ -2741,6 +2744,9 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
   </data>
   <data name="EqStatusSoftwareCapture" xml:space="preserve">
     <value>On, running on this computer at the head of the input, before the plugins.</value>
+  </data>
+  <data name="EqStatusSoftwareMix" xml:space="preserve">
+    <value>On, running on this computer after the mix's plugins, before its outputs.</value>
   </data>
   <data name="EqStatusDevice" xml:space="preserve">
     <value>On, running on the interface before USB, ahead of the plugins and everything else on this computer.</value>
@@ -3467,6 +3473,18 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
   </data>
   <data name="MicSetupPresetSoftSibilantsTip" xml:space="preserve">
     <value>Softens a fixed band around sharp S sounds and reduces bright highs.</value>
+  </data>
+  <data name="EqPresetSoftTreble" xml:space="preserve">
+    <value>Soft treble</value>
+  </data>
+  <data name="EqPresetBassBoost" xml:space="preserve">
+    <value>Bass boost</value>
+  </data>
+  <data name="EqPresetFootsteps" xml:space="preserve">
+    <value>Footsteps</value>
+  </data>
+  <data name="EqPresetVoicesForward" xml:space="preserve">
+    <value>Voices forward</value>
   </data>
   <data name="MicSetupPresetWarm" xml:space="preserve">
     <value>Warm</value>
