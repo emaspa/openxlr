@@ -1188,9 +1188,10 @@ public sealed partial class DeviceManager : BackgroundService
             if (_device is null || !_device.Connected) return "no device connected";
             DeviceState s = _last ?? Stamp(_device.ReadState());
             DeviceCapabilities c = EffectiveCapabilitiesLocked(_device);
-            // A saved state holds the Pro's jacks as software mixing plays them.
-            if (c.OutputRouting && HardwareMixingEntry?.Invoke() is { } entry)
-                p = HardwareMixingPlanner.ToUnitJackLevels(p, entry);
+            // A saved state holds the Pro's jacks as software mixing plays them,
+            // or above 0 dB when saved in the mode, where only the mode plays them.
+            p = c.OutputRouting && HardwareMixingEntry?.Invoke() is { } entry
+                ? HardwareMixingPlanner.ToUnitJackLevels(p, entry) : HardwareMixingPlanner.ToSoftwareJackLevels(p);
             bool lockApplies = GainIsLocked && !restoring;
             bool gainBlocked = lockApplies &&
                 (c.Gain && s.GainDb != p.GainDb ||

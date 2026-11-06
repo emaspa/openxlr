@@ -498,12 +498,27 @@ public static class HardwareMixingPlanner
     /// <summary>
     /// The headphone levels to save from a unit in the mode: where leaving
     /// would put them, so a profile saved in the mode recalls the same
-    /// loudness in either mode (see <see cref="ToUnitJackLevels"/>).
+    /// loudness in either mode (see <see cref="ToUnitJackLevels"/>). The mode
+    /// can play a jack up to the entry offset louder than software mixing
+    /// can, so a saved level may sit above 0 dB: kept as it is, in the
+    /// unit's quarter-dB steps, it recalls the same level in the mode, and
+    /// software mixing plays it at its loudest, 0 dB (see <see cref="ToSoftwareJackLevels"/>).
     /// </summary>
     public static DeviceState ToSavedJackLevels(DeviceState unit, HardwareEntry entry) => unit with
     {
         HpVolumeDb = SavedLevelDb(unit.HpVolumeDb, entry, "hp1"),
         Hp2VolumeDb = SavedLevelDb(unit.Hp2VolumeDb, entry, "hp2"),
+    };
+
+    /// <summary>
+    /// The headphone levels of a saved state as software mixing plays them:
+    /// a level saved in the mode above 0 dB is held to 0 dB, the loudest a
+    /// jack goes without the mode (see <see cref="ToSavedJackLevels"/>).
+    /// </summary>
+    public static DeviceState ToSoftwareJackLevels(DeviceState saved) => saved with
+    {
+        HpVolumeDb = Math.Min(saved.HpVolumeDb, 0),
+        Hp2VolumeDb = Math.Min(saved.Hp2VolumeDb, 0),
     };
 
     private static double EntryOffsetDbOf(HardwareEntry entry, string jack)
@@ -521,7 +536,10 @@ public static class HardwareMixingPlanner
         double output = Mixer.JackOutputVolumeDb(entry.OutputVolume);
         // With the output volume at 0 the unit sits at its floor, and the base says where the jack is.
         double baseDb = double.IsFinite(output) ? unitDb - output : entry.Jacks.GetValueOrDefault(jack, unitDb);
-        return ProJackLevels.DbOf(ProJackLevels.ByteOf(LeaveLevelDb(baseDb, EntryOffsetDbOf(entry, jack), entry.OutputVolume)));
+        // Not held to the unit's 0 dB: a jack the mode plays louder than software
+        // mixing can would save as 0 dB and recall the entry offset quieter.
+        double leaving = LeaveLevelDb(baseDb, EntryOffsetDbOf(entry, jack), entry.OutputVolume);
+        return Math.Max(ProJackLevels.DbOf(240), Math.Round(leaving * 4, MidpointRounding.AwayFromZero) / 4);
     }
 
     /// <summary>The fixed keys of what the mode turns off for this layout, with each sentence.</summary>

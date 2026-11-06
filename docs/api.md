@@ -3041,8 +3041,11 @@ outputs play) keep everything.
 software mixing plays them. `loadProfile` and recall on connect write them
 lowered by each jack's entry offset and the output volume while the mode
 runs, and `saveProfile` stores the levels leaving would give, so a profile
-recalls the same loudness in either mode. The state's `hpVolumeDb` and
-`hp2VolumeDb` stay what the unit holds.
+recalls the same loudness in either mode. A jack the mode plays louder than
+software mixing can saves above 0 dB, in quarter-dB steps, and recalls at
+the same level in the mode. Outside the mode, `loadProfile` and recall on
+connect write such a level as 0 dB. The state's `hpVolumeDb` and `hp2VolumeDb` stay what the
+unit holds.
 
 **State.** Once the daemon has planned the mode, the mixer state carries
 `hardwareMixing {wanted, active, reason, note}`. While the mode runs it

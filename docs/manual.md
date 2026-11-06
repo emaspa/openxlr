@@ -3889,7 +3889,11 @@ A profile keeps the headphone volumes as this computer's mixing plays them.
 Recalled while the unit mixes, on connect after a replug or a restart too,
 each jack is turned down by the same amount the mode turned it down when it
 started, so it sounds as loud as the profile was. A profile saved while the
-unit mixes keeps the levels the jacks go back to when you switch back.
+unit mixes keeps the levels the jacks go back to when you switch back. The
+unit can play a jack louder than this computer's mixing can, so such a
+profile can hold a level above 0 dB. Recalled while the unit mixes, the jack
+comes back where it was. Recalled after you switch back, it plays at 0 dB,
+the loudest this computer's mixing goes.
 
 Stream, Chat, your own virtual microphones and any mix a device other than
 the Pro's jacks and USB Aux port plays stay on this computer, with their plugins, ducking
