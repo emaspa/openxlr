@@ -321,7 +321,7 @@ lands in Voice Chat. An app you move to another channel is remembered
 
 **Profiles** are named scenes: the interface's hardware settings plus
 the whole submixer (sends, channel volumes, masters, monitor outputs, aux state, insert
-chains). They are saved per interface. Application routing and the
+chains, and each capture input's own gain and mute). They are saved per interface. Application routing and the
 system default devices are not part of a profile, so recalling one
 does not rewire the desktop. The **Profiles** button in the header holds
 them. Type a name and press Save to save a new one, or click a name to
@@ -4961,7 +4961,9 @@ the volume in a mix matrix row, and as a Gain row above Volume in the
 classic INPUTS block. Its readout shows the volume while you move the
 volume fader, as Aux In's does ([gain readout](#gain-readout)). The
 terminal mixer has it on the Inputs tab, and a Stream Deck dial can turn
-it. Two capture inputs on one source share its gain.
+it. Two capture inputs on one source share its gain. A profile keeps the
+gain and the mute; one recalled while the device is unplugged sets them
+when it comes back.
 
 A **Mute** button goes with the gain: under the strip's controls in an
 input rack, in the row head's mute place in a mix matrix, and under the
