@@ -94,6 +94,13 @@ public partial class MixMatrixView : UserControl
         if ((sender as Control)?.DataContext is MatrixRowViewModel row) row.Main.CycleSoftLowCut();
     }
 
+    /// <summary>A capture input's Own clock button, the switch alone: turn it on or off.</summary>
+    private void OnToggleOwnClock(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is MatrixRowViewModel { ShowsOwnClockButton: true } row)
+            row.Channel.OwnClock = !row.Channel.OwnClock;
+    }
+
     /// <summary>An input row's name and binding line: open its binding dialog.</summary>
     private void OnBinding(object? sender, RoutedEventArgs e)
     {

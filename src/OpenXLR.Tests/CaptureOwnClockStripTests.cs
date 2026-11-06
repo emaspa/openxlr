@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text.Json.Nodes;
 using OpenXLR.UI;
 using OpenXLR.UI.Layout;
+using OpenXLR.UI.Localization;
 using OpenXLR.UI.Skinning;
 
 namespace OpenXLR.Tests;
@@ -11,6 +12,8 @@ namespace OpenXLR.Tests;
 /// the rack draws it in the switches part, the matrix in the row's
 /// processing flyout, both only for a capture input the daemon reports an
 /// own clock for, and the matrix's processing button is lit while it is on.
+/// When the switch is all the row has, the matrix draws it as its own
+/// button instead of a Mic button with a flyout.
 ///
 /// The window's model reads ui.json when it is made, from the configuration
 /// directory the tests of that collection redirect for the whole process.
@@ -50,10 +53,21 @@ public sealed class CaptureOwnClockStripTests
         Assert.True(row.ShowsProcessing);
         Assert.False(row.ProcessingOn);
 
+        // With nothing else behind it, the head draws the switch itself instead of a Mic button and its flyout.
+        Assert.True(row.OwnClockOnly);
+        Assert.True(row.ShowsOwnClockButton);
+        Assert.False(row.ShowsSwitchesButton);
+        Assert.Equal(Localizer.Format("MatrixOwnClockName", "4K X"), row.OwnClockName);
+        Assert.Equal(Localizer.Text("CaptureOwnClockTip"), row.OwnClockTip);
+        MatrixRowViewModel xlr1 = matrix.Rows.Single(r => r.Channel.Id == "xlr1");
+        Assert.False(xlr1.OwnClockOnly);
+        Assert.False(xlr1.ShowsOwnClockButton);
+
         ApplyMixer.Invoke(model, [JsonNode.Parse(State(Running))]);
         Assert.True(strip.Channel.OwnClock);
         Assert.True(row.ProcessingOn);
         Assert.NotNull(strip.Channel.OwnClockStatus);
+        Assert.EndsWith(strip.Channel.OwnClockStatus!, row.OwnClockTip);
 
         // An older daemon reports no own clock: no switch, and the parts go with it.
         ApplyMixer.Invoke(model, [JsonNode.Parse(State(null))]);
@@ -61,6 +75,7 @@ public sealed class CaptureOwnClockStripTests
         Assert.DoesNotContain(SkinStripParts.HardwareControls, strip.Spec.Parts);
         Assert.False(row.ShowsOwnClock);
         Assert.False(row.ShowsProcessing);
+        Assert.False(row.ShowsOwnClockButton);
 
         // XLR 1 never has one.
         Assert.False(rack.Strips.Single(s => s.Channel.Id == "xlr1").ShowsOwnClock);

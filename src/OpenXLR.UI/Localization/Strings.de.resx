@@ -2457,6 +2457,9 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="MatrixProcessing" xml:space="preserve">
     <value>Mic</value>
   </data>
+  <data name="MatrixOwnClockName" xml:space="preserve">
+    <value>Eigener Takt von {0}</value>
+  </data>
   <data name="MatrixProcessingName" xml:space="preserve">
     <value>Mikrofonschalter von {0}</value>
   </data>

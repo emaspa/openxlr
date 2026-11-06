@@ -3175,8 +3175,11 @@ interface has, with the Voice Tune strength while Voice Tune is on. On an
 interface without a hardware low cut or ClipGuard, XLR 1's software low cut
 and ClipGuard are there too. Under them is the microphone's
 [noise removal](#noise-removal), which also gives a capture input with no
-interface behind it a **Mic** button. They are the same controls as in
-INPUTS, so switching one here switches it there. **Mic** turns green while
+interface behind it a **Mic** button. A capture input whose only switch
+is [Own clock](#own-clock) gets an **Own clock** button instead, which
+turns it on and off at a click and turns green while it is on; its
+tooltip shows the delay and the dropouts. They are the same controls as
+in INPUTS, so switching one here switches it there. **Mic** turns green while
 one of them is on or noise removal runs, and its small lamp lights red while phantom power is on, so you can
 see both without opening it. Under **Mic** is the input's gain in dB. While
 you move the row's volume fader it shows the volume instead, as a
@@ -5092,8 +5095,9 @@ those units' sources, the Wave XLR Pro's included.
 
 <a name="own-clock"></a>
 **Own clock**, under the Mute button in the classic INPUTS block, among an
-input rack's switches, behind a mix matrix row's **Mic** button and as a row
-on the terminal mixer's Inputs tab, puts the capture input's device on a
+input rack's switches, on a mix matrix row (its own button, or behind
+**Mic** when the input has microphone switches too) and as a row on the
+terminal mixer's Inputs tab, puts the capture input's device on a
 clock of its own. Normally every device that feeds the mixer runs on one
 clock, the one the microphone's interface gives the graph, and PipeWire
 resamples the others to it. Some devices do not survive that. An Elgato

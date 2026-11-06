@@ -2462,6 +2462,9 @@ Select the interface OpenXLR drives</value>
   <data name="MatrixProcessing" xml:space="preserve">
     <value>Mic</value>
   </data>
+  <data name="MatrixOwnClockName" xml:space="preserve">
+    <value>{0} own clock</value>
+  </data>
   <data name="MatrixProcessingName" xml:space="preserve">
     <value>{0} microphone switches</value>
   </data>
