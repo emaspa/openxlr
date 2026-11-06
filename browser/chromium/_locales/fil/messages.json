@@ -119,6 +119,9 @@
   "siteChanged": {
     "message": "Nagbago ang website ng tab na ito. Buksan muli ang pagpili ng channel bago ito italaga."
   },
+  "siteChangedReopen": {
+    "message": "Nagbago ang website ng tab na ito. Buksan muli ang OpenXLR sa tab."
+  },
   "channelUnavailable": {
     "message": "Hindi magagamit ang OpenXLR channel na ito."
   },

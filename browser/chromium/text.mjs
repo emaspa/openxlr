@@ -46,6 +46,7 @@ export const ENGLISH = {
   bridgeDisconnected: 'OpenXLR browser integration disconnected.',
   tabUnregistered: 'This tab is no longer registered with OpenXLR.',
   siteChanged: "This tab's website changed. Reopen the channel picker before assigning it.",
+  siteChangedReopen: "This tab's website changed. Open OpenXLR on the tab again.",
   channelUnavailable: 'This OpenXLR channel is unavailable.',
   tooManyAssignments: 'Too many browser assignments are waiting for OpenXLR. Try again after a pending assignment finishes.',
   activateFromTab: 'Activate routing from the tab you want to listen to.',

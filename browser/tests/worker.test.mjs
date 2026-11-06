@@ -166,7 +166,7 @@ test('a stale or missing displayed website cannot assign the replacement page', 
   await f.publish({ tabs: f.state.tabs.map(tab => tab.id === 1 ? { ...tab, site: 'https://replacement.example' } : tab) });
   for (const site of ['https://site1.example', undefined]) {
     const reply = await f.request('assign', { id: 1, site, channel: 'music', remember: true });
-    assert.match(reply.error, /website changed/i);
+    assert.match(reply.error, /website changed\. Reopen the channel picker/i);
   }
   assert.equal(f.posts.filter(message => message.type === 'assign').length, 0);
   assert.equal((await f.request('snapshot')).value.pendingTabs.length, 0);
@@ -538,7 +538,7 @@ test('a popup still showing an earlier website leaves an OpenXLR activation wait
   const f = await readyFixture(); f.permissionError = NOT_INVOKED;
   await f.native({ type: 'activate', tabId: 2, site: 'https://site2.example' });
   assert.equal((await f.refresh()).find(tab => tab.id === 2).activation, 'popup');
-  assert.match((await f.request('start', { id: 2, site: 'https://earlier.example' })).error ?? '', /website changed/i);
+  assert.match((await f.request('start', { id: 2, site: 'https://earlier.example' })).error ?? '', /website changed\. Open OpenXLR on the tab again/i);
   assert.deepEqual(f.tokens, [2], 'only the refused OpenXLR attempt asked for a token');
   assert.deepEqual(Array.from((await f.request('snapshot')).value.requestedTabs), [2]);
   const listed = (await f.refresh()).find(tab => tab.id === 2);
@@ -673,6 +673,8 @@ test('showing a routed tab focuses its window without starting another capture',
   assert.deepEqual(f.tokens, [1]);
   assert.match((await f.request('showTab', { id: 2, site: 'https://site2.example' })).error, /no longer registered/);
   assert.match((await f.request('showTab', { id: 1, site: 'https://other.example' })).error, /no longer registered/);
+  f.tabs.find(tab => tab.id === 1).url = 'https://replacement.example/watch';
+  assert.match((await f.request('showTab', { id: 1, site: 'https://site1.example' })).error, /website changed\. Open OpenXLR on the tab again/i);
 });
 
 test('Stop all cancels an OpenXLR activation waiting for its first tab lookup', async () => {
@@ -721,7 +723,7 @@ test('a popup showing an earlier site cannot capture a new site in the same tab'
   const f = await readyFixture();
   f.update(1, 'https://replacement.example/watch');
   await f.publish({ tabs: f.state.tabs.map(tab => tab.id === 1 ? { ...tab, site: 'https://replacement.example' } : tab) });
-  assert.match((await f.request('start', { id: 1, site: 'https://site1.example' })).error ?? '', /website changed/i);
+  assert.match((await f.request('start', { id: 1, site: 'https://site1.example' })).error ?? '', /website changed\. Open OpenXLR on the tab again/i);
   assert.deepEqual(f.tokens, []);
   assert.equal((await f.request('start', { id: 1 })).error, undefined);
 });

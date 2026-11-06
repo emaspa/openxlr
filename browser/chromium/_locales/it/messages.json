@@ -119,6 +119,9 @@
   "siteChanged": {
     "message": "Il sito di questa scheda è cambiato. Riapri la scelta del canale prima di assegnarla."
   },
+  "siteChangedReopen": {
+    "message": "Il sito di questa scheda è cambiato. Riapri OpenXLR sulla scheda."
+  },
   "channelUnavailable": {
     "message": "Questo canale OpenXLR non è disponibile."
   },

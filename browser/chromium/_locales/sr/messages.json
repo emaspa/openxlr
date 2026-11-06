@@ -119,6 +119,9 @@
   "siteChanged": {
     "message": "Веб-сајт ове картице се променио. Поново отвори избор канала пре доделе."
   },
+  "siteChangedReopen": {
+    "message": "Веб-сајт ове картице се променио. Поново отвори OpenXLR на картици."
+  },
   "channelUnavailable": {
     "message": "Овај OpenXLR канал није доступан."
   },
