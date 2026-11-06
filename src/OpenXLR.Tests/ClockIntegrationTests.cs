@@ -46,13 +46,16 @@ public sealed partial class MonitorVolumeIntegrationTests
             Assert.True(File.Exists(reads), "Continuous graph changes must not postpone the clock read indefinitely.");
             Assert.Single(File.ReadAllLines(reads));
 
-            // A transient empty result needs another read even if the graph has settled.
+            // One last event must not postpone the retry of the empty read.
             File.WriteAllText(snapshot, """
                 [
                   {"id":1,"type":"PipeWire:Interface:Node","info":{"props":{"node.name":"test_driver"}}},
                   {"id":2,"type":"PipeWire:Interface:Node","info":{"props":{"node.name":"OpenXLR_mix_monitor","node.driver-id":1}}}
                 ]
                 """);
+            long? lastRevision = pw.ClockRevision;
+            pw.CreateNullSink("test_clock_change_before_retry", "Clock change before retry");
+            Assert.True(SpinWait.SpinUntil(() => pw.ClockRevision is long revision && revision != lastRevision, TimeSpan.FromSeconds(5)));
             now = 9999;
             Assert.False(mixer.SyncClock());
             Assert.Single(File.ReadAllLines(reads));

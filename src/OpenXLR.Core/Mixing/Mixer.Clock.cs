@@ -73,8 +73,10 @@ public sealed partial class Mixer
             if (!_built || _clockRevision != revision || _pw.ClockRevision is null) return false;
             if (objects.Length == 0)
             {
-                // An empty or failed dump does not consume the pending read.
-                _clockDueAt ??= now;
+                // Retry after the minimum gap, even if a graph event arrives
+                // just before then and would normally start a new quiet period.
+                _clockDueAt ??= now + minGap;
+                _clockDeadline ??= _clockDueAt;
                 return false;
             }
             // The dump runs outside the mixer lock. A route command can change
