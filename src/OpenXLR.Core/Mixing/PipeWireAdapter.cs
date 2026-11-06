@@ -1409,9 +1409,8 @@ public sealed class PipeWireAdapter
     public FilterHandle CreateMixChain(string id, string description, IReadOnlyList<InsertDefinition> inserts)
         => CreateFilterChain($"OpenXLR_ins_{id}_in", $"OpenXLR_ins_{id}_out", description, 2, 0, false, inserts);
 
-    internal FilterHandle CreateMonitorEqChain(string id, string description, IReadOnlyList<InsertDefinition> inserts,
-        MonitorEqPreset preset)
-        => CreateFilterChain($"OpenXLR_ins_{id}_in", $"OpenXLR_ins_{id}_out", description, 2, 0, false, inserts, preset);
+    internal FilterHandle CreateMonitorEq(string id, string description, MonitorEqPreset preset)
+        => CreateFilterChain($"OpenXLR_meq_{id}_in", $"OpenXLR_meq_{id}_out", description, 2, 0, false, null, preset);
 
     /// <summary>
     /// Build and hold a filter-chain: the builtin low cut and LADSPA limiter
@@ -1423,7 +1422,7 @@ public sealed class PipeWireAdapter
         int lowCutHz, bool clipGuard, IReadOnlyList<InsertDefinition>? inserts, MonitorEqPreset? monitorEq = null)
     {
         if (inserts?.Any(i => !i.Bypass && (i.NeedsNativeHost || NeedsLatencyHost(i))) == true)
-            return CreateHostedChain(sinkName, srcName, description, channels, lowCutHz, clipGuard, inserts, monitorEq: monitorEq);
+            return CreateHostedChain(sinkName, srcName, description, channels, lowCutHz, clipGuard, inserts);
         if (clipGuard)
         {
             DspFeatureAvailability support = GetSoftwareClipGuardAvailability();
@@ -1489,7 +1488,7 @@ public sealed class PipeWireAdapter
         try { return StartFilterChain(sinkName, srcName, spa); }
         catch (InvalidOperationException failure) when (NativeFallbackFor(inserts, channels) is { } active)
         {
-            return CreateFallbackChain(sinkName, srcName, description, channels, lowCutHz, clipGuard, active, failure, monitorEq);
+            return CreateFallbackChain(sinkName, srcName, description, channels, lowCutHz, clipGuard, active, failure);
         }
     }
 
@@ -1516,7 +1515,7 @@ public sealed class PipeWireAdapter
     /// not changed: the next build tries the filter chain again.
     /// </summary>
     private FilterHandle CreateFallbackChain(string sinkName, string srcName, string description, int channels,
-        int lowCutHz, bool clipGuard, IReadOnlyList<InsertDefinition> active, InvalidOperationException failure, MonitorEqPreset? monitorEq)
+        int lowCutHz, bool clipGuard, IReadOnlyList<InsertDefinition> active, InvalidOperationException failure)
     {
         InsertDefinition? lone = active.Count == 1 ? active[0] : null;
         if (lone is not null && !NativePluginHost.SupportsFeatures(PluginCatalog.Find(lone)!.RequiredFeatures))
@@ -1524,7 +1523,7 @@ public sealed class PipeWireAdapter
         try
         {
             var chain = CreateHostedChain(sinkName, srcName, description, channels, lowCutHz, clipGuard, active,
-                lone is null ? null : (lone.Id, failure.Message), monitorEq);
+                lone is null ? null : (lone.Id, failure.Message));
             if (lone is not null)
                 Note($"PipeWire's filter chain could not load {InsertName(lone)}, so the native host runs it. {failure.Message}");
             return chain;
@@ -1635,7 +1634,7 @@ public sealed class PipeWireAdapter
     /// </summary>
     private FilterHandle CreateHostedChain(string sinkName, string sourceName, string description, int channels,
         int lowCutHz, bool clipGuard, IReadOnlyList<InsertDefinition> inserts,
-        (string Id, string Reason)? fallback = null, MonitorEqPreset? monitorEq = null)
+        (string Id, string Reason)? fallback = null)
     {
         var stages = new List<FilterHandle>();
         var insertStages = new List<(string Id, FilterHandle Stage)>();
@@ -1685,8 +1684,6 @@ public sealed class PipeWireAdapter
                 // that runs.
                 insertStages.Add((insert.Id, stage.InsertStages.FirstOrDefault(s => s.Id == insert.Id).Stage ?? stage));
             }
-            if (monitorEq is not null)
-                stages.Add(CreateFilterChain(sinkName + "_eq", sourceName + "_eq", description, channels, 0, false, null, monitorEq));
             for (int i = 1; i < stages.Count; i++)
                 if (LinkNodes(stages[i - 1].SourceName, "capture", stages[i].SinkName, "playback").Pairs.Count < channels)
                     throw new InvalidOperationException("Could not link the plugin stages.");

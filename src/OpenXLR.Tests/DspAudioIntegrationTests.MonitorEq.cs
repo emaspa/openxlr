@@ -29,7 +29,7 @@ public sealed partial class DspAudioIntegrationTests
         Assert.Equal("fps", Status("monitor2").Preset);
         MixerSettings saved = mixer.ExportSettings();
         mixer.SetMonitorEqPreset("monitor", null, _ => null);
-        Assert.DoesNotContain(MixDelayIntegrationTests.OwnNodes(pw), n => n == "OpenXLR_ins_monitor_out");
+        Assert.DoesNotContain(MixDelayIntegrationTests.OwnNodes(pw), n => n == "OpenXLR_meq_monitor_out");
         mixer.ApplySettings(saved);
         Assert.Equal(new MonitorEqStatus("bass-boost", null), Status("monitor"));
         Assert.Equal(new MonitorEqStatus("fps", null), Status("monitor2"));
@@ -44,11 +44,88 @@ public sealed partial class DspAudioIntegrationTests
     }
 
     [DspPipeWireFact]
+    public void RestoringAndChangingMonitorEqKeepsTheHostedInsertAndItsRestartLimit()
+    {
+        const string mix = "monitor", key = "mix:monitor";
+        const string inserts = "OpenXLR_ins_", eq = "OpenXLR_meq_";
+        var pw = new PipeWireAdapter();
+        using var registry = pw.WatchGraph();
+        using var mixer = new Mixer(pw);
+        mixer.SetMixLatencyCompensation(true);
+        mixer.SetInserts(key, [Fixture("delay", 0)]);
+        mixer.Build(new MixerConfig { Mixes = [new(mix, "A", MixKind.Monitor)], Channels = [] });
+
+        InsertStatus Insert() => Assert.Single(mixer.Snapshot().Inserts[key]);
+        MonitorEqStatus Eq() => Assert.Single(mixer.Snapshot().Mixes).MonitorEq!;
+        Assert.True(Insert().NativeHostRunning, Insert().Error);
+        var originalHost = SettledChain(mix, inserts).Nodes.OrderBy(p => p.Key).ToArray();
+        mixer.ApplySettings(mixer.ExportSettings() with { MonitorEqPresets = new() { [mix] = "fps" } });
+        Assert.Equal(originalHost, SettledChain(mix, inserts).Nodes.OrderBy(p => p.Key));
+        Assert.Equal(new MonitorEqStatus("fps", null), Eq());
+
+        mixer.SetMonitorEqPreset(mix, "bass-boost", _ => null);
+        Assert.Equal(originalHost, SettledChain(mix, inserts).Nodes.OrderBy(p => p.Key));
+        var originalEq = SettledChain(mix, eq).Nodes.OrderBy(p => p.Key).ToArray();
+
+        // Kill the insert process three times, as the normal sweep would
+        // observe a crashing plugin. Each filter remains owned by this test.
+        for (int death = 0; death < 3; death++)
+        {
+            KillChainHolder(SettledChain(mix, inserts));
+            Assert.True(mixer.EnsureFilterRoutes());
+        }
+        Assert.Contains("kept failing", Insert().Error);
+        Assert.False(Insert().NativeHostRunning);
+        Assert.Equal(new MonitorEqStatus("bass-boost", null), Eq());
+        Assert.Equal(originalEq, SettledChain(mix, eq).Nodes.OrderBy(p => p.Key));
+
+        mixer.SetMonitorEqPreset(mix, "soft-treble", _ => null);
+        Assert.Contains("kept failing", Insert().Error);
+        Assert.False(Insert().NativeHostRunning);
+        Assert.Empty(Chain(mix, inserts).Nodes);
+        Assert.Equal(new MonitorEqStatus("soft-treble", null), Eq());
+        var workingEq = SettledChain(mix, eq).Nodes.OrderBy(p => p.Key).ToArray();
+
+        // This fixture has no native editor, so forcing its native mode
+        // fails at chain creation. The listening filter is still usable.
+        mixer.SetInserts(key, [CaptureChainFixture.Gain(2) with { NativeHost = true }]);
+        Assert.Contains("no editor", Insert().Error);
+        Assert.Equal(new MonitorEqStatus("soft-treble", null), Eq());
+        Assert.Equal(workingEq, SettledChain(mix, eq).Nodes.OrderBy(p => p.Key));
+    }
+
+    [DspPipeWireFact]
+    public void MonitorEqFailureLeavesTheInsertAndAProJackKeepsItsDirectMic()
+    {
+        const string mix = "monitor", key = "mix:monitor";
+        const string inserts = "OpenXLR_ins_", eq = "OpenXLR_meq_";
+        var pw = new PipeWireAdapter();
+        using var registry = pw.WatchGraph();
+        using var mixer = new Mixer(pw);
+        mixer.SetMixLatencyCompensation(true);
+        mixer.Build(MixerConfig.Default());
+        mixer.SetChannelMuted("xlr1", mix, false);
+        Assert.True(mixer.SetHardwareMicMonitor(true, whenHeardIn: mix));
+        mixer.SetInserts(key, [Fixture("delay", 0)]);
+        mixer.SetMonitorEqPreset(mix, "fps", _ => null);
+        Assert.True(mixer.SetHardwareMicMonitor(true, whenHeardIn: mix));
+
+        var originalHost = SettledChain(mix, inserts).Nodes.OrderBy(p => p.Key).ToArray();
+        KillChainHolder(SettledChain(mix, eq));
+        Assert.True(mixer.EnsureFilterRoutes());
+        var state = mixer.Snapshot();
+        Assert.Null(Assert.Single(state.Inserts[key]).Error);
+        Assert.Contains("monitor EQ stopped", state.Mixes.Single(m => m.Id == mix).MonitorEq!.Error);
+        Assert.Equal(originalHost, Chain(mix, inserts).Nodes.OrderBy(p => p.Key));
+        Assert.True(mixer.SetHardwareMicMonitor(true, whenHeardIn: mix));
+    }
+
+    [DspPipeWireFact]
     public void BassPresetShapesBothSidesOfARealPipeWireFilter()
     {
         var pw = new PipeWireAdapter();
         using var registry = pw.WatchGraph();
-        FilterHandle eq = pw.CreateMonitorEqChain("eq-test", "Test monitor EQ", [], MonitorEqPresets.Find("bass-boost")!);
+        FilterHandle eq = pw.CreateMonitorEq("eq-test", "Test monitor EQ", MonitorEqPresets.Find("bass-boost")!);
         try
         {
             var result = ProcessRunner.Run("python3", ["-c", """

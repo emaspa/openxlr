@@ -501,19 +501,23 @@ strip. A bound strip keeps its sends and send mutes everywhere.
 **Voice Boost** emphasizes speech, **FPS** reduces lows and sharp highs,
 **Bass Boost** emphasizes the low end, and **Soft Treble** reduces bright
 highs. **Off (flat)** removes the listening curve. The curves cut other
-frequencies to preserve headroom. Every output following the mix hears
+frequencies to preserve headroom. Software outputs following the mix hear
 its stereo curve after its inserts. Other mixes, the microphone EQ and
 virtual microphones keep their own processing.
 
 To add another listening mix, open **SUBMIXER → Edit layout**, add a
 **Monitor mix**, then select it in the feed picker next to the output under
 **MONITOR → Devices**. The preset follows the mix across a rename or restart
-and is kept apart from profiles. Changing a preset rebuilds that mix's
-effects, which can briefly interrupt playback and close native plugin editors.
-The Wave XLR Pro's hardware
-mixing mode builds its jack feeds on the device, where the listening EQ
-cannot run. For a jack feed with listening EQ in software mixing mode,
-the microphone also goes through the software mix instead of its direct path.
+and is kept apart from profiles. Changing a preset can briefly interrupt
+playback while the EQ stage changes. The inserts and their editors keep
+running. If an insert chain fails, the EQ can still shape the mix. If the
+EQ fails, the mix continues through its inserts when available.
+
+On the Wave XLR Pro, the direct microphone signal keeps its zero-latency
+hardware path. The listening EQ applies to audio returned from the
+software mix. With hardware mixing on, the Pro builds its jack feeds on
+the unit, so those feeds bypass the software EQ. A separate output that
+follows the same mix in software still uses the preset.
 
 The level meters show the newest reading available. If the UI is
 temporarily busy, it keeps one pending meter update and resumes with the

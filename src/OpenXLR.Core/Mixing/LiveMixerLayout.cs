@@ -449,6 +449,7 @@ public sealed partial class Mixer
                 SetMonitorOutputsLocked([.. _monitorOutputs]);
             SyncDuckingLocked();
             RemoveMixChainLocked(key);
+            RemoveMonitorEqStageLocked(id);
             _monitorEqErrors.Remove(id);
             _appearance.Remove("mix:" + id);
             _meters.Remove($"mix:{id}");
