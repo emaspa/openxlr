@@ -319,11 +319,13 @@ the physical outputs that receive these mixes.
 **Application routing**: when an app starts playing, the daemon reads
 its name from PipeWire and picks a channel by rules: browsers to
 Browser; Spotify, YouTube Music and media players to Music; Discord,
-Zoom, Slack and other chat apps to Voice Chat; Steam, Lutris, Heroic
+Zoom, Slack, WhatsApp desktop clients and other chat apps to Voice Chat; Steam, Lutris, Heroic
 and games to Game; apps named like a soundboard to SFX; anything else to
 System. Electron apps report
 "Chromium", so the process name is used instead, which is how Discord
-lands in Voice Chat. An app you move to another channel is remembered
+lands in Voice Chat. Apps built on WebKitGTK, such as whatRust, all play
+from the same `WebKitWebProcess` program, so the app name tells them apart
+instead. An app you move to another channel is remembered
 ([section 3.3](#apps)).
 
 **Profiles** are named scenes: the interface's hardware settings plus
@@ -1006,6 +1008,10 @@ An app's playback streams and audio client share the same identity even
 when PipeWire puts the process name only on the client. Windows executable
 names such as `Balatro.exe` use the same normalized key as their Wine or
 Proton client, so the app keeps one entry and one channel assignment.
+WebKitGTK apps go by their own name, not the shared `WebKitWebProcess`;
+an app saved under that shared name before keeps its channel under its
+own. The list spells a name the way the app's desktop entry does, so
+`whatrust` reads whatRust.
 When older settings contain both that key and a stale executable-name
 alias, the existing normalized assignment takes precedence.
 The entry shows the application's name, not the name of one of its helper

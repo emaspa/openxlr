@@ -221,6 +221,29 @@ public sealed class AppIdentityTests
     }
 
     /// <summary>
+    /// Every WebKitGTK application plays from the same web process binary,
+    /// so the application name tells them apart: whatRust and OpenDeck keep
+    /// their own channels, and a WhatsApp client lands in Voice Chat.
+    /// </summary>
+    [Fact]
+    public void WebKitApplicationsAreToldApartByName()
+    {
+        var whatrust = new AudioStream(1, "whatrust", "WebKitWebProcess", "Playback Stream");
+        var opendeck = new AudioStream(2, "opendeck", "WebKitWebProcess", "Playback Stream");
+        var unnamed = new AudioStream(3, null, "WebKitWebProcess", "Playback Stream");
+        Assert.Equal("whatrust", whatrust.Identity);
+        Assert.Equal("opendeck", opendeck.Identity);
+        Assert.Equal("WebKitWebProcess", unnamed.Identity);
+        Assert.Equal("WPEWebProcess", new AudioStream(4, "WPEWebProcess", "WPEWebProcess", null).Identity);
+        var matcher = new StreamMatcher();
+        Assert.Equal("voicechat", matcher.Match(whatrust));
+        matcher.SetOverride(whatrust.Identity, "music");
+        Assert.Equal("music", matcher.Match(whatrust));
+        Assert.Equal("system", matcher.Match(opendeck));
+        Assert.Null(ApplicationIconHints.From(whatrust).Binary);
+    }
+
+    /// <summary>
     /// The name an entry shows. A runtime's name or an identifier one word
     /// long with underscores gives way to the application's own binary; a
     /// real name, a Windows executable's and anything without a binary of its

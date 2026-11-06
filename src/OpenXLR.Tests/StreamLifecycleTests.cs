@@ -327,6 +327,28 @@ public sealed class StreamLifecycleTests
         Assert.All(apps, app => Assert.False(app.Running));
     }
 
+    /// <summary>
+    /// An application saved under WebKitGTK's shared web process, from
+    /// before such applications were told apart by name, comes back under
+    /// its own name with its channel, and the shared process keeps no
+    /// choice of its own.
+    /// </summary>
+    [Fact]
+    public void ASavedWebKitApplicationMovesToItsName()
+    {
+        using var graph = new Graph();
+        graph.Mixer.ApplySettings(new MixerSettings
+        {
+            AppOverrides = new() { ["WebKitWebProcess"] = "music" },
+            KnownApps = [new("WebKitWebProcess", "whatrust", "music")],
+        });
+        StreamAssignment app = Assert.Single(graph.Mixer.Snapshot().Streams);
+        Assert.Equal("whatrust", app.Identity);
+        Assert.Equal("music", app.ChannelId);
+        Assert.Equal("music", graph.Mixer.Matcher.Overrides["whatrust"]);
+        Assert.False(graph.Mixer.Matcher.Overrides.ContainsKey("WebKitWebProcess"));
+    }
+
     [Fact]
     public void AnAlsaClientKeepsItsSavedChannelUnderItsProgramsName()
     {
