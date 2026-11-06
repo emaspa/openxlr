@@ -49,4 +49,90 @@ public sealed class StartupIntegrationRestartTests
             Directory.Delete(directory, recursive: true);
         }
     }
+    [Theory]
+    [InlineData("42", 0, true, true)]
+    [InlineData("42", 1, true, false)]
+    [InlineData("0", 0, true, null)]
+    [InlineData("43", 0, true, null)]
+    [InlineData("42", 0, false, null)]
+    public async Task TheUpgradeQuestionRequiresTheSameDaemonAndClaimsOnlyOneAttempt(
+        string servicePid, int restartExit, bool remainsConnected, bool? expected)
+    {
+        string directory = Directory.CreateTempSubdirectory("openxlr-restart-upgrade-").FullName;
+        string log = Path.Combine(directory, "calls");
+        string? previousPath = Environment.GetEnvironmentVariable("PATH");
+        string? previousRuntime = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
+        try
+        {
+            ExecutableScript.Write(Path.Combine(directory, "systemctl"), $$"""
+                #!/bin/sh
+                case "$*" in
+                  '--user show --property=MainPID --value openxlr-daemon.service')
+                    printf '%s\n' '{{servicePid}}'
+                    ;;
+                  '--user --job-mode=fail try-restart openxlr-daemon.service')
+                    printf '%s\n' restart >> {{InstallationDoctor.Quote(log)}}
+                    exit {{restartExit}}
+                    ;;
+                  *) exit 99 ;;
+                esac
+                """);
+            Environment.SetEnvironmentVariable("PATH", directory);
+            Environment.SetEnvironmentVariable("XDG_RUNTIME_DIR", directory);
+            OpenXlrPaths.EnsurePrivateDir(OpenXlrPaths.RuntimeDir);
+
+            bool?[] results = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => Task.Run(() =>
+            {
+                int checks = 0;
+                return StartupIntegration.ClaimDaemonUpgradePrompt(42, () => ++checks == 1 || remainsConnected)
+                    ? StartupIntegration.RestartRunningDaemonService(42, () => remainsConnected) : (bool?)null;
+            })));
+            Assert.Equal(expected is null ? [] : new[] { expected }, results.Where(result => result is not null));
+            Assert.False(StartupIntegration.ClaimDaemonUpgradePrompt(42, () => remainsConnected));
+            if (expected is null) Assert.False(File.Exists(log));
+            else Assert.Equal(["restart"], File.ReadAllLines(log));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PATH", previousPath);
+            Environment.SetEnvironmentVariable("XDG_RUNTIME_DIR", previousRuntime);
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+    [Fact]
+    public void AServiceReplacedWhileTheQuestionIsOpenIsNotRestarted()
+    {
+        string directory = Directory.CreateTempSubdirectory("ox-upgrade-pid-").FullName;
+        string pidFile = Path.Combine(directory, "pid"), log = Path.Combine(directory, "restart");
+        string? previousPath = Environment.GetEnvironmentVariable("PATH");
+        string? previousRuntime = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
+        try
+        {
+            ExecutableScript.Write(Path.Combine(directory, "systemctl"), $$"""
+                #!/bin/sh
+                case "$*" in
+                  '--user show --property=MainPID --value openxlr-daemon.service')
+                    read -r pid < {{InstallationDoctor.Quote(pidFile)}}
+                    echo "$pid" ;;
+                  '--user --job-mode=fail try-restart openxlr-daemon.service')
+                    echo restart > {{InstallationDoctor.Quote(log)}} ;;
+                  *) exit 99 ;;
+                esac
+                """);
+            Environment.SetEnvironmentVariable("PATH", directory);
+            Environment.SetEnvironmentVariable("XDG_RUNTIME_DIR", directory);
+            File.WriteAllText(pidFile, "42\n");
+            Assert.True(StartupIntegration.ClaimDaemonUpgradePrompt(42, () => true));
+            File.WriteAllText(pidFile, "43\n");
+            Assert.False(StartupIntegration.RestartRunningDaemonService(42, () => true));
+            Assert.False(File.Exists(log));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PATH", previousPath);
+            Environment.SetEnvironmentVariable("XDG_RUNTIME_DIR", previousRuntime);
+            Directory.Delete(directory, true);
+        }
+    }
+
 }

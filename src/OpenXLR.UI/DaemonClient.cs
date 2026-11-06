@@ -82,9 +82,11 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
     /// <summary>Raised on every state push (already on a background thread).</summary>
     public event Action<JsonNode>? StateReceived;
 
-    internal sealed record StateObservation(string? Json, DateTimeOffset? ReceivedAt, bool Connected);
+    internal sealed record StateObservation(string? Json, DateTimeOffset? ReceivedAt, bool Connected, int PeerProcessId = 0, long Connection = 0);
+    private long _connection;
     private volatile StateObservation _lastState = new(null, null, false);
     internal StateObservation StateForDiagnostics => _lastState;
+    internal bool IsConnectedTo(int pid) => pid > 0 && _lastState is { Connected: true } state && state.PeerProcessId == pid;
 
     /// <summary>The last state of this connection, retained after disconnection for diagnostics.</summary>
     public string? LastStateJson => _lastState.Json;
@@ -332,7 +334,7 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
                 SetPresence(DaemonPresence.Reachable);
                 // Do not attribute the previous daemon's cached state to this
                 // connection while waiting for its first state message.
-                _lastState = new(null, null, true);
+                _lastState = new(null, null, true, link.PeerProcessId, Interlocked.Increment(ref _connection));
                 ConnectionChanged?.Invoke(true);
                 await ReceiveLoop(socket);
             }
@@ -405,7 +407,7 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
             if (type == "error") ErrorReceived?.Invoke(node["message"]?.GetValue<string>() ?? Localizer.Text("UnknownError"));
             else if (type == "state")
             {
-                _lastState = new(text, DateTimeOffset.UtcNow, true);
+                _lastState = _lastState with { Json = text, ReceivedAt = DateTimeOffset.UtcNow };
                 StateReceived?.Invoke(node);
             }
             else if (type is "diagnostics" or "runtimeDiagnostics") StoreReply(type, node);

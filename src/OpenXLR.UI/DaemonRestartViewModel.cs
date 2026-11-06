@@ -34,7 +34,11 @@ public sealed class DaemonRestartViewModel : ViewModelBase
     /// Run systemctl off the UI thread. Only one restart runs at a time, and a
     /// failed request leaves the buttons usable for another attempt.
     /// </summary>
-    public async Task<bool> RestartAsync()
+    public Task<bool> RestartAsync() => RestartAsync(_restart);
+
+    internal void ReportFailure() => Status = Localizer.Text("RestartFailed");
+
+    internal async Task<bool> RestartAsync(Func<Task<bool>> restart)
     {
         if (_busy) return false;
         _reconnected = false;
@@ -43,7 +47,7 @@ public sealed class DaemonRestartViewModel : ViewModelBase
         Status = Localizer.Text("RestartingDaemon");
         try
         {
-            bool restarted = await _restart();
+            bool restarted = await restart();
             Status = restarted
                 ? _reconnected ? null : Localizer.Text("ServiceRestartedWaiting")
                 : Localizer.Text("RestartFailedManualDaemon");

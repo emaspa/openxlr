@@ -1138,15 +1138,44 @@ public static class StartupIntegration
     /// </summary>
     internal static Func<bool>? AttachedRestart { get; set; }
 
-    private static bool Systemctl(params string[] args)
+    internal static bool IsRunningDaemonService(int peerPid, Func<bool> isCurrent)
+    {
+        return peerPid > 0 && isCurrent() &&
+            RunSystemctl("show", "--property=MainPID", "--value", "openxlr-daemon.service") is { Ok: true } service &&
+            int.TryParse(service.StdoutText.Trim(), System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture, out int mainPid) && mainPid == peerPid && isCurrent();
+    }
+
+    /// <summary>Claim the question, including Later, once per UI version and login session.</summary>
+    internal static bool ClaimDaemonUpgradePrompt(int peerPid, Func<bool> isCurrent)
+    {
+        if (!IsRunningDaemonService(peerPid, isCurrent)) return false;
+        string version = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(AppVersion.Current)));
+        try
+        {
+            OpenXlrPaths.EnsurePrivateDir(OpenXlrPaths.RuntimeDir);
+            using var marker = OpenXlrPaths.CreatePrivate(Path.Combine(OpenXlrPaths.RuntimeDir, $"upgrade-prompt-{version}"));
+            return isCurrent();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return false; }
+    }
+
+    internal static bool RestartRunningDaemonService(int peerPid, Func<bool> isCurrent)
+        => IsRunningDaemonService(peerPid, isCurrent) &&
+            Systemctl("--job-mode=fail", "try-restart", "openxlr-daemon.service");
+
+    private static bool Systemctl(params string[] args) => RunSystemctl(args)?.Ok == true;
+
+    private static ProcessResult? RunSystemctl(params string[] args)
     {
         try
         {
             // Bounded: a systemctl that hangs (a stuck user manager) is
             // killed after 15 s instead of being left behind.
             return ProcessRunner.Run("systemctl", ["--user", .. args], TimeSpan.FromSeconds(15),
-                stdoutCap: 64 * 1024, stderrCap: 64 * 1024).Ok;
+                stdoutCap: 64 * 1024, stderrCap: 64 * 1024);
         }
-        catch (Exception) { return false; }
+        catch (Exception) { return null; }
     }
 }

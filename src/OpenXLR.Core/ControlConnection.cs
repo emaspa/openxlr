@@ -27,19 +27,22 @@ sealed class ControlConnection : IDisposable
     private readonly Uri _uri;
     private readonly HttpMessageInvoker? _http;
     public ClientWebSocket Socket { get; } = new();
+    internal int PeerProcessId { get; private set; }
 
     // An explicit endpoint is used by client tests and callers that own their
     // transport. Normal clients always use the private Unix socket.
     public ControlConnection(Uri? endpoint = null, string? socketPath = null)
     {
         _uri = endpoint ?? new Uri("ws://localhost/ws");
-        if (endpoint is null) _http = new HttpMessageInvoker(HttpHandler(socketPath));
+        if (endpoint is null) _http = new HttpMessageInvoker(HttpHandler(socketPath, pid => PeerProcessId = pid));
     }
 
     public Task ConnectAsync(CancellationToken cancel) => _http is null
         ? Socket.ConnectAsync(_uri, cancel) : Socket.ConnectAsync(_uri, _http, cancel);
 
-    public static SocketsHttpHandler HttpHandler(string? path = null) => new()
+    public static SocketsHttpHandler HttpHandler(string? path = null) => HttpHandler(path, null);
+
+    private static SocketsHttpHandler HttpHandler(string? path, Action<int>? peerConnected) => new()
     {
         UseProxy = false,
         AllowAutoRedirect = false,
@@ -49,7 +52,8 @@ sealed class ControlConnection : IDisposable
             try
             {
                 await socket.ConnectAsync(new UnixDomainSocketEndPoint(path ?? OpenXlrPaths.ControlSocketPath), cancel).ConfigureAwait(false);
-                UnixPeerCredentials.RequireSameUser(socket);
+                int pid = UnixPeerCredentials.SameUserProcessId(socket);
+                peerConnected?.Invoke(pid);
                 return new NetworkStream(socket, ownsSocket: true);
             }
             catch { socket.Dispose(); throw; }
@@ -69,13 +73,16 @@ static class UnixPeerCredentials
 {
     public static uint User => OperatingSystem.IsLinux() ? GetEffectiveUser() : throw new PlatformNotSupportedException("The control socket requires Linux peer credentials.");
 
-    public static void RequireSameUser(Socket socket)
+    public static void RequireSameUser(Socket socket) => _ = SameUserProcessId(socket);
+
+    internal static int SameUserProcessId(Socket socket)
     {
         if (socket.AddressFamily != AddressFamily.Unix) throw new IOException("Peer credentials require a Unix socket.");
         uint size = 12;
         if (!OperatingSystem.IsLinux() || GetCredentials(socket.SafeHandle, 1, 17, out var peer, ref size) != 0 || size != 12)
             throw new IOException("Could not authenticate the Unix socket peer.");
         if (peer.User != User) throw new UnauthorizedAccessException("The control socket peer belongs to another user.");
+        return peer.Process;
     }
 
     [StructLayout(LayoutKind.Sequential)]

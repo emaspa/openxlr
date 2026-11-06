@@ -24,6 +24,7 @@ public partial class MainWindow : Window
     private bool _hideToTrayPending;
     private readonly CancellationTokenSource _lifetime = new();
     private bool _automaticUpdateCheckStarted;
+    private DaemonUpgradePrompt? _daemonUpgradePrompt;
     private (bool Toolbar, bool Stacked)? _monitorStacked;
     private string _monitorTemplate = Skinning.SkinLayoutTemplates.OutputPanel;
 
@@ -184,11 +185,54 @@ public partial class MainWindow : Window
     /// <summary>True when the window should stay unshown until the tray asks for it.</summary>
     public bool StartsHidden { get; }
 
+    internal void EnableDaemonUpgradePrompt()
+    {
+        _daemonUpgradePrompt = new DaemonUpgradePrompt(
+            (pid, current) => Task.Run(() => StartupIntegration.ClaimDaemonUpgradePrompt(pid, current)),
+            () => Dialogs.ConfirmAsync(this, Localizer.Text("DaemonUpgradeTitle"),
+                Localizer.Text("DaemonUpgradeQuestion"), Localizer.Text("Restart"), Localizer.Text("Later")),
+            (pid, current) => _vm.DaemonRestart.RestartAsync(() =>
+                Task.Run(() => StartupIntegration.RestartRunningDaemonService(pid, current))),
+            () =>
+            {
+                Program.RelaunchRequested = true;
+                Quit();
+            },
+            () => _vm.DaemonRestart.ReportFailure());
+        _client.StateReceived += OnUpgradeState;
+        Opened += (_, _) => CheckLatestUpgradeState();
+        Closed += (_, _) => _client.StateReceived -= OnUpgradeState;
+    }
+
+    private void CheckLatestUpgradeState()
+    {
+        var observation = _client.StateForDiagnostics;
+        if (observation is { Connected: true, Json: { } json } &&
+            System.Text.Json.Nodes.JsonNode.Parse(json) is { } state) QueueUpgradeState(state, observation);
+    }
+
+    private void OnUpgradeState(System.Text.Json.Nodes.JsonNode node)
+        => QueueUpgradeState(node, _client.StateForDiagnostics);
+
+    private void QueueUpgradeState(System.Text.Json.Nodes.JsonNode node, DaemonClient.StateObservation observation)
+    {
+        int pid = observation.PeerProcessId;
+        string? version = node["daemonVersion"]?.GetValue<string>();
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (!IsVisible || _reallyExit) return;
+            _ = _daemonUpgradePrompt?.CheckAsync(version, pid,
+                () => !_lifetime.IsCancellationRequested && _client.IsConnectedTo(pid) &&
+                    _client.StateForDiagnostics.Connection == observation.Connection);
+        });
+    }
+
     internal void ShowMixer()
     {
         _hideToTrayPending = false;
         if (_reallyExit) return;
         Show();
+        if (_daemonUpgradePrompt is not null) CheckLatestUpgradeState();
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
         Activate();
         ApplyPendingPopOut();

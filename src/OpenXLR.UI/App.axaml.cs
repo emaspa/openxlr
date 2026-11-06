@@ -38,6 +38,7 @@ public partial class App : Application
             if (!FlatpakEnvironment.IsFlatpak) StartupIntegration.RepairWindowAutostart();
 
             var window = new MainWindow(new DaemonClient(), syncDesktopVolume: true, showWelcomeGuide: _showWelcomeGuide);
+            if (!FlatpakEnvironment.IsFlatpak) window.EnableDaemonUpgradePrompt();
             // A later launch asks for the window through the single-instance
             // socket: bring it up, from the tray or from behind other windows.
             if (Program.Instance is { } instance)

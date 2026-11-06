@@ -25,8 +25,8 @@ internal static class OlderDaemonWindowTests
 {
     internal static void Check()
     {
-        Task pending = OfferRestartsTheServiceAndConnects();
-        var deadline = DateTime.UtcNow.AddSeconds(30);
+        Task pending = CheckAll();
+        var deadline = DateTime.UtcNow.AddSeconds(60);
         while (!pending.IsCompleted && DateTime.UtcNow < deadline)
         {
             Dispatcher.UIThread.RunJobs();
@@ -34,6 +34,123 @@ internal static class OlderDaemonWindowTests
         }
         Assert.True(pending.IsCompleted, "The older daemon restart check hung.");
         pending.GetAwaiter().GetResult();
+    }
+
+    private static async Task CheckAll()
+    {
+        await OfferRestartsTheServiceAndConnects();
+        await UpgradeQuestionLeavesAudioAloneUntilRestart();
+        var owner = new Window { Width = 400, Height = 200 };
+        owner.Show();
+        try
+        {
+            foreach (int answer in new[] { 0, 1, 2 })
+            {
+                void Answer(Window dialog)
+                {
+                    dialog.Opened += (_, _) => Dispatcher.UIThread.Post(() =>
+                    {
+                        var buttons = dialog.GetVisualDescendants().OfType<Button>().ToArray();
+                        var later = buttons.Single(button => Equals(button.Content, Localizer.Text("Later")));
+                        Assert.True(later.IsCancel);
+                        Assert.True(later.IsDefault);
+                        if (answer == 0) dialog.Close();
+                        else buttons.Single(button => Equals(button.Content,
+                            Localizer.Text(answer == 1 ? "Later" : "Restart")))
+                            .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    });
+                }
+                Dialogs.ConfirmOpening += Answer;
+                try
+                {
+                    bool accepted = await Dialogs.ConfirmAsync(owner, Localizer.Text("DaemonUpgradeTitle"),
+                        Localizer.Text("DaemonUpgradeQuestion"), Localizer.Text("Restart"), Localizer.Text("Later"));
+                    Assert.Equal(answer == 2, accepted);
+                }
+                finally { Dialogs.ConfirmOpening -= Answer; }
+            }
+        }
+        finally { owner.Close(); }
+    }
+
+    private static async Task UpgradeQuestionLeavesAudioAloneUntilRestart()
+    {
+        string bin = Directory.CreateTempSubdirectory("ox-upgrade-window-").FullName;
+        string log = Path.Combine(bin, "restarts");
+        string? previousPath = Environment.GetEnvironmentVariable("PATH");
+        string? previousFlatpak = Environment.GetEnvironmentVariable("FLATPAK_ID");
+        ExecutableScript.Write(Path.Combine(bin, "systemctl"), $$"""
+            #!/bin/sh
+            case "$*" in
+              '--user show --property=MainPID --value openxlr-daemon.service') echo {{Environment.ProcessId}} ;;
+              '--user --job-mode=fail try-restart openxlr-daemon.service')
+                echo restart >> {{InstallationDoctor.Quote(log)}}
+                exit 1 ;;
+              *) exit 99 ;;
+            esac
+            """);
+        Environment.SetEnvironmentVariable("PATH", bin);
+        Environment.SetEnvironmentVariable("FLATPAK_ID", null);
+        using var listener = ControlSocketListener.Bind();
+        await using var daemon = Daemon(listener, "0.0.1");
+        try
+        {
+            await daemon.StartAsync();
+            foreach (bool accept in new[] { false, true })
+            {
+                foreach (string marker in Directory.GetFiles(OpenXLR.UI.OpenXlrPaths.RuntimeDir, "upgrade-prompt-*")) File.Delete(marker);
+                await using var client = new DaemonClient();
+                var window = new MainWindow(client);
+                window.EnableDaemonUpgradePrompt();
+                int questions = 0;
+                void Answer(Window dialog)
+                {
+                    if (dialog.Title != Localizer.Text("DaemonUpgradeTitle")) return;
+                    questions++;
+                    dialog.Opened += (_, _) => Dispatcher.UIThread.Post(() =>
+                    {
+                        Assert.False(File.Exists(log));
+                        if (!accept) dialog.Close();
+                        else dialog.GetVisualDescendants().OfType<Button>()
+                            .Single(button => Equals(button.Content, Localizer.Text("Restart")))
+                            .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    });
+                }
+                Dialogs.ConfirmOpening += Answer;
+                try
+                {
+                    window.Show();
+                    await WaitFor(() => questions == 1, "The upgrade question did not appear.");
+                    var vm = (MainViewModel)window.DataContext!;
+                    if (accept)
+                    {
+                        await WaitFor(() => vm.DaemonRestart.Status == Localizer.Text("RestartFailed"), "The restart failure was not shown.");
+                        Assert.Equal(["restart"], File.ReadAllLines(log));
+                        Assert.True(window.IsVisible);
+                    }
+                    else
+                    {
+                        await Task.Delay(100);
+                        Assert.False(File.Exists(log));
+                        Assert.True(vm.DaemonConnected);
+                    }
+                    Assert.Equal(1, questions);
+                }
+                finally
+                {
+                    Dialogs.ConfirmOpening -= Answer;
+                    window.Quit();
+                }
+            }
+        }
+        finally
+        {
+            using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await daemon.StopAsync(stop.Token);
+            Environment.SetEnvironmentVariable("PATH", previousPath);
+            Environment.SetEnvironmentVariable("FLATPAK_ID", previousFlatpak);
+            Directory.Delete(bin, true);
+        }
     }
 
     private static async Task OfferRestartsTheServiceAndConnects()
@@ -99,7 +216,7 @@ internal static class OlderDaemonWindowTests
     }
 
     /// <summary>A daemon of this build on the control socket: one state, then it reads until closed.</summary>
-    private static WebApplication Daemon(ControlSocketListener listener)
+    private static WebApplication Daemon(ControlSocketListener listener, string? version = null)
     {
         var builder = WebApplication.CreateBuilder();
         builder.Logging.ClearProviders();
@@ -112,7 +229,7 @@ internal static class OlderDaemonWindowTests
             CancellationToken stop = app.Lifetime.ApplicationStopping;
             try
             {
-                await SocketTestServer.Send(socket, new { type = "state", connected = false, daemonVersion = AppVersion.Current,
+                await SocketTestServer.Send(socket, new { type = "state", connected = false, daemonVersion = version ?? AppVersion.Current,
                     profiles = Array.Empty<object>(), detected = Array.Empty<object>(), devices = Array.Empty<object>(),
                     mixer = new { channels = Array.Empty<object>(), mixes = Array.Empty<object>(), inserts = new { } } }, stop);
                 while (true) await SocketTestServer.Receive(socket, stop);

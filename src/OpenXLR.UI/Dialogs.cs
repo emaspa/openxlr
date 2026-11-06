@@ -140,10 +140,10 @@ internal static class Dialogs
     }
 
     /// <summary>True when the user accepts; closing the dialog any other way is a no.</summary>
-    public static async Task<bool> ConfirmAsync(Window owner, string title, string message, string yesLabel)
+    public static async Task<bool> ConfirmAsync(Window owner, string title, string message, string yesLabel, string? noLabel = null)
     {
         var yes = new Button { Content = yesLabel, Classes = { "danger" } };
-        var no = new Button { Content = Localizer.Text("Cancel"), IsCancel = true };
+        var no = new Button { Content = noLabel ?? Localizer.Text("Cancel"), IsCancel = true, IsDefault = noLabel is not null };
         var dialog = new Window
         {
             Title = title,

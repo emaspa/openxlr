@@ -39,6 +39,7 @@ public sealed class ControlSocketTests
             using var link = new ControlConnection(socketPath: listener.Path);
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             await link.ConnectAsync(timeout.Token);
+            Assert.Equal(Environment.ProcessId, link.PeerProcessId);
             await SocketTestServer.Send(link.Socket, new { cmd = "getState" }, timeout.Token);
             Assert.Equal("getState", (await SocketTestServer.Receive(link.Socket, timeout.Token))["cmd"]!.GetValue<string>());
             Assert.False(File.Exists(Path.Combine(directory, "token")));
