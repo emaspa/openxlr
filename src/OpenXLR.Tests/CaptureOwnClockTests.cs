@@ -82,6 +82,35 @@ public sealed class CaptureOwnClockTests
     }
 
     [Fact]
+    public void AProfileKeepsEveryCaptureInputsClockAndRecallSetsIt()
+    {
+        using Mixer mixer = Unbuilt();
+        // Every capture input, off or on; no other channel.
+        Assert.Equal(new Dictionary<string, bool> { ["console"] = false, ["mic"] = false }, mixer.ExportScene().CaptureOwnClock);
+        mixer.SetCaptureOwnClock("mic", true, _ => null);
+        Dictionary<string, bool> saved = mixer.ExportScene().CaptureOwnClock!;
+        Assert.True(saved["mic"]);
+        string json = JsonSerializer.Serialize(new OpenXLR.Core.MixerScene { CaptureOwnClock = saved }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        Assert.Equal(saved, JsonSerializer.Deserialize<OpenXLR.Core.MixerScene>(json, new JsonSerializerOptions(JsonSerializerDefaults.Web))!.CaptureOwnClock);
+        Assert.True(JsonNode.Parse(json)!["captureOwnClock"]!["mic"]!.GetValue<bool>());
+
+        // A recall sets each capture input it names and skips the rest; the settings keep it.
+        Recall(mixer, new() { ["console"] = true, ["mic"] = false, ["music"] = true, ["gone"] = true });
+        Assert.True(mixer.Snapshot().Channels.Single(c => c.Id == "console").OwnClock!.On);
+        Assert.False(mixer.Snapshot().Channels.Single(c => c.Id == "mic").OwnClock!.On);
+        Assert.True(mixer.ExportSettings().UserChannels!.Single(c => c.Id == "console").CaptureOwnClock);
+        Assert.Null(mixer.Snapshot().Channels.Single(c => c.Id == "music").OwnClock);
+        // A profile saved before the field leaves every input alone, and one naming part of them leaves the others.
+        Recall(mixer, null);
+        Recall(mixer, new() { ["mic"] = true });
+        Assert.True(mixer.Snapshot().Channels.Single(c => c.Id == "console").OwnClock!.On);
+        Assert.True(mixer.Snapshot().Channels.Single(c => c.Id == "mic").OwnClock!.On);
+    }
+
+    private static void Recall(Mixer mixer, Dictionary<string, bool>? recalled)
+        => typeof(Mixer).GetMethod("RecallCaptureOwnClockLocked", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(mixer, [recalled]);
+
+    [Fact]
     public void TheHelperRunsTheBridgeMode()
     {
         Assert.Equal(["bridge"], NativePluginHost.Arguments(new() { Id = "console_1", Kind = "bridge", Plugin = "bridge" }, null));

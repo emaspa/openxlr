@@ -181,7 +181,8 @@ public sealed class InputStripViewModel : ViewModelBase
     /// neither, except XLR 1's software low cut and ClipGuard, and a capture
     /// channel carrying the interface's microphone has both. A capture input
     /// with a gain of its own keeps the switches part for its source's mute,
-    /// where a carried unit's mute would be. The gain part
+    /// where a carried unit's mute would be, and any capture input keeps it
+    /// for its Own clock switch. The gain part
     /// also holds the channel's own volume, which every channel has once the
     /// daemon reports one, so a bound strip keeps the part for its volume.
     /// </summary>
@@ -190,7 +191,7 @@ public sealed class InputStripViewModel : ViewModelBase
         (InputStripKind.Xlr1, SkinStripParts.HardwareControls) => CarriesUnit || CarriesExtraUnit || Main.ShowSoftLowCut || Main.ShowSoftClipGuard,
         (InputStripKind.Xlr1 or InputStripKind.Xlr2, SkinStripParts.Gain) => CarriesUnit || CarriesExtraUnit || Channel.HasVolume,
         (InputStripKind.Xlr2, SkinStripParts.HardwareControls) => CarriesUnit || CarriesExtraUnit,
-        (InputStripKind.Capture, SkinStripParts.HardwareControls) => CarriesUnit || CarriesExtraUnit || ShowsCaptureMute,
+        (InputStripKind.Capture, SkinStripParts.HardwareControls) => CarriesUnit || CarriesExtraUnit || ShowsCaptureMute || ShowsOwnClock,
         (InputStripKind.Capture or InputStripKind.Application, SkinStripParts.Gain) => CarriesUnit || CarriesExtraUnit || Channel.HasVolume
             || ShowsCaptureGain,
         (InputStripKind.LineIn, SkinStripParts.Gain) => Main.CapLineInput || Channel.HasVolume,
@@ -226,6 +227,9 @@ public sealed class InputStripViewModel : ViewModelBase
 
     /// <summary>The strip draws a capture input's own mute, its source's, beside that gain.</summary>
     public bool ShowsCaptureMute => Kind == InputStripKind.Capture && Channel.ShowsCaptureMute;
+
+    /// <summary>The strip draws a capture input's Own clock switch: the daemon reports one for it.</summary>
+    public bool ShowsOwnClock => Kind == InputStripKind.Capture && Channel.HasOwnClock;
 
     internal void RefreshSpec()
     {
@@ -286,6 +290,7 @@ public sealed class InputStripViewModel : ViewModelBase
             case nameof(ChannelViewModel.HasVolume): RefreshSpec(); Raise(nameof(ShowsVolume)); break;
             case nameof(ChannelViewModel.ShowsCaptureGain): RefreshSpec(); Raise(nameof(ShowsCaptureGain)); break;
             case nameof(ChannelViewModel.ShowsCaptureMute): RefreshSpec(); Raise(nameof(ShowsCaptureMute)); break;
+            case nameof(ChannelViewModel.HasOwnClock): RefreshSpec(); Raise(nameof(ShowsOwnClock)); break;
             case nameof(ChannelViewModel.Inserts): Raise(nameof(Inserts)); Raise(nameof(InsertsKey)); RefreshSpec(); break;
             case nameof(ChannelViewModel.ShownUnitInput):
                 Raise(nameof(Unit)); Raise(nameof(CarriesUnit)); Raise(nameof(ShowsCaptureGain)); Raise(nameof(ShowsCaptureMute)); RefreshSpec();

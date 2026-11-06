@@ -460,10 +460,10 @@ which the state reports as `captureGain.muted`. Neither is saved.
 `setCaptureOwnClock {channel, value}` puts a capture input's device on a
 clock of its own, carried into the mixer by a clock bridge, or with `false`
 back on the mixer's clock ([api.md](api.md#own-clock)). It is saved in the
-entry as `captureOwnClock: true`, written only while on, and like the
-binding it belongs to the layout, not a profile. The command saves before
-it rewires the input; a failed save changes nothing. The state reports it
-in the channel's `ownClock`.
+entry as `captureOwnClock: true`, written only while on. A profile keeps
+it as well, and recalling one sets it and saves the entry. The command
+saves before it rewires the input; a failed save changes nothing. The
+state reports it in the channel's `ownClock`.
 
 Disconnected sources retain their exact binding and faders. They reconnect
 when that node and pair return. With `captureUnit`, a missing exact name

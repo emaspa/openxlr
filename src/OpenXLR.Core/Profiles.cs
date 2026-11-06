@@ -97,6 +97,13 @@ public sealed record MixerScene
     /// </summary>
     public Dictionary<string, CaptureGainScene>? CaptureGains { get; init; }
 
+    /// <summary>
+    /// Whether each capture input runs on its own clock, by channel; absent
+    /// in older profiles, which leave every input's clock as it is. A recall
+    /// sets each capture input named here and keeps it in the mixer settings.
+    /// </summary>
+    public Dictionary<string, bool>? CaptureOwnClock { get; init; }
+
     /// <summary>The ducking setup without machine processing. Absent in older profiles, which leave it alone.</summary>
     public DuckingScene? Ducking { get; init; }
 }

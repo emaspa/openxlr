@@ -97,8 +97,8 @@
          row carries, bound to the same properties under the same capability rules
          and styled as they are there, the Voice Tune strength under them while Voice
          Tune is on, an additional interface's switches, XLR 1's software low
-         cut and ClipGuard, and the microphone's noise removal. The mute stays
-         the row head's own part. -->
+         cut and ClipGuard, the microphone's noise removal and a capture input's
+         Own clock. The mute stays the row head's own part. -->
     <DataTemplate x:Key="ProcessingSwitches" x:DataType="layout:MatrixRowViewModel">
       <!-- as wide as the switches need, at most the width the monitor picker's flyout gives its rows, so they wrap as in INPUTS -->
       <StackPanel Classes="dev" Spacing="6" Name="MatrixProcessingPanel" MaxWidth="400">
@@ -137,6 +137,13 @@
         <Panel IsVisible="{Binding ShowsDynamics}">
           <views:DynamicsControls Name="MatrixDynamics" DataContext="{Binding Channel.Dynamics}"/>
         </Panel>
+        <!-- a capture input's device on a clock of its own, with what the bridge does under it -->
+        <StackPanel Name="MatrixOwnClockPanel" Spacing="2" IsVisible="{Binding ShowsOwnClock}">
+          <CheckBox Name="MatrixOwnClock" Content="{loc:Text Key=CaptureOwnClock}" HorizontalAlignment="Left"
+                    IsChecked="{Binding Channel.OwnClock, Mode=TwoWay}" ToolTip.Tip="{loc:Text Key=CaptureOwnClockTip}"/>
+          <TextBlock Text="{Binding Channel.OwnClockStatus}" Classes="hint" FontSize="{DynamicResource UiText.FontSize11}"
+                     TextWrapping="Wrap" IsVisible="{Binding Channel.HasOwnClockStatus}"/>
+        </StackPanel>
       </StackPanel>
     </DataTemplate>
 

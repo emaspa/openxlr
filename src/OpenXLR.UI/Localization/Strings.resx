@@ -2469,7 +2469,7 @@ Select the interface OpenXLR drives</value>
     <value>{0} microphone switches, phantom power on</value>
   </data>
   <data name="MatrixProcessingTip" xml:space="preserve">
-    <value>The microphone's switches: low cut, expander, Voice Tune, phantom power, ClipGuard and the compressor, where the interface has them. Lit while one is on. The lamp lights red while phantom power is on.</value>
+    <value>The microphone's switches: low cut, expander, Voice Tune, phantom power, ClipGuard and the compressor, where the interface has them, and a capture input's Own clock. Lit while one is on. The lamp lights red while phantom power is on.</value>
   </data>
   <data name="IconDefaultNamed" xml:space="preserve">
     <value>Default ({0})</value>

@@ -650,7 +650,8 @@ A capture input on a Wave unit has the unit's gain instead,
 and OpenXLR never writes the volume of a Wave unit's source.
 
 A capture input can run its device on its own clock (`setCaptureOwnClock`,
-**Own clock** in classic INPUTS and the terminal mixer). The device then
+**Own clock** in INPUTS, the input rack, the mix matrix and the terminal
+mixer, kept in profiles). The device then
 drives a small graph of its own and a clock bridge in the native helper
 carries its audio into the mixer through a ring buffer, with a delay-locked
 loop and a resampler that correct the drift between the two clocks. It is

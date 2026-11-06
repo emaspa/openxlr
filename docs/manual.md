@@ -5091,8 +5091,9 @@ gain while OpenXLR drives the unit. OpenXLR never changes the volume of
 those units' sources, the Wave XLR Pro's included.
 
 <a name="own-clock"></a>
-**Own clock**, under the Mute button in the classic INPUTS block and as a
-row on the terminal mixer's Inputs tab, puts the capture input's device on a
+**Own clock**, under the Mute button in the classic INPUTS block, among an
+input rack's switches, behind a mix matrix row's **Mic** button and as a row
+on the terminal mixer's Inputs tab, puts the capture input's device on a
 clock of its own. Normally every device that feeds the mixer runs on one
 clock, the one the microphone's interface gives the graph, and PipeWire
 resamples the others to it. Some devices do not survive that. An Elgato
@@ -5110,8 +5111,9 @@ is worse than the bridge's margin. Mic setup ends when you switch it.
 Switch it on for every capture input on that device. An input on the same
 device left on the mixer's clock links the device into the mixer again, and
 the bridge cannot keep it apart; **Flow** and a diagnostics archive say so.
-The setting is saved with the input in the layout, not in a profile. It
-needs the native helper; without it the input stays silent and says why.
+The setting is saved with the input, and a profile keeps it, so recalling
+a profile turns it on or off again. It needs the native helper; without it
+the input stays silent and says why.
 
 A capture channel on the primary interface's own source, at the first port
 or pair for its first microphone or the third port or second pair for its
