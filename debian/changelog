@@ -1,3 +1,12 @@
+openxlr (0.6.2) resolute; urgency=medium
+
+  * Mixer: a capture input can run its device on its own clock, bridged into the mixer, for capture cards that garble or drop off USB while they follow another clock
+  * Profiles: each capture input's own clock
+  * UI: the Own clock switch in INPUTS, the mix matrix and the terminal mixer, with the bridge's delay and dropouts
+  * Diagnostics: the USB controllers and their chips
+
+ -- Emanuele Sparvoli <sparvoli@gmail.com>  Fri, 06 Nov 2026 19:17:58 +0000
+
 openxlr (0.6.1) resolute; urgency=medium
 
   * Mixer: an editable EQ on every output mix, with four listening curves, running ahead of the mix's plugins
