@@ -752,9 +752,12 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         foreach (MixDefinition mix in _config.Mixes)
         {
             string key = MixKey(mix);
-            if (_chains.TryGetValue(key, out FilterHandle? chain))
-                changed |= EnsureMixLinkLocked(_mixTaps, key, mix.SinkName, "monitor", chain.SinkName);
             changed |= EnsureMixEqLinkLocked(mix);
+            if (_chains.TryGetValue(key, out FilterHandle? chain))
+            {
+                (string from, string prefix) = MixChainUpstreamLocked(mix);
+                changed |= EnsureMixLinkLocked(_mixTaps, key, from, prefix, chain.SinkName);
+            }
             if (mix.Kind == MixKind.VirtualMic)
             {
                 (string node, string prefix) = MixTapLocked(mix);
@@ -1030,13 +1033,14 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
 
     /// <summary>
     /// Where a mix's consumers should read from: its latency delay when it
-    /// has one, else its EQ stage when one runs, else its insert chain when
-    /// one runs, else its own monitor.
+    /// has one, else its insert chain when one runs, else its EQ stage when
+    /// one runs, else its own monitor. The EQ comes first in the mix, so
+    /// every one of these is after it.
     /// </summary>
     private (string Node, string Prefix) MixTapLocked(MixDefinition mix)
         => _mixDelays.TryGetValue(mix.Id, out FilterHandle? delay) ? (delay.SourceName, "capture")
-        : _mixEqStages.TryGetValue(mix.Id, out SoftwareEqBackend? eq) ? (eq.Node, "capture")
-        : MixEqUpstreamLocked(mix);
+        : _chains.TryGetValue(MixKey(mix), out FilterHandle? chain) ? (chain.SourceName, "capture")
+        : MixChainUpstreamLocked(mix);
 
     /// <summary>
     /// (Re)build one mix's insert chain and re-point everything that reads
@@ -1050,6 +1054,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         if (_chains.Remove(key, out FilterHandle? old)) _pw.StopFilter(old);
         _insertErrors.Remove(key);
         _chainStructures[key] = MixChainLocked(key).Structure;
+        // The EQ stage comes first and stays; the new chain takes its input
+        // from it, or from the mix itself without one.
+        PrepareMixEqLocked(mix);
 
         List<InsertDefinition> inserts = InsertsFor(key);
         bool anyInsert = inserts.Any(i => !i.Bypass && PluginCatalog.Find(i) is { } p && p.Fits(2));
@@ -1060,16 +1067,14 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             {
                 FilterHandle chain = _pw.CreateMixChain(mix.Id, $"OpenXLR {mix.Name} Inserts", inserts);
                 _chains[key] = chain;
-                _mixTaps[key] = _pw.LinkNodes(mix.SinkName, "monitor", chain.SinkName, "playback");
+                (string from, string prefix) = MixChainUpstreamLocked(mix);
+                _mixTaps[key] = _pw.LinkNodes(from, prefix, chain.SinkName, "playback");
             }
             catch (Exception ex)
             {
                 _insertErrors[key] = ex.Message;   // the mix keeps flowing without its inserts
             }
         }
-        // The EQ stage stays and takes its input from the new chain, or from
-        // the mix itself without one.
-        WireMixEqInputLocked(mix);
         RewireMixConsumersLocked(mix);
     }
 

@@ -8,15 +8,17 @@ namespace OpenXLR.Tests;
 /// <summary>
 /// The output EQ on a private PipeWire server: XLR 1 and XLR 2 on the fake
 /// unit's 1 kHz tone, both sent to the Stream mix, which has the latency
-/// fixture as an insert. The EQ is one stereo stage after the insert, in
-/// front of what records the mix; every value reaches it live, with no node,
-/// link or helper process, the insert chain is never built again for it, a
-/// chain the mixer gave up on stays off, and the microphone EQ works beside it.
+/// fixture as an insert. The EQ is one stereo stage at the head of the mix,
+/// between the mix and the insert, and what records the mix reads the
+/// insert; every value reaches it live, with no node, link or helper
+/// process, the insert chain is never built again for it, a chain the mixer
+/// gave up on stays off with the EQ read directly, and the microphone EQ
+/// works beside it.
 /// </summary>
 public sealed partial class DspAudioIntegrationTests
 {
     [DspPipeWireFact]
-    public Task AMixEqIsOneLiveStageAfterTheInsertsAndTheMicrophoneEqStillWorks() => OnTheUnitWithTone(compensate: false, (mixer, pw, runs) =>
+    public Task AMixEqIsOneLiveStageBeforeTheInsertsAndTheMicrophoneEqStillWorks() => OnTheUnitWithTone(compensate: false, (mixer, pw, runs) =>
     {
         // The insert runs in PipeWire's filter chain, whose nodes would come
         // back with new serials if anything built it again; the native
@@ -42,14 +44,20 @@ public sealed partial class DspAudioIntegrationTests
         Assert.Null(MixState(mixer, "stream").Backend);
         Assert.Equal(hosts, NativeHosts());
 
-        // On: one stereo stage, fed by the insert chain, read by the post sink.
+        // Before the EQ the chain takes the mix itself.
+        Assert.Equal(["OpenXLR_mix_stream"], LinksInto(StreamChain()!.SinkName).Distinct());
+        Assert.Equal([StreamChain()!.SourceName], LinksInto(recorded).Distinct());
+
+        // On: one stereo stage, fed by the mix, feeding the insert chain, whose
+        // end the post sink still reads.
         mixer.SetMixEqEnabled("stream", true);
         string node = mixer.MixEqNode("stream")!;
         Assert.StartsWith("OpenXLR_mixeq_stream_", node);
         ChainGraph eq = SettledChain("stream", "OpenXLR_mixeq_");
         Assert.Single(eq.Nodes);
-        Assert.Contains(StreamChain()!.SourceName, LinksInto(node));
-        Assert.Equal([node], LinksInto(recorded).Distinct());
+        Assert.Equal(["OpenXLR_mix_stream"], LinksInto(node).Distinct());
+        Assert.Equal([node], LinksInto(StreamChain()!.SinkName).Distinct());
+        Assert.Equal([StreamChain()!.SourceName], LinksInto(recorded).Distinct());
         Assert.Equal(chain.Nodes, Chain("stream", "OpenXLR_ins_").Nodes);
         Assert.True(SpinWait.SpinUntil(() => NativeHosts() == hosts + 1, TimeSpan.FromSeconds(5)), "The stage is not one helper.");
         Assert.Equal("software", MixState(mixer, "stream").Backend);
@@ -107,41 +115,46 @@ public sealed partial class DspAudioIntegrationTests
         AssertNodeLevel(recorded, flat + 9);
 
         // The insert chain built again for its own reasons: the stage keeps
-        // running and takes its input from the new chain. A rebuilt mix
-        // chain keeps its node names, and a link made while the old nodes are
-        // still leaving goes with them, so the sweep links it, as it does
-        // without the EQ.
+        // running and the new chain is linked from it. A rebuilt mix chain
+        // keeps its node names, and a link made while the old nodes are still
+        // leaving goes with them, so the sweep links it, as it does without
+        // the EQ.
         mixer.SetInserts("mix:stream", [Fixture("mix", 100), Fixture("more", 50)]);
         Assert.True(SpinWait.SpinUntil(() =>
         {
             mixer.EnsureFilterRoutes();
-            return StreamChain() is { } rebuilt && LinksInto(node).Contains(rebuilt.SourceName)
-                && LinksInto(rebuilt.SinkName).Contains("OpenXLR_mix_stream") && LinksInto(recorded).Contains(node);
-        }, TimeSpan.FromSeconds(8)), "The rebuilt chain was not linked between the mix and its EQ: "
-            + (StreamChain() is { } now ? $"{Links(now.SinkName)}; {now.SourceName} -> EQ? {Links(node)}" : "no chain"));
+            return StreamChain() is { } rebuilt && LinksInto(rebuilt.SinkName).Distinct().SequenceEqual([node])
+                && LinksInto(node).Contains("OpenXLR_mix_stream") && LinksInto(recorded).Contains(rebuilt.SourceName);
+        }, TimeSpan.FromSeconds(8)), "The rebuilt chain was not linked between the EQ and the post sink: "
+            + (StreamChain() is { } now ? $"{Links(now.SinkName)}; {Links(node)}; {Links(recorded)}" : "no chain"));
+        Assert.DoesNotContain(node, LinksInto(recorded));
         Assert.NotEqual(chain.Nodes, SettledChain("stream", "OpenXLR_ins_").Nodes);
         Assert.Equal(eq.Nodes, Chain("stream", "OpenXLR_mixeq_").Nodes);
         AssertNodeLevel(recorded, flat + 9);
         chain = SettledChain("stream", "OpenXLR_ins_");
         hosts = NativeHosts();
 
-        // Another number of bands is the one change that starts a fresh stage.
+        // Another number of bands is the one change that starts a fresh
+        // stage; the running chain is linked from it, and from it alone.
         mixer.SetMixEq("stream", louder with { Bands = louder.Bands.Take(3).ToArray() });
         ChainGraph three = SettledChain("stream", "OpenXLR_mixeq_");
         Assert.NotEqual(eq.Nodes, three.Nodes);
         Assert.Single(three.Nodes);
         Assert.Equal(chain.Nodes, Chain("stream", "OpenXLR_ins_").Nodes);
+        Assert.Equal([mixer.MixEqNode("stream")!], LinksInto(StreamChain()!.SinkName).Distinct());
         Assert.True(SpinWait.SpinUntil(() => NativeHosts() == hosts, TimeSpan.FromSeconds(5)), "The old stage's helper is still running.");
         AssertNodeLevel(recorded, flat + 9);
 
-        // The stage's helper dies: the sweep starts a new one, the chain keeps running.
+        // The stage's helper dies: the sweep starts a new one and links the
+        // running chain from it.
         KillChainHolder(three);
         Assert.True(SpinWait.SpinUntil(() =>
         {
             mixer.EnsureFilterRoutes();
             ChainGraph now = Chain("stream", "OpenXLR_mixeq_");
-            return now.Nodes.Count == 1 && !now.Nodes.Keys.Intersect(three.Nodes.Keys).Any();
-        }, TimeSpan.FromSeconds(8)), "The mix EQ was not started again.");
+            return now.Nodes.Count == 1 && !now.Nodes.Keys.Intersect(three.Nodes.Keys).Any()
+                && mixer.MixEqNode("stream") is { } restarted && LinksInto(StreamChain()!.SinkName).Contains(restarted);
+        }, TimeSpan.FromSeconds(8)), "The mix EQ was not started again in front of the chain.");
         AssertNodeLevel(recorded, flat + 9);
         Assert.Equal(chain.Nodes, Chain("stream", "OpenXLR_ins_").Nodes);
 
@@ -160,8 +173,10 @@ public sealed partial class DspAudioIntegrationTests
             return Chain("stream", "OpenXLR_ins_").Nodes.Count == 0;
         }, TimeSpan.FromSeconds(8)), "The given-up chain was built again.");
         string current = mixer.MixEqNode("stream")!;
-        Assert.True(SpinWait.SpinUntil(() => LinksInto(current).Contains("OpenXLR_mix_stream"), TimeSpan.FromSeconds(5)),
-            "The EQ does not take the mix itself without its chain: " + string.Join(", ", LinksInto(current)));
+        Assert.True(SpinWait.SpinUntil(() => LinksInto(current).Contains("OpenXLR_mix_stream")
+                && LinksInto(recorded).Distinct().SequenceEqual([current]), TimeSpan.FromSeconds(5)),
+            $"The post sink does not read the EQ without its chain: {Links(current)}; {Links(recorded)}");
+        AssertNodeLevel(recorded, flat + 9);
         mixer.SetMixEqEnabled("stream", false);
         mixer.SetMixEqEnabled("stream", true);
         mixer.SetMixEq("stream", louder);

@@ -2728,7 +2728,7 @@ Von OpenXLR gesteuertes Interface wählen</value>
     <value>An, läuft auf diesem Computer am Anfang des Eingangs, vor den Plugins.</value>
   </data>
   <data name="EqStatusSoftwareMix" xml:space="preserve">
-    <value>An, läuft auf diesem Computer nach den Plugins des Mixes, vor seinen Ausgängen.</value>
+    <value>An, läuft auf diesem Computer am Anfang des Mixes, vor seinen Plugins und Ausgängen.</value>
   </data>
   <data name="EqStatusDevice" xml:space="preserve">
     <value>An, läuft auf dem Interface noch vor USB, also vor den Plugins und allem anderen auf diesem Computer.</value>

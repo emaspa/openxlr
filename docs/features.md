@@ -294,15 +294,16 @@ physical gain dial.
 - Output EQ: the microphone EQ on every mix, Monitor A and B, user
   monitor mixes, Stream, Chat, the other virtual microphones and Aux, with
   the same editor, one to sixteen bands, values and profiles. It is one
-  stereo stage in the native plugin host after the mix's inserts and
-  before its outputs, the post sink and the USB Aux port, running the EQ
-  alone. Switching it on splices it in once without restarting the
-  plugins; every later change reaches the running filters live, and off
+  stereo stage in the native plugin host at the head of the mix, before
+  its inserts, so a limiter among them catches the EQ's boosts, and before
+  its outputs, the post sink and the USB Aux port, running the EQ alone.
+  Switching it on splices it in once without restarting the plugins;
+  every later change reaches the running filters live, and off
   bypasses inside the stage. Only a new number of bands starts a new
   stage. A chain rebuilt for its own reasons keeps the EQ running, and a
   chain the mixer gave up on stays off. Four listening curves come with it
   as built-in profiles: Voices forward, Footsteps, Bass boost and Soft
-  treble, each only cutting. Opened from **EQ** under a mix's **FX** in
+  treble, each only cutting. Opened from **EQ** over a mix's **FX** in
   the matrix head and the mix strips, and in the terminal mixer's Outputs
   tab; Deck keys and dials drive it; saved with the mixer under `mixEq`
   and in profiles, where an older profile leaves it alone. The Wave XLR

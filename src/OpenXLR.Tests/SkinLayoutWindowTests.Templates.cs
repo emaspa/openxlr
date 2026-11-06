@@ -73,7 +73,9 @@ internal static partial class SkinLayoutWindowTests
             var model = (MainViewModel)window.DataContext!;
             typeof(MainViewModel).GetMethod("ApplyMixer", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(model, [JsonNode.Parse("""
                 {"mixes":[{"id":"monitor","name":"Monitor A","kind":"monitor"},{"id":"monitor2","name":"Monitor B","kind":"monitor"},
-                          {"id":"stream","name":"Stream","kind":"virtualMic"},{"id":"chat","name":"Chat","kind":"virtualMic"},
+                          {"id":"stream","name":"Stream","kind":"virtualMic",
+                           "eq":{"enabled":false,"bands":[{"enabled":true,"type":"peak","frequency":1000,"gain":0,"q":0.707}],"available":true,"processing":"software"}},
+                          {"id":"chat","name":"Chat","kind":"virtualMic"},
                           {"id":"auxout","name":"Aux","kind":"auxPort"}],
                  "channels":[{"id":"xlr1","name":"XLR 1","hardware":true,"levels":{"monitor":0.8,"stream":0.6},"volume":0.75},
                              {"id":"xlr2","name":"XLR 2","hardware":true,"volume":1},
@@ -113,6 +115,7 @@ internal static partial class SkinLayoutWindowTests
             Border Card(string tile) => (Border)window.FindControl<Expander>(tile)!.Parent!;
             Border[] cards = [.. Usual.Select(Card)];
             var scroll = window.FindControl<ScrollViewer>("SectionScroll")!;
+            int mixEqs = 0;
             foreach (double width in new[] { 640d, 1040, 2560 })
             {
                 Layout(window, width, 1200);
@@ -153,6 +156,7 @@ internal static partial class SkinLayoutWindowTests
                     var master = bank.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "BankMaster");
                     AssertInside(master, bank);
                     AssertNoOverlap([cells, master]);
+                    mixEqs += MixEqOverChain(master, where);
                     foreach (Slider fader in bank.GetVisualDescendants().OfType<Slider>().Where(f => f.IsEffectivelyVisible))
                     {
                         Assert.Equal(Orientation.Vertical, fader.Orientation);
@@ -172,6 +176,8 @@ internal static partial class SkinLayoutWindowTests
                 foreach (Border s in strips) AssertPartsApart(s);
                 Capture(window, $"skin-layout-banks-{width}");
             }
+            // Stream's master strip in the second bank, at every width.
+            Assert.Equal(3, mixEqs);
             Layout(window, 1040, 1200);
 
             // The rack's parts in the skin's order; effects left out and out of the tab order.
@@ -318,11 +324,15 @@ internal static partial class SkinLayoutWindowTests
             TextBlock icon = Part(row, SkinStripParts.Identity).GetVisualDescendants().OfType<TextBlock>().Single(t => t.IsVisible);
             Assert.Equal("♫", icon.Text);
             Assert.Equal("Music with a long display name", AutomationProperties.GetName(icon));
+            mixEqs = 0;
             foreach (Border list in lists)
             {
                 AssertInside(list, Card("SubmixerTile"));
-                AssertInside(list.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "BankMaster"), list);
+                Border master = list.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "BankMaster");
+                AssertInside(master, list);
+                mixEqs += MixEqOverChain(master, "in a master card");
             }
+            Assert.Equal(1, mixEqs);
             foreach (Border cell in BankCells(window).SelectMany(c => c)) AssertPartsApart(cell);
             Capture(window, "skin-layout-send-lists-1040");
 
@@ -363,6 +373,23 @@ internal static partial class SkinLayoutWindowTests
                          .Where(c => c is TextBlock or Slider or ToggleButton && c.IsEffectivelyVisible && c.Bounds.Width > 0))
                 AssertInside(inner, part);
         }
+    }
+
+    /// <summary>
+    /// A bank master's EQ button stands over its plugin chain's, the order
+    /// the signal meets them, as on a microphone. 1 when the master shows an
+    /// EQ, else 0.
+    /// </summary>
+    private static int MixEqOverChain(Border master, string where)
+    {
+        Button[] buttons = [.. master.GetVisualDescendants().OfType<Button>().Where(b => b.IsEffectivelyVisible && b.Classes.Contains("fx"))];
+        Button? eq = buttons.SingleOrDefault(b => b.Name is "MixEq" or "MixEqCompact");
+        if (eq is null) return 0;
+        Button chain = Assert.Single(buttons, b => b != eq);
+        double Top(Control c) => c.TranslatePoint(default, master)!.Value.Y;
+        Assert.True(Top(eq) + eq.Bounds.Height <= Top(chain) + 0.5, $"The mix EQ is not over its plugin chain {where}");
+        AssertNoOverlap([eq, chain]);
+        return 1;
     }
 
     /// <summary>The bank tiles in the window, first bank first.</summary>

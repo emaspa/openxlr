@@ -75,7 +75,7 @@ public sealed class MicEqViewModel : ViewModelBase, IDisposable
     /// <summary>The prefix of <see cref="Channel"/> for a mix's output EQ.</summary>
     public const string MixPrefix = "mix:";
 
-    /// <summary>An output mix's EQ: no unit, no choice of where, after the mix's plugins.</summary>
+    /// <summary>An output mix's EQ: no unit, no choice of where, before the mix's plugins.</summary>
     public bool IsMix => Channel.StartsWith(MixPrefix, StringComparison.Ordinal);
 
     private string? _unitNote;

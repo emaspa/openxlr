@@ -2746,7 +2746,7 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
     <value>On, running on this computer at the head of the input, before the plugins.</value>
   </data>
   <data name="EqStatusSoftwareMix" xml:space="preserve">
-    <value>On, running on this computer after the mix's plugins, before its outputs.</value>
+    <value>On, running on this computer at the head of the mix, before its plugins and outputs.</value>
   </data>
   <data name="EqStatusDevice" xml:space="preserve">
     <value>On, running on the interface before USB, ahead of the plugins and everything else on this computer.</value>
