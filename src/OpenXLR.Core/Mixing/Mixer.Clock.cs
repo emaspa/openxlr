@@ -23,66 +23,79 @@ public sealed partial class Mixer
     private long? _clockRevision;
     private string _clockDevices = "";
     private long? _clockDueAt;
+    private long? _clockDeadline;
     private long _clockReadAt = long.MinValue / 2;
 
     /// <summary>How long the graph has to stay as it is before the clock is read again.</summary>
     internal TimeSpan ClockSettle { get; init; } = TimeSpan.FromSeconds(1.5);
 
-    /// <summary>The shortest time between two reads while the graph keeps changing.</summary>
+    /// <summary>Minimum gap between reads and maximum wait for a changing graph to settle.</summary>
     internal TimeSpan ClockMinGap { get; init; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
-    /// Read the clock of the mixer's graph again once the graph has settled
-    /// after a change; true when what the state reports changed.
+    /// Read the mixer's clock after a change; true when what the state
+    /// reports changed.
     ///
     /// The registry subscription says when something that can move the
     /// clock changed (a node, its state, a link) but not which driver a node
     /// follows now, which PipeWire does not send to subscribers. So a change
     /// schedules one pw-dump, <see cref="ClockSettle"/> after the last change
-    /// and at most once per <see cref="ClockMinGap"/>. A graph that does not
-    /// change starts no helper: each sweep compares one revision and one
-    /// short string. Without a subscription there is no clock.
+    /// or after <see cref="ClockMinGap"/> of continuous changes. Reads are
+    /// spaced by at least that same gap. A graph that stays unchanged after
+    /// a successful read starts no helper. Without a subscription there is no clock.
     /// </summary>
     public bool SyncClock()
     {
         IReadOnlyList<ClockCandidate> devices;
         string signature;
-        long now = Environment.TickCount64;
+        long? revision;
+        long now = Clock();
+        long minGap = (long)ClockMinGap.TotalMilliseconds;
         lock (_gate)
         {
             if (!_built) return false;
-            devices = ClockCandidatesLocked();
-            signature = string.Join("\n", devices.Select(d => $"{d.Node}|{d.Role}|{d.Microphone}|{string.Join(',', d.Channels)}"));
-            long? revision = _pw.ClockRevision;
+            revision = _pw.ClockRevision;
             if (revision is null) return false;
+            devices = ClockCandidatesLocked();
+            signature = ClockDeviceSignature(devices);
             if (revision != _clockRevision || signature != _clockDevices)
             {
                 _clockRevision = revision;
                 _clockDevices = signature;
-                _clockDueAt = now + (long)ClockSettle.TotalMilliseconds;
+                _clockDeadline ??= now + minGap;
+                _clockDueAt = Math.Min(now + (long)ClockSettle.TotalMilliseconds, _clockDeadline.Value);
             }
-            if (_clockDueAt is not long due || now < due || now - _clockReadAt < (long)ClockMinGap.TotalMilliseconds)
+            if (_clockDueAt is not long due || now < due || now - _clockReadAt < minGap)
                 return false;
             _clockDueAt = null;
+            _clockDeadline = null;
             _clockReadAt = now;
         }
         JsonElement[] objects;
         try { objects = _pw.ReadGraphOnce(); }
-        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
-        {
-            // pw-dump failed or timed out: try again after the gap.
-            lock (_gate) _clockDueAt ??= now;
-            return false;
-        }
-        if (objects.Length == 0) return false;
-        MixerClock? clock = MixerClock.Read(objects, devices);
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { objects = []; }
+        MixerClock? clock = objects.Length == 0 ? null : MixerClock.Read(objects, devices);
         lock (_gate)
         {
-            if (Equals(clock, _clock)) return false;
+            if (!_built || _clockRevision != revision || _pw.ClockRevision is null) return false;
+            if (objects.Length == 0)
+            {
+                // Retry after the minimum gap, even if a graph event arrives
+                // just before then and would normally start a new quiet period.
+                _clockDueAt ??= now + minGap;
+                _clockDeadline ??= _clockDueAt;
+                return false;
+            }
+            // The dump runs outside the mixer lock. A route command can change
+            // the devices while it runs, which the next sweep will pick up.
+            if (signature != ClockDeviceSignature(ClockCandidatesLocked()) || Equals(clock, _clock)) return false;
             _clock = clock;
             return true;
         }
     }
+
+    private static string ClockDeviceSignature(IReadOnlyList<ClockCandidate> devices)
+        => string.Join("\n", devices.Select(d => $"{d.Node}|{d.Role}|{d.Microphone}|{string.Join(',', d.Channels)}"));
 
     /// <summary>The driven unit's capture node, once the strips found it.</summary>
     public string? UnitInputNode { get { lock (_gate) return _inputDevice; } }

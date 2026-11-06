@@ -1084,8 +1084,8 @@ public sealed partial class MixerService : IHostedService, IDisposable
             // current: the unit when the setup fits it, software otherwise.
             // EnsureFilterRoutes above keeps repairing its buses and stages.
             changed |= SyncUnitDucking() | _mixer.SyncDucking();
-            // Which device drives the graph: one pw-dump once the graph has
-            // settled after a change, nothing while it stays as it is.
+            // Which device drives the graph: refresh after graph changes,
+            // or retry if the previous read failed.
             if (_mixer.SyncClock())
             {
                 changed = true;

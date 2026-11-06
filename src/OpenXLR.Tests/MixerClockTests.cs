@@ -164,6 +164,16 @@ public sealed class MixerClockTests
     }
 
     [Fact]
+    public void AnInvalidRegistryIdDoesNotHideTheValidClock()
+    {
+        JsonElement[] invalid = Dump("""
+            {"id":"invalid","type":"PipeWire:Interface:Node","info":{"props":{"node.name":"invalid"}}}
+            """);
+        JsonElement[] valid = CaptureCardDrives();
+        Assert.Equal(MixerClock.Read(valid, WaveXlrMixer), MixerClock.Read([.. invalid, .. valid], WaveXlrMixer));
+    }
+
+    [Fact]
     public void WithoutDeviceIdsTheCardInTheNameDecides()
     {
         JsonElement[] dump = Dump(
