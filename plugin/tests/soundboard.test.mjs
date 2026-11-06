@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
-import { clipKey, clipPress, clipProgress, progressBucket, clipAppearance, clipChoices, boardNotice, pressMode }
+import { clipKey, clipPress, clipProgress, progressBucket, clipAppearance, clipChoices, boardNotice }
   from "../com.emaspa.openxlr.sdPlugin/soundboard.mjs";
 import { iconPath } from "../com.emaspa.openxlr.sdPlugin/layout-choices.mjs";
 
@@ -15,20 +15,21 @@ const mixer = (soundboard = {}) => ({
 
 test("a press plays in the clip's mode unless the key gives its own, and only hold waits for the release", () => {
   const key = clipKey(mixer(), {target: "clip:cheer"});
-  assert.deepEqual(clipPress(key, {}), {payload: {cmd: "playClip", clip: "cheer"}, hold: false});
+  assert.deepEqual(clipPress(key, {}), {payload: {cmd: "playClip", clip: "cheer", mode: "toggle"}, hold: false});
   assert.deepEqual(clipPress(key, {mode: "restart"}), {payload: {cmd: "playClip", clip: "cheer", mode: "restart"}, hold: false});
   assert.deepEqual(clipPress(key, {mode: "hold"}), {payload: {cmd: "playClip", clip: "cheer", mode: "hold"}, hold: true});
-  assert.deepEqual(clipPress(key, {mode: "sideways"}), {payload: {cmd: "playClip", clip: "cheer"}, hold: false},
-    "a mode the daemon does not know is not sent");
+  assert.deepEqual(clipPress(key, {mode: "sideways"}), {payload: {cmd: "playClip", clip: "cheer", mode: "toggle"}, hold: false},
+    "an unknown override falls back to the clip's mode");
   const hold = clipKey(mixer({clips: [clip("airhorn", {mode: "hold"})]}), {target: "clip:airhorn"});
-  assert.equal(clipPress(hold, {}).hold, true);
+  assert.deepEqual(clipPress(hold, {}), {payload: {cmd: "playClip", clip: "airhorn", mode: "hold"}, hold: true});
   assert.equal(clipPress(hold, {mode: "overlap"}).hold, false);
   assert.deepEqual(clipPress(clipKey(mixer(), {target: "stopClips"}), {mode: "hold"}), {payload: {cmd: "stopClips"}, hold: false});
-  assert.equal(pressMode(null, ""), "overlap");
+  const unknown = clipKey(mixer({clips: [clip("airhorn", {mode: "unknown"})]}), {target: "clip:airhorn"});
+  assert.deepEqual(clipPress(unknown, {}), {payload: {cmd: "playClip", clip: "airhorn", mode: "overlap"}, hold: false});
   // Inside a multi-action the key up follows 100 ms later: hold plays as overlap.
   assert.deepEqual(clipPress(hold, {}, true), {payload: {cmd: "playClip", clip: "airhorn", mode: "overlap"}, hold: false});
   assert.deepEqual(clipPress(key, {mode: "hold"}, true), {payload: {cmd: "playClip", clip: "cheer", mode: "overlap"}, hold: false});
-  assert.deepEqual(clipPress(key, {}, true), {payload: {cmd: "playClip", clip: "cheer"}, hold: false});
+  assert.deepEqual(clipPress(key, {}, true), {payload: {cmd: "playClip", clip: "cheer", mode: "toggle"}, hold: false});
 });
 
 test("a key reads why it cannot play, the board's reason before the clip's", () => {

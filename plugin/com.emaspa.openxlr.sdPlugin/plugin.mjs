@@ -175,7 +175,7 @@ const send = (o) => host.send(JSON.stringify(o));
 host.onopen = () => send({ event: registerEvent, uuid: pluginUUID });
 host.onclose = () => process.exit(0);
 
-// Visible action instances: context -> {action, settings, controller}
+// Visible action instances: context -> {action, device, settings, controller}
 const instances = new Map();
 
 // OpenDeck keeps one persisted title field per key, shared by the plugin's
@@ -325,10 +325,12 @@ host.onmessage = (e) => {
   const inst = instances.get(m.context);
   switch (m.event) {
     case "willAppear":
+      releaseHeldClip(m.context);
       keyCommands.clear(m.context);
       clearEqTurns(m.context);
       instances.set(m.context, {
         action: m.action,
+        device: m.device,
         settings: m.payload?.settings ?? {},
         controller: m.payload?.controller ?? "Keypad",
       });
@@ -344,6 +346,12 @@ host.onmessage = (e) => {
       emptyTitle.delete(m.context);
       lastMeter.delete(m.context);
       marquee.delete(m.context);
+      break;
+    case "deviceDidDisconnect":
+      // A device may go away without a key up or willDisappear for its keys.
+      if (typeof m.device !== "string" || !m.device) break;
+      for (const context of heldClips.keys())
+        if (instances.get(context)?.device === m.device) releaseHeldClip(context);
       break;
     case "didReceiveSettings":
       releaseHeldClip(m.context);

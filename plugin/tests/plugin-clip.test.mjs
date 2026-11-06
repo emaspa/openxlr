@@ -43,8 +43,8 @@ test("a clip key plays, holds, stops all and draws the board's state and the cli
     const push = async () => { daemon.receive(current); await flush(); };
     const meters = async levels => { daemon.receive({type: "meters", levels}); await flush(); };
     await push();
-    const appear = (context, settings) => {
-      host.receive({event: "willAppear", context, action: "com.emaspa.openxlr.clip", payload: {settings}});
+    const appear = (context, settings, device = "deck-1") => {
+      host.receive({event: "willAppear", context, device, action: "com.emaspa.openxlr.clip", payload: {settings}});
       host.receive({event: "titleParametersDidChange", context, payload: {title: ""}});
     };
     const images = context => host.messages.filter(m => m.event === "setImage" && m.context === context);
@@ -73,13 +73,13 @@ test("a clip key plays, holds, stops all and draws the board's state and the cli
 
     // An overlap press plays the clip; its success shows no check mark over the key.
     down("horn"); up("horn"); await flush();
-    assert.deepEqual(sent().map(({requestId, ...rest}) => rest), [{cmd: "playClip", clip: "airhorn"}]);
+    assert.deepEqual(sent().map(({requestId, ...rest}) => rest), [{cmd: "playClip", clip: "airhorn", mode: "overlap"}]);
     await answer();
     assert.equal(host.messages.filter(m => m.event === "showOk").length, 0);
 
     // The clip's own hold mode: the release ends it.
     down("roll"); await flush();
-    assert.deepEqual(sent().at(-1), {cmd: "playClip", clip: "drum-roll", requestId: sent().at(-1).requestId});
+    assert.deepEqual(sent().at(-1), {cmd: "playClip", clip: "drum-roll", mode: "hold", requestId: sent().at(-1).requestId});
     up("roll"); await flush();
     assert.deepEqual(sent().at(-1), {cmd: "releaseClip", clip: "drum-roll"});
     await answer();
@@ -229,6 +229,31 @@ test("a clip key plays, holds, stops all and draws the board's state and the cli
     assert.deepEqual(releases().at(-1), {cmd: "releaseClip", clip: "airhorn"});
     assert.equal(releases().length, released + 1);
 
+    // A device can disappear without sending a key up or willDisappear.
+    appear("hold-remote", {target: "clip:airhorn", mode: "hold"}, "deck-2");
+    down("hold-a"); await flush(); await answer();
+    down("hold-b"); await flush(); await answer();
+    down("hold-remote"); await flush(); await answer();
+    released = releases().length;
+    host.receive({event: "deviceDidDisconnect", device: "deck-1"}); await flush();
+    assert.deepEqual(releases().slice(released), [{cmd: "releaseClip", clip: "drum-roll"}],
+      "release the disconnected device's holds but leave a clip held by a different device playing");
+    host.receive({event: "willDisappear", context: "hold-b"});
+    up("hold-a"); await flush();
+    assert.equal(releases().length, released + 1, "late releases from the disconnected deck do nothing");
+    up("hold-remote"); await flush();
+    assert.deepEqual(releases().slice(released + 1), [{cmd: "releaseClip", clip: "airhorn"}]);
+    appear("hold-b", {target: "clip:airhorn", mode: "hold"});
+
+    down("hold-a"); await flush(); await answer();
+    released = releases().length;
+    host.receive({event: "deviceDidDisconnect"}); await flush();
+    assert.equal(releases().length, released, "a missing device id releases nothing");
+    appear("hold-a", {target: "clip:drum-roll"});
+    await flush();
+    assert.deepEqual(releases().slice(released), [{cmd: "releaseClip", clip: "drum-roll"}],
+      "a key that reappears also lets go of its previous hold");
+
     // Inside a multi-action OpenDeck sends the key up 100 ms after the key
     // down: a hold key plays as overlap there and its key up sends nothing.
     released = releases().length;
@@ -240,7 +265,7 @@ test("a clip key plays, holds, stops all and draws the board's state and the cli
     assert.equal(sent().at(-1).mode, "overlap", "so is the key's own");
     await answer();
     host.receive({event: "keyDown", context: "horn", payload: {isInMultiAction: true}}); await flush();
-    assert.equal(sent().at(-1).mode, undefined, "a clip that does not hold plays as it is");
+    assert.equal(sent().at(-1).mode, "overlap", "a clip that does not hold plays as it is");
     await answer();
     up("hold-a"); up("hold-b"); await flush();
     assert.equal(releases().length, released);

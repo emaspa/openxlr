@@ -4072,12 +4072,13 @@ stops it when it is playing, and hold plays it while the key is down and
 ends it when the key comes up. **When pressed** in the key's settings gives
 the key a mode of its own instead. Every press plays, however fast they
 come. With two hold keys on the same clip, the clip ends when the last of
-them comes up. A key held down past the end of its clip holds nothing once
-the clip has ended, so a later hold key on the same clip still ends its own
-play when it comes up. Inside a multi-action a hold key plays its clip as overlap,
-because OpenDeck lets the key up a tenth of a second after pressing it. If
-the Deck goes away while a hold key is down and no key up arrives, a looping
-clip keeps playing until **Stop every clip** ends it.
+them comes up, even if the earlier key's clip has already ended.
+Inside a multi-action a hold key plays its clip as overlap, because OpenDeck
+lets the key up a tenth of a second after pressing it. If
+OpenDeck reports that a Deck has disconnected, its keys let go of their held
+clips. A key still holding the same clip on another Deck keeps it playing.
+If OpenDeck misses the disconnect and the key release, use **Stop every clip**
+to end a loop.
 
 The key shows the clip's name, icon and colour, or SFX's icon and colour
 from the layout editor where the clip has none. Its light is green while the
