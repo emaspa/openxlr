@@ -72,6 +72,32 @@ public sealed class EqEditorModelTests
     private static readonly Rect Plot = new(30, 6, 640, 300);
 
     [Fact]
+    public void TheBadgeSaysWhetherThisComputerOrTheUnitRunsTheEq()
+    {
+        var (mic, _) = Model();
+        mic.Apply(State(true, Defaults), null);
+        Assert.True(mic.InSoftware);
+        Assert.False(mic.OnDevice);
+        // Off, a microphone's EQ runs nowhere yet: no badge.
+        mic.Apply(State(false, Defaults, "null"), null);
+        Assert.False(mic.InSoftware);
+        mic.Apply(State(true, Defaults, "\"device\""), null);
+        Assert.True(mic.OnDevice);
+        Assert.False(mic.InSoftware);
+
+        // A mix's EQ and a capture input's can only run here, on or off.
+        foreach (string channel in new[] { MicEqViewModel.MixPrefix + "stream", "guest" })
+        {
+            var eq = new MicEqViewModel(new Recorder(), channel, channel, TimeSpan.Zero, new ManualTime());
+            eq.Apply(State(false, Defaults, "null"), null);
+            Assert.True(eq.InSoftware);
+            Assert.False(eq.OnDevice);
+            eq.Apply(JsonNode.Parse($$"""{"enabled":true,"bands":[{{Defaults}}],"backend":null,"available":false,"error":"The native plugin host is not installed."}""")!, null);
+            Assert.False(eq.InSoftware);
+        }
+    }
+
+    [Fact]
     public void TheCurveIsTheDaemonsResponseAtEveryPointOnALogAxis()
     {
         // The texts below are written as an English desktop formats numbers.

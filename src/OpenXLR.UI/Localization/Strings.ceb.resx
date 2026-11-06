@@ -2683,6 +2683,12 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
   <data name="EqHardwareBadgeTipUnnamed" xml:space="preserve">
     <value>Nagdagan kining EQ sa kaugalingong processor sa interface, sa dili pa ang USB.</value>
   </data>
+  <data name="EqSoftwareBadge" xml:space="preserve">
+    <value>Software processing</value>
+  </data>
+  <data name="EqSoftwareBadgeTip" xml:space="preserve">
+    <value>Nagdagan kining EQ niining kompyuter.</value>
+  </data>
   <data name="EqTheInterface" xml:space="preserve">
     <value>interface</value>
   </data>

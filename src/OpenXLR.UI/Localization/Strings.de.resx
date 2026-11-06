@@ -2742,6 +2742,12 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="EqHardwareBadgeTipUnnamed" xml:space="preserve">
     <value>Dieser EQ läuft auf dem eigenen Prozessor des Interfaces, vor USB.</value>
   </data>
+  <data name="EqSoftwareBadge" xml:space="preserve">
+    <value>Software-Verarbeitung</value>
+  </data>
+  <data name="EqSoftwareBadgeTip" xml:space="preserve">
+    <value>Dieser EQ läuft auf diesem Computer.</value>
+  </data>
   <data name="EqTheInterface" xml:space="preserve">
     <value>Interface</value>
   </data>

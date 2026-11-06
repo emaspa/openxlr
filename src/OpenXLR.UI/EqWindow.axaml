@@ -19,13 +19,21 @@
   <Grid Margin="12" RowDefinitions="Auto,Auto,*,*,Auto">
     <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" Margin="0,0,0,8">
       <TextBlock Text="{Binding Title}" Classes="h" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-      <!-- the unit's own DSP runs this EQ -->
-      <Border Grid.Column="1" Name="EqHardwareBadge" IsVisible="{Binding OnDevice}" VerticalAlignment="Center"
-              Background="{DynamicResource Ox.Badge.Background}" CornerRadius="{DynamicResource Ox.Eq.CornerRadius}" Padding="8,2"
-              ToolTip.Tip="{Binding DeviceBadgeTip}" AutomationProperties.Name="{Binding DeviceBadgeTip}">
-        <TextBlock Text="{loc:Text Key=EqHardwareBadge}" Foreground="{DynamicResource Ox.Text.Info}"
-                   FontSize="{DynamicResource Ox.Eq.LabelFontSize}" FontWeight="{DynamicResource Ox.Label.FontWeight}"/>
-      </Border>
+      <!-- where this EQ runs: the unit's own DSP, or this computer; one at a time, in the same place -->
+      <Panel Grid.Column="1" VerticalAlignment="Center">
+        <Border Name="EqHardwareBadge" IsVisible="{Binding OnDevice}"
+                Background="{DynamicResource Ox.Badge.Background}" CornerRadius="{DynamicResource Ox.Eq.CornerRadius}" Padding="8,2"
+                ToolTip.Tip="{Binding DeviceBadgeTip}" AutomationProperties.Name="{Binding DeviceBadgeTip}">
+          <TextBlock Text="{loc:Text Key=EqHardwareBadge}" Foreground="{DynamicResource Ox.Text.Info}"
+                     FontSize="{DynamicResource Ox.Eq.LabelFontSize}" FontWeight="{DynamicResource Ox.Label.FontWeight}"/>
+        </Border>
+        <Border Name="EqSoftwareBadge" IsVisible="{Binding InSoftware}"
+                Background="{DynamicResource Ox.Badge.Background}" CornerRadius="{DynamicResource Ox.Eq.CornerRadius}" Padding="8,2"
+                ToolTip.Tip="{loc:Text Key=EqSoftwareBadgeTip}" AutomationProperties.Name="{loc:Text Key=EqSoftwareBadgeTip}">
+          <TextBlock Text="{loc:Text Key=EqSoftwareBadge}" Foreground="{DynamicResource Ox.Text.Info}"
+                     FontSize="{DynamicResource Ox.Eq.LabelFontSize}" FontWeight="{DynamicResource Ox.Label.FontWeight}"/>
+        </Border>
+      </Panel>
       <WrapPanel Grid.Column="2" Name="EqActions" ItemSpacing="6" LineSpacing="4" HorizontalAlignment="Right">
         <ToggleButton Name="EqSwitch" Content="{loc:Text Key=EqSwitch}" IsChecked="{Binding Enabled, Mode=TwoWay}"
                       AutomationProperties.Name="{Binding ButtonName}" ToolTip.Tip="{loc:Text Key=EqSwitchTip}"/>

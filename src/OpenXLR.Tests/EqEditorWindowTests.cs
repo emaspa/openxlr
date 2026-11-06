@@ -487,6 +487,7 @@ public sealed class EqEditorWindowTests
         Assert.Equal(Localizer.Format("EqWindowTitle", "Stream"), editor.Title);
         Assert.False(editor.FindControl<WrapPanel>("EqProcessing")!.IsVisible);
         Assert.False(editor.FindControl<Border>("EqHardwareBadge")!.IsVisible);
+        Assert.True(editor.FindControl<Border>("EqSoftwareBadge")!.IsEffectivelyVisible);
         ComboBox list = editor.FindControl<ComboBox>("EqProfileList")!;
         string[] listed = [.. list.Items.OfType<EqProfile>().Select(p => p.Id)];
         Assert.Equal(EqPresets.All.Select(p => p.Id), listed.Where(id => id.StartsWith("builtin:", StringComparison.Ordinal)));
@@ -627,6 +628,7 @@ public sealed class EqEditorWindowTests
         {
             Layout(editor, width, width < 1000 ? 620 : 760);
             Assert.True(badge.IsEffectivelyVisible, $"the badge is hidden at {width}");
+            Assert.False(editor.FindControl<Border>("EqSoftwareBadge")!.IsVisible);
             AssertInside(badge, editor);
             foreach (Control action in editor.FindControl<WrapPanel>("EqActions")!.Children) AssertNoOverlap([badge, action]);
             Assert.False(note.IsVisible);
@@ -766,6 +768,7 @@ public sealed class EqEditorWindowTests
         Pump(30);
         Layout(editor, 1040, 760);
         Assert.True(badge.IsEffectivelyVisible);
+        Assert.False(editor.FindControl<Border>("EqSoftwareBadge")!.IsVisible);
         Assert.True(choice.IsEffectivelyVisible);
         Assert.True(onUnit.IsChecked);
         Assert.False(note.IsVisible);

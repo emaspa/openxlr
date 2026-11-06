@@ -210,6 +210,14 @@ public sealed class MicEqViewModel : ViewModelBase, IDisposable
     /// <summary>The unit's own DSP runs the EQ, on or off. Never on a capture input.</summary>
     public bool OnDevice => _backend == "device" && !IsCaptureInput;
 
+    /// <summary>
+    /// This computer runs the EQ: a microphone's while its software stage
+    /// runs, a capture input's or a mix's whenever the engine is there,
+    /// since nothing else can. The editor's badge says so, as it names the
+    /// unit when the unit runs it.
+    /// </summary>
+    public bool InSoftware => _available && !OnDevice && (_backend == "software" || IsCaptureInput);
+
     /// <summary>The unit that runs it, or the one the channel carries; null when the daemon names none.</summary>
     public string? DeviceName => _deviceName;
 
@@ -354,6 +362,7 @@ public sealed class MicEqViewModel : ViewModelBase, IDisposable
         Raise(nameof(Available));
         Raise(nameof(Error));
         Raise(nameof(OnDevice));
+        Raise(nameof(InSoftware));
         Raise(nameof(DeviceName));
         Raise(nameof(Processing));
         Raise(nameof(HasProcessingChoice));
