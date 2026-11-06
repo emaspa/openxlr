@@ -1261,14 +1261,16 @@ be `resampled` without setting `microphone`, since an extra microphone
 follows the unit's clock in a normal setup. Followers come unit input
 first, then capture inputs, the unit's outputs and other outputs.
 
-The daemon reads this from one `pw-dump` after the graph changes: once
-the registry it subscribes to has shown no new node, node state, link or
-change to `node.name`, `node.description`, `node.driver-id`,
-`priority.driver`, `clock.name`, `device.id` or `device.api` for 1.5
-seconds, and at most once every 5 seconds. PipeWire keeps a node's
-`node.driver-id` current but does not send that change to subscribers,
-which is why the one dump is needed. A graph that does not change is not
-read again. Every node that runs in a
+The daemon reads this from one `pw-dump` after the graph changes. It
+waits for 1.5 quiet seconds, or reads after 5 seconds of continuous
+changes. The registry changes it watches are new or removed nodes and
+links, node state, and changes to `node.name`, `node.description`,
+`node.driver-id`, `priority.driver`, `clock.name`, `device.id` or
+`device.api`. Reads are at least 5 seconds apart. A failed or empty read
+is retried even if there are no further events. After a successful read,
+a graph that stays unchanged starts no further helper. PipeWire keeps a
+node's `node.driver-id` current but does not send that change to
+subscribers, which is why the dump is needed. Every node that runs in a
 graph carries `node.driver-id`, the registry id of its driver, and a
 running driver carries its own id or none. The mixer's graph is the one
 its mix sinks (`OpenXLR_mix_*`) follow, or, before they run, the one its

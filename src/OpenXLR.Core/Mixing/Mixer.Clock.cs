@@ -16,31 +16,33 @@ public sealed partial class Mixer
     private long? _clockRevision;
     private string _clockDevices = "";
     private long? _clockDueAt;
+    private long? _clockDeadline;
     private long _clockReadAt = long.MinValue / 2;
 
     /// <summary>How long the graph has to stay as it is before the clock is read again.</summary>
     internal TimeSpan ClockSettle { get; init; } = TimeSpan.FromSeconds(1.5);
 
-    /// <summary>The shortest time between two reads while the graph keeps changing.</summary>
+    /// <summary>Minimum gap between reads and maximum wait for a changing graph to settle.</summary>
     internal TimeSpan ClockMinGap { get; init; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
-    /// Read the clock of the mixer's graph again once the graph has settled
-    /// after a change; true when what the state reports changed.
+    /// Read the mixer's clock after a change; true when what the state
+    /// reports changed.
     ///
     /// The registry subscription says when something that can move the
     /// clock changed (a node, its state, a link) but not which driver a node
     /// follows now, which PipeWire does not send to subscribers. So a change
     /// schedules one pw-dump, <see cref="ClockSettle"/> after the last change
-    /// and at most once per <see cref="ClockMinGap"/>. A graph that does not
-    /// change starts no helper: each sweep compares one revision and one
-    /// short string. Without a subscription there is no clock.
+    /// or after <see cref="ClockMinGap"/> of continuous changes. Reads are
+    /// spaced by at least that same gap. A graph that stays unchanged after
+    /// a successful read starts no helper. Without a subscription there is no clock.
     /// </summary>
     public bool SyncClock()
     {
         IReadOnlyList<ClockCandidate> devices;
         string signature;
-        long now = Environment.TickCount64;
+        long now = Clock();
+        long minGap = (long)ClockMinGap.TotalMilliseconds;
         lock (_gate)
         {
             if (!_built) return false;
@@ -52,22 +54,24 @@ public sealed partial class Mixer
             {
                 _clockRevision = revision;
                 _clockDevices = signature;
-                _clockDueAt = now + (long)ClockSettle.TotalMilliseconds;
+                _clockDeadline ??= now + minGap;
+                _clockDueAt = Math.Min(now + (long)ClockSettle.TotalMilliseconds, _clockDeadline.Value);
             }
-            if (_clockDueAt is not long due || now < due || now - _clockReadAt < (long)ClockMinGap.TotalMilliseconds)
+            if (_clockDueAt is not long due || now < due || now - _clockReadAt < minGap)
                 return false;
             _clockDueAt = null;
+            _clockDeadline = null;
             _clockReadAt = now;
         }
         JsonElement[] objects;
         try { objects = _pw.ReadGraphOnce(); }
-        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { objects = []; }
+        if (objects.Length == 0)
         {
-            // pw-dump failed or timed out: try again after the gap.
+            // An empty or failed dump does not consume the pending read.
             lock (_gate) _clockDueAt ??= now;
             return false;
         }
-        if (objects.Length == 0) return false;
         MixerClock? clock = MixerClock.Read(objects, devices);
         lock (_gate)
         {

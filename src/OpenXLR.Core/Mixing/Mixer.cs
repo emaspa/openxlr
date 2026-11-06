@@ -3850,6 +3850,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         _clock = null;
         _clockRevision = null;
         _clockDueAt = null;
+        _clockDeadline = null;
         _clockDevices = "";
         _stripWarnings.Clear();
         _captureWarnings.Clear();

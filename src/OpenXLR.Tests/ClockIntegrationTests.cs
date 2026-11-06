@@ -5,6 +5,71 @@ namespace OpenXLR.Tests;
 
 public sealed partial class MonitorVolumeIntegrationTests
 {
+    [MonitorPipeWireFact]
+    public void ClockReadsDespiteGraphChurnAndRetriesAnEmptySnapshot()
+    {
+        var pw = new PipeWireAdapter();
+        using var registry = pw.WatchGraph();
+        long now = 0;
+        using var mixer = new Mixer(pw) { Clock = () => now };
+        mixer.Build(new MixerConfig
+        {
+            Channels = [new("system", "System")],
+            Mixes = [new("monitor", "Monitor", MixKind.Monitor)],
+        });
+        string directory = Path.Combine(Path.GetTempPath(), "openxlr-clock-reads-" + Guid.NewGuid());
+        Directory.CreateDirectory(directory);
+        string? path = Environment.GetEnvironmentVariable("PATH");
+        string reads = Path.Combine(directory, "reads");
+        string snapshot = Path.Combine(directory, "snapshot");
+        try
+        {
+            ExecutableScript.Write(Path.Combine(directory, "pw-dump"), """
+                #!/bin/sh
+                dir=$(dirname "$0")
+                printf '%s\n' read >> "$dir/reads"
+                cat "$dir/snapshot"
+                """);
+            File.WriteAllText(snapshot, "[]");
+            Environment.SetEnvironmentVariable("PATH", directory + Path.PathSeparator + path);
+            Assert.NotNull(pw.ClockRevision);
+            Assert.False(mixer.SyncClock());
+            for (int step = 1; step <= 5; step++)
+            {
+                long? before = pw.ClockRevision;
+                pw.CreateNullSink($"test_clock_change_{step}", "Clock change");
+                Assert.True(SpinWait.SpinUntil(() => pw.ClockRevision is long revision && revision != before, TimeSpan.FromSeconds(5)));
+                now = step * 1000;
+                Assert.False(mixer.SyncClock());
+                if (step < 5) Assert.False(File.Exists(reads));
+            }
+            Assert.True(File.Exists(reads), "Continuous graph changes must not postpone the clock read indefinitely.");
+            Assert.Single(File.ReadAllLines(reads));
+
+            // A transient empty result needs another read even if the graph has settled.
+            File.WriteAllText(snapshot, """
+                [
+                  {"id":1,"type":"PipeWire:Interface:Node","info":{"props":{"node.name":"test_driver"}}},
+                  {"id":2,"type":"PipeWire:Interface:Node","info":{"props":{"node.name":"OpenXLR_mix_monitor","node.driver-id":1}}}
+                ]
+                """);
+            now = 9999;
+            Assert.False(mixer.SyncClock());
+            Assert.Single(File.ReadAllLines(reads));
+            now = 10000;
+            Assert.True(mixer.SyncClock());
+            Assert.Equal("test_driver", mixer.GraphClock?.Driver?.Name);
+            now = 20000;
+            Assert.False(mixer.SyncClock());
+            Assert.Equal(2, File.ReadAllLines(reads).Length);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PATH", path);
+            Directory.Delete(directory, true);
+        }
+    }
+
     /// <summary>
     /// The clock on a private PipeWire server: two capture devices that each
     /// have a clock of their own (null sources standing in for a USB
