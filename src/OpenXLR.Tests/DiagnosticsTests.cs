@@ -498,6 +498,13 @@ public sealed class DiagnosticsTests
                   *) echo 'unexpected USB request' >&2; exit 91 ;;
                 esac
                 """);
+            ExecutableScript.Write(Path.Combine(bin, "lspci"), """
+                if [ "$*" = '-nnk -d ::0c03' ]; then
+                  printf '%s\n' '77:00.0 USB controller [0c03]: ASMedia Technology Inc. ASM4242 USB 3.2 xHCI Controller [1b21:2426] (rev 01)' \
+                    '	Kernel driver in use: xhci_hcd'
+                else echo 'unexpected PCI request' >&2; exit 92
+                fi
+                """);
             ExecutableScript.Write(Path.Combine(bin, "pactl"), $$"""
                 if [ "$1" = --version ]; then
                   printf '%s\n' 'pactl fixture 17.0'
@@ -673,6 +680,9 @@ public sealed class DiagnosticsTests
             Assert.Contains("Class=root_hub, Driver=xhci_hcd/8p, 480M", entries["usb-topology.txt"]);
             Assert.Contains("    |__ Port 005: Dev 002, If 0, Class=Audio, Driver=snd-usb-audio, 12M", entries["usb-topology.txt"]);
             Assert.DoesNotContain("unexpected USB request", entries["usb-topology.txt"]);
+            Assert.Contains("ASM4242 USB 3.2 xHCI Controller [1b21:2426]", entries["usb-controllers.txt"]);
+            Assert.Contains("Kernel driver in use: xhci_hcd", entries["usb-controllers.txt"]);
+            Assert.DoesNotContain("unexpected PCI request", entries["usb-controllers.txt"]);
             if (commandWarning)
             {
                 Assert.Contains("tree warning for <redacted>@<redacted>: access incomplete", entries["usb-topology.txt"]);
