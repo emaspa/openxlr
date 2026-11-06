@@ -3904,4 +3904,10 @@ Selecciona la interfaz que controla OpenXLR</value>
   <data name="FlowUnitMixes" xml:space="preserve">
     <value>Construye {0}</value>
   </data>
+  <data name="AutoRestartDaemonAfterUpdate" xml:space="preserve"><value>Reiniciar el servicio de audio automáticamente tras las actualizaciones</value></data>
+  <data name="AutoRestartDaemonAfterUpdateHint" xml:space="preserve"><value>Si el mezclador se conecta a un servicio de audio de systemd anterior tras una actualización, reinicia el servicio y vuelve a abrir el mezclador sin preguntar. El audio se interrumpe brevemente, también durante llamadas o transmisiones.</value></data>
+  <data name="DaemonUpgradeTitle" xml:space="preserve"><value>¿Reiniciar OpenXLR después de la actualización?</value></data>
+  <data name="DaemonUpgradeQuestion" xml:space="preserve"><value>Sigue en ejecución una versión anterior del servicio de audio. ¿Reiniciar el servicio y esta ventana ahora? El audio se interrumpirá brevemente. Elige Más tarde para mantener el audio en funcionamiento.</value></data>
+  <data name="Restart" xml:space="preserve"><value>Reiniciar</value></data>
+  <data name="Later" xml:space="preserve"><value>Más tarde</value></data>
 </root>

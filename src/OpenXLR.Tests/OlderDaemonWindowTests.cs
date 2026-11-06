@@ -93,12 +93,15 @@ internal static class OlderDaemonWindowTests
         Environment.SetEnvironmentVariable("FLATPAK_ID", null);
         using var listener = ControlSocketListener.Bind();
         await using var daemon = Daemon(listener, "0.0.1");
+        bool previousAutomatic = UiSettings.Load().AutoRestartDaemonAfterUpdate;
         try
         {
             await daemon.StartAsync();
-            foreach (bool accept in new[] { false, true })
+            foreach ((bool automatic, bool accept) in new[] { (false, false), (false, true), (true, false) })
             {
+                File.Delete(log);
                 foreach (string marker in Directory.GetFiles(OpenXLR.UI.OpenXlrPaths.RuntimeDir, "upgrade-prompt-*")) File.Delete(marker);
+                Assert.Null((UiSettings.Load() with { AutoRestartDaemonAfterUpdate = automatic }).Save());
                 await using var client = new DaemonClient();
                 var window = new MainWindow(client);
                 window.EnableDaemonUpgradePrompt();
@@ -120,9 +123,9 @@ internal static class OlderDaemonWindowTests
                 try
                 {
                     window.Show();
-                    await WaitFor(() => questions == 1, "The upgrade question did not appear.");
+                    if (!automatic) await WaitFor(() => questions == 1, "The upgrade question did not appear.");
                     var vm = (MainViewModel)window.DataContext!;
-                    if (accept)
+                    if (accept || automatic)
                     {
                         await WaitFor(() => vm.DaemonRestart.Status == Localizer.Text("RestartFailed"), "The restart failure was not shown.");
                         Assert.Equal(["restart"], File.ReadAllLines(log));
@@ -134,7 +137,7 @@ internal static class OlderDaemonWindowTests
                         Assert.False(File.Exists(log));
                         Assert.True(vm.DaemonConnected);
                     }
-                    Assert.Equal(1, questions);
+                    Assert.Equal(automatic ? 0 : 1, questions);
                 }
                 finally
                 {
@@ -145,6 +148,7 @@ internal static class OlderDaemonWindowTests
         }
         finally
         {
+            (UiSettings.Load() with { AutoRestartDaemonAfterUpdate = previousAutomatic }).Save();
             using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             await daemon.StopAsync(stop.Token);
             Environment.SetEnvironmentVariable("PATH", previousPath);

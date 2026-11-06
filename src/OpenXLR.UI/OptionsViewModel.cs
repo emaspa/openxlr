@@ -49,6 +49,7 @@ public sealed class OptionsViewModel : ViewModelBase
         _minimizeToTray = s.MinimizeToTray;
         _startMinimized = s.StartMinimized;
         _checkForUpdates = s.CheckForUpdates;
+        _autoRestartDaemonAfterUpdate = s.AutoRestartDaemonAfterUpdate;
         _startupError = RepairNote(StartupIntegration.LastRepair);
         // No saved choice means the daemon runs whatever its unit asked for,
         // which for every shipped unit is the submixer on.
@@ -257,6 +258,22 @@ public sealed class OptionsViewModel : ViewModelBase
     {
         get => _checkForUpdates;
         set { if (Set(ref _checkForUpdates, value)) Persist(); }
+    }
+
+    private bool _autoRestartDaemonAfterUpdate;
+    public bool AutoRestartDaemonAfterUpdate
+    {
+        get => _autoRestartDaemonAfterUpdate;
+        set
+        {
+            if (_autoRestartDaemonAfterUpdate == value) return;
+            if (Report((UiSettings.Load() with { AutoRestartDaemonAfterUpdate = value }).Save()))
+            {
+                Reject(ref _autoRestartDaemonAfterUpdate, value, nameof(AutoRestartDaemonAfterUpdate));
+                return;
+            }
+            Set(ref _autoRestartDaemonAfterUpdate, value);
+        }
     }
 
     private bool _startDaemonAtLogin;

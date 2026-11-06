@@ -144,6 +144,18 @@ public sealed class LocalizationTests
     }
 
     [Fact]
+    public void EveryTranslationCoversTheUpgradeQuestionAndAutomaticRestartSetting()
+    {
+        string[] keys = ["DaemonUpgradeTitle", "DaemonUpgradeQuestion", "Restart", "Later",
+            "AutoRestartDaemonAfterUpdate", "AutoRestartDaemonAfterUpdateHint"];
+        foreach (var language in Localizer.Languages.Skip(1))
+        {
+            var translated = Read($"Strings.{language.Id}.resx");
+            Assert.All(keys, key => Assert.True(translated.ContainsKey(key), $"{language.Id} is missing {key}."));
+        }
+    }
+
+    [Fact]
     public void AMissingEntryReadsEnglishAndAnUnknownKeyReadsItself()
     {
         // An unshipped language uses the English catalogue.

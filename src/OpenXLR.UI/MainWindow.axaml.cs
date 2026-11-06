@@ -190,8 +190,9 @@ public partial class MainWindow : Window
         _daemonUpgradePrompt = new DaemonUpgradePrompt(
             (pid, current) => Task.Run(() => StartupIntegration.IsRunningDaemonService(pid, current)),
             StartupIntegration.ClaimDaemonUpgradePrompt,
-            () => Dialogs.ConfirmAsync(this, Localizer.Text("DaemonUpgradeTitle"),
-                Localizer.Text("DaemonUpgradeQuestion"), Localizer.Text("Restart"), Localizer.Text("Later")),
+            () => UiSettings.Load().AutoRestartDaemonAfterUpdate ? Task.FromResult(true)
+                : Dialogs.ConfirmAsync(this, Localizer.Text("DaemonUpgradeTitle"),
+                    Localizer.Text("DaemonUpgradeQuestion"), Localizer.Text("Restart"), Localizer.Text("Later")),
             (pid, current) => _vm.DaemonRestart.RestartAsync(() =>
                 Task.Run(() => StartupIntegration.RestartRunningDaemonService(pid, current))),
             () =>

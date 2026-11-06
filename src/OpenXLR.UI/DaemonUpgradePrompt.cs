@@ -3,11 +3,11 @@ using System.Threading.Tasks;
 
 namespace OpenXLR.UI;
 
-/// <summary>The upgrade question never changes the service before the user accepts.</summary>
+/// <summary>Restart only with the user's consent, for the current systemd connection.</summary>
 internal sealed class DaemonUpgradePrompt(
     Func<int, Func<bool>, Task<bool>> isManaged,
     Func<bool> claim,
-    Func<Task<bool>> ask,
+    Func<Task<bool>> consent,
     Func<int, Func<bool>, Task<bool>> restart,
     Action relaunch,
     Action failed)
@@ -30,7 +30,7 @@ internal sealed class DaemonUpgradePrompt(
             if (!managed) return;
 
             _offered = true;
-            if (!claim() || !await ask() || !isCurrent()) return;
+            if (!claim() || !await consent() || !isCurrent()) return;
             if (await restart(pid, isCurrent)) relaunch();
             else failed();
         }

@@ -499,6 +499,14 @@ public sealed class WindowLayoutTests
                 LocalizationRenderingTests.CheckPluginActions(options);
                 OptionsTabsWindowTests.Show(options, OptionsTab.General);
                 Assert.Equal(Localizer.Text("DesktopKeys"), options.FindControl<Button>("DesktopKeysButton")!.Content);
+                var autoRestart = options.FindControl<CheckBox>("AutoRestartAfterUpdateToggle")!;
+                Assert.Equal(Localizer.Text("AutoRestartDaemonAfterUpdate"), Assert.IsType<TextBlock>(autoRestart.Content).Text);
+                Assert.False(autoRestart.IsChecked);
+                autoRestart.IsChecked = true;
+                Assert.True(UiSettings.Load().AutoRestartDaemonAfterUpdate);
+                Assert.True(new OptionsViewModel(new DaemonClient(), vm).AutoRestartDaemonAfterUpdate);
+                autoRestart.IsChecked = false;
+                Assert.False(UiSettings.Load().AutoRestartDaemonAfterUpdate);
                 var launch = options.FindControl<ComboBox>("LaunchBehavior")!;
                 var close = options.FindControl<ComboBox>("CloseBehavior")!;
                 Assert.Equal(1, launch.SelectedIndex);

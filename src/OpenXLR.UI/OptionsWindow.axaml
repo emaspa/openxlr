@@ -96,6 +96,14 @@
                   <Button Content="{loc:Text Key=CheckNow}" Click="OnCheckUpdates" IsEnabled="{Binding !Updates.Busy}"/>
                   <Button Content="{loc:Text Key=ViewResult}" Click="OnUpdates"/>
                 </StackPanel>
+                <StackPanel Spacing="4" IsVisible="{Binding !IsFlatpak}">
+                  <CheckBox Name="AutoRestartAfterUpdateToggle"
+                            IsChecked="{Binding AutoRestartDaemonAfterUpdate, Mode=TwoWay}"
+                            AutomationProperties.Name="{loc:Text Key=AutoRestartDaemonAfterUpdate}">
+                    <TextBlock Text="{loc:Text Key=AutoRestartDaemonAfterUpdate}" TextWrapping="Wrap"/>
+                  </CheckBox>
+                  <TextBlock Text="{loc:Text Key=AutoRestartDaemonAfterUpdateHint}" Classes="hint" TextWrapping="Wrap"/>
+                </StackPanel>
               </StackPanel>
             </Border>
           </StackPanel>
