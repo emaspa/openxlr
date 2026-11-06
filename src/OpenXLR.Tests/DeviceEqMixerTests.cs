@@ -630,7 +630,7 @@ public sealed class DeviceEqMixerTests
     [InlineData("""{"cmd":"setEqProcessing","channel":"xlr1","value":"unit"}""", "setEqProcessing: value must be 'device' or 'software'")]
     [InlineData("""{"cmd":"setEqProcessing","channel":"xlr1","value":true}""", "setEqProcessing: value must be 'device' or 'software'")]
     [InlineData("""{"cmd":"setEqProcessing","channel":"xlr1"}""", "setEqProcessing: value must be 'device' or 'software'")]
-    [InlineData("""{"cmd":"setEqProcessing","channel":"aux","value":"software"}""", "setEqProcessing: 'aux' is not a microphone input")]
+    [InlineData("""{"cmd":"setEqProcessing","channel":"aux","value":"software"}""", "setEqProcessing: 'aux' is not a microphone or capture input")]
     [InlineData("""{"cmd":"setEqProcessing","value":"software"}""", "setEqProcessing: need 'channel'")]
     public void TheCommandTakesAMicrophoneAndOneOfTheTwoWords(string json, string? error)
         => Assert.Equal(error, CommandValidation.Check(JsonSerializer.Deserialize<Command>(json, new JsonSerializerOptions(JsonSerializerDefaults.Web))!,

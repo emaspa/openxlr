@@ -459,7 +459,7 @@ public static class CommandValidation
     }
 
     /// <summary>
-    /// What an EQ command acts on: a microphone as <c>channel</c>, or, where
+    /// What an EQ command acts on: a microphone or capture input as <c>channel</c>, or, where
     /// <paramref name="mixAllowed"/>, any mix of the layout as <c>mix</c>.
     /// Exactly one of the two. Null when the target is right.
     /// </summary>
@@ -472,8 +472,8 @@ public static class CommandValidation
             return TooLong(mix, 36) || !layout.HasMix(mix) ? $"{cmd.Cmd}: '{Short(mix)}' is not a mix" : null;
         }
         if (cmd.Channel is null) return mixAllowed ? $"{cmd.Cmd}: need 'channel' or 'mix'" : $"{cmd.Cmd}: need 'channel'";
-        return TooLong(cmd.Channel, 36) || !layout.IsMicrophoneChannel(cmd.Channel)
-            ? $"{cmd.Cmd}: '{Short(cmd.Channel)}' is not a microphone input" : null;
+        return TooLong(cmd.Channel, 36) || !layout.CarriesEqChannel(cmd.Channel)
+            ? $"{cmd.Cmd}: {Mixer.NoEq(Short(cmd.Channel))}" : null;
     }
 
     /// <summary><c>setEqBand</c>'s band and fields, the same for a microphone and a mix.</summary>

@@ -1650,7 +1650,7 @@ cell's are `mute`, `fader` and `value`.
 For capture row heads, an explicit `rowHead.parts` list shows `binding`
 and `effects` only when it names them, and a row without `binding` keeps
 its connection line under the name. With no list, both use their default
-places. The source line opens the binding dialog. A capture input on one mono port has the microphone EQ button over its chain's, as XLR 1 has; a stereo pair has none.
+places. The source line opens the binding dialog. Every capture input, on one mono port or a stereo pair, has the microphone EQ button over its chain's, as XLR 1 has.
 A capture input on one microphone port draws one meter bar, including under
 the source and send faders; a stereo capture input draws two.
 

@@ -34,14 +34,16 @@ public sealed partial class Mixer
 
     /// <summary>
     /// Whether a route built now would put the microphone stage at the
-    /// channel's head: the channel carries the EQ, and its software EQ, its
-    /// noise removal, its voice changer, its compressor or its expander is
-    /// on.
+    /// channel's head: the channel carries the EQ, and its software EQ is on,
+    /// or on a microphone its noise removal, its voice changer, its
+    /// compressor or its expander. A capture input on a stereo pair keeps
+    /// those saved and runs none of them.
     /// </summary>
     private bool StageWantedLocked(string channel)
         => CarriesEqLocked(channel)
-            && (SoftwareEqLocked(channel).Enabled || NoiseLocked(channel).Enabled || VoiceLocked(channel).Enabled
-                || DynamicsWantedLocked(channel));
+            && (SoftwareEqLocked(channel).Enabled
+                || CarriesMicrophoneStageLocked(channel)
+                    && (NoiseLocked(channel).Enabled || VoiceLocked(channel).Enabled || DynamicsWantedLocked(channel)));
 
     /// <summary>The engines this installation's helper carries, in <see cref="MicNoise.Engines"/> order.</summary>
     public IReadOnlyList<string> NoiseEngines => _pw.NoiseEngines;
@@ -100,7 +102,7 @@ public sealed partial class Mixer
 
     /// <summary>Every microphone's noise removal, for a profile: a recall then names every microphone.</summary>
     private Dictionary<string, MicNoise> SceneNoiseLocked()
-        => _config.Channels.Where(CarriesEq).ToDictionary(c => c.Id, c => NoiseLocked(c.Id), StringComparer.Ordinal);
+        => _config.Channels.Where(CarriesMicrophoneStage).ToDictionary(c => c.Id, c => NoiseLocked(c.Id), StringComparer.Ordinal);
 
     /// <summary>
     /// A microphone's noise removal for the state: the setting, what runs, the

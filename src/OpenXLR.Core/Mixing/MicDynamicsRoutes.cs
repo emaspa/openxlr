@@ -150,11 +150,11 @@ public sealed partial class Mixer
 
     /// <summary>Every microphone's compressor, for a profile: a recall then names every microphone.</summary>
     private Dictionary<string, MicCompressor> SceneCompressorLocked()
-        => _config.Channels.Where(CarriesEq).ToDictionary(c => c.Id, c => CompressorLocked(c.Id), StringComparer.Ordinal);
+        => _config.Channels.Where(CarriesMicrophoneStage).ToDictionary(c => c.Id, c => CompressorLocked(c.Id), StringComparer.Ordinal);
 
     /// <summary>Every microphone's expander, for a profile.</summary>
     private Dictionary<string, MicExpander> SceneExpanderLocked()
-        => _config.Channels.Where(CarriesEq).ToDictionary(c => c.Id, c => ExpanderLocked(c.Id), StringComparer.Ordinal);
+        => _config.Channels.Where(CarriesMicrophoneStage).ToDictionary(c => c.Id, c => ExpanderLocked(c.Id), StringComparer.Ordinal);
 
     /// <summary>
     /// A microphone's compressor for the state: the setting, why it does not
@@ -260,7 +260,7 @@ public sealed partial class Mixer
     {
         long now = Stopwatch.GetTimestamp();
         foreach ((string channel, long until) in _dynamicsWatch.ToList())
-            if (now >= until || !CarriesEqLocked(channel)) _dynamicsWatch.Remove(channel);
+            if (now >= until || !CarriesMicrophoneStageLocked(channel)) _dynamicsWatch.Remove(channel);
         foreach (string channel in _dynamicsWatch.Keys.Union(_dynamicsMeterHosts.Keys).ToList())
             FollowDynamicsMetersLocked(channel);
     }

@@ -113,7 +113,7 @@ public sealed class CaptureChainTests
     }
 
     [Fact]
-    public void ExistingInsertCommandsAcceptCaptureKeysAndTheEqTakesOnlyMonoOnes()
+    public void ExistingInsertCommandsAcceptCaptureKeysAndTheEqTakesBoth()
     {
         using var mixer = Layout();
         foreach (string key in new[] { "mono", "stereo" })
@@ -124,11 +124,9 @@ public sealed class CaptureChainTests
             PluginInfo controls = Plugin with { Params = [new("gain", "Gain", 0, 1, 1, false, false, false, false, [])] };
             Assert.Null(CommandValidation.Check(new() { Cmd = "setInsertParam", Channel = key, InsertId = "gain", Symbol = "gain",
                 Value = JsonSerializer.SerializeToElement(.5) }, mixer, _ => controls));
-            // The EQ's stage is mono: a capture microphone takes it, a stereo pair does not.
-            string? eq = CommandValidation.Check(new() { Cmd = "setEqEnabled", Channel = key, Value = JsonSerializer.SerializeToElement(true) }, mixer, _ => Plugin,
-                nativeHostInstalled: true);
-            if (key == "mono") Assert.Null(eq);
-            else Assert.Equal("setEqEnabled: 'stereo' is not a microphone input", eq);
+            // A capture microphone takes the EQ on a mono stage, a stereo pair on a stereo one.
+            Assert.Null(CommandValidation.Check(new() { Cmd = "setEqEnabled", Channel = key, Value = JsonSerializer.SerializeToElement(true) }, mixer, _ => Plugin,
+                nativeHostInstalled: true));
             // An existing misfit can still be removed or reordered.
             Assert.Null(CommandValidation.Check(new() { Cmd = "setInserts", Channel = key, Inserts = [Insert] }, mixer, _ => Plugin));
         }

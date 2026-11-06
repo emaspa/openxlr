@@ -2569,7 +2569,7 @@ Von OpenXLR gesteuertes Interface wählen</value>
     <value>Der EQ des Mikrofons, am Anfang des Eingangs vor Hochpass, ClipGuard und Plugins. Leuchtet, solange er an ist, rot, wenn er nicht laufen kann. Öffnet den Editor.</value>
   </data>
   <data name="EqButtonTipCapture" xml:space="preserve">
-    <value>Der EQ des Mikrofons, auf diesem Computer am Anfang des Eingangs vor den Plugins. Leuchtet, solange er an ist, rot, wenn er nicht laufen kann. Öffnet den Editor.</value>
+    <value>Der EQ des Eingangs, auf diesem Computer am Anfang des Eingangs vor den Plugins. Leuchtet, solange er an ist, rot, wenn er nicht laufen kann. Öffnet den Editor.</value>
   </data>
   <data name="EqButtonTipMix" xml:space="preserve">
     <value>Der EQ des Mixes, auf diesem Computer nach seinen Plugins und vor seinen Ausgängen. Leuchtet, solange er an ist, rot, wenn er nicht laufen kann. Öffnet den Editor.</value>

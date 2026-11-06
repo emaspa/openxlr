@@ -231,7 +231,7 @@ every save. Every field is optional on read; an absent one is empty or off.
 | `lowCutHz` | the software low cut, 0, 80 or 120 |
 | `softClipGuard` | the software ClipGuard |
 | `inserts` | insert chains by `xlr1`, `xlr2`, capture channel id or `mix:<id>` |
-| `eq` | the [microphone EQ](api.md#microphone-eq) of `xlr1`, `xlr2` and every capture input on one mono port, by channel id |
+| `eq` | the [microphone EQ](api.md#microphone-eq) of `xlr1`, `xlr2` and every capture input, on one mono port or a stereo pair, by channel id |
 | `noiseRemoval` | channel id to `{enabled, engine, strength}`, the microphone's [noise removal](api.md#noise-removal); a microphone absent here has it off |
 | `voiceChanger` | channel id to `{enabled, voice, pitch, formant}`, the microphone's [voice changer](api.md#voice-changer); a microphone absent here has it off |
 | `dryMonitors` | mix id to `true` for each monitor mix that hears the microphones [dry](api.md#dry-monitor), before their effects; a monitor mix absent here, or false, hears them processed |
@@ -480,9 +480,10 @@ target their unit. The software low cut and ClipGuard stay on the XLR
 strips.
 Capture inputs host their own insert chains through the API. A binding with
 `captureMonoChannel` has `microphone: true` and `chainWidth: 1`; a pair has
-`microphone: false` and `chainWidth: 2`, even while disconnected. A
-microphone capture input also has the microphone EQ, which runs in software
-and is saved in `mixer.json` under `eq` by its channel id, like XLR 1's
+`microphone: false` and `chainWidth: 2`, even while disconnected. Every
+capture input also has the microphone EQ, on a mono stage or a stereo one,
+which runs in software ahead of its inserts and is saved in `mixer.json`
+under `eq` by its channel id, like XLR 1's
 ([api.md](api.md#eq-on-capture-inputs)).
 
 The daemon moves a pair-0 capture input with no mono port to

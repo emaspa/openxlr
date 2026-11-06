@@ -187,7 +187,8 @@ yet on hardware.
 ## Software controls
 
 These run on the computer. The microphone EQ is on XLR 1 and XLR 2
-whatever feeds them, and on every capture input on one mono port. The low cut and ClipGuard are on XLR 1 when it is
+whatever feeds them, and on every capture input, on one mono port or a
+stereo pair. The low cut and ClipGuard are on XLR 1 when it is
 bound to another source, or when the interface's backend has no mapped
 hardware control for them. Gain lock is for Elgato devices without a
 physical gain dial.
@@ -204,8 +205,9 @@ physical gain dial.
   LADSPA package. If that plugin is unavailable, enabling ClipGuard is
   rejected, the control stays disabled, and the existing microphone
   route remains live.
-- Microphone EQ: one to sixteen bands on XLR 1, XLR 2 and mono capture inputs with Wave Link's band
-  types (high pass, low shelf, bell, notch, high shelf, low pass), ranges
+- Microphone EQ: one to sixteen bands on XLR 1, XLR 2 and every capture
+  input with Wave Link's band types (high pass, low shelf, bell, notch,
+  high shelf, low pass), ranges
   and steps (20 Hz to 20 kHz in hertz, -12 to +12 dB in quarter decibels,
   Q 0.1 to 10 on Wave Link's log grid) and defaults, off until switched
   on. The curves are the Audio EQ Cookbook's, which Wave Link's are; a test
@@ -250,7 +252,9 @@ physical gain dial.
   where the EQ runs. A capture input's EQ always runs in software, at the
   head of the input before its inserts, with the same editor without the
   switch and the badge; its Mic setup take is the raw microphone, looped
-  through the EQ ([api.md](api.md#eq-on-capture-inputs)).
+  through the EQ ([api.md](api.md#eq-on-capture-inputs)). A capture input
+  on a stereo pair runs it in one stereo stage, the EQ alone, with the same
+  curve on both sides and no noise removal, dynamics or voice changer.
 - Noise removal: on the same microphones, first in the same native stage,
   ahead of the EQ, the low cut, ClipGuard and the inserts, with a choice of
   two engines per microphone. RNNoise 0.2 (Xiph) is light, best on steady
@@ -1029,8 +1033,9 @@ unit inputs. A target resolves the channel's current unit at each press or
 turn, keeps its id through a rename, and becomes unavailable when the unit
 or control is unavailable. Legacy interface targets remain unchanged.
 
-Microphone EQ groups offer EQ and band on/off keys, filter-type keys and
-dials for a band's frequency, gain, Q and type. The dial press switches
+Microphone EQ groups, and Input EQ groups for capture inputs on a stereo
+pair, offer EQ and band on/off keys, filter-type keys and dials for a
+band's frequency, gain, Q and type. The dial press switches
 that band. They follow the daemon's reported bands, types, ranges and
 steps, retain stable channel ids through renames, and use the channel's
 icon and colour. Quick turns lead locally and coalesce through the
@@ -1107,9 +1112,9 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
 - Capture microphones in Inputs show their source, connection and carried
   unit controls. Inserts includes mono and stereo capture chains, using the
   width the daemon reports; an older daemon keeps XLR and mix chains only
-- Microphone EQ in Inputs: open a microphone's bands to edit each band's
-  switch, type, frequency, gain and Q, plus the EQ's own
-  switch. Enter on a number asks for an exact value. The shared EQ model
+- Microphone EQ in Inputs: open a microphone's or a capture input's bands
+  to edit each band's switch, type, frequency, gain and Q, plus the EQ's
+  own switch. Enter on a number asks for an exact value. The shared EQ model
   supplies the ranges, steps and defaults; reset keeps the EQ's on/off
   state and changes only that microphone
 - Output EQ in Outputs: each mix's EQ status and the same band editor,

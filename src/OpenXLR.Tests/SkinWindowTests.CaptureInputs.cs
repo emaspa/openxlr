@@ -62,9 +62,17 @@ public sealed partial class SkinWindowTests
                         Button inserts = strip.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "CaptureInserts");
                         Assert.True(rackEq.TranslatePoint(default, strip)!.Value.Y < inserts.TranslatePoint(default, strip)!.Value.Y);
                     }
+                    // The stereo pair's EQ comes first in its effects part too, ahead of its plugins.
                     InputStripViewModel camera = window.InputRackModel!.Strips.Single(s => s.Channel.Id == "camera");
-                    Assert.DoesNotContain(window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "InputStrip" && b.DataContext == camera)
-                        .GetVisualDescendants().OfType<Button>(), b => b.Name == "RackEq" && b.IsEffectivelyVisible);
+                    Border cameraStrip = window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "InputStrip" && b.DataContext == camera);
+                    Button? cameraEq = cameraStrip.GetVisualDescendants().OfType<Button>().SingleOrDefault(b => b.Name == "RackEq" && b.IsEffectivelyVisible);
+                    Assert.Equal(shown, cameraEq is not null);
+                    if (cameraEq is not null)
+                    {
+                        WindowLayoutTests.AssertInside(cameraEq, cameraStrip);
+                        Button inserts = cameraStrip.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "CaptureInserts");
+                        Assert.True(cameraEq.TranslatePoint(default, cameraStrip)!.Value.Y < inserts.TranslatePoint(default, cameraStrip)!.Value.Y);
+                    }
                     // One bar: the spare keeps its room and draws nothing.
                     LevelMeter[] bars = [.. strip.GetVisualDescendants().OfType<LevelMeter>().Where(m => m.IsEffectivelyVisible)];
                     Assert.Single(bars, m => m.Opacity > 0);
@@ -90,9 +98,9 @@ public sealed partial class SkinWindowTests
                     Button button = head.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "MatrixCaptureInserts");
                     Assert.Equal(shown, button.IsEffectivelyVisible);
                     if (shown) WindowLayoutTests.AssertInside(button, head);
-                    // A mono microphone's EQ over its chain; the stereo pair has none.
+                    // Each capture input's EQ over its chain, the stereo pair's too.
                     Button eq = head.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "MatrixEq");
-                    Assert.Equal(shown && channel != "camera", eq.IsEffectivelyVisible);
+                    Assert.Equal(shown, eq.IsEffectivelyVisible);
                     if (eq.IsEffectivelyVisible) WindowLayoutTests.AssertInside(eq, head);
                     MeterFader volume = head.GetVisualDescendants().OfType<MeterFader>().Single(f => f.IsEffectivelyVisible);
                     Assert.Equal(channel != "camera", volume.Mono);

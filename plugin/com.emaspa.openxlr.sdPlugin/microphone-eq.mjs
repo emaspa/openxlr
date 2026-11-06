@@ -1,5 +1,7 @@
 // Microphone EQ targets use stable channel ids and the daemon's reported
 // ranges. There is no second EQ, preset table or hardware backend here.
+// A capture input on a stereo pair has the same EQ targets, with no noise
+// removal beside them.
 // A microphone's noise removal switch (noise:<id>) rides along: it lives on
 // the same channels and acts like the EQ's own switch.
 // A mix's output EQ takes the same targets with "mix" before the mix's id
@@ -18,6 +20,13 @@ const usesGain = type => ["lowShelf", "peak", "highShelf"].includes(type);
 const finite = value => typeof value === "number" && Number.isFinite(value);
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const round = value => Math.sign(value) * Math.round(Math.abs(value));
+
+// A channel the EQ targets may name: a microphone, or any capture input,
+// whose EQ the daemon reports on a stereo pair too.
+export function carriesEq(channel) {
+  return channel?.microphone === true || typeof channel?.captureSource === "string" && channel.captureSource !== ""
+    || channel?.microphone !== false && (channel?.id === "xlr1" || channel?.id === "xlr2");
+}
 
 export function isEqTarget(target) {
   return typeof target === "string" && /^(eq|noise|eqband|eqtype|eqfreq|eqgain|eqq):/.test(target);
@@ -52,7 +61,7 @@ export function eqTarget(mixer, target) {
   if (!id || id.length > 64 || !/^[a-zA-Z0-9_-]+$/.test(id) || extra.length || mix && kind === "noise"
       || (kind === "eq" || kind === "noise" ? number !== undefined : !/^[1-9][0-9]?$/.test(number ?? ""))) return null;
   const channel = mix ? mixes(mixer).find(m => m?.id === id) : channels(mixer).find(c => c?.id === id && c.present !== false
-    && (c.microphone === true || c.microphone !== false && (id === "xlr1" || id === "xlr2")));
+    && carriesEq(c));
   const eq = channel?.eq, limits = mixer?.eqLimits;
   const min = limits?.minBands ?? limits?.bands, max = limits?.maxBands ?? limits?.bands;
   if (!eq || typeof eq.enabled !== "boolean" || !limits || !Number.isInteger(limits.bands)
@@ -99,8 +108,9 @@ export function eqChoices(mixer) {
       for (const [prefix, label] of [["eqfreq", "frequency"], ["eqgain", "gain"], ["eqq", "Q"], ["eqtype", "type"]])
         levels.push({target: `${prefix}:${channel.id}:${band}`, label: `${name} EQ band ${band} ${label}`});
     }
-    toggleGroups.push({id: `layout-eq-keys-${channel.id}`, label: `Microphone EQ: ${name}`, items: toggles});
-    levelGroups.push({id: `layout-eq-dials-${channel.id}`, label: `Microphone EQ: ${name}`, items: levels});
+    const group = channel.microphone === false ? "Input EQ" : "Microphone EQ";
+    toggleGroups.push({id: `layout-eq-keys-${channel.id}`, label: `${group}: ${name}`, items: toggles});
+    levelGroups.push({id: `layout-eq-dials-${channel.id}`, label: `${group}: ${name}`, items: levels});
   }
   for (const mix of mixes(mixer)) {
     if (typeof mix?.id !== "string") continue;
