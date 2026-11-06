@@ -3731,16 +3731,28 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// </para>
     /// </summary>
     /// <param name="held">The sends whose leg was put back on its fader.</param>
-    public bool EnsureCellLevels(out IReadOnlyList<string> held)
+    public bool EnsureCellLevels(out IReadOnlyList<string> held) => EnsureCellLevels(out held, out _);
+
+    /// <inheritdoc cref="EnsureCellLevels(out IReadOnlyList{string})"/>
+    /// <param name="held">The sends whose leg was put back on its fader.</param>
+    /// <param name="reloaded">The channels whose sink was reloaded for a lost leg (<see cref="RestoreLostLegsLocked"/>).</param>
+    public bool EnsureCellLevels(out IReadOnlyList<string> held, out IReadOnlyList<string> reloaded)
     {
         lock (_gate)
         {
             held = [];
+            reloaded = [];
             ForgetRemovedCells(_pendingCells, _cells);
-            if (!_built) { _cellRounds = _cellWait = 0; return false; }
-            held = HoldCellLevelsLocked();
-            if (_pendingCells.Count == 0) { _cellRounds = _cellWait = 0; return held.Count > 0; }
-            if (_cellWait > 0) { _cellWait--; return held.Count > 0; }
+            if (!_built) { _cellRounds = _cellWait = 0; _legMissing.Clear(); return false; }
+            var missing = new HashSet<string>(StringComparer.Ordinal);
+            held = HoldCellLevelsLocked(missing);
+            // A send waiting for a leg it has none of is short of one too.
+            foreach (string cell in _pendingCells)
+                if (!_legIndex.ContainsKey(cell) && cell.IndexOf('|', StringComparison.Ordinal) is int bar and > 0) missing.Add(cell[..bar]);
+            reloaded = RestoreLostLegsLocked(missing);
+            bool restored = held.Count > 0 || reloaded.Count > 0;
+            if (_pendingCells.Count == 0) { _cellRounds = _cellWait = 0; return restored; }
+            if (_cellWait > 0) { _cellWait--; return restored; }
             DiscoverLegsLocked();
             bool applied = false;
             foreach (string cell in _pendingCells.ToList())
@@ -3755,7 +3767,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             // The gap is a distance between rounds; the wait counts the
             // sweeps skipped in between, which is one fewer.
             _cellWait = Math.Max(0, CellRoundGap(_cellRounds) - 1);
-            return applied || held.Count > 0;
+            return applied || restored;
         }
     }
 
@@ -3767,19 +3779,23 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// from it. A leg the registry does not show yet is left for the next
     /// sweep, and a waiting cell is the pending round's business.
     /// </summary>
-    private List<string> HoldCellLevelsLocked()
+    /// <param name="missing">Gets each channel with a known leg the registry does not show.</param>
+    private List<string> HoldCellLevelsLocked(HashSet<string> missing)
     {
         var held = new List<string>();
         if (_legIndex.Count == 0) return held;
-        IReadOnlyDictionary<int, (int Percent, bool Muted)> legs = _pw.CombineLegLevels();
+        (IReadOnlyDictionary<int, (int Percent, bool Muted)> legs, IReadOnlySet<int> unlinked) = _pw.CombineLegs();
         foreach ((string cell, int index) in _legIndex.ToList())
         {
             if (_pendingCells.Contains(cell) || !_cells.Contains(cell)) continue;
             int bar = cell.IndexOf('|', StringComparison.Ordinal);
             if (bar <= 0) continue;
             string channel = cell[..bar], mix = cell[(bar + 1)..];
+            // A leg nothing links plays into no mix; see RestoreLostLegsLocked.
+            if (unlinked.Contains(index)) missing.Add(channel);
             if (!legs.TryGetValue(index, out (int Percent, bool Muted) leg))
             {
+                missing.Add(channel);
                 if (_duckBuses.ContainsKey(mix)) MarkCellPendingLocked(cell);
                 continue;
             }

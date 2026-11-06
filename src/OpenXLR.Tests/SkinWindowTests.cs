@@ -68,7 +68,7 @@ public sealed partial class SkinWindowTests
             AnAdditionalUnitsControlsFollowTheStripsOwnParts();
             AppearanceModeWindowTests.Check(main, options, flow);
             TouchControlsWindowTests.Check(main, options, flow);
-            AudioClockWindowTests.Check(main, flow);
+            AudioClockWindowTests.Check(main, options, flow);
         });
     }
 

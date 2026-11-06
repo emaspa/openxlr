@@ -173,6 +173,17 @@ graph stays as it is. Tested with pw-dump fixtures from an owner's archive
 and from the maintainer's desk, and on a private PipeWire server where the
 driver changes hands.
 
+The audio clock can be chosen in Options → Audio → AUDIO, or from the
+warning with **Make *interface* the clock**: Automatic, or one of the
+mixer's hardware inputs and outputs. The daemon writes the choice as a
+WirePlumber rule in the user's configuration and reads it back from
+there, and the state says while it waits for WirePlumber to restart.
+**Restart audio now** restarts WirePlumber after a confirm, and the mixer
+comes back without a daemon restart. Not in the Flatpak, which keeps the
+manual's hand-written rule. Tested with a supervised WirePlumber on a
+private PipeWire server that restarts it and makes the devices again, not
+yet on hardware.
+
 ## Software controls
 
 These run on the computer. The microphone EQ is on XLR 1 and XLR 2
@@ -1169,7 +1180,10 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   headroom left; the packages raise that limit with a systemd drop-in.
   It also holds every sink it created at full volume and unmuted, since
   a desktop applet or the session manager can turn one down and quietly
-  cut the mixes it feeds
+  cut the mixes it feeds. A WirePlumber restart needs no daemon restart:
+  WirePlumber links what names a target again, the sweep links the
+  devices as after a replug, and a channel whose send stream ended or was
+  left unlinked has its sink reloaded, at most three times in ten minutes
 - Text size: five settings from 80% to 120% in Options under Appearance.
   The change reaches open windows immediately and is saved in `ui.json`.
 - Skins: every surface, label, indicator, meter, fader and control in the

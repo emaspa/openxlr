@@ -149,6 +149,15 @@ then restart WirePlumber. For a custom host
 `OPENXLR_HOST_CONFIG_HOME` to that host `XDG_CONFIG_HOME` with a Flatpak override. App
 preferences and profiles stay in Flatpak's private XDG directories.
 
+The packaged builds have an **Audio clock** choice in Options → Audio →
+AUDIO and a **Make *interface* the clock** button on the resampled
+microphone warning. Both write a WirePlumber rule into the host's
+configuration and restart the host's WirePlumber, which the sandbox's
+daemon cannot do, so the Flatpak has neither and its daemon refuses
+`setAudioClock` and `restartAudioServices`. To choose the audio clock, write
+the rule by hand and restart WirePlumber on the host, as the manual's
+[garbled microphone section](manual.md#garbled-mic) shows.
+
 USB controls require the host udev rule. Run outside the sandbox, then
 reconnect the interface:
 

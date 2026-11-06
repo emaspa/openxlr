@@ -154,6 +154,14 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
     public Task<string?> SetBlockSizeAsync(int? frames)
         => EditLayoutAsync(new() { ["cmd"] = "setBlockSize", ["value"] = frames! });
 
+    /// <summary>Make a device the audio clock by its node name, or with null leave it to the packaged rules.</summary>
+    public Task<string?> SetAudioClockAsync(string? node)
+        => EditLayoutAsync(new() { ["cmd"] = "setAudioClock", ["value"] = node! });
+
+    /// <summary>Restart WirePlumber so the audio clock rule applies; every device stops for a moment.</summary>
+    public Task<string?> RestartAudioServicesAsync()
+        => EditLayoutAsync(new() { ["cmd"] = "restartAudioServices" });
+
     public Task<string?> SetRouteAppsByDefaultAsync(bool value)
         => EditLayoutAsync(new() { ["cmd"] = "setRouteAppsByDefault", ["value"] = value });
 

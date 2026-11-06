@@ -4451,4 +4451,49 @@ When the window is in the tray, open it again from the OpenXLR icon or your app 
   <data name="GuideOpenStartup" xml:space="preserve">
     <value>Open startup options</value>
   </data>
+  <data name="AudioClock" xml:space="preserve">
+    <value>Audio clock</value>
+  </data>
+  <data name="AudioClockAutomatic" xml:space="preserve">
+    <value>Automatic</value>
+  </data>
+  <data name="AudioClockInput" xml:space="preserve">
+    <value>{0} (input)</value>
+  </data>
+  <data name="AudioClockOutput" xml:space="preserve">
+    <value>{0} (output)</value>
+  </data>
+  <data name="AudioClockHint" xml:space="preserve">
+    <value>The device whose timing PipeWire runs OpenXLR's graph on. Every other device in the graph is resampled to it. Automatic leaves it to the packaged rules. A choice is a WirePlumber rule and applies after the audio restarts or at the next login.</value>
+  </data>
+  <data name="AudioClockPending" xml:space="preserve">
+    <value>Applies after the audio restarts.</value>
+  </data>
+  <data name="RestartAudioNow" xml:space="preserve">
+    <value>Restart audio now</value>
+  </data>
+  <data name="RestartAudioNowTip" xml:space="preserve">
+    <value>Restart WirePlumber so the audio clock applies</value>
+  </data>
+  <data name="RestartAudioTitle" xml:space="preserve">
+    <value>Restart audio</value>
+  </data>
+  <data name="RestartAudioConfirm" xml:space="preserve">
+    <value>WirePlumber restarts and makes every audio device again. All audio stops for a moment, in every application. OpenXLR then links its mixer to the devices again by itself.</value>
+  </data>
+  <data name="AudioRestarted" xml:space="preserve">
+    <value>WirePlumber restarted.</value>
+  </data>
+  <data name="MakeDeviceTheClock" xml:space="preserve">
+    <value>Make {0} the clock</value>
+  </data>
+  <data name="MakeDeviceTheClockTip" xml:space="preserve">
+    <value>Make the microphone's interface the audio clock, so the other device is the one resampled</value>
+  </data>
+  <data name="MakeClockConfirm" xml:space="preserve">
+    <value>OpenXLR writes a WirePlumber rule that makes {0} the audio clock, and the other device in the graph is then the one resampled. The rule applies after the audio restarts. Restarting now stops all audio for a moment. Later leaves it for the next login or for Restart audio now in Options, Audio.</value>
+  </data>
+  <data name="MakeClockLater" xml:space="preserve">
+    <value>Later</value>
+  </data>
 </root>

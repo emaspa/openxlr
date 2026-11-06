@@ -43,6 +43,12 @@ public static class CommandValidation
             : cmd.Check.ValueKind is JsonValueKind.Undefined or JsonValueKind.True or JsonValueKind.False ? null
             : "setMixing: check must be a boolean";
 
+    /// <summary><c>setAudioClock</c>: a value null or absent for Automatic, or an ALSA node name (<see cref="AudioClockRule.IsValidNode"/>).</summary>
+    internal static string? CheckAudioClock(Command cmd)
+        => cmd.Value.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null
+            || cmd.Value.ValueKind == JsonValueKind.String && AudioClockRule.IsValidNode(cmd.Value.GetString())
+            ? null : "setAudioClock: value must be null or the node name of an ALSA device, alsa_input. or alsa_output. followed by letters, digits, '_', '-' and '.'";
+
     public const int MaxText = 256;          // identities, labels, device names, symbols
     public const int MaxUri = 512;
     public const int MaxDevices = 16;
@@ -302,6 +308,10 @@ public static class CommandValidation
             case "recoverCapture":
                 return null;   // no arguments; the driven unit's capabilities decide
             case "restartDaemon":
+                return null;   // no arguments
+            case "setAudioClock":
+                return CheckAudioClock(cmd);
+            case "restartAudioServices":
                 return null;   // no arguments
             case "setMonitorFeed":
                 if (TooLong(cmd.Device, MaxText)) return "setMonitorFeed: device name too long";

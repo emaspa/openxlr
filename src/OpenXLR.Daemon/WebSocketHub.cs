@@ -572,6 +572,16 @@ public sealed class WebSocketHub
                 // A USB reset can take a few seconds; not on the socket's thread.
                 error = await Task.Run(_mixer.RecoverCapture);
                 break;
+            case "setAudioClock":
+                // Writes or deletes the WirePlumber rule; restarts nothing.
+                error = CommandValidation.CheckAudioClock(cmd)
+                    ?? _mixer.SetAudioClock(cmd.Value.ValueKind == JsonValueKind.String ? cmd.Value.GetString() : null);
+                stateOnError = true;
+                break;
+            case "restartAudioServices":
+                // Off the socket's thread: systemctl waits for WirePlumber to stop and start.
+                error = await Task.Run(_mixer.RestartAudioServicesAsync);
+                break;
             case "restartDaemon":
                 // A daemon the UI did not start (the Flatpak's user service)
                 // is restarted by its service manager after this clean exit.

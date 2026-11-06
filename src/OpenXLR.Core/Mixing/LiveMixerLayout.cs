@@ -517,10 +517,10 @@ public sealed partial class Mixer
         _meters.Remove($"ch:{id}");
         if (_combineModules.Remove(id, out uint old)) _pw.UnloadModule(old);
         uint fresh;
-        try { fresh = _pw.CreateCombineSink(channel.SinkName, MixSinkPattern, $"OpenXLR {channel.Name}"); }
+        try { fresh = _pw.CreateCombineSink(channel.SinkName, MixSinkPattern, $"OpenXLR {channel.Name}", visible: channel.IsApplication); }
         catch (Exception renameError)
         {
-            try { fresh = _pw.CreateCombineSink(channel.SinkName, MixSinkPattern, oldDescription); }
+            try { fresh = _pw.CreateCombineSink(channel.SinkName, MixSinkPattern, oldDescription, visible: channel.IsApplication); }
             catch (Exception restoreError)
             { throw new AggregateException("the channel's sink could not be reloaded or restored", renameError, restoreError); }
             FinishReloadLocked(channel, fresh, onIt);

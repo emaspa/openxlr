@@ -922,6 +922,7 @@ public sealed partial class MainViewModel : ViewModelBase
         Clock = AudioClock.From(node["mixer"]);
         // A card without a microphone input is the bigger problem and keeps its own button.
         ClockProblem = !CardProfileProblem && Clock is { MicResampled: true };
+        ApplyClockChoice(node["mixer"]);
         MixerWaiting = node["mixerWaiting"]?.GetValue<bool>() ?? false;
         try
         {
