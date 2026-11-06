@@ -139,6 +139,47 @@ internal static class Dialogs
         return result;
     }
 
+    /// <summary>
+    /// Making <paramref name="device"/> the audio clock: true to choose it
+    /// and restart the audio now, false to choose it and leave the restart
+    /// for later, null to cancel.
+    /// </summary>
+    public static async Task<bool?> MakeClockAsync(Window owner, string device)
+    {
+        var now = new Button { Name = "MakeClockRestart", Content = Localizer.Text("RestartAudioNow"), IsDefault = true, Classes = { "danger" } };
+        var later = new Button { Name = "MakeClockLater", Content = Localizer.Text("MakeClockLater") };
+        var cancel = new Button { Content = Localizer.Text("Cancel"), IsCancel = true };
+        var dialog = new Window
+        {
+            Title = Localizer.Format("MakeDeviceTheClock", device),
+            SizeToContent = SizeToContent.WidthAndHeight,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+            Classes = { "dialog" },
+            Content = new StackPanel
+            {
+                Margin = new Avalonia.Thickness(18), Spacing = 14, MaxWidth = 420,
+                Children =
+                {
+                    new TextBlock { Text = Localizer.Format("MakeClockConfirm", device), TextWrapping = TextWrapping.Wrap },
+                    new StackPanel
+                    {
+                        Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 8,
+                        HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                        Children = { cancel, later, now },
+                    },
+                },
+            },
+        };
+        bool? result = null;
+        now.Click += (_, _) => { result = true; dialog.Close(); };
+        later.Click += (_, _) => { result = false; dialog.Close(); };
+        cancel.Click += (_, _) => dialog.Close();
+        ConfirmOpening?.Invoke(dialog);
+        await dialog.ShowDialog(owner);
+        return result;
+    }
+
     /// <summary>True when the user accepts; closing the dialog any other way is a no.</summary>
     public static async Task<bool> ConfirmAsync(Window owner, string title, string message, string yesLabel, string? noLabel = null)
     {

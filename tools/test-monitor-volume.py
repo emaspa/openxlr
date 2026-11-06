@@ -13,6 +13,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -40,6 +41,52 @@ def shard_filter(test_filter, shard, arguments):
     selected = names[index - 1::count]
     print(f"Shard {shard}: {len(selected)} of {len(names)} tests", flush=True)
     return "|".join("FullyQualifiedName=" + name for name in selected)
+
+
+class Supervised:
+    """A WirePlumber that starts again when it exits, as systemd starts the
+    user unit again after `systemctl --user restart`. Its process id is in
+    `pidfile`, so a test can restart it the way restartAudioServices does
+    and see the new one come up."""
+
+    def __init__(self, command, env, log, pidfile):
+        self.command, self.env, self.log, self.pidfile = command, env, log, Path(pidfile)
+        self.lock = threading.Lock()
+        self.stopping = False
+        self.process = self.start()
+        self.thread = threading.Thread(target=self.watch, daemon=True)
+        self.thread.start()
+
+    def start(self):
+        process = subprocess.Popen(self.command, env=self.env, stdout=self.log, stderr=self.log)
+        temporary = self.pidfile.with_suffix(".tmp")
+        temporary.write_text(str(process.pid))
+        temporary.replace(self.pidfile)
+        return process
+
+    def watch(self):
+        while True:
+            process = self.process
+            process.wait()
+            with self.lock:
+                if self.stopping:
+                    return
+                time.sleep(0.2)
+                self.process = self.start()
+
+    def poll(self):
+        return self.process.poll() if self.stopping else None
+
+    def terminate(self):
+        with self.lock:
+            self.stopping = True
+        self.process.terminate()
+
+    def wait(self, timeout=None):
+        return self.process.wait(timeout=timeout)
+
+    def kill(self):
+        self.process.kill()
 
 
 def main():
@@ -115,8 +162,13 @@ def main():
                         "alsa_monitor.enabled = false\nv4l2_monitor.enabled = false\n"
                         "libcamera_monitor.enabled = false\n")
                     policies = [["--config-file", "main.conf"], ["--config-file", "policy.conf"]]
-                for policy in policies:
-                    processes.append(subprocess.Popen(["wireplumber", *policy], env=env, stdout=log, stderr=log))
+                # Each WirePlumber runs supervised and names its pid file in
+                # OPENXLR_TEST_WIREPLUMBER_PIDS, so the audio clock test can
+                # restart it as systemd would.
+                pidfiles = [runtime + f"/wireplumber-{index}.pid" for index in range(len(policies))]
+                env["OPENXLR_TEST_WIREPLUMBER_PIDS"] = ":".join(pidfiles)
+                for policy, pidfile in zip(policies, pidfiles):
+                    processes.append(Supervised(["wireplumber", *policy], env, log, pidfile))
                 command = ["dotnet", "test", PROJECT, "-c", "Release", "--no-build", "--filter",
                            test_filter, *sys.argv[1:]]
                 if sys.argv[1:2] == ["--command"]:

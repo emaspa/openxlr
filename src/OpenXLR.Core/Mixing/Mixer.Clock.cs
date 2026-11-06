@@ -6,6 +6,13 @@ public sealed partial record MixerState
 {
     /// <summary>The node that drives the mixer's graph and the mixer's devices that follow it; null until a read shows one.</summary>
     public MixerClock? Clock { get; init; }
+
+    /// <summary>
+    /// The audio clock the user picked and whether it waits for WirePlumber
+    /// to restart; set by the daemon, which owns the rule, and absent where
+    /// it cannot write one (the Flatpak).
+    /// </summary>
+    public AudioClockChoice? ClockChoice { get; init; }
 }
 
 public sealed partial class Mixer
@@ -76,6 +83,9 @@ public sealed partial class Mixer
             return true;
         }
     }
+
+    /// <summary>The driven unit's capture node, once the strips found it.</summary>
+    public string? UnitInputNode { get { lock (_gate) return _inputDevice; } }
 
     /// <summary>The clock as the last read found it.</summary>
     public MixerClock? GraphClock { get { lock (_gate) return _clock; } }

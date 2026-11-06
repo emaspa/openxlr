@@ -407,6 +407,13 @@ public partial class MainWindow : Window
 
     private void OnClockManual(object? sender, RoutedEventArgs e) => ExternalLink.Open(GarbledMicrophoneManualLink);
 
+    /// <summary>The warning's action: the microphone's interface becomes the audio clock, with the restart offered in the same window.</summary>
+    private async void OnMakeClock(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm || !vm.HasClockAction) return;
+        if (await Dialogs.MakeClockAsync(this, vm.ClockActionDevice) is bool restart) await vm.MakeClockAsync(restart);
+    }
+
     /// <summary>
     /// Opens the browser tabs dialog the way Manage opens its window, owned by
     /// this one. A second request while it is open brings the same window

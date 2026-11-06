@@ -13,7 +13,7 @@ namespace OpenXLR.Daemon;
 /// graph adds sinks to the user's audio setup, which shouldn't happen by
 /// surprise). Set OPENXLR_BUILD_MIXER=1, or pass --mixer.
 /// </summary>
-public sealed class MixerService : IHostedService, IDisposable
+public sealed partial class MixerService : IHostedService, IDisposable
 {
     private readonly ILogger<MixerService> _log;
     private readonly IConfiguration _config;
@@ -319,7 +319,15 @@ public sealed class MixerService : IHostedService, IDisposable
             byte now = ProJackLevels.ByteOf(db);
             _jackWritten[jack] = _jackWritten.TryGetValue(jack, out var was) ? was.Now == now ? was : (now, was.Now) : (now, now);
         }
-        if (_mixer.HardwareEntry != _savedEntry) ScheduleSave();
+        // A changed entry is saved once. Comparing against an entry that only
+        // SaveEntryNow updates scheduled a save on every one-second sweep after
+        // the output volume moved in the mode, which kept the debounce from
+        // ever writing.
+        if (_mixer.HardwareEntry is var current && current != _savedEntry)
+        {
+            _savedEntry = current;
+            ScheduleSave();
+        }
     }
 
     /// <summary>
@@ -605,10 +613,12 @@ public sealed class MixerService : IHostedService, IDisposable
     {
         if (!_mixer.Built) return null;
         MixerState state = _mixer.Snapshot();
+        MixerClock? clock = NamedClock(state.Clock);
         return state with
         {
             LayoutWarning = ResourceWarning,
-            Clock = NamedClock(state.Clock),
+            Clock = clock,
+            ClockChoice = ClockChoice(clock),
             Inserts = state.Inserts.ToDictionary(e => e.Key, e => (IReadOnlyList<InsertStatus>)e.Value.Select(insert =>
             {
                 string? reason = EditorPolicy.BlockReason(insert.Insert.Kind, insert.Insert.Plugin);
@@ -1032,10 +1042,15 @@ public sealed class MixerService : IHostedService, IDisposable
             // OpenXLR set it, plays at the wrong level until the stored
             // fader is pushed onto it.
             stop.ThrowIfCancellationRequested();
-            _mixer.EnsureCellLevels(out IReadOnlyList<string> heldSends);
+            // A leg that ended, as one can while a restarted WirePlumber
+            // links the graph again, comes back with its channel's sink.
+            _mixer.EnsureCellLevels(out IReadOnlyList<string> heldSends, out IReadOnlyList<string> reloadedChannels);
             if (heldSends.Count > 0)
                 _log.LogInformation("put {n} send(s) back on their faders ({cells}); something outside OpenXLR had changed them",
                     heldSends.Count, string.Join(", ", heldSends));
+            if (reloadedChannels.Count > 0)
+                _log.LogWarning("reloaded the sink of {channels} to make its sends again; a send's stream had ended",
+                    string.Join(", ", reloadedChannels));
             stop.ThrowIfCancellationRequested();
             bool changed = _mixer.SyncStreams();
             if (_mixer.MigrateCaptureInputs(source => _devices.SupportedUnitFor(source)?.Id))
@@ -1076,6 +1091,9 @@ public sealed class MixerService : IHostedService, IDisposable
                 changed = true;
                 NoteClock(NamedClock(_mixer.GraphClock));
             }
+            // The audio clock the user picked: its rule, which can also be
+            // edited or deleted by hand.
+            changed |= SyncClockRule();
             if (changed) Changed?.Invoke();
             stop.ThrowIfCancellationRequested();
             SyncOutputSelectors();
@@ -1681,6 +1699,10 @@ public sealed class MixerService : IHostedService, IDisposable
                 case "setDynamicsProcessing":
                     _mixer.SetDynamicsProcessing(cmd.Channel!, cmd.Value.GetString()!);   // checked by CommandValidation
                     SyncOutputSelectors();   // software processing moves the Pro's mic between its hardware path and the send
+                    break;
+                case "setMonitorDry":
+                    _mixer.SetMonitorDry(cmd.Mix!, cmd.Value.GetBoolean());   // checked by CommandValidation
+                    SyncOutputSelectors();   // a dry monitor on the jacks keeps the Pro's hardware path with effects on
                     break;
                 case "setDucking":
                 case "setDuckingProcessing":

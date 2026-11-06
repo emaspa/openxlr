@@ -155,6 +155,14 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
     public Task<string?> SetBlockSizeAsync(int? frames)
         => EditLayoutAsync(new() { ["cmd"] = "setBlockSize", ["value"] = frames! });
 
+    /// <summary>Make a device the audio clock by its node name, or with null leave it to the packaged rules.</summary>
+    public Task<string?> SetAudioClockAsync(string? node)
+        => EditLayoutAsync(new() { ["cmd"] = "setAudioClock", ["value"] = node! });
+
+    /// <summary>Restart WirePlumber so the audio clock rule applies; every device stops for a moment.</summary>
+    public Task<string?> RestartAudioServicesAsync()
+        => EditLayoutAsync(new() { ["cmd"] = "restartAudioServices" });
+
     public Task<string?> SetRouteAppsByDefaultAsync(bool value)
         => EditLayoutAsync(new() { ["cmd"] = "setRouteAppsByDefault", ["value"] = value });
 
@@ -575,6 +583,10 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
     /// <summary>Where a microphone's compressor and expander run: <c>device</c> on the unit's own processor or <c>software</c>.</summary>
     public Task SetDynamicsProcessingAsync(string channel, string value)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setDynamicsProcessing", ["channel"] = channel, ["value"] = value });
+
+    /// <summary>Hear a microphone in the monitor mixes before its effects, or through them again.</summary>
+    public Task SetMonitorDryAsync(string mix, bool value)
+        => SendAsync(new Dictionary<string, object> { ["cmd"] = "setMonitorDry", ["mix"] = mix, ["value"] = value });
 
     /// <summary>Part of a microphone's voice changer: the fields given change, the others keep their values.</summary>
     public Task SetVoiceChangerAsync(string channel, bool? enabled = null, string? voice = null, double? pitch = null, double? formant = null)

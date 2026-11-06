@@ -62,10 +62,19 @@ internal static class SavedMixerValidation
             VoiceChanger = VoiceChanger(settings.VoiceChanger, notes),
             Compressor = Dynamics(settings.Compressor, "compressor", MicCompressor.Check, MicCompressor.Snap, notes),
             Expander = Dynamics(settings.Expander, "expander", MicExpander.Check, MicExpander.Snap, notes),
+            MonitorDry = MonitorDry(settings.MonitorDry, notes),
             Ducking = Ducking(settings, notes),
             Appearance = Appearance(settings.Appearance, notes),
             BlockSize = BlockSize(settings.BlockSize, notes),
         };
+    }
+
+    /// <summary>The dry monitor switches; a null map, which a hand edit can leave, reads as none on.</summary>
+    private static Dictionary<string, bool> MonitorDry(Dictionary<string, bool>? entries, List<string> notes)
+    {
+        if (entries is not null) return entries;
+        notes.Add($"dryMonitors: {NullEntry}");
+        return [];
     }
 
     private static int? BlockSize(int? frames, List<string> notes)
@@ -90,6 +99,7 @@ internal static class SavedMixerValidation
         if (scene.VoiceChanger is not null) VoiceChanger(scene.VoiceChanger);
         if (scene.Compressor is not null) Dynamics(scene.Compressor, "compressor", MicCompressor.Check);
         if (scene.Expander is not null) Dynamics(scene.Expander, "expander", MicExpander.Check);
+        if (scene.CaptureGains is not null) CaptureGains(scene.CaptureGains);
         if (scene.Ducking is { } ducking)
         {
             Require(!string.IsNullOrWhiteSpace(ducking.Key), "key must name a microphone channel", "ducking.key");
@@ -474,6 +484,12 @@ internal static class SavedMixerValidation
         foreach ((string channel, MicNoise noise) in entries)
             if (MicNoise.Check(noise) is string problem)
                 throw new JsonException($"Invalid saved mixer field 'noiseRemoval.{channel}': {problem}.");
+    }
+
+    private static void CaptureGains(IReadOnlyDictionary<string, CaptureGainScene> entries)
+    {
+        foreach ((string channel, CaptureGainScene? gain) in entries)
+            Require(gain is not null && double.IsFinite(gain.GainDb), "the gain must be a finite number of dB", $"captureGains.{channel}");
     }
 
     private static void VoiceChanger(IReadOnlyDictionary<string, MicVoice> entries)

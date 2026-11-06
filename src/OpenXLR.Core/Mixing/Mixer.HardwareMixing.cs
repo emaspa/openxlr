@@ -142,6 +142,12 @@ public sealed partial class Mixer
             // mixes need the channel's audio, not the raw input, for the session.
             Processed = unitSources.Values.Where(c => ProcessedInSoftwareLocked(c) || _soundCheck is not null && _soundCheckChannel == c)
                 .ToHashSet(StringComparer.Ordinal),
+            // A jack whose monitor mixes are dry hears a microphone from the
+            // unit's own input, as the software monitor sends take it; Mic
+            // setup's take is heard processed, as it is in the graph.
+            MonitorDry = unitSources.Values.Where(c => CarriesEqLocked(c) && !(_soundCheck is not null && _soundCheckChannel == c))
+                .ToHashSet(StringComparer.Ordinal),
+            DryMixes = DryMonitorsLocked(),
             MixVolumesDb = _config.Mixes.ToDictionary(m => m.Id, m => HardwareMixVolumeDbLocked(m.Id), StringComparer.Ordinal),
             DirectPath = _hardwareMicChannels.OfType<string>().ToHashSet(StringComparer.Ordinal),
             MixChains = _config.Mixes.Where(m => InsertsFor(MixKey(m)).Count > 0).Select(m => m.Id).ToHashSet(StringComparer.Ordinal),

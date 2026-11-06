@@ -167,6 +167,7 @@ internal static partial class SkinLayoutWindowTests
                         SkinService.ApplyControlSizing(enlarged);
                         CheckVolumeChip(window, matrix, $"{percent}% text, {(enlarged ? "touch" : "standard")}");
                         CheckMasterChip(window, matrix, $"{percent}% text, {(enlarged ? "touch" : "standard")}");
+                        CheckDryChip(window, matrix, $"{percent}% text, {(enlarged ? "touch" : "standard")}");
                     }
             }
             finally
@@ -945,6 +946,97 @@ internal static partial class SkinLayoutWindowTests
         {
             column.StartVolumeHold = timer;
         }
+    }
+
+    /// <summary>
+    /// A monitor mix's dry switch in its head, from a daemon that reports it:
+    /// always shown, whole and inside the head, grey while off and green
+    /// while on, the volume in its place while the master moves, and the
+    /// volume-only chip never shown beside it. The matrix keeps its places.
+    /// </summary>
+    private static void CheckDryChip(Window window, MixMatrixViewModel matrix, string where)
+    {
+        MatrixColumnViewModel column = matrix.Columns.Single(c => c.Mix.Id == "monitor");
+        string at = $"Monitor A's dry switch {where}";
+        void Report(bool? dry)
+        {
+            var node = new JsonObject { ["id"] = "monitor", ["name"] = column.Mix.Name, ["kind"] = "monitor", ["volume"] = column.Mix.Volume };
+            if (dry is bool on) node["monitorDry"] = on;
+            column.Mix.ApplyFromDaemon(node);
+        }
+        Report(false);
+        Layout(window, 1040, 1400);
+        Rect[] Places() => [.. window.GetVisualDescendants().OfType<Border>()
+            .Where(b => b.Name is "MatrixColumn" or "MatrixRowHead" or "MatrixCell" && b.IsEffectivelyVisible)
+            .Select(b => new Rect(b.TranslatePoint(default, window)!.Value, b.Bounds.Size))];
+        Rect[] before = Places();
+        Border head = ColumnHead(window, "monitor");
+        ToggleButton chip = head.GetVisualDescendants().OfType<ToggleButton>().Single(b => b.Name == "MatrixDryChip");
+        Border volumeOnly = head.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "MatrixMasterChip");
+        Slider master = head.GetVisualDescendants().OfType<Slider>().Single(s => s.Name == "MatrixMaster");
+        // The face as drawn: the presenter's text and border colours.
+        (Color Text, Color Border) Face()
+        {
+            Avalonia.Controls.Presenters.ContentPresenter presenter = chip.GetVisualDescendants()
+                .OfType<Avalonia.Controls.Presenters.ContentPresenter>().First(c => c.Name == "PART_ContentPresenter");
+            return (Assert.IsAssignableFrom<ISolidColorBrush>(presenter.Foreground).Color,
+                Assert.IsAssignableFrom<ISolidColorBrush>(presenter.BorderBrush).Color);
+        }
+        Color Token(string key) => ((ISolidColorBrush)window.FindResource(key)!).Color;
+        var hold = new ManualHold();
+        Func<TimeSpan, Action, IDisposable> timer = column.StartVolumeHold;
+        column.StartVolumeHold = hold.Start;
+        try
+        {
+            Assert.True(chip.IsEffectivelyVisible, at);
+            Assert.False(volumeOnly.IsEffectivelyVisible, at);
+            Assert.False(chip.IsChecked, at);
+            Assert.Equal(Localizer.Text("MonitorDry"), chip.Content);
+            Assert.Equal(Localizer.Format("MonitorDryName", column.Mix.Name), AutomationProperties.GetName(chip));
+            (Color Text, Color Border) off = Face();
+            Assert.Equal(Token("Ox.Text.Secondary"), off.Text);
+            MainWindowLabelTests.CheckWhole([.. chip.GetVisualDescendants().OfType<TextBlock>()], at);
+            AssertInside(chip, head);
+            // Its right edge is the FX button's below it, not a handle's width short of it.
+            Button fx = head.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("matrixEffects"));
+            double Right(Control c) => c.TranslatePoint(new Point(c.Bounds.Width, 0), window)!.Value.X;
+            Assert.True(Math.Abs(Right(chip) - Right(fx)) <= 1, $"{at} ends at {Right(chip)}, the FX button at {Right(fx)}");
+
+            Report(true);
+            Layout(window, 1040, 1400);
+            Assert.True(chip.IsChecked, at);
+            // Green while on, and visibly unlike the face it had off: the
+            // broadcast skin gives an open mute the plain control grey.
+            (Color Text, Color Border) on = Face();
+            Assert.Equal(Token("Ox.Led.On"), on.Text);
+            Assert.Equal(Token("Ox.Led.On"), on.Border);
+            Assert.NotEqual(off.Text, on.Text);
+            Assert.NotEqual(off.Border, on.Border);
+
+            // The volume in its place while the master moves, then Dry again.
+            FaderInput.SetIsAdjusting(master, true);
+            Layout(window, 1040, 1400);
+            Assert.Equal(column.Mix.VolumeText, chip.Content);
+            Assert.False(volumeOnly.IsEffectivelyVisible, at);
+            // The volume in the grey of the plain volume chip, though the mix is dry.
+            Assert.Equal(Token("Ox.Control.Foreground"), Face().Text);
+            Assert.Equal(Token("Ox.Control.BorderBrush"), Face().Border);
+            MainWindowLabelTests.CheckWhole([.. chip.GetVisualDescendants().OfType<TextBlock>()], $"the volume on {at}");
+            AssertInside(chip, head);
+            FaderInput.SetIsAdjusting(master, false);
+            Assert.Single(hold.Handles).Elapse();
+            Layout(window, 1040, 1400);
+            Assert.Equal(Localizer.Text("MonitorDry"), chip.Content);
+            Assert.True(before.SequenceEqual(Places()), $"the matrix moved while {at} changed");
+            Assert.Equal(on, Face());
+        }
+        finally
+        {
+            column.StartVolumeHold = timer;
+            Report(null);
+            Layout(window, 1040, 1400);
+        }
+        Assert.False(chip.IsEffectivelyVisible, $"{at} from a daemon without the switch");
     }
 
     internal static Border RowHead(Visual root, string channel) =>

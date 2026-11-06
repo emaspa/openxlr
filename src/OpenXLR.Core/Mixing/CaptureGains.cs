@@ -21,6 +21,9 @@ public sealed partial class Mixer
     private readonly Dictionary<string, (double? Value, long? FailedAt, int Failures)> _hardwareMinimums = new(StringComparer.Ordinal);
     private string? _captureGainKey;
     private long? _captureGainRetrySince;
+    // A recalled profile's gains and mutes, by channel, until each channel's
+    // source is connected and they are written.
+    private readonly Dictionary<string, CaptureGainScene> _captureRecall = new(StringComparer.Ordinal);
 
     /// <summary>
     /// The source a capture input's gain is read from and written to, or
@@ -62,6 +65,10 @@ public sealed partial class Mixer
                 && (_captureGainRetrySince is not { } since || Time.GetElapsedTime(since) < HardwareMinimumRetry)) return false;
             IReadOnlyDictionary<string, SourceVolume>? volumes = _pw.GetSourceVolumes(names);
             if (volumes is null) return false;   // pactl failed: keep the last reading and try again next sweep
+            // A recalled profile's gains go to their sources once connected,
+            // and the reading is taken again so the state shows them.
+            if (_captureRecall.Count > 0 && WriteCaptureRecallLocked(volumes, carried))
+                volumes = _pw.GetSourceVolumes(names) ?? volumes;
             _captureGainKey = key;
             _captureGainRetrySince = null;
             var next = new Dictionary<string, CaptureGainStatus>(StringComparer.Ordinal);
@@ -95,6 +102,7 @@ public sealed partial class Mixer
             double? minimum = HardwareMinimumLocked(volume, out _);
             long raw = CaptureGain.RawFor(volume, CaptureGain.Status(volume, minimum), gainDb);
             _pw.SetSourceVolume(source, raw);
+            _captureRecall.Remove(channelId);
             // Report what was written at once; the next sweep reads it back.
             _captureGains[channelId] = CaptureGain.Status(volume with { Volume = raw }, minimum);
             _captureGainKey = null;
@@ -130,6 +138,10 @@ public sealed partial class Mixer
     private void SetCaptureMutedLocked((string Source, SourceVolume Volume) found, bool muted)
     {
         _pw.SetSourceMute(found.Source, muted);
+        // A recall still waiting for this source must not undo the change.
+        Dictionary<string, UnitInputStatus> onSource = UnitInputsLocked();
+        foreach (ChannelDefinition channel in _config.Channels)
+            if (CaptureGainSource(channel, onSource) == found.Source) _captureRecall.Remove(channel.Id);
         // Report it at once on every input on the source, which shares the
         // one mute; the next sweep reads the source again.
         CaptureGainStatus status = CaptureGain.Status(found.Volume with { Muted = muted }, HardwareMinimumLocked(found.Volume, out _));
@@ -182,5 +194,60 @@ public sealed partial class Mixer
         if (_hardwareMinimums.Count >= 64) _hardwareMinimums.Clear();
         _hardwareMinimums[key] = (found, failedAt, failures);
         return found;
+    }
+
+    /// <summary>
+    /// The gains and mutes a profile keeps: every capture input with a gain
+    /// of its own, as last read, or as a recall still waiting for its source
+    /// asked. An input whose source has not been read is left out, so a
+    /// recall leaves it as it is.
+    /// </summary>
+    private Dictionary<string, CaptureGainScene> SceneCaptureGainsLocked()
+    {
+        Dictionary<string, UnitInputStatus> carried = UnitInputsLocked();
+        var gains = new Dictionary<string, CaptureGainScene>(StringComparer.Ordinal);
+        foreach (ChannelDefinition channel in _config.Channels)
+        {
+            if (CaptureGainSource(channel, carried) is null) continue;
+            if (_captureRecall.TryGetValue(channel.Id, out CaptureGainScene? waiting)) gains[channel.Id] = waiting;
+            else if (_captureGains.TryGetValue(channel.Id, out CaptureGainStatus? gain)) gains[channel.Id] = new(gain.GainDb, gain.Muted);
+        }
+        return gains;
+    }
+
+    /// <summary>
+    /// Recall a profile's gains and mutes. Each is written by the next sweep
+    /// that finds its source connected; one for a channel the layout no
+    /// longer has, or whose gain belongs to a Wave unit, is dropped then.
+    /// </summary>
+    private void RecallCaptureGainsLocked(IReadOnlyDictionary<string, CaptureGainScene>? recalled)
+    {
+        if (recalled is null) return;
+        foreach ((string channel, CaptureGainScene gain) in recalled)
+            if (_config.Channels.Any(c => c.Id == channel && c.CaptureSource is not null)) _captureRecall[channel] = gain;
+        // The next sweep reads the sources again, connected or not.
+        _captureGainKey = null;
+    }
+
+    /// <summary>Write each waiting recall whose source is connected. True when anything was written.</summary>
+    private bool WriteCaptureRecallLocked(IReadOnlyDictionary<string, SourceVolume> volumes, IReadOnlyDictionary<string, UnitInputStatus> carried)
+    {
+        bool wrote = false;
+        foreach ((string channelId, CaptureGainScene wanted) in _captureRecall.ToArray())
+        {
+            ChannelDefinition? channel = _config.Channels.FirstOrDefault(c => c.Id == channelId);
+            if (channel is null || CaptureGainSource(channel, carried) is not { } source)
+            {
+                _captureRecall.Remove(channelId);
+                continue;
+            }
+            if (!volumes.TryGetValue(source, out SourceVolume? volume)) continue;   // not connected yet
+            long raw = CaptureGain.RawFor(volume, CaptureGain.Status(volume, HardwareMinimumLocked(volume, out _)), wanted.GainDb);
+            if (raw != volume.Volume) _pw.SetSourceVolume(source, raw);
+            if (wanted.Muted != volume.Muted) _pw.SetSourceMute(source, wanted.Muted);
+            _captureRecall.Remove(channelId);
+            wrote = true;
+        }
+        return wrote;
     }
 }

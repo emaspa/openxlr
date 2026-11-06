@@ -582,6 +582,14 @@
                     "voice": "dracula"
                   }
                 },
+                "monitorDry": {
+                  "summary": "Have Monitor A hear the microphones before their effects, while the other mixes keep the processed voice",
+                  "value": {
+                    "cmd": "setMonitorDry",
+                    "mix": "monitor",
+                    "value": true
+                  }
+                },
                 "loadEqProfile": {
                   "summary": "Put the built-in Warm EQ profile on a microphone and switch its EQ on",
                   "value": {

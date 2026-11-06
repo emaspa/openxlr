@@ -17,6 +17,13 @@ internal sealed class SettingsSaver : IDisposable
 {
     public static readonly TimeSpan SaveDelay = TimeSpan.FromSeconds(2);
     public static readonly TimeSpan MaxRetryDelay = TimeSpan.FromSeconds(60);
+    /// <summary>
+    /// The longest a change waits while later changes keep arriving. Without
+    /// it, a caller that schedules more often than <see cref="SaveDelay"/>
+    /// (the one-second sweep does while a value it watches stays changed)
+    /// pushes the write back for as long as it runs.
+    /// </summary>
+    public static readonly TimeSpan MaxSaveWait = TimeSpan.FromSeconds(10);
 
     private readonly object _gate = new();
     private readonly Func<string?> _write;   // export and save; null on success, else the reason
@@ -24,6 +31,7 @@ internal sealed class SettingsSaver : IDisposable
     private readonly Action? _changed;
     private Timer? _debounce;
     private bool _dirty;
+    private long _dirtySince;   // Stopwatch timestamp of the oldest change not yet written
     private bool _closed;
     private TimeSpan _retry = SaveDelay;
     private string? _error;
@@ -53,9 +61,18 @@ internal sealed class SettingsSaver : IDisposable
         lock (_gate)
         {
             if (_closed) return;
+            if (!_dirty) _dirtySince = System.Diagnostics.Stopwatch.GetTimestamp();
             _dirty = true;
             _debounce ??= new Timer(_ => Flush(), null, Timeout.Infinite, Timeout.Infinite);
-            _debounce.Change(SaveDelay, Timeout.InfiniteTimeSpan);
+            // A failing write keeps its backoff; otherwise the oldest pending
+            // change is written within MaxSaveWait however often this runs.
+            TimeSpan delay = SaveDelay;
+            if (_error is null)
+            {
+                TimeSpan left = MaxSaveWait - System.Diagnostics.Stopwatch.GetElapsedTime(_dirtySince);
+                if (left < delay) delay = left > TimeSpan.Zero ? left : TimeSpan.Zero;
+            }
+            _debounce.Change(delay, Timeout.InfiniteTimeSpan);
         }
     }
 

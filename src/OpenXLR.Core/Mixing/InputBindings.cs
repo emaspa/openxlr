@@ -513,7 +513,7 @@ public sealed partial class Mixer
             ? _pw.LinkNodes(source, "", target, "playback", fromChannel: binding.Port)
             : _pw.RouteInputToChannel(source, target, processed ? 0 : channel.InputPair!.Value);
         if ((binding is not null || channel.CaptureSource is not null)
-            && (!route.Complete || route.Pairs.Count < (target == channel.SinkName ? 2 : channel.ChainWidth ?? 1)))
+            && (!route.Complete || route.Pairs.Count < (target == channel.SinkName || target == channel.DrySinkName ? 2 : channel.ChainWidth ?? 1)))
         {
             // A half-connected microphone must retry instead of being kept
             // as a healthy route that carries audio on one side only.

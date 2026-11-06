@@ -390,6 +390,79 @@ public sealed class CaptureGainTests
     }
 
     [Fact]
+    public void AProfileKeepsEachCaptureInputsGainAndMuteThroughSaveAndLoad()
+    {
+        using var fake = new FakeAudio();
+        fake.MuteBrio(true);
+        fake.Mixer.SyncCaptureGains();
+        Dictionary<string, CaptureGainScene> gains = fake.Mixer.ExportScene().CaptureGains!;
+        // Every capture input with a gain of its own, and no other channel.
+        Assert.Equal(["brio", "brio-left", "onboard"], gains.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal(new CaptureGainScene(54, true), gains["brio"]);
+        Assert.Equal(new CaptureGainScene(54, true), gains["brio-left"]);
+        Assert.Equal(-18, gains["onboard"].GainDb, 1);
+        Assert.False(gains["onboard"].Muted);
+
+        string? previous = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
+        string config = Directory.CreateTempSubdirectory("openxlr-capture-profile-").FullName;
+        try
+        {
+            Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", config);
+            ProfileStore.Save("046d:085e", "desk", new Profile { Mixer = new MixerScene { CaptureGains = gains } });
+            Assert.Equal(gains, ProfileStore.Load("046d:085e", "desk")!.Mixer!.CaptureGains!);
+            Assert.Contains("\"captureGains\"", File.ReadAllText(Directory.GetFiles(config, "desk.json", SearchOption.AllDirectories).Single()));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", previous);
+            Directory.Delete(config, true);
+        }
+    }
+
+    [Fact]
+    public void ARecallWritesTheGainAndMuteOnceTheSourceIsConnected()
+    {
+        using var fake = new FakeAudio();
+        fake.Mixer.SyncCaptureGains();
+        fake.Gone();
+        fake.MoveBrioRegistry(0.5);
+        fake.Mixer.SyncCaptureGains();
+        typeof(Mixer).GetMethod("RecallCaptureGainsLocked", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(fake.Mixer,
+            [new Dictionary<string, CaptureGainScene>
+            {
+                ["brio"] = new(36, true),
+                ["onboard"] = new(-18, false),
+                ["pro"] = new(30, true),
+                ["music"] = new(0, true),
+            }]);
+        fake.Clear();
+        // The BRIO is unplugged and the onboard input already sits where the
+        // profile wants it: nothing is written, and the wait is kept.
+        fake.Mixer.SyncCaptureGains();
+        Assert.DoesNotContain(fake.Calls, c => c.StartsWith("pactl set-", StringComparison.Ordinal));
+        // A profile saved meanwhile keeps what the recall asked for.
+        Assert.Equal(new CaptureGainScene(36, true), fake.Mixer.ExportScene().CaptureGains!["brio"]);
+
+        // The BRIO comes back: its gain and mute are written, once, and never on the Pro's source.
+        fake.MoveBrio(65536);
+        fake.Clear();
+        Assert.True(fake.Mixer.SyncCaptureGains());
+        Assert.Equal([$"pactl set-source-volume {Brio} 32846", $"pactl set-source-mute {Brio} 1"],
+            fake.Calls.Where(c => c.StartsWith("pactl set-", StringComparison.Ordinal)));
+        fake.MoveBrio(32846);
+        fake.Clear();
+        fake.Mixer.SyncCaptureGains();
+        Assert.DoesNotContain(fake.Calls, c => c.StartsWith("pactl set-", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void AProfileGainMustBeANumber()
+    {
+        var scene = new MixerScene { CaptureGains = new() { ["brio"] = new(double.NaN, false) } };
+        Assert.Throws<System.Text.Json.JsonException>(() => SavedMixerValidation.Validate(scene));
+    }
+
+    [Fact]
     public void TheToggleFlipsWhatTheAudioServerReportsNow()
     {
         using var fake = new FakeAudio();
@@ -576,6 +649,13 @@ public sealed class CaptureGainTests
             File.WriteAllText(Path.Combine(_dir, "sources"), Sources(raw));
             Graph(Math.Round(Math.Pow(raw / 65536.0, 3), 6));
             // The adapter keeps a one-shot dump for a moment; a daemon's registry has no such delay.
+            Thread.Sleep(450);
+        }
+
+        /// <summary>The registry's BRIO volume moves, as it does when the source leaves or comes back.</summary>
+        public void MoveBrioRegistry(double level)
+        {
+            Graph(level);
             Thread.Sleep(450);
         }
 

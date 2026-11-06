@@ -173,6 +173,17 @@ graph stays as it is. Tested with pw-dump fixtures from an owner's archive
 and from the maintainer's desk, and on a private PipeWire server where the
 driver changes hands.
 
+The audio clock can be chosen in Options → Audio → AUDIO, or from the
+warning with **Make *interface* the clock**: Automatic, or one of the
+mixer's hardware inputs and outputs. The daemon writes the choice as a
+WirePlumber rule in the user's configuration and reads it back from
+there, and the state says while it waits for WirePlumber to restart.
+**Restart audio now** restarts WirePlumber after a confirm, and the mixer
+comes back without a daemon restart. Not in the Flatpak, which keeps the
+manual's hand-written rule. Tested with a supervised WirePlumber on a
+private PipeWire server that restarts it and makes the devices again, not
+yet on hardware.
+
 ## Software controls
 
 These run on the computer. The microphone EQ is on XLR 1 and XLR 2
@@ -265,6 +276,19 @@ physical gain dial.
   terminal mixer, a Deck key with toggle and hold modes and
   [`setVoiceChanger`](api.md#voice-changer) control it, and it is saved
   with the mixer and in profiles.
+- Hear it dry: a Dry chip on each monitor mix, at the top right of its
+  head in the mix matrix and beside 150% on its strip, grey while off and
+  green while on, with the volume in its place while the fader moves.
+  Once on, that monitor mix hears the microphones before their software
+  effects, so your own voice arrives earlier, while the other monitor
+  mixes, Stream, Chat, the virtual microphones and recordings keep the
+  processed voice. The
+  send level, the mutes and the channel volume work on it as before, and
+  nothing else in the graph restarts. On the Wave XLR Pro the zero-latency
+  path stays on with effects running when the monitor mixes on the jacks
+  are dry, and hardware mixing plays the microphones raw on those jacks.
+  Saved with the mixer and in profiles, in the terminal mixer's Outputs
+  tab, and set by [`setMonitorDry`](api.md#dry-monitor).
 - Compressor and expander on this computer: on the same microphones, in
   the same native stage, the expander after noise removal and the
   compressor after the EQ. The compressor has a threshold, ratio, attack,
@@ -504,7 +528,7 @@ microphone with no delay; muted, you do not. With another device in the
 monitor set, with the microphone in an exclusive group, or while it runs a
 software effect (EQ in software, noise removal, the voice changer, the soft
 low cut, ClipGuard or a plugin), the software send carries it instead,
-effects included.
+effects included, unless the monitor mixes the jacks play are dry.
 
 Channels appear as playback devices in the desktop's audio applet, and
 the virtual microphones (Stream and Chat by default) as recording
@@ -1073,6 +1097,8 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   since a terminal sends no key-up ([manual](manual.md#terminal-sounds))
 - The voice changer in Inputs: a choice of Off or a voice per microphone,
   and the custom voice's pitch and formant
+- Hear it dry in Outputs: each monitor mix's switch for hearing the
+  microphones before their effects
 - The compressor and expander in Inputs: each microphone's switches and
   thresholds, and every other setting while one is on
 - Insert editing opens the plugin's native editor. A blocked or refused
@@ -1169,7 +1195,10 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   headroom left; the packages raise that limit with a systemd drop-in.
   It also holds every sink it created at full volume and unmuted, since
   a desktop applet or the session manager can turn one down and quietly
-  cut the mixes it feeds
+  cut the mixes it feeds. A WirePlumber restart needs no daemon restart:
+  WirePlumber links what names a target again, the sweep links the
+  devices as after a replug, and a channel whose send stream ended or was
+  left unlinked has its sink reloaded, at most three times in ten minutes
 - Text size: five settings from 80% to 120% in Options under Appearance.
   The change reaches open windows immediately and is saved in `ui.json`.
 - Skins: every surface, label, indicator, meter, fader and control in the

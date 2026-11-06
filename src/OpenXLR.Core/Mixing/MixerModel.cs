@@ -161,6 +161,13 @@ public sealed record ChannelDefinition(string Id, string Name)
 
     /// <summary>PipeWire node name of the channel sink.</summary>
     public string SinkName => $"OpenXLR_ch_{Id}";
+
+    /// <summary>
+    /// The hidden combine a microphone heard dry in the monitor mixes plays
+    /// into: fed from the source before any processing, with a send into
+    /// each monitor mix only.
+    /// </summary>
+    public string DrySinkName => $"{SinkName}.dry";
 }
 
 /// <summary>Live mixer state pushed to clients.</summary>
@@ -288,6 +295,12 @@ public sealed partial record MixStatus(string Id, string Name, double Volume, bo
 {
     /// <summary>Editable, and not the last remaining monitor mix.</summary>
     public bool Deletable { get; init; }
+
+    /// <summary>
+    /// Whether this monitor mix hears the microphones dry, before their
+    /// software effects (<c>setMonitorDry</c>); null on every other mix.
+    /// </summary>
+    public bool? MonitorDry { get; init; }
 }
 
 /// <param name="Present">

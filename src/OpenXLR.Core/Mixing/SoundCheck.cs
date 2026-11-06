@@ -218,6 +218,8 @@ public sealed partial class Mixer
             if (_soundCheck != filter)
                 throw new InvalidOperationException(_soundCheckError ?? "Sound Check could not connect its audio path.");
             _soundCheckProbe = new SoundCheckProbe(channel, filter.NativeHost!, rate);
+            // The monitor hears the take through the effects, not the live microphone dry.
+            SyncDryRoutesLocked();
         }
         catch (Exception failure)
         {
@@ -404,6 +406,8 @@ public sealed partial class Mixer
             if (input is not null) _pw.Unlink(input);
             if (helper is not null) _pw.StopFilter(helper);
         }
+        // A microphone heard dry gets its route back; the sweep does it after a stop without a restore.
+        if (restore && channel is not null && _built) SyncDryRoutesLocked();
     }
 
     /// <summary>

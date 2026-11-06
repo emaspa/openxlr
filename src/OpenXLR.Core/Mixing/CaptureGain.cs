@@ -15,6 +15,9 @@ namespace OpenXLR.Core.Mixing;
 /// </summary>
 public sealed record CaptureGainStatus(double GainDb, double MinDb, double MaxDb, bool Hardware, bool Muted = false);
 
+/// <summary>A capture input's gain in dB and its source's mute, as a profile keeps them.</summary>
+public sealed record CaptureGainScene(double GainDb, bool Muted);
+
 /// <summary>One PipeWire source's volume as pipewire-pulse reports it.</summary>
 /// <param name="Name">The source's node name.</param>
 /// <param name="Volume">The loudest channel's volume, on Pulse's scale (65536 is 0 dB).</param>

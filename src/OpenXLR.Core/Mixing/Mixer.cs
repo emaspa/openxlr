@@ -154,6 +154,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                     _duckLegIndex[Cell(chId, mix.Id)] = duckIdx;
             }
         }
+        DiscoverDryLegsLocked();
     }
 
     /// <summary>
@@ -245,6 +246,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             // The soundboard's player went with the last graph; it starts
             // again here and loads its clips anew.
             StartSoundboardIfWantedLocked();
+            // A microphone heard dry in the monitor mixes gets its route once
+            // the channels' own routes are up.
+            SyncDryRoutesLocked();
         }
     }
 
@@ -310,6 +314,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 if (InputRouteLocked(ch, null).Eq && !_eqStages.ContainsKey(ch.Id)) _eqErrors[ch.Id] = ex.Message;
             }
         }
+        // A dry monitor route follows the source the strip now takes, and
+        // stops while Sound Check plays its take through the channel.
+        SyncDryRoutesLocked();
     }
 
     private void WireInputFeedLocked(IReadOnlyCollection<string> only)
@@ -693,6 +700,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             soundCheckChanged |= TrackNoiseReportsLocked();
             soundCheckChanged |= TrackVoiceReportsLocked();
             soundCheckChanged |= HealDuckBusesLocked();
+            soundCheckChanged |= SyncDryRoutesLocked();
             if (_chains.Count == 0 && _mixDelays.Count == 0 && _latencyReports.Count == 0)
                 return EnsureMixRoutesLocked() || soundCheckChanged;
             bool changed = false;
@@ -952,6 +960,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     // ILayoutInfo, for command validation ahead of the mixer methods.
     public bool HasChannel(string id) { lock (_gate) return _config.Channels.Any(c => c.Id == id); }
     public bool HasMix(string id) { lock (_gate) return _config.Mixes.Any(m => m.Id == id); }
+    public bool IsMonitorMix(string id) { lock (_gate) return MonitorMixLocked(id) is not null; }
     public bool HasApplicationChannel(string id) { lock (_gate) return _config.Channels.Any(c => c.Id == id && c.IsApplication); }
     public bool HasEditableChannel(string id) { lock (_gate) return _config.Channels.Any(c => c.Id == id && c.InputPair is null); }
     public bool HasCaptureChannel(string id) { lock (_gate) return _config.Channels.Any(c => c.Id == id && c.CaptureSource is not null); }
@@ -1658,6 +1667,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 VoiceChanger = new Dictionary<string, MicVoice>(_voice, StringComparer.Ordinal),
                 Compressor = new Dictionary<string, MicCompressor>(_compressor, StringComparer.Ordinal),
                 Expander = new Dictionary<string, MicExpander>(_expander, StringComparer.Ordinal),
+                MonitorDry = ExportMonitorDryLocked(),
                 Ducking = DuckingSetupLocked().Copy(),
                 Appearance = ExportAppearanceLocked(),
             };
@@ -1845,6 +1855,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             RecallVoiceLocked(s.VoiceChanger);
             RecallCompressorLocked(s.Compressor);
             RecallExpanderLocked(s.Expander);
+            RecallMonitorDryLocked(s.MonitorDry);
             _eqProcessing.Clear();
             foreach ((string channel, string processing) in s.EqProcessing)
                 if (processing == MicEqProcessing.Software) _eqProcessing[channel] = processing;
@@ -1858,6 +1869,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             SyncEqStagesLocked();
             UpdateMixLatencyLocked();
             SyncDuckingLocked();
+            SyncDryRoutesLocked();
         }
     }
 
@@ -1885,6 +1897,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 VoiceChanger = SceneVoiceLocked(),
                 Compressor = SceneCompressorLocked(),
                 Expander = SceneExpanderLocked(),
+                MonitorDry = SceneMonitorDryLocked(),
+                CaptureGains = SceneCaptureGainsLocked(),
                 Ducking = DuckingSetupLocked().ToScene(),
             };
         }
@@ -2001,7 +2015,12 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 ApplyChainsLocked(s.Inserts, absentMixesEmpty: true, rebuildAll: false);
             if (s.Eq is not null || s.NoiseRemoval is not null || s.VoiceChanger is not null || s.Compressor is not null
                 || s.Expander is not null) SyncEqStagesLocked();
+            // The dry monitor switch the same way: a profile without it leaves it alone.
+            if (s.MonitorDry is not null) RecallMonitorDryLocked(s.MonitorDry);
+            // A capture input's gain and mute too, written once its source is there.
+            RecallCaptureGainsLocked(s.CaptureGains);
             SyncDuckingLocked();
+            SyncDryRoutesLocked();
         }
         if (s.OutputVolume is double v) SetOutputVolume(v);
     }
@@ -2475,7 +2494,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// must hear the loop the send carries. Never while software changes the
     /// channel's audio (see <see cref="ProcessedInSoftwareLocked"/>): the
     /// direct path would play the voice unchanged, so the send carries the
-    /// processed one instead, a few milliseconds later. Input 2 never takes
+    /// processed one instead, a few milliseconds later; unless every monitor
+    /// mix the jacks play is dry (<see cref="SetMonitorDry"/>), where the
+    /// unchanged voice is what the owner asked for. Input 2 never takes
     /// the channel that already carries input 1.
     /// </summary>
     public bool SetHardwareMicMonitor(bool on, string? whenHeardIn = null, int input = 1)
@@ -2485,7 +2506,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         {
             string? channel = DirectPathChannelLocked(input);
             on &= !_monitorMuted && channel is not null && GroupForChannelLocked(channel) is null && _soundCheckChannel != channel
-                && !ProcessedInSoftwareLocked(channel)
+                && (!ProcessedInSoftwareLocked(channel) || DryHeardInLocked(channel, whenHeardIn))
                 && (input == 1 || channel != DirectPathChannelLocked(1))
                 && (whenHeardIn is null || MonitorFeed.Parts(whenHeardIn).Any(m => !_mixMuted.Contains(m) && !_muted.Contains(Cell(channel, m))));
             SetHardwareMicChannelLocked(input, on ? channel : null);
@@ -3536,7 +3557,10 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                     m.Id, m.Name,
                     _mixVolume.GetValueOrDefault(m.Id, 1.0),
                     _mixMuted.Contains(m.Id), KindName(m.Kind), m.IsEditable)
-                    { Deletable = m.IsEditable && (m.Kind != MixKind.Monitor || monitorCount > 1) })],
+                    {
+                        Deletable = m.IsEditable && (m.Kind != MixKind.Monitor || monitorCount > 1),
+                        MonitorDry = m.Kind == MixKind.Monitor ? _dryMonitors.Contains(m.Id) : null,
+                    })],
                 Channels = [.. _config.Channels.Select(c => new ChannelStatus(
                     c.Id, ChannelNameLocked(c),
                     _config.Mixes.ToDictionary(m => m.Id, m => _levels.GetValueOrDefault(Cell(c.Id, m.Id), 0.0)),
@@ -3631,7 +3655,6 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     private void ApplyCellLocked(string channelId, string mixId)
     {
         string cell = Cell(channelId, mixId);
-        var targets = CellLegTargetsLocked(channelId, mixId, out bool waiting);
         bool bus = _duckBuses.ContainsKey(mixId);
         if (!_legIndex.ContainsKey(cell) || bus && !_duckLegIndex.ContainsKey(cell)) DiscoverLegsLocked();
         try
@@ -3654,6 +3677,14 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 MarkCellPendingLocked(cell);
                 return;
             }
+            // Discovery can add or remove the dry leg. Use the current
+            // routing for both the first write and a retry after rediscovery.
+            var targets = CellLegTargetsLocked(channelId, mixId, out bool waiting);
+            // A dry leg the cell does not use closes before the channel's own
+            // legs open, and one it uses opens after they closed.
+            bool dry = DryCarriesLocked(channelId, mixId);
+            int? dryLeg = _dryLegIndex.TryGetValue(cell, out int dryIndex) ? dryIndex : null;
+            if (!dry && dryLeg is int closing) Leg(closing, (0, true));
             // Close the unused leg first. A failed close must never be
             // followed by opening the other path onto the same audio.
             if (bus && UsesDuckBusLocked(cell, mixId))
@@ -3666,6 +3697,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 if (bus) Leg(_duckLegIndex[cell], targets.Bus);
                 Leg(direct, targets.Direct);
             }
+            if (dry && dryLeg is int opening) Leg(opening, DryLegTargetLocked(channelId, mixId));
             if (waiting) MarkCellPendingLocked(cell); else _pendingCells.Remove(cell);
         }
 
@@ -3731,16 +3763,28 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// </para>
     /// </summary>
     /// <param name="held">The sends whose leg was put back on its fader.</param>
-    public bool EnsureCellLevels(out IReadOnlyList<string> held)
+    public bool EnsureCellLevels(out IReadOnlyList<string> held) => EnsureCellLevels(out held, out _);
+
+    /// <inheritdoc cref="EnsureCellLevels(out IReadOnlyList{string})"/>
+    /// <param name="held">The sends whose leg was put back on its fader.</param>
+    /// <param name="reloaded">The channels whose sink was reloaded for a lost leg (<see cref="RestoreLostLegsLocked"/>).</param>
+    public bool EnsureCellLevels(out IReadOnlyList<string> held, out IReadOnlyList<string> reloaded)
     {
         lock (_gate)
         {
             held = [];
+            reloaded = [];
             ForgetRemovedCells(_pendingCells, _cells);
-            if (!_built) { _cellRounds = _cellWait = 0; return false; }
-            held = HoldCellLevelsLocked();
-            if (_pendingCells.Count == 0) { _cellRounds = _cellWait = 0; return held.Count > 0; }
-            if (_cellWait > 0) { _cellWait--; return held.Count > 0; }
+            if (!_built) { _cellRounds = _cellWait = 0; _legMissing.Clear(); return false; }
+            var missing = new HashSet<string>(StringComparer.Ordinal);
+            held = HoldCellLevelsLocked(missing);
+            // A send waiting for a leg it has none of is short of one too.
+            foreach (string cell in _pendingCells)
+                if (!_legIndex.ContainsKey(cell) && cell.IndexOf('|', StringComparison.Ordinal) is int bar and > 0) missing.Add(cell[..bar]);
+            reloaded = RestoreLostLegsLocked(missing);
+            bool restored = held.Count > 0 || reloaded.Count > 0;
+            if (_pendingCells.Count == 0) { _cellRounds = _cellWait = 0; return restored; }
+            if (_cellWait > 0) { _cellWait--; return restored; }
             DiscoverLegsLocked();
             bool applied = false;
             foreach (string cell in _pendingCells.ToList())
@@ -3755,7 +3799,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             // The gap is a distance between rounds; the wait counts the
             // sweeps skipped in between, which is one fewer.
             _cellWait = Math.Max(0, CellRoundGap(_cellRounds) - 1);
-            return applied || held.Count > 0;
+            return applied || restored;
         }
     }
 
@@ -3767,19 +3811,23 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// from it. A leg the registry does not show yet is left for the next
     /// sweep, and a waiting cell is the pending round's business.
     /// </summary>
-    private List<string> HoldCellLevelsLocked()
+    /// <param name="missing">Gets each channel with a known leg the registry does not show.</param>
+    private List<string> HoldCellLevelsLocked(HashSet<string> missing)
     {
         var held = new List<string>();
         if (_legIndex.Count == 0) return held;
-        IReadOnlyDictionary<int, (int Percent, bool Muted)> legs = _pw.CombineLegLevels();
+        (IReadOnlyDictionary<int, (int Percent, bool Muted)> legs, IReadOnlySet<int> unlinked) = _pw.CombineLegs();
         foreach ((string cell, int index) in _legIndex.ToList())
         {
             if (_pendingCells.Contains(cell) || !_cells.Contains(cell)) continue;
             int bar = cell.IndexOf('|', StringComparison.Ordinal);
             if (bar <= 0) continue;
             string channel = cell[..bar], mix = cell[(bar + 1)..];
+            // A leg nothing links plays into no mix; see RestoreLostLegsLocked.
+            if (unlinked.Contains(index)) missing.Add(channel);
             if (!legs.TryGetValue(index, out (int Percent, bool Muted) leg))
             {
+                missing.Add(channel);
                 if (_duckBuses.ContainsKey(mix)) MarkCellPendingLocked(cell);
                 continue;
             }
@@ -3787,7 +3835,10 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             bool directHeld = Matches(leg, targets.Direct);
             bool busHeld = !_duckBuses.ContainsKey(mix) || _duckLegIndex.TryGetValue(cell, out int busIndex)
                 && legs.TryGetValue(busIndex, out var busLeg) && Matches(busLeg, targets.Bus);
-            if (directHeld && busHeld) continue;
+            // A dry leg the registry does not show yet is left for the next sweep.
+            bool dryHeld = !_dryLegIndex.TryGetValue(cell, out int dryIndex) || !legs.TryGetValue(dryIndex, out var dryLeg)
+                || Matches(dryLeg, DryLegTargetLocked(channel, mix));
+            if (directHeld && busHeld && dryHeld) continue;
             ApplyCellLocked(channel, mix);
             held.Add(cell);
         }
@@ -3841,6 +3892,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         StopPlayerLocked();
         RemoveEqStagesLocked();
         RemoveDuckBusesLocked();
+        DropDryRoutesLocked();
         RemoveInputChainsLocked();
         RemoveMixChainsLocked();
         _chainStructures.Clear();
