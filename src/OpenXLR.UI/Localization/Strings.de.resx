@@ -4127,6 +4127,9 @@ Aus dem Tray holst du den Mixer über das OpenXLR-Symbol oder dein App-Menü zur
   <data name="AudioClockAutomatic" xml:space="preserve">
     <value>Automatisch</value>
   </data>
+  <data name="AudioClockAutomaticDriver" xml:space="preserve">
+    <value>Automatisch ({0})</value>
+  </data>
   <data name="AudioClockInput" xml:space="preserve">
     <value>{0} (Eingang)</value>
   </data>

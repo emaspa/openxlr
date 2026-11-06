@@ -4749,7 +4749,8 @@ clock, pick it in the UI:
    open Options → Audio → AUDIO and pick the interface's input under
    **Audio clock**. The list holds the mixer's inputs and outputs that run
    in its graph and the driven unit's input. **Automatic**, the default,
-   leaves the choice to the packaged rules.
+   leaves the choice to the packaged rules and shows in brackets the
+   device that is the clock now.
 2. Restart the audio. The warning's button asks, and **Restart audio now**
    restarts WirePlumber at once. **Later** saves the choice, and Options →
    Audio → AUDIO then says "Applies after the audio restarts" with a

@@ -4463,6 +4463,9 @@ When the window is in the tray, open it again from the OpenXLR icon or your app 
   <data name="AudioClockAutomatic" xml:space="preserve">
     <value>Automatic</value>
   </data>
+  <data name="AudioClockAutomaticDriver" xml:space="preserve">
+    <value>Automatic ({0})</value>
+  </data>
   <data name="AudioClockInput" xml:space="preserve">
     <value>{0} (input)</value>
   </data>
