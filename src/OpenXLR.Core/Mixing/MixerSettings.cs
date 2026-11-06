@@ -209,6 +209,13 @@ public sealed record MixerSettings
     [System.Text.Json.Serialization.JsonPropertyName("dryMonitors")]
     public Dictionary<string, bool> MonitorDry { get; init; } = [];
 
+    /// <summary>
+    /// The output EQ of each mix by mix id, in the microphone EQ's shape. A
+    /// mix absent here has the defaults with the EQ off; an id that is no
+    /// mix of the layout is dropped when the file is read.
+    /// </summary>
+    public Dictionary<string, MicEq> MixEq { get; init; } = [];
+
     /// <summary>The ducking setup and processing choice. Absent takes the layout's default targets, switched off.</summary>
     public DuckingSetup? Ducking { get; init; }
 

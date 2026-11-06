@@ -387,8 +387,8 @@ public sealed partial class MixerService : IHostedService, IDisposable
 
     /// <summary>
     /// What hardware mixing turns off while it runs, as the command's error:
-    /// a Sound Check session and Hear myself, an audition, an insert chain on
-    /// a mix a jack plays (the unit builds it), and a channel or binding that
+    /// a Sound Check session and Hear myself, an audition, an insert chain or
+    /// an EQ change on a mix the unit builds, and a channel or binding that
     /// needs a USB pair when none is left. Null otherwise.
     /// </summary>
     private string? RefusedInHardwareMixing(Command cmd)
@@ -407,6 +407,8 @@ public sealed partial class MixerService : IHostedService, IDisposable
             "auditionClip" => Disabled("audition"),
             "setInserts" when cmd.Channel is { } key && key.StartsWith("mix:", StringComparison.Ordinal) && cmd.Inserts is { Count: > 0 }
                 => Disabled($"inserts:{key}"),
+            // The unit builds the mix, so its EQ is held off and kept as it was.
+            "setEq" or "setEqEnabled" or "setEqBand" or "loadEqProfile" when cmd.Mix is { } mix => Disabled(Mixer.MixEqDisabledKey(mix)),
             "createChannel" or "createCaptureChannel" => Budget(),
             // A strip bound to another source streams on a pair of its own.
             "setInputBinding" when cmd.Source is not null && cmd.Channel is { } strip && !plan.Pairs.ContainsKey(strip) => Budget(),
@@ -1659,6 +1661,17 @@ public sealed partial class MixerService : IHostedService, IDisposable
                         return "setInsertParam: need 'channel', 'insertId', and 'symbol'";
                     _mixer.SetInsertParam(cmd.Channel, cmd.InsertId, cmd.Symbol, cmd.Value.GetDouble());
                     break;
+                // A mix's EQ (the command names a mix) moves no microphone, so
+                // the Pro's direct path stays as it is.
+                case "setEq" when cmd.Mix is { } mix:
+                    _mixer.SetMixEq(mix, MicEq.Read(cmd.Eq, out _)!);   // checked by CommandValidation
+                    break;
+                case "setEqEnabled" when cmd.Mix is { } mix:
+                    _mixer.SetMixEqEnabled(mix, cmd.Value.GetBoolean());
+                    break;
+                case "setEqBand" when cmd.Mix is { } mix:
+                    _mixer.SetMixEqBand(mix, cmd.Band!.Value, new EqBandChange(cmd.Enabled, cmd.Type, cmd.Frequency, cmd.Gain, cmd.Q));
+                    break;
                 case "setEq":
                     _mixer.SetEq(cmd.Channel!, MicEq.Read(cmd.Eq, out _)!);   // checked by CommandValidation
                     SyncOutputSelectors();   // software processing moves the Pro's mic between its hardware path and the send
@@ -1803,13 +1816,15 @@ public sealed partial class MixerService : IHostedService, IDisposable
         }
         if (profile.Bands.Count < limits.MinBands || profile.Bands.Count > limits.MaxBands)
         {
-            error = $"loadEqProfile: {profile.Name} has {profile.Bands.Count} bands, and this microphone's EQ takes {limits.MinBands} to {limits.MaxBands}";
+            string whose = cmd.Mix is null ? "this microphone's EQ" : "this mix's EQ";
+            error = $"loadEqProfile: {profile.Name} has {profile.Bands.Count} bands, and {whose} takes {limits.MinBands} to {limits.MaxBands}";
             return null;
         }
         return new Command
         {
             Cmd = "setEq",
             Channel = cmd.Channel,
+            Mix = cmd.Mix,
             Eq = System.Text.Json.JsonSerializer.SerializeToElement(new
             {
                 enabled = true,

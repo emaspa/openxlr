@@ -655,6 +655,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     private void RemoveMixChainsLocked()
     {
         RemoveMixDelaysLocked();
+        RemoveMixEqStagesLocked();
         foreach (PortLink link in _mixTaps.Values) _pw.Unlink(link);
         foreach (PortLink link in _mixPostLinks.Values) _pw.Unlink(link);
         _mixTaps.Clear();
@@ -701,6 +702,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             soundCheckChanged |= TrackVoiceReportsLocked();
             soundCheckChanged |= HealDuckBusesLocked();
             soundCheckChanged |= SyncDryRoutesLocked();
+            soundCheckChanged |= HealMixEqStagesLocked();
             if (_chains.Count == 0 && _mixDelays.Count == 0 && _latencyReports.Count == 0)
                 return EnsureMixRoutesLocked() || soundCheckChanged;
             bool changed = false;
@@ -752,6 +754,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             string key = MixKey(mix);
             if (_chains.TryGetValue(key, out FilterHandle? chain))
                 changed |= EnsureMixLinkLocked(_mixTaps, key, mix.SinkName, "monitor", chain.SinkName);
+            changed |= EnsureMixEqLinkLocked(mix);
             if (mix.Kind == MixKind.VirtualMic)
             {
                 (string node, string prefix) = MixTapLocked(mix);
@@ -1027,11 +1030,13 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
 
     /// <summary>
     /// Where a mix's consumers should read from: its latency delay when it
-    /// has one, else its insert chain when one runs, else its own monitor.
+    /// has one, else its EQ stage when one runs, else its insert chain when
+    /// one runs, else its own monitor.
     /// </summary>
     private (string Node, string Prefix) MixTapLocked(MixDefinition mix)
         => _mixDelays.TryGetValue(mix.Id, out FilterHandle? delay) ? (delay.SourceName, "capture")
-        : _chains.TryGetValue(MixKey(mix), out FilterHandle? chain) ? (chain.SourceName, "capture") : (mix.SinkName, "monitor");
+        : _mixEqStages.TryGetValue(mix.Id, out SoftwareEqBackend? eq) ? (eq.Node, "capture")
+        : MixEqUpstreamLocked(mix);
 
     /// <summary>
     /// (Re)build one mix's insert chain and re-point everything that reads
@@ -1062,6 +1067,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 _insertErrors[key] = ex.Message;   // the mix keeps flowing without its inserts
             }
         }
+        // The EQ stage stays and takes its input from the new chain, or from
+        // the mix itself without one.
+        WireMixEqInputLocked(mix);
         RewireMixConsumersLocked(mix);
     }
 
@@ -1668,6 +1676,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 Compressor = new Dictionary<string, MicCompressor>(_compressor, StringComparer.Ordinal),
                 Expander = new Dictionary<string, MicExpander>(_expander, StringComparer.Ordinal),
                 MonitorDry = ExportMonitorDryLocked(),
+                MixEq = ExportMixEqLocked(),
                 Ducking = DuckingSetupLocked().Copy(),
                 Appearance = ExportAppearanceLocked(),
             };
@@ -1856,6 +1865,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             RecallCompressorLocked(s.Compressor);
             RecallExpanderLocked(s.Expander);
             RecallMonitorDryLocked(s.MonitorDry);
+            RecallMixEqLocked(s.MixEq);
             _eqProcessing.Clear();
             foreach ((string channel, string processing) in s.EqProcessing)
                 if (processing == MicEqProcessing.Software) _eqProcessing[channel] = processing;
@@ -1867,6 +1877,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             if (chainsChanged || rebuildAll || s.Inserts.Count > 0)
                 ApplyChainsLocked(s.Inserts.Count > 0 ? s.Inserts : null, absentMixesEmpty: false, rebuildAll);
             SyncEqStagesLocked();
+            SyncMixEqStagesLocked();
             UpdateMixLatencyLocked();
             SyncDuckingLocked();
             SyncDryRoutesLocked();
@@ -1898,6 +1909,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 Compressor = SceneCompressorLocked(),
                 Expander = SceneExpanderLocked(),
                 MonitorDry = SceneMonitorDryLocked(),
+                MixEq = SceneMixEqLocked(),
                 CaptureGains = SceneCaptureGainsLocked(),
                 Ducking = DuckingSetupLocked().ToScene(),
             };
@@ -2017,6 +2029,12 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 || s.Expander is not null) SyncEqStagesLocked();
             // The dry monitor switch the same way: a profile without it leaves it alone.
             if (s.MonitorDry is not null) RecallMonitorDryLocked(s.MonitorDry);
+            // The output EQs the same way: a profile saved before them leaves every mix's EQ alone.
+            if (s.MixEq is not null)
+            {
+                RecallMixEqLocked(s.MixEq);
+                SyncMixEqStagesLocked();
+            }
             // A capture input's gain and mute too, written once its source is there.
             RecallCaptureGainsLocked(s.CaptureGains);
             SyncDuckingLocked();
@@ -3560,6 +3578,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                     {
                         Deletable = m.IsEditable && (m.Kind != MixKind.Monitor || monitorCount > 1),
                         MonitorDry = m.Kind == MixKind.Monitor ? _dryMonitors.Contains(m.Id) : null,
+                        Eq = MixEqStateLocked(m.Id),
                     })],
                 Channels = [.. _config.Channels.Select(c => new ChannelStatus(
                     c.Id, ChannelNameLocked(c),

@@ -284,7 +284,10 @@ public sealed partial class DspAudioIntegrationTests
     }
 
     /// <summary>The level of a channel's sink, its left side's RMS in dBFS over a quarter second.</summary>
-    private static double Level(string channel)
+    private static double Level(string channel) => NodeLevel($"OpenXLR_ch_{channel}");
+
+    /// <summary>The level of a sink's monitor, its left side's RMS in dBFS over a quarter second.</summary>
+    private static double NodeLevel(string node)
     {
         ProcessResult result = ProcessRunner.Run("python3", ["-c", """
             import math, os, struct, subprocess, sys, tempfile, time
@@ -310,7 +313,7 @@ public sealed partial class DspAudioIntegrationTests
                 finally:
                     if p.poll() is None: p.kill()
                     p.wait()
-            """, $"OpenXLR_ch_{channel}"], TimeSpan.FromSeconds(10));
+            """, node], TimeSpan.FromSeconds(10));
         Assert.True(result.Ok, result.StdoutText + result.Stderr);
         return double.Parse(result.StdoutText.Trim(), CultureInfo.InvariantCulture);
     }

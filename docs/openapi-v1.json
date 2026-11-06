@@ -590,6 +590,23 @@
                     "value": true
                   }
                 },
+                "mixEqProfile": {
+                  "summary": "Put the built-in Footsteps curve on the Stream mix's output EQ and switch it on",
+                  "value": {
+                    "cmd": "loadEqProfile",
+                    "mix": "stream",
+                    "profile": "builtin:footsteps"
+                  }
+                },
+                "mixEqBand": {
+                  "summary": "Change one band of the Stream mix's output EQ, live",
+                  "value": {
+                    "cmd": "setEqBand",
+                    "mix": "stream",
+                    "band": 1,
+                    "gain": -4
+                  }
+                },
                 "loadEqProfile": {
                   "summary": "Put the built-in Warm EQ profile on a microphone and switch its EQ on",
                   "value": {

@@ -83,6 +83,13 @@ public sealed record MixerScene
     public Dictionary<string, bool>? MonitorDry { get; init; }
 
     /// <summary>
+    /// Each mix's output EQ, by mix id; absent in profiles saved before the
+    /// output EQ, which leave every mix's EQ as it is. A recall replaces the
+    /// EQ of each mix of the layout named here.
+    /// </summary>
+    public Dictionary<string, MicEq>? MixEq { get; init; }
+
+    /// <summary>
     /// The gain and source mute of each capture input that has a gain of its
     /// own, by channel; absent in older profiles, which leave both as they
     /// are. A recall writes each channel named here once its source is

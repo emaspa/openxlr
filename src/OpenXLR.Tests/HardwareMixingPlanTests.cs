@@ -309,7 +309,7 @@ public sealed class HardwareMixingPlanTests
         Assert.Equal(
         [
             "ducking:channel:aux", "ducking:channel:line", "ducking:channel:xlr2", "ducking:key",
-            "inserts:mix:monitor", "inserts:mix:monitor2", "latencyCompensation",
+            "eq:mix:monitor", "eq:mix:monitor2", "inserts:mix:monitor", "inserts:mix:monitor2", "latencyCompensation",
         ], disabled.Keys.Order(StringComparer.Ordinal));
         Assert.All(disabled.Values, sentence => Assert.DoesNotContain("\u2014", sentence));
         Assert.Contains("Monitor A", disabled["inserts:mix:monitor"]);

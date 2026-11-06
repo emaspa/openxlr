@@ -67,9 +67,9 @@ public sealed class EqProfileStoreTests : IDisposable
         Assert.Equal(EqPresets.All.Select(p => p.Id), state.Profiles.Select(p => p.Id));
         Assert.Equal(EqPresets.All.Select(p => p.Name), state.Profiles.Select(p => p.Name));
         Assert.All(state.Profiles, p => Assert.True(p.Builtin));
-        // Mic setup offers the same table, not a copy of it.
-        Assert.Equal(EqPresets.All.Select(p => p.Key), OpenXLR.UI.MicSetupPresets.All.Select(p => p.Id));
-        foreach ((EqPreset preset, OpenXLR.UI.MicSetupPreset offered) in EqPresets.All.Zip(OpenXLR.UI.MicSetupPresets.All))
+        // Mic setup offers the voice curves of the same table, not a copy of them.
+        Assert.Equal(EqPresets.Voices.Select(p => p.Key), OpenXLR.UI.MicSetupPresets.All.Select(p => p.Id));
+        foreach ((EqPreset preset, OpenXLR.UI.MicSetupPreset offered) in EqPresets.Voices.Zip(OpenXLR.UI.MicSetupPresets.All))
         {
             Assert.Equal(preset.Eq.Bands.Count, offered.Eq.Bands.Count);
             Assert.True(preset.Eq.Enabled);
@@ -297,7 +297,7 @@ public sealed class EqProfileStoreTests : IDisposable
     [InlineData("""{"cmd":"loadEqProfile","channel":"xlr1","profile":"builtin:clear"}""", null)]
     [InlineData("""{"cmd":"loadEqProfile","channel":"guest","profile":"saved:My voice"}""", null)]
     [InlineData("""{"cmd":"loadEqProfile","channel":"aux","profile":"builtin:clear"}""", "loadEqProfile: 'aux' is not a microphone input")]
-    [InlineData("""{"cmd":"loadEqProfile","profile":"builtin:clear"}""", "loadEqProfile: need 'channel'")]
+    [InlineData("""{"cmd":"loadEqProfile","profile":"builtin:clear"}""", "loadEqProfile: need 'channel' or 'mix'")]
     [InlineData("""{"cmd":"loadEqProfile","channel":"xlr1"}""", "loadEqProfile: need 'profile'")]
     [InlineData("""{"cmd":"loadEqProfile","channel":"xlr1","profile":"Clear"}""", "loadEqProfile: 'profile' must start with 'builtin:' or 'saved:'")]
     [InlineData("""{"cmd":"loadEqProfile","channel":"xlr1","profile":"saved:"}""", "loadEqProfile: 'profile' is not a profile id")]

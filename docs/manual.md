@@ -1814,8 +1814,9 @@ clicking **EQ** again brings it to the front.
   then puts the four bands back where they start and leaves the EQ on or
   off.
 - The **Profile** row under them keeps EQs by name. The list starts with
-  the built-in profiles from Mic setup, marked "(built in)". Your saved
-  profiles follow.
+  the built-in profiles, marked "(built in)": the voice curves from Mic
+  setup, then the listening curves made for outputs. Your saved profiles
+  follow. Every profile loads on every EQ, a microphone's or a mix's.
   Picking a profile in the list loads it at once: its bands go on this
   microphone and its EQ switches on. The list shows the profile the EQ
   holds, so it goes back to "Choose a profile" when you change a band, and
@@ -1881,11 +1882,14 @@ every microphone's EQ with the rest of the mixer.
   usually leaves the profile, and then the list goes back to "Choose a
   profile". **Compare** leaves the list as it is. Only a pick in the list
   loads a profile; the list changing by itself sends nothing.
-- The built-in profiles are the presets Mic setup's Shape step offers,
-  with the same bands. Podcast balances the extra bass of close speech,
-  Deep voice reduces boom, and Soft sibilants uses a fixed EQ cut for sharp
-  S sounds. The built-in profiles come first, use the UI language, and
-  cannot be renamed or deleted.
+- The built-in profiles start with the voice curves, the presets Mic
+  setup's Shape step offers, with the same bands. Podcast balances the
+  extra bass of close speech, Deep voice reduces boom, and Soft sibilants
+  uses a fixed EQ cut for sharp S sounds. The listening curves follow:
+  Voices forward, Footsteps, Bass boost and Soft treble, made for what a
+  mix plays (see [output EQ](#output-eq)). Every EQ lists all of them, a
+  microphone's and a mix's alike. The built-in profiles come first, use
+  the UI language, and cannot be renamed or deleted.
   A profile you save may share a built-in one's name.
 - The daemon keeps your profiles in `~/.config/openxlr/eq-profiles.json`,
   readable by you alone, and writes the whole file at once. Up to 64
@@ -1931,6 +1935,58 @@ the mixer and in profiles like XLR 1's. Changing the input's source keeps
 it; deleting the input deletes it. A capture input on a stereo pair has no
 EQ, and one moved from a mono port to a stereo pair keeps its EQ settings
 for when it goes back to a mono port.
+
+<a name="output-eq"></a>
+**Output EQ.** Every mix has an EQ of its own: Monitor A and B and any
+monitor mix you add, Stream, Chat, the other virtual microphones and Aux.
+It shapes what that mix plays, such as your headphones or what your stream
+hears, and leaves the other mixes alone. It is the microphone EQ with the
+same editor, bands, values and profiles, and it always runs on this
+computer, after the mix's plugins and before its outputs.
+
+- Open it with **EQ** under the mix's **FX**: in the matrix column head,
+  and in the mix strips of the other layouts. **EQ** turns green while the
+  EQ runs and red when it cannot run. The editor is named after the mix and
+  has no **Where the EQ runs** switch or **Hardware processing** badge.
+- Everything in the editor works as on a microphone: the graph, the band
+  rows, **EQ on**, **Compare**, **Copy** and **Paste**, **Reset**, **Add
+  band** and the **Profile** row. Copy on a microphone and Paste on a mix
+  works too.
+- The listening curves among the built-in profiles are made for mixes.
+  Each one only cuts, so no part of the mix gets louder:
+
+  | Profile | Band 1 | Band 2 |
+  | --- | --- | --- |
+  | Voices forward | low shelf 380 Hz -4 dB | high shelf 6.2 kHz -2 dB |
+  | Footsteps | low shelf 240 Hz -6 dB | high shelf 7.2 kHz -2 dB |
+  | Bass boost | high shelf 170 Hz -5 dB | |
+  | Soft treble | high shelf 4.5 kHz -4 dB | |
+
+  Every band is on, with the EQ's default Q of 0.70. Voices forward brings
+  voices in a game or a call a little ahead of the rest. Footsteps cuts
+  low rumble so footsteps in a shooter stand out. Bass boost turns down
+  everything above the bass rather than raising the bass. Soft treble
+  tames a harsh or bright top end. The voice curves load on a mix as well.
+- The first switch on adds the EQ to the mix without restarting its
+  plugins. After that every change goes to the running EQ, as on a
+  microphone. Off, it stays in the path bypassed until the mix is next
+  rebuilt. Changing the mix's plugins keeps the EQ running.
+- It is saved with the mixer and in profiles. A profile saved before the
+  output EQ existed leaves every mix's EQ as it is. Deleting a mix deletes
+  its EQ.
+- On the Wave XLR Pro the zero-latency path stays on with an output EQ.
+  Your voice reaches the jacks on that path, inside the interface, so the
+  monitor mix's EQ does not change how you hear yourself there.
+- In [hardware mixing](#hardware-mixing) the Wave XLR Pro builds the mixes
+  its jacks play, and Aux while the USB Aux port is on, so their EQ is off
+  and their **EQ** button is greyed out, with the reason as its tooltip.
+  Your settings are kept and come back when the computer mixes again.
+  Stream, Chat and any mix only other outputs play keep their EQ.
+- It needs the native plugin host the packages include. The terminal
+  mixer's Outputs tab edits it, a Stream Deck key or dial drives it, and
+  scripts use the [control API](api.md#output-eq): the same `setEq`,
+  `setEqEnabled`, `setEqBand` and `loadEqProfile`, with `mix` in place of
+  `channel`.
 
 <a name="where-the-eq-runs"></a>
 **Where the EQ runs.** A Wave XLR MK.2 or XLR Dock MK.2 on firmware 1.0.15
@@ -3127,7 +3183,8 @@ MONITOR hear it (or what kind of mix it is when none does), a thin line in
 the mix's colour when you gave it one in the layout editor, and its mute,
 master level and **FX**, which opens the mix's plugin chain. **FX** is
 green while the chain is processing and red when its plugins are all
-bypassed or failed; an empty chain keeps the plain button. While you move
+bypassed or failed; an empty chain keeps the plain button. Under **FX**,
+**EQ** opens the mix's [output EQ](#output-eq). While you move
 a column's master, and for a second after, its volume shows at the right
 end of the name line, opposite the mix's name.
 
@@ -3908,6 +3965,7 @@ profiles work as before. What changes on the mixes the unit builds:
 | Balance | Applications sit 7.9 dB under the microphones at equal faders, as they do under Wave Link. |
 | Noise removal, the voice changer, a software EQ and plugins on a microphone | Heard on the unit's mixes too: the processed voice plays back to the unit on a free USB pair, a few milliseconds later than the raw microphone, as it reaches your headset today. With no pair free, the unit's mixes get the microphone as it comes in, without them, and the UI says so. Stream and Chat always get them. |
 | Plugins on a mix the unit builds | Not run there, and no plugin can be added. |
+| The [output EQ](#output-eq) of a mix the unit builds | Off, with its **EQ** button greyed. Your settings are kept and come back with software mixing. |
 | Ducking on a mix the unit builds | Runs on the unit for each chosen channel, with XLR 1 as the key. The unit never lowers its own inputs. |
 | Latency compensation | Leaves out the mixes the unit builds. |
 | Mic setup | Works. The take and Hear myself play back on the microphone's own free USB pair. With none free, Mic setup is refused for that microphone and says why. |
@@ -4028,6 +4086,13 @@ discards its unsent EQ turns; cycling an unchanged stack keeps its last
 turn. EQ changes use the existing microphone EQ and its normal mixer and
 profile persistence.
 
+Each mix's [output EQ](#output-eq) has an **Output EQ** group with the same
+keys and dials, without noise removal. Its targets put `mix:` before the
+mix's id: `eq:mix:<mix>`, `eqband:mix:<mix>:<band>`, and `eqtype:`,
+`eqfreq:`, `eqgain:` or `eqq:` followed by `mix:`, the mix and the band.
+While [hardware mixing](#hardware-mixing) holds a mix's EQ off, its keys
+and dials send nothing and its dials say so.
+
 <a name="voice-keys"></a>
 Where the daemon reports the [voice changer](#voice-changer) for a
 microphone, the Toggle action has a **Voice changer** group for it with a
@@ -4041,8 +4106,9 @@ cannot switch a voice on without the native plugin host. The saved target
 is `voice:<channel>:<voice>`, with the voice's name as the API spells it.
 
 <a name="eq-profile-keys"></a>
-Each microphone with an EQ also has a **Load EQ profile** group in the
-Toggle action's settings, with a key per [EQ profile](#eq-profiles). The
+Each microphone with an EQ, and each mix, also has a **Load EQ profile**
+group in the Toggle action's settings, with a key per
+[EQ profile](#eq-profiles). The
 built-in ones come first, marked "(built in)", then the saved ones. A press
 puts the profile's bands on that microphone and switches its EQ on, after
 any EQ dial turn still waiting. The key shows an EQ curve and names the
@@ -4051,7 +4117,8 @@ label. It lights while the microphone's EQ is on and holds the profile's
 bands, and goes dark when a band moves, from the UI or a dial. A profile
 with a band count the microphone's EQ does not take, or one deleted
 since, only flashes an alert. The saved target is
-`eqprofile:<channel>:<profile>`, with the profile's id from the API:
+`eqprofile:<channel>:<profile>`, or `eqprofile:mix:<mix>:<profile>` for a
+mix, with the profile's id from the API:
 `builtin:clear`, or `saved:` and the name. A saved profile is found by
 its name, so saving it again under the same name keeps the key; after a
 rename, pick the new name in the key's settings.
