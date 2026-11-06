@@ -282,6 +282,7 @@ async function startCapture(id, site, active = null) {
   const channel = state.channels.find(channel => channel.id === selected.channelId);
   if (!channel) throw new Error(t('chooseChannelFirst'));
   if (starts.has(id)) throw new Error(t('alreadyStarting'));
+  if (captures.get(id)?.capturing) return null;
   // The popup's tab lookup is part of the activation and must be cancellable.
   const pending = { site, channel: channel.id, cancelled: false };
   starts.set(id, pending);
@@ -353,6 +354,8 @@ async function activateRequest(message) {
     const shown = await chrome.tabs.get(id);
     if (!current()) return;
     if (!shown?.active || shown.incognito || siteOf(shown.url) !== request.site) throw new Error(t('changedWhileStarting'));
+    // The popup may have picked up this request while Chrome was focusing the tab.
+    if (starts.has(id)) return;
     await startCapture(id, request.site, shown);
   } catch (error) {
     if (!current()) return;

@@ -284,6 +284,34 @@ test('a duplicate pending activation does not request a second capture token', {
   assert.deepEqual(f.tokens, [1]);
 });
 
+test('a second popup press does not restart a tab that is already routed', async () => {
+  const f = await readyFixture();
+  assert.equal((await f.request('start', { id: 1 })).error, undefined);
+  const capture = f.active.get(1);
+  const before = f.calls.length;
+  assert.equal((await f.request('start', { id: 1 })).error, undefined);
+  assert.deepEqual(f.tokens, [1]);
+  assert.equal(f.calls.length, before);
+  assert.equal(f.active.get(1), capture);
+});
+
+test('a popup taking over a native activation keeps the request until capture begins', { timeout: 2000 }, async () => {
+  const f = await readyFixture();
+  f.tabGate = deferred();
+  f.devicesGate = deferred();
+  const native = f.native({ type: 'activate', tabId: 1, site: 'https://site1.example' });
+  await tick();
+  const popup = f.request('start', { id: 1 });
+  await tick();
+  f.tabGate.resolve();
+  await native;
+  assert.deepEqual(Array.from((await f.request('snapshot')).value.requestedTabs), [1]);
+  f.devicesGate.resolve();
+  assert.equal((await popup).error, undefined);
+  assert.deepEqual(f.tokens, [1]);
+  assert.equal((await f.request('snapshot')).value.requestedTabs.length, 0);
+});
+
 test('stop during output discovery cancels acquisition and permits a clean retry', { timeout: 2000 }, async () => {
   const f = await readyFixture(); f.devicesGate = deferred();
   const start = f.request('start', { id: 1 }); await tick();

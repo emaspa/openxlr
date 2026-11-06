@@ -200,8 +200,9 @@ release just that tab.
 **Stop all routing** releases all tab captures and the offscreen audio
 document. It also cancels pending activations, including a popup activation
 still waiting for the browser to identify the current tab. If a tab moves to
-a different website, reopen the popup on that site to activate it. Website
-channel defaults stay saved. Each tab needs explicit activation to start again.
+a different website, reopen the popup on that site to activate it. A second
+activation leaves a running capture in place. Website channel defaults stay
+saved. Each tab needs explicit activation to start again after a stop.
 
 Control requests already waiting when the daemon connection is lost are
 discarded, rather than replayed after reconnection. An old error cannot
