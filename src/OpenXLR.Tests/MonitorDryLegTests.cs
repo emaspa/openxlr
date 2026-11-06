@@ -5,10 +5,10 @@ namespace OpenXLR.Tests;
 
 /// <summary>
 /// The order a dry monitor send is written in, against a fake pactl: the
-/// channel's own leg into a monitor mix closes before the dry leg opens, the
-/// dry leg takes the send's level and mute, the other mixes keep their own
-/// legs, and taking the route down hands the monitor send back to the
-/// processed path.
+/// channel's own leg into a dry monitor mix closes before the dry leg opens,
+/// the dry leg takes the send's level and mute, the other mixes, a monitor
+/// mix that is not dry among them, keep their own legs, and taking the route
+/// down hands the monitor send back to the processed path.
 /// </summary>
 [Collection("xdg-config")]
 public sealed class MonitorDryLegTests : IDisposable
@@ -17,31 +17,33 @@ public sealed class MonitorDryLegTests : IDisposable
     private readonly string? _path = Environment.GetEnvironmentVariable("PATH");
     private readonly Mixer _mixer;
 
-    // xlr1 into monitor and stream (legs 10 and 11), and its dry leg into monitor (30).
+    // xlr1 into monitor, stream and monitor2 (legs 10, 11 and 12), and its dry
+    // legs into monitor (30) and monitor2 (31). Monitor is dry, monitor2 is not.
     public MonitorDryLegTests()
     {
         ExecutableScript.Write(Path.Combine(_dir, "pactl"), """
             dir=${0%/*}
             echo "$*" >> "$dir/writes"
             case "$*" in
-                'list sinks short') printf '1\tOpenXLR_mix_monitor\n2\tOpenXLR_mix_stream\n' ;;
+                'list sinks short') printf '1\tOpenXLR_mix_monitor\n2\tOpenXLR_mix_stream\n3\tOpenXLR_mix_monitor2\n' ;;
                 'list sink-inputs') /bin/cat "$dir/legs" ;;
             esac
             """);
         ExecutableScript.Write(Path.Combine(_dir, "pw-dump"), "echo '[]'");
         ExecutableScript.Write(Path.Combine(_dir, "pw-link"), "echo \"pw-link $*\" >> \"${0%/*}/writes\"");
         File.WriteAllText(Path.Combine(_dir, "legs"),
-            "Sink Input #10\nOwner Module: 1\nSink: 1\nSink Input #11\nOwner Module: 1\nSink: 2\nSink Input #30\nOwner Module: 3\nSink: 1\n");
+            "Sink Input #10\nOwner Module: 1\nSink: 1\nSink Input #11\nOwner Module: 1\nSink: 2\nSink Input #12\nOwner Module: 1\nSink: 3\n"
+            + "Sink Input #30\nOwner Module: 3\nSink: 1\nSink Input #31\nOwner Module: 3\nSink: 3\n");
         Environment.SetEnvironmentVariable("PATH", _dir);
         _mixer = new Mixer(new PipeWireAdapter());
         Set("_built", true);
         Set("_config", new MixerConfig
         {
             Channels = [new("xlr1", "Mic 1") { InputPair = 0 }],
-            Mixes = [new("monitor", "Monitor", MixKind.Monitor), new("stream", "Stream", MixKind.VirtualMic)],
+            Mixes = [new("monitor", "Monitor", MixKind.Monitor), new("stream", "Stream", MixKind.VirtualMic), new("monitor2", "Monitor B", MixKind.Monitor)],
         });
         Field<Dictionary<string, uint>>("_combineModules")["xlr1"] = 1;
-        foreach ((string mix, int leg) in new[] { ("monitor", 10), ("stream", 11) })
+        foreach ((string mix, int leg) in new[] { ("monitor", 10), ("stream", 11), ("monitor2", 12) })
         {
             string cell = "xlr1|" + mix;
             Field<HashSet<string>>("_cells").Add(cell);
@@ -56,7 +58,9 @@ public sealed class MonitorDryLegTests : IDisposable
         routeType.GetProperty("Feed")!.SetValue(route, new PortLink([("Wave_XLR:capture_AUX0", "OpenXLR_ch_xlr1.dry:playback_FL")]));
         Field<System.Collections.IDictionary>("_dryRoutes")["xlr1"] = route;
         Field<Dictionary<string, int>>("_dryLegIndex")["xlr1|monitor"] = 30;
-        Field<HashSet<string>>("_monitorDry").Add("xlr1");
+        Field<Dictionary<string, int>>("_dryLegIndex")["xlr1|monitor2"] = 31;
+        Field<HashSet<string>>("_dryMonitors").Add("monitor");
+        Field<HashSet<string>>("_dryApplied").Add("monitor");
         File.WriteAllText(Path.Combine(_dir, "writes"), "");
     }
 
@@ -83,6 +87,7 @@ public sealed class MonitorDryLegTests : IDisposable
         // The dry leg carries the send level the channel's own leg would have.
         Assert.Contains($"set-sink-input-volume 30 {PipeWireAdapter.SinkInputPercent(Mixer.SendGain(.8, 1, 1))}%", writes);
         Assert.DoesNotContain(writes, w => w.Contains(" 11 ", StringComparison.Ordinal));
+        Assert.DoesNotContain(writes, w => w.Contains(" 31 0", StringComparison.Ordinal));
 
         // The channel volume and a mute reach the dry leg as they would the send.
         _mixer.SetChannelVolume("xlr1", .5);
@@ -98,6 +103,26 @@ public sealed class MonitorDryLegTests : IDisposable
         string[] writes = Writes();
         Assert.Contains("set-sink-input-mute 11 0", writes);
         Assert.DoesNotContain(writes, w => w.Contains(" 30 ", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void AMonitorMixThatIsNotDryKeepsTheProcessedSendAndItsDryLegClosed()
+    {
+        _mixer.SetChannelMuted("xlr1", "monitor2", false);
+        string[] writes = Writes();
+        int closed = Array.IndexOf(writes, "set-sink-input-mute 31 1");
+        int opened = Array.IndexOf(writes, "set-sink-input-mute 12 0");
+        Assert.True(closed >= 0 && opened > closed, string.Join(" | ", writes));
+        Assert.DoesNotContain("set-sink-input-mute 31 0", writes);
+        Assert.DoesNotContain(writes, w => w.Contains(" 10 ", StringComparison.Ordinal) || w.Contains(" 30 ", StringComparison.Ordinal));
+
+        // Once Monitor B is dry too, its dry leg opens after its own leg closed.
+        Field<HashSet<string>>("_dryMonitors").Add("monitor2");
+        _mixer.SetLevel("xlr1", "monitor2", .7);
+        writes = Writes();
+        closed = Array.IndexOf(writes, "set-sink-input-mute 12 1");
+        opened = Array.IndexOf(writes, "set-sink-input-mute 31 0");
+        Assert.True(closed >= 0 && opened > closed, string.Join(" | ", writes));
     }
 
     [Theory]
@@ -138,7 +163,7 @@ public sealed class MonitorDryLegTests : IDisposable
     {
         _mixer.SetChannelMuted("xlr1", "monitor", false);
         Writes();
-        _mixer.SetMonitorDry("xlr1", false);
+        _mixer.SetMonitorDry("monitor", false);
         string[] writes = Writes();
         int unlinked = Array.FindIndex(writes, w => w.StartsWith("pw-link -d", StringComparison.Ordinal));
         int opened = Array.IndexOf(writes, "set-sink-input-mute 10 0");

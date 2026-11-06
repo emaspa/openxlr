@@ -584,8 +584,8 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setDynamicsProcessing", ["channel"] = channel, ["value"] = value });
 
     /// <summary>Hear a microphone in the monitor mixes before its effects, or through them again.</summary>
-    public Task SetMonitorDryAsync(string channel, bool value)
-        => SendAsync(new Dictionary<string, object> { ["cmd"] = "setMonitorDry", ["channel"] = channel, ["value"] = value });
+    public Task SetMonitorDryAsync(string mix, bool value)
+        => SendAsync(new Dictionary<string, object> { ["cmd"] = "setMonitorDry", ["mix"] = mix, ["value"] = value });
 
     /// <summary>Part of a microphone's voice changer: the fields given change, the others keep their values.</summary>
     public Task SetVoiceChangerAsync(string channel, bool? enabled = null, string? voice = null, double? pitch = null, double? formant = null)

@@ -705,15 +705,14 @@ public static class CommandValidation
             : null;
 
     /// <summary>
-    /// <c>setMonitorDry</c>: a microphone channel (one that carries the EQ)
-    /// and a boolean <c>value</c>. It needs no native helper: the dry route
-    /// is a combine and a port link.
+    /// <c>setMonitorDry</c>: a monitor mix and a boolean <c>value</c>. It
+    /// needs no native helper: each dry route is a combine and a port link.
     /// </summary>
     internal static string? CheckMonitorDry(Command cmd, ILayoutInfo layout)
     {
-        if (cmd.Channel is null) return "setMonitorDry: need 'channel'";
-        if (TooLong(cmd.Channel, 36) || !layout.IsMicrophoneChannel(cmd.Channel))
-            return $"setMonitorDry: '{Short(cmd.Channel)}' is not a microphone input";
+        if (cmd.Mix is null) return "setMonitorDry: need 'mix'";
+        if (TooLong(cmd.Mix, 36) || !layout.IsMonitorMix(cmd.Mix))
+            return $"setMonitorDry: '{Short(cmd.Mix)}' is not a monitor mix";
         return cmd.Value.ValueKind is JsonValueKind.True or JsonValueKind.False ? null : "setMonitorDry: value must be a boolean";
     }
 

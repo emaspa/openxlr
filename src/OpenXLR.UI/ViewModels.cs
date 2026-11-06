@@ -1542,8 +1542,6 @@ public sealed partial class MainViewModel : ViewModelBase
                     vm.ApplyEq(c["eq"], mixer["eqLimits"]);
                     vm.ApplyNoise(c["noise"]);
                     vm.ApplyDynamics(c["compressor"], c["expander"]);
-                    // XLR 1 and XLR 2 keep their chains on the main model.
-                    (vm.Id switch { "xlr1" => Inserts, "xlr2" => Inserts2, _ => vm.Inserts })?.ApplyMonitorDry(c["monitorDry"]);
                     vm.Inserts?.Apply(mixer["inserts"]?[vm.Id]);
                     vm.Inserts?.MicSetup.Apply(mixer["soundCheck"]);
                     vm.Inserts?.EnsurePluginsLoaded();
@@ -1877,8 +1875,37 @@ public sealed class MixViewModel : ViewModelBase, IHasId
             Muted = (n["muted"]?.GetValue<bool>() ?? false) || IsMonitor && monitorMuted;
             if (n["name"]?.GetValue<string>() is { Length: > 0 } name) Name = name;
             HardwareSection = n["hardwareSection"] is JsonValue section && section.TryGetValue(out int start) ? start : null;
+            bool? dry = n["monitorDry"] is JsonValue d && d.TryGetValue(out bool on) ? on : null;
+            if (dry != _monitorDry)
+            {
+                bool had = _monitorDry is not null;
+                _monitorDry = dry;
+                Raise(nameof(MonitorDry));
+                if (had != dry is not null) Raise(nameof(HasMonitorDry));
+            }
         }
         finally { _applying = false; }
+    }
+
+    private bool? _monitorDry;
+    /// <summary>The daemon reports the dry switch on this mix: a monitor mix, from a daemon that has it.</summary>
+    public bool HasMonitorDry => _monitorDry is not null;
+
+    /// <summary>
+    /// The mix hears the microphones before their effects. A change from the
+    /// matrix goes to the daemon as <c>setMonitorDry</c>; the next state push
+    /// confirms it.
+    /// </summary>
+    public bool MonitorDry
+    {
+        get => _monitorDry ?? false;
+        set
+        {
+            if (_monitorDry is null || _monitorDry == value) return;
+            _monitorDry = value;
+            Raise();
+            if (!_applying && !Detached) _ = _client.SetMonitorDryAsync(Id, value);
+        }
     }
 
     private int? _hardwareSection;

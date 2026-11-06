@@ -583,10 +583,10 @@
                   }
                 },
                 "monitorDry": {
-                  "summary": "Hear a microphone in the monitor mixes before its effects, while the other mixes keep the processed voice",
+                  "summary": "Have Monitor A hear the microphones before their effects, while the other mixes keep the processed voice",
                   "value": {
                     "cmd": "setMonitorDry",
-                    "channel": "xlr1",
+                    "mix": "monitor",
                     "value": true
                   }
                 },

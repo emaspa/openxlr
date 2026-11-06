@@ -3,18 +3,21 @@ using System.Text;
 namespace OpenXLR.Core.Mixing;
 
 /// <summary>
-/// A microphone heard dry in the monitor mixes: the monitor sends take the
+/// A monitor mix that hears the microphones dry: its sends take each
 /// microphone before its software effects, so the owner hears their own
-/// voice early, while every other mix keeps the processed voice.
+/// voice early, while every other mix, other monitor mixes included, keeps
+/// the processed voice.
 ///
 ///   source -> [OpenXLR_eq_&lt;id&gt;] -> [chain] -> OpenXLR_ch_&lt;id&gt; -> every mix
 ///   source -> OpenXLR_ch_&lt;id&gt;.dry -> the monitor mixes only
 ///
 /// The dry route is a hidden combine of its own, linked from the same
 /// capture port the channel's route starts at and beside it, so it touches
-/// no stage, chain or plugin host. Its pattern names the monitor mixes by
-/// their exact node names, so it never grows a send into a mix that is
-/// recorded or streamed. While it carries a monitor mix, the channel's own
+/// no stage, chain or plugin host. Its pattern names every monitor mix by
+/// its exact node name, so it never grows a send into a mix that is
+/// recorded or streamed; a microphone has the route while any monitor mix
+/// is dry, and its legs into the other monitor mixes stay closed. While it
+/// carries a dry monitor mix, the channel's own
 /// send into that mix (and its duck bus leg) is held closed and the dry send
 /// takes the send level, the channel volume and the mutes instead; the mix
 /// master is the monitor sink's own volume, so it applies to both alike.
@@ -38,9 +41,11 @@ public sealed partial class Mixer
         public string? Device { get; set; }
     }
 
-    // The microphones whose monitor sends are dry (saved, and in profiles),
-    // the running routes, and each dry leg's sink-input index by cell.
-    private readonly HashSet<string> _monitorDry = new(StringComparer.Ordinal);
+    // The monitor mixes that hear the microphones dry (saved, and in
+    // profiles), the set the cells were last pushed for, the running routes
+    // by microphone, and each dry leg's sink-input index by cell.
+    private readonly HashSet<string> _dryMonitors = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _dryApplied = new(StringComparer.Ordinal);
     private readonly Dictionary<string, DryRoute> _dryRoutes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _dryLegIndex = new(StringComparer.Ordinal);
     // When a route last failed to load, so a sweep does not try it every second.
@@ -48,68 +53,88 @@ public sealed partial class Mixer
     private static readonly TimeSpan DryRetry = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan DryLegWait = TimeSpan.FromSeconds(1);
 
-    /// <summary>Whether the monitor mixes hear a microphone dry.</summary>
-    public bool MonitorDry(string channel) { lock (_gate) return _monitorDry.Contains(channel); }
+    /// <summary>Whether a monitor mix hears the microphones dry.</summary>
+    public bool MonitorDry(string mix) { lock (_gate) return _dryMonitors.Contains(mix); }
 
     /// <summary>
-    /// Hear a microphone dry in the monitor mixes, or through its effects
-    /// again. Only that microphone's monitor sends move; every other mix,
-    /// stage and plugin host stays as it is.
+    /// Have a monitor mix hear every microphone dry, or through its effects
+    /// again. Only the microphones' sends into that mix move; every other
+    /// mix, stage and plugin host stays as it is.
     /// </summary>
-    public void SetMonitorDry(string channel, bool on)
+    public void SetMonitorDry(string mix, bool on)
     {
         lock (_gate)
         {
-            RequireMicrophoneLocked(channel);
-            if (on ? !_monitorDry.Add(channel) : !_monitorDry.Remove(channel)) return;
-            _dryFailedAt.Remove(channel);
+            if (MonitorMixLocked(mix) is null) throw new ArgumentException($"'{mix}' is not a monitor mix", nameof(mix));
+            if (on ? !_dryMonitors.Add(mix) : !_dryMonitors.Remove(mix)) return;
+            _dryFailedAt.Clear();
             SyncDryRoutesLocked();
         }
     }
 
-    /// <summary>The switch as the settings file keeps it: the microphones that are on.</summary>
+    /// <summary>The monitor mixes that are dry now, in layout order, for the hardware plan.</summary>
+    private HashSet<string> DryMonitorsLocked()
+        => _config.Mixes.Where(m => m.Kind == MixKind.Monitor && _dryMonitors.Contains(m.Id)).Select(m => m.Id).ToHashSet(StringComparer.Ordinal);
+
+    /// <summary>The switches as the settings file keeps them: the monitor mixes that are on.</summary>
     private Dictionary<string, bool> ExportMonitorDryLocked()
-        => _monitorDry.Order(StringComparer.Ordinal).ToDictionary(c => c, _ => true, StringComparer.Ordinal);
+        => _dryMonitors.Order(StringComparer.Ordinal).ToDictionary(m => m, _ => true, StringComparer.Ordinal);
 
-    /// <summary>Every microphone's switch, for a profile: a recall then names every microphone.</summary>
+    /// <summary>Every monitor mix's switch, for a profile: a recall then names every monitor mix.</summary>
     private Dictionary<string, bool> SceneMonitorDryLocked()
-        => _config.Channels.Where(CarriesEq).ToDictionary(c => c.Id, c => _monitorDry.Contains(c.Id), StringComparer.Ordinal);
+        => _config.Mixes.Where(m => m.Kind == MixKind.Monitor).ToDictionary(m => m.Id, m => _dryMonitors.Contains(m.Id), StringComparer.Ordinal);
 
+    /// <summary>Take the recalled switches; an id that is not a monitor mix of this layout is ignored.</summary>
     private void RecallMonitorDryLocked(IReadOnlyDictionary<string, bool>? recalled)
     {
-        HashSet<string> next = RecallMonitorDry(_monitorDry, recalled);
-        _monitorDry.Clear();
-        _monitorDry.UnionWith(next);
+        HashSet<string> next = RecallMonitorDry(_dryMonitors, recalled);
+        next.RemoveWhere(m => MonitorMixLocked(m) is null);
+        _dryMonitors.Clear();
+        _dryMonitors.UnionWith(next);
     }
 
     /// <summary>
-    /// The switches after a recall: each channel the recalled data names
-    /// takes its value, every other keeps what it has, so a recall without
-    /// the field (null) changes nothing.
+    /// The switches after a recall: each mix the recalled data names takes
+    /// its value, every other keeps what it has, so a recall without the
+    /// field (null) changes nothing.
     /// </summary>
     internal static HashSet<string> RecallMonitorDry(IReadOnlySet<string> current, IReadOnlyDictionary<string, bool>? recalled)
     {
         var next = new HashSet<string>(current, StringComparer.Ordinal);
-        foreach ((string channel, bool on) in recalled ?? new Dictionary<string, bool>())
-            if (on) next.Add(channel);
-            else next.Remove(channel);
+        foreach ((string mix, bool on) in recalled ?? new Dictionary<string, bool>())
+            if (on) next.Add(mix);
+            else next.Remove(mix);
         return next;
     }
 
     /// <summary>
-    /// Whether a microphone should have its dry route now: the switch is on,
-    /// the channel carries the EQ and is present, and Sound Check is not
+    /// Whether a microphone should have its dry route now: a monitor mix is
+    /// dry, the channel carries the EQ and is present, and Sound Check is not
     /// playing its take through it, which the monitor must hear processed.
     /// </summary>
     private bool DryWantedLocked(ChannelDefinition channel)
-        => _built && _monitorDry.Contains(channel.Id) && CarriesEq(channel) && ChannelPresentLocked(channel)
+        => _built && _dryMonitors.Any(m => MonitorMixLocked(m) is not null) && CarriesEq(channel) && ChannelPresentLocked(channel)
             && !(_soundCheck is not null && _soundCheckChannel == channel.Id);
 
     /// <summary>Whether the dry route carries this channel's send into this mix, and the channel's own send is held closed for it.</summary>
     private bool DryCarriesLocked(string channel, string mix)
-        => _dryRoutes.TryGetValue(channel, out DryRoute? route) && route.Ready && route.Feed is not null
+        => _dryMonitors.Contains(mix) && _dryRoutes.TryGetValue(channel, out DryRoute? route) && route.Ready && route.Feed is not null
             && _dryLegIndex.ContainsKey(Cell(channel, mix)) && _cells.Contains(Cell(channel, mix))
             && MonitorMixLocked(mix) is not null;
+
+    /// <summary>
+    /// Whether a microphone is heard dry wherever a monitor feed plays: every
+    /// mix of the feed is a dry monitor mix, so its raw input may stand in
+    /// for the processed send there. A null feed means every monitor mix.
+    /// </summary>
+    private bool DryHeardInLocked(string channel, string? feed)
+    {
+        if (!CarriesEqLocked(channel)) return false;
+        IReadOnlyList<string> parts = feed is null
+            ? [.. _config.Mixes.Where(m => m.Kind == MixKind.Monitor).Select(m => m.Id)]
+            : MonitorFeed.Parts(feed);
+        return parts.Count > 0 && parts.All(m => MonitorMixLocked(m) is not null && _dryMonitors.Contains(m));
+    }
 
     /// <summary>
     /// What a dry leg should carry: the send as the channel's own leg would
@@ -146,12 +171,25 @@ public sealed partial class Mixer
     /// Bring every dry route in line with the switches, the layout and the
     /// sources: start the routes that are wanted, finish one whose legs were
     /// late, follow each microphone's source, and remove the routes no longer
-    /// wanted or loaded for another set of monitor mixes. True when the graph
-    /// changed.
+    /// wanted or loaded for another set of monitor mixes. A route that stays
+    /// while a monitor mix's switch moved has its sends into that mix pushed
+    /// again. True when the graph changed.
     /// </summary>
     private bool SyncDryRoutesLocked()
     {
         if (!_built) return false;
+        bool changed = SyncDryRoutesCoreLocked();
+        HashSet<string> moved = [.. _dryMonitors.Except(_dryApplied).Concat(_dryApplied.Except(_dryMonitors))];
+        _dryApplied.Clear();
+        _dryApplied.UnionWith(_dryMonitors);
+        foreach (string channel in _dryRoutes.Keys.ToList())
+            foreach (string mix in moved)
+                if (MonitorMixLocked(mix) is not null && _cells.Contains(Cell(channel, mix))) ApplyCellLocked(channel, mix);
+        return changed;
+    }
+
+    private bool SyncDryRoutesCoreLocked()
+    {
         bool changed = false;
         string pattern = DryPattern(_config.Mixes);
         foreach ((string id, DryRoute route) in _dryRoutes.ToList())

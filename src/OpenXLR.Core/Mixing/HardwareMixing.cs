@@ -65,11 +65,15 @@ public sealed record HardwareMixingSetup
     public IReadOnlySet<string> Processed { get; init; } = new HashSet<string>();
 
     /// <summary>
-    /// Unit inputs the monitor mixes hear dry (<c>setMonitorDry</c>): the
-    /// jacks' sections take them from the unit's own input even while they
-    /// are processed, and only the Aux mix's section plays their return pair.
+    /// Unit inputs a dry monitor mix may hear raw: the microphones, less the
+    /// one under Mic setup. A jack whose feed is made only of
+    /// <see cref="DryMixes"/> takes them from the unit's own input even while
+    /// they are processed; every other section plays their return pair.
     /// </summary>
     public IReadOnlySet<string> MonitorDry { get; init; } = new HashSet<string>();
+
+    /// <summary>The monitor mixes that hear the microphones dry (<c>setMonitorDry</c>).</summary>
+    public IReadOnlySet<string> DryMixes { get; init; } = new HashSet<string>();
 
     /// <summary>
     /// Each mix's volume in dB on the desktop's cubic scale, negative infinity
@@ -261,7 +265,7 @@ public static class HardwareMixingPlanner
             Disabled = Disabled(setup, sections.Keys, pairs, returns, cue),
             // A dry input plays raw on the jacks, so it gains what any unit input does.
             EntryOffsetsDb = setup.Jacks.ToDictionary(j => j.Jack,
-                j => EntryOffsetDb(setup, j.Feed, returns.Keys.Where(c => !setup.MonitorDry.Contains(c))), StringComparer.Ordinal),
+                j => EntryOffsetDb(setup, j.Feed, returns.Keys.Where(c => !DryOn(setup, c, j.Feed))), StringComparer.Ordinal),
         };
     }
 
@@ -317,9 +321,9 @@ public static class HardwareMixingPlanner
     /// its processed audio; then the cue, for auditions. Channels come first
     /// and keep their pairs, so a channel added later takes a pair from these
     /// claims, and the claim it takes falls back (the input raw, auditions
-    /// refused) with a note. An input the monitor mixes hear dry needs its
-    /// return only for the Aux mix's section, so it claims none while the
-    /// unit builds no Aux mix.
+    /// refused) with a note. An input every jack hears dry needs its return
+    /// only for the Aux mix's section, so it claims none while the unit
+    /// builds no Aux mix.
     /// </summary>
     internal static (Dictionary<string, int> Returns, int? Cue) Claim(HardwareMixingSetup setup, IReadOnlyDictionary<string, int> pairs)
     {
@@ -332,7 +336,16 @@ public static class HardwareMixingPlanner
 
     /// <summary>Whether a unit input's processed audio has a section to play in: it is processed, and heard processed on the jacks or in the Aux mix.</summary>
     private static bool NeedsReturn(HardwareMixingSetup setup, string channel)
-        => setup.Processed.Contains(channel) && (!setup.MonitorDry.Contains(channel) || AuxMixOf(setup) is not null);
+        => setup.Processed.Contains(channel) && (setup.Jacks.Any(j => !DryOn(setup, channel, j.Feed)) || AuxMixOf(setup) is not null);
+
+    /// <summary>
+    /// Whether a jack's feed hears a unit input raw: the input may be dry and
+    /// every mix the feed plays is a dry monitor mix. A feed that sums a dry
+    /// mix with one that is not hears the processed voice, so the voice is
+    /// never doubled and the effects the other mix keeps stay.
+    /// </summary>
+    internal static bool DryOn(HardwareMixingSetup setup, string channel, string feed)
+        => setup.MonitorDry.Contains(channel) && MonitorFeed.Parts(feed) is { Count: > 0 } parts && parts.All(setup.DryMixes.Contains);
 
     /// <summary>The channel pairs not in <paramref name="taken"/>, in <see cref="ChannelPairs"/> order.</summary>
     internal static IEnumerable<int> FreePairs(IEnumerable<int> taken)
@@ -366,8 +379,8 @@ public static class HardwareMixingPlanner
     /// Aux mix keeps playing). A source no channel carries is out, and so is
     /// Aux In in the Aux mix's section. A unit input with a return pair plays
     /// from that pair, processed, and its own source stays out, so the voice
-    /// is never heard twice; on a jack's section a dry input plays from its
-    /// own source instead, and its pair stays out. The cue pair is in the jacks' sections only, at
+    /// is never heard twice; on a jack's section whose mixes are all dry a
+    /// dry input plays from its own source instead, and its pair stays out. The cue pair is in the jacks' sections only, at
     /// the volume of the feed's mixes, as an audition into those mixes is.
     /// </summary>
     private static HardwareSectionContent Build(HardwareMixingSetup setup, string feed, int section,
@@ -391,7 +404,7 @@ public static class HardwareMixingPlanner
         foreach ((int source, string channel) in setup.UnitSources)
         {
             if (source is < 0 or >= ProMixSections.FirstPair || aux && source == ProMixSections.UsbAux) continue;
-            if (returns.TryGetValue(channel, out int back) && (aux || !setup.MonitorDry.Contains(channel)))
+            if (returns.TryGetValue(channel, out int back) && (aux || !DryOn(setup, channel, feed)))
                 Source(ProMixSections.SourceOfPair(back), channel, 0);
             else Source(source, channel, ProMixSections.CellCeiling / 2.0);
         }
