@@ -1615,7 +1615,6 @@ public sealed class MixerService : IHostedService, IDisposable
                     break;
                 case "setMonitorEqPreset":
                     _saves.RunSaved(() => _mixer.SetMonitorEqPreset(cmd.Mix!, cmd.Value.GetString(), s => s.Save()));
-                    SyncOutputSelectors();
                     Changed?.Invoke();
                     return null;
                 case "setInsertBypass":

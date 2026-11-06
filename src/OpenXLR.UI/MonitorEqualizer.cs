@@ -57,16 +57,24 @@ public sealed partial class InsertsViewModel
         MonitorEqError = _reportedMonitorEqError;
     }
 
+    private void ResetMonitorEq()
+    {
+        MonitorEqBusy = false;
+        ApplyMonitorEq(null);
+    }
+
     private async Task ChooseMonitorEqAsync(MonitorEqOption choice)
     {
+        int epoch = _connectionEpoch;
         MonitorEqBusy = true;
         MonitorEqError = null;
         try
         {
             string? error = await _client.SetMonitorEqPresetAsync(_channel[4..], choice.Id);
+            if (epoch != _connectionEpoch) return;
             Set(ref _selectedMonitorEq, _reportedMonitorEq, nameof(SelectedMonitorEq));
             MonitorEqError = error ?? _reportedMonitorEqError;
         }
-        finally { MonitorEqBusy = false; }
+        finally { if (epoch == _connectionEpoch) MonitorEqBusy = false; }
     }
 }

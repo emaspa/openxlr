@@ -29,7 +29,8 @@ public sealed partial class DspAudioIntegrationTests
         Assert.Equal("fps", Status("monitor2").Preset);
         MixerSettings saved = mixer.ExportSettings();
         mixer.SetMonitorEqPreset("monitor", null, _ => null);
-        Assert.DoesNotContain(MixDelayIntegrationTests.OwnNodes(pw), n => n == "OpenXLR_meq_monitor_out");
+        CaptureChainFixture.Wait(() => !MixDelayIntegrationTests.OwnNodes(pw).Contains("OpenXLR_meq_monitor_out"));
+        Assert.Contains("OpenXLR_meq_monitor2_out", MixDelayIntegrationTests.OwnNodes(pw));
         mixer.ApplySettings(saved);
         Assert.Equal(new MonitorEqStatus("bass-boost", null), Status("monitor"));
         Assert.Equal(new MonitorEqStatus("fps", null), Status("monitor2"));
@@ -118,6 +119,45 @@ public sealed partial class DspAudioIntegrationTests
         Assert.Contains("monitor EQ stopped", state.Mixes.Single(m => m.Id == mix).MonitorEq!.Error);
         Assert.Equal(originalHost, Chain(mix, inserts).Nodes.OrderBy(p => p.Key));
         Assert.True(mixer.SetHardwareMicMonitor(true, whenHeardIn: mix));
+    }
+
+    [DspPipeWireFact]
+    public void ChangingMonitorEqPreservesLinksToAnOutputOnAnotherMix()
+    {
+        var pw = new PipeWireAdapter();
+        using var registry = pw.WatchGraph();
+        using var mixer = new Mixer(pw);
+        const string first = "monitor_eq_test_a", second = "monitor_eq_test_b";
+        pw.CreateNullSink(first, "Test output A");
+        pw.CreateNullSink(second, "Test output B");
+        mixer.Build(new MixerConfig
+        {
+            Mixes = [new("monitor", "A", MixKind.Monitor), new("monitor2", "B", MixKind.Monitor)],
+            Channels = [],
+        });
+        mixer.SetMonitorOutputs([first, second]);
+        Assert.Null(mixer.SetMonitorFeed(second, "monitor2"));
+        int firstId = pw.FindNodeId(first)!.Value, secondId = pw.FindNodeId(second)!.Value;
+
+        string[] LinksTo(int id)
+        {
+            using var dump = Dump();
+            return [.. dump.RootElement.EnumerateArray()
+                .Where(entry => entry.GetProperty("type").GetString() == "PipeWire:Interface:Link"
+                    && entry.GetProperty("info").GetProperty("input-node-id").GetInt32() == id)
+                .Select(entry => entry.GetProperty("info").GetProperty("props").GetProperty("object.serial").ToString())
+                .Order(StringComparer.Ordinal)];
+        }
+
+        string[] previousA = LinksTo(firstId), previousB = LinksTo(secondId);
+        Assert.Equal(2, previousA.Length);
+        Assert.Equal(2, previousB.Length);
+        mixer.SetMonitorEqPreset("monitor", "fps", _ => null);
+        Assert.Equal(new MonitorEqStatus("fps", null), mixer.Snapshot().Mixes.Single(m => m.Id == "monitor").MonitorEq);
+        string[] nextA = LinksTo(firstId);
+        Assert.Equal(2, nextA.Length);
+        Assert.Empty(previousA.Intersect(nextA));
+        Assert.Equal(previousB, LinksTo(secondId));
     }
 
     [DspPipeWireFact]

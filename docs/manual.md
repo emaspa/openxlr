@@ -509,7 +509,7 @@ To add another listening mix, open **SUBMIXER → Edit layout**, add a
 **Monitor mix**, then select it in the feed picker next to the output under
 **MONITOR → Devices**. The preset follows the mix across a rename or restart
 and is kept apart from profiles. Changing a preset can briefly interrupt
-playback while the EQ stage changes. The inserts and their editors keep
+the outputs that play this mix while its EQ stage changes. The inserts and their editors keep
 running. If an insert chain fails, the EQ can still shape the mix. If the
 EQ fails, the mix continues through its inserts when available.
 

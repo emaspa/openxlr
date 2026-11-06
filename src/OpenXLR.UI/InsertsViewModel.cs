@@ -218,6 +218,7 @@ public sealed partial class InsertsViewModel : ViewModelBase
         Note = null;
         foreach (var insert in Items) insert.ForgetPendingParameters();
         ResetEffectWorkflow();
+        ResetMonitorEq();
     }
 
     /// <summary>
@@ -243,6 +244,7 @@ public sealed partial class InsertsViewModel : ViewModelBase
         MicSetupWindow.CloseRemovedInput(MicSetup);
         _catalogGeneration++;
         ResetEffectWorkflow();
+        ResetMonitorEq();
         Apply(null);
         PluginChoices.Clear();
         SelectedPlugin = null;

@@ -1086,10 +1086,15 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 WireAuxRouteLocked();
                 break;
         }
-        // Every mix can now feed an output, including those with a virtual
-        // microphone or Aux consumer. Follow its new post-insert tap too.
-        if (_monitorOutputs.Any(o => MixesForOutputLocked(o).Any(m => m.Id == mix.Id)))
-            SetMonitorOutputsLocked([.. _monitorOutputs]);
+        // The selection and the jack slots are unchanged. Rewire just the
+        // output routes that read this tap, including summed feeds.
+        if (_monitorMuted) return;
+        foreach ((string routeKey, string target) in MonitorRouteTargetsLocked())
+        {
+            if (!MixesForOutputLocked(target).Any(m => m.Id == mix.Id)) continue;
+            if (_monitorRoutes.Remove(routeKey, out PortLink? previous)) _pw.Unlink(previous);
+            _monitorRoutes[routeKey] = RouteFeedLocked(target) ?? new PortLink([]);
+        }
     }
 
     private List<InsertDefinition> InsertsFor(string channelId)
