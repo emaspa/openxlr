@@ -12,7 +12,7 @@
 %global deepfilter_version 0.5.6
 
 Name:           openxlr
-Version: 0.6.0
+Version: 0.6.1
 Release:        1%{?dist}
 Summary:        Linux Wave Link replacement for Elgato XLR interfaces and Wave microphones
 # OpenXLR is GPL-3.0-only. The native helper links RNNoise (BSD-3-Clause),
@@ -246,6 +246,18 @@ MSG
 %{_datadir}/gnome-shell/extensions/openxlr-focus@emaspa.github.com/
 
 %changelog
+* Fri Nov 06 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.6.1-1
+- Mixer: an editable EQ on every output mix, with four listening curves, running ahead of the mix's plugins
+- Mixer: an EQ on stereo capture inputs, and a mute on a capture input's source beside its gain
+- Mixer: hear the microphones dry on chosen monitor mixes
+- Mixer: the audio clock in the state, Signal flow and Options, with a picker and the driven unit's input as the default clock
+- Mixer: WebKitGTK applications are told apart by name
+- Pro: hardware mixing keeps the Pro's sink with a Wave XLR MK.2 attached, and keeps a saved jack level above 0 dB
+- Daemon: settings saves are no longer held back while the Pro mixes
+- Profiles: each capture input's gain and source mute
+- UI: Options in five tabs, a first-launch guide, three microphone EQ presets, the EQ editor says when this computer runs the EQ
+- Browser and Deck: tab route controls in the popup, popup activation and clip key fixes
+
 * Wed Nov 04 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.6.0-1
 - Pro: hardware mixing (experimental) builds each jack's feed and the Aux mix in the unit, with per-channel ducking, processed microphones on return pairs and a cue pair for auditions
 - Pro: ducking on the unit reaches the USB Aux port
