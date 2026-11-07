@@ -94,14 +94,14 @@ internal static partial class SkinLayoutWindowTests
             CheckLongName(window, model);
             model.ActiveApps.Remove(model.ActiveApps.Single(a => a.Label == LongAppName));
 
-            // The classic wrap of the same thirteen, for comparison: each chip as wide as its own name and channel.
+            // Classic chips wrap while keeping their different natural widths.
             Wear(SkinPackage.DefaultId);
             ShowApps(model, all, all.Length);
             Layout(window, 1600, 1400);
             Border[] chips = ApplicationChips(window);
             Assert.Equal(ColumnApps.Length, chips.Length);
             Assert.Empty(ApplicationTiles(window));
-            Assert.IsType<WrapPanel>(window.FindControl<ItemsControl>("ApplicationRows")!.ItemsPanelRoot);
+            Assert.Equal(1, Assert.IsType<TileColumnsPanel>(window.FindControl<ItemsControl>("ApplicationRows")!.ItemsPanelRoot).PerColumn);
             Assert.True(chips.Max(c => c.Bounds.Width) - chips.Min(c => c.Bounds.Width) > 20, "the default chips are all one width");
             Capture(window, "default-applications-13-1600");
         }
@@ -180,7 +180,7 @@ internal static partial class SkinLayoutWindowTests
     {
         const int maximumPerColumn = 4;
         var rows = window.FindControl<ItemsControl>("ApplicationRows")!;
-        ApplicationColumnsPanel panel = Assert.IsType<ApplicationColumnsPanel>(rows.ItemsPanelRoot);
+        TileColumnsPanel panel = Assert.IsType<TileColumnsPanel>(rows.ItemsPanelRoot);
         Assert.Equal(maximumPerColumn, panel.PerColumn);
         Border card = (Border)window.FindControl<Expander>("ApplicationsTile")!.Parent!;
         Assert.True(card.IsVisible, where);

@@ -634,7 +634,7 @@ the framework's.
 | `Ox.Fader.Thumb.Background` | brush | framework |  | the cap |
 | `Ox.Fader.Thumb.BorderBrush` | brush | #00000000 |  | the cap's ring |
 | `Ox.Fader.Thumb.BorderThickness` | thickness | 0 | 0 to 16 | that ring's width |
-| `Ox.Headphones.FaderMaxWidth` | number | 640 | 150 to 1600 | the maximum width of each headphone volume fader and the mic/PC blend fader |
+| `Ox.Main.FaderMaxWidth` | number | 640 | 150 to 1600 | the maximum track width of a classic input, headphone, mic/PC blend or monitor fader |
 | `Ox.Fader.Thumb.Width` | number | 22 | 4 to 64 | the cap across the groove |
 | `Ox.Fader.Thumb.Height` | number | 10 | 4 to 64 | the cap along the groove |
 | `Ox.Fader.Thumb.CornerRadius` | radius | 2 | 0 to 48 | the cap's corners |
@@ -734,7 +734,7 @@ the same in every tile.
 | `Ox.AppIcon.CornerRadius` | radius | 4 | 0 to 48 | that badge's corners |
 | `Ox.AppIcon.FontSize` | number | 11 | 6 to 32 | the size of that initial |
 | `Ox.AppColumns.NameWidth` | number | 128 | 64 to 400 | the width of an application's name in a tile of APPLICATIONS' columns, the same in every tile; a longer name is clipped and scrolls to its end while the pointer is over its tile |
-| `Ox.AppColumns.TileMaxWidth` | number | 720 | 0 to 1000 | the width up to which application tiles can grow to share spare space in each row of columns; 0 keeps their natural width |
+| `Ox.AppColumns.TileMaxWidth` | number | 720 | 0 to 1000 | the width up to which application chips and tiles can grow into spare space; 0 keeps their natural width |
 
 ### Audio flow window
 
@@ -830,8 +830,9 @@ other windows and the plugins' own editors keep their sizes.
 | `Ox.Mixer.DeviceSliderHeight` | number | 30 | 30 to 96 | the height of a slider in the interface's control rows |
 | `Ox.Mixer.SmallControlMinSize` | number | 0 | 0 to 64 | the smallest size of the compact controls: the interface rows' buttons and sliders, the tile headers and their buttons, the Arrange buttons and drag handles, the gain lock, the binding and capture source chips, the inserts buttons, the SUBMIXER header's buttons, a send's mute and the EQ graph's handle target |
 | `Ox.Mixer.InsertControlMinSize` | number | 24 | 16 to 64 | the smallest width and height of an insert row's own process, bypass and controls buttons |
-| `Ox.Mixer.ChannelWidth` | number | 132 | 132 to 400 | the width of a submixer channel strip |
-| `Ox.Mixer.MixWidth` | number | 232 | 232 to 500 | the width of a mix master tile |
+| `Ox.Mixer.ChannelWidth` | number | 132 | 132 to 400 | the base width of a classic submixer channel strip |
+| `Ox.Mixer.MixWidth` | number | 232 | 232 to 500 | the base width of a mix master tile |
+| `Ox.Mixer.TileMaxWidth` | number | 420 | 0 to 1000 | the width up to which classic channel and mix master tiles can grow; 0 keeps their measured width |
 | `Ox.Mixer.StripWidth` | number | 76 | 56 to 200 | the width of an upright strip in a mix bank, the name column of a send list, and the unit an input rack and mix banks reckon their narrowest width in |
 | `Ox.Mixer.VerticalFaderLength` | number | 160 | 80 to 480 | the length of an upright fader |
 | `Ox.Mixer.BankSpacing` | number | 12 | 0 to 64 | the gap between mix banks |
@@ -1315,7 +1316,7 @@ reduce motion, since the UI toolkit does not report one. The picker is as wide a
 lists. Columns that do not fit the section's width start a new row of
 columns below, whole, so nothing scrolls sideways; a window narrower than
 two columns shows them one under the other. The default template's chips
-keep the width of their own name and channel.
+wrap after each row and share spare width up to the same limit.
 
 The input rack draws one strip per channel, in the mixer's channel
 order. When a strip shows only its name, the name starts at the strip's

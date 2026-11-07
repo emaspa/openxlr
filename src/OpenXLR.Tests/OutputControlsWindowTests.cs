@@ -23,7 +23,7 @@ internal static class OutputControlsWindowTests
                 Layout(window, width, 900);
                 var phones = window.FindControl<Grid>("HeadphoneControls")!;
                 Slider[] faders = [.. phones.Children.OfType<Slider>()];
-                double maximum = (double)window.FindResource("Ox.Headphones.FaderMaxWidth")!;
+                double maximum = (double)window.FindResource("Ox.Main.FaderMaxWidth")!;
                 void CheckSingleFader()
                 {
                     double expected = Math.Min(maximum, phones.Bounds.Width - faders[0].Bounds.X - 64);
@@ -52,9 +52,12 @@ internal static class OutputControlsWindowTests
                 Layout(window, width, 900);
                 var slider = window.FindControl<Slider>("OutputVolumeSlider")!;
                 var controls = window.FindControl<Grid>("MonitorControls")!;
-                Assert.True(slider.Bounds.Width >= Math.Max(80, controls.Bounds.Width * .25),
+                Assert.True(slider.Bounds.Width >= Math.Min(maximum, Math.Max(80, controls.Bounds.Width * .25)) - 1,
                     $"A long output name squeezes the volume slider to {slider.Bounds.Width} at {width}.");
                 AssertInside(slider, controls);
+                Assert.True(slider.Bounds.Width <= maximum + 1);
+                var value = window.FindControl<TextBlock>("MonitorVolumeReadout")!;
+                Assert.InRange(value.Bounds.Left - slider.Bounds.Right, -1, 64);
             }
         }
         finally { window.Quit(); }

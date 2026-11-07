@@ -7,26 +7,25 @@ using Avalonia.Controls;
 namespace OpenXLR.UI.Layout;
 
 /// <summary>
-/// APPLICATIONS' <c>"application-columns"</c> template: the chips in
-/// columns of at most <see cref="PerColumn"/>, top to bottom, the next tile
-/// starting the next column to the right. Each tile starts with the size it asks
-/// for; the tile template gives every tile the same width, its name a fixed
-/// width and its channel picker a width shared by all the tiles under this
-/// panel, which is their shared size scope. A column starts at the width of
+/// Tiles in columns of at most <see cref="PerColumn"/>, top to bottom, the next tile
+/// starting the next column to the right. A column starts at the width of
 /// its widest tile. A column that does not fit goes on the next band, whole.
 /// Flexible columns use fewer rows when more columns fit across the panel.
 /// Their tiles share the remaining width up to the skin's limit.
 /// </summary>
-public sealed class ApplicationColumnsPanel : Panel
+public sealed class TileColumnsPanel : Panel
 {
     public static readonly StyledProperty<int> PerColumnProperty =
-        AvaloniaProperty.Register<ApplicationColumnsPanel, int>(nameof(PerColumn), Skinning.SkinFormat.DefaultApplicationsPerColumn,
+        AvaloniaProperty.Register<TileColumnsPanel, int>(nameof(PerColumn), Skinning.SkinFormat.DefaultApplicationsPerColumn,
             coerce: (_, value) => Math.Max(1, value));
 
-    static ApplicationColumnsPanel() => AffectsMeasure<ApplicationColumnsPanel>(PerColumnProperty);
+    public static readonly StyledProperty<double> MaxTileWidthProperty =
+        AvaloniaProperty.Register<TileColumnsPanel, double>(nameof(MaxTileWidth));
 
-    /// <summary>The tiles' channel pickers share one width across the whole panel.</summary>
-    public ApplicationColumnsPanel() => Grid.SetIsSharedSizeScope(this, true);
+    public static readonly StyledProperty<double> BaseTileWidthProperty =
+        AvaloniaProperty.Register<TileColumnsPanel, double>(nameof(BaseTileWidth));
+
+    static TileColumnsPanel() => AffectsMeasure<TileColumnsPanel>(PerColumnProperty, BaseTileWidthProperty, MaxTileWidthProperty);
 
     /// <summary>How many chips one column holds.</summary>
     public int PerColumn
@@ -37,7 +36,10 @@ public sealed class ApplicationColumnsPanel : Panel
 
     protected override Size MeasureOverride(Size availableSize)
     {
-        var constraint = new Size(availableSize.Width, double.PositiveInfinity);
+        // Classic mixer tiles have an eight-unit right margin. Measure them
+        // at their base width so a long name cannot push other tiles away.
+        double width = BaseTileWidth > 0 ? Math.Min(availableSize.Width, BaseTileWidth + 8) : availableSize.Width;
+        var constraint = new Size(width, double.PositiveInfinity);
         foreach (Control child in Children) child.Measure(constraint);
         return Place(availableSize.Width, null);
     }
@@ -48,8 +50,22 @@ public sealed class ApplicationColumnsPanel : Panel
         return finalSize;
     }
 
+    /// <summary>The classic tile's base width, or zero to measure its contents at their natural width.</summary>
+    public double BaseTileWidth
+    {
+        get => GetValue(BaseTileWidthProperty);
+        set => SetValue(BaseTileWidthProperty, value);
+    }
+
     /// <summary>How far a tile can grow into spare width. Zero keeps its natural width.</summary>
-    public double MaxTileWidth { get; init; }
+    public double MaxTileWidth
+    {
+        get => GetValue(MaxTileWidthProperty);
+        set => SetValue(MaxTileWidthProperty, value);
+    }
+
+    /// <summary>Allow whole columns to wrap. The classic channel row scrolls instead.</summary>
+    public bool Wrap { get; set; } = true;
 
     private readonly record struct Column(int Start, int End, double Width, double Height);
 
@@ -63,7 +79,7 @@ public sealed class ApplicationColumnsPanel : Panel
     {
         var shown = new List<Control>();
         foreach (Control child in Children)
-            if (child.IsVisible) shown.Add(child);
+            if (child.IsVisible && child.DesiredSize.Width > 0 && child.DesiredSize.Height > 0) shown.Add(child);
         int perColumn = PerColumn;
         if (perColumn > 1 && MaxTileWidth > 0 && shown.Count > 1 && double.IsFinite(width))
         {
@@ -94,7 +110,7 @@ public sealed class ApplicationColumnsPanel : Panel
         {
             int end = first + 1;
             double used = columns[first].Width, height = columns[first].Height;
-            while (end < columns.Count && used + columns[end].Width <= width)
+            while (end < columns.Count && (!Wrap || used + columns[end].Width <= width))
             {
                 used += columns[end].Width;
                 height = Math.Max(height, columns[end].Height);

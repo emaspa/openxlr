@@ -339,12 +339,12 @@
           "$ref": "#/$defs/thickness",
           "description": "that ring's width"
         },
-        "Ox.Headphones.FaderMaxWidth": {
+        "Ox.Main.FaderMaxWidth": {
           "type": "number",
           "minimum": 150,
           "maximum": 1600,
           "default": 640,
-          "description": "the maximum width of each headphone volume fader and the mic/PC blend fader"
+          "description": "the maximum track width of a classic input, headphone, mic/PC blend or monitor fader"
         },
         "Ox.Fader.Thumb.Width": {
           "type": "number",
@@ -573,7 +573,7 @@
           "minimum": 0,
           "maximum": 1000,
           "default": 720,
-          "description": "the width up to which application tiles can grow to share spare space in each row of columns; 0 keeps their natural width"
+          "description": "the width up to which application chips and tiles can grow into spare space; 0 keeps their natural width"
         },
         "Ox.Flow.Background": {
           "$ref": "#/$defs/brush",
@@ -759,13 +759,20 @@
           "type": "number",
           "minimum": 132,
           "maximum": 400,
-          "description": "the width of a submixer channel strip"
+          "description": "the base width of a classic submixer channel strip"
         },
         "Ox.Mixer.MixWidth": {
           "type": "number",
           "minimum": 232,
           "maximum": 500,
-          "description": "the width of a mix master tile"
+          "description": "the base width of a mix master tile"
+        },
+        "Ox.Mixer.TileMaxWidth": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000,
+          "default": 420,
+          "description": "the width up to which classic channel and mix master tiles can grow; 0 keeps their measured width"
         },
         "Ox.Mixer.StripWidth": {
           "type": "number",

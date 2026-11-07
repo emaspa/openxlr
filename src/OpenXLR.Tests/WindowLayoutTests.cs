@@ -183,7 +183,7 @@ public sealed class WindowLayoutTests
                         < outputHeading.TranslatePoint(default, main)!.Value.Y);
 
                     var masters = main.GetVisualDescendants().OfType<Border>()
-                        .Where(b => b.DataContext is MixViewModel && b.Width == 232).ToArray();
+                        .Where(b => b.DataContext is MixViewModel && b.Name == "ClassicMasterTile").ToArray();
                     Assert.Equal(8, masters.Length);
                     AssertNoOverlap(masters);
                     foreach (var master in masters)
@@ -204,22 +204,24 @@ public sealed class WindowLayoutTests
                     var appCards = appRows.GetVisualDescendants().OfType<Border>()
                         .Where(b => b.DataContext is AppStreamViewModel && b.Padding == new Thickness(8, 6)).ToArray();
                     Assert.Equal(6, appCards.Length);
-                    var appWrap = appRows.GetVisualDescendants().OfType<WrapPanel>().Single();
-                    foreach (var appCard in appCards) Assert.Equal(4, appCard.Margin.Right);
-                    // Font metrics differ across desktops. A chip stays on
-                    // the preceding row exactly when its measured width fits.
+                    var appWrap = Assert.IsType<OpenXLR.UI.Layout.TileColumnsPanel>(appRows.ItemsPanelRoot);
+                    AssertNoOverlap(appCards);
+                    Assert.All(appCards, card => Assert.Equal(4, card.Margin.Right));
+                    // Wrapping uses natural widths before the row receives spare space.
+                    double used = appWrap.Children[0].DesiredSize.Width;
                     for (int i = 1; i < appCards.Length; i++)
                     {
-                        var previous = appCards[i - 1];
-                        var current = appCards[i];
-                        var before = previous.TranslatePoint(default, appWrap)!.Value;
-                        var here = current.TranslatePoint(default, appWrap)!.Value;
-                        double end = before.X + previous.Bounds.Width + previous.Margin.Right
-                            + current.Margin.Left + current.Bounds.Width + current.Margin.Right;
-                        if (end <= appWrap.Bounds.Width)
-                            Assert.Equal(before.Y, here.Y);
-                        else
-                            Assert.True(here.Y > before.Y, "An app wider than the remaining space did not wrap.");
+                        Point before = appCards[i - 1].TranslatePoint(default, appWrap)!.Value;
+                        Point here = appCards[i].TranslatePoint(default, appWrap)!.Value;
+                        double natural = appWrap.Children[i].DesiredSize.Width;
+                        if (here.Y > before.Y + .5)
+                        {
+                            Assert.True(used + natural > appWrap.Bounds.Width - .5);
+                            Assert.Equal(0, here.X, .5);
+                            used = 0;
+                        }
+                        else Assert.True(here.X >= before.X + appCards[i - 1].Bounds.Width - .5);
+                        used += natural;
                     }
                     var appHeader = (StackPanel)main.FindControl<Expander>("ApplicationsTile")!.Header!;
                     var heading = appHeader.Children.OfType<TextBlock>().Single();
@@ -775,7 +777,7 @@ public sealed class WindowLayoutTests
         LiveLayoutOrderTests.Apply(model, ["music", "game"], ["monitor", "chat", "stream"]);
         Layout(main, 1040, 900);
         var channels = main.GetVisualDescendants().OfType<Border>()
-            .Where(b => b.DataContext is ChannelViewModel && b.Width == 132)
+            .Where(b => b.DataContext is ChannelViewModel && b.Name == "ClassicChannelTile")
             .OrderBy(b => b.TranslatePoint(default, main)!.Value.X).ToArray();
         Assert.Equal(["music", "game"], channels.Select(b => ((ChannelViewModel)b.DataContext!).Id));
         foreach (var channel in channels)
@@ -810,7 +812,7 @@ public sealed class WindowLayoutTests
         LiveLayoutOrderTests.Apply(model, ["music", "game"], ["monitor", "chat", "stream"]);
         Layout(main, 1040, 900);
         var mixes = main.GetVisualDescendants().OfType<Border>()
-            .Where(b => b.DataContext is MixViewModel && b.Width == 232)
+            .Where(b => b.DataContext is MixViewModel && b.Name == "ClassicMasterTile")
             .OrderBy(b => b.TranslatePoint(default, main)!.Value.Y)
             .ThenBy(b => b.TranslatePoint(default, main)!.Value.X).ToArray();
         Assert.Equal(["monitor", "chat", "stream"], mixes.Select(b => ((MixViewModel)b.DataContext!).Id));
@@ -830,7 +832,7 @@ public sealed class WindowLayoutTests
             """)]);
         Layout(main, 1040, 900);
         var strips = main.GetVisualDescendants().OfType<Border>()
-            .Where(b => b.DataContext is ChannelViewModel && b.Width == 132).ToArray();
+            .Where(b => b.DataContext is ChannelViewModel && b.Name == "ClassicChannelTile").ToArray();
         Assert.False(strips.Single(b => ((ChannelViewModel)b.DataContext!).Id == "game").IsVisible);
         Border music = strips.Single(b => ((ChannelViewModel)b.DataContext!).Id == "music");
         Assert.True(music.IsVisible);
@@ -851,7 +853,7 @@ public sealed class WindowLayoutTests
         Assert.False(strips.Single(b => ((ChannelViewModel)b.DataContext!).Id == "sfx")
             .GetVisualDescendants().OfType<LayoutIconBlock>().Single().IsVisible);
         LayoutIconBlock stream = main.GetVisualDescendants().OfType<Border>()
-            .Single(b => b.DataContext is MixViewModel { Id: "stream" } && b.Width == 232).GetVisualDescendants().OfType<LayoutIconBlock>().Single();
+            .Single(b => b.DataContext is MixViewModel { Id: "stream" } && b.Name == "ClassicMasterTile").GetVisualDescendants().OfType<LayoutIconBlock>().Single();
         Assert.True(stream.IsVisible && stream.DrawsPath);
         // The headphone jacks wear their icon before their label, in their colour; without one, the headset.
         LayoutIconBlock phones1 = main.FindControl<Grid>("Phones1Label")!.GetVisualDescendants().OfType<LayoutIconBlock>().Single();
@@ -861,7 +863,7 @@ public sealed class WindowLayoutTests
         Assert.Equal("headset", main.FindControl<Grid>("Phones2Label")!.GetVisualDescendants().OfType<LayoutIconBlock>().Single().Shown);
         // Every built-in drawing is one Avalonia accepts.
         Assert.All(OpenXLR.UI.LayoutIcons.BuiltIn, icon => Assert.NotNull(LayoutIconRegistry.Geometry(icon.Name)));
-        Border mix = main.GetVisualDescendants().OfType<Border>().Single(b => b.DataContext is MixViewModel { Id: "monitor" } && b.Width == 232);
+        Border mix = main.GetVisualDescendants().OfType<Border>().Single(b => b.DataContext is MixViewModel { Id: "monitor" } && b.Name == "ClassicMasterTile");
         TextBlock mixName = mix.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Text == "Monitor A");
         Assert.Equal(Avalonia.Media.Color.Parse("#12ABCD"), ((Avalonia.Media.ISolidColorBrush)mixName.Foreground!).Color);
         Capture(main, "layout-appearance-1040");

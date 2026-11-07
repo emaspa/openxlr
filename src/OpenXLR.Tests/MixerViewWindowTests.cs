@@ -43,17 +43,17 @@ internal static class MixerViewWindowTests
             window.Show();
             Layout(window, 1040, 900);
             Assert.False(Picker(window, "CompactChannelPicker").IsEffectivelyVisible);
-            Assert.Equal(3, Tiles<MixViewModel>(window, 232).Length);
+            Assert.Equal(3, Tiles<MixViewModel>(window, "ClassicMasterTile").Length);
 
             Assert.Null(model.ChooseMixerView(MainViewModel.CompactView));
             Layout(window, 640, 900);
             Assert.True(Picker(window, "CompactChannelPicker").IsEffectivelyVisible);
             Assert.False(Picker(window, "CompactMixPicker").IsEffectivelyVisible);
-            Assert.Equal(["music"], Tiles<ChannelViewModel>(window, 132).Select(t => t.Id));
+            Assert.Equal(["music"], Tiles<ChannelViewModel>(window, "ClassicChannelTile").Select(t => t.Id));
             Assert.Equal(3, Sends(window).Length);
             model.SelectedCompactChannel = model.Channels.Single(c => c.Id == "game");
             Layout(window, 640, 900);
-            Assert.Equal(["game"], Tiles<ChannelViewModel>(window, 132).Select(t => t.Id));
+            Assert.Equal(["game"], Tiles<ChannelViewModel>(window, "ClassicChannelTile").Select(t => t.Id));
             Capture(window, "compact-640");
 
             Assert.Null(model.ChooseMixerView(MainViewModel.MiniView));
@@ -65,7 +65,7 @@ internal static class MixerViewWindowTests
             Assert.True(window.FindControl<Expander>("MonitorTile")!.IsEffectivelyVisible);
             Assert.False(window.FindControl<ToggleButton>("ArrangeButton")!.IsEffectivelyVisible);
             Assert.True(Picker(window, "CompactMixPicker").IsEffectivelyVisible);
-            Assert.Equal(["monitor2"], Tiles<MixViewModel>(window, 232).Select(t => t.Id));
+            Assert.Equal(["monitor2"], Tiles<MixViewModel>(window, "ClassicMasterTile").Select(t => t.Id));
             Assert.Equal(["monitor2"], Sends(window).Select(s => s.MixId));
             foreach (Control control in window.GetVisualDescendants().OfType<Control>()
                          .Where(c => c.IsEffectivelyVisible && c is ComboBox or Slider))
@@ -92,8 +92,8 @@ internal static class MixerViewWindowTests
             Assert.Null(model.ChooseMixerView(MainViewModel.FullView));
             Layout(window, 1040, 900);
             Assert.True(window.FindControl<Expander>("InputsTile")!.IsEffectivelyVisible);
-            Assert.Equal(["music"], Tiles<ChannelViewModel>(window, 132).Select(t => t.Id));   // game stays hidden
-            Assert.Equal(3, Tiles<MixViewModel>(window, 232).Length);
+            Assert.Equal(["music"], Tiles<ChannelViewModel>(window, "ClassicChannelTile").Select(t => t.Id));   // game stays hidden
+            Assert.Equal(3, Tiles<MixViewModel>(window, "ClassicMasterTile").Length);
             CheckMonitorControls(window, stacked: false);
 
             // Monitor B hidden: its master tile and every send row into it leave the classic mixer.
@@ -106,7 +106,7 @@ internal static class MixerViewWindowTests
                              {"id":"game","name":"Game","levels":{"monitor":1,"monitor2":1,"chat":1},"appearance":{"hidden":true}}]}
                 """)]);
             Layout(window, 1040, 900);
-            Assert.Equal(["monitor", "chat"], Tiles<MixViewModel>(window, 232).Select(m => m.Id));
+            Assert.Equal(["monitor", "chat"], Tiles<MixViewModel>(window, "ClassicMasterTile").Select(m => m.Id));
             Assert.Equal(["monitor", "chat"], Sends(window).Select(s => s.MixId));
             Assert.Equal(0.7, model.Channels.Single(c => c.Id == "music").Sends.Single(s => s.MixId == "monitor2").Level);
             Assert.True(showHidden.IsEffectivelyVisible);
@@ -121,16 +121,16 @@ internal static class MixerViewWindowTests
             Assert.True(UiSettings.Load().ShowHiddenItems);
             double faded = (double)window.FindResource("Ox.Mixer.HiddenOpacity")!;
             Assert.True(faded < 1);
-            Assert.Equal(["monitor", "monitor2", "chat"], Tiles<MixViewModel>(window, 232).Select(m => m.Id));
-            Assert.Equal(["music", "game"], Tiles<ChannelViewModel>(window, 132).Select(c => c.Id));
-            Border Tile(object item, double width) => window.GetVisualDescendants().OfType<Border>()
-                .Single(b => ReferenceEquals(b.DataContext, item) && b.Width == width);
+            Assert.Equal(["monitor", "monitor2", "chat"], Tiles<MixViewModel>(window, "ClassicMasterTile").Select(m => m.Id));
+            Assert.Equal(["music", "game"], Tiles<ChannelViewModel>(window, "ClassicChannelTile").Select(c => c.Id));
+            Border Tile(object item, string name) => window.GetVisualDescendants().OfType<Border>()
+                .Single(b => ReferenceEquals(b.DataContext, item) && b.Name == name);
             MixViewModel monitor2 = model.Mixes.Single(m => m.Id == "monitor2");
             ChannelViewModel music = model.Channels.Single(c => c.Id == "music"), game = model.Channels.Single(c => c.Id == "game");
-            Assert.Equal(faded, Tile(monitor2, 232).Opacity, 3);
-            Assert.Equal(1, Tile(model.Mixes[0], 232).Opacity, 3);
-            Assert.Equal(faded, Tile(game, 132).Opacity, 3);
-            Assert.Equal(1, Tile(music, 132).Opacity, 3);
+            Assert.Equal(faded, Tile(monitor2, "ClassicMasterTile").Opacity, 3);
+            Assert.Equal(1, Tile(model.Mixes[0], "ClassicMasterTile").Opacity, 3);
+            Assert.Equal(faded, Tile(game, "ClassicChannelTile").Opacity, 3);
+            Assert.Equal(1, Tile(music, "ClassicChannelTile").Opacity, 3);
             StackPanel Row(SendViewModel send) => window.GetVisualDescendants().OfType<StackPanel>()
                 .Single(p => ReferenceEquals(p.DataContext, send) && p.Margin.Bottom == 8);
             Assert.Equal(faded, Row(music.Sends.Single(s => s.MixId == "monitor2")).Opacity, 3);
@@ -142,10 +142,10 @@ internal static class MixerViewWindowTests
             // The popped-out mixer draws the same.
             MixerWindow popped = window.PopOutMixer();
             Layout(popped, 1040, 700);
-            Assert.Equal(["monitor", "monitor2", "chat"], Tiles<MixViewModel>(popped, 232).Select(m => m.Id));
+            Assert.Equal(["monitor", "monitor2", "chat"], Tiles<MixViewModel>(popped, "ClassicMasterTile").Select(m => m.Id));
             model.ShowHidden = false;
             Layout(popped, 1040, 700);
-            Assert.Equal(["monitor", "chat"], Tiles<MixViewModel>(popped, 232).Select(m => m.Id));
+            Assert.Equal(["monitor", "chat"], Tiles<MixViewModel>(popped, "ClassicMasterTile").Select(m => m.Id));
             popped.Close();
             Avalonia.Threading.Dispatcher.UIThread.RunJobs();
             Layout(window, 1040, 900);
@@ -185,8 +185,8 @@ internal static class MixerViewWindowTests
         Assert.Equal(0.42, model.OutputVolume);
     }
 
-    private static T[] Tiles<T>(Window window, double width) where T : class => [.. window.GetVisualDescendants().OfType<Border>()
-        .Where(b => b.DataContext is T && b.Width == width && b.IsEffectivelyVisible).Select(b => (T)b.DataContext!)];
+    private static T[] Tiles<T>(Window window, string name) where T : class => [.. window.GetVisualDescendants().OfType<Border>()
+        .Where(b => b.DataContext is T && b.Name == name && b.IsEffectivelyVisible).Select(b => (T)b.DataContext!)];
 
     private static SendViewModel[] Sends(Window window) => [.. window.GetVisualDescendants().OfType<Slider>()
         .Where(s => s.DataContext is SendViewModel && s.IsEffectivelyVisible).Select(s => (SendViewModel)s.DataContext!)];

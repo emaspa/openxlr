@@ -202,7 +202,7 @@ public static class SkinTokens
         // Faders. The window has always sized the Fluent thumb through these
         // three theme keys; the rest is applied only when a skin asks for it,
         // so an unskinned slider is the stock Fluent one.
-        Number("Ox.Headphones.FaderMaxWidth", 640, 150, 1600),
+        Number("Ox.Main.FaderMaxWidth", 640, 150, 1600),
         Number("Ox.Fader.Thumb.Width", 22, 4, 64,
             new SkinBridge("SliderHorizontalThumbWidth"), new SkinBridge("SliderVerticalThumbHeight")),
         Number("Ox.Fader.Thumb.Height", 10, 4, 64,
@@ -406,6 +406,7 @@ public static class SkinTokens
         // bank, the length of an upright fader, and the gap between banks. An
         // input rack and a submixer of banks reckon their narrowest width
         // from the strip width.
+        Number("Ox.Mixer.TileMaxWidth", 420, 0, 1000),
         Number("Ox.Mixer.StripWidth", 76, 56, 200),
         Number("Ox.Mixer.VerticalFaderLength", 160, 80, 480),
         Number("Ox.Mixer.BankSpacing", 12, 0, 64),

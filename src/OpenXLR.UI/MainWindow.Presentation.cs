@@ -97,12 +97,8 @@ public partial class MainWindow
 
         // MONITOR and APPLICATIONS: the same controls and the same
         // application objects, in other cells or another item template.
-        string monitor = layout?.Monitor ?? SkinLayoutTemplates.OutputPanel;
-        if (_monitorTemplate != monitor)
-        {
-            _monitorTemplate = monitor;
-            LayOutMonitor(MonitorControls.Bounds.Width > 0 ? MonitorControls.Bounds.Width : double.PositiveInfinity);
-        }
+        _monitorTemplate = layout?.Monitor ?? SkinLayoutTemplates.OutputPanel;
+        LayOutMonitor(MonitorControls.Bounds.Width > 0 ? MonitorControls.Bounds.Width : double.PositiveInfinity);
         string applications = layout?.Applications ?? SkinLayoutTemplates.ApplicationChips;
         int perColumn = layout?.ApplicationsPerColumn ?? SkinFormat.DefaultApplicationsPerColumn;
         double maxTileWidth = (double)this.FindResource("Ox.AppColumns.TileMaxWidth")!;
@@ -113,7 +109,12 @@ public partial class MainWindow
             bool list = applications == SkinLayoutTemplates.ApplicationList;
             // Columns hold tiles of one width, so the tiles of a column line up.
             ApplicationRows.ItemsPanel = applications == SkinLayoutTemplates.ApplicationColumns
-                ? new FuncTemplate<Panel?>(() => new ApplicationColumnsPanel { PerColumn = perColumn, MaxTileWidth = maxTileWidth })
+                ? new FuncTemplate<Panel?>(() =>
+                {
+                    var panel = new TileColumnsPanel { PerColumn = perColumn, MaxTileWidth = maxTileWidth };
+                    Grid.SetIsSharedSizeScope(panel, true);
+                    return panel;
+                })
                 : (ITemplate<Panel?>)this.FindResource(list ? "ApplicationListPanel" : "ApplicationChipsPanel")!;
             ApplicationRows.ItemTemplate = (Avalonia.Controls.Templates.IDataTemplate)this.FindResource(
                 list ? "ApplicationLine" : applications == SkinLayoutTemplates.ApplicationColumns ? "ApplicationTile" : "ApplicationChip")!;

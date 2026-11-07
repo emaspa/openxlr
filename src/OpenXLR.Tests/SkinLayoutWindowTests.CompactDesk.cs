@@ -68,7 +68,7 @@ internal static partial class SkinLayoutWindowTests
                             Assert.Equal(window.FindControl<StackPanel>("MixerContent")!.Bounds.Width, mixer.Bounds.Width, 0.5);
                         }
                         var rows = window.FindControl<ItemsControl>("ApplicationRows")!;
-                        var panel = Assert.IsType<ApplicationColumnsPanel>(rows.ItemsPanelRoot);
+                        var panel = Assert.IsType<TileColumnsPanel>(rows.ItemsPanelRoot);
                         Assert.Equal(1, panel.PerColumn);
                         Border[] tiles = ApplicationTiles(window);
                         Assert.Equal(count, tiles.Length);
@@ -160,7 +160,7 @@ internal static partial class SkinLayoutWindowTests
         foreach (string skin in new[] { "compact-desk", "broadcast", "wave" })
         {
             Wear(skin);
-            foreach (double width in new[] { 640d, 960, 1280, 1600, 2400, 2560, 640 })
+            foreach (double width in new[] { 640d, 960, 1280, 1600, 2400, 2560, 3147, 640 })
             {
                 Layout(window, width, 800);
                 string where = $"{skin}, three mixes at {width}";
@@ -171,21 +171,39 @@ internal static partial class SkinLayoutWindowTests
                     var card = (Border)window.FindControl<Expander>("SubmixerTile")!.Parent!;
                     Border last = ColumnHead(window, "chat");
                     double end = last.TranslatePoint(new Point(last.Bounds.Width, 0), card)!.Value.X;
-                    Assert.True(end >= card.Bounds.Width * .94, $"Three mixes should use the desk: {where}.");
+                    double limit = (double)window.FindResource("Ox.Matrix.CellMaxWidth")!;
+                    double names = (double)window.FindResource("Ox.Matrix.NameWidth")!;
+                    Assert.True(end >= Math.Min(card.Bounds.Width * .94, names + 4 * limit), where);
                 }
-                if (width == 2560)
+                if (width >= 2560)
                 {
                     var rows = window.FindControl<ItemsControl>("ApplicationRows")!;
-                    var panel = Assert.IsType<ApplicationColumnsPanel>(rows.ItemsPanelRoot);
+                    var panel = Assert.IsType<TileColumnsPanel>(rows.ItemsPanelRoot);
                     Border[] tiles = ApplicationTiles(window);
                     Assert.Equal(4, tiles.Length);
                     Assert.All(tiles, tile => Assert.Equal(0, tile.TranslatePoint(default, panel)!.Value.Y, .5));
                     Assert.True(tiles.Max(tile => tile.TranslatePoint(new Point(tile.Bounds.Width, 0), panel)!.Value.X)
-                        >= panel.Bounds.Width * .95, $"Four application tiles should use the wide row: {where}.");
+                        >= Math.Min(panel.Bounds.Width * .95, tiles.Length * (panel.MaxTileWidth - 4)),
+                        $"Four application tiles should use the wide row: {where}.");
                     AssertNoOverlap(tiles);
                 }
-                if (width is 640 or 2560) Capture(window, $"skin-{skin}-three-mixes-{width}");
+                if (width is 640 or 3147) Capture(window, $"skin-{skin}-three-mixes-{width}");
             }
         }
+        Wear(SkinPackage.DefaultId);
+        double WidthOf(string itemsName)
+        {
+            var items = window.FindControl<ItemsControl>(itemsName)!;
+            var panel = Assert.IsType<TileColumnsPanel>(items.ItemsPanelRoot);
+            return panel.Children.First(child => child.Bounds.Width > 0).Bounds.Width;
+        }
+
+        Layout(window, 960, 800);
+        double channels = WidthOf("ChannelTiles"), masters = WidthOf("MixMasterTiles"), apps = WidthOf("ApplicationRows");
+        Layout(window, 3147, 800);
+        Assert.True(WidthOf("ChannelTiles") > channels + 40, "classic channel tiles should grow on a wide window");
+        Assert.True(WidthOf("MixMasterTiles") > masters + 40, "classic mix masters should grow on a wide window");
+        Assert.True(WidthOf("ApplicationRows") > apps + 40, "classic application chips should grow on a wide window");
+        Capture(window, "skin-material-wide-3147");
     }
 }

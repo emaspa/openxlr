@@ -233,7 +233,11 @@ public partial class MainWindow : Window
         // the volume fader's space. Recompute even within the same row mode.
         MonitorDestination.MaxWidth = stacked ? double.PositiveInfinity
             : Math.Max(0, (width - (toolbar ? 76 : 264)) / 2);
-        if (_monitorStacked == (toolbar, stacked)) return;
+        if (_monitorStacked == (toolbar, stacked))
+        {
+            LimitMonitorTracks();
+            return;
+        }
         _monitorStacked = (toolbar, stacked);
         MonitorDevicesLabel.IsVisible = MonitorVolumeLabel.IsVisible = !toolbar;
         ToolTip.SetTip(OutputVolumeSlider, toolbar ? Localizer.Text("Volume") : null);
@@ -263,6 +267,17 @@ public partial class MainWindow : Window
         Grid.SetRow(OutputVolumeSlider, stacked ? 1 : 0);
         Grid.SetColumn(MonitorVolumeReadout, readout);
         Grid.SetRow(MonitorVolumeReadout, stacked ? 1 : 0);
+        LimitMonitorTracks();
+    }
+
+    private void LimitMonitorTracks()
+    {
+        if (this.TryFindResource("Ox.Main.FaderMaxWidth", out object? value) && value is double width)
+        {
+            var columns = MonitorControls.ColumnDefinitions;
+            columns[Grid.GetColumn(MonitorDestination)].MaxWidth = width;
+            columns[Grid.GetColumn(OutputVolumeSlider)].MaxWidth = width;
+        }
     }
 
     /// <summary>A gamescope session, which SteamOS and Bazzite call Game Mode.</summary>
