@@ -4217,4 +4217,13 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
   <data name="FlowUnitMixes" xml:space="preserve">
     <value>Прави {0}</value>
   </data>
+  <data name="MinimizeWindow" xml:space="preserve">
+    <value>Умањи</value>
+  </data>
+  <data name="MaximizeWindow" xml:space="preserve">
+    <value>Увећај</value>
+  </data>
+  <data name="RestoreWindow" xml:space="preserve">
+    <value>Врати</value>
+  </data>
 </root>

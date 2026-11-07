@@ -69,6 +69,9 @@ public partial class MainWindow : Window
             return _vm.DaemonConnected;
         };
         HeaderVersion.Text = $"v{AppVersion.Current}";
+        // The skin's outline. Only this window takes it: the separate mixer
+        // window and the dialogs keep the platform's own frame.
+        Frame = new WindowFrame(this);
         UpdateControlSizing();
         Skinning.SkinService.Changed += UpdateControlSizing;
         SetupTray();
@@ -156,6 +159,7 @@ public partial class MainWindow : Window
         Closed += async (_, _) =>
         {
             Skinning.SkinService.Changed -= UpdateControlSizing;
+            Frame.Dispose();
             _reallyExit = true;
             _hideToTrayPending = false;
             _mixerWindow?.Close();
@@ -180,6 +184,9 @@ public partial class MainWindow : Window
                 desktop.Shutdown();
         };
     }
+
+    /// <summary>The outline the skin gives this window, and its own caption and edges while it draws one.</summary>
+    internal WindowFrame Frame { get; }
 
     /// <summary>True when the window should stay unshown until the tray asks for it.</summary>
     public bool StartsHidden { get; }

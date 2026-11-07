@@ -1273,7 +1273,13 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   repaints open windows without touching audio or the layout. A skin is
   data. It carries no markup and no code, reaches no file outside its own
   folder, makes no network request, and its images are bounded and measured
-  before they are decoded. It cannot change what a control does either: the
+  before they are decoded. A shipped skin can carry images as well, compiled
+  into the application beside its `skin.json` and held to the same limits.
+  A skin can round the UI's corners as well. OpenXLR then draws its own
+  caption row and resize edges, squares the corners while the UI is
+  maximised, and keeps the desktop's rectangle wherever the desktop cannot
+  draw a transparent window. No shipped skin does this.
+  A skin cannot change what a control does either: the
   console fader is the framework's slider with OpenXLR's drawing over it,
   and a plugin's own editor window is drawn by the plugin and is not
   skinned. [skins.md](skins.md) is the contract

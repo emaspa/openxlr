@@ -23,6 +23,21 @@ internal static class SkinImageHeader
         try
         {
             using FileStream stream = file.OpenRead();
+            return Read(stream);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return null; }
+    }
+
+    /// <summary>
+    /// The size of the image a seekable stream holds from its start, an
+    /// installed skin's file or a built-in skin's resource alike, or null when
+    /// it is not a PNG or JPEG we can measure. The stream is left wherever the
+    /// header ended; the caller rewinds it before decoding.
+    /// </summary>
+    public static PixelSize? Read(Stream stream)
+    {
+        try
+        {
             Span<byte> signature = stackalloc byte[8];
             if (stream.ReadAtLeast(signature, 8, throwOnEndOfStream: false) < 8) return null;
             // The PNG signature's first byte is 0x89, which is not a character:

@@ -28,7 +28,8 @@ public sealed record SkinReadResult(SkinPackage? Package, IReadOnlyList<string> 
 /// - every token name is one this version has, and every value has that
 ///   token's type and stays inside its bounds;
 /// - an image is a plain relative path inside the skin's own folder, with no
-///   parent segment, no root, no symbolic link leaving the folder and no URL;
+///   parent segment, no root, no symbolic link leaving the folder and no URL,
+///   whether that folder is on disk or compiled in (<see cref="SkinAssets"/>);
 /// - an optional layout block passes <see cref="SkinLayoutReader"/> whole, or
 ///   is dropped whole.
 ///
@@ -46,11 +47,20 @@ public static class SkinReader
 
     /// <summary>
     /// Read a document. <paramref name="directory"/> is the skin's own folder
-    /// and the only place its images may come from; null for a built-in skin,
-    /// which therefore may not declare images at all.
+    /// and the only place its images may come from; null for a document with
+    /// no files at all, which therefore may not declare images.
     /// </summary>
-    public static SkinReadResult Read(string id, string json, SkinOrigin origin, string? directory)
+    public static SkinReadResult Read(string id, string json, SkinOrigin origin, string? directory) =>
+        ReadFrom(id, json, origin, directory is null ? null : new SkinFolderAssets(directory));
+
+    /// <summary>
+    /// Read a document whose images come from <paramref name="assets"/>: an
+    /// installed skin's folder, or the resources compiled in beside a built-in
+    /// skin. Null for a document with no files, which may not declare images.
+    /// </summary>
+    public static SkinReadResult ReadFrom(string id, string json, SkinOrigin origin, SkinAssets? assets)
     {
+        string? directory = (assets as SkinFolderAssets)?.Directory;
         var errors = new List<string>();
         if (!IsValidId(id))
             return new SkinReadResult(null, [$"\"{id}\" is not a usable skin name: use lower-case letters, digits, dot, dash or underscore."]);
@@ -96,7 +106,7 @@ public static class SkinReader
                 if (tokenElement.ValueKind != JsonValueKind.Object)
                     errors.Add("\"tokens\" must be an object of token name to value.");
                 else
-                    ReadTokens(tokenElement, directory, tokens, errors);
+                    ReadTokens(tokenElement, assets, tokens, errors);
             }
             else errors.Add("skin.json has no \"tokens\" object, so it changes nothing.");
 
@@ -125,15 +135,25 @@ public static class SkinReader
                 else ReadIcons(iconElement, icons, errors);
             }
 
+            string shape = SkinWindowShapes.Default;
+            if (root.TryGetProperty("window", out JsonElement windowElement))
+            {
+                if (windowElement.ValueKind != JsonValueKind.Object)
+                    errors.Add("\"window\" must be an object such as {\"shape\": \"rounded\"}.");
+                else shape = ReadWindow(windowElement, errors);
+            }
+
             var package = new SkinPackage(id, name, description, author, schema, origin, directory, tokens, controls, layout)
             {
                 Icons = icons,
+                Assets = assets,
+                WindowShape = shape,
             };
             return new SkinReadResult(package, errors);
         }
     }
 
-    private static void ReadTokens(JsonElement tokenElement, string? directory,
+    private static void ReadTokens(JsonElement tokenElement, SkinAssets? assets,
         Dictionary<string, SkinValue> tokens, List<string> errors)
     {
         int images = 0;
@@ -146,7 +166,7 @@ public static class SkinReader
             }
             try
             {
-                SkinValue value = ReadValue(token, property.Value, directory, ref images);
+                SkinValue value = ReadValue(token, property.Value, assets, ref images);
                 tokens[token.Name] = value;
             }
             catch (SkinValueException ex)
@@ -186,6 +206,32 @@ public static class SkinReader
             }
             controls[slot.Name] = variant;
         }
+    }
+
+    /// <summary>
+    /// The "window" section: the outline of the main window, one of the
+    /// shapes OpenXLR draws. A shape this version does not have is reported
+    /// and the window keeps the rectangle; a field it does not read is
+    /// reported and ignored, since that is almost always a typo.
+    /// </summary>
+    private static string ReadWindow(JsonElement element, List<string> errors)
+    {
+        string shape = SkinWindowShapes.Default;
+        foreach (JsonProperty property in element.EnumerateObject())
+        {
+            if (property.Name != "shape")
+            {
+                string name = property.Name.Length > 40 ? property.Name[..40] + "..." : property.Name;
+                errors.Add($"window: \"{name}\" is not a window setting this OpenXLR reads; it is ignored.");
+                continue;
+            }
+            if (property.Value.ValueKind == JsonValueKind.String
+                && SkinWindowShapes.All.Contains(property.Value.GetString()!, StringComparer.Ordinal))
+                shape = property.Value.GetString()!;
+            else
+                errors.Add($"window.shape: expected one of {SkinWindowShapes.List}; the window keeps the rectangle.");
+        }
+        return shape;
     }
 
     /// <summary>
@@ -241,10 +287,10 @@ public static class SkinReader
         }
     }
 
-    private static SkinValue ReadValue(SkinToken token, JsonElement value, string? directory, ref int images) =>
+    private static SkinValue ReadValue(SkinToken token, JsonElement value, SkinAssets? assets, ref int images) =>
         token.Kind switch
         {
-            SkinTokenKind.Brush => ReadBrush(token, value, directory, ref images),
+            SkinTokenKind.Brush => ReadBrush(token, value, assets, ref images),
             SkinTokenKind.Number => new SkinNumber(Bounded(token, Double(value))),
             SkinTokenKind.CornerRadius => new SkinCornerRadius(ReadCornerRadius(token, value)),
             SkinTokenKind.Thickness => new SkinThickness(ReadThickness(token, value)),
@@ -252,7 +298,7 @@ public static class SkinReader
             _ => new SkinFontWeight(ReadFontWeight(value)),
         };
 
-    private static SkinValue ReadBrush(SkinToken token, JsonElement value, string? directory, ref int images)
+    private static SkinValue ReadBrush(SkinToken token, JsonElement value, SkinAssets? assets, ref int images)
     {
         if (value.ValueKind == JsonValueKind.String)
             return new SkinSolid(ReadColor(value.GetString()!));
@@ -272,11 +318,11 @@ public static class SkinReader
             case "radial":
                 return ReadGradient(type == "radial", value);
             case "image":
-                if (directory is null)
-                    throw new SkinValueException("a built-in skin carries no files, so it cannot use an image.");
+                if (assets is null)
+                    throw new SkinValueException("this skin carries no files, so it cannot use an image.");
                 if (++images > SkinFormat.MaxImages)
                     throw new SkinValueException($"a skin may use at most {SkinFormat.MaxImages} images.");
-                return ReadImage(value, directory);
+                return ReadImage(value, assets);
             default:
                 throw new SkinValueException($"\"{type}\" is not a brush type; use \"solid\", \"linear\", \"radial\" or \"image\".");
         }
@@ -323,10 +369,10 @@ public static class SkinReader
         return new Point(numbers[0], numbers[1]);
     }
 
-    private static SkinValue ReadImage(JsonElement value, string directory)
+    private static SkinValue ReadImage(JsonElement value, SkinAssets assets)
     {
         string source = Text(value, "source") ?? throw new SkinValueException("an image needs a \"source\" file name.");
-        string relative = SafeRelativePath(source, directory);
+        string relative = assets.Check(source);
         Stretch stretch = Text(value, "stretch") switch
         {
             null or "uniformToFill" => Stretch.UniformToFill,
@@ -340,36 +386,6 @@ public static class SkinReader
         if (double.IsNaN(opacity) || opacity is < 0 or > 1)
             throw new SkinValueException("an image \"opacity\" is between 0 and 1.");
         return new SkinImage(relative, stretch, opacity);
-    }
-
-    /// <summary>
-    /// A file reference a skin may use: a relative path, with no root, no
-    /// parent segment, no URL scheme and nothing that leaves the skin's folder
-    /// once symbolic links are resolved. A skin is data a user downloaded, so
-    /// this is the boundary that keeps it from naming <c>../../.ssh/id_ed25519</c>
-    /// or a link pointing there.
-    /// </summary>
-    internal static string SafeRelativePath(string source, string directory)
-    {
-        if (source.Length == 0 || source.Length > 256)
-            throw new SkinValueException("a file name is between 1 and 256 characters.");
-        if (source.Contains("://", StringComparison.Ordinal))
-            throw new SkinValueException("a skin loads files from its own folder only, never from a URL.");
-        if (source.Contains('\\'))
-            throw new SkinValueException("use forward slashes in a file name.");
-        if (Path.IsPathRooted(source))
-            throw new SkinValueException("a file name is relative to the skin's folder.");
-        string[] segments = source.Split('/');
-        if (segments.Any(s => s.Length == 0 || s == "." || s == ".."))
-            throw new SkinValueException("a file name has no empty, \".\" or \"..\" segments.");
-        if (segments.Any(s => s.Any(c => char.IsControl(c) || c == ':')))
-            throw new SkinValueException("a file name has no control characters or colons.");
-
-        string full = Path.GetFullPath(Path.Combine(directory, source));
-        string root = Path.GetFullPath(directory) + Path.DirectorySeparatorChar;
-        if (!full.StartsWith(root, StringComparison.Ordinal))
-            throw new SkinValueException("that file is outside the skin's folder.");
-        return source;
     }
 
     /// <summary>

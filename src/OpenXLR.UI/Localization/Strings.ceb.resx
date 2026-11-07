@@ -4217,4 +4217,13 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
   <data name="FlowUnitMixes" xml:space="preserve">
     <value>Nagtukod sa {0}</value>
   </data>
+  <data name="MinimizeWindow" xml:space="preserve">
+    <value>I-minimize</value>
+  </data>
+  <data name="MaximizeWindow" xml:space="preserve">
+    <value>I-maximize</value>
+  </data>
+  <data name="RestoreWindow" xml:space="preserve">
+    <value>Ibalik</value>
+  </data>
 </root>

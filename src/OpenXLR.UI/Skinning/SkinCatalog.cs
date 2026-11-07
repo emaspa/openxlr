@@ -90,9 +90,16 @@ public static class SkinCatalog
             : Discover().FirstOrDefault(e => e.Id == id);
 
     /// <summary>The skins compiled into the application.</summary>
-    public static IEnumerable<SkinEntry> BuiltIn()
+    public static IEnumerable<SkinEntry> BuiltIn() => BuiltIn(typeof(SkinCatalog).Assembly);
+
+    /// <summary>
+    /// The skins compiled into one assembly: each <c>skin.json</c> under its
+    /// id, and its images beside it (<see cref="SkinEmbeddedAssets"/>). The
+    /// application reads its own; a test reads a fixture compiled into the
+    /// test assembly under the same names.
+    /// </summary>
+    internal static IEnumerable<SkinEntry> BuiltIn(Assembly assembly)
     {
-        Assembly assembly = typeof(SkinCatalog).Assembly;
         foreach (string resource in assembly.GetManifestResourceNames()
                      .Where(n => n.StartsWith(ResourcePrefix, StringComparison.Ordinal)
                                  && n.EndsWith(".skin.json", StringComparison.Ordinal))
@@ -106,7 +113,8 @@ public static class SkinCatalog
                 using var reader = new StreamReader(stream);
                 json = reader.ReadToEnd();
             }
-            SkinReadResult result = SkinReader.Read(id, json, SkinOrigin.BuiltIn, null);
+            SkinReadResult result = SkinReader.ReadFrom(id, json, SkinOrigin.BuiltIn,
+                SkinEmbeddedAssets.For(assembly, id));
             if (result.Package is { } package) yield return new SkinEntry(package, result.Errors);
         }
     }

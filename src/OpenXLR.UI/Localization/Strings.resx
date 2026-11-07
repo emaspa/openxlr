@@ -4553,4 +4553,13 @@ When the window is in the tray, open it again from the OpenXLR icon or your app 
   <data name="MakeClockLater" xml:space="preserve">
     <value>Later</value>
   </data>
+  <data name="MinimizeWindow" xml:space="preserve">
+    <value>Minimize</value>
+  </data>
+  <data name="MaximizeWindow" xml:space="preserve">
+    <value>Maximize</value>
+  </data>
+  <data name="RestoreWindow" xml:space="preserve">
+    <value>Restore</value>
+  </data>
 </root>

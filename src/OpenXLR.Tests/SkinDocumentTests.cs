@@ -233,6 +233,37 @@ public sealed class SkinDocumentTests
     }
 
     /// <summary>
+    /// The window section as the document and the schema state it: a row per
+    /// shape the reader takes, the default marked, the schema's enum and
+    /// default the same, and the example a skin the reader takes whole.
+    /// </summary>
+    [Fact]
+    public void TheWindowShapesAreDocumentedAndInTheSchema()
+    {
+        string section = Section(Document, "Window shape", "Layout");
+        string[] rows = [.. section[section.IndexOf("| Shape | What it is |", StringComparison.Ordinal)..].Split('\n').Skip(2)
+            .TakeWhile(line => line.StartsWith('|'))
+            .Select(line => System.Text.RegularExpressions.Regex.Match(line, @"^\| `([a-z]+)`").Groups[1].Value)];
+        Assert.Equal(SkinWindowShapes.All, rows);
+        Assert.Contains($"| `{SkinWindowShapes.Default}` (default) |", section, StringComparison.Ordinal);
+        Assert.Contains("| `window` | no |", Section(Document, "The file", "Controls"), StringComparison.Ordinal);
+
+        int start = section.IndexOf("```json\n", StringComparison.Ordinal) + "```json\n".Length;
+        string example = section[start..section.IndexOf("```", start, StringComparison.Ordinal)];
+        SkinReadResult read = SkinReader.Read("rounded", example, SkinOrigin.User, null);
+        Assert.True(read.Ok, string.Join("\n", read.Errors));
+        Assert.Equal(SkinWindowShapes.Rounded, read.Package!.WindowShape);
+
+        using JsonDocument schema = JsonDocument.Parse(File.ReadAllText(Path.Combine(Root, "docs", "skin.schema.json")));
+        JsonElement window = schema.RootElement.GetProperty("properties").GetProperty("window");
+        Assert.False(window.GetProperty("additionalProperties").GetBoolean());
+        JsonElement shape = window.GetProperty("properties").GetProperty("shape");
+        Assert.Equal(SkinWindowShapes.All, shape.GetProperty("enum").EnumerateArray().Select(v => v.GetString()!));
+        Assert.Equal(SkinWindowShapes.Default, shape.GetProperty("default").GetString());
+        Assert.Equal(["shape"], window.GetProperty("properties").EnumerateObject().Select(p => p.Name));
+    }
+
+    /// <summary>
     /// The font weight names the document offers are names the reader takes.
     /// They are the toolkit's, and "SemiBold" and "DemiBold" are the same 600,
     /// so the list is worth checking rather than remembering.

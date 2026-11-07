@@ -311,6 +311,7 @@ name.
 | `tokens` | yes | the appearance values, see [The tokens](#the-tokens) |
 | `layout` | no | where the header and the UI's sections go, see [Layout](#layout) |
 | `icons` | no | the skin's own channel and mix icons as path data, see [Icons](#icons) |
+| `window` | no | the UI's outline, see [Window shape](#window-shape) |
 
 `name`, `description` and `author` are cut at 400 characters, and control
 characters in them are dropped.
@@ -352,8 +353,8 @@ A fault anywhere in it drops the whole block, and only the block, as
 [Layout](#layout) describes.
 
 Unknown fields at the top level of the file are ignored without comment,
-which is what lets `$schema` sit there. Unknown names inside `tokens` and
-`controls` are reported, since those are almost always a typo.
+which is what lets `$schema` sit there. Unknown names inside `tokens`,
+`controls` and `window` are reported, since those are almost always a typo.
 
 The complaints appear in Options under the picker. The rest of the UI never
 shows them.
@@ -490,6 +491,9 @@ without a row here fails the build.
 | Token | Kind | Default | Range | What it paints |
 |---|---|---|---|---|
 | `Ox.Window.Background` | brush | #16181d |  | the ground behind every window |
+| `Ox.Window.CornerRadius` | radius | 12 | 0 to 48 | the UI's corners, `window.shape: rounded` only |
+| `Ox.Window.BorderBrush` | brush | #00000000 |  | the line round the UI's outline, `window.shape: rounded` only |
+| `Ox.Window.BorderThickness` | thickness | 0 | 0 to 16 | that line's width, `window.shape: rounded` only |
 | `Ox.Card.Background` | brush | #1d2027 |  | a section card: INPUTS, HEADPHONES, an Options group |
 | `Ox.Card.BorderBrush` | brush | #00000000 |  | that card's border |
 | `Ox.Card.BorderThickness` | thickness | 0 | 0 to 16 | that border's width |
@@ -959,6 +963,25 @@ Images are paintable wherever a brush is: a faceplate behind the UI, a
 texture on a card, a metal face on a key. They are not available to a
 token of kind colour.
 
+The 16 megapixel budget is counted each time a token uses an image, so a
+picture named by three tokens counts three times.
+
+### Images in a shipped skin
+
+A skin compiled into the application can carry images too. They sit
+beside its `skin.json` in the source tree, under
+`src/OpenXLR.UI/Assets/Skins/<id>/`, and the build compiles every PNG and
+JPEG there into the application, so a package needs no extra file for
+them. The skin names an image as an installed skin does:
+`"source": "art/faceplate.png"` means
+`Assets/Skins/<id>/art/faceplate.png`. Every rule and limit above applies
+unchanged, with the same messages. A shipped skin reaches only its own
+images, never another skin's.
+
+To start your own skin from a shipped one that uses images, copy its
+images with its `skin.json`, into the same places under your skin's
+folder.
+
 ## Icons
 
 Every channel and mix wears an icon from the set OpenXLR ships, chosen in
@@ -1006,6 +1029,57 @@ icons reach only the UI. The terminal mixer and the Stream Deck
 plugin draw the built-in icon of the same name if there is one, and the
 item's default otherwise, so a layout that names a skin's icon still reads
 on every client.
+
+## Window shape
+
+A skin can round the UI's corners with an optional `window` object:
+
+```json
+{
+  "schema": 1,
+  "name": "Rounded",
+  "window": { "shape": "rounded" },
+  "tokens": {
+    "Ox.Window.CornerRadius": 16,
+    "Ox.Window.BorderBrush": "#3a3f4b",
+    "Ox.Window.BorderThickness": 1
+  }
+}
+```
+
+| Shape | What it is |
+|---|---|
+| `rectangle` (default) | the desktop's own frame and title bar, as the UI has always looked |
+| `rounded` | corners rounded by `Ox.Window.CornerRadius`, with the desktop showing through outside them, and OpenXLR's own caption row in place of the title bar |
+
+A skin with no `window` object keeps the rectangle, and so does every
+shipped skin. Any other shape, or a field other than `shape`, is reported
+in Options and the UI stays a rectangle.
+
+The rounded outline needs a desktop that draws transparent windows, which
+on X11 means a running compositor. Where there is none, or the toolkit
+says it cannot draw one, the UI keeps its rectangle and its usual title
+bar. Nothing is reported, since the desktop decides this and not the
+skin, and the rest of the skin still applies. When a compositor starts or
+stops, the UI follows.
+
+With the rounded outline the desktop's title bar goes and OpenXLR draws
+its own row above the header. Drag it to move the UI, double click it to
+maximise, and use its three buttons to minimise, maximise or restore, and
+close. Close does what the desktop's close button does, so with "When
+closing" set to "Keep running in tray" it hides the UI in the tray. A few
+pixels along every edge and a square in each corner resize the UI.
+Maximised or full screen, the UI drops the corners and the resize edges so
+it fills the screen, and gets them back when it is restored.
+
+Only the UI's own frame takes the shape. The separate mixer window,
+Options, the dialogs and every other window keep the desktop's frame.
+
+A shape is one of the outlines OpenXLR draws. A skin cannot supply an
+outline of its own, such as one taken from an image. The toolkit could
+paint everything outside it transparent, but the pointer would still land
+on the UI there rather than on the desktop below, and the outline would
+stretch whenever the UI is resized.
 
 ## Layout
 

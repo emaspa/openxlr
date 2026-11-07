@@ -112,6 +112,18 @@
           "$ref": "#/$defs/brush",
           "description": "the ground behind every window"
         },
+        "Ox.Window.CornerRadius": {
+          "$ref": "#/$defs/radius",
+          "description": "the UI's corners, `window.shape: rounded` only"
+        },
+        "Ox.Window.BorderBrush": {
+          "$ref": "#/$defs/brush",
+          "description": "the line round the UI's outline, `window.shape: rounded` only"
+        },
+        "Ox.Window.BorderThickness": {
+          "$ref": "#/$defs/thickness",
+          "description": "that line's width, `window.shape: rounded` only"
+        },
         "Ox.Card.Background": {
           "$ref": "#/$defs/brush",
           "description": "a section card: INPUTS, HEADPHONES, an Options group"
@@ -1021,6 +1033,21 @@
             "pattern": "^[MmLlHhVvCcSsQqTtAaZz0-9eE.,+\\- \\t\\r\\n]+$",
             "description": "SVG path data in a 24 by 24 box, filled under the nonzero rule."
           }
+        }
+      }
+    },
+    "window": {
+      "type": "object",
+      "description": "The UI's outline. See Window shape in docs/skins.md.",
+      "additionalProperties": false,
+      "properties": {
+        "shape": {
+          "enum": [
+            "rectangle",
+            "rounded"
+          ],
+          "default": "rectangle",
+          "description": "`rectangle` is the desktop's own frame. `rounded` rounds the corners by Ox.Window.CornerRadius where the desktop draws transparent windows."
         }
       }
     }

@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Media;
+using Avalonia.Controls;
 using Avalonia.Media.Immutable;
 using System.Text.Json;
 using OpenXLR.UI;
@@ -504,11 +505,97 @@ public sealed class SkinPackageTests : IDisposable
     }
 
     [Fact]
-    public void ABuiltInSkinCannotUseAnImageBecauseItCarriesNoFiles()
+    public void ADocumentWithNoFilesCannotUseAnImage()
     {
         Assert.Contains("carries no files", Assert.Single(Read(Doc("""
             "Ox.Card.Background": {"type":"image","source":"x.png"}
             """)).Errors));
+    }
+
+    /// <summary>The fixture skins compiled into this assembly the way the application compiles in its own.</summary>
+    private static SkinEntry[] Fixtures => [.. SkinCatalog.BuiltIn(typeof(SkinPackageTests).Assembly)];
+
+    /// <summary>
+    /// A built-in skin carries its images as resources beside its document,
+    /// read through the same asset source an installed skin's folder is.
+    /// </summary>
+    [Fact]
+    public void ABuiltInSkinReadsItsImagesFromTheResourcesBesideIt()
+    {
+        SkinEntry art = Assert.Single(Fixtures, e => e.Id == "embedded-art");
+        Assert.Empty(art.Errors);
+        Assert.Equal(SkinOrigin.BuiltIn, art.Package.Origin);
+        Assert.Null(art.Package.Directory);
+        Assert.IsType<SkinEmbeddedAssets>(art.Package.Assets);
+        Assert.Equal(new SkinImage("art/plate.png", Stretch.Fill, 1), art.Package.Tokens["Ox.Tile.Background"]);
+
+        using (Stream stream = Assert.IsAssignableFrom<Stream>(art.Package.Assets!.Open("art/plate.png")))
+            Assert.Equal(new PixelSize(16, 12), SkinImageHeader.Read(stream));
+        Assert.Null(art.Package.Assets.Open("art/missing.png"));
+        Assert.Null(art.Package.Assets.Open("plate.png"));
+
+        // The application's own skins have a source too, so an image added
+        // beside one of them later needs no code.
+        Assert.All(SkinCatalog.BuiltIn(), e => Assert.IsType<SkinEmbeddedAssets>(e.Package.Assets));
+    }
+
+    /// <summary>
+    /// A built-in skin's file names are held to the installed skin's rules,
+    /// with the same messages, and one skin cannot reach another's files.
+    /// </summary>
+    [Fact]
+    public void ABuiltInSkinsFilesAreItsOwn()
+    {
+        SkinEntry limits = Assert.Single(Fixtures, e => e.Id == "embedded-limits");
+        Assert.Equal(3, limits.Errors.Count);
+        Assert.Contains(limits.Errors, e => e.StartsWith("Ox.Control.Background:", StringComparison.Ordinal)
+            && e.Contains("no empty, \".\" or \"..\" segments", StringComparison.Ordinal));
+        Assert.Contains(limits.Errors, e => e.StartsWith("Ox.Control.BackgroundPointerOver:", StringComparison.Ordinal)
+            && e.Contains("relative to the skin's folder", StringComparison.Ordinal));
+        Assert.Contains(limits.Errors, e => e.StartsWith("Ox.Control.BackgroundPressed:", StringComparison.Ordinal)
+            && e.Contains("forward slashes", StringComparison.Ordinal));
+        Assert.False(limits.Package.Tokens.ContainsKey("Ox.Control.Background"));
+
+        // The name is checked before any resource is looked up, and a
+        // resource of another skin is not under this skin's name.
+        SkinAssets assets = limits.Package.Assets!;
+        Assert.Null(assets.Open("art/plate.png"));
+        Assert.NotNull(SkinEmbeddedAssets.For(typeof(SkinPackageTests).Assembly, "embedded-art").Open("art/plate.png"));
+        foreach (string bad in new[] { "../embedded-art/art/plate.png", "/art/big.png", "art/./big.png", "https://example.invalid/a.png" })
+            Assert.Throws<SkinValueException>(() => assets.Check(bad));
+        Assert.Equal("art/big.png", assets.Check("art/big.png"));
+    }
+
+    /// <summary>
+    /// The fixtures are compiled in under the names the application gives its
+    /// own skins, so the tests above read a built-in skin as it really is.
+    /// </summary>
+    [Fact]
+    public void TheFixtureSkinsAreEmbeddedUnderTheApplicationsNames()
+    {
+        static string[] Names(string project) =>
+        [
+            .. System.Xml.Linq.XDocument.Load(Path.Combine(RepositoryRoot, "src", project, project + ".csproj"))
+                .Descendants("EmbeddedResource")
+                .Select(e => (string?)e.Attribute("LogicalName") ?? "")
+                .Where(n => n.StartsWith("OpenXLR.UI.Assets.Skin", StringComparison.Ordinal)),
+        ];
+        string[] application = Names("OpenXLR.UI");
+        Assert.Equal(2, application.Length);
+        Assert.Equal(application, Names("OpenXLR.Tests"));
+        Assert.All(Fixtures, e => Assert.StartsWith("embedded-", e.Id, StringComparison.Ordinal));
+    }
+
+    private static string RepositoryRoot
+    {
+        get
+        {
+            DirectoryInfo? directory = new(AppContext.BaseDirectory);
+            while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "docs", "skins.md")))
+                directory = directory.Parent;
+            Assert.NotNull(directory);
+            return directory.FullName;
+        }
     }
 
     [Fact]
@@ -527,6 +614,68 @@ public sealed class SkinPackageTests : IDisposable
         Assert.NotNull(SkinReader.ResolveAsset(folder, "own.png"));
         Assert.Null(SkinReader.ResolveAsset(folder, "gone.png"));
     }
+
+    // --- the window's outline ---
+
+    private static SkinReadResult Window(string section) =>
+        Read("""{"schema":1,"tokens":{},"window":""" + section + "}");
+
+    /// <summary>
+    /// The window section picks one of OpenXLR's outlines. Anything else is
+    /// reported and the window keeps the rectangle, and the rest of the skin
+    /// still reads.
+    /// </summary>
+    [Fact]
+    public void TheWindowSectionChoosesAnOutlineAndRefusesTheRest()
+    {
+        SkinReadResult none = Read(Doc(""));
+        Assert.True(none.Ok);
+        Assert.Equal(SkinWindowShapes.Rectangle, none.Package!.WindowShape);
+
+        SkinReadResult rounded = Window("""{"shape":"rounded"}""");
+        Assert.True(rounded.Ok, string.Join("; ", rounded.Errors));
+        Assert.Equal(SkinWindowShapes.Rounded, rounded.Package!.WindowShape);
+        Assert.True(Window("""{"shape":"rectangle"}""").Ok);
+
+        foreach (string bad in new[] { """{"shape":"oval"}""", """{"shape":3}""", """{"shape":"Rounded"}""" })
+        {
+            SkinReadResult result = Window(bad);
+            Assert.Equal(SkinWindowShapes.Rectangle, result.Package!.WindowShape);
+            Assert.Equal("window.shape: expected one of \"rectangle\" or \"rounded\"; the window keeps the rectangle.",
+                Assert.Single(result.Errors));
+        }
+
+        SkinReadResult notObject = Window("\"rounded\"");
+        Assert.Equal(SkinWindowShapes.Rectangle, notObject.Package!.WindowShape);
+        Assert.Contains("\"window\" must be an object", Assert.Single(notObject.Errors));
+
+        // A field this version does not read is a typo or a later feature:
+        // reported, and the shape beside it still applies.
+        SkinReadResult extra = Window("""{"shape":"rounded","mask":"outline.png"}""");
+        Assert.Equal(SkinWindowShapes.Rounded, extra.Package!.WindowShape);
+        Assert.Equal("window: \"mask\" is not a window setting this OpenXLR reads; it is ignored.", Assert.Single(extra.Errors));
+
+        // Opt in only: every appearance the application ships keeps the rectangle.
+        Assert.All(SkinCatalog.BuiltIn(), e => Assert.Equal(SkinWindowShapes.Rectangle, e.Package.WindowShape));
+        Assert.Equal(SkinWindowShapes.Rectangle, SkinPackage.Default.WindowShape);
+    }
+
+    /// <summary>
+    /// The outline the window wears: the skin's shape only where the platform
+    /// draws a transparent window, and square corners while it fills the screen.
+    /// </summary>
+    [Theory]
+    [InlineData("rounded", true, WindowState.Normal, "Rounded")]
+    [InlineData("rounded", true, WindowState.Minimized, "Rounded")]
+    [InlineData("rounded", true, WindowState.Maximized, "Square")]
+    [InlineData("rounded", true, WindowState.FullScreen, "Square")]
+    [InlineData("rounded", false, WindowState.Normal, "System")]
+    [InlineData("rounded", false, WindowState.Maximized, "System")]
+    [InlineData("rectangle", true, WindowState.Normal, "System")]
+    [InlineData("rectangle", false, WindowState.Normal, "System")]
+    public void TheOutlineFollowsTheShapeThePlatformAndTheWindowState(
+        string shape, bool transparent, WindowState state, string expected) =>
+        Assert.Equal(Enum.Parse<WindowOutline>(expected), WindowFrame.Decide(shape, transparent, state));
 
     [Fact]
     public void TooManyImagesAreRefused()
