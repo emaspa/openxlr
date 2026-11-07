@@ -175,11 +175,13 @@ internal static class TouchControlsWindowTests
                 $"{skin}: an insert action escaped its row: {control.Bounds}, row {row.Bounds.Size}");
         }
 
-        foreach (Border strip in main.GetVisualDescendants().OfType<Border>()
-            .Where(b => b.Classes.Contains("tile") && b.IsEffectivelyVisible))
+        double maximum = (double)main.FindResource("Ox.Mixer.TileMaxWidth")!;
+        foreach (Border strip in main.GetVisualDescendants().OfType<Border>().Where(b => b.IsEffectivelyVisible))
         {
-            if (strip.DataContext is ChannelViewModel) Assert.Equal(180, strip.Bounds.Width);
-            else if (strip.DataContext is MixViewModel) Assert.Equal(280, strip.Bounds.Width);
+            // Touch sizing supplies the base widths. A wide layout can give
+            // the same tiles more room without reducing any touch target.
+            if (strip.Name == "ClassicChannelTile") Assert.InRange(strip.Bounds.Width, 180, Math.Max(180, maximum));
+            else if (strip.Name == "ClassicMasterTile") Assert.InRange(strip.Bounds.Width, 280, Math.Max(280, maximum));
         }
     }
 
