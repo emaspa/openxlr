@@ -188,7 +188,7 @@
               </Button>
             </Grid>
             <DropDownButton Name="DevicePicker" Grid.Column="1" Content="{Binding ActiveDeviceName}" FontSize="{DynamicResource UiText.FontSize11}" Padding="6,1"
-                            MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center" HorizontalAlignment="Left" Classes="ghost"
+                            MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center" HorizontalAlignment="Left"
                             IsVisible="{Binding HasMultipleDevices}"
                             ToolTip.Tip="{Binding ActiveDeviceName, StringFormat={loc:Text Key=SelectInterfaceTip}}">
               <DropDownButton.ContentTemplate>
