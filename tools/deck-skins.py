@@ -36,9 +36,10 @@ def generate():
             # A Deck image uses a representative colour for a surface.
             if isinstance(value, dict) and value.get('type') in ('linear', 'radial'):
                 value = value['stops'][0]['color']
-            # A skin image stays in the UI; the key keeps the default colour.
+            # A skin image stays in the UI; the key takes the colour the skin
+            # gives for it, or keeps the default colour.
             elif isinstance(value, dict) and value.get('type') == 'image':
-                value = None
+                value = value.get('color')
             if value is not None:
                 values[token] = value
         palettes[skin['id']] = values

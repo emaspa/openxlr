@@ -520,6 +520,11 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
   stay in the header's overflow menu. See [Skins](skins.md)
 - Nyan Pink: dark plum surfaces, pink faders and cyan details, keeping the
   classic mixer arrangement and the saved section order.
+- Hi-Fi and Hi-Fi Amber: a 1980s separates stack drawn with images, in a
+  blue or an amber display, with backlit keys and names, glowing lamps,
+  three stacked mix banks picked from keys and a typeface the UI carries
+  itself. Both open the UI at the size their layout was drawn for. See
+  [Skins](skins.md)
 - The Wave skin: Broadcast's arrangement on a dark charcoal palette with
   grey faders and green meters. HEADPHONES and MONITOR's toolbar side by
   side above the mix matrix, INPUTS hidden until Arrange mode shows it, and
@@ -1262,11 +1267,11 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   a bezel, a flat or a bevelled mute cap. A meter is coloured by position on
   its scale, so a skin can give it a hi-fi green, amber and red ladder
   without the bar ever repainting itself end to end. What a skin leaves out
-  keeps the shipped default. Seventeen appearances ship, all compiled into
+  keeps the shipped default. Nineteen appearances ship, all compiled into
   the application: Material, the classic look, Deck, built from the
   OpenDeck plugin's key and dial art, one for each of the eleven
-  Omarchy palettes, two of them light, Nyan Pink, Broadcast, Compact Desk
-  and Wave. The last three also arrange the UI. Broadcast is the default: a new
+  Omarchy palettes, two of them light, Nyan Pink, Broadcast, Compact Desk,
+  Wave, Hi-Fi and Hi-Fi Amber. The last five also arrange the UI. Broadcast is the default: a new
   install, or one that never picked a skin, starts on it, and a skin the
   user picked, Material included, is kept. The picker is in Options, the
   choice lives in `ui.json` alone, and switching
@@ -1279,6 +1284,8 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   caption row and resize edges, squares the corners while the UI is
   maximised, and keeps the desktop's rectangle wherever the desktop cannot
   draw a transparent window. No shipped skin does this.
+  A skin can also name the size the UI opens at when it is put on, fitted
+  to the screen; the user's own resizing stands until the skin changes.
   A skin cannot change what a control does either: the
   console fader is the framework's slider with OpenXLR's drawing over it,
   and a plugin's own editor window is drawn by the plugin and is not

@@ -3126,7 +3126,7 @@ the old controls cannot affect a plugin that now uses the same slot id.
 <a name="skins"></a>
 ### 3.10 Change how the UI looks
 
-Options, APPEARANCE picks a skin. OpenXLR ships seventeen, all built into
+Options, APPEARANCE picks a skin. OpenXLR ships nineteen, all built into
 the application, so a package brings them with it:
 
 - **Material**, the classic appearance, in a dark palette, which is what
@@ -3153,7 +3153,14 @@ the application, so a package brings them with it:
   Wave too, in its own colours, with a wider name column and the cards a
   little closer together. Your Arrange moves are kept for each of the two
   separately. Choosing it changes appearance and arrangement, not routing
-  or audio levels.
+  or audio levels;
+- **Hi-Fi**, a 1980s separates stack: brushed black faceplates, blue
+  display meters, backlit keys and glowing lamps, with INPUTS and
+  APPLICATIONS on the left and three mix banks stacked on the right, each
+  with a row of keys to pick its mix. A channel's icon turns red while it
+  is muted in that mix. Choosing it opens the UI at 1668 by 1174, or as
+  large as a smaller screen allows; resize it as you like after that;
+- **Hi-Fi Amber**, the same with an amber display.
 
 A new install opens on Broadcast. An install that never picked a skin
 opens on Broadcast too, so after upgrading from a version that started on
@@ -5910,8 +5917,9 @@ be written, and the bottom line says the saved choice could not be written.
 `--skin <id>` uses one appearance for this run without saving it, with
 Material held dark, and
 `--list-skins` prints what this machine has, `OPENXLR_SKIN` names a skin
-the same way, and `--version` prints the version. Deck, Nyan Pink and the
-Omarchy skins get console fader caps, bracketed keys and lamps; Wave and
+the same way, and `--version` prints the version. Deck, Nyan Pink, Hi-Fi,
+Hi-Fi Amber and the Omarchy skins get console fader caps, bracketed keys
+and lamps; Wave and
 Broadcast get the console cap with plain keys; Material is plain
 throughout.
 The terminal reads these choices from `controls` and derives its surfaces

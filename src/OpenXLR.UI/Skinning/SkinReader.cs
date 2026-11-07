@@ -136,11 +136,12 @@ public static class SkinReader
             }
 
             string shape = SkinWindowShapes.Default;
+            SkinWindowSize? size = null;
             if (root.TryGetProperty("window", out JsonElement windowElement))
             {
                 if (windowElement.ValueKind != JsonValueKind.Object)
                     errors.Add("\"window\" must be an object such as {\"shape\": \"rounded\"}.");
-                else shape = ReadWindow(windowElement, errors);
+                else (shape, size) = ReadWindow(windowElement, errors);
             }
 
             var package = new SkinPackage(id, name, description, author, schema, origin, directory, tokens, controls, layout)
@@ -148,6 +149,7 @@ public static class SkinReader
                 Icons = icons,
                 Assets = assets,
                 WindowShape = shape,
+                WindowSize = size,
             };
             return new SkinReadResult(package, errors);
         }
@@ -210,15 +212,25 @@ public static class SkinReader
 
     /// <summary>
     /// The "window" section: the outline of the main window, one of the
-    /// shapes OpenXLR draws. A shape this version does not have is reported
-    /// and the window keeps the rectangle; a field it does not read is
-    /// reported and ignored, since that is almost always a typo.
+    /// shapes OpenXLR draws, and the size the UI takes when the skin is put
+    /// on. A shape this version does not have is reported and the window
+    /// keeps the rectangle; a size out of bounds is reported and the UI keeps
+    /// its size; a field it does not read is reported and ignored, since that
+    /// is almost always a typo.
     /// </summary>
-    private static string ReadWindow(JsonElement element, List<string> errors)
+    private static (string Shape, SkinWindowSize? Size) ReadWindow(JsonElement element, List<string> errors)
     {
         string shape = SkinWindowShapes.Default;
+        SkinWindowSize? size = null;
         foreach (JsonProperty property in element.EnumerateObject())
         {
+            if (property.Name == "size")
+            {
+                size = ReadWindowSize(property.Value);
+                if (size is null)
+                    errors.Add($"window.size: expected {SkinWindowSize.Bounds}; the UI keeps its size.");
+                continue;
+            }
             if (property.Name != "shape")
             {
                 string name = property.Name.Length > 40 ? property.Name[..40] + "..." : property.Name;
@@ -231,7 +243,25 @@ public static class SkinReader
             else
                 errors.Add($"window.shape: expected one of {SkinWindowShapes.List}; the window keeps the rectangle.");
         }
-        return shape;
+        return (shape, size);
+    }
+
+    /// <summary>A width and a height, both whole numbers in bounds and nothing else, or null.</summary>
+    private static SkinWindowSize? ReadWindowSize(JsonElement element)
+    {
+        if (element.ValueKind != JsonValueKind.Object) return null;
+        int? width = null, height = null;
+        foreach (JsonProperty property in element.EnumerateObject())
+        {
+            if (property.Value.ValueKind != JsonValueKind.Number || !property.Value.TryGetInt32(out int value)) return null;
+            switch (property.Name)
+            {
+                case "width" when width is null && value is >= SkinWindowSize.MinWidth and <= SkinWindowSize.MaxWidth: width = value; break;
+                case "height" when height is null && value is >= SkinWindowSize.MinHeight and <= SkinWindowSize.MaxHeight: height = value; break;
+                default: return null;
+            }
+        }
+        return width is { } w && height is { } h ? new SkinWindowSize(w, h) : null;
     }
 
     /// <summary>
@@ -385,7 +415,8 @@ public static class SkinReader
         double opacity = value.TryGetProperty("opacity", out JsonElement o) ? Double(o) : 1;
         if (double.IsNaN(opacity) || opacity is < 0 or > 1)
             throw new SkinValueException("an image \"opacity\" is between 0 and 1.");
-        return new SkinImage(relative, stretch, opacity);
+        Color? fallback = Text(value, "color") is { } colour ? ReadColor(colour) : null;
+        return new SkinImage(relative, stretch, opacity) { Fallback = fallback };
     }
 
     /// <summary>

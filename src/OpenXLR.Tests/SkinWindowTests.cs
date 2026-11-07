@@ -60,6 +60,8 @@ public sealed partial class SkinWindowTests
             TheApplicationsWindowKeepsItsBottomControlsReachable();
             ThePluginBypassKeyIsLegibleInBothAppearances();
             LampKeysAndCheckKeysWearTheSkinsFaces();
+            TheHiFiSkinsLetterInTheirBundledTypeface();
+            ASkinOpensTheUIAtItsOwnSize(main);
             TheOptionsTabsWearTheSkin(options);
             TheWindowActuallyRepaintsWhenTheSkinChanges(main);
             ASkinCanLeaveTheBindingOut();
@@ -1597,8 +1599,10 @@ public sealed partial class SkinWindowTests
                 .Where(c => c is Button or ToggleButton or DropDownButton
                             && c is not RepeatButton and not CheckBox and not RadioButton
                             && c.IsEffectivelyVisible
+                            // Its own template's presenter: a header strip holds
+                            // a hidden handle whose template may be applied too.
                             && c.GetVisualDescendants().OfType<ContentPresenter>()
-                                .Any(p => p.Name == "PART_ContentPresenter"))];
+                                .Any(p => p.Name == "PART_ContentPresenter" && p.TemplatedParent == c))];
 
         static IBrush? Gloss(Control c) => c.GetVisualDescendants().OfType<Border>()
             .FirstOrDefault(b => b.Name == "Bevel")?.Background;
@@ -1875,6 +1879,84 @@ public sealed partial class SkinWindowTests
             finally { window.Close(); }
         }
         SkinService.Apply(new SkinEntry(SkinPackage.Default, []));
+    }
+
+    /// <summary>
+    /// Hi-Fi and Hi-Fi Amber name Fira Sans Condensed, which the UI carries
+    /// itself: the name reaches the bundled copy, so the skins letter the same
+    /// on a machine without the font installed, as the test machines are.
+    /// </summary>
+    private static void TheHiFiSkinsLetterInTheirBundledTypeface()
+    {
+        foreach (string id in new[] { "hifi", "hifi-amber" })
+        {
+            SkinEntry skin = SkinCatalog.Find(id)!;
+            Assert.Empty(skin.Errors);
+            Assert.Empty(SkinService.Apply(skin));
+            var family = (FontFamily)Application.Current!.FindResource("Ox.Font.Family")!;
+            Assert.True(FontManager.Current.TryGetGlyphTypeface(new Typeface(family, FontStyle.Normal, FontWeight.SemiBold), out GlyphTypeface? face),
+                $"{id}: no typeface for {family}");
+            // The bundled copy, whether or not the machine has the font
+            // installed: the family names the collection's key, which resolves
+            // there or nowhere. A face past the four classic styles keeps its
+            // weight in the font's own family name.
+            Assert.Equal(BundledFonts.CollectionKey, family.Key?.Source.OriginalString);
+            Assert.StartsWith("Fira Sans Condensed", face!.FamilyName, StringComparison.Ordinal);
+            Assert.Equal(FontWeight.SemiBold, face.Weight);
+        }
+        SkinService.Apply(new SkinEntry(SkinPackage.Default, []));
+    }
+
+    /// <summary>
+    /// A skin that names a size puts the UI at it when it is put on, fitted
+    /// to the screen. Leaving it for a skin without one brings back the usual
+    /// size; between two skins without one, and on a change that is not a
+    /// change of skin, the user's own size stays.
+    /// </summary>
+    private static void ASkinOpensTheUIAtItsOwnSize(MainWindow main)
+    {
+        double width = main.Width, height = main.Height;
+        try
+        {
+            MainWindow.WorkingAreaProbe = _ => new Rect(0, 0, 2560, 1440);
+            Assert.Empty(SkinService.Apply(new SkinEntry(SkinPackage.Default, [])));
+            main.Width = 1300;
+            main.Height = 800;
+
+            Assert.Empty(SkinService.Apply(SkinCatalog.Find("hifi")!));
+            Assert.Equal((1668d, 1174d), (main.Width, main.Height));
+
+            // Resizing stands while the skin stays on, through a change of text size.
+            main.Width = 1500;
+            SkinService.ApplyTextSize(110);
+            SkinService.ApplyTextSize(SkinService.NormalTextSize);
+            Assert.Equal(1500d, main.Width);
+
+            // A change to another skin with a size takes that skin's.
+            Assert.Empty(SkinService.Apply(SkinCatalog.Find("hifi-amber")!));
+            Assert.Equal((1668d, 1174d), (main.Width, main.Height));
+
+            Assert.Empty(SkinService.Apply(new SkinEntry(SkinPackage.Default, [])));
+            Assert.Equal(((double)SkinWindowSize.Default.Width, (double)SkinWindowSize.Default.Height), (main.Width, main.Height));
+
+            main.Width = 1200;
+            Assert.Empty(SkinService.Apply(SkinCatalog.Find("nord")!));
+            Assert.Equal(1200d, main.Width);
+
+            // A screen smaller than the skin's size gets the UI as large as it allows.
+            MainWindow.WorkingAreaProbe = _ => new Rect(0, 0, 1280, 720);
+            Assert.Empty(SkinService.Apply(SkinCatalog.Find("hifi")!));
+            Assert.InRange(main.Width, SkinWindowSize.MinWidth, 1280);
+            Assert.InRange(main.Height, SkinWindowSize.MinHeight, 720);
+            Assert.True(main.Width > 1200 && main.Height > 640, $"{main.Width} by {main.Height} on a 1280 by 720 screen");
+        }
+        finally
+        {
+            MainWindow.WorkingAreaProbe = null;
+            SkinService.Apply(new SkinEntry(SkinPackage.Default, []));
+            main.Width = width;
+            main.Height = height;
+        }
     }
 
     /// <summary>
@@ -2224,7 +2306,8 @@ public sealed partial class SkinWindowTests
                 Environment.SetEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS", "unix:path=/nonexistent");
                 Environment.SetEnvironmentVariable("OPENXLR_SKIN", null);
                 WindowLayoutTests.PinMaterial();
-                AppBuilder.Configure<App>().UseSkia().UseHarfBuzz().UseX11().SetupWithoutStarting();
+                AppBuilder.Configure<App>().UseSkia().UseHarfBuzz().UseX11()
+                    .ConfigureFonts(BundledFonts.Register).SetupWithoutStarting();
                 Application.Current!.RequestedThemeVariant = ThemeVariant.Dark;
 
                 var main = new MainWindow();

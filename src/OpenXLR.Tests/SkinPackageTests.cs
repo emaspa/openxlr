@@ -100,7 +100,7 @@ public sealed class SkinPackageTests : IDisposable
         // Every appearance the application carries is compiled in, so a
         // package has them all without installing a single file.
         Assert.Equal(
-            ["broadcast", "catppuccin", "catppuccin-latte", "compact-desk", "everforest", "gruvbox", "kanagawa", "matte-black",
+            ["broadcast", "catppuccin", "catppuccin-latte", "compact-desk", "everforest", "gruvbox", "hifi", "hifi-amber", "kanagawa", "matte-black",
                 "nord", "nyan-pink", "opendeck", "osaka-jade", "ristretto", "rose-pine", "tokyo-night", "wave"],
             built.Select(e => e.Id).Order(StringComparer.Ordinal));
         foreach (SkinEntry entry in built)
@@ -520,6 +520,19 @@ public sealed class SkinPackageTests : IDisposable
     /// read through the same asset source an installed skin's folder is.
     /// </summary>
     [Fact]
+    public void AnImageCanNameTheColourThatStandsForIt()
+    {
+        SkinEntry hifi = Assert.Single(SkinCatalog.BuiltIn(), e => e.Id == "hifi");
+        Assert.Empty(hifi.Errors);
+        SkinImage[] images = [.. hifi.Package.Tokens.Values.OfType<SkinImage>()];
+        Assert.NotEmpty(images);
+        // Every image in the shipped skins gives the terminal, the Deck and the
+        // bar a colour, so none of them falls back to Material's surfaces.
+        Assert.All(images, image => Assert.NotNull(image.Fallback));
+        Assert.Equal(Color.Parse("#0a1115"), ((SkinImage)hifi.Package.Tokens["Ox.Window.Background"]).Fallback);
+    }
+
+    [Fact]
     public void ABuiltInSkinReadsItsImagesFromTheResourcesBesideIt()
     {
         SkinEntry art = Assert.Single(Fixtures, e => e.Id == "embedded-art");
@@ -658,6 +671,61 @@ public sealed class SkinPackageTests : IDisposable
         // Opt in only: every appearance the application ships keeps the rectangle.
         Assert.All(SkinCatalog.BuiltIn(), e => Assert.Equal(SkinWindowShapes.Rectangle, e.Package.WindowShape));
         Assert.Equal(SkinWindowShapes.Rectangle, SkinPackage.Default.WindowShape);
+    }
+
+    /// <summary>
+    /// A skin can name the size the UI opens at: a width and a height, whole
+    /// numbers in bounds and nothing else. Anything else is reported, the UI
+    /// keeps its size, and the shape beside it still applies.
+    /// </summary>
+    [Fact]
+    public void TheWindowSectionCanNameASizeAndRefusesABadOne()
+    {
+        Assert.Null(Read(Doc("")).Package!.WindowSize);
+
+        SkinReadResult sized = Window("""{"shape":"rounded","size":{"width":1668,"height":1174}}""");
+        Assert.True(sized.Ok, string.Join("; ", sized.Errors));
+        Assert.Equal(new SkinWindowSize(1668, 1174), sized.Package!.WindowSize);
+        Assert.Equal(SkinWindowShapes.Rounded, sized.Package.WindowShape);
+        Assert.Equal(new SkinWindowSize(640, 480), Window("""{"size":{"height":480,"width":640}}""").Package!.WindowSize);
+        Assert.Equal(new SkinWindowSize(7680, 4320), Window("""{"size":{"width":7680,"height":4320}}""").Package!.WindowSize);
+
+        foreach (string bad in new[]
+        {
+            """{"width":639,"height":900}""", """{"width":1040,"height":479}""", """{"width":7681,"height":900}""",
+            """{"width":1040,"height":4321}""", """{"width":1040.5,"height":900}""", """{"width":"1040","height":900}""",
+            """{"width":1040}""", """{"height":900}""", """{"width":1040,"height":900,"depth":1}""",
+            """{"width":1040,"width":1200,"height":900}""", "[1040,900]", "\"1040x900\"", "{}",
+        })
+        {
+            SkinReadResult result = Window("""{"shape":"rounded","size":""" + bad + "}");
+            Assert.Null(result.Package!.WindowSize);
+            Assert.Equal(SkinWindowShapes.Rounded, result.Package.WindowShape);
+            Assert.Equal("window.size: expected {\"width\": 640 to 7680, \"height\": 480 to 4320}; the UI keeps its size.",
+                Assert.Single(result.Errors));
+        }
+
+        // Hi-Fi and Hi-Fi Amber are drawn for one size; every other shipped
+        // appearance leaves the UI's size alone.
+        foreach (SkinEntry entry in SkinCatalog.BuiltIn())
+            Assert.Equal(entry.Package.Id is "hifi" or "hifi-amber" ? new SkinWindowSize(1668, 1174) : null, entry.Package.WindowSize);
+        Assert.Null(SkinPackage.Default.WindowSize);
+    }
+
+    /// <summary>
+    /// The size the UI takes is the skin's, made smaller where the screen's
+    /// free area, less the desktop's frame, is smaller, and never under the
+    /// smallest size a skin can name.
+    /// </summary>
+    [Fact]
+    public void ASkinSizeIsFittedToTheScreen()
+    {
+        var size = new SkinWindowSize(1668, 1174);
+        Assert.Equal(new Size(1668, 1174), size.FitIn(null, default));
+        Assert.Equal(new Size(1668, 1174), size.FitIn(new Rect(0, 0, 3440, 1400), new Size(2, 34)));
+        Assert.Equal(new Size(1668, 1046), size.FitIn(new Rect(0, 0, 1920, 1080), new Size(0, 34)));
+        Assert.Equal(new Size(1278, 686), size.FitIn(new Rect(100, 0, 1280, 720), new Size(2, 34)));
+        Assert.Equal(new Size(640, 480), size.FitIn(new Rect(0, 0, 600, 400), new Size(2, 34)));
     }
 
     /// <summary>
@@ -1338,6 +1406,8 @@ public sealed class SkinPackageTests : IDisposable
         {
             SkinSolid solid => [solid.Color],
             SkinGradient gradient => [.. gradient.Stops.Select(s => s.Color)],
+            // An image is read at the colour the skin gives for it, its average.
+            SkinImage { Fallback: { } colour } => [colour],
             _ => throw new InvalidOperationException($"{token} is not a colour in {entry.Id}"),
         };
     }

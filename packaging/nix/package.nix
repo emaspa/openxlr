@@ -186,7 +186,7 @@ buildDotnetModule {
     # Stretch and Linear (MIT), libDF, the DeepFilterNet model and the Rust
     # crates (MIT, Apache-2.0 or either);
     # the soundboard's starter sounds are CC0-1.0.
-    license = with lib.licenses; [ gpl3Only bsd3 mit asl20 cc0 ];
+    license = with lib.licenses; [ gpl3Only bsd3 mit asl20 cc0 ofl ];
     platforms = lib.platforms.linux;
     mainProgram = "openxlr";
   };

@@ -1038,7 +1038,7 @@
     },
     "window": {
       "type": "object",
-      "description": "The UI's outline. See Window shape in docs/skins.md.",
+      "description": "The UI's outline and the size it opens at. See Window shape and Window size in docs/skins.md.",
       "additionalProperties": false,
       "properties": {
         "shape": {
@@ -1048,6 +1048,27 @@
           ],
           "default": "rectangle",
           "description": "`rectangle` is the desktop's own frame. `rounded` rounds the corners by Ox.Window.CornerRadius where the desktop draws transparent windows."
+        },
+        "size": {
+          "type": "object",
+          "description": "The size the UI takes when the skin is put on, its content without the desktop's title bar, made smaller to fit the screen.",
+          "additionalProperties": false,
+          "required": [
+            "width",
+            "height"
+          ],
+          "properties": {
+            "width": {
+              "type": "integer",
+              "minimum": 640,
+              "maximum": 7680
+            },
+            "height": {
+              "type": "integer",
+              "minimum": 480,
+              "maximum": 4320
+            }
+          }
         }
       }
     }
@@ -1173,6 +1194,11 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1
+        },
+        "color": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The flat colour that stands for the image where it cannot be drawn: the terminal, the Deck and the bar, or a refused image."
         }
       }
     },

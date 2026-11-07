@@ -34,9 +34,10 @@ def generate():
         palette = {}
         for key, token in TOKENS.items():
             value = tokens.get("Ox.Meter." + token, DEFAULTS.get(token))
-            # A skin image stays in the UI; the bar draws the token's default colour.
+            # A skin image stays in the UI; the bar draws the colour the skin
+            # gives for it, or the token's default colour.
             if isinstance(value, dict) and value.get("type") == "image":
-                value = default_colour("Ox.Meter." + token)
+                value = value.get("color") or default_colour("Ox.Meter." + token)
             if token in DEFAULTS:
                 if type(value) not in (int, float) or not 0 <= value <= 1:
                     raise ValueError(f"{path}: invalid meter threshold {token}")

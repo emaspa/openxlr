@@ -95,6 +95,34 @@
     "Ox.Meter.Warning": "#d8a657",
     "Ox.Meter.Hot": "#ea6962"
   },
+  "hifi": {
+    "Ox.Card.Background": "#1b1d21",
+    "Ox.Text.Primary": "#e2e8eb",
+    "Ox.Text.Muted": "#727b80",
+    "Ox.Led.On": "#3fe6ff",
+    "Ox.Led.Off": "#2a3236",
+    "Ox.Led.Alert": "#ff3b2f",
+    "Ox.Meter.Track": "#0b2328",
+    "Ox.Meter.Fill": "#3fe6ff",
+    "Ox.Meter.Warning": "#ff3b2f",
+    "Ox.Meter.Hot": "#ff3b2f",
+    "Ox.Meter.WarningLevel": 0.7,
+    "Ox.Meter.HotLevel": 0.9
+  },
+  "hifi-amber": {
+    "Ox.Card.Background": "#211e1b",
+    "Ox.Text.Primary": "#e2e8eb",
+    "Ox.Text.Muted": "#807972",
+    "Ox.Led.On": "#ff9f3f",
+    "Ox.Led.Off": "#36302a",
+    "Ox.Led.Alert": "#ff3b2f",
+    "Ox.Meter.Track": "#28190b",
+    "Ox.Meter.Fill": "#ff9f3f",
+    "Ox.Meter.Warning": "#ff3b2f",
+    "Ox.Meter.Hot": "#ff3b2f",
+    "Ox.Meter.WarningLevel": 0.7,
+    "Ox.Meter.HotLevel": 0.9
+  },
   "kanagawa": {
     "Ox.Card.Background": "#262631",
     "Ox.Text.Primary": "#dcd7ba",
