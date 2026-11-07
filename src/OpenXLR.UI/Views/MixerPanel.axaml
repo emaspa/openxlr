@@ -296,7 +296,7 @@
           <DataTemplate x:DataType="layout:MixBankViewModel">
             <Border Classes="tile" Name="Bank" Padding="8" VerticalAlignment="Top">
               <DockPanel>
-                <ComboBox DockPanel.Dock="Top" Name="BankPicker" ItemsSource="{Binding Available}"
+                <ComboBox DockPanel.Dock="Top" Name="BankPicker" ItemsSource="{Binding Available}" IsVisible="{Binding PickerDropdown}"
                           SelectedItem="{Binding Mix, Mode=TwoWay}" HorizontalAlignment="Stretch" Margin="0,0,0,8"
                           AutomationProperties.Name="{Binding PickerName}" ToolTip.Tip="{loc:Text Key=BankPickerTip}">
                   <ComboBox.ItemTemplate>
@@ -305,6 +305,22 @@
                     </DataTemplate>
                   </ComboBox.ItemTemplate>
                 </ComboBox>
+                <!-- the same pick as a row of keys, one per mix, the shown mix's key lit -->
+                <ItemsControl DockPanel.Dock="Top" Name="BankKeys" ItemsSource="{Binding Choices}" IsVisible="{Binding PickerButtons}"
+                              Margin="0,0,0,4" AutomationProperties.Name="{Binding PickerName}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <WrapPanel Orientation="Horizontal"/>
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="layout:BankChoiceViewModel">
+                      <ToggleButton Name="BankKey" Content="{Binding Mix.Name}" IsChecked="{Binding IsSelected, Mode=OneWay}"
+                                    Click="OnBankKey" Margin="0,0,4,4" MinWidth="64" HorizontalContentAlignment="Center"
+                                    AutomationProperties.Name="{Binding Mix.Name}" ToolTip.Tip="{loc:Text Key=BankPickerTip}"/>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
                 <ContentControl Name="BankMasterHost" DockPanel.Dock="{Binding MasterDock}" Content="{Binding Master}"
                                 ContentTemplate="{StaticResource BankMasters}" Margin="{Binding MasterMargin}"
                                 HorizontalContentAlignment="Stretch" VerticalAlignment="Top" Classes.revealed="{Binding Mix.Revealed}"/>

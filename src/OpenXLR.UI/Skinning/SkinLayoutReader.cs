@@ -38,10 +38,10 @@ public static class SkinLayoutReader
     private static readonly string[] SectionOptions = ["visibility", "width", "height"];
     private static readonly string[] InputsOptions = [.. SectionOptions, "template", "strip"];
     private static readonly string[] SubmixerOptions =
-        [.. SectionOptions, "template", "orientation", "visibleBanks", "selectionDefaults", "strip", "master", "matrix", "popOut"];
+        [.. SectionOptions, "template", "orientation", "visibleBanks", "selectionDefaults", "strip", "master", "picker", "matrix", "popOut"];
     private static readonly string[] TemplateOptions = [.. SectionOptions, "template"];
     private static readonly string[] ApplicationsOptions = [.. TemplateOptions, "perColumn"];
-    private static readonly string[] BankOnlyOptions = ["orientation", "visibleBanks", "selectionDefaults", "strip", "master"];
+    private static readonly string[] BankOnlyOptions = ["orientation", "visibleBanks", "selectionDefaults", "strip", "master", "picker"];
     private static readonly string[] MatrixOnlyOptions = ["matrix"];
     private static readonly string[] MatrixOptions = ["rowHead", "columnHead", "cell", "meter"];
     private static readonly string[] MatrixMuted = ["tint", "dim"];
@@ -477,7 +477,10 @@ public static class SkinLayoutReader
         SkinMasterOptions master = fields.TryGetValue("master", out JsonElement masterElement)
             ? ReadMaster(masterElement, path + ".master")
             : SkinMasterOptions.Default;
-        return new SkinSubmixerOptions(template, orientation, banks, defaults, strip, master);
+        string picker = fields.TryGetValue("picker", out JsonElement pickerElement)
+            ? Name(pickerElement, path + ".picker", SkinLayoutTemplates.BankPickers, "a bank picker")
+            : SkinLayoutTemplates.PickerDropdown;
+        return new SkinSubmixerOptions(template, orientation, banks, defaults, strip, master) { Picker = picker };
     }
 
     /// <summary>

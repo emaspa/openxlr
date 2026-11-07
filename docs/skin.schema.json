@@ -1646,6 +1646,14 @@
           "$ref": "#/$defs/layoutMaster",
           "description": "How a bank's master is drawn. Only with template mix-banks."
         },
+        "picker": {
+          "enum": [
+            "dropdown",
+            "buttons"
+          ],
+          "default": "dropdown",
+          "description": "How each bank picks its mix: a dropdown, or a row of keys with one key per mix and the shown mix's key lit. Only with template mix-banks."
+        },
         "matrix": {
           "$ref": "#/$defs/layoutMatrix",
           "description": "How the matrix's row heads, column heads and cells are drawn. Only with template mix-matrix."
@@ -1691,6 +1699,11 @@
             {
               "required": [
                 "master"
+              ]
+            },
+            {
+              "required": [
+                "picker"
               ]
             }
           ]

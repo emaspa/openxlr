@@ -480,7 +480,8 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
   orders their parts or leaves some out, stands faders and meters up,
   reverses faders, labels channels with icons, and draws each master as a
   card or a strip. Every bank has a picker listing
-  every mix that is not hidden; your pick is kept per skin, and a bank whose mix is deleted
+  every mix that is not hidden, a dropdown or a row of keys as the skin
+  chooses; your pick is kept per skin, and a bank whose mix is deleted
   moves to the next one. Channel and mix order stay the layout's. See
   [Templates](skins.md#templates) and [Mix banks](manual.md#mix-banks)
 - Skins can draw MONITOR as a one-row toolbar that keeps every output and

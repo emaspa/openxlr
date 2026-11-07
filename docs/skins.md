@@ -1272,6 +1272,7 @@ send fader stays a send fader.
 | `visibleBanks` | `"mix-banks"` | how many banks show, from 1 to 4; 2 when it is missing |
 | `selectionDefaults` | `"mix-banks"` | the mixes the banks start on, by the id `mixer.json` gives them, such as `"monitor"` and `"stream"`: at most 16 mix ids, each 1 to 64 lowercase letters, digits, hyphens and underscores |
 | `master` | `"mix-banks"` | how each bank's master is drawn, below |
+| `picker` | `"mix-banks"` | how each bank picks its mix: `"dropdown"`, the default, or `"buttons"`, a row of keys with one key per mix and the shown mix's key lit |
 | `perColumn` | `"application-columns"` | the most applications in one column, from 1 to 24; 6 when it is missing |
 | `matrix` | `"mix-matrix"` | how the matrix's row heads, column heads and cells are drawn; see [The mix matrix](#the-mix-matrix) |
 | `popOut` | `submixer`, any template | where the submixer starts out: `{ "default": "docked" }`, the default, or `{ "default": "detached" }`. See [The mixer's own window](#the-mixers-own-window) |
@@ -1342,7 +1343,13 @@ Mix banks draw the submixer by mix instead of by channel. Each bank
 shows one mix: the send of every channel into that mix, then the mix's
 master. Every bank has a picker at its top that lists every mix not hidden
 in the layout editor, so Monitor B, Aux and the mixes you added stay
-reachable with two banks. The skin
+reachable with two banks. The picker is a dropdown, or with
+`"picker": "buttons"` a row of keys, one per mix in the mixer's order,
+which wrap onto a second row when the bank is too narrow for them. The key
+of the mix the bank shows is lit, as a toggle that is on, and pressing
+another key makes the same pick the dropdown makes. Pressing the lit key
+leaves it lit. The keys wear the skin's key face, and a screen reader
+hears each by its mix's name and the row as the bank's picker. The skin
 only says which mixes the banks start on:
 
 - A bank starts on the mix you last picked for it under this skin. Without

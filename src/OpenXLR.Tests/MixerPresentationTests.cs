@@ -166,6 +166,53 @@ public sealed class MixerPresentationTests
     }
 
     [Fact]
+    public void KeysFollowTheMixesAndAPressTradesPlacesLikeTheDropdown()
+    {
+        var model = new MainViewModel(new DaemonClient());
+        Apply(model, ["game"], ["monitor", "stream", "chat"]);
+        using var presentation = Presentation(model, Banks(2) with { Picker = SkinLayoutTemplates.PickerButtons });
+        MixBankViewModel first = presentation.Banks[0], second = presentation.Banks[1];
+        Assert.True(first.PickerButtons);
+        Assert.False(first.PickerDropdown);
+        string[] Ids(MixBankViewModel bank) => [.. bank.Choices.Select(c => c.Mix.Id)];
+        string[] Lit(MixBankViewModel bank) => [.. bank.Choices.Where(c => c.IsSelected).Select(c => c.Mix.Id)];
+        Assert.Equal(["monitor", "stream", "chat"], Ids(first));
+        Assert.Equal(["monitor"], Lit(first));
+        Assert.Equal(["stream"], Lit(second));
+        Assert.All(first.Choices, c => Assert.Same(model.Mixes.Single(m => m.Id == c.Mix.Id), c.Mix));
+
+        var chosen = new List<IReadOnlyList<string>>();
+        presentation.SelectionChosen += chosen.Add;
+        var raised = new List<string>();
+        foreach (BankChoiceViewModel choice in first.Choices.Concat(second.Choices))
+            choice.PropertyChanged += (_, e) => raised.Add(choice.Mix.Id + ":" + e.PropertyName);
+        first.Choices.Single(c => c.Mix.Id == "stream").Select();
+        Assert.Equal(["stream", "monitor"], presentation.Selection);
+        Assert.Equal(["stream"], Lit(first));
+        Assert.Equal(["monitor"], Lit(second));
+        Assert.Equal(["stream", "monitor"], Assert.Single(chosen));
+        Assert.Contains("monitor:IsSelected", raised);
+        // Pressing the lit key changes nothing and says it is still lit.
+        raised.Clear();
+        first.Choices.Single(c => c.Mix.Id == "stream").Select();
+        Assert.Single(chosen);
+        Assert.Contains("stream:IsSelected", raised);
+
+        // The keys follow the mixes: added, reordered and removed.
+        Apply(model, ["game"], ["chat", "stream", "monitor", "aux"]);
+        Assert.Equal(["chat", "stream", "monitor", "aux"], Ids(first));
+        Assert.Equal(Ids(first), Ids(second));
+        Apply(model, ["game"], ["chat", "stream"]);
+        Assert.Equal(["chat", "stream"], Ids(first));
+        Assert.Equal(["stream"], Lit(first));
+        Assert.Single(Lit(second));
+
+        // A dropdown skin's banks draw the dropdown.
+        presentation.Configure(Banks(2), null);
+        Assert.All(presentation.Banks, b => Assert.True(b.PickerDropdown));
+    }
+
+    [Fact]
     public void TheBankCountIsClampedToTheMixesThereAre()
     {
         var model = new MainViewModel(new DaemonClient());

@@ -2974,7 +2974,8 @@ not have stays hidden, as in the panel.
 
 Each mix bank shows one mix: every channel's send into it and the mix's
 master. The picker at the top of a bank lists every mix that is not
-hidden. Choose one to
+hidden. A skin draws it as a dropdown or as a row of keys, one per mix,
+with the key of the mix the bank shows lit. Choose one to
 show it in that bank; a mix another bank already shows trades places with
 it, so two banks never show the same mix and every mix stays reachable
 however few banks the skin shows. Your choice is remembered for that skin

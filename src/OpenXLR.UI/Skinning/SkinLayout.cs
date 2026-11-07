@@ -168,6 +168,14 @@ public static class SkinLayoutTemplates
 
     /// <summary>What a bank's <c>master.template</c> may name; the first is the default.</summary>
     public static IReadOnlyList<string> Masters { get; } = [MasterCard, MasterStrip];
+
+    /// <summary>A bank picks its mix from a dropdown that lists every mix.</summary>
+    public const string PickerDropdown = "dropdown";
+    /// <summary>A bank picks its mix with a row of keys, one per mix, the shown mix's key lit.</summary>
+    public const string PickerButtons = "buttons";
+
+    /// <summary>What <c>regions.submixer.picker</c> may name; the first is the default.</summary>
+    public static IReadOnlyList<string> BankPickers { get; } = [PickerDropdown, PickerButtons];
 }
 
 /// <summary>
@@ -471,8 +479,18 @@ public sealed record SkinSubmixerOptions(
     /// <summary>How a <c>mix-matrix</c> is drawn; <see cref="SkinMatrixOptions.Default"/> with any other template.</summary>
     public SkinMatrixOptions Matrix { get; init; } = SkinMatrixOptions.Default;
 
+    /// <summary>
+    /// How each bank picks its mix: a dropdown, the default, or a row of keys,
+    /// one per mix. Either lists every mix the view shows and makes the same
+    /// pick, so the choice is only how the picker looks.
+    /// </summary>
+    public string Picker { get; init; } = SkinLayoutTemplates.PickerDropdown;
+
+    /// <summary>True when each bank picks its mix with a row of keys.</summary>
+    public bool PickerButtons => IsBanks && Picker == SkinLayoutTemplates.PickerButtons;
+
     internal string Description() => IsBanks
-        ? $"{Template}({Orientation},{VisibleBanks},{string.Join(',', SelectionDefaults)},{Strip.Description()},{Master.Description()})"
+        ? $"{Template}({Orientation},{VisibleBanks},{string.Join(',', SelectionDefaults)},{Strip.Description()},{Master.Description()},{Picker})"
         : IsMatrix ? $"{Template}({Matrix.Description()})" : Template;
 }
 

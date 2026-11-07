@@ -437,7 +437,7 @@ public sealed class SkinDocumentTests
         Assert.Equal(SkinLayoutRegions.All, Table("| Region | What it is |"));
         Assert.Equal(SkinHeaderActions.All, Table("| Action | What it is |"));
         Assert.Equal(["visibility", "width", "height", "actions", "overflow"], Table("| Option | Region | What it is |"));
-        Assert.Equal(["template", "strip", "orientation", "visibleBanks", "selectionDefaults", "master", "perColumn", "matrix", "popOut"], Table("| Option | Template | What it is |"));
+        Assert.Equal(["template", "strip", "orientation", "visibleBanks", "selectionDefaults", "master", "picker", "perColumn", "matrix", "popOut"], Table("| Option | Template | What it is |"));
         Assert.Equal(["rowHead", "columnHead", "cell", "meter"], Table("| Matrix option | What it is |"));
         Assert.Equal(SkinMatrixParts.RowHead.Concat(SkinMatrixParts.ColumnHead).Concat(SkinMatrixParts.Cell).Distinct(),
             Table("| Matrix part | Where | What it is |"));
@@ -610,8 +610,10 @@ public sealed class SkinDocumentTests
         Assert.Equal(SkinLayoutTemplates.Inputs, Strings(inputs.GetProperty("template").GetProperty("enum")));
         Assert.Equal("#/$defs/layoutInputStrip", inputs.GetProperty("strip").GetProperty("$ref").GetString());
         JsonElement submixer = Properties("layoutSubmixerOptions");
-        Assert.Equal(["visibility", "width", "height", "template", "orientation", "visibleBanks", "selectionDefaults", "strip", "master", "matrix", "popOut"],
+        Assert.Equal(["visibility", "width", "height", "template", "orientation", "visibleBanks", "selectionDefaults", "strip", "master", "picker", "matrix", "popOut"],
             Names(submixer));
+        Assert.Equal(SkinLayoutTemplates.BankPickers, Strings(submixer.GetProperty("picker").GetProperty("enum")));
+        Assert.Equal(SkinLayoutTemplates.PickerDropdown, submixer.GetProperty("picker").GetProperty("default").GetString());
         Assert.Equal("#/$defs/layoutMatrix", submixer.GetProperty("matrix").GetProperty("$ref").GetString());
         // matrix is refused without mix-matrix, as the reader refuses it.
         JsonElement matrixRule = Assert.Single(Definition("layoutSubmixerOptions").GetProperty("allOf").EnumerateArray());
@@ -653,7 +655,7 @@ public sealed class SkinDocumentTests
         Assert.Equal("input-rack", Definition("layoutInputsOptions").GetProperty("if").GetProperty("properties").GetProperty("template").GetProperty("const").GetString());
         Assert.Equal(["strip"], Strings(Definition("layoutInputsOptions").GetProperty("else").GetProperty("not").GetProperty("required")));
         Assert.Equal("mix-banks", Definition("layoutSubmixerOptions").GetProperty("if").GetProperty("properties").GetProperty("template").GetProperty("const").GetString());
-        Assert.Equal(["orientation", "visibleBanks", "selectionDefaults", "strip", "master"],
+        Assert.Equal(["orientation", "visibleBanks", "selectionDefaults", "strip", "master", "picker"],
             Definition("layoutSubmixerOptions").GetProperty("else").GetProperty("not").GetProperty("anyOf").EnumerateArray()
                 .Select(b => Strings(b.GetProperty("required")).Single()));
 
