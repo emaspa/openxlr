@@ -16,6 +16,13 @@ TOKENS = {"fill": "Fill", "warning": "Warning", "hot": "Hot", "track": "Track",
 DEFAULTS = {"WarningLevel": 0.7, "HotLevel": 0.9}
 
 
+def default_colour(token):
+    """The flat default SkinTokens.cs gives a brush token, or None."""
+    source = (ROOT / "src/OpenXLR.UI/Skinning/SkinTokens.cs").read_text()
+    match = re.search(r'(?:SolidBrush|Brush)\("' + re.escape(token) + r'", "(#[0-9a-fA-F]{6})"', source)
+    return match[1] if match else None
+
+
 def generate():
     palettes = {}
     for path in sorted((ROOT / "src/OpenXLR.UI/Assets/Skins").glob("*/skin.json")):
@@ -27,6 +34,9 @@ def generate():
         palette = {}
         for key, token in TOKENS.items():
             value = tokens.get("Ox.Meter." + token, DEFAULTS.get(token))
+            # A skin image stays in the UI; the bar draws the token's default colour.
+            if isinstance(value, dict) and value.get("type") == "image":
+                value = default_colour("Ox.Meter." + token)
             if token in DEFAULTS:
                 if type(value) not in (int, float) or not 0 <= value <= 1:
                     raise ValueError(f"{path}: invalid meter threshold {token}")

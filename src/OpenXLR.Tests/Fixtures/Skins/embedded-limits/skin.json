@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "id": "embedded-limits",
+  "name": "Embedded limits",
+  "description": "A test fixture: a built-in skin that runs into every image limit.",
+  "tokens": {
+    "Ox.Window.Background": { "type": "image", "source": "art/big.png" },
+    "Ox.Card.Background": { "type": "image", "source": "art/big.png" },
+    "Ox.Tile.Background": { "type": "image", "source": "art/big.png" },
+    "Ox.Dialog.Background": { "type": "image", "source": "art/big.png" },
+    "Ox.Badge.Background": { "type": "image", "source": "art/big.png" },
+    "Ox.Divider": { "type": "image", "source": "art/huge.png" },
+    "Ox.Danger.Background": { "type": "image", "source": "art/fake.png" },
+    "Ox.Danger.Foreground": { "type": "image", "source": "art/missing.png" },
+    "Ox.Control.Background": { "type": "image", "source": "../embedded-art/art/plate.png" },
+    "Ox.Control.BackgroundPointerOver": { "type": "image", "source": "/art/big.png" },
+    "Ox.Control.BackgroundPressed": { "type": "image", "source": "art\\big.png" }
+  }
+}

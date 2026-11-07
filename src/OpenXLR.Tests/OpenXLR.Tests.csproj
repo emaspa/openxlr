@@ -21,6 +21,16 @@
     <None Update="skin-rack-keys.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!-- Built-in skins for the tests, compiled into this assembly under the
+       names the application gives its own (OpenXLR.UI.csproj), so
+       SkinCatalog.BuiltIn reads them through the same code path.
+       SkinPackageTests holds the two sets of names to each other. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Fixtures/Skins/*/skin.json" LogicalName="OpenXLR.UI.Assets.Skins.$([System.String]::Copy('%(RecursiveDir)').TrimEnd('/')).skin.json"/>
+    <EmbeddedResource Include="Fixtures/Skins/*/**/*.png;Fixtures/Skins/*/**/*.jpg;Fixtures/Skins/*/**/*.jpeg"
+                      LogicalName="OpenXLR.UI.Assets.SkinFiles/$([System.String]::Copy('%(RecursiveDir)').Replace('\','/'))%(Filename)%(Extension)"/>
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="../OpenXLR.Core/OpenXLR.Core.csproj" />
     <ProjectReference Include="../OpenXLR.Daemon/OpenXLR.Daemon.csproj" />

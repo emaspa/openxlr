@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "id": "embedded-art",
+  "name": "Embedded art",
+  "description": "A test fixture: a built-in skin whose image is compiled in beside it.",
+  "tokens": {
+    "Ox.Tile.Background": { "type": "image", "source": "art/plate.png", "stretch": "fill" },
+    "Ox.Text.Primary": "#fafafa"
+  }
+}

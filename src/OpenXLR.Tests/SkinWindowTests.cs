@@ -38,6 +38,7 @@ public sealed partial class SkinWindowTests
         {
             SkinsReachOpenWindowsAndTheDefaultComesBackExactly(main, options, flow);
             AnInstalledSkinIsFoundAndItsImageIsUsed(main);
+            ABuiltInSkinPaintsItsOwnImagesUnderTheSameLimits(main);
             ALayoutSkinTurnsTheSectionsWithoutRebuildingThem(main);
             ASwitchToMixBanksKeepsEveryViewModelAndSendsNothing(main);
             AStructuralSwitchKeepsFocusFoldsAndScrollAndLeavesNothingBehind(main);
@@ -173,6 +174,45 @@ public sealed partial class SkinWindowTests
             Environment.SetEnvironmentVariable("XDG_DATA_HOME", oldHome);
             Environment.SetEnvironmentVariable("XDG_DATA_DIRS", oldDirs);
             Directory.Delete(data, recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// A built-in skin's images, compiled in beside its document (the test
+    /// assembly's fixtures, under the application's names): the image is
+    /// decoded from its resource, and the limits an installed skin is held to
+    /// hold here too. The megapixel budget is counted per token that uses an
+    /// image, so one 4 megapixel file named five times fits four times.
+    /// </summary>
+    private static void ABuiltInSkinPaintsItsOwnImagesUnderTheSameLimits(MainWindow main)
+    {
+        SkinEntry[] fixtures = [.. SkinCatalog.BuiltIn(typeof(SkinWindowTests).Assembly)];
+        try
+        {
+            Assert.Empty(SkinService.Apply(Assert.Single(fixtures, e => e.Id == "embedded-art")));
+            Pump(main);
+            Border tile = main.GetVisualDescendants().OfType<Border>().First(b => b.Classes.Contains("tile"));
+            var brush = Assert.IsType<ImageBrush>(tile.Background);
+            Assert.Equal(new Size(16, 12), ((IImage)brush.Source!).Size);
+            Assert.Equal(Stretch.Fill, brush.Stretch);
+
+            SkinEntry limits = Assert.Single(fixtures, e => e.Id == "embedded-limits");
+            IReadOnlyList<string> errors = SkinService.Apply(limits);
+            Pump(main);
+            string[] big = ["Ox.Window.Background", "Ox.Card.Background", "Ox.Tile.Background", "Ox.Dialog.Background", "Ox.Badge.Background"];
+            Assert.Equal(4, big.Count(name => Application.Current!.Resources[name] is ImageBrush));
+            Assert.Contains(errors, e => e.EndsWith("the skin's images together are over the 16 megapixel budget.", StringComparison.Ordinal));
+            Assert.Contains(errors, e => e == "Ox.Divider: \"art/huge.png\" is 5000 by 5000; a skin image is at most 4096 pixels a side.");
+            Assert.Contains(errors, e => e == "Ox.Danger.Background: \"art/fake.png\" is not a PNG or JPEG image.");
+            Assert.Contains(errors, e => e == "Ox.Danger.Foreground: \"art/missing.png\" is missing, or it is a link out of the skin's folder.");
+            // Each refused image leaves its token at the default.
+            Assert.IsNotType<ImageBrush>(Application.Current!.Resources["Ox.Divider"]);
+            Assert.IsNotType<ImageBrush>(Application.Current.Resources["Ox.Danger.Background"]);
+        }
+        finally
+        {
+            SkinService.Apply(new SkinEntry(SkinPackage.Default, []));
+            Pump(main);
         }
     }
 

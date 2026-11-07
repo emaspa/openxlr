@@ -44,7 +44,7 @@ public sealed record SkinFontWeight(FontWeight Value) : SkinValue;
 /// <summary>Where a skin came from, which decides what it is allowed to carry.</summary>
 public enum SkinOrigin
 {
-    /// <summary>Compiled into the application; no files, no images.</summary>
+    /// <summary>Compiled into the application; its images, if any, are compiled in beside it.</summary>
     BuiltIn,
     /// <summary>A folder under the user's data directory.</summary>
     User,
@@ -92,6 +92,13 @@ public sealed record SkinPackage(
     /// replaces that icon's drawing while the skin is worn.
     /// </summary>
     public IReadOnlyDictionary<string, string> Icons { get; init; } = new Dictionary<string, string>(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Where the skin's images are read from: its folder, or the resources
+    /// compiled in beside a built-in document. Null for a skin with no files,
+    /// which the reader allowed no image.
+    /// </summary>
+    public SkinAssets? Assets { get; init; }
 
     /// <summary>The built-in appearance: no overlay at all, so every token keeps its default.</summary>
     public static SkinPackage Default { get; } = new(

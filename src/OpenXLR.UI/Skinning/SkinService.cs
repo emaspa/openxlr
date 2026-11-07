@@ -564,23 +564,30 @@ public static class SkinService
 
         private object? Image(SkinToken token, SkinImage image)
         {
-            if (package.Directory is not { } directory)
+            if (package.Assets is not { } assets)
             {
-                errors.Add($"{token.Name}: a built-in skin carries no files.");
+                errors.Add($"{token.Name}: this skin carries no files.");
                 return null;
             }
-            if (SkinReader.ResolveAsset(directory, image.RelativePath) is not { } file)
+            // One way in for every skin: a file in an installed skin's folder
+            // and a resource beside a built-in skin are the same stream here,
+            // held to the same limits in the same order.
+            using Stream? stream = assets.Open(image.RelativePath);
+            if (stream is null)
             {
                 errors.Add($"{token.Name}: \"{image.RelativePath}\" is missing, or it is a link out of the skin's folder.");
                 return null;
             }
-            if (file.Length > SkinFormat.MaxImageBytes)
+            long length;
+            try { length = stream.Length; }
+            catch (Exception ex) when (ex is IOException or NotSupportedException) { length = long.MaxValue; }
+            if (length > SkinFormat.MaxImageBytes)
             {
                 errors.Add($"{token.Name}: \"{image.RelativePath}\" is larger than the "
                     + $"{SkinFormat.MaxImageBytes / (1024 * 1024)} MB image limit.");
                 return null;
             }
-            if (SkinImageHeader.Read(file) is not { } size)
+            if (SkinImageHeader.Read(stream) is not { } size)
             {
                 errors.Add($"{token.Name}: \"{image.RelativePath}\" is not a PNG or JPEG image.");
                 return null;
@@ -601,7 +608,8 @@ public static class SkinService
 
             try
             {
-                var bitmap = new Bitmap(file.FullName);
+                stream.Position = 0;
+                var bitmap = new Bitmap(stream);
                 _pixels += pixels;
                 Bitmaps.Add(bitmap);
                 return new ImageBrush(bitmap) { Stretch = image.Stretch, Opacity = image.Opacity };

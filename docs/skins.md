@@ -959,6 +959,25 @@ Images are paintable wherever a brush is: a faceplate behind the UI, a
 texture on a card, a metal face on a key. They are not available to a
 token of kind colour.
 
+The 16 megapixel budget is counted each time a token uses an image, so a
+picture named by three tokens counts three times.
+
+### Images in a shipped skin
+
+A skin compiled into the application can carry images too. They sit
+beside its `skin.json` in the source tree, under
+`src/OpenXLR.UI/Assets/Skins/<id>/`, and the build compiles every PNG and
+JPEG there into the application, so a package needs no extra file for
+them. The skin names an image as an installed skin does:
+`"source": "art/faceplate.png"` means
+`Assets/Skins/<id>/art/faceplate.png`. Every rule and limit above applies
+unchanged, with the same messages. A shipped skin reaches only its own
+images, never another skin's.
+
+To start your own skin from a shipped one that uses images, copy its
+images with its `skin.json`, into the same places under your skin's
+folder.
+
 ## Icons
 
 Every channel and mix wears an icon from the set OpenXLR ships, chosen in

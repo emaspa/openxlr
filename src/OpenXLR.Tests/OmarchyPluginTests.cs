@@ -28,7 +28,14 @@ public sealed class OmarchyPluginTests
             foreach ((string key, string token) in fields)
             {
                 string name = "Ox.Meter." + token;
-                if (tokens.TryGetProperty(name, out JsonElement value))
+                // A skin image stays in the UI; the bar draws the default colour.
+                if (tokens.TryGetProperty(name, out JsonElement image) && image.ValueKind == JsonValueKind.Object
+                    && image.TryGetProperty("type", out JsonElement type) && type.GetString() == "image")
+                {
+                    Avalonia.Media.Color colour = Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(SkinTokens.Find(name)!.Default).Color;
+                    palette[key] = $"#{colour.R:x2}{colour.G:x2}{colour.B:x2}";
+                }
+                else if (tokens.TryGetProperty(name, out JsonElement value))
                     palette[key] = JsonNode.Parse(value.GetRawText());
                 else
                     palette[key] = Assert.IsType<double>(SkinTokens.Find(name)!.Default);

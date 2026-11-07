@@ -53,6 +53,11 @@
          the same file. -->
     <EmbeddedResource Include="Assets/Appearance/material-light.json" LogicalName="OpenXLR.UI.Assets.Appearance.material-light.json"/>
     <EmbeddedResource Include="Assets/Skins/*/skin.json" LogicalName="OpenXLR.UI.Assets.Skins.$([System.String]::Copy('%(RecursiveDir)').TrimEnd('/')).skin.json"/>
+    <!-- A built-in skin's images, named by their path below Assets/Skins so
+         SkinEmbeddedAssets finds "<id>/art/plate.png" for the id's skin and
+         for no other. The test project embeds its fixture skin the same way. -->
+    <EmbeddedResource Include="Assets/Skins/*/**/*.png;Assets/Skins/*/**/*.jpg;Assets/Skins/*/**/*.jpeg"
+                      LogicalName="OpenXLR.UI.Assets.SkinFiles/$([System.String]::Copy('%(RecursiveDir)').Replace('\','/'))%(Filename)%(Extension)"/>
   </ItemGroup>
 
   <ItemGroup>
