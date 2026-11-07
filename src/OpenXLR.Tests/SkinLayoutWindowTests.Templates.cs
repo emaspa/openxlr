@@ -67,6 +67,9 @@ internal static partial class SkinLayoutWindowTests
     {
         Write(dir, "banks", BanksSkin);
         Write(dir, "list", ListSkin);
+        // A rack of keys: a hi-fi skin's own tokens, its images given flat
+        // colours, with the badge chips, check keys and lamp-lettered faces.
+        Write(dir, "keys", File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "skin-rack-keys.json")));
         var window = new MainWindow(new DaemonClient("ws://127.0.0.1:1/ws"));
         try
         {
@@ -92,6 +95,27 @@ internal static partial class SkinLayoutWindowTests
             Layout(window, 1040, 900);
             Wear("banks");
             Layout(window, 1040, 900);
+            // A skin that sets the optional styles keeps every strip its own
+            // height through a reload and through a change of skin and back.
+            // Rebuilding those styles in place once restyled every control,
+            // and a strip measured while its hidden handle briefly counted
+            // stayed a handle's height taller than what it holds.
+            {
+                Wear("keys");
+                Layout(window, 1920, 1200);
+                string Heights() => string.Join(" | ", BankCells(window).Select(b => string.Join(",", b.Select(c => c.Bounds.Height.ToString("0.#")))));
+                string worn = Heights();
+                Assert.Empty(SkinService.Reload());
+                Layout(window, 1920, 1200);
+                Assert.Equal(worn, Heights());
+                Wear("banks");
+                Layout(window, 1920, 1200);
+                Wear("keys");
+                Layout(window, 1920, 1200);
+                Assert.Equal(worn, Heights());
+                Wear("banks");
+                Layout(window, 1040, 900);
+            }
 
             var panel = window.FindControl<MixerPanel>("MixerPanel")!;
             var rack = window.FindControl<InputRackView>("InputRack")!;

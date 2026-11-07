@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Primitives;
+using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Media;
 using Avalonia.Styling;
 
@@ -25,8 +26,11 @@ namespace OpenXLR.UI.Skinning;
 /// </summary>
 internal static class SkinOptionalStyles
 {
-    /// <summary>The styles made for the skin in force, kept last in the application's styles so they win.</summary>
-    private static readonly Styles Made = [];
+    /// <summary>The styles made for the skin in force, kept last in the application's styles so they win; null while it sets none.</summary>
+    private static Styles? _current;
+
+    /// <summary>What those styles set and where, to tell a skin that needs other styles from one that needs the same.</summary>
+    private static string _signature = "";
 
     private const string Presenter = "PART_ContentPresenter";
 
@@ -91,85 +95,95 @@ internal static class SkinOptionalStyles
     ];
 
     /// <summary>
-    /// Make the styles for the tokens the skin sets, from the values now in
-    /// <paramref name="resources"/>, and put them last in the application's
-    /// styles. A face under the pointer that the skin leaves out takes the
-    /// face at rest, so a key never loses its face when the pointer reaches it.
+    /// Make the styles for the tokens the skin sets and put them last in the
+    /// application's styles. A face under the pointer that the skin leaves
+    /// out takes the face at rest, so a key never loses its face when the
+    /// pointer reaches it.
+    ///
+    /// Each setter reads its token as a dynamic resource rather than holding
+    /// the value, so the styles depend only on which tokens the skin sets.
+    /// Reloading a skin, or moving to another that sets the same tokens,
+    /// leaves the application's styles untouched and the new values arrive
+    /// through the resources. Only a change in which tokens are set swaps the
+    /// styles, and then the new set goes in before the old one comes out:
+    /// clearing a set already in the application restyled every control in
+    /// place, and a hidden part briefly counted as shown, which left strips
+    /// measured taller than what they hold.
     /// </summary>
     public static void Apply(Application application, IResourceDictionary resources)
     {
-        Made.Clear();
-        Family(resources, "Ox.Alert.Background", "Ox.Alert.BackgroundPointerOver", "Ox.Alert.BorderBrush", AlertRest, AlertActive);
-        Family(resources, "Ox.Lit.Background", "Ox.Lit.BackgroundPointerOver", "Ox.Lit.BorderBrush", LitRest, LitActive);
-        if (Brush(resources, "Ox.Mute.BorderBrushChecked") is { } muted)
-            Add(Muted, ContentPresenter.BorderBrushProperty, muted);
-        if (Brush(resources, "Ox.Danger.BorderBrush") is { } danger)
-            Add(Danger, ContentPresenter.BorderBrushProperty, danger);
-        if (Brush(resources, "Ox.Value.Foreground") is { } value)
-            Add(Readouts, TextBlock.ForegroundProperty, value);
-        if (resources.TryGetValue("Ox.Chip.Theme", out object? chip) && chip is ControlTheme badge)
+        var next = new Styles();
+        var signature = new List<string>();
+        void Add(IEnumerable<Func<Selector?, Selector>> keys, AvaloniaProperty property, object value)
         {
-            Add(Chips, StyledElement.ThemeProperty, badge);
-            if (Brush(resources, "Ox.Text.Info") is { } info)
-                Add(ChipLettering, TextBlock.ForegroundProperty, info);
+            foreach (Func<Selector?, Selector> key in keys)
+            {
+                Selector selector = key(null);
+                object setterValue = value is Token token ? new DynamicResourceExtension(token.Key) : value;
+                next.Add(new Style(_ => selector) { Setters = { new Setter(property, setterValue) } });
+                signature.Add($"{selector} {property.Name} {value}");
+            }
+        }
+        Token? Set(string key) => resources.ContainsKey(key) ? new Token(key) : null;
+        void Family(string rest, string active, string ring,
+            Func<Selector?, Selector>[] restKeys, Func<Selector?, Selector>[] activeKeys)
+        {
+            Token? face = Set(rest);
+            Token? under = Set(active) ?? face;
+            Token? border = Set(ring);
+            if (face is not null) Add(restKeys, ContentPresenter.BackgroundProperty, face);
+            if (under is not null) Add(activeKeys, ContentPresenter.BackgroundProperty, under);
+            if (border is not null)
+            {
+                Add(restKeys, ContentPresenter.BorderBrushProperty, border);
+                Add(activeKeys, ContentPresenter.BorderBrushProperty, border);
+            }
+        }
+
+        Family("Ox.Alert.Background", "Ox.Alert.BackgroundPointerOver", "Ox.Alert.BorderBrush", AlertRest, AlertActive);
+        Family("Ox.Lit.Background", "Ox.Lit.BackgroundPointerOver", "Ox.Lit.BorderBrush", LitRest, LitActive);
+        if (Set("Ox.Mute.BorderBrushChecked") is { } muted) Add(Muted, ContentPresenter.BorderBrushProperty, muted);
+        if (Set("Ox.Danger.BorderBrush") is { } danger) Add(Danger, ContentPresenter.BorderBrushProperty, danger);
+        if (Set("Ox.Value.Foreground") is { } value) Add(Readouts, TextBlock.ForegroundProperty, value);
+        if (resources.TryGetValue("Ox.Chip.Theme", out object? chip) && chip is ControlTheme)
+        {
+            var info = new Token("Ox.Text.Info");
+            var alert = new Token("Ox.Led.Alert");
+            Add(Chips, StyledElement.ThemeProperty, new Token("Ox.Chip.Theme"));
+            Add(ChipLettering, TextBlock.ForegroundProperty, info);
             // A badge has no lamp: a source that is not linked is lettered in
             // the alert colour instead. The gap is the lamp's margin, so it goes too.
             Add(ChipLamps, Visual.IsVisibleProperty, false);
-            if (Brush(resources, "Ox.Led.Alert") is { } alert)
-                Add(UnlinkedLettering, TextBlock.ForegroundProperty, alert);
+            Add(UnlinkedLettering, TextBlock.ForegroundProperty, alert);
 
             // A plugin's name in an insert list is the same badge, with no
             // lamp: lettered in the alert colour while bypassed or failing.
-            if (Brush(resources, "Ox.Badge.Background") is { } face)
-                Add(InsertChips, Border.BackgroundProperty, face);
+            Add(InsertChips, Border.BackgroundProperty, new Token("Ox.Badge.Background"));
             Add(InsertChips, Decorator.PaddingProperty, new Thickness(6, 1));
-            if (resources.TryGetValue("Ox.Eq.CornerRadius", out object? corners) && corners is CornerRadius radius)
-                Add(InsertChips, Border.CornerRadiusProperty, radius);
+            Add(InsertChips, Border.CornerRadiusProperty, new Token("Ox.Eq.CornerRadius"));
             Add(InsertLamps, Visual.IsVisibleProperty, false);
-            if (Brush(resources, "Ox.Text.Info") is { } insertInfo)
-                Add(InsertLettering, TextBlock.ForegroundProperty, insertInfo);
-            if (Brush(resources, "Ox.Led.Alert") is { } insertAlert)
-                Add(InsertOffLettering, TextBlock.ForegroundProperty, insertAlert);
+            Add(InsertLettering, TextBlock.ForegroundProperty, info);
+            Add(InsertOffLettering, TextBlock.ForegroundProperty, alert);
 
             // The interface's lamp in the header goes the same way: its line is
             // lettered in the alert colour while the interface is disconnected.
             Add(DeviceLamp, Visual.IsVisibleProperty, false);
-            if (Brush(resources, "Ox.Led.Alert") is { } deviceAlert)
-                Add(DisconnectedLettering, TextBlock.ForegroundProperty, deviceAlert);
+            Add(DisconnectedLettering, TextBlock.ForegroundProperty, alert);
         }
 
+        string made = string.Join("\n", signature);
         Styles styles = application.Styles;
-        if (Made.Count == 0)
-        {
-            styles.Remove(Made);
-            return;
-        }
-        if (styles.Count > 0 && ReferenceEquals(styles[^1], Made)) return;
-        styles.Remove(Made);
-        styles.Add(Made);
+        bool inPlace = _current is not null && styles.Count > 0 && ReferenceEquals(styles[^1], _current);
+        if (made == _signature && (inPlace || _current is null)) return;
+        if (next.Count > 0) styles.Add(next);
+        if (_current is not null) styles.Remove(_current);
+        _current = next.Count > 0 ? next : null;
+        _signature = made;
     }
 
-    private static void Family(IResourceDictionary resources, string rest, string active, string ring,
-        Func<Selector?, Selector>[] restKeys, Func<Selector?, Selector>[] activeKeys)
+    /// <summary>A setter's value read from a token as a dynamic resource.</summary>
+    private sealed record Token(string Key)
     {
-        IBrush? face = Brush(resources, rest);
-        IBrush? under = Brush(resources, active) ?? face;
-        IBrush? border = Brush(resources, ring);
-        if (face is not null) Add(restKeys, ContentPresenter.BackgroundProperty, face);
-        if (under is not null) Add(activeKeys, ContentPresenter.BackgroundProperty, under);
-        if (border is not null)
-        {
-            Add(restKeys, ContentPresenter.BorderBrushProperty, border);
-            Add(activeKeys, ContentPresenter.BorderBrushProperty, border);
-        }
+        public override string ToString() => "{" + Key + "}";
     }
-
-    private static void Add(IEnumerable<Func<Selector?, Selector>> keys, AvaloniaProperty property, object value)
-    {
-        foreach (Func<Selector?, Selector> key in keys)
-            Made.Add(new Style(key) { Setters = { new Setter(property, value) } });
-    }
-
-    private static IBrush? Brush(IResourceDictionary resources, string token) =>
-        resources.TryGetValue(token, out object? value) ? value as IBrush : null;
 }
