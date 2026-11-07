@@ -94,14 +94,14 @@ internal static partial class SkinLayoutWindowTests
             CheckLongName(window, model);
             model.ActiveApps.Remove(model.ActiveApps.Single(a => a.Label == LongAppName));
 
-            // The classic wrap of the same thirteen, for comparison: each chip as wide as its own name and channel.
+            // Classic chips wrap while keeping their different natural widths.
             Wear(SkinPackage.DefaultId);
             ShowApps(model, all, all.Length);
             Layout(window, 1600, 1400);
             Border[] chips = ApplicationChips(window);
             Assert.Equal(ColumnApps.Length, chips.Length);
             Assert.Empty(ApplicationTiles(window));
-            Assert.IsType<WrapPanel>(window.FindControl<ItemsControl>("ApplicationRows")!.ItemsPanelRoot);
+            Assert.Equal(1, Assert.IsType<TileColumnsPanel>(window.FindControl<ItemsControl>("ApplicationRows")!.ItemsPanelRoot).PerColumn);
             Assert.True(chips.Max(c => c.Bounds.Width) - chips.Min(c => c.Bounds.Width) > 20, "the default chips are all one width");
             Capture(window, "default-applications-13-1600");
         }
@@ -175,13 +175,13 @@ internal static partial class SkinLayoutWindowTests
         foreach (AppStreamViewModel app in all.Take(count)) model.ActiveApps.Add(app);
     }
 
-    /// <summary>The tiles in columns of four, in order, all one width with their names and pickers lined up, whole columns side by side or below.</summary>
+    /// <summary>Tiles flow down columns of up to four, then across or into the next band.</summary>
     private static void CheckColumnsAt(MainWindow window, MainViewModel model, string where)
     {
-        const int perColumn = 4;
+        const int maximumPerColumn = 4;
         var rows = window.FindControl<ItemsControl>("ApplicationRows")!;
-        ApplicationColumnsPanel panel = Assert.IsType<ApplicationColumnsPanel>(rows.ItemsPanelRoot);
-        Assert.Equal(perColumn, panel.PerColumn);
+        TileColumnsPanel panel = Assert.IsType<TileColumnsPanel>(rows.ItemsPanelRoot);
+        Assert.Equal(maximumPerColumn, panel.PerColumn);
         Border card = (Border)window.FindControl<Expander>("ApplicationsTile")!.Parent!;
         Assert.True(card.IsVisible, where);
         AppStreamViewModel[] order = [.. model.ActiveApps];
@@ -195,6 +195,9 @@ internal static partial class SkinLayoutWindowTests
         // What a chip takes in its column: its width and its margin, which spaces the columns.
         double Taken(int i) => chips[i].Margin.Left + chips[i].Bounds.Width + chips[i].Margin.Right;
         double Bottom(int i) => At(i).Y + chips[i].Bounds.Height;
+        int perColumn = Enumerable.Range(1, chips.Length - 1).FirstOrDefault(i => At(i).X > 0.5);
+        if (perColumn == 0) perColumn = Math.Min(maximumPerColumn, chips.Length);
+        Assert.InRange(perColumn, 1, maximumPerColumn);
 
         AssertNoOverlap(chips);
         CheckTileParts(window, chips, where);

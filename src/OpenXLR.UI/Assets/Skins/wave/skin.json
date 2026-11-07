@@ -130,7 +130,11 @@
     "Ox.Matrix.MutedOpacity": 0.3,
     "Ox.Label.FontSize": 12,
     "Ox.Label.FontWeight": "SemiBold",
-    "Ox.Title.FontSize": 18
+    "Ox.Title.FontSize": 18,
+    "Ox.Main.FaderMaxWidth": 640,
+    "Ox.Mixer.TileMaxWidth": 420,
+    "Ox.Matrix.CellMaxWidth": 800,
+    "Ox.AppColumns.TileMaxWidth": 720
   },
   "layout": {
     "version": 1,

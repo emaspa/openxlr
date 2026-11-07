@@ -3016,7 +3016,13 @@ Options, APPEARANCE, **Mixer view** chooses how the SUBMIXER card is drawn:
 
 In a narrow UI, MONITOR puts the device picker above the volume row
 so both remain usable. Long device names shorten with an ellipsis; hover
-over the picker to read its full summary.
+over the picker to read its full summary. In the Compact Desk, Wave and
+Nyan Pink skins, a wider main window gives the matrix and classic mixer
+tiles more room, and application chips and columns move more tiles side by
+side. Their input, headphone and monitor faders stop at a maximum track
+width so the readouts stay close to the controls. These rules use logical
+window dimensions and follow the display scale. The other skins keep their
+base widths.
 
 The view, the channel and the mix are saved in `ui.json`. When the chosen
 channel or mix is gone, after a layout change or with an interface that
@@ -3062,8 +3068,8 @@ smaller mixer, use the compact or mini view, or Standard sizing.
 Fit scales text and control targets together. In the mix matrix it also
 shares spare width between the columns, giving the faders longer tracks
 when the window is wide and short. Channel tiles and mix banks keep their
-proportions. Choose a larger fixed or custom size for bigger controls
-with scrolling.
+proportions. At a fixed or custom percentage the matrix starts from the
+skin's base cell width, then scales with the rest of the panel.
 
 **Custom** shows a percentage box beside the picker, or under it in a narrow
 window. The box starts at the size the panel has now, so picking Custom after

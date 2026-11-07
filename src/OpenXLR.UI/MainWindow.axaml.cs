@@ -207,10 +207,12 @@ public partial class MainWindow : Window
     private void LayOutHeadphones()
     {
         bool twoJacks = _watchedView?.HasHp2 == true;
-        var columns = new ColumnDefinitions(twoJacks ? "Auto,*,64,20,Auto,*,64" : "Auto,*,64,0,0,0,0");
-        if (twoJacks)
-            columns[0].SharedSizeGroup = columns[4].SharedSizeGroup = "HeadphoneLabel";
-        HeadphoneControls.ColumnDefinitions = columns;
+        ColumnDefinitions columns = HeadphoneControls.ColumnDefinitions;
+        columns[0].SharedSizeGroup = columns[4].SharedSizeGroup = twoJacks ? "HeadphoneLabel" : null;
+        columns[3].Width = new GridLength(twoJacks ? 20 : 0);
+        columns[4].Width = twoJacks ? GridLength.Auto : new GridLength(0);
+        columns[5].Width = twoJacks ? GridLength.Star : new GridLength(0);
+        columns[6].Width = new GridLength(twoJacks ? 64 : 0);
     }
 
     /// <summary>
@@ -231,7 +233,11 @@ public partial class MainWindow : Window
         // the volume fader's space. Recompute even within the same row mode.
         MonitorDestination.MaxWidth = stacked ? double.PositiveInfinity
             : Math.Max(0, (width - (toolbar ? 76 : 264)) / 2);
-        if (_monitorStacked == (toolbar, stacked)) return;
+        if (_monitorStacked == (toolbar, stacked))
+        {
+            LimitMonitorTracks();
+            return;
+        }
         _monitorStacked = (toolbar, stacked);
         MonitorDevicesLabel.IsVisible = MonitorVolumeLabel.IsVisible = !toolbar;
         ToolTip.SetTip(OutputVolumeSlider, toolbar ? Localizer.Text("Volume") : null);
@@ -261,6 +267,17 @@ public partial class MainWindow : Window
         Grid.SetRow(OutputVolumeSlider, stacked ? 1 : 0);
         Grid.SetColumn(MonitorVolumeReadout, readout);
         Grid.SetRow(MonitorVolumeReadout, stacked ? 1 : 0);
+        LimitMonitorTracks();
+    }
+
+    private void LimitMonitorTracks()
+    {
+        // A skin without the limit leaves the tracks as wide as the row.
+        double width = this.TryFindResource("Ox.Main.FaderMaxWidth", out object? value) && value is double limit
+            ? limit : double.PositiveInfinity;
+        var columns = MonitorControls.ColumnDefinitions;
+        columns[Grid.GetColumn(MonitorDestination)].MaxWidth = width;
+        columns[Grid.GetColumn(OutputVolumeSlider)].MaxWidth = width;
     }
 
     /// <summary>A gamescope session, which SteamOS and Bazzite call Game Mode.</summary>

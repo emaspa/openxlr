@@ -22,23 +22,26 @@
          the section, is the classic one; a line per application, the name
          shortening beside its channel picker, fits a narrow column. The
          columns template lays tiles of one width out in columns of a skin's
-         length (Layout/ApplicationColumnsPanel, made in code since the length
+         length (Layout/TileColumnsPanel, made in code since the length
          comes from the skin). All bind the same application objects, show the
          application's icon before its name, and the picker is the only control. -->
-    <ItemsPanelTemplate x:Key="ApplicationChipsPanel"><WrapPanel/></ItemsPanelTemplate>
+    <ItemsPanelTemplate x:Key="ApplicationChipsPanel">
+      <layout:TileColumnsPanel PerColumn="1" MaxTileWidth="{DynamicResource Ox.AppColumns.TileMaxWidth}"/>
+    </ItemsPanelTemplate>
     <ItemsPanelTemplate x:Key="ApplicationListPanel"><StackPanel Spacing="4"/></ItemsPanelTemplate>
     <DataTemplate x:Key="ApplicationChip" x:DataType="vm:AppStreamViewModel">
       <Border Classes="tile" Name="ApplicationChip" Padding="8,6" Margin="0,0,4,8">
-        <StackPanel Orientation="Horizontal" Spacing="8">
-          <skin:StatusLed IsOn="{Binding Active}"
+        <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8">
+          <skin:StatusLed IsOn="{Binding Active}" VerticalAlignment="Center"
                           AutomationProperties.Name="{loc:Text Key=StreamState}"
                           ToolTip.Tip="{Binding StatusText}"/>
-          <views:ApplicationIconView Icon="{Binding Icon}" Label="{Binding Label}"/>
-          <TextBlock Text="{Binding Label}" Classes="body" VerticalAlignment="Center"/>
-          <ComboBox Name="ApplicationChannel" ItemsSource="{Binding Channels}" MinWidth="110"
+          <views:ApplicationIconView Grid.Column="1" Icon="{Binding Icon}" Label="{Binding Label}"/>
+          <TextBlock Grid.Column="2" Text="{Binding Label}" Classes="body" VerticalAlignment="Center"
+                     TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
+          <ComboBox Grid.Column="3" Name="ApplicationChannel" ItemsSource="{Binding Channels}" MinWidth="110" MaxWidth="240"
                     SelectedItem="{Binding SelectedChannel, Mode=TwoWay}" ToolTip.Tip="{Binding BrowserHeldNote}"
                     AutomationProperties.Name="{Binding Label, StringFormat={loc:Text Key=ApplicationChannelName}}"/>
-        </StackPanel>
+        </Grid>
       </Border>
     </DataTemplate>
     <!-- The columns' tile: the chip's parts, every one the same width so the
@@ -420,7 +423,13 @@
                             AutomationProperties.Name="{Binding UnitInput1.Heading}"/>
             </Grid>
             <StackPanel Spacing="4" IsVisible="{Binding UnitInput1.ControlsShown}">
-              <Grid ColumnDefinitions="Auto,*,64,Auto">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="*" MaxWidth="{DynamicResource Ox.Main.FaderMaxWidth}"/>
+                  <ColumnDefinition Width="64"/>
+                  <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
                 <TextBlock Text="{Binding UnitInput1.GainLabel}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
                 <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="{Binding GainMaxDb}"
                         Value="{Binding GainDb, Mode=TwoWay}" IsEnabled="{Binding !GainLocked}"
@@ -581,7 +590,12 @@
                             AutomationProperties.Name="{Binding UnitInput2.Heading}"/>
             </Grid>
             <StackPanel Spacing="4" IsVisible="{Binding UnitInput2.ControlsShown}">
-              <Grid ColumnDefinitions="Auto,*,64">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="*" MaxWidth="{DynamicResource Ox.Main.FaderMaxWidth}"/>
+                  <ColumnDefinition Width="64"/>
+                </Grid.ColumnDefinitions>
                 <TextBlock Text="{Binding UnitInput2.GainLabel}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
                 <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="{Binding GainMaxDb}"
                         Value="{Binding Gain2Db, Mode=TwoWay}" IsEnabled="{Binding !GainLocked}"
@@ -657,7 +671,14 @@
         </Grid>
 
         <!-- USB Aux input stage; its readout shows Aux In's volume while that fader moves and for a second after -->
-        <Grid Name="AuxInRow" ColumnDefinitions="Auto,*,64,20,110" Margin="0,2,0,0" IsVisible="{Binding CapAuxInput}">
+        <Grid Name="AuxInRow" Margin="0,2,0,0" IsVisible="{Binding CapAuxInput}">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*" MaxWidth="{DynamicResource Ox.Main.FaderMaxWidth}"/>
+            <ColumnDefinition Width="64"/>
+            <ColumnDefinition Width="20"/>
+            <ColumnDefinition Width="110"/>
+          </Grid.ColumnDefinitions>
           <TextBlock Text="{loc:Text Key=USBAuxIn}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
           <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="-60" Maximum="0"
                   Value="{Binding AuxLevelDb, Mode=TwoWay}" AutomationProperties.Name="{loc:Text Key=USBAuxIn}"/>
@@ -667,7 +688,14 @@
         </Grid>
         <!-- the Wave XLR Pro's analog Line In, an input of its own; its readout shows Line In's
              volume while that fader moves and for a second after -->
-        <Grid Name="LineInRow" ColumnDefinitions="Auto,*,64,20,110" Margin="0,2,0,0" IsVisible="{Binding ShowLineInRow}">
+        <Grid Name="LineInRow" Margin="0,2,0,0" IsVisible="{Binding ShowLineInRow}">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*" MaxWidth="{DynamicResource Ox.Main.FaderMaxWidth}"/>
+            <ColumnDefinition Width="64"/>
+            <ColumnDefinition Width="20"/>
+            <ColumnDefinition Width="110"/>
+          </Grid.ColumnDefinitions>
           <TextBlock Text="{loc:Text Key=LineIn}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
           <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="{Binding LineInGainMaxDb}"
                   Value="{Binding LineInGainSliderDb, Mode=TwoWay}" AutomationProperties.Name="{loc:Text Key=LineInGain}"/>
@@ -728,7 +756,13 @@
                            TextWrapping="Wrap" IsVisible="{Binding HasBindingWarning}"/>
                 <!-- the source's own gain, on a source OpenXLR does not drive; its readout shows the
                      channel's volume while that fader moves and for a second after -->
-                <Grid Name="CaptureGainRow" ColumnDefinitions="Auto,*,Auto,64" IsVisible="{Binding ShowsCaptureGain}">
+                <Grid Name="CaptureGainRow" IsVisible="{Binding ShowsCaptureGain}">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*" MaxWidth="{DynamicResource Ox.Main.FaderMaxWidth}"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="64"/>
+                  </Grid.ColumnDefinitions>
                   <TextBlock Text="{loc:Text Key=UnitInputGain}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
                   <Slider Grid.Column="1" vm:FaderInput.Step="1" Minimum="{Binding CaptureGainMinDb}" Maximum="{Binding CaptureGainMaxDb}"
                           Value="{Binding CaptureGainDb, Mode=TwoWay}"
@@ -746,7 +780,13 @@
                           ToolTip.Tip="{loc:Text Key=CaptureOwnClockTip}"/>
                 <TextBlock Name="CaptureOwnClockStatus" Text="{Binding OwnClockStatus}" Classes="hint" FontSize="{DynamicResource UiText.FontSize11}"
                            TextWrapping="Wrap" IsVisible="{Binding HasOwnClockStatus}"/>
-                <Grid ColumnDefinitions="Auto,*,Auto,64" IsVisible="{Binding HasVolume}">
+                <Grid IsVisible="{Binding HasVolume}">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*" MaxWidth="{DynamicResource Ox.Main.FaderMaxWidth}"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="64"/>
+                  </Grid.ColumnDefinitions>
                   <TextBlock Text="{loc:Text Key=Volume}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
                   <Slider Grid.Column="1" vm:FaderInput.Step="0.01" Minimum="0" Maximum="1" Value="{Binding Volume, Mode=TwoWay}"
                           vm:FaderInput.IsAdjusting="{Binding VolumeAdjusting, Mode=OneWayToSource}"
@@ -788,7 +828,16 @@
           <TextBlock Text="{loc:Text Key=HEADPHONES}" Classes="h" VerticalAlignment="Center"/>
         </StackPanel></Expander.Header>
       <StackPanel Classes="dev" Spacing="4">
-        <Grid Name="HeadphoneControls" ColumnDefinitions="Auto,*,64,20,Auto,*,64" Grid.IsSharedSizeScope="True">
+        <Grid Name="HeadphoneControls" Grid.IsSharedSizeScope="True">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*" MaxWidth="{DynamicResource Ox.Main.FaderMaxWidth}"/>
+            <ColumnDefinition Width="64"/>
+            <ColumnDefinition Width="20"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*" MaxWidth="{DynamicResource Ox.Main.FaderMaxWidth}"/>
+            <ColumnDefinition Width="64"/>
+          </Grid.ColumnDefinitions>
           <Grid Name="Phones1Label" ColumnDefinitions="Auto,*" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center" ToolTip.Tip="{loc:Text Key=FrontJack}"
                 DataContext="{Binding Phones1Appearance}" x:DataType="vm:LayoutAppearanceViewModel">
             <vm:LayoutIconBlock Icon="{Binding Icon}" Fallback="{Binding DefaultIcon}" Classes="h" Classes.layoutAccent="{Binding HasColour}"
@@ -816,7 +865,12 @@
         </Grid>
         <!-- hardware zero-latency blend between mic direct and PC playback;
              the value column can grow for larger text and translated readouts -->
-        <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding CapCrossfade}">
+        <Grid IsVisible="{Binding CapCrossfade}">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*" MaxWidth="{DynamicResource Ox.Main.FaderMaxWidth}"/>
+            <ColumnDefinition Width="Auto"/>
+          </Grid.ColumnDefinitions>
           <TextBlock Text="{loc:Text Key=MicPC}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"
                      ToolTip.Tip="{loc:Text Key=DirectMonitorBlendLeftOnlyYourMicRight}"/>
           <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="200"
@@ -1084,13 +1138,16 @@
         <!-- Mix masters control the outgoing mixes, separate from the channel sends. -->
         <StackPanel DockPanel.Dock="Bottom" IsVisible="{Binding HasMixer}" Margin="0,10,0,0" Spacing="8">
         <TextBlock Name="OutputMixHeading" Text="{loc:Text Key=OutputMixesHeading}" Classes="h"/>
-        <ItemsControl ItemsSource="{Binding Mixes}">
+        <ItemsControl Name="MixMasterTiles" ItemsSource="{Binding Mixes}">
           <ItemsControl.ItemsPanel>
-            <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+            <ItemsPanelTemplate>
+              <layout:TileColumnsPanel PerColumn="1" BaseTileWidth="{DynamicResource Ox.Mixer.MixWidth}"
+                                       MaxTileWidth="{DynamicResource Ox.Mixer.TileMaxWidth}"/>
+            </ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:MixViewModel">
-              <Border Classes="tile" Padding="10" Margin="0,0,8,8" Width="{DynamicResource Ox.Mixer.MixWidth}"
+              <Border Name="ClassicMasterTile" Classes="tile" Padding="10" Margin="0,0,8,8" MinWidth="{DynamicResource Ox.Mixer.MixWidth}"
                       IsVisible="{Binding DisplayVisible}" Classes.revealed="{Binding Revealed}">
                 <StackPanel Spacing="6">
                   <Button Classes="ghost reorderHandle" Classes.fixedPlace="{Binding !IsEditable}" Content="↔" Tag="{Binding}"
@@ -1164,13 +1221,16 @@
                the same height in every tile. -->
           <ItemsControl Name="ChannelTiles" ItemsSource="{Binding Channels}" Grid.IsSharedSizeScope="True">
             <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+              <ItemsPanelTemplate>
+                <layout:TileColumnsPanel PerColumn="1" Wrap="False" BaseTileWidth="{DynamicResource Ox.Mixer.ChannelWidth}"
+                                         MaxTileWidth="{DynamicResource Ox.Mixer.TileMaxWidth}"/>
+              </ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:ChannelViewModel">
                 <!-- A tile out of sight keeps its volume row to itself, so it holds
                      no space open in the tiles that are shown. -->
-                <Border Classes="tile" Padding="10" Margin="0,0,8,0" Width="{DynamicResource Ox.Mixer.ChannelWidth}"
+                <Border Name="ClassicChannelTile" Classes="tile" Padding="10" Margin="0,0,8,0" MinWidth="{DynamicResource Ox.Mixer.ChannelWidth}"
                         IsVisible="{Binding DisplayVisible}" Classes.revealed="{Binding Revealed}"
                         Grid.IsSharedSizeScope="{Binding !DisplayVisible}">
                   <StackPanel Spacing="8">

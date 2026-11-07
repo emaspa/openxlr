@@ -311,6 +311,7 @@ internal static partial class MixerPopOutWindowTests
             popped.Close();
             Dispatcher.UIThread.RunJobs();
             Layout(main, 1400, 900);
+            // This skin sets no Ox.Matrix.CellMaxWidth, so docked it keeps the base width.
             Assert.Equal(normalWidth, lines.Bounds.Width, 0.5);
         }
         finally

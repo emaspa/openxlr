@@ -68,7 +68,7 @@ internal static partial class SkinLayoutWindowTests
                             Assert.Equal(window.FindControl<StackPanel>("MixerContent")!.Bounds.Width, mixer.Bounds.Width, 0.5);
                         }
                         var rows = window.FindControl<ItemsControl>("ApplicationRows")!;
-                        var panel = Assert.IsType<ApplicationColumnsPanel>(rows.ItemsPanelRoot);
+                        var panel = Assert.IsType<TileColumnsPanel>(rows.ItemsPanelRoot);
                         Assert.Equal(1, panel.PerColumn);
                         Border[] tiles = ApplicationTiles(window);
                         Assert.Equal(count, tiles.Length);
@@ -93,7 +93,7 @@ internal static partial class SkinLayoutWindowTests
                     }
                 }
             }
-            CheckCompactDeskThreeMixes(window, model);
+            CheckWideMixerLayouts(window, model);
             // Returning to another skin keeps the same section contents and application objects.
             ShowApps(model, apps, apps.Length);
             Wear(SkinPackage.DefaultId);
@@ -110,7 +110,7 @@ internal static partial class SkinLayoutWindowTests
         }
     }
 
-    private static void CheckCompactDeskThreeMixes(MainWindow window, MainViewModel model)
+    private static void CheckWideMixerLayouts(MainWindow window, MainViewModel model)
     {
         model.HasHp2 = model.CapCrossfade = false;
         SkinService.ApplyControlSizing(false);
@@ -157,19 +157,79 @@ internal static partial class SkinLayoutWindowTests
         Layout(window, window.ClientSize.Width + exact - matrixView.Bounds.Width, 800);
         Assert.True(matrixView.Scroller.Extent.Width <= matrixView.Scroller.Viewport.Width + .5,
             "The matrix gained a scrollbar from its own border at a width where the cells fit.");
-        foreach (double width in new[] { 640d, 960, 1280, 1600, 2400, 640 })
+        // Compact Desk and Wave grow into a wide window. Broadcast sets no
+        // growth limit, so it keeps its base cells and columns of four.
+        foreach (string skin in new[] { "compact-desk", "wave", "broadcast" })
         {
-            Layout(window, width, 800);
-            Assert.Equal(3, window.MixMatrix!.Columns.Count);
-            CheckMatrixCells(window, window.MixMatrix, $"Compact Desk, three mixes at {width}");
-            if (width >= 1280)
+            Wear(skin);
+            double limit = (double)window.FindResource("Ox.Matrix.CellMaxWidth")!;
+            bool grows = limit > 0;
+            Assert.Equal(skin != "broadcast", grows);
+            double? baseHead = null;
+            foreach (double width in new[] { 640d, 960, 1280, 1600, 2400, 2560, 3147, 640 })
             {
-                var card = (Border)window.FindControl<Expander>("SubmixerTile")!.Parent!;
+                Layout(window, width, 800);
+                string where = $"{skin}, three mixes at {width}";
+                Assert.Equal(3, window.MixMatrix!.Columns.Count);
+                CheckMatrixCells(window, window.MixMatrix, where);
                 Border last = ColumnHead(window, "chat");
-                double end = last.TranslatePoint(new Point(last.Bounds.Width, 0), card)!.Value.X;
-                Assert.True(end >= card.Bounds.Width * .95, "Three mixes should use the desk instead of leaving half of it empty.");
+                if (width == 640) baseHead ??= last.Bounds.Width;
+                if (width >= 1280 && grows)
+                {
+                    var card = (Border)window.FindControl<Expander>("SubmixerTile")!.Parent!;
+                    double end = last.TranslatePoint(new Point(last.Bounds.Width, 0), card)!.Value.X;
+                    double names = (double)window.FindResource("Ox.Matrix.NameWidth")!;
+                    Assert.True(end >= Math.Min(card.Bounds.Width * .94, names + 4 * limit), where);
+                }
+                else if (!grows) Assert.Equal(baseHead!.Value, last.Bounds.Width, 0.5);
+                if (width >= 2560)
+                {
+                    var rows = window.FindControl<ItemsControl>("ApplicationRows")!;
+                    var panel = Assert.IsType<TileColumnsPanel>(rows.ItemsPanelRoot);
+                    Border[] tiles = ApplicationTiles(window);
+                    Assert.Equal(4, tiles.Length);
+                    AssertNoOverlap(tiles);
+                    if (grows)
+                    {
+                        Assert.All(tiles, tile => Assert.Equal(0, tile.TranslatePoint(default, panel)!.Value.Y, .5));
+                        Assert.True(tiles.Max(tile => tile.TranslatePoint(new Point(tile.Bounds.Width, 0), panel)!.Value.X)
+                            >= Math.Min(panel.Bounds.Width * .95, tiles.Length * (panel.MaxTileWidth - 4)),
+                            $"Four application tiles should use the wide row: {where}.");
+                    }
+                    else
+                        Assert.All(tiles, tile => Assert.Equal(0, tile.TranslatePoint(default, panel)!.Value.X, .5));
+                }
+                if (width is 640 or 3147) Capture(window, $"skin-{skin}-three-mixes-{width}");
             }
-            Capture(window, $"skin-compact-desk-three-mixes-{width}");
+        }
+        double WidthOf(string itemsName)
+        {
+            var items = window.FindControl<ItemsControl>(itemsName)!;
+            var panel = Assert.IsType<TileColumnsPanel>(items.ItemsPanelRoot);
+            return panel.Children.First(child => child.Bounds.Width > 0).Bounds.Width;
+        }
+
+        // The classic arrangement: Nyan Pink's tiles grow on a wide window,
+        // the default skin's keep their width.
+        foreach (string skin in new[] { "nyan-pink", SkinPackage.DefaultId })
+        {
+            Wear(skin);
+            Layout(window, 960, 800);
+            double channels = WidthOf("ChannelTiles"), masters = WidthOf("MixMasterTiles"), apps = WidthOf("ApplicationRows");
+            Layout(window, 3147, 800);
+            if (skin == SkinPackage.DefaultId)
+            {
+                Assert.Equal(channels, WidthOf("ChannelTiles"), 0.5);
+                Assert.Equal(masters, WidthOf("MixMasterTiles"), 0.5);
+                Assert.Equal(apps, WidthOf("ApplicationRows"), 0.5);
+            }
+            else
+            {
+                Assert.True(WidthOf("ChannelTiles") > channels + 40, "classic channel tiles should grow on a wide window");
+                Assert.True(WidthOf("MixMasterTiles") > masters + 40, "classic mix masters should grow on a wide window");
+                Assert.True(WidthOf("ApplicationRows") > apps + 40, "classic application chips should grow on a wide window");
+            }
+            Capture(window, $"skin-{skin}-wide-3147");
         }
     }
 }

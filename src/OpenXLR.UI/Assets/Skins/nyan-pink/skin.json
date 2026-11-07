@@ -153,6 +153,10 @@
     "Ox.Led.Bezel": "#140e1c",
     "Ox.Led.BezelThickness": 1,
     "Ox.Led.Glow": 0.25,
-    "Ox.Led.CoreScale": 0.6
+    "Ox.Led.CoreScale": 0.6,
+    "Ox.Main.FaderMaxWidth": 640,
+    "Ox.Mixer.TileMaxWidth": 420,
+    "Ox.Matrix.CellMaxWidth": 800,
+    "Ox.AppColumns.TileMaxWidth": 720
   }
 }

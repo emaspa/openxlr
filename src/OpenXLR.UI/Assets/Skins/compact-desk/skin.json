@@ -130,7 +130,9 @@
     "Ox.Matrix.MutedForeground": "#ffffff",
     "Ox.Matrix.MutedOpacity": 0.55,
     "Ox.AppColumns.NameWidth": 144,
-    "Ox.AppColumns.TileMaxWidth": 720
+    "Ox.AppColumns.TileMaxWidth": 720,
+    "Ox.Main.FaderMaxWidth": 640,
+    "Ox.Mixer.TileMaxWidth": 420
   },
   "layout": {
     "version": 1,

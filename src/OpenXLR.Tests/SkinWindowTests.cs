@@ -714,7 +714,7 @@ public sealed partial class SkinWindowTests
                 SkinService.ApplyTextSize(100);
                 Assert.Empty(SkinService.Apply(skin));
                 double normal = (double)main.FindResource("Ox.Label.FontSize")!;
-                foreach (double width in new[] { 640d, 1040 })
+                foreach (double width in new[] { 640d, 1040, 2560 })
                 {
                     Layout(main, width, 900);
                     MainWindowLabelTests.Check(main);

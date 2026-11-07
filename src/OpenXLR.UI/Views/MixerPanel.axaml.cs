@@ -46,7 +46,7 @@ public partial class MixerPanel : UserControl
     /// <summary>The view the matrix is drawn in, for the tests.</summary>
     internal MixMatrixView MatrixItems => MatrixView;
 
-    internal void SetMatrixFillWidth(bool fill) => MatrixView.FillWidth = fill;
+    internal void SetMatrixFillWidth(bool? fill) => MatrixView.FillWidth = fill;
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
