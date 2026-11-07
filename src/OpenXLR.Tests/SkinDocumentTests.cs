@@ -436,7 +436,7 @@ public sealed class SkinDocumentTests
             .Select(line => System.Text.RegularExpressions.Regex.Match(line, @"^\| `([A-Za-z.-]+)` \|").Groups[1].Value)];
         Assert.Equal(SkinLayoutRegions.All, Table("| Region | What it is |"));
         Assert.Equal(SkinHeaderActions.All, Table("| Action | What it is |"));
-        Assert.Equal(["visibility", "width", "height", "actions", "overflow"], Table("| Option | Region | What it is |"));
+        Assert.Equal(["visibility", "width", "height", "actions", "overflow", "version"], Table("| Option | Region | What it is |"));
         Assert.Equal(["template", "strip", "orientation", "visibleBanks", "selectionDefaults", "master", "picker", "perColumn", "matrix", "popOut"], Table("| Option | Template | What it is |"));
         Assert.Equal(["rowHead", "columnHead", "cell", "meter"], Table("| Matrix option | What it is |"));
         Assert.Equal(SkinMatrixParts.RowHead.Concat(SkinMatrixParts.ColumnHead).Concat(SkinMatrixParts.Cell).Distinct(),
@@ -695,7 +695,8 @@ public sealed class SkinDocumentTests
             Assert.Equal(SkinFormat.MinRegionSize, options.GetProperty(dimension).GetProperty("minimum").GetDouble());
             Assert.Equal(SkinFormat.MaxRegionSize, options.GetProperty(dimension).GetProperty("maximum").GetDouble());
         }
-        Assert.Equal(["actions", "overflow"], Names(Properties("layoutHeaderOptions")));
+        Assert.Equal(["actions", "overflow", "version"], Names(Properties("layoutHeaderOptions")));
+        Assert.Equal(["row", "title"], Strings(Properties("layoutHeaderOptions").GetProperty("version").GetProperty("enum")));
         Assert.Equal(SkinHeaderActions.All, Strings(Definition("layoutHeaderAction").GetProperty("enum")));
         Assert.All(new[] { "actions", "overflow" }, list =>
             Assert.Equal(SkinHeaderActions.All.Count, Properties("layoutHeaderOptions").GetProperty(list).GetProperty("maxItems").GetInt32()));

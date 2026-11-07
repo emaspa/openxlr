@@ -51,7 +51,7 @@ public static class SkinLayoutReader
     private static readonly string[] Placements = ["below-label", "beside-label", "beside-fader"];
     private static readonly string[] Directions = ["normal", "reversed"];
     private static readonly string[] LabelStyles = ["text", "icon-and-text", "icon"];
-    private static readonly string[] HeaderOptions = ["actions", "overflow"];
+    private static readonly string[] HeaderOptions = ["actions", "overflow", "version"];
 
     /// <summary>What the reader has seen so far in one tree: nodes, container ids and placed regions.</summary>
     private sealed class Tree
@@ -795,7 +795,13 @@ public static class SkinLayoutReader
             return actions;
         }
         List<string> row = Actions("actions");
-        return new SkinHeaderOptions(row, Actions("overflow"));
+        List<string> overflow = Actions("overflow");
+        bool byTitle = fields.TryGetValue("version", out JsonElement version)
+            && Name(version, path + ".version", ["row", "title"], "a place for the version number") == "title";
+        if (byTitle && seen.Contains(SkinHeaderActions.Version))
+            throw new LayoutException(path + ".version",
+                "the version number stands by the title, so it cannot also be listed in \"actions\" or \"overflow\".");
+        return new SkinHeaderOptions(row, overflow) { VersionByTitle = byTitle };
     }
 
     /// <summary>A finite number inside its bounds.</summary>

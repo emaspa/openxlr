@@ -247,6 +247,12 @@
     <Setter Property="CoreScale" Value="{DynamicResource Ox.Led.CoreScale}"/>
   </ControlTheme>
 
+  <!-- The lamp's tokens, drawn as a domed lens with a smooth glow. -->
+  <ControlTheme x:Key="Ox.Led.Lens" TargetType="skin:StatusLed"
+                BasedOn="{StaticResource Ox.Led.Lamp}">
+    <Setter Property="Presentation" Value="Lens"/>
+  </ControlTheme>
+
 
   <!-- ==== the raised key face ==== -->
 

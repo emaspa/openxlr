@@ -130,7 +130,7 @@ internal sealed class Theme
             theme.ConsoleFaders = Is("fader", "console");
             theme.CapKeys = Is("button", "cap");
             theme.CapMutes = Is("mute", "cap");
-            theme.LampLeds = Is("led", "lamp");
+            theme.LampLeds = Is("led", "lamp") || Is("led", "lens");
         }
 
         if (SkinCatalog.Text(root, "name") is { Length: > 0 } name) theme.Name = SkinCatalog.Cut(name);

@@ -13,6 +13,11 @@ public enum LedPresentation
     Flat,
     /// <summary>A lamp in a bezel with a halo around it when lit, as on a panel.</summary>
     Lamp,
+    /// <summary>
+    /// A domed lens: lit, it is bright at the heart with a soft glow fading
+    /// out from it; dark, it is unlit glass. Both catch a highlight.
+    /// </summary>
+    Lens,
 }
 
 /// <summary>What an indicator means when it is not lit.</summary>
@@ -147,6 +152,11 @@ public sealed class StatusLed : Control
         double bezel = Math.Clamp(BezelThickness, 0, Math.Max(0, limit - core - 0.5));
 
         double glow = Math.Clamp(Glow, 0, 1);
+        if (Presentation == LedPresentation.Lens)
+        {
+            DrawLens(context, lamp, centre, limit, core, bezel, glow);
+            return;
+        }
         if (IsOn && glow > 0 && limit > core)
         {
             // No blur is available in the drawing context, so the halo is two
@@ -160,4 +170,62 @@ public sealed class StatusLed : Control
         context.DrawEllipse(lamp, bezel > 0 && Bezel is not null ? new Pen(Bezel, bezel) : null,
             centre, core, core);
     }
+
+    /// <summary>
+    /// The lens: a halo that fades smoothly from the bezel to the edge of the
+    /// box while lit, the bezel, a body lit from inside (or dark glass) and a
+    /// highlight up and to the left, as light from above catches a dome.
+    /// </summary>
+    private void DrawLens(DrawingContext context, IBrush lamp, Point centre, double limit, double core, double bezel, double glow)
+    {
+        Color colour = lamp switch
+        {
+            ISolidColorBrush solid => solid.Color,
+            GradientBrush gradient when gradient.GradientStops.Count > 0 => gradient.GradientStops[0].Color,
+            _ => Colors.Gray,
+        };
+        double rim = core + bezel;
+        if (IsOn && glow > 0 && limit > rim)
+        {
+            double from = rim / limit;
+            var halo = new RadialGradientBrush
+            {
+                RadiusX = new RelativeScalar(0.5, RelativeUnit.Relative),
+                RadiusY = new RelativeScalar(0.5, RelativeUnit.Relative),
+                GradientStops =
+                {
+                    new GradientStop(WithAlpha(colour, 0.8 * glow), from * 0.9),
+                    new GradientStop(WithAlpha(colour, 0.35 * glow), from + (1 - from) * 0.35),
+                    new GradientStop(WithAlpha(colour, 0), 1),
+                },
+            };
+            context.DrawEllipse(halo, null, centre, limit, limit);
+        }
+        if (bezel > 0 && Bezel is not null)
+            context.DrawEllipse(null, new Pen(Bezel, bezel), centre, core + bezel / 2, core + bezel / 2);
+
+        var body = new RadialGradientBrush
+        {
+            GradientOrigin = new RelativePoint(0.38, 0.32, RelativeUnit.Relative),
+            Center = new RelativePoint(0.45, 0.4, RelativeUnit.Relative),
+            RadiusX = new RelativeScalar(0.6, RelativeUnit.Relative),
+            RadiusY = new RelativeScalar(0.6, RelativeUnit.Relative),
+            GradientStops = IsOn
+                ? [new GradientStop(Mix(colour, Colors.White, 0.55), 0), new GradientStop(colour, 0.55), new GradientStop(Mix(colour, Colors.Black, 0.3), 1)]
+                : [new GradientStop(Mix(colour, Colors.White, 0.12), 0), new GradientStop(colour, 0.5), new GradientStop(Mix(colour, Colors.Black, 0.55), 1)],
+        };
+        context.DrawEllipse(body, null, centre, core, core);
+
+        var highlight = new Point(centre.X - core * 0.32, centre.Y - core * 0.36);
+        using (context.PushOpacity(IsOn ? 0.6 : 0.3))
+            context.DrawEllipse(new SolidColorBrush(Colors.White), null, highlight, core * 0.28, core * 0.22);
+    }
+
+    private static Color WithAlpha(Color colour, double alpha) =>
+        Color.FromArgb((byte)Math.Round(Math.Clamp(alpha, 0, 1) * colour.A), colour.R, colour.G, colour.B);
+
+    private static Color Mix(Color from, Color to, double amount) => Color.FromArgb(from.A,
+        (byte)Math.Round(from.R + (to.R - from.R) * amount),
+        (byte)Math.Round(from.G + (to.G - from.G) * amount),
+        (byte)Math.Round(from.B + (to.B - from.B) * amount));
 }

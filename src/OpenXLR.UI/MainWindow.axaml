@@ -36,7 +36,7 @@
                           AutomationProperties.Name="{loc:Text Key=StreamState}"
                           ToolTip.Tip="{Binding StatusText}"/>
           <views:ApplicationIconView Grid.Column="1" Icon="{Binding Icon}" Label="{Binding Label}"/>
-          <TextBlock Grid.Column="2" Text="{Binding Label}" Classes="body" VerticalAlignment="Center"
+          <TextBlock Grid.Column="2" Text="{Binding Label}" Classes="body appName" VerticalAlignment="Center"
                      TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
           <ComboBox Grid.Column="3" Name="ApplicationChannel" ItemsSource="{Binding Channels}" MinWidth="110" MaxWidth="240"
                     SelectedItem="{Binding SelectedChannel, Mode=TwoWay}" ToolTip.Tip="{Binding BrowserHeldNote}"
@@ -67,7 +67,7 @@
           <layout:ScrollingName Grid.Column="2" Name="ApplicationName" VerticalAlignment="Center"
                                 PreferredWidth="{DynamicResource Ox.AppColumns.NameWidth}"
                                 Scrolls="{Binding $parent[Border].IsPointerOver}" ToolTip.Tip="{Binding Label}">
-            <TextBlock Text="{Binding Label}" Classes="body" VerticalAlignment="Center"/>
+            <TextBlock Text="{Binding Label}" Classes="body appName" VerticalAlignment="Center"/>
           </layout:ScrollingName>
           <ComboBox Grid.Column="3" Name="ApplicationChannel" ItemsSource="{Binding Channels}" MinWidth="110"
                     HorizontalAlignment="Stretch"
@@ -99,7 +99,7 @@
                           AutomationProperties.Name="{loc:Text Key=StreamState}"
                           ToolTip.Tip="{Binding StatusText}"/>
           <views:ApplicationIconView Grid.Column="1" Icon="{Binding Icon}" Label="{Binding Label}"/>
-          <TextBlock Grid.Column="2" Text="{Binding Label}" Classes="body" VerticalAlignment="Center"
+          <TextBlock Grid.Column="2" Text="{Binding Label}" Classes="body appName" VerticalAlignment="Center"
                      TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
           <ComboBox Grid.Column="3" Name="ApplicationChannel" ItemsSource="{Binding Channels}" MinWidth="110" MaxWidth="160"
                     SelectedItem="{Binding SelectedChannel, Mode=TwoWay}" ToolTip.Tip="{Binding BrowserHeldNote}"
@@ -164,7 +164,11 @@
         <Button Name="OptionsButton" Grid.RowSpan="2" Content="⚙" FontSize="{DynamicResource UiText.FontSize18}" Padding="8,4"
                 VerticalAlignment="Center" Classes="ghost"
                 Click="OnOptions" ToolTip.Tip="{loc:Text Key=Options}"/>
-        <TextBlock Grid.Column="2" Text="OpenXLR" Classes="title" VerticalAlignment="Center"/>
+        <!-- the title, and the version number when the skin puts it beside the title -->
+        <StackPanel Name="TitleLine" Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <TextBlock Text="OpenXLR" Classes="title" VerticalAlignment="Center"/>
+          <Panel Name="TitleVersionSlot" VerticalAlignment="Bottom" Margin="0,0,0,3"/>
+        </StackPanel>
         <!-- the lamp says whether the interface is connected; a skin that draws its
              chips as badges hides it and letters the line in the alert colour instead -->
         <Grid Name="DeviceLine" Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2" ColumnDefinitions="Auto,*"

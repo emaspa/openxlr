@@ -379,10 +379,10 @@ draws, and then tint and size it with the tokens further down.
 | `button` | `flat` (default), `cap` | `flat` is the framework's button. `cap` is the raised key: the control paints its own face and `Ox.Cap.Bevel` lays the gloss over it. One drawing serves the plain button, the toggle and the dropdown button, so a skin cannot raise one and leave the next one flat. Corner shape comes from `Ox.Control.CornerRadius`, so a skin can make every key square |
 | `fader` | `flat` (default), `console` | `flat` is the framework's slider. `console` is OpenXLR's own: an inset groove, a filled section up to the value, and a machined cap with a grip line across it. It is drawn flat and upright, so the upright faders of a mix bank wear it too |
 | `meter` | `continuous` (default), `segmented` | `continuous` is one bar that grows. `segmented` is a ladder of cells that light one after another, as on a console |
-| `led` | `flat` (default), `lamp` | `flat` is a filled dot. `lamp` puts the dot in a bezel ring and gives it a halo while it is lit |
+| `led` | `flat` (default), `lamp`, `lens` | `flat` is a filled dot. `lamp` puts the dot in a bezel ring and gives it a halo while it is lit. `lens` reads the same tokens and draws a domed lens: bright at the heart with a glow that fades smoothly to the edge while lit, dark glass while off, with a highlight on both |
 | `mute` | `flat` (default), `cap` | `flat` is the framework's button. `cap` is the same raised key the `button` slot draws, so the mute matches the controls around it |
 | `check` | `flat` (default), `key` | `flat` is the framework's tick box beside its label. `key` draws a check box as a key: the label is the legend, and the key lights while ticked in the colours of a toggle that is on, so a switch such as **Own clock** matches the switches around it |
-| `chip` | `key` (default), `badge` | the chip that names an input's source, such as **XLR 1 jack**. `key` is the button the skin chooses. `badge` draws it flat in `Ox.Badge.Background` and letters it in `Ox.Text.Info`, like the submixer's **On the unit** badge, with no lamp: a source that is not linked is lettered in `Ox.Led.Alert` instead. It still opens the binding dialog, and the pointer rings it in `Ox.Text.Info`. A plugin's name in an input's insert list becomes the same badge, its lamp hidden and its name lettered in `Ox.Led.Alert` while the plugin is bypassed or failing. The interface's lamp in the header is hidden too, and its line lettered in `Ox.Led.Alert` while the interface is disconnected |
+| `chip` | `key` (default), `badge` | the chip that names an input's source, such as **XLR 1 jack**. `key` is the button the skin chooses. `badge` draws it flat in `Ox.Badge.Background` and letters it in `Ox.Text.Info`, like the submixer's **On the unit** badge, with no lamp: a source that is not linked is lettered in `Ox.Led.Alert` instead. It still opens the binding dialog, and the pointer rings it in `Ox.Text.Info`. A plugin's name in an input's insert list becomes the same badge, its lamp hidden and its name lettered in `Ox.Led.Alert` while the plugin is bypassed or failing. A master strip drops its row of plugin lamps and keeps its chain key, lit while a plugin processes and red when none does, as an input's is. The interface's lamp in the header is hidden too, and its line lettered in `Ox.Led.Alert` while the interface is disconnected |
 
 A control a skin does not mention keeps the appearance the UI has
 always had. The `button` slot covers the plain button, the toggle and the
@@ -398,7 +398,7 @@ change what a control does, only how it is drawn.
 Some tokens are read only by one of these appearances and do nothing under
 the others. They are marked in the tables below: the grip and track radius
 under `fader: console`, the segment count and gap under `meter:
-segmented`, the bezel, glow and core scale under `led: lamp`, and
+segmented`, the bezel, glow and core scale under `led: lamp` and `led: lens`, and
 `Ox.Cap.Bevel` and `Ox.Control.BorderThickness` under the `cap` faces.
 
 A lamp draws entirely inside the box `Ox.Led.Size` gives it: the lit core
@@ -406,9 +406,8 @@ fills `Ox.Led.CoreScale` of it, the bezel is stroked outside the core, and
 the halo fills what is left up to the edge. Nothing is drawn beyond the
 box, so a lamp at the edge of a rounded card is never cut. Give the lamp a
 larger `Ox.Led.Size` and a smaller `Ox.Led.CoreScale` for more halo, not a
-bigger glow. The halo is drawn as soft rings rather than a real blur,
-since the drawing context has none; at the size these lamps are drawn it
-reads the same.
+bigger glow. Under `lamp` the halo is drawn as two soft rings; under
+`lens` it is a gradient fading from the bezel to the edge of the box.
 
 ## Values
 
@@ -542,7 +541,12 @@ remaining fader width to the nearest display pixel.
 | `Ox.Label.FontWeight` | weight | SemiBold |  | those same headings and labels |
 | `Ox.Title.FontSize` | number | 20 | 10 to 40 | the UI's own title line |
 | `Ox.Title.FontWeight` | weight | Bold |  | that title line |
+| `Ox.Title.Foreground` | brush | framework |  | that title line's lettering, and the version number's when the header stands it by the title; unset, it keeps `Ox.Text.Primary` |
+| `Ox.Title.Glow` | number | 0 | 0 to 1 | a halo round that title, and that version number, in their own colour, as a backlit legend has; 0 for none |
 | `Ox.Strip.FontWeight` | weight | SemiBold |  | the name over a channel strip or a mix |
+| `Ox.Strip.Foreground` | brush | framework |  | the name and icon over a channel strip or a mix, and an application's name under **Applications** and in its **Manage** window; unset, they keep `Ox.Text.Primary`. A colour the layout gives a channel still wins |
+| `Ox.Strip.IconMuted` | brush | framework |  | a mixer strip's icon while its send is muted, and a master's while its mix is; its name keeps its colour. Unset, the icon does not change |
+| `Ox.Strip.Glow` | number | 0 | 0 to 1 | a halo round that name and icon in their own colour, as a backlit legend has, and round a muted icon in its; 0 for none. A channel the layout colours has none |
 | `Ox.Value.FontFamily` | family | monospace |  | the numeric readouts |
 | `Ox.Value.Foreground` | brush | framework |  | the numeric readouts' lettering, such as a fader's level or a gain; unset, they keep `Ox.Text.Primary` |
 | `Ox.Font.Family` | family | framework |  | the font the buttons, labels and dropdowns use |
@@ -567,10 +571,10 @@ The rest of an indicator's appearance is shape and size:
 | Token | Kind | Default | Range | What it paints |
 |---|---|---|---|---|
 | `Ox.Led.Size` | number | 9 | 4 to 40 | the box a lamp or a dot is drawn in, both appearances |
-| `Ox.Led.Bezel` | brush | #00000000 |  | the ring around the core, `led: lamp` only |
-| `Ox.Led.BezelThickness` | number | 0 | 0 to 6 | that ring's width, `led: lamp` only |
-| `Ox.Led.Glow` | number | 0 | 0 to 1 | the halo while the lamp is lit, 0 for none, `led: lamp` only |
-| `Ox.Led.CoreScale` | number | 1 | 0.1 to 1 | how much of the box the lit core fills, `led: lamp` only |
+| `Ox.Led.Bezel` | brush | #00000000 |  | the ring around the core, `led: lamp` and `led: lens` only |
+| `Ox.Led.BezelThickness` | number | 0 | 0 to 6 | that ring's width, `led: lamp` and `led: lens` only |
+| `Ox.Led.Glow` | number | 0 | 0 to 1 | the halo while the lamp is lit, 0 for none, `led: lamp` and `led: lens` only |
+| `Ox.Led.CoreScale` | number | 1 | 0.1 to 1 | how much of the box the lit core fills, `led: lamp` and `led: lens` only |
 | `Ox.Meter.Track` | brush | #14161b |  | the groove a meter sits in, and an unlit cell |
 | `Ox.Meter.CornerRadius` | radius | 2 | 0 to 48 | the meter's corners, each cell's, and Mic setup's target band's |
 | `Ox.Meter.Height` | number | 4 | 2 to 24 | how tall a meter is |
@@ -1248,6 +1252,7 @@ id, with only the options that region has:
 | `height` | the five sections | a preferred height in pixels, from 120 to 4000 |
 | `actions` | `header` | header action ids in the order the header shows them |
 | `overflow` | `header` | header action ids to put in the ⋯ menu at the end of the header instead |
+| `version` | `header` | `"row"`, the default, keeps the version number among the actions. `"title"` stands it just after the title, at its own small size and lettered in the title's colour and halo; it is then listed in neither `actions` nor `overflow` |
 
 A preferred width applies where the region has a width of its own: in a
 horizontal stack, a grid cell and a dock's left or right side. It never

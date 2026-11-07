@@ -669,9 +669,13 @@ public sealed record SkinHeaderOptions(IReadOnlyList<string> Actions, IReadOnlyL
 {
     public static SkinHeaderOptions Default { get; } = new([], []);
 
+    /// <summary>Whether the version number stands just after the title rather than among the actions.</summary>
+    public bool VersionByTitle { get; init; }
+
     /// <summary>The actions shown in the row, in order.</summary>
     public IReadOnlyList<string> Row =>
-        [.. Actions, .. SkinHeaderActions.All.Where(a => !Actions.Contains(a) && !Overflow.Contains(a))];
+        [.. Actions, .. SkinHeaderActions.All.Where(a => !Actions.Contains(a) && !Overflow.Contains(a)
+            && !(VersionByTitle && a == SkinHeaderActions.Version))];
 }
 
 /// <summary>

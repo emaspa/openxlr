@@ -180,6 +180,13 @@ internal static partial class SkinLayoutWindowTests
                     var master = bank.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "BankMaster");
                     AssertInside(master, bank);
                     AssertNoOverlap([cells, master]);
+                    // An upright master beside the strips is as tall as they are.
+                    if (master.Classes.Contains("beside"))
+                    {
+                        double tallest = cells.GetVisualDescendants().OfType<Border>()
+                            .Where(b => b.Name == "BankCell" && b.IsEffectivelyVisible).Max(b => b.Bounds.Height);
+                        Assert.Equal(tallest, master.Bounds.Height, 0.5);
+                    }
                     mixEqs += MixEqOverChain(master, where);
                     foreach (Slider fader in bank.GetVisualDescendants().OfType<Slider>().Where(f => f.IsEffectivelyVisible))
                     {

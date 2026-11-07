@@ -66,12 +66,13 @@ public static class SkinControls
                 ["continuous"] = null,
                 ["segmented"] = ["Ox.Meter.Segmented"],
             }),
-        // A flat dot, or a lamp in a bezel with a halo when lit.
+        // A flat dot, a lamp in a bezel with a halo when lit, or a domed lens.
         new("led", ["Ox.Led.Theme"], "flat",
             new Dictionary<string, IReadOnlyList<string>?>(StringComparer.Ordinal)
             {
                 ["flat"] = null,
                 ["lamp"] = ["Ox.Led.Lamp"],
+                ["lens"] = ["Ox.Led.Lens"],
             }),
         // The framework's button, or a cap with a bevel laid over it.
         new("mute", ["Ox.MuteButton.Theme"], "flat",

@@ -275,6 +275,22 @@ public sealed class SkinLayoutTests
         Assert.NotEqual(SkinLayoutDefaults.Classic.Description(), layout.Description());
     }
 
+    /// <summary>
+    /// A skin may stand the version number just after the title: it then
+    /// leaves the row, and listing it in either list as well is refused.
+    /// </summary>
+    [Fact]
+    public void TheVersionCanStandByTheTitle()
+    {
+        Assert.False(Taken("""{"version":1,"regions":{"header":{"version":"row"}}}""").Header.VersionByTitle);
+        SkinLayout layout = Taken("""{"version":1,"regions":{"header":{"version":"title","overflow":["about"]}}}""");
+        Assert.True(layout.Header.VersionByTitle);
+        Assert.Equal(["profiles", "arrange", "flow", "restart-daemon"], layout.Header.Row);
+        Refused("""{"version":1,"regions":{"header":{"version":"title","actions":["version"]}}}""", "layout.regions.header.version");
+        Refused("""{"version":1,"regions":{"header":{"version":"title","overflow":["version"]}}}""", "layout.regions.header.version");
+        Refused("""{"version":1,"regions":{"header":{"version":"beside"}}}""", "layout.regions.header.version");
+    }
+
     [Fact]
     public void TheSpacingBoundsAreTheDocumentedOnes()
     {

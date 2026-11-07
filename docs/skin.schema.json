@@ -71,7 +71,8 @@
         "led": {
           "enum": [
             "flat",
-            "lamp"
+            "lamp",
+            "lens"
           ],
           "default": "flat",
           "description": "`flat` is a filled dot."
@@ -223,9 +224,33 @@
           "$ref": "#/$defs/fontWeight",
           "description": "that title line"
         },
+        "Ox.Title.Foreground": {
+          "$ref": "#/$defs/brush",
+          "description": "that title line's lettering, and the version number's when the header stands it by the title; unset, it keeps `Ox.Text.Primary`"
+        },
+        "Ox.Title.Glow": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "a halo round that title, and that version number, in their own colour, as a backlit legend has; 0 for none"
+        },
         "Ox.Strip.FontWeight": {
           "$ref": "#/$defs/fontWeight",
           "description": "the name over a channel strip or a mix"
+        },
+        "Ox.Strip.Foreground": {
+          "$ref": "#/$defs/brush",
+          "description": "the name and icon over a channel strip or a mix, and an application's name under **Applications** and in its **Manage** window; unset, they keep `Ox.Text.Primary`. A colour the layout gives a channel still wins"
+        },
+        "Ox.Strip.IconMuted": {
+          "$ref": "#/$defs/brush",
+          "description": "a mixer strip's icon while its send is muted, and a master's while its mix is; its name keeps its colour. Unset, the icon does not change"
+        },
+        "Ox.Strip.Glow": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "a halo round that name and icon in their own colour, as a backlit legend has, and round a muted icon in its; 0 for none. A channel the layout colours has none"
         },
         "Ox.Value.FontFamily": {
           "$ref": "#/$defs/fontFamily",
@@ -321,25 +346,25 @@
         },
         "Ox.Led.Bezel": {
           "$ref": "#/$defs/brush",
-          "description": "the ring around the core, `led: lamp` only"
+          "description": "the ring around the core, `led: lamp` and `led: lens` only"
         },
         "Ox.Led.BezelThickness": {
           "type": "number",
           "minimum": 0,
           "maximum": 6,
-          "description": "that ring's width, `led: lamp` only"
+          "description": "that ring's width, `led: lamp` and `led: lens` only"
         },
         "Ox.Led.Glow": {
           "type": "number",
           "minimum": 0,
           "maximum": 1,
-          "description": "the halo while the lamp is lit, 0 for none, `led: lamp` only"
+          "description": "the halo while the lamp is lit, 0 for none, `led: lamp` and `led: lens` only"
         },
         "Ox.Led.CoreScale": {
           "type": "number",
           "minimum": 0.1,
           "maximum": 1,
-          "description": "how much of the box the lit core fills, `led: lamp` only"
+          "description": "how much of the box the lit core fills, `led: lamp` and `led: lens` only"
         },
         "Ox.Mute.Background": {
           "$ref": "#/$defs/brush",
@@ -2156,6 +2181,14 @@
             "$ref": "#/$defs/layoutHeaderAction"
           },
           "description": "Actions in the menu at the end of the header. An action appears once across both lists."
+        },
+        "version": {
+          "enum": [
+            "row",
+            "title"
+          ],
+          "default": "row",
+          "description": "Where the version number stands: among the actions, or just after the title in the title's colour. Under \"title\" it is listed in neither list."
         }
       }
     },

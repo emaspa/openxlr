@@ -378,7 +378,8 @@ public partial class MainWindow
     /// The header's actions in the order the skin gives, the ones it names
     /// nowhere after them in their usual order, and the ones it puts in the
     /// overflow in the menu at the end. The controls are the same ones,
-    /// moved; Options is never among them.
+    /// moved; Options is never among them. A skin may stand the version number
+    /// just after the title instead, where it is lettered as the title is.
     /// </summary>
     private void ApplyHeaderActions(SkinHeaderOptions header)
     {
@@ -395,7 +396,9 @@ public partial class MainWindow
         Control[] overflow = [.. header.Overflow.Select(Action)];
         foreach (Control action in SkinHeaderActions.All.Select(Action))
         {
-            Panel goes = overflow.Contains(action) ? HeaderOverflowItems : HeaderActions;
+            Panel goes = overflow.Contains(action) ? HeaderOverflowItems
+                : header.VersionByTitle && ReferenceEquals(action, HeaderVersion) ? TitleVersionSlot
+                : HeaderActions;
             if (action.Parent is Panel parent && !ReferenceEquals(parent, goes)) parent.Children.Remove(action);
             if (ReferenceEquals(goes, HeaderOverflowItems))
                 action.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch;
@@ -403,6 +406,8 @@ public partial class MainWindow
         }
         DesktopLayoutHost.SetChildren(HeaderActions, row);
         DesktopLayoutHost.SetChildren(HeaderOverflowItems, overflow);
+        DesktopLayoutHost.SetChildren(TitleVersionSlot, header.VersionByTitle ? [HeaderVersion] : []);
+        HeaderVersion.Classes.Set("titleVersion", header.VersionByTitle);
         HeaderOverflow.IsVisible = overflow.Length > 0;
     }
 
