@@ -491,6 +491,74 @@
     </Style>
   </ControlTheme>
 
+  <!--
+    A check box drawn as a key: the toggle's face and colours, the label as
+    the legend, lit while ticked. The face is the cap's, with the bevel, but
+    the legend's colour is set on the content presenter by state rather than
+    passed down from the control, because the application gives every check
+    box the running-text colour for its label and that must not reach a key.
+    The check box keeps its own behaviour: clicking, the keyboard and the
+    checked state are the framework's.
+  -->
+  <ControlTemplate x:Key="Ox.Cap.CheckFace" TargetType="CheckBox">
+    <Panel>
+      <ContentPresenter Name="PART_ContentPresenter"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="{TemplateBinding CornerRadius}"
+                        Content="{TemplateBinding Content}"
+                        ContentTemplate="{TemplateBinding ContentTemplate}"
+                        Padding="{TemplateBinding Padding}"
+                        HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                        VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                        RecognizesAccessKey="True"/>
+      <Border Name="Bevel" IsHitTestVisible="False"
+              Margin="{TemplateBinding BorderThickness}"
+              CornerRadius="{TemplateBinding CornerRadius}"
+              Background="{DynamicResource Ox.Cap.Bevel}"/>
+    </Panel>
+  </ControlTemplate>
+
+  <ControlTheme x:Key="Ox.CheckBox.Key" TargetType="CheckBox">
+    <Setter Property="Background" Value="{DynamicResource ToggleButtonBackground}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource ToggleButtonBorderBrush}"/>
+    <Setter Property="BorderThickness" Value="{DynamicResource Ox.Control.BorderThickness}"/>
+    <Setter Property="CornerRadius" Value="{DynamicResource ControlCornerRadius}"/>
+    <Setter Property="Padding" Value="6,3"/>
+    <Setter Property="FontSize" Value="{DynamicResource UiText.FontSize12}"/>
+    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+    <Setter Property="Template" Value="{StaticResource Ox.Cap.CheckFace}"/>
+    <Style Selector="^ /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Foreground" Value="{DynamicResource ToggleButtonForeground}"/>
+    </Style>
+    <Style Selector="^:pointerover">
+      <Setter Property="Background" Value="{DynamicResource ToggleButtonBackgroundPointerOver}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource ToggleButtonBorderBrushPointerOver}"/>
+    </Style>
+    <Style Selector="^:pressed">
+      <Setter Property="Background" Value="{DynamicResource ToggleButtonBackgroundPressed}"/>
+    </Style>
+    <Style Selector="^:checked">
+      <Setter Property="Background" Value="{DynamicResource ToggleButtonBackgroundChecked}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource ToggleButtonBorderBrushChecked}"/>
+    </Style>
+    <Style Selector="^:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Foreground" Value="{DynamicResource ToggleButtonForegroundChecked}"/>
+    </Style>
+    <Style Selector="^:checked:pointerover">
+      <Setter Property="Background" Value="{DynamicResource ToggleButtonBackgroundCheckedPointerOver}"/>
+    </Style>
+    <Style Selector="^:disabled">
+      <Setter Property="Background" Value="{DynamicResource ToggleButtonBackgroundDisabled}"/>
+      <Setter Property="Opacity" Value="{DynamicResource Ox.Control.DisabledOpacity}"/>
+    </Style>
+    <Style Selector="^:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Foreground" Value="{DynamicResource ToggleButtonForegroundDisabled}"/>
+    </Style>
+  </ControlTheme>
+
   <!-- ==== mute buttons ==== -->
 
   <ControlTheme x:Key="Ox.MuteButton.Cap" TargetType="ToggleButton"

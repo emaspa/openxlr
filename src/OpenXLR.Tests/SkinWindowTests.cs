@@ -57,6 +57,7 @@ public sealed partial class SkinWindowTests
             EveryKeyIsDrawnLikeTheMuteKey();
             TheApplicationsWindowKeepsItsBottomControlsReachable();
             ThePluginBypassKeyIsLegibleInBothAppearances();
+            LampKeysAndCheckKeysWearTheSkinsFaces();
             TheOptionsTabsWearTheSkin(options);
             TheWindowActuallyRepaintsWhenTheSkinChanges(main);
             ASkinCanLeaveTheBindingOut();
@@ -1679,6 +1680,89 @@ public sealed partial class SkinWindowTests
             finally { window.Close(); }
         }
         SkinService.Apply(new SkinEntry(SkinPackage.Default, []));
+    }
+
+    /// <summary>
+    /// A key the UI letters in a lamp colour wears the skin's lit or alert face
+    /// and ring when the skin sets them, and the ordinary face when it does not,
+    /// so no other appearance changes. Under <c>check: key</c> a check box is a
+    /// key with the bevel, lettered and lit as a toggle is.
+    /// </summary>
+    private static void LampKeysAndCheckKeysWearTheSkinsFaces()
+    {
+        var off = new Button { Content = "Inserts", Classes = { "fx", "fxOff" } };
+        var on = new Button { Content = "EQ", Classes = { "fx", "fxOn", "chip" } };
+        var plain = new Button { Content = "Inserts", Classes = { "fx" } };
+        var bypass = new ToggleButton { Content = "B", Classes = { "insertmini", "bypass" }, IsChecked = true };
+        var mute = new ToggleButton { Content = "M", Classes = { "mute" }, IsChecked = true };
+        var danger = new Button { Content = "Delete", Classes = { "danger" } };
+        var check = new CheckBox { Content = "Own clock" };
+        var probe = new Window
+        {
+            Content = new StackPanel { Children = { off, on, plain, bypass, mute, danger, check } },
+            Width = 300, Height = 320, WindowDecorations = WindowDecorations.None,
+        };
+        probe.Show();
+        try
+        {
+            ContentPresenter Face(Control c)
+            {
+                Layout(probe, 300, 320);
+                return c.GetVisualDescendants().OfType<ContentPresenter>().First(p => p.Name == "PART_ContentPresenter");
+            }
+            Color Fill(Control c) => ((ISolidColorBrush)Face(c).Background!).Color;
+            Color Ring(Control c) => ((ISolidColorBrush)Face(c).BorderBrush!).Color;
+            Color Letters(Control c) => ((ISolidColorBrush)Face(c).Foreground!).Color;
+            bool Bevelled(Control c) => c.GetVisualDescendants().OfType<Border>().Any(b => b.Name == "Bevel");
+
+            // Without the tokens a key lettered in a lamp colour keeps the ordinary face.
+            foreach (SkinEntry plainSkin in new[] { new SkinEntry(SkinPackage.Default, []), SkinCatalog.Find("opendeck")! })
+            {
+                SkinService.Apply(plainSkin);
+                Assert.Same(Face(plain).Background, Face(off).Background);
+                Assert.Same(Face(plain).Background, Face(on).Background);
+                Assert.Equal(new Thickness(0), on.BorderThickness);
+                Assert.False(Bevelled(check), $"{plainSkin.Id} drew a check box as a key");
+            }
+
+            SkinReadResult read = SkinReader.Read("lamps", """
+                {"schema":1,"name":"Lamps","controls":{"button":"cap","mute":"cap","check":"key"},"tokens":{
+                  "Ox.Alert.Background":"#400000","Ox.Alert.BackgroundPointerOver":"#500000","Ox.Alert.BorderBrush":"#ff0000",
+                  "Ox.Lit.Background":"#003040","Ox.Lit.BackgroundPointerOver":"#004050","Ox.Lit.BorderBrush":"#00ffff",
+                  "Ox.Chip.BorderThickness":1,"Ox.Danger.BorderBrush":"#ff8000","Ox.Mute.BorderBrushChecked":"#ff00ff",
+                  "Ox.Control.Background":"#101010","Ox.Control.BackgroundChecked":"#002030",
+                  "Ox.Toggle.Foreground":"#008090","Ox.Toggle.ForegroundChecked":"#00e0ff"}}
+                """, SkinOrigin.BuiltIn, null);
+            Assert.Empty(read.Errors);
+            Assert.Empty(SkinService.Apply(new SkinEntry(read.Package!, read.Errors)));
+            Assert.Equal(Color.Parse("#400000"), Fill(off));
+            Assert.Equal(Color.Parse("#ff0000"), Ring(off));
+            Assert.Equal(Color.Parse("#003040"), Fill(on));
+            Assert.Equal(Color.Parse("#00ffff"), Ring(on));
+            Assert.Equal(new Thickness(1), on.BorderThickness);
+            Assert.Equal(Color.Parse("#101010"), Fill(plain));
+            // A bypassed plugin's key is the alert key; a processing one is a plain key.
+            Assert.Equal(Color.Parse("#400000"), Fill(bypass));
+            bypass.IsChecked = false;
+            Assert.NotEqual(Color.Parse("#400000"), Fill(bypass));
+            Assert.Equal(Color.Parse("#ff00ff"), Ring(mute));
+            Assert.Equal(Color.Parse("#ff8000"), Ring(danger));
+            // The check box is a key: the bevel, the toggle's lettering, lit while ticked.
+            Assert.True(Bevelled(check), "check: key drew no key");
+            Assert.Equal(Color.Parse("#008090"), Letters(check));
+            check.IsChecked = true;
+            Assert.Equal(Color.Parse("#002030"), Fill(check));
+            Assert.Equal(Color.Parse("#00e0ff"), Letters(check));
+            Capture(probe, "lamp-keys");
+
+            // And back: the plain faces and the tick box return.
+            SkinService.Apply(new SkinEntry(SkinPackage.Default, []));
+            bypass.IsChecked = true;
+            Assert.Same(Face(plain).Background, Face(off).Background);
+            Assert.Equal(new Thickness(0), on.BorderThickness);
+            Assert.False(Bevelled(check));
+        }
+        finally { probe.Close(); }
     }
 
     /// <summary>

@@ -128,6 +128,8 @@ public static class SkinTokens
         Brush("Ox.Dialog.Background", "#1d2027"),
         Brush("Ox.Danger.Background", "#a03434"),
         Brush("Ox.Danger.Foreground", "#f6dede"),
+        // The ring of that button. Unset, it keeps the ordinary button's ring.
+        Brush("Ox.Danger.BorderBrush", null),
 
         // Text.
         Brush("Ox.Text.Primary", "#e6e9f0"),
@@ -196,6 +198,8 @@ public static class SkinTokens
         Brush("Ox.Mute.BackgroundChecked", "#a03434"),
         Brush("Ox.Mute.ForegroundChecked", "#f6dede"),
         Brush("Ox.Mute.BorderBrush", "#00000000"),
+        // The ring while muted. Unset, the ring stays Ox.Mute.BorderBrush.
+        Brush("Ox.Mute.BorderBrushChecked", null),
         Thick("Ox.Mute.BorderThickness", 0),
 
 
@@ -293,6 +297,23 @@ public static class SkinTokens
         // readable in an appearance that does not colour by state.
         Brush("Ox.Bypass.Foreground", "#ffffff"),
         Brush("Ox.Bypass.ForegroundBypassed", "#ffffff"),
+        // The face of a key the window letters in the lamp colour of something
+        // running: a plugin chain that is processing, a microphone EQ, noise
+        // removal or dynamics that is on. Unset, those keys keep the ordinary
+        // face and only their lettering lights.
+        Brush("Ox.Lit.Background", null),
+        Brush("Ox.Lit.BackgroundPointerOver", null),
+        Brush("Ox.Lit.BorderBrush", null),
+        // The ring of the small keys beside an input's binding chip, and of the
+        // chip itself. None by default, which is how they have always looked.
+        Thick("Ox.Chip.BorderThickness", 0),
+        // The face of a key the window letters in the alert colour: a plugin
+        // chain with nothing processing, a microphone EQ that cannot run and a
+        // bypassed plugin. Unset, those keys keep the ordinary face and only
+        // their lettering turns, as it always has.
+        Brush("Ox.Alert.Background", null),
+        Brush("Ox.Alert.BackgroundPointerOver", null),
+        Brush("Ox.Alert.BorderBrush", null),
         // The label beside a checkbox is running text, not a lit legend, so it
         // defaults to the colour the rest of the running text has.
         Brush("Ox.Check.Foreground", "#e6e9f0",

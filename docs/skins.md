@@ -381,6 +381,7 @@ draws, and then tint and size it with the tokens further down.
 | `meter` | `continuous` (default), `segmented` | `continuous` is one bar that grows. `segmented` is a ladder of cells that light one after another, as on a console |
 | `led` | `flat` (default), `lamp` | `flat` is a filled dot. `lamp` puts the dot in a bezel ring and gives it a halo while it is lit |
 | `mute` | `flat` (default), `cap` | `flat` is the framework's button. `cap` is the same raised key the `button` slot draws, so the mute matches the controls around it |
+| `check` | `flat` (default), `key` | `flat` is the framework's tick box beside its label. `key` draws a check box as a key: the label is the legend, and the key lights while ticked in the colours of a toggle that is on, so a switch such as **Own clock** matches the switches around it |
 
 A control a skin does not mention keeps the appearance the UI has
 always had. The `button` slot covers the plain button, the toggle and the
@@ -500,6 +501,7 @@ without a row here fails the build.
 | `Ox.Dialog.Background` | brush | #1d2027 |  | the small dialogs: confirmations, rename and the input binding dialog |
 | `Ox.Danger.Background` | brush | #a03434 |  | a button that deletes something |
 | `Ox.Danger.Foreground` | brush | #f6dede |  | that button's label |
+| `Ox.Danger.BorderBrush` | brush | framework |  | that button's ring |
 | `Ox.Badge.Background` | brush | #2a2e38 |  | a small badge: the format badge beside a plugin name, a strip's binding or capture source chip, and the hardware badge in the EQ editor and the Ducking window |
 | `Ox.Divider` | brush | #2d313c |  | the rule under a plugin control group |
 
@@ -619,6 +621,7 @@ its own rather than the ordinary control's.
 | `Ox.Mute.BackgroundChecked` | brush | #a03434 |  | the face when muted |
 | `Ox.Mute.ForegroundChecked` | brush | #f6dede |  | its label when muted |
 | `Ox.Mute.BorderBrush` | brush | #00000000 |  | its ring |
+| `Ox.Mute.BorderBrushChecked` | brush | framework |  | its ring when muted; unset, the ring stays `Ox.Mute.BorderBrush` |
 | `Ox.Mute.BorderThickness` | thickness | 0 | 0 to 16 | that ring's width |
 
 ### Faders
@@ -680,12 +683,25 @@ for toggles, so a skin that sets only the older tokens behaves as it did.
 | `Ox.Toggle.BorderBrushChecked` | brush | framework |  | the ring of a toggle that is on |
 | `Ox.Bypass.Foreground` | brush | #ffffff |  | the plugin bypass key while the plugin is processing |
 | `Ox.Bypass.ForegroundBypassed` | brush | #ffffff |  | the same key while the plugin is bypassed |
+| `Ox.Lit.Background` | brush | framework |  | the face of a key lettered in `Ox.Led.On`: a plugin chain's button while a plugin processes, and a microphone's **EQ**, noise removal or dynamics button while it is on |
+| `Ox.Lit.BackgroundPointerOver` | brush | framework |  | that face under the pointer or held down |
+| `Ox.Lit.BorderBrush` | brush | framework |  | that key's ring |
+| `Ox.Chip.BorderThickness` | thickness | 0 | 0 to 16 | the ring of an input's binding chip and of the **EQ**, noise removal and dynamics buttons beside it |
+| `Ox.Alert.Background` | brush | framework |  | the face of a key lettered in `Ox.Led.Alert`: a plugin chain's button while it has plugins and none processes, a microphone's **EQ** button while its EQ cannot run, and the plugin bypass key while the plugin is bypassed |
+| `Ox.Alert.BackgroundPointerOver` | brush | framework |  | that face under the pointer or held down |
+| `Ox.Alert.BorderBrush` | brush | framework |  | that key's ring |
 | `Ox.Check.Foreground` | brush | #e6e9f0 |  | the label beside a checkbox, which is running text rather than a lit legend |
 
 The bypass key reads the other way round from an ordinary toggle, because
 its checked state is the one that stops the audio. Its two colours default
 to the plain lettering the framework uses, so the key stays readable in an
 appearance that does not colour by state.
+
+Keys that the UI letters in a lamp colour, green for something running and
+red for something stopped or failing, keep the ordinary face unless the
+skin sets `Ox.Lit.*` and `Ox.Alert.*`. With them a red key is a whole key
+in red, face and ring, rather than a red word on an ordinary face, and a
+lit one matches a toggle that is on.
 
 ### Text boxes, flyouts and the accent
 
@@ -700,9 +716,10 @@ appearance that does not colour by state.
 | `Ox.Tooltip.BorderBrush` | brush | framework |  | its border |
 | `Ox.Accent` | colour | framework |  | the tick in a checkbox and the selection in a list; must be flat, since the theme reads it as a colour |
 
-A checkbox, a repeat button inside a fader groove and the toggle that
-opens a section header are not keys: they keep their own appearance
-whichever button variant is chosen.
+A checkbox keeps its tick box whichever button variant is chosen, and
+becomes a key only under `check: key`. A repeat button inside a fader
+groove and the toggle that opens a section header are not keys: they keep
+their own appearance.
 
 A control token a skin does not set keeps the framework's own value, so a
 skin that only recolours the cards leaves buttons exactly as they are.

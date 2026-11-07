@@ -80,6 +80,14 @@ public static class SkinControls
                 ["flat"] = null,
                 ["cap"] = ["Ox.MuteButton.Cap"],
             }),
+        // The framework's tick box beside its label, or a key whose legend is
+        // the label and which lights while ticked, as a toggle does.
+        new("check", ["Ox.CheckBox.Theme"], "flat",
+            new Dictionary<string, IReadOnlyList<string>?>(StringComparer.Ordinal)
+            {
+                ["flat"] = null,
+                ["key"] = ["Ox.CheckBox.Key"],
+            }),
     ];
 
     private static readonly Dictionary<string, SkinControlSlot> ByName =

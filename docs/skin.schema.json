@@ -83,6 +83,14 @@
           ],
           "default": "flat",
           "description": "`flat` is the framework's button."
+        },
+        "check": {
+          "enum": [
+            "flat",
+            "key"
+          ],
+          "default": "flat",
+          "description": "`flat` is the framework's tick box beside its label."
         }
       }
     },
@@ -138,6 +146,10 @@
         "Ox.Danger.Foreground": {
           "$ref": "#/$defs/brush",
           "description": "that button's label"
+        },
+        "Ox.Danger.BorderBrush": {
+          "$ref": "#/$defs/brush",
+          "description": "that button's ring"
         },
         "Ox.Text.Primary": {
           "$ref": "#/$defs/brush",
@@ -335,6 +347,10 @@
           "$ref": "#/$defs/brush",
           "description": "its ring"
         },
+        "Ox.Mute.BorderBrushChecked": {
+          "$ref": "#/$defs/brush",
+          "description": "its ring when muted; unset, the ring stays `Ox.Mute.BorderBrush`"
+        },
         "Ox.Mute.BorderThickness": {
           "$ref": "#/$defs/thickness",
           "description": "that ring's width"
@@ -472,6 +488,34 @@
         "Ox.Bypass.ForegroundBypassed": {
           "$ref": "#/$defs/brush",
           "description": "the same key while the plugin is bypassed"
+        },
+        "Ox.Lit.Background": {
+          "$ref": "#/$defs/brush",
+          "description": "the face of a key lettered in `Ox.Led.On`: a plugin chain's button while a plugin processes, and a microphone's **EQ**, noise removal or dynamics button while it is on"
+        },
+        "Ox.Lit.BackgroundPointerOver": {
+          "$ref": "#/$defs/brush",
+          "description": "that face under the pointer or held down"
+        },
+        "Ox.Lit.BorderBrush": {
+          "$ref": "#/$defs/brush",
+          "description": "that key's ring"
+        },
+        "Ox.Chip.BorderThickness": {
+          "$ref": "#/$defs/thickness",
+          "description": "the ring of an input's binding chip and of the **EQ**, noise removal and dynamics buttons beside it"
+        },
+        "Ox.Alert.Background": {
+          "$ref": "#/$defs/brush",
+          "description": "the face of a key lettered in `Ox.Led.Alert`: a plugin chain's button while it has plugins and none processes, a microphone's **EQ** button while its EQ cannot run, and the plugin bypass key while the plugin is bypassed"
+        },
+        "Ox.Alert.BackgroundPointerOver": {
+          "$ref": "#/$defs/brush",
+          "description": "that face under the pointer or held down"
+        },
+        "Ox.Alert.BorderBrush": {
+          "$ref": "#/$defs/brush",
+          "description": "that key's ring"
         },
         "Ox.Check.Foreground": {
           "$ref": "#/$defs/brush",

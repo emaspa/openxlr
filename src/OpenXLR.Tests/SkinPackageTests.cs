@@ -614,7 +614,9 @@ public sealed class SkinPackageTests : IDisposable
     public void TheOpenDeckSkinChoosesAnAppearanceForEveryControl()
     {
         SkinPackage openDeck = SkinCatalog.BuiltIn().Single(e => e.Id == "opendeck").Package;
-        foreach (SkinControlSlot slot in SkinControls.Slots)
+        // Deck keeps the tick box: a check box as a key is an appearance for
+        // skins that want every switch to be a key, and Deck's look predates it.
+        foreach (SkinControlSlot slot in SkinControls.Slots.Where(s => s.Name != "check"))
         {
             string variant = Assert.Contains(slot.Name, openDeck.Controls);
             Assert.NotEqual(slot.Default, variant);
