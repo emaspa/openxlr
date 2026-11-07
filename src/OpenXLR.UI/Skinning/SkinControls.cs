@@ -66,12 +66,13 @@ public static class SkinControls
                 ["continuous"] = null,
                 ["segmented"] = ["Ox.Meter.Segmented"],
             }),
-        // A flat dot, or a lamp in a bezel with a halo when lit.
+        // A flat dot, a lamp in a bezel with a halo when lit, or a domed lens.
         new("led", ["Ox.Led.Theme"], "flat",
             new Dictionary<string, IReadOnlyList<string>?>(StringComparer.Ordinal)
             {
                 ["flat"] = null,
                 ["lamp"] = ["Ox.Led.Lamp"],
+                ["lens"] = ["Ox.Led.Lens"],
             }),
         // The framework's button, or a cap with a bevel laid over it.
         new("mute", ["Ox.MuteButton.Theme"], "flat",
@@ -79,6 +80,22 @@ public static class SkinControls
             {
                 ["flat"] = null,
                 ["cap"] = ["Ox.MuteButton.Cap"],
+            }),
+        // The framework's tick box beside its label, or a key whose legend is
+        // the label and which lights while ticked, as a toggle does.
+        new("check", ["Ox.CheckBox.Theme"], "flat",
+            new Dictionary<string, IReadOnlyList<string>?>(StringComparer.Ordinal)
+            {
+                ["flat"] = null,
+                ["key"] = ["Ox.CheckBox.Key"],
+            }),
+        // An input's source chip: the skin's button, or a flat badge lettered
+        // like the submixer's "On the unit" badge.
+        new("chip", ["Ox.Chip.Theme"], "key",
+            new Dictionary<string, IReadOnlyList<string>?>(StringComparer.Ordinal)
+            {
+                ["key"] = null,
+                ["badge"] = ["Ox.Chip.Badge"],
             }),
     ];
 

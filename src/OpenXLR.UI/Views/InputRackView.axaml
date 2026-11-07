@@ -20,12 +20,15 @@
     <!-- One plugin of an input's chain at a glance, as the INPUTS panel shows it. -->
     <DataTemplate x:Key="InsertRow" x:DataType="vm:InsertViewModel">
       <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="0,0,0,3">
-        <skin:StatusLed IsOn="{Binding IsActive}" Kind="Insert" Margin="0,0,8,0"
+        <skin:StatusLed Classes="insertLamp" IsOn="{Binding IsActive}" Kind="Insert" Margin="0,0,8,0"
                         AutomationProperties.Name="{loc:Text Key=PluginState}"/>
         <Grid Grid.Column="1" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"
               ColumnSpacing="8" VerticalAlignment="Center" ClipToBounds="True">
-          <TextBlock Text="{Binding Label}" Classes="insertName body" FontSize="{DynamicResource UiText.FontSize12}"
-                     TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
+          <!-- the name in a chip a skin can draw as a badge, lettered for a bypassed or failing plugin -->
+          <Border Classes="insertChip" Classes.off="{Binding !IsActive}" HorizontalAlignment="Left" VerticalAlignment="Center">
+            <TextBlock Text="{Binding Label}" Classes="insertName body" FontSize="{DynamicResource UiText.FontSize12}"
+                       TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
+          </Border>
           <TextBlock Grid.Column="1" Text="{Binding StateText}" Classes="h" FontSize="{DynamicResource UiText.FontSize11}"/>
           <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Error}" Classes="warn"
                      FontSize="{DynamicResource UiText.FontSize11}" TextWrapping="Wrap" IsVisible="{Binding HasError}"/>
@@ -505,12 +508,10 @@
                 <ToggleButton Name="RackCaptureMute" Content="{loc:Text Key=Mute}" Classes="mute" HorizontalAlignment="Left"
                               IsChecked="{Binding Channel.CaptureMuted, Mode=TwoWay}" IsVisible="{Binding ShowsCaptureMute}"
                               AutomationProperties.Name="{Binding Channel.CaptureMuteName}" ToolTip.Tip="{loc:Text Key=CaptureMuteTip}"/>
-                <!-- the device on a clock of its own, with what the bridge does under it -->
+                <!-- the device on a clock of its own, with what the bridge does in its tooltip -->
                 <CheckBox Name="RackOwnClock" Content="{loc:Text Key=CaptureOwnClock}" HorizontalAlignment="Left"
                           IsChecked="{Binding Channel.OwnClock, Mode=TwoWay}" IsVisible="{Binding ShowsOwnClock}"
-                          ToolTip.Tip="{loc:Text Key=CaptureOwnClockTip}"/>
-                <TextBlock Name="RackOwnClockStatus" Text="{Binding Channel.OwnClockStatus}" Classes="hint" FontSize="{DynamicResource UiText.FontSize11}"
-                           TextWrapping="Wrap" IsVisible="{Binding Channel.HasOwnClockStatus}"/>
+                          ToolTip.Tip="{Binding Channel.OwnClockTip}"/>
               </StackPanel>
               <!-- the microphone's EQ and noise removal, on a capture input the daemon reports them for, then its plugin chain -->
               <StackPanel layout:StripPanel.Part="effects" Name="RackCaptureEffects" Spacing="4">

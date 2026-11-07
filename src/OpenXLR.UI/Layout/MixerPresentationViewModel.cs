@@ -302,6 +302,8 @@ public sealed class MixBankViewModel : ViewModelBase
         Presentation = presentation;
         Index = index;
         SyncCells(channels);
+        presentation.Available.CollectionChanged += OnAvailableChanged;
+        SyncChoices();
     }
 
     public MixerPresentationViewModel Presentation { get; }
@@ -317,6 +319,15 @@ public sealed class MixBankViewModel : ViewModelBase
 
     /// <summary>What a screen reader calls the picker.</summary>
     public string PickerName => Localizer.Format("BankPickerName", Index + 1);
+
+    /// <summary>True when the skin draws the picker as a row of keys rather than a dropdown.</summary>
+    public bool PickerButtons => Presentation.Options.PickerButtons;
+
+    /// <summary>The opposite of <see cref="PickerButtons"/>, for the dropdown's visibility.</summary>
+    public bool PickerDropdown => !PickerButtons;
+
+    /// <summary>One key per mix in <see cref="Available"/>, in its order, for a picker drawn as keys.</summary>
+    public ObservableCollection<BankChoiceViewModel> Choices { get; } = [];
 
     private MixViewModel? _mix;
     /// <summary>
@@ -356,6 +367,14 @@ public sealed class MixBankViewModel : ViewModelBase
     /// <summary>The gap between the master and the cells, on the side the master is.</summary>
     public Thickness MasterMargin => MasterDock == Dock.Right ? new Thickness(4, 0, 0, 0) : new Thickness(0, 8, 0, 0);
 
+    /// <summary>
+    /// A master strip follows the last strip rather than the bank's right edge,
+    /// so a bank wider than its strips leaves its spare room after the master,
+    /// not between the strips and it. A master card and a send list fill the bank.
+    /// </summary>
+    public HorizontalAlignment ContentAlignment =>
+        MasterDock == Dock.Right ? HorizontalAlignment.Left : HorizontalAlignment.Stretch;
+
     /// <summary>True for the bank whose cells carry the channels' Arrange handles.</summary>
     internal bool CarriesHandles => Index == 0 && Presentation.OwnsHandles;
 
@@ -368,6 +387,26 @@ public sealed class MixBankViewModel : ViewModelBase
         Raise(nameof(Mix));
         Raise(nameof(Master));
         foreach (BankCellViewModel cell in Cells) cell.Refresh();
+        foreach (BankChoiceViewModel choice in Choices) choice.Refresh();
+    }
+
+    private void OnAvailableChanged(object? sender, NotifyCollectionChangedEventArgs e) => SyncChoices();
+
+    /// <summary>Follow the picker's list: keep each mix's key, add new ones, drop the gone, in order.</summary>
+    private void SyncChoices()
+    {
+        IList<MixViewModel> wanted = Presentation.Available;
+        for (int i = Choices.Count - 1; i >= 0; i--)
+            if (!wanted.Contains(Choices[i].Mix)) Choices.RemoveAt(i);
+        for (int i = 0; i < wanted.Count; i++)
+        {
+            int at = -1;
+            for (int j = 0; j < Choices.Count; j++)
+                if (ReferenceEquals(Choices[j].Mix, wanted[i])) { at = j; break; }
+            if (at == i) continue;
+            if (at >= 0) Choices.Move(at, i);
+            else Choices.Insert(i, new BankChoiceViewModel(this, wanted[i]));
+        }
     }
 
     /// <summary>Follow the mixer's channels: keep each channel's cell, add new ones, drop the gone, in order.</summary>
@@ -398,9 +437,39 @@ public sealed class MixBankViewModel : ViewModelBase
 
     internal void Detach()
     {
+        Presentation.Available.CollectionChanged -= OnAvailableChanged;
+        Choices.Clear();
         foreach (BankCellViewModel cell in Cells) cell.Detach();
         Cells.Clear();
     }
+}
+
+/// <summary>
+/// One key of a bank's picker drawn as keys: a mix the bank can show. The key
+/// is lit while the bank shows that mix, and pressing it is the same pick the
+/// dropdown makes, trading places with a bank that shows the mix already.
+/// </summary>
+public sealed class BankChoiceViewModel(MixBankViewModel bank, MixViewModel mix) : ViewModelBase
+{
+    public MixBankViewModel Bank { get; } = bank;
+
+    /// <summary>The mix, the same object the mixer holds, so a rename relabels the key.</summary>
+    public MixViewModel Mix { get; } = mix;
+
+    /// <summary>True while the bank shows this mix.</summary>
+    public bool IsSelected => ReferenceEquals(Bank.Mix, Mix);
+
+    /// <summary>
+    /// The key was pressed: show its mix. Pressing the lit key changes
+    /// nothing, and it stays lit, since a bank always shows a mix.
+    /// </summary>
+    public void Select()
+    {
+        Bank.Mix = Mix;
+        Refresh();
+    }
+
+    internal void Refresh() => Raise(nameof(IsSelected));
 }
 
 /// <summary>A bank's master: the mix the bank shows, drawn as a card or as a strip.</summary>

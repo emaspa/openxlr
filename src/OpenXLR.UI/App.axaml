@@ -142,6 +142,9 @@
         <Style Selector="DropDownButton">
             <Setter Property="Theme" Value="{DynamicResource Ox.DropDownButton.Theme}"/>
         </Style>
+        <Style Selector="CheckBox">
+            <Setter Property="Theme" Value="{DynamicResource Ox.CheckBox.Theme}"/>
+        </Style>
 
         <!-- Mute buttons: lit while audio passes, red when muted. -->
         <Style Selector="ToggleButton.mute">
@@ -297,6 +300,12 @@
         </Style>
         <Style Selector="Button.fx.fxOff /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Foreground" Value="{DynamicResource Ox.Led.Alert}"/>
+        </Style>
+
+        <!-- The small keys beside an input's binding chip: EQ, noise removal
+             and dynamics. They draw no ring unless the skin gives chips one. -->
+        <Style Selector="Button.chip">
+            <Setter Property="BorderThickness" Value="{DynamicResource Ox.Chip.BorderThickness}"/>
         </Style>
     </Application.Styles>
 </Application>

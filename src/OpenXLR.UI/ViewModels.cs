@@ -2409,8 +2409,17 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
         }
     }
 
-    /// <summary>What the bridge does, under the switch while it is on: the delay it adds, or that it waits for the device.</summary>
-    public string? OwnClockStatus { get => _ownClockStatus; private set { if (Set(ref _ownClockStatus, value)) Raise(nameof(HasOwnClockStatus)); } }
+    /// <summary>What the bridge does while the switch is on: the delay it adds, or that it waits for the device.</summary>
+    public string? OwnClockStatus
+    {
+        get => _ownClockStatus;
+        private set { if (Set(ref _ownClockStatus, value)) { Raise(nameof(HasOwnClockStatus)); Raise(nameof(OwnClockTip)); } }
+    }
+
+    /// <summary>The Own clock switch's tooltip: what the switch does, and under it what the bridge does while it runs.</summary>
+    public string OwnClockTip => _ownClockStatus is { } status
+        ? Localizer.Text("CaptureOwnClockTip") + "\n\n" + status
+        : Localizer.Text("CaptureOwnClockTip");
 
     public bool HasOwnClockStatus => _ownClockStatus is not null;
 

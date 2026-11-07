@@ -45,6 +45,9 @@ public sealed class LevelMeter : Control
     public static readonly StyledProperty<double> SegmentGapProperty =
         AvaloniaProperty.Register<LevelMeter, double>(nameof(SegmentGap), 2);
 
+    public static readonly StyledProperty<double> GlowProperty =
+        AvaloniaProperty.Register<LevelMeter, double>(nameof(Glow));
+
     public static readonly StyledProperty<IBrush?> TrackProperty =
         AvaloniaProperty.Register<LevelMeter, IBrush?>(nameof(Track));
 
@@ -72,7 +75,7 @@ public sealed class LevelMeter : Control
     static LevelMeter()
     {
         AffectsRender<LevelMeter>(LevelProperty, PresentationProperty, SegmentsProperty,
-            SegmentGapProperty, TrackProperty, FillProperty, WarningProperty, HotProperty,
+            SegmentGapProperty, GlowProperty, TrackProperty, FillProperty, WarningProperty, HotProperty,
             WarningLevelProperty, HotLevelProperty, CornerRadiusProperty, OrientationProperty);
         AffectsMeasure<LevelMeter>(PresentationProperty, OrientationProperty);
     }
@@ -99,6 +102,13 @@ public sealed class LevelMeter : Control
 
     /// <summary>The gap between those cells, in pixels.</summary>
     public double SegmentGap { get => GetValue(SegmentGapProperty); set => SetValue(SegmentGapProperty, value); }
+
+    /// <summary>
+    /// How strongly the lit part glows, 0 for none to 1: a halo in each lit
+    /// cell's own colour that bleeds into the gaps around it, as the phosphor
+    /// of a display tube does.
+    /// </summary>
+    public double Glow { get => GetValue(GlowProperty); set => SetValue(GlowProperty, value); }
 
     public IBrush? Track { get => GetValue(TrackProperty); set => SetValue(TrackProperty, value); }
 
@@ -182,34 +192,53 @@ public sealed class LevelMeter : Control
             return;
         }
 
-        double length = Length(bounds);
+        double length = Math.Floor(Length(bounds));
         int cells = (int)Math.Clamp(Math.Round(Segments), 2, 64);
-        double gap = Math.Clamp(SegmentGap, 0, 8);
-        double cell = (length - gap * (cells - 1)) / cells;
+        int gap = (int)Math.Round(Math.Clamp(SegmentGap, 0, 8));
+        // Every cell is the same whole number of pixels. The pixels that do
+        // not divide evenly go to the gaps, at most one more to a gap and
+        // spread along the ladder, so the first cell starts at the quiet edge
+        // and the last ends at the loud one. Rounding each cell's own edges
+        // instead made thin cells alternate between one size and the next,
+        // which on a ladder of slim lines read as a ragged scale.
+        double cell = Math.Floor((length - gap * (cells - 1)) / cells);
         if (cell < 1)
         {
             // Too narrow to draw a ladder in: one bar reads better than a smear.
             Bar(context, bounds, level, warn, hot);
             return;
         }
+        int spare = (int)(length - cell * cells - gap * (cells - 1));
+        double Start(int i) => i * (cell + gap) + Math.Floor((double)i * spare / (cells - 1));
 
         // A cell lights when the level reaches its far edge, so a silent meter
         // is dark and a meter at the top is full.
         int on = (int)Math.Ceiling(level * cells - 1e-9);
-        // Cells are laid out on whole pixels. Left to the fractional positions
-        // the arithmetic gives, the first and last cell came out a fraction
-        // narrower than the rest and read as clipped.
-        double slot = (length + gap) / cells;
+        // A cell's colour is its own place on the scale, so the ladder shows
+        // its green, warning and top zones whether or not they are lit.
+        if (Glow > 0)
+            for (int i = 0; i < on; i++)
+                Halo(context, ZoneAt((i + 1.0) / cells), Along(bounds, Start(i), Start(i) + cell));
         for (int i = 0; i < cells; i++)
         {
-            double start = Math.Round(i * slot);
-            double end = Math.Min(length, Math.Round((i + 1) * slot - gap));
-            if (end <= start) end = Math.Min(length, start + 1);
-            // A cell's colour is its own place on the scale, so the ladder shows
-            // its green, warning and top zones whether or not they are lit.
             IBrush? brush = i < on ? ZoneAt((i + 1.0) / cells) : Track;
-            Draw(context, brush, Along(bounds, start, end));
+            Draw(context, brush, Along(bounds, Start(i), Start(i) + cell));
         }
+    }
+
+    /// <summary>
+    /// The glow round a lit part: one faint layer in its own colour, at most a
+    /// pixel and a half wide, drawn under the cells so it never dims a cell
+    /// beside it and only tints the gaps rather than filling them. The meter
+    /// does not clip, so the halo may reach past its edges.
+    /// </summary>
+    private void Halo(DrawingContext context, IBrush? brush, Rect rect)
+    {
+        double glow = Math.Clamp(Glow, 0, 1);
+        if (brush is null || glow <= 0) return;
+        double spread = 0.5 + glow;
+        using (context.PushOpacity(0.3 * glow))
+            context.DrawRectangle(brush, null, new RoundedRect(rect.Inflate(spread), spread));
     }
 
     /// <summary>
@@ -230,6 +259,13 @@ public sealed class LevelMeter : Control
         double end = length * level;
         double first = Math.Round(length * warn);
         double second = Math.Round(length * hot);
+        if (Glow > 0 && end > 0)
+        {
+            Halo(context, Fill, Along(bounds, 0, Math.Min(end, first)));
+            if (end > first) Halo(context, Warning ?? Fill, Along(bounds, first, Math.Min(end, second)));
+            if (end > second) Halo(context, Hot ?? Fill, Along(bounds, second, end));
+            Draw(context, Track, bounds, CornerRadius);
+        }
         DrawSpan(context, bounds, 0, Math.Min(end, first), Fill, end);
         DrawSpan(context, bounds, first, Math.Min(end, second), Warning ?? Fill, end);
         DrawSpan(context, bounds, second, end, Hot ?? Fill, end);

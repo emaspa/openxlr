@@ -57,6 +57,7 @@ public sealed partial class SkinWindowTests
             EveryKeyIsDrawnLikeTheMuteKey();
             TheApplicationsWindowKeepsItsBottomControlsReachable();
             ThePluginBypassKeyIsLegibleInBothAppearances();
+            LampKeysAndCheckKeysWearTheSkinsFaces();
             TheOptionsTabsWearTheSkin(options);
             TheWindowActuallyRepaintsWhenTheSkinChanges(main);
             ASkinCanLeaveTheBindingOut();
@@ -542,7 +543,7 @@ public sealed partial class SkinWindowTests
             Assert.Equal(size.Height - 1, runs[0].Start);     // the bottom cell is not shaved
             Assert.True(runs[^1].End > size.Height / 2 - 8, "the lit cells run up from the bottom, not down from the top");
             int[] heights = [.. runs.Select(r => r.Start - r.End + 1)];
-            Assert.True(heights.Max() - heights.Min() <= 1, $"cells came out uneven: {string.Join(",", heights)}");
+            Assert.True(heights.Max() == heights.Min(), $"cells came out uneven: {string.Join(",", heights)}");
 
             meter.Level = 1;
             Layout(probe, 7, 140);
@@ -1033,44 +1034,47 @@ public sealed partial class SkinWindowTests
         SkinService.Apply(SkinCatalog.Find("opendeck")!);
         var ground = new SolidColorBrush(Color.FromRgb(0, 0, 0));
 
-        // The lamp, with the widest halo a skin may ask for, inside a host that
-        // leaves a margin all round. Anything painted in that margin is a part
-        // of the indicator a real window would have cut off.
-        var led = new StatusLed
+        // The lamp and the lens, with the widest halo a skin may ask for, inside
+        // a host that leaves a margin all round. Anything painted in that margin
+        // is a part of the indicator a real window would have cut off.
+        foreach (LedPresentation presentation in new[] { LedPresentation.Lamp, LedPresentation.Lens })
         {
-            IsOn = true, Presentation = LedPresentation.Lamp, Width = 11, Height = 11,
-            OnBrush = new SolidColorBrush(Color.FromRgb(0x3e, 0xcf, 0x7a)),
-            Bezel = new SolidColorBrush(Color.FromRgb(0x0a, 0x0b, 0x0d)),
-            BezelThickness = 1.5, Glow = 1, CoreScale = 0.55,
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
-            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-        };
-        const int margin = 8;
-        var host = new Border { Background = ground, Padding = new Thickness(margin), Child = led };
-        var probe = new Window { Content = host, Width = 11 + margin * 2, Height = 11 + margin * 2, WindowDecorations = WindowDecorations.None };
-        probe.Show();
-        Layout(probe, 11 + margin * 2, 11 + margin * 2);
-        try
-        {
-            var size = new PixelSize((int)host.Bounds.Width, (int)host.Bounds.Height);
-            byte[] pixels = Read(host, size);
-            Rect box = new(led.TranslatePoint(default, host)!.Value, led.Bounds.Size);
-            var outside = new List<string>();
-            for (int y = 0; y < size.Height; y++)
-                for (int x = 0; x < size.Width; x++)
-                {
-                    int i = (y * size.Width + x) * 4;
-                    if (pixels[i] == 0 && pixels[i + 1] == 0 && pixels[i + 2] == 0) continue;
-                    if (x + 1 <= box.X || x >= box.Right || y + 1 <= box.Y || y >= box.Bottom)
-                        outside.Add($"({x},{y})");
-                }
-            Assert.True(outside.Count == 0,
-                $"the lamp painted {outside.Count} pixels outside its {box} box: {string.Join(" ", outside.Take(8))}");
-            // And it did paint something, so the check above is not vacuous.
-            Assert.Contains(Enumerable.Range(0, size.Width * size.Height),
-                i => pixels[i * 4] != 0 || pixels[i * 4 + 1] != 0 || pixels[i * 4 + 2] != 0);
+            var led = new StatusLed
+            {
+                IsOn = true, Presentation = presentation, Width = 11, Height = 11,
+                OnBrush = new SolidColorBrush(Color.FromRgb(0x3e, 0xcf, 0x7a)),
+                Bezel = new SolidColorBrush(Color.FromRgb(0x0a, 0x0b, 0x0d)),
+                BezelThickness = 1.5, Glow = 1, CoreScale = 0.55,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+            };
+            const int margin = 8;
+            var host = new Border { Background = ground, Padding = new Thickness(margin), Child = led };
+            var probe = new Window { Content = host, Width = 11 + margin * 2, Height = 11 + margin * 2, WindowDecorations = WindowDecorations.None };
+            probe.Show();
+            Layout(probe, 11 + margin * 2, 11 + margin * 2);
+            try
+            {
+                var size = new PixelSize((int)host.Bounds.Width, (int)host.Bounds.Height);
+                byte[] pixels = Read(host, size);
+                Rect box = new(led.TranslatePoint(default, host)!.Value, led.Bounds.Size);
+                var outside = new List<string>();
+                for (int y = 0; y < size.Height; y++)
+                    for (int x = 0; x < size.Width; x++)
+                    {
+                        int i = (y * size.Width + x) * 4;
+                        if (pixels[i] == 0 && pixels[i + 1] == 0 && pixels[i + 2] == 0) continue;
+                        if (x + 1 <= box.X || x >= box.Right || y + 1 <= box.Y || y >= box.Bottom)
+                            outside.Add($"({x},{y})");
+                    }
+                Assert.True(outside.Count == 0,
+                    $"the {presentation} painted {outside.Count} pixels outside its {box} box: {string.Join(" ", outside.Take(8))}");
+                // And it did paint something, so the check above is not vacuous.
+                Assert.Contains(Enumerable.Range(0, size.Width * size.Height),
+                    i => pixels[i * 4] != 0 || pixels[i * 4 + 1] != 0 || pixels[i * 4 + 2] != 0);
+            }
+            finally { probe.Close(); }
         }
-        finally { probe.Close(); }
 
         // The meter's cells: every one a whole number of pixels, the first
         // starting at the left edge, the last reaching the right one.
@@ -1105,7 +1109,7 @@ public sealed partial class SkinWindowTests
             Assert.Equal(10, runs.Count);                    // half of twenty cells
             Assert.Equal(0, runs[0].Start);                  // the first cell is not shaved
             int[] widths = [.. runs.Select(r => r.End - r.Start + 1)];
-            Assert.True(widths.Max() - widths.Min() <= 1,
+            Assert.True(widths.Max() == widths.Min(),
                 $"cells came out uneven: {string.Join(",", widths)}");
 
             // With the meter full, the last cell has to reach the right edge,
@@ -1679,6 +1683,168 @@ public sealed partial class SkinWindowTests
             finally { window.Close(); }
         }
         SkinService.Apply(new SkinEntry(SkinPackage.Default, []));
+    }
+
+    /// <summary>
+    /// A key the UI letters in a lamp colour wears the skin's lit or alert face
+    /// and ring when the skin sets them, and the ordinary face when it does not,
+    /// so no other appearance changes. Under <c>check: key</c> a check box is a
+    /// key with the bevel, lettered and lit as a toggle is. Under <c>chip: badge</c>
+    /// a source chip is a flat badge lettered in the information colour, and a
+    /// skin that sets <c>Ox.Value.Foreground</c> letters the readouts in it. A
+    /// plugin's name in an insert list becomes the same badge, without its lamp.
+    /// A strip's name and icon take <c>Ox.Strip.Foreground</c> and the halo of
+    /// <c>Ox.Strip.Glow</c>, as an application's name does, a muted icon <c>Ox.Strip.IconMuted</c>, and a
+    /// channel the layout colours keeps its colour and no halo.
+    /// </summary>
+    private static void LampKeysAndCheckKeysWearTheSkinsFaces()
+    {
+        var off = new Button { Content = "Inserts", Classes = { "fx", "fxOff" } };
+        var on = new Button { Content = "EQ", Classes = { "fx", "fxOn", "chip" } };
+        var plain = new Button { Content = "Inserts", Classes = { "fx" } };
+        var bypass = new ToggleButton { Content = "B", Classes = { "insertmini", "bypass" }, IsChecked = true };
+        var mute = new ToggleButton { Content = "M", Classes = { "mute" }, IsChecked = true };
+        var danger = new Button { Content = "Delete", Classes = { "danger" } };
+        var check = new CheckBox { Content = "Own clock" };
+        var chipText = new TextBlock { Name = "ChipText", Text = "XLR 1 jack", Classes = { "body" } };
+        var chipLamp = new StatusLed { IsOn = true, Margin = new Thickness(0, 0, 6, 0) };
+        var chip = new Button
+        {
+            Content = new Grid { ColumnDefinitions = new("Auto,*"), Children = { chipLamp, chipText } },
+            Classes = { "bindingChip" },
+        };
+        Grid.SetColumn(chipText, 1);
+        var readout = new TextBlock { Text = "52 dB", Classes = { "val" } };
+        var insertLamp = new StatusLed { IsOn = false, Kind = LedKind.Insert, Classes = { "insertLamp" } };
+        var insertName = new TextBlock { Text = "Voice Focus", Classes = { "insertName", "body" } };
+        var insertChip = new Border { Child = insertName, Classes = { "insertChip", "off" } };
+        var masterLamps = new Panel { Classes = { "insertLamps" } };
+        var stripName = new TextBlock { Text = "Music", Classes = { "strip" } };
+        var appName = new TextBlock { Text = "Cider", Classes = { "body", "appName" } };
+        var stripIcon = new TextBlock { Text = "*", Classes = { "strip", "muted" } };
+        var colouredIcon = new TextBlock { Text = "*", Classes = { "strip", "muted", "layoutAccent" }, Foreground = Brushes.Lime };
+        var probe = new Window
+        {
+            Content = new StackPanel { Children = { off, on, plain, bypass, mute, danger, check, chip, readout, insertLamp, insertChip, masterLamps, stripName, appName, stripIcon, colouredIcon } },
+            Width = 300, Height = 480, WindowDecorations = WindowDecorations.None,
+        };
+        probe.Show();
+        try
+        {
+            ContentPresenter Face(Control c)
+            {
+                Layout(probe, 300, 480);
+                return c.GetVisualDescendants().OfType<ContentPresenter>().First(p => p.Name == "PART_ContentPresenter");
+            }
+            Color Fill(Control c) => ((ISolidColorBrush)Face(c).Background!).Color;
+            Color Ring(Control c) => ((ISolidColorBrush)Face(c).BorderBrush!).Color;
+            Color Letters(Control c) => ((ISolidColorBrush)Face(c).Foreground!).Color;
+            bool Bevelled(Control c) => c.GetVisualDescendants().OfType<Border>().Any(b => b.Name == "Bevel");
+
+            // Without the tokens a key lettered in a lamp colour keeps the ordinary face.
+            foreach (SkinEntry plainSkin in new[] { new SkinEntry(SkinPackage.Default, []), SkinCatalog.Find("opendeck")! })
+            {
+                SkinService.Apply(plainSkin);
+                Assert.Same(Face(plain).Background, Face(off).Background);
+                Assert.Same(Face(plain).Background, Face(on).Background);
+                Assert.Equal(new Thickness(0), on.BorderThickness);
+                Assert.False(Bevelled(check), $"{plainSkin.Id} drew a check box as a key");
+                // The chip wears the skin's button, and the readout the primary text.
+                Assert.Same(chip.Theme, plain.Theme);
+                Assert.True(chipLamp.IsVisible);
+                Assert.True(insertLamp.IsVisible);
+                Assert.True(masterLamps.IsVisible);
+                Assert.Null(insertChip.Background);
+                Assert.Equal(((ISolidColorBrush)Application.Current!.FindResource("Ox.Text.Primary")!).Color,
+                    ((ISolidColorBrush)readout.Foreground!).Color);
+                Assert.Null(stripName.Effect);
+                Assert.Equal(((ISolidColorBrush)stripName.Foreground!).Color, ((ISolidColorBrush)stripIcon.Foreground!).Color);
+            }
+
+            SkinReadResult read = SkinReader.Read("lamps", """
+                {"schema":1,"name":"Lamps","controls":{"button":"cap","mute":"cap","check":"key","chip":"badge"},"tokens":{
+                  "Ox.Alert.Background":"#400000","Ox.Alert.BackgroundPointerOver":"#500000","Ox.Alert.BorderBrush":"#ff0000",
+                  "Ox.Lit.Background":"#003040","Ox.Lit.BackgroundPointerOver":"#004050","Ox.Lit.BorderBrush":"#00ffff",
+                  "Ox.Chip.BorderThickness":1,"Ox.Danger.BorderBrush":"#ff8000","Ox.Mute.BorderBrushChecked":"#ff00ff",
+                  "Ox.Control.Background":"#101010","Ox.Control.BackgroundChecked":"#002030",
+                  "Ox.Toggle.Foreground":"#008090","Ox.Toggle.ForegroundChecked":"#00e0ff",
+                  "Ox.Badge.Background":"#061418","Ox.Text.Info":"#40e0ff","Ox.Value.Foreground":"#30d0f0",
+                  "Ox.Strip.Foreground":"#20c0e0","Ox.Strip.IconMuted":"#ff5040","Ox.Strip.Glow":0.5}}
+                """, SkinOrigin.BuiltIn, null);
+            Assert.Empty(read.Errors);
+            Assert.Empty(SkinService.Apply(new SkinEntry(read.Package!, read.Errors)));
+            Assert.Equal(Color.Parse("#400000"), Fill(off));
+            Assert.Equal(Color.Parse("#ff0000"), Ring(off));
+            Assert.Equal(Color.Parse("#003040"), Fill(on));
+            Assert.Equal(Color.Parse("#00ffff"), Ring(on));
+            Assert.Equal(new Thickness(1), on.BorderThickness);
+            Assert.Equal(Color.Parse("#101010"), Fill(plain));
+            // A bypassed plugin's key is the alert key; a processing one is a plain key.
+            Assert.Equal(Color.Parse("#400000"), Fill(bypass));
+            bypass.IsChecked = false;
+            Assert.NotEqual(Color.Parse("#400000"), Fill(bypass));
+            Assert.Equal(Color.Parse("#ff00ff"), Ring(mute));
+            Assert.Equal(Color.Parse("#ff8000"), Ring(danger));
+            // The check box is a key: the bevel, the toggle's lettering, lit while ticked.
+            Assert.True(Bevelled(check), "check: key drew no key");
+            Assert.Equal(Color.Parse("#008090"), Letters(check));
+            check.IsChecked = true;
+            Assert.Equal(Color.Parse("#002030"), Fill(check));
+            Assert.Equal(Color.Parse("#00e0ff"), Letters(check));
+            // The chip is the badge: flat, the badge colour, lettered in the information colour.
+            Assert.False(Bevelled(chip), "chip: badge drew a key");
+            Assert.Equal(Color.Parse("#061418"), Fill(chip));
+            Assert.Equal(Color.Parse("#40e0ff"), ((ISolidColorBrush)chipText.Foreground!).Color);
+            // A badge has no lamp; a source that is not linked is lettered in the alert colour.
+            Assert.False(chipLamp.IsVisible, "chip: badge kept its lamp");
+            chip.Classes.Add("unlinked");
+            Layout(probe, 300, 480);
+            Assert.Equal(Color.Parse("#ff3c4e"), ((ISolidColorBrush)chipText.Foreground!).Color);
+            chip.Classes.Remove("unlinked");
+            // A plugin's name is the same badge, without its lamp, red while bypassed.
+            Assert.False(insertLamp.IsVisible, "chip: badge kept the insert's lamp");
+            Assert.False(masterLamps.IsVisible, "chip: badge kept a master strip's plugin lamps");
+            Assert.Equal(Color.Parse("#061418"), ((ISolidColorBrush)insertChip.Background!).Color);
+            Assert.Equal(Color.Parse("#ff3c4e"), ((ISolidColorBrush)insertName.Foreground!).Color);
+            insertChip.Classes.Remove("off");
+            Layout(probe, 300, 480);
+            Assert.Equal(Color.Parse("#40e0ff"), ((ISolidColorBrush)insertName.Foreground!).Color);
+            Assert.Equal(Color.Parse("#30d0f0"), ((ISolidColorBrush)readout.Foreground!).Color);
+            // The strip name is backlit in its colour; a muted icon is red with a red halo.
+            Assert.Equal(Color.Parse("#20c0e0"), ((ISolidColorBrush)stripName.Foreground!).Color);
+            Assert.Equal(Color.Parse("#20c0e0"), Assert.IsType<DropShadowEffect>(stripName.Effect).Color);
+            Assert.Equal(0, ((DropShadowEffect)stripName.Effect!).OffsetY);
+            // An application's name under Applications is lettered the same way.
+            Assert.Equal(Color.Parse("#20c0e0"), ((ISolidColorBrush)appName.Foreground!).Color);
+            Assert.Equal(Color.Parse("#20c0e0"), Assert.IsType<DropShadowEffect>(appName.Effect).Color);
+            Assert.Equal(Color.Parse("#ff5040"), ((ISolidColorBrush)stripIcon.Foreground!).Color);
+            Assert.Equal(Color.Parse("#ff5040"), Assert.IsType<DropShadowEffect>(stripIcon.Effect).Color);
+            stripIcon.Classes.Remove("muted");
+            Layout(probe, 300, 480);
+            Assert.Equal(Color.Parse("#20c0e0"), ((ISolidColorBrush)stripIcon.Foreground!).Color);
+            stripIcon.Classes.Add("muted");
+            // A colour the layout gives a channel is its own: no skin colour, no halo.
+            Assert.Equal(Colors.Lime, ((ISolidColorBrush)colouredIcon.Foreground!).Color);
+            Assert.Null(colouredIcon.Effect);
+            Capture(probe, "lamp-keys");
+
+            // And back: the plain faces and the tick box return.
+            SkinService.Apply(new SkinEntry(SkinPackage.Default, []));
+            bypass.IsChecked = true;
+            Assert.Same(Face(plain).Background, Face(off).Background);
+            Assert.Equal(new Thickness(0), on.BorderThickness);
+            Assert.False(Bevelled(check));
+            Assert.Same(chip.Theme, plain.Theme);
+            Assert.True(chipLamp.IsVisible);
+            Assert.True(insertLamp.IsVisible);
+            Assert.Null(insertChip.Background);
+            Assert.NotEqual(Color.Parse("#30d0f0"), ((ISolidColorBrush)readout.Foreground!).Color);
+            Assert.Null(stripName.Effect);
+            Assert.Null(appName.Effect);
+            Assert.Null(stripIcon.Effect);
+            Assert.NotEqual(Color.Parse("#ff5040"), ((ISolidColorBrush)stripIcon.Foreground!).Color);
+        }
+        finally { probe.Close(); }
     }
 
     /// <summary>

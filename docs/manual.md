@@ -2974,7 +2974,8 @@ not have stays hidden, as in the panel.
 
 Each mix bank shows one mix: every channel's send into it and the mix's
 master. The picker at the top of a bank lists every mix that is not
-hidden. Choose one to
+hidden. A skin draws it as a dropdown or as a row of keys, one per mix,
+with the key of the mix the bank shows lit. Choose one to
 show it in that bank; a mix another bank already shows trades places with
 it, so two banks never show the same mix and every mix stays reachable
 however few banks the skin shows. Your choice is remembered for that skin
@@ -5112,7 +5113,7 @@ gain while OpenXLR drives the unit. OpenXLR never changes the volume of
 those units' sources, the Wave XLR Pro's included.
 
 <a name="own-clock"></a>
-**Own clock**, under the Mute button in the classic INPUTS block, among an
+**Own clock**, beside the Mute button in the classic INPUTS block, among an
 input rack's switches, on a mix matrix row (its own button, or behind
 **Mic** when the input has microphone switches too) and as a row on the
 terminal mixer's Inputs tab, puts the capture input's device on a
@@ -5124,8 +5125,8 @@ seconds. With **Own clock** on, the device keeps its own timing and a
 bridge inside OpenXLR's native helper carries its sound into the mixer,
 correcting the drift between the two clocks itself. The microphone's clock
 is not touched. The input's sound arrives about 27 ms later when the
-audio server runs 256-frame blocks, about 75 ms later at 1024. The line under the
-switch shows the delay once the bridge carries sound, and how many dropouts
+audio server runs 256-frame blocks, about 75 ms later at 1024. The switch's tooltip
+shows the delay once the bridge carries sound, and how many dropouts
 it had, if any. A few dropouts after plugging the device in or waking the
 computer are normal; a count that keeps climbing means the device's timing
 is worse than the bridge's margin. Mic setup ends when you switch it.

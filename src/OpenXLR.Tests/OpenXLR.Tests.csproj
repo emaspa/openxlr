@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <None Update="run-script.sh" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="skin-rack-keys.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

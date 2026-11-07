@@ -51,11 +51,11 @@ internal static partial class SkinLayoutWindowTests
                       "master":{"template":"master-strip"}}}}}
         """;
 
-    /// <summary>The same window with the submixer as two send lists one above the other, reversed faders and icons for names.</summary>
+    /// <summary>The same window with the submixer as three send lists one above the other, reversed faders, icons for names and keys for pickers.</summary>
     private const string ListSkin = """
         {"schema":1,"name":"List","tokens":{"Ox.Card.Background":"#20232a"},"layout":{"version":1,
          "regions":{
-          "submixer":{"template":"mix-banks","orientation":"vertical","visibleBanks":3,
+          "submixer":{"template":"mix-banks","orientation":"vertical","visibleBanks":3,"picker":"buttons",
                       "strip":{"template":"send-list","hidden":["value"],"label":{"style":"icon"},
                                "fader":{"direction":"reversed"},"meter":{"placement":"beside-label"}},
                       "master":{"template":"master-card"}}}}}
@@ -67,6 +67,9 @@ internal static partial class SkinLayoutWindowTests
     {
         Write(dir, "banks", BanksSkin);
         Write(dir, "list", ListSkin);
+        // A rack of keys: a hi-fi skin's own tokens, its images given flat
+        // colours, with the badge chips, check keys and lamp-lettered faces.
+        Write(dir, "keys", File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "skin-rack-keys.json")));
         var window = new MainWindow(new DaemonClient("ws://127.0.0.1:1/ws"));
         try
         {
@@ -92,6 +95,27 @@ internal static partial class SkinLayoutWindowTests
             Layout(window, 1040, 900);
             Wear("banks");
             Layout(window, 1040, 900);
+            // A skin that sets the optional styles keeps every strip its own
+            // height through a reload and through a change of skin and back.
+            // Rebuilding those styles in place once restyled every control,
+            // and a strip measured while its hidden handle briefly counted
+            // stayed a handle's height taller than what it holds.
+            {
+                Wear("keys");
+                Layout(window, 1920, 1200);
+                string Heights() => string.Join(" | ", BankCells(window).Select(b => string.Join(",", b.Select(c => c.Bounds.Height.ToString("0.#")))));
+                string worn = Heights();
+                Assert.Empty(SkinService.Reload());
+                Layout(window, 1920, 1200);
+                Assert.Equal(worn, Heights());
+                Wear("banks");
+                Layout(window, 1920, 1200);
+                Wear("keys");
+                Layout(window, 1920, 1200);
+                Assert.Equal(worn, Heights());
+                Wear("banks");
+                Layout(window, 1040, 900);
+            }
 
             var panel = window.FindControl<MixerPanel>("MixerPanel")!;
             var rack = window.FindControl<InputRackView>("InputRack")!;
@@ -156,6 +180,13 @@ internal static partial class SkinLayoutWindowTests
                     var master = bank.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "BankMaster");
                     AssertInside(master, bank);
                     AssertNoOverlap([cells, master]);
+                    // An upright master beside the strips is as tall as they are.
+                    if (master.Classes.Contains("beside"))
+                    {
+                        double tallest = cells.GetVisualDescendants().OfType<Border>()
+                            .Where(b => b.Name == "BankCell" && b.IsEffectivelyVisible).Max(b => b.Bounds.Height);
+                        Assert.Equal(tallest, master.Bounds.Height, 0.5);
+                    }
                     mixEqs += MixEqOverChain(master, where);
                     foreach (Slider fader in bank.GetVisualDescendants().OfType<Slider>().Where(f => f.IsEffectivelyVisible))
                     {
@@ -334,7 +365,34 @@ internal static partial class SkinLayoutWindowTests
             }
             Assert.Equal(1, mixEqs);
             foreach (Border cell in BankCells(window).SelectMany(c => c)) AssertPartsApart(cell);
+
+            // Each bank picks with a row of keys instead of the dropdown: one
+            // key per mix, the shown mix's key lit, and a press makes the
+            // dropdown's pick, trading places with the bank that showed it.
+            Assert.Empty(Pickers(window));
+            ToggleButton[][] keys = [.. lists.Select(BankKeys)];
+            Assert.All(keys, row => Assert.Equal(BankFixtureMixes, row.Select(k => ((BankChoiceViewModel)k.DataContext!).Mix.Id)));
+            Assert.All(keys, row => Assert.Equal(["Monitor A", "Monitor B", "Stream", "Chat", "Aux"], row.Select(k => AutomationProperties.GetName(k))));
+            Assert.Equal(Localizer.Format("BankPickerName", 2),
+                AutomationProperties.GetName(lists[1].GetVisualDescendants().OfType<ItemsControl>().Single(i => i.Name == "BankKeys")));
+            string[] shown = [.. banks.Selection];
+            for (int b = 0; b < lists.Length; b++)
+                Assert.Equal(BankFixtureMixes.Select(id => id == shown[b]), keys[b].Select(k => k.IsChecked == true));
+            foreach (Border list in lists)
+                foreach (ToggleButton key in BankKeys(list)) AssertInside(key, list);
             Capture(window, "skin-layout-send-lists-1040");
+            PressKey(keys[0].Single(k => ((BankChoiceViewModel)k.DataContext!).Mix.Id == shown[2]));
+            Layout(window, 1040, 1200);
+            Assert.Equal([shown[2], shown[1], shown[0]], banks.Selection);
+            Assert.Equal(banks.Selection, UiSettings.Load().SkinBanksFor("list", 1));
+            for (int b = 0; b < lists.Length; b++)
+                Assert.Equal(BankFixtureMixes.Select(id => id == banks.Selection[b]), BankKeys(Banks(window)[b]).Select(k => k.IsChecked == true));
+            // The lit key stays lit when pressed again, and nothing moves.
+            ToggleButton lit = BankKeys(Banks(window)[1]).Single(k => k.IsChecked == true);
+            PressKey(lit);
+            Layout(window, 1040, 1200);
+            Assert.True(lit.IsChecked);
+            Assert.Equal([shown[2], shown[1], shown[0]], banks.Selection);
 
             // Back to the classic templates: the same channel, mix and send objects throughout.
             Wear(SkinPackage.DefaultId);
@@ -395,6 +453,17 @@ internal static partial class SkinLayoutWindowTests
     /// <summary>The bank tiles in the window, first bank first.</summary>
     internal static Border[] Banks(Window window) =>
         [.. window.GetVisualDescendants().OfType<Border>().Where(b => b.Name == "Bank" && b.IsEffectivelyVisible)];
+
+    /// <summary>The keys of a bank's picker drawn as keys, in the mixer's order.</summary>
+    internal static ToggleButton[] BankKeys(Border bank) =>
+        [.. bank.GetVisualDescendants().OfType<ToggleButton>().Where(k => k.Name == "BankKey" && k.IsEffectivelyVisible)];
+
+    /// <summary>A press as the key takes one: it flips its own state, then raises Click.</summary>
+    private static void PressKey(ToggleButton key)
+    {
+        key.SetCurrentValue(ToggleButton.IsCheckedProperty, key.IsChecked != true);
+        key.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+    }
 
     internal static ComboBox[] Pickers(Window window) =>
         [.. window.GetVisualDescendants().OfType<ComboBox>().Where(b => b.Name == "BankPicker" && b.IsEffectivelyVisible)];

@@ -27,7 +27,7 @@
                     ToolTip.Tip="{loc:Text Key=DragOntoAnotherChannelYouCanEdit}"/>
             <layout:StripPanel Spec="{Binding Spec}" Spacing="6">
               <StackPanel layout:StripPanel.Part="identity" Spacing="2">
-                <vm:LayoutIconBlock Icon="{Binding Channel.Appearance.Icon}" Fallback="{Binding Channel.Appearance.DefaultIcon}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
+                <vm:LayoutIconBlock Icon="{Binding Channel.Appearance.Icon}" Fallback="{Binding Channel.Appearance.DefaultIcon}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}" Classes.muted="{Binding Send.Muted}"
                            HorizontalAlignment="Center" IsVisible="{Binding ShowsIcon}"
                            AutomationProperties.Name="{Binding Channel.Name}" ToolTip.Tip="{Binding Channel.Name}"/>
                 <TextBlock Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
@@ -70,7 +70,7 @@
               <!-- a fixed column, so the rows' faders line up; the name shortens to fit it -->
               <DockPanel layout:StripPanel.Part="identity" VerticalAlignment="Center" Width="{DynamicResource Ox.Mixer.StripWidth}">
                 <vm:LayoutIconBlock DockPanel.Dock="Left" Icon="{Binding Channel.Appearance.Icon}" Fallback="{Binding Channel.Appearance.DefaultIcon}" Classes="strip"
-                           Classes.layoutAccent="{Binding Channel.Appearance.HasColour}" Margin="0,0,4,0"
+                           Classes.layoutAccent="{Binding Channel.Appearance.HasColour}" Classes.muted="{Binding Send.Muted}" Margin="0,0,4,0"
                            VerticalAlignment="Center" IsVisible="{Binding ShowsIcon}"
                            AutomationProperties.Name="{Binding Channel.Name}" ToolTip.Tip="{Binding Channel.Name}"/>
                 <TextBlock Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
@@ -107,11 +107,11 @@
          mix the bank shows, never rebound from one to the next. -->
     <layout:StripTemplateSelector x:Key="BankMasters">
       <DataTemplate x:Key="master-card" x:DataType="layout:BankMasterViewModel">
-        <Border Classes="tile" Name="BankMaster" Padding="10">
+        <Border Classes="tile" Name="BankMaster" Padding="10" VerticalAlignment="Top">
           <StackPanel Spacing="6">
             <layout:StripPanel Spec="{Binding Spec}" Spacing="6">
               <Grid layout:StripPanel.Part="identity" ColumnDefinitions="Auto,*" ColumnSpacing="6">
-                <vm:LayoutIconBlock Icon="{Binding Mix.Appearance.Icon}" Fallback="{Binding Mix.Appearance.DefaultIcon}" Classes="strip" Classes.layoutAccent="{Binding Mix.Appearance.HasColour}"
+                <vm:LayoutIconBlock Icon="{Binding Mix.Appearance.Icon}" Fallback="{Binding Mix.Appearance.DefaultIcon}" Classes="strip" Classes.layoutAccent="{Binding Mix.Appearance.HasColour}" Classes.muted="{Binding Mix.Muted}"
                            AutomationProperties.Name="{Binding Mix.Name}" ToolTip.Tip="{Binding Mix.Name}">
                   <vm:LayoutIconBlock.IsVisible>
                     <MultiBinding Converter="{x:Static BoolConverters.And}">
@@ -168,11 +168,14 @@
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:InsertViewModel">
                   <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="0,2,0,0">
-                    <skin:StatusLed IsOn="{Binding IsActive}" Kind="Insert" Margin="0,0,6,0"
+                    <skin:StatusLed Classes="insertLamp" IsOn="{Binding IsActive}" Kind="Insert" Margin="0,0,6,0"
                                     AutomationProperties.Name="{loc:Text Key=PluginState}"/>
-                    <TextBlock Grid.Column="1" Text="{Binding Label}" Classes="insertName body"
-                               FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center"
-                               TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
+                    <!-- the name in a chip a skin can draw as a badge, lettered for a bypassed or failing plugin -->
+                    <Border Grid.Column="1" Classes="insertChip" Classes.off="{Binding !IsActive}" HorizontalAlignment="Left" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding Label}" Classes="insertName body"
+                                 FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center"
+                                 TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
+                    </Border>
                     <ToggleButton Grid.Column="2" Content="{loc:Text Key=NativeHostLetter}" Classes="insertmini"
                                   IsChecked="{Binding NativeHost, Mode=TwoWay}"
                                   IsVisible="{Binding CanChooseNativeHost}"
@@ -199,11 +202,38 @@
         </Border>
       </DataTemplate>
       <DataTemplate x:Key="master-strip" x:DataType="layout:BankMasterViewModel">
-        <Border Classes="tile strip upright" Name="BankMaster" VerticalAlignment="Top">
-          <StackPanel Spacing="6">
+        <!-- Upright, the master's keys stand in a column beside its fader, so the
+             master is no taller than the strips beside it, and the tile grows to
+             their height with its parts at the foot, its fader level with
+             theirs; flat, under a send list, the keys follow the strip as before. -->
+        <Border Classes="tile strip" Classes.upright="{Binding !Spec.FaderUpright}" Classes.beside="{Binding Spec.FaderUpright}" Name="BankMaster">
+          <Border.Styles>
+            <Style Selector="Border#BankMaster">
+              <Setter Property="VerticalAlignment" Value="Top"/>
+            </Style>
+            <Style Selector="Border#BankMaster.beside">
+              <Setter Property="VerticalAlignment" Value="Stretch"/>
+            </Style>
+            <Style Selector="Border#BankMaster.beside > Grid#BankMasterLayout">
+              <Setter Property="VerticalAlignment" Value="Bottom"/>
+            </Style>
+          </Border.Styles>
+          <Grid Name="BankMasterLayout" ColumnDefinitions="Auto,Auto" RowDefinitions="Auto,Auto" Classes.beside="{Binding Spec.FaderUpright}">
+            <Grid.Styles>
+              <Style Selector="Grid#BankMasterLayout > StackPanel#BankMasterKeys">
+                <Setter Property="Grid.Row" Value="1"/>
+                <Setter Property="Margin" Value="0,6,0,0"/>
+              </Style>
+              <Style Selector="Grid#BankMasterLayout.beside > StackPanel#BankMasterKeys">
+                <Setter Property="Grid.Row" Value="0"/>
+                <Setter Property="Grid.Column" Value="1"/>
+                <Setter Property="Margin" Value="6,0,0,0"/>
+                <Setter Property="VerticalAlignment" Value="Bottom"/>
+              </Style>
+            </Grid.Styles>
             <layout:StripPanel Spec="{Binding Spec}" Spacing="6">
               <StackPanel layout:StripPanel.Part="identity" Spacing="2">
-                <vm:LayoutIconBlock Icon="{Binding Mix.Appearance.Icon}" Fallback="{Binding Mix.Appearance.DefaultIcon}" Classes="strip" Classes.layoutAccent="{Binding Mix.Appearance.HasColour}"
+                <vm:LayoutIconBlock Icon="{Binding Mix.Appearance.Icon}" Fallback="{Binding Mix.Appearance.DefaultIcon}" Classes="strip" Classes.layoutAccent="{Binding Mix.Appearance.HasColour}" Classes.muted="{Binding Mix.Muted}"
                            HorizontalAlignment="Center" AutomationProperties.Name="{Binding Mix.Name}" ToolTip.Tip="{Binding Mix.Name}">
                   <vm:LayoutIconBlock.IsVisible>
                     <MultiBinding Converter="{x:Static BoolConverters.And}">
@@ -243,36 +273,48 @@
                               ToolTip.Tip="{Binding Mix.Name, StringFormat={loc:Text Key=MixMuteName}}"/>
               </Panel>
             </layout:StripPanel>
-            <ToggleButton Content="150%" IsChecked="{Binding Mix.VolumeRange.Boost, Mode=TwoWay}" IsVisible="{Binding Mix.IsMonitor}"
-                          Padding="4,2" FontSize="{DynamicResource UiText.FontSize11}" ToolTip.Tip="{loc:Text Key=AllowThisMonitorMixAbove100Up}"/>
-            <!-- the mix's EQ, before its plugins as the signal meets them -->
-            <Button Name="MixEqCompact" Content="{loc:Text Key=Eq}" Padding="4,2" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Stretch" Classes="fx"
-                    Classes.fxOn="{Binding Mix.Eq.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Mix.Eq.IsFaulty, FallbackValue=False}"
-                    HorizontalContentAlignment="Center" Click="OnMixEq"
-                    IsVisible="{Binding Mix.HasEq}" IsEnabled="{Binding Mix.Eq.CanOpen, FallbackValue=False}" ToolTip.ShowOnDisabled="True"
-                    AutomationProperties.Name="{Binding Mix.Eq.ButtonName, FallbackValue=''}" ToolTip.Tip="{Binding Mix.Eq.ButtonTip, FallbackValue=''}"/>
-            <!-- compact effects access: the chain's button and one lamp per
-                 plugin, failing ones lit in the alert colour; bypass and the
-                 rest live in the chain window -->
-            <Button Click="OnMixInserts" Padding="4,2" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Stretch" Classes="fx" Classes.fxOn="{Binding Mix.Inserts.IsProcessing}" Classes.fxOff="{Binding Mix.Inserts.IsOff}"
-                    HorizontalContentAlignment="Center" ToolTip.Tip="{Binding Mix.Inserts.ButtonTip}">
-              <TextBlock Text="{Binding Mix.Inserts.ButtonText}" TextTrimming="CharacterEllipsis"/>
-            </Button>
-            <ItemsControl ItemsSource="{Binding Mix.Inserts.Items}" IsVisible="{Binding Mix.Inserts.HasItems}" HorizontalAlignment="Center">
-              <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate><WrapPanel ItemSpacing="3" LineSpacing="3"/></ItemsPanelTemplate>
-              </ItemsControl.ItemsPanel>
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:InsertViewModel">
-                  <skin:StatusLed IsOn="{Binding IsActive}" Kind="Insert" ToolTip.Tip="{Binding Label}"
-                                  AutomationProperties.Name="{Binding Label}"/>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-            <ToggleButton Content="{loc:Text Key=ToUSBAuxPort}" IsChecked="{Binding Mix.AuxPortEnabled, Mode=TwoWay}"
-                          IsVisible="{Binding Mix.ShowAuxPortToggle}" Padding="4,2" FontSize="{DynamicResource UiText.FontSize11}"
-                          ToolTip.Tip="{loc:Text Key=SendThisMixToTheSecondComputerOn}"/>
-          </StackPanel>
+            <StackPanel Name="BankMasterKeys" Spacing="4">
+              <ToggleButton Content="150%" IsChecked="{Binding Mix.VolumeRange.Boost, Mode=TwoWay}" IsVisible="{Binding Mix.IsMonitor}"
+                            Padding="4,2" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                            ToolTip.Tip="{loc:Text Key=AllowThisMonitorMixAbove100Up}"/>
+              <!-- the monitor mix's dry switch, as the mix card and the matrix head have it -->
+              <ToggleButton Name="MixDryCompact" Content="{loc:Text Key=MonitorDry}" Padding="4,2" FontSize="{DynamicResource UiText.FontSize11}"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                            IsChecked="{Binding Mix.MonitorDry, Mode=TwoWay}" IsVisible="{Binding Mix.HasMonitorDry}"
+                            AutomationProperties.Name="{Binding Mix.Name, StringFormat={loc:Text Key=MonitorDryName}}" ToolTip.Tip="{loc:Text Key=MonitorDryTip}"/>
+              <!-- the mix's EQ, before its plugins as the signal meets them -->
+              <Button Name="MixEqCompact" Content="{loc:Text Key=Eq}" Padding="4,2" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Stretch" Classes="fx"
+                      Classes.fxOn="{Binding Mix.Eq.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Mix.Eq.IsFaulty, FallbackValue=False}"
+                      HorizontalContentAlignment="Center" Click="OnMixEq"
+                      IsVisible="{Binding Mix.HasEq}" IsEnabled="{Binding Mix.Eq.CanOpen, FallbackValue=False}" ToolTip.ShowOnDisabled="True"
+                      AutomationProperties.Name="{Binding Mix.Eq.ButtonName, FallbackValue=''}" ToolTip.Tip="{Binding Mix.Eq.ButtonTip, FallbackValue=''}"/>
+              <!-- compact effects access: the chain's button and one lamp per
+                   plugin, failing ones lit in the alert colour; bypass and the
+                   rest live in the chain window -->
+              <Button Click="OnMixInserts" Padding="4,2" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Stretch" Classes="fx" Classes.fxOn="{Binding Mix.Inserts.IsProcessing}" Classes.fxOff="{Binding Mix.Inserts.IsOff}"
+                      HorizontalContentAlignment="Center" ToolTip.Tip="{Binding Mix.Inserts.ButtonTip}">
+                <TextBlock Text="{Binding Mix.Inserts.ButtonText}" TextTrimming="CharacterEllipsis"/>
+              </Button>
+              <!-- in a panel of its own, so a skin that draws its chips as badges can drop the lamps:
+                   the list's own visibility is bound, and a binding outranks a style -->
+              <Panel Classes="insertLamps">
+                <ItemsControl ItemsSource="{Binding Mix.Inserts.Items}" IsVisible="{Binding Mix.Inserts.HasItems}" HorizontalAlignment="Center">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><WrapPanel ItemSpacing="3" LineSpacing="3"/></ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:InsertViewModel">
+                      <skin:StatusLed IsOn="{Binding IsActive}" Kind="Insert" ToolTip.Tip="{Binding Label}"
+                                      AutomationProperties.Name="{Binding Label}"/>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </Panel>
+              <ToggleButton Content="{loc:Text Key=ToUSBAuxPort}" IsChecked="{Binding Mix.AuxPortEnabled, Mode=TwoWay}"
+                            IsVisible="{Binding Mix.ShowAuxPortToggle}" Padding="4,2" FontSize="{DynamicResource UiText.FontSize11}"
+                            ToolTip.Tip="{loc:Text Key=SendThisMixToTheSecondComputerOn}"/>
+            </StackPanel>
+          </Grid>
         </Border>
       </DataTemplate>
     </layout:StripTemplateSelector>
@@ -295,8 +337,8 @@
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="layout:MixBankViewModel">
             <Border Classes="tile" Name="Bank" Padding="8" VerticalAlignment="Top">
-              <DockPanel>
-                <ComboBox DockPanel.Dock="Top" Name="BankPicker" ItemsSource="{Binding Available}"
+              <DockPanel HorizontalAlignment="{Binding ContentAlignment}">
+                <ComboBox DockPanel.Dock="Top" Name="BankPicker" ItemsSource="{Binding Available}" IsVisible="{Binding PickerDropdown}"
                           SelectedItem="{Binding Mix, Mode=TwoWay}" HorizontalAlignment="Stretch" Margin="0,0,0,8"
                           AutomationProperties.Name="{Binding PickerName}" ToolTip.Tip="{loc:Text Key=BankPickerTip}">
                   <ComboBox.ItemTemplate>
@@ -305,9 +347,25 @@
                     </DataTemplate>
                   </ComboBox.ItemTemplate>
                 </ComboBox>
+                <!-- the same pick as a row of keys, one per mix, the shown mix's key lit -->
+                <ItemsControl DockPanel.Dock="Top" Name="BankKeys" ItemsSource="{Binding Choices}" IsVisible="{Binding PickerButtons}"
+                              Margin="0,0,0,4" AutomationProperties.Name="{Binding PickerName}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <WrapPanel Orientation="Horizontal"/>
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="layout:BankChoiceViewModel">
+                      <ToggleButton Name="BankKey" Content="{Binding Mix.Name}" IsChecked="{Binding IsSelected, Mode=OneWay}"
+                                    Click="OnBankKey" Margin="0,0,4,4" MinWidth="64" HorizontalContentAlignment="Center"
+                                    AutomationProperties.Name="{Binding Mix.Name}" ToolTip.Tip="{loc:Text Key=BankPickerTip}"/>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
                 <ContentControl Name="BankMasterHost" DockPanel.Dock="{Binding MasterDock}" Content="{Binding Master}"
                                 ContentTemplate="{StaticResource BankMasters}" Margin="{Binding MasterMargin}"
-                                HorizontalContentAlignment="Stretch" VerticalAlignment="Top" Classes.revealed="{Binding Mix.Revealed}"/>
+                                HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Classes.revealed="{Binding Mix.Revealed}"/>
                 <ScrollViewer Name="BankCells" HorizontalScrollBarVisibility="{Binding CellsScrollAcross}"
                               VerticalScrollBarVisibility="Disabled">
                   <ItemsControl ItemsSource="{Binding Cells}" ItemTemplate="{StaticResource BankCells}">

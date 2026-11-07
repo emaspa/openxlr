@@ -71,7 +71,8 @@
         "led": {
           "enum": [
             "flat",
-            "lamp"
+            "lamp",
+            "lens"
           ],
           "default": "flat",
           "description": "`flat` is a filled dot."
@@ -83,6 +84,22 @@
           ],
           "default": "flat",
           "description": "`flat` is the framework's button."
+        },
+        "check": {
+          "enum": [
+            "flat",
+            "key"
+          ],
+          "default": "flat",
+          "description": "`flat` is the framework's tick box beside its label."
+        },
+        "chip": {
+          "enum": [
+            "key",
+            "badge"
+          ],
+          "default": "key",
+          "description": "`key` is the button the skin chooses."
         }
       }
     },
@@ -138,6 +155,10 @@
         "Ox.Danger.Foreground": {
           "$ref": "#/$defs/brush",
           "description": "that button's label"
+        },
+        "Ox.Danger.BorderBrush": {
+          "$ref": "#/$defs/brush",
+          "description": "that button's ring"
         },
         "Ox.Text.Primary": {
           "$ref": "#/$defs/brush",
@@ -203,13 +224,41 @@
           "$ref": "#/$defs/fontWeight",
           "description": "that title line"
         },
+        "Ox.Title.Foreground": {
+          "$ref": "#/$defs/brush",
+          "description": "that title line's lettering, and the version number's when the header stands it by the title; unset, it keeps `Ox.Text.Primary`"
+        },
+        "Ox.Title.Glow": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "a halo round that title, and that version number, in their own colour, as a backlit legend has; 0 for none"
+        },
         "Ox.Strip.FontWeight": {
           "$ref": "#/$defs/fontWeight",
           "description": "the name over a channel strip or a mix"
         },
+        "Ox.Strip.Foreground": {
+          "$ref": "#/$defs/brush",
+          "description": "the name and icon over a channel strip or a mix, and an application's name under **Applications** and in its **Manage** window; unset, they keep `Ox.Text.Primary`. A colour the layout gives a channel still wins"
+        },
+        "Ox.Strip.IconMuted": {
+          "$ref": "#/$defs/brush",
+          "description": "a mixer strip's icon while its send is muted, and a master's while its mix is; its name keeps its colour. Unset, the icon does not change"
+        },
+        "Ox.Strip.Glow": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "a halo round that name and icon in their own colour, as a backlit legend has, and round a muted icon in its; 0 for none. A channel the layout colours has none"
+        },
         "Ox.Value.FontFamily": {
           "$ref": "#/$defs/fontFamily",
           "description": "the numeric readouts"
+        },
+        "Ox.Value.Foreground": {
+          "$ref": "#/$defs/brush",
+          "description": "the numeric readouts' lettering, such as a fader's level or a gain; unset, they keep `Ox.Text.Primary`"
         },
         "Ox.Font.Family": {
           "$ref": "#/$defs/fontFamily",
@@ -281,7 +330,13 @@
           "type": "number",
           "minimum": 0,
           "maximum": 8,
-          "description": "the gap between cells in pixels, `meter: segmented` only"
+          "description": "the gap between cells in pixels, `meter: segmented` only. Every cell is the same whole number of pixels; the pixels left over widen some gaps by one"
+        },
+        "Ox.Meter.Glow": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "a halo in each lit cell's colour, or round the lit bar, bleeding into the gaps as a display tube does; 0 for none"
         },
         "Ox.Led.Size": {
           "type": "number",
@@ -291,25 +346,25 @@
         },
         "Ox.Led.Bezel": {
           "$ref": "#/$defs/brush",
-          "description": "the ring around the core, `led: lamp` only"
+          "description": "the ring around the core, `led: lamp` and `led: lens` only"
         },
         "Ox.Led.BezelThickness": {
           "type": "number",
           "minimum": 0,
           "maximum": 6,
-          "description": "that ring's width, `led: lamp` only"
+          "description": "that ring's width, `led: lamp` and `led: lens` only"
         },
         "Ox.Led.Glow": {
           "type": "number",
           "minimum": 0,
           "maximum": 1,
-          "description": "the halo while the lamp is lit, 0 for none, `led: lamp` only"
+          "description": "the halo while the lamp is lit, 0 for none, `led: lamp` and `led: lens` only"
         },
         "Ox.Led.CoreScale": {
           "type": "number",
           "minimum": 0.1,
           "maximum": 1,
-          "description": "how much of the box the lit core fills, `led: lamp` only"
+          "description": "how much of the box the lit core fills, `led: lamp` and `led: lens` only"
         },
         "Ox.Mute.Background": {
           "$ref": "#/$defs/brush",
@@ -334,6 +389,10 @@
         "Ox.Mute.BorderBrush": {
           "$ref": "#/$defs/brush",
           "description": "its ring"
+        },
+        "Ox.Mute.BorderBrushChecked": {
+          "$ref": "#/$defs/brush",
+          "description": "its ring when muted; unset, the ring stays `Ox.Mute.BorderBrush`"
         },
         "Ox.Mute.BorderThickness": {
           "$ref": "#/$defs/thickness",
@@ -472,6 +531,34 @@
         "Ox.Bypass.ForegroundBypassed": {
           "$ref": "#/$defs/brush",
           "description": "the same key while the plugin is bypassed"
+        },
+        "Ox.Lit.Background": {
+          "$ref": "#/$defs/brush",
+          "description": "the face of a key lettered in `Ox.Led.On`: a plugin chain's button while a plugin processes, and a microphone's **EQ**, noise removal or dynamics button while it is on"
+        },
+        "Ox.Lit.BackgroundPointerOver": {
+          "$ref": "#/$defs/brush",
+          "description": "that face under the pointer or held down"
+        },
+        "Ox.Lit.BorderBrush": {
+          "$ref": "#/$defs/brush",
+          "description": "that key's ring"
+        },
+        "Ox.Chip.BorderThickness": {
+          "$ref": "#/$defs/thickness",
+          "description": "the ring of an input's binding chip and of the **EQ**, noise removal and dynamics buttons beside it"
+        },
+        "Ox.Alert.Background": {
+          "$ref": "#/$defs/brush",
+          "description": "the face of a key lettered in `Ox.Led.Alert`: a plugin chain's button while it has plugins and none processes, a microphone's **EQ** button while its EQ cannot run, and the plugin bypass key while the plugin is bypassed"
+        },
+        "Ox.Alert.BackgroundPointerOver": {
+          "$ref": "#/$defs/brush",
+          "description": "that face under the pointer or held down"
+        },
+        "Ox.Alert.BorderBrush": {
+          "$ref": "#/$defs/brush",
+          "description": "that key's ring"
         },
         "Ox.Check.Foreground": {
           "$ref": "#/$defs/brush",
@@ -1646,6 +1733,14 @@
           "$ref": "#/$defs/layoutMaster",
           "description": "How a bank's master is drawn. Only with template mix-banks."
         },
+        "picker": {
+          "enum": [
+            "dropdown",
+            "buttons"
+          ],
+          "default": "dropdown",
+          "description": "How each bank picks its mix: a dropdown, or a row of keys with one key per mix and the shown mix's key lit. Only with template mix-banks."
+        },
         "matrix": {
           "$ref": "#/$defs/layoutMatrix",
           "description": "How the matrix's row heads, column heads and cells are drawn. Only with template mix-matrix."
@@ -1691,6 +1786,11 @@
             {
               "required": [
                 "master"
+              ]
+            },
+            {
+              "required": [
+                "picker"
               ]
             }
           ]
@@ -2081,6 +2181,14 @@
             "$ref": "#/$defs/layoutHeaderAction"
           },
           "description": "Actions in the menu at the end of the header. An action appears once across both lists."
+        },
+        "version": {
+          "enum": [
+            "row",
+            "title"
+          ],
+          "default": "row",
+          "description": "Where the version number stands: among the actions, or just after the title in the title's colour. Under \"title\" it is listed in neither list."
         }
       }
     },

@@ -1,6 +1,7 @@
 using System;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Interactivity;
 using OpenXLR.UI.Layout;
 using OpenXLR.UI.Skinning;
@@ -95,6 +96,17 @@ public partial class MixerPanel : UserControl
         var sizes = new RegionSizes(Token("Ox.Mixer.StripWidth", 76), mix, Token("Ox.Mixer.BankSpacing", 12),
             banks.Banks.Count, banks.VisibleChannels);
         return SkinLayoutDefaults.RegionMinWidth(SkinLayoutRegions.Submixer, layout, sizes) - SkinLayoutDefaults.CardPadding;
+    }
+
+    /// <summary>
+    /// A key of a bank's picker: show its mix. The key's own toggle is put
+    /// back to what the bank shows, so pressing the lit key leaves it lit.
+    /// </summary>
+    private void OnBankKey(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not ToggleButton { DataContext: BankChoiceViewModel choice } key) return;
+        choice.Select();
+        key.SetCurrentValue(ToggleButton.IsCheckedProperty, choice.IsSelected);
     }
 
     private void OnMixInserts(object? sender, RoutedEventArgs e)

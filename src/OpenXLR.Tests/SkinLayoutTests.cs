@@ -275,6 +275,22 @@ public sealed class SkinLayoutTests
         Assert.NotEqual(SkinLayoutDefaults.Classic.Description(), layout.Description());
     }
 
+    /// <summary>
+    /// A skin may stand the version number just after the title: it then
+    /// leaves the row, and listing it in either list as well is refused.
+    /// </summary>
+    [Fact]
+    public void TheVersionCanStandByTheTitle()
+    {
+        Assert.False(Taken("""{"version":1,"regions":{"header":{"version":"row"}}}""").Header.VersionByTitle);
+        SkinLayout layout = Taken("""{"version":1,"regions":{"header":{"version":"title","overflow":["about"]}}}""");
+        Assert.True(layout.Header.VersionByTitle);
+        Assert.Equal(["profiles", "arrange", "flow", "restart-daemon"], layout.Header.Row);
+        Refused("""{"version":1,"regions":{"header":{"version":"title","actions":["version"]}}}""", "layout.regions.header.version");
+        Refused("""{"version":1,"regions":{"header":{"version":"title","overflow":["version"]}}}""", "layout.regions.header.version");
+        Refused("""{"version":1,"regions":{"header":{"version":"beside"}}}""", "layout.regions.header.version");
+    }
+
     [Fact]
     public void TheSpacingBoundsAreTheDocumentedOnes()
     {
@@ -658,7 +674,7 @@ public sealed class SkinLayoutTests
         string strip = Refused(Regions("\"inputs\":{\"strip\":{}}"), "layout.regions.inputs.strip");
         Assert.Contains("input-rack", strip, StringComparison.Ordinal);
         Refused(Regions("\"inputs\":{\"template\":\"hardware-panel\",\"strip\":{}}"), "layout.regions.inputs.strip");
-        foreach (string option in new[] { "orientation", "visibleBanks", "selectionDefaults", "strip", "master" })
+        foreach (string option in new[] { "orientation", "visibleBanks", "selectionDefaults", "strip", "master", "picker" })
             Assert.Contains("mix-banks", Refused(Regions("\"submixer\":{\"template\":\"channel-tiles\",\"" + option + "\":{}}"),
                 "layout.regions.submixer." + option), StringComparison.Ordinal);
         Refused(Regions("\"monitor\":{\"strip\":{}}"), "layout.regions.monitor.strip");
@@ -708,6 +724,22 @@ public sealed class SkinLayoutTests
         Refused(Regions("\"submixer\":{\"template\":\"mix-banks\",\"master\":{\"fader\":{\"direction\":1}}}"),
             "layout.regions.submixer.master.fader.direction");
         Taken(Bank("\"label\":{},\"meter\":{},\"fader\":{}"));
+    }
+
+    [Fact]
+    public void ABankPicksWithADropdownOrWithKeys()
+    {
+        string Banks(string option) => Regions("\"submixer\":{\"template\":\"mix-banks\"" + option + "}");
+        SkinSubmixerOptions dropdown = Taken(Banks("")).Submixer;
+        Assert.Equal(SkinLayoutTemplates.PickerDropdown, dropdown.Picker);
+        Assert.False(dropdown.PickerButtons);
+        Assert.Equal(SkinLayoutTemplates.PickerDropdown, Taken(Banks(",\"picker\":\"dropdown\"")).Submixer.Picker);
+        SkinSubmixerOptions buttons = Taken(Banks(",\"picker\":\"buttons\"")).Submixer;
+        Assert.True(buttons.PickerButtons);
+        Assert.NotEqual(dropdown.Description(), buttons.Description());
+        foreach (string value in new[] { "\"keys\"", "\"Buttons\"", "true", "1", "[\"buttons\"]" })
+            Assert.Contains("buttons", Refused(Banks(",\"picker\":" + value), "layout.regions.submixer.picker"), StringComparison.Ordinal);
+        Refused(Regions("\"submixer\":{\"template\":\"mix-matrix\",\"picker\":\"buttons\"}"), "layout.regions.submixer.picker");
     }
 
     [Fact]
@@ -982,7 +1014,7 @@ public sealed class SkinLayoutTests
     [Fact]
     public void TheOptionsOfBanksAndOfAMatrixAreRefusedOnTheOtherTemplate()
     {
-        foreach (string option in new[] { "orientation", "visibleBanks", "selectionDefaults", "strip", "master" })
+        foreach (string option in new[] { "orientation", "visibleBanks", "selectionDefaults", "strip", "master", "picker" })
             Assert.Contains("mix-banks", Refused(Matrix("\"" + option + "\":{}"), "layout.regions.submixer." + option), StringComparison.Ordinal);
         foreach (string template in new[] { "mix-banks", "channel-tiles" })
             Assert.Contains("mix-matrix", Refused(Regions("\"submixer\":{\"template\":\"" + template + "\",\"matrix\":{}}"),

@@ -166,9 +166,13 @@ public sealed class WindowLayoutTests
                     Assert.Equal(10, names.Length);
                     foreach (var name in names)
                     {
-                        AssertInside(name, (Control)name.Parent!);
+                        // the name sits in its chip, which a skin may draw as a badge
+                        var chip = Assert.IsType<Border>(name.Parent);
+                        Assert.Contains("insertChip", chip.Classes);
+                        AssertInside(name, chip);
+                        AssertInside(chip, (Control)chip.Parent!);
                         AssertInside(name, main);
-                        AssertNoOverlap(((Grid)name.Parent!).Children.Where(c => c.IsVisible).ToArray());
+                        AssertNoOverlap(((Grid)chip.Parent!).Children.Where(c => c.IsVisible).ToArray());
                     }
 
                     // The SUBMIXER header introduces the channel tiles; only the

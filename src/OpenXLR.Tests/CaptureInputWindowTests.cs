@@ -94,10 +94,14 @@ public sealed class CaptureInputWindowTests
                     Button eq = block.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "CaptureEq");
                     Assert.True(eq.IsEffectivelyVisible, input.Id);
                     CheckCaptureEq(block, eq, $"{input.Id} at {width}");
-                    // A name without an icon starts where the chip and the labels under it start.
-                    TextBlock name = block.GetVisualDescendants().OfType<TextBlock>().First(t => t.Classes.Contains("strip") && t.IsEffectivelyVisible);
+                    // The name, a label like Line In's, starts where the labels under it start, with the
+                    // source chip beside it on its row as XLR 1 input's chip sits beside its label.
+                    TextBlock name = block.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "CaptureName");
                     CaptureSourceChip chip = block.GetVisualDescendants().OfType<CaptureSourceChip>().Single();
-                    Assert.Equal(chip.TranslatePoint(default, block)!.Value.X, name.TranslatePoint(default, block)!.Value.X, 0.5);
+                    Assert.Equal(0, name.TranslatePoint(default, block)!.Value.X, 0.5);
+                    Assert.True(chip.TranslatePoint(default, block)!.Value.X >= name.Bounds.Width - 0.5, input.Id);
+                    Assert.Equal(name.TranslatePoint(new Point(0, name.Bounds.Height / 2), block)!.Value.Y,
+                        chip.TranslatePoint(new Point(0, chip.Bounds.Height / 2), block)!.Value.Y, 1.0);
                 }
                 Assert.True(blocks[0].TranslatePoint(default, window)!.Value.Y < blocks[1].TranslatePoint(default, window)!.Value.Y);
                 Assert.True(blocks[1].TranslatePoint(default, window)!.Value.Y < blocks[2].TranslatePoint(default, window)!.Value.Y);
