@@ -3246,7 +3246,7 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
     <value>Clip light, patay</value>
   </data>
   <data name="MicSetupGain" xml:space="preserve">
-    <value>Gain ng interface</value>
+    <value>Input gain (dB)</value>
   </data>
   <data name="MicSetupNoGain" xml:space="preserve">
     <value>Walang gain control ang OpenXLR para sa mikroponong ito. Itakda ang gain sa mikropono o sa sarili nitong interface.</value>
@@ -3288,7 +3288,7 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
     <value>Nag-clip ang boses mo, kaya mas malakas ito kaysa sa nasukat. Babaan ang gain, saka sukatin muli.</value>
   </data>
   <data name="MicSetupSuggestElsewhere" xml:space="preserve">
-    <value>Hindi itinatakda ng OpenXLR ang gain ng mikroponong ito. Baguhin ito nang mga {0:+0;-0} dB sa mikropono o sa interface nito, saka sukatin muli.</value>
+    <value>Baguhin ang gain nang mga {0:+0;-0} dB, saka sukatin muli.</value>
   </data>
   <data name="MicSetupSuggestLocked" xml:space="preserve">
     <value>Naka-on ang gain lock. Alisin ito upang tanggapin.</value>

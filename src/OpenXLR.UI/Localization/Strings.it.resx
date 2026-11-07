@@ -3259,7 +3259,7 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
     <value>Spia di clip spenta</value>
   </data>
   <data name="MicSetupGain" xml:space="preserve">
-    <value>Guadagno dell'interfaccia</value>
+    <value>Guadagno in ingresso (dB)</value>
   </data>
   <data name="MicSetupNoGain" xml:space="preserve">
     <value>OpenXLR non ha un controllo del guadagno per questo microfono. Regola il guadagno sul microfono o sulla sua interfaccia.</value>
@@ -3301,7 +3301,7 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
     <value>La tua voce è andata in clip, quindi è più forte di quanto misurato. Abbassa il guadagno, poi misura di nuovo.</value>
   </data>
   <data name="MicSetupSuggestElsewhere" xml:space="preserve">
-    <value>OpenXLR non regola il guadagno di questo microfono. Cambialo di circa {0:+0;-0} dB sul microfono o sulla sua interfaccia, poi misura di nuovo.</value>
+    <value>Modifica il guadagno di circa {0:+0;-0} dB, poi misura di nuovo.</value>
   </data>
   <data name="MicSetupSuggestLocked" xml:space="preserve">
     <value>Il blocco del guadagno è attivo. Disattivalo per accettare.</value>

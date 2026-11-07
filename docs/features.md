@@ -842,11 +842,12 @@ the kind of unit the microphone is on (a Wave:3's, Wave:3 MK.2's or Wave:1's cap
 XLR jack, or a device OpenXLR does not drive) and the unit's phantom power
 switch where it has one. **Level** shows the microphone before any processing on a large
 meter, with a band for speech, a clip light that holds until cleared and
-the interface's gain beside it where the input has one. **Suggest gain**
+an input gain slider and a field for entering dB where the input has a gain,
+including supported external mono capture inputs. **Suggest gain**
 listens to five seconds of speech and proposes a gain for the interface
 that brings the voice into the band without clipping, and writes it only
-when you accept; for a microphone whose gain OpenXLR does not set, it says
-how much to change it on the device. **Listen** records
+when you accept. For an external capture microphone it gives a manual gain
+change in dB. **Listen** records
 up to ten seconds and loops that dry take through the channel's software
 processing and insert chain in place of the live input, so the effects can
 be tuned while the same words repeat, with the take's waveform and a

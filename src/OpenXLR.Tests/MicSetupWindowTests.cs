@@ -6,6 +6,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Platform;
 using Avalonia.Controls.Primitives;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -18,7 +19,8 @@ namespace OpenXLR.Tests;
 internal static class MicSetupWindowTests
 {
     internal static async Task CheckCaptureChain(MainViewModel main, MixInsertsWindow chain, ConcurrentQueue<JsonNode> commands,
-        ConcurrentQueue<JsonNode> meterWatches, ConcurrentQueue<JsonNode> eqCommands, ConcurrentQueue<JsonNode> bypassCommands)
+        ConcurrentQueue<JsonNode> meterWatches, ConcurrentQueue<JsonNode> eqCommands, ConcurrentQueue<JsonNode> bypassCommands,
+        Action<JsonNode?> reportCaptureGain, ConcurrentQueue<JsonNode> gainCommands)
     {
         InsertsViewModel inserts = main.CaptureInputs.Single(c => c.Id == "guest").Inserts!;
         MicSetupViewModel model = inserts.MicSetup;
@@ -74,6 +76,32 @@ internal static class MicSetupWindowTests
             Click(window, "MicSetupDiscardGain");
             await Until(() => !window.FindControl<TextBlock>("MicSetupSuggestAdvice")!.IsVisible);
             Assert.False(window.FindControl<Control>("MicSetupListen")!.IsVisible);
+
+            var capture = main.CaptureInputs.Single(c => c.Id == "guest");
+            reportCaptureGain(JsonNode.Parse("""{"gainDb":-6,"minDb":-60,"maxDb":10,"hardware":false}"""));
+            await Until(() => capture.ShowsCaptureGain);
+            var gain = window.FindControl<NumericUpDown>("MicSetupCaptureGainValue");
+            Assert.NotNull(gain);
+            Assert.True(gain.IsEffectivelyVisible);
+            Assert.Equal((-60m, 10m, -6m), (gain.Minimum, gain.Maximum, gain.Value!.Value));
+            Assert.False(window.FindControl<TextBlock>("MicSetupNoGain")!.IsEffectivelyVisible);
+            Assert.Empty(gainCommands);
+            EnterGain(gain, (-12.5).ToString(CultureInfo.CurrentCulture));
+            await Until(() => !gainCommands.IsEmpty);
+            JsonNode captureWrite = Assert.Single(gainCommands);
+            Assert.Equal("setCaptureGain", captureWrite["cmd"]!.GetValue<string>());
+            Assert.Equal("guest", captureWrite["channel"]!.GetValue<string>());
+            Assert.Equal(-12.5, captureWrite["value"]!.GetValue<double>());
+            Assert.Equal(-12.5, capture.CaptureGainDb);
+            var captureSlider = window.FindControl<Slider>("MicSetupCaptureGain")!;
+            Assert.Equal(-12.5, captureSlider.Value);
+            captureSlider.Value = -14;
+            await Until(() => gainCommands.Count == 2);
+            Assert.Equal(-14, gainCommands.Last()["value"]!.GetValue<double>());
+            Assert.Equal(-14m, gain.Value);
+            reportCaptureGain(null);
+            await Until(() => !gain.IsEffectivelyVisible);
+            Assert.True(window.FindControl<TextBlock>("MicSetupNoGain")!.IsEffectivelyVisible);
 
             // Then Listen, from the step bar.
             Step(window, "MicSetupStepListen");
@@ -133,6 +161,19 @@ internal static class MicSetupWindowTests
             Assert.Same(model, window.DataContext);
             Assert.True(model.CanRecord);
             await CheckPicker(main, chain, window, model, commands, meterWatches);
+            gainCommands.Clear();
+            WindowLayoutTests.Settle(window);
+            Step(window, "MicSetupStepLevel");
+            WindowLayoutTests.Settle(window);
+            var unitGain = window.FindControl<NumericUpDown>("MicSetupUnitGainValue")!;
+            Assert.True(unitGain.IsEffectivelyVisible);
+            Assert.False(window.FindControl<NumericUpDown>("MicSetupCaptureGainValue")!.IsEffectivelyVisible);
+            EnterGain(unitGain, "27");
+            await Until(() => !gainCommands.IsEmpty);
+            JsonNode unitWrite = Assert.Single(gainCommands);
+            Assert.Equal("gain", unitWrite["control"]!.GetValue<string>());
+            Assert.Equal(27, unitWrite["value"]!.GetValue<int>());
+            Assert.Equal(27, main.GainDb);
             window.Close();
             await Until(() => !window.IsVisible);
         }
@@ -183,6 +224,15 @@ internal static class MicSetupWindowTests
         await Until(() => ReferenceEquals(window.DataContext, xlr1) && window.IsEnabled);
         Assert.Single(chain.OwnedWindows.OfType<MicSetupWindow>().Concat(mainWindow.OwnedWindows.OfType<MicSetupWindow>()), w => w.IsVisible);
         Assert.Single(commands);
+    }
+
+    private static void EnterGain(NumericUpDown editor, string value)
+    {
+        editor.ApplyTemplate();
+        var input = Assert.Single(editor.GetVisualDescendants().OfType<TextBox>());
+        input.Focus();
+        input.Text = value;
+        input.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Enter });
     }
 
     /// <summary>
