@@ -165,9 +165,11 @@
                 VerticalAlignment="Center" Classes="ghost"
                 Click="OnOptions" ToolTip.Tip="{loc:Text Key=Options}"/>
         <TextBlock Grid.Column="2" Text="OpenXLR" Classes="title" VerticalAlignment="Center"/>
-        <Grid Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2" ColumnDefinitions="Auto,*"
-              ColumnSpacing="6" Margin="0,2,0,0">
-            <skin:StatusLed IsOn="{Binding DeviceConnected}"
+        <!-- the lamp says whether the interface is connected; a skin that draws its
+             chips as badges hides it and letters the line in the alert colour instead -->
+        <Grid Name="DeviceLine" Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2" ColumnDefinitions="Auto,*"
+              Margin="0,2,0,0" Classes.disconnected="{Binding !DeviceConnected}">
+            <skin:StatusLed Classes="deviceLamp" IsOn="{Binding DeviceConnected}" Margin="0,0,6,0"
                             AutomationProperties.Name="{loc:Text Key=InterfaceConnection}"/>
             <TextBlock Name="DeviceStatus" Grid.Column="1" Text="{Binding StatusLine}" Classes="h"
                        VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding StatusLine}"
@@ -493,12 +495,15 @@
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:InsertViewModel">
                     <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="0,0,0,3">
-                      <skin:StatusLed IsOn="{Binding IsActive}" Kind="Insert" Margin="0,0,8,0"
+                      <skin:StatusLed Classes="insertLamp" IsOn="{Binding IsActive}" Kind="Insert" Margin="0,0,8,0"
                                       AutomationProperties.Name="{loc:Text Key=PluginState}"/>
                       <Grid Grid.Column="1" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"
                             ColumnSpacing="8" VerticalAlignment="Center" ClipToBounds="True">
-                        <TextBlock Text="{Binding Label}" Classes="insertName body" FontSize="{DynamicResource UiText.FontSize12}"
-                                   TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
+                        <!-- the name in a chip a skin can draw as a badge, lettered for a bypassed or failing plugin -->
+                        <Border Classes="insertChip" Classes.off="{Binding !IsActive}" HorizontalAlignment="Left" VerticalAlignment="Center">
+                          <TextBlock Text="{Binding Label}" Classes="insertName body" FontSize="{DynamicResource UiText.FontSize12}"
+                                     TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
+                        </Border>
                         <TextBlock Grid.Column="1" Text="{Binding StateText}" Classes="h" FontSize="{DynamicResource UiText.FontSize11}"/>
                         <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Error}" Classes="warn"
                                    FontSize="{DynamicResource UiText.FontSize11}" TextWrapping="Wrap" IsVisible="{Binding HasError}"/>
@@ -638,12 +643,15 @@
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:InsertViewModel">
                   <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="0,0,0,3">
-                    <skin:StatusLed IsOn="{Binding IsActive}" Kind="Insert" Margin="0,0,8,0"
+                    <skin:StatusLed Classes="insertLamp" IsOn="{Binding IsActive}" Kind="Insert" Margin="0,0,8,0"
                                     AutomationProperties.Name="{loc:Text Key=PluginState}"/>
                     <Grid Grid.Column="1" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"
                           ColumnSpacing="8" VerticalAlignment="Center" ClipToBounds="True">
-                      <TextBlock Text="{Binding Label}" Classes="insertName body" FontSize="{DynamicResource UiText.FontSize12}"
-                                 TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
+                      <!-- the name in a chip a skin can draw as a badge, lettered for a bypassed or failing plugin -->
+                      <Border Classes="insertChip" Classes.off="{Binding !IsActive}" HorizontalAlignment="Left" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Label}" Classes="insertName body" FontSize="{DynamicResource UiText.FontSize12}"
+                                   TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
+                      </Border>
                       <TextBlock Grid.Column="1" Text="{Binding StateText}" Classes="h" FontSize="{DynamicResource UiText.FontSize11}"/>
                       <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Error}" Classes="warn"
                                  FontSize="{DynamicResource UiText.FontSize11}" TextWrapping="Wrap" IsVisible="{Binding HasError}"/>
@@ -708,49 +716,49 @@
             <DataTemplate x:DataType="vm:ChannelViewModel">
               <StackPanel Name="CaptureInputBlock" Spacing="4" Margin="0,8,0,0"
                           IsVisible="{Binding DisplayVisible}" Classes.revealed="{Binding Revealed}">
-                <!-- the gap sits on the icon, so a name without one lines up with the labels below -->
-                <Grid ColumnDefinitions="Auto,*">
-                  <vm:LayoutIconBlock Icon="{Binding Appearance.Icon}" Fallback="{Binding Appearance.DefaultIcon}" Margin="0,0,6,0"
-                                      Classes="strip" Classes.layoutAccent="{Binding Appearance.HasColour}" IsVisible="{Binding Appearance.HasIcon}"/>
-                  <TextBlock Grid.Column="1" Text="{Binding Name}" Classes="strip" Classes.layoutAccent="{Binding Appearance.HasColour}"
+                <!-- the name as a label, like Line In and USB Aux in above it, with the source chip beside
+                     it as XLR 1 input's chip sits beside its label; the icon stays on the strip in the mixer -->
+                <Grid Name="CaptureHead" ColumnDefinitions="Auto,*">
+                  <TextBlock Name="CaptureName" Text="{Binding Name}" Classes="h" Classes.layoutAccent="{Binding Appearance.HasColour}"
+                             Width="{DynamicResource UiText.Width90}" VerticalAlignment="Center"
                              TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}"/>
-                </Grid>
-                <!-- the source chip, then the microphone's EQ and noise removal at its height, as on XLR 1:
-                     the button letters at the size the chip letters its source in, so they stay level -->
-                <Grid Name="CaptureChipRow" ColumnDefinitions="*,Auto,Auto,Auto" HorizontalAlignment="Left">
-                  <views:CaptureSourceChip HorizontalAlignment="Left"/>
-                  <Button Name="CaptureEq" Grid.Column="1" Content="{loc:Text Key=Eq}" Classes="fx chip" Margin="6,0,0,0" Padding="6,1" FontSize="{DynamicResource UiText.FontSize11}"
-                          MinWidth="0" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalContentAlignment="Center"
-                          Classes.fxOn="{Binding Eq.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Eq.IsFaulty, FallbackValue=False}"
-                          IsVisible="{Binding HasEq}" Tag="{Binding Id}" Click="OnEq"
-                          AutomationProperties.Name="{Binding Eq.ButtonName, FallbackValue=''}"
-                          ToolTip.Tip="{Binding Eq.ButtonTip, FallbackValue=''}"/>
-                  <Button Name="CaptureNoise" Grid.Column="2" Content="{loc:Text Key=NoiseButton}" Classes="fx chip" Margin="4,0,0,0" Padding="6,1" FontSize="{DynamicResource UiText.FontSize11}"
-                          MinWidth="0" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalContentAlignment="Center"
-                          Classes.fxOn="{Binding Noise.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Noise.IsFaulty, FallbackValue=False}"
-                          IsVisible="{Binding HasNoise, FallbackValue=False}"
-                          AutomationProperties.Name="{Binding Noise.ButtonName, FallbackValue=''}" ToolTip.Tip="{loc:Text Key=NoiseButtonTip}">
-                    <Button.Flyout>
-                      <Flyout Placement="BottomEdgeAlignedLeft">
-                        <StackPanel Classes="dev" MaxWidth="360">
-                          <views:NoiseRemovalControls DataContext="{Binding Noise}"/>
-                        </StackPanel>
-                      </Flyout>
-                    </Button.Flyout>
-                  </Button>
-                  <Button Name="CaptureDynamics" Grid.Column="3" Content="{loc:Text Key=Dynamics}" Classes="fx chip" Margin="4,0,0,0" Padding="6,1" FontSize="{DynamicResource UiText.FontSize11}"
-                          MinWidth="0" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalContentAlignment="Center"
-                          Classes.fxOn="{Binding Dynamics.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Dynamics.IsFaulty, FallbackValue=False}"
-                          IsVisible="{Binding HasDynamics, FallbackValue=False}"
-                          AutomationProperties.Name="{Binding Dynamics.ButtonName, FallbackValue=''}" ToolTip.Tip="{loc:Text Key=DynamicsButtonTip}">
-                    <Button.Flyout>
-                      <Flyout Placement="BottomEdgeAlignedLeft">
-                        <StackPanel Classes="dev" MaxWidth="360">
-                          <views:DynamicsControls DataContext="{Binding Dynamics}"/>
-                        </StackPanel>
-                      </Flyout>
-                    </Button.Flyout>
-                  </Button>
+                  <!-- the source chip, then the microphone's EQ and noise removal at its height, as on XLR 1:
+                       the button letters at the size the chip letters its source in, so they stay level -->
+                  <Grid Name="CaptureChipRow" Grid.Column="1" ColumnDefinitions="*,Auto,Auto,Auto" HorizontalAlignment="Left">
+                    <views:CaptureSourceChip HorizontalAlignment="Left"/>
+                    <Button Name="CaptureEq" Grid.Column="1" Content="{loc:Text Key=Eq}" Classes="fx chip" Margin="6,0,0,0" Padding="6,1" FontSize="{DynamicResource UiText.FontSize11}"
+                            MinWidth="0" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalContentAlignment="Center"
+                            Classes.fxOn="{Binding Eq.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Eq.IsFaulty, FallbackValue=False}"
+                            IsVisible="{Binding HasEq}" Tag="{Binding Id}" Click="OnEq"
+                            AutomationProperties.Name="{Binding Eq.ButtonName, FallbackValue=''}"
+                            ToolTip.Tip="{Binding Eq.ButtonTip, FallbackValue=''}"/>
+                    <Button Name="CaptureNoise" Grid.Column="2" Content="{loc:Text Key=NoiseButton}" Classes="fx chip" Margin="4,0,0,0" Padding="6,1" FontSize="{DynamicResource UiText.FontSize11}"
+                            MinWidth="0" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalContentAlignment="Center"
+                            Classes.fxOn="{Binding Noise.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Noise.IsFaulty, FallbackValue=False}"
+                            IsVisible="{Binding HasNoise, FallbackValue=False}"
+                            AutomationProperties.Name="{Binding Noise.ButtonName, FallbackValue=''}" ToolTip.Tip="{loc:Text Key=NoiseButtonTip}">
+                      <Button.Flyout>
+                        <Flyout Placement="BottomEdgeAlignedLeft">
+                          <StackPanel Classes="dev" MaxWidth="360">
+                            <views:NoiseRemovalControls DataContext="{Binding Noise}"/>
+                          </StackPanel>
+                        </Flyout>
+                      </Button.Flyout>
+                    </Button>
+                    <Button Name="CaptureDynamics" Grid.Column="3" Content="{loc:Text Key=Dynamics}" Classes="fx chip" Margin="4,0,0,0" Padding="6,1" FontSize="{DynamicResource UiText.FontSize11}"
+                            MinWidth="0" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalContentAlignment="Center"
+                            Classes.fxOn="{Binding Dynamics.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Dynamics.IsFaulty, FallbackValue=False}"
+                            IsVisible="{Binding HasDynamics, FallbackValue=False}"
+                            AutomationProperties.Name="{Binding Dynamics.ButtonName, FallbackValue=''}" ToolTip.Tip="{loc:Text Key=DynamicsButtonTip}">
+                      <Button.Flyout>
+                        <Flyout Placement="BottomEdgeAlignedLeft">
+                          <StackPanel Classes="dev" MaxWidth="360">
+                            <views:DynamicsControls DataContext="{Binding Dynamics}"/>
+                          </StackPanel>
+                        </Flyout>
+                      </Button.Flyout>
+                    </Button>
+                  </Grid>
                 </Grid>
                 <TextBlock Text="{Binding BindingWarning}" Classes="hint" FontSize="{DynamicResource UiText.FontSize11}"
                            TextWrapping="Wrap" IsVisible="{Binding HasBindingWarning}"/>
@@ -770,16 +778,18 @@
                   <TextBlock Grid.Column="3" Name="CaptureGainReadout" Text="{Binding Readout}" Classes="val" VerticalAlignment="Center"
                              HorizontalAlignment="Right" AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
                 </Grid>
-                <!-- the source's own mute, under its gain, as XLR 1's mute sits under the interface's gain -->
-                <ToggleButton Name="CaptureMute" Content="{loc:Text Key=Mute}" Classes="mute" HorizontalAlignment="Left"
-                              IsChecked="{Binding CaptureMuted, Mode=TwoWay}" IsVisible="{Binding ShowsCaptureMute}"
-                              AutomationProperties.Name="{Binding CaptureMuteName}" ToolTip.Tip="{loc:Text Key=CaptureMuteTip}"/>
-                <!-- the device on a clock of its own, for one that misbehaves while it follows the mixer's -->
-                <CheckBox Name="CaptureOwnClock" Content="{loc:Text Key=CaptureOwnClock}" HorizontalAlignment="Left"
-                          IsChecked="{Binding OwnClock, Mode=TwoWay}" IsVisible="{Binding HasOwnClock}"
-                          ToolTip.Tip="{loc:Text Key=CaptureOwnClockTip}"/>
-                <TextBlock Name="CaptureOwnClockStatus" Text="{Binding OwnClockStatus}" Classes="hint" FontSize="{DynamicResource UiText.FontSize11}"
-                           TextWrapping="Wrap" IsVisible="{Binding HasOwnClockStatus}"/>
+                <!-- the source's own mute, under its gain, as XLR 1's mute sits under the interface's gain,
+                     and beside it the device on a clock of its own, for one that misbehaves while it follows
+                     the mixer's: one row of switches, as XLR 1's -->
+                <WrapPanel Name="CaptureSwitches" ItemSpacing="6" LineSpacing="4">
+                  <ToggleButton Name="CaptureMute" Content="{loc:Text Key=Mute}" Classes="mute" VerticalAlignment="Center"
+                                IsChecked="{Binding CaptureMuted, Mode=TwoWay}" IsVisible="{Binding ShowsCaptureMute}"
+                                AutomationProperties.Name="{Binding CaptureMuteName}" ToolTip.Tip="{loc:Text Key=CaptureMuteTip}"/>
+                  <!-- what the bridge does, its delay and dropouts, is in the tooltip under what the switch does -->
+                  <CheckBox Name="CaptureOwnClock" Content="{loc:Text Key=CaptureOwnClock}" VerticalAlignment="Center"
+                            IsChecked="{Binding OwnClock, Mode=TwoWay}" IsVisible="{Binding HasOwnClock}"
+                            ToolTip.Tip="{Binding OwnClockTip}"/>
+                </WrapPanel>
                 <Grid IsVisible="{Binding HasVolume}">
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -1180,11 +1190,14 @@
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="vm:InsertViewModel">
                         <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="0,2,0,0">
-                          <skin:StatusLed IsOn="{Binding IsActive}" Kind="Insert" Margin="0,0,6,0"
+                          <skin:StatusLed Classes="insertLamp" IsOn="{Binding IsActive}" Kind="Insert" Margin="0,0,6,0"
                                           AutomationProperties.Name="{loc:Text Key=PluginState}"/>
-                          <TextBlock Grid.Column="1" Text="{Binding Label}" Classes="insertName body"
-                                     FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center"
-                                     TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
+                          <!-- the name in a chip a skin can draw as a badge, lettered for a bypassed or failing plugin -->
+                          <Border Grid.Column="1" Classes="insertChip" Classes.off="{Binding !IsActive}" HorizontalAlignment="Left" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Label}" Classes="insertName body"
+                                       FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}"/>
+                          </Border>
                           <ToggleButton Grid.Column="2" Content="{loc:Text Key=NativeHostLetter}" Classes="insertmini"
                                         IsChecked="{Binding NativeHost, Mode=TwoWay}"
                                         IsVisible="{Binding CanChooseNativeHost}"

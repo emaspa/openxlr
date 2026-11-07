@@ -543,7 +543,7 @@ public sealed partial class SkinWindowTests
             Assert.Equal(size.Height - 1, runs[0].Start);     // the bottom cell is not shaved
             Assert.True(runs[^1].End > size.Height / 2 - 8, "the lit cells run up from the bottom, not down from the top");
             int[] heights = [.. runs.Select(r => r.Start - r.End + 1)];
-            Assert.True(heights.Max() - heights.Min() <= 1, $"cells came out uneven: {string.Join(",", heights)}");
+            Assert.True(heights.Max() == heights.Min(), $"cells came out uneven: {string.Join(",", heights)}");
 
             meter.Level = 1;
             Layout(probe, 7, 140);
@@ -1106,7 +1106,7 @@ public sealed partial class SkinWindowTests
             Assert.Equal(10, runs.Count);                    // half of twenty cells
             Assert.Equal(0, runs[0].Start);                  // the first cell is not shaved
             int[] widths = [.. runs.Select(r => r.End - r.Start + 1)];
-            Assert.True(widths.Max() - widths.Min() <= 1,
+            Assert.True(widths.Max() == widths.Min(),
                 $"cells came out uneven: {string.Join(",", widths)}");
 
             // With the meter full, the last cell has to reach the right edge,
@@ -1686,7 +1686,10 @@ public sealed partial class SkinWindowTests
     /// A key the UI letters in a lamp colour wears the skin's lit or alert face
     /// and ring when the skin sets them, and the ordinary face when it does not,
     /// so no other appearance changes. Under <c>check: key</c> a check box is a
-    /// key with the bevel, lettered and lit as a toggle is.
+    /// key with the bevel, lettered and lit as a toggle is. Under <c>chip: badge</c>
+    /// a source chip is a flat badge lettered in the information colour, and a
+    /// skin that sets <c>Ox.Value.Foreground</c> letters the readouts in it. A
+    /// plugin's name in an insert list becomes the same badge, without its lamp.
     /// </summary>
     private static void LampKeysAndCheckKeysWearTheSkinsFaces()
     {
@@ -1697,17 +1700,29 @@ public sealed partial class SkinWindowTests
         var mute = new ToggleButton { Content = "M", Classes = { "mute" }, IsChecked = true };
         var danger = new Button { Content = "Delete", Classes = { "danger" } };
         var check = new CheckBox { Content = "Own clock" };
+        var chipText = new TextBlock { Name = "ChipText", Text = "XLR 1 jack", Classes = { "body" } };
+        var chipLamp = new StatusLed { IsOn = true, Margin = new Thickness(0, 0, 6, 0) };
+        var chip = new Button
+        {
+            Content = new Grid { ColumnDefinitions = new("Auto,*"), Children = { chipLamp, chipText } },
+            Classes = { "bindingChip" },
+        };
+        Grid.SetColumn(chipText, 1);
+        var readout = new TextBlock { Text = "52 dB", Classes = { "val" } };
+        var insertLamp = new StatusLed { IsOn = false, Kind = LedKind.Insert, Classes = { "insertLamp" } };
+        var insertName = new TextBlock { Text = "Voice Focus", Classes = { "insertName", "body" } };
+        var insertChip = new Border { Child = insertName, Classes = { "insertChip", "off" } };
         var probe = new Window
         {
-            Content = new StackPanel { Children = { off, on, plain, bypass, mute, danger, check } },
-            Width = 300, Height = 320, WindowDecorations = WindowDecorations.None,
+            Content = new StackPanel { Children = { off, on, plain, bypass, mute, danger, check, chip, readout, insertLamp, insertChip } },
+            Width = 300, Height = 480, WindowDecorations = WindowDecorations.None,
         };
         probe.Show();
         try
         {
             ContentPresenter Face(Control c)
             {
-                Layout(probe, 300, 320);
+                Layout(probe, 300, 480);
                 return c.GetVisualDescendants().OfType<ContentPresenter>().First(p => p.Name == "PART_ContentPresenter");
             }
             Color Fill(Control c) => ((ISolidColorBrush)Face(c).Background!).Color;
@@ -1723,15 +1738,23 @@ public sealed partial class SkinWindowTests
                 Assert.Same(Face(plain).Background, Face(on).Background);
                 Assert.Equal(new Thickness(0), on.BorderThickness);
                 Assert.False(Bevelled(check), $"{plainSkin.Id} drew a check box as a key");
+                // The chip wears the skin's button, and the readout the primary text.
+                Assert.Same(chip.Theme, plain.Theme);
+                Assert.True(chipLamp.IsVisible);
+                Assert.True(insertLamp.IsVisible);
+                Assert.Null(insertChip.Background);
+                Assert.Equal(((ISolidColorBrush)Application.Current!.FindResource("Ox.Text.Primary")!).Color,
+                    ((ISolidColorBrush)readout.Foreground!).Color);
             }
 
             SkinReadResult read = SkinReader.Read("lamps", """
-                {"schema":1,"name":"Lamps","controls":{"button":"cap","mute":"cap","check":"key"},"tokens":{
+                {"schema":1,"name":"Lamps","controls":{"button":"cap","mute":"cap","check":"key","chip":"badge"},"tokens":{
                   "Ox.Alert.Background":"#400000","Ox.Alert.BackgroundPointerOver":"#500000","Ox.Alert.BorderBrush":"#ff0000",
                   "Ox.Lit.Background":"#003040","Ox.Lit.BackgroundPointerOver":"#004050","Ox.Lit.BorderBrush":"#00ffff",
                   "Ox.Chip.BorderThickness":1,"Ox.Danger.BorderBrush":"#ff8000","Ox.Mute.BorderBrushChecked":"#ff00ff",
                   "Ox.Control.Background":"#101010","Ox.Control.BackgroundChecked":"#002030",
-                  "Ox.Toggle.Foreground":"#008090","Ox.Toggle.ForegroundChecked":"#00e0ff"}}
+                  "Ox.Toggle.Foreground":"#008090","Ox.Toggle.ForegroundChecked":"#00e0ff",
+                  "Ox.Badge.Background":"#061418","Ox.Text.Info":"#40e0ff","Ox.Value.Foreground":"#30d0f0"}}
                 """, SkinOrigin.BuiltIn, null);
             Assert.Empty(read.Errors);
             Assert.Empty(SkinService.Apply(new SkinEntry(read.Package!, read.Errors)));
@@ -1753,6 +1776,24 @@ public sealed partial class SkinWindowTests
             check.IsChecked = true;
             Assert.Equal(Color.Parse("#002030"), Fill(check));
             Assert.Equal(Color.Parse("#00e0ff"), Letters(check));
+            // The chip is the badge: flat, the badge colour, lettered in the information colour.
+            Assert.False(Bevelled(chip), "chip: badge drew a key");
+            Assert.Equal(Color.Parse("#061418"), Fill(chip));
+            Assert.Equal(Color.Parse("#40e0ff"), ((ISolidColorBrush)chipText.Foreground!).Color);
+            // A badge has no lamp; a source that is not linked is lettered in the alert colour.
+            Assert.False(chipLamp.IsVisible, "chip: badge kept its lamp");
+            chip.Classes.Add("unlinked");
+            Layout(probe, 300, 480);
+            Assert.Equal(Color.Parse("#ff3c4e"), ((ISolidColorBrush)chipText.Foreground!).Color);
+            chip.Classes.Remove("unlinked");
+            // A plugin's name is the same badge, without its lamp, red while bypassed.
+            Assert.False(insertLamp.IsVisible, "chip: badge kept the insert's lamp");
+            Assert.Equal(Color.Parse("#061418"), ((ISolidColorBrush)insertChip.Background!).Color);
+            Assert.Equal(Color.Parse("#ff3c4e"), ((ISolidColorBrush)insertName.Foreground!).Color);
+            insertChip.Classes.Remove("off");
+            Layout(probe, 300, 480);
+            Assert.Equal(Color.Parse("#40e0ff"), ((ISolidColorBrush)insertName.Foreground!).Color);
+            Assert.Equal(Color.Parse("#30d0f0"), ((ISolidColorBrush)readout.Foreground!).Color);
             Capture(probe, "lamp-keys");
 
             // And back: the plain faces and the tick box return.
@@ -1761,6 +1802,11 @@ public sealed partial class SkinWindowTests
             Assert.Same(Face(plain).Background, Face(off).Background);
             Assert.Equal(new Thickness(0), on.BorderThickness);
             Assert.False(Bevelled(check));
+            Assert.Same(chip.Theme, plain.Theme);
+            Assert.True(chipLamp.IsVisible);
+            Assert.True(insertLamp.IsVisible);
+            Assert.Null(insertChip.Background);
+            Assert.NotEqual(Color.Parse("#30d0f0"), ((ISolidColorBrush)readout.Foreground!).Color);
         }
         finally { probe.Close(); }
     }

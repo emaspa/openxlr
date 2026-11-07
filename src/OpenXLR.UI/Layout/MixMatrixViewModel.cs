@@ -641,9 +641,7 @@ public sealed class MatrixRowViewModel : ViewModelBase
     public string OwnClockName => Localizer.Format("MatrixOwnClockName", Channel.Name);
 
     /// <summary>The Own clock button's tooltip: what the switch does, and under it what the bridge does while it runs.</summary>
-    public string OwnClockTip => Channel.OwnClockStatus is { } status
-        ? Localizer.Text("CaptureOwnClockTip") + "\n\n" + status
-        : Localizer.Text("CaptureOwnClockTip");
+    public string OwnClockTip => Channel.OwnClockTip;
 
     /// <summary>
     /// The processing button is lit: a switch the input's interface has is

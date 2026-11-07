@@ -153,6 +153,7 @@ public static class SkinTokens
         Weight("Ox.Title.FontWeight", FontWeight.Bold),
         Weight("Ox.Strip.FontWeight", FontWeight.SemiBold),
         Family("Ox.Value.FontFamily", "monospace"),
+        Brush("Ox.Value.Foreground", null),
         Family("Ox.Font.Family", null, new SkinBridge("ContentControlThemeFontFamily")),
 
         // Indicators. These reach the views through value converters as well as
@@ -181,6 +182,7 @@ public static class SkinTokens
         // Read by the segmented meter only; the continuous one ignores them.
         Number("Ox.Meter.Segments", 16, 2, 64),
         Number("Ox.Meter.SegmentGap", 2, 0, 8),
+        Number("Ox.Meter.Glow", 0, 0, 1),
         // Read by the lamp indicator only. The defaults draw no ring and no
         // halo, which is the flat dot the window has always shown.
         Number("Ox.Led.Size", 9, 4, 40),

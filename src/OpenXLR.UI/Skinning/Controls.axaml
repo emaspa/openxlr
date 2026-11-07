@@ -203,6 +203,7 @@
     <Setter Property="Hot" Value="{DynamicResource Ox.Meter.Hot}"/>
     <Setter Property="WarningLevel" Value="{DynamicResource Ox.Meter.WarningLevel}"/>
     <Setter Property="HotLevel" Value="{DynamicResource Ox.Meter.HotLevel}"/>
+    <Setter Property="Glow" Value="{DynamicResource Ox.Meter.Glow}"/>
     <!-- Stood up by a strip template: its thickness is its own token, and its
          length is the length of what it stands beside. -->
     <Style Selector="^[Orientation=Vertical]">
@@ -556,6 +557,48 @@
     </Style>
     <Style Selector="^:disabled /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Foreground" Value="{DynamicResource ToggleButtonForegroundDisabled}"/>
+    </Style>
+  </ControlTheme>
+
+  <!-- ==== source chips ==== -->
+
+  <!-- An input's source chip drawn as the submixer's "On the unit" badge: a
+       flat face in the badge colour, lettered in the information colour, with
+       no key face or bevel. It is still a button: the pointer rings it in the
+       lettering's colour and a press dims it. The lettering's colour is set
+       on the chip's text by SkinOptionalStyles, since the text carries a class
+       of its own that a theme cannot outrank. -->
+  <ControlTheme x:Key="Ox.Chip.Badge" TargetType="Button">
+    <Setter Property="Background" Value="{DynamicResource Ox.Badge.Background}"/>
+    <Setter Property="Foreground" Value="{DynamicResource Ox.Text.Info}"/>
+    <Setter Property="BorderBrush" Value="Transparent"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="{DynamicResource Ox.Eq.CornerRadius}"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <ContentPresenter Name="PART_ContentPresenter"
+                          Background="{TemplateBinding Background}"
+                          BorderBrush="{TemplateBinding BorderBrush}"
+                          BorderThickness="{TemplateBinding BorderThickness}"
+                          CornerRadius="{TemplateBinding CornerRadius}"
+                          Content="{TemplateBinding Content}"
+                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                          Foreground="{TemplateBinding Foreground}"
+                          Padding="{TemplateBinding Padding}"
+                          HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                          VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                          RecognizesAccessKey="True"/>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="BorderBrush" Value="{DynamicResource Ox.Text.Info}"/>
+    </Style>
+    <Style Selector="^:pressed">
+      <Setter Property="Opacity" Value="0.8"/>
+    </Style>
+    <Style Selector="^:disabled">
+      <Setter Property="Opacity" Value="{DynamicResource Ox.Control.DisabledOpacity}"/>
     </Style>
   </ControlTheme>
 

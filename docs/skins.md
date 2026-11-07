@@ -382,6 +382,7 @@ draws, and then tint and size it with the tokens further down.
 | `led` | `flat` (default), `lamp` | `flat` is a filled dot. `lamp` puts the dot in a bezel ring and gives it a halo while it is lit |
 | `mute` | `flat` (default), `cap` | `flat` is the framework's button. `cap` is the same raised key the `button` slot draws, so the mute matches the controls around it |
 | `check` | `flat` (default), `key` | `flat` is the framework's tick box beside its label. `key` draws a check box as a key: the label is the legend, and the key lights while ticked in the colours of a toggle that is on, so a switch such as **Own clock** matches the switches around it |
+| `chip` | `key` (default), `badge` | the chip that names an input's source, such as **XLR 1 jack**. `key` is the button the skin chooses. `badge` draws it flat in `Ox.Badge.Background` and letters it in `Ox.Text.Info`, like the submixer's **On the unit** badge, with no lamp: a source that is not linked is lettered in `Ox.Led.Alert` instead. It still opens the binding dialog, and the pointer rings it in `Ox.Text.Info`. A plugin's name in an input's insert list becomes the same badge, its lamp hidden and its name lettered in `Ox.Led.Alert` while the plugin is bypassed or failing. The interface's lamp in the header is hidden too, and its line lettered in `Ox.Led.Alert` while the interface is disconnected |
 
 A control a skin does not mention keeps the appearance the UI has
 always had. The `button` slot covers the plain button, the toggle and the
@@ -543,6 +544,7 @@ remaining fader width to the nearest display pixel.
 | `Ox.Title.FontWeight` | weight | Bold |  | that title line |
 | `Ox.Strip.FontWeight` | weight | SemiBold |  | the name over a channel strip or a mix |
 | `Ox.Value.FontFamily` | family | monospace |  | the numeric readouts |
+| `Ox.Value.Foreground` | brush | framework |  | the numeric readouts' lettering, such as a fader's level or a gain; unset, they keep `Ox.Text.Primary` |
 | `Ox.Font.Family` | family | framework |  | the font the buttons, labels and dropdowns use |
 
 ### Indicators
@@ -574,7 +576,8 @@ The rest of an indicator's appearance is shape and size:
 | `Ox.Meter.Height` | number | 4 | 2 to 24 | how tall a meter is |
 | `Ox.Meter.VerticalWidth` | number | 4 | 2 to 24 | how thick an upright meter is, where a strip template stands its meter up; it is as long as what it stands beside |
 | `Ox.Meter.Segments` | number | 16 | 2 to 64 | how many cells, `meter: segmented` only |
-| `Ox.Meter.SegmentGap` | number | 2 | 0 to 8 | the gap between cells in pixels, `meter: segmented` only |
+| `Ox.Meter.SegmentGap` | number | 2 | 0 to 8 | the gap between cells in pixels, `meter: segmented` only. Every cell is the same whole number of pixels; the pixels left over widen some gaps by one |
+| `Ox.Meter.Glow` | number | 0 | 0 to 1 | a halo in each lit cell's colour, or round the lit bar, bleeding into the gaps as a display tube does; 0 for none |
 
 Cells are laid out on whole pixels, and a ladder too narrow to draw is
 drawn as one continuous bar instead, so a segmented meter never comes out
@@ -1452,11 +1455,13 @@ older daemon that does not report `chainWidth`, a capture input has no
 `"master-card"`, the mix tile the channel tiles have always shown, under
 the bank's strips, and the default; or `"master-strip"`, one more strip at
 the end of the bank, on the right of upright strips or under a send list.
-Both keep the master's level, mute, 150% range for a monitor mix, the
-button that opens its plugin chain and the To USB Aux port switch. The
-master card also shows the chain at a glance; the master strip shows one
-lamp per plugin, lit in the alert colour when a plugin fails, and its
-bypass switches are in the chain window. A master's parts stay in their
+Both keep the master's level, mute, 150% range and dry switch for a
+monitor mix, its EQ, the button that opens its plugin chain and the To USB
+Aux port switch. The master card also shows the chain at a glance; the
+master strip shows one lamp per plugin, lit in the alert colour when a
+plugin fails, and its bypass switches are in the chain window. An upright
+master strip stands those keys in a column beside its fader, so it is no
+taller than the strips beside it; under a send list they follow the strip. A master's parts stay in their
 default order.
 
 #### Labels, meters and faders

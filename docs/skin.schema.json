@@ -91,6 +91,14 @@
           ],
           "default": "flat",
           "description": "`flat` is the framework's tick box beside its label."
+        },
+        "chip": {
+          "enum": [
+            "key",
+            "badge"
+          ],
+          "default": "key",
+          "description": "`key` is the button the skin chooses."
         }
       }
     },
@@ -223,6 +231,10 @@
           "$ref": "#/$defs/fontFamily",
           "description": "the numeric readouts"
         },
+        "Ox.Value.Foreground": {
+          "$ref": "#/$defs/brush",
+          "description": "the numeric readouts' lettering, such as a fader's level or a gain; unset, they keep `Ox.Text.Primary`"
+        },
         "Ox.Font.Family": {
           "$ref": "#/$defs/fontFamily",
           "description": "the font the buttons, labels and dropdowns use"
@@ -293,7 +305,13 @@
           "type": "number",
           "minimum": 0,
           "maximum": 8,
-          "description": "the gap between cells in pixels, `meter: segmented` only"
+          "description": "the gap between cells in pixels, `meter: segmented` only. Every cell is the same whole number of pixels; the pixels left over widen some gaps by one"
+        },
+        "Ox.Meter.Glow": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "a halo in each lit cell's colour, or round the lit bar, bleeding into the gaps as a display tube does; 0 for none"
         },
         "Ox.Led.Size": {
           "type": "number",

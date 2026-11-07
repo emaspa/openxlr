@@ -88,6 +88,14 @@ public static class SkinControls
                 ["flat"] = null,
                 ["key"] = ["Ox.CheckBox.Key"],
             }),
+        // An input's source chip: the skin's button, or a flat badge lettered
+        // like the submixer's "On the unit" badge.
+        new("chip", ["Ox.Chip.Theme"], "key",
+            new Dictionary<string, IReadOnlyList<string>?>(StringComparer.Ordinal)
+            {
+                ["key"] = null,
+                ["badge"] = ["Ox.Chip.Badge"],
+            }),
     ];
 
     private static readonly Dictionary<string, SkinControlSlot> ByName =

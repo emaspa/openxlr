@@ -337,7 +337,7 @@ public static class SkinService
         }
 
         ApplyControls(palette, application, resources, errors);
-        SkinKeyFaces.Apply(application, resources);
+        SkinOptionalStyles.Apply(application, resources);
         DeckPalette.Publish(entry.Id, resources, errors);
         // The reader checked each icon's grammar; this is where Avalonia
         // builds it, so an entry it still refuses is reported like a bad token.

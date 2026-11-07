@@ -367,6 +367,14 @@ public sealed class MixBankViewModel : ViewModelBase
     /// <summary>The gap between the master and the cells, on the side the master is.</summary>
     public Thickness MasterMargin => MasterDock == Dock.Right ? new Thickness(4, 0, 0, 0) : new Thickness(0, 8, 0, 0);
 
+    /// <summary>
+    /// A master strip follows the last strip rather than the bank's right edge,
+    /// so a bank wider than its strips leaves its spare room after the master,
+    /// not between the strips and it. A master card and a send list fill the bank.
+    /// </summary>
+    public HorizontalAlignment ContentAlignment =>
+        MasterDock == Dock.Right ? HorizontalAlignment.Left : HorizontalAlignment.Stretch;
+
     /// <summary>True for the bank whose cells carry the channels' Arrange handles.</summary>
     internal bool CarriesHandles => Index == 0 && Presentation.OwnsHandles;
 
