@@ -89,6 +89,45 @@ public sealed class CaptureRunTests : IDisposable
         Assert.True(new CaptureRun(1, Alsa: true, NodeRunning: false, KernelRunning: true).Started);
     }
 
+    [Fact]
+    public void TheRunningPcmCursorUsesTheActualCardAndIsUnavailableWhilePlaybackIsOpen()
+    {
+        const string source = "alsa_input.usb-Elgato_Systems_Elgato_XLR_Dock-test";
+        const string frozen = """
+            state: RUNNING
+            owner_pid   : 2053
+            trigger_time: 19.095039214
+            tstamp      : 4774.932181708
+            -----
+            hw_ptr      : 228280655
+            appl_ptr    : 228280576
+            """;
+        string card = Path.Combine(_root, "card4");
+        string capture = Directory.CreateDirectory(Path.Combine(card, "pcm1c", "sub2")).FullName;
+        string playback = Directory.CreateDirectory(Path.Combine(card, "pcm0p", "sub0")).FullName;
+        string status = Path.Combine(capture, "status");
+        string output = Path.Combine(playback, "status");
+        File.WriteAllText(status, frozen);
+        File.WriteAllText(output, "closed\n");
+        JsonElement[] graph = Graph($$"""
+            [{ "id": 46, "type": "PipeWire:Interface:Node", "info": { "state": "running",
+               "props": { "node.name": "{{source}}", "api.alsa.pcm.card": "4", "api.alsa.pcm.stream": "capture",
+                          "alsa.device": 1, "alsa.subdevice": 2 } } }]
+            """);
+        CaptureRun Read() => PipeWireAdapter.CaptureRunOf(graph, source, _root, readCursor: true);
+
+        Assert.Equal(new CaptureCursor(4, 1, 2, "19.095039214", 228280655), Read().Cursor);
+        File.WriteAllText(output, "state: RUNNING\n");
+        Assert.Null(Read().Cursor);
+        File.Delete(output);
+        Assert.Null(Read().Cursor);
+        File.WriteAllText(output, "closed\n");
+        File.WriteAllText(status, frozen.Replace("RUNNING", "XRUN"));
+        Assert.Null(Read().Cursor);
+        File.WriteAllText(status, frozen.Replace("hw_ptr", "unknown"));
+        Assert.Null(Read().Cursor);
+    }
+
     private static JsonElement[] Graph(string json)
     {
         using JsonDocument document = JsonDocument.Parse(json);

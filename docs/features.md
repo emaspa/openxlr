@@ -91,6 +91,11 @@ reset by itself when the kernel keeps the capture stopped for three
 seconds while a mix plays into the unit's headphones, at most once every
 two minutes and three times in half an hour.
 
+For a linked primary USB microphone with playback off on the same card,
+OpenXLR can also detect a frozen ALSA hardware position while the source
+still reports running. It reopens that source on the same retry budget.
+See [Microphone silent](manual.md#dock-silent).
+
 Wave:1: the same controls as the Wave:3, from the same backend under the
 Wave:1's product id. An owner's diagnostics showed the
 microphone answering the Wave:3's block, firmware line and desktop

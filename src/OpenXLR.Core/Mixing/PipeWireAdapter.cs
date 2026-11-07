@@ -2478,15 +2478,19 @@ public sealed class PipeWireAdapter
     /// node's own ALSA properties, so a renumbered card after a replug is
     /// followed. <see cref="CaptureRun.Missing"/> without a graph.
     /// </summary>
-    public CaptureRun CaptureRunOf(string sourceName)
+    public CaptureRun CaptureRunOf(string sourceName, bool readCursor = false)
     {
+        // The periodic cursor watch can wait for the subscription instead of
+        // starting pw-dump or relying on an old graph during a reconnect.
+        if (readCursor)
+            return LiveObjects() is { } live ? CaptureRunOf(live, sourceName, AsoundRoot, readCursor: true) : CaptureRun.Missing;
         JsonElement[] objects;
         try { objects = GraphObjects(); }
         catch (Exception ex) when (ex is InvalidOperationException or IOException) { return CaptureRun.Missing; }
         return CaptureRunOf(objects, sourceName, AsoundRoot);
     }
 
-    internal static CaptureRun CaptureRunOf(IEnumerable<JsonElement> objects, string sourceName, string asoundRoot)
+    internal static CaptureRun CaptureRunOf(IEnumerable<JsonElement> objects, string sourceName, string asoundRoot, bool readCursor = false)
     {
         foreach (JsonElement o in objects)
         {
@@ -2499,8 +2503,14 @@ public sealed class PipeWireAdapter
             bool running = info.TryGetProperty("state", out JsonElement state) && state.ValueKind == JsonValueKind.String
                 && state.GetString() == "running";
             int? card = PropInt(props, "api.alsa.pcm.card") ?? PropInt(props, "alsa.card");
-            bool? kernel = card is int number ? CaptureRun.ReadKernelStatus(asoundRoot, number, PropInt(props, "alsa.device") ?? 0) : null;
-            return new CaptureRun(id, card is not null, running, kernel);
+            int device = PropInt(props, "alsa.device") ?? 0;
+            bool? kernel = card is int number ? CaptureRun.ReadKernelStatus(asoundRoot, number, device) : null;
+            CaptureCursor? cursor = readCursor && running && kernel != false && card is >= 0
+                && props.TryGetProperty("api.alsa.pcm.stream", out JsonElement stream) && stream.ValueKind == JsonValueKind.String
+                && stream.GetString() == "capture"
+                ? CaptureRun.ReadCursor(asoundRoot, card.Value, device, PropInt(props, "alsa.subdevice") ?? 0)
+                : null;
+            return new CaptureRun(id, card is not null, running, kernel, cursor);
         }
         return CaptureRun.Missing;
 
@@ -2511,6 +2521,19 @@ public sealed class PipeWireAdapter
                 : value.ValueKind == JsonValueKind.String && int.TryParse(value.GetString(), System.Globalization.NumberStyles.None,
                     System.Globalization.CultureInfo.InvariantCulture, out int parsed) ? parsed
                 : null;
+    }
+
+    /// <summary>Reopen just a source. Always try to resume it, even when the suspend request fails or times out.</summary>
+    internal bool ReopenCaptureSource(string source)
+    {
+        bool suspended = false, resumed;
+        try
+        {
+            suspended = TryConfirm("pactl", "suspend-source", source, "1") is not null;
+            if (suspended) Thread.Sleep(500);
+        }
+        finally { resumed = TryConfirm("pactl", "suspend-source", source, "0") is not null; }
+        return suspended && resumed;
     }
 
     /// <summary>

@@ -4309,6 +4309,17 @@ the unit's input 2200, so the other device is resampled instead. A unit on
 pro-audio and the Wave XLR Pro already have 2600 and keep it. Like the
 other rules, this one takes effect when WirePlumber restarts.
 
+OpenXLR also watches the primary USB interface while its microphone is
+linked, its own playback is closed and it has no monitor route playing
+into it. A capture can say it is running
+even though the kernel's hardware frame position has stopped moving.
+When that position stays fixed for three seconds, OpenXLR reopens just
+the capture source. The watch reads the kernel's position, so silence or
+a muted microphone with a moving position never triggers it. Attempts
+are spaced by two minutes, with at most three in 30 minutes. Look for
+`hardware capture position` in the daemon journal to see whether this
+recovery ran.
+
 On the Wave:3 MK.2 OpenXLR also watches the microphone while a mix plays
 into its headphones, and brings it back when it stalls. The sign it acts
 on is the kernel keeping the capture stopped for 3 seconds while PipeWire
