@@ -136,17 +136,35 @@
           <Border Classes="tile" Padding="12">
             <StackPanel Spacing="8">
               <TextBlock Text="{loc:Text Key=MicSetupGain}" Classes="h"/>
-              <Grid ColumnDefinitions="*,64" ColumnSpacing="8" IsVisible="{Binding CarriesUnit}">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding CarriesUnit}">
                 <Slider Name="MicSetupUnitGain" vm:FaderInput.Step="1" Minimum="0" Maximum="{Binding Unit.GainMaxDb, FallbackValue=80}"
                         Value="{Binding Unit.GainDb, Mode=TwoWay, FallbackValue=0}" IsEnabled="{Binding !Unit.GainLocked, FallbackValue=False}"
                         AutomationProperties.Name="{Binding Unit.GainName, FallbackValue=''}"/>
-                <TextBlock Grid.Column="1" Text="{Binding Unit.GainText, FallbackValue=''}" Classes="val" VerticalAlignment="Center"/>
+                <NumericUpDown Grid.Column="1" Name="MicSetupUnitGainValue" Minimum="0" Maximum="{Binding Unit.GainMaxDb, FallbackValue=80}"
+                               Value="{Binding Unit.GainDb, Mode=TwoWay, FallbackValue=0}" IsEnabled="{Binding !Unit.GainLocked, FallbackValue=False}"
+                               FormatString="0" Increment="1" MinWidth="92" VerticalAlignment="Center"
+                               AutomationProperties.Name="{Binding Unit.GainName, FallbackValue=''}"/>
               </Grid>
-              <Grid ColumnDefinitions="*,64" ColumnSpacing="8" IsVisible="{Binding CarriesExtraUnit}">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding CarriesExtraUnit}">
                 <Slider Name="MicSetupExtraGain" vm:FaderInput.Step="1" Minimum="0" Maximum="{Binding ExtraUnit.GainMaxDb, FallbackValue=80}"
                         Value="{Binding ExtraUnit.GainDb, Mode=TwoWay, FallbackValue=0}" IsEnabled="{Binding ExtraUnit.CanAdjustGain, FallbackValue=False}"
                         AutomationProperties.Name="{Binding ExtraUnit.GainName, FallbackValue=''}"/>
-                <TextBlock Grid.Column="1" Text="{Binding ExtraUnit.GainText, FallbackValue=''}" Classes="val" VerticalAlignment="Center"/>
+                <NumericUpDown Grid.Column="1" Name="MicSetupExtraGainValue" Minimum="0" Maximum="{Binding ExtraUnit.GainMaxDb, FallbackValue=80}"
+                               Value="{Binding ExtraUnit.GainDb, Mode=TwoWay, FallbackValue=0}" IsEnabled="{Binding ExtraUnit.CanAdjustGain, FallbackValue=False}"
+                               FormatString="0" Increment="1" MinWidth="92" VerticalAlignment="Center"
+                               AutomationProperties.Name="{Binding ExtraUnit.GainName, FallbackValue=''}"/>
+              </Grid>
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding CaptureInput.ShowsCaptureGain, FallbackValue=False}">
+                <Slider Name="MicSetupCaptureGain" vm:FaderInput.Step="1" Minimum="{Binding CaptureInput.CaptureGainMinDb, FallbackValue=-60}"
+                        Maximum="{Binding CaptureInput.CaptureGainMaxDb, FallbackValue=10}"
+                        Value="{Binding CaptureInput.CaptureGainDb, Mode=TwoWay, FallbackValue=0}"
+                        AutomationProperties.Name="{Binding CaptureInput.CaptureGainName, FallbackValue=''}"
+                        ToolTip.Tip="{Binding CaptureInput.CaptureGainTip}"/>
+                <NumericUpDown Grid.Column="1" Name="MicSetupCaptureGainValue" Minimum="{Binding CaptureInput.CaptureGainMinDb, FallbackValue=-60}"
+                               Maximum="{Binding CaptureInput.CaptureGainMaxDb, FallbackValue=10}"
+                               Value="{Binding CaptureInput.CaptureGainDb, Mode=TwoWay, FallbackValue=0}"
+                               FormatString="0.#" Increment="1" MinWidth="92" VerticalAlignment="Center"
+                               AutomationProperties.Name="{Binding CaptureInput.CaptureGainName, FallbackValue=''}"/>
               </Grid>
               <TextBlock Name="MicSetupNoGain" Text="{loc:Text Key=MicSetupNoGain}" Classes="hint" TextWrapping="Wrap" IsVisible="{Binding NoGain}"/>
             </StackPanel>

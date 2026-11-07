@@ -3910,4 +3910,7 @@ Selecciona la interfaz que controla OpenXLR</value>
   <data name="FlowUnitMixes" xml:space="preserve">
     <value>Construye {0}</value>
   </data>
+  <data name="MicSetupGain" xml:space="preserve"><value>Ganancia de entrada (dB)</value></data>
+  <data name="MicSetupSuggestElsewhere" xml:space="preserve"><value>Cambia la ganancia en unos {0:+0;-0} dB y vuelve a medir.</value></data>
+  <data name="MicSetupNoGain" xml:space="preserve"><value>OpenXLR no puede ajustar la ganancia de este micrófono. Ajústala en el micrófono o en su interfaz.</value></data>
 </root>

@@ -183,9 +183,16 @@ public sealed class CaptureInputWindowTests
         var meterWatches = new ConcurrentQueue<JsonNode>();
         var eqCommands = new ConcurrentQueue<JsonNode>();
         var bypassCommands = new ConcurrentQueue<JsonNode>();
+        var gainCommands = new ConcurrentQueue<JsonNode>();
         var gate = new object();
         JsonNode state = State();
         using var pushes = new SemaphoreSlim(0);
+        void ReportCaptureGain(JsonNode? gain)
+        {
+            lock (gate)
+                state["mixer"]!["channels"]!.AsArray().Single(c => c!["id"]!.GetValue<string>() == "guest")!["captureGain"] = gain;
+            pushes.Release();
+        }
         await using var server = await SocketTestServer.Start(async (socket, stop) =>
         {
             using var sending = new SemaphoreSlim(1);
@@ -280,6 +287,8 @@ public sealed class CaptureInputWindowTests
                         }
                         await Send(Snapshot());
                     }
+                    else if (name == "setCaptureGain" || name == "set" && cmd["control"]?.GetValue<string>() == "gain")
+                        gainCommands.Enqueue(cmd);
                     else if (name == "watchInputMeter")
                     {
                         // The meter before the chain, with a clip in it.
@@ -332,7 +341,8 @@ public sealed class CaptureInputWindowTests
                 Assert.Equal(id == "guest", micSetup.IsEffectivelyVisible);
                 if (id == "guest")
                 {
-                    await MicSetupWindowTests.CheckCaptureChain(main, chain, soundCommands, meterWatches, eqCommands, bypassCommands);
+                    await MicSetupWindowTests.CheckCaptureChain(main, chain, soundCommands, meterWatches, eqCommands, bypassCommands,
+                        ReportCaptureGain, gainCommands);
                     // Mic setup removed the guest's plugin: one chain with nothing in it.
                     JsonNode removed = Assert.Single(commands, c => c["channel"]!.GetValue<string>() == id);
                     Assert.Empty(removed["inserts"]!.AsArray());

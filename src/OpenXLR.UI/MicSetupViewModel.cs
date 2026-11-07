@@ -330,7 +330,27 @@ public sealed class MicSetupViewModel : ViewModelBase
     }
     public bool CarriesExtraUnit => _extraUnit is { HasGain: true };
 
-    public bool HasGain => CarriesUnit || CarriesExtraUnit;
+    private ChannelViewModel? _captureInput;
+    public ChannelViewModel? CaptureInput
+    {
+        get => _captureInput;
+        private set
+        {
+            var old = _captureInput;
+            if (!Set(ref _captureInput, value)) return;
+            if (old is not null) old.PropertyChanged -= OnCaptureGainChanged;
+            if (value is not null) value.PropertyChanged += OnCaptureGainChanged;
+            Raise(nameof(HasGain)); Raise(nameof(NoGain));
+        }
+    }
+
+    private void OnCaptureGainChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(ChannelViewModel.ShowsCaptureGain)) return;
+        Raise(nameof(HasGain)); Raise(nameof(NoGain));
+    }
+
+    public bool HasGain => CarriesUnit || CarriesExtraUnit || _captureInput?.ShowsCaptureGain == true;
     public bool NoGain => !HasGain;
 
     // --- Position: the unit the microphone is on, tips for it, phantom power ---
@@ -465,6 +485,7 @@ public sealed class MicSetupViewModel : ViewModelBase
     /// <summary>A source or unit changed, even when the same gain control and value are reused.</summary>
     internal void ObserveInput(ChannelViewModel? input)
     {
+        CaptureInput = input?.CaptureSource is not null ? input : null;
         var next = (input?.Binding, input?.UnitInput, input?.CaptureSource, input?.CapturePair ?? 0,
             input?.CaptureMonoChannel, input?.CaptureSource is not null ? input.CaptureConnected : input?.BindingConnected == true);
         if (_input == next) return;
@@ -827,6 +848,7 @@ public sealed class MicSetupViewModel : ViewModelBase
         _detached = true;
         Unit = null;
         ExtraUnit = null;
+        CaptureInput = null;
         Eq = null;
         Software = null;
         Inputs = null;

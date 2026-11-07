@@ -1404,11 +1404,12 @@ the thin one under it the average level, both on the same -60 to 0 dBFS
 scale as the channel meters. Speak as you will on air and set the gain so
 your voice peaks inside the band drawn under the bar, -18 to -6 dBFS. The
 **Clip** light comes on when a sample reaches -0.1 dBFS and stays on until
-you press it. The interface's gain sits beside the meter when the channel
-carries an input that has one: the primary interface's input, or that of an
-additional interface. For any other microphone, set the gain on the
-microphone or its own interface. The meter runs while the window is open
-and changes nothing in the channel's route.
+you press it. Under **Input gain (dB)**, drag the slider or type a value
+and press Enter. The control uses the same gain and range as the mixer,
+including an external mono capture input that reports a gain. Its gain is
+shared with other apps recording that source. If the microphone has no
+gain control here, set it on the microphone or its interface. The meter
+runs while the window is open and changes nothing in the channel's route.
 
 **Suggest gain** works out a gain for you. Press it and talk for five seconds
 as you will on air. OpenXLR measures two figures from the meter. One is

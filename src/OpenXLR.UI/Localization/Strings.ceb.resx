@@ -3246,7 +3246,7 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
     <value>Clip light, patay</value>
   </data>
   <data name="MicSetupGain" xml:space="preserve">
-    <value>Gain sa interface</value>
+    <value>Gain sa input (dB)</value>
   </data>
   <data name="MicSetupNoGain" xml:space="preserve">
     <value>Walay gain control ang OpenXLR alang niining mikropono. Itakda ang gain sa mikropono o sa kaugalingong interface niini.</value>
@@ -3288,7 +3288,7 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
     <value>Nag-clip ang imong tingog, busa mas kusog kini kaysa sa nasukod. Pahinayi ang gain, dayon sukda pag-usab.</value>
   </data>
   <data name="MicSetupSuggestElsewhere" xml:space="preserve">
-    <value>Dili itakda sa OpenXLR ang gain niining mikropono. Usba kini og mga {0:+0;-0} dB sa mikropono o sa interface niini, dayon sukda pag-usab.</value>
+    <value>Usba ang gain og mga {0:+0;-0} dB, dayon sukda pag-usab.</value>
   </data>
   <data name="MicSetupSuggestLocked" xml:space="preserve">
     <value>Naka-on ang gain lock. I-off kini aron madawat.</value>

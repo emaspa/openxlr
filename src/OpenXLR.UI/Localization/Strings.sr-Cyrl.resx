@@ -3246,7 +3246,7 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
     <value>Лампица изобличења угашена</value>
   </data>
   <data name="MicSetupGain" xml:space="preserve">
-    <value>Појачање интерфејса</value>
+    <value>Улазно појачање (dB)</value>
   </data>
   <data name="MicSetupNoGain" xml:space="preserve">
     <value>OpenXLR нема контролу појачања за овај микрофон. Подеси појачање на микрофону или на његовом интерфејсу.</value>
@@ -3288,7 +3288,7 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
     <value>Твој глас је изобличен, па је гласнији него што ово мерење показује. Смањи појачање, па измери поново.</value>
   </data>
   <data name="MicSetupSuggestElsewhere" xml:space="preserve">
-    <value>OpenXLR не подешава појачање овог микрофона. Промени га за око {0:+0;-0} dB на микрофону или његовом интерфејсу, па измери поново.</value>
+    <value>Промени појачање за око {0:+0;-0} dB, па измери поново.</value>
   </data>
   <data name="MicSetupSuggestLocked" xml:space="preserve">
     <value>Закључавање појачања је укључено. Откључај га да прихватиш.</value>
