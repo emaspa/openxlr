@@ -1,5 +1,6 @@
 ﻿using Avalonia;
 using System;
+using OpenXLR.UI.Skinning;
 
 namespace OpenXLR.UI;
 
@@ -32,5 +33,6 @@ class Program
             .WithDeveloperTools()
 #endif
             .WithInterFont()
+            .ConfigureFonts(BundledFonts.Register)
             .LogToTrace();
 }

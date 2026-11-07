@@ -1,0 +1,523 @@
+{
+  "$schema": "https://raw.githubusercontent.com/emaspa/openxlr/main/docs/skin.schema.json",
+  "schema": 1,
+  "id": "hifi-amber",
+  "name": "Hi-Fi Amber",
+  "description": "Hi-Fi with an amber display: brushed black faceplates, amber VFD meters and backlit keys, glowing lens lamps and red indexes on machined fader caps.",
+  "author": "OpenXLR",
+  "window": {
+    "size": {
+      "width": 1668,
+      "height": 1174
+    }
+  },
+  "controls": {
+    "button": "cap",
+    "fader": "console",
+    "meter": "segmented",
+    "led": "lens",
+    "mute": "cap",
+    "check": "key",
+    "chip": "badge"
+  },
+  "tokens": {
+    "Ox.Window.Background": {
+      "type": "image",
+      "source": "cabinet.jpg",
+      "stretch": "uniformToFill",
+      "color": "#15100a"
+    },
+    "Ox.Card.Background": {
+      "type": "image",
+      "source": "faceplate.jpg",
+      "stretch": "uniformToFill",
+      "color": "#211e1b"
+    },
+    "Ox.Card.BorderBrush": {
+      "type": "linear",
+      "from": [
+        0,
+        0
+      ],
+      "to": [
+        0,
+        1
+      ],
+      "stops": [
+        {
+          "offset": 0,
+          "color": "#8d8680"
+        },
+        {
+          "offset": 0.012,
+          "color": "#47423d"
+        },
+        {
+          "offset": 0.5,
+          "color": "#2b2824"
+        },
+        {
+          "offset": 0.985,
+          "color": "#100e0d"
+        },
+        {
+          "offset": 1,
+          "color": "#000000"
+        }
+      ]
+    },
+    "Ox.Card.BorderThickness": [
+      1,
+      1,
+      1,
+      2
+    ],
+    "Ox.Card.CornerRadius": 3,
+    "Ox.Tile.Background": {
+      "type": "image",
+      "source": "display.jpg",
+      "stretch": "uniformToFill",
+      "color": "#120d08"
+    },
+    "Ox.Tile.BorderBrush": {
+      "type": "linear",
+      "from": [
+        0,
+        0
+      ],
+      "to": [
+        0,
+        1
+      ],
+      "stops": [
+        {
+          "offset": 0,
+          "color": "#000000"
+        },
+        {
+          "offset": 0.5,
+          "color": "#0e0c0b"
+        },
+        {
+          "offset": 1,
+          "color": "#453f3a"
+        }
+      ]
+    },
+    "Ox.Tile.BorderThickness": 1,
+    "Ox.Tile.CornerRadius": 3,
+    "Ox.Dialog.Background": {
+      "type": "image",
+      "source": "faceplate.jpg",
+      "stretch": "uniformToFill",
+      "color": "#211e1b"
+    },
+    "Ox.Badge.Background": {
+      "type": "image",
+      "source": "display-dark.jpg",
+      "stretch": "uniformToFill",
+      "color": "#110d08"
+    },
+    "Ox.Divider": "#3d3833",
+    "Ox.Danger.Background": {
+      "type": "image",
+      "source": "key-red.png",
+      "stretch": "fill",
+      "color": "#342729"
+    },
+    "Ox.Danger.BorderBrush": "#5c2420",
+    "Ox.Danger.Foreground": "#f26a5c",
+    "Ox.Text.Primary": "#e2e8eb",
+    "Ox.Value.Foreground": "#ff9f3f",
+    "Ox.Text.Secondary": "#a7b0b5",
+    "Ox.Text.Muted": "#807972",
+    "Ox.Text.Detail": "#c3cbcf",
+    "Ox.Text.Warning": "#ff7a6c",
+    "Ox.Text.Alert": "#ff5a4a",
+    "Ox.Text.Info": "#ffb76f",
+    "Ox.Link.Foreground": "#f5aa5f",
+    "Ox.Link.ForegroundPointerOver": "#ffdab4",
+    "Ox.Font.Family": "Fira Sans Condensed",
+    "Ox.Label.FontSize": 10,
+    "Ox.Label.FontWeight": "SemiBold",
+    "Ox.Title.FontSize": 17,
+    "Ox.Title.FontWeight": "Bold",
+    "Ox.Title.Foreground": "#ffb76f",
+    "Ox.Title.Glow": 0.85,
+    "Ox.Strip.FontWeight": "SemiBold",
+    "Ox.Strip.Foreground": "#ffb76f",
+    "Ox.Strip.IconMuted": "#ff6a5a",
+    "Ox.Strip.Glow": 0.85,
+    "Ox.Led.On": "#ff9f3f",
+    "Ox.Led.Off": "#36302a",
+    "Ox.Led.Alert": "#ff3b2f",
+    "Ox.Led.Size": 13,
+    "Ox.Led.CoreScale": 0.55,
+    "Ox.Led.Bezel": "#030202",
+    "Ox.Led.BezelThickness": 0,
+    "Ox.Led.Glow": 0.9,
+    "Ox.Meter.Fill": "#ff9f3f",
+    "Ox.Meter.Warning": "#ff3b2f",
+    "Ox.Meter.Hot": "#ff3b2f",
+    "Ox.Meter.WarningLevel": 0.7,
+    "Ox.Meter.HotLevel": 0.9,
+    "Ox.Meter.Track": "#28190b",
+    "Ox.Meter.CornerRadius": 0,
+    "Ox.Meter.Height": 5,
+    "Ox.Meter.VerticalWidth": 9,
+    "Ox.Meter.Segments": 35,
+    "Ox.Meter.Glow": 0.5,
+    "Ox.Meter.SegmentGap": 2,
+    "Ox.Mute.Background": {
+      "type": "image",
+      "source": "key.png",
+      "stretch": "fill",
+      "color": "#392f24"
+    },
+    "Ox.Mute.Foreground": "#d89858",
+    "Ox.Mute.BackgroundPointerOver": {
+      "type": "image",
+      "source": "key-hover.png",
+      "stretch": "fill",
+      "color": "#493b2d"
+    },
+    "Ox.Mute.BackgroundChecked": {
+      "type": "image",
+      "source": "key-red-lit.png",
+      "stretch": "fill",
+      "color": "#452829"
+    },
+    "Ox.Mute.ForegroundChecked": "#ff6a5a",
+    "Ox.Mute.BorderBrush": "#55391d",
+    "Ox.Mute.BorderBrushChecked": "#ff5f50",
+    "Ox.Mute.BorderThickness": 1,
+    "Ox.Fader.Track": "#050404",
+    "Ox.Fader.Fill": "#90561d",
+    "Ox.Fader.TrackHeight": 4,
+    "Ox.Fader.TrackCornerRadius": 2,
+    "Ox.Fader.Thumb.Background": {
+      "type": "image",
+      "source": "cap.png",
+      "stretch": "fill",
+      "color": "#59544e"
+    },
+    "Ox.Fader.Thumb.BorderBrush": "#0c0b0a",
+    "Ox.Fader.Thumb.BorderThickness": 1,
+    "Ox.Fader.Thumb.Width": 26,
+    "Ox.Fader.Thumb.Height": 13,
+    "Ox.Fader.Thumb.CornerRadius": 2,
+    "Ox.Fader.Thumb.Grip": "#ff3b2f",
+    "Ox.Fader.Thumb.GripLength": 8,
+    "Ox.Control.Background": {
+      "type": "image",
+      "source": "key.png",
+      "stretch": "fill",
+      "color": "#392f24"
+    },
+    "Ox.Control.BackgroundPointerOver": {
+      "type": "image",
+      "source": "key-hover.png",
+      "stretch": "fill",
+      "color": "#493b2d"
+    },
+    "Ox.Control.BackgroundPressed": {
+      "type": "image",
+      "source": "key-pressed.png",
+      "stretch": "fill",
+      "color": "#3b2d1e"
+    },
+    "Ox.Control.BackgroundChecked": {
+      "type": "image",
+      "source": "key-lit.png",
+      "stretch": "fill",
+      "color": "#4b3722"
+    },
+    "Ox.Control.BackgroundDisabled": {
+      "type": "image",
+      "source": "key-disabled.png",
+      "stretch": "fill",
+      "color": "#201e1b"
+    },
+    "Ox.Control.Foreground": "#d89858",
+    "Ox.Control.ForegroundChecked": "#ffb76f",
+    "Ox.Control.ForegroundDisabled": "#78542f",
+    "Ox.Control.BorderBrush": "#55391d",
+    "Ox.Control.BorderBrushPointerOver": "#91602f",
+    "Ox.Control.BorderBrushDisabled": "#0e0d0c",
+    "Ox.Control.BorderThickness": 1,
+    "Ox.Control.CornerRadius": 3,
+    "Ox.Control.DisabledOpacity": 0.55,
+    "Ox.Ghost.Background": "#00000000",
+    "Ox.Cap.Bevel": {
+      "type": "linear",
+      "from": [
+        0,
+        0
+      ],
+      "to": [
+        0,
+        1
+      ],
+      "stops": [
+        {
+          "offset": 0,
+          "color": "#38ffffff"
+        },
+        {
+          "offset": 0.07,
+          "color": "#14ffffff"
+        },
+        {
+          "offset": 0.45,
+          "color": "#00ffffff"
+        },
+        {
+          "offset": 0.9,
+          "color": "#00000000"
+        },
+        {
+          "offset": 1,
+          "color": "#66000000"
+        }
+      ]
+    },
+    "Ox.Toggle.Foreground": "#d89858",
+    "Ox.Toggle.ForegroundChecked": "#ffb76f",
+    "Ox.Toggle.ForegroundDisabled": "#78542f",
+    "Ox.Toggle.BorderBrushChecked": "#e29345",
+    "Ox.Bypass.Foreground": "#ffb76f",
+    "Ox.Bypass.ForegroundBypassed": "#ff887a",
+    "Ox.Lit.Background": {
+      "type": "image",
+      "source": "key-lit.png",
+      "stretch": "fill",
+      "color": "#4b3722"
+    },
+    "Ox.Lit.BackgroundPointerOver": {
+      "type": "image",
+      "source": "key-lit.png",
+      "stretch": "fill",
+      "color": "#4b3722"
+    },
+    "Ox.Lit.BorderBrush": "#e29345",
+    "Ox.Chip.BorderThickness": 1,
+    "Ox.Alert.Background": {
+      "type": "image",
+      "source": "key-red.png",
+      "stretch": "fill",
+      "color": "#342729"
+    },
+    "Ox.Alert.BackgroundPointerOver": {
+      "type": "image",
+      "source": "key-red-hover.png",
+      "stretch": "fill",
+      "color": "#433034"
+    },
+    "Ox.Alert.BorderBrush": "#5c2420",
+    "Ox.Check.Foreground": "#e2e8eb",
+    "Ox.Input.Background": {
+      "type": "image",
+      "source": "display-dark.jpg",
+      "stretch": "uniformToFill",
+      "color": "#110d08"
+    },
+    "Ox.Input.Foreground": "#ffb76f",
+    "Ox.Input.BorderBrush": "#342f2a",
+    "Ox.Flyout.Background": {
+      "type": "image",
+      "source": "faceplate.jpg",
+      "stretch": "uniformToFill",
+      "color": "#211e1b"
+    },
+    "Ox.Tooltip.Background": {
+      "type": "image",
+      "source": "display-dark.jpg",
+      "stretch": "uniformToFill",
+      "color": "#110d08"
+    },
+    "Ox.Tooltip.Foreground": "#ffb76f",
+    "Ox.Tooltip.BorderBrush": "#75481b",
+    "Ox.Accent": "#ff9f3f",
+    "Ox.Tab.Indicator": "#ff9f3f",
+    "Ox.AppIcon.Background": "#1d150d",
+    "Ox.AppIcon.Foreground": "#ffb76f",
+    "Ox.AppIcon.CornerRadius": 3,
+    "Ox.Mixer.VerticalFaderLength": 140,
+    "Ox.Mixer.StripWidth": 66,
+    "Ox.Mixer.BankSpacing": 8,
+    "Ox.Matrix.MutedBackground": "#38ff3b2f",
+    "Ox.Matrix.MutedForeground": "#ff7a6c",
+    "Ox.Flow.Background": {
+      "type": "image",
+      "source": "cabinet.jpg",
+      "stretch": "uniformToFill",
+      "color": "#15100a"
+    },
+    "Ox.Flow.Card": "#1a1714",
+    "Ox.Flow.CardSelected": "#28221c",
+    "Ox.Flow.Text": "#e2e8eb",
+    "Ox.Flow.TextDim": "#a7b0b5",
+    "Ox.Flow.Input": "#ff9f3f",
+    "Ox.Flow.Channel": "#ffa74f",
+    "Ox.Flow.Output": "#ff3b2f",
+    "Ox.Flow.Muted": "#58524c",
+    "Ox.Flow.NodeHoverBackground": "#241f1a",
+    "Ox.Flow.NodeHoverBorderBrush": "#8a5d2f",
+    "Ox.Eq.Background": "#0c0804",
+    "Ox.Eq.Grid": "#382512",
+    "Ox.Eq.GridLabel": "#d6924f",
+    "Ox.Eq.ZoneA": "#00000000",
+    "Ox.Eq.ZoneB": "#0aff9f3f",
+    "Ox.Eq.ZoneLabel": "#915e2c",
+    "Ox.Eq.Curve": "#ffcf9f",
+    "Ox.Eq.CurveFill": "#30ff9f3f",
+    "Ox.Eq.Band1": "#ff9f3f",
+    "Ox.Eq.Band2": "#ff3b2f",
+    "Ox.Eq.Band3": "#ffa74f",
+    "Ox.Eq.Band4": "#ff7a6c",
+    "Ox.Eq.HandleOff": "#70502f",
+    "Ox.Eq.HandleRing": "#fff4e9",
+    "Ox.Eq.CornerRadius": 3,
+    "Ox.Dynamics.Level": "#ff9f3f",
+    "Ox.Dynamics.LevelFill": "#80ff9f3f",
+    "Ox.Dynamics.Threshold": "#ff3b2f",
+    "Ox.Dynamics.Reduction": "#ff7a6c",
+    "Ox.Soundboard.PadCornerRadius": 4,
+    "Ox.Soundboard.Playing": "#ff9f3f",
+    "Ox.Soundboard.Progress": "#ff9f3f",
+    "Ox.Swatch.CornerRadius": 3
+  },
+  "layout": {
+    "version": 1,
+    "main": {
+      "kind": "stack",
+      "id": "rack",
+      "orientation": "vertical",
+      "spacing": 6,
+      "children": [
+        {
+          "kind": "grid",
+          "id": "amplifier",
+          "spacing": 6,
+          "columns": [
+            {
+              "star": 1
+            },
+            {
+              "size": 340
+            }
+          ],
+          "rows": [
+            "auto"
+          ],
+          "children": [
+            {
+              "kind": "region",
+              "region": "headphones",
+              "row": 0,
+              "column": 0
+            },
+            {
+              "kind": "region",
+              "region": "monitor",
+              "row": 0,
+              "column": 1
+            }
+          ]
+        },
+        {
+          "kind": "grid",
+          "id": "deck",
+          "spacing": 6,
+          "columns": [
+            {
+              "star": 1
+            },
+            {
+              "size": 950
+            }
+          ],
+          "rows": [
+            "auto"
+          ],
+          "children": [
+            {
+              "kind": "stack",
+              "id": "preamp",
+              "orientation": "vertical",
+              "spacing": 6,
+              "row": 0,
+              "column": 0,
+              "children": [
+                {
+                  "kind": "region",
+                  "region": "inputs"
+                },
+                {
+                  "kind": "region",
+                  "region": "applications"
+                }
+              ]
+            },
+            {
+              "kind": "region",
+              "region": "submixer",
+              "row": 0,
+              "column": 1
+            }
+          ]
+        }
+      ]
+    },
+    "regions": {
+      "header": {
+        "version": "title"
+      },
+      "monitor": {
+        "template": "output-toolbar"
+      },
+      "submixer": {
+        "template": "mix-banks",
+        "orientation": "vertical",
+        "visibleBanks": 3,
+        "selectionDefaults": [
+          "monitor",
+          "stream",
+          "chat"
+        ],
+        "picker": "buttons",
+        "strip": {
+          "template": "vertical-strip",
+          "partsOrder": [
+            "identity",
+            "value",
+            "meter",
+            "fader",
+            "mute"
+          ],
+          "fader": {
+            "orientation": "vertical",
+            "direction": "normal"
+          },
+          "meter": {
+            "orientation": "vertical",
+            "placement": "beside-fader"
+          },
+          "label": {
+            "style": "icon-and-text"
+          }
+        },
+        "master": {
+          "template": "master-strip",
+          "label": {
+            "style": "icon-and-text"
+          }
+        }
+      },
+      "applications": {
+        "template": "application-columns",
+        "perColumn": 3
+      }
+    }
+  }
+}

@@ -72,6 +72,7 @@ public partial class MainWindow : Window
         // The skin's outline. Only this window takes it: the separate mixer
         // window and the dialogs keep the platform's own frame.
         Frame = new WindowFrame(this);
+        SetupSkinSize();
         UpdateControlSizing();
         Skinning.SkinService.Changed += UpdateControlSizing;
         SetupTray();

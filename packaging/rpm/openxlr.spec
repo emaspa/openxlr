@@ -23,7 +23,7 @@ Summary:        Linux Wave Link replacement for Elgato XLR interfaces and Wave m
 # regex families offer Unlicense OR MIT. `cargo metadata --filter-platform
 # x86_64-unknown-linux-gnu` in native/deepfilter lists every crate. The
 # soundboard's starter sounds are CC0-1.0, each credited in their CREDITS.
-License:        GPL-3.0-only AND BSD-3-Clause AND MIT AND Apache-2.0 AND (MIT OR Apache-2.0) AND (Unlicense OR MIT) AND CC0-1.0
+License:        GPL-3.0-only AND BSD-3-Clause AND MIT AND Apache-2.0 AND (MIT OR Apache-2.0) AND (Unlicense OR MIT) AND CC0-1.0 AND OFL-1.1
 URL:            https://github.com/emaspa/openxlr
 Source0:        %{name}-%{version}.tar.gz
 Source1:        https://raw.githubusercontent.com/Rikorose/DeepFilterNet/v%{deepfilter_version}/models/DeepFilterNet3_onnx.tar.gz#/DeepFilterNet3_onnx-%{deepfilter_version}.tar.gz
@@ -202,6 +202,9 @@ install -Dm644 native/vst3/LICENSE %{buildroot}%{_licensedir}/openxlr/vst3/LICEN
 # The starter sounds' sources and authors; the clips are installed beside the daemon.
 install -Dm644 packaging/starter-sounds/CREDITS \
     %{buildroot}%{_licensedir}/openxlr/starter-sounds/CREDITS
+# Fira Sans Condensed, compiled into the UI for the Hi-Fi skins.
+install -Dm644 src/OpenXLR.UI/Assets/Fonts/OFL.txt \
+    %{buildroot}%{_licensedir}/openxlr/fira-sans/OFL.txt
 install -Dm644 README.md %{buildroot}%{_docdir}/openxlr/README.md
 
 %post
@@ -224,6 +227,7 @@ MSG
 %license %{_licensedir}/openxlr/clap/
 %license %{_licensedir}/openxlr/vst3/
 %license %{_licensedir}/openxlr/starter-sounds/
+%license %{_licensedir}/openxlr/fira-sans/
 %doc %{_docdir}/openxlr/README.md
 %{_prefix}/lib/openxlr/
 %{_bindir}/openxlr

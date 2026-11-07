@@ -48,6 +48,22 @@ var palettes = {
     "warningLevel": 0.7,
     "hotLevel": 0.9
   },
+  "hifi": {
+    "fill": "#3fe6ff",
+    "warning": "#ff3b2f",
+    "hot": "#ff3b2f",
+    "track": "#0b2328",
+    "warningLevel": 0.7,
+    "hotLevel": 0.9
+  },
+  "hifi-amber": {
+    "fill": "#ff9f3f",
+    "warning": "#ff3b2f",
+    "hot": "#ff3b2f",
+    "track": "#28190b",
+    "warningLevel": 0.7,
+    "hotLevel": 0.9
+  },
   "kanagawa": {
     "fill": "#98bb6c",
     "warning": "#e6c384",

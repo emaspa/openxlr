@@ -50,6 +50,16 @@ every package has them and there is nothing to install:
   and its faders stop at 640 pixels, as in Compact Desk and Nyan Pink.
   It uses the same routing and controls as the other skins; no Elgato
   artwork or additional software is needed.
+- **Hi-Fi**, a 1980s separates stack drawn with images: brushed black
+  faceplates, display glass behind the meters, blue VFD meter lines,
+  backlit keys and machined fader caps with a red index. Channel names,
+  icons and the title glow like lit legends, a muted channel's icon turns
+  red, and the lamps are glowing lenses. INPUTS and APPLICATIONS stand on
+  the left, HEADPHONES and MONITOR above, and the submixer shows three mix
+  banks stacked on the right, each with its mix picked from a row of keys.
+  It letters in Fira Sans Condensed, which the UI carries itself, and
+  opens the UI at 1668 by 1174, the size that layout was drawn for.
+- **Hi-Fi Amber**, Hi-Fi with an amber display in place of the blue one.
 
 Pick one in Options under APPEARANCE. A new install starts on Broadcast,
 and so does an install whose user never picked a skin, so upgrading from a
@@ -311,7 +321,7 @@ name.
 | `tokens` | yes | the appearance values, see [The tokens](#the-tokens) |
 | `layout` | no | where the header and the UI's sections go, see [Layout](#layout) |
 | `icons` | no | the skin's own channel and mix icons as path data, see [Icons](#icons) |
-| `window` | no | the UI's outline, see [Window shape](#window-shape) |
+| `window` | no | the UI's outline and size, see [Window shape](#window-shape) and [Window size](#window-size) |
 
 `name`, `description` and `author` are cut at 400 characters, and control
 characters in them are dropped.
@@ -462,7 +472,10 @@ bottom), or four (left, top, right, bottom).
 120 characters. A skin never loads a font file, so a family with a `#` or
 a URL in it is refused. Name a family the machine is likely to have, or
 one your skin's readme tells the user to install; an unknown family falls
-back to the system default without an error.
+back to the system default without an error. The UI carries Fira Sans
+Condensed (Regular, SemiBold and Bold, under the SIL Open Font License)
+for the Hi-Fi skins, so a skin may name it on any machine; the name
+reaches that copy even where the font is installed.
 
 **A weight** is `"Thin"`, `"ExtraLight"`, `"Light"`, `"Normal"`,
 `"Medium"`, `"SemiBold"`, `"Bold"`, `"ExtraBold"`, `"Black"` and the other
@@ -941,7 +954,12 @@ An image comes from the skin's own folder:
 ```
 
 `stretch` is `fill`, `uniform`, `uniformToFill` (the default) or `none`,
-and `opacity` is between 0 and 1, 1 by default.
+and `opacity` is between 0 and 1, 1 by default. An optional `color`, a
+colour string, stands for the image where it cannot be drawn: the
+terminal mixer, the Deck and the Omarchy bar use it for the surface, and
+the UI paints it if the image is refused. Without it they keep the token's
+default. Give the image's average colour, so the text over it stays as
+readable there as it is over the image.
 
 The rules a `source` is held to:
 
@@ -1053,8 +1071,8 @@ A skin can round the UI's corners with an optional `window` object:
 | `rounded` | corners rounded by `Ox.Window.CornerRadius`, with the desktop showing through outside them, and OpenXLR's own caption row in place of the title bar |
 
 A skin with no `window` object keeps the rectangle, and so does every
-shipped skin. Any other shape, or a field other than `shape`, is reported
-in Options and the UI stays a rectangle.
+shipped skin. Any other shape is reported in Options and the UI stays a
+rectangle. A field other than `shape` or `size` is reported and ignored.
 
 The rounded outline needs a desktop that draws transparent windows, which
 on X11 means a running compositor. Where there is none, or the toolkit
@@ -1080,6 +1098,39 @@ outline of its own, such as one taken from an image. The toolkit could
 paint everything outside it transparent, but the pointer would still land
 on the UI there rather than on the desktop below, and the outline would
 stretch whenever the UI is resized.
+
+## Window size
+
+A skin drawn for a given size can open the UI at it with `size` in the
+same `window` object:
+
+```json
+{
+  "schema": 1,
+  "name": "Wide desk",
+  "window": { "size": { "width": 1668, "height": 1174 } },
+  "tokens": {}
+}
+```
+
+The width and height are the UI's content in the same pixels as every
+other size in a skin, the desktop's title bar left out. The width is 640
+to 7680 and the height 480 to 4320, both whole numbers.
+
+The UI takes the size when it starts with the skin and whenever you change
+to it in Options. On a screen too small for it, the UI is made as large as
+the screen's free area allows, and moved back onto the screen if the new
+size took it past an edge. A maximised or full screen UI is left as it is.
+
+You can resize the UI after that, and it keeps your size until you
+change skin. Changing from a skin with a size to one without brings the
+UI back to its usual 1040 by 900. Between two skins without a size, the
+UI keeps the size you gave it.
+
+A `size` that is not an object with both numbers in range, or that holds
+any other field, is reported in Options and the UI keeps its size. The
+skin's other values still apply. Hi-Fi and Hi-Fi Amber are the shipped
+skins that name a size.
 
 ## Layout
 

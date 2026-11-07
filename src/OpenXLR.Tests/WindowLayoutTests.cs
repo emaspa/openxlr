@@ -1086,7 +1086,10 @@ public sealed class WindowLayoutTests
         Assert.True(mute.IsEffectivelyVisible);
         Assert.Equal(Localizer.Text("MuteMonitoring"), AutomationProperties.GetName(mute));
         Assert.Equal(Localizer.Text("Mute"), mute.Content);
-        Assert.True(mute.Bounds.Width > 40, $"Monitoring mute shrank to {mute.Bounds.Width}.");
+        // Never squeezed below what its lettering needs; a condensed typeface
+        // (the Hi-Fi skins') letters Mute narrower than the default does.
+        Assert.True(mute.Bounds.Width > 32 && mute.Bounds.Width >= mute.DesiredSize.Width - 0.5,
+            $"Monitoring mute shrank to {mute.Bounds.Width} of the {mute.DesiredSize.Width} it needs.");
         AssertInside(mute, main.FindControl<Expander>("MonitorTile")!);
     }
 

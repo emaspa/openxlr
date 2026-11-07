@@ -28,7 +28,15 @@ public sealed record SkinGradient(
     IReadOnlyList<SkinStop> Stops) : SkinValue;
 
 /// <summary>An image file inside the skin's own folder.</summary>
-public sealed record SkinImage(string RelativePath, Stretch Stretch, double Opacity) : SkinValue;
+public sealed record SkinImage(string RelativePath, Stretch Stretch, double Opacity) : SkinValue
+{
+    /// <summary>
+    /// The flat colour that stands for the image where it cannot be drawn: in
+    /// the terminal mixer, the Deck and bar palettes, and in the UI when the
+    /// image is refused. Null when the skin gives none.
+    /// </summary>
+    public Color? Fallback { get; init; }
+}
 
 /// <summary>A bounded number.</summary>
 public sealed record SkinNumber(double Value) : SkinValue;
@@ -105,6 +113,12 @@ public sealed record SkinPackage(
     /// The rectangle unless the skin's <c>window</c> section names another.
     /// </summary>
     public string WindowShape { get; init; } = SkinWindowShapes.Default;
+
+    /// <summary>
+    /// The size the UI takes when the skin is put on, from the skin's
+    /// <c>window</c> section; null for a skin that leaves the size alone.
+    /// </summary>
+    public SkinWindowSize? WindowSize { get; init; }
 
     /// <summary>The built-in appearance: no overlay at all, so every token keeps its default.</summary>
     public static SkinPackage Default { get; } = new(

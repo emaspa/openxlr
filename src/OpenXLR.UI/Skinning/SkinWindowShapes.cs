@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using Avalonia;
 using System.Linq;
 
 namespace OpenXLR.UI.Skinning;
@@ -31,4 +33,39 @@ public static class SkinWindowShapes
 
     /// <summary>The shapes quoted for a message: "rectangle" or "rounded".</summary>
     public static string List => string.Join(" or ", All.Select(s => $"\"{s}\""));
+}
+
+/// <summary>
+/// The size a skin's <c>"window": {"size": ...}</c> gives the UI, in device
+/// independent pixels of its content, title bar left out. The UI takes it when
+/// the skin is put on, made smaller where the screen is.
+/// </summary>
+public readonly record struct SkinWindowSize(int Width, int Height)
+{
+    public const int MinWidth = 640;
+    public const int MaxWidth = 7680;
+    public const int MinHeight = 480;
+    public const int MaxHeight = 4320;
+
+    /// <summary>The size of a skin that names none, after one that did.</summary>
+    public static SkinWindowSize Default { get; } = new(1040, 900);
+
+    /// <summary>
+    /// The size the UI takes: this one, made smaller where the screen's
+    /// working area, less the desktop's frame round the UI, is smaller, but
+    /// never under the smallest size a skin can name.
+    /// </summary>
+    public Size FitIn(Rect? area, Size decorations)
+    {
+        double width = Width, height = Height;
+        if (area is { } screen)
+        {
+            width = Math.Min(width, Math.Max(MinWidth, screen.Width - decorations.Width));
+            height = Math.Min(height, Math.Max(MinHeight, screen.Height - decorations.Height));
+        }
+        return new Size(width, height);
+    }
+
+    /// <summary>The bounds quoted for a message.</summary>
+    public static string Bounds => $"{{\"width\": {MinWidth} to {MaxWidth}, \"height\": {MinHeight} to {MaxHeight}}}";
 }

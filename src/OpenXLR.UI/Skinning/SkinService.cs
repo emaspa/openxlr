@@ -525,7 +525,9 @@ public static class SkinService
                 case SkinGradient gradient:
                     return Gradient(gradient);
                 case SkinImage image:
-                    return Image(token, image);
+                    // A refused image is still reported; its colour, when the
+                    // skin gives one, stands in rather than the token's default.
+                    return Image(token, image) ?? (image.Fallback is { } colour ? new SolidColorBrush(colour) : null);
                 case SkinNumber number:
                     return number.Value;
                 case SkinCornerRadius radius:
@@ -533,7 +535,7 @@ public static class SkinService
                 case SkinThickness thickness:
                     return thickness.Value;
                 case SkinFontFamily family:
-                    return new FontFamily(family.Value);
+                    return new FontFamily(BundledFonts.Resolve(family.Value));
                 case SkinFontWeight weight:
                     return weight.Value;
                 default:

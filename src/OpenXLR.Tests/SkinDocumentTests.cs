@@ -240,7 +240,7 @@ public sealed class SkinDocumentTests
     [Fact]
     public void TheWindowShapesAreDocumentedAndInTheSchema()
     {
-        string section = Section(Document, "Window shape", "Layout");
+        string section = Section(Document, "Window shape", "Window size");
         string[] rows = [.. section[section.IndexOf("| Shape | What it is |", StringComparison.Ordinal)..].Split('\n').Skip(2)
             .TakeWhile(line => line.StartsWith('|'))
             .Select(line => System.Text.RegularExpressions.Regex.Match(line, @"^\| `([a-z]+)`").Groups[1].Value)];
@@ -260,7 +260,35 @@ public sealed class SkinDocumentTests
         JsonElement shape = window.GetProperty("properties").GetProperty("shape");
         Assert.Equal(SkinWindowShapes.All, shape.GetProperty("enum").EnumerateArray().Select(v => v.GetString()!));
         Assert.Equal(SkinWindowShapes.Default, shape.GetProperty("default").GetString());
-        Assert.Equal(["shape"], window.GetProperty("properties").EnumerateObject().Select(p => p.Name));
+        Assert.Equal(["shape", "size"], window.GetProperty("properties").EnumerateObject().Select(p => p.Name));
+    }
+
+    /// <summary>
+    /// The window size as the document and the schema state it: the bounds
+    /// the reader holds a size to, in the prose and the schema alike, and the
+    /// example a skin the reader takes whole.
+    /// </summary>
+    [Fact]
+    public void TheWindowSizeIsDocumentedAndInTheSchema()
+    {
+        string section = Section(Document, "Window size", "Layout");
+        Assert.Contains($"The width is {SkinWindowSize.MinWidth}\nto {SkinWindowSize.MaxWidth} and the height {SkinWindowSize.MinHeight} to {SkinWindowSize.MaxHeight}",
+            section, StringComparison.Ordinal);
+        Assert.Contains($"its usual {SkinWindowSize.Default.Width} by {SkinWindowSize.Default.Height}", section, StringComparison.Ordinal);
+
+        int start = section.IndexOf("```json\n", StringComparison.Ordinal) + "```json\n".Length;
+        string example = section[start..section.IndexOf("```", start, StringComparison.Ordinal)];
+        SkinReadResult read = SkinReader.Read("wide", example, SkinOrigin.User, null);
+        Assert.True(read.Ok, string.Join("\n", read.Errors));
+        Assert.Equal(new SkinWindowSize(1668, 1174), read.Package!.WindowSize);
+
+        using JsonDocument schema = JsonDocument.Parse(File.ReadAllText(Path.Combine(Root, "docs", "skin.schema.json")));
+        JsonElement size = schema.RootElement.GetProperty("properties").GetProperty("window").GetProperty("properties").GetProperty("size");
+        Assert.False(size.GetProperty("additionalProperties").GetBoolean());
+        Assert.Equal(["width", "height"], size.GetProperty("required").EnumerateArray().Select(v => v.GetString()!));
+        JsonElement width = size.GetProperty("properties").GetProperty("width"), height = size.GetProperty("properties").GetProperty("height");
+        Assert.Equal((SkinWindowSize.MinWidth, SkinWindowSize.MaxWidth), (width.GetProperty("minimum").GetInt32(), width.GetProperty("maximum").GetInt32()));
+        Assert.Equal((SkinWindowSize.MinHeight, SkinWindowSize.MaxHeight), (height.GetProperty("minimum").GetInt32(), height.GetProperty("maximum").GetInt32()));
     }
 
     /// <summary>
