@@ -207,10 +207,12 @@ public partial class MainWindow : Window
     private void LayOutHeadphones()
     {
         bool twoJacks = _watchedView?.HasHp2 == true;
-        var columns = new ColumnDefinitions(twoJacks ? "Auto,*,64,20,Auto,*,64" : "Auto,*,64,0,0,0,0");
-        if (twoJacks)
-            columns[0].SharedSizeGroup = columns[4].SharedSizeGroup = "HeadphoneLabel";
-        HeadphoneControls.ColumnDefinitions = columns;
+        ColumnDefinitions columns = HeadphoneControls.ColumnDefinitions;
+        columns[0].SharedSizeGroup = columns[4].SharedSizeGroup = twoJacks ? "HeadphoneLabel" : null;
+        columns[3].Width = new GridLength(twoJacks ? 20 : 0);
+        columns[4].Width = twoJacks ? GridLength.Auto : new GridLength(0);
+        columns[5].Width = twoJacks ? GridLength.Star : new GridLength(0);
+        columns[6].Width = new GridLength(twoJacks ? 64 : 0);
     }
 
     /// <summary>

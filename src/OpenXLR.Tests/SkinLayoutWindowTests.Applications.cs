@@ -33,7 +33,7 @@ internal static partial class SkinLayoutWindowTests
     ];
 
     /// <summary>A name longer than the name width, as a helper stream of Discord's calls itself.</summary>
-    private const string LongAppName = "discord_hardware_mute";
+    private const string LongAppName = "discord_hardware_mute_background_audio_process";
 
     private static void CheckApplicationColumns()
     {
@@ -175,13 +175,13 @@ internal static partial class SkinLayoutWindowTests
         foreach (AppStreamViewModel app in all.Take(count)) model.ActiveApps.Add(app);
     }
 
-    /// <summary>The tiles in columns of four, in order, all one width with their names and pickers lined up, whole columns side by side or below.</summary>
+    /// <summary>Tiles flow down columns of up to four, then across or into the next band.</summary>
     private static void CheckColumnsAt(MainWindow window, MainViewModel model, string where)
     {
-        const int perColumn = 4;
+        const int maximumPerColumn = 4;
         var rows = window.FindControl<ItemsControl>("ApplicationRows")!;
         ApplicationColumnsPanel panel = Assert.IsType<ApplicationColumnsPanel>(rows.ItemsPanelRoot);
-        Assert.Equal(perColumn, panel.PerColumn);
+        Assert.Equal(maximumPerColumn, panel.PerColumn);
         Border card = (Border)window.FindControl<Expander>("ApplicationsTile")!.Parent!;
         Assert.True(card.IsVisible, where);
         AppStreamViewModel[] order = [.. model.ActiveApps];
@@ -195,6 +195,9 @@ internal static partial class SkinLayoutWindowTests
         // What a chip takes in its column: its width and its margin, which spaces the columns.
         double Taken(int i) => chips[i].Margin.Left + chips[i].Bounds.Width + chips[i].Margin.Right;
         double Bottom(int i) => At(i).Y + chips[i].Bounds.Height;
+        int perColumn = Enumerable.Range(1, chips.Length - 1).FirstOrDefault(i => At(i).X > 0.5);
+        if (perColumn == 0) perColumn = Math.Min(maximumPerColumn, chips.Length);
+        Assert.InRange(perColumn, 1, maximumPerColumn);
 
         AssertNoOverlap(chips);
         CheckTileParts(window, chips, where);

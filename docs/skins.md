@@ -634,6 +634,7 @@ the framework's.
 | `Ox.Fader.Thumb.Background` | brush | framework |  | the cap |
 | `Ox.Fader.Thumb.BorderBrush` | brush | #00000000 |  | the cap's ring |
 | `Ox.Fader.Thumb.BorderThickness` | thickness | 0 | 0 to 16 | that ring's width |
+| `Ox.Headphones.FaderMaxWidth` | number | 640 | 150 to 1600 | the maximum width of each headphone volume fader and the mic/PC blend fader |
 | `Ox.Fader.Thumb.Width` | number | 22 | 4 to 64 | the cap across the groove |
 | `Ox.Fader.Thumb.Height` | number | 10 | 4 to 64 | the cap along the groove |
 | `Ox.Fader.Thumb.CornerRadius` | radius | 2 | 0 to 48 | the cap's corners |
@@ -733,7 +734,7 @@ the same in every tile.
 | `Ox.AppIcon.CornerRadius` | radius | 4 | 0 to 48 | that badge's corners |
 | `Ox.AppIcon.FontSize` | number | 11 | 6 to 32 | the size of that initial |
 | `Ox.AppColumns.NameWidth` | number | 128 | 64 to 400 | the width of an application's name in a tile of APPLICATIONS' columns, the same in every tile; a longer name is clipped and scrolls to its end while the pointer is over its tile |
-| `Ox.AppColumns.TileMaxWidth` | number | 0 | 0 to 1000 | the width up to which application tiles can grow to share spare space in each row of columns; 0 keeps their natural width |
+| `Ox.AppColumns.TileMaxWidth` | number | 720 | 0 to 1000 | the width up to which application tiles can grow to share spare space in each row of columns; 0 keeps their natural width |
 
 ### Audio flow window
 
@@ -848,7 +849,7 @@ past the skin's maximum to fill the available width.
 |---|---|---|---|---|
 | `Ox.Matrix.NameWidth` | number | 140 | 56 to 400 | the width of a row head's name column, which holds the name, the binding line under it, the **Mic** button and the gain under it, or on SFX's row its **Sounds** button |
 | `Ox.Matrix.CellWidth` | number | 168 | 120 to 400 | the width of a cell, of a column head and of a row head's source controls |
-| `Ox.Matrix.CellMaxWidth` | number | 0 | 0 to 1000 | the width up to which matrix cells and source controls grow together; 0 keeps the base cell width |
+| `Ox.Matrix.CellMaxWidth` | number | 800 | 0 to 1000 | the width up to which matrix cells and source controls grow together; 0 keeps the base cell width |
 | `Ox.Matrix.RowHeight` | number | 40 | 28 to 120 | the height of a row: its head and every cell in it; a row whose head stacks a gain over the channel volume, or the **EQ** button over the chain's, is as tall as the two need, never less |
 | `Ox.Matrix.MutedBackground` | brush | #40a03434 | | the background of a cell whose send is muted, when the matrix tints muted cells. Translucent by default, so the cell's own surface shows through as a red tint |
 | `Ox.Matrix.MutedForeground` | brush | #f6dede | | the lettering of a muted send's mute in a tinted cell |
@@ -1268,7 +1269,7 @@ send fader stays a send fader.
 | `visibleBanks` | `"mix-banks"` | how many banks show, from 1 to 4; 2 when it is missing |
 | `selectionDefaults` | `"mix-banks"` | the mixes the banks start on, by the id `mixer.json` gives them, such as `"monitor"` and `"stream"`: at most 16 mix ids, each 1 to 64 lowercase letters, digits, hyphens and underscores |
 | `master` | `"mix-banks"` | how each bank's master is drawn, below |
-| `perColumn` | `"application-columns"` | how many applications one column holds before the next column starts, from 1 to 24; 6 when it is missing |
+| `perColumn` | `"application-columns"` | the most applications in one column, from 1 to 24; 6 when it is missing |
 | `matrix` | `"mix-matrix"` | how the matrix's row heads, column heads and cells are drawn; see [The mix matrix](#the-mix-matrix) |
 | `popOut` | `submixer`, any template | where the submixer starts out: `{ "default": "docked" }`, the default, or `{ "default": "detached" }`. See [The mixer's own window](#the-mixers-own-window) |
 
@@ -1296,13 +1297,15 @@ its tooltip, and its channel picker. The picker assigns the application to
 a channel exactly as a chip's does. Levels and sends stay with the
 channels; the list only assigns.
 
-APPLICATIONS' columns are tiles of one width, in columns: the first
-`perColumn` applications top to bottom, the next ones in a column to the
-right, in the order the chips of the default template wrap in. A tile holds
+APPLICATIONS' columns are tiles of one width, ordered down each column
+and then to the right. Each column holds up to `perColumn` applications.
+On a wide window the panel uses more columns and fewer rows when the
+tiles fit side by side. A tile holds
 what a chip holds: its state lamp, its icon, its name and its channel
 picker. Each part is the same width in every tile, so the tiles of a column
-line up and so do their pickers. A skin can set `Ox.AppColumns.TileMaxWidth`
-so each row of columns shares its spare width up to that limit. The name
+line up and so do their pickers. Each row of columns shares its spare
+width up to `Ox.AppColumns.TileMaxWidth`. Setting it to zero keeps the
+tiles at their natural width and uses `perColumn` for each full column. The name
 starts at `Ox.AppColumns.NameWidth`, 128 by default, which holds about sixteen
 characters such as "Telegram Desktop". A longer name is clipped; while the
 pointer is over its tile it glides once to its end and stays there, and

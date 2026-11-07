@@ -339,6 +339,13 @@
           "$ref": "#/$defs/thickness",
           "description": "that ring's width"
         },
+        "Ox.Headphones.FaderMaxWidth": {
+          "type": "number",
+          "minimum": 150,
+          "maximum": 1600,
+          "default": 640,
+          "description": "the maximum width of each headphone volume fader and the mic/PC blend fader"
+        },
         "Ox.Fader.Thumb.Width": {
           "type": "number",
           "minimum": 4,
@@ -565,7 +572,7 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1000,
-          "default": 0,
+          "default": 720,
           "description": "the width up to which application tiles can grow to share spare space in each row of columns; 0 keeps their natural width"
         },
         "Ox.Flow.Background": {
@@ -800,7 +807,7 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1000,
-          "default": 0,
+          "default": 800,
           "description": "the width up to which matrix cells and source controls grow together; 0 keeps the base cell width"
         },
         "Ox.Matrix.RowHeight": {
@@ -2167,14 +2174,14 @@
             "application-columns"
           ],
           "default": "application-chips",
-          "description": "application-chips is the APPLICATIONS chips; application-list is one line per application with its channel picker, for a narrow column; application-columns puts tiles of one width in columns of perColumn, top to bottom, the columns left to right, and a column that does not fit goes below, whole."
+          "description": "application-chips is the APPLICATIONS chips; application-list is one line per application with its channel picker, for a narrow column; application-columns puts tiles of one width in columns of up to perColumn when tiles can grow, top to bottom, the columns left to right, and a column that does not fit goes below, whole."
         },
         "perColumn": {
           "type": "integer",
           "minimum": 1,
           "maximum": 24,
           "default": 6,
-          "description": "How many applications one column holds before the next column starts. Only with template application-columns."
+          "description": "The most applications in a column. With Ox.AppColumns.TileMaxWidth set to 0, every full column has this many tiles. Only with template application-columns."
         }
       }
     },

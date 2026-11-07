@@ -118,7 +118,7 @@ public partial class MixerWindow : Window
         PanelScale.LayoutTransform = null;
         _scale = 1;
         _panel = null;
-        if (panel is Views.MixerPanel mixer) mixer.SetMatrixFillWidth(false);
+        if (panel is Views.MixerPanel mixer) mixer.SetMatrixFillWidth(null);
         panel.ClearValue(WidthProperty);
         panel.ClearValue(RenderTransformProperty);
         panel.ClearValue(RenderTransformOriginProperty);

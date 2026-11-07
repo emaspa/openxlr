@@ -17,14 +17,21 @@ internal static class OutputControlsWindowTests
             typeof(MainViewModel).GetMethod("ApplyMixer", BindingFlags.NonPublic | BindingFlags.Instance)!
                 .Invoke(model, [JsonNode.Parse("""{"mixes":[],"channels":[]}""")]);
             window.Show();
-            foreach (double width in new[] { 640d, 1280, 1600 })
+            foreach (double width in new[] { 640d, 1280, 1600, 2560 })
             {
                 model.HasHp2 = false;
                 Layout(window, width, 900);
                 var phones = window.FindControl<Grid>("HeadphoneControls")!;
                 Slider[] faders = [.. phones.Children.OfType<Slider>()];
-                Assert.True(faders[0].Bounds.Width > phones.Bounds.Width * .6,
-                    $"A single headphone output leaves its second jack's columns reserved at {width}.");
+                double maximum = (double)window.FindResource("Ox.Headphones.FaderMaxWidth")!;
+                void CheckSingleFader()
+                {
+                    double expected = Math.Min(maximum, phones.Bounds.Width - faders[0].Bounds.X - 64);
+                    Assert.InRange(faders[0].Bounds.Width, expected - 1, expected + 1);
+                    var readout = phones.Children.OfType<TextBlock>().First();
+                    Assert.InRange(readout.Bounds.Left - faders[0].Bounds.Right, -1, 64);
+                }
+                CheckSingleFader();
                 model.HasHp2 = true;
                 Layout(window, width, 900);
                 // The two star columns can split an odd number of display pixels.
@@ -33,9 +40,10 @@ internal static class OutputControlsWindowTests
                 int secondPixels = (int)Math.Round(faders[1].Bounds.Width * scale);
                 Assert.InRange(Math.Abs(firstPixels - secondPixels), 0, 1);
                 AssertNoOverlap(faders);
+                Assert.All(faders, fader => Assert.True(fader.Bounds.Width <= maximum + 1));
                 model.HasHp2 = false;
                 Layout(window, width, 900);
-                Assert.True(faders[0].Bounds.Width > phones.Bounds.Width * .6);
+                CheckSingleFader();
 
                 const string label = "CORSAIR VIRTUOSO MAX WIRELESS Gaming Receiver + Monitor with a long saved name";
                 typeof(MainViewModel).GetMethod("ApplyDevices", BindingFlags.NonPublic | BindingFlags.Instance)!

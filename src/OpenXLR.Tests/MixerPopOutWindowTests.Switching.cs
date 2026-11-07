@@ -311,7 +311,8 @@ internal static partial class MixerPopOutWindowTests
             popped.Close();
             Dispatcher.UIThread.RunJobs();
             Layout(main, 1400, 900);
-            Assert.Equal(normalWidth, lines.Bounds.Width, 0.5);
+            Assert.True(lines.Bounds.Width > normalWidth, "the docked matrix grows again");
+            Assert.InRange(matrix.Scroller.Viewport.Width - lines.Bounds.Width, -0.5, 6);
         }
         finally
         {

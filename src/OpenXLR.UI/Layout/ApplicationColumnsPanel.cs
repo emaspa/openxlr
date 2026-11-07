@@ -9,13 +9,13 @@ namespace OpenXLR.UI.Layout;
 /// <summary>
 /// APPLICATIONS' <c>"application-columns"</c> template: the chips in
 /// columns of at most <see cref="PerColumn"/>, top to bottom, the next tile
-/// starting the next column to the right. Each tile keeps the size it asks
+/// starting the next column to the right. Each tile starts with the size it asks
 /// for; the tile template gives every tile the same width, its name a fixed
 /// width and its channel picker a width shared by all the tiles under this
 /// panel, which is their shared size scope. A column starts at the width of
 /// its widest tile. A column that does not fit goes on the next band, whole.
-/// A skin can let the columns grow into the unused width, all by the same
-/// amount, so the columns of every band still line up.
+/// Flexible columns use fewer rows when more columns fit across the panel.
+/// Their tiles share the remaining width up to the skin's limit.
 /// </summary>
 public sealed class ApplicationColumnsPanel : Panel
 {
@@ -65,6 +65,16 @@ public sealed class ApplicationColumnsPanel : Panel
         foreach (Control child in Children)
             if (child.IsVisible) shown.Add(child);
         int perColumn = PerColumn;
+        if (perColumn > 1 && MaxTileWidth > 0 && shown.Count > 1 && double.IsFinite(width))
+        {
+            double widestTile = shown.Max(child => child.DesiredSize.Width);
+            if (widestTile > 0)
+            {
+                int across = (int)Math.Clamp(Math.Floor(width / widestTile), 1, shown.Count);
+                perColumn = Math.Min(perColumn, (shown.Count - 1) / across + 1);
+            }
+        }
+
         var columns = new List<Column>();
         for (int start = 0; start < shown.Count; start += perColumn)
         {

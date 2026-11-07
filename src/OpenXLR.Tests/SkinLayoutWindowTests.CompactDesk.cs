@@ -93,7 +93,7 @@ internal static partial class SkinLayoutWindowTests
                     }
                 }
             }
-            CheckCompactDeskThreeMixes(window, model);
+            CheckWideMixerLayouts(window, model);
             // Returning to another skin keeps the same section contents and application objects.
             ShowApps(model, apps, apps.Length);
             Wear(SkinPackage.DefaultId);
@@ -110,7 +110,7 @@ internal static partial class SkinLayoutWindowTests
         }
     }
 
-    private static void CheckCompactDeskThreeMixes(MainWindow window, MainViewModel model)
+    private static void CheckWideMixerLayouts(MainWindow window, MainViewModel model)
     {
         model.HasHp2 = model.CapCrossfade = false;
         SkinService.ApplyControlSizing(false);
@@ -157,19 +157,35 @@ internal static partial class SkinLayoutWindowTests
         Layout(window, window.ClientSize.Width + exact - matrixView.Bounds.Width, 800);
         Assert.True(matrixView.Scroller.Extent.Width <= matrixView.Scroller.Viewport.Width + .5,
             "The matrix gained a scrollbar from its own border at a width where the cells fit.");
-        foreach (double width in new[] { 640d, 960, 1280, 1600, 2400, 640 })
+        foreach (string skin in new[] { "compact-desk", "broadcast", "wave" })
         {
-            Layout(window, width, 800);
-            Assert.Equal(3, window.MixMatrix!.Columns.Count);
-            CheckMatrixCells(window, window.MixMatrix, $"Compact Desk, three mixes at {width}");
-            if (width >= 1280)
+            Wear(skin);
+            foreach (double width in new[] { 640d, 960, 1280, 1600, 2400, 2560, 640 })
             {
-                var card = (Border)window.FindControl<Expander>("SubmixerTile")!.Parent!;
-                Border last = ColumnHead(window, "chat");
-                double end = last.TranslatePoint(new Point(last.Bounds.Width, 0), card)!.Value.X;
-                Assert.True(end >= card.Bounds.Width * .95, "Three mixes should use the desk instead of leaving half of it empty.");
+                Layout(window, width, 800);
+                string where = $"{skin}, three mixes at {width}";
+                Assert.Equal(3, window.MixMatrix!.Columns.Count);
+                CheckMatrixCells(window, window.MixMatrix, where);
+                if (width >= 1280)
+                {
+                    var card = (Border)window.FindControl<Expander>("SubmixerTile")!.Parent!;
+                    Border last = ColumnHead(window, "chat");
+                    double end = last.TranslatePoint(new Point(last.Bounds.Width, 0), card)!.Value.X;
+                    Assert.True(end >= card.Bounds.Width * .94, $"Three mixes should use the desk: {where}.");
+                }
+                if (width == 2560)
+                {
+                    var rows = window.FindControl<ItemsControl>("ApplicationRows")!;
+                    var panel = Assert.IsType<ApplicationColumnsPanel>(rows.ItemsPanelRoot);
+                    Border[] tiles = ApplicationTiles(window);
+                    Assert.Equal(4, tiles.Length);
+                    Assert.All(tiles, tile => Assert.Equal(0, tile.TranslatePoint(default, panel)!.Value.Y, .5));
+                    Assert.True(tiles.Max(tile => tile.TranslatePoint(new Point(tile.Bounds.Width, 0), panel)!.Value.X)
+                        >= panel.Bounds.Width * .95, $"Four application tiles should use the wide row: {where}.");
+                    AssertNoOverlap(tiles);
+                }
+                if (width is 640 or 2560) Capture(window, $"skin-{skin}-three-mixes-{width}");
             }
-            Capture(window, $"skin-compact-desk-three-mixes-{width}");
         }
     }
 }

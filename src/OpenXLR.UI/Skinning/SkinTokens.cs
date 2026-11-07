@@ -202,6 +202,7 @@ public static class SkinTokens
         // Faders. The window has always sized the Fluent thumb through these
         // three theme keys; the rest is applied only when a skin asks for it,
         // so an unskinned slider is the stock Fluent one.
+        Number("Ox.Headphones.FaderMaxWidth", 640, 150, 1600),
         Number("Ox.Fader.Thumb.Width", 22, 4, 64,
             new SkinBridge("SliderHorizontalThumbWidth"), new SkinBridge("SliderVerticalThumbHeight")),
         Number("Ox.Fader.Thumb.Height", 10, 4, 64,
@@ -346,7 +347,7 @@ public static class SkinTokens
         // characters of the body text, "Telegram Desktop" or "VLC media
         // player"; a longer name scrolls while the pointer is on its tile.
         Number("Ox.AppColumns.NameWidth", 128, 64, 400),
-        Number("Ox.AppColumns.TileMaxWidth", 0, 0, 1000),
+        Number("Ox.AppColumns.TileMaxWidth", 720, 0, 1000),
 
         // The audio flow window.
         Brush("Ox.Flow.Background", "#242624"),
@@ -419,7 +420,7 @@ public static class SkinTokens
         // rows across it. Touch sizing raises the three to TouchMinimums.
         Number("Ox.Matrix.NameWidth", 140, 56, 400),
         Number("Ox.Matrix.CellWidth", 168, 120, 400),
-        Number("Ox.Matrix.CellMaxWidth", 0, 0, 1000),
+        Number("Ox.Matrix.CellMaxWidth", 800, 0, 1000),
         Number("Ox.Matrix.RowHeight", 40, 28, 120),
         // A muted send's cell: its background, and the lettering of its mute.
         // The background is translucent by default, so the cell's own surface

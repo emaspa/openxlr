@@ -788,7 +788,16 @@
           <TextBlock Text="{loc:Text Key=HEADPHONES}" Classes="h" VerticalAlignment="Center"/>
         </StackPanel></Expander.Header>
       <StackPanel Classes="dev" Spacing="4">
-        <Grid Name="HeadphoneControls" ColumnDefinitions="Auto,*,64,20,Auto,*,64" Grid.IsSharedSizeScope="True">
+        <Grid Name="HeadphoneControls" Grid.IsSharedSizeScope="True">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*" MaxWidth="{DynamicResource Ox.Headphones.FaderMaxWidth}"/>
+            <ColumnDefinition Width="64"/>
+            <ColumnDefinition Width="20"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*" MaxWidth="{DynamicResource Ox.Headphones.FaderMaxWidth}"/>
+            <ColumnDefinition Width="64"/>
+          </Grid.ColumnDefinitions>
           <Grid Name="Phones1Label" ColumnDefinitions="Auto,*" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center" ToolTip.Tip="{loc:Text Key=FrontJack}"
                 DataContext="{Binding Phones1Appearance}" x:DataType="vm:LayoutAppearanceViewModel">
             <vm:LayoutIconBlock Icon="{Binding Icon}" Fallback="{Binding DefaultIcon}" Classes="h" Classes.layoutAccent="{Binding HasColour}"
@@ -816,7 +825,12 @@
         </Grid>
         <!-- hardware zero-latency blend between mic direct and PC playback;
              the value column can grow for larger text and translated readouts -->
-        <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding CapCrossfade}">
+        <Grid IsVisible="{Binding CapCrossfade}">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*" MaxWidth="{DynamicResource Ox.Headphones.FaderMaxWidth}"/>
+            <ColumnDefinition Width="Auto"/>
+          </Grid.ColumnDefinitions>
           <TextBlock Text="{loc:Text Key=MicPC}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"
                      ToolTip.Tip="{loc:Text Key=DirectMonitorBlendLeftOnlyYourMicRight}"/>
           <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="200"
