@@ -12,7 +12,9 @@ namespace OpenXLR.Daemon;
 /// re-enumerated card's capture runs; that order cleared the stall on the
 /// maintainer's unit every time. The recoverCapture command tries the cheap
 /// step first: the unit's capture links are dropped and made again, and only
-/// a capture the kernel still does not run is reset the same way.
+/// a capture the kernel still does not run is reset the same way. A running
+/// USB capture with a frozen ALSA hardware position takes a separate path:
+/// reopen its source while the card's own playback is closed.
 /// </summary>
 internal sealed class CaptureRescue(
     ILogger log,
@@ -21,23 +23,41 @@ internal sealed class CaptureRescue(
     Func<DeviceCapabilities?> capabilities,
     Func<string, string?> resetUnit,
     CaptureWatch? watch = null,
-    Action<TimeSpan>? wait = null)
+    Action<TimeSpan>? wait = null,
+    CaptureWatch? progressWatch = null)
 {
     /// <summary>How long a relinked capture is given before the kernel is asked whether it runs.</summary>
     internal static readonly TimeSpan RelinkSettle = TimeSpan.FromSeconds(2);
 
     private readonly CaptureWatch _watch = watch ?? new CaptureWatch();
+    private readonly CaptureWatch _progressWatch = progressWatch ?? new CaptureWatch();
     private readonly Action<TimeSpan> _wait = wait ?? Thread.Sleep;
     private readonly object _gate = new();
 
-    /// <summary>One look at the driven unit's capture; resets it when the watch says so.</summary>
+    /// <summary>One look at the driven unit's capture; recover only the confirmed stall.</summary>
     public void Sweep()
     {
-        bool applies = capabilities()?.CaptureRecovery == true && !mixer.CaptureRecoveryActive;
-        CaptureVerdict verdict = _watch.Observe(applies ? mixer.DrivenUnitPlayback() : null, mixer.ProbeCapture);
-        if (verdict.Note is { } note) log.LogWarning("{note}", note);
-        if (verdict.Recover)
-            lock (_gate) Reset(unit(), verdict.Reason!);
+        lock (_gate)
+        {
+            DeviceInfo? driven = unit();
+            bool active = driven is not null && !mixer.CaptureRecoveryActive;
+            bool applies = active && capabilities()?.CaptureRecovery == true;
+            CaptureVerdict verdict = _watch.Observe(applies ? mixer.DrivenUnitPlayback() : null, mixer.ProbeCapture);
+            if (verdict.Note is { } note) log.LogWarning("{note}", note);
+            if (verdict.Recover)
+            {
+                _progressWatch.Recovered();
+                Reset(driven, verdict.Reason!);
+                return;
+            }
+
+            UnitCaptureProgress? progress = active ? mixer.DrivenCaptureProgress() : null;
+            CaptureVerdict stalled = _progressWatch.ObserveProgress(progress);
+            if (stalled.Note is { } limit) log.LogWarning("{note}", limit);
+            if (stalled.Recover && progress is { } capture && unit()?.InstanceId == driven?.InstanceId
+                && mixer.ReopenDrivenCapture(capture) is bool reopened)
+                log.LogWarning("{reason}; {result}", stalled.Reason, reopened ? "reopened only that capture source" : "could not reopen the capture source");
+        }
     }
 
     /// <summary>

@@ -6,6 +6,9 @@ namespace OpenXLR.Core.Mixing;
 /// </summary>
 public readonly record struct UnitPlayback(string Source, string Sink);
 
+/// <summary>The driven unit's source and its current capture position.</summary>
+public readonly record struct UnitCaptureProgress(string Source, CaptureRun Run);
+
 /// <summary>The driven unit's capture source and how many of its port links were dropped and made again.</summary>
 public readonly record struct UnitRelink(string Source, int Links);
 
@@ -16,6 +19,10 @@ public interface ICaptureRecoveryMixer
     UnitPlayback? DrivenUnitPlayback();
     /// <inheritdoc cref="Mixer.ProbeCapture"/>
     CaptureRun ProbeCapture(string source);
+    /// <inheritdoc cref="Mixer.DrivenCaptureProgress"/>
+    UnitCaptureProgress? DrivenCaptureProgress();
+    /// <inheritdoc cref="Mixer.ReopenDrivenCapture"/>
+    bool? ReopenDrivenCapture(UnitCaptureProgress expected);
     /// <inheritdoc cref="Mixer.RelinkDrivenUnitCapture"/>
     UnitRelink? RelinkDrivenUnitCapture();
     /// <inheritdoc cref="Mixer.BeginCaptureRecovery"/>
@@ -50,6 +57,32 @@ public sealed partial class Mixer : ICaptureRecoveryMixer
     public CaptureRun ProbeCapture(string source)
     {
         lock (_gate) return ProbeCaptureLocked(source);
+    }
+
+    /// <summary>The live USB capture of the driven unit, while its own playback is off.</summary>
+    public UnitCaptureProgress? DrivenCaptureProgress()
+    {
+        lock (_gate) return DrivenCaptureProgressLocked();
+    }
+
+    private UnitCaptureProgress? DrivenCaptureProgressLocked()
+    {
+        if (!_built || _soundCheck is not null || _inputDevice is not { } source ||
+            !source.StartsWith("alsa_input.usb-", StringComparison.Ordinal) ||
+            !_inputHints.Any(hint => hint.Length > 0 && source.Contains(hint, StringComparison.OrdinalIgnoreCase)) ||
+            !_config.Channels.Any(c => c.InputPair is not null && CarriesMicrophoneStage(c) && !_bindings.ContainsKey(c.Id)
+                && _inputFeeds.GetValueOrDefault(c.Id) is { Pairs.Count: > 0 }) ||
+            UnitRoutesLocked(InterfaceNodes.CardKey(source)).Count > 0)
+            return null;
+        CaptureRun run = _pw.CaptureRunOf(source, readCursor: true);
+        return run.Cursor is null ? null : new UnitCaptureProgress(source, run);
+    }
+
+    /// <summary>Reopen a still-stalled capture. Null if the source, cursor or playback state changed.</summary>
+    public bool? ReopenDrivenCapture(UnitCaptureProgress expected)
+    {
+        lock (_gate)
+            return DrivenCaptureProgressLocked() == expected ? _pw.ReopenCaptureSource(expected.Source) : null;
     }
 
     /// <summary>The source node a strip is fed from now, or before it is wired the driven unit's.</summary>

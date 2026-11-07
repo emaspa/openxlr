@@ -29,9 +29,18 @@ public sealed class CaptureRescueTests
     {
         public CaptureRun Run = new(10, true, true, false);
         public UnitPlayback? Playing = new(Source, Sink);
+        public UnitCaptureProgress? Progress;
         public bool CaptureRecoveryActive { get; private set; }
         public UnitPlayback? DrivenUnitPlayback() => CaptureRecoveryActive ? null : Playing;
         public CaptureRun ProbeCapture(string source) { Assert.Equal(Source, source); return Run; }
+        public UnitCaptureProgress? DrivenCaptureProgress() => Progress;
+        public bool? ReopenDrivenCapture(UnitCaptureProgress expected)
+        {
+            Assert.Equal(Progress, expected);
+            calls.Add("reopen " + expected.Source);
+            Progress = null;
+            return true;
+        }
         /// <summary>What the capture reads once its links are made again; null keeps it as it was.</summary>
         public CaptureRun? AfterRelink;
         public UnitRelink? RelinkDrivenUnitCapture()
@@ -85,6 +94,50 @@ public sealed class CaptureRescueTests
         for (int i = 0; i < 600; i++, advance(1000)) rescue.Sweep();
         Assert.NotNull(rescue.Recover());
         Assert.Empty(calls);
+    }
+
+    [Fact]
+    public void ARunningDockWithAFrozenCursorReopensOnlyItsSource()
+    {
+        long now = 0;
+        var calls = new List<string>();
+        const string source = "alsa_input.usb-Elgato_Systems_Elgato_XLR_Dock";
+        var mixer = new Mixer(calls) { Playing = null, Progress = new(source,
+            new CaptureRun(46, true, true, true, new CaptureCursor(2, 0, 0, "19.095039214", 228280655))) };
+        var rescue = new CaptureRescue(NullLogger.Instance, mixer,
+            () => new DeviceInfo("Elgato", "XLR Dock", 0x0fd9, 0x00a6), () => Plain,
+            _ => throw new InvalidOperationException("The Dock must not be reset on USB."),
+            progressWatch: new CaptureWatch(() => now));
+        for (int i = 0; i < 3; i++, now += 1000) rescue.Sweep();
+        Assert.Empty(calls);
+        rescue.Sweep();
+        Assert.Equal(["reopen " + source], calls);
+        Assert.False(mixer.CaptureRecoveryActive);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ASourceIsAlwaysResumedEvenIfSuspendingFails(bool suspendSucceeds)
+    {
+        string directory = Directory.CreateTempSubdirectory("openxlr-reopen-capture-").FullName;
+        string log = Path.Combine(directory, "calls");
+        string? previous = Environment.GetEnvironmentVariable("PATH");
+        try
+        {
+            ExecutableScript.Write(Path.Combine(directory, "pactl"), $$"""
+                printf '%s\n' "$*" >> {{OpenXLR.UI.InstallationDoctor.Quote(log)}}
+                if [ "$3" = 1 ]; then exit {{(suspendSucceeds ? 0 : 1)}}; fi
+                """);
+            Environment.SetEnvironmentVariable("PATH", directory);
+            Assert.Equal(suspendSucceeds, new PipeWireAdapter().ReopenCaptureSource("test_capture"));
+            Assert.Equal(["suspend-source test_capture 1", "suspend-source test_capture 0"], File.ReadAllLines(log));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PATH", previous);
+            Directory.Delete(directory, recursive: true);
+        }
     }
 
     [Fact]

@@ -8,7 +8,8 @@ namespace OpenXLR.Core.Mixing;
 /// <c>/proc/asound/MK2/stream0</c> read <c>Capture: Status: Stop</c> and no
 /// data came, so a linked capture is not yet a running one.
 /// </summary>
-public readonly record struct CaptureRun(int? NodeId, bool Alsa, bool NodeRunning, bool? KernelRunning)
+public readonly record struct CaptureRun(int? NodeId, bool Alsa, bool NodeRunning, bool? KernelRunning,
+    CaptureCursor? Cursor = null)
 {
     /// <summary>The source is not in the graph.</summary>
     public static CaptureRun Missing => new(null, false, false, null);
@@ -62,4 +63,47 @@ public readonly record struct CaptureRun(int? NodeId, bool Alsa, bool NodeRunnin
         try { return ParseKernelStatus(File.ReadAllText(Path.Combine(root, $"card{card}", $"stream{device}"))); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return null; }
     }
+
+    /// <summary>A running capture's hardware position, available only while the card's playback PCM devices are closed.</summary>
+    internal static CaptureCursor? ReadCursor(string root, int card, int device, int subdevice)
+    {
+        string path = Path.Combine(root, $"card{card}");
+        try
+        {
+            string status = File.ReadAllText(Path.Combine(path, $"pcm{device}c", $"sub{subdevice}", "status"));
+            CaptureCursor? cursor = ParseCursor(status, card, device, subdevice);
+            if (cursor is null) return null;
+            // Playback can have been opened by another application, outside
+            // the mixer. Opening capture again then can hit the capture-first bug.
+            foreach (string pcm in Directory.EnumerateDirectories(path, "pcm*p"))
+                foreach (string sub in Directory.EnumerateDirectories(pcm, "sub*"))
+                    if (File.ReadAllText(Path.Combine(sub, "status")).Trim() != "closed") return null;
+            return cursor;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return null; }
+    }
+
+    internal static CaptureCursor? ParseCursor(string status, int card, int device, int subdevice)
+    {
+        string? trigger = null;
+        ulong? pointer = null;
+        bool running = false;
+        foreach (string raw in status.Split('\n'))
+        {
+            ReadOnlySpan<char> line = raw.AsSpan().Trim();
+            int separator = line.IndexOf(':');
+            if (separator < 0) continue;
+            var key = line[..separator].TrimEnd();
+            var value = line[(separator + 1)..].TrimStart();
+            if (key.SequenceEqual("state")) running = value.SequenceEqual("RUNNING");
+            else if (key.SequenceEqual("trigger_time") && !value.IsEmpty) trigger = value.ToString();
+            else if (key.SequenceEqual("hw_ptr") && ulong.TryParse(value, System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture, out ulong position)) pointer = position;
+        }
+        return running && trigger is not null && pointer is ulong frame
+            ? new CaptureCursor(card, device, subdevice, trigger, frame) : null;
+    }
 }
+
+/// <summary>The kernel's hardware frame position and the identity of that ALSA capture run.</summary>
+public readonly record struct CaptureCursor(int Card, int Device, int Subdevice, string Trigger, ulong Frame);

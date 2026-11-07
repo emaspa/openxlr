@@ -273,6 +273,55 @@ public sealed partial class MonitorVolumeIntegrationTests
         Assert.False(mixer.CaptureRecoveryActive);
     }
 
+    [MonitorPipeWireFact]
+    public void AReopenRechecksTheCursorAndOnlyTouchesTheSelectedSource()
+    {
+        const string parent = "test_reopen_capture_parent";
+        const string otherOutput = "test_reopen_capture_output";
+        string root = Directory.CreateTempSubdirectory("openxlr-capture-pcm-").FullName;
+        string capture = Path.Combine(Directory.CreateDirectory(Path.Combine(root, "card7", "pcm0c", "sub0")).FullName, "status");
+        string playback = Path.Combine(Directory.CreateDirectory(Path.Combine(root, "card7", "pcm0p", "sub0")).FullName, "status");
+        var pw = new PipeWireAdapter { AsoundRoot = root };
+        using var registry = pw.WatchGraph();
+        using var mixer = new Mixer(pw);
+        pw.CreateNullSink(parent, "Reopen fixture");
+        pw.CreateNullSink(otherOutput, "Independent monitor");
+        WaitForRecovery(() => pw.Run("pactl", "list", "sources", "short").Contains(parent + ".monitor", StringComparison.Ordinal));
+        string module = pw.Run("pactl", "load-module", "module-remap-source", $"source_name={Wave3Source}", $"master={parent}.monitor",
+            "source_properties=" + PipeWireAdapter.PropList("api.alsa.pcm.card=7 api.alsa.pcm.stream=capture alsa.device=0 alsa.subdevice=0")).Trim();
+        try
+        {
+            File.WriteAllText(capture, "state: RUNNING\ntrigger_time: 10.000000000\nhw_ptr: 100\n");
+            File.WriteAllText(playback, "closed\n");
+            mixer.SetInputDeviceHint(Wave3Hints, hardwareOutputRouting: false, modelFallback: false);
+            mixer.Build(HardwareInputConfig, monitorOutputSink: otherOutput);
+            WaitForRecovery(() => { mixer.EnsureMonitorRoutes(); return GraphLinksInto(otherOutput).Length == 2; });
+            UnitCaptureProgress? seen = null;
+            WaitForRecovery(() =>
+            {
+                mixer.EnsureInputFeeds();
+                seen = mixer.DrivenCaptureProgress();
+                return seen is not null;
+            });
+            var stale = Assert.IsType<UnitCaptureProgress>(seen);
+            File.WriteAllText(capture, "state: RUNNING\ntrigger_time: 10.000000000\nhw_ptr: 200\n");
+            Assert.Null(mixer.ReopenDrivenCapture(stale));
+            var current = Assert.IsType<UnitCaptureProgress>(mixer.DrivenCaptureProgress());
+            Assert.Equal(Wave3Source, current.Source);
+            File.WriteAllText(playback, "state: RUNNING\n");
+            Assert.Null(mixer.ReopenDrivenCapture(current));
+            File.WriteAllText(playback, "closed\n");
+            Assert.True(mixer.ReopenDrivenCapture(current));
+            Assert.Equal(2, GraphLinksInto(otherOutput).Length);
+            WaitForRecovery(() => { mixer.EnsureInputFeeds(); return IncomingRouteLinks(Xlr1).Length == 2; });
+        }
+        finally
+        {
+            pw.Run("pactl", "unload-module", module);
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     /// <summary>
     /// Puts a pw-link in front of the real one that appends every link it
     /// made, "output input", to a file, and takes it away again on dispose.

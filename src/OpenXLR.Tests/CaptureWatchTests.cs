@@ -63,4 +63,31 @@ public sealed class CaptureWatchTests
         for (int i = 0; i < 60; i++, now += 1000)
             Assert.False(watch.Observe(Playing, _ => Running with { KernelRunning = null }).Recover);
     }
+
+    [Fact]
+    public void AStationaryHardwareCursorRecoversOnTheSameBudgetAsAStoppedCapture()
+    {
+        long now = 0;
+        var watch = new CaptureWatch(() => now);
+        var cursor = new CaptureCursor(2, 0, 0, "19.095039214", 228280655);
+        var dock = new UnitCaptureProgress("alsa_input.usb-Elgato_XLR_Dock", Running with { Cursor = cursor });
+        // A silent capture still advances. A new PCM run or missing sample
+        // starts a new observation, even if it starts at the same frame.
+        for (ulong i = 0; i < 10; i++, now += 1000)
+            Assert.False(watch.ObserveProgress(dock with { Run = dock.Run with { Cursor = cursor with { Frame = i } } }).Recover);
+        Assert.False(watch.ObserveProgress(dock).Recover);
+        now += 2000;
+        Assert.False(watch.ObserveProgress(null).Recover);
+        now += 1000;
+        var newRun = dock with { Run = dock.Run with { Cursor = cursor with { Trigger = "30.000000000" } } };
+        Assert.False(watch.ObserveProgress(newRun).Recover);
+        now += 2000;
+        Assert.False(watch.ObserveProgress(newRun).Recover);
+        now += 1000;
+        Assert.True(watch.ObserveProgress(newRun).Recover);
+        var verdicts = new List<CaptureVerdict>();
+        for (int i = 0; i < 600; i++, now += 1000) verdicts.Add(watch.ObserveProgress(newRun));
+        Assert.Equal(CaptureWatch.MaxRecoveries - 1, verdicts.Count(v => v.Recover));
+        Assert.Contains("tried reopening the capture", Assert.Single(verdicts, v => v.Note is not null).Note, StringComparison.Ordinal);
+    }
 }

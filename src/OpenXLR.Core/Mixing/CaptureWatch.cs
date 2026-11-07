@@ -1,7 +1,7 @@
 namespace OpenXLR.Core.Mixing;
 
 /// <summary>What one look at a unit's capture decided.</summary>
-/// <param name="Recover">Reset the unit now.</param>
+/// <param name="Recover">Try the recovery now.</param>
 /// <param name="Reason">What was seen, for the journal.</param>
 /// <param name="Note">Said once when recoveries are given up for a while.</param>
 public readonly record struct CaptureVerdict(bool Recover, string? Reason, string? Note);
@@ -26,6 +26,7 @@ public sealed class CaptureWatch
 
     private readonly Func<long> _clock;
     private long? _stoppedSince;
+    private (UnitCaptureProgress Value, long Since)? _stationary;
     private readonly Queue<long> _recoveries = new();
     private bool _gaveUpSaid;
 
@@ -54,14 +55,37 @@ public sealed class CaptureWatch
         _stoppedSince ??= now;
         if (now - _stoppedSince < (long)StopWindow.TotalMilliseconds) return default;
         string reason = $"the kernel has kept the capture of {unit.Source} stopped for {StopWindow.TotalSeconds:0} seconds while PipeWire runs it and {unit.Sink} plays";
+        return TryRecover(now, reason, "reset the unit", "Unplug it and plug it back in, or move the monitor output off its headphones");
+    }
+
+    /// <summary>A running capture is stalled only when its hardware position stays unchanged.</summary>
+    public CaptureVerdict ObserveProgress(UnitCaptureProgress? progress)
+    {
+        if (progress is not { Run: { NodeRunning: true, Cursor: not null } } current)
+        {
+            _stationary = null;
+            return default;
+        }
+        long now = _clock();
+        if (_stationary is not { } previous || previous.Value != current)
+        {
+            _stationary = (current, now);
+            return default;
+        }
+        if (now - previous.Since < (long)StopWindow.TotalMilliseconds) return default;
+        string reason = $"the hardware capture position of {current.Source} has not moved for {StopWindow.TotalSeconds:0} seconds";
+        return TryRecover(now, reason, "tried reopening the capture", "Unplug the interface and plug it back in");
+    }
+
+    private CaptureVerdict TryRecover(long now, string reason, string action, string advice)
+    {
         while (_recoveries.Count > 0 && now - _recoveries.Peek() >= (long)RecoveryWindow.TotalMilliseconds) _recoveries.Dequeue();
         if (_recoveries.Count >= MaxRecoveries)
         {
             if (_gaveUpSaid) return default;
             _gaveUpSaid = true;
             return new CaptureVerdict(false, reason,
-                $"{reason}; OpenXLR has reset the unit {MaxRecoveries} times in {RecoveryWindow.TotalMinutes:0} minutes and stops for now. " +
-                "Unplug it and plug it back in, or move the monitor output off its headphones");
+                $"{reason}; OpenXLR has {action} {MaxRecoveries} times in {RecoveryWindow.TotalMinutes:0} minutes and stops for now. " + advice);
         }
         if (_recoveries.Count > 0 && now - _recoveries.Last() < (long)RecoverySpacing.TotalMilliseconds) return default;
         _recoveries.Enqueue(now);
@@ -73,5 +97,9 @@ public sealed class CaptureWatch
     /// <summary>A recovery ran, asked for or not: every count starts over.</summary>
     public void Recovered() => Forget();
 
-    private void Forget() => _stoppedSince = null;
+    private void Forget()
+    {
+        _stoppedSince = null;
+        _stationary = null;
+    }
 }
