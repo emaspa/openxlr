@@ -272,12 +272,12 @@ public partial class MainWindow : Window
 
     private void LimitMonitorTracks()
     {
-        if (this.TryFindResource("Ox.Main.FaderMaxWidth", out object? value) && value is double width)
-        {
-            var columns = MonitorControls.ColumnDefinitions;
-            columns[Grid.GetColumn(MonitorDestination)].MaxWidth = width;
-            columns[Grid.GetColumn(OutputVolumeSlider)].MaxWidth = width;
-        }
+        // A skin without the limit leaves the tracks as wide as the row.
+        double width = this.TryFindResource("Ox.Main.FaderMaxWidth", out object? value) && value is double limit
+            ? limit : double.PositiveInfinity;
+        var columns = MonitorControls.ColumnDefinitions;
+        columns[Grid.GetColumn(MonitorDestination)].MaxWidth = width;
+        columns[Grid.GetColumn(OutputVolumeSlider)].MaxWidth = width;
     }
 
     /// <summary>A gamescope session, which SteamOS and Bazzite call Game Mode.</summary>

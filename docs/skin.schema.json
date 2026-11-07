@@ -343,8 +343,7 @@
           "type": "number",
           "minimum": 150,
           "maximum": 1600,
-          "default": 640,
-          "description": "the maximum track width of a classic input, headphone, mic/PC blend or monitor fader"
+          "description": "the maximum track width of a classic input, headphone, mic/PC blend or monitor fader; without it a track takes the whole row"
         },
         "Ox.Fader.Thumb.Width": {
           "type": "number",
@@ -572,7 +571,7 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1000,
-          "default": 720,
+          "default": 0,
           "description": "the width up to which application chips and tiles can grow into spare space; 0 keeps their natural width"
         },
         "Ox.Flow.Background": {
@@ -771,7 +770,7 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1000,
-          "default": 420,
+          "default": 0,
           "description": "the width up to which classic channel and mix master tiles can grow; 0 keeps their measured width"
         },
         "Ox.Mixer.StripWidth": {
@@ -814,7 +813,7 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1000,
-          "default": 800,
+          "default": 0,
           "description": "the width up to which matrix cells and source controls grow together; 0 keeps the base cell width"
         },
         "Ox.Matrix.RowHeight": {

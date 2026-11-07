@@ -517,7 +517,8 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
 - The Wave skin: Broadcast's arrangement on a dark charcoal palette with
   grey faders and green meters. HEADPHONES and MONITOR's toolbar side by
   side above the mix matrix, INPUTS hidden until Arrange mode shows it, and
-  APPLICATIONS in columns of four under the matrix. Its palette also
+  APPLICATIONS in columns of up to four under the matrix, spreading across
+  a wide window. Its palette also
   reaches the terminal, Deck and bar through the shared skin palettes. See
   [Skins](skins.md)
 - A compact view with one chosen channel strip, and a mini view with that

@@ -33,7 +33,7 @@ internal static partial class SkinLayoutWindowTests
     ];
 
     /// <summary>A name longer than the name width, as a helper stream of Discord's calls itself.</summary>
-    private const string LongAppName = "discord_hardware_mute_background_audio_process";
+    private const string LongAppName = "discord_hardware_mute";
 
     private static void CheckApplicationColumns()
     {

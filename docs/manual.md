@@ -3015,12 +3015,13 @@ Options, APPEARANCE, **Mixer view** chooses how the SUBMIXER card is drawn:
 
 In a narrow UI, MONITOR puts the device picker above the volume row
 so both remain usable. Long device names shorten with an ellipsis; hover
-over the picker to read its full summary. When the main window widens,
-matrix layouts and classic mixer tiles give the faders more room.
-Application chips and columns can move more tiles side by side. Each skin
-can limit that growth. Input, headphone and monitor faders have a maximum
-track width so their readouts stay close to the controls. These rules use
-logical window dimensions and follow the display scale.
+over the picker to read its full summary. In the Compact Desk, Wave and
+Nyan Pink skins, a wider main window gives the matrix and classic mixer
+tiles more room, and application chips and columns move more tiles side by
+side. Their input, headphone and monitor faders stop at a maximum track
+width so the readouts stay close to the controls. These rules use logical
+window dimensions and follow the display scale. The other skins keep their
+base widths.
 
 The view, the channel and the mix are saved in `ui.json`. When the chosen
 channel or mix is gone, after a layout change or with an interface that
