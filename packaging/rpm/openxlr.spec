@@ -146,6 +146,12 @@ install -Dm644 browser-host.json \
 install -Dm644 browser-host.json \
     %{buildroot}%{_sysconfdir}/opt/chrome/native-messaging-hosts/com.emaspa.openxlr.browser.json
 
+# Chromium and Chrome offer the companion from the Chrome Web Store.
+install -Dm644 browser/external-extension.json \
+    %{buildroot}%{_datadir}/chromium/extensions/beeohanoffjpcofbjiiamkdammhcihaf.json
+install -Dm644 browser/external-extension.json \
+    %{buildroot}%{_datadir}/google-chrome/extensions/beeohanoffjpcofbjiiamkdammhcihaf.json
+
 install -Dm644 packaging/70-openxlr.rules \
     %{buildroot}%{_udevrulesdir}/70-openxlr.rules
 install -Dm644 packaging/50-xlr-dock-capture-hold.conf \
@@ -232,6 +238,8 @@ MSG
 %{_bindir}/openxlr-tui
 %config(noreplace) %{_sysconfdir}/chromium/native-messaging-hosts/com.emaspa.openxlr.browser.json
 %config(noreplace) %{_sysconfdir}/opt/chrome/native-messaging-hosts/com.emaspa.openxlr.browser.json
+%{_datadir}/chromium/extensions/beeohanoffjpcofbjiiamkdammhcihaf.json
+%{_datadir}/google-chrome/extensions/beeohanoffjpcofbjiiamkdammhcihaf.json
 %{_udevrulesdir}/70-openxlr.rules
 %{_datadir}/wireplumber/wireplumber.conf.d/50-xlr-dock-capture-hold.conf
 %{_datadir}/wireplumber/wireplumber.conf.d/51-openxlr-pro-raw-names.conf
