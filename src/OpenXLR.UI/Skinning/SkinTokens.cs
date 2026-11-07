@@ -117,6 +117,11 @@ public static class SkinTokens
     [
         // Surfaces.
         Brush("Ox.Window.Background", "#16181d"),
+        // Read only while the skin's window section asks for the rounded
+        // outline and the platform can draw it (OpenXLR.UI.WindowFrame).
+        Radius("Ox.Window.CornerRadius", 12),
+        Brush("Ox.Window.BorderBrush", "#00000000"),
+        Thick("Ox.Window.BorderThickness", 0),
         Brush("Ox.Card.Background", "#1d2027"),
         Brush("Ox.Card.BorderBrush", "#00000000"),
         Thick("Ox.Card.BorderThickness", 0),

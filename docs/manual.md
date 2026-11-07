@@ -3318,6 +3318,18 @@ redrawn is still the same fader underneath. A plugin's own editor window belongs
 not skinned. [skins.md](skins.md) is the full list of values and the rules
 a skin is read under.
 
+<a name="window-shape"></a>
+A skin can also give the UI rounded corners
+([Window shape](skins.md#window-shape)); none of the shipped ones does.
+The desktop's title bar then gives way to OpenXLR's own row above the
+header: drag it to move the UI, double click it to maximise, and use its
+buttons to minimise, maximise or restore, and close. Close follows
+"When closing" as the desktop's button does. Drag any edge or corner to
+resize. Maximised, the corners go square so the UI fills the screen. On a
+desktop that cannot draw transparent windows, such as X11 without a
+compositor, the UI keeps its usual rectangle and title bar. The separate
+mixer window and the dialogs always keep the desktop's frame.
+
 If a skin makes something unreadable, start the UI once with
 
 ```sh

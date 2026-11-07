@@ -135,10 +135,19 @@ public static class SkinReader
                 else ReadIcons(iconElement, icons, errors);
             }
 
+            string shape = SkinWindowShapes.Default;
+            if (root.TryGetProperty("window", out JsonElement windowElement))
+            {
+                if (windowElement.ValueKind != JsonValueKind.Object)
+                    errors.Add("\"window\" must be an object such as {\"shape\": \"rounded\"}.");
+                else shape = ReadWindow(windowElement, errors);
+            }
+
             var package = new SkinPackage(id, name, description, author, schema, origin, directory, tokens, controls, layout)
             {
                 Icons = icons,
                 Assets = assets,
+                WindowShape = shape,
             };
             return new SkinReadResult(package, errors);
         }
@@ -197,6 +206,32 @@ public static class SkinReader
             }
             controls[slot.Name] = variant;
         }
+    }
+
+    /// <summary>
+    /// The "window" section: the outline of the main window, one of the
+    /// shapes OpenXLR draws. A shape this version does not have is reported
+    /// and the window keeps the rectangle; a field it does not read is
+    /// reported and ignored, since that is almost always a typo.
+    /// </summary>
+    private static string ReadWindow(JsonElement element, List<string> errors)
+    {
+        string shape = SkinWindowShapes.Default;
+        foreach (JsonProperty property in element.EnumerateObject())
+        {
+            if (property.Name != "shape")
+            {
+                string name = property.Name.Length > 40 ? property.Name[..40] + "..." : property.Name;
+                errors.Add($"window: \"{name}\" is not a window setting this OpenXLR reads; it is ignored.");
+                continue;
+            }
+            if (property.Value.ValueKind == JsonValueKind.String
+                && SkinWindowShapes.All.Contains(property.Value.GetString()!, StringComparer.Ordinal))
+                shape = property.Value.GetString()!;
+            else
+                errors.Add($"window.shape: expected one of {SkinWindowShapes.List}; the window keeps the rectangle.");
+        }
+        return shape;
     }
 
     /// <summary>

@@ -4220,4 +4220,13 @@ Aus dem Tray holst du den Mixer über das OpenXLR-Symbol oder dein App-Menü zur
   <data name="MicSetupGain" xml:space="preserve"><value>Eingangsverstärkung (dB)</value></data>
   <data name="MicSetupSuggestElsewhere" xml:space="preserve"><value>Ändere die Verstärkung um etwa {0:+0;-0} dB und miss danach erneut.</value></data>
   <data name="MicSetupNoGain" xml:space="preserve"><value>OpenXLR kann die Verstärkung dieses Mikrofons nicht einstellen. Stelle sie am Mikrofon oder an seinem Audiointerface ein.</value></data>
+  <data name="MinimizeWindow" xml:space="preserve">
+    <value>Minimieren</value>
+  </data>
+  <data name="MaximizeWindow" xml:space="preserve">
+    <value>Maximieren</value>
+  </data>
+  <data name="RestoreWindow" xml:space="preserve">
+    <value>Wiederherstellen</value>
+  </data>
 </root>

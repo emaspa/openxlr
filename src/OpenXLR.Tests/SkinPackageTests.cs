@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Media;
+using Avalonia.Controls;
 using Avalonia.Media.Immutable;
 using System.Text.Json;
 using OpenXLR.UI;
@@ -613,6 +614,68 @@ public sealed class SkinPackageTests : IDisposable
         Assert.NotNull(SkinReader.ResolveAsset(folder, "own.png"));
         Assert.Null(SkinReader.ResolveAsset(folder, "gone.png"));
     }
+
+    // --- the window's outline ---
+
+    private static SkinReadResult Window(string section) =>
+        Read("""{"schema":1,"tokens":{},"window":""" + section + "}");
+
+    /// <summary>
+    /// The window section picks one of OpenXLR's outlines. Anything else is
+    /// reported and the window keeps the rectangle, and the rest of the skin
+    /// still reads.
+    /// </summary>
+    [Fact]
+    public void TheWindowSectionChoosesAnOutlineAndRefusesTheRest()
+    {
+        SkinReadResult none = Read(Doc(""));
+        Assert.True(none.Ok);
+        Assert.Equal(SkinWindowShapes.Rectangle, none.Package!.WindowShape);
+
+        SkinReadResult rounded = Window("""{"shape":"rounded"}""");
+        Assert.True(rounded.Ok, string.Join("; ", rounded.Errors));
+        Assert.Equal(SkinWindowShapes.Rounded, rounded.Package!.WindowShape);
+        Assert.True(Window("""{"shape":"rectangle"}""").Ok);
+
+        foreach (string bad in new[] { """{"shape":"oval"}""", """{"shape":3}""", """{"shape":"Rounded"}""" })
+        {
+            SkinReadResult result = Window(bad);
+            Assert.Equal(SkinWindowShapes.Rectangle, result.Package!.WindowShape);
+            Assert.Equal("window.shape: expected one of \"rectangle\" or \"rounded\"; the window keeps the rectangle.",
+                Assert.Single(result.Errors));
+        }
+
+        SkinReadResult notObject = Window("\"rounded\"");
+        Assert.Equal(SkinWindowShapes.Rectangle, notObject.Package!.WindowShape);
+        Assert.Contains("\"window\" must be an object", Assert.Single(notObject.Errors));
+
+        // A field this version does not read is a typo or a later feature:
+        // reported, and the shape beside it still applies.
+        SkinReadResult extra = Window("""{"shape":"rounded","mask":"outline.png"}""");
+        Assert.Equal(SkinWindowShapes.Rounded, extra.Package!.WindowShape);
+        Assert.Equal("window: \"mask\" is not a window setting this OpenXLR reads; it is ignored.", Assert.Single(extra.Errors));
+
+        // Opt in only: every appearance the application ships keeps the rectangle.
+        Assert.All(SkinCatalog.BuiltIn(), e => Assert.Equal(SkinWindowShapes.Rectangle, e.Package.WindowShape));
+        Assert.Equal(SkinWindowShapes.Rectangle, SkinPackage.Default.WindowShape);
+    }
+
+    /// <summary>
+    /// The outline the window wears: the skin's shape only where the platform
+    /// draws a transparent window, and square corners while it fills the screen.
+    /// </summary>
+    [Theory]
+    [InlineData("rounded", true, WindowState.Normal, "Rounded")]
+    [InlineData("rounded", true, WindowState.Minimized, "Rounded")]
+    [InlineData("rounded", true, WindowState.Maximized, "Square")]
+    [InlineData("rounded", true, WindowState.FullScreen, "Square")]
+    [InlineData("rounded", false, WindowState.Normal, "System")]
+    [InlineData("rounded", false, WindowState.Maximized, "System")]
+    [InlineData("rectangle", true, WindowState.Normal, "System")]
+    [InlineData("rectangle", false, WindowState.Normal, "System")]
+    public void TheOutlineFollowsTheShapeThePlatformAndTheWindowState(
+        string shape, bool transparent, WindowState state, string expected) =>
+        Assert.Equal(Enum.Parse<WindowOutline>(expected), WindowFrame.Decide(shape, transparent, state));
 
     [Fact]
     public void TooManyImagesAreRefused()

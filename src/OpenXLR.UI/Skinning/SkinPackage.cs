@@ -100,6 +100,12 @@ public sealed record SkinPackage(
     /// </summary>
     public SkinAssets? Assets { get; init; }
 
+    /// <summary>
+    /// The main window's outline, one of <see cref="SkinWindowShapes.All"/>.
+    /// The rectangle unless the skin's <c>window</c> section names another.
+    /// </summary>
+    public string WindowShape { get; init; } = SkinWindowShapes.Default;
+
     /// <summary>The built-in appearance: no overlay at all, so every token keeps its default.</summary>
     public static SkinPackage Default { get; } = new(
         // The id stays "default" forever: it is what ui.json holds and what

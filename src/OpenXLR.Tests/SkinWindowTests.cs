@@ -39,6 +39,7 @@ public sealed partial class SkinWindowTests
             SkinsReachOpenWindowsAndTheDefaultComesBackExactly(main, options, flow);
             AnInstalledSkinIsFoundAndItsImageIsUsed(main);
             ABuiltInSkinPaintsItsOwnImagesUnderTheSameLimits(main);
+            ARoundedSkinShapesTheWindowOnlyWhereItCanBeDrawn(main);
             ALayoutSkinTurnsTheSectionsWithoutRebuildingThem(main);
             ASwitchToMixBanksKeepsEveryViewModelAndSendsNothing(main);
             AStructuralSwitchKeepsFocusFoldsAndScrollAndLeavesNothingBehind(main);
@@ -211,6 +212,157 @@ public sealed partial class SkinWindowTests
         }
         finally
         {
+            SkinService.Apply(new SkinEntry(SkinPackage.Default, []));
+            Pump(main);
+        }
+    }
+
+    /// <summary>
+    /// A skin asking for the rounded outline. Xvfb has no compositor, so the
+    /// platform reports no transparency and the window must stay exactly the
+    /// rectangle it was, with nothing reported. The shaped path is then
+    /// reached through the frame's transparency seam: the content moves into
+    /// the frame unchanged, the platform's decorations go, the corners are
+    /// transparent, the caption and edges are there, a maximised window goes
+    /// square, and taking the skin off gives the window back as it was.
+    /// </summary>
+    private static void ARoundedSkinShapesTheWindowOnlyWhereItCanBeDrawn(MainWindow main)
+    {
+        SkinReadResult read = SkinReader.Read("rounded-test", """
+            {"schema":1,"name":"Rounded","window":{"shape":"rounded"},"tokens":{
+              "Ox.Window.Background":"#203040",
+              "Ox.Window.CornerRadius":20,
+              "Ox.Window.BorderBrush":"#ff0000",
+              "Ox.Window.BorderThickness":1
+            }}
+            """, SkinOrigin.User, null);
+        Assert.True(read.Ok, string.Join("; ", read.Errors));
+        var rounded = new SkinEntry(read.Package!, []);
+
+        object? content = main.Content;
+        IBrush? background = main.Background;
+        Assert.Equal(WindowOutline.System, main.Frame.Outline);
+        Assert.False(main.IsSet(Window.TransparencyLevelHintProperty));
+        try
+        {
+            // The fallback: no compositor here, so the rectangle, silently.
+            Assert.NotEqual(WindowTransparencyLevel.Transparent, main.ActualTransparencyLevel);
+            Assert.Empty(SkinService.Apply(rounded));
+            Pump(main);
+            Assert.Equal(WindowOutline.System, main.Frame.Outline);
+            Assert.Same(content, main.Content);
+            Assert.Equal(WindowDecorations.Full, main.WindowDecorations);
+            Assert.False(main.IsSet(Window.WindowDecorationsProperty));
+            Assert.Null(main.Frame.Frame);
+            Assert.Empty(SkinService.Errors);
+
+            // Where the platform can draw it.
+            WindowFrame.TransparencyProbe = _ => true;
+            main.Frame.Update();
+            Pump(main);
+            Assert.Equal(WindowOutline.Rounded, main.Frame.Outline);
+            Border frame = Assert.IsType<Border>(main.Content);
+            Assert.Same(frame, main.Frame.Frame);
+            Assert.Contains(frame, ((Visual)content!).GetVisualAncestors());
+            Assert.Equal(WindowDecorations.None, main.WindowDecorations);
+            Assert.Equal(Colors.Transparent, Assert.IsAssignableFrom<ISolidColorBrush>(main.Background).Color);
+            Assert.Equal(new CornerRadius(20), frame.CornerRadius);
+            Assert.Equal(new Thickness(1), frame.BorderThickness);
+            Assert.True(frame.ClipToBounds);
+            // The caption keeps clear of the corners, and the content of the curve.
+            Assert.Equal(20, main.Frame.Caption!.Margin.Left);
+            Assert.Equal(20, main.Frame.Caption.Margin.Right);
+
+            Button Caption(string name) => main.Frame.Caption!.Children.OfType<Button>().Single(b => b.Name == name);
+            Assert.Equal(Localizer.Text("MinimizeWindow"), Avalonia.Automation.AutomationProperties.GetName(Caption("WindowMinimize")));
+            Assert.Equal(Localizer.Text("MaximizeWindow"), Avalonia.Automation.AutomationProperties.GetName(Caption("WindowMaximize")));
+            Assert.Equal(Localizer.Text("Close"), Avalonia.Automation.AutomationProperties.GetName(Caption("WindowClose")));
+            Panel edges = main.Frame.Edges!;
+            Assert.True(edges.IsVisible);
+            Assert.Equal(8, edges.Children.Count);
+            Assert.Equal(Enum.GetValues<WindowEdge>().Order(), edges.Children.Select(c => (WindowEdge)c.Tag!).Order());
+            Assert.All(edges.Children, c => Assert.NotNull(c.Cursor));
+            // The header and every section are still where they were, inside the frame.
+            Assert.Contains(frame, main.HeaderCard.GetVisualAncestors());
+
+            // Outside the curve the desktop shows through; inside it, the
+            // window's own ground.
+            var size = new PixelSize((int)frame.Bounds.Width, (int)frame.Bounds.Height);
+            byte[] pixels = Read(frame, size);
+            // BGRA, so the alpha is the fourth byte of a pixel.
+            byte Alpha(int x, int y) => pixels[(y * size.Width + x) * 4 + 3];
+            Assert.Equal(0, Alpha(0, 0));
+            Assert.Equal(0, Alpha(size.Width - 1, 0));
+            Assert.Equal(0, Alpha(0, size.Height - 1));
+            Assert.Equal(0, Alpha(size.Width - 1, size.Height - 1));
+            int middle = (12 * size.Width + size.Width / 2) * 4;
+            Assert.Equal(Color.Parse("#203040"),
+                Color.FromArgb(pixels[middle + 3], pixels[middle + 2], pixels[middle + 1], pixels[middle]));
+
+            // Maximised or full screen: square corners, no resize edges, and
+            // the button restores. Xvfb has no window manager, so the platform
+            // keeps every window normal; the state reaches the frame through
+            // its seam instead.
+            foreach (WindowState full in new[] { WindowState.Maximized, WindowState.FullScreen })
+            {
+                WindowFrame.StateProbe = _ => full;
+                main.Frame.Update();
+                Pump(main);
+                Assert.Equal(WindowOutline.Square, main.Frame.Outline);
+                Assert.Equal(default, frame.CornerRadius);
+                Assert.Equal(default, frame.BorderThickness);
+                Assert.False(edges.IsVisible);
+                Assert.Same(frame, main.Content);
+            }
+            WindowFrame.StateProbe = _ => WindowState.Maximized;
+            main.Frame.Update();
+            Assert.Equal(Localizer.Text("RestoreWindow"), Avalonia.Automation.AutomationProperties.GetName(Caption("WindowMaximize")));
+            // And back: the corners, the edges and the button's name return.
+            WindowFrame.StateProbe = null;
+            main.Frame.Update();
+            Pump(main);
+            Assert.Equal(WindowOutline.Rounded, main.Frame.Outline);
+            Assert.Equal(new CornerRadius(20), frame.CornerRadius);
+            Assert.True(edges.IsVisible);
+            Assert.Equal(Localizer.Text("MaximizeWindow"), Avalonia.Automation.AutomationProperties.GetName(Caption("WindowMaximize")));
+            // The buttons ask the platform; here it answers normal, and the
+            // frame stays as it is.
+            Caption("WindowMaximize").RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            Pump(main);
+            Assert.Equal(WindowOutline.Rounded, main.Frame.Outline);
+
+            // Close is the window's own, on a window of its own so the mixer
+            // stays open for the rest of the run.
+            var other = new Window { Width = 320, Height = 200, Content = new TextBlock { Text = "x" } };
+            using (var otherFrame = new WindowFrame(other))
+            {
+                other.Show();
+                Pump(other);
+                Assert.Equal(WindowOutline.Rounded, otherFrame.Outline);
+                Button Other(string name) => otherFrame.Caption!.Children.OfType<Button>().Single(b => b.Name == name);
+                Other("WindowMinimize").RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+                Pump(other);
+                bool closed = false;
+                other.Closed += (_, _) => closed = true;
+                Other("WindowClose").RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+                Pump(main);
+                Assert.True(closed, "the caption's close did not close the window");
+            }
+
+            // Another skin gives the window back exactly as it was.
+            SkinService.Apply(new SkinEntry(SkinPackage.Default, []));
+            Pump(main);
+            Assert.Equal(WindowOutline.System, main.Frame.Outline);
+            Assert.Same(content, main.Content);
+            Assert.Null(frame.Child is Panel p ? p.Children.OfType<DockPanel>().Single().Children.OfType<Decorator>().Single().Child : null);
+            Assert.False(main.IsSet(Window.WindowDecorationsProperty));
+            Assert.False(main.IsSet(Window.TransparencyLevelHintProperty));
+            Assert.Equal(background?.ToString(), main.Background?.ToString());
+        }
+        finally
+        {
+            WindowFrame.TransparencyProbe = null;
+            WindowFrame.StateProbe = null;
             SkinService.Apply(new SkinEntry(SkinPackage.Default, []));
             Pump(main);
         }
