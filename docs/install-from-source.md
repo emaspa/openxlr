@@ -76,6 +76,12 @@ Binaries land in `src/OpenXLR.Daemon/bin/Release/net10.0/` and
 `native/` and copies `openxlr-lv2-host` next to the daemon. CLAP/VST3
 headers are vendored.
 
+With the native flag, both `dotnet build` and `dotnet publish` use the
+available processors for Make jobs. Set `MAKEFLAGS=-j2` before either
+command to limit native jobs on a machine with little free memory.
+Keep the build directories between builds so Make and Cargo can reuse
+unchanged objects and the DeepFilterNet library.
+
 You may omit the flag for hardware control and LV2 filter-chain inserts
 without native editors. CLAP, VST3, the microphone EQ in software, noise
 removal, ducking and the soundboard require the helper. Keep the flag

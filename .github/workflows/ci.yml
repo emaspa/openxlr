@@ -218,7 +218,10 @@ jobs:
         run: |
           tools/ci-install-packages.sh pipewire pipewire-pulse wireplumber pulseaudio-utils swh-plugins lsp-plugins-lv2 g++ libpipewire-0.3-dev liblilv-dev lv2-dev libx11-dev libsndfile1-dev libxtst6 xvfb xauth
           cargo --version
-          make -C native
+          # Exercise the source install's build before any test makes native objects.
+          dotnet restore src/OpenXLR.slnx --locked-mode
+          dotnet build src/OpenXLR.slnx -c Release --no-restore -warnaserror -p:EnableNativeLv2Host=true
+          test -x src/OpenXLR.Daemon/bin/Release/net10.0/openxlr-lv2-host
           make -C native test-sound-check
           make -C native test-eq
           make -C native test-duck
@@ -226,9 +229,6 @@ jobs:
           make -C native test-voice
           make -C native test-player
           make -C native test-bridge
-          dotnet restore src/OpenXLR.slnx --locked-mode
-          dotnet build src/OpenXLR.slnx -c Release --no-restore -warnaserror -p:EnableNativeLv2Host=true
-          test -x native/openxlr-lv2-host
           make -C native test-audio test-clap test-lv2 test-vst3 test-scan
           xvfb-run -a make -C native test-editor
 
