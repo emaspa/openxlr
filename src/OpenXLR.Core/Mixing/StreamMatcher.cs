@@ -97,11 +97,15 @@ public sealed class StreamMatcher
 
         // Wine and Proton report a shared binary, so treat them as games rather
         // than letting them fall through to System with every other unknown app.
-        if (IsWineLike(stream.Binary) || IsWineLike(stream.AppName) ||
-            IsWindowsExecutable(stream.Binary) || IsWindowsExecutable(stream.AppName)) return "game";
+        if (RunsUnderWine(stream)) return "game";
 
         return _fallbackChannel;
     }
+
+    /// <summary>Whether the stream is a Windows program under Wine or Proton.</summary>
+    internal static bool RunsUnderWine(AudioStream stream)
+        => IsWineLike(stream.Binary) || IsWineLike(stream.AppName) ||
+           IsWindowsExecutable(stream.Binary) || IsWindowsExecutable(stream.AppName);
 
     private static bool IsWineLike(string? s) =>
         s is not null && WineLike.Any(w => s.Contains(w, StringComparison.OrdinalIgnoreCase));

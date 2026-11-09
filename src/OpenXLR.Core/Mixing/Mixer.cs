@@ -3249,6 +3249,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     // Each application's icon. Its desktop entries are read outside the
     // mixer lock; inside it, lookups only read what was already read.
     private readonly ApplicationIconResolver _icons = new();
+    // A Windows game's own icon, from its executable, read outside the lock too.
+    private readonly WindowsExecutableIcons _programIcons = new();
 
     /// <summary>
     /// Look for application streams and route new ones to their channel. Called
@@ -3447,14 +3449,18 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// <summary>
     /// The best icon each live identity's streams and clients lead to: an
     /// application can register several clients, and one of them may carry a
-    /// published icon name or an application id the others lack.
+    /// published icon name or an application id the others lack. A Windows
+    /// game that no desktop entry names gets the icon in its executable.
     /// </summary>
     private Dictionary<string, string> LiveIcons(IReadOnlyList<AudioStream> live, IReadOnlyList<AudioStream> clients)
     {
         var best = new Dictionary<string, IconMatch>(StringComparer.OrdinalIgnoreCase);
         foreach (AudioStream s in live.Concat(clients))
         {
-            if (_icons.Resolve(ApplicationIconHints.From(s)) is not { } match) continue;
+            IconMatch? match = _icons.Resolve(ApplicationIconHints.From(s));
+            if (match is null or { Source: IconSource.BinaryName } && _programIcons.For(s) is { } program)
+                match = new(program, IconSource.Executable);
+            if (match is null) continue;
             string identity = s.Identity;
             if (!best.TryGetValue(identity, out IconMatch? held) || match.Source < held.Source) best[identity] = match;
         }

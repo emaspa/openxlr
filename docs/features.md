@@ -967,7 +967,9 @@ restores the split profile when it stops.
 - Every app in APPLICATIONS shows its icon. The daemon takes the icon
   name the app publishes to PipeWire, or finds the app's desktop entry by
   its Flatpak or application id, its process binary or its name, in the
-  XDG data directories, the Flatpak exports and Snap's. The UI looks
+  XDG data directories, the Flatpak exports and Snap's. A Wine or Proton
+  game with no desktop entry gets the icon inside its `.exe`, written
+  once as a PNG under the user's cache. The UI looks
   the name up in the desktop's icon theme, then hicolor and the pixmaps
   directory, and draws a PNG or SVG at its drawn size. An app with no icon
   shows its initial on a badge the skin sizes and colours
