@@ -6,6 +6,8 @@ src/*/bin/
 src/*/obj/
 native/openxlr-lv2-host
 native/*.o
+native/**/*.d
+native/**/*.d.tmp
 native/tests/*.o
 native/tests/editor
 native/tests/audio

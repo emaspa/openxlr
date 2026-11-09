@@ -76,6 +76,26 @@ Binaries land in `src/OpenXLR.Daemon/bin/Release/net10.0/` and
 `native/` and copies `openxlr-lv2-host` next to the daemon. CLAP/VST3
 headers are vendored.
 
+With the native flag, both `dotnet build` and `dotnet publish` use the
+available processors for Make jobs. Set `MAKEFLAGS=-j2` before either
+command to limit native jobs on a machine with little free memory.
+Keep the build directories between builds so Make and Cargo can reuse
+unchanged objects and the DeepFilterNet library. The C and C++ compilers
+record the headers each object uses, so editing a header only rebuilds
+the objects that include it.
+
+Build the project you are editing for a quick local check. For example,
+after the locked restore above, this builds the UI without compiling
+the test project:
+
+```sh
+dotnet build src/OpenXLR.UI -c Release --no-restore
+```
+
+Publishing the solution skips the test project. To republish outputs
+you just built, pass `--no-build` with the same configuration, runtime
+identifier and build options.
+
 You may omit the flag for hardware control and LV2 filter-chain inserts
 without native editors. CLAP, VST3, the microphone EQ in software, noise
 removal, ducking and the soundboard require the helper. Keep the flag
@@ -110,6 +130,24 @@ Every package sets `DEEPFILTER=1`. For a build with no network, put the
 model at `native/deepfilter/model/DeepFilterNet3_onnx.tar.gz` and the
 crates under `native/deepfilter/vendor` (`cargo vendor --locked` in
 `native/deepfilter` fetches them); the build then reads only those.
+
+Use `make -C native clean-native` when you need a fresh C or C++ build,
+for example after changing compiler flags. The next build reuses the
+DeepFilterNet library when its inputs are current. Use
+`make -C native clean` to clear the checkout's Rust outputs as well.
+
+With Cargo 1.91 or newer, an optional cache outside the checkout keeps
+Rust intermediates available even after a full Make clean. Run this in
+the shell before the first build that should populate the cache.
+
+```sh
+export CARGO_BUILD_BUILD_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/openxlr/cargo/{workspace-path-hash}"
+```
+
+The workspace hash gives each checkout its own cache. A single
+intermediate directory shared by different checkouts can reuse an old
+artifact when source timestamps predate it. The cache lives in the
+directory you set and can be removed when you want to reclaim the space.
 
 ## 3. Device access
 
