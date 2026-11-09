@@ -64,6 +64,14 @@ var palettes = {
     "warningLevel": 0.7,
     "hotLevel": 0.9
   },
+  "hifi-classic": {
+    "fill": "#4ade80",
+    "warning": "#facc15",
+    "hot": "#ef4444",
+    "track": "#0b2816",
+    "warningLevel": 0.7,
+    "hotLevel": 0.9
+  },
   "kanagawa": {
     "fill": "#98bb6c",
     "warning": "#e6c384",

@@ -1882,13 +1882,13 @@ public sealed partial class SkinWindowTests
     }
 
     /// <summary>
-    /// Hi-Fi and Hi-Fi Amber name Fira Sans Condensed, which the UI carries
+    /// The Hi-Fi skins name Fira Sans Condensed, which the UI carries
     /// itself: the name reaches the bundled copy, so the skins letter the same
     /// on a machine without the font installed, as the test machines are.
     /// </summary>
     private static void TheHiFiSkinsLetterInTheirBundledTypeface()
     {
-        foreach (string id in new[] { "hifi", "hifi-amber" })
+        foreach (string id in new[] { "hifi", "hifi-amber", "hifi-classic" })
         {
             SkinEntry skin = SkinCatalog.Find(id)!;
             Assert.Empty(skin.Errors);

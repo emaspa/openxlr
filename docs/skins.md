@@ -60,6 +60,8 @@ every package has them and there is nothing to install:
   It letters in Fira Sans Condensed, which the UI carries itself, and
   opens the UI at 1668 by 1174, the size that layout was drawn for.
 - **Hi-Fi Amber**, Hi-Fi with an amber display in place of the blue one.
+- **Hi-Fi Classic**, Hi-Fi with a classic green display. Its meters turn
+  yellow and then red near the top, like an LED ladder.
 
 Pick one in Options under APPEARANCE. A new install starts on Broadcast,
 and so does an install whose user never picked a skin, so upgrading from a
@@ -1129,7 +1131,7 @@ UI keeps the size you gave it.
 
 A `size` that is not an object with both numbers in range, or that holds
 any other field, is reported in Options and the UI keeps its size. The
-skin's other values still apply. Hi-Fi and Hi-Fi Amber are the shipped
+skin's other values still apply. The three Hi-Fi skins are the shipped
 skins that name a size.
 
 ## Layout

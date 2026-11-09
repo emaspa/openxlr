@@ -100,7 +100,7 @@ public sealed class SkinPackageTests : IDisposable
         // Every appearance the application carries is compiled in, so a
         // package has them all without installing a single file.
         Assert.Equal(
-            ["broadcast", "catppuccin", "catppuccin-latte", "compact-desk", "everforest", "gruvbox", "hifi", "hifi-amber", "kanagawa", "matte-black",
+            ["broadcast", "catppuccin", "catppuccin-latte", "compact-desk", "everforest", "gruvbox", "hifi", "hifi-amber", "hifi-classic", "kanagawa", "matte-black",
                 "nord", "nyan-pink", "opendeck", "osaka-jade", "ristretto", "rose-pine", "tokyo-night", "wave"],
             built.Select(e => e.Id).Order(StringComparer.Ordinal));
         foreach (SkinEntry entry in built)
@@ -705,10 +705,10 @@ public sealed class SkinPackageTests : IDisposable
                 Assert.Single(result.Errors));
         }
 
-        // Hi-Fi and Hi-Fi Amber are drawn for one size; every other shipped
+        // The Hi-Fi skins are drawn for one size; every other shipped
         // appearance leaves the UI's size alone.
         foreach (SkinEntry entry in SkinCatalog.BuiltIn())
-            Assert.Equal(entry.Package.Id is "hifi" or "hifi-amber" ? new SkinWindowSize(1668, 1174) : null, entry.Package.WindowSize);
+            Assert.Equal(entry.Package.Id is "hifi" or "hifi-amber" or "hifi-classic" ? new SkinWindowSize(1668, 1174) : null, entry.Package.WindowSize);
         Assert.Null(SkinPackage.Default.WindowSize);
     }
 

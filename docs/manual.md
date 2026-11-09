@@ -3132,7 +3132,7 @@ the old controls cannot affect a plugin that now uses the same slot id.
 <a name="skins"></a>
 ### 3.10 Change how the UI looks
 
-Options, APPEARANCE picks a skin. OpenXLR ships nineteen, all built into
+Options, APPEARANCE picks a skin. OpenXLR ships twenty, all built into
 the application, so a package brings them with it:
 
 - **Material**, the classic appearance, in a dark palette, which is what
@@ -3166,7 +3166,9 @@ the application, so a package brings them with it:
   with a row of keys to pick its mix. A channel's icon turns red while it
   is muted in that mix. Choosing it opens the UI at 1668 by 1174, or as
   large as a smaller screen allows; resize it as you like after that;
-- **Hi-Fi Amber**, the same with an amber display.
+- **Hi-Fi Amber**, the same with an amber display;
+- **Hi-Fi Classic**, the same with a green display whose meters turn
+  yellow and then red near the top.
 
 A new install opens on Broadcast. An install that never picked a skin
 opens on Broadcast too, so after upgrading from a version that started on
@@ -5973,8 +5975,8 @@ be written, and the bottom line says the saved choice could not be written.
 `--skin <id>` uses one appearance for this run without saving it, with
 Material held dark, and
 `--list-skins` prints what this machine has, `OPENXLR_SKIN` names a skin
-the same way, and `--version` prints the version. Deck, Nyan Pink, Hi-Fi,
-Hi-Fi Amber and the Omarchy skins get console fader caps, bracketed keys
+the same way, and `--version` prints the version. Deck, Nyan Pink, the
+three Hi-Fi skins and the Omarchy skins get console fader caps, bracketed keys
 and lamps; Wave and
 Broadcast get the console cap with plain keys; Material is plain
 throughout.
