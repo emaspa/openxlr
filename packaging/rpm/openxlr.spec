@@ -12,7 +12,7 @@
 %global deepfilter_version 0.5.6
 
 Name:           openxlr
-Version: 0.6.4
+Version: 0.6.5
 Release:        1%{?dist}
 Summary:        Linux Wave Link replacement for Elgato XLR interfaces and Wave microphones
 # OpenXLR is GPL-3.0-only. The native helper links RNNoise (BSD-3-Clause),
@@ -250,6 +250,12 @@ MSG
 %{_datadir}/gnome-shell/extensions/openxlr-focus@emaspa.github.com/
 
 %changelog
+* Mon Nov 09 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.6.5-1
+- UI: Hi-Fi Classic, Hi-Fi with a green display whose meters turn yellow and then red
+- UI: the Profiles button names the active profile
+- Build: the native helper builds in parallel and rebuilds only what a change touches
+- Docs: keeping your settings on a new installation
+
 * Mon Nov 09 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.6.4-1
 - Mixer: a Windows game under Wine or Proton with no desktop entry shows the icon inside its executable
 - UI: Avalonia 12.1.5

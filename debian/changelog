@@ -1,3 +1,12 @@
+openxlr (0.6.5) resolute; urgency=medium
+
+  * UI: Hi-Fi Classic, Hi-Fi with a green display whose meters turn yellow and then red
+  * UI: the Profiles button names the active profile
+  * Build: the native helper builds in parallel and rebuilds only what a change touches
+  * Docs: keeping your settings on a new installation
+
+ -- Emanuele Sparvoli <sparvoli@gmail.com>  Mon, 09 Nov 2026 15:04:41 +0000
+
 openxlr (0.6.4) resolute; urgency=medium
 
   * Mixer: a Windows game under Wine or Proton with no desktop entry shows the icon inside its executable
