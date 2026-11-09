@@ -920,7 +920,8 @@ show `label` and keep `identity` for commands.
 
 A `streams` entry carries `icon` when the daemon found one for the app: a
 freedesktop icon name, or an absolute image path when the app's desktop
-entry names one. `icon` is absent when nothing was found. The daemon tries,
+entry names one or the icon came out of a Windows program. `icon` is
+absent when nothing was found. The daemon tries,
 in order:
 
 1. the `application.icon_name` the app published to PipeWire, a bare name
@@ -932,7 +933,12 @@ in order:
 4. the desktop entry whose `Name`, `StartupWMClass` or id is the app's
    label, or whose `Name` has the same letters and digits, the way game
    identities compare;
-5. the process binary itself, lowercased, since many packages install their
+5. for a program under Wine or Proton, the largest icon inside its `.exe`.
+   The daemon reads the program's Windows path from the process's command
+   line, finds the file through the process's `WINEPREFIX`, or `~/.wine`
+   when it has none, and writes the icon once as a PNG under
+   `$XDG_CACHE_HOME/openxlr/icons`. `icon` is that file's path;
+6. the process binary itself, lowercased, since many packages install their
    icon under the program's name.
 
 Wine and Proton binaries are skipped, since every game shares them. The

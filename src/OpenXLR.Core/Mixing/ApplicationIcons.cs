@@ -43,6 +43,8 @@ public enum IconSource
     Binary,
     /// <summary>A desktop entry whose name, window class or id is the application's name.</summary>
     AppName,
+    /// <summary>A Wine program with no desktop entry: the icon inside its executable, as a PNG path.</summary>
+    Executable,
     /// <summary>No desktop entry: the binary itself as an icon name, which many packages install.</summary>
     BinaryName,
 }
