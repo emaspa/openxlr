@@ -13,6 +13,10 @@ WARN = -O2 -g -Wall -Wextra -Werror -Wno-unused-parameter
 CFLAGS += -std=c11 $(WARN)
 CXXFLAGS += -std=c++17 $(WARN) -fno-exceptions -fno-rtti
 LDLIBS += $(shell pkg-config --libs $(PKGS)) -ldl -lm -pthread
+# Track headers from each compilation, including SDKs passed with -isystem.
+# Replace the dependency file only after a successful compile.
+DEPFLAGS = -MD -MP -MF $@.d.tmp -MT $@
+.DELETE_ON_ERROR:
 
 # Noise removal (denoise.c). RNNoise 0.2 (Xiph, BSD-3-Clause) is vendored
 # under rnnoise/ and always built in. DeepFilterNet 0.5.6 (MIT or
@@ -34,7 +38,6 @@ RNN_SOURCES += $(addprefix rnnoise/src/x86/,x86_dnn_map.c x86cpu.c nnet_sse4_1.c
 RNN_CPPFLAGS += -DRNN_ENABLE_X86_RTCD -DCPU_INFO_BY_ASM
 endif
 RNN_OBJECTS = $(RNN_SOURCES:.c=.o)
-RNN_HEADERS = $(wildcard rnnoise/include/*.h rnnoise/src/*.h rnnoise/src/x86/*.h)
 
 # DeepFilterNet's model is fetched once and checked against its SHA-256; a
 # package that builds offline puts the same file at DF_MODEL first. The
@@ -57,26 +60,32 @@ endif
 
 OBJECTS = host.o measure.o lv2.o clap.o vst3.o sound-check.o eq.o duck.o level.o player.o denoise.o \
           voice.o voice-stretch.o dynamics.o bridge.o $(RNN_OBJECTS)
-HEADERS = host.h measure.h icon.h denoise.h dynamics.h eq.h voice.h bridge.h $(wildcard clap/include/clap/*.h clap/include/clap/*/*.h) \
-          $(wildcard vst3/pluginterfaces/*/*.h)
+TEST_OBJECTS = $(addprefix tests/,editor.o audio.o own-block.o measure.o clap.o lv2.o vst3.o host.o \
+               lifecycle.o sound-check.o eq.o duck.o denoise.o denoise-handoff.o denoise-recovery.o \
+               voice.o dynamics.o player.o)
+DEP_TARGETS = $(OBJECTS) $(TEST_OBJECTS) tests/bridge tests/scan-plugin.so \
+              tests/latency.lv2/latency.so tests/gain.lv2/gain.so
+DEP_FILES = $(addsuffix .d,$(DEP_TARGETS))
 # The stages and their tests link these beside the noise removal objects.
 DENOISE_OBJECTS = denoise.o $(RNN_OBJECTS)
 # The microphone stage (eq.c) runs noise removal first, the expander and the
 # compressor around the EQ, and the voice changer last; its tests link them.
 STAGE_OBJECTS = $(DENOISE_OBJECTS) voice.o voice-stretch.o dynamics.o
-SIGNALSMITH_HEADERS = signalsmith/signalsmith-stretch.h $(wildcard signalsmith/signalsmith-linear/*.h)
 
 openxlr-lv2-host: $(OBJECTS) $(DF_DEPS)
 	$(CXX) $(OBJECTS) -o $@ $(LDFLAGS) $(DF_LINK) $(LDLIBS)
 
-%.o: %.c $(HEADERS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+%.o: %.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
+	@mv $@.d.tmp $@.d
 
-%.o: %.cpp $(HEADERS)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+%.o: %.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(DEPFLAGS) -c $< -o $@
+	@mv $@.d.tmp $@.d
 
-rnnoise/src/%.o: rnnoise/src/%.c $(RNN_HEADERS)
-	$(CC) $(RNN_CPPFLAGS) $(RNN_CFLAGS) -c $< -o $@
+rnnoise/src/%.o: rnnoise/src/%.c
+	$(CC) $(RNN_CPPFLAGS) $(RNN_CFLAGS) $(DEPFLAGS) -c $< -o $@
+	@mv $@.d.tmp $@.d
 
 rnnoise/src/x86/nnet_sse4_1.o: RNN_CFLAGS += -msse4.1
 rnnoise/src/x86/nnet_avx2.o: RNN_CFLAGS += -mavx -mfma -mavx2
@@ -87,11 +96,12 @@ build-config.h: FORCE
 	@printf '#define OPENXLR_DEEPFILTER %s\n' '$(DEEPFILTER)' > $@.new
 	@if cmp -s $@.new $@; then rm -f $@.new; else mv $@.new $@; fi
 
-denoise.o: denoise.c build-config.h rnnoise/include/rnnoise.h $(HEADERS)
-	$(CC) $(CPPFLAGS) -Irnnoise/include $(CFLAGS) -c $< -o $@
+# The generated header must exist before the first compile can record it.
+denoise.o tests/denoise-handoff.o tests/denoise-recovery.o: %.o: %.c build-config.h
+	$(CC) $(CPPFLAGS) -Irnnoise/include $(CFLAGS) $(DEPFLAGS) -c $< -o $@
+	@mv $@.d.tmp $@.d
 
-voice-stretch.o: voice-stretch.cpp $(SIGNALSMITH_HEADERS) $(HEADERS)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+tests/denoise.o: build-config.h
 
 $(DF_MODEL):
 	mkdir -p $(@D)
@@ -112,68 +122,47 @@ FORCE:
 # The library alone, for a package that builds it in a step of its own.
 deepfilter: deepfilter/target/release/libopenxlr_deepfilter.a
 
-tests/editor.o: tests/editor.c host.c $(HEADERS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
-
 tests/editor: tests/editor.o lv2.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
-
-tests/audio.o: tests/audio.c host.c $(HEADERS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
 tests/audio: tests/audio.o lv2.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 # The plugin's own block: the audio callback and its worker, without a graph.
-tests/own-block.o: tests/own-block.c host.c $(HEADERS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
-
 tests/own-block: tests/own-block.o lv2.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 # The measured delay: known delays, a noise remover, the own block, and
 # outputs that must never give a figure, without a graph.
-tests/measure.o: tests/measure.c host.c $(HEADERS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
-
 tests/measure: tests/measure.o measure.o lv2.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 # This one compiles clap.c into itself to reach the layout reading, so it
 # links without clap.o.
-tests/clap.o: tests/clap.c host.c clap.c $(HEADERS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
-
 tests/clap: tests/clap.o lv2.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 # This one compiles lv2.c into itself, and loads the latency fixture.
-tests/lv2.o: tests/lv2.c host.c lv2.c $(HEADERS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
-
 tests/lv2: tests/lv2.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 tests/latency.lv2/latency.so: tests/latency.lv2/latency.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) -shared -fPIC $< -o $@ -lm
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(DEPFLAGS) -shared -fPIC $< -o $@ -lm
+	@mv $@.d.tmp $@.d
 
 tests/gain.lv2/gain.so: tests/gain.lv2/gain.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) -shared -fPIC $< -o $@
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(DEPFLAGS) -shared -fPIC $< -o $@
+	@mv $@.d.tmp $@.d
+
+tests/host.o: tests/vst3-host.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
+	@mv $@.d.tmp $@.d
 
 # The C++ test includes vst3.cpp to exercise host-owned SDK objects.
-tests/vst3.o: tests/vst3.cpp vst3.cpp $(HEADERS)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
-
-tests/host.o: tests/vst3-host.c host.c $(HEADERS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
-
 tests/vst3: tests/vst3.o tests/host.o lv2.o clap.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 # A plugin lifecycle check against a real plugin, run by hand (see README).
-tests/lifecycle.o: tests/lifecycle.c host.c $(HEADERS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
-
 tests/lifecycle: tests/lifecycle.o lv2.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
@@ -181,8 +170,9 @@ tests/lifecycle: tests/lifecycle.o lv2.o clap.o vst3.o
 # The editor tests need a display; the others need nothing.
 test: test-audio test-clap test-lv2 test-vst3 test-scan test-editor
 
-tests/scan-plugin.so: tests/scan-plugin.cpp $(HEADERS)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -std=c++20 -shared -fPIC $< -o $@
+tests/scan-plugin.so: tests/scan-plugin.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(DEPFLAGS) -std=c++20 -shared -fPIC $< -o $@
+	@mv $@.d.tmp $@.d
 
 test-scan: openxlr-lv2-host tests/scan-plugin.so
 	python3 tests/scan.py
@@ -210,12 +200,10 @@ test-vst3: tests/vst3
 
 clean:
 	rm -f openxlr-lv2-host $(OBJECTS) tests/editor tests/editor.o tests/audio tests/audio.o tests/own-block tests/own-block.o tests/measure tests/measure.o tests/clap tests/clap.o tests/lifecycle tests/lifecycle.o tests/lv2 tests/lv2.o tests/latency.lv2/latency.so tests/gain.lv2/gain.so tests/vst3 tests/vst3.o tests/host.o tests/scan-plugin.so
+	rm -f $(DEP_FILES) $(addsuffix .tmp,$(DEP_FILES))
 
 # Sound Check: the loop backend and the level meter beside it, driven
 # directly with deterministic samples and no audio server.
-tests/sound-check.o: tests/sound-check.c sound-check.c level.c host.c $(HEADERS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
-
 tests/sound-check: tests/sound-check.o lv2.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
@@ -230,9 +218,6 @@ clean-sound-check:
 
 # The microphone EQ: the backend driven directly, its response measured
 # against tools/eq-reference.py's table, with no audio server.
-tests/eq.o: tests/eq.c eq.c host.c $(HEADERS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
-
 tests/eq: tests/eq.o $(STAGE_OBJECTS) lv2.o clap.o vst3.o $(DF_DEPS)
 	$(CXX) $(filter %.o,$^) -o $@ $(LDFLAGS) $(DF_LINK) $(LDLIBS)
 
@@ -246,9 +231,6 @@ clean-eq:
 	rm -f tests/eq tests/eq.o
 
 # The duck stage: detector and gain timing with no audio server.
-tests/duck.o: tests/duck.c duck.c host.c $(HEADERS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
-
 tests/duck: tests/duck.o lv2.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
@@ -264,24 +246,15 @@ clean-duck:
 # Noise removal: both engines driven through the microphone stage with a
 # synthetic voice in noise, with no audio server. DeepFilterNet is checked
 # when this build carries it.
-tests/denoise.o: tests/denoise.c eq.c host.c build-config.h $(HEADERS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
-
 tests/denoise: tests/denoise.o $(STAGE_OBJECTS) lv2.o clap.o vst3.o $(DF_DEPS)
 	$(CXX) $(filter %.o,$^) -o $@ $(LDFLAGS) $(DF_LINK) $(LDLIBS)
 
 # The handoff test compiles denoise.c with a fake DeepFilterNet model.
-tests/denoise-handoff.o: tests/denoise-handoff.c denoise.c host.c build-config.h $(HEADERS)
-	$(CC) $(CPPFLAGS) -Irnnoise/include $(CFLAGS) -c $< -o $@
-
 tests/denoise-handoff: tests/denoise-handoff.o $(RNN_OBJECTS) lv2.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 # Recovery from an engine that answers with NaN: RNNoise's own state, and a
 # fake DeepFilterNet model, with denoise.c compiled in.
-tests/denoise-recovery.o: tests/denoise-recovery.c denoise.c host.c build-config.h $(HEADERS)
-	$(CC) $(CPPFLAGS) -Irnnoise/include $(CFLAGS) -c $< -o $@
-
 tests/denoise-recovery: tests/denoise-recovery.o $(RNN_OBJECTS) lv2.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
@@ -301,9 +274,6 @@ clean-denoise:
 # The voice changer: every voice driven through the microphone stage over a
 # synthetic voice, with no audio server. `tests/voice --render IN.wav DIR`
 # writes every voice over a recording for listening.
-tests/voice.o: tests/voice.c eq.c host.c $(HEADERS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
-
 tests/voice: tests/voice.o $(STAGE_OBJECTS) lv2.o clap.o vst3.o $(DF_DEPS)
 	$(CXX) $(filter %.o,$^) -o $@ $(LDFLAGS) $(DF_LINK) $(LDLIBS)
 
@@ -319,9 +289,6 @@ clean-voice:
 # The compressor and the expander: driven through the microphone stage with
 # steady and stepped levels and with no audio server, checked against their
 # static curves, their time constants and their meters.
-tests/dynamics.o: tests/dynamics.c eq.c host.c $(HEADERS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
-
 tests/dynamics: tests/dynamics.o $(STAGE_OBJECTS) lv2.o clap.o vst3.o $(DF_DEPS)
 	$(CXX) $(filter %.o,$^) -o $@ $(LDFLAGS) $(DF_LINK) $(LDLIBS)
 
@@ -337,9 +304,6 @@ clean-dynamics:
 # The soundboard player: decoding, resampling, press modes and ramps, driven
 # directly with no audio server. It asks the helper for its `formats` and
 # `probe` lines.
-tests/player.o: tests/player.c player.c host.c $(HEADERS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
-
 tests/player: tests/player.o lv2.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
@@ -354,8 +318,9 @@ clean-player:
 
 # The clock bridge: its ring, loop and resampler between two simulated
 # clocks a known distance apart, with jitter, stalls and no audio server.
-tests/bridge: tests/bridge.c bridge.c $(HEADERS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) $< -o $@ $(LDFLAGS) $(LDLIBS)
+tests/bridge: tests/bridge.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(DEPFLAGS) $< -o $@ $(LDFLAGS) $(LDLIBS)
+	@mv $@.d.tmp $@.d
 
 .PHONY: test-bridge clean-bridge
 test: test-bridge
@@ -365,3 +330,9 @@ test-bridge: tests/bridge
 clean: clean-bridge
 clean-bridge:
 	rm -f tests/bridge
+
+# Objects from a previous checkout or a removed dependency file need one
+# compile to recover their prerequisites. Keep this below the default goal.
+EXISTING_DEP_FILES := $(wildcard $(DEP_FILES))
+$(filter-out $(EXISTING_DEP_FILES:.d=),$(DEP_TARGETS)): FORCE
+-include $(EXISTING_DEP_FILES)
