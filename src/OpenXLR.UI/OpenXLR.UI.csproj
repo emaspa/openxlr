@@ -12,6 +12,8 @@
     <!-- Shared with the daemon (see the file): XDG paths and private atomic writes. -->
     <Compile Include="../OpenXLR.Core/OpenXlrPaths.cs" Link="OpenXlrPaths.cs" />
     <Compile Include="../OpenXLR.Core/ControlConnection.cs" Link="ControlConnection.cs" />
+    <Compile Include="../OpenXLR.Core/ControlSocketListener.cs" Link="ControlSocketListener.cs" />
+    <Compile Include="../OpenXLR.Core/DaemonLock.cs" Link="DaemonLock.cs" />
     <Compile Include="../OpenXLR.Core/DaemonProbe.cs" Link="DaemonProbe.cs" />
     <Compile Include="../OpenXLR.Core/ProcessRunner.cs" Link="ProcessRunner.cs" />
     <Compile Include="../OpenXLR.Core/FlatpakEnvironment.cs" Link="FlatpakEnvironment.cs" />

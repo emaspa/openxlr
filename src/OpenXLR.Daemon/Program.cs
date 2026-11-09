@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using Microsoft.AspNetCore.Connections;
 using OpenXLR.Daemon;
+using OpenXLR.Core;
 
 // The same binary is its own USB helper (see UsbHelperMain): nothing of the
 // host below runs in that mode.

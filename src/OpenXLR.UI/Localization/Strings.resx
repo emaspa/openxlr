@@ -4562,4 +4562,25 @@ When the window is in the tray, open it again from the OpenXLR icon or your app 
   <data name="RestoreWindow" xml:space="preserve">
     <value>Restore</value>
   </data>
+  <data name="SettingsBackup" xml:space="preserve">
+    <value>Settings backup</value>
+  </data>
+  <data name="ExportSettingsBackup" xml:space="preserve">
+    <value>Export settings and profiles</value>
+  </data>
+  <data name="ExportProfileBackup" xml:space="preserve">
+    <value>Export profiles only</value>
+  </data>
+  <data name="RestoreBackupHelp" xml:space="preserve">
+    <value>How to restore</value>
+  </data>
+  <data name="BackupNeedsLocalFolder" xml:space="preserve">
+    <value>Choose a local folder for this backup.</value>
+  </data>
+  <data name="SettingsBackupSaved" xml:space="preserve">
+    <value>Saved {0} files to {1}.</value>
+  </data>
+  <data name="SettingsBackupFailed" xml:space="preserve">
+    <value>Could not save the backup. {0}</value>
+  </data>
 </root>

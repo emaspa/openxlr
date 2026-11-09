@@ -992,6 +992,10 @@ restores the split profile when it stops.
 
 ## Profiles
 
+Options can export profiles alone or the saved settings and profiles in one
+backup. Preview and restore it from the terminal before opening the new
+installation. See [Settings backups](manual.md#settings-backups).
+
 Named scenes: every hardware setting plus the whole submix (send
 levels, channel volumes, mutes, masters, monitor outputs, aux state, insert chains with
 their parameters). Saved per device and recalled from the header, over

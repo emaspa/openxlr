@@ -74,6 +74,18 @@
 
             <Border Classes="card">
               <StackPanel Spacing="6">
+                <TextBlock Text="{loc:Text Key=SettingsBackup}" Classes="h"/>
+                <WrapPanel Name="BackupButtons" ItemSpacing="6" LineSpacing="4">
+                  <Button Content="{loc:Text Key=ExportSettingsBackup}" Click="OnExportSettings"/>
+                  <Button Content="{loc:Text Key=ExportProfileBackup}" Click="OnExportProfiles"/>
+                  <Button Content="{loc:Text Key=RestoreBackupHelp}" Click="OnBackupHelp"/>
+                </WrapPanel>
+                <TextBlock Name="BackupStatus" TextWrapping="Wrap"/>
+              </StackPanel>
+            </Border>
+
+            <Border Classes="card">
+              <StackPanel Spacing="6">
                 <TextBlock Text="{loc:Text Key=DESKTOP}" Classes="h"/>
                 <TextBlock Text="{loc:Text Key=DesktopKeysNote}"
                            FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>

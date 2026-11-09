@@ -1,6 +1,12 @@
-using OpenXLR.Core;
+using System;
+using System.IO;
+using System.Threading;
 
-namespace OpenXLR.Daemon;
+#if OPENXLR_UI
+namespace OpenXLR.UI;
+#else
+namespace OpenXLR.Core;
+#endif
 
 /// <summary>
 /// One daemon per user. The lock file lives next to the control socket in the
@@ -9,7 +15,12 @@ namespace OpenXLR.Daemon;
 /// started by hand while the service runs, stops here with a clear message
 /// instead of waiting a minute for a port it will never get.
 /// </summary>
-public static class DaemonLock
+#if OPENXLR_UI
+internal
+#else
+public
+#endif
+static class DaemonLock
 {
     public static string Path => OpenXlrPaths.DaemonLockPath;
 

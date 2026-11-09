@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using OpenXLR.Core;
 using OpenXLR.Daemon;
 using OpenXLR.UI;
+using ControlSocketListener = OpenXLR.Core.ControlSocketListener;
 using OpenXLR.UI.Localization;
 using Presence = OpenXLR.UI.DaemonPresence;
 

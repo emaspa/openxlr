@@ -7,6 +7,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 
 namespace OpenXLR.UI;
@@ -204,6 +205,38 @@ public partial class OptionsWindow : Window
             await vm.LoadPluginSetupAsync();
         }
     }
+
+    private async void OnExportSettings(object? sender, RoutedEventArgs e) => await ExportBackupAsync(profilesOnly: false);
+    private async void OnExportProfiles(object? sender, RoutedEventArgs e) => await ExportBackupAsync(profilesOnly: true);
+
+    private async System.Threading.Tasks.Task ExportBackupAsync(bool profilesOnly)
+    {
+        BackupButtons.IsEnabled = false;
+        BackupStatus.Text = "";
+        try
+        {
+            var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+            {
+                Title = profilesOnly ? Localizer.Text("ExportProfileBackup") : Localizer.Text("ExportSettingsBackup"),
+                AllowMultiple = false,
+            });
+            if (folders.Count == 0) return;
+            string directory = folders[0].TryGetLocalPath() ?? throw new System.IO.IOException(Localizer.Text("BackupNeedsLocalFolder"));
+            string stem = profilesOnly ? "openxlr-profiles" : "openxlr-settings";
+            string name = $"{stem}-{DateTime.UtcNow:yyyyMMdd-HHmmssfff}.{SettingsBackup.Extension}";
+            string path = System.IO.Path.Combine(directory, name);
+            int count = await System.Threading.Tasks.Task.Run(() => SettingsBackup.Export(path, profilesOnly));
+            BackupStatus.Text = Localizer.Format("SettingsBackupSaved", count, path);
+        }
+        catch (Exception ex) when (SettingsBackup.IsFileFailure(ex))
+        {
+            BackupStatus.Text = Localizer.Format("SettingsBackupFailed", ex.Message);
+        }
+        finally { BackupButtons.IsEnabled = true; }
+    }
+
+    private void OnBackupHelp(object? sender, RoutedEventArgs e)
+        => ExternalLink.Open("https://github.com/emaspa/openxlr/blob/main/docs/manual.md#settings-backups");
 
     private void OnPluginsManual(object? sender, RoutedEventArgs e) => ExternalLink.Open(PluginInstall.Manual);
     private void OnWindowsEditorHelp(object? sender, RoutedEventArgs e)

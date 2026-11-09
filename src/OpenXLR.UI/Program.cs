@@ -17,6 +17,11 @@ class Program
     {
         if (BrowserNativeHost.TryRun(args)) return;
         if (InstallationCommands.TryRun(args)) return;
+        if (args.Length > 0 && args[0] == "backup")
+        {
+            Environment.ExitCode = SettingsBackupCommands.Run(args[1..], Console.Out, Console.Error);
+            return;
+        }
         // A window is already open: it shows itself, this process is done.
         Instance = SingleInstance.TryBecomePrimary();
         if (Instance is null) return;

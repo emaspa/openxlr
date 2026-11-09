@@ -6,10 +6,19 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
 
+#if OPENXLR_UI
+namespace OpenXLR.UI;
+#else
 namespace OpenXLR.Core;
+#endif
 
 /// <summary>A private socket owned for this listener's lifetime, including after an unclean shutdown.</summary>
-public sealed class ControlSocketListener : IDisposable
+#if OPENXLR_UI
+internal
+#else
+public
+#endif
+sealed class ControlSocketListener : IDisposable
 {
     public Socket Socket { get; }
     public string Path { get; }

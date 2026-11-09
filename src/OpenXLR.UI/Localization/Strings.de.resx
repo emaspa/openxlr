@@ -4229,4 +4229,25 @@ Aus dem Tray holst du den Mixer über das OpenXLR-Symbol oder dein App-Menü zur
   <data name="RestoreWindow" xml:space="preserve">
     <value>Wiederherstellen</value>
   </data>
+  <data name="SettingsBackup" xml:space="preserve">
+    <value>Sicherung</value>
+  </data>
+  <data name="ExportSettingsBackup" xml:space="preserve">
+    <value>Einstellungen und Profile exportieren</value>
+  </data>
+  <data name="ExportProfileBackup" xml:space="preserve">
+    <value>Nur Profile exportieren</value>
+  </data>
+  <data name="RestoreBackupHelp" xml:space="preserve">
+    <value>So stellst du eine Sicherung wieder her</value>
+  </data>
+  <data name="BackupNeedsLocalFolder" xml:space="preserve">
+    <value>Wähle einen lokalen Ordner für die Sicherung.</value>
+  </data>
+  <data name="SettingsBackupSaved" xml:space="preserve">
+    <value>{0} Dateien in {1} gesichert.</value>
+  </data>
+  <data name="SettingsBackupFailed" xml:space="preserve">
+    <value>Die Sicherung konnte nicht gespeichert werden. {0}</value>
+  </data>
 </root>

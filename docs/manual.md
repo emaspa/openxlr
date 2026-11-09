@@ -5064,6 +5064,59 @@ an interrupted write leaves the previous file in place.
 Uninstalling a package leaves `~/.config/openxlr` in place; remove it
 by hand if you want a clean slate.
 
+### Settings backups
+
+In **Options → General → Settings backup**, choose **Export settings and
+profiles** or **Export profiles only**. Choose a folder that will
+survive the reinstall. OpenXLR saves a dated `.openxlr-backup` file there.
+The same exports are available in a terminal:
+
+```sh
+openxlr backup export ~/openxlr-settings.openxlr-backup
+openxlr backup export ~/openxlr-profiles.openxlr-backup --profiles-only
+```
+
+Export copies the saved files. Quit OpenXLR and stop its daemon first if
+you want a snapshot after all pending settings have been written.
+
+After reinstalling, preview the import to see which files will be added
+or replaced. To apply it, quit OpenXLR completely, including its tray
+instance, and stop its daemon. For a native installation using the
+packaged user service:
+
+```sh
+openxlr backup preview ~/openxlr-settings.openxlr-backup
+systemctl --user stop openxlr-daemon
+openxlr backup import ~/openxlr-settings.openxlr-backup
+systemctl --user start openxlr-daemon
+```
+
+If the preview reports replacements, review them and pass `--replace` to
+import them. OpenXLR first saves the replaced files in a dated
+`before-import-*.openxlr-backup` file in its configuration directory. It
+keeps files absent from the backup. Running the import again skips files
+that already match. Use backups from your own installation.
+
+For Flatpak, quit the app and stop `openxlr-flatpak.service` if you enabled
+the optional background service. Grant access to the backup folder just
+for the command. For a backup in Downloads:
+
+```sh
+flatpak run --filesystem=xdg-download:ro io.github.emaspa.openxlr backup preview ~/Downloads/openxlr-settings.openxlr-backup
+flatpak run --filesystem=xdg-download:ro io.github.emaspa.openxlr backup import ~/Downloads/openxlr-settings.openxlr-backup
+```
+
+Open OpenXLR again after importing.
+
+The profile-only backup keeps named scenes in their original device
+scopes and includes their recall-on-connect choices. A full backup also
+includes the persisted mixer and application routing, UI and daemon
+preferences, EQ and effect-chain presets, desktop keys and saved device
+settings. Output device names and plugin paths can change on another
+machine. Reselect missing devices and reinstall plugins there. Custom
+skin assets, soundboard media and their library, startup files,
+installation receipts, and runtime state are separate.
+
 <a name="capture-inputs"></a>
 ## Additional capture inputs
 

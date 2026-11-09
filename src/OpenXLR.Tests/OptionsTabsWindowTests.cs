@@ -29,7 +29,7 @@ internal static class OptionsTabsWindowTests
     /// <summary>The cards each tab holds, by the key of their heading, top to bottom.</summary>
     internal static readonly (OptionsTab Tab, string[] Headings)[] Cards =
     [
-        (OptionsTab.General, ["ATLOGIN", "WINDOW", "DESKTOP", "UPDATES"]),
+        (OptionsTab.General, ["ATLOGIN", "WINDOW", "SettingsBackup", "DESKTOP", "UPDATES"]),
         (OptionsTab.Audio, ["AUDIO", "SYSTEMDEFAULTDEVICES", "INTERFACE"]),
         (OptionsTab.Plugins, ["PLUGINS"]),
         (OptionsTab.Appearance, ["APPEARANCE"]),
