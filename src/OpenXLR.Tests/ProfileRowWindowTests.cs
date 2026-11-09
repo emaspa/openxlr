@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Net.WebSockets;
 using System.Text.Json.Nodes;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
@@ -10,7 +11,7 @@ using OpenXLR.UI.Localization;
 
 namespace OpenXLR.Tests;
 
-/// <summary>Each saved profile's row saves over it and deletes it, and both ask first.</summary>
+/// <summary>The header follows daemon state, and each saved profile's row confirms overwrites and deletion.</summary>
 internal static class ProfileRowWindowTests
 {
     internal static void Check()
@@ -29,8 +30,10 @@ internal static class ProfileRowWindowTests
     private static async Task CheckRows()
     {
         var commands = new ConcurrentQueue<string>();
+        var accepted = new TaskCompletionSource<WebSocket>(TaskCreationOptions.RunContinuationsAsynchronously);
         await using var server = await SocketTestServer.Start(async (socket, stop) =>
         {
+            accepted.TrySetResult(socket);
             while (!stop.IsCancellationRequested)
             {
                 JsonNode command = await SocketTestServer.Receive(socket, stop);
@@ -40,19 +43,21 @@ internal static class ProfileRowWindowTests
             }
         });
         var client = new DaemonClient(server.Url);
-        var connected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        client.ConnectionChanged += up => { if (up) connected.TrySetResult(); };
         var main = new MainWindow(client);
-        var model = (MainViewModel)main.DataContext!;
         Window? dialog = null;
         void OnConfirm(Window window) => dialog = window;
         Dialogs.ConfirmOpening += OnConfirm;
         try
         {
-            await connected.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            model.Profiles.Add("main");
-            model.Profiles.Add("main9");
+            WebSocket socket = await accepted.Task.WaitAsync(TimeSpan.FromSeconds(5));
             main.Show();
+            var marker = main.FindControl<TextBlock>("ActiveProfileLabel")!;
+            Assert.False(marker.IsVisible);
+            await SocketTestServer.Send(socket, new { type = "state", profiles = new[] { "main", "main9" },
+                activeProfile = "main", recallOnConnect = "main9" }, CancellationToken.None);
+            await WaitFor(() => marker.IsVisible);
+            Assert.Equal(Localizer.Format("ActiveProfileLabel", "main"), marker.Text);
+
             var profiles = main.FindControl<DropDownButton>("ProfilesButton")!;
             var flyout = (Flyout)profiles.Flyout!;
             flyout.ShowAt(profiles);
@@ -75,6 +80,23 @@ internal static class ProfileRowWindowTests
             await WaitFor(() => commands.Count >= 1);
             Assert.Equal(["saveProfile main"], commands);
             flyout.Hide();
+
+            // The daemon omits activeProfile after the active profile is deleted.
+            await SocketTestServer.Send(socket, new { type = "state", profiles = Array.Empty<string>() }, CancellationToken.None);
+            await WaitFor(() => !marker.IsVisible);
+
+            // An external recall can change the marker without a click in this window.
+            string longName = new('W', 60);
+            main.Width = 520;
+            await SocketTestServer.Send(socket, new { type = "state", profiles = new[] { longName },
+                activeProfile = longName }, CancellationToken.None);
+            await WaitFor(() => marker.IsVisible && marker.Text == Localizer.Format("ActiveProfileLabel", longName));
+            main.UpdateLayout();
+            WindowLayoutTests.AssertInside(marker, main);
+            Assert.Equal(longName, ToolTip.GetTip(marker));
+
+            socket.Abort();
+            await WaitFor(() => !marker.IsVisible);
         }
         finally
         {
@@ -111,6 +133,6 @@ internal static class ProfileRowWindowTests
     {
         var deadline = DateTime.UtcNow.AddSeconds(3);
         while (!ready() && DateTime.UtcNow < deadline) await Task.Delay(10);
-        Assert.True(ready(), "Profile commands did not arrive.");
+        Assert.True(ready(), "The profile window or socket did not reach the expected state.");
     }
 }

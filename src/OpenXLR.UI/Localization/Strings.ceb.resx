@@ -1598,6 +1598,9 @@
     <value>Aduna nay profile nga "{0}" alang niining device.
 Ilisan kini sa kasamtangang eksena kon i-save.</value>
   </data>
+  <data name="ActiveProfileLabel" xml:space="preserve">
+    <value>Aktibong profile: {0}</value>
+  </data>
   <data name="Profiles" xml:space="preserve">
     <value>Mga profile</value>
   </data>

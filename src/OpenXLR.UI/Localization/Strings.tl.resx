@@ -1598,6 +1598,9 @@
     <value>May profile nang "{0}" para sa device na ito.
 Papalitan ito ng kasalukuyang eksena kapag nag-save.</value>
   </data>
+  <data name="ActiveProfileLabel" xml:space="preserve">
+    <value>Aktibong profile: {0}</value>
+  </data>
   <data name="Profiles" xml:space="preserve">
     <value>Mga profile</value>
   </data>

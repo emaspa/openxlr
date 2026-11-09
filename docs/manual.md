@@ -336,7 +336,12 @@ does not rewire the desktop. The **Profiles** button in the header holds
 them. Type a name and press Save to save a new one, or click a name to
 load it. Each saved profile's row has its own Save, which puts the
 current scene over that profile without typing its name, and an ✕, which
-deletes it. Both ask first.
+deletes it. Both ask first. **Active profile** in the header shows the
+profile last loaded or saved for the current interface, or for the mixer
+when no interface is connected. Manual mixer changes keep that name.
+The label disappears when there is no active profile or the UI loses its
+connection to the daemon. Hover over the label to read a shortened name
+in full.
 
 **Inserts** are LV2, CLAP or VST3 effects placed in the signal path: a mono
 chain on each XLR input, a mono or stereo chain on each capture input,

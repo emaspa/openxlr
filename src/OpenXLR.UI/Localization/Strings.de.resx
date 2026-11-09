@@ -1688,6 +1688,9 @@
     <value>Für dieses Gerät existiert bereits das Profil "{0}".
 Speichern ersetzt es durch die aktuelle Szene.</value>
   </data>
+  <data name="ActiveProfileLabel" xml:space="preserve">
+    <value>Aktives Profil: {0}</value>
+  </data>
   <data name="Profiles" xml:space="preserve">
     <value>Profile</value>
   </data>

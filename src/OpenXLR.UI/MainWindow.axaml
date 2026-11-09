@@ -160,7 +160,7 @@
     <!-- header: the "header" region. Without a place in the skin's tree it
          heads the page; Options in it is always shown, the way back. -->
     <Border Name="HeaderCard" Classes="card" Margin="0,0,0,8">
-      <Grid Name="WindowHeader" ColumnDefinitions="Auto,8,Auto,*" RowDefinitions="Auto,Auto">
+      <Grid Name="WindowHeader" ColumnDefinitions="Auto,8,Auto,*" RowDefinitions="Auto,Auto,Auto">
         <Button Name="OptionsButton" Grid.RowSpan="2" Content="⚙" FontSize="{DynamicResource UiText.FontSize18}" Padding="8,4"
                 VerticalAlignment="Center" Classes="ghost"
                 Click="OnOptions" ToolTip.Tip="{loc:Text Key=Options}"/>
@@ -211,6 +211,11 @@
               </DropDownButton.Flyout>
             </DropDownButton>
         </Grid>
+        <TextBlock Name="ActiveProfileLabel" Grid.Row="2" Grid.Column="2" Grid.ColumnSpan="2" Margin="0,2,0,0"
+                   Classes="h" HorizontalAlignment="Left" TextTrimming="CharacterEllipsis"
+                   Text="{Binding ActiveProfile, StringFormat={loc:Text Key=ActiveProfileLabel}}"
+                   ToolTip.Tip="{Binding ActiveProfile}"
+                   IsVisible="{Binding ActiveProfile, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
         <WrapPanel Name="HeaderActions" Grid.Column="3" ItemSpacing="8" LineSpacing="4" Margin="8,0,0,0"
                    HorizontalAlignment="Right" ItemsAlignment="End" VerticalAlignment="Center">
           <DropDownButton Name="ProfilesButton" Content="{loc:Text Key=Profiles}" Padding="10,3" FontSize="{DynamicResource UiText.FontSize12}" Classes="ghost"
