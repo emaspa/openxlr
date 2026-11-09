@@ -1598,6 +1598,9 @@
     <value>Профил под називом "{0}" већ постоји за овај уређај.
 Чување га замењује тренутном сценом.</value>
   </data>
+  <data name="ActiveProfileLabel" xml:space="preserve">
+    <value>({0})</value>
+  </data>
   <data name="Profiles" xml:space="preserve">
     <value>Профили</value>
   </data>

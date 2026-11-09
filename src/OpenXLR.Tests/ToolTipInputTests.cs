@@ -97,8 +97,7 @@ public sealed class ToolTipInputTests
             {
                 cog = Named<Button>(main!, Localizer.Text("OpenThisPluginSControls"));
                 bypass = Named<ToggleButton>(main!, Localizer.Text("BypassThisPlugin"));
-                profiles = main!.GetVisualDescendants().OfType<DropDownButton>()
-                    .First(d => d.Content as string == Localizer.Text("Profiles"));
+                profiles = main!.FindControl<DropDownButton>("ProfilesButton")!;
                 cog.AddHandler(Button.ClickEvent, (_, _) => cogClicks++, handledEventsToo: true);
                 bypass.AddHandler(Button.ClickEvent, (_, _) => bypassClicks++, handledEventsToo: true);
                 profiles.AddHandler(Button.ClickEvent, (_, _) => profileClicks++, handledEventsToo: true);

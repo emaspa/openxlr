@@ -75,6 +75,7 @@ public sealed partial class MainViewModel : ViewModelBase
             if (!up)
             {
                 DeviceConnected = false; RefreshBindings(); Status = Localizer.Text("StatusDaemonNotRunning");
+                ActiveProfile = null;
                 ResetWaveInterfaces();
                 ResetBrowserTabs();
                 ResetAppRouting();
@@ -1010,6 +1011,7 @@ public sealed partial class MainViewModel : ViewModelBase
 
             ApplyDetected(node["detected"]);
             ApplyProfiles(node["profiles"]);
+            ActiveProfile = node["activeProfile"]?.GetValue<string>();
             ApplyRecallOnConnect(node["recallOnConnect"]);
             ApplyDevices(node["devices"], node["mixer"]);
             ApplyWaveInterfaces(node["waveInterfaces"]);
@@ -1077,6 +1079,10 @@ public sealed partial class MainViewModel : ViewModelBase
 
     /// <summary>Saved profile names from the daemon, newest list wins.</summary>
     public ObservableCollection<string> Profiles { get; } = [];
+
+    private string? _activeProfile;
+    /// <summary>The active device's last successfully recalled or saved profile, as reported by the daemon.</summary>
+    public string? ActiveProfile { get => _activeProfile; private set => Set(ref _activeProfile, value); }
 
     private void ApplyProfiles(JsonNode? profiles)
     {

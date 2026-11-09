@@ -1683,6 +1683,9 @@
     <value>A profile named "{0}" already exists for this device.
 Saving will replace it with the current scene.</value>
   </data>
+  <data name="ActiveProfileLabel" xml:space="preserve">
+    <value>({0})</value>
+  </data>
   <data name="Profiles" xml:space="preserve">
     <value>Profiles</value>
   </data>

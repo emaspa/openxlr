@@ -213,8 +213,16 @@
         </Grid>
         <WrapPanel Name="HeaderActions" Grid.Column="3" ItemSpacing="8" LineSpacing="4" Margin="8,0,0,0"
                    HorizontalAlignment="Right" ItemsAlignment="End" VerticalAlignment="Center">
-          <DropDownButton Name="ProfilesButton" Content="{loc:Text Key=Profiles}" Padding="10,3" FontSize="{DynamicResource UiText.FontSize12}" Classes="ghost"
+          <DropDownButton Name="ProfilesButton" Padding="10,3" FontSize="{DynamicResource UiText.FontSize12}" Classes="ghost"
                           ToolTip.Tip="{loc:Text Key=SaveAndRecallCompleteScenesHardwareDSPPlus}">
+            <!-- the profile last recalled or saved, in brackets after the label; a long name shortens -->
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="{loc:Text Key=Profiles}"/>
+              <TextBlock Name="ActiveProfileLabel" MaxWidth="160" TextTrimming="CharacterEllipsis"
+                         Text="{Binding ActiveProfile, StringFormat={loc:Text Key=ActiveProfileLabel}}"
+                         ToolTip.Tip="{Binding ActiveProfile}"
+                         IsVisible="{Binding ActiveProfile, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+            </StackPanel>
             <DropDownButton.Flyout>
               <Flyout Placement="BottomEdgeAlignedRight">
                 <StackPanel MinWidth="240" Spacing="6">

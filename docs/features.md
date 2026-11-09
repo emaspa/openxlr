@@ -995,7 +995,8 @@ restores the split profile when it stops.
 Named scenes: every hardware setting plus the whole submix (send
 levels, channel volumes, mutes, masters, monitor outputs, aux state, insert chains with
 their parameters). Saved per device and recalled from the header, over
-the API, or from a Stream Deck key. One profile per device can be
+the API, or from a Stream Deck key. The Profiles button in the UI names
+the profile last recalled or saved for the current device. One profile per device can be
 marked to recall on connect: at daemon start, after a replug or power
 cycle, or when switching to that device. Interfaces using OpenXLR's connect-time
 restoration (Wave XLR, the first XLR Dock) get their last settings back
