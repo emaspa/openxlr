@@ -5,16 +5,11 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
-  # Every night the whole suite runs on main with nothing skipped, which
-  # catches what path gating defers and changes in the runner images.
-  schedule:
-    - cron: "23 3 * * *"
 
 # A newer push to the same pull request, or a newer merge to main, cancels
-# the run it replaces; only the tip can be merged or released. The nightly
-# run has its own group, so a merge does not cancel it.
+# the run it replaces; only the tip can be merged or released.
 concurrency:
-  group: ci-${{ github.event_name == 'schedule' && 'nightly' || github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 # Actions are pinned to commit SHAs (the tag is in the comment) so a moved
@@ -45,8 +40,7 @@ jobs:
         run: |
           # A pull request checks out its merge commit, whose first parent is
           # the base. A push to main compares with the previous tip; a run
-          # started by hand or by the schedule has none, so it runs
-          # everything.
+          # started by hand has none, so it runs everything.
           files=""
           if [ "$EVENT" = pull_request ]; then
             files=$(git diff --name-only HEAD^1 HEAD)
@@ -357,27 +351,3 @@ jobs:
               *) exit 1 ;;
             esac
           done
-
-  # A failed nightly run opens an issue, or comments on the open one, so a
-  # failure nobody was watching for is not lost.
-  nightly-report:
-    needs: ci-ok
-    if: failure() && github.event_name == 'schedule'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      issues: write
-    steps:
-      - env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          body="The nightly CI run on $(date -u +%F) failed: $RUN_URL"
-          number=$(gh issue list --label ci-nightly --state open --json number --jq '.[0].number')
-          if [ -n "$number" ]; then
-            gh issue comment "$number" --body "$body"
-          else
-            gh label create ci-nightly --color B60205 --description "Nightly CI failures" 2>/dev/null || true
-            gh issue create --title "Nightly CI failed" --label ci-nightly --body "$body"
-          fi

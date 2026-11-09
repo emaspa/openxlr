@@ -245,9 +245,7 @@ no .NET build run for every change. A change that touches only Markdown
 files other than `docs/skins.md`, pictures under `docs/`, or the deck
 plugin's script, pages and tests skips the build and tests, and the
 Omarchy QML check runs only when its own files or the workflow change.
-Skipped jobs count as passing for the required `ci-ok` check. Every night
-the whole CI runs on `main` with nothing skipped, and a failure opens an
-issue labelled `ci-nightly`, or comments on the open one. CodeQL
+Skipped jobs count as passing for the required `ci-ok` check. CodeQL
 skips a change to `README.md` alone.
 
 - **Branch from `main`** and keep one topic per pull request. Split an
