@@ -5064,6 +5064,56 @@ an interrupted write leaves the previous file in place.
 Uninstalling a package leaves `~/.config/openxlr` in place; remove it
 by hand if you want a clean slate.
 
+<a name="move-settings"></a>
+### Keep your settings on a new installation
+
+Everything you set up in OpenXLR lives in two folders in your home, so a
+reinstall of OpenXLR picks it up again on its own. To keep it across a
+reinstall of Linux or a move to another computer, copy those folders.
+
+- `~/.config/openxlr` holds the mixer and its layout, application routing,
+  profiles, UI preferences and the chosen skin, EQ profiles, effect
+  presets, desktop keys, the added plugin folders and the additional
+  interfaces.
+- `~/.local/share/openxlr` holds the soundboard's clips and the skins you
+  installed.
+
+Leave out the files that belong to this machine's installation: the
+`installation*` files and folders that `openxlr doctor` reads, the lock and
+socket files, the companion bridge's `bridge` folder and its `yabridge`
+wrappers. The new installation writes its own.
+
+Stop the daemon first, so its last save lands in the file before you copy
+it:
+
+```sh
+systemctl --user stop openxlr-daemon
+tar -C ~ -czf openxlr-settings.tar.gz \
+  --exclude='.config/openxlr/installation*' --exclude='.config/openxlr/bridge' \
+  --exclude='.config/openxlr/*.lock' --exclude='.config/openxlr/*.sock' \
+  --exclude='.local/share/openxlr/yabridge' \
+  .config/openxlr .local/share/openxlr
+```
+
+When you have never used the soundboard or installed a skin,
+`~/.local/share/openxlr` may not exist; `tar` says so and still writes the
+rest. On the new computer, install OpenXLR, stop its daemon so it cannot save
+its defaults over the copy, unpack the archive and start the daemon again:
+
+```sh
+systemctl --user stop openxlr-daemon
+tar -C ~ -xzf openxlr-settings.tar.gz
+systemctl --user start openxlr-daemon
+```
+
+Profiles are kept per interface model, so they come back for the same
+model. Plugins are not in these folders: install them again on the new
+computer, in the same folders if you added plugin folders by hand. The
+Flatpak keeps the same two folders under
+`~/.var/app/io.github.emaspa.openxlr/config/openxlr` and
+`~/.var/app/io.github.emaspa.openxlr/data/openxlr`, and its service is
+`openxlr-flatpak` instead of `openxlr-daemon`.
+
 <a name="capture-inputs"></a>
 ## Additional capture inputs
 
