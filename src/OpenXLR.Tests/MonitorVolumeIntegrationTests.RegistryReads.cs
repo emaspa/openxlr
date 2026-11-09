@@ -101,20 +101,35 @@ public sealed partial class MonitorVolumeIntegrationTests
                     subprocess.run(['pw-cat', '--playback', *args, '--target', 'test_stream_first',
                         '--properties={ application.name = stream-sink-test application.process.binary = stream-sink-test }', '-'], stdin=source, check=True)
                 """], TimeSpan.FromSeconds(30), cancel: stop.Token);
-            AudioStream? stream = null;
-            Assert.True(SpinWait.SpinUntil(() =>
-                (stream = pw.ListStreams().FirstOrDefault(s => s.Binary == "stream-sink-test")) is not null
-                && pw.StreamSinkName(stream.Serial) == "test_stream_first", TimeSpan.FromSeconds(5)));
             ExecutableScript.Write(Path.Combine(dir, "pactl"), $$"""
                 #!/bin/sh
                 case "$1" in list) printf '%s\n' "$*" >> '{{calls}}';; esac
                 exec /usr/bin/pactl "$@"
                 """);
             Environment.SetEnvironmentVariable("PATH", dir + ":" + path);
+            // The stream's link reaches the registry a moment after pactl
+            // already reports the sink; wait for an answer read from the
+            // registry alone, not one pactl gave while the link was on its way.
+            AudioStream? stream = null;
+            Assert.True(SpinWait.SpinUntil(() =>
+            {
+                if ((stream = pw.ListStreams().FirstOrDefault(s => s.Binary == "stream-sink-test")) is null) return false;
+                File.Delete(calls);
+                return pw.StreamSinkName(stream.Serial) == "test_stream_first" && !File.Exists(calls);
+            }, TimeSpan.FromSeconds(5)));
             for (int i = 0; i < 50; i++) Assert.Equal("test_stream_first", pw.StreamSinkName(stream!.Serial));
             Assert.False(File.Exists(calls), File.Exists(calls) ? File.ReadAllText(calls) : "");
             pw.MoveStreamToSink(stream!.Serial, "test_stream_second");
-            Assert.True(SpinWait.SpinUntil(() => pw.StreamSinkName(stream.Serial) == "test_stream_second", TimeSpan.FromSeconds(3)));
+            bool moved = SpinWait.SpinUntil(() => pw.StreamSinkName(stream.Serial) == "test_stream_second", TimeSpan.FromSeconds(3));
+            if (!moved)
+            {
+                // Seen once in a hundred local runs and not again: keep what
+                // each source said, so a recurrence on CI shows which one lagged.
+                if (File.Exists(calls)) File.Delete(calls);
+                string answer = $"answer {pw.StreamSinkName(stream.Serial)}, pactl asked {File.Exists(calls)}, serial {stream.Serial}\n";
+                Assert.Fail(answer + Output("/usr/bin/pactl", "list", "sink-inputs", "short")
+                    + Output("/usr/bin/pactl", "list", "sinks", "short") + Output("pw-link", "-l"));
+            }
         }
         finally
         {
@@ -146,4 +161,8 @@ public sealed partial class MonitorVolumeIntegrationTests
         }
         finally { pw.TearDown(); }
     }
+
+    private static string Output(string program, params string[] arguments)
+        => System.Text.Encoding.UTF8.GetString(
+            ProcessRunner.RunAsync(program, arguments, TimeSpan.FromSeconds(5)).GetAwaiter().GetResult().Stdout);
 }
