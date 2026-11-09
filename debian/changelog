@@ -1,3 +1,10 @@
+openxlr (0.6.4) resolute; urgency=medium
+
+  * Mixer: a Windows game under Wine or Proton with no desktop entry shows the icon inside its executable
+  * UI: Avalonia 12.1.5
+
+ -- Emanuele Sparvoli <sparvoli@gmail.com>  Mon, 09 Nov 2026 09:51:20 +0000
+
 openxlr (0.6.3) resolute; urgency=medium
 
   * Skins: Hi-Fi and Hi-Fi Amber, a 1980s separates stack drawn with images, with Fira Sans Condensed carried in the UI

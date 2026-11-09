@@ -12,7 +12,7 @@
 %global deepfilter_version 0.5.6
 
 Name:           openxlr
-Version: 0.6.3
+Version: 0.6.4
 Release:        1%{?dist}
 Summary:        Linux Wave Link replacement for Elgato XLR interfaces and Wave microphones
 # OpenXLR is GPL-3.0-only. The native helper links RNNoise (BSD-3-Clause),
@@ -250,6 +250,10 @@ MSG
 %{_datadir}/gnome-shell/extensions/openxlr-focus@emaspa.github.com/
 
 %changelog
+* Mon Nov 09 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.6.4-1
+- Mixer: a Windows game under Wine or Proton with no desktop entry shows the icon inside its executable
+- UI: Avalonia 12.1.5
+
 * Sat Nov 07 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.6.3-1
 - Skins: Hi-Fi and Hi-Fi Amber, a 1980s separates stack drawn with images, with Fira Sans Condensed carried in the UI
 - Skins: built-in skins can carry images, a skin can round the UI's corners and name the size the UI opens at
