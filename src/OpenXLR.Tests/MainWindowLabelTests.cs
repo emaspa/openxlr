@@ -12,6 +12,10 @@ namespace OpenXLR.Tests;
 
 internal static class MainWindowLabelTests
 {
+    /// <summary>A button's text: its string content, or the first line of a panel such as Profiles with its active profile.</summary>
+    private static string? Label(Button button)
+        => button.Content as string ?? (button.Content as Panel)?.Children.OfType<TextBlock>().FirstOrDefault()?.Text;
+
     internal static void Check(MainWindow main)
     {
         var failures = new List<string>();
@@ -20,7 +24,7 @@ internal static class MainWindowLabelTests
         CheckText(title);
         CheckText(main.FindControl<TextBlock>("HeaderVersion")!);
         var actions = header.GetVisualDescendants().OfType<Button>().Where(b => b.IsVisible && b.Name != "DevicePicker").ToArray();
-        Assert.Equal(new[] { "⚙", Localizer.Text("Profiles"), Localizer.Text("Arrange"), Localizer.Text("Flow"), Localizer.Text("RestartDaemon"), Localizer.Text("About") }, actions.Select(b => b.Content as string));
+        Assert.Equal(new[] { "⚙", Localizer.Text("Profiles"), Localizer.Text("Arrange"), Localizer.Text("Flow"), Localizer.Text("RestartDaemon"), Localizer.Text("About") }, actions.Select(Label));
         foreach (Button action in actions)
             foreach (TextBlock label in action.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsVisible))
                 CheckText(label);

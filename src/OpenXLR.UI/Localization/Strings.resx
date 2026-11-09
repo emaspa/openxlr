@@ -1684,7 +1684,7 @@
 Saving will replace it with the current scene.</value>
   </data>
   <data name="ActiveProfileLabel" xml:space="preserve">
-    <value>Active profile: {0}</value>
+    <value>({0})</value>
   </data>
   <data name="Profiles" xml:space="preserve">
     <value>Profiles</value>

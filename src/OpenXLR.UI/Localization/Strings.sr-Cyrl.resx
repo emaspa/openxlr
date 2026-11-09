@@ -1599,7 +1599,7 @@
 Чување га замењује тренутном сценом.</value>
   </data>
   <data name="ActiveProfileLabel" xml:space="preserve">
-    <value>Активни профил: {0}</value>
+    <value>({0})</value>
   </data>
   <data name="Profiles" xml:space="preserve">
     <value>Профили</value>

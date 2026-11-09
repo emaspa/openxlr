@@ -1643,7 +1643,7 @@
 Al guardar, se sustituirá por la escena actual.</value>
   </data>
   <data name="ActiveProfileLabel" xml:space="preserve">
-    <value>Perfil activo: {0}</value>
+    <value>({0})</value>
   </data>
   <data name="Profiles" xml:space="preserve">
     <value>Perfiles</value>

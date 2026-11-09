@@ -1651,7 +1651,7 @@
 Il salvataggio lo sostituirà con la scena attuale.</value>
   </data>
   <data name="ActiveProfileLabel" xml:space="preserve">
-    <value>Profilo attivo: {0}</value>
+    <value>({0})</value>
   </data>
   <data name="Profiles" xml:space="preserve">
     <value>Profili</value>
