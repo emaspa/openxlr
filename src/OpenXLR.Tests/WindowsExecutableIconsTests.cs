@@ -118,6 +118,42 @@ public sealed class WindowsExecutableIconsTests : IDisposable
         Assert.Null(icons.For(game with { ProcessId = 4242, FlatpakInstanceId = "1" }));
     }
 
+    [Fact]
+    public void WithoutTheEnvironmentThePrefixIsFoundOnDisk()
+    {
+        // The daemon's service cannot read another process's environment:
+        // its command line is all there is.
+        string prefix = Prefix();
+        string proc = Path.Combine(_root, "proc");
+        Process(proc, 7, @"C:\Program Files\Game\Game.exe" + "\0", environ: null);
+        string unix = Path.Combine(prefix, "drive_c/Program Files/Game/Game.exe").Replace('/', '\\');
+        Process(proc, 8, "Z:" + unix + "\0", environ: null);
+        Process(proc, 9, @"C:\Elsewhere\Game.exe" + "\0", environ: null);
+        var icons = new WindowsExecutableIcons(proc, Path.Combine(_root, "cache"), Path.Combine(_root, "no-wine"),
+            [(Path.Combine(_root, "missing"), 4), (_root, 1)]);
+
+        Assert.NotNull(icons.For(new AudioStream(1, "Game.exe", "wine64-preloader", null) { ProcessId = 7 }));
+        Assert.NotNull(icons.For(new AudioStream(2, "Game.exe", "wine64-preloader", null) { ProcessId = 8 }));
+        Assert.Null(icons.For(new AudioStream(3, "Game.exe", "wine64-preloader", null) { ProcessId = 9 }));
+    }
+
+    [Fact]
+    public void PrefixesAreFoundToTheirDepthAndNotSearchedInside()
+    {
+        string prefix = Prefix();
+        Directory.CreateDirectory(Path.Combine(prefix, "drive_c/nested/dosdevices"));
+        Directory.CreateDirectory(Path.Combine(prefix, "drive_c/nested/drive_c"));
+        Directory.CreateDirectory(Path.Combine(_root, "a/b/c/deep/dosdevices"));
+        Directory.CreateDirectory(Path.Combine(_root, "a/b/c/deep/drive_c"));
+        Directory.CreateDirectory(Path.Combine(_root, ".hidden/dosdevices"));
+        Directory.CreateDirectory(Path.Combine(_root, ".hidden/drive_c"));
+
+        Assert.Equal([prefix], WindowsExecutableIcons.PrefixesUnder(_root, 3));
+        Assert.Equal([Path.Combine(_root, "a/b/c/deep"), prefix], WindowsExecutableIcons.PrefixesUnder(_root, 4));
+        Assert.Equal([prefix], WindowsExecutableIcons.PrefixesUnder(prefix, 0));
+        Assert.Empty(WindowsExecutableIcons.PrefixesUnder(Path.Combine(_root, "missing"), 4));
+    }
+
     // A prefix whose drive C holds one game with a 32-pixel icon.
     private string Prefix()
     {
@@ -132,12 +168,13 @@ public sealed class WindowsExecutableIconsTests : IDisposable
         return prefix;
     }
 
-    private static void Process(string proc, int pid, string cmdline, string environ)
+    // A null environment is one that cannot be read.
+    private static void Process(string proc, int pid, string cmdline, string? environ)
     {
         string dir = Path.Combine(proc, pid.ToString(System.Globalization.CultureInfo.InvariantCulture));
         Directory.CreateDirectory(dir);
         File.WriteAllText(Path.Combine(dir, "cmdline"), cmdline);
-        File.WriteAllText(Path.Combine(dir, "environ"), environ);
+        if (environ is not null) File.WriteAllText(Path.Combine(dir, "environ"), environ);
     }
 
     private static byte[] Group(params (int Side, int Bits, ushort Id)[] icons)

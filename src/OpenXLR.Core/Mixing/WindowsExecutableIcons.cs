@@ -27,13 +27,36 @@ public sealed class WindowsExecutableIcons
     private readonly string _procRoot;
     private readonly string _cacheDirectory;
     private readonly string _homePrefix;
+    private readonly IReadOnlyList<(string Root, int Depth)> _prefixRoots;
     private readonly ConcurrentDictionary<(int Pid, string? Name), string?> _byProcess = new();
 
-    public WindowsExecutableIcons(string? procRoot = null, string? cacheDirectory = null, string? homePrefix = null)
+    /// <param name="prefixRoots">Where to look for Wine prefixes, and how many folders deep, when the process's own prefix cannot be read.</param>
+    public WindowsExecutableIcons(string? procRoot = null, string? cacheDirectory = null, string? homePrefix = null,
+        IReadOnlyList<(string Root, int Depth)>? prefixRoots = null)
     {
+        string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         _procRoot = procRoot ?? "/proc";
         _cacheDirectory = cacheDirectory ?? DefaultCacheDirectory;
-        _homePrefix = homePrefix ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".wine");
+        _homePrefix = homePrefix ?? Path.Combine(home, ".wine");
+        _prefixRoots = prefixRoots ?? DefaultPrefixRoots(home);
+    }
+
+    /// <summary>
+    /// Where launchers keep their prefixes: the data directory (Bottles,
+    /// Lutris, a game's own launcher), <c>~/Games</c> (Lutris and Heroic) and
+    /// Steam's per-game <c>compatdata</c>.
+    /// </summary>
+    private static IReadOnlyList<(string Root, int Depth)> DefaultPrefixRoots(string home)
+    {
+        string? dataHome = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
+        if (string.IsNullOrEmpty(dataHome) || !Path.IsPathRooted(dataHome)) dataHome = Path.Combine(home, ".local/share");
+        return
+        [
+            (dataHome, 4),
+            (Path.Combine(home, "Games"), 4),
+            (Path.Combine(dataHome, "Steam/steamapps/compatdata"), 2),
+            (Path.Combine(home, ".steam/steam/steamapps/compatdata"), 2),
+        ];
     }
 
     /// <summary><c>$XDG_CACHE_HOME/openxlr/icons</c>, or under <c>~/.cache</c>.</summary>
@@ -73,11 +96,61 @@ public sealed class WindowsExecutableIcons
             string? program = Encoding.UTF8.GetString(File.ReadAllBytes(Path.Combine(process, "cmdline")))
                 .Split('\0').FirstOrDefault(StreamMatcher.IsWindowsExecutable);
             if (program is null) return null;
-            string prefix = WineSession.PrefixIn(File.ReadAllBytes(Path.Combine(process, "environ")), _homePrefix);
-            return UnixPath(program, prefix) is { } file ? Cached(file) : null;
+            foreach (string prefix in Prefixes(process))
+                if (UnixPath(program, prefix) is { } file) return Cached(file);
+            // Wine makes Z: the root of the file system in every prefix.
+            if (program.Length > 3 && program[0] is 'Z' or 'z' && program[1] == ':' && UnixPath("/" + program[3..], "/") is { } root)
+                return Cached(root);
+            return null;
         }
         // The process ended, or it is somebody else's.
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { return null; }
+    }
+
+    /// <summary>
+    /// The prefixes to look for the program in: the one the process runs
+    /// with, else every prefix found. The daemon's service runs in a user
+    /// namespace of its own, and from there another process's environment
+    /// cannot be read, though its command line can.
+    /// </summary>
+    private IEnumerable<string> Prefixes(string process)
+    {
+        byte[]? environment = null;
+        try { environment = File.ReadAllBytes(Path.Combine(process, "environ")); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        if (environment is not null)
+        {
+            yield return WineSession.PrefixIn(environment, _homePrefix);
+            yield break;
+        }
+        yield return _homePrefix;
+        foreach (var (root, depth) in _prefixRoots)
+            foreach (string prefix in PrefixesUnder(root, depth))
+                yield return prefix;
+    }
+
+    /// <summary>Folders holding both <c>drive_c</c> and <c>dosdevices</c>, at most this deep; a prefix is not searched inside.</summary>
+    internal static IEnumerable<string> PrefixesUnder(string folder, int depth)
+    {
+        if (Directory.Exists(Path.Combine(folder, "dosdevices")) && Directory.Exists(Path.Combine(folder, "drive_c")))
+        {
+            yield return folder;
+            yield break;
+        }
+        if (depth <= 0) yield break;
+        List<string> children;
+        try
+        {
+            children = [.. Directory.EnumerateDirectories(folder, "*", new EnumerationOptions
+            {
+                IgnoreInaccessible = true,
+                AttributesToSkip = FileAttributes.Hidden | FileAttributes.ReparsePoint,
+            }).Order(StringComparer.Ordinal)];
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { yield break; }
+        foreach (string child in children)
+            foreach (string prefix in PrefixesUnder(child, depth - 1))
+                yield return prefix;
     }
 
     /// <summary>

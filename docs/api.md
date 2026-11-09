@@ -935,9 +935,12 @@ in order:
    identities compare;
 5. for a program under Wine or Proton, the largest icon inside its `.exe`.
    The daemon reads the program's Windows path from the process's command
-   line, finds the file through the process's `WINEPREFIX`, or `~/.wine`
-   when it has none, and writes the icon once as a PNG under
-   `$XDG_CACHE_HOME/openxlr/icons`. `icon` is that file's path;
+   line and finds the file in the process's `WINEPREFIX`. Its service
+   cannot read another process's environment, so it then looks in
+   `~/.wine` and in the prefixes under `XDG_DATA_HOME`, `~/Games` and
+   Steam's `compatdata`, and a `Z:` path is the file system root. It
+   writes the icon once as a PNG under `$XDG_CACHE_HOME/openxlr/icons`,
+   and `icon` is that file's path;
 6. the process binary itself, lowercased, since many packages install their
    icon under the program's name.
 
