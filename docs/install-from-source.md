@@ -131,6 +131,24 @@ model at `native/deepfilter/model/DeepFilterNet3_onnx.tar.gz` and the
 crates under `native/deepfilter/vendor` (`cargo vendor --locked` in
 `native/deepfilter` fetches them); the build then reads only those.
 
+Use `make -C native clean-native` when you need a fresh C or C++ build,
+for example after changing compiler flags. The next build reuses the
+DeepFilterNet library when its inputs are current. Use
+`make -C native clean` to clear the checkout's Rust outputs as well.
+
+With Cargo 1.91 or newer, an optional cache outside the checkout keeps
+Rust intermediates available even after a full Make clean. Run this in
+the shell before the first build that should populate the cache.
+
+```sh
+export CARGO_BUILD_BUILD_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/openxlr/cargo/{workspace-path-hash}"
+```
+
+The workspace hash gives each checkout its own cache. A single
+intermediate directory shared by different checkouts can reuse an old
+artifact when source timestamps predate it. The cache lives in the
+directory you set and can be removed when you want to reclaim the space.
+
 ## 3. Device access
 
 ```sh

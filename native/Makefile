@@ -166,7 +166,7 @@ tests/vst3: tests/vst3.o tests/host.o lv2.o clap.o
 tests/lifecycle: tests/lifecycle.o lv2.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
-.PHONY: test test-editor test-audio test-clap test-lv2 test-vst3 test-scan test-fixtures clean
+.PHONY: test test-editor test-audio test-clap test-lv2 test-vst3 test-scan test-fixtures
 # The editor tests need a display; the others need nothing.
 test: test-audio test-clap test-lv2 test-vst3 test-scan test-editor
 
@@ -198,7 +198,11 @@ test-lv2: tests/lv2 test-fixtures
 test-vst3: tests/vst3
 	./tests/vst3
 
-clean:
+.PHONY: clean clean-native clean-deepfilter
+clean: clean-native clean-deepfilter
+
+# Rebuild the C and C++ helper without discarding the Rust library.
+clean-native:
 	rm -f openxlr-lv2-host $(OBJECTS) tests/editor tests/editor.o tests/audio tests/audio.o tests/own-block tests/own-block.o tests/measure tests/measure.o tests/clap tests/clap.o tests/lifecycle tests/lifecycle.o tests/lv2 tests/lv2.o tests/latency.lv2/latency.so tests/gain.lv2/gain.so tests/vst3 tests/vst3.o tests/host.o tests/scan-plugin.so
 	rm -f $(DEP_FILES) $(addsuffix .tmp,$(DEP_FILES))
 
@@ -212,7 +216,7 @@ test: test-sound-check
 test-sound-check: tests/sound-check
 	./tests/sound-check
 
-clean: clean-sound-check
+clean-native: clean-sound-check
 clean-sound-check:
 	rm -f tests/sound-check tests/sound-check.o
 
@@ -226,7 +230,7 @@ test: test-eq
 test-eq: tests/eq
 	./tests/eq tests/eq-reference.txt
 
-clean: clean-eq
+clean-native: clean-eq
 clean-eq:
 	rm -f tests/eq tests/eq.o
 
@@ -239,7 +243,7 @@ test: test-duck
 test-duck: tests/duck
 	./tests/duck
 
-clean: clean-duck
+clean-native: clean-duck
 clean-duck:
 	rm -f tests/duck tests/duck.o
 
@@ -258,17 +262,20 @@ tests/denoise-handoff: tests/denoise-handoff.o $(RNN_OBJECTS) lv2.o clap.o vst3.
 tests/denoise-recovery: tests/denoise-recovery.o $(RNN_OBJECTS) lv2.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
-.PHONY: test-denoise clean-denoise
+.PHONY: test-denoise clean-denoise clean-denoise-objects
 test: test-denoise
 test-denoise: tests/denoise tests/denoise-handoff tests/denoise-recovery openxlr-lv2-host
 	./tests/denoise ./openxlr-lv2-host
 	./tests/denoise-handoff
 	./tests/denoise-recovery
 
-clean: clean-denoise
-clean-denoise:
+clean-native: clean-denoise-objects
+clean-denoise: clean-denoise-objects clean-deepfilter
+clean-denoise-objects:
 	rm -f tests/denoise tests/denoise.o tests/denoise-handoff tests/denoise-handoff.o tests/denoise-recovery \
 	      tests/denoise-recovery.o build-config.h $(RNN_OBJECTS) rnnoise/src/x86/*.o
+
+clean-deepfilter:
 	rm -rf deepfilter/target deepfilter/model/verified
 
 # The voice changer: every voice driven through the microphone stage over a
@@ -282,7 +289,7 @@ test: test-voice
 test-voice: tests/voice
 	./tests/voice
 
-clean: clean-voice
+clean-native: clean-voice
 clean-voice:
 	rm -f tests/voice tests/voice.o
 
@@ -297,7 +304,7 @@ test: test-dynamics
 test-dynamics: tests/dynamics
 	./tests/dynamics
 
-clean: clean-dynamics
+clean-native: clean-dynamics
 clean-dynamics:
 	rm -f tests/dynamics tests/dynamics.o
 
@@ -312,7 +319,7 @@ test: test-player
 test-player: tests/player openxlr-lv2-host
 	./tests/player ./openxlr-lv2-host
 
-clean: clean-player
+clean-native: clean-player
 clean-player:
 	rm -f tests/player tests/player.o
 
@@ -327,7 +334,7 @@ test: test-bridge
 test-bridge: tests/bridge
 	./tests/bridge
 
-clean: clean-bridge
+clean-native: clean-bridge
 clean-bridge:
 	rm -f tests/bridge
 
