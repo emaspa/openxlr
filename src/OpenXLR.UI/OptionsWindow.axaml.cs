@@ -228,7 +228,7 @@ public partial class OptionsWindow : Window
             int count = await System.Threading.Tasks.Task.Run(() => SettingsBackup.Export(path, profilesOnly));
             BackupStatus.Text = Localizer.Format("SettingsBackupSaved", count, path);
         }
-        catch (Exception ex) when (SettingsBackup.IsFileFailure(ex))
+        catch (Exception ex)
         {
             BackupStatus.Text = Localizer.Format("SettingsBackupFailed", ex.Message);
         }

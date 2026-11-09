@@ -111,6 +111,53 @@ public sealed class SettingsBackupTests : IDisposable
     }
 
     [Fact]
+    public void TheArchiveFileLimitIsCheckedBeforeDecodingFurtherEntries()
+    {
+        var entries = Enumerable.Range(0, 1024).ToDictionary(i => $"profiles/generic/Profile {i}.json", _ => "{}"u8.ToArray());
+        entries.Add("mixer.json", null!);
+        WriteArchive(entries);
+        var error = Assert.Throws<InvalidDataException>(() => Backup.Preview(Archive));
+        Assert.Contains("file count limit", error.Message);
+        Assert.False(Directory.Exists(Root));
+    }
+
+    [Fact]
+    public void InvalidUnicodeInArchiveNamesIsReportedWithoutStartingTheApp()
+    {
+        byte[] prefix = """{"version":1,"files":{"profiles/generic/"""u8.ToArray();
+        byte[] suffix = """.json":"e30="}}"""u8.ToArray();
+        File.WriteAllBytes(Archive, [.. prefix, 0xff, .. suffix]);
+        using var error = new StringWriter();
+        Assert.Equal(1, Commands.Run(["preview", Archive], TextWriter.Null, error));
+        Assert.Contains("invalid JSON text", error.ToString());
+        Assert.False(Directory.Exists(Root));
+    }
+
+    [Fact]
+    public void InvalidUtf8InASettingsFileCannotBeImported()
+    {
+        byte[] prefix = "{\"language\":\""u8.ToArray();
+        WriteArchive(new Dictionary<string, byte[]> { ["ui.json"] = [.. prefix, 0xff, (byte)'"', (byte)'}'] });
+        using var error = new StringWriter();
+        Assert.Equal(1, Commands.Run(["import", Archive], TextWriter.Null, error));
+        Assert.Contains("Invalid text in ui.json.", error.ToString());
+        Assert.False(Directory.Exists(Root));
+    }
+
+    [Fact]
+    public void DamagedExistingSettingsAreNamedAndLeftForManualRecovery()
+    {
+        Write("ui.json", "{}");
+        Backup.Export(Archive, profilesOnly: false);
+        FreshConfig();
+        Write("ui.json", "broken");
+        using var error = new StringWriter();
+        Assert.Equal(1, Commands.Run(["import", Archive, "--replace"], TextWriter.Null, error));
+        Assert.Contains("Existing ui.json is damaged.", error.ToString());
+        Assert.Equal("broken", File.ReadAllText(Path.Combine(Root, "ui.json")));
+    }
+
+    [Fact]
     public void BackupRefusesSymlinkedProfileDirectoriesAndDoesNotOverwriteExports()
     {
         Write("mixer.json", "{}");

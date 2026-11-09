@@ -5098,13 +5098,17 @@ keeps files absent from the backup. Running the import again skips files
 that already match. Use backups from your own installation.
 
 For Flatpak, quit the app and stop `openxlr-flatpak.service` if you enabled
-the optional background service. Grant access to the backup folder just
-for the command. For a backup in Downloads:
+the optional background service. Use file forwarding to share just the
+backup with the sandbox. For a backup in Downloads:
 
 ```sh
-flatpak run --filesystem=xdg-download:ro io.github.emaspa.openxlr backup preview ~/Downloads/openxlr-settings.openxlr-backup
-flatpak run --filesystem=xdg-download:ro io.github.emaspa.openxlr backup import ~/Downloads/openxlr-settings.openxlr-backup
+backup="$HOME/Downloads/openxlr-settings.openxlr-backup"
+flatpak run --file-forwarding io.github.emaspa.openxlr backup preview @@ "$backup" @@
+flatpak run --file-forwarding io.github.emaspa.openxlr backup import @@ "$backup" @@
 ```
+
+Use **Options → General → Settings backup** to export from the Flatpak.
+The folder picker grants access to the selected destination.
 
 Open OpenXLR again after importing.
 

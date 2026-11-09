@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
 namespace OpenXLR.UI;
@@ -24,12 +24,12 @@ internal static partial class SettingsBackup
     private static readonly JsonSerializerOptions Json = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        AllowDuplicateProperties = false,
-        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
     };
     private static readonly JsonDocumentOptions FileJson = new() { AllowDuplicateProperties = false };
+    private static readonly Encoding StrictUtf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: true, throwOnInvalidBytes: true);
 
-    private sealed record Archive(int Version, Dictionary<string, byte[]>? Files);
+    private const int Version = 1;
+    private sealed record Archive(int Version, Dictionary<string, byte[]> Files);
 
     internal sealed record Change(string Name, byte[] Next, byte[]? Previous)
     {
@@ -66,26 +66,29 @@ internal static partial class SettingsBackup
     internal static List<Change> Preview(string path)
     {
         RejectLinkOrSpecial(path, directory: false);
-        using var document = JsonDocument.Parse(RegularFile.ReadBytes(path, MaxArchiveBytes), FileJson);
-        var archive = document.Deserialize<Archive>(Json);
-        if (archive is not { Version: 1, Files.Count: > 0 and <= MaxFiles })
-            throw new InvalidDataException("This is not a supported OpenXLR settings backup.");
-
-        var changes = new List<Change>();
-        long total = 0, rollbackBytes = 0;
-        string root = Root;
-        foreach (var (name, bytes) in archive.Files)
+        byte[] archive = RegularFile.ReadBytes(path, MaxArchiveBytes);
+        Dictionary<string, byte[]> files;
+        try { files = ReadArchive(archive); }
+        catch (InvalidOperationException ex)
         {
-            if (bytes is null || Limit(name) == 0)
-                throw new InvalidDataException("The backup contains an unsupported file.");
-            Count(ref total, changes.Count, bytes);
+            throw new InvalidDataException("The settings backup contains invalid JSON text.", ex);
+        }
+        var changes = new List<Change>();
+        long rollbackBytes = 0;
+        string root = Root;
+        foreach (var (name, bytes) in files)
+        {
             Validate(name, bytes);
             byte[]? previous = Read(root, name);
             if (previous is not null)
             {
                 if (bytes.AsSpan().SequenceEqual(previous)) continue;
                 // The safety backup must fit the same limits and be restorable.
-                Validate(name, previous);
+                try { Validate(name, previous); }
+                catch (Exception ex) when (ex is JsonException or InvalidDataException)
+                {
+                    throw new InvalidDataException($"Existing {name} is damaged. Move it aside before restoring this backup.", ex);
+                }
                 Count(ref rollbackBytes, changes.Count, previous);
             }
             changes.Add(new(name, bytes, previous));
@@ -151,8 +154,62 @@ internal static partial class SettingsBackup
     private static string Root => Path.TrimEndingDirectorySeparator(Path.GetFullPath(OpenXlrPaths.ConfigDir));
 
     private static void SaveArchive(string path, Dictionary<string, byte[]> files) =>
-        OpenXlrPaths.WriteAtomic(path, JsonSerializer.SerializeToUtf8Bytes(new Archive(1, files), Json),
+        OpenXlrPaths.WriteAtomic(path, JsonSerializer.SerializeToUtf8Bytes(new Archive(Version, files), Json),
             privatePermissions: false, fileMode: UnixFileMode.UserRead | UnixFileMode.UserWrite, overwrite: false);
+
+    private static Dictionary<string, byte[]> ReadArchive(byte[] bytes)
+    {
+        // Validate the envelope and each key before allocating its decoded
+        // contents. A small archive can otherwise contain millions of keys.
+        var reader = new Utf8JsonReader(bytes, new JsonReaderOptions { MaxDepth = 2 });
+        if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject) throw InvalidArchive();
+        bool version = false;
+        Dictionary<string, byte[]>? files = null;
+        while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
+        {
+            if (!version && reader.ValueTextEquals("version"u8))
+            {
+                if (!reader.Read() || reader.TokenType != JsonTokenType.Number ||
+                    !reader.TryGetInt32(out int number) || number != Version) throw InvalidArchive();
+                version = true;
+            }
+            else if (files is null && reader.ValueTextEquals("files"u8))
+                files = ReadFiles(ref reader);
+            else
+                throw InvalidArchive();
+        }
+        if (reader.TokenType != JsonTokenType.EndObject || reader.Read() || !version || files is not { Count: > 0 })
+            throw InvalidArchive();
+        return files;
+    }
+
+    private static Dictionary<string, byte[]> ReadFiles(ref Utf8JsonReader reader)
+    {
+        if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject) throw InvalidArchive();
+        var files = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        long total = 0;
+        while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
+        {
+            if (files.Count >= MaxFiles) throw new InvalidDataException("The settings backup exceeds its file count limit.");
+            // A key contains at most a 60-character profile name, a scope,
+            // separators and the extension. Allow up to six bytes per char.
+            if (reader.ValueSpan.Length > 600) throw InvalidArchive();
+            string name = reader.GetString()!;
+            int limit = Limit(name);
+            if (limit == 0) throw new InvalidDataException("The backup contains an unsupported file.");
+            if (files.ContainsKey(name)) throw new InvalidDataException($"The backup repeats {name}.");
+            if (!reader.Read() || reader.TokenType != JsonTokenType.String ||
+                reader.ValueSpan.Length > 4 * ((limit + 2) / 3) ||
+                !reader.TryGetBytesFromBase64(out byte[]? content) || content.Length > limit)
+                throw new InvalidDataException($"The backup contains an invalid or oversized entry for {name}.");
+            Count(ref total, files.Count, content);
+            files.Add(name, content);
+        }
+        if (reader.TokenType != JsonTokenType.EndObject) throw InvalidArchive();
+        return files;
+    }
+
+    private static InvalidDataException InvalidArchive() => new("This is not a supported OpenXLR settings backup.");
 
     private static void Count(ref long total, int count, byte[] bytes)
     {
@@ -215,8 +272,13 @@ internal static partial class SettingsBackup
     private static void Validate(string name, byte[] bytes)
     {
         if (bytes.Length > Limit(name)) throw new InvalidDataException($"The file {name} exceeds its size limit.");
-        using var reader = new StreamReader(new MemoryStream(bytes));
-        string text = reader.ReadToEnd();
+        using var reader = new StreamReader(new MemoryStream(bytes), StrictUtf8);
+        string text;
+        try { text = reader.ReadToEnd(); }
+        catch (DecoderFallbackException ex)
+        {
+            throw new InvalidDataException($"Invalid text in {name}.", ex);
+        }
         if (name.EndsWith("/recall-on-connect", StringComparison.Ordinal))
         {
             if (text.Trim() is { Length: > 0 } target && !ProfileName(target))
