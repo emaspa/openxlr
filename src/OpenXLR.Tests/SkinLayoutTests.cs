@@ -123,7 +123,7 @@ public sealed class SkinLayoutTests
         foreach (SkinEntry entry in SkinCatalog.BuiltIn())
         {
             Assert.Empty(entry.Errors);
-            if (entry.Id is "broadcast" or "wave" or "compact-desk" or "hifi" or "hifi-amber") Assert.NotNull(entry.Package.Layout);
+            if (entry.Id is "broadcast" or "wave" or "compact-desk" or "hifi" or "hifi-amber" or "hifi-classic") Assert.NotNull(entry.Package.Layout);
             else Assert.Null(entry.Package.Layout);
         }
     }

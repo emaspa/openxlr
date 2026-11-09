@@ -123,6 +123,20 @@
     "Ox.Meter.WarningLevel": 0.7,
     "Ox.Meter.HotLevel": 0.9
   },
+  "hifi-classic": {
+    "Ox.Card.Background": "#1b211d",
+    "Ox.Text.Primary": "#e2e8eb",
+    "Ox.Text.Muted": "#728077",
+    "Ox.Led.On": "#3fff85",
+    "Ox.Led.Off": "#2a362e",
+    "Ox.Led.Alert": "#ff3b2f",
+    "Ox.Meter.Track": "#0b2816",
+    "Ox.Meter.Fill": "#4ade80",
+    "Ox.Meter.Warning": "#facc15",
+    "Ox.Meter.Hot": "#ef4444",
+    "Ox.Meter.WarningLevel": 0.7,
+    "Ox.Meter.HotLevel": 0.9
+  },
   "kanagawa": {
     "Ox.Card.Background": "#262631",
     "Ox.Text.Primary": "#dcd7ba",
