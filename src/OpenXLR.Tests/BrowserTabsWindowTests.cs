@@ -51,7 +51,7 @@ internal static class BrowserTabsWindowTests
             {"type":"state","mixer":{"appVolumeSupported":true,"mixes":[],"channels":[{"id":"music","name":"Music"}],
              "streams":[{"identity":"discord","label":"Discord","channelId":"music","active":true,"volume":0.9}]}}
             """)!;
-        var server = SocketTestServer.Start(async (socket, stop) =>
+        var server = Task.Run(() => SocketTestServer.Start(async (socket, stop) =>
         {
             await SocketTestServer.Send(socket, state, stop);
             while (!stop.IsCancellationRequested)
@@ -65,7 +65,7 @@ internal static class BrowserTabsWindowTests
                 await SocketTestServer.Send(socket, new { type = "commandResult", requestId = command["requestId"]!.GetValue<string>() }, stop);
                 applied.TrySetResult(value);
             }
-        }).GetAwaiter().GetResult();
+        })).GetAwaiter().GetResult();
         var client = new DaemonClient(server.Url);
         var main = new MainWindow(client);
         try
@@ -103,8 +103,11 @@ internal static class BrowserTabsWindowTests
         finally
         {
             main.Quit();
-            client.DisposeAsync().AsTask().GetAwaiter().GetResult();
-            server.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            Task.Run(async () =>
+            {
+                await client.DisposeAsync();
+                await server.DisposeAsync();
+            }).GetAwaiter().GetResult();
         }
 
         static void Wait(Func<bool> condition)
