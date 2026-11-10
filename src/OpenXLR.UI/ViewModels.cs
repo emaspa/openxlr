@@ -789,7 +789,9 @@ public sealed partial class MainViewModel : ViewModelBase
         {
             string label = Outputs.FirstOrDefault(output => output.Name == device)?.Description ?? device;
             bool suspended = mixer?["outputVolumeLockSuspended"]?.GetValue<bool>() ?? false;
-            OutputVolumeLockNote = Localizer.Format(suspended ? "OutputVolumeLockSuspended" : "OutputVolumeLockHolding", label, volume * 100);
+            OutputVolumeLockNote = suspended
+                ? Localizer.Format("OutputVolumeLockSuspended", label, volume * 100)
+                : Localizer.Format("OutputVolumeLockHolding", label, volume * 100);
         }
         else OutputVolumeLockNote = null;
     }
