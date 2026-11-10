@@ -273,6 +273,9 @@ internal static class MicSetupWindowTests
 
     private static void EnterGain(NumericUpDown editor, string value)
     {
+        // The editor became visible with a state push; its spinner and text box
+        // are templated by the layout pass, which may not have run yet.
+        (TopLevel.GetTopLevel(editor) as Window)?.UpdateLayout();
         editor.ApplyTemplate();
         var input = Assert.Single(editor.GetVisualDescendants().OfType<TextBox>());
         input.Focus();
