@@ -32,7 +32,7 @@ function fixture({ acquire, sink, resume, close, timeoutMs } = {}) {
     const context = { closed: false, destination: {}, async setSinkId(id) { if (sink) await sink(id); this.sink = id; },
       createMediaStreamSource() { return { connect() {}, disconnect() {} }; },
       currentTime: 0,
-      createGain() { return this.gain = { gain: { value: 1, setTargetAtTime(value) { this.value = value; } },
+      createGain() { return this.gain = { gain: { value: 1, cancelAndHoldAtTime() {}, setTargetAtTime(value) { this.value = value; } },
         connect() {}, disconnect() {} }; },
       async resume() { if (resume) await resume(); }, async close() { if (close) await close(); this.closed = true; } };
     contexts.push(context); return context;
@@ -96,13 +96,16 @@ test('two tabs have independent native output contexts and stop independently', 
 
 test('tab gain is independent on a shared destination and survives a reroute', async () => {
   const f = fixture();
-  await f.audio.start(1, 'teams-stream', 'chat', .5);
+  const teams = 'https://teams.example';
+  await f.audio.start(1, 'teams-stream', 'chat', .5, teams);
   await f.audio.start(2, 'youtube-stream', 'chat');
   assert.deepEqual(f.contexts.map(context => context.gain.gain.value), [.125, 1]);
-  f.audio.setVolume(1, 0);
+  f.audio.setVolume(1, 0, 'https://old.example');
+  assert.equal(f.contexts[0].gain.gain.value, .125);
+  f.audio.setVolume(1, 0, teams);
   await f.audio.route(1, 'music');
   assert.deepEqual(f.contexts.map(context => context.gain.gain.value), [0, 1]);
-  f.audio.setVolume(1, null);
+  f.audio.setVolume(1, null, teams);
   assert.equal(f.contexts[0].gain.gain.value, 1);
   assert.equal(f.acquisitions.length, 2);
   await f.audio.stopAll();

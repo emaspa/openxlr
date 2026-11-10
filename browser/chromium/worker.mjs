@@ -275,7 +275,7 @@ async function reconcile() {
       const volume = playbackVolume(selected()?.volume);
       if (current.volume === volume) return;
       const sameVolume = () => unchanged() && playbackVolume(selected()?.volume) === volume;
-      await audio({ type: 'volume', id, volume }, false, sameVolume);
+      await audio({ type: 'volume', id, volume, site: tab.site }, false, sameVolume);
       if (sameVolume()) current.volume = volume;
     });
   }
@@ -315,7 +315,7 @@ async function startCapture(id, site, active = null) {
     const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: id });
     check();
     const volume = playbackVolume(state.tabs.find(tab => tab.id === id)?.volume);
-    await audio({ type: 'start', id, streamId, deviceId, volume }, true, check);
+    await audio({ type: 'start', id, streamId, deviceId, volume, site }, true, check);
     const captured = captures.get(id);
     if (!pending.cancelled && captured?.capturing) {
       captured.channelId = channel.id;
@@ -502,7 +502,18 @@ chrome.runtime.onInstalled.addListener(details => {
 void (async () => {
   try {
     const existing = await audio({ type: 'snapshot' });
-    for (const tab of existing ?? []) captures.set(tab.id, { capturing: tab.capturing, error: null });
+    if (existing?.length) {
+      const liveSites = new Map((await chrome.tabs.query({}))
+        .filter(tab => !tab.incognito).map(tab => [tab.id, siteOf(tab.url)]));
+      for (const { id, site, volume, capturing } of existing) {
+        if (!capturing || !site || liveSites.get(id) !== site) {
+          await stopTab(id);
+          continue;
+        }
+        sites.set(id, site);
+        captures.set(id, { capturing, site, volume: playbackVolume(volume), error: null });
+      }
+    }
   } catch (error) {
     await stopAll(errorText(error));
   } finally {

@@ -60,7 +60,7 @@ function fixture({ existing = [], recovery } = {}) {
             return { value: [{ kind: 'audiooutput', label: 'OpenXLR Music', deviceId: 'music-device' },
               { kind: 'audiooutput', label: 'OpenXLR Chat', deviceId: 'chat-device' }] };
           case 'start': {
-            f.active.set(message.id, { id: message.id, capturing: true, deviceId: message.deviceId, volume: message.volume });
+            f.active.set(message.id, { id: message.id, capturing: true, deviceId: message.deviceId, volume: message.volume, site: message.site });
             await f.status(message.id, true);
             const gate = f.startGates.shift();
             if (gate) await gate.promise;
@@ -490,16 +490,27 @@ test('same-origin navigation preserves an active capture', { timeout: 2000 }, as
 
 test('startup events wait for offscreen recovery before publishing native tab metadata', { timeout: 2000 }, async () => {
   const recovery = deferred();
-  const f = fixture({ recovery, existing: [{ id: 1, capturing: true, deviceId: 'chat-device' }] });
+  const f = fixture({ recovery, existing: [{ id: 1, capturing: true, deviceId: 'chat-device', site: 'https://site1.example' }] });
   f.chrome.runtime.onStartup.emit(); await tick();
   assert.equal(f.ports.length, 0);
   recovery.resolve(); await f.ready;
   assert.equal(f.ports.length, 1); assert.equal(f.posts[0].tabs.find(tab => tab.id === 1).capturing, true);
 });
 
+test('offscreen recovery stops a capture whose origin changed while the worker slept', { timeout: 2000 }, async () => {
+  const f = await readyFixture({ existing: [
+    { id: 1, capturing: true, deviceId: 'chat-device', site: 'https://previous.example', volume: .2 },
+    { id: 2, capturing: true, deviceId: 'music-device', site: 'https://site2.example', volume: .6 },
+  ] });
+  assert.deepEqual([...f.active.keys()], [2]);
+  assert.equal(f.posts[0].tabs.find(tab => tab.id === 1).capturing, false);
+  assert.equal(f.posts[0].tabs.find(tab => tab.id === 2).capturing, true);
+  assert.equal(f.calls.filter(call => call.type === 'volume' && call.id === 1).length, 0);
+});
+
 test('failed offscreen recovery restores normal playback and still connects the provider', { timeout: 2000 }, async () => {
   const recovery = deferred();
-  const f = fixture({ recovery, existing: [{ id: 1, capturing: true, deviceId: 'chat-device' }] });
+  const f = fixture({ recovery, existing: [{ id: 1, capturing: true, deviceId: 'chat-device', site: 'https://site1.example' }] });
   recovery.reject(new Error('Cannot read offscreen sessions')); await f.ready;
   assert.equal(f.document, false); assert.equal(f.active.size, 0);
   assert.equal(f.posts[0].tabs.find(tab => tab.id === 1).capturing, false);
