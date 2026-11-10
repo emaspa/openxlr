@@ -383,7 +383,8 @@ across the strips.
 
 The **Flow** window shows inputs, channels, mixes and outputs in four columns.
 Click a card to trace its signal path, with colours for each routing stage and
-unrelated routes dimmed. Processing stays inside the channel and mix cards;
+unrelated routes dimmed. Selecting an output explains known blockers in its
+mixer settings. Processing stays inside the channel and mix cards;
 the tooltip lists each insert in signal order. See [Audio flow](manual.md#audio-flow).
 
 Built from PipeWire nodes, no kernel modules or custom drivers:

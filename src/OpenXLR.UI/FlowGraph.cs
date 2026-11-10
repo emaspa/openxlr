@@ -19,7 +19,7 @@ internal sealed record FlowRoute(string From, string To, FlowStage Stage, bool A
 /// <summary>A read-only snapshot of the routing and its four-column layout.</summary>
 internal sealed record FlowGraph(IReadOnlyList<FlowNode> Nodes, IReadOnlyList<FlowRoute> Routes)
 {
-    private const double Top = 62, Gap = 10;
+    private const double Top = 62, Gap = 10, MinimumRouteLevel = 0.001;
 
     /// <summary>The one card that stands for every mix the Wave XLR Pro builds for its jacks.</summary>
     internal const string UnitMixKey = "mix:@unit";
@@ -37,7 +37,7 @@ internal sealed record FlowGraph(IReadOnlyList<FlowNode> Nodes, IReadOnlyList<Fl
             : [];
         static bool IsJack(MonitorOutputItem output) => output.Name.Contains('#', StringComparison.Ordinal);
         HashSet<string> heardElsewhere = [.. vm.MonitorOutputs.Where(o => o.IsSelected && !IsJack(o))
-            .SelectMany(o => (o.Feed?.Id ?? vm.DefaultMonitorMix).Split('+', StringSplitOptions.RemoveEmptyEntries))];
+            .SelectMany(o => MonitorFeedIds(vm, o))];
         static string Inserts(InsertsViewModel inserts) => string.Join("\n", inserts.Items.Select(i =>
             i.HasError ? Localizer.Format("FlowInsertProblem", i.Label) : i.Bypass ? Localizer.Format("FlowInsertBypassed", i.Label) : i.Label));
 
@@ -117,7 +117,7 @@ internal sealed record FlowGraph(IReadOnlyList<FlowNode> Nodes, IReadOnlyList<Fl
             }
             bool toUnit = false, toUnitHeard = false;
             foreach (SendViewModel send in channel.Sends)
-                if (send.Level > 0.001 && vm.Mixes.Any(m => m.Id == send.MixId))
+                if (send.Level > MinimumRouteLevel && vm.Mixes.Any(m => m.Id == send.MixId))
                 {
                     if (unitMixes.Contains(send.MixId))
                     {
@@ -145,14 +145,14 @@ internal sealed record FlowGraph(IReadOnlyList<FlowNode> Nodes, IReadOnlyList<Fl
             MixViewModel[] built = [.. vm.Mixes.Where(m => unitMixes.Contains(m.Id))];
             var unit = new FlowNode(UnitMixKey, vm.DeviceName.Length > 0 ? vm.DeviceName : Localizer.Text("HardwareMixingUnitCard"),
                 Localizer.Format("FlowUnitMixes", string.Join(", ", built.Select(m => m.Name))), FlowStage.Mix, FlowIcon.Mix, y,
-                built.Any(m => !m.Muted && m.Volume > 0.001));
+                built.Any(m => !m.Muted && m.Volume > MinimumRouteLevel));
             nodes.Add(unit);
             y += unit.Height + Gap;
         }
         foreach (MixViewModel mix in vm.Mixes)
         {
             if (unitMixes.Contains(mix.Id) && !heardElsewhere.Contains(mix.Id)) continue;
-            bool active = !mix.Muted && mix.Volume > 0.001;
+            bool active = !mix.Muted && mix.Volume > MinimumRouteLevel;
             var node = new FlowNode($"mix:{mix.Id}", mix.Name,
                 mix.Muted ? Localizer.Text("FlowMuted") : Localizer.Format("FlowVolume", mix.VolumeText), FlowStage.Mix,
                 mix.Kind == "monitor" ? FlowIcon.Headphones : FlowIcon.Mix, y,
@@ -173,7 +173,7 @@ internal sealed record FlowGraph(IReadOnlyList<FlowNode> Nodes, IReadOnlyList<Fl
         }
         foreach (MonitorOutputItem output in vm.MonitorOutputs.Where(o => o.IsSelected))
         {
-            string[] feeds = (output.Feed?.Id ?? vm.DefaultMonitorMix).Split('+', StringSplitOptions.RemoveEmptyEntries);
+            string[] feeds = MonitorFeedIds(vm, output);
             // A jack the unit feeds hears its card; every other output the mixes this computer builds.
             if (IsJack(output) && feeds.Any(unitMixes.Contains)) feeds = [UnitMixKey[4..]];
             string detail = vm.Clock?.ResampledOutput(output.Name) is not null
@@ -189,6 +189,71 @@ internal sealed record FlowGraph(IReadOnlyList<FlowNode> Nodes, IReadOnlyList<Fl
                     [mix.Id], mix.AuxPortEnabled, FlowIcon.Speaker);
         }
         return new FlowGraph(nodes, routes);
+    }
+
+    private static string[] MonitorFeedIds(MainViewModel vm, MonitorOutputItem output)
+        => (output.Feed?.Id ?? vm.DefaultMonitorMix).Split('+', StringSplitOptions.RemoveEmptyEntries);
+
+    /// <summary>Explain the selected output from mixer settings, using the individual feeds even for a hardware jack.</summary>
+    internal static string? ExplainOutput(MainViewModel vm, string key)
+    {
+        IEnumerable<MixViewModel> feeds;
+        if (key.StartsWith("out:", StringComparison.Ordinal))
+        {
+            string name = key[4..];
+            MonitorOutputItem? output = vm.MonitorOutputs.FirstOrDefault(o => o.IsSelected && o.Name == name);
+            if (output is null) return null;
+            if (!output.IsPresent) return Localizer.Text("FlowOutputDisconnected");
+            if (vm.MonitorMuted) return Localizer.Text("FlowMonitoringPaused");
+            string[] ids = MonitorFeedIds(vm, output);
+            feeds = vm.Mixes.Where(m => ids.Contains(m.Id, StringComparer.Ordinal));
+        }
+        else if (key.StartsWith("vm:", StringComparison.Ordinal))
+        {
+            string id = key[3..];
+            MixViewModel? mic = vm.Mixes.FirstOrDefault(m => m.Kind == "virtualMic" && m.Id == id);
+            if (mic is null) return null;
+            feeds = [mic];
+        }
+        else if (key == "aux:port" && vm.Mixes.FirstOrDefault(m => m.IsAuxPort) is { } aux)
+        {
+            if (!vm.DeviceConnected || !vm.CapOutputRouting)
+                return Localizer.Format("OutputUnavailable", Localizer.Text("UsbAuxPortKind"));
+            if (!aux.AuxPortEnabled) return Localizer.Text("FlowAuxPortDisabled");
+            feeds = [aux];
+        }
+        else return null;
+
+        string[] notes = [.. feeds.Select(mix => ExplainFeed(vm, mix))];
+        return notes.Length == 0 ? Localizer.Text("FlowNoOutputFeed") : string.Join("\n", notes);
+    }
+
+    private static string ExplainFeed(MainViewModel vm, MixViewModel mix)
+    {
+        if (mix.Muted) return Localizer.Format("FlowFeedMuted", mix.Name);
+        if (mix.Volume <= MinimumRouteLevel) return Localizer.Format("FlowFeedAtZero", mix.Name);
+
+        int open = 0, closed = 0;
+        string? closedChannel = null;
+        bool closedByMute = false;
+        foreach (ChannelViewModel channel in vm.Channels)
+        {
+            if (channel.Sends.FirstOrDefault(send => send.MixId == mix.Id) is not { } send) continue;
+            if (send.Muted || send.Level <= MinimumRouteLevel)
+            {
+                closed++;
+                closedChannel = channel.Name;
+                closedByMute = send.Muted;
+            }
+            else open++;
+        }
+
+        if (closed == 1)
+            return closedByMute ? Localizer.Format("FlowSendMuted", closedChannel, mix.Name)
+                : Localizer.Format("FlowSendAtZero", closedChannel, mix.Name);
+        if (open == 0) return Localizer.Format("FlowNoOpenSends", mix.Name);
+        if (closed > 0) return Localizer.Format("FlowSeveralSendsClosed", closed, mix.Name);
+        return Localizer.Format("FlowOpenSends", mix.Name);
     }
 
     /// <summary>Trace each direction separately so a shared mix does not select sibling inputs.</summary>

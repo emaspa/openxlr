@@ -1,4 +1,7 @@
+using System.Reflection;
+using System.Text.Json.Nodes;
 using OpenXLR.UI;
+using OpenXLR.UI.Localization;
 
 namespace OpenXLR.Tests;
 
@@ -183,6 +186,94 @@ public sealed class FlowGraphTests
         Assert.True(graph.Nodes.Single(n => n.Key == "ch:xlr2").Y >= channel.Y + channel.Height);
         Assert.All(graph.Nodes, n => Assert.InRange((int)n.Stage, 0, 3));
         Assert.Contains(graph.Routes, r => r.From == "hw:xlr1" && r.To == "ch:xlr1");
+    }
+
+    [Fact]
+    public async Task OutputExplanationTracksConnectionPauseAndTheDefaultFeed()
+    {
+        await using var client = new DaemonClient();
+        var vm = new MainViewModel(client);
+        var output = new MonitorOutputItem("headset", "Headset", () => { },
+            (_, _) => Task.FromResult<string?>(null), isPresent: false);
+        vm.MonitorOutputs.Add(output);
+        Assert.Null(FlowGraph.ExplainOutput(vm, "out:headset"));
+        output.Sync(true);
+        Assert.Equal(Localizer.Text("FlowOutputDisconnected"), FlowGraph.ExplainOutput(vm, "out:headset"));
+
+        output.SyncPresent(true);
+        Assert.Equal(Localizer.Text("FlowNoOutputFeed"), FlowGraph.ExplainOutput(vm, "out:headset"));
+        vm.Mixes.Add(new(client, "monitor", "Monitor A"));
+        Assert.Equal(Localizer.Format("FlowNoOpenSends", "Monitor A"), FlowGraph.ExplainOutput(vm, "out:headset"));
+
+        vm.MonitorMuted = true;
+        Assert.Equal(Localizer.Text("FlowMonitoringPaused"), FlowGraph.ExplainOutput(vm, "out:headset"));
+        Assert.Null(FlowGraph.ExplainOutput(vm, "ch:voice-chat"));
+    }
+
+    [Fact]
+    public async Task OutputExplanationKeepsTheIndividualFeedsOnAHardwareJack()
+    {
+        await using var client = new DaemonClient();
+        var vm = new MainViewModel(client);
+        var a = new MixViewModel(client, "monitor", "Monitor A");
+        var b = new MixViewModel(client, "monitor2", "Monitor B");
+        a.ApplyFromDaemon(JsonNode.Parse("""{"muted":true,"hardwareSection":0}""")!);
+        b.ApplyFromDaemon(JsonNode.Parse("""{"volume":0,"hardwareSection":18}""")!);
+        vm.Mixes.Add(a);
+        vm.Mixes.Add(b);
+        vm.HardwareMixing.Apply(JsonNode.Parse("""{"hardwareMixing":{"wanted":true,"active":true}}"""), capable: true);
+        var output = new MonitorOutputItem("unit#hp1", "Headphones 1", () => { },
+            (_, _) => Task.FromResult<string?>(null));
+        output.Sync(true);
+        output.SyncFeed([new("monitor", "Monitor A"), new("monitor2", "Monitor B")], "monitor+monitor2");
+        vm.MonitorOutputs.Add(output);
+        Assert.Contains(FlowGraph.From(vm).Routes, r => r.From == FlowGraph.UnitMixKey && r.To == "out:unit#hp1");
+        Assert.Equal(string.Join("\n", Localizer.Format("FlowFeedMuted", "Monitor A"), Localizer.Format("FlowFeedAtZero", "Monitor B")),
+            FlowGraph.ExplainOutput(vm, "out:unit#hp1"));
+    }
+
+    [Theory]
+    [InlineData(0, false, "FlowSendAtZero")]
+    [InlineData(.5, true, "FlowSendMuted")]
+    [InlineData(0, true, "FlowSendMuted")]
+    public async Task AClosedSendIsNamedEvenWhenAnotherSendIsOpen(double level, bool muted, string key)
+    {
+        await using var client = new DaemonClient();
+        var vm = new MainViewModel(client);
+        vm.Mixes.Add(new(client, "chat", "Chat") { Kind = "virtualMic" });
+        vm.MonitorMuted = true;
+        var voice = new ChannelViewModel(client, "voice", "Voice Chat", ["chat"]);
+        voice.Sends[0].ApplyFromDaemon(level, muted);
+        var music = new ChannelViewModel(client, "music", "Music", ["chat"]);
+        music.Sends[0].ApplyFromDaemon(1, false);
+        vm.Channels.Add(voice);
+        vm.Channels.Add(music);
+        Assert.Equal(Localizer.Format(key, "Voice Chat", "Chat"), FlowGraph.ExplainOutput(vm, "vm:chat"));
+
+        voice.Sends[0].ApplyFromDaemon(1, false);
+        Assert.Equal(Localizer.Format("FlowOpenSends", "Chat"), FlowGraph.ExplainOutput(vm, "vm:chat"));
+    }
+
+    [Fact]
+    public async Task OutputExplanationSummarizesMultipleSendsAndTheAuxSwitch()
+    {
+        await using var client = new DaemonClient();
+        var vm = new MainViewModel(client);
+        var aux = new MixViewModel(client, "auxout", "Aux");
+        vm.Mixes.Add(aux);
+        Assert.Equal(Localizer.Format("OutputUnavailable", Localizer.Text("UsbAuxPortKind")),
+            FlowGraph.ExplainOutput(vm, "aux:port"));
+
+        typeof(MainViewModel).GetMethod("Apply", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(vm, [JsonNode.Parse(InputBindingModelTests.ProState(""))!]);
+        vm.Mixes.Add(aux);
+        for (int i = 0; i < 3; i++) vm.Channels.Add(new(client, $"channel{i}", $"Channel {i}", ["auxout"]));
+        aux.ApplyAuxPort(false);
+        Assert.Equal(Localizer.Text("FlowAuxPortDisabled"), FlowGraph.ExplainOutput(vm, "aux:port"));
+        aux.ApplyAuxPort(true);
+        Assert.Equal(Localizer.Format("FlowNoOpenSends", "Aux"), FlowGraph.ExplainOutput(vm, "aux:port"));
+        vm.Channels[0].Sends[0].ApplyFromDaemon(.5, false);
+        Assert.Equal(Localizer.Format("FlowSeveralSendsClosed", 2, "Aux"), FlowGraph.ExplainOutput(vm, "aux:port"));
     }
 
     [Fact]

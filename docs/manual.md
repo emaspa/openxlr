@@ -983,6 +983,12 @@ The dots indicate routing, not measured audio levels. Click the card again,
 click empty space, press Escape or use **Clear selection** to show every route.
 Cards also work with Tab and Enter or Space. Selection does not change routing.
 
+Select an output to see what its mixer settings allow. Flow reports a missing
+device, paused monitoring, an unavailable or disabled USB Aux port, or muted mix
+feeds and closed sends. An output with several feeds gets a line for each mix.
+Hover over the explanation to read the full text. Use the meters to check the
+signal and the device's own controls to check its volume and mute.
+
 Input and mix processing appears in an FX row inside its card. Hover over the
 card for the full chain in signal order, including bypass and error states.
 Outputs follow the selected monitor feeds, including outputs where both

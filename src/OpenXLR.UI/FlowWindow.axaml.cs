@@ -32,7 +32,12 @@ public partial class FlowWindow : Window
     public FlowWindow()
     {
         InitializeComponent();
-        GraphScroll.SizeChanged += (_, _) => RenderGraph();
+        GraphScroll.SizeChanged += (_, _) =>
+        {
+            // The explanation can change only the viewport height. Keep the
+            // existing cards and keyboard focus while the graph fits as before.
+            if (GraphCanvas.Width != GraphWidth) RenderGraph();
+        };
         GraphCanvas.PointerPressed += (_, e) =>
         {
             if (e.Source == GraphCanvas) Select(null);
@@ -66,7 +71,10 @@ public partial class FlowWindow : Window
     private void OnStatePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(MainViewModel.DaemonConnected) or nameof(MainViewModel.HasMixer))
+        {
             UpdateHint();
+            UpdateOutputStatus();
+        }
     }
 
     /// <summary>
@@ -88,7 +96,11 @@ public partial class FlowWindow : Window
         FlowGraph next = FlowGraph.From(_vm);
         UpdateHint();
         UpdateClock();
-        if (_graph.Nodes.SequenceEqual(next.Nodes) && _graph.Routes.SequenceEqual(next.Routes)) return;
+        if (_graph.Nodes.SequenceEqual(next.Nodes) && _graph.Routes.SequenceEqual(next.Routes))
+        {
+            UpdateOutputStatus();
+            return;
+        }
         _graph = next;
         if (_selected is not null && !_graph.Nodes.Any(n => n.Key == _selected)) _selected = null;
         RenderGraph();
@@ -99,6 +111,16 @@ public partial class FlowWindow : Window
         FlowHint.Text = _vm is { DaemonConnected: false } ? Localizer.Text("FlowDaemonDisconnected")
             : _vm is { HasMixer: false } ? Localizer.Text("FlowSubmixerOff")
             : Localizer.Text("ClickAnyElementToTraceItsSignalPath");
+    }
+
+    private void UpdateOutputStatus()
+    {
+        string? status = _vm is { DaemonConnected: true, HasMixer: true } && _selected is { } key
+            ? FlowGraph.ExplainOutput(_vm, key) : null;
+        FlowOutputStatus.IsVisible = status is not null;
+        if (FlowOutputStatus.Text == status) return;
+        FlowOutputStatus.Text = status;
+        ToolTip.SetTip(FlowOutputStatus, status);
     }
 
     /// <summary>The clock lines under the hint: the driver, and each microphone resampled to it.</summary>
@@ -130,16 +152,18 @@ public partial class FlowWindow : Window
         => new(Math.Min(desired.Width, Math.Max(1, workingArea.Width / scaling - decoration.Width)),
             Math.Min(desired.Height, Math.Max(1, workingArea.Height / scaling - decoration.Height)));
 
+    // Auto-size against a fixed natural width. Once the user resizes the
+    // window, Avalonia switches SizeToContent to Manual and the graph adapts.
+    private double GraphWidth => SizeToContent == SizeToContent.Manual
+        ? Math.Max(1040, GraphScroll.Bounds.Width - 16) : 1208;
+
     private void RenderGraph()
     {
         Canvas canvas = GraphCanvas;
         canvas.Children.Clear();
         _cards.Clear();
         _routes.Clear();
-        // Auto-size against a fixed natural width. Once the user resizes the
-        // window, Avalonia switches SizeToContent to Manual and the graph adapts.
-        double width = SizeToContent == SizeToContent.Manual
-            ? Math.Max(1040, GraphScroll.Bounds.Width - 16) : 1208;
+        double width = GraphWidth;
         double gap = Math.Clamp(width * 0.075, 72, 140);
         double cardWidth = (width - 3 * gap) / 4;
         double X(FlowStage stage) => (int)stage * (cardWidth + gap);
@@ -227,6 +251,7 @@ public partial class FlowWindow : Window
     {
         _selected = key;
         ClearSelection.IsEnabled = key is not null;
+        UpdateOutputStatus();
         HashSet<FlowRoute>? path = key is null ? null : _graph.Trace(key);
         var related = path?.SelectMany(r => new[] { r.From, r.To }).ToHashSet() ?? [];
         if (key is not null) related.Add(key);

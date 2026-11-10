@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.Json.Nodes;
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Primitives;
@@ -75,7 +76,58 @@ public sealed partial class SkinWindowTests
             AppearanceModeWindowTests.Check(main, options, flow);
             TouchControlsWindowTests.Check(main, options, flow);
             AudioClockWindowTests.Check(main, options, flow);
+            FlowExplainsTheSelectedOutputAsStateChanges(main, flow);
         });
+    }
+
+    private static void FlowExplainsTheSelectedOutputAsStateChanges(MainWindow main, FlowWindow flow)
+    {
+        var vm = (MainViewModel)main.DataContext!;
+        MethodInfo apply = typeof(MainViewModel).GetMethod("Apply", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var state = JsonNode.Parse("""
+            {
+              "type":"state",
+              "devices":[{"name":"headset","description":"Headset","kind":0}],
+              "mixer":{
+                "monitorOutputs":["headset"],
+                "mixes":[{"id":"monitor","name":"Monitor A","kind":"monitor"}],
+                "channels":[{"id":"voice","name":"Voice Chat","levels":{"monitor":0}}]
+              }
+            }
+            """)!;
+        void Update()
+        {
+            apply.Invoke(vm, [state]);
+            flow.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+        }
+
+        Update();
+        TextBlock explanation = flow.FindControl<TextBlock>("FlowOutputStatus")!;
+        Assert.False(explanation.IsVisible);
+        Button output = flow.GetVisualDescendants().OfType<Button>()
+            .Single(b => b.Classes.Contains("flowNode") && AutomationProperties.GetName(b)?.StartsWith("Headset,", StringComparison.Ordinal) == true);
+        output.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        flow.UpdateLayout();
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(explanation.IsEffectivelyVisible);
+        Assert.Equal(Localizer.Format("FlowSendAtZero", "Voice Chat", "Monitor A"), explanation.Text);
+        Assert.Contains(output, flow.GetVisualDescendants());
+
+        // The zero-level send has no line in either state. Its explanation
+        // still changes even though the graph's cards and routes are identical.
+        state["mixer"]!["channels"]![0]!["mutedIn"] = new JsonArray("monitor");
+        Update();
+        Assert.Equal(Localizer.Format("FlowSendMuted", "Voice Chat", "Monitor A"), explanation.Text);
+        Assert.Contains(output, flow.GetVisualDescendants());
+
+        state["devices"] = new JsonArray();
+        Update();
+        Assert.Equal(Localizer.Text("FlowOutputDisconnected"), explanation.Text);
+        state["mixer"]!["monitorOutputs"] = new JsonArray();
+        Update();
+        Assert.False(explanation.IsVisible);
+        Assert.False(flow.FindControl<Button>("ClearSelection")!.IsEnabled);
     }
 
     private static void SkinsReachOpenWindowsAndTheDefaultComesBackExactly(

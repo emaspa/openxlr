@@ -883,6 +883,39 @@
   <data name="FlowSubmixerOff" xml:space="preserve">
     <value>Aktiviere den Submixer in den Einstellungen, um den Signalfluss zu sehen.</value>
   </data>
+  <data name="FlowOutputDisconnected" xml:space="preserve">
+    <value>Der ausgewählte Ausgang ist nicht verbunden.</value>
+  </data>
+  <data name="FlowMonitoringPaused" xml:space="preserve">
+    <value>Das Abhören ist pausiert.</value>
+  </data>
+  <data name="FlowAuxPortDisabled" xml:space="preserve">
+    <value>Der USB-Aux-Ausgang ist ausgeschaltet.</value>
+  </data>
+  <data name="FlowNoOutputFeed" xml:space="preserve">
+    <value>Diesem Ausgang ist kein Mix zugewiesen.</value>
+  </data>
+  <data name="FlowFeedMuted" xml:space="preserve">
+    <value>{0} ist stummgeschaltet.</value>
+  </data>
+  <data name="FlowFeedAtZero" xml:space="preserve">
+    <value>{0} steht auf 0 %.</value>
+  </data>
+  <data name="FlowSendMuted" xml:space="preserve">
+    <value>Der Send von {0} an {1} ist stummgeschaltet.</value>
+  </data>
+  <data name="FlowSendAtZero" xml:space="preserve">
+    <value>Der Send von {0} an {1} steht auf 0 %.</value>
+  </data>
+  <data name="FlowNoOpenSends" xml:space="preserve">
+    <value>Kein Kanal-Send an {0} ist offen.</value>
+  </data>
+  <data name="FlowSeveralSendsClosed" xml:space="preserve">
+    <value>{0} Kanal-Sends an {1} sind stumm oder stehen auf 0 %.</value>
+  </data>
+  <data name="FlowOpenSends" xml:space="preserve">
+    <value>Die Kanal-Sends an {0} sind offen.</value>
+  </data>
   <data name="FlowVolume" xml:space="preserve">
     <value>Lautst. {0}</value>
   </data>

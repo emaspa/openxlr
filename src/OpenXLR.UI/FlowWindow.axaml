@@ -32,6 +32,9 @@
         <TextBlock Name="FlowClock" FontSize="{DynamicResource UiText.FontSize12}" Foreground="{DynamicResource Ox.Flow.TextDim}" IsVisible="False"/>
         <TextBlock Name="FlowClockWarning" FontSize="{DynamicResource UiText.FontSize12}" Foreground="{DynamicResource Ox.Text.Warning}"
                    TextWrapping="Wrap" IsVisible="False"/>
+        <TextBlock Name="FlowOutputStatus" FontSize="{DynamicResource UiText.FontSize12}"
+                   Foreground="{DynamicResource Ox.Flow.Text}" TextWrapping="Wrap"
+                   MaxLines="3" TextTrimming="CharacterEllipsis" IsVisible="False"/>
       </StackPanel>
       <Button Name="ClearSelection" Grid.Column="1" Content="{loc:Text Key=ClearSelection}" Click="OnClearSelection"
               VerticalAlignment="Center" FontSize="{DynamicResource UiText.FontSize12}" Background="{DynamicResource Ox.Flow.Card}" Foreground="{DynamicResource Ox.Flow.Text}"
