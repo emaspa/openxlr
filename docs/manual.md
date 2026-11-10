@@ -1018,6 +1018,8 @@ An app's playback streams and audio client share the same identity even
 when PipeWire puts the process name only on the client. Windows executable
 names such as `Balatro.exe` use the same normalized key as their Wine or
 Proton client, so the app keeps one entry and one channel assignment.
+An app whose name has a space in it, such as Music Player, is kept under
+one key too, and its assignment applies to its streams.
 WebKitGTK apps go by their own name, not the shared `WebKitWebProcess`;
 an app saved under that shared name before keeps its channel under its
 own. The list spells a name the way the app's desktop entry does, so

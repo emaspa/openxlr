@@ -182,8 +182,24 @@ public sealed record AudioStream(int Id, string? AppName, string? Binary, string
     /// the name and with probe media names, so without this a single game used
     /// to register under several identities. The media name stays as the last
     /// resort separator for games that never set a name.
+    /// <para>
+    /// A name with a space in it, as a program without a process binary or a
+    /// WebKitGTK application can have, is collapsed the way
+    /// <see cref="StreamMatcher.MigrateIdentity"/> collapses a stored one, so
+    /// a live stream and its saved assignment always meet on one key.
+    /// Plumbing keeps its spelling; it is recognised by it and never stored.
+    /// </para>
     /// </summary>
     public string Identity
+    {
+        get
+        {
+            string published = PublishedIdentity;
+            return PipeWireAdapter.IsPlumbingIdentity(published) ? published : StreamMatcher.MigrateIdentity(published);
+        }
+    }
+
+    private string PublishedIdentity
     {
         get
         {

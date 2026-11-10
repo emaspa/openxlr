@@ -85,6 +85,47 @@ public sealed class AppRoutingPolicyTests
         Assert.Equal(StreamMatcher.Ignore, Assert.Single(graph.Mixer.Snapshot().Streams).ChannelId);
     }
 
+    [Theory]
+    [InlineData("\"application.name\":\"Music Player\"", "Music Player")]
+    [InlineData("\"application.process.binary\":\"Music Player.x86_64\",\"application.name\":\"Music Player\"", "Music Player.x86_64")]
+    [InlineData("\"application.process.binary\":\"WebKitWebProcess\",\"application.name\":\"News Flash\"", "News Flash")]
+    public void AnApplicationWithASpaceInItsNameKeepsOneEntryAndItsAssignment(string props, string published)
+    {
+        using var graph = new BrowserGraph(props);
+        graph.Build();
+        graph.Mixer.SyncStreams();
+        StreamAssignment listed = Assert.Single(graph.Mixer.Snapshot().Streams);
+        Assert.Equal(StreamMatcher.MigrateIdentity(published), listed.Identity);
+        Assert.DoesNotContain(' ', listed.Identity);
+        Assert.Equal("system", listed.ChannelId);
+        graph.ClearCalls();
+
+        // A client may still send the name as the application published it.
+        graph.Mixer.AssignApp(published, "music");
+        graph.Mixer.SyncStreams();
+        Assert.Contains("move-sink-input 100 OpenXLR_ch_music", graph.Calls);
+        StreamAssignment assigned = Assert.Single(graph.Mixer.Snapshot().Streams);
+        Assert.Equal((listed.Identity, "music", true), (assigned.Identity, assigned.ChannelId, assigned.Active));
+        Assert.Equal("music", Assert.Single(graph.Mixer.ExportSettings().AppOverrides).Value);
+
+        // Settings written while the live name and the stored one disagreed
+        // hold both; they come back as the one entry, with the assignment.
+        MixerSettings saved = graph.Mixer.ExportSettings();
+        saved = saved with { KnownApps = [new SavedApp(published, published, "system"), .. saved.KnownApps] };
+        using var restored = new Mixer();
+        graph.Build(restored);
+        restored.ApplySettings(saved);
+        graph.SetStreamSink(1);
+        graph.ClearCalls();
+        restored.SyncStreams();
+        Assert.Contains("move-sink-input 100 OpenXLR_ch_music", graph.Calls);
+        StreamAssignment again = Assert.Single(restored.Snapshot().Streams);
+        Assert.Equal((listed.Identity, "music", true), (again.Identity, again.ChannelId, again.Active));
+
+        restored.ForgetApp(published);
+        Assert.Empty(restored.ExportSettings().AppOverrides);
+    }
+
     [Fact]
     public void ADesktopOutputIsLeftAloneAndBrowserPreservationStillWins()
     {
