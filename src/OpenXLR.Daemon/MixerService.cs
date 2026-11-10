@@ -1416,6 +1416,10 @@ public sealed partial class MixerService : IHostedService, IDisposable
                     else _mixer.AssignBrowserTab(cmd.Session!, cmd.TabId!.Value, cmd.Site!, cmd.Channel, false, _ => null);
                     Changed?.Invoke();
                     return null;
+                case "setOutputVolumeLock":
+                    _saves.RunSaved(() => _mixer.SetOutputVolumeLock(cmd.Value.GetBoolean(), settings => settings.Save()));
+                    Changed?.Invoke();
+                    return null;
                 case "setRouteAppsByDefault":
                     _saves.RunSaved(() => _mixer.SetRouteAppsByDefault(cmd.Value.GetBoolean(), s => s.Save()));
                     Changed?.Invoke();
@@ -1590,7 +1594,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
                     SyncOutputSelectors();   // the jacks may now follow another mix's XLR 1 send
                     break;
                 case "setOutputVolume":
-                    _mixer.SetOutputVolume(cmd.Value.GetDouble());
+                    _mixer.SetSharedOutputVolume(cmd.Value.GetDouble());
                     SyncOutputSelectors();   // the Pro's microphone paths follow the output volume on the jacks
                     break;
                 case "setEnforcedDefaults":

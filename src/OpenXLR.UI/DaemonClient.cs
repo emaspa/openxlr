@@ -756,6 +756,9 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
     public Task<string?> ToggleMonitorMutedAsync()
         => EditLayoutAsync(new Dictionary<string, object> { ["cmd"] = "toggleMonitorMuted" });
 
+    public Task<string?> SetOutputVolumeLockAsync(bool value)
+        => EditLayoutAsync(new() { ["cmd"] = "setOutputVolumeLock", ["value"] = value });
+
     public Task<string?> SetMonitorMuteMicrophonesAsync(bool value)
         => EditLayoutAsync(new Dictionary<string, object> { ["cmd"] = "setMonitorMuteMicrophones", ["value"] = value });
 

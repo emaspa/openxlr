@@ -645,6 +645,10 @@ that was the default.
    the MONITOR selection updates that default on the next sweep (about one
    second). No selected output means no default is enforced.
 
+   **Lock active output volume**, in the same group, holds an output at its
+   current level. While it holds the first selected device, this slider and
+   its **150%** button are disabled ([section 3.7](#default-devices)).
+
    Desktop changes appear in the MONITOR slider on the next sweep and also
    update the other selected monitor outputs, at the level the desktop
    chose: a desktop that boosts past 100% sets the other outputs there too,
@@ -2824,6 +2828,31 @@ hold; it re-asserts them once a second and reverts any outside change.
 
 Stopping the daemon waits for a repair in progress to stop, so nothing
 changes the desktop's default devices after the daemon has exited.
+
+**Lock active output volume**, in the same group, holds one output at the
+volume it has when you tick the box. OpenXLR takes the Default output chosen
+above it. With "(don't enforce)" it takes the desktop's default output, and
+when either one is an OpenXLR device it takes the first selected MONITOR
+output. A line under the box names the output and the held level.
+
+OpenXLR reads that output once a second and puts the held level back after
+an outside change, a change to one side of a stereo output included. It
+keeps the channel balance as long as the output keeps its channel count.
+The lock stays with its output across a restart of OpenXLR, a reconnection
+of the device and a change of the default. To lock a different output,
+untick the box, choose the output and tick the box again. Profiles do not
+save the lock, and recalling one leaves a locked output at its level.
+
+While the first MONITOR output is locked, the MONITOR Volume slider and its
+**150%** button are disabled. The terminal mixer's Outputs tab shows the
+held level as locked, and a Stream Deck dial for that volume reads LOCKED
+and sends nothing when turned. Mix faders, headphone gain, the mute controls
+and the volume of every other output keep working.
+
+On a Wave XLR Pro in hardware mixing the unit sets the level of its jacks,
+so a lock on the Pro's sink waits from the switch to This unit until you
+switch back to This computer. OpenXLR then writes the held level and
+balance before it reconnects the computer's mixes to the jacks.
 
 <a name="hardware-only"></a>
 ### 3.8 Hardware control only
@@ -5559,7 +5588,10 @@ its output is muted. Output-selection keys indicate the enforced choice. A
 Dial can also take a target from the **Outputs** group, the system default or
 any controllable output: turning it sets that output's desktop volume, up to
 150%, and pressing it toggles the mute; the ring shows the level and the
-mute. These Deck actions only
+mute. On an output whose volume is locked
+([section 3.7](#default-devices)) the dial reads LOCKED and a turn sends
+nothing, the Deck's louder and quieter keys are drawn as unavailable, and a
+PC shortcut for its volume is refused. The mute keeps working. These Deck actions only
 need the daemon. PC shortcuts also need the running UI and a desktop supporting
 the GlobalShortcuts portal, but do not need KDE's focused-window integration.
 Desktop shortcuts are explicitly selected in the portal; existing media-key

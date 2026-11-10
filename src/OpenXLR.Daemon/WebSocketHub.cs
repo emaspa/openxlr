@@ -470,6 +470,7 @@ public sealed class WebSocketHub
             case "toggleMonitorMuted":
             case "setMonitorFeed":
             case "setOutputVolume":
+            case "setOutputVolumeLock":
             case "setEnforcedDefaults":
             case "setAuxPortEnabled":
             case "setMixing":

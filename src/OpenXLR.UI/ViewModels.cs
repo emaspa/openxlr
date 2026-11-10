@@ -717,7 +717,11 @@ public sealed partial class MainViewModel : ViewModelBase
         set
         {
             OutputVolumeRange.Include(value);
-            if (Set(ref _outputVolume, value) && !_applying)
+            // The daemon refuses the shared volume while its first output is
+            // locked. The slider is disabled then, and a value the range
+            // coerces (the desktop can close the boost range) is not sent:
+            // the next state brings the held level back.
+            if (Set(ref _outputVolume, value) && !_applying && !MonitorVolumeLocked)
             {
                 double v = value;
                 SliderSync.Touch("outvol");
@@ -727,6 +731,74 @@ public sealed partial class MainViewModel : ViewModelBase
         }
     }
     public string OutputVolumeText => $"{_outputVolume * 100:0}%";
+
+    private bool _outputVolumeLockReported;
+    public bool OutputVolumeLockReported
+    {
+        get => _outputVolumeLockReported;
+        private set => Set(ref _outputVolumeLockReported, value);
+    }
+
+    private bool _outputVolumeLocked;
+    public bool OutputVolumeLocked
+    {
+        get => _outputVolumeLocked;
+        private set => Set(ref _outputVolumeLocked, value);
+    }
+
+    private bool _monitorVolumeLocked;
+    public bool MonitorVolumeLocked
+    {
+        get => _monitorVolumeLocked;
+        private set => Set(ref _monitorVolumeLocked, value);
+    }
+
+    private string? _outputVolumeLockNote;
+    public string? OutputVolumeLockNote
+    {
+        get => _outputVolumeLockNote;
+        private set => Set(ref _outputVolumeLockNote, value);
+    }
+
+    private bool _outputVolumeLockBusy;
+    public bool OutputVolumeLockBusy
+    {
+        get => _outputVolumeLockBusy;
+        private set => Set(ref _outputVolumeLockBusy, value);
+    }
+
+    private string? _outputVolumeLockError;
+    public string? OutputVolumeLockError
+    {
+        get => _outputVolumeLockError;
+        private set => Set(ref _outputVolumeLockError, value);
+    }
+
+    public async Task SetOutputVolumeLockAsync(bool value)
+    {
+        if (OutputVolumeLockBusy || !OutputVolumeLockReported || !CanEditLayout || value == OutputVolumeLocked) return;
+        OutputVolumeLockBusy = true;
+        OutputVolumeLockError = null;
+        try { OutputVolumeLockError = await _client.SetOutputVolumeLockAsync(value); }
+        finally { OutputVolumeLockBusy = false; }
+    }
+
+    private void ApplyOutputVolumeLock(JsonNode? mixer)
+    {
+        OutputVolumeLockReported = mixer is JsonObject obj && obj.ContainsKey("outputVolumeLock");
+        JsonNode? held = mixer?["outputVolumeLock"];
+        OutputVolumeLocked = held is not null;
+        MonitorVolumeLocked = mixer?["monitorVolumeLocked"]?.GetValue<bool>() ?? false;
+        if (held?["device"]?.GetValue<string>() is { } device && held["volume"]?.GetValue<double>() is { } volume)
+        {
+            string label = Outputs.FirstOrDefault(output => output.Name == device)?.Description ?? device;
+            bool suspended = mixer?["outputVolumeLockSuspended"]?.GetValue<bool>() ?? false;
+            OutputVolumeLockNote = suspended
+                ? Localizer.Format("OutputVolumeLockSuspended", label, volume * 100)
+                : Localizer.Format("OutputVolumeLockHolding", label, volume * 100);
+        }
+        else OutputVolumeLockNote = null;
+    }
 
     private bool _monitorMuted;
     /// <summary>Monitoring is paused; the optional microphone pause leaves saved sends and mutes unchanged.</summary>
@@ -1246,7 +1318,7 @@ public sealed partial class MainViewModel : ViewModelBase
         EnforcedDefaultSink = mixer?["enforcedDefaultSink"]?.GetValue<string>();
         EnforcedDefaultSource = mixer?["enforcedDefaultSource"]?.GetValue<string>();
 
-        if (!SliderSync.RecentlyTouched("outvol"))
+        if (mixer?["monitorVolumeLocked"]?.GetValue<bool>() == true || !SliderSync.RecentlyTouched("outvol"))
             OutputVolume = mixer?["outputVolume"]?.GetValue<double>() ?? 0;
 
         foreach (MonitorOutputItem item in MonitorOutputs) item.Sync(current.Contains(item.Name));
@@ -1480,6 +1552,7 @@ public sealed partial class MainViewModel : ViewModelBase
 
     private void ApplyMixer(JsonNode? mixer)
     {
+        ApplyOutputVolumeLock(mixer);
         MonitorMuted = mixer?["monitorMuted"]?.GetValue<bool>() ?? false;
         _reportedMonitorMuteMicrophones = mixer?["monitorMuteMicrophones"]?.GetValue<bool>() ?? false;
         if (mixer is null) CancelMonitorMicrophoneEdit();

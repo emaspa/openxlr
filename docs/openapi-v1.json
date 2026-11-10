@@ -556,6 +556,13 @@
                     "remember": true
                   }
                 },
+                "lockActiveOutputVolume": {
+                  "summary": "Hold the active PipeWire output at its current volume",
+                  "value": {
+                    "cmd": "setOutputVolumeLock",
+                    "value": true
+                  }
+                },
                 "includeMicrophonesInMonitoringPause": {
                   "summary": "Include OpenXLR microphone sends in the monitoring pause",
                   "value": {

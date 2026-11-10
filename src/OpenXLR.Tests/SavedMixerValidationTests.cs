@@ -74,6 +74,29 @@ public sealed class SavedMixerValidationTests
         });
     }
 
+    [Theory]
+    [InlineData("""{"device":"headset"}""")]
+    [InlineData("""{"volume":0.5}""")]
+    [InlineData("""{"device":"@DEFAULT_SINK@","volume":0.5}""")]
+    [InlineData("""{"device":"42","volume":0.5}""")]
+    [InlineData("""{"device":"headset#hp1","volume":0.5}""")]
+    [InlineData("""{"device":"OpenXLR_ch_system","volume":0.5}""")]
+    [InlineData("""{"device":"headset","volume":-0.1}""")]
+    [InlineData("""{"device":"headset","volume":1.51}""")]
+    [InlineData("""{"device":"headset","volume":1e999}""")]
+    public void MalformedSavedOutputLocksAreDiscarded(string outputLock)
+    {
+        InConfig(root =>
+        {
+            string path = Path.Combine(root, "mixer.json");
+            File.WriteAllText(path, $$"""{"outputVolumeLock":{{outputLock}},"monitorOutputs":["headset"]}""");
+            MixerSettings loaded = Assert.IsType<MixerSettings>(MixerSettings.Load(path, out string? warning));
+            Assert.Contains("outputVolumeLock", warning);
+            Assert.Null(loaded.OutputVolumeLock);
+            Assert.Equal(["headset"], loaded.MonitorOutputs);
+        });
+    }
+
     [Fact]
     public void RememberedOutputLabelsSurviveASaveAndStayOutOfProfiles()
     {

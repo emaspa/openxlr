@@ -50,6 +50,11 @@ public sealed class MonitorVolumeSyncTests
                     /bin/cat "$dir/mute"
                     exit
                 fi
+                if [ "$1" = get-sink-volume ]; then
+                    /bin/cat "$dir/volume"
+                    exit
+                fi
+                if [ "$1" = set-sink-volume ] && [ -f "$dir/fail-volume" ]; then exit 1; fi
                 if [ "$1" = set-sink-mute ]; then
                     if [ -f "$dir/fail" ]; then
                         left=$(/bin/cat "$dir/fail")
@@ -86,6 +91,28 @@ public sealed class MonitorVolumeSyncTests
 
         public void SelectExternalOutput() => ((List<string>)typeof(Mixer).GetField("_monitorOutputs", BindingFlags.Instance | BindingFlags.NonPublic)!
             .GetValue(Mixer)!).Add("external");
+
+        public void TraceJackLinks() => ExecutableScript.Write(Path.Combine(_dir, "pw-link"), """
+            dir=${0%/*}
+            case "$1" in
+                -o) printf 'OpenXLR_mix_monitor:monitor_FL\nOpenXLR_mix_monitor:monitor_FR\n' ;;
+                -i) printf 'external:playback_FL\nexternal:playback_FR\nexternal:playback_AUX0\nexternal:playback_AUX1\n' ;;
+                -*) ;;
+                *) printf 'link %s\n' "$*" >> "$dir/writes" ;;
+            esac
+            """);
+
+        public void OutputVolume(int left, int right) => File.WriteAllText(Path.Combine(_dir, "volume"),
+            $"Volume: front-left: 0 / {left}% / 0 dB, front-right: 0 / {right}% / 0 dB");
+
+        public void OutputVolumeUnreadable() => File.Delete(Path.Combine(_dir, "volume"));
+
+        public void RefuseVolumeWrite(bool refuse)
+        {
+            string marker = Path.Combine(_dir, "fail-volume");
+            if (refuse) File.WriteAllText(marker, "");
+            else File.Delete(marker);
+        }
 
         public void DirectMute(bool muted) => File.WriteAllText(Path.Combine(_dir, "mute"), muted ? "Mute: yes\n" : "Mute: no\n");
         public void DefaultSink(string name) => File.WriteAllText(Path.Combine(_dir, "default"), name + "\n");
@@ -147,6 +174,148 @@ public sealed class MonitorVolumeSyncTests
                 Directory.Delete(_dir, recursive: true);
             }
         }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LeavingHardwareMixingRestoresTheLockBeforeRelinkingJacks(bool refused)
+    {
+        using var sinks = new Sinks();
+        var mixer = sinks.Mixer;
+        sinks.Dump(1, externalMuted: false);
+        sinks.TraceJackLinks();
+        sinks.OutputVolume(35, 70);
+        mixer.SetMonitorOutputs(["external#hp1"]);
+        mixer.SetMainOutput("external");
+        mixer.SetOutputVolumeLock(true, _ => null);
+
+        mixer.BeginHardwareMixing(new HardwareEntry { OutputVolume = .9 });
+        mixer.EnterHardwareGraph(new Dictionary<string, int>(), new Dictionary<string, int>());
+        Assert.True(mixer.Snapshot().OutputVolumeLockSuspended);
+        sinks.OutputVolume(100, 100);
+        sinks.RefuseVolumeWrite(refused);
+
+        int before = sinks.Writes.Length;
+        mixer.LeaveHardwareMixing();
+        string[] writes = sinks.Writes[before..];
+        const string restore = "set-sink-volume external 35% 70%";
+        int restored = Array.IndexOf(writes, restore);
+        int linked = Array.FindIndex(writes, write => write.StartsWith("link ", StringComparison.Ordinal));
+        Assert.True(restored >= 0 && linked > restored, string.Join(Environment.NewLine, writes));
+        Assert.Single(writes, write => write.StartsWith("set-sink-volume ", StringComparison.Ordinal));
+        Assert.False(mixer.Snapshot().OutputVolumeLockSuspended);
+        Assert.Equal([.35, .70], Assert.IsType<double[]>(mixer.Snapshot().OutputVolumeLock!.ChannelVolumes));
+
+        if (!refused) return;
+        sinks.RefuseVolumeWrite(false);
+        mixer.SyncDeviceVolumes();
+        Assert.Single(sinks.Writes[before..], write => write == restore);
+        sinks.Now = 3000;
+        mixer.SyncDeviceVolumes();
+        Assert.Equal(2, sinks.Writes[before..].Count(write => write == restore));
+    }
+
+    [Fact]
+    public void LeavingHardwareMixingWritesTheHeldLevelWhenTheSinkCannotBeRead()
+    {
+        using var sinks = new Sinks();
+        var mixer = sinks.Mixer;
+        sinks.Dump(1, externalMuted: false);
+        sinks.TraceJackLinks();
+        sinks.OutputVolume(35, 70);
+        mixer.SetMonitorOutputs(["external#hp1"]);
+        mixer.SetMainOutput("external");
+        mixer.SetOutputVolumeLock(true, _ => null);
+        mixer.BeginHardwareMixing(new HardwareEntry { OutputVolume = .9 });
+        mixer.EnterHardwareGraph(new Dictionary<string, int>(), new Dictionary<string, int>());
+        sinks.OutputVolumeUnreadable();
+
+        int before = sinks.Writes.Length;
+        mixer.LeaveHardwareMixing();
+        string[] writes = sinks.Writes[before..];
+        // The mode left the sink at 100%, so the jacks are not relinked on a level nobody could read.
+        int restored = Array.IndexOf(writes, "set-sink-volume external 35% 70%");
+        int linked = Array.FindIndex(writes, write => write.StartsWith("link ", StringComparison.Ordinal));
+        Assert.True(restored >= 0 && linked > restored, string.Join(Environment.NewLine, writes));
+        Assert.Single(writes, write => write.StartsWith("set-sink-volume ", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void LeavingHardwareMixingWithoutALockGivesTheSinkTheModesVolume()
+    {
+        using var sinks = new Sinks();
+        var mixer = sinks.Mixer;
+        sinks.Dump(1, externalMuted: false);
+        sinks.TraceJackLinks();
+        sinks.OutputVolume(100, 100);
+        mixer.SetMonitorOutputs(["external#hp1"]);
+        mixer.SetMainOutput("external");
+        mixer.BeginHardwareMixing(new HardwareEntry { OutputVolume = .9 });
+        mixer.EnterHardwareGraph(new Dictionary<string, int>(), new Dictionary<string, int>());
+
+        int before = sinks.Writes.Length;
+        mixer.LeaveHardwareMixing();
+        string[] writes = sinks.Writes[before..];
+        int restored = Array.IndexOf(writes, "set-sink-volume external 90%");
+        int linked = Array.FindIndex(writes, write => write.StartsWith("link ", StringComparison.Ordinal));
+        Assert.True(restored >= 0 && linked > restored, string.Join(Environment.NewLine, writes));
+        Assert.Single(writes, write => write.StartsWith("set-sink-volume ", StringComparison.Ordinal));
+        Assert.Null(mixer.Snapshot().OutputVolumeLock);
+    }
+
+    [Fact]
+    public void TheLockWaitsWhileTheModeIsKeptAndTheGraphHasNotEntered()
+    {
+        using var sinks = new Sinks();
+        var mixer = sinks.Mixer;
+        sinks.Dump(1, externalMuted: false);
+        sinks.TraceJackLinks();
+        sinks.OutputVolume(35, 70);
+        mixer.SetMonitorOutputs(["external#hp1"]);
+        mixer.SetMainOutput("external");
+        mixer.SetOutputVolumeLock(true, _ => null);
+
+        // A restart in the mode: the entry is kept, the sink still holds the
+        // 100% the mode pinned, and the graph enters a sweep or two later.
+        mixer.BeginHardwareMixing(new HardwareEntry { OutputVolume = .9 });
+        sinks.OutputVolume(100, 100);
+        int before = sinks.Writes.Length;
+        mixer.SyncDeviceVolumes();
+        Assert.DoesNotContain(sinks.Writes[before..], write => write.StartsWith("set-sink-volume ", StringComparison.Ordinal));
+        MixerState waiting = mixer.Snapshot();
+        Assert.True(waiting.OutputVolumeLockSuspended);
+        Assert.False(waiting.MonitorVolumeLocked);
+
+        mixer.EnterHardwareGraph(new Dictionary<string, int>(), new Dictionary<string, int>());
+        mixer.SyncDeviceVolumes();
+        Assert.DoesNotContain(sinks.Writes[before..], write => write.StartsWith("set-sink-volume ", StringComparison.Ordinal));
+        Assert.True(mixer.Snapshot().OutputVolumeLockSuspended);
+    }
+
+    [Fact]
+    public void TheSharedOutputVolumeIsRefusedWhileItsFirstOutputIsLocked()
+    {
+        using var sinks = new Sinks();
+        var mixer = sinks.Mixer;
+        sinks.Dump(1, externalMuted: false);
+        sinks.OutputVolume(60, 60);
+        mixer.SetMonitorOutputs(["external"]);
+        mixer.SetMainOutput("external");
+        mixer.SetOutputVolumeLock(true, _ => null);
+        Assert.True(mixer.Snapshot().MonitorVolumeLocked);
+
+        int before = sinks.Writes.Length;
+        string named = Assert.Throws<InvalidOperationException>(() => mixer.SetOutputDeviceVolume("external", .3)).Message;
+        Assert.Equal(named, Assert.Throws<InvalidOperationException>(() => mixer.SetSharedOutputVolume(.3)).Message);
+        // A profile recall carries an output volume too. It leaves the locked output alone and is not an error.
+        mixer.SetOutputVolume(.3);
+        Assert.DoesNotContain(sinks.Writes[before..], write => write.StartsWith("set-sink-volume ", StringComparison.Ordinal));
+        Assert.Equal(.6, mixer.Snapshot().OutputVolume);
+
+        mixer.SetOutputVolumeLock(false, _ => null);
+        mixer.SetSharedOutputVolume(.3);
+        Assert.Contains("set-sink-volume external 30%", sinks.Writes[before..]);
     }
 
     [Theory]

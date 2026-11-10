@@ -252,6 +252,24 @@
                   </ComboBox>
                 </Grid>
 
+                <StackPanel Spacing="4" IsVisible="{Binding Main.OutputVolumeLockReported}">
+                  <CheckBox Name="ActiveOutputVolumeLock" IsChecked="{Binding Main.OutputVolumeLocked, Mode=OneWay}"
+                            Click="OnOutputVolumeLock" AutomationProperties.Name="{loc:Text Key=LockActiveOutputVolume}">
+                    <CheckBox.IsEnabled>
+                      <MultiBinding Converter="{x:Static BoolConverters.And}">
+                        <Binding Path="Main.CanEditLayout"/>
+                        <Binding Path="!Main.OutputVolumeLockBusy"/>
+                      </MultiBinding>
+                    </CheckBox.IsEnabled>
+                    <TextBlock Text="{loc:Text Key=LockActiveOutputVolume}" TextWrapping="Wrap"/>
+                  </CheckBox>
+                  <TextBlock Text="{loc:Text Key=LockActiveOutputVolumeHint}" Classes="hint" TextWrapping="Wrap"/>
+                  <TextBlock Text="{Binding Main.OutputVolumeLockNote}" Classes="hint" TextWrapping="Wrap"
+                             IsVisible="{Binding Main.OutputVolumeLockNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                  <TextBlock Text="{Binding Main.OutputVolumeLockError}" Classes="warn" TextWrapping="Wrap"
+                             IsVisible="{Binding Main.OutputVolumeLockError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                </StackPanel>
+
                 <TextBlock Text="{loc:Text Key=TipEnforcingOpenXLRChatAsDefaultInputMakes}"
                            FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
               </StackPanel>

@@ -1379,6 +1379,18 @@
   <data name="OptionsTabSupport" xml:space="preserve">
     <value>Подршка</value>
   </data>
+  <data name="LockActiveOutputVolume" xml:space="preserve">
+    <value>Закључај јачину активног излаза</value>
+  </data>
+  <data name="LockActiveOutputVolumeHint" xml:space="preserve">
+    <value>Држи један излаз на јачини коју сада има: Подраз. излаз изабран изнад, иначе подразумевани излаз радне површине. Ако је то OpenXLR уређај, држи се први излаз МОНИТОРА. Да закључаш други излаз, искључи закључавање па га поново укључи.</value>
+  </data>
+  <data name="OutputVolumeLockHolding" xml:space="preserve">
+    <value>{0}: јачина је закључана на {1:0}%.</value>
+  </data>
+  <data name="OutputVolumeLockSuspended" xml:space="preserve">
+    <value>{0} се миксује на уређају. Закључавање на {1:0}% наставља се када миксовање пређе на овај рачунар.</value>
+  </data>
   <data name="OutputMixesHeading" xml:space="preserve">
     <value>ИЗЛАЗНИ МИКСЕВИ</value>
   </data>

@@ -11,13 +11,43 @@ internal static class OutputControlsWindowTests
 {
     internal static void Check()
     {
-        var window = new MainWindow(new DaemonClient("ws://127.0.0.1:1/ws"));
+        var client = new DaemonClient("ws://127.0.0.1:1/ws");
+        var window = new MainWindow(client);
+        OptionsWindow? options = null;
         try
         {
             var model = (MainViewModel)window.DataContext!;
-            typeof(MainViewModel).GetMethod("ApplyMixer", BindingFlags.NonPublic | BindingFlags.Instance)!
-                .Invoke(model, [JsonNode.Parse("""{"mixes":[],"channels":[]}""")]);
+            var applyMixer = typeof(MainViewModel).GetMethod("ApplyMixer", BindingFlags.NonPublic | BindingFlags.Instance)!;
+            applyMixer.Invoke(model, [JsonNode.Parse("""{"mixes":[],"channels":[]}""")]);
             window.Show();
+            OptionsWindow.ForgetLastTab();
+            options = new OptionsWindow { DataContext = new OptionsViewModel(client, model) };
+            options.Show();
+            OptionsTabsWindowTests.Show(options, OptionsTab.Audio);
+            var volumeLock = options.FindControl<CheckBox>("ActiveOutputVolumeLock")!;
+            Assert.False(volumeLock.IsEffectivelyVisible);
+
+            var monitorVolume = window.FindControl<Slider>("OutputVolumeSlider")!;
+            var headphoneVolume = window.FindControl<Grid>("HeadphoneControls")!.Children.OfType<Slider>().First();
+            Assert.False(model.OutputVolumeLockReported);
+            Assert.True(monitorVolume.IsEnabled);
+            applyMixer.Invoke(model, [JsonNode.Parse("""
+                {"mixes":[],"channels":[],"outputVolumeLock":{"device":"headset","volume":1.25},"monitorVolumeLocked":true}
+                """)]);
+            Assert.True(model.OutputVolumeLockReported);
+            Assert.True(model.OutputVolumeLocked);
+            Assert.True(volumeLock.IsEffectivelyVisible);
+            Assert.True(volumeLock.IsChecked);
+            Assert.False(monitorVolume.IsEnabled);
+            Assert.True(headphoneVolume.IsEnabled);
+            applyMixer.Invoke(model, [JsonNode.Parse("""{"mixes":[],"channels":[],"outputVolumeLock":null}""")]);
+            Assert.True(model.OutputVolumeLockReported);
+            Assert.False(model.OutputVolumeLocked);
+            Assert.False(volumeLock.IsChecked);
+            Assert.True(monitorVolume.IsEnabled);
+            options.Close();
+            options = null;
+            OptionsWindow.ForgetLastTab();
             // Nyan Pink stops its faders at a maximum track width. The default
             // skin has none, so the same tracks then take the whole row; it
             // comes second so the limit is seen to go when the skin changes.
@@ -72,6 +102,8 @@ internal static class OutputControlsWindowTests
         }
         finally
         {
+            options?.Close();
+            OptionsWindow.ForgetLastTab();
             window.Quit();
             SkinLayoutWindowTests.Wear(SkinPackage.DefaultId);
         }

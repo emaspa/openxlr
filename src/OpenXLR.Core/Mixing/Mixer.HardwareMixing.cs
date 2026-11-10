@@ -433,9 +433,19 @@ public sealed partial class Mixer
             _hardwareEntry = entry with { Leaving = true };
             _hardwareGraphEntered = false;
             if (!_built) return;
+            string? pro = JackSinkLocked();
+            bool locked = pro is not null && IsOutputVolumeLocked(pro);
+            if (locked)
+            {
+                // A locked sink gets its held level and balance back before
+                // an EQ or the monitor routing can reconnect the jacks, and
+                // also when its level cannot be read: the mode left it at 100%.
+                _outputVolumeLockRetryAt = 0;
+                SyncOutputVolumeLockLocked(writeUnread: true);
+            }
             // The mixes the unit built play their EQ again.
             SyncMixEqAfterLocked(held);
-            if (JackSinkLocked() is { } pro)
+            if (pro is not null && !locked)
             {
                 try { _pw.SetSinkVolume(pro, entry.OutputVolume ?? 1.0); }
                 catch (InvalidOperationException) { /* the unit left; its sink comes back at its own volume */ }

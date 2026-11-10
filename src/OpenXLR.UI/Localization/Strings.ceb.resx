@@ -1379,6 +1379,18 @@
   <data name="OptionsTabSupport" xml:space="preserve">
     <value>Tabang</value>
   </data>
+  <data name="LockActiveOutputVolume" xml:space="preserve">
+    <value>I-lock ang volume sa aktibong output</value>
+  </data>
+  <data name="LockActiveOutputVolumeHint" xml:space="preserve">
+    <value>Tipigan ang usa ka output sa volume niini karon: ang Default output nga gipili sa ibabaw, o ang default output sa desktop kon walay gipili. Kon OpenXLR device kana, ang unang MONITOR output ang tipigan. Aron i-lock ang laing output, i-off ang lock ug i-on pag-usab.</value>
+  </data>
+  <data name="OutputVolumeLockHolding" xml:space="preserve">
+    <value>Naka-lock ang {0} sa {1:0}%.</value>
+  </data>
+  <data name="OutputVolumeLockSuspended" xml:space="preserve">
+    <value>Gi-mix ang {0} sa unit. Mobalik ang lock sa {1:0}% kon niini nga computer na usab ang pag-mix.</value>
+  </data>
   <data name="OutputMixesHeading" xml:space="preserve">
     <value>MGA OUTPUT MIX</value>
   </data>

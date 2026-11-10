@@ -14,8 +14,11 @@ internal abstract class Row
     /// <summary>False for a row the device cannot do, which is drawn faded and skipped.</summary>
     public bool Enabled { get; init; } = true;
 
+    /// <summary>What a disabled row says unless it has a reason of its own.</summary>
+    public const string Unsupported = "not on this device";
+
     /// <summary>What a disabled row says in place of its value.</summary>
-    public string DisabledText { get; init; } = "not on this device";
+    public string DisabledText { get; init; } = Unsupported;
 
     /// <summary>A note shown to the right of the value.</summary>
     public string? Note { get; init; }

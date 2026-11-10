@@ -567,15 +567,15 @@ public sealed class PipeWireAdapter
     /// </summary>
     private static (double Volume, double DesktopVolume, bool Muted)? SinkLevel(JsonElement info, bool firstChannel = false)
     {
-        if (!info.TryGetProperty("params", out JsonElement pars) ||
-            !pars.TryGetProperty("Props", out JsonElement list) || list.ValueKind != JsonValueKind.Array) return null;
+        JsonElement list = SinkProps(info);
+        if (list.ValueKind != JsonValueKind.Array) return null;
         foreach (JsonElement p in list.EnumerateArray())
         {
             if (!p.TryGetProperty("channelVolumes", out JsonElement cv) || cv.ValueKind != JsonValueKind.Array) continue;
             double volume = 1.0, maximum = 0.0, first = 0.0;
             bool any = false;
             foreach (JsonElement v in cv.EnumerateArray())
-                if (v.ValueKind == JsonValueKind.Number && v.TryGetDouble(out double d) && double.IsFinite(d) && d >= 0)
+                if (TryChannelAmplitude(v, out double d))
                 {
                     if (!any) first = d;
                     volume = any ? Math.Min(volume, d) : d;
@@ -588,10 +588,23 @@ public sealed class PipeWireAdapter
             // use its cube root. Device lists keep the loudest channel;
             // the legacy sink-volume query keeps pactl's first channel.
             // Neither read changes channel balance.
-            return (volume, Math.Round(Math.Cbrt(firstChannel ? first : maximum) * 100) / 100, muted);
+            return (volume, DesktopVolume(firstChannel ? first : maximum), muted);
         }
         return null;
     }
+
+    private static JsonElement SinkProps(JsonElement info)
+        => info.TryGetProperty("params", out JsonElement parameters) && parameters.TryGetProperty("Props", out JsonElement props)
+            ? props : default;
+
+    private static bool TryChannelAmplitude(JsonElement value, out double amplitude)
+    {
+        amplitude = 0;
+        return value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out amplitude)
+            && double.IsFinite(amplitude) && amplitude >= 0;
+    }
+
+    private static double DesktopVolume(double amplitude) => Math.Round(Math.Cbrt(amplitude) * 100) / 100;
 
     /// <summary>
     /// The loudest an output device is driven from here, and the most a read
@@ -613,8 +626,19 @@ public sealed class PipeWireAdapter
     /// <summary>Set a sink's volume (0 to <see cref="MaxSinkVolume"/>).</summary>
     public void SetSinkVolume(string sinkName, double volume)
     {
+        WriteSinkVolume(sinkName, [VolumePercent(volume)]);
         string bare = BareSink(sinkName);
-        Run("pactl", "set-sink-volume", bare, VolumePercent(volume));
+        if (IsOwnSink(bare))
+            WaitForSinkLevel(bare, level => Math.Abs(level.DesktopVolume - Math.Round(Math.Clamp(volume, 0, MaxSinkVolume) * 100) / 100) < .005);
+    }
+
+    internal void SetSinkChannelVolumes(string sinkName, double[] volumes)
+        => WriteSinkVolume(sinkName, [.. volumes.Select(VolumePercent)]);
+
+    private void WriteSinkVolume(string sinkName, string[] volumes)
+    {
+        string bare = BareSink(sinkName);
+        Run("pactl", ["set-sink-volume", bare, .. volumes]);
         lock (DumpGate)
         {
             _dumpObjects = null;
@@ -628,8 +652,6 @@ public sealed class PipeWireAdapter
                 _directSinkVolumeUntil[bare] = now + 1000;
             }
         }
-        if (IsOwnSink(bare))
-            WaitForSinkLevel(bare, level => Math.Abs(level.DesktopVolume - Math.Round(Math.Clamp(volume, 0, MaxSinkVolume) * 100) / 100) < .005);
     }
 
     /// <summary>Mute or unmute a sink.</summary>
@@ -817,18 +839,68 @@ public sealed class PipeWireAdapter
 
     /// <summary>A sink's desktop volume, within the supported output range.</summary>
     public double? GetSinkVolume(string sinkName)
+        => GetUnclampedSinkVolume(sinkName) is double volume ? Math.Clamp(volume, 0, MaxSinkVolume) : null;
+
+    internal double? GetUnclampedSinkVolume(string sinkName)
     {
         string bare = BareSink(sinkName);
-        JsonElement[]? observed;
-        lock (DumpGate)
-            observed = _directSinkVolumeUntil.TryGetValue(bare, out long until) && Environment.TickCount64 < until
-                ? null : LiveObjects();
+        JsonElement[]? observed = ReadVolumeObjects(bare);
         // A sink the registry has not echoed yet, or one without a readable
         // Props volume, is read through Pulse.
-        if (observed is { } objects && FindSink(objects, bare) is { } info
-            && SinkLevel(info, firstChannel: true) is { } level)
-            return Math.Clamp(level.DesktopVolume, 0, MaxSinkVolume);
+        if (observed is { } objects)
+        {
+            if (FindSink(objects, bare) is { } info)
+            {
+                if (SinkLevel(info, firstChannel: true) is { } level) return level.DesktopVolume;
+            }
+        }
         return ParseVolumePercent(TryConfirm("pactl", "get-sink-volume", bare));
+    }
+
+    private JsonElement[]? ReadVolumeObjects(string bare)
+    {
+        lock (DumpGate)
+            return _directSinkVolumeUntil.TryGetValue(bare, out long until) && Environment.TickCount64 < until
+                ? null : LiveObjects();
+    }
+
+    internal const int MaxSinkChannels = 32;
+
+    internal double[]? GetSinkChannelVolumes(string sinkName, bool skipMissing = false)
+    {
+        string bare = BareSink(sinkName);
+        if (ReadVolumeObjects(bare) is { } objects)
+        {
+            if (FindSink(objects, bare) is { } info)
+            {
+                JsonElement props = SinkProps(info);
+                if (props.ValueKind == JsonValueKind.Array)
+                    foreach (JsonElement entry in props.EnumerateArray())
+                        if (entry.TryGetProperty("channelVolumes", out JsonElement values) && values.ValueKind == JsonValueKind.Array
+                            && values.GetArrayLength() is > 0 and <= MaxSinkChannels)
+                        {
+                            var volumes = new double[values.GetArrayLength()];
+                            int i = 0;
+                            foreach (JsonElement value in values.EnumerateArray())
+                            {
+                                if (!TryChannelAmplitude(value, out double amplitude)) break;
+                                volumes[i++] = DesktopVolume(amplitude);
+                            }
+                            if (i == volumes.Length) return volumes;
+                        }
+            }
+            else if (skipMissing) return null;
+        }
+        if (TryConfirm("pactl", "get-sink-volume", bare) is not { } text) return null;
+        var matches = System.Text.RegularExpressions.Regex.Matches(text, VolumePercentagePattern);
+        if (matches.Count is 0 or > MaxSinkChannels) return null;
+        var result = new double[matches.Count];
+        for (int i = 0; i < matches.Count; i++)
+        {
+            if (!int.TryParse(matches[i].Groups[1].Value, out int percent)) return null;
+            result[i] = percent / 100.0;
+        }
+        return result;
     }
 
     /// <summary>
@@ -947,11 +1019,14 @@ public sealed class PipeWireAdapter
         catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { return null; }
     }
 
+    private const string VolumePercentagePattern = @"(\d+)%";
+
     internal static double? ParseVolumePercent(string? pactlOutput)
     {
         if (pactlOutput is null) return null;
-        var m = System.Text.RegularExpressions.Regex.Match(pactlOutput, @"(\d+)%");
-        return m.Success ? Math.Clamp(int.Parse(m.Groups[1].Value) / 100.0, 0, MaxSinkVolume) : null;
+        var m = System.Text.RegularExpressions.Regex.Match(pactlOutput, VolumePercentagePattern);
+        if (!m.Success || !int.TryParse(m.Groups[1].Value, out int percent)) return null;
+        return percent / 100.0;
     }
 
     /// <summary>The capture device applications record from by default.</summary>

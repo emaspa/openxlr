@@ -53,6 +53,32 @@ public sealed class MonitorMicrophonePauseViewModelTests
     }
 
     [Fact]
+    public async Task TheSharedVolumeIsNotSentWhileItsFirstOutputIsLocked()
+    {
+        await using var f = await Fixture.Start();
+        try
+        {
+            f.Report(new JsonObject
+            {
+                ["outputVolumeLock"] = new JsonObject { ["device"] = "headset", ["volume"] = 1.25 },
+                ["monitorVolumeLocked"] = true,
+            });
+            // What the slider writes back when the desktop closes the boost range under it.
+            f.Model.OutputVolume = 1;
+            SliderSync.FlushPending();
+
+            f.Report(new JsonObject { ["outputVolumeLock"] = null });
+            f.Model.OutputVolume = .9;
+            SliderSync.FlushPending();
+            JsonNode sent = await f.Next();
+            Assert.Equal("setOutputVolume", sent["cmd"]!.GetValue<string>());
+            Assert.Equal(.9, sent["value"]!.GetValue<double>());
+            Assert.False(f.Commands.TryRead(out _));
+        }
+        finally { SliderSync.Forget("outvol"); }
+    }
+
+    [Fact]
     public async Task ARejectedLatestChangeRestoresTheReportAndUsesTheExistingStatus()
     {
         await using var f = await Fixture.Start();
@@ -134,7 +160,7 @@ public sealed class MonitorMicrophonePauseViewModelTests
                 while (!stop.IsCancellationRequested)
                 {
                     JsonNode command = await SocketTestServer.Receive(socket, stop);
-                    if (command["cmd"]?.GetValue<string>() is "setMonitorMuteMicrophones" or "toggleMonitorMuted")
+                    if (command["cmd"]?.GetValue<string>() is "setMonitorMuteMicrophones" or "toggleMonitorMuted" or "setOutputVolume")
                         commands.Writer.TryWrite(command);
                 }
             });

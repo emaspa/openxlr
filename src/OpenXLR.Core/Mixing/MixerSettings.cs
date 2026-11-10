@@ -77,6 +77,9 @@ public sealed record MixerSettings
     /// <summary>Also pause XLR strips and mono capture channels while monitoring is paused. Never profile state.</summary>
     public bool MonitorMuteMicrophones { get; init; }
 
+    /// <summary>Volume held on one PipeWire output. Machine state, never profile state.</summary>
+    public OutputVolumeLock? OutputVolumeLock { get; init; }
+
     /// <summary>Original native mute flags while OpenXLR holds selected outputs muted. Never profile state.</summary>
     public Dictionary<string, bool> MonitorOutputMutes { get; init; } = [];
 

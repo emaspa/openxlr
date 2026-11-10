@@ -1653,6 +1653,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 MonitorOutputs = [.. _monitorOutputs],
                 MonitorMuted = _monitorMuted,
                 MonitorMuteMicrophones = _monitorMuteMicrophones,
+                OutputVolumeLock = _outputVolumeLock,
                 // A release still pending for a deselected output is saved too.
                 MonitorOutputMutes = new Dictionary<string, bool>(_monitorOutputMutes),
                 MonitorFeeds = new Dictionary<string, string>(_monitorFeeds),
@@ -1738,6 +1739,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             SetBlockSize(s.BlockSize);
             RestoreBrowserSettingsLocked(s);
             SetMonitorMuteMicrophones(s.MonitorMuteMicrophones);
+            _outputVolumeLock = s.OutputVolumeLock;
+            _outputVolumeLockRetryAt = 0;
             _duckingSetup = DuckingSetup.Prune(s.Ducking ?? DuckingSetup.Default(_config), _config);
             // What the Pro's sections held before a jack feed used them is
             // kept whether or not the mixer runs, so no save loses it.
@@ -2085,16 +2088,19 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 // sink stays at 100% and the other outputs follow as before.
                 _hardwareEntry = _hardwareEntry! with { OutputVolume = volume };
                 foreach (string sink in sinks.Where(s => s != pro)) WriteFollowerVolumeLocked(sink, volume);
-                _outputVolume = volume;
+                if (!IsOutputVolumeLocked(sinks[0])) _outputVolume = volume;
                 return;
             }
             // The first output is the one the desktop drives and the one
             // every sweep reads back, so a failed write on it corrects
             // itself; only what the others owe is worth chasing.
-            try { _pw.SetSinkVolume(sinks[0], volume); }
-            catch (InvalidOperationException) { /* device gone */ }
+            if (!IsOutputVolumeLocked(sinks[0]))
+            {
+                try { _pw.SetSinkVolume(sinks[0], volume); }
+                catch (InvalidOperationException) { /* device gone */ }
+                _outputVolume = volume;
+            }
             foreach (string sink in sinks.Skip(1)) WriteFollowerVolumeLocked(sink, volume);
-            _outputVolume = volume;
         }
     }
 
@@ -2105,6 +2111,11 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// <summary>Write one follower's volume, remembering it when the device refuses.</summary>
     private void WriteFollowerVolumeLocked(string sink, double volume)
     {
+        if (IsOutputVolumeLocked(sink))
+        {
+            _outputVolumeDue.Delivered(sink);
+            return;
+        }
         try
         {
             _pw.SetSinkVolume(sink, volume);
@@ -2207,7 +2218,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             try
             {
                 string? first = _monitorOutputs.FirstOrDefault();
-                double? outV = first is null ? null : _pw.GetSinkVolume(first);
+                bool firstLocked = first is not null && IsOutputVolumeLocked(StripMarker(first));
+                double? lockedVolume = SyncOutputVolumeLockLocked();
+                double? outV = first is null ? null : firstLocked ? lockedVolume : _pw.GetSinkVolume(first);
                 if (UnitBuildsJacksLocked && JackSinkLocked() is { } pro)
                 {
                     // The desktop moved the Pro's sink: a step of the jacks'
@@ -2227,7 +2240,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 // Carry that change to the other selected outputs just as the
                 // MONITOR slider does. A new output selection establishes a fresh
                 // baseline rather than overwriting its remembered device volume.
-                if (_enforcedSink == FollowMonitorOutput && changed && _outputVolume is not null && outV is double volume)
+                if (!firstLocked && _enforcedSink == FollowMonitorOutput && changed && _outputVolume is not null && outV is double volume)
                 {
                     foreach (string sink in FollowerOutputsLocked()) WriteFollowerVolumeLocked(sink, volume);
                     if (UnitBuildsJacksLocked && JackSinkLocked() is not null) _hardwareEntry = _hardwareEntry! with { OutputVolume = volume };
@@ -3639,6 +3652,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 MonitorMuted = _monitorMuted,
                 MonitorMuteMicrophones = _monitorMuteMicrophones,
                 MicrophonePausePending = _microphonePausePending,
+                OutputVolumeLock = _outputVolumeLock,
+                OutputVolumeLockSuspended = _outputVolumeLock is { } held && IsVolumeControlledByUnitLocked(held.Device),
+                MonitorVolumeLocked = _monitorOutputs.FirstOrDefault() is { } output && IsOutputVolumeLocked(StripMarker(output)),
                 MonitorFeeds = new Dictionary<string, string>(_monitorFeeds),
                 MonitorOutputLabels = new Dictionary<string, string>(_monitorOutputLabels, StringComparer.Ordinal),
                 OutputVolume = _outputVolume,
