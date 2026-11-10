@@ -1469,6 +1469,18 @@
   <data name="OptionsTabSupport" xml:space="preserve">
     <value>Hilfe</value>
   </data>
+  <data name="LockActiveOutputVolume" xml:space="preserve">
+    <value>Lautstärke des aktiven Ausgangs sperren</value>
+  </data>
+  <data name="LockActiveOutputVolumeHint" xml:space="preserve">
+    <value>Hält die aktuelle Lautstärke des ausgewählten PipeWire-Ausgangs. Schalte die Sperre aus und wieder ein, um einen anderen Ausgang zu sperren.</value>
+  </data>
+  <data name="OutputVolumeLockHolding" xml:space="preserve">
+    <value>{0} ist bei {1:0} % gesperrt.</value>
+  </data>
+  <data name="OutputVolumeLockSuspended" xml:space="preserve">
+    <value>{0} wird auf dem Interface gemischt. Die Sperre bei {1:0} % greift wieder beim Mischen am Computer.</value>
+  </data>
   <data name="OutputMixesHeading" xml:space="preserve">
     <value>AUSGANGSMIXE</value>
   </data>
@@ -4231,17 +4243,5 @@ Aus dem Tray holst du den Mixer über das OpenXLR-Symbol oder dein App-Menü zur
   </data>
   <data name="RestoreWindow" xml:space="preserve">
     <value>Wiederherstellen</value>
-  </data>
-  <data name="LockActiveOutputVolume" xml:space="preserve">
-    <value>Lautstärke des aktiven Ausgangs sperren</value>
-  </data>
-  <data name="LockActiveOutputVolumeHint" xml:space="preserve">
-    <value>Hält die aktuelle Lautstärke des ausgewählten PipeWire-Ausgangs. Schalte die Sperre aus und wieder ein, um einen anderen Ausgang zu sperren.</value>
-  </data>
-  <data name="OutputVolumeLockHolding" xml:space="preserve">
-    <value>{0} ist bei {1:0} % gesperrt.</value>
-  </data>
-  <data name="OutputVolumeLockSuspended" xml:space="preserve">
-    <value>{0} wird auf dem Interface gemischt. Die Sperre bei {1:0} % greift wieder beim Mischen am Computer.</value>
   </data>
 </root>
