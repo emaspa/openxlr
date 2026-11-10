@@ -45,8 +45,13 @@ public sealed partial class MonitorVolumeIntegrationTests
         {
             Assert.True(SpinWait.SpinUntil(() =>
             {
+                // pactl first, then a fresh registry read: the mixer has seen
+                // every stream the condition saw, rather than a dump kept from
+                // before the last one started.
+                var volumes = StreamVolumes();
+                pw.InvalidateDump();
                 mixer.SyncStreams();
-                return condition(StreamVolumes());
+                return condition(volumes);
             }, TimeSpan.FromSeconds(5)), string.Join(", ", StreamVolumes()));
         }
 
