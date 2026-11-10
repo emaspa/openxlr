@@ -337,4 +337,47 @@ public sealed class InputBindingModelTests
         Assert.Equal("", model.CrossfadeNote);
         Assert.Equal(Localizer.Text("Xlr1Jack"), model.Channels[0].BindingLabel);
     }
+
+    [Fact]
+    public async Task AUnitWithADialOffersTheGainLockOnlyToReleaseIt()
+    {
+        await using var client = new DaemonClient("ws://127.0.0.1:1/ws");
+        var model = new MainViewModel(client);
+        JsonNode state = JsonNode.Parse(ProState($"{Xlr("xlr1", 0, Input(1))},{Xlr("xlr2", 1, Input(2))}"))!;
+        void Report(bool locked)
+        {
+            state["state"] = new JsonObject { ["gainLocked"] = locked };
+            Apply(model, state.ToJsonString());
+        }
+
+        // Unlocked: the dial would walk past a lock, so nothing offers one, and a write from a control is refused.
+        Report(false);
+        Assert.True(model.DeviceConnected);
+        Assert.False(model.ShowGainLock);
+        Assert.False(model.UnitInput1.CanSetGainLock);
+        Assert.False(model.UnitInput2.CanSetGainLock);
+        model.UnitInput1.GainLocked = true;
+        Assert.False(model.GainLocked);
+
+        // Locked from a Deck key, the terminal mixer or the API: both inputs show the lock so it can be released.
+        Report(true);
+        Assert.False(model.ShowGainLock);
+        Assert.True(model.UnitInput1.GainLocked);
+        Assert.True(model.UnitInput1.CanSetGainLock);
+        Assert.True(model.UnitInput2.CanSetGainLock);
+
+        // Released from either input, it is gone again.
+        model.UnitInput2.GainLocked = false;
+        Assert.False(model.GainLocked);
+        Assert.False(model.UnitInput1.CanSetGainLock);
+        Assert.False(model.UnitInput2.CanSetGainLock);
+
+        // A unit without a dial, an XLR Dock, always shows it.
+        state["capabilities"]!["physicalControls"] = false;
+        Report(false);
+        Assert.True(model.ShowGainLock);
+        Assert.True(model.UnitInput1.CanSetGainLock);
+        model.UnitInput1.GainLocked = true;
+        Assert.True(model.GainLocked);
+    }
 }

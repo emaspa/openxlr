@@ -853,7 +853,7 @@ height. **Position** gives placement tips for
 the kind of unit the microphone is on (a Wave:3's, Wave:3 MK.2's or Wave:1's capsule, an
 XLR jack, or a device OpenXLR does not drive) and the unit's phantom power
 switch where it has one. **Level** shows the microphone before any processing on a large
-meter, with a band for speech, a clip light that holds until cleared and
+meter, with a band for speech, a clipping warning that holds until cleared and
 an input gain slider and a field for entering dB where the input has a gain,
 including supported external mono capture inputs. **Suggest gain**
 listens to five seconds of speech and proposes a gain for the interface

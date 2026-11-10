@@ -3925,4 +3925,22 @@ Selecciona la interfaz que controla OpenXLR</value>
   <data name="RestoreWindow" xml:space="preserve">
     <value>Restaurar</value>
   </data>
+  <data name="MicSetupClip" xml:space="preserve">
+    <value>Borrar aviso</value>
+  </data>
+  <data name="MicSetupClipTip" xml:space="preserve">
+    <value>Borra el aviso hasta la próxima saturación.</value>
+  </data>
+  <data name="MicSetupClipLit" xml:space="preserve">
+    <value>Saturación detectada</value>
+  </data>
+  <data name="MicSetupClipDark" xml:space="preserve">
+    <value>Sin saturación</value>
+  </data>
+  <data name="LockInputGain" xml:space="preserve">
+    <value>Bloquear ganancia de entrada</value>
+  </data>
+  <data name="MicSetupGainLocked" xml:space="preserve">
+    <value>La ganancia de entrada está bloqueada.</value>
+  </data>
 </root>

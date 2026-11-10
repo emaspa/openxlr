@@ -4232,4 +4232,22 @@ Aus dem Tray holst du den Mixer über das OpenXLR-Symbol oder dein App-Menü zur
   <data name="RestoreWindow" xml:space="preserve">
     <value>Wiederherstellen</value>
   </data>
+  <data name="MicSetupClip" xml:space="preserve">
+    <value>Warnung löschen</value>
+  </data>
+  <data name="MicSetupClipTip" xml:space="preserve">
+    <value>Löscht die Warnung bis zur nächsten Übersteuerung.</value>
+  </data>
+  <data name="MicSetupClipLit" xml:space="preserve">
+    <value>Übersteuerung erkannt</value>
+  </data>
+  <data name="MicSetupClipDark" xml:space="preserve">
+    <value>Keine Übersteuerung erkannt</value>
+  </data>
+  <data name="LockInputGain" xml:space="preserve">
+    <value>Eingangsverstärkung sperren</value>
+  </data>
+  <data name="MicSetupGainLocked" xml:space="preserve">
+    <value>Die Eingangsverstärkung ist gesperrt.</value>
+  </data>
 </root>

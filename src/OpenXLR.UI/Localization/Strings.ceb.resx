@@ -3219,7 +3219,7 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
     <value>Gi-loop ang {0:0.0} ka segundo</value>
   </data>
   <data name="MicSetupLevelHint" xml:space="preserve">
-    <value>Sulti sama sa imong pagsulti on air, sa naandan nimong gilay-on gikan sa mikropono. Itakda ang gain aron ang peak sa imong tingog anaa sulod sa band ug magpabiling patay ang clip light.</value>
+    <value>Sulti sama sa imong pagsulti on air, sa naandan nimong gilay-on gikan sa mikropono. Itakda ang gain aron ang peak sa imong tingog anaa sulod sa band ug magpabiling patay ang pasidaan sa clipping.</value>
   </data>
   <data name="MicSetupBeforeEffects" xml:space="preserve">
     <value>Mikropono sa dili pa ang mga effect</value>
@@ -3237,16 +3237,16 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
     <value>Average nga level</value>
   </data>
   <data name="MicSetupClip" xml:space="preserve">
-    <value>Clip</value>
+    <value>Hawani ang pasidaan</value>
   </data>
   <data name="MicSetupClipTip" xml:space="preserve">
-    <value>Mosiga kon moabot sa full scale ang mikropono, ug magpabiling nagsiga hangtod imo kining pislitan.</value>
+    <value>Hawani ang pasidaan hangtod sa sunod nga clipping.</value>
   </data>
   <data name="MicSetupClipLit" xml:space="preserve">
-    <value>Clip light, nagsiga: miabot sa full scale ang mikropono. Pislita aron mapalong.</value>
+    <value>Adunay clipping</value>
   </data>
   <data name="MicSetupClipDark" xml:space="preserve">
-    <value>Clip light, patay</value>
+    <value>Walay clipping</value>
   </data>
   <data name="MicSetupGain" xml:space="preserve">
     <value>Gain sa input (dB)</value>
@@ -4228,5 +4228,11 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
   </data>
   <data name="RestoreWindow" xml:space="preserve">
     <value>Ibalik</value>
+  </data>
+  <data name="LockInputGain" xml:space="preserve">
+    <value>I-lock ang input gain</value>
+  </data>
+  <data name="MicSetupGainLocked" xml:space="preserve">
+    <value>Naka-lock ang input gain.</value>
   </data>
 </root>

@@ -289,8 +289,8 @@ public sealed class MicSetupViewModel : ViewModelBase
 
     private bool _clipped;
     /// <summary>A sample reached the clip level since the light was last cleared.</summary>
-    public bool Clipped { get => _clipped; private set { if (Set(ref _clipped, value)) Raise(nameof(ClipName)); } }
-    public string ClipName => _clipped ? Localizer.Text("MicSetupClipLit") : Localizer.Text("MicSetupClipDark");
+    public bool Clipped { get => _clipped; private set { if (Set(ref _clipped, value)) Raise(nameof(ClipStatus)); } }
+    public string ClipStatus => _clipped ? Localizer.Text("MicSetupClipLit") : Localizer.Text("MicSetupClipDark");
 
     public void ClearClip() => Clipped = false;
 
@@ -497,6 +497,11 @@ public sealed class MicSetupViewModel : ViewModelBase
     {
         if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName is nameof(UnitInputViewModel.GainDb) or nameof(UnitInputViewModel.GainMaxDb))
             CheckMeasuredGain();
+        if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == nameof(UnitInputViewModel.GainLocked))
+        {
+            Raise(nameof(CanAcceptGain));
+            Raise(nameof(SuggestBlocked));
+        }
     }
 
     private void CheckMeasuredGain()

@@ -98,7 +98,7 @@
           </Border>
         </StackPanel>
 
-        <!-- Level: the microphone before any processing, the target band and the clip light -->
+        <!-- Level: the microphone before any processing, the target band and the clipping warning -->
         <StackPanel Name="MicSetupLevel" Spacing="12" IsVisible="{Binding ShowsLevel}">
           <TextBlock Text="{loc:Text Key=MicSetupLevelHint}" Classes="hint" TextWrapping="Wrap"/>
           <Border Classes="tile" Padding="12">
@@ -119,16 +119,15 @@
               </Grid>
               <skin:LevelMeter Name="MicSetupRms" Level="{Binding InputLevel}" AutomationProperties.Name="{loc:Text Key=MicSetupAverage}"
                                ToolTip.Tip="{loc:Text Key=MicSetupAverage}"/>
-              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                <TextBlock Text="{loc:Text Key=MicSetupTargetTip}" Classes="hint" TextWrapping="Wrap" VerticalAlignment="Center"/>
-                <!-- the clip light holds until it is pressed -->
-                <Button Grid.Column="1" Name="MicSetupClip" Click="OnClearClip" Padding="10,4"
-                        AutomationProperties.Name="{Binding ClipName}" ToolTip.Tip="{loc:Text Key=MicSetupClipTip}">
-                  <StackPanel Orientation="Horizontal" Spacing="6">
-                    <skin:StatusLed IsOn="{Binding Clipped}" Kind="Power"/>
-                    <TextBlock Text="{loc:Text Key=MicSetupClip}" VerticalAlignment="Center"/>
-                  </StackPanel>
-                </Button>
+              <TextBlock Text="{loc:Text Key=MicSetupTargetTip}" Classes="hint" TextWrapping="Wrap"/>
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6" VerticalAlignment="Center">
+                  <skin:StatusLed Name="MicSetupClipLed" IsOn="{Binding Clipped}" Kind="Power" AutomationProperties.AccessibilityView="Raw"/>
+                  <TextBlock Grid.Column="1" Name="MicSetupClipStatus" Text="{Binding ClipStatus}" Classes="body"
+                             Classes.warn="{Binding Clipped}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                </Grid>
+                <Button Grid.Column="1" Name="MicSetupClip" Content="{loc:Text Key=MicSetupClip}" Click="OnClearClip"
+                        IsEnabled="{Binding Clipped}" ToolTip.Tip="{loc:Text Key=MicSetupClipTip}" Padding="10,4"/>
               </Grid>
             </StackPanel>
           </Border>
@@ -136,6 +135,10 @@
           <Border Classes="tile" Padding="12">
             <StackPanel Spacing="8">
               <TextBlock Text="{loc:Text Key=MicSetupGain}" Classes="h"/>
+              <CheckBox Name="MicSetupGainLock" Content="{loc:Text Key=LockInputGain}"
+                        IsVisible="{Binding Unit.CanSetGainLock, FallbackValue=False}"
+                        IsChecked="{Binding Unit.GainLocked, Mode=TwoWay, FallbackValue=False}"
+                        ToolTip.Tip="{loc:Text Key=GainLockTheDaemonRejectsEveryGainChange}"/>
               <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding CarriesUnit}">
                 <Slider Name="MicSetupUnitGain" vm:FaderInput.Step="1" Minimum="0" Maximum="{Binding Unit.GainMaxDb, FallbackValue=80}"
                         Value="{Binding Unit.GainDb, Mode=TwoWay, FallbackValue=0}" IsEnabled="{Binding !Unit.GainLocked, FallbackValue=False}"
@@ -166,6 +169,8 @@
                                FormatString="0.#" Increment="1" MinWidth="92" VerticalAlignment="Center"
                                AutomationProperties.Name="{Binding CaptureInput.CaptureGainName, FallbackValue=''}"/>
               </Grid>
+              <TextBlock Text="{loc:Text Key=MicSetupGainLocked}" Classes="hint" TextWrapping="Wrap"
+                         IsVisible="{Binding ExtraUnit.Unit.GainLocked, FallbackValue=False}"/>
               <TextBlock Name="MicSetupNoGain" Text="{loc:Text Key=MicSetupNoGain}" Classes="hint" TextWrapping="Wrap" IsVisible="{Binding NoGain}"/>
             </StackPanel>
           </Border>

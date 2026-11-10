@@ -3280,7 +3280,7 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
     <value>Looping {0:0.0} seconds</value>
   </data>
   <data name="MicSetupLevelHint" xml:space="preserve">
-    <value>Speak as you will on air, at your usual distance from the microphone. Set the gain so your voice peaks inside the band and the clip light stays dark.</value>
+    <value>Speak as you will on air, at your usual distance from the microphone. Set the gain so your voice peaks inside the band and the clipping warning stays off.</value>
   </data>
   <data name="MicSetupBeforeEffects" xml:space="preserve">
     <value>Microphone before effects</value>
@@ -3298,16 +3298,16 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
     <value>Average level</value>
   </data>
   <data name="MicSetupClip" xml:space="preserve">
-    <value>Clip</value>
+    <value>Clear warning</value>
   </data>
   <data name="MicSetupClipTip" xml:space="preserve">
-    <value>Lights when the microphone reaches full scale, and stays lit until you press it.</value>
+    <value>Clears the warning until the next clipped sample.</value>
   </data>
   <data name="MicSetupClipLit" xml:space="preserve">
-    <value>Clip light, lit: the microphone reached full scale. Press to clear it.</value>
+    <value>Clipping detected</value>
   </data>
   <data name="MicSetupClipDark" xml:space="preserve">
-    <value>Clip light, dark</value>
+    <value>No clipping detected</value>
   </data>
   <data name="MicSetupGain" xml:space="preserve">
     <value>Input gain (dB)</value>
@@ -4564,5 +4564,11 @@ When the window is in the tray, open it again from the OpenXLR icon or your app 
   </data>
   <data name="RestoreWindow" xml:space="preserve">
     <value>Restore</value>
+  </data>
+  <data name="LockInputGain" xml:space="preserve">
+    <value>Lock input gain</value>
+  </data>
+  <data name="MicSetupGainLocked" xml:space="preserve">
+    <value>Input gain is locked.</value>
   </data>
 </root>

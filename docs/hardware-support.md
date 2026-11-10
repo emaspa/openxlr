@@ -425,7 +425,7 @@ grid would swallow the Stream Deck's five-unit crossfade ticks.
 | Direct monitor balance, as the crossfade | verified on hardware | Q8.8 percent at 10, half a percent per crossfade unit, shown as the Mic and PC crossfade (0 to 200). The word runs the other way from the crossfade: 0 percent is the computer alone and 100 the microphone alone. None of the sources states the direction; an owner settled it by ear on 2026-10-18, when the straight mapping put all computer audio at the slider's microphone end, and the backend mirrors the scales since |
 | Headphone mute | read | byte 9, in the state as `hpMute`. wave3-research saw the firmware assert it when the level reaches its floor; a level written above the floor releases it, so the jack cannot stay silent with nothing in OpenXLR to release it. No control sets it |
 | Low cut | software | the submixer's high-pass, by design; byte 6 is carried as read |
-| Gain lock | software | the daemon's own lock, kept off the UI because of the dial, as on every device with one; byte 15 is carried as read |
+| Gain lock | software | the daemon's own lock. The UI does not offer to set it because of the dial, as on every device with one. While a lock set from a Deck key, the terminal mixer or the API is on, Mic setup and Options show its checkbox so you can release it; byte 15 is carried as read |
 | Dial target | read | byte 12: 1 gain, 2 headphones, 3 monitor mix; named in the diagnostics dump, with where the reported gain came from |
 | Mute ring colour, LED brightness | unmapped | wave3-research's bytes 10, 11, 13 and 15; carried as read where no setter owns them |
 | Desktop volume controls | verified on hardware | the kernel's 'Mic Capture Volume', 'Mic Capture Switch' and 'PCM Playback Volume' kept in step with the block, as openwave does on the hardware; a change to the sink volume or the source mute in the desktop reached the block within a second. See below |
@@ -881,7 +881,7 @@ opening a muted send, with simulated nodes. On real units, so far:
 |---|---|---|
 | Hear myself on a Wave XLR Pro: the zero-latency path off for the session, the voice with its effects in the headphones, the latency the window says against what is heard | not yet checked | |
 | Raw and Processed by ear, on a looped take and on the live microphone: no click or gap at the switch | not yet checked | |
-| The meter before the chain against the unit's gain, and the clip light at full scale | not yet checked | |
+| The meter before the chain against the unit's gain, and the clipping warning at full scale | not yet checked | |
 | Suggest gain on a Pro, an XLR Dock, a Wave:3 and an additional interface: the accepted gain puts speech in the band, and the gain lock holds it back | not yet checked | |
 | A looped take by ear where it starts over: no click | not yet checked | |
 | The gain beside the meter on a Pro, an XLR Dock, a Wave:3 and an additional interface | not yet checked | |

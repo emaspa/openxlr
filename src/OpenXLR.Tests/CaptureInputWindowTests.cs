@@ -190,6 +190,8 @@ public sealed class CaptureInputWindowTests
         var gainCommands = new ConcurrentQueue<JsonNode>();
         var gate = new object();
         JsonNode state = State();
+        state["capabilities"]!["physicalControls"] = false;
+        state["state"] ??= new JsonObject();
         using var pushes = new SemaphoreSlim(0);
         void ReportCaptureGain(JsonNode? gain)
         {
@@ -291,8 +293,12 @@ public sealed class CaptureInputWindowTests
                         }
                         await Send(Snapshot());
                     }
-                    else if (name == "setCaptureGain" || name == "set" && cmd["control"]?.GetValue<string>() == "gain")
+                    else if (name == "setCaptureGain" || name == "set" && cmd["control"]?.GetValue<string>() is "gain" or "gainLock")
+                    {
+                        if (cmd["control"]?.GetValue<string>() == "gainLock")
+                            lock (gate) state["state"]!["gainLocked"] = cmd["value"]!.DeepClone();
                         gainCommands.Enqueue(cmd);
+                    }
                     else if (name == "watchInputMeter")
                     {
                         // The meter before the chain, with a clip in it.
