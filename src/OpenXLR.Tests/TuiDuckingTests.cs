@@ -246,6 +246,40 @@ public sealed class TuiDuckingTests
     }
 
     [Fact]
+    public void AChannelEditBeforeTheKeyEchoKeepsThePendingKeyOutOfTheTargets()
+    {
+        (App app, List<string> sent) = Ready(ProJson);
+        Select(app, "Keys");
+        app.Handle(new KeyPress(Key.Right));
+        app.Handle(Space);
+        Assert.Equal(["game", "music"], Ids(Command(sent).GetProperty("channels")));
+
+        Select(app, "Channels");
+        app.Handle(new KeyPress(Key.End));
+        app.Handle(Space);
+        Assert.Equal(["game", "music", "cap1"], Ids(Command(sent).GetProperty("channels")));
+        app.Handle(Space);
+        Assert.Equal(["game", "music"], Ids(Command(sent).GetProperty("channels")));
+    }
+
+    [Fact]
+    public void RapidMixEditsKeepBothChoicesUntilANewReportArrives()
+    {
+        (App app, List<string> sent) = Ready(ProJson);
+        Select(app, "Mixes");
+        app.Handle(new KeyPress(Key.Right));
+        app.Handle(Space);
+        Assert.Equal(["monitor", "monitor2"], Ids(Command(sent).GetProperty("mixes")));
+        app.Handle(new KeyPress(Key.Right));
+        app.Handle(Space);
+        Assert.Equal(["monitor", "monitor2", "stream"], Ids(Command(sent).GetProperty("mixes")));
+
+        app.Link.Receive(ProJson);
+        app.Handle(Space);
+        Assert.Equal(["monitor", "stream"], Ids(Command(sent).GetProperty("mixes")));
+    }
+
+    [Fact]
     public void AStereoCaptureInputIsNoKeyAndAMissingKeyStaysShown()
     {
         (App app, List<string> sent) = Ready(Edit(root =>
@@ -326,19 +360,19 @@ public sealed class TuiDuckingTests
         app.Handle(new KeyPress(Key.Right));
         Assert.Empty(sent);
         app.Handle(new KeyPress(Key.Enter));
-        Assert.Equal(["music", "xlr2"], Ids(Command(sent).GetProperty("channels")));
+        Assert.Equal(["music"], Ids(Command(sent).GetProperty("channels")));
         // Browser is not ducked: it joins at the end.
         app.Handle(new KeyPress(Key.Right));
         app.Handle(new KeyPress(Key.Right));
         app.Handle(new KeyPress(Key.Char, ' '));
-        Assert.Equal(["game", "music", "xlr2", "browser"], Ids(Command(sent).GetProperty("channels")));
+        Assert.Equal(["music", "browser"], Ids(Command(sent).GetProperty("channels")));
         // The ends hold, and Home goes back to the first.
         for (int i = 0; i < 20; i++) app.Handle(new KeyPress(Key.Right));
         app.Handle(new KeyPress(Key.Char, ' '));
-        Assert.Equal(["game", "music", "xlr2", "cap1"], Ids(Command(sent).GetProperty("channels")));
+        Assert.Equal(["music", "browser", "cap1"], Ids(Command(sent).GetProperty("channels")));
         app.Handle(new KeyPress(Key.Home));
         app.Handle(new KeyPress(Key.Char, ' '));
-        Assert.Equal(["game", "music"], Ids(Command(sent).GetProperty("channels")));
+        Assert.Equal(["music", "browser", "cap1", "xlr2"], Ids(Command(sent).GetProperty("channels")));
 
         string mixes = Select(app, "Mixes");
         Assert.Contains("✓ Monitor A", mixes, StringComparison.Ordinal);
@@ -350,7 +384,7 @@ public sealed class TuiDuckingTests
         Assert.Equal(["monitor", "stream"], Ids(Command(sent).GetProperty("mixes")));
         app.Handle(new KeyPress(Key.Home));
         app.Handle(new KeyPress(Key.Enter));
-        Assert.Empty(Ids(Command(sent).GetProperty("mixes")));
+        Assert.Equal(["stream"], Ids(Command(sent).GetProperty("mixes")));
 
         // The rows follow the daemon: once it reports Stream ducked, the key is lit.
         app.Link.Receive(Edit(root => Ducking(root)["mixes"] = new JsonArray("monitor", "stream")));

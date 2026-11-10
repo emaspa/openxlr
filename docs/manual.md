@@ -5910,7 +5910,7 @@ Controls below the visible hardware cards appear as the selection moves.
 | Sounds | `p`, `P`, `g`, `G` | show the next or previous page, move the clip to a page, or rename the page shown |
 | Sounds | `<`, `>`, `,`, `.` | lower or raise SFX's volume, the board's master, by five points or by one point |
 | Inputs, Bindings | Left/Right, Enter | choose a strip's source or port, then apply it |
-| Inputs, Ducking keys, channels and mixes | Left/Right, Home, End, Space, Enter | move between the channels or mixes, then make the one under the cursor a key or duck it, or stop |
+| Inputs, Ducking keys, channels and mixes | Left/Right, Home, End, Space, Enter | move between the channels or mixes, then make the one under the cursor a key or duck it, or stop. Rapid edits keep the earlier choices while the daemon replies |
 | Text prompts | Enter, Escape | accept or cancel |
 
 Anything that cannot be undone, such as deleting a channel or resetting

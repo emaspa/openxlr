@@ -606,6 +606,13 @@ internal sealed class InputsView : View
         // device, then each saved key the layout lacks, so the daemon's whole
         // list is in view. Space adds a channel at the end or takes it out.
         List<string> keys = ducking.KeyList;
+        DuckingEntry editing = _sentDucking is { } sent && ReferenceEquals(sent.From, ducking) ? sent.Sent : ducking;
+        void SendSelection(JsonObject value)
+        {
+            _sentDucking = (ducking, Sent(editing, value));
+            link.Send("setDucking", body => body["value"] = value);
+        }
+
         List<ChannelEntry> keyable = [.. state.Mixer.Channels.Where(channel =>
             CanKey(channel) && (channel.Present || keys.Contains(channel.Id)))];
         List<(string Id, string Name)> keyChoices = [.. keyable.Select(channel => (channel.Id, channel.Name)),
@@ -617,26 +624,26 @@ internal sealed class InputsView : View
             {
                 string key = keyChoices[index].Id;
                 _duckKey = key;
-                DuckingEntry current = _sentDucking is { } sent && ReferenceEquals(sent.From, ducking) ? sent.Sent : ducking;
-                if (FlipKey(current, key) is not { } value) return;
-                _sentDucking = (ducking, Sent(current, value));
-                link.Send("setDucking", body => body["value"] = value);
+                if (FlipKey(editing, key) is { } value) SendSelection(value);
             }));
 
         // A daemon from before channels and mixes keeps them to itself.
-        if (ducking.Channels is { } ducked)
+        if (editing.Channels is { } ducked)
         {
-            List<ChannelEntry> candidates = [.. state.Mixer.Shown.Where(channel => !keys.Contains(channel.Id))];
+            // A pending key must stay out of the targets. A key just removed
+            // becomes selectable when the daemon confirms the change.
+            var unavailable = keys.Concat(editing.KeyList).ToHashSet(StringComparer.Ordinal);
+            List<ChannelEntry> candidates = [.. state.Mixer.Shown.Where(channel => !unavailable.Contains(channel.Id))];
             int at = Math.Max(0, candidates.FindIndex(channel => channel.Id == _duckChannel));
             rows.Add(new ToggleStripRow("Channels", [.. candidates.Select(channel => (channel.Name, ducked.Contains(channel.Id)))], at,
                 index => _duckChannel = candidates[index].Id,
                 index =>
                 {
                     _duckChannel = candidates[index].Id;
-                    Duck(link, "channels", Flip(ducked, candidates[index].Id));
+                    SendSelection(new() { ["channels"] = Flip(ducked, candidates[index].Id) });
                 }));
         }
-        if (ducking.Mixes is { } mixes)
+        if (editing.Mixes is { } mixes)
         {
             List<MixEntry> targets = state.Mixer.Mixes;
             int at = Math.Max(0, targets.FindIndex(mix => mix.Id == _duckMix));
@@ -645,7 +652,7 @@ internal sealed class InputsView : View
                 index =>
                 {
                     _duckMix = targets[index].Id;
-                    Duck(link, "mixes", Flip(mixes, targets[index].Id));
+                    SendSelection(new() { ["mixes"] = Flip(mixes, targets[index].Id) });
                 }));
         }
 
@@ -733,6 +740,7 @@ internal sealed class InputsView : View
             Keys = keys,
             Key = keys is { Count: > 0 } ? keys[0] : ducking.Key,
             Channels = value["channels"] is JsonArray c ? [.. c.Select(id => (string)id!)] : ducking.Channels,
+            Mixes = value["mixes"] is JsonArray m ? [.. m.Select(id => (string)id!)] : ducking.Mixes,
         };
     }
 
