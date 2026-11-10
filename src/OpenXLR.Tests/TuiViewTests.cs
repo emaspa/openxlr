@@ -692,6 +692,47 @@ public sealed class TuiViewTests
     }
 
     [Fact]
+    public void ALockedOutputVolumeIsShownAndItsKeysSendNothing()
+    {
+        (App app, List<string> sent) = Ready(tab: 3);
+        app.Handle(new KeyPress(Key.Right));
+        Assert.Equal("setOutputVolume", Text(Command(sent), "cmd"));
+        sent.Clear();
+
+        var state = System.Text.Json.Nodes.JsonNode.Parse(StateJson)!;
+        state["mixer"]!["outputVolumeLock"] = new System.Text.Json.Nodes.JsonObject
+        { ["device"] = "alsa_output.arctis", ["volume"] = 0.5 };
+        state["mixer"]!["monitorVolumeLocked"] = true;
+        app.Link.Receive(state.ToJsonString());
+        var screen = new Screen(140, 36);
+        app.Draw(screen);
+        Assert.Contains("50% locked", Frame(screen));
+
+        // The daemon refuses both commands for the locked output, so neither is sent.
+        SelectOutputRow(app, "Arctis");
+        app.Handle(new KeyPress(Key.Char, '+'));
+        app.Handle(new KeyPress(Key.Char, '-'));
+        Assert.Empty(sent);
+        SelectOutputRow(app, "Katana");
+        app.Handle(new KeyPress(Key.Char, '+'));
+        JsonElement command = Command(sent);
+        Assert.Equal("adjustOutputVolume", Text(command, "cmd"));
+        Assert.Equal("alsa_output.katana", Text(command, "device"));
+
+        // While the Wave XLR Pro mixes the sink's jacks the lock waits and the volume is the jacks' own.
+        sent.Clear();
+        state["mixer"]!["monitorVolumeLocked"] = false;
+        state["mixer"]!["outputVolumeLockSuspended"] = true;
+        app.Link.Receive(state.ToJsonString());
+        app.Draw(screen);
+        Assert.DoesNotContain("50% locked", Frame(screen));
+        app.Handle(new KeyPress(Key.Up));
+        SelectOutputRow(app, "Arctis");
+        app.Handle(new KeyPress(Key.Char, '+'));
+        Assert.Equal("adjustOutputVolume", Text(Command(sent), "cmd"));
+    }
+
+    [Fact]
     public void RapidOutputSelectionsKeepEarlierChoicesAcrossDelayedState()
     {
         (App app, List<string> sent) = Ready(tab: 3);

@@ -175,11 +175,15 @@ internal sealed class OutputsView : View
         SyncPendingFeeds(app, state, selected);
 
         rows.Add(new HeadingRow("Monitor"));
+        // The daemon refuses the shared volume while its first output is
+        // locked, so the row shows the held level and sends nothing.
+        bool volumeLocked = selected.Count > 0 && state.Mixer.MonitorVolumeLocked;
         rows.Add(new NumberRow("Output volume", state.Mixer.OutputVolume ?? 0, 0, 1.5, 0.05,
             value => Widgets.Percent(value), value => link.Send("setOutputVolume", body => body["value"] = Math.Round(value, 3)))
         {
-            Enabled = selected.Count > 0,
-            Note = selected.Count == 0 ? "no output selected" : null,
+            Enabled = selected.Count > 0 && !volumeLocked,
+            DisabledText = volumeLocked ? $"{Widgets.Percent(state.Mixer.OutputVolume ?? 0)} locked" : Row.Unsupported,
+            Note = selected.Count == 0 ? "no output selected" : volumeLocked ? "unlock in the UI's Options, Audio" : null,
         });
         rows.Add(new ToggleRow("Mute monitoring", state.Mixer.MonitorMuted,
             _ => link.Send("toggleMonitorMuted"))
@@ -255,12 +259,15 @@ internal sealed class OutputsView : View
         {
             Widgets.Lamp(screen, x, y, selected, theme, back);
             string label = selected ? Feeds() : "not selected";
+            bool locked = state.Mixer.HoldsVolumeOf(sink.Name);
             screen.Text(x + 2, y, label, selected ? theme.TextDetail : theme.TextMuted, back,
-                bold: focused, maxWidth: Math.Max(4, width - 12));
+                bold: focused, maxWidth: Math.Max(4, width - (locked ? 17 : 12)));
 
             if (sink.Volume is { } volume)
                 screen.Text(x + Math.Max(6, width - 9), y, Widgets.Percent(volume).PadLeft(5),
                     sink.Muted == true ? theme.MuteForeChecked : theme.TextSecondary, back);
+            if (locked)
+                screen.Text(x + Math.Max(6, width - 14), y, "lock", theme.Accent, back);
             if (state.Mixer.EnforcedDefaultSink == sink.Name)
                 screen.Text(x + Math.Max(6, width - 3), y, "def", theme.Accent, back);
         }
@@ -290,6 +297,11 @@ internal sealed class OutputsView : View
                     return true;
 
                 case Key.Char when key.Char is '+' or '=' or '-' or '_':
+                    if (state.Mixer.HoldsVolumeOf(sink.Name))
+                    {
+                        app.Say($"{Describe(sink)} has its volume locked");
+                        return true;
+                    }
                     double by = key.Char is '+' or '=' ? 0.05 : -0.05;
                     link.Send("adjustOutputVolume", body =>
                     {

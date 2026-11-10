@@ -599,6 +599,13 @@ internal sealed record DeviceDescriptor
     public string? Note { get; init; }
 }
 
+/// <summary>The output volume lock: the exact sink name and the level it keeps.</summary>
+internal sealed record OutputVolumeLockEntry
+{
+    public string Device { get; init; } = "";
+    public double Volume { get; init; }
+}
+
 internal sealed record MixerSnapshot
 {
     public bool? RouteAppsByDefault { get; init; }
@@ -646,6 +653,16 @@ internal sealed record MixerSnapshot
     public bool MonitorMuted { get; init; }
     public bool MonitorMuteMicrophones { get; init; }
     public bool MicrophonePausePending { get; init; }
+
+    /// <summary>The output whose volume is held and the held level, or null; null too from a daemon without the lock.</summary>
+    public OutputVolumeLockEntry? OutputVolumeLock { get; init; }
+    /// <summary>The lock waits while the Wave XLR Pro mixes the locked sink's jacks.</summary>
+    public bool OutputVolumeLockSuspended { get; init; }
+    /// <summary>The shared output volume belongs to a locked output, so the daemon refuses a change.</summary>
+    public bool MonitorVolumeLocked { get; init; }
+
+    /// <summary>True while the daemon holds this sink's volume and refuses a change to it.</summary>
+    public bool HoldsVolumeOf(string sink) => OutputVolumeLock?.Device == sink && !OutputVolumeLockSuspended;
     public bool AuxPortEnabled { get; init; }
     public int LowCutHz { get; init; }
     public bool SoftClipGuard { get; init; }

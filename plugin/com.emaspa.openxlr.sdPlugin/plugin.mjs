@@ -450,6 +450,15 @@ function outputDevices() {
 const dev = () => daemonState?.state ?? null;
 const mixer = () => daemonState?.mixer ?? null;
 const monitorMuted = () => mixer()?.monitorMuted === true;
+// The output volume lock. The daemon refuses a volume change for the sink it
+// holds, and the shared Monitor volume while that sink is the first output,
+// so neither is sent. The lock waits while the Wave XLR Pro mixes the sink's
+// jacks. An older daemon reports none of this.
+const monitorVolumeLocked = () => mixer()?.monitorVolumeLocked === true;
+const outputVolumeLocked = (name) => {
+  const held = mixer()?.outputVolumeLock;
+  return !!held && !!name && held.device === name && mixer().outputVolumeLockSuspended !== true;
+};
 const effectiveMixMuted = mix => mix?.kind === "monitor" && monitorMuted() ? true : mix?.muted ?? null;
 const mixOf = (id) => mixer()?.mixes?.find((x) => x.id === id);
 const chOf = (id) => mixer()?.channels?.find((x) => x.id === id);
@@ -504,7 +513,9 @@ function toggleValue(target, inst) {
       return mixer().monitorOutputs?.length ? mixer().enforcedDefaultSink === "@monitor" : null;
     if (output.device && !controllableOutputs(mixer(), daemonState?.devices).some(d => d.name === output.device)) return null;
     if (output.kind === "main") return mixer().enforcedDefaultSink === output.device;
-    if (output.kind !== "mute") return false;   // louder and quieter are momentary
+    // Louder and quieter are momentary. On an output whose volume is locked
+    // the key is drawn as unavailable and a press sends nothing.
+    if (output.kind !== "mute") return outputVolumeLocked(outputDeviceName(output.device)) ? null : false;
     // The system default key stays momentary while the daemon cannot say
     // which sink it is, so the key still works.
     const name = outputDeviceName(output.device);
@@ -859,14 +870,16 @@ function dialValue(target, inst) {
     const v = dialNow(target, volume);
     const muted = outputMuted(name) === true;
     const label = target.length > 7 ? deviceLabel(name) || name : "System default";
-    return { label, pct: pct(v), maxPct: 150, text: muted ? "MUTED" : `${pct(v)}%`, muted };
+    return { label, pct: pct(v), maxPct: 150,
+             text: muted ? "MUTED" : outputVolumeLocked(name) ? "LOCKED" : `${pct(v)}%`, muted };
   }
   const s = dev(), x = mixer();
   switch (target) {
     case "outputVolume": {
       const v = dialNow(target, x?.outputVolume ?? 0);
       const muted = monitorMuted() || monitorDialMixes().every((id) => mixOf(id)?.muted === true);
-      return { label: "Monitor", pct: pct(v), maxPct: 150, text: muted ? "MUTED" : `${pct(v)}%`, muted };
+      return { label: "Monitor", pct: pct(v), maxPct: 150,
+               text: muted ? "MUTED" : monitorVolumeLocked() ? "LOCKED" : `${pct(v)}%`, muted };
     }
     case "gain": case "gain2": {
       if (!supported(target)) return null;
@@ -1109,11 +1122,13 @@ function onDialRotate(context, inst, ticks) {
     dialTurn(key, value, () => cmd({ cmd: "setMixVolume", mix, value }));
   } else if (t === "outputVolume") {
     if (mixer()?.outputVolume == null) return;
+    if (monitorVolumeLocked()) { send({ event: "showAlert", context }); return; }
     const value = level(dialNow(t, mixer().outputVolume), 0, 1.5);
     dialTurn(t, value, () => cmd({ cmd: "setOutputVolume", value }));
   } else if (t.startsWith("output:")) {
     const name = t.slice(7), current = outputVolume(outputDeviceName(name));
     if (current == null) return;
+    if (outputVolumeLocked(outputDeviceName(name))) { send({ event: "showAlert", context }); return; }
     const value = level(dialNow(t, current), 0, 1.5);
     dialTurn(t, value, () => cmd({ cmd: "setOutputDeviceVolume", device: name || null, value }));
   } else if (t === "gain" || t === "gain2") {
