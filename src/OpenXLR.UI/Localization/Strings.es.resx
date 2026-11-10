@@ -3925,9 +3925,6 @@ Selecciona la interfaz que controla OpenXLR</value>
   <data name="RestoreWindow" xml:space="preserve">
     <value>Restaurar</value>
   </data>
-  <data name="MicSetup" xml:space="preserve">
-    <value>Micrófono (ajustes)</value>
-  </data>
   <data name="MicSetupClip" xml:space="preserve">
     <value>Borrar aviso</value>
   </data>
@@ -3940,7 +3937,7 @@ Selecciona la interfaz que controla OpenXLR</value>
   <data name="MicSetupClipDark" xml:space="preserve">
     <value>Sin saturación</value>
   </data>
-  <data name="MicSetupGainLock" xml:space="preserve">
+  <data name="LockInputGain" xml:space="preserve">
     <value>Bloquear ganancia de entrada</value>
   </data>
   <data name="MicSetupGainLocked" xml:space="preserve">

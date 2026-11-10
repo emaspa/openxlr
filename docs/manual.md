@@ -1343,10 +1343,10 @@ and your headphones. 256 shortens that wait, and a monitor mix's
 
 <a name="mic-setup"></a>
 <a name="sound-check"></a>
-**Mic setup.** Press **Mic (setup)** in the SUBMIXER header, beside
+**Mic setup.** Press **Mic setup** in the SUBMIXER header, beside
 **Ducking**, to open the controls for XLR 1, or the first microphone in
 the mixer when XLR 1 is not one. Use any step on its own to change a setting.
-To start on another microphone, press **Mic (setup)** in
+To start on another microphone, press **Mic setup** in
 the chain window of XLR 1, XLR 2 or a capture input on one mono port. The
 header button shows while the software mixer runs and has at least one
 microphone to set up. Stereo capture inputs have no Mic setup. The window
@@ -1411,8 +1411,8 @@ the thin one under it the average level, both on the same -60 to 0 dBFS
 scale as the channel meters. Speak as you will on air and set the gain so
 your voice peaks inside the band drawn under the bar, -18 to -6 dBFS. The
 clipping warning comes on when a sample reaches -0.1 dBFS and stays on until
-you press **Clear warning**. The warning reports a peak, while the ClipGuard
-checkbox in **Shape** controls the protection. Under **Input gain (dB)**, turn
+you press **Clear warning**. The warning only reports a peak. ClipGuard, in
+**Shape**, is the protection. Under **Input gain (dB)**, turn
 off **Lock input gain** if checked, then drag the slider or type a value and
 press Enter. The same lock is in **Options → Audio** and applies to the
 primary interface and its other input if present. The control uses the

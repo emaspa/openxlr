@@ -881,7 +881,7 @@ opening a muted send, with simulated nodes. On real units, so far:
 |---|---|---|
 | Hear myself on a Wave XLR Pro: the zero-latency path off for the session, the voice with its effects in the headphones, the latency the window says against what is heard | not yet checked | |
 | Raw and Processed by ear, on a looped take and on the live microphone: no click or gap at the switch | not yet checked | |
-| The meter before the chain against the unit's gain, and the clip light at full scale | not yet checked | |
+| The meter before the chain against the unit's gain, and the clipping warning at full scale | not yet checked | |
 | Suggest gain on a Pro, an XLR Dock, a Wave:3 and an additional interface: the accepted gain puts speech in the band, and the gain lock holds it back | not yet checked | |
 | A looped take by ear where it starts over: no click | not yet checked | |
 | The gain beside the meter on a Pro, an XLR Dock, a Wave:3 and an additional interface | not yet checked | |

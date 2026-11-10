@@ -3189,7 +3189,7 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
     <value>Ова радна површина не нуди глобалне пречице кроз дијалог дозвола. Усмеравање фокусиране апликације за OpenDeck остаје доступно.</value>
   </data>
   <data name="MicSetup" xml:space="preserve">
-    <value>Микрофон (подешавање)</value>
+    <value>Подешавање микрофона</value>
   </data>
   <data name="MicSetupButtonTip" xml:space="preserve">
     <value>Подеси микрофон корак по корак: где стоји, његов ниво, снимак који чујеш сиров и обрађен, и његов EQ и додаци. Отвара се на XLR 1 или на првом микрофону у миксеру.</value>
@@ -3219,7 +3219,7 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
     <value>Петља: {0:0.0} s</value>
   </data>
   <data name="MicSetupLevelHint" xml:space="preserve">
-    <value>Говори као у етеру, на уобичајеној удаљености од микрофона. Подеси појачање тако да врхови гласа буду у појасу, а лампица изобличења остане угашена.</value>
+    <value>Говори као у етеру, на уобичајеној удаљености од микрофона. Подеси појачање тако да врхови гласа буду у појасу, а упозорење на преоптерећење остане угашено.</value>
   </data>
   <data name="MicSetupBeforeEffects" xml:space="preserve">
     <value>Микрофон пре ефеката</value>
@@ -4229,7 +4229,7 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
   <data name="RestoreWindow" xml:space="preserve">
     <value>Врати</value>
   </data>
-  <data name="MicSetupGainLock" xml:space="preserve">
+  <data name="LockInputGain" xml:space="preserve">
     <value>Закључај улазно појачање</value>
   </data>
   <data name="MicSetupGainLocked" xml:space="preserve">

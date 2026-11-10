@@ -3189,7 +3189,7 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
     <value>Walang global shortcut ang desktop na ito sa pamamagitan ng portal. Magagamit pa rin ang focus routing ng OpenDeck.</value>
   </data>
   <data name="MicSetup" xml:space="preserve">
-    <value>Mikropono (setup)</value>
+    <value>Setup ng mic</value>
   </data>
   <data name="MicSetupButtonTip" xml:space="preserve">
     <value>I-set up ang mikropono nang hakbang-hakbang: saan ito ilalagay, ang level nito, isang take na pinakikinggan nang raw at naproseso, at ang EQ at mga plugin nito. Bubukas sa XLR 1, o sa unang mikropono sa mixer.</value>
@@ -3219,7 +3219,7 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
     <value>Nilo-loop ang {0:0.0} segundo</value>
   </data>
   <data name="MicSetupLevelHint" xml:space="preserve">
-    <value>Magsalita gaya ng sa on air, sa karaniwang layo mo sa mikropono. Itakda ang gain upang nasa loob ng band ang peak ng boses mo at manatiling patay ang clip light.</value>
+    <value>Magsalita gaya ng sa on air, sa karaniwang layo mo sa mikropono. Itakda ang gain upang nasa loob ng band ang peak ng boses mo at manatiling patay ang babala ng clipping.</value>
   </data>
   <data name="MicSetupBeforeEffects" xml:space="preserve">
     <value>Mikropono bago ang mga effect</value>
@@ -4229,7 +4229,7 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
   <data name="RestoreWindow" xml:space="preserve">
     <value>Ibalik</value>
   </data>
-  <data name="MicSetupGainLock" xml:space="preserve">
+  <data name="LockInputGain" xml:space="preserve">
     <value>I-lock ang input gain</value>
   </data>
   <data name="MicSetupGainLocked" xml:space="preserve">

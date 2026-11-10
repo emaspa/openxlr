@@ -158,7 +158,7 @@
                   </ItemsControl>
                   <TextBlock Text="{loc:Text Key=InputBindingsHint}" FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
                 </StackPanel>
-                <CheckBox Name="AudioInputGainLock" Content="{loc:Text Key=MicSetupGainLock}"
+                <CheckBox Name="AudioInputGainLock" Content="{loc:Text Key=LockInputGain}"
                           IsVisible="{Binding Main.UnitInput1.CanSetGainLock}"
                           IsChecked="{Binding Main.UnitInput1.GainLocked, Mode=TwoWay}"
                           ToolTip.Tip="{loc:Text Key=GainLockTheDaemonRejectsEveryGainChange}"/>

@@ -3241,7 +3241,7 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
     <value>This desktop does not offer global shortcuts through the portal. OpenDeck focus routing remains available.</value>
   </data>
   <data name="MicSetup" xml:space="preserve">
-    <value>Mic (setup)</value>
+    <value>Mic setup</value>
   </data>
   <data name="MonitorDry" xml:space="preserve">
     <value>Dry</value>
@@ -3280,7 +3280,7 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
     <value>Looping {0:0.0} seconds</value>
   </data>
   <data name="MicSetupLevelHint" xml:space="preserve">
-    <value>Speak as you will on air, at your usual distance from the microphone. Set the gain so your voice peaks inside the band and the clip light stays dark.</value>
+    <value>Speak as you will on air, at your usual distance from the microphone. Set the gain so your voice peaks inside the band and the clipping warning stays off.</value>
   </data>
   <data name="MicSetupBeforeEffects" xml:space="preserve">
     <value>Microphone before effects</value>
@@ -4565,7 +4565,7 @@ When the window is in the tray, open it again from the OpenXLR icon or your app 
   <data name="RestoreWindow" xml:space="preserve">
     <value>Restore</value>
   </data>
-  <data name="MicSetupGainLock" xml:space="preserve">
+  <data name="LockInputGain" xml:space="preserve">
     <value>Lock input gain</value>
   </data>
   <data name="MicSetupGainLocked" xml:space="preserve">
