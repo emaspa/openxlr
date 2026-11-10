@@ -14,7 +14,10 @@ public sealed partial class Mixer
     internal static bool IsLockableOutputName(string name)
         => IsExactOutputName(name) && !name.StartsWith("OpenXLR", StringComparison.Ordinal);
 
-    private bool IsVolumeControlledByUnitLocked(string sink) => UnitBuildsJacksLocked && JackSinkLocked() == sink;
+    // From the moment the unit takes the mode until it is left, graph entered
+    // or not: after a restart in the mode the Pro's sink is still at the 100%
+    // the mode pinned, and the graph enters a sweep or two later.
+    private bool IsVolumeControlledByUnitLocked(string sink) => RoutesOffJacksLocked && JackSinkLocked() == sink;
 
     private bool IsOutputVolumeLocked(string sink) => _outputVolumeLock?.Device == sink && !IsVolumeControlledByUnitLocked(sink);
 
@@ -72,23 +75,28 @@ public sealed partial class Mixer
         }
     }
 
-    private double? SyncOutputVolumeLockLocked()
+    /// <summary>
+    /// Put the held level back where the output has left it; the level the
+    /// state reports, or null without a lock in force. A level that cannot be
+    /// read is left for the next sweep, unless <paramref name="writeUnread"/>
+    /// asks for the held level to be written anyway.
+    /// </summary>
+    private double? SyncOutputVolumeLockLocked(bool writeUnread = false)
     {
         if (_outputVolumeLock is not { } held || IsVolumeControlledByUnitLocked(held.Device)) return null;
-        if (Clock() >= _outputVolumeLockRetryAt &&
-            _pw.GetSinkChannelVolumes(held.Device, skipMissing: true) is { } current)
+        if (Clock() < _outputVolumeLockRetryAt) return held.Volume;
+        double[]? current = _pw.GetSinkChannelVolumes(held.Device, skipMissing: true);
+        if (current is null && !writeUnread) return held.Volume;
+        try
         {
-            try
+            if (held.ChannelVolumes is { } saved && (current is null || saved.Length == current.Length))
             {
-                if (held.ChannelVolumes is { } saved && saved.Length == current.Length)
-                {
-                    if (!saved.SequenceEqual(current)) _pw.SetSinkChannelVolumes(held.Device, saved);
-                }
-                else if (current.Any(volume => volume != held.Volume))
-                    _pw.SetSinkVolume(held.Device, held.Volume);
+                if (current is null || !saved.SequenceEqual(current)) _pw.SetSinkChannelVolumes(held.Device, saved);
             }
-            catch (InvalidOperationException) { _outputVolumeLockRetryAt = Clock() + 3000; }
+            else if (current is null || current.Any(volume => volume != held.Volume))
+                _pw.SetSinkVolume(held.Device, held.Volume);
         }
+        catch (InvalidOperationException) { _outputVolumeLockRetryAt = Clock() + 3000; }
         return held.Volume;
     }
 }
