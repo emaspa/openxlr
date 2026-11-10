@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -40,15 +41,42 @@ def matches(root, key):
     return input_key(root, paths) == key
 
 
+def owned_directory(path):
+    info = path.lstat()
+    return (stat.S_ISDIR(info.st_mode) and info.st_uid == os.geteuid()
+            and not info.st_mode & 0o022)
+
+
+def make_cache_directory(path):
+    path.mkdir(mode=0o700, exist_ok=True)
+    if not owned_directory(path):
+        raise PermissionError(f"untrusted cache directory: {path}")
+    return path
+
+
 def cached_manifest(cache, paths):
     root = Path.cwd()
     key = input_key(root, paths)
-    directory = Path(cache).expanduser().resolve() / "v1" / key
+    cache = Path(cache).expanduser()
+    parent = cache.parent.resolve()
+    # A directory other users can replace is unsafe even if its own mode
+    # looks private. The sticky bit protects user-owned children in /tmp.
+    for ancestor in (*reversed(parent.parents), parent):
+        try:
+            info = ancestor.lstat()
+        except FileNotFoundError:
+            ancestor.mkdir(mode=0o700, exist_ok=True)
+            info = ancestor.lstat()
+        if (not stat.S_ISDIR(info.st_mode) or info.st_uid not in (0, os.geteuid())
+                or (info.st_mode & 0o022 and not info.st_mode & stat.S_ISVTX)):
+            return None
+    cache = make_cache_directory(parent / cache.name)
+    directory = make_cache_directory(make_cache_directory(cache / "v1") / key)
     source = directory / "source"
-    if not source.is_dir():
-        directory.mkdir(parents=True, exist_ok=True)
+    if not source.exists() and not source.is_symlink():
         with tempfile.TemporaryDirectory(dir=directory) as temporary:
             snapshot = Path(temporary) / "source"
+            snapshot.mkdir(mode=0o700)
             for path in paths:
                 destination = snapshot / path
                 destination.parent.mkdir(parents=True, exist_ok=True)
@@ -60,7 +88,7 @@ def cached_manifest(cache, paths):
             except OSError:
                 if not source.is_dir():
                     raise
-    if matches(source, key):
+    if owned_directory(source) and matches(source, key):
         return source / "Cargo.toml"
     return None
 
@@ -79,8 +107,8 @@ def cache_root():
 
 def supports_build_dir(cargo):
     try:
-        version = subprocess.check_output([*cargo, "--version"], text=True, stderr=subprocess.DEVNULL)
-    except (OSError, subprocess.CalledProcessError):
+        version = subprocess.check_output([*cargo, "--version"], text=True, stderr=subprocess.DEVNULL, timeout=5)
+    except (OSError, subprocess.SubprocessError):
         return False
     match = re.match(r"cargo (\d+)\.(\d+)\.", version)
     return match is not None and tuple(map(int, match.groups())) >= (1, 91)
@@ -93,11 +121,11 @@ def uses_default_build_dir(cargo):
         output = subprocess.check_output(
             [*cargo, "metadata", "--locked", "--offline", "--no-deps", "--format-version", "1",
              "--config", 'build.target-dir="target"'],
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL, timeout=5,
         )
         metadata = json.loads(output)
         return metadata["build_directory"] == metadata["target_directory"]
-    except (OSError, subprocess.CalledProcessError, ValueError, KeyError):
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError):
         return False
 
 
@@ -113,7 +141,7 @@ def main():
                 paths = input_paths(Path.cwd())
                 if paths is not None and (manifest := cached_manifest(cache, paths)) is not None:
                     build_dir = manifest.parent.parent / "build"
-                    build_dir.mkdir(exist_ok=True)
+                    make_cache_directory(build_dir)
                     if os.access(build_dir, os.W_OK | os.X_OK):
                         # Stable input timestamps survive release extraction.
                         os.environ["CARGO_BUILD_BUILD_DIR"] = str(build_dir)

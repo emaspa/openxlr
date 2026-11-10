@@ -71,6 +71,20 @@ else:
         (build.parent / "source/src/lib.rs").write_text("corrupt")
         self.assertEqual(self.build_dir(workspace), "")
 
+    def test_untrusted_build_or_source_directory_disables_the_cache(self):
+        workspace = self.workspace("openxlr-release", 100)
+        build = Path(self.build_dir(workspace))
+        for directory in (build, build.parent / "source"):
+            with self.subTest(directory=directory):
+                original = directory.with_name(directory.name + "-moved")
+                directory.rename(original)
+                directory.symlink_to(original, target_is_directory=True)
+                self.assertEqual(self.build_dir(workspace), "")
+                directory.unlink()
+                original.rename(directory)
+        build.chmod(0o777)
+        self.assertEqual(self.build_dir(workspace), "")
+
     def test_changes_to_sources_lockfile_and_model_select_new_caches(self):
         workspace = self.workspace("openxlr-release", 100)
         previous = self.build_dir(workspace)

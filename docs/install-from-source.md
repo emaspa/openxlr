@@ -185,7 +185,9 @@ compiled binaries.
 `OPENXLR_BUILD_CACHE=0` disables automatic native caches. An explicit
 `CARGO_BUILD_BUILD_DIR` or a custom Cargo `build.build-dir` takes
 precedence over the OpenXLR Rust cache.
-`OPENXLR_DEEPFILTER_BUILD_CACHE` can set a different location. Automatic
+`OPENXLR_DEEPFILTER_BUILD_CACHE` can set a different location. The cache
+must be owned by the build user and protected from writes by other users.
+Untrusted cache directories fall back to building in the checkout. Automatic
 native caches apply to local builds as a regular user outside CI.
 Vendored Rust builds keep their normal Cargo directory.
 
