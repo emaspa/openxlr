@@ -266,8 +266,12 @@ async function reconcile() {
       if (current.channelId !== channel.id) {
         try {
           const deviceId = await outputFor(channel);
-          await audio({ type: 'route', id, deviceId }, false, unchanged);
-          if (unchanged()) current.channelId = channel.id;
+          let dispatched = false;
+          await audio({ type: 'route', id, deviceId }, false, () => {
+            dispatched = unchanged();
+            return dispatched;
+          });
+          if (dispatched && captures.get(id) === current) current.channelId = channel.id;
         }
         catch (error) { if (unchanged()) await stopTab(id, errorText(error)); return; }
       }
