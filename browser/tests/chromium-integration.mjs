@@ -1,6 +1,6 @@
 // Optional real-browser acceptance test. Run inside a device-isolated container
 // with tools/test-monitor-volume.py --command node browser/tests/chromium-integration.mjs.
-// Chrome for Testing 151+ and Playwright are required; this is not a *.test.mjs suite.
+// Chrome 151+ and Playwright are required; this is not a *.test.mjs suite.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { access, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, writeFile } from 'node:fs/promises';
@@ -225,7 +225,7 @@ try {
   await writeFile(executable, `#!/bin/sh\nexec dotnet ${quote(uiDll)} "$@"\n`, { mode: 0o700 });
   const native = JSON.parse(await readFile(join(root, 'browser/native-host.json'), 'utf8'));
   native.path = executable;
-  for (const location of [join(profile, 'NativeMessagingHosts'), ...['google-chrome-for-testing', 'google-chrome', 'chromium']
+  for (const location of [join(profile, 'NativeMessagingHosts'), ...['google-chrome-for-testing', 'google-chrome', 'google-chrome-beta', 'chromium']
     .flatMap(browser => [join(config, browser, 'NativeMessagingHosts'), join(home, '.config', browser, 'NativeMessagingHosts')])]) {
     await mkdir(location, { recursive: true, mode: 0o700 });
     await writeFile(join(location, `${native.name}.json`), JSON.stringify(native), { mode: 0o600 });
@@ -234,20 +234,20 @@ try {
     executablePath: process.env.OPENXLR_TEST_CHROMIUM,
     headless: !process.env.DISPLAY,
     env: environment,
-    ignoreDefaultArgs: ['--mute-audio'],
+    ignoreDefaultArgs: ['--mute-audio', '--disable-extensions'],
     args: [
       ...(process.getuid() === 0 ? ['--no-sandbox'] : []),
       '--disable-dev-shm-usage', '--autoplay-policy=no-user-gesture-required', '--enable-unsafe-extension-debugging',
-      `--disable-extensions-except=${join(root, 'browser/chromium')}`, `--load-extension=${join(root, 'browser/chromium')}`,
     ],
   });
   const major = Number(context.browser().version().split('.')[0]);
-  assert.ok(major >= 151, 'Extensions.triggerAction requires Chrome for Testing 151+.');
-  const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
-  const extensionId = new URL(worker.url()).host;
+  assert.ok(major >= 151, 'Extensions.triggerAction requires Chrome 151+.');
+  const cdp = await context.browser().newBrowserCDPSession();
+  const { id: extensionId } = await cdp.send('Extensions.loadUnpacked', { path: join(root, 'browser/chromium') });
+  const isWorker = worker => new URL(worker.url()).host === extensionId;
+  const worker = context.serviceWorkers().find(isWorker) ?? await context.waitForEvent('serviceworker', { predicate: isWorker, timeout: 15000 });
   assert.ok(native.allowed_origins.includes(`chrome-extension://${extensionId}/`), 'The test extension must match its native manifest.');
   await context.grantPermissions(['microphone']);
-  const cdp = await context.browser().newBrowserCDPSession();
   let nextId = 1;
   async function targetCall(targetId, method, params) {
     const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: false });
