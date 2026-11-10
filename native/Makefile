@@ -18,6 +18,28 @@ LDLIBS += $(shell pkg-config --libs $(PKGS)) -ldl -lm -pthread
 DEPFLAGS = -MD -MP -MF $@.d.tmp -MT $@
 .DELETE_ON_ERROR:
 
+COMPILE_CC = $(CC)
+COMPILE_CXX = $(CXX)
+ifneq ($(strip $(OPENXLR_BUILD_CACHE)),0)
+ifeq ($(strip $(CI)),)
+ifneq ($(shell id -u),0)
+_CCACHE := $(shell tool=$$(command -v ccache) || exit; \
+	dir=$$("$$tool" --get-config cache_dir 2>/dev/null) || exit; test -n "$$dir" || exit; \
+	while [ ! -e "$$dir" ] && [ ! -L "$$dir" ]; do dir=$$(dirname -- "$$dir"); done; \
+	if [ -d "$$dir" ] && [ -w "$$dir" ] && [ -x "$$dir" ]; then printf '%s' "$$tool"; fi)
+ifneq ($(_CCACHE),)
+# Wrap plain GCC and Clang commands, leaving existing wrappers in charge.
+# Normalize debug paths so an object can be reused in a new checkout.
+cacheable_compiler = $(and $(filter 1,$(words $(1))),$(filter cc c++ gcc g++ clang clang++,$(notdir $(1))))
+ccache_command = $(if $(filter $(realpath $(_CCACHE)),$(realpath $(shell command -v "$(1)"))),$(1),"$(_CCACHE)" "$(1)" "-fdebug-prefix-map=$(CURDIR)=.")
+cached_compiler = $(if $(call cacheable_compiler,$(1)),$(call ccache_command,$(1)),$(1))
+COMPILE_CC := $(call cached_compiler,$(CC))
+COMPILE_CXX := $(call cached_compiler,$(CXX))
+endif
+endif
+endif
+endif
+
 # Noise removal (denoise.c). RNNoise 0.2 (Xiph, BSD-3-Clause) is vendored
 # under rnnoise/ and always built in. DeepFilterNet 0.5.6 (MIT or
 # Apache-2.0) is a Rust static library from deepfilter/: DEEPFILTER=1 builds
@@ -49,9 +71,9 @@ DF_MODEL = deepfilter/model/DeepFilterNet3_onnx.tar.gz
 DF_MODEL_URL = https://raw.githubusercontent.com/Rikorose/DeepFilterNet/v$(DF_VERSION)/models/DeepFilterNet3_onnx.tar.gz
 DF_MODEL_SHA256 = c94d91f70911001c946e0fabb4aa9adc37045f45a03b56008cb0c8244cb63616
 CARGO ?= cargo
-DF_CARGO = $(CARGO)
-ifneq ($(strip $(OPENXLR_DEEPFILTER_BUILD_CACHE)),)
-DF_CARGO = python3 build-cache.py $(CARGO)
+DF_BUILD = $(CARGO) build
+ifneq ($(strip $(OPENXLR_BUILD_CACHE)),0)
+DF_BUILD = $(if $(shell command -v python3 2>/dev/null),python3 build-cache.py $(CARGO) -- build,$(CARGO) build)
 endif
 DF_CARGO_FLAGS = --release --locked --target-dir target $(if $(wildcard deepfilter/vendor/),--offline \
                  --config 'source.crates-io.replace-with="vendored"' \
@@ -80,15 +102,15 @@ openxlr-lv2-host: $(OBJECTS) $(DF_DEPS)
 	$(CXX) $(OBJECTS) -o $@ $(LDFLAGS) $(DF_LINK) $(LDLIBS)
 
 %.o: %.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
+	$(COMPILE_CC) $(CPPFLAGS) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
 	@mv $@.d.tmp $@.d
 
 %.o: %.cpp
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(DEPFLAGS) -c $< -o $@
+	$(COMPILE_CXX) $(CPPFLAGS) $(CXXFLAGS) $(DEPFLAGS) -c $< -o $@
 	@mv $@.d.tmp $@.d
 
 rnnoise/src/%.o: rnnoise/src/%.c
-	$(CC) $(RNN_CPPFLAGS) $(RNN_CFLAGS) $(DEPFLAGS) -c $< -o $@
+	$(COMPILE_CC) $(RNN_CPPFLAGS) $(RNN_CFLAGS) $(DEPFLAGS) -c $< -o $@
 	@mv $@.d.tmp $@.d
 
 rnnoise/src/x86/nnet_sse4_1.o: RNN_CFLAGS += -msse4.1
@@ -102,7 +124,7 @@ build-config.h: FORCE
 
 # The generated header must exist before the first compile can record it.
 denoise.o tests/denoise-handoff.o tests/denoise-recovery.o: %.o: %.c build-config.h
-	$(CC) $(CPPFLAGS) -Irnnoise/include $(CFLAGS) $(DEPFLAGS) -c $< -o $@
+	$(COMPILE_CC) $(CPPFLAGS) -Irnnoise/include $(CFLAGS) $(DEPFLAGS) -c $< -o $@
 	@mv $@.d.tmp $@.d
 
 tests/denoise.o: build-config.h
@@ -118,7 +140,7 @@ deepfilter/model/verified: $(DF_MODEL)
 
 deepfilter/target/release/libopenxlr_deepfilter.a: deepfilter/model/verified deepfilter/Cargo.toml \
 		deepfilter/Cargo.lock deepfilter/src/lib.rs deepfilter/libdf/Cargo.toml $(wildcard deepfilter/libdf/src/*.rs)
-	cd deepfilter && $(DF_CARGO) build $(DF_CARGO_FLAGS)
+	cd deepfilter && $(DF_BUILD) $(DF_CARGO_FLAGS)
 	touch $@
 
 .PHONY: FORCE deepfilter
@@ -159,7 +181,7 @@ tests/gain.lv2/gain.so: tests/gain.lv2/gain.c
 	@mv $@.d.tmp $@.d
 
 tests/host.o: tests/vst3-host.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
+	$(COMPILE_CC) $(CPPFLAGS) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
 	@mv $@.d.tmp $@.d
 
 # The C++ test includes vst3.cpp to exercise host-owned SDK objects.

@@ -136,9 +136,9 @@ for example after changing compiler flags. The next build reuses the
 DeepFilterNet library when its inputs are current. Use
 `make -C native clean` to clear the checkout's Rust outputs as well.
 
-With Cargo 1.91 or newer, an optional cache outside the checkout keeps
-Rust intermediates available even after a full Make clean. Run this in
-the shell before the first build that should populate the cache.
+With Cargo 1.91 or newer, you can choose a separate cache for each
+checkout and keep Rust intermediates after a full Make clean. Set this
+before the first build that should populate those caches.
 
 ```sh
 export CARGO_BUILD_BUILD_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/openxlr/cargo/{workspace-path-hash}"
@@ -151,23 +151,30 @@ directory you set and can be removed when you want to reclaim the space.
 
 #### AUR build cache
 
-AUR updates extract each release into its own source directory. To reuse
-DeepFilterNet intermediates across those directories, export the following
-before running your AUR helper. This option needs Cargo 1.91 or newer and
-Python 3.
+AUR updates extract each release into its own source directory. Local
+builds use the following user caches automatically.
 
-```sh
-export OPENXLR_DEEPFILTER_BUILD_CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/openxlr/deepfilter-build"
-```
+- NuGet uses its global packages folder. MSBuild also reuses current
+  outputs when you build again in the same checkout.
+- C and C++ builds use `ccache` if it is installed and its cache is
+  writable. Compiler wrappers already selected by the caller keep control.
+- With Cargo 1.91 or newer and Python 3, DeepFilterNet uses
+  `${XDG_CACHE_HOME:-$HOME/.cache}/openxlr/deepfilter-build`. The first
+  build fills the cache. Releases with byte-identical Rust inputs reuse a
+  verified source snapshot and its intermediates. Cargo checks the
+  toolchain and build flags. Each release gets its own packaged helper.
 
-The first build fills the cache. Later releases with byte-identical Rust
-sources, manifests, lock file and model reuse a verified source snapshot
-and its intermediates. Changes to those files select a new cache. Cargo
-checks the toolchain and build flags.
-Each release still gets its own output directory and packaged helper.
-Use this option in place of the per-checkout setting above for AUR
-updates. An explicit `CARGO_BUILD_BUILD_DIR` takes precedence, and
-vendored builds use their normal Cargo directory.
+These directories are outside the extracted sources and the system's
+package download caches. Re-extracting the package or running the usual
+package update does not remove them. Their contents can be reclaimed by
+clearing the respective user caches.
+
+`OPENXLR_BUILD_CACHE=0` disables automatic native caches. An explicit
+`CARGO_BUILD_BUILD_DIR` or a custom Cargo `build.build-dir` takes
+precedence over the OpenXLR Rust cache.
+`OPENXLR_DEEPFILTER_BUILD_CACHE` can set a different location. Root and
+CI builds skip the automatic user caches, and vendored builds keep their
+normal Cargo directory.
 
 ## 3. Device access
 

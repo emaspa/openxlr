@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise the optional Cargo build cache without compiling the model."""
+"""Exercise Cargo cache selection without compiling the model."""
 
 from concurrent.futures import ThreadPoolExecutor
 import json
@@ -20,7 +20,18 @@ class CacheTests(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
         self.env = dict(os.environ, OPENXLR_DEEPFILTER_BUILD_CACHE=str(self.root / "cache"))
-        self.env.pop("CARGO_BUILD_BUILD_DIR", None)
+        for name in ("CARGO_BUILD_BUILD_DIR", "OPENXLR_BUILD_CACHE", "CI"):
+            self.env.pop(name, None)
+        self.cargo = self.root / "cargo.py"
+        self.cargo.write_text("""import json, os, sys
+if sys.argv[1:] == ["--version"]:
+    print("cargo " + os.getenv("TEST_CARGO_VERSION", "1.91.0"))
+elif sys.argv[1] == "metadata":
+    print(json.dumps({"target_directory": "/target",
+                      "build_directory": os.getenv("TEST_CONFIG_BUILD_DIR", "/target")}))
+else:
+    print(json.dumps([os.getenv("CARGO_BUILD_BUILD_DIR", ""), sys.argv[1:]]))
+""")
 
     def workspace(self, name, mtime):
         root = self.root / name
@@ -34,9 +45,8 @@ class CacheTests(unittest.TestCase):
 
     def command(self, workspace, **overrides):
         return json.loads(subprocess.check_output(
-            [sys.executable, str(WRAPPER), sys.executable, "-c",
-             "import json, os, sys; print(json.dumps([os.getenv('CARGO_BUILD_BUILD_DIR', ''), sys.argv[1:]]))",
-             "--target-dir", "target"],
+            [sys.executable, str(WRAPPER), sys.executable, str(self.cargo), "--",
+             "build", "--target-dir", "target"],
             cwd=workspace, env=self.env | overrides, text=True,
         ))
 
@@ -51,8 +61,8 @@ class CacheTests(unittest.TestCase):
         self.assertEqual(first_command, second_command)
         build = Path(second_command[0])
         self.assertEqual(build.parent.parent, self.root / "cache" / "v1")
-        self.assertEqual(second_command[1],
-                         ["--target-dir", "target", "--manifest-path", str(build.parent / "source/Cargo.toml")])
+        self.assertEqual(second_command[1], ["build", "--target-dir", "target", "--manifest-path",
+                                             str(build.parent / "source/Cargo.toml")])
         self.assertEqual((build.parent / "source/src/lib.rs").read_text(), "src/lib.rs")
 
     def test_damaged_snapshot_falls_back_to_the_checkout(self):
@@ -79,6 +89,29 @@ class CacheTests(unittest.TestCase):
         self.assertEqual(self.build_dir(workspace, OPENXLR_DEEPFILTER_BUILD_CACHE=""), "")
         (workspace / "vendor").mkdir()
         self.assertEqual(self.build_dir(workspace), "")
+
+    def test_default_uses_xdg_cache_without_an_opt_in(self):
+        workspace = self.workspace("openxlr-release", 100)
+        self.env.pop("OPENXLR_DEEPFILTER_BUILD_CACHE")
+        self.env["XDG_CACHE_HOME"] = str(self.root / "xdg")
+        build = self.build_dir(workspace)
+        if os.geteuid() == 0:
+            self.assertEqual(build, "")
+        else:
+            self.assertEqual(Path(build).parents[2], self.root / "xdg/openxlr/deepfilter-build")
+        self.assertEqual(self.build_dir(workspace, CI="true"), "")
+
+    def test_opt_out_old_cargo_and_unavailable_cache_build_locally(self):
+        workspace = self.workspace("openxlr-release", 100)
+        self.assertEqual(self.build_dir(workspace, OPENXLR_BUILD_CACHE="0"), "")
+        self.assertEqual(self.build_dir(workspace, TEST_CARGO_VERSION="1.90.0"), "")
+        unavailable = self.root / "file"
+        unavailable.touch()
+        self.assertEqual(self.build_dir(workspace, OPENXLR_DEEPFILTER_BUILD_CACHE=str(unavailable)), "")
+
+    def test_cargo_config_keeps_its_build_directory(self):
+        workspace = self.workspace("openxlr-release", 100)
+        self.assertEqual(self.build_dir(workspace, TEST_CONFIG_BUILD_DIR="/configured"), "")
 
 
 if __name__ == "__main__":
