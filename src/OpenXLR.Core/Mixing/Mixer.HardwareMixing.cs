@@ -433,13 +433,23 @@ public sealed partial class Mixer
             _hardwareEntry = entry with { Leaving = true };
             _hardwareGraphEntered = false;
             if (!_built) return;
-            // The mixes the unit built play their EQ again.
-            SyncMixEqAfterLocked(held);
             if (JackSinkLocked() is { } pro)
             {
-                try { _pw.SetSinkVolume(pro, entry.OutputVolume ?? 1.0); }
-                catch (InvalidOperationException) { /* the unit left; its sink comes back at its own volume */ }
+                if (IsOutputVolumeLocked(pro))
+                {
+                    // Restore the software volume and balance before an EQ
+                    // or the monitor routing can reconnect the jacks.
+                    _outputVolumeLockRetryAt = 0;
+                    SyncOutputVolumeLockLocked();
+                }
+                else
+                {
+                    try { _pw.SetSinkVolume(pro, entry.OutputVolume ?? 1.0); }
+                    catch (InvalidOperationException) { /* the unit left; its sink comes back at its own volume */ }
+                }
             }
+            // The mixes the unit built play their EQ again.
+            SyncMixEqAfterLocked(held);
             SetMonitorOutputsLocked([.. _monitorOutputs]);
             WireAuxRouteLocked();
         }

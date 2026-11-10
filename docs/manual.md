@@ -5557,7 +5557,8 @@ locked. Mix faders, headphone gain and mute controls stay available.
 The lock survives an OpenXLR restart or a reconnection of the same sink. To
 lock a different output, release the lock, select the output and enable it
 again. When the Wave XLR Pro mixes its jacks on the interface, the volume lock
-for its sink is suspended until computer mixing resumes.
+for its sink is suspended. OpenXLR tries to restore the locked volume and
+channel balance before reconnecting the computer's mixes.
 
 For OpenDeck, use the Toggle inspector's **System output controls** and
 **Enforced system output** groups. Volume up and down keys are momentary:
