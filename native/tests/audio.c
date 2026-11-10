@@ -457,10 +457,10 @@ static void check_ports(void) {
       free(h.silence), free(h.scratch);
     }
     if (h.backend != &keyed) {
-      assert(h.backend->key_inputs == 0 && h.key_port == NULL);
+      assert(h.backend->key_inputs == 0 && h.key_ports[0] == NULL);
     } else {
-      assert(h.key_port);
-      const struct pw_properties *key = pw_filter_get_properties(h.filter, h.key_port);
+      assert(h.key_ports[0] && !h.key_ports[1]);
+      const struct pw_properties *key = pw_filter_get_properties(h.filter, h.key_ports[0]);
       assert(!strcmp(pw_properties_get(key, PW_KEY_PORT_NAME), "key_0"));
       assert(!strcmp(pw_properties_get(key, PW_KEY_AUDIO_CHANNEL), "MONO"));
       assert(!strcmp(pw_properties_get(key, PW_KEY_FORMAT_DSP), "32 bit float mono audio"));
