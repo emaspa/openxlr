@@ -134,13 +134,16 @@ public sealed class AppStreamStateTests
         AppStreamViewModel chrome = Assert.Single(model.Apps);
         Assert.Equal("music", chrome.ChannelId);
         Assert.Equal(OpenXLR.UI.Localization.Localizer.Format("BrowserOutputHeldOnChannel", "System"), chrome.BrowserHeldNote);
+        Assert.Equal("ch:system", Assert.Single(FlowGraph.From(model).Routes, r => r.From == "app:chrome").To);
         Apply(model, State(Chrome(null)));
         Assert.Equal(OpenXLR.UI.Localization.Localizer.Text("BrowserOutputHeldElsewhere"), chrome.BrowserHeldNote);
+        Assert.DoesNotContain(FlowGraph.From(model).Routes, r => r.From == "app:chrome");
         Apply(model, State(Chrome(null, active: false)));
         Assert.Equal(OpenXLR.UI.Localization.Localizer.Text("BrowserOutputHeld"), chrome.BrowserHeldNote);
         Apply(model, State(App("chrome", "music")));
         Assert.Null(chrome.BrowserHeldNote);
         Assert.Equal("music", chrome.ChannelId);
+        Assert.Equal("ch:music", Assert.Single(FlowGraph.From(model).Routes, r => r.From == "app:chrome").To);
     }
 
     private static JsonObject App(string identity, string channel, bool active = true, bool running = true, string? label = null)

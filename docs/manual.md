@@ -996,7 +996,10 @@ or output that is resampled says "Resampled to the clock of" that device.
 When it is a microphone's interface, a warning line under the clock names
 it; see [The microphone sounds garbled, robotic or crackly](#garbled-mic).
 
-Apps left to desktop routing appear without an OpenXLR connection. The Flow window sizes itself to the graph when it opens, or when
+Apps left to desktop routing appear without an OpenXLR connection. While
+browser output selection is enabled, the browser card follows the reported
+OpenXLR channel, or shows no connection when its output is elsewhere or unknown.
+The Flow window sizes itself to the graph when it opens, or when
 the first routing state arrives, up to the screen's usable area. Larger layouts
 scroll horizontally and vertically. Resizing the window manually turns off automatic sizing.
 
