@@ -33,6 +33,11 @@ levels, membership and ducking fields, the output selectors, byte 94 and
 byte 98, the cell law with its floor and ceiling, and the small low-level
 changes the unit drops. Diagnostics show the block decoded with it.
 
+Block 0x0002, the unit's meters (section 21), has its own codec,
+`src/OpenXLR.Core/Devices/ProMeters.cs`. Diagnostics show it decoded, and
+the device loop reads it for the ducking reduction only while the unit
+runs ducking and a client takes meters.
+
 OpenXLR writes block 0x0001 in one place,
 `src/OpenXLR.Core/Devices/ProMixPlan.cs`: the output selectors, the USB Aux
 port's cells in section 36, the Monitor return and both microphones' paths
@@ -89,7 +94,7 @@ read or written as one unit; individual controls are byte fields at fixed offset
 | block | size | dir seen | reads (17 Hz poll) | writes | role |
 |-------|------|----------|--------|--------|------|
 | 0x0001 | 108 B | R/W | 9832 | 146 | main config/state (toggles + a large tail array) |
-| 0x0002 | 150 B | R only | 9872 | 0 | **telemetry / meters** (polled, never written) |
+| 0x0002 | 150 B | R only | 9872 | 0 | **telemetry / meters** (polled, never written; layout in section 21) |
 | 0x0003 | 12 B  | W     | 0    | 57  | write-only commit block (constant `04 00…` in this capture; role established in section 6) |
 | 0x0004 | 80 B  | R/W   | 9828 | 168 | config: a 0–100 fader + a packed-flags byte + an enum |
 | 0x0005 | 8 B   | R/W   | 9790 | 131 | **two independent one-byte level faders** |
@@ -1306,3 +1311,54 @@ at once. A hardware mixing write and every section it puts back do the
 same, except for the inputs the ducking posted to the unit puts after the
 ducker, which they leave as read; they never set a field to `11`. The
 other input fields stay as read.
+
+## 21. The meters in block 0x0002
+
+Block 0x0002 is 150 bytes, read only. It is the unit's meters: reductions
+and levels, never a setting.
+
+| Bytes | Field |
+|---|---|
+| 0 to 9 | five maximizers, two bytes each: reduction, input level |
+| 10 to 57 | twelve duckers, four bytes each, ducker N at `10 + 4N`: reduction, key level, output left, output right |
+| 58 to 63 | two expanders, three bytes each: reduction, key level, output level |
+| 64 to 69 | two compressors, laid out as the expanders |
+| 70, 71 | Voice Tune's reduction on XLR 1 and XLR 2 |
+| 72 to 141 | 35 stereo levels, channel K at `72 + 2K`, left then right |
+| 142 to 149 | the level at Headphones 1, Headphones 2, Line Out and the USB Aux port, left and right each |
+
+Ducker N is block 0x0008's entry N, in the same numbering: 0 XLR 1, 1 XLR
+2, 2 USB Aux, 3 Line In, 4 + k USB playback pair k. Pair k's reduction is
+byte `26 + 4k`. This is what section 12 saw: bytes 26, 30, 38 and 42 at
+`18` (6 dB) are the duckers of pairs 0, 1, 3 and 4 at the configured
+depth, and bytes 48 and 49, which stayed at the floor with noise on pair 1,
+are the output of pair 5's ducker.
+
+The 35 level channels:
+
+| K | Level |
+|---|---|
+| 0 to 3 | XLR 1 before the unit's processing, after it, after the insert return, after the ducker |
+| 4 to 7 | XLR 2, the same four |
+| 8 to 10 | USB Aux as it arrives, after the insert return, after the ducker |
+| 11 to 13 | Line In, the same three |
+| `14 + 2k`, `15 + 2k` | USB playback pair k as it arrives and after its ducker (k 0 to 7) |
+| 30 to 34 | the five mix sections of block 0x0001, in order (0, 18, 36, 54, 72) |
+
+A level byte is -4 times dBFS: `00` is 0 dBFS, `50` is -20 dBFS, and `f0`
+is the floor, silence. A reduction byte is 4 times dB: `18` is 6 dB.
+
+### What OpenXLR does with it
+
+While the unit runs ducking and holds the setup, and a client takes the
+meters, the device loop reads the block once per poll and reports the
+largest reduction across the duckers of the inputs and pairs it ducks as
+the ducking reduction meter ([api.md](api.md#ducking)). Diagnostics decode
+the whole block. The maximizers, expanders, compressors and Voice Tune
+bytes are read for diagnostics only.
+
+### Open
+
+- The ballistics: whether a level is a peak or an average, and how long the
+  unit holds a peak or a reduction between reads.
+- Which input each maximizer, expander and compressor belongs to.
