@@ -1511,7 +1511,7 @@ it.
 and adjust it here while it plays. Every change is heard at once, on the
 take or on the live microphone:
 
-- **Starting presets** put one of three EQs on the microphone and switch
+- **Starting presets** put one of seven EQs on the microphone and switch
   the EQ on, as one change. They are OpenXLR's own starting points for a
   speaking voice; adjust them on the curve. The preset the EQ holds is lit
   like any chosen option. Its light goes out when you move a band off the
@@ -1528,6 +1528,7 @@ take or on the live microphone:
   | Warm | high pass 60 Hz | low shelf 200 Hz +2 dB | bell 3 kHz +1 dB, Q 1.02 | high shelf 8 kHz -2 dB |
   | Broadcast | high pass 100 Hz | bell 400 Hz -3 dB, Q 1.42 | bell 4 kHz +3 dB, Q 0.79 | high shelf 12 kHz +2 dB |
   | Podcast | high pass 65 Hz | low shelf 140 Hz -2 dB | bell 1.9 kHz +1.75 dB, Q 0.79 | high shelf 7 kHz -1.5 dB |
+  | Higher voice | high pass 90 Hz | low shelf 270 Hz +1.5 dB | bell 700 Hz -2.5 dB, Q 1.42 | bell 2.4 kHz +2 dB, Q 1.02 |
   | Deep voice | high pass 70 Hz | bell 170 Hz -2.5 dB, Q 1.18 | bell 500 Hz -1.5 dB, Q 0.91 | high shelf 3.2 kHz +2 dB |
   | Soft sibilants | high pass 80 Hz | bell 300 Hz -2 dB, Q 1.02 | bell 6.6 kHz -3 dB, Q 1.98 | high shelf 9.5 kHz -1.5 dB |
 
@@ -1912,8 +1913,10 @@ every microphone's EQ with the rest of the mixer.
   loads a profile; the list changing by itself sends nothing.
 - The built-in profiles start with the voice curves, the presets Mic
   setup's Shape step offers, with the same bands. Podcast balances the
-  extra bass of close speech, Deep voice reduces boom, and Soft sibilants
-  uses a fixed EQ cut for sharp S sounds. The listening curves follow:
+  extra bass of close speech. Higher voice adds a little body, reduces a
+  boxy midrange and brings out speech while keeping the top end flat. Deep
+  voice reduces boom, and Soft sibilants uses a fixed EQ cut for sharp S
+  sounds. The listening curves follow:
   Voices forward, Footsteps, Bass boost and Soft treble, made for what a
   mix plays (see [output EQ](#output-eq)). Every EQ lists all of them, a
   microphone's and a mix's alike. The built-in profiles come first, use

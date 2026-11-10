@@ -3516,6 +3516,12 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
   <data name="MicSetupPresetPodcastTip" xml:space="preserve">
     <value>Balances the bass of close speech and gently lifts the range that makes words clear.</value>
   </data>
+  <data name="MicSetupPresetHigherVoice" xml:space="preserve">
+    <value>Higher voice</value>
+  </data>
+  <data name="MicSetupPresetHigherVoiceTip" xml:space="preserve">
+    <value>Adds body to higher voices, softens hollow mids and makes words clearer.</value>
+  </data>
   <data name="MicSetupPresetDeepVoice" xml:space="preserve">
     <value>Deep voice</value>
   </data>

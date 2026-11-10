@@ -4172,6 +4172,12 @@ Aus dem Tray holst du den Mixer über das OpenXLR-Symbol oder dein App-Menü zur
   <data name="MicSetupPresetPodcastTip" xml:space="preserve">
     <value>Gleicht den Bass bei naher Mikrofonposition aus und hebt die Sprachverständlichkeit leicht an.</value>
   </data>
+  <data name="MicSetupPresetHigherVoice" xml:space="preserve">
+    <value>Höhere Stimme</value>
+  </data>
+  <data name="MicSetupPresetHigherVoiceTip" xml:space="preserve">
+    <value>Gibt höheren Stimmen mehr Fülle, mildert hohle Mitten und macht Wörter verständlicher.</value>
+  </data>
   <data name="MicSetupPresetDeepVoice" xml:space="preserve">
     <value>Tiefe Stimme</value>
   </data>

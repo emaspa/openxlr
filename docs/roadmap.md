@@ -52,8 +52,8 @@ is measured over one that is described.
   a full microphone strip: its own insert chain, the microphone EQ, noise
   removal and Mic setup when mono, and the controls of the unit behind
   it. Each microphone with the EQ also has noise removal, a compressor,
-  an expander and a voice changer. EQ profiles, six of them built in,
-  load from the UI, a Deck key or the API. Exclusive channel groups,
+  an expander and a voice changer. Built-in and saved EQ profiles load
+  from the UI, a Deck key or the API. Exclusive channel groups,
   ducking on every device with presets or custom values, profiles with
   one recalled on connect, and browser tabs routed to channels through the Chromium
   companion. A soundboard plays clips into SFX, with pages, audition,

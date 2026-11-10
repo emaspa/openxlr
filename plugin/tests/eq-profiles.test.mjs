@@ -68,7 +68,8 @@ test("built-in profiles are named in the plugin's language, an unknown one by th
 
 test("the new speech presets keep readable labels while the daemon is offline", () => {
   for (const [id, name] of [
-    ["podcast", "Podcast"], ["deep-voice", "Deep voice"], ["soft-sibilants", "Soft sibilants"],
+    ["podcast", "Podcast"], ["higher-voice", "Higher voice"], ["deep-voice", "Deep voice"],
+    ["soft-sibilants", "Soft sibilants"],
   ]) {
     assert.equal(eqProfileLabel(null, `eqprofile:xlr1:builtin:${id}`), `EQ profile\n${name}`);
   }

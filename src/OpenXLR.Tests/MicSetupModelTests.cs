@@ -57,7 +57,7 @@ public sealed class MicSetupModelTests
     [Fact]
     public void ThePresetsAreGentleValidEqsWithALowCutFirst()
     {
-        Assert.Equal(["clear", "warm", "broadcast", "podcast", "deep-voice", "soft-sibilants"],
+        Assert.Equal(["clear", "warm", "broadcast", "podcast", "higher-voice", "deep-voice", "soft-sibilants"],
             MicSetupPresets.All.Select(p => p.Id));
         Assert.Equal(MicSetupPresets.All.Count, MicSetupPresets.All.Select(p => p.Name).Distinct().Count());
         foreach (MicSetupPreset preset in MicSetupPresets.All)
@@ -83,6 +83,7 @@ public sealed class MicSetupModelTests
 
     [Theory]
     [InlineData("podcast", 1900, 120, 3)]
+    [InlineData("higher-voice", 2400, 700, 4)]
     [InlineData("deep-voice", 4800, 170, 3)]
     [InlineData("soft-sibilants", 2000, 6600, 2)]
     public void NewPresetsShapeTheIntendedRange(string id, int featuredHz, int reducedHz, double minimumDifference)
@@ -95,6 +96,20 @@ public sealed class MicSetupModelTests
             Assert.InRange(featured - reduced, minimumDifference, 8);
             Assert.InRange(featured, -1, 3);
         }
+    }
+
+    [Theory]
+    [InlineData(44100)]
+    [InlineData(48000)]
+    [InlineData(96000)]
+    public void HigherVoiceKeepsMoreBodyAndTamesMoreMidrangeThanClear(int rate)
+    {
+        MicEq eq = Assert.Single(MicSetupPresets.All, preset => preset.Id == "higher-voice").Eq;
+        MicEq clear = MicSetupPresets.Clear.Eq;
+
+        Assert.InRange(EqResponse.MagnitudeDb(eq, rate, 270) - EqResponse.MagnitudeDb(clear, rate, 270), 2, 3);
+        Assert.InRange(EqResponse.MagnitudeDb(clear, rate, 700) - EqResponse.MagnitudeDb(eq, rate, 700), 1.5, 2.5);
+        Assert.InRange(EqResponse.MagnitudeDb(eq, rate, 8000), -0.25, 0.25);
     }
 
     /// <summary>The manual's table is the presets as the code holds them, band by band.</summary>
