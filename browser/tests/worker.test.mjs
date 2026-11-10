@@ -68,6 +68,7 @@ function fixture({ existing = [], recovery } = {}) {
           }
           case 'volume':
             if (f.active.has(message.id)) f.active.get(message.id).volume = message.volume;
+            if (f.volumeGate) await f.volumeGate.promise;
             return { value: null };
           case 'route':
             if (f.active.has(message.id)) f.active.get(message.id).deviceId = message.deviceId;
@@ -155,6 +156,26 @@ test('changing one tab volume updates its capture in place, and navigation disca
   f.update(1, 'https://other.example/watch'); await settle();
   assert.deepEqual([...f.active.keys()], [2]);
   assert.equal(f.active.get(2).volume, 1);
+});
+
+test('returning to the previous volume while an edit is in flight restores the gain', { timeout: 2000 }, async () => {
+  const f = await readyFixture();
+  const change = volume => f.publish({ tabs: f.state.tabs.map(tab => tab.id === 1 ? { ...tab, volume } : tab) });
+  await change(.2);
+  assert.equal((await f.request('start', { id: 1 })).error, undefined);
+  assert.equal(f.active.get(1).volume, .2);
+
+  const reply = f.volumeGate = deferred();
+  await change(.8);
+  assert.equal(f.active.get(1).volume, .8);
+  await change(.2);
+  f.volumeGate = null;
+  reply.resolve();
+  await settle();
+
+  assert.equal(f.active.get(1).volume, .2);
+  assert.deepEqual(f.calls.filter(call => call.type === 'volume').map(call => call.volume), [.8, .2]);
+  assert.deepEqual(f.tokens, [1]);
 });
 
 test('refused browser capture permission leaves playback alone and explicit retry gets a new token', { timeout: 2000 }, async () => {

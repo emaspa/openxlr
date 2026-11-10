@@ -274,9 +274,14 @@ async function reconcile() {
       if (!unchanged()) return;
       const volume = playbackVolume(selected()?.volume);
       if (current.volume === volume) return;
-      const sameVolume = () => unchanged() && playbackVolume(selected()?.volume) === volume;
-      await audio({ type: 'volume', id, volume, site: tab.site }, false, sameVolume);
-      if (sameVolume()) current.volume = volume;
+      let dispatched = false;
+      await audio({ type: 'volume', id, volume, site: tab.site }, false, () => {
+        dispatched = unchanged() && playbackVolume(selected()?.volume) === volume;
+        return dispatched;
+      });
+      // Cache the applied gain even if a newer edit arrived during the send.
+      // The queued reconciliation needs to compare against what is playing.
+      if (dispatched && captures.get(id) === current) current.volume = volume;
     });
   }
 }
