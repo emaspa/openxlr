@@ -72,24 +72,6 @@ internal static class SavedMixerValidation
         };
     }
 
-    internal static Dictionary<string, double> PlaybackVolumes(IReadOnlyDictionary<string, double>? entries,
-        bool sites, List<string>? notes)
-    {
-        var kept = new Dictionary<string, double>(sites ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase);
-        int limit = sites ? BrowserTabRouting.MaxSites : Mixer.MaxAppOverrides;
-        string field = sites ? "browserSiteVolumes" : "appVolumes";
-        if (entries is null) notes?.Add($"{field}: {NullEntry}");
-        foreach ((string key, double volume) in entries ?? new Dictionary<string, double>())
-        {
-            string? name = sites ? BrowserTabRouting.CanonicalSite(key)
-                : Mixer.ValidAppVolumeIdentity(key) ? StreamMatcher.MigrateIdentity(key) : null;
-            if (name is not null && Mixer.ValidPlaybackVolume(volume) && kept.Count < limit)
-                kept.TryAdd(name, Math.Round(volume * 100) / 100);
-            else if (notes is not null && !notes.Contains(field)) notes.Add(field);
-        }
-        return kept;
-    }
-
     /// <summary>The dry monitor switches; a null map, which a hand edit can leave, reads as none on.</summary>
     private static Dictionary<string, bool> MonitorDry(Dictionary<string, bool>? entries, List<string> notes)
     {
@@ -258,6 +240,24 @@ internal static class SavedMixerValidation
         if (entries is null) { notes.Add($"{field}: {NullEntry}"); return []; }
         var kept = entries.Where(pair => pair.Value is not null).ToDictionary();
         if (kept.Count != entries.Count) notes.Add($"{field}: {NullEntry}");
+        return kept;
+    }
+
+    internal static Dictionary<string, double> PlaybackVolumes(IReadOnlyDictionary<string, double>? entries,
+        bool sites, List<string>? notes)
+    {
+        var kept = new Dictionary<string, double>(sites ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase);
+        int limit = sites ? BrowserTabRouting.MaxSites : Mixer.MaxAppOverrides;
+        string field = sites ? "browserSiteVolumes" : "appVolumes";
+        if (entries is null) notes?.Add($"{field}: {NullEntry}");
+        foreach ((string key, double volume) in entries ?? new Dictionary<string, double>())
+        {
+            string? name = sites ? BrowserTabRouting.CanonicalSite(key)
+                : Mixer.ValidAppVolumeIdentity(key) ? StreamMatcher.MigrateIdentity(key) : null;
+            if (name is not null && Mixer.ValidPlaybackVolume(volume) && kept.Count < limit)
+                kept.TryAdd(name, Math.Round(volume * 100) / 100);
+            else if (notes is not null && !notes.Contains(field)) notes.Add(field);
+        }
         return kept;
     }
 

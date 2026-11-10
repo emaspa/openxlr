@@ -34,11 +34,88 @@ internal static class BrowserTabsWindowTests
                 SkinService.ApplyControlSizing(touch);
                 CheckAt(language, touch);
             }
+            SkinService.ApplyControlSizing(false);
+            CheckManageEdit();
         }
         finally
         {
             culture.SetValue(null, previous);
             SkinService.ApplyControlSizing(false);
+        }
+    }
+
+    private static void CheckManageEdit()
+    {
+        var applied = new TaskCompletionSource<double>(TaskCreationOptions.RunContinuationsAsynchronously);
+        JsonNode state = JsonNode.Parse("""
+            {"type":"state","mixer":{"appVolumeSupported":true,"mixes":[],"channels":[{"id":"music","name":"Music"}],
+             "streams":[{"identity":"discord","label":"Discord","channelId":"music","active":true,"volume":0.9}]}}
+            """)!;
+        var server = SocketTestServer.Start(async (socket, stop) =>
+        {
+            await SocketTestServer.Send(socket, state, stop);
+            while (!stop.IsCancellationRequested)
+            {
+                JsonNode command = await SocketTestServer.Receive(socket, stop);
+                if (command["cmd"]?.GetValue<string>() != "setAppVolume") continue;
+                Assert.Equal("discord", command["identity"]?.GetValue<string>());
+                double value = command["value"]!.GetValue<double>();
+                state["mixer"]!["streams"]![0]!["volume"] = value;
+                await SocketTestServer.Send(socket, state, stop);
+                await SocketTestServer.Send(socket, new { type = "commandResult", requestId = command["requestId"]!.GetValue<string>() }, stop);
+                applied.TrySetResult(value);
+            }
+        }).GetAwaiter().GetResult();
+        var client = new DaemonClient(server.Url);
+        var main = new MainWindow(client);
+        try
+        {
+            using var pointer = new XPointer();
+            void Click(Control control, double position = .5)
+            {
+                PixelPoint point = control.PointToScreen(new Point(control.Bounds.Width * position, control.Bounds.Height / 2));
+                pointer.MoveTo(point.X, point.Y);
+                pointer.Click();
+            }
+
+            main.Show();
+            Wait(() => ((MainViewModel)main.DataContext!).ActiveApps.Count == 1);
+            Layout(main, 640, 1000);
+            Click(main.FindControl<Button>("ManageApps")!);
+            Wait(() => main.OwnedWindows.OfType<AppsWindow>().Any(window => window.IsVisible));
+            var manage = Assert.Single(main.OwnedWindows.OfType<AppsWindow>());
+            Layout(manage, 620, 700);
+            var button = Assert.Single(manage.GetVisualDescendants().OfType<Button>(), control => control.Name == "PlaybackVolume");
+            Click(button);
+            Wait(() => button.Flyout?.IsOpen == true);
+            var panel = (StackPanel)((Flyout)button.Flyout!).Content!;
+            var slider = Assert.Single(panel.GetVisualDescendants().OfType<Slider>());
+            Assert.Equal(.9, slider.Value, 2);
+            Click(slider, .4);
+            Wait(() => applied.Task.IsCompleted);
+            double accepted = applied.Task.GetAwaiter().GetResult();
+            Assert.InRange(accepted, .2, .6);
+            Wait(() => Equals(button.Content, $"{accepted * 100:0}%"));
+            Assert.Equal("music", ((MainViewModel)main.DataContext!).Apps.Single().ChannelId);
+            button.Flyout.Hide();
+            manage.Close();
+        }
+        finally
+        {
+            main.Quit();
+            client.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            server.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        }
+
+        static void Wait(Func<bool> condition)
+        {
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(20) };
+            timer.Tick += (_, _) => { if (condition()) deadline.Cancel(); };
+            timer.Start();
+            try { Dispatcher.UIThread.MainLoop(deadline.Token); }
+            finally { timer.Stop(); }
+            Assert.True(condition(), "The playback volume window did not reach the expected state.");
         }
     }
 

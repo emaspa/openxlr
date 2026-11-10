@@ -2379,6 +2379,24 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="BankChoiceNotSaved" xml:space="preserve">
     <value>Die Auswahl der Bänke gilt bis zum Schließen des Fensters, konnte aber nicht gespeichert werden: {0}</value>
   </data>
+  <data name="PlaybackVolumeShort" xml:space="preserve">
+    <value>Pegel</value>
+  </data>
+  <data name="PlaybackVolume" xml:space="preserve">
+    <value>Wiedergabelautstärke</value>
+  </data>
+  <data name="AppPlaybackVolumeHint" xml:space="preserve">
+    <value>Ändere den Pegel dieses Programms vor dem Mix. Nach dem Zurücksetzen steuert der Desktop die Lautstärke.</value>
+  </data>
+  <data name="BrowserPlaybackVolumeHeld" xml:space="preserve">
+    <value>Unter Browser-Tabs kannst du über die Erweiterung geroutete Tabs einzeln einstellen.</value>
+  </data>
+  <data name="TabPlaybackVolumeHint" xml:space="preserve">
+    <value>Der Pegel gilt, sobald die Erweiterung diesen Tab routet.</value>
+  </data>
+  <data name="RememberTabPlaybackVolume" xml:space="preserve">
+    <value>Lautstärke für diese Website merken</value>
+  </data>
   <data name="ApplicationChannelName" xml:space="preserve">
     <value>Kanal für {0}</value>
   </data>
@@ -4231,23 +4249,5 @@ Aus dem Tray holst du den Mixer über das OpenXLR-Symbol oder dein App-Menü zur
   </data>
   <data name="RestoreWindow" xml:space="preserve">
     <value>Wiederherstellen</value>
-  </data>
-  <data name="PlaybackVolumeShort" xml:space="preserve">
-    <value>Pegel</value>
-  </data>
-  <data name="PlaybackVolume" xml:space="preserve">
-    <value>Wiedergabelautstärke</value>
-  </data>
-  <data name="AppPlaybackVolumeHint" xml:space="preserve">
-    <value>Ändere den Pegel dieses Programms vor dem Mix. Nach dem Zurücksetzen steuert der Desktop die Lautstärke.</value>
-  </data>
-  <data name="BrowserPlaybackVolumeHeld" xml:space="preserve">
-    <value>Unter Browser-Tabs kannst du über die Erweiterung geroutete Tabs einzeln einstellen.</value>
-  </data>
-  <data name="TabPlaybackVolumeHint" xml:space="preserve">
-    <value>Der Pegel gilt, sobald die Erweiterung diesen Tab routet.</value>
-  </data>
-  <data name="RememberTabPlaybackVolume" xml:space="preserve">
-    <value>Lautstärke für diese Website merken</value>
   </data>
 </root>

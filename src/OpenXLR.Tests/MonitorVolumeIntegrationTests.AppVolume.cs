@@ -28,7 +28,7 @@ public sealed partial class MonitorVolumeIntegrationTests
             return task;
         }
 
-        void Wait(Func<Dictionary<string, (int Index, string Volume, int Sink)>, bool> condition)
+        void Wait(Func<Dictionary<string, (int Index, string Volume, uint Sink)>, bool> condition)
         {
             Assert.True(SpinWait.SpinUntil(() =>
             {
@@ -77,17 +77,20 @@ public sealed partial class MonitorVolumeIntegrationTests
         }
     }
 
-    private static Dictionary<string, (int Index, string Volume, int Sink)> StreamVolumes()
+    private static Dictionary<string, (int Index, string Volume, uint Sink)> StreamVolumes()
     {
         ProcessResult result = ProcessRunner.Run("pactl", ["--format=json", "list", "sink-inputs"]);
         Assert.True(result.Ok, result.Stderr);
         using JsonDocument json = JsonDocument.Parse(result.Stdout);
         return json.RootElement.EnumerateArray()
+            // Pulse can list a stream before attaching it. Its unsigned
+            // PA_INVALID_INDEX sink id is not an output we can compare.
             .Where(stream => stream.GetProperty("properties").TryGetProperty("media.name", out JsonElement name)
-                && name.GetString() is "teams-first" or "teams-second" or "teams-restarted" or "discord")
+                && name.GetString() is "teams-first" or "teams-second" or "teams-restarted" or "discord"
+                && stream.GetProperty("sink").TryGetUInt32(out uint sink) && sink != uint.MaxValue)
             .ToDictionary(stream => stream.GetProperty("properties").GetProperty("media.name").GetString()!,
                 stream => (stream.GetProperty("index").GetInt32(),
                     stream.GetProperty("volume").EnumerateObject().First().Value.GetProperty("value_percent").GetString()!,
-                    stream.GetProperty("sink").GetInt32()));
+                    stream.GetProperty("sink").GetUInt32()));
     }
 }

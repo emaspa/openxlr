@@ -171,10 +171,22 @@ async function sample(sink) {
   return { low: amplitude(440), high: amplitude(880) };
 }
 
-async function fixture(title, frequency) {
-  const server = createServer((_request, response) => {
+async function fixture(title, frequency, pwa = null) {
+  const server = createServer((request, response) => {
+    if (pwa && request.url === '/manifest.webmanifest') {
+      response.setHeader('Content-Type', 'application/manifest+json');
+      response.end(JSON.stringify({ id: '/', name: title, start_url: '/', display: 'standalone',
+        icons: [{ src: '/icon.svg', sizes: 'any', type: 'image/svg+xml' }] }));
+      return;
+    }
+    if (pwa && request.url === '/icon.svg') {
+      response.setHeader('Content-Type', 'image/svg+xml');
+      response.end('<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192"><rect width="192" height="192" fill="purple"/></svg>');
+      return;
+    }
     response.setHeader('Content-Type', 'text/html');
-    response.end(`<title>${title}</title><button id="play">Play</button><script>
+    response.end(`<title>${title}</title>${pwa ? '<link rel="manifest" href="/manifest.webmanifest">' : ''}
+      <button id="play">Play</button><script>
       document.querySelector('button').onclick = () => {
         const audio = new AudioContext();
         const oscillator = audio.createOscillator();
@@ -188,8 +200,20 @@ async function fixture(title, frequency) {
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
   servers.push(server);
   const site = `http://127.0.0.1:${server.address().port}`;
-  const page = await context.newPage();
-  await page.goto(site);
+  let page;
+  if (pwa) {
+    const manifestId = site + '/';
+    await pwa.send('PWA.install', { manifestId, installUrlOrBundleUrl: site });
+    await pwa.send('PWA.changeAppUserSettings', { manifestId, displayMode: 'standalone' });
+    const opened = context.waitForEvent('page');
+    await pwa.send('PWA.launch', { manifestId });
+    page = await opened;
+    await page.waitForURL(site + '/');
+    assert.ok(await page.evaluate(() => matchMedia('(display-mode: standalone)').matches), 'Teams fixture runs in its own PWA window.');
+  } else {
+    page = await context.newPage();
+    await page.goto(site);
+  }
   await page.click('#play');
   return { site, page };
 }
@@ -272,7 +296,7 @@ try {
     .then(reply => reply.value?.state), 'native host connection');
   await control.close();
   const musicTab = await fixture('YouTube test', 440);
-  const chatTab = await fixture('Teams test', 880);
+  const chatTab = await fixture('Teams test PWA', 880, cdp);
   const tabs = await until(async () => {
     const tabs = (await api('GET', 'state')).mixer.browserTabs;
     return tabs.length === 2 && tabs;
@@ -314,7 +338,7 @@ try {
   assert.ok(music.low > .025 && music.high < music.low / 8, 'Only the 440 Hz tab reaches Music.');
   assert.ok(chat.high > .025 && chat.low < chat.high / 8, 'Only the 880 Hz tab reaches Voice Chat.');
   assert.equal(await worker.evaluate(() => chrome.action.getBadgeText({})), '2');
-  console.log('PASS native bridge, two user-activated tabs, toolbar count and isolated 440/880 Hz channel audio');
+  console.log('PASS native bridge, a user-activated tab and standalone PWA, toolbar count and isolated 440/880 Hz channel audio');
 
   await api('POST', 'commands', { cmd: 'assignBrowserTab', session, tabId: chatId, site: chatTab.site, channel: 'music', remember: false });
   const together = await until(async () => {
