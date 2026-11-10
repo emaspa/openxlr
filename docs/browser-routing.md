@@ -14,7 +14,9 @@ stream title or process id. The companion takes over audio from a tab that
 you activate and plays it into the selected OpenXLR application channel.
 It does not record an audio file. A call still uses the microphone chosen
 in the browser or website. Check a real call's echo cancellation and delay
-with your headset before relying on this for meetings.
+with your headset before relying on this for meetings. If selecting the output
+or starting playback stalls, the companion reports a timeout and releases the
+capture so you can retry.
 
 ### Playback volume
 
