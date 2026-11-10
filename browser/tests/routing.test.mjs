@@ -94,6 +94,29 @@ test('two tabs have independent native output contexts and stop independently', 
   await f.audio.stopAll(); assert(f.contexts.every(context => context.closed));
 });
 
+test('stopping all tabs finishes even if one audio context stalls on close', { timeout: 1000 }, async () => {
+  const closing = deferred();
+  let closes = 0;
+  const f = fixture({ close: () => ++closes === 1 ? closing.promise : undefined, timeoutMs: 30 });
+  await f.audio.start(1, 'first', 'music');
+  await f.audio.start(2, 'second', 'chat');
+  try {
+    await f.audio.stopAll();
+    assert.deepEqual(f.audio.snapshot(), []);
+    assert(f.streams.every(stream => stream.track.stopped));
+    assert.equal(f.contexts[1].closed, true);
+
+    await f.audio.start(1, 'retry', 'chat');
+    closing.resolve();
+    await closing.promise;
+    assert.deepEqual(f.audio.snapshot().map(tab => [tab.id, tab.deviceId]), [[1, 'chat']]);
+    assert.equal(f.streams[2].track.stopped, false);
+  } finally {
+    closing.resolve();
+    await f.audio.stopAll();
+  }
+});
+
 test('tab gain is independent on a shared destination and survives a reroute', async () => {
   const f = fixture();
   const teams = 'https://teams.example';

@@ -224,6 +224,10 @@ a different website, reopen the popup on that site to activate it. A second
 activation leaves a running capture in place. Website channel defaults stay
 saved. Each tab needs explicit activation to start again after a stop.
 
+Stopping routing releases the capture tracks immediately. If Chrome stalls
+while closing an audio context, the companion stops waiting after ten seconds
+and lets you activate the tab again.
+
 Control requests already waiting when the daemon connection is lost are
 discarded, rather than replayed after reconnection. An old error cannot
 replace the new connection's status. The latest tab metadata is kept and

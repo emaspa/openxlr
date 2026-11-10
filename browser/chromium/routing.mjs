@@ -160,7 +160,14 @@ export class TabAudio {
     try { session.source?.disconnect(); } catch { /* A partially connected node is already released. */ }
     try { session.gain?.disconnect(); } catch { /* The context may already be closed. */ }
     session.stream?.getTracks().forEach(track => track.stop());
-    try { await session.context?.close(); } catch { /* Tracks have been released even if the context is gone. */ }
+    if (!session.context) return;
+    let timer;
+    try {
+      await Promise.race([session.context.close(), new Promise(resolve => {
+        timer = setTimeout(resolve, this.timeoutMs);
+      })]);
+    } catch { /* Tracks have been released even if the context is gone. */ }
+    finally { clearTimeout(timer); }
   }
 
   async stopAll(error = null) {
