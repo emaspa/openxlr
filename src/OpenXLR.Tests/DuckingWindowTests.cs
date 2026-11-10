@@ -19,7 +19,8 @@ namespace OpenXLR.Tests;
 /// The Ducking window against a fake daemon: Options no longer carries a
 /// ducking group and opens the window from its AUDIO card, the layout editor
 /// opens the same window beside Exclusive groups, every control sends its
-/// command and shows the daemon's answer, the key leaves the channel list,
+/// command and shows the daemon's answer, a key leaves the channel list and
+/// the last key cannot be unticked,
 /// "Runs on" follows the unit with the badge and the note, a refused change
 /// comes back with its reason, the reduction bar follows the duck meters, the
 /// sliders send numbers on a mark's click, a key step and the end of a drag
@@ -35,7 +36,7 @@ internal static class DuckingWindowTests
         public bool HasUnit = true;
         public JsonObject Ducking = new()
         {
-            ["enabled"] = false, ["key"] = "xlr1",
+            ["enabled"] = false, ["keys"] = new JsonArray("xlr1"), ["key"] = "xlr1",
             ["channels"] = new JsonArray("game", "music", "browser", "system", "voicechat"), ["mixes"] = new JsonArray("monitor"),
             ["sensitivity"] = "medium", ["amount"] = "medium", ["speed"] = "medium", ["processing"] = "device",
         };
@@ -49,7 +50,9 @@ internal static class DuckingWindowTests
             mixer["inserts"] = new JsonObject();
             state["mixer"] = mixer;
             var ducking = (JsonObject)Ducking.DeepClone();
-            bool keyed = ducking["key"]!.GetValue<string>() == "xlr1";
+            // This fake unit runs only XLR 1 as its key.
+            string[] keys = [.. ducking["keys"]!.AsArray().Select(k => k!.GetValue<string>())];
+            bool keyed = keys.All(k => k == "xlr1");
             bool onUnit = HasUnit && keyed && ducking["processing"]!.GetValue<string>() == "device";
             ducking["backend"] = onUnit ? "device" : "software";
             ducking["available"] = true;
@@ -57,7 +60,7 @@ internal static class DuckingWindowTests
             ducking["device"] = !HasUnit ? null : new JsonObject
             {
                 ["unit"] = "0fd9:00b4@1", ["name"] = "Wave XLR Pro", ["firmware"] = null, ["ready"] = keyed,
-                ["reason"] = keyed ? null : "keyNotSupported", ["note"] = keyed ? null : "The Wave XLR Pro ducks only with XLR 1 as the key.",
+                ["reason"] = keyed ? null : "keyNotSupported", ["note"] = keyed ? null : KeyNote,
                 ["outputs"] = new JsonArray("monitor"), ["held"] = true,
             };
             state["ducking"] = ducking;
@@ -77,9 +80,13 @@ internal static class DuckingWindowTests
             if (value["mixes"] is JsonArray mixes && mixes.Any(m => m!.GetValue<string>() == "chat"))
                 return "setDucking: refused for the test";
             foreach ((string field, JsonNode? v) in value.AsObject()) Ducking[field] = v?.DeepClone();
+            if (value["keys"] is JsonArray keys) Ducking["key"] = keys[0]!.DeepClone();
             return null;
         }
     }
+
+    /// <summary>The fake daemon's note for a key its unit cannot hear.</summary>
+    private const string KeyNote = "The Wave XLR Pro cannot use XLR 2 as a key here.";
 
     internal static void Check()
     {
@@ -165,7 +172,10 @@ internal static class DuckingWindowTests
                 ducking.FontFamily = new Avalonia.Media.FontFamily(font);
 
             CheckBox enabled = Find<CheckBox>(ducking, "DuckingEnabled");
-            ComboBox key = Find<ComboBox>(ducking, "DuckingKey");
+            CheckBox KeyBox(string name) => ducking.GetVisualDescendants().OfType<CheckBox>()
+                .Single(c => c.Name == "DuckingKey" && ((DuckingChoice)c.DataContext!).Name == name);
+            string[] KeyNames() => [.. ducking.GetVisualDescendants().OfType<CheckBox>().Where(c => c.Name == "DuckingKey")
+                .Select(c => ((DuckingChoice)c.DataContext!).Name)];
             DuckingSliderView sensitivity = Find<DuckingSliderView>(ducking, "DuckingSensitivity"),
                 amount = Find<DuckingSliderView>(ducking, "DuckingAmount"), attack = Find<DuckingSliderView>(ducking, "DuckingAttack"),
                 release = Find<DuckingSliderView>(ducking, "DuckingRelease");
@@ -186,7 +196,10 @@ internal static class DuckingWindowTests
             // The daemon's setup, and nothing sent for it.
             Layout(ducking, 640, 900);
             Assert.False(enabled.IsChecked);
-            Assert.Equal("XLR 1", (key.SelectedItem as DuckingKeyChoice)?.Name);
+            // Microphones, the unit's own inputs and application channels can key; XLR 1 does.
+            Assert.Equal(["XLR 1", "XLR 2", "Aux In", "Game", "Music", "Browser", "System", "Voice Chat", "Headset"], KeyNames());
+            Assert.True(KeyBox("XLR 1").IsChecked);
+            Assert.False(KeyBox("XLR 2").IsChecked);
             Assert.Equal(["XLR 2", "Aux In", "Game", "Music", "Browser", "System", "Voice Chat", "Headset"], ChannelNames());
             Assert.True(Channel("Music").IsChecked);
             Assert.False(Channel("Aux In").IsChecked);
@@ -213,7 +226,7 @@ internal static class DuckingWindowTests
                 return commands.ToArray()[^1];
             }
             Assert.True((await Sent(() => enabled.IsChecked = true))["value"]!["enabled"]!.GetValue<bool>());
-            await Until(() => status.Text == Localizer.Format("DuckingStatusOnUnit", "Wave XLR Pro"));
+            await Until(() => status.Text == Localizer.Format("DuckingKeysStatusOnUnit", "Wave XLR Pro"));
             JsonNode ticked = await Sent(() => Channel("Aux In").IsChecked = true);
             Assert.Equal("""["aux","game","music","browser","system","voicechat"]""", ticked["value"]!["channels"]!.ToJsonString());
             await Until(() => daemon.Ducking["channels"]!.AsArray().Count == 6 && Channel("Aux In").IsChecked == true);
@@ -262,22 +275,38 @@ internal static class DuckingWindowTests
             await Until(() => refusal.IsEffectivelyVisible && Mix("Chat").IsChecked == false);
             Assert.Equal("setDucking: refused for the test", refusal.Text);
 
-            // The key: XLR 2 leaves the channels in the same command, and the unit cannot run it.
+            // A second key: XLR 2 leaves the channels in the same command, and the unit cannot run it.
             Channel("XLR 2").IsChecked = true;
             await Until(() => daemon.Ducking["channels"]!.AsArray().Any(c => c!.GetValue<string>() == "xlr2"));
             int sentBefore = commands.Count;
-            key.SelectedItem = main.Ducking.Keys.Single(k => k.Id == "xlr2");
+            KeyBox("XLR 2").IsChecked = true;
             await Until(() => commands.Count == sentBefore + 1);
             JsonNode picked = commands.ToArray()[^1]["value"]!;
-            Assert.Equal("xlr2", picked["key"]!.GetValue<string>());
+            Assert.Equal("""["xlr1","xlr2"]""", picked["keys"]!.ToJsonString());
+            Assert.Null(picked["key"]);
             Assert.DoesNotContain("xlr2", picked["channels"]!.AsArray().Select(c => c!.GetValue<string>()));
             await Until(() => !badge.IsEffectivelyVisible && note.IsEffectivelyVisible && reduction.IsEffectivelyVisible);
-            // The channel rows were rebuilt for the new key, and letting the old ones go sent nothing.
+            // The channel rows were rebuilt without both keys, and letting the old ones go sent nothing.
             Assert.Equal(sentBefore + 1, commands.Count);
             Assert.False(refusal.IsEffectivelyVisible);
+            Assert.Equal(["Aux In", "Game", "Music", "Browser", "System", "Voice Chat", "Headset"], ChannelNames());
+            // The daemon's note names the key the unit cannot hear.
+            Assert.Equal(KeyNote, note.Text);
+            Assert.Equal(Localizer.Format("DuckingKeysStatusOnComputer",
+                Localizer.Format("DuckingKeysListLast", "XLR 1", "XLR 2")), status.Text);
+            // XLR 1 unticked: XLR 2 alone, and XLR 1 is a channel again.
+            Assert.Equal("""["xlr2"]""", (await Sent(() => KeyBox("XLR 1").IsChecked = false))["value"]!["keys"]!.ToJsonString());
+            await Until(() => daemon.Ducking["key"]!.GetValue<string>() == "xlr2" && ChannelNames().Contains("XLR 1"));
             Assert.Equal(["XLR 1", "Aux In", "Game", "Music", "Browser", "System", "Voice Chat", "Headset"], ChannelNames());
-            Assert.Equal(Localizer.Format("DuckingDeviceKeyNotSupported", "Wave XLR Pro"), note.Text);
-            Assert.Equal(Localizer.Format("DuckingStatusOnComputer", "XLR 2"), status.Text);
+            Assert.Equal(Localizer.Format("DuckingKeysStatusOnComputer", "XLR 2"), status.Text);
+            // The last key stays: nothing is sent, the box stays ticked and the window says why.
+            sentBefore = commands.Count;
+            KeyBox("XLR 2").IsChecked = false;
+            Dispatcher.UIThread.RunJobs();
+            await Until(() => refusal.IsEffectivelyVisible);
+            Assert.Equal(Localizer.Text("DuckingKeysLast"), refusal.Text);
+            Assert.True(KeyBox("XLR 2").IsChecked);
+            Assert.Equal(sentBefore, commands.Count);
             // The switch lights where it runs: this computer, with the unit's side off and saying why.
             Assert.True(onComputer.IsChecked);
             Assert.False(onUnit.IsChecked);
@@ -304,15 +333,15 @@ internal static class DuckingWindowTests
             await Until(() => main.Ducking.Processing == "software" && onComputer.IsChecked == true && onUnit.IsChecked == false
                 && note.IsEffectivelyVisible && !onUnit.IsEnabled);
 
-            // Back to XLR 1 and the unit: the badge returns and the bar hides.
-            sentBefore = commands.Count;
-            key.SelectedItem = main.Ducking.Keys.Single(k => k.Id == "xlr1");
-            await Until(() => commands.Count == sentBefore + 1);
+            // Back to XLR 1 alone and the unit: the badge returns and the bar hides.
+            Assert.Equal("""["xlr2","xlr1"]""", (await Sent(() => KeyBox("XLR 1").IsChecked = true))["value"]!["keys"]!.ToJsonString());
+            await Until(() => daemon.Ducking["keys"]!.AsArray().Count == 2 && KeyBox("XLR 1").IsChecked == true);
+            Assert.Equal("""["xlr1"]""", (await Sent(() => KeyBox("XLR 2").IsChecked = false))["value"]!["keys"]!.ToJsonString());
             // The unit can run it again: its side can be pressed, and software by choice needs no note.
             await Until(() => onUnit.IsEnabled && onComputer.IsChecked == true && !note.IsEffectivelyVisible);
             await Sent(() => onUnit.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)));
             await Until(() => badge.IsEffectivelyVisible && !reduction.IsEffectivelyVisible && onUnit.IsChecked == true
-                && status.Text == Localizer.Format("DuckingStatusOnUnit", "Wave XLR Pro"));
+                && status.Text == Localizer.Format("DuckingKeysStatusOnUnit", "Wave XLR Pro"));
             foreach (double width in new[] { 640d, 2400 })
             {
                 Layout(ducking, width, 1000);
@@ -326,7 +355,7 @@ internal static class DuckingWindowTests
             await live.Push(daemon.State());
             await Until(() => !main.Ducking.HasProcessingChoice && !Find<WrapPanel>(ducking, "DuckingProcessing").IsEffectivelyVisible);
             Assert.False(badge.IsEffectivelyVisible);
-            await Until(() => status.Text == Localizer.Format("DuckingStatusOnComputer", "XLR 1"));
+            await Until(() => status.Text == Localizer.Format("DuckingKeysStatusOnComputer", "XLR 1"));
             Layout(ducking, 640, 1000);
             AssertFits(ducking, "without a unit");
             // The narrowest the window goes.

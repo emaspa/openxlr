@@ -2914,9 +2914,6 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
   <data name="Ducking" xml:space="preserve">
     <value>Ducking</value>
   </data>
-  <data name="DuckingEnabled" xml:space="preserve">
-    <value>Pahinayi ang ubang audio samtang kusog ang key microphone</value>
-  </data>
   <data name="DuckingSensitivity" xml:space="preserve">
     <value>Pagkasensitibo</value>
   </data>
@@ -2947,21 +2944,6 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
   <data name="DuckingMarkTip" xml:space="preserve">
     <value>{0}, {1}</value>
   </data>
-  <data name="DuckingSensitivityTip" xml:space="preserve">
-    <value>Unsa ka kusog ang key microphone sa dili pa mohinay ang mga channel. Sa tuo pa, motubag sa mas hinay nga tingog.</value>
-  </data>
-  <data name="DuckingAmountTip" xml:space="preserve">
-    <value>Unsa ka layo mohinay ang mga channel samtang kusog ang key microphone.</value>
-  </data>
-  <data name="DuckingAttackTip" xml:space="preserve">
-    <value>Unsa ka dugay mohinay ang mga channel kung kusog na ang key microphone.</value>
-  </data>
-  <data name="DuckingReleaseTip" xml:space="preserve">
-    <value>Unsa ka dugay mobalik ang mga channel kung hilom na ang key microphone.</value>
-  </data>
-  <data name="DuckingHint" xml:space="preserve">
-    <value>Pahinayon sa ducking ang gipiling mga channel sa gipiling mga mix samtang kusog ang key microphone. Niining computer kini nagdagan, o sa kaugalingong processor sa Wave XLR Pro kung mohaum ang setup sa mahimo sa unit.</value>
-  </data>
   <data name="DuckingNotHeld" xml:space="preserve">
     <value>Wala pa tipigi sa unit kining setting; isulat kini pag-usab sa OpenXLR sulod sa pipila ka segundo.</value>
   </data>
@@ -2973,15 +2955,6 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
   </data>
   <data name="DuckingNotRunning" xml:space="preserve">
     <value>Walay nagpadagan niining setup.</value>
-  </data>
-  <data name="DuckingButtonTip" xml:space="preserve">
-    <value>Pahinayi ang ubang audio samtang kusog ang mikropono: key, channel, mix, preset ug asa kini nagdagan.</value>
-  </data>
-  <data name="DuckingKey" xml:space="preserve">
-    <value>Key microphone</value>
-  </data>
-  <data name="DuckingKeyTip" xml:space="preserve">
-    <value>Mikropono nga ang tingog maoy mopahinay sa ubang audio. Dili niini pahinayon ang kaugalingon.</value>
   </data>
   <data name="DuckingChannels" xml:space="preserve">
     <value>Pahinayi kining mga channel</value>
@@ -3007,26 +2980,11 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
   <data name="DuckingProcessingSoftware" xml:space="preserve">
     <value>Kining computer</value>
   </data>
-  <data name="DuckingProcessingDeviceTip" xml:space="preserve">
-    <value>Padagana ang ducking sa kaugalingong processor sa {0}. Madungog niini ang XLR 1 sama sa unit, sa dili pa ang USB, busa sa dili pa ang software EQ, mga insert ug bisan unsang gate niining computer. Dili makapugong ang noise gate o suppressor sa XLR 1 sa pag-trigger niini sa kasaba. Pahinayon niini ang nahuman nang mix samtang ipatukar sa unit sa mga output, human sa tanang pagproseso niining computer. Pilia kining computer kon ang gate sa XLR 1 kinahanglan mopugong sa sayop nga pag-trigger.</value>
-  </data>
-  <data name="DuckingProcessingSoftwareTip" xml:space="preserve">
-    <value>Padagana ang ducking niining computer. Ang key mao ang mikropono human sa EQ, insert ug Sound Check loop, sa dili pa ang volume ug send niini, busa mapugngan sa gate dinhi ang sayop nga pag-trigger. Moubos ang gipiling mga channel sulod sa matag mix, sa dili pa ang kaugalingong plugin ug latency delay sa mix. Naka-off ang kaugalingong ducking sa unit.</value>
-  </data>
-  <data name="DuckingStatusOnUnit" xml:space="preserve">
-    <value>Naka-on, nagdagan sa kaugalingong processor sa {0}. Madungog niini ang XLR 1 sa dili pa ang USB, tanang gate ug plugin niining computer, ug pahinayon ang nahuman nang mix sa mga output sa unit.</value>
-  </data>
-  <data name="DuckingStatusOnComputer" xml:space="preserve">
-    <value>Naka-on, nagdagan niining computer. Madungog niini ang {0} human sa EQ, insert ug Sound Check loop, ug pahinayon ang gipiling mga channel sulod sa matag mix, sa dili pa ang kaugalingong plugin sa mix.</value>
-  </data>
   <data name="DuckingMixerOff" xml:space="preserve">
     <value>Naka-off ang software mixer, busa dili modagan ang ducking. I-enable kini sa Mga opsyon, AUDIO.</value>
   </data>
   <data name="DuckingNothingChosen" xml:space="preserve">
     <value>Naka-on, apan walay gipahinay. Pagpili og labing menos usa ka channel ug mix.</value>
-  </data>
-  <data name="DuckingDeviceKeyNotSupported" xml:space="preserve">
-    <value>XLR 1 ra ang key nga suportahan sa {0} alang sa ducking.</value>
   </data>
   <data name="DuckingDeviceFailed" xml:space="preserve">
     <value>Wala tipigi sa {0} ang ducking nga gisulat niini. I-off ug i-on ang ducking aron sulayan pag-usab ang unit.</value>

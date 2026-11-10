@@ -2937,9 +2937,6 @@ Selecciona la interfaz que controla OpenXLR</value>
   <data name="Ducking" xml:space="preserve">
     <value>Atenuación automática</value>
   </data>
-  <data name="DuckingEnabled" xml:space="preserve">
-    <value>Bajar el resto del audio mientras el micrófono de disparo suena fuerte</value>
-  </data>
   <data name="DuckingSensitivity" xml:space="preserve">
     <value>Sensibilidad</value>
   </data>
@@ -2970,21 +2967,6 @@ Selecciona la interfaz que controla OpenXLR</value>
   <data name="DuckingMarkTip" xml:space="preserve">
     <value>{0}, {1}</value>
   </data>
-  <data name="DuckingSensitivityTip" xml:space="preserve">
-    <value>Qué tan fuerte debe sonar el micrófono de disparo para que bajen los canales. Más a la derecha reacciona a una voz más suave.</value>
-  </data>
-  <data name="DuckingAmountTip" xml:space="preserve">
-    <value>Cuánto bajan los canales mientras el micrófono de disparo suena fuerte.</value>
-  </data>
-  <data name="DuckingAttackTip" xml:space="preserve">
-    <value>Cuánto tardan los canales en bajar cuando el micrófono de disparo suena fuerte.</value>
-  </data>
-  <data name="DuckingReleaseTip" xml:space="preserve">
-    <value>Cuánto tardan los canales en volver cuando el micrófono de disparo se calla.</value>
-  </data>
-  <data name="DuckingHint" xml:space="preserve">
-    <value>La atenuación baja los canales elegidos en las mezclas elegidas mientras el micrófono de disparo suena fuerte. La hace este ordenador, o el Wave XLR Pro en su propio procesador cuando la configuración encaja con lo que el equipo puede hacer.</value>
-  </data>
   <data name="DuckingNotHeld" xml:space="preserve">
     <value>El equipo aún no mantiene este ajuste; OpenXLR lo vuelve a escribir en unos segundos.</value>
   </data>
@@ -2996,15 +2978,6 @@ Selecciona la interfaz que controla OpenXLR</value>
   </data>
   <data name="DuckingNotRunning" xml:space="preserve">
     <value>Nada ejecuta este ajuste.</value>
-  </data>
-  <data name="DuckingButtonTip" xml:space="preserve">
-    <value>Bajar el resto del audio mientras un micrófono suena fuerte: el disparo, los canales, las mezclas, los ajustes y dónde funciona.</value>
-  </data>
-  <data name="DuckingKey" xml:space="preserve">
-    <value>Micrófono de disparo</value>
-  </data>
-  <data name="DuckingKeyTip" xml:space="preserve">
-    <value>El micrófono cuya voz baja el resto del audio. Él mismo nunca se baja.</value>
   </data>
   <data name="DuckingChannels" xml:space="preserve">
     <value>Bajar estos canales</value>
@@ -3030,26 +3003,11 @@ Selecciona la interfaz que controla OpenXLR</value>
   <data name="DuckingProcessingSoftware" xml:space="preserve">
     <value>Este ordenador</value>
   </data>
-  <data name="DuckingProcessingDeviceTip" xml:space="preserve">
-    <value>Atenuar en el procesador propio de {0}. Escucha XLR 1 tal como lo oye la unidad, antes del USB, así que antes del EQ por software, las inserciones y cualquier puerta de ruido de este ordenador. Una puerta de ruido o un supresor en XLR 1 no le impide atenuar con el ruido. Baja la mezcla terminada mientras la unidad la reproduce en sus salidas, después de todo lo que hay en este ordenador. Si una puerta en XLR 1 debe evitar disparos falsos, elige este ordenador.</value>
-  </data>
-  <data name="DuckingProcessingSoftwareTip" xml:space="preserve">
-    <value>Atenuar en este ordenador. El disparo es el micrófono después de su EQ, sus inserciones y el bucle de Sound Check, antes de su volumen y sus envíos, así que una puerta en él evita disparos falsos. Los canales elegidos bajan dentro de cada mezcla, antes de los plugins propios y el retardo de latencia de esa mezcla. La atenuación propia de la unidad se desactiva.</value>
-  </data>
-  <data name="DuckingStatusOnUnit" xml:space="preserve">
-    <value>Activada, en el procesador propio de {0}. Oye XLR 1 antes del USB, por delante de cualquier puerta y plugin de este ordenador, y baja la mezcla terminada en las salidas de la unidad.</value>
-  </data>
-  <data name="DuckingStatusOnComputer" xml:space="preserve">
-    <value>Activada, en este ordenador. Oye {0} después de su EQ, sus inserciones y el bucle de Sound Check, y baja los canales elegidos dentro de cada mezcla, antes de los plugins propios de la mezcla.</value>
-  </data>
   <data name="DuckingMixerOff" xml:space="preserve">
     <value>El mezclador por software está desactivado, así que la atenuación no funciona. Actívalo en Opciones, AUDIO.</value>
   </data>
   <data name="DuckingNothingChosen" xml:space="preserve">
     <value>Activada, pero no baja nada. Elige al menos un canal y una mezcla.</value>
-  </data>
-  <data name="DuckingDeviceKeyNotSupported" xml:space="preserve">
-    <value>{0} solo atenúa con XLR 1 como disparo.</value>
   </data>
   <data name="DuckingDeviceFailed" xml:space="preserve">
     <value>{0} no conservó la atenuación que se le escribió. Desactiva y vuelve a activar la atenuación para probar de nuevo con la unidad.</value>

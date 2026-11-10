@@ -46,7 +46,7 @@
                 IsEnabled="{Binding CanEditLayout}" Click="OnExclusiveGroups"
                 ToolTip.Tip="{loc:Text Key=ChannelsOfWhichOnlyOneIsHeard}"/>
         <Button Name="DuckingButton" Content="{loc:Text Key=Ducking}" IsVisible="{Binding Ducking.IsReported}"
-                Click="OnDucking" ToolTip.Tip="{loc:Text Key=DuckingButtonTip}"/>
+                Click="OnDucking" ToolTip.Tip="{loc:Text Key=DuckingKeysButtonTip}"/>
       </WrapPanel>
     </DockPanel>
 

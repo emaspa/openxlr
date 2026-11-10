@@ -2978,9 +2978,6 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
   <data name="Ducking" xml:space="preserve">
     <value>Ducking</value>
   </data>
-  <data name="DuckingEnabled" xml:space="preserve">
-    <value>Abbassa il resto dell'audio mentre il microfono chiave è forte</value>
-  </data>
   <data name="DuckingSensitivity" xml:space="preserve">
     <value>Sensibilità</value>
   </data>
@@ -3011,21 +3008,6 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
   <data name="DuckingMarkTip" xml:space="preserve">
     <value>{0}, {1}</value>
   </data>
-  <data name="DuckingSensitivityTip" xml:space="preserve">
-    <value>Quanto deve essere forte il microfono chiave prima che i canali si abbassino. Più a destra reagisce a una voce più debole.</value>
-  </data>
-  <data name="DuckingAmountTip" xml:space="preserve">
-    <value>Di quanto si abbassano i canali mentre il microfono chiave è forte.</value>
-  </data>
-  <data name="DuckingAttackTip" xml:space="preserve">
-    <value>Quanto impiegano i canali ad abbassarsi quando il microfono chiave è forte.</value>
-  </data>
-  <data name="DuckingReleaseTip" xml:space="preserve">
-    <value>Quanto impiegano i canali a tornare quando il microfono chiave tace.</value>
-  </data>
-  <data name="DuckingHint" xml:space="preserve">
-    <value>Il ducking abbassa i canali scelti nei mix scelti mentre il microfono chiave è forte. Lo esegue questo computer, oppure il Wave XLR Pro sul proprio processore quando l'impostazione rientra in ciò che il dispositivo sa fare.</value>
-  </data>
   <data name="DuckingNotHeld" xml:space="preserve">
     <value>L'unità non mantiene ancora questa impostazione; OpenXLR la riscrive entro pochi secondi.</value>
   </data>
@@ -3037,15 +3019,6 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
   </data>
   <data name="DuckingNotRunning" xml:space="preserve">
     <value>Questa configurazione non è in funzione da nessuna parte.</value>
-  </data>
-  <data name="DuckingButtonTip" xml:space="preserve">
-    <value>Abbassa il resto dell'audio mentre un microfono è forte: la chiave, i canali, i mix, i preset e dove funziona.</value>
-  </data>
-  <data name="DuckingKey" xml:space="preserve">
-    <value>Microfono chiave</value>
-  </data>
-  <data name="DuckingKeyTip" xml:space="preserve">
-    <value>Il microfono la cui voce abbassa il resto dell'audio. Non viene mai abbassato a sua volta.</value>
   </data>
   <data name="DuckingChannels" xml:space="preserve">
     <value>Abbassa questi canali</value>
@@ -3071,26 +3044,11 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
   <data name="DuckingProcessingSoftware" xml:space="preserve">
     <value>Questo computer</value>
   </data>
-  <data name="DuckingProcessingDeviceTip" xml:space="preserve">
-    <value>Ducking sul processore interno di {0}. Ascolta XLR 1 come lo sente l'unità, prima dell'USB, quindi prima dell'EQ via software, degli insert e di qualsiasi gate su questo computer. Un noise gate o un soppressore su XLR 1 non gli impedisce di attivarsi sul rumore. Abbassa il mix finito così come l'unità lo riproduce sulle sue uscite, dopo tutto ciò che avviene su questo computer. Se un gate su XLR 1 deve evitare gli inneschi indesiderati, scegli questo computer.</value>
-  </data>
-  <data name="DuckingProcessingSoftwareTip" xml:space="preserve">
-    <value>Ducking su questo computer. La chiave è il microfono dopo il suo EQ, gli insert e il loop di Sound Check, prima del suo volume e delle mandate, quindi un gate su di esso evita gli inneschi indesiderati. I canali scelti si abbassano all'interno di ogni mix, prima dei plugin propri di quel mix e del ritardo di latenza. Il ducking proprio dell'unità viene spento.</value>
-  </data>
-  <data name="DuckingStatusOnUnit" xml:space="preserve">
-    <value>Acceso, in funzione sul processore interno di {0}. Sente XLR 1 prima dell'USB, a monte di ogni gate e plugin su questo computer, e abbassa il mix finito sulle uscite dell'unità.</value>
-  </data>
-  <data name="DuckingStatusOnComputer" xml:space="preserve">
-    <value>Acceso, in funzione su questo computer. Sente {0} dopo il suo EQ, gli insert e il loop di Sound Check, e abbassa i canali scelti all'interno di ogni mix, prima dei plugin propri del mix.</value>
-  </data>
   <data name="DuckingMixerOff" xml:space="preserve">
     <value>Il mixer software è spento, quindi il ducking non funziona. Attivalo in Opzioni, AUDIO.</value>
   </data>
   <data name="DuckingNothingChosen" xml:space="preserve">
     <value>Acceso, ma non viene abbassato nulla. Scegli almeno un canale e un mix.</value>
-  </data>
-  <data name="DuckingDeviceKeyNotSupported" xml:space="preserve">
-    <value>Con {0} il ducking funziona solo con XLR 1 come chiave.</value>
   </data>
   <data name="DuckingDeviceFailed" xml:space="preserve">
     <value>Il ducking scritto su {0} non è stato mantenuto. Disattiva e riattiva il ducking per riprovare con l'unità.</value>

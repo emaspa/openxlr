@@ -2994,9 +2994,6 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="Ducking" xml:space="preserve">
     <value>Ducking</value>
   </data>
-  <data name="DuckingEnabled" xml:space="preserve">
-    <value>Anderen Ton absenken, solange das Auslösemikrofon laut ist</value>
-  </data>
   <data name="DuckingSensitivity" xml:space="preserve">
     <value>Empfindlichkeit</value>
   </data>
@@ -3027,21 +3024,6 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="DuckingMarkTip" xml:space="preserve">
     <value>{0}, {1}</value>
   </data>
-  <data name="DuckingSensitivityTip" xml:space="preserve">
-    <value>Wie laut das Auslösemikrofon sein muss, bevor die Kanäle abgesenkt werden. Weiter rechts reagiert auf eine leisere Stimme.</value>
-  </data>
-  <data name="DuckingAmountTip" xml:space="preserve">
-    <value>Wie weit die Kanäle abgesenkt werden, solange das Auslösemikrofon laut ist.</value>
-  </data>
-  <data name="DuckingAttackTip" xml:space="preserve">
-    <value>Wie lange die Kanäle zum Absenken brauchen, sobald das Auslösemikrofon laut ist.</value>
-  </data>
-  <data name="DuckingReleaseTip" xml:space="preserve">
-    <value>Wie lange die Kanäle zum Zurückkehren brauchen, sobald das Auslösemikrofon leise ist.</value>
-  </data>
-  <data name="DuckingHint" xml:space="preserve">
-    <value>Ducking senkt die gewählten Kanäle in den gewählten Mixen ab, solange das Auslösemikrofon laut ist. Dieser Computer übernimmt das, oder das Wave XLR Pro auf seinem eigenen Prozessor, wenn die Einstellung zu dem passt, was das Gerät kann.</value>
-  </data>
   <data name="DuckingNotHeld" xml:space="preserve">
     <value>Das Gerät hält diese Einstellung noch nicht; OpenXLR schreibt sie in wenigen Sekunden erneut.</value>
   </data>
@@ -3053,15 +3035,6 @@ Von OpenXLR gesteuertes Interface wählen</value>
   </data>
   <data name="DuckingNotRunning" xml:space="preserve">
     <value>Nichts führt diese Einstellung aus.</value>
-  </data>
-  <data name="DuckingButtonTip" xml:space="preserve">
-    <value>Anderen Ton absenken, solange ein Mikrofon laut ist: Auslöser, Kanäle, Mixe, Voreinstellungen und wo es läuft.</value>
-  </data>
-  <data name="DuckingKey" xml:space="preserve">
-    <value>Auslösemikrofon</value>
-  </data>
-  <data name="DuckingKeyTip" xml:space="preserve">
-    <value>Das Mikrofon, dessen Stimme den anderen Ton absenkt. Es selbst wird nie abgesenkt.</value>
   </data>
   <data name="DuckingChannels" xml:space="preserve">
     <value>Diese Kanäle absenken</value>
@@ -3087,26 +3060,11 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="DuckingProcessingSoftware" xml:space="preserve">
     <value>Diesem Computer</value>
   </data>
-  <data name="DuckingProcessingDeviceTip" xml:space="preserve">
-    <value>Das Ducking auf dem eigenen Prozessor von {0} rechnen. Es hört XLR 1 so, wie das Gerät es hört, vor USB, also vor dem EQ in Software, den Effekten und jedem Gate auf diesem Computer. Ein Noise Gate oder eine Rauschunterdrückung auf XLR 1 hält es nicht davon ab, bei Geräuschen abzusenken. Es senkt den fertigen Mix ab, während das Gerät ihn auf seinen Ausgängen spielt, nach allem auf diesem Computer. Wenn ein Gate auf XLR 1 Fehlauslösungen verhindern soll, wähle diesen Computer.</value>
-  </data>
-  <data name="DuckingProcessingSoftwareTip" xml:space="preserve">
-    <value>Das Ducking auf diesem Computer rechnen. Der Auslöser ist das Mikrofon nach seinem EQ, seinen Effekten und der Sound-Check-Schleife, vor Lautstärke und Sends, sodass ein Gate darauf Fehlauslösungen verhindert. Die gewählten Kanäle werden in jedem Mix abgesenkt, vor den eigenen Plugins und der Latenzverzögerung dieses Mixes. Das eigene Ducking des Geräts wird ausgeschaltet.</value>
-  </data>
-  <data name="DuckingStatusOnUnit" xml:space="preserve">
-    <value>An, läuft auf dem eigenen Prozessor von {0}. Es hört XLR 1 vor USB, also vor jedem Gate und Plugin auf diesem Computer, und senkt den fertigen Mix auf den Ausgängen des Geräts ab.</value>
-  </data>
-  <data name="DuckingStatusOnComputer" xml:space="preserve">
-    <value>An, läuft auf diesem Computer. Es hört {0} nach EQ, Effekten und Sound-Check-Schleife und senkt die gewählten Kanäle in jedem Mix ab, vor den eigenen Plugins des Mixes.</value>
-  </data>
   <data name="DuckingMixerOff" xml:space="preserve">
     <value>Der Software-Mixer ist aus, daher läuft kein Ducking. Schalte ihn unter Optionen, AUDIO ein.</value>
   </data>
   <data name="DuckingNothingChosen" xml:space="preserve">
     <value>An, aber nichts wird abgesenkt. Wähle mindestens einen Kanal und einen Mix.</value>
-  </data>
-  <data name="DuckingDeviceKeyNotSupported" xml:space="preserve">
-    <value>{0} kann nur mit XLR 1 als Auslöser absenken.</value>
   </data>
   <data name="DuckingDeviceFailed" xml:space="preserve">
     <value>{0} hat das geschriebene Ducking nicht behalten. Schalte das Ducking aus und wieder an, um es erneut mit dem Gerät zu versuchen.</value>

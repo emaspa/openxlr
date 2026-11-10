@@ -3012,9 +3012,6 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
   <data name="Ducking" xml:space="preserve">
     <value>Ducking</value>
   </data>
-  <data name="DuckingEnabled" xml:space="preserve">
-    <value>Lower other audio while the key microphone is loud</value>
-  </data>
   <data name="DuckingSensitivity" xml:space="preserve">
     <value>Sensitivity</value>
   </data>
@@ -3045,21 +3042,6 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
   <data name="DuckingMarkTip" xml:space="preserve">
     <value>{0}, {1}</value>
   </data>
-  <data name="DuckingSensitivityTip" xml:space="preserve">
-    <value>How loud the key microphone has to be before the channels go down. Further right reacts to a softer voice.</value>
-  </data>
-  <data name="DuckingAmountTip" xml:space="preserve">
-    <value>How far the channels go down while the key microphone is loud.</value>
-  </data>
-  <data name="DuckingAttackTip" xml:space="preserve">
-    <value>How long the channels take to go down once the key microphone is loud.</value>
-  </data>
-  <data name="DuckingReleaseTip" xml:space="preserve">
-    <value>How long the channels take to come back once the key microphone is quiet.</value>
-  </data>
-  <data name="DuckingHint" xml:space="preserve">
-    <value>Ducking lowers the chosen channels in the chosen mixes while the key microphone is loud. This computer runs it, or the Wave XLR Pro on its own processor when the setup fits what the unit can do.</value>
-  </data>
   <data name="DuckingNotHeld" xml:space="preserve">
     <value>The unit does not hold this setting yet; OpenXLR writes it again within a few seconds.</value>
   </data>
@@ -3072,14 +3054,53 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
   <data name="DuckingNotRunning" xml:space="preserve">
     <value>Nothing runs this setup.</value>
   </data>
-  <data name="DuckingButtonTip" xml:space="preserve">
-    <value>Lower other audio while a microphone is loud: the key, the channels, the mixes, the presets and where it runs.</value>
+  <data name="DuckingKeysEnabled" xml:space="preserve">
+    <value>Lower other audio while a key is loud</value>
   </data>
-  <data name="DuckingKey" xml:space="preserve">
-    <value>Key microphone</value>
+  <data name="DuckingKeysSensitivityTip" xml:space="preserve">
+    <value>How loud the loudest key has to be before the channels go down. Further right reacts to a softer sound.</value>
   </data>
-  <data name="DuckingKeyTip" xml:space="preserve">
-    <value>The microphone whose voice lowers the other audio. It is never lowered itself.</value>
+  <data name="DuckingKeysAmountTip" xml:space="preserve">
+    <value>How far the channels go down while a key is loud.</value>
+  </data>
+  <data name="DuckingKeysAttackTip" xml:space="preserve">
+    <value>How long the channels take to go down once a key is loud.</value>
+  </data>
+  <data name="DuckingKeysReleaseTip" xml:space="preserve">
+    <value>How long the channels take to come back once every key is quiet.</value>
+  </data>
+  <data name="DuckingKeysHint" xml:space="preserve">
+    <value>Ducking lowers the chosen channels in the chosen mixes while a key is loud, following the loudest key at each moment. This computer runs it, or the Wave XLR Pro on its own processor when the setup fits what the unit can do.</value>
+  </data>
+  <data name="DuckingKeysButtonTip" xml:space="preserve">
+    <value>Lower other audio while a key is loud: the keys, the channels, the mixes, the presets and where it runs.</value>
+  </data>
+  <data name="DuckingKeys" xml:space="preserve">
+    <value>Keys</value>
+  </data>
+  <data name="DuckingKeysTip" xml:space="preserve">
+    <value>The channels whose sound lowers the other audio: microphones, Aux In, Line In and application channels. The loudest key at each moment counts, and a key is never lowered itself.</value>
+  </data>
+  <data name="DuckingKeysProcessingDeviceTip" xml:space="preserve">
+    <value>Duck on the {0}'s own processor. It listens to its keys as the unit hears them, its own inputs before USB, so before the EQ in software, the inserts and any gate on this computer. A noise gate or suppressor on a microphone does not stop it ducking on noise. It lowers the audio as the unit plays it on its outputs, after everything on this computer. If a gate on a key should stop false triggers, choose this computer.</value>
+  </data>
+  <data name="DuckingKeysProcessingSoftwareTip" xml:space="preserve">
+    <value>Duck on this computer. Each key is heard after its EQ, inserts and Sound Check loop, before its volume and sends, so a gate on a microphone stops false triggers. The chosen channels dip inside each mix, before that mix's own plugins and latency delay. The unit's own ducking is switched off.</value>
+  </data>
+  <data name="DuckingKeysStatusOnUnit" xml:space="preserve">
+    <value>On, running on the {0}'s own processor. It hears its keys on the unit, ahead of every gate and plugin on this computer, and lowers the chosen channels on the unit's outputs.</value>
+  </data>
+  <data name="DuckingKeysStatusOnComputer" xml:space="preserve">
+    <value>On, running on this computer. It hears {0} after any EQ, inserts and Sound Check loop, and lowers the chosen channels inside each mix, before the mix's own plugins.</value>
+  </data>
+  <data name="DuckingKeysListMore" xml:space="preserve">
+    <value>{0}, {1}</value>
+  </data>
+  <data name="DuckingKeysListLast" xml:space="preserve">
+    <value>{0} and {1}</value>
+  </data>
+  <data name="DuckingKeysLast" xml:space="preserve">
+    <value>Ducking needs at least one key. Tick another key before unticking this one.</value>
   </data>
   <data name="DuckingChannels" xml:space="preserve">
     <value>Lower these channels</value>
@@ -3105,26 +3126,11 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
   <data name="DuckingProcessingSoftware" xml:space="preserve">
     <value>This computer</value>
   </data>
-  <data name="DuckingProcessingDeviceTip" xml:space="preserve">
-    <value>Duck on the {0}'s own processor. It listens to XLR 1 as the unit hears it, before USB, so before the EQ in software, the inserts and any gate on this computer. A noise gate or suppressor on XLR 1 does not stop it ducking on noise. It lowers the finished mix as the unit plays it on its outputs, after everything on this computer. If a gate on XLR 1 should stop false triggers, choose this computer.</value>
-  </data>
-  <data name="DuckingProcessingSoftwareTip" xml:space="preserve">
-    <value>Duck on this computer. The key is the microphone after its EQ, inserts and Sound Check loop, before its volume and sends, so a gate on it stops false triggers. The chosen channels dip inside each mix, before that mix's own plugins and latency delay. The unit's own ducking is switched off.</value>
-  </data>
-  <data name="DuckingStatusOnUnit" xml:space="preserve">
-    <value>On, running on the {0}'s own processor. It hears XLR 1 before USB, ahead of every gate and plugin on this computer, and lowers the finished mix on the unit's outputs.</value>
-  </data>
-  <data name="DuckingStatusOnComputer" xml:space="preserve">
-    <value>On, running on this computer. It hears {0} after its EQ, inserts and Sound Check loop, and lowers the chosen channels inside each mix, before the mix's own plugins.</value>
-  </data>
   <data name="DuckingMixerOff" xml:space="preserve">
     <value>The software mixer is off, so ducking does not run. Switch it on under Options, AUDIO.</value>
   </data>
   <data name="DuckingNothingChosen" xml:space="preserve">
     <value>On, but nothing is lowered. Choose at least one channel and one mix.</value>
-  </data>
-  <data name="DuckingDeviceKeyNotSupported" xml:space="preserve">
-    <value>The {0} ducks only with XLR 1 as the key.</value>
   </data>
   <data name="DuckingDeviceFailed" xml:space="preserve">
     <value>The {0} did not keep the ducking written to it. Switch ducking off and on to try the unit again.</value>

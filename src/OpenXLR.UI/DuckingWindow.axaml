@@ -6,7 +6,7 @@
         x:Class="OpenXLR.UI.DuckingWindow" x:DataType="vm:DuckingViewModel"
         Title="{loc:Text Key=Ducking}" Width="680" Height="760" MinWidth="480" MinHeight="420"
         WindowStartupLocation="CenterOwner" Background="{DynamicResource Ox.Window.Background}">
-  <!-- The ducking setup: the switch and the key, the channels and the mixes,
+  <!-- The ducking setup: the switch and the keys, the channels and the mixes,
        the sliders with their presets, where it runs and what runs it now. Every colour, size and
        radius is an Ox.* token or a control theme; the badge is the EQ
        editor's. -->
@@ -34,7 +34,7 @@
                       IsEnabled="{Binding CanProcessOnDevice}" ToolTip.ShowOnDisabled="True"
                       Click="OnProcessOnUnit" ToolTip.Tip="{Binding ProcessOnDeviceTip}"/>
         <ToggleButton Name="DuckingOnComputer" Content="{loc:Text Key=DuckingProcessingSoftware}" IsChecked="{Binding ProcessInSoftware, Mode=OneWay}"
-                      Click="OnProcessInSoftware" ToolTip.Tip="{loc:Text Key=DuckingProcessingSoftwareTip}"/>
+                      Click="OnProcessInSoftware" ToolTip.Tip="{loc:Text Key=DuckingKeysProcessingSoftwareTip}"/>
       </WrapPanel>
       <!-- why the unit cannot run it -->
       <TextBlock Name="DuckingDeviceNote" Text="{Binding Note}" IsVisible="{Binding HasNote}" Classes="hint" TextWrapping="Wrap"/>
@@ -55,23 +55,29 @@
     <ScrollViewer Name="DuckingScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
       <!-- the right margin keeps the overlay scroll bar off the text and the pickers -->
       <StackPanel Name="DuckingSetup" Spacing="12" Margin="0,0,16,0" IsEnabled="{Binding CanEdit}">
-        <TextBlock Text="{loc:Text Key=DuckingHint}" Classes="hint" TextWrapping="Wrap"/>
+        <TextBlock Text="{loc:Text Key=DuckingKeysHint}" Classes="hint" TextWrapping="Wrap"/>
         <CheckBox Name="DuckingEnabled" IsChecked="{Binding Enabled, Mode=TwoWay}">
-          <TextBlock Text="{loc:Text Key=DuckingEnabled}" TextWrapping="Wrap"/>
+          <TextBlock Text="{loc:Text Key=DuckingKeysEnabled}" TextWrapping="Wrap"/>
         </CheckBox>
 
-        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
-          <TextBlock Text="{loc:Text Key=DuckingKey}" Classes="h" VerticalAlignment="Center"/>
-          <ComboBox Grid.Column="1" Name="DuckingKey" ItemsSource="{Binding Keys}" SelectedItem="{Binding SelectedKey, Mode=TwoWay}"
-                    HorizontalAlignment="Stretch" AutomationProperties.Name="{loc:Text Key=DuckingKey}"
-                    ToolTip.Tip="{loc:Text Key=DuckingKeyTip}">
-            <ComboBox.ItemTemplate>
-              <DataTemplate x:DataType="vm:DuckingKeyChoice">
-                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/>
+        <!-- the keys: any of them loud lowers the targets, the loudest counting -->
+        <StackPanel Name="DuckingKeyList" Spacing="6" ToolTip.Tip="{loc:Text Key=DuckingKeysTip}">
+          <TextBlock Text="{loc:Text Key=DuckingKeys}" Classes="h" TextWrapping="Wrap"/>
+          <ItemsControl Name="DuckingKeys" ItemsSource="{Binding Keys}" AutomationProperties.Name="{loc:Text Key=DuckingKeys}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel ItemSpacing="6" LineSpacing="4"/>
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:DuckingChoice">
+                <CheckBox Name="DuckingKey" IsChecked="{Binding IsChecked, Mode=TwoWay}" AutomationProperties.Name="{Binding Name}">
+                  <TextBlock Text="{Binding Name}" TextWrapping="Wrap"/>
+                </CheckBox>
               </DataTemplate>
-            </ComboBox.ItemTemplate>
-          </ComboBox>
-        </Grid>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
 
         <!-- what is lowered, and where: channels times mixes -->
         <Grid Name="DuckingTargets" ColumnDefinitions="*,*" ColumnSpacing="16" IsVisible="{Binding HasTargets}">
