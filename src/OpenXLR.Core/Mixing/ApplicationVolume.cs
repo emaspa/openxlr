@@ -32,7 +32,7 @@ public sealed partial class Mixer
     private long _appVolumeRevision;
     // What was last written to each playback stream, by registry id.
     private readonly Dictionary<int, AppliedAppVolume> _appVolumeApplied = [];
-    // The playback streams of the last pass, so a command reaches them at once.
+    // The addressable playback streams of the last pass, so a command reaches them at once.
     private readonly Dictionary<int, AudioStream> _appVolumeStreams = [];
     // The level each application plays at now, by the key its volume is saved under.
     private Dictionary<string, double> _appLiveVolumes = new(StringComparer.OrdinalIgnoreCase);
@@ -260,10 +260,12 @@ public sealed partial class Mixer
     {
         _appVolumeRevision++;
         _appVolumeStreams.Clear();
+        HashSet<int>? waitingForSerial = null;
         var playing = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
         foreach (AudioStream stream in live)
         {
-            _appVolumeStreams[stream.Id] = stream;
+            if (stream.Serial > 0) _appVolumeStreams[stream.Id] = stream;
+            else if (_appVolumeResets.ContainsKey(stream.Id)) (waitingForSerial ??= []).Add(stream.Id);
             if (stream.Volume is double level) playing[AppVolumeKey(stream.Identity)] = level;
         }
         foreach (int gone in _appVolumeApplied.Keys.Where(id => !_appVolumeStreams.ContainsKey(id)).ToArray())
@@ -272,7 +274,10 @@ public sealed partial class Mixer
         var budget = new AppVolumeWriteBudget(Clock());
         foreach ((int id, PendingAppVolumeReset owed) in _appVolumeResets.ToArray())
         {
-            if (!_appVolumeStreams.TryGetValue(id, out AudioStream? stream) || stream.Serial != owed.Serial)
+            // Keep the reset owed while this node is present but unaddressable.
+            if (waitingForSerial?.Contains(id) == true) continue;
+            if (!_appVolumeStreams.TryGetValue(id, out AudioStream? stream) || stream.Serial != owed.Serial
+                || _appVolumes.ContainsKey(AppVolumeKey(stream.Identity)))
             {
                 _appVolumeResets.Remove(id);
                 continue;
@@ -281,7 +286,7 @@ public sealed partial class Mixer
         }
 
         bool adopted = false;
-        foreach (AudioStream stream in live)
+        foreach (AudioStream stream in _appVolumeStreams.Values)
         {
             string key = AppVolumeKey(stream.Identity);
             if (!_appVolumes.TryGetValue(key, out double target))

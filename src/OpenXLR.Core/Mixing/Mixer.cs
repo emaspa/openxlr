@@ -3301,6 +3301,11 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 string identity = s.Identity;
                 seen[s.Id] = (s, identity);
                 latestByApp[identity] = s;
+                if (s.Serial <= 0)
+                {
+                    changed |= _streams.Remove(s.Id);
+                    continue;
+                }
                 bool browser = BrowserTabRouting.IsChromium(s.Binary);
                 if (_streams.TryGetValue(s.Id, out StreamAssignment? previous))
                 {
@@ -3412,8 +3417,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
 
             // Every running audio-capable app is listed even before it plays:
             // PipeWire clients cover "running", streams cover "playing".
+            // An unaddressable stream can still identify its application.
             var runningIdentities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (IGrouping<string, AudioStream> app in clients
+            foreach (IGrouping<string, AudioStream> app in clients.Concat(live.Where(s => s.Serial <= 0))
                          .Where(c => !PipeWireAdapter.IsPlumbingIdentity(c.Identity))
                          .GroupBy(c => c.Identity, StringComparer.OrdinalIgnoreCase))
             {

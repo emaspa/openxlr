@@ -2964,11 +2964,9 @@ public sealed class PipeWireAdapter
             string? mediaName = props.TryGetProperty("media.name", out JsonElement mn) ? mn.GetString() : null;
             if (mediaName is not null && mediaName.StartsWith("Simultaneous output", StringComparison.Ordinal)) continue;
 
-            // object.serial is what PulseAudio exposes as the sink-input
-            // id, and pactl move-sink-input addresses streams by that, not
-            // by the PipeWire node id.
-            int serial = props.TryGetProperty("object.serial", out JsonElement os) &&
-                         os.TryGetInt32(out int sv) ? sv : o.GetProperty("id").GetInt32();
+            // PulseAudio indexes sink inputs by object.serial. A node id
+            // can equal the PulseAudio index of a different stream.
+            int serial = Serial(props) is > 0 and int index ? index : 0;
             // A binary replaced on disk while running (updates) reports
             // as "name (deleted)"; strip it or the app splits identities.
             JsonElement client = default;

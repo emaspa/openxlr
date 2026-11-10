@@ -63,6 +63,67 @@ public sealed class AppVolumeTests : IDisposable
         Assert.Equal(1, App("mpv").LiveVolume);
     }
 
+    [Theory]
+    [InlineData("101", 101)]
+    [InlineData("\"101\"", 101)]
+    [InlineData(null, 0)]
+    [InlineData("null", 0)]
+    [InlineData("true", 0)]
+    [InlineData("\"invalid\"", 0)]
+    [InlineData("0", 0)]
+    [InlineData("-1", 0)]
+    [InlineData("2147483648", 0)]
+    public void AStreamRetainsItsApplicationIdentityWithoutAUsableSerial(string? serial, int expected)
+    {
+        AudioStream stream = Assert.Single(Read(VlcAtNode100(serial)));
+
+        Assert.Equal(100, stream.Id);
+        Assert.Equal("vlc", stream.Identity);
+        Assert.Equal(expected, stream.Serial);
+    }
+
+    [Fact]
+    public void ARegistryNodeIdNeverAddressesAnotherApplicationsPlaybackStream()
+    {
+        // mpv's real PulseAudio index equals VLC's registry node id.
+        string mpv = BrowserGraph.Node(11, 100, Mpv);
+        _mixer.AssignApp("mpv", "music");
+        Streams(mpv);
+        _mixer.SyncStreams();
+        _graph.ClearCalls();
+
+        Streams(VlcAtNode100(null), mpv);
+        _mixer.SyncStreams();
+        _mixer.SetAppVolume("vlc", .35);
+
+        Assert.Empty(VolumeWrites);
+        Assert.DoesNotContain(_graph.Calls, call => call.StartsWith("move-sink-input 100 ", StringComparison.Ordinal));
+        Assert.DoesNotContain("set-sink-input-mute 100 0", _graph.Calls);
+        Assert.Throws<InvalidOperationException>(() => _mixer.AssignStream(100, "music"));
+        Assert.True(App("vlc").Active);
+        Assert.Equal(1, App("vlc").LiveVolume);
+
+        // Routing and the saved volume apply once the intended index is known.
+        _mixer.AssignApp("vlc", "system");
+        Streams(VlcAtNode100("101"), mpv);
+        _mixer.SyncStreams();
+        Assert.Contains("move-sink-input 101 OpenXLR_ch_system", _graph.Calls);
+        Assert.Equal(["set-sink-input-volume 101 35%"], VolumeWrites);
+
+        // A later unreadable snapshot also invalidates the cached write target.
+        _graph.ClearCalls();
+        Streams(VlcAtNode100(null), mpv);
+        _mixer.SyncStreams();
+        _mixer.SetAppVolume("vlc", null);
+        _mixer.AssignApp("vlc", "music");
+        Assert.Empty(VolumeWrites);
+        Assert.DoesNotContain(_graph.Calls, call => call.StartsWith("move-sink-input", StringComparison.Ordinal));
+    }
+
+    private static string VlcAtNode100(string? serial)
+        => BrowserGraph.Node(100, 101, Vlc).Replace("\"object.serial\":101,",
+            serial is null ? "" : $"\"object.serial\":{serial},", StringComparison.Ordinal);
+
     [Fact]
     public void ResetAndForgetPutThePlayingStreamsBackToFullVolume()
     {
@@ -103,6 +164,40 @@ public sealed class AppVolumeTests : IDisposable
         _graph.ClearCalls();
         _mixer.SyncStreams();
         Assert.Empty(VolumeWrites);
+    }
+
+    [Theory]
+    [InlineData("101", false, null, "set-sink-input-volume 101 100%")]
+    [InlineData("102", false, null, null)]
+    [InlineData("101", true, null, null)]
+    [InlineData("101", false, .6, "set-sink-input-volume 101 60%")]
+    public void AQueuedResetWaitsForTheSameStreamSerial(string returnedSerial, bool disappeared,
+        double? replacementLevel, string? expectedWrite)
+    {
+        Streams(VlcAtNode100("101"));
+        _mixer.SyncStreams();
+        _mixer.SetAppVolume("vlc", .35);
+        _graph.RefuseVolumes();
+        _mixer.SetAppVolume("vlc", null);
+        _graph.RefuseVolumes(false);
+        _graph.ClearCalls();
+
+        Streams(VlcAtNode100(null));
+        _now += 300;
+        _mixer.SyncStreams();
+        if (replacementLevel is double level) _mixer.SetAppVolume("vlc", level);
+        Assert.Empty(VolumeWrites);
+
+        if (disappeared)
+        {
+            Streams();
+            _mixer.SyncStreams();
+        }
+        Streams(VlcAtNode100(returnedSerial));
+        _mixer.SyncStreams();
+
+        string[] expected = expectedWrite is null ? [] : [expectedWrite];
+        Assert.Equal(expected, VolumeWrites);
     }
 
     [Fact]

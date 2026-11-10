@@ -637,9 +637,10 @@ so the next sweep reapplies automatic routing even while the app is playing.
 the hardware channels `xlr1`, `xlr2`, `aux` and `line` are refused with
 `unknown channel`.
 `assignStream` requires a currently tracked PipeWire node id. An unknown id
-returns an error without being treated as a PulseAudio stream serial. A
-refused stream move does not store an unapplied assignment, including an
-`ignore` choice.
+returns an error. Streams without a usable PulseAudio index can still
+identify a playing application. OpenXLR needs a usable index to route a
+stream or apply a saved playback level to it. A refused stream move does
+not store an unapplied assignment, including an `ignore` choice.
 At most 512 application assignments can be added through live commands.
 At that limit, `assignApp` and `assignStream` may still update an existing
 assignment, including an `ignore` choice. A new remembered identity returns
