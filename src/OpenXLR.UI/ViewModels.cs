@@ -1458,7 +1458,7 @@ public sealed partial class MainViewModel : ViewModelBase
                 existing.Icon = icon;
             }
             existing.ApplyBrowserHold(browserHeld, output);
-            existing.PlaybackVolume.Apply(volumeSupported, !browserHeld,
+            existing.PlaybackVolume.Apply(volumeSupported, true,
                 stream["volume"]?.GetValue<double>(), browserHeld: browserHeld);
         }
         for (int i = Apps.Count - 1; i >= 0; i--)

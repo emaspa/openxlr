@@ -7,7 +7,14 @@ namespace OpenXLR.Tests;
 public sealed partial class MonitorVolumeIntegrationTests
 {
     [MonitorPipeWireFact]
-    public async Task ApplicationVolumeBalancesStreamsOnOneChannelAndSurvivesAPlaybackRestart()
+    public Task ApplicationVolumeBalancesStreamsOnOneChannelAndSurvivesAPlaybackRestart()
+        => CheckApplicationVolume(native: false);
+
+    [MonitorPipeWireFact]
+    public Task ApplicationVolumeBalancesNativePipeWireStreams()
+        => CheckApplicationVolume(native: true);
+
+    private static async Task CheckApplicationVolume(bool native)
     {
         const string app = "openxlr-app-volume-teams";
         const string other = "openxlr-app-volume-discord";
@@ -21,9 +28,13 @@ public sealed partial class MonitorVolumeIntegrationTests
         var players = new List<Task<ProcessResult>>();
         Task<ProcessResult> Play(string identity, string media, CancellationToken cancel)
         {
-            var task = ProcessRunner.RunAsync("pacat", ["--raw", "--playback", $"--device={system.SinkName}",
-                $"--client-name={identity}", $"--property=application.process.binary={identity}",
-                $"--stream-name={media}", "/dev/zero"], TimeSpan.FromSeconds(30), cancel: cancel);
+            var task = native
+                ? ProcessRunner.RunAsync("pw-cat", ["--raw", "--playback", "--target", system.SinkName,
+                    "--properties", $"{{ application.name = {identity} application.process.binary = {identity} media.name = {media} }}",
+                    "/dev/zero"], TimeSpan.FromSeconds(30), cancel: cancel)
+                : ProcessRunner.RunAsync("pacat", ["--raw", "--playback", $"--device={system.SinkName}",
+                    $"--client-name={identity}", $"--property=application.process.binary={identity}",
+                    $"--stream-name={media}", "/dev/zero"], TimeSpan.FromSeconds(30), cancel: cancel);
             players.Add(task);
             return task;
         }

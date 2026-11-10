@@ -85,6 +85,19 @@ public sealed class AppIdentityTests
     }
 
     [Theory]
+    [InlineData("43258", true)]
+    [InlineData("\"43258\"", true)]
+    [InlineData("null", false)]
+    [InlineData("0", false)]
+    [InlineData("2147483648", false)]
+    public void MissingPulseSerialDoesNotUseTheRegistryNodeId(string value, bool valid)
+    {
+        byte[] json = Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(BalatroGraph)
+            .Replace("\"object.serial\":43258", $"\"object.serial\":{value}", StringComparison.Ordinal));
+        Assert.Equal(valid ? 43258 : 0, Assert.Single(PipeWireAdapter.ListStreams(json)).Serial);
+    }
+
+    [Theory]
     [InlineData("")]
     [InlineData("[] {}")]
     [InlineData("[{\"id\":1")]

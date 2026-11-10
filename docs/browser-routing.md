@@ -23,6 +23,10 @@ activate the tab or PWA as usual. Select **Vol.** or the percentage beside
 its channel picker. The level takes effect once the companion routes that
 tab. You can adjust two routed tabs independently even when they play
 into the same channel. A volume change leaves the capture running.
+Chromium's application control in **Manage** sets the shared browser
+level, including installed web apps. The tab control adjusts each
+captured tab relative to that shared level. If all tabs are quiet, check
+the shared browser level in **Manage** or the desktop volume controls.
 
 Turn on **Remember volume for this website** to use the same level for
 future tabs on that origin. This is separate from remembering a channel.

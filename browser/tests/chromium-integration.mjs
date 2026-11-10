@@ -304,7 +304,28 @@ try {
   const musicId = tabs.find(tab => tab.site === musicTab.site).id;
   const chatId = tabs.find(tab => tab.site === chatTab.site).id;
   const session = tabs[0].session;
+
+  // In application mode Chromium owns both the tab and the standalone PWA
+  // streams. Check both tones before handing them over to the companion.
+  const browserApp = await until(async () => (await api('GET', 'state')).mixer.streams
+    .find(app => app.active && app.channelId === 'browser' && /chrome|chromium/i.test(app.identity)),
+  'Chromium playback is listed as an application');
+  const browserAudio = await until(async () => {
+    const audio = await sample('OpenXLR_ch_browser');
+    return audio.low > .025 && audio.high > .025 ? audio : null;
+  }, 'the regular tab and standalone PWA play through the Browser channel');
+  const appVolume = { cmd: 'setAppVolume', identity: browserApp.identity };
+  await api('POST', 'commands', { ...appVolume, value: .5 });
+  await until(async () => {
+    const audio = await sample('OpenXLR_ch_browser');
+    return audio.low > browserAudio.low * .08 && audio.low < browserAudio.low * .18
+      && audio.high > browserAudio.high * .08 && audio.high < browserAudio.high * .18;
+  }, 'the browser volume attenuates both the regular tab and the standalone PWA');
+  console.log('PASS browser-wide volume applies to both the tab and standalone PWA');
   await api('POST', 'commands', { cmd: 'setPreserveBrowserOutputs', value: true });
+  await until(async () => (await api('GET', 'state')).mixer.streams
+    .some(app => app.identity === browserApp.identity && app.browserHeld),
+  'the browser routing is held independently of its volume control');
 
   const devices = await context.newPage();
   await devices.goto(`chrome-extension://${extensionId}/devices.html`);
@@ -333,10 +354,25 @@ try {
     }
     await cdp.send('Target.closeTarget', { targetId: popup.targetId });
   }
-  const music = await sample('OpenXLR_ch_music');
-  const chat = await sample('OpenXLR_ch_voicechat');
-  assert.ok(music.low > .025 && music.high < music.low / 8, 'Only the 440 Hz tab reaches Music.');
-  assert.ok(chat.high > .025 && chat.low < chat.high / 8, 'Only the 880 Hz tab reaches Voice Chat.');
+  await until(async () => {
+    const music = await sample('OpenXLR_ch_music');
+    const chat = await sample('OpenXLR_ch_voicechat');
+    return music.low > browserAudio.low * .08 && music.low < browserAudio.low * .18 && music.high < music.low / 8
+      && chat.high > browserAudio.high * .08 && chat.high < browserAudio.high * .18 && chat.low < chat.high / 8;
+  }, 'the shared browser level is retained as both captures route to separate channels');
+  await api('POST', 'commands', { ...appVolume, value: 0 });
+  await until(async () => {
+    const music = await sample('OpenXLR_ch_music');
+    const chat = await sample('OpenXLR_ch_voicechat');
+    return music.low < .002 && chat.high < .002;
+  }, 'the browser volume can silence both captures');
+  await api('POST', 'commands', { ...appVolume, value: 1 });
+  await until(async () => {
+    const music = await sample('OpenXLR_ch_music');
+    const chat = await sample('OpenXLR_ch_voicechat');
+    return music.low > browserAudio.low * .8 && music.high < music.low / 8
+      && chat.high > browserAudio.high * .8 && chat.low < chat.high / 8;
+  }, 'the browser level remains editable with individual tab routing enabled');
   assert.equal(await worker.evaluate(() => chrome.action.getBadgeText({})), '2');
   console.log('PASS native bridge, a user-activated tab and standalone PWA, toolbar count and isolated 440/880 Hz channel audio');
 

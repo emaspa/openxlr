@@ -23,10 +23,8 @@ public sealed partial class Mixer
         identity = StreamMatcher.MigrateIdentity(identity);
         lock (_gate)
         {
-            if (!_apps.TryGetValue(identity, out StreamAssignment? app))
+            if (!_apps.ContainsKey(identity))
                 throw new InvalidOperationException("the application is no longer listed");
-            if (volume is not null && app.BrowserHeld)
-                throw new InvalidOperationException("use Browser tabs for a browser with individual tab routing enabled");
             if (volume is not null && !_appVolumes.ContainsKey(identity) && _appVolumes.Count >= MaxAppOverrides)
                 throw new InvalidOperationException($"at most {MaxAppOverrides} application volumes can be remembered");
             double? nextVolume = volume is double value ? SnapPlaybackVolume(value) : null;
@@ -54,16 +52,16 @@ public sealed partial class Mixer
             _appVolumeApplied.Remove(id);
     }
 
-    private void SyncAppVolumeLocked(StreamAssignment stream, ref int budget)
+    private void SyncAppVolumeLocked(AudioStream stream, string identity, ref int budget)
     {
-        if (stream.BrowserHeld || !_appVolumes.TryGetValue(stream.Identity, out double volume))
+        if (!_appVolumes.TryGetValue(identity, out double volume))
         {
             _appVolumeApplied.Remove(stream.Id);
             return;
         }
         if (budget <= 0 || stream.Serial <= 0) return;
         if (_appVolumeApplied.TryGetValue(stream.Id, out var applied) && applied.Serial == stream.Serial
-            && applied.Volume == volume && applied.Identity.Equals(stream.Identity, StringComparison.OrdinalIgnoreCase)
+            && applied.Volume == volume && applied.Identity.Equals(identity, StringComparison.OrdinalIgnoreCase)
             && (applied.RetryAt == 0 || Clock() < applied.RetryAt)) return;
         budget--;
         long retryAt = 0;
@@ -75,6 +73,6 @@ public sealed partial class Mixer
             retryAt = Clock() + 3000;
             budget = 0;
         }
-        _appVolumeApplied[stream.Id] = (stream.Serial, stream.Identity, volume, retryAt);
+        _appVolumeApplied[stream.Id] = (stream.Serial, identity, volume, retryAt);
     }
 }

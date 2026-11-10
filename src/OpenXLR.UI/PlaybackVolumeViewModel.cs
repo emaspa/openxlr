@@ -23,7 +23,7 @@ public sealed class PlaybackVolumeViewModel(Func<double?, bool, Task<string?>> s
     public string Label => (_pending ?? _reported).Level is double level
         ? $"{level * 100:0}%" : Localizer.Text("PlaybackVolumeShort");
     public string Hint => website ? Localizer.Text("TabPlaybackVolumeHint")
-        : _browserHeld ? Localizer.Text("BrowserPlaybackVolumeHeld") : Localizer.Text("AppPlaybackVolumeHint");
+        : _browserHeld ? Localizer.Text("BrowserPlaybackVolumeHint") : Localizer.Text("AppPlaybackVolumeHint");
     public string? Error { get => _error; private set => Set(ref _error, value); }
 
     public double Level

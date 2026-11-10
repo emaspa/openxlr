@@ -86,6 +86,25 @@ public sealed class AppRoutingPolicyTests
     }
 
     [Fact]
+    public void PlaybackVolumeAppliesWhileAnApplicationRouteIsWaitingForAMove()
+    {
+        using var graph = new BrowserGraph();
+        graph.Build();
+        graph.Mixer.SyncStreams();
+        graph.Mixer.SetAppVolume("chromium", .35, _ => null);
+        graph.RefuseMoves();
+        graph.Mixer.SetRouteAppsByDefault(false);
+        graph.ClearCalls();
+
+        graph.Mixer.SyncStreams();
+        Assert.Contains("move-sink-input 100 desktop", graph.Calls);
+        Assert.Contains("set-sink-input-volume 100 35%", graph.Calls);
+        graph.ClearCalls();
+        graph.Mixer.SyncStreams();
+        Assert.DoesNotContain("set-sink-input-volume 100 35%", graph.Calls);
+    }
+
+    [Fact]
     public void ADesktopOutputIsLeftAloneAndBrowserPreservationStillWins()
     {
         using var graph = new BrowserGraph();

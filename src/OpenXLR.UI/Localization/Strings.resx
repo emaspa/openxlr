@@ -2393,8 +2393,8 @@ Select the interface OpenXLR drives</value>
   <data name="AppPlaybackVolumeHint" xml:space="preserve">
     <value>Change this program's level before it enters a mix. Reset lets the desktop handle its volume.</value>
   </data>
-  <data name="BrowserPlaybackVolumeHeld" xml:space="preserve">
-    <value>Use Browser tabs to adjust captured tabs independently.</value>
+  <data name="BrowserPlaybackVolumeHint" xml:space="preserve">
+    <value>This adjusts the whole browser. Use Browser tabs to adjust each captured tab or web app independently.</value>
   </data>
   <data name="TabPlaybackVolumeHint" xml:space="preserve">
     <value>This level applies when the companion routes this tab.</value>
