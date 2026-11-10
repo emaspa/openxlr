@@ -178,6 +178,10 @@ internal sealed record StreamEntry
     public string? ChannelId { get; init; }
     public bool Active { get; init; }
     public bool Running { get; init; }
+    /// <summary>The application's saved playback volume, 0 to 1; null when the desktop keeps it.</summary>
+    public double? Volume { get; init; }
+    /// <summary>What its newest stream plays at now, on the same scale; null when it is silent.</summary>
+    public double? LiveVolume { get; init; }
 }
 
 /// <summary>One plugin in a chain, with the status the daemon reports for it.</summary>
@@ -609,6 +613,9 @@ internal sealed record OutputVolumeLockEntry
 internal sealed record MixerSnapshot
 {
     public bool? RouteAppsByDefault { get; init; }
+
+    /// <summary>True from a daemon that takes setAppVolume.</summary>
+    public bool AppVolumeSupported { get; init; }
 
     /// <summary>The forced block size in frames, or null when PipeWire chooses.</summary>
     public int? BlockSize { get; init; }

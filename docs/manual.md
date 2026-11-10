@@ -1021,7 +1021,9 @@ streams published through PipeWire. Audio that bypasses PipeWire does not
 appear here. This level applies to the
 program's playback streams, before the channel and its sends. Two apps
 can share one channel and still have different levels. A program marked
-**Not managed** can also have a saved volume.
+**Not managed** can also have a saved volume. In the terminal mixer's
+Apps tab, `-` and `+` change the level by five points, `[` and `]` by
+one, and `r` resets it.
 
 The level is the program's stream volume, the one the desktop's volume
 control shows for that program. Moving the slider changes what plays at
@@ -5839,6 +5841,7 @@ Controls below the visible hardware cards appear as the selection moves.
 | Outputs, on a sink | Space, Left/Right, Enter | select the sink, choose its feed (a summed feed asks for a second press), or make it the main output |
 | Outputs, on a sink | `-`, `+`, `m` | change its volume or toggle its mute |
 | Apps | Left/Right, `i`, `f` | assign a channel, leave routing to the desktop, or forget the assignment |
+| Apps | `-`, `+`, `[`, `]`, `r` | lower or raise the application's playback volume by five points or by one, or reset it to 100% |
 | Inserts | Space, Ctrl+Up/Down, `d`, `e` | bypass, reorder, remove, or open the plugin's native editor, with generated controls when blocked or refused |
 | Inserts | `a` | add a plugin: the picker lists plugins that fit the reported chain width: mono for a microphone, stereo for a capture pair or mix |
 | Plugin picker | letters and digits, Backspace, Up/Down, Enter, Escape | narrow the list by name, category or format; choose; add the plugin after the chain's last one; go back. While the picker is open `q` and the digits are filter text |
