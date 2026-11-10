@@ -97,6 +97,7 @@ public sealed class AppVolumeTests : IDisposable
         _graph.RefuseVolumes(false);
         _graph.ClearCalls();
 
+        _now += 300;
         _mixer.SyncStreams();
         Assert.Equal(["set-sink-input-volume 100 100%"], VolumeWrites);
         _graph.ClearCalls();
@@ -262,5 +263,165 @@ public sealed class AppVolumeTests : IDisposable
         Assert.Throws<InvalidOperationException>(() => _mixer.SetAppVolume("not-listed", .4));
         Assert.Throws<ArgumentException>(() => _mixer.SetAppVolume("wine64-preloader", .4));
         Assert.Throws<ArgumentOutOfRangeException>(() => _mixer.SetAppVolume("cyberpunk2077", 1.2));
+        // An identity that names no application once migrated.
+        Assert.False(Mixer.ValidAppVolumeIdentity(" (deleted)"));
+        Assert.Throws<ArgumentException>(() => _mixer.SetAppVolume(" (deleted)", .4));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ACommandWritesOneBatchAndLeavesTheRemainingStreamsForTheSweep(bool reset)
+    {
+        Streams([.. Enumerable.Range(0, 9).Select(i => BrowserGraph.Node(20 + i, 110 + i, Vlc, 35))]);
+        _mixer.SyncStreams();
+        _mixer.SetAppVolume("vlc", .35);
+        _now += 1000;
+        _mixer.SyncStreams();
+        _graph.ClearCalls();
+
+        _mixer.SetAppVolume("vlc", reset ? null : .5);
+        string level = reset ? "100%" : "50%";
+        Assert.Equal([.. Enumerable.Range(110, 8).Select(serial => $"set-sink-input-volume {serial} {level}")], VolumeWrites);
+        _graph.ClearCalls();
+        _mixer.SyncStreams();
+        Assert.Equal([$"set-sink-input-volume 118 {level}"], VolumeWrites);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AStreamTheSoundServerKeepsRefusingDoesNotStarveTheOthers(bool reset)
+    {
+        Streams(BrowserGraph.Node(10, 100, Vlc), BrowserGraph.Node(11, 101, Mpv));
+        _mixer.SyncStreams();
+        _graph.RefuseVolume(100);
+        _mixer.SetAppVolume("vlc", .35);
+        if (reset) _mixer.SetAppVolume("vlc", null);
+        _mixer.SetAppVolume("mpv", .5);
+        _graph.ClearCalls();
+
+        // A refusal ends nothing: the new stream after it is written too.
+        Streams(BrowserGraph.Node(10, 100, Vlc), BrowserGraph.Node(11, 101, Mpv, 50), BrowserGraph.Node(12, 102, Mpv));
+        _now += 300;
+        _mixer.SyncStreams();
+        Assert.Equal([$"set-sink-input-volume 100 {(reset ? 100 : 35)}%", "set-sink-input-volume 102 50%"], VolumeWrites);
+
+        // Refused twice, the stream waits longer before the next try.
+        _graph.ClearCalls();
+        Streams(BrowserGraph.Node(10, 100, Vlc), BrowserGraph.Node(11, 101, Mpv, 50), BrowserGraph.Node(12, 102, Mpv, 50),
+            BrowserGraph.Node(13, 103, Mpv));
+        _now += 1000;
+        _mixer.SyncStreams();
+        Assert.Equal(["set-sink-input-volume 103 50%"], VolumeWrites);
+        _graph.ClearCalls();
+        Streams(BrowserGraph.Node(10, 100, Vlc), BrowserGraph.Node(11, 101, Mpv, 50), BrowserGraph.Node(12, 102, Mpv, 50),
+            BrowserGraph.Node(13, 103, Mpv, 50));
+        _now += 2500;
+        _mixer.SyncStreams();
+        Assert.Equal([$"set-sink-input-volume 100 {(reset ? 100 : 35)}%"], VolumeWrites);
+    }
+
+    private static IReadOnlyList<AudioStream> Read(params string[] nodes)
+        => PipeWireAdapter.ListStreams(System.Text.Encoding.UTF8.GetBytes("[" + string.Join(",", nodes) + "]"));
+
+    private IReadOnlyList<AudioStream> Current()
+        => PipeWireAdapter.ListStreams(File.ReadAllBytes(Path.Combine(_graph.Folder, "streams")));
+
+    private void TwoStreamsSettledAt35()
+    {
+        Streams(BrowserGraph.Node(10, 100, Vlc, 35), BrowserGraph.Node(11, 101, Vlc, 35));
+        _mixer.SyncStreams();
+        _mixer.SetAppVolume("vlc", .35);
+        _now += 1000;
+        _mixer.SyncStreams();
+        _graph.ClearCalls();
+    }
+
+    [Fact]
+    public void AStreamPassReadingBeforeASweepCannotRollBackTheLevelTheSweepFollowed()
+    {
+        TwoStreamsSettledAt35();
+        IReadOnlyList<AudioStream> before = Read(BrowserGraph.Node(10, 100, Vlc, 35), BrowserGraph.Node(11, 101, Vlc, 35));
+
+        // The pass for a new stream read the registry; before it takes the
+        // lock the desktop moves one stream and a sweep follows the move.
+        int reads = 0;
+        _mixer.SyncAppVolumes(read =>
+        {
+            reads++;
+            if (read > 0) return Current();
+            Streams(BrowserGraph.Node(10, 100, Vlc, 60), BrowserGraph.Node(11, 101, Vlc, 35));
+            _now += 1000;
+            _mixer.SyncStreams();
+            return before;
+        });
+
+        Assert.Equal(["set-sink-input-volume 101 60%"], VolumeWrites);
+        Assert.Equal(.6, _mixer.ExportSettings().AppVolumes["vlc"]);
+        Assert.Equal(2, reads);
+    }
+
+    [Fact]
+    public void ASweepReadingBeforeAStreamPassCannotRollBackTheLevelThePassFollowed()
+    {
+        TwoStreamsSettledAt35();
+        var before = PipeWireAdapter.ListApplications(System.Text.Encoding.UTF8.GetBytes(
+            "[" + BrowserGraph.Node(10, 100, Vlc, 35) + "," + BrowserGraph.Node(11, 101, Vlc, 35) + "]"));
+
+        _mixer.SyncStreams(() =>
+        {
+            Streams(BrowserGraph.Node(10, 100, Vlc, 60), BrowserGraph.Node(11, 101, Vlc, 35));
+            _now += 1000;
+            _mixer.SyncAppVolumes();
+            return before;
+        });
+
+        Assert.Equal(["set-sink-input-volume 101 60%"], VolumeWrites);
+        Assert.Equal(.6, _mixer.ExportSettings().AppVolumes["vlc"]);
+    }
+
+    [Fact]
+    public void AStreamArrivingDuringASweepGetsItsLevelAtOnce()
+    {
+        Streams(BrowserGraph.Node(10, 100, Vlc, 35));
+        _mixer.SyncStreams();
+        _mixer.SetAppVolume("vlc", .35);
+        _now += 1000;
+        _mixer.SyncStreams();
+        _graph.ClearCalls();
+        IReadOnlyList<AudioStream> arrived = Read(BrowserGraph.Node(10, 100, Vlc, 35), BrowserGraph.Node(12, 102, Vlc));
+
+        // A sweep that read the registry before the stream appeared takes
+        // the lock between this pass's read and its own turn.
+        Assert.True(_mixer.SyncAppVolumes(read =>
+        {
+            if (read > 0) return Current();
+            _mixer.SyncStreams();
+            Streams(BrowserGraph.Node(10, 100, Vlc, 35), BrowserGraph.Node(12, 102, Vlc));
+            return arrived;
+        }));
+        Assert.Equal(["set-sink-input-volume 102 35%"], VolumeWrites);
+    }
+
+    [Fact]
+    public void AfterTheAudioServerRestartsAStreamWithAnEarlierIdAndSerialGetsTheSavedLevel()
+    {
+        Streams(BrowserGraph.Node(10, 100, Vlc, 35));
+        _mixer.SyncStreams();
+        _mixer.SetAppVolume("vlc", .35);
+        _now += 1000;
+        _mixer.SyncStreams();
+        _mixer.ForgetGraph();
+        _graph.Build(_mixer);
+        _graph.ClearCalls();
+
+        // The restarted server hands the program's new stream the same id
+        // and serial, at the level the session manager gave it.
+        Streams(BrowserGraph.Node(10, 100, Vlc, 100));
+        _now += 1000;
+        _mixer.SyncStreams();
+        Assert.Equal(["set-sink-input-volume 100 35%"], VolumeWrites);
+        Assert.Equal(.35, _mixer.ExportSettings().AppVolumes["vlc"]);
     }
 }
