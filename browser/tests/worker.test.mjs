@@ -72,6 +72,7 @@ function fixture({ existing = [], recovery } = {}) {
             return { value: null };
           case 'route':
             if (f.active.has(message.id)) f.active.get(message.id).deviceId = message.deviceId;
+            if (f.routeGate) await f.routeGate.promise;
             return { value: null };
           case 'stop':
             f.active.delete(message.id); await f.status(message.id, false, message.error);
@@ -175,6 +176,25 @@ test('returning to the previous volume while an edit is in flight restores the g
 
   assert.equal(f.active.get(1).volume, .2);
   assert.deepEqual(f.calls.filter(call => call.type === 'volume').map(call => call.volume), [.8, .2]);
+  assert.deepEqual(f.tokens, [1]);
+});
+
+test('returning to the previous channel during a route change restores the actual output', { timeout: 2000 }, async () => {
+  const f = await readyFixture();
+  const change = channelId => f.publish({ tabs: f.state.tabs.map(tab => tab.id === 1 ? { ...tab, channelId } : tab) });
+  assert.equal((await f.request('start', { id: 1 })).error, undefined);
+  assert.equal(f.active.get(1).deviceId, 'chat-device');
+
+  const reply = f.routeGate = deferred();
+  await change('music');
+  assert.equal(f.active.get(1).deviceId, 'music-device');
+  await change('chat');
+  f.routeGate = null;
+  reply.resolve();
+  await settle();
+
+  assert.equal(f.active.get(1).deviceId, 'chat-device');
+  assert.deepEqual(f.calls.filter(call => call.type === 'route').map(call => call.deviceId), ['music-device', 'chat-device']);
   assert.deepEqual(f.tokens, [1]);
 });
 
