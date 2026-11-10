@@ -65,8 +65,11 @@ internal static class BrowserTabsWindowTests
             Assert.False(button.IsVisible);
 
             AppRoutingViewModelTests.Report(model, true);
+            var capturedTab = BrowserTabViewModelTests.Tab(title: "A long browser tab title with a video, a playlist and more details that must remain within the row", channel: "music", remember: true, capturing: true);
+            capturedTab["volumeSupported"] = true;
+            capturedTab["volume"] = .45;
             BrowserTabViewModelTests.Report(model, true, new JsonArray(
-                BrowserTabViewModelTests.Tab(title: "A long browser tab title with a video, a playlist and more details that must remain within the row", channel: "music", remember: true, capturing: true),
+                capturedTab,
                 BrowserTabViewModelTests.Tab(id: 8, title: "", channel: null),
                 BrowserTabViewModelTests.Tab(id: 9, title: "A call waiting for its audio", channel: "chat")));
             Layout(main, 640, 1000);
@@ -125,6 +128,10 @@ internal static class BrowserTabsWindowTests
             Assert.True(option.TranslatePoint(default, window)!.Value.Y + option.Bounds.Height
                 <= first.TranslatePoint(default, window)!.Value.Y);
             Assert.False(view.FindControl<TextBlock>("BrowserTabsEmpty")!.IsVisible);
+            Button level = Assert.Single(first.GetVisualDescendants().OfType<Button>(), b => b.Name == "PlaybackVolume");
+            Assert.True(level.IsEffectivelyVisible && level.IsEffectivelyEnabled);
+            Assert.Equal("45%", level.Content);
+            AssertInside(level, first);
             Capture(window, $"browser-tabs-window-{suffix}");
             window.Close();
             Dispatcher.UIThread.RunJobs();

@@ -30,14 +30,18 @@ public sealed class BrowserTabViewModel : ViewModelBase
 
     public BrowserTabViewModel(string session, int id,
         Func<string, int, string, string?, bool, Task<string?>> assign, Action<string> reportError,
-        Func<string, int, string, Task<string?>>? activate = null, TimeSpan? activationTimeout = null)
+        Func<string, int, string, Task<string?>>? activate = null, TimeSpan? activationTimeout = null,
+        Func<string, int, string, double?, bool, Task<string?>>? setVolume = null)
     {
         Session = session; Id = id; _assign = assign; _reportError = reportError;
         _activate = activate; _activationTimeout = activationTimeout ?? ActivationAnswerTimeout;
+        PlaybackVolume = new((level, remember) => setVolume is null ? Task.FromResult<string?>(null)
+            : setVolume(Session, Id, Site, level, remember), website: true);
     }
 
     public string Session { get; }
     public int Id { get; }
+    public PlaybackVolumeViewModel PlaybackVolume { get; }
     public string Title => _title;
     public string Site => _site;
     public ObservableCollection<ChannelChoice> Channels { get; } = [];
@@ -146,7 +150,7 @@ public sealed class BrowserTabViewModel : ViewModelBase
             Set(ref _title, title.Length == 0 ? site : title, nameof(Title));
             Set(ref _site, site, nameof(Site));
             _reported = new(channel, channel is not null && remember);
-            if (navigated) CancelPending();
+            if (navigated) { CancelPending(); PlaybackVolume.Cancel(); }
             if (_pending?.Channel is { } target && !channels.Any(c => c.Id == target)) CancelPending();
             if (!Channels.SequenceEqual(channels))
             {

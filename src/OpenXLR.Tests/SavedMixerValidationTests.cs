@@ -56,6 +56,25 @@ public sealed class SavedMixerValidationTests
     }
 
     [Fact]
+    public void SiteVolumePreferencesKeepOnlyValidOriginsAndLevels()
+    {
+        InConfig(root =>
+        {
+            string path = Path.Combine(root, "mixer.json");
+            File.WriteAllText(path, """
+                {"browserSiteVolumes":{"https://teams.microsoft.com":0.55,"https://example.com/path":0.8,"https://other.com":1.1}}
+                """);
+            MixerSettings loaded = Assert.IsType<MixerSettings>(MixerSettings.Load(path, out string? warning));
+            Assert.Contains("browserSiteVolumes", warning);
+            Assert.Equal(0.55, Assert.Single(loaded.BrowserSiteVolumes).Value);
+            Assert.Null(loaded.Save(path));
+            MixerSettings reopened = Assert.IsType<MixerSettings>(MixerSettings.Load(path, out warning));
+            Assert.Null(warning);
+            Assert.Equal(0.55, reopened.BrowserSiteVolumes["https://teams.microsoft.com"]);
+        });
+    }
+
+    [Fact]
     public void SettingsDropUserMixesOfAnUnknownKind()
     {
         InConfig(root =>

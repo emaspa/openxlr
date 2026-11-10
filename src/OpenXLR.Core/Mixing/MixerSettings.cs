@@ -109,6 +109,9 @@ public sealed record MixerSettings
     /// <summary>Remembered browser origins and their application channel. Titles and runtime tab ids are never saved.</summary>
     public Dictionary<string, string> BrowserSiteChannels { get; init; } = [];
 
+    /// <summary>Remembered playback volume for routed browser tabs by website origin.</summary>
+    public Dictionary<string, double> BrowserSiteVolumes { get; init; } = [];
+
     /// <summary>Every app ever seen, so the list survives silence and restarts.</summary>
     public List<SavedApp> KnownApps { get; init; } = [];
 

@@ -1661,6 +1661,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 RouteAppsByDefault = Matcher.RouteByDefault,
                 BlockSize = _blockSize,
                 PreserveBrowserOutputs = _preserveBrowserOutputs,
+                BrowserSiteVolumes = new Dictionary<string, double>(_browserSiteVolumes, StringComparer.Ordinal),
                 BrowserSiteChannels = _browserSiteChannels.Where(p => HasApplicationChannel(p.Value))
                     .ToDictionary(p => p.Key, p => p.Value, StringComparer.Ordinal),
                 KnownApps = [.. _apps.Values.Select(a => new SavedApp(a.Identity, a.Label, a.ChannelId))],

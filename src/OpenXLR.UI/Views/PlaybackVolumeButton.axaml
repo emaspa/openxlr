@@ -1,0 +1,42 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="using:OpenXLR.UI.Localization"
+             xmlns:vm="using:OpenXLR.UI"
+             x:Class="OpenXLR.UI.Views.PlaybackVolumeButton"
+             x:DataType="vm:PlaybackVolumeViewModel"
+             IsVisible="{Binding Supported}" VerticalAlignment="Center">
+  <Button Name="PlaybackVolume" Content="{Binding Label}" IsEnabled="{Binding Enabled}"
+          Padding="6,4" ToolTip.Tip="{Binding Hint}" ToolTip.ShowOnDisabled="True"
+          AutomationProperties.Name="{loc:Text Key=PlaybackVolume}">
+    <!-- Reserve room for both labels so changing a level does not shift its row. -->
+    <Button.ContentTemplate>
+      <DataTemplate x:DataType="x:String">
+        <Panel>
+          <TextBlock Text="100%" Opacity="0" AutomationProperties.AccessibilityView="Raw"/>
+          <TextBlock Text="{loc:Text Key=PlaybackVolumeShort}" Opacity="0" AutomationProperties.AccessibilityView="Raw"/>
+          <TextBlock Text="{Binding}"/>
+        </Panel>
+      </DataTemplate>
+    </Button.ContentTemplate>
+    <Button.Flyout>
+      <Flyout Placement="BottomEdgeAlignedRight">
+        <StackPanel Spacing="6" Width="240">
+          <TextBlock Text="{loc:Text Key=PlaybackVolume}" Classes="h"/>
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+            <Slider Name="PlaybackLevel" Minimum="0" Maximum="1" vm:FaderInput.Step="0.01"
+                    Value="{Binding Level, Mode=TwoWay}" AutomationProperties.Name="{loc:Text Key=PlaybackVolume}"/>
+            <TextBlock Grid.Column="1" Text="{Binding Level, StringFormat={}{0:0%}}" Classes="val"
+                       VerticalAlignment="Center"/>
+          </Grid>
+          <CheckBox IsVisible="{Binding Website}" IsEnabled="{Binding HasLevel}" IsChecked="{Binding Remember, Mode=TwoWay}">
+            <TextBlock Text="{loc:Text Key=RememberTabPlaybackVolume}" TextWrapping="Wrap"/>
+          </CheckBox>
+          <Button Content="{loc:Text Key=Reset}" IsEnabled="{Binding HasLevel}" Click="OnReset"/>
+          <TextBlock Text="{Binding Hint}" Classes="note" TextWrapping="Wrap"/>
+          <TextBlock Text="{Binding Error}" Classes="warn" TextWrapping="Wrap"
+                     IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+        </StackPanel>
+      </Flyout>
+    </Button.Flyout>
+  </Button>
+</UserControl>

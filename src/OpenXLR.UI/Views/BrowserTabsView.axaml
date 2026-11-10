@@ -3,6 +3,7 @@
              xmlns:vm="using:OpenXLR.UI"
              xmlns:loc="using:OpenXLR.UI.Localization"
              xmlns:skin="using:OpenXLR.UI.Skinning"
+             xmlns:views="using:OpenXLR.UI.Views"
              x:Class="OpenXLR.UI.Views.BrowserTabsView"
              x:DataType="vm:MainViewModel">
   <!-- The routing option stays on top and the tab list takes what is left and
@@ -46,6 +47,7 @@
                       <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/>
                     </DataTemplate></ComboBox.ItemTemplate>
                   </ComboBox>
+                  <views:PlaybackVolumeButton DataContext="{Binding PlaybackVolume}" Margin="0,0,12,4"/>
                   <CheckBox Name="BrowserTabRemember" IsChecked="{Binding Remember, Mode=TwoWay}"
                             IsEnabled="{Binding CanRemember}" Margin="0,0,12,4"
                             Content="{loc:Text Key=BrowserTabRemember}" ToolTip.Tip="{loc:Text Key=BrowserTabRememberHint}"/>

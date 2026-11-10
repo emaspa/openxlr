@@ -459,6 +459,7 @@ public sealed class WebSocketHub
             case "assignStream":
             case "assignApp":
             case "assignBrowserTab":
+            case "setBrowserTabVolume":
             case "setRouteAppsByDefault":
             case "setBlockSize":
             case "setPreserveBrowserOutputs":

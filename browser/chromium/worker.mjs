@@ -1,4 +1,4 @@
-import { HOST, MAX_TABS, deviceFor, errorText, notInvoked, siteOf, tabRecords } from './routing.mjs';
+import { HOST, MAX_TABS, deviceFor, errorText, notInvoked, playbackVolume, siteOf, tabRecords } from './routing.mjs';
 import { t } from './text.mjs';
 
 const ASSIGNMENT_PENDING = t('assignmentPending');
@@ -253,21 +253,30 @@ async function reconcile() {
     }
   }
   for (const [id, current] of captures) {
-    if (!current.capturing || assignments.has(id)) continue;
+    if (!current.capturing || assignments.has(id) || starts.has(id)) continue;
     await serial(id, async () => {
-      if (captures.get(id) !== current || !current.capturing || !state?.preserveBrowserOutputs || assignments.has(id)) return;
+      if (captures.get(id) !== current || !current.capturing || !state?.preserveBrowserOutputs
+        || assignments.has(id) || starts.has(id)) return;
       const tab = state?.tabs.find(candidate => candidate.id === id);
       const channel = state?.channels.find(candidate => candidate.id === tab?.channelId);
-      if (!channel) { await stopTab(id); return; }
-      if (current.channelId === channel.id) return;
+      if (!channel || (current.site && current.site !== tab.site)) { await stopTab(id); return; }
+      const selected = () => state?.tabs.find(candidate => candidate.id === id);
       const unchanged = () => captures.get(id) === current && state?.preserveBrowserOutputs === true
-        && !assignments.has(id) && state.tabs.find(candidate => candidate.id === id)?.channelId === channel.id;
-      try {
-        const deviceId = await outputFor(channel);
-        await audio({ type: 'route', id, deviceId }, false, unchanged);
-        if (unchanged()) current.channelId = channel.id;
+        && !assignments.has(id) && selected()?.site === tab.site && selected()?.channelId === channel.id;
+      if (current.channelId !== channel.id) {
+        try {
+          const deviceId = await outputFor(channel);
+          await audio({ type: 'route', id, deviceId }, false, unchanged);
+          if (unchanged()) current.channelId = channel.id;
+        }
+        catch (error) { if (unchanged()) await stopTab(id, errorText(error)); return; }
       }
-      catch (error) { if (unchanged()) await stopTab(id, errorText(error)); }
+      if (!unchanged()) return;
+      const volume = playbackVolume(selected()?.volume);
+      if (current.volume === volume) return;
+      const sameVolume = () => unchanged() && playbackVolume(selected()?.volume) === volume;
+      await audio({ type: 'volume', id, volume }, false, sameVolume);
+      if (sameVolume()) current.volume = volume;
     });
   }
 }
@@ -305,10 +314,22 @@ async function startCapture(id, site, active = null) {
     // The browser grants this only for a user-activated tab. Never reuse ids.
     const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: id });
     check();
-    await audio({ type: 'start', id, streamId, deviceId }, true, check);
-    if (!pending.cancelled && captures.get(id)?.capturing) captures.get(id).channelId = channel.id;
+    const volume = playbackVolume(state.tabs.find(tab => tab.id === id)?.volume);
+    await audio({ type: 'start', id, streamId, deviceId, volume }, true, check);
+    const captured = captures.get(id);
+    if (!pending.cancelled && captured?.capturing) {
+      captured.channelId = channel.id;
+      captured.site = site;
+      captured.volume = volume;
+    }
     return null;
-  } finally { if (starts.get(id) === pending) starts.delete(id); }
+  } finally {
+    if (starts.get(id) === pending) {
+      starts.delete(id);
+      // A volume edit during getUserMedia need not cancel the start.
+      if (captures.get(id)?.capturing) void reconcile().catch(error => { bridgeError = errorText(error); });
+    }
+  }
 }
 
 async function openPopup(windowId) {

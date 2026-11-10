@@ -286,6 +286,7 @@ that final acknowledgement (or an `error` without a request id):
 | `toggleMonitorMuted` | none | atomically toggle the same monitor pause. Use this for keys and repeated presses instead of reading `monitorMuted` and sending its inverse; each accepted command toggles once |
 | `getBrowserSession` | none | WebSocket only; register this connection as a browser companion and return its `browserSession`. Repeated calls on the same connection return the same id |
 | `syncBrowserTabs` | `session`, `tabs` | WebSocket only; replace this companion's complete tab list. Only the connection that obtained the session may publish it; see [browser tabs](#browser-tabs) |
+| `setBrowserTabVolume` | `session`, `tabId`, `site`, `value`, `remember` | volume from 0 to 1 for a tab whose companion reports `volumeSupported`. The origin must still match the tab. `remember:true` stores a site default independently of routing; `false` overrides only this tab until navigation or closure. `value:null` clears the specified override |
 | `assignBrowserTab` | `session`, `tabId`, `site`, `channel`, `remember` | select an application channel or `null` for browser default for a connected tab. Required `site` is the origin the caller saw; an assignment is refused if that tab has navigated to another origin. `remember` must be boolean; true saves the website origin preference, and `channel:null, remember:true` forgets it. False changes only this tab |
 | `activateBrowserTab` | `session`, `tabId`, `site` | ask the companion that registered a connected tab to bring it forward and start routing it, as its own Activate does. Refused unless `preserveBrowserOutputs` is on, `site` still matches the tab's origin, the tab has a channel, and it is neither capturing nor reporting an `activation`. Success means the request reached the companion, not that capture started; see [browser tabs](#browser-tabs) |
 | `setRouteAppsByDefault` | `value` | boolean only; automatic name rules for apps without an explicit assignment. True by default. False leaves them not managed by OpenXLR; explicit assignments still win. Saved in `mixer.json`, never recalled by a profile |
@@ -1402,7 +1403,11 @@ The Chromium companion captures tabs the user explicitly starts and sends
 their audio to the selected OpenXLR application channel inside the browser.
 The daemon exchanges metadata and output choices; audio does not pass
 through this protocol. Browser process ids and application identities
-cannot distinguish tabs that share a browser audio process.
+cannot distinguish tabs that share a browser audio process. The companion
+applies `browserTabs[].volume` inside each tab's capture graph. It advertises
+`volumeSupported` in its registration, and `rememberVolume` in the state says
+the level comes from the saved website default. An absent or null volume
+plays at unity.
 
 The user enables `preserveBrowserOutputs` before using tab routing. While
 enabled, OpenXLR does not move or unmute recognized Chrome, Chromium, Brave,

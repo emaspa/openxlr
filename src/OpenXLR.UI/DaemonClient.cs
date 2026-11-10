@@ -132,6 +132,10 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
             ? Task.FromResult<string?>(BrowserTabsTooLarge) : EditLayoutAsync(payload);
     }
 
+    public Task<string?> SetBrowserTabVolumeAsync(string session, int tabId, string site, double? volume, bool remember)
+        => EditLayoutAsync(new() { ["cmd"] = "setBrowserTabVolume", ["session"] = session,
+            ["tabId"] = tabId, ["site"] = site, ["value"] = volume!, ["remember"] = remember });
+
     public Task<string?> AssignBrowserTabAsync(string session, int tabId, string site, string? channel, bool remember)
         => EditLayoutAsync(new() { ["cmd"] = "assignBrowserTab", ["session"] = session,
             ["tabId"] = tabId, ["site"] = site, ["channel"] = channel!, ["remember"] = remember });
