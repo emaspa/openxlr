@@ -1414,8 +1414,9 @@ clipping warning comes on when a sample reaches -0.1 dBFS and stays on until
 you press **Clear warning**. The warning reports a peak, while the ClipGuard
 checkbox in **Shape** controls the protection. Under **Input gain (dB)**, turn
 off **Lock input gain** if checked, then drag the slider or type a value and
-press Enter. The lock applies to the primary interface and its other input
-if present. The control uses the same gain and range as the mixer,
+press Enter. The same lock is in **Options → Audio** and applies to the
+primary interface and its other input if present. The control uses the
+same gain and range as the mixer,
 including an external mono capture input that reports a gain. Its gain is
 shared with other apps recording that source. If the microphone has no
 gain control here, set it on the microphone or its interface. The meter

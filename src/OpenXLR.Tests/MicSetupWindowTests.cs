@@ -202,6 +202,23 @@ internal static class MicSetupWindowTests
             Assert.Equal("gain", unitWrite["control"]!.GetValue<string>());
             Assert.Equal(27, unitWrite["value"]!.GetValue<int>());
             Assert.Equal(27, main.GainDb);
+
+            var mainWindow = (MainWindow)chain.Owner!;
+            OptionsWindow options = mainWindow.OpenOptions();
+            try
+            {
+                OptionsTabsWindowTests.Show(options, OptionsTab.Audio);
+                var audioLock = options.FindControl<CheckBox>("AudioInputGainLock")!;
+                Assert.True(audioLock.IsEffectivelyVisible);
+                Assert.Equal(false, audioLock.IsChecked);
+                audioLock.IsChecked = true;
+                Assert.Equal(true, lockGain.IsChecked);
+                Assert.False(unitGain.IsEnabled);
+                audioLock.IsChecked = false;
+                Assert.Equal(false, lockGain.IsChecked);
+                Assert.True(unitGain.IsEnabled);
+            }
+            finally { options.Close(); }
             window.Close();
             await Until(() => !window.IsVisible);
         }
