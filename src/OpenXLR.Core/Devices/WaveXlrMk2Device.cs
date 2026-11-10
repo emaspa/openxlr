@@ -11,7 +11,8 @@ namespace OpenXLR.Core.Devices;
 /// the Pro's two: gain dB at 0 (0..80), a flag byte at 1 (bit0 mute, bit1
 /// phantom, bit4 low cut, bit5 expander, bit6 voice tune, bit7 compressor),
 /// ClipGuard at 2 (set = disabled: 0x04 before firmware 1.0.15, 0x10 from
-/// it, where 0x04 is the unit's gain lock), voice tune strength at 10. Block 0x0005 (2 bytes): headphone attenuation at 0
+/// it, where 0x04 is the unit's gain lock, which OpenXLR's gain lock holds),
+/// voice tune strength at 10. Block 0x0005 (2 bytes): headphone attenuation at 0
 /// (quarter-dB steps, 0 = loudest, 240 = -60 dB) and bit1 of byte 1 = low
 /// impedance. Block 0x0001 (6 bytes): crossfade at 0 (0..200, 100 = centre).
 /// Decoded from a Wave Link USB capture during the Pro reverse engineering;
@@ -125,6 +126,10 @@ public class WaveXlrMk2Device : IAudioDevice
     // Whether this unit's firmware is the limiter-mode layout, decided at connect.
     private bool _limiterMode;
 
+    // Whether OpenXLR holds the unit's gain lock, set by SetUnitGainLock
+    // after each connect; a ClipGuard write keeps byte 2 bit 0x04 to it.
+    private bool _gainLockHeld;
+
     /// <summary>The version block 0x0000 reports, as major.minor.patch; null until read.</summary>
     public string? Firmware { get; private set; }
 
@@ -181,7 +186,7 @@ public class WaveXlrMk2Device : IAudioDevice
         _crossfadeReversed = crossfadeReversed;
         _lowCutMask = lowCutMask;
         Info = UsbTransport.WithLocation(new DeviceInfo("Elgato", model, VendorId, productId));
-        Capabilities = _modelCapabilities = capabilities with { HardwareEq = false };
+        Capabilities = _modelCapabilities = capabilities with { HardwareEq = false, HardwareGainLock = false };
     }
 
     private static DeviceCapabilities Mk2Capabilities(bool physicalControls, bool retainsSettings) => new()
@@ -238,6 +243,7 @@ public class WaveXlrMk2Device : IAudioDevice
         ConnectionNote = null;
         Firmware = null;
         _limiterMode = false;
+        _gainLockHeld = false;
         EqSupport = null;
         DynamicsSupport = null;
         Capabilities = _modelCapabilities;
@@ -287,6 +293,9 @@ public class WaveXlrMk2Device : IAudioDevice
         Firmware = version is null ? null : WaveFxEq.Format(version);
         // An unread version keeps the older meaning, as the EQ stays in software.
         _limiterMode = version is not null && _limiterModeFirmware is not null && version >= _limiterModeFirmware;
+        // The gain lock bit exists only in the limiter-mode layout; below it
+        // 0x04 is ClipGuard off and is never written for the lock.
+        Capabilities = _modelCapabilities with { HardwareGainLock = _limiterMode };
         if (_eqFirmware is null) return;
         byte[]? block = null;
         EqSupport = WaveFxEq.Gate(Info.Model, version, _eqFirmware, () =>
@@ -301,7 +310,12 @@ public class WaveXlrMk2Device : IAudioDevice
         // same gate, on a model that has both switches.
         if (_modelCapabilities is { Compressor: true, Expander: true })
             DynamicsSupport = WaveFxDynamics.Gate(Info.Model, EqSupport, () => WaveFxDynamics.Decodes(WaveFxDynamics.Decode(block)));
-        Capabilities = _modelCapabilities with { HardwareEq = EqSupport.Ready, HardwareDynamics = DynamicsSupport?.Ready == true };
+        Capabilities = _modelCapabilities with
+        {
+            HardwareEq = EqSupport.Ready,
+            HardwareDynamics = DynamicsSupport?.Ready == true,
+            HardwareGainLock = _limiterMode,
+        };
     }
 
     // A successful settings read alone is not enough to authorize writes, so
@@ -425,6 +439,7 @@ public class WaveXlrMk2Device : IAudioDevice
             Phantom = c.Phantom && (s[1] & PhantomMask) != 0,
             Compressor = c.Compressor && (s[1] & CompressorMask) != 0,
             ClipGuard = c.ClipGuard && (s[ClipGuardOffset] & (_limiterMode ? LimiterOffMask : ClipGuardOffBefore1015)) == 0,
+            UnitGainLock = _limiterMode ? (s[ClipGuardOffset] & GainLockMask) != 0 : null,
             VoiceTuneStrength = c.VoiceTune ? s[10] : 0,
             HpVolumeDb = -hp[0] / 4.0,
             LowImpedance = c.LowImpedance && (hp[1] & LowZMask) != 0,
@@ -501,16 +516,47 @@ public class WaveXlrMk2Device : IAudioDevice
 
     /// <summary>
     /// Byte 2 with ClipGuard switched, as Wave Link writes it on the unit's
-    /// firmware. From 1.0.15 the write also clears the gain lock: earlier
-    /// OpenXLR releases wrote 0x04 there for ClipGuard off, which locked the
-    /// gain against the desktop's volume control and left ClipGuard on.
+    /// firmware. From 1.0.15 the write also brings the gain lock to what
+    /// OpenXLR holds: set while <see cref="SetUnitGainLock"/> holds it,
+    /// cleared otherwise. Earlier OpenXLR releases wrote 0x04 there for
+    /// ClipGuard off, which locked the gain against the desktop's volume
+    /// control and left ClipGuard on.
     /// </summary>
     private byte ClipGuardByte(byte b, bool on)
     {
         if (!_limiterMode)
             return on ? (byte)(b & ~ClipGuardOffBefore1015) : (byte)(b | ClipGuardOffBefore1015);
         b = (byte)(b & ~(LimiterModeMask | GainLockMask));
+        if (_gainLockHeld) b |= GainLockMask;
         return on ? b : (byte)(b | LimiterOffMask);
+    }
+
+    /// <summary>
+    /// Hold or release the unit's own gain lock, byte 2 bit 0x04 of the
+    /// settings block from firmware 1.0.15, as Wave Link writes it. While it
+    /// is set the unit ignores gain written through its USB volume control,
+    /// and still takes the gain written to byte 0 of the block (measured on a
+    /// Wave XLR MK.2 on 1.0.15). One read and one write of the block, none
+    /// when the unit already holds the bit; later ClipGuard writes keep it.
+    /// False when nothing was written.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The unit has no gain lock of its own (<see cref="DeviceCapabilities.HardwareGainLock"/>), or a transfer failed.</exception>
+    public bool SetUnitGainLock(bool on)
+    {
+        if (!Capabilities.HardwareGainLock)
+            throw new InvalidOperationException($"{Info.Model}: this unit has no gain lock OpenXLR can set");
+        lock (_lock)
+        {
+            byte[] b = Read(BlockSettings, SettingsLen, SettingsUsed);
+            byte held = b[ClipGuardOffset];
+            b[ClipGuardOffset] = on ? (byte)(held | GainLockMask) : (byte)(held & ~GainLockMask);
+            if (b[ClipGuardOffset] != held) Write(BlockSettings, b);
+            // Recorded once the unit has it, so a failed write leaves later
+            // ClipGuard writes keeping the bit as it was.
+            _gainLockHeld = on;
+            _settings = b;
+            return b[ClipGuardOffset] != held;
+        }
     }
 
     public bool SetEq(int input, DeviceEq eq)

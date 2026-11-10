@@ -113,6 +113,15 @@ public sealed record DeviceState
     public bool? LineInLevelLock { get; init; }
 
     /// <summary>
+    /// The unit's own gain lock as the unit reads it back, block 0x0004
+    /// byte 2 bit 0x04 on a unit with
+    /// <see cref="DeviceCapabilities.HardwareGainLock"/>: while it is on the
+    /// unit ignores gain written through its USB volume control. The daemon
+    /// holds it with <see cref="GainLocked"/>. Null on every other unit.
+    /// </summary>
+    public bool? UnitGainLock { get; init; }
+
+    /// <summary>
     /// Daemon-enforced software gain lock (Wave Link's Gain Lock for devices
     /// that keep it app-side). Not a hardware field: the daemon stamps it
     /// onto every snapshot and rejects gain writes while it is set.

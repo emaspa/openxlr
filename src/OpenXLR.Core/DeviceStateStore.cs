@@ -49,11 +49,13 @@ public static class DeviceStateStore
 
     /// <summary>
     /// A snapshot without the daemon's own stamps (gain lock, phantom
-    /// settling), which describe the daemon at the time, not the hardware.
+    /// settling), which describe the daemon at the time, not the hardware,
+    /// and without the unit's own gain lock, which follows the daemon's.
     /// </summary>
     public static DeviceState Hardware(DeviceState s) => s with
     {
         GainLocked = false,
+        UnitGainLock = null,
         PhantomSettling = false,
         PhantomSettling2 = false,
         PhantomSettleSeconds = 0,
