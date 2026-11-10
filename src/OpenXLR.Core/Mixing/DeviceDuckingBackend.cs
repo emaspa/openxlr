@@ -103,6 +103,15 @@ public interface IDeviceDuckingPort
     /// holds no ducking, or this unit is not driven. Never waits for USB.
     /// </summary>
     double? Reduction(string unit) => null;
+
+    /// <summary>
+    /// The unit's own meters (block 0x0002), for the mixes it builds in
+    /// hardware mixing. Asking keeps them read for a second while the unit
+    /// holds the mode; null while none is read yet, after a read that
+    /// failed, outside the mode, or when this unit is not driven. Never
+    /// waits for USB.
+    /// </summary>
+    ProMeterReading? Meters(string unit) => null;
 }
 
 /// <summary>

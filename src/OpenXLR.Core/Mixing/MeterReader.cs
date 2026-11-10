@@ -312,6 +312,18 @@ public sealed class MeterReader : IDisposable
         return Math.Clamp((db - FloorDb) / -FloorDb, 0, 1);
     }
 
+    /// <summary>
+    /// A level in dBFS on the meters' scale, rounded as <see cref="Read"/>
+    /// rounds: 0 at -60 dBFS and below, 1 at 0 dBFS, and 0 for null
+    /// (silence), for a level a device measured itself.
+    /// </summary>
+    public static double DisplayOfDb(double? db)
+    {
+        if (db is not { } value || !double.IsFinite(value)) return 0;
+        double display = Math.Clamp((value - FloorDb) / -FloorDb, 0, 1);
+        return display < 0.004 ? 0 : Math.Round(display, 3);
+    }
+
     public void Dispose()
     {
         lock (_gate)

@@ -1362,10 +1362,16 @@ Checked on the desk (2026-11-10, firmware 1.0.14):
 
 ### What OpenXLR does with it
 
-While the unit runs ducking and holds the setup, and a client takes the
-meters, the device loop reads the block once per poll and reports the
-largest reduction across the duckers of the inputs and pairs it ducks as
-the ducking reduction meter ([api.md](api.md#ducking)). Diagnostics decode
+While a client takes the meters and the unit runs ducking and holds the
+setup, or builds mixes in hardware mixing, the device loop reads the block
+once per poll and once more halfway to the next, about 20 times a second;
+one read serves both. It reports the largest reduction across the duckers
+of the inputs and pairs it ducks as the ducking reduction meter
+([api.md](api.md#ducking)), and the level of each section that builds one
+mix alone (channels 30 to 34) as that mix's meter
+([api.md](api.md#hardware-mixing)). It takes the section, not the jack
+level at bytes 142 to 149, so the headphone volume and Line Out level stay
+out of the mix meter, as they are in software mixing. Diagnostics decode
 the whole block. The maximizers, expanders, compressors and Voice Tune
 bytes are read for diagnostics only.
 

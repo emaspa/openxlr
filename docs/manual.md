@@ -4144,7 +4144,7 @@ profiles work as before. What changes on the mixes the unit builds:
 | Soundboard auditions | Play on a free USB pair, heard on the jacks only, never on the USB Aux port or the stream. With none free they are refused and the Soundboard window says why. On a layout of seven channels a processed XLR 1 takes the last pair, so auditions stop until a channel goes or the processing is off. |
 | Exclusive groups and the monitoring pause | Work, by taking channels out of the unit's mix. |
 | The USB Aux port | Plays the Aux mix, which the unit builds too while the port is on, at the same balance as the jacks and without Aux In. Your output volume no longer turns it down, and the monitoring pause leaves it playing. |
-| Mix meters | Read this computer's copy of each mix, at the same faders. |
+| Mix meters | A mix the unit builds on its own, for a jack or the USB Aux port, shows the unit's own meter. It follows the faders and the mix volume, not the headphone volume or the output volume. The unit shows peaks, so a mix reads a little higher than in software mixing on the same audio. When a jack plays two mixes summed, each of them keeps this computer's meter, and so do Stream, Chat and every other mix the computer builds. The input meters are unchanged: they show each input as the unit sends it. |
 
 A greyed control says why in its tooltip. The plugin chain window, Mic
 setup and the Options card say it under the control as well. The terminal

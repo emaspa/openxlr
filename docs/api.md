@@ -119,7 +119,7 @@ Messages from the daemon, each a JSON object with a `type` field:
 | `mixingPlan` | in answer to `setMixing` with `check` | what [hardware mixing](#hardware-mixing) would do with the layout as it stands: `wanted`, `active`, `reason`, `note`, `pairs`, `sections`, `jacks`, `cells` (section start to bytes 0 to 13 as hex), `clamped`, `disabled` and `entryOffsetsDb`. Nothing changes |
 | `diagnostics` | in answer to `getDiagnostics` | `blocks`, mapping vendor block names to hex strings or read errors. An XLR Dock adds `paths`, the card number and the path each of its gain, mute and headphone controls takes (`Alsa` through the card's mixer, `Block` through the dock's config block when the card lacks the control, `None` when the USB handle is closed too, so the control is unavailable), and `alsa`, the values read through the card. A Wave XLR Pro adds its five hardware mixes decoded from block 0x0001: `section0`, `section18`, `section36`, `section54` and `section72` (each member with its level, the pairs the section ducks, the raw ducking fields and the unknown byte 14), `outputs` (the section each jack, the USB Aux port and Line Out plays), `section0Level` (byte 98) and `xlr1Capture` (byte 94, whether XLR 1's capture is taken before or after the unit's processing); a block of another layout gives `sections` saying why it was not decoded instead. It adds its meters decoded from block 0x0002, each line naming only what moves, levels in dBFS and `-` for silence: `meterDucking` (each ducker that lowers its source or hears its key: the source, the reduction, the key level and its output left and right), `meterLevels` (each of the 35 level points with a level: each input before the unit's processing, after it, after the insert return and after the ducker, each USB pair as it arrives and after its ducker, and the five mix sections), `meterOutputs` (Headphones 1, Headphones 2, Line Out and the USB Aux port), `meterMaximizers` and `meterDynamics` (the expanders, compressors and Voice Tune, read only for diagnostics); a block of another length gives `meters` saying why. `usbFault` carries the last USB fault of this run and `error` a dump that failed |
 | `runtimeDiagnostics` | in answer to `getRuntimeDiagnostics` | the daemon build version and ID, and the [runtime snapshot](#runtime-snapshot) |
-| `meters` | 15 Hz while the mixer is built | `levels`, an object mapping each key below to its values: live stereo levels per channel (`ch:<id>`) and mix (`mix:<id>`), and `duck:<id>` for each mix with a running software [ducking](#ducking) stage, or ducked by a Wave XLR Pro that holds the setup: one value, the reduction in dB now (0 while the key is quiet). While a client keeps a [meter before the chain](#meter-before-the-chain) running, `in:<id>` carries that microphone's `[rms, peak, clip]`, and while a [Sound Check](#sound-check) take loops, `take:<id>` carries one value, where the loop is across the take from 0 to 1. While a [soundboard](#soundboard) clip plays, `clip:<id>` carries `[position, voices]`: how far its newest voice is, 0 to 1, and how many voices play it; the key is absent while the clip is silent. While a client keeps a microphone's [compressor and expander](#compressor-and-expander) levels coming with `watchDynamics` and its stage runs, `exp:<id>` and `comp:<id>` each carry `[input, reduction, output]` in dB |
+| `meters` | 15 Hz while the mixer is built | `levels`, an object mapping each key below to its values: live stereo levels per channel (`ch:<id>`) and mix (`mix:<id>`), `[left, right]` from 0 at -60 dBFS and below to 1 at 0 dBFS (a mix the Wave XLR Pro builds in [hardware mixing](#hardware-mixing) reads the unit's own meter), and `duck:<id>` for each mix with a running software [ducking](#ducking) stage, or ducked by a Wave XLR Pro that holds the setup: one value, the reduction in dB now (0 while the key is quiet). While a client keeps a [meter before the chain](#meter-before-the-chain) running, `in:<id>` carries that microphone's `[rms, peak, clip]`, and while a [Sound Check](#sound-check) take loops, `take:<id>` carries one value, where the loop is across the take from 0 to 1. While a [soundboard](#soundboard) clip plays, `clip:<id>` carries `[position, voices]`: how far its newest voice is, 0 to 1, and how many voices play it; the key is absent while the clip is silent. While a client keeps a microphone's [compressor and expander](#compressor-and-expander) levels coming with `watchDynamics` and its stage runs, `exp:<id>` and `comp:<id>` each carry `[input, reduction, output]` in dB |
 | `soundCheckTake` | once, when the Sound Check helper finishes a take, and in answer to `getSoundCheckTake` | `channel`, `take` (the take's number in the session, from 1), `seconds` (its length) and `peaks` (200 values from 0 to 1, the peak of each stretch of the take in order); without a take `channel` is null, `take` 0 and `peaks` empty. See [Sound Check](#sound-check) |
 | `soundboard` | in answer to `getSoundboard` | `soundboard`, the same object as the state's `mixer.soundboard`. See [Soundboard](#soundboard) |
 | `clipImport` | in answer to `importClip` | `ok`, `message` (a sentence for the user) and `clip`, the new clip's id, or null when the file was refused. See [Soundboard](#soundboard) |
@@ -2957,12 +2957,14 @@ own reduction from its meters (block 0x0002) for each ducked mix: the
 largest across the unit's ducked inputs and pairs, in quarter dB, the same
 value under every such mix, since the unit ducks a pair or an input, not a
 mix. In hardware mixing a mix software ducks too keeps its stage's reading
-under its key. The device loop reads the unit's meters once per poll,
-about 10 times a second, and only while ducking is on the unit and the
-`meters` message goes to a client. It stops a second after the last frame.
-The first frame after ducking moves to the unit, or after a client
-connects, carries no `duck:` key for the unit. How the unit's meters move
-over time (peak or average, and how long a level is held) is not known.
+under its key. The device loop reads the unit's meters once per poll and
+once more halfway to the next, about 20 times a second, and only while
+ducking is on the unit and the `meters` message goes to a client. It stops
+a second after the last frame. One read serves the ducking reduction and
+the [hardware mixing](#hardware-mixing) mix meters together. The first
+frame after ducking moves to the unit, or after a client connects, carries
+no `duck:` key for the unit. The unit's levels are peaks: they rise within
+about 40 ms, hold nothing and fall at about 34 dB a second.
 
 `setDucking` takes `value`, an object with any of `enabled`, `keys`,
 `key`, `channels`, `mixes`, `sensitivity`, `amount` and `speed`; a field
@@ -3230,9 +3232,29 @@ volume moved on the unit, by its knob or by `set` with `hpVolumeDb`, is
 taken as the jack's new base. Microphones play as the unit's inputs, or
 from their return pairs while processed, so the direct path is not used.
 Mic setup's Hear myself opens the microphone's sends in the unit's mixes
-as it does in the graph. The mix meters read the computer's copy
-of each mix, at the same faders. If the unit does not keep five writes in
-a row, the mode leaves with `failed` until `setMixing` is sent again.
+as it does in the graph. If the unit does not keep five writes in a row,
+the mode leaves with `failed` until `setMixing` is sent again.
+
+**Mix meters.** A mix the unit builds alone in a section, a jack's feed of
+one mix or the Aux mix while the port plays it, reads that section's level
+from the unit's meters (block 0x0002) as its `mix:<id>` meter. The section
+level comes after the faders, channel volumes and mix volume and before
+the jack's headphone volume or Line Out level. The output volume moves
+neither this meter nor the computer's. The unit measures peaks, which
+read higher than the computer's average on the same audio, 3 dB higher on
+a sine. Each part of a summed feed, and every mix the computer builds,
+reads the computer's copy, which keeps running for any other output that
+plays the mix.
+
+The device loop reads the unit's meters only while the mode runs and the
+`meters` message goes to a client, and stops a second after the last
+frame. It reads them with each poll and once more halfway to the next,
+about 20 times a second. A frame with no fresh reading carries the
+computer's copy: the first one after a client connects, and any after a
+failed read. The input channels (`ch:xlr1`, `ch:xlr2`, `ch:aux`,
+`ch:line`) keep their meters on this computer. They read each input as
+the unit sends it over USB, before the channel volume, as in software
+mixing.
 
 **Refused while it runs.** `soundCheck` (other than `stop`),
 `setSoundCheckRaw` and `setSoundCheckHearMyself` with true are refused for

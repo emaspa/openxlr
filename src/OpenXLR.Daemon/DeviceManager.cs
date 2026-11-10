@@ -385,11 +385,31 @@ public sealed partial class DeviceManager : BackgroundService
         {
             SweepOnce();
             // An EQ posted while no write is due wakes the loop at once.
-            await _wake.WaitAsync(100, stop).ContinueWith(_ => { }, TaskScheduler.Default);
+            if (!_unitMetersWatched)
+            {
+                await NapAsync(PollIntervalMs, stop);
+                continue;
+            }
+            // While a client watches the unit's meters, they are read once
+            // more halfway to the next poll: about 20 reads a second of block
+            // 0x0002 alone instead of 10, and only for as long as asked.
+            if (await NapAsync(PollIntervalMs / 2, stop)) continue;
+            ReadUnitMetersBetweenPolls();
+            await NapAsync(PollIntervalMs / 2, stop);
         }
         FlushLastState(force: true);
         Drop();
         RestoreCardProfile();
+    }
+
+    /// <summary>The device loop's wait between polls, in milliseconds, unless something wakes it.</summary>
+    private const int PollIntervalMs = 100;
+
+    /// <summary>Wait up to <paramref name="ms"/> for a wake; true when woken or stopping, so the loop polls (or ends) at once.</summary>
+    private async Task<bool> NapAsync(int ms, CancellationToken stop)
+    {
+        try { return await _wake.WaitAsync(ms, stop); }
+        catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException) { return true; }
     }
 
     /// <summary>One pass of the device loop: connect, poll, park the card profile, persist. Tests drive it directly.</summary>
@@ -985,7 +1005,11 @@ public sealed partial class DeviceManager : BackgroundService
     {
         lock (_gate)
         {
-            if (_device is null || !_device.Connected) return;
+            if (_device is null || !_device.Connected)
+            {
+                _unitMetersWatched = false;
+                return;
+            }
             DeviceState now;
             try { now = Stamp(_device.ReadState()); }
             catch (Exception ex) when (ex is not UsbHungException)
@@ -1010,7 +1034,7 @@ public sealed partial class DeviceManager : BackgroundService
             }
             // A readback that changed can change whether the unit runs ducking at all.
             changed |= VerifyDuckingLocked(_device);
-            ReadDuckReductionLocked(_device);
+            ReadUnitMetersLocked(_device);
             VerifyEqLocked(_device);
             VerifyDynamicsLocked(_device);
             if (changed || recovered) RaiseFromLocked();
@@ -1520,7 +1544,17 @@ public sealed partial class DeviceManager : BackgroundService
     private double? _duckReduction;
     private long _duckReductionAt;
 
-    /// <summary>How long one ask for the unit's reduction keeps its meters read.</summary>
+    // The same block for the mixes the unit builds in hardware mixing: read
+    // only while the mixer holds the mode and asked within UnitMetersHold.
+    // One read serves both. Guarded by _duckGate, as the reduction is.
+    private long? _unitMetersAskedAt;
+    private ProMeterReading? _unitMeters;
+    private long _unitMetersAt;
+    // The last poll read the unit's meters for someone, so the device loop
+    // reads them once more between polls.
+    private volatile bool _unitMetersWatched;
+
+    /// <summary>How long one ask for the unit's reduction or meters keeps its meters read.</summary>
     internal static readonly TimeSpan UnitMetersHold = TimeSpan.FromSeconds(1);
 
     /// <summary>What a unit that did not keep a written ducking target reports, after the unit's name.</summary>
@@ -1651,33 +1685,85 @@ public sealed partial class DeviceManager : BackgroundService
     }
 
     /// <summary>
-    /// After the ducking readback: one read of the unit's meters while it
-    /// holds an enabled target, verified and not moved since, and the
-    /// reduction was asked for within the hold. Anything else reads nothing
-    /// and forgets the last reading.
+    /// The driven unit's own meters as the poll last read them for the mixes
+    /// it builds in hardware mixing. Each ask keeps the poll reading them for
+    /// <see cref="UnitMetersHold"/> while the mixer holds the mode; null for a
+    /// unit that is not driven, before the first read, after a read that
+    /// failed, and once the last read is older than the hold. Never waits
+    /// for the device lock.
     /// </summary>
-    private void ReadDuckReductionLocked(IAudioDevice dev)
+    internal ProMeterReading? UnitMeters(string unit)
     {
-        if (!dev.Capabilities.Ducking) return;
+        if (_published.Info?.InstanceId != unit) return null;
         long now = NowMs;
-        IReadOnlyList<int> entries;
         lock (_duckGate)
         {
-            bool asked = _duckMetersAskedAt is { } at && now - at < (long)UnitMetersHold.TotalMilliseconds;
-            bool held = _duckPending is null && _duckWritten is null && _duckFailed is null && !_duckDrifted;
-            entries = asked && held && _duckVerified is { } verified ? ProMeters.DuckedEntries(verified) : [];
-            if (entries.Count == 0)
-            {
-                _duckReduction = null;
-                return;
-            }
+            _unitMetersAskedAt = now;
+            return _unitMeters is { } meters && now - _unitMetersAt < (long)UnitMetersHold.TotalMilliseconds ? meters : null;
         }
+    }
+
+    /// <summary>
+    /// After the ducking readback: at most one read of the unit's meters,
+    /// for whoever wants it. The ducking reduction wants it while the unit
+    /// holds an enabled target, verified and not moved since, and the
+    /// reduction was asked for within the hold. The mix meters want it while
+    /// the mixer holds hardware mixing and asked within the hold. Anything
+    /// else reads nothing and forgets the last reading; a read that fails
+    /// leaves no reading, so the mixer meters its own copy instead.
+    /// </summary>
+    private void ReadUnitMetersLocked(IAudioDevice dev)
+    {
+        long now = NowMs;
+        long hold = (long)UnitMetersHold.TotalMilliseconds;
+        bool inMode = HardwareMixingEntry?.Invoke() is not null;
+        IReadOnlyList<int> entries = [];
+        bool forMixes;
+        lock (_duckGate)
+        {
+            if (dev.Capabilities.Ducking)
+            {
+                bool asked = _duckMetersAskedAt is { } at && now - at < hold;
+                bool held = _duckPending is null && _duckWritten is null && _duckFailed is null && !_duckDrifted;
+                entries = asked && held && _duckVerified is { } verified ? ProMeters.DuckedEntries(verified) : [];
+            }
+            forMixes = inMode && _unitMetersAskedAt is { } mixesAt && now - mixesAt < hold;
+            if (entries.Count == 0) _duckReduction = null;
+            if (!forMixes) _unitMeters = null;
+        }
+        _unitMetersWatched = entries.Count > 0 || forMixes;
+        if (!_unitMetersWatched) return;
         ProMeterReading? meters = dev.ReadMeters();
         lock (_duckGate)
         {
-            _duckReduction = meters?.DuckReductionDb(entries);
-            _duckReductionAt = now;
+            if (entries.Count > 0)
+            {
+                _duckReduction = meters?.DuckReductionDb(entries);
+                _duckReductionAt = now;
+            }
+            if (forMixes)
+            {
+                _unitMeters = meters;
+                _unitMetersAt = now;
+            }
         }
+    }
+
+    /// <summary>
+    /// Between two polls, while the last one read the unit's meters for
+    /// someone: one more read of them alone, so they move at about twice the
+    /// poll rate. Nothing else is read. Tests drive it directly.
+    /// </summary>
+    internal void ReadUnitMetersBetweenPolls()
+    {
+        if (_suspended || !_unitMetersWatched) return;
+        try
+        {
+            lock (_gate)
+                if (_device is { Connected: true } dev) ReadUnitMetersLocked(dev);
+        }
+        catch (UsbHungException ex) { NoteHung(ex); }
+        catch (Exception ex) { _log.LogDebug("unit meters: {msg}", ex.Message); }
     }
 
     private void ForgetDucking()
