@@ -3099,6 +3099,9 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
   <data name="DuckingKeysListLast" xml:space="preserve">
     <value>{0} and {1}</value>
   </data>
+  <data name="DuckingKeysLimit" xml:space="preserve">
+    <value>Choose at most {0} ducking keys.</value>
+  </data>
   <data name="DuckingKeysLast" xml:space="preserve">
     <value>Ducking needs at least one key. Tick another key before unticking this one.</value>
   </data>

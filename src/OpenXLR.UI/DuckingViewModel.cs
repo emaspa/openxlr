@@ -73,6 +73,7 @@ public sealed class DuckingViewModel : ViewModelBase
     internal static readonly (string Word, int Attack, int Release)[] SpeedPresets = [("slow", 100, 2000), ("medium", 80, 1200), ("fast", 30, 200)];
     public const int MinThreshold = -60, MaxThreshold = 0, MinDepth = 1, MaxDepth = 40;
     public const int MinAttack = 1, MaxAttack = 1000, MinRelease = 10, MaxRelease = 10000;
+    private const int MaxKeys = 8;
 
     /// <summary>The deepest preset, in dB: the reduction bar is full at this depth, or at a deeper amount.</summary>
     public const double FullScaleDb = 24;
@@ -173,6 +174,12 @@ public sealed class DuckingViewModel : ViewModelBase
         {
             Refusal = Localizer.Text("DuckingKeysLast");
             choice.Show(true);
+            return;
+        }
+        if (choice.IsChecked && keys.Count > MaxKeys)
+        {
+            Refusal = Localizer.Format("DuckingKeysLimit", MaxKeys);
+            choice.Show(false);
             return;
         }
         if (keys.SequenceEqual(_keys)) return;

@@ -4244,4 +4244,7 @@ Aus dem Tray holst du den Mixer über das OpenXLR-Symbol oder dein App-Menü zur
   <data name="MicSetupGainLocked" xml:space="preserve">
     <value>Die Eingangsverstärkung ist gesperrt.</value>
   </data>
+  <data name="DuckingKeysLimit" xml:space="preserve">
+    <value>Wähle höchstens {0} Auslöser für Ducking.</value>
+  </data>
 </root>

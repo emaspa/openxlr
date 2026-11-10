@@ -812,7 +812,8 @@ The setup has four parts:
   In, Line In and application channels such as Voice Chat. The loudest
   key at each moment is the one that counts, so the music dips while you
   or a friend on Voice Chat talks, and two quiet keys never add up to a
-  loud one. A capture input on a stereo pair cannot be a key.
+  loud one. A capture input on a stereo pair cannot be a key. The window
+  keeps the eight selected keys and explains the limit when you try a ninth.
 - The **channels** to lower. By default every application channel: Game,
   Music, Browser, System, Voice Chat and SFX. A key is never lowered.
 - The **mixes** to lower them in. By default the default monitor mix,

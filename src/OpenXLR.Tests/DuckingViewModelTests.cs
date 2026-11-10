@@ -459,6 +459,29 @@ public sealed class DuckingViewModelTests
     }
 
     [Fact]
+    public void ANinthKeyIsRefusedBeforeTheWindowSendsACommand()
+    {
+        var (model, sent, _) = Model();
+        foreach (string id in new[] { "xlr2", "aux", "game", "music", "browser", "system", "voicechat" })
+        {
+            model.Keys.Single(k => k.Id == id).IsChecked = true;
+            sent.One();
+        }
+        DuckingChoice headset = model.Keys.Single(k => k.Id == "headset");
+        headset.IsChecked = true;
+        Assert.False(headset.IsChecked);
+        Assert.Equal(8, model.KeyIds.Count);
+        Assert.Equal(Localizer.Format("DuckingKeysLimit", 8), model.Refusal);
+        Assert.Contains(model.Channels, c => c.Id == "headset");
+        Assert.Empty(sent.Sent);
+
+        model.Keys.Single(k => k.Id == "xlr2").IsChecked = false;
+        sent.One();
+        headset.IsChecked = true;
+        Assert.Contains("headset", Ids(sent.One()["keys"]));
+    }
+
+    [Fact]
     public void AChannelTheListDoesNotShowStaysInTheSetup()
     {
         // XLR 2 is ducked, and the unit now in use has no second input.
