@@ -153,11 +153,13 @@ public sealed partial class Mixer
         view = view with { Failed = unit is not null && _duckingFailed.Contains(unit) };
         DuckingVerdict verdict = DuckingPlacement.Evaluate(setup, view, unit is null ? null : _unitDucking);
         bool wantDevice = verdict.Backend == ProDucking.Device && _duckingWriter is not null;
-        string owner = _config.Channels.FirstOrDefault(c => c.Id == setup.Key)?.Name ?? setup.Key;
-        ProDuckingTarget target = DuckingTarget(setup, verdict.Pairs) with { Sections = verdict.Sections };
+        IReadOnlyList<string> keys = DuckingScene.KeysOf(setup) ?? [];
+        string owner = string.Join(", ", keys.Select(k => _config.Channels.FirstOrDefault(c => c.Id == k)?.Name ?? k));
+        ProDuckingTarget target = DuckingTarget(setup, verdict);
         // A custom layout can even lack the fallback xlr1. Pruning keeps
         // the saved key word but an invalid graph plan must never reach D2.
-        DuckingPlan? plan = _config.Channels.Any(c => c.Id == setup.Key && c.Microphone) ? SoftwarePlan(setup, verdict) : null;
+        List<string> present = [.. keys.Where(k => _config.Channels.Any(c => c.Id == k && DuckingSetup.CanKey(c)))];
+        DuckingPlan? plan = present.Count > 0 ? SoftwarePlan(setup with { Keys = present }, verdict) : null;
 
         if (wantDevice && verdict.SoftwareMixes is not null)
         {
@@ -221,19 +223,24 @@ public sealed partial class Mixer
     }
 
     private static bool SameDuckingPlan(DuckingPlan? left, DuckingPlan? right)
-        => left is null ? right is null : right is not null && left.Key == right.Key && left.Enabled == right.Enabled
+        => left is null ? right is null : right is not null && left.Keys.SequenceEqual(right.Keys) && left.Enabled == right.Enabled
             && left.ThresholdDb == right.ThresholdDb && left.DepthDb == right.DepthDb
             && left.AttackMs == right.AttackMs && left.ReleaseMs == right.ReleaseMs && left.Cells.SetEquals(right.Cells);
 
-    private static ProDuckingTarget DuckingTarget(DuckingSetup setup, IReadOnlyList<int> pairs)
+    /// <summary>What the unit is posted for a setup: the verdict's pairs, sections, keys and inputs.</summary>
+    private static ProDuckingTarget DuckingTarget(DuckingSetup setup, DuckingVerdict verdict)
         => new(setup.Enabled && setup.Channels.Count > 0 && setup.Mixes.Count > 0,
-            setup.Sensitivity, setup.Amount, setup.Speed, pairs.ToFrozenSet());
+            setup.Sensitivity, setup.Amount, setup.Speed, verdict.Pairs.ToFrozenSet())
+        {
+            Sections = verdict.Sections,
+            Keys = verdict.Keys,
+            Inputs = verdict.Inputs.ToFrozenSet(),
+        };
 
     private DuckingView DuckingViewLocked()
     {
         DuckingSetup setup = DuckingSetupLocked();
-        bool carrier = UnitInputsLocked().TryGetValue(setup.Key, out UnitInputStatus? input)
-            && input.Primary && input.Input == 1 && input.Unit == _duckingUnit;
+        IReadOnlyList<string> keys = DuckingScene.KeysOf(setup) ?? [];
         List<JackFeed> jackFeeds = JackFeedsLocked();
         IReadOnlyList<string> feed = jackFeeds.Count == 0 ? MonitorFeed.Parts(JackFeedLocked())
             : [.. jackFeeds.SelectMany(f => MonitorFeed.Parts(f.Feed)).Distinct()];
@@ -258,16 +265,18 @@ public sealed partial class Mixer
                     && !_mixMuted.Contains(mix.Id) && _mixVolume.GetValueOrDefault(mix.Id, mix.Volume) > 0)
                     open[channel.Id] = ChannelNameLocked(channel);
             }
-            bool keyInSoftware = open.ContainsKey(setup.Key)
-                && !(IsHardwareMicLocked(setup.Key) && mix.Kind == MixKind.Monitor && feed.Contains(mix.Id));
+            List<string> keysInSoftware = [.. keys.Where(key => open.ContainsKey(key)
+                && !(IsHardwareMicLocked(key) && mix.Kind == MixKind.Monitor && feed.Contains(mix.Id)))];
             mixes.Add(new(mix.Id, mix.Name, mix.Kind, jacks,
                 mix.Kind == MixKind.AuxPort && _auxPortEnabled && _hardwareOutputRouting,
-                consumers, open, keyInSoftware));
+                consumers, open, keysInSoftware));
         }
         bool unitBuilds = UnitBuildsJacksLocked && _hardwarePlan is { Active: true };
-        return new(_built || _duckingPort is not null, carrier, mixes, feed,
+        return new(_built || _duckingPort is not null, mixes, feed,
             DuckingStatus.RunningMixes.Count > 0, _duckingUnit is not null && _duckingFailed.Contains(_duckingUnit))
         {
+            UnitSources = DuckingUnitSourcesLocked(),
+            ReturnPairs = unitBuilds ? _hardwarePlan!.ReturnPairs : new Dictionary<string, int>(),
             HardwareMixing = UnitBuildsJacksLocked,
             JackFeeds = jackFeeds.Count == 0 ? null
                 : [.. jackFeeds.Select((f, slot) => new DuckingJackFeed(ProJackFeeds.Pairs[slot], MonitorFeed.Parts(f.Feed)))],
@@ -275,6 +284,24 @@ public sealed partial class Mixer
             ChannelPairs = unitBuilds ? _hardwarePlan!.Pairs : new Dictionary<string, int>(),
             ChannelNames = _config.Channels.ToDictionary(c => c.Id, ChannelNameLocked, StringComparer.Ordinal),
         };
+    }
+
+    /// <summary>
+    /// The channels that carry an input of the primary unit with hardware
+    /// ducking, to the input's source number: XLR 1 and XLR 2 on whatever
+    /// strip carries them, and the unbound Aux In and Line In strips while
+    /// the unit has those inputs. Empty while no such unit is driven.
+    /// </summary>
+    private Dictionary<string, int> DuckingUnitSourcesLocked()
+    {
+        var sources = new Dictionary<string, int>(StringComparer.Ordinal);
+        if (_duckingUnit is null || _duckingUnit != _drivenUnit) return sources;
+        foreach ((string channel, UnitInputStatus input) in UnitInputsLocked())
+            if (input.Primary && input.Unit == _duckingUnit) sources.TryAdd(channel, input.Input - 1);
+        foreach (ChannelDefinition c in _config.Channels)
+            if (c.InputPair is ProMixSections.UsbAux or ProMixSections.LineIn && !_bindings.ContainsKey(c.Id) && ChannelPresentLocked(c))
+                sources.TryAdd(c.Id, c.InputPair.Value);
+        return sources;
     }
 
     /// <summary>Each mix a running hardware mixing plan builds, to the sections of the feeds that hold it.</summary>

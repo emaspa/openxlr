@@ -8,23 +8,33 @@ public sealed class DuckingPlacementTests
     internal static readonly UnitDuckingSupport Pro = new("Wave XLR Pro", "1.0.14", true);
     private static DuckingSetup Setup => DuckingSetup.Default(MixerConfig.Default()) with { Enabled = true };
 
-    private static DuckingView View => new(true, true,
+    /// <summary>The Pro's four inputs on their default strips.</summary>
+    internal static IReadOnlyDictionary<string, int> ProInputs { get; } = new Dictionary<string, int>
+    {
+        ["xlr1"] = ProMixSections.Xlr1, ["xlr2"] = ProMixSections.Xlr2, ["aux"] = ProMixSections.UsbAux, ["line"] = ProMixSections.LineIn,
+    };
+
+    private static DuckingView View => new(true,
     [
         new("monitor", "Monitor A", MixKind.Monitor, true, false, [],
-            MixerConfig.Default().Channels.Where(c => c.IsApplication).ToDictionary(c => c.Id, c => c.Name), false),
-        new("monitor2", "Monitor B", MixKind.Monitor, false, false, [], new Dictionary<string, string>(), false),
-        new("auxout", "Aux", MixKind.AuxPort, false, true, [], new Dictionary<string, string>(), false),
-        new("stream", "Stream", MixKind.VirtualMic, false, false, [], new Dictionary<string, string>(), false),
-    ], ["monitor"]);
+            MixerConfig.Default().Channels.Where(c => c.IsApplication).ToDictionary(c => c.Id, c => c.Name), []),
+        new("monitor2", "Monitor B", MixKind.Monitor, false, false, [], new Dictionary<string, string>(), []),
+        new("auxout", "Aux", MixKind.AuxPort, false, true, [], new Dictionary<string, string>(), []),
+        new("stream", "Stream", MixKind.VirtualMic, false, false, [], new Dictionary<string, string>(), []),
+    ], ["monitor"])
+    {
+        UnitSources = ProInputs,
+        ChannelNames = new Dictionary<string, string>(MixerConfig.Default().Channels.ToDictionary(c => c.Id, c => c.Name)) { ["mic"] = "Mic" },
+    };
 
     [Theory]
     [InlineData("mixerOff", "The software mixer is off, so ducking does not run.")]
-    [InlineData("keyNotSupported", "The Wave XLR Pro ducks only with XLR 1 as the key.")]
+    [InlineData("keyNotSupported", "Mic is not one of the Wave XLR Pro's inputs, so the unit cannot use it as a key.")]
     [InlineData("monitorReturn", "The jacks' feed is not in the Wave XLR Pro's headphone mix, where it ducks, so this computer ducks.")]
     [InlineData("mixElsewhere", "Monitor A also plays on Speakers, which the Wave XLR Pro cannot duck.")]
     [InlineData("sharedOutput", "The jacks play Monitor A and Monitor B together, and only Monitor A is ducked.")]
     [InlineData("partialMix", "Voice Chat plays in Monitor A and is not ducked; the Wave XLR Pro lowers a whole output.")]
-    [InlineData("keyInMix", "XLR 1 is heard in Monitor A through its software send, so the unit would lower the voice too.")]
+    [InlineData("keyInMix", "XLR 1 is heard in Monitor A through its software send, so the unit would lower the key too.")]
     [InlineData("failed", "The Wave XLR Pro did not keep the ducking written to it. Switch ducking off and on to try again.")]
     [InlineData("unsupportedBlock", "The Wave XLR Pro's ducking block holds values OpenXLR does not know.")]
     public void EachRuleReportsItsReasonAndNote(string reason, string note)
@@ -35,13 +45,13 @@ public sealed class DuckingPlacementTests
         switch (reason)
         {
             case "mixerOff": view = view with { MixerRunning = false }; break;
-            case "keyNotSupported": view = view with { KeyIsUnitInput1 = false }; break;
+            case "keyNotSupported": setup = setup with { Keys = ["xlr1", "mic"] }; break;
             case "monitorReturn": support = Pro with { ReachesJacks = false }; break;
             case "mixElsewhere": view = EditMonitor(view, m => m with { OtherConsumers = ["Speakers"] }); break;
             case "sharedOutput": view = view with { JackFeed = ["monitor", "monitor2"] }; break;
             case "partialMix": setup = setup with { Channels = [.. setup.Channels.Where(c => c != "voicechat")] }; break;
             case "keyInMix": view = EditMonitor(view, m => m with
-                { KeyInSoftware = true, OpenChannels = new Dictionary<string, string>(m.OpenChannels) { ["xlr1"] = "XLR 1" } }); break;
+                { KeysInSoftware = ["xlr1"], OpenChannels = new Dictionary<string, string>(m.OpenChannels) { ["xlr1"] = "XLR 1" } }); break;
             case "failed": view = view with { Failed = true }; break;
             case "unsupportedBlock": support = Pro with { Ready = false, Reason = "unsupportedBlock" }; break;
         }
@@ -67,18 +77,73 @@ public sealed class DuckingPlacementTests
         Assert.Equal(outputs.Split('+'), verdict.Outputs);
         Assert.Equal(outputs.Split('+').Select(o => o == "monitor" ? ProReturnPairs.Monitor : ProReturnPairs.Aux),
             verdict.Outputs.Select(ProDucking.PairOf));
+        Assert.Equal(ProDucking.KeyXlr1Mask, verdict.Keys);
+        Assert.Empty(verdict.Inputs);
+    }
+
+    [Fact]
+    public void EveryInputOfTheUnitCanKeyItAndTheLoudestWins()
+    {
+        // XLR 1, XLR 2, USB Aux and Line In together: one bit each.
+        DuckingVerdict verdict = DuckingPlacement.Evaluate(Setup with { Keys = ["xlr2", "aux", "line", "xlr1"] }, View, Pro);
+        Assert.True(verdict.Ready);
+        Assert.Equal("device", verdict.Backend);
+        Assert.Equal(0b1111, verdict.Keys);
+        // XLR 2 bound to another strip keys the unit's XLR 2 just the same.
+        DuckingView bound = View with { UnitSources = new Dictionary<string, int> { ["xlr1"] = 0, ["mic"] = 1 } };
+        Assert.Equal(0b11, DuckingPlacement.Evaluate(Setup with { Keys = ["xlr1", "mic"] }, bound, Pro).Keys);
+    }
+
+    [Theory]
+    [InlineData("voicechat", "Voice Chat is not one of the Wave XLR Pro's inputs, so the unit cannot use it as a key.")]
+    [InlineData("mic", "Mic is not one of the Wave XLR Pro's inputs, so the unit cannot use it as a key.")]
+    public void OutsideHardwareMixingOnlyTheUnitsInputsCanKeyIt(string key, string note)
+    {
+        // An application channel streams inside a mix's pair, and a capture
+        // microphone never reaches the unit, so neither can key it.
+        DuckingSetup setup = Setup with { Keys = ["xlr1", key], Channels = [.. Setup.Channels.Where(c => c != key)] };
+        DuckingVerdict verdict = DuckingPlacement.Evaluate(setup, View with { SoftwareRunning = true }, Pro);
+        Assert.False(verdict.Ready);
+        Assert.Equal("keyNotSupported", verdict.Reason);
+        Assert.Equal(note, verdict.Note);
+        Assert.Equal("software", verdict.Backend);
+        Assert.Equal(0, verdict.Keys);
+    }
+
+    [Fact]
+    public void TheUnitsInputsAmongTheChannelsAreDuckedAtTheirInputFields()
+    {
+        // XLR 2 and Line In heard in Monitor A beside the applications.
+        DuckingView view = EditMonitor(View, m => m with
+            { OpenChannels = new Dictionary<string, string>(m.OpenChannels) { ["xlr2"] = "XLR 2", ["line"] = "Line In" } });
+        DuckingVerdict verdict = DuckingPlacement.Evaluate(Setup with { Channels = [.. Setup.Channels, "line", "xlr2"] }, view, Pro);
+        Assert.True(verdict.Ready);
+        Assert.Equal([ProMixSections.Xlr2, ProMixSections.LineIn], verdict.Inputs);
+        Assert.Equal([ProReturnPairs.Monitor], verdict.Pairs);
+        // Left out of the channels, the inputs it hears there make a partial mix.
+        Assert.Equal("partialMix", DuckingPlacement.Evaluate(Setup, view, Pro).Reason);
+    }
+
+    [Fact]
+    public void AnyKeyHeardThroughItsSoftwareSendKeepsTheUnitOff()
+    {
+        DuckingView view = EditMonitor(View, m => m with
+            { KeysInSoftware = ["aux"], OpenChannels = new Dictionary<string, string>(m.OpenChannels) { ["aux"] = "Aux In" } });
+        DuckingVerdict verdict = DuckingPlacement.Evaluate(Setup with { Keys = ["xlr1", "aux"] }, view, Pro);
+        Assert.Equal("keyInMix", verdict.Reason);
+        Assert.Equal("Aux In is heard in Monitor A through its software send, so the unit would lower the key too.", verdict.Note);
     }
 
     [Fact]
     public void TheFirstFailureWinsEvenWhileDisabledOrSoftwareIsChosen()
     {
         DuckingSetup setup = Setup with { Enabled = false, Processing = "software", Channels = [] };
-        DuckingView view = EditMonitor(View, m => m with { OtherConsumers = ["Speakers"], KeyInSoftware = true })
-            with { MixerRunning = false, KeyIsUnitInput1 = false, Failed = true, JackFeed = ["monitor", "monitor2"] };
+        DuckingView view = EditMonitor(View, m => m with { OtherConsumers = ["Speakers"], KeysInSoftware = ["xlr1"] })
+            with { MixerRunning = false, UnitSources = new Dictionary<string, int>(), Failed = true, JackFeed = ["monitor", "monitor2"] };
         Assert.Equal("mixerOff", DuckingPlacement.Evaluate(setup, view, Pro).Reason);
         view = view with { MixerRunning = true };
         Assert.Equal("keyNotSupported", DuckingPlacement.Evaluate(setup, view, Pro).Reason);
-        view = view with { KeyIsUnitInput1 = true };
+        view = view with { UnitSources = ProInputs };
         Assert.Equal("mixElsewhere", DuckingPlacement.Evaluate(setup, view, Pro).Reason);
         view = EditMonitor(view, m => m with { OtherConsumers = [] });
         Assert.Equal("sharedOutput", DuckingPlacement.Evaluate(setup, view, Pro).Reason);
@@ -86,7 +151,7 @@ public sealed class DuckingPlacementTests
         Assert.Equal("partialMix", DuckingPlacement.Evaluate(setup, view, Pro).Reason);
         setup = setup with { Channels = Setup.Channels };
         Assert.Equal("keyInMix", DuckingPlacement.Evaluate(setup, view, Pro).Reason);
-        view = EditMonitor(view, m => m with { KeyInSoftware = false });
+        view = EditMonitor(view, m => m with { KeysInSoftware = [] });
         Assert.Equal("failed", DuckingPlacement.Evaluate(setup, view, Pro).Reason);
     }
 
@@ -98,7 +163,7 @@ public sealed class DuckingPlacementTests
     /// </summary>
     private static DuckingView Mode => EditMonitor(View, m => m with
         {
-            KeyInSoftware = true,
+            KeysInSoftware = ["xlr1"],
             OpenChannels = new Dictionary<string, string>(m.OpenChannels) { ["xlr1"] = "XLR 1" },
         }) with
         {
@@ -106,7 +171,7 @@ public sealed class DuckingPlacementTests
             SoftwareRunning = true,
             UnitMixSections = new Dictionary<string, IReadOnlyList<int>> { ["monitor"] = [0], ["monitor2"] = [18] },
             ChannelPairs = new Dictionary<string, int> { ["system"] = 0, ["game"] = 1, ["music"] = 2, ["browser"] = 3, ["voicechat"] = 4, ["sfx"] = 6 },
-            ChannelNames = MixerConfig.Default().Channels.ToDictionary(c => c.Id, c => c.Name),
+            ChannelNames = new Dictionary<string, string>(MixerConfig.Default().Channels.ToDictionary(c => c.Id, c => c.Name)) { ["mic"] = "Mic" },
         };
 
     private static string Sections(DuckingVerdict verdict)
@@ -127,6 +192,7 @@ public sealed class DuckingPlacementTests
         Assert.Equal("0: 1 2; 18: 1 2", Sections(verdict));
         Assert.Equal([1, 2], verdict.Pairs);
         Assert.Equal(["monitor"], verdict.Outputs);
+        Assert.Equal(ProDucking.KeyXlr1Mask, verdict.Keys);
         // Stream is the computer's to duck, beside the unit.
         Assert.Equal(["stream"], verdict.SoftwareMixes!.Order());
 
@@ -147,16 +213,44 @@ public sealed class DuckingPlacementTests
     }
 
     [Fact]
-    public void InHardwareMixingTheUnitsOwnInputsAreSkippedWithANote()
+    public void InHardwareMixingTheUnitsOwnInputsAreDuckedAtTheirInputFields()
     {
-        DuckingSetup setup = Setup with { Channels = ["music", "xlr2", "line"] };
+        DuckingSetup setup = Setup with { Channels = ["music", "xlr2", "line", "aux"] };
         DuckingVerdict verdict = DuckingPlacement.Evaluate(setup, Mode, Pro);
         Assert.True(verdict.Ready);
         Assert.Null(verdict.Reason);
+        Assert.Null(verdict.Note);
         Assert.Equal("0: 2", Sections(verdict));
-        Assert.Equal("XLR 2 and Line In are the Wave XLR Pro's own inputs, which it does not duck.", verdict.Note);
-        Assert.Equal("XLR 2 is the Wave XLR Pro's own input, which it does not duck.",
-            DuckingPlacement.Evaluate(setup with { Channels = ["xlr2"] }, Mode, Pro).Note);
+        Assert.Equal([ProMixSections.Xlr2, ProMixSections.UsbAux, ProMixSections.LineIn], verdict.Inputs);
+        // An input alone still ducks in the target mix's section, with no pair.
+        DuckingVerdict alone = DuckingPlacement.Evaluate(setup with { Channels = ["xlr2"] }, Mode, Pro);
+        Assert.Equal("0: ", Sections(alone));
+        Assert.Equal([ProMixSections.Xlr2], alone.Inputs);
+        Assert.Empty(alone.Pairs);
+    }
+
+    [Fact]
+    public void InHardwareMixingAChannelOnAPairCanKeyTheUnit()
+    {
+        // Voice Chat on pair 4 is source 8; Game on pair 1 is source 5.
+        DuckingSetup setup = Setup with { Keys = ["voicechat", "xlr1", "game"], Channels = ["music", "xlr2"] };
+        DuckingVerdict verdict = DuckingPlacement.Evaluate(setup, Mode, Pro);
+        Assert.True(verdict.Ready);
+        Assert.Equal("device", verdict.Backend);
+        Assert.Equal(1 << 0 | 1 << 5 | 1 << 8, verdict.Keys);
+        Assert.Equal("0: 2", Sections(verdict));
+        Assert.Equal([ProMixSections.Xlr2], verdict.Inputs);
+    }
+
+    [Fact]
+    public void InHardwareMixingAProcessedInputIsDuckedOnItsReturnPairToo()
+    {
+        // XLR 2 runs through software and plays back to the unit on pair 7.
+        DuckingView view = Mode with { ReturnPairs = new Dictionary<string, int> { ["xlr2"] = 7 } };
+        DuckingVerdict verdict = DuckingPlacement.Evaluate(Setup with { Channels = ["music", "xlr2"] }, view, Pro);
+        Assert.Equal("0: 2 7", Sections(verdict));
+        Assert.Equal([2, 7], verdict.Pairs);
+        Assert.Equal([ProMixSections.Xlr2], verdict.Inputs);
     }
 
     [Fact]
@@ -195,20 +289,21 @@ public sealed class DuckingPlacementTests
     }
 
     [Theory]
-    [InlineData("keyNotSupported", "The Wave XLR Pro ducks only with XLR 1 as the key, so the mixes it builds for its outputs are not ducked.")]
+    [InlineData("keyNotSupported", "Mic is neither one of the Wave XLR Pro's inputs nor on one of its USB pairs, so the unit cannot use it as a key and the mixes it builds for its outputs are not ducked.")]
     [InlineData("failed", "The Wave XLR Pro did not keep the ducking written to it. Switch ducking off and on to try again.")]
     [InlineData("unsupportedBlock", "The Wave XLR Pro's ducking block holds values OpenXLR does not know.")]
     public void InHardwareMixingAUnitThatCannotDuckLeavesItsMixesUnduckedAndTheRestToSoftware(string reason, string note)
     {
         DuckingView view = Mode;
         UnitDuckingSupport support = Pro;
+        DuckingSetup setup = Setup with { Mixes = ["monitor", "stream"] };
         switch (reason)
         {
-            case "keyNotSupported": view = view with { KeyIsUnitInput1 = false }; break;
+            case "keyNotSupported": setup = setup with { Keys = ["xlr1", "mic"] }; break;
             case "failed": view = view with { Failed = true }; break;
             case "unsupportedBlock": support = Pro with { Ready = false, Reason = "unsupportedBlock" }; break;
         }
-        DuckingVerdict verdict = DuckingPlacement.Evaluate(Setup with { Mixes = ["monitor", "stream"] }, view, support);
+        DuckingVerdict verdict = DuckingPlacement.Evaluate(setup, view, support);
         Assert.False(verdict.Ready);
         Assert.Equal(reason, verdict.Reason);
         Assert.Equal(note, verdict.Note);
@@ -237,7 +332,7 @@ public sealed class DuckingPlacementTests
     public void UnheardMixesAreIgnoredButVirtualMicrophonesAlwaysPreventDevicePlacement()
     {
         DuckingView view = View with { Mixes = [.. View.Mixes.Select(m => m.Id == "monitor2"
-            ? m with { OpenChannels = new Dictionary<string, string> { ["xlr2"] = "XLR 2" }, KeyInSoftware = true } : m)] };
+            ? m with { OpenChannels = new Dictionary<string, string> { ["xlr2"] = "XLR 2" }, KeysInSoftware = ["xlr2"] } : m)] };
         Assert.True(DuckingPlacement.Evaluate(Setup with { Mixes = ["monitor", "monitor2"] }, view, Pro).Ready);
         DuckingVerdict verdict = DuckingPlacement.Evaluate(Setup with { Mixes = ["monitor", "stream"] }, view, Pro);
         Assert.Equal("mixElsewhere", verdict.Reason);

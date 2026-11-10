@@ -74,13 +74,14 @@ public sealed class DuckingDaemonTests
             Assert.False(state.Connected);
             DuckingState ducking = state.Ducking!;
             Assert.Equal((false, "xlr1", "medium", "device"), (ducking.Enabled, ducking.Key, ducking.Speed, ducking.Processing));
+            Assert.Equal(["xlr1"], ducking.Keys);
             Assert.Equal(["game", "music", "browser", "system", "voicechat", "sfx"], ducking.Channels);
             Assert.Equal(["monitor"], ducking.Mixes);
             Assert.Null(ducking.Backend);
             Assert.Null(ducking.Device);
 
             JsonNode json = Serialized(state)["ducking"]!;
-            Assert.Equal(["enabled", "key", "channels", "mixes", "sensitivity", "amount", "speed", "processing", "backend", "available", "error", "device"],
+            Assert.Equal(["enabled", "keys", "key", "channels", "mixes", "sensitivity", "amount", "speed", "processing", "backend", "available", "error", "device"],
                 json.AsObject().Select(p => p.Key));
             Assert.Null(json["backend"]);
             Assert.Null(json["device"]);
@@ -95,7 +96,7 @@ public sealed class DuckingDaemonTests
         {
             Ducking = DuckingSetup.Default(MixerConfig.Default()) with
             {
-                Enabled = true, Key = "xlr2", Channels = ["music", "nothing"], Mixes = ["stream"], Amount = "high", Processing = "software",
+                Enabled = true, Keys = ["xlr2", "voicechat"], Channels = ["music", "nothing"], Mixes = ["stream"], Amount = "high", Processing = "software",
             },
         };
         Assert.Null(saved.Save());
@@ -105,6 +106,7 @@ public sealed class DuckingDaemonTests
         {
             DuckingState ducking = hub.Snapshot().Ducking!;
             Assert.Equal((true, "xlr2", "high", "software"), (ducking.Enabled, ducking.Key, ducking.Amount, ducking.Processing));
+            Assert.Equal(["xlr2", "voicechat"], ducking.Keys);
             Assert.Equal(["music"], ducking.Channels);   // an id the layout lacks is pruned
             Assert.Equal(["stream"], ducking.Mixes);
         }
@@ -167,6 +169,32 @@ public sealed class DuckingDaemonTests
         }
     });
 
+    /// <summary>
+    /// Every key on one of the unit's inputs goes to it as a bit of the key
+    /// mask, and an input among the channels as an input it lowers; a key it
+    /// cannot hear sends ducking off to the unit and runs it in software.
+    /// </summary>
+    [Fact]
+    public void TheMixerPostsTheKeysAndTheInputsTheUnitLowers()
+    {
+        var port = new RecordingPort();
+        using Mixer mixer = ProMixer(port);
+        DuckingSetup setup = DuckingSetup.Default(mixer.Config) with { Enabled = true, Keys = ["xlr2", "xlr1"] };
+        mixer.SetDuckingSetup(setup with { Channels = [.. setup.Channels, "aux"] }, _ => null);
+        ProDuckingTarget posted = port.Posts[^1];
+        Assert.True(posted.Enabled);
+        Assert.Equal(0b11, posted.Keys);
+        Assert.Equal([ProMixSections.UsbAux], posted.Inputs);
+        Assert.Equal([ProReturnPairs.Monitor], posted.Pairs);
+        Assert.True(mixer.DuckingSnapshot().Device!.Ready);
+
+        // Line In is not reported on this unit, so it cannot key it.
+        mixer.SetDuckingSetup(setup with { Keys = ["xlr1", "line"] }, _ => null);
+        Assert.False(port.Posts[^1].Enabled);
+        Assert.Equal("keyNotSupported", mixer.DuckingSnapshot().Device!.Reason);
+        Assert.Equal("Line In is not one of the Wave XLR Pro's inputs, so the unit cannot use it as a key.", mixer.DuckingSnapshot().Device!.Note);
+    }
+
     /// <summary>The Pro's verdict with its outputs, as a Core mixer with the jacks on Monitor A computes it, in the state's shape.</summary>
     [Fact]
     public void TheSerializedStateOfAProShowsItsVerdictAndOutputs()
@@ -194,11 +222,16 @@ public sealed class DuckingDaemonTests
         Assert.Equal("""[-12,"high",{"attack":45,"release":900}]""",
             new JsonArray(json["sensitivity"]!.DeepClone(), json["amount"]!.DeepClone(), json["speed"]!.DeepClone()).ToJsonString());
 
-        // Keyed by XLR 2: software, the unit's reason and the outputs it would have ducked.
-        mixer.SetDuckingSetup(mixer.DuckingSnapshot().Setup with { Key = "xlr2", Channels = ["music"] }, _ => null);
-        device = Serialized(new StateMessage { Ducking = DuckingState.From(mixer.DuckingSnapshot()) })["ducking"]!["device"]!;
+        // Keyed by XLR 1 and Music, which the unit does not hear outside
+        // hardware mixing: software, the unit's reason and the outputs it
+        // would have ducked.
+        mixer.SetDuckingSetup(mixer.DuckingSnapshot().Setup with { Keys = ["xlr1", "music"], Channels = ["game"] }, _ => null);
+        json = Serialized(new StateMessage { Ducking = DuckingState.From(mixer.DuckingSnapshot()) })["ducking"]!;
+        Assert.Equal(["xlr1", "music"], json["keys"]!.AsArray().Select(k => k!.GetValue<string>()));
+        Assert.Equal("xlr1", json["key"]!.GetValue<string>());
+        device = json["device"]!;
         Assert.Equal("keyNotSupported", device["reason"]!.GetValue<string>());
-        Assert.Equal("The Wave XLR Pro ducks only with XLR 1 as the key.", device["note"]!.GetValue<string>());
+        Assert.Equal("Music is not one of the Wave XLR Pro's inputs, so the unit cannot use it as a key.", device["note"]!.GetValue<string>());
         Assert.Equal(["monitor"], device["outputs"]!.AsArray().Select(o => o!.GetValue<string>()));
         Assert.False(port.Posts[^1].Enabled);
     }
@@ -241,7 +274,7 @@ public sealed class DuckingDaemonTests
         Assert.Equal([1], on.Device.Readback!.Pairs);
         Assert.Equal(("medium", "high", "fast"), (on.Device.Readback.Sensitivity, on.Device.Readback.Amount, on.Device.Readback.Speed));
         Assert.Contains(log.Written, line => line.StartsWith(
-            "ducking (update) on Elgato Wave XLR Pro: on, pairs 1, sensitivity medium, amount high, speed fast, keyed by XLR 1.", StringComparison.Ordinal));
+            "ducking (update) on Elgato Wave XLR Pro: on, pairs 1, keys XLR 1, sensitivity medium, amount high, speed fast, keyed by XLR 1.", StringComparison.Ordinal));
 
         // Custom numbers go into the same bytes and read back as numbers.
         mixer.SetDuckingSetup(on.Setup with { Sensitivity = -30, Amount = 18, Speed = DuckingSpeed.Times(45, 900) }, _ => null);
@@ -254,7 +287,7 @@ public sealed class DuckingDaemonTests
             (on.Device.Readback!.Sensitivity, on.Device.Readback.Amount, on.Device.Readback.Speed));
         Assert.Equal(new byte[] { 0xe2, 0x12, 0x2d, 0x00, 0x84, 0x03 }, unit.Blocks[0x0008][..6]);
         Assert.Contains(log.Written, line => line.StartsWith(
-            "ducking (update) on Elgato Wave XLR Pro: on, pairs 1, sensitivity -30, amount 18, speed attack 45 ms, release 900 ms, keyed by XLR 1.",
+            "ducking (update) on Elgato Wave XLR Pro: on, pairs 1, keys XLR 1, sensitivity -30, amount 18, speed attack 45 ms, release 900 ms, keyed by XLR 1.",
             StringComparison.Ordinal));
 
         // Software chosen: the unit is written off and reads back without pairs.

@@ -800,17 +800,21 @@ connected)** and gets its feed back when it returns.
 <a name="ducking"></a>
 #### Lower what you hear while you speak
 
-Ducking lowers chosen channels in chosen mixes while a key microphone is
-loud, and brings them back when you stop. Talk into XLR 1 and the music
-in your headphones dips; your own voice keeps its level. It works on every
+Ducking lowers chosen channels in chosen mixes while a key is loud, and
+brings them back when you stop. Talk into XLR 1 and the music in your
+headphones dips; your own voice keeps its level. It works on every
 device, and with no device at all, as long as the software mixer runs.
 
 The setup has four parts:
 
-- The **key**: the microphone whose level ducks, XLR 1 by default. XLR 2
-  or a capture input on one mono port can be the key too.
+- The **keys**: the channels whose level ducks, XLR 1 by default. Up to
+  eight can be keys at once: XLR 2, a capture input on one mono port, Aux
+  In, Line In and application channels such as Voice Chat. The loudest
+  key at each moment is the one that counts, so the music dips while you
+  or a friend on Voice Chat talks, and two quiet keys never add up to a
+  loud one. A capture input on a stereo pair cannot be a key.
 - The **channels** to lower. By default every application channel: Game,
-  Music, Browser, System, Voice Chat and SFX. The key is never lowered.
+  Music, Browser, System, Voice Chat and SFX. A key is never lowered.
 - The **mixes** to lower them in. By default the default monitor mix,
   Monitor A until it is removed.
   Add Stream to dip the music your viewers hear while you talk.
@@ -831,9 +835,10 @@ Ducking window, on any device; the header button shows only while the software
 mixer runs, and with the mixer off the Ducking window opened from Options shows
 the setup without letting you change it:
 
-1. Tick **Lower other audio while the key microphone is loud**.
-2. Pick the **Key microphone**. It leaves the channel list, since the key
-   is never lowered.
+1. Tick **Lower other audio while a key is loud**.
+2. Tick one or more channels under **Keys**. A channel you tick as a key
+   leaves the channel list, since a key is never lowered. At least one key
+   stays ticked: tick another before you untick the last.
 3. Tick the channels under **Lower these channels**. **All application
    channels** ticks the application channels and nothing else; **None**
    clears the list.
@@ -866,11 +871,15 @@ small stage for each ducked mix that lowers only the chosen channels.
 The Wave XLR Pro has ducking on its own processor too, and runs it on its
 headphone jacks, Line Out and USB Aux port when the setup fits what it
 can do. The unit only lowers a whole output, the mix OpenXLR sends to its
-jacks and Line Out or to its USB Aux port, and only with XLR 1 as the key.
-When the setup does not fit, the computer runs it and the state says why
+jacks and Line Out or to its USB Aux port, and it hears only its own
+inputs as keys: XLR 1, XLR 2, Aux In and Line In. XLR 2, Aux In and Line
+In on the channel list are lowered on the unit too, where it plays them
+itself. When the setup does not fit, the
+computer runs it and the state says why
 (see [where ducking runs](api.md#where-ducking-runs)):
 
-- the key is not XLR 1;
+- a key is not one of the unit's inputs, such as Voice Chat or a capture
+  microphone;
 - for a moment after the unit connects, the jacks' feed is not read in
   its mix yet;
 - a ducked mix also plays somewhere the unit cannot lower, such as
@@ -879,8 +888,8 @@ When the setup does not fit, the computer runs it and the state says why
   jack on another feed does not count: it keeps its level;
 - a channel that plays in a ducked mix is not on the list, so lowering
   the whole output would lower it too;
-- XLR 1 is heard in the ducked mix through its software send, so the unit
-  would lower your voice as well;
+- a key is heard in the ducked mix through its software send, so the unit
+  would lower it as well;
 - the unit did not keep the setting written to it. Switch ducking off and
   on to try again.
 
@@ -897,17 +906,17 @@ badge shows beside the title while the unit runs it.
 **Where each side sits in the signal.** The unit and this computer listen
 and lower at different points:
 
-- On the unit, the Pro listens to XLR 1 as the unit hears it, before USB.
-  That is before anything on this computer: the EQ in software, inserts
-  and gates. A noise gate or suppressor insert on XLR 1 does not stop the
-  unit from ducking on noise. The unit lowers the finished mix as it plays
-  it on its outputs, after everything on this computer.
-- On this computer, the key is the key channel after its EQ, its insert
-  chain and Mic setup's loop, before the channel's volume and sends. The
-  chosen channels dip inside each ducked mix, before that mix's own insert
-  chain and latency delay.
+- On the unit, the Pro listens to its keys before USB. That is before anything on this computer: the EQ in software,
+  inserts and gates. A noise gate or suppressor insert on a microphone
+  does not stop the unit from ducking on noise. The unit lowers the
+  finished mix as it plays it on its outputs, after everything on this
+  computer.
+- On this computer, each key is heard from its channel after its EQ, its
+  insert chain and Mic setup's loop, before the channel's volume and sends. A
+  stereo key is heard on its left channel. The chosen channels dip inside
+  each ducked mix, before that mix's own insert chain and latency delay.
 
-If a gate on XLR 1 should stop false triggers, choose **This computer**.
+If a gate on a microphone should stop false triggers, choose **This computer**.
 
 **In hardware mixing on the Pro.** When the Pro builds the mixes its jacks
 play ([hardware mixing](#hardware-mixing)), each
@@ -916,17 +925,23 @@ channel by channel. Only the chosen channels dip in a
 ducked mix the jacks play; anything else in that mix, your voice
 included, keeps its level, and a jack on another mix is not touched. The
 unit does this whatever **Runs on** says, since nothing on this computer
-can lower a mix the unit builds. It still needs XLR 1 as the key; with
-another key the jacks' mixes are not ducked and the state says why. XLR 2,
-Aux In and Line In are the unit's own inputs, and it does not lower them:
-one on the list is skipped, and the state's note says so. Every other ducked mix, such as Stream or Chat, is ducked on this
+can lower a mix the unit builds. Here every channel on a USB pair can be
+a key too, so Voice Chat can duck the music on the jacks; a capture
+microphone cannot, and with one among the keys the jacks' mixes are not
+ducked and the state says why. XLR 1, XLR 2, Aux In and Line In on the
+channel list are lowered where the unit takes them into the mix. Every other ducked mix, such as Stream or Chat, is ducked on this
 computer at the same time. The amount and speed are the same everywhere,
 and the reduction meter stays empty for the unit's mixes.
+
+Keys other than XLR 1, and the unit's own inputs on the channel list, come
+from Wave Link captures, and nobody has heard them on a unit yet. Aux In
+and Line In as lowered channels are the least certain, since no capture
+shows them.
 
 On the Pro, OpenXLR writes the setting every time the unit connects, which
 clears any ducking Wave Link left on it, extra keys included. On a unit
 Wave Link used, talking into XLR 2 could also duck the unit's mixes; once
-OpenXLR has written its setting, only XLR 1 does.
+OpenXLR has written its setting, only the keys you chose do.
 If another program changes the
 setting while OpenXLR runs, OpenXLR writes its own back within a few
 seconds. In hardware-control mode OpenXLR writes nothing and the unit
@@ -937,12 +952,14 @@ result was checked by ear on Headphones 1
 ([hardware support](hardware-support.md#wave-xlr-pro-0fd900b4)).
 
 On this computer a muted key does not duck: XLR 1 muted in every mix it is
-sent to lowers nothing, and a key paused by **Mute microphone sends with
-monitoring** lowers nothing either until monitoring resumes. On the Pro the
-unit listens to XLR 1 before USB, so it ducks while XLR 1 is muted in every
-mix; choose **This computer** if muting the microphone should stop ducking.
-The unit reacts to XLR 1 only: talking into XLR 2 does not duck. On this
-computer, [Mic setup](#mic-setup)'s loop plays through the key channel, so a looped take ducks the music, which is a quick way to
+sent to lowers nothing, and a microphone key paused by **Mute microphone
+sends with monitoring** lowers nothing either until monitoring resumes; the
+other keys still duck. On the Pro the unit listens to its inputs before
+USB, so it ducks while XLR 1 is muted in every mix; choose **This
+computer** if muting the microphone should stop ducking. The unit reacts
+to its keys only: with XLR 1 alone as the key, talking into XLR 2 does not
+duck. On this computer, [Mic setup](#mic-setup)'s loop plays through the
+key's channel, so a looped take ducks the music, which is a quick way to
 try a sensitivity. On the Pro the unit hears the live microphone, so the
 loop does not duck.
 
@@ -3923,7 +3940,7 @@ Some things follow from the clips sharing SFX:
   with the clips. Route loud applications to System or a channel of
   their own in the layout editor.
 - With ducking on, the default setup lowers SFX in your monitor mix while
-  the key microphone is loud, and the clips with it; Stream and Chat keep
+  a key is loud, and the clips with it; Stream and Chat keep
   them at their level unless you tick those mixes. Untick SFX in the
   Ducking window to keep the clips at their level.
 - Renaming or hiding SFX keeps the board playing. Deleting SFX turns the
@@ -4115,7 +4132,7 @@ profiles work as before. What changes on the mixes the unit builds:
 | Noise removal, the voice changer, a software EQ and plugins on a microphone | Heard on the unit's mixes too: the processed voice plays back to the unit on a free USB pair, a few milliseconds later than the raw microphone, as it reaches your headset today. With no pair free, the unit's mixes get the microphone as it comes in, without them, and the UI says so. Stream and Chat always get them. |
 | Plugins on a mix the unit builds | Not run there, and no plugin can be added. |
 | The [output EQ](#output-eq) of a mix the unit builds | Off, with its **EQ** button greyed. Your settings are kept and come back with software mixing. |
-| Ducking on a mix the unit builds | Runs on the unit for each chosen channel, with XLR 1 as the key. The unit never lowers its own inputs. |
+| Ducking on a mix the unit builds | Runs on the unit for each chosen channel, its own inputs included. Its inputs and any channel on a USB pair can be keys; a capture microphone cannot. |
 | Latency compensation | Leaves out the mixes the unit builds. |
 | Mic setup | Works. The take and Hear myself play back on the microphone's own free USB pair. With none free, Mic setup is refused for that microphone and says why. |
 | Soundboard auditions | Play on a free USB pair, heard on the jacks only, never on the USB Aux port or the stream. With none free they are refused and the Soundboard window says why. On a layout of seven channels a processed XLR 1 takes the last pair, so auditions stop until a channel goes or the processing is off. |
@@ -4178,8 +4195,13 @@ once. With no interface connected the hardware keys go grey, the hardware
 dials show OpenXLR and "set up", and a press only flashes an alert. The ducking key, under **Mixer** in the
 key's settings, is no hardware key: it works with any device or none,
 lights while ducking is on, and a press switches only that, leaving the
-key microphone, channels, mixes and presets as they are. A daemon that
-reports no ducking leaves it grey. A key's icon can be chosen in its settings, and a
+keys, channels, mixes and presets as they are. A daemon that
+reports no ducking leaves it grey. Under **Ducking keys**, a key per
+channel, such as **Voice Chat keys ducking**, makes that channel a ducking
+key or stops it being one: it lights while the channel is a key, a press
+adds it to the keys or takes it out, and a channel that becomes a key
+stops being lowered. A press that would take out the last key, or add a
+ninth, only flashes an alert. A key's icon can be chosen in its settings, and a
 title typed there replaces the built-in label. An icon name the plugin does
 not know shows the target's default icon. A key or dial whose target is a
 channel or a mix with an icon or colour from the layout editor
@@ -5693,8 +5715,9 @@ The microphone pause affects audio routed through OpenXLR, including its
 virtual microphones used by Discord or a recording program. It does not mute
 applications capturing a physical microphone directly, stereo capture channels
 or Aux In and Line In. It stops a Mic setup session and discards its take; a new recording is
-refused until microphones resume. A paused microphone that is the
-[ducking](#ducking) key stops lowering the other channels on this computer.
+refused until microphones resume. A paused microphone that is a
+[ducking](#ducking) key stops lowering the other channels on this computer;
+another key still ducks.
 Its strip meter keeps moving while you speak, because the meter reads the
 microphone before the pause mutes it. If the audio server refuses a microphone
 mute, Options shows that silence is not yet confirmed and the daemon retries.
@@ -5883,7 +5906,7 @@ Controls below the visible hardware cards appear as the selection moves.
 | Sounds | `p`, `P`, `g`, `G` | show the next or previous page, move the clip to a page, or rename the page shown |
 | Sounds | `<`, `>`, `,`, `.` | lower or raise SFX's volume, the board's master, by five points or by one point |
 | Inputs, Bindings | Left/Right, Enter | choose a strip's source or port, then apply it |
-| Inputs, Ducking channels and mixes | Left/Right, Home, End, Space, Enter | move between the channels or mixes, then duck the one under the cursor or stop ducking it |
+| Inputs, Ducking keys, channels and mixes | Left/Right, Home, End, Space, Enter | move between the channels or mixes, then make the one under the cursor a key or duck it, or stop |
 | Text prompts | Enter, Escape | accept or cancel |
 
 Anything that cannot be undone, such as deleting a channel or resetting
@@ -5937,23 +5960,26 @@ microphone; bind from the UI when you want to keep it in the mixer.
 The Ducking card on Inputs holds the whole [ducking](#ducking) setup, on
 any device and with no interface at all. **Ducking** is the switch, with
 a word beside it while it is on: in software, on the unit, not held yet,
-not running, or cannot run. **Key** cycles through the microphones: XLR 1,
-XLR 2 on a Wave XLR Pro, and each capture input on one mono port. When a
-channel on the list becomes the key, it leaves the list in the same step.
+not running, or cannot run. **Keys** is a row of the channels that can
+key ducking: the microphones, Aux In and Line In on a Wave XLR Pro, and
+the application channels, with a check on each key. Space makes the
+channel under the cursor a key or stops it being one; the last key stays,
+and a ninth is not added. When a channel on the Channels row becomes a
+key, it leaves that row in the same step.
 **Channels** and **Mixes** are rows of keys, one per channel or mix, with
 a check on each one ducked. Left and right move along the row, which
 scrolls when the keys do not fit, and space ducks the key under the
-cursor or stops ducking it. The key microphone is never on the Channels
+cursor or stops ducking it. A ducking key is never on the Channels
 row. **Sensitivity**, **Amount** and **Speed** are the three presets. A
 number that matches a preset shows as that preset. A custom value set in
 the UI or over the API shows as a fourth choice, such as custom, -30 dBFS;
 left or right from it picks a preset.
 
 On a Wave XLR Pro the card adds **Runs on**, this unit or this computer,
-which `setDuckingProcessing` sends, and **Key heard**. On the unit that
-reads XLR 1 before inserts: the Pro listens to its own input, so a gate
-or noise suppressor on XLR 1 does not stop the unit ducking on noise. On
-this computer it reads after the EQ and inserts. While the unit is chosen
+which `setDuckingProcessing` sends, and **Keys heard**. On the unit it
+reads "on the unit, before inserts": the Pro listens to its own inputs, so
+a gate or noise suppressor on a microphone does not stop the unit ducking
+on noise. On this computer it reads after the EQ and inserts. While the unit is chosen
 and the setup does not fit it, **Not on unit** gives the reason in a few
 words; the UI shows the whole sentence. While this computer runs it,
 **Lowered by** is a short bar of how far the channels are down right now,

@@ -181,7 +181,7 @@ public sealed partial class MonitorVolumeIntegrationTests
             Sweep();
 
             // Ducking: the unit lowers Game and Music in sections 0 and 36
-            // only, from their own pairs, keyed by XLR 1; Monitor A and the Aux
+            // only, from their own pairs, keyed by XLR 1 alone; Monitor A and the Aux
             // mix are the unit's alone, so no software stage runs for them.
             Run(new()
             {
@@ -203,6 +203,34 @@ public sealed partial class MonitorVolumeIntegrationTests
             Assert.Equal(0x01, pro.Ducking[6 * 8 + ProDucking.KeyMaskOffset]);
             Assert.DoesNotContain(service.Meters()!.Keys, k => k.StartsWith("duck:", StringComparison.Ordinal));
             Run(new() { Cmd = "setDucking", Value = JsonSerializer.SerializeToElement(new { enabled = false }) });
+            PrimaryWait(() => { Sweep(); return (pro.Block[16] & 0xaa) == 0 && (pro.Block[52] & 0xaa) == 0; });
+
+            // Several keys: XLR 1 and Voice Chat, on pair 4 (source 8), key
+            // the unit, which lowers Game and Music at their pairs and XLR 2
+            // at its input's field, in sections 0 and 36.
+            Run(new()
+            {
+                Cmd = "setDucking",
+                Value = JsonSerializer.SerializeToElement(new { enabled = true, keys = new[] { "xlr1", "voicechat" }, channels = new[] { "game", "music", "xlr2" } }),
+            });
+            PrimaryWait(() => { Sweep(); return service.Ducking().Device?.Held == true && (pro.Block[15] & 0x0c) == 0x0c && (pro.Block[51] & 0x0c) == 0x0c; });
+            ducking = service.Ducking();
+            Assert.Equal(["xlr1", "voicechat"], ducking.Keys);
+            Assert.Equal("xlr1", ducking.Key);
+            Assert.True(ducking.Device!.Ready, ducking.Device.Note);
+            Assert.Equal([0, 8], ducking.Device.Readback!.Keys);
+            Assert.Equal([1], ducking.Device.Readback.Inputs);
+            Assert.Equal([1, 2], ducking.Device.Readback.Pairs);
+            foreach (int keyed in new[] { 1, 5, 6 })
+                Assert.Equal(0x0101, pro.Ducking[keyed * 8 + ProDucking.KeyMaskOffset] | pro.Ducking[keyed * 8 + ProDucking.KeyMaskOffset + 1] << 8);
+            // Voice Chat keys and is not lowered: its own entry holds no key.
+            Assert.Equal(0, pro.Ducking[8 * 8 + ProDucking.KeyMaskOffset] | pro.Ducking[8 * 8 + ProDucking.KeyMaskOffset + 1] << 8);
+            foreach (int at in new[] { 33, 69, 87 }) Assert.NotEqual(0x0c, pro.Block[at] & 0x0c);
+            // XLR 2 leaves the setup: its field goes back to 2 at once.
+            Run(new() { Cmd = "setDucking", Value = JsonSerializer.SerializeToElement(new { channels = new[] { "game", "music" } }) });
+            PrimaryWait(() => { Sweep(); return service.Ducking().Device?.Held == true && (pro.Block[15] & 0x0c) == 0x08 && (pro.Block[51] & 0x0c) == 0x08; });
+            Assert.Equal(0, pro.Ducking[1 * 8 + ProDucking.KeyMaskOffset] | pro.Ducking[1 * 8 + ProDucking.KeyMaskOffset + 1] << 8);
+            Run(new() { Cmd = "setDucking", Value = JsonSerializer.SerializeToElement(new { enabled = false, keys = new[] { "xlr1" } }) });
             PrimaryWait(() => { Sweep(); return (pro.Block[16] & 0xaa) == 0 && (pro.Block[52] & 0xaa) == 0; });
 
             // A profile recalled in the mode (recall on connect after a replug

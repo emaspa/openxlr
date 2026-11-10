@@ -243,7 +243,7 @@ public sealed class ProDuckingDeviceTests
         Assert.Equal([1], status.Readback!.Pairs);
         Assert.Equal(("medium", "medium", "medium"), (status.Readback.Sensitivity, status.Readback.Amount, status.Readback.Speed));
         Assert.Contains(log.Written, line => line.StartsWith(
-            "ducking (update) on Elgato Wave XLR Pro: on, pairs 1, sensitivity medium, amount medium, speed medium, keyed by XLR 1. Block 0x0008 written: ",
+            "ducking (update) on Elgato Wave XLR Pro: on, pairs 1, keys XLR 1, sensitivity medium, amount medium, speed medium, keyed by XLR 1. Block 0x0008 written: ",
             StringComparison.Ordinal) && line.Contains("Block 0x0001 written: 17 fd->55, 35 fd->55, 53 fd->55, 71 fd->55.", StringComparison.Ordinal));
 
         // The same target again is not written; another unit's post is dropped.
@@ -278,7 +278,7 @@ public sealed class ProDuckingDeviceTests
         Assert.Equal(0x1e, unit.Blocks[0x0001][90]);
         Assert.Equal(new byte[] { 0x5d, 0x55, 0x5d, 0x55, 0x5d, 0x55, 0x5d, 0x55 }, Fields(unit.Blocks[0x0001]));
         Assert.Contains(log.Written, line => line.StartsWith(
-            "ducking (update) on Elgato Wave XLR Pro: on, pairs 1, sensitivity medium, amount medium, speed medium, keyed by XLR 1. Block 0x0008 written: ",
+            "ducking (update) on Elgato Wave XLR Pro: on, pairs 1, keys XLR 1, sensitivity medium, amount medium, speed medium, keyed by XLR 1. Block 0x0008 written: ",
             StringComparison.Ordinal) && line.Contains("Block 0x0001 written: 17 fd->55, 35 fd->55, 53 fd->55, 71 fd->55, 90 23->1e.", StringComparison.Ordinal));
 
         // The loop finds nothing left to write, and the poll verifies the target.
@@ -368,7 +368,7 @@ public sealed class ProDuckingDeviceTests
         Assert.Equal([1, 5], held.Readback!.Pairs);
         Assert.Equal(Block8([0xe8, 0x06, 0x1e, 0x00, 0xc8, 0x00], Xlr1Keys(5, 9)), unit.Blocks[0x0008]);
         Assert.Contains(log.Written, line => line.StartsWith(
-            "ducking (connect) on Elgato Wave XLR Pro: on, pairs 1 5, sensitivity high, amount low, speed fast, keyed by XLR 1.", StringComparison.Ordinal));
+            "ducking (connect) on Elgato Wave XLR Pro: on, pairs 1 5, keys XLR 1, sensitivity high, amount low, speed fast, keyed by XLR 1.", StringComparison.Ordinal));
 
         // With off posted, the connect clears what Wave Link left, its leftover keys included.
         manager.PostDucking(Unit, ProDuckingTarget.Off, "XLR 1");

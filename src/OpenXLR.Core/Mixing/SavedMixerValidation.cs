@@ -118,12 +118,16 @@ internal static class SavedMixerValidation
         if (scene.CaptureGains is not null) CaptureGains(scene.CaptureGains);
         if (scene.Ducking is { } ducking)
         {
-            Require(!string.IsNullOrWhiteSpace(ducking.Key), "key must name a microphone channel", "ducking.key");
+            // A profile from before several keys names one key.
+            IReadOnlyList<string>? keys = DuckingScene.KeysOf(ducking);
+            Require(keys is { Count: > 0 and <= DuckingSetup.MaxKeys } && keys.All(k => !string.IsNullOrWhiteSpace(k))
+                && keys.Distinct(StringComparer.Ordinal).Count() == keys.Count,
+                $"keys must name one to {DuckingSetup.MaxKeys} distinct channels", ducking.LegacyKey is not null && ReferenceEquals(ducking.Keys, DuckingScene.UnsavedKeys) ? "ducking.key" : "ducking.keys");
             Names(ducking.Channels, "ducking.channels");
             Names(ducking.Mixes, "ducking.mixes");
-            Require(ducking.Channels.All(c => !string.IsNullOrWhiteSpace(c) && c != ducking.Key)
+            Require(ducking.Channels.All(c => !string.IsNullOrWhiteSpace(c) && !keys!.Contains(c))
                 && ducking.Channels.Distinct(StringComparer.Ordinal).Count() == ducking.Channels.Count,
-                "channels must be distinct channel ids other than the key", "ducking.channels");
+                "channels must be distinct channel ids other than the keys", "ducking.channels");
             Require(ducking.Mixes.All(m => !string.IsNullOrWhiteSpace(m))
                 && ducking.Mixes.Distinct(StringComparer.Ordinal).Count() == ducking.Mixes.Count,
                 "mixes must be distinct mix ids", "ducking.mixes");

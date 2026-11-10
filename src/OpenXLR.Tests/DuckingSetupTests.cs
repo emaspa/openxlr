@@ -17,7 +17,7 @@ public sealed class DuckingSetupTests
         layout = layout with { Channels = [.. layout.Channels, new("mic", "Mic") { CaptureSource = "source", CaptureMonoChannel = 0 }] };
         DuckingSetup setup = DuckingSetup.Default(layout);
         Assert.False(setup.Enabled);
-        Assert.Equal("xlr1", setup.Key);
+        Assert.Equal(["xlr1"], setup.Keys);
         Assert.Equal(layout.Channels.Where(c => c.IsApplication).Select(c => c.Id), setup.Channels);
         Assert.Equal(["monitor"], setup.Mixes);
         Assert.Equal(("medium", "medium", "medium", "device"), (setup.Sensitivity, setup.Amount, setup.Speed, setup.Processing));
@@ -28,15 +28,15 @@ public sealed class DuckingSetupTests
     [InlineData("low", "low", "slow", -3, 6, 100, 2000)]
     [InlineData("medium", "medium", "medium", -12, 12, 80, 1200)]
     [InlineData("high", "high", "fast", -24, 24, 30, 200)]
-    public void PlansUseTheHardwarePresetTableAndExcludeTheKey(string sensitivity, string amount, string speed,
+    public void PlansUseTheHardwarePresetTableAndExcludeTheKeys(string sensitivity, string amount, string speed,
         double threshold, double depth, double attack, double release)
     {
-        var setup = new DuckingSetup { Key = "mic", Channels = ["mic", "music", "game"], Mixes = ["monitor", "stream"],
+        var setup = new DuckingSetup { Keys = ["mic", "voicechat"], Channels = ["mic", "music", "voicechat", "game"], Mixes = ["monitor", "stream"],
             Sensitivity = sensitivity, Amount = amount, Speed = speed, Enabled = true };
         DuckingPlan plan = setup.ToPlan();
         Assert.Equal((threshold, depth, attack, release), Values(plan));
         Assert.True(plan.Enabled);
-        Assert.Equal("mic", plan.Key);
+        Assert.Equal(["mic", "voicechat"], plan.Keys);
         Assert.True(plan.Cells.SetEquals(["music|monitor", "music|stream", "game|monitor", "game|stream"]));
         Assert.Empty((setup with { Channels = [] }).ToPlan().Cells);
         Assert.Empty((setup with { Mixes = [] }).ToPlan().Cells);
@@ -47,7 +47,7 @@ public sealed class DuckingSetupTests
     [Fact]
     public void CustomNumbersGoToTheSoftwareStageAsTheyAre()
     {
-        var setup = new DuckingSetup { Key = "xlr1", Channels = ["music"], Mixes = ["monitor"], Enabled = true,
+        var setup = new DuckingSetup { Keys = ["xlr1"], Channels = ["music"], Mixes = ["monitor"], Enabled = true,
             Sensitivity = -37, Amount = 31, Speed = DuckingSpeed.Times(7, 4321) };
         Assert.Equal((-37.0, 31.0, 7.0, 4321.0), Values(setup.ToPlan()));
         // The bounds themselves are taken.
@@ -85,16 +85,23 @@ public sealed class DuckingSetupTests
     private static (double, double, double, double) Values(DuckingPlan plan)
         => (plan.ThresholdDb, plan.DepthDb, plan.AttackMs, plan.ReleaseMs);
 
+    private const string KeysProblem = "keys must be one to 8 distinct microphone, Aux In, Line In or application channels";
+
     public static TheoryData<DuckingSetup, string> InvalidSetups => new()
     {
-        { new() { Key = "music" }, "key must be a microphone channel" },
-        { new() { Key = "gone" }, "key must be a microphone channel" },
-        { new() { Key = null! }, "key must be a microphone channel" },
-        { new() { Channels = ["xlr1"] }, "channels must be distinct channel ids other than the key" },
-        { new() { Channels = ["music", "music"] }, "channels must be distinct channel ids other than the key" },
-        { new() { Channels = ["gone"] }, "channels must be distinct channel ids other than the key" },
-        { new() { Channels = null! }, "channels must be distinct channel ids other than the key" },
-        { new() { Channels = [null!] }, "channels must be distinct channel ids other than the key" },
+        { new() { Keys = ["gone"] }, KeysProblem },
+        { new() { Keys = [] }, KeysProblem },
+        { new() { Keys = null! }, KeysProblem },
+        { new() { Keys = [null!] }, KeysProblem },
+        { new() { Keys = ["xlr1", "xlr1"] }, KeysProblem },
+        { new() { Keys = ["xlr1", "xlr2", "aux", "line", "game", "music", "browser", "system", "voicechat"] }, KeysProblem },
+        { new() { LegacyKey = "gone" }, KeysProblem },
+        { new() { Channels = ["xlr1"] }, "channels must be distinct channel ids other than the keys" },
+        { new() { Keys = ["xlr1", "music"], Channels = ["game", "music"] }, "channels must be distinct channel ids other than the keys" },
+        { new() { Channels = ["music", "music"] }, "channels must be distinct channel ids other than the keys" },
+        { new() { Channels = ["gone"] }, "channels must be distinct channel ids other than the keys" },
+        { new() { Channels = null! }, "channels must be distinct channel ids other than the keys" },
+        { new() { Channels = [null!] }, "channels must be distinct channel ids other than the keys" },
         { new() { Mixes = ["monitor", "monitor"] }, "mixes must be distinct mix ids" },
         { new() { Mixes = ["gone"] }, "mixes must be distinct mix ids" },
         { new() { Mixes = null! }, "mixes must be distinct mix ids" },
@@ -124,15 +131,24 @@ public sealed class DuckingSetupTests
     }
 
     [Fact]
-    public void MonoCaptureKeysAreAcceptedAndStereoCaptureKeysAreRefused()
+    public void MicrophonesUnitInputsAndApplicationsKeyAndStereoCapturesDoNot()
     {
         using var mixer = new Mixer();
         MixerConfig layout = MixerConfig.Default();
         Set(mixer, "_config", layout with { Channels = [.. layout.Channels,
             new("mic", "Mic") { CaptureSource = "source", CaptureMonoChannel = 0 },
             new("stereo", "Stereo") { CaptureSource = "source" }] });
-        Assert.Null(DuckingSetup.Validate(new() { Key = "mic" }, mixer));
-        Assert.Equal("key must be a microphone channel", DuckingSetup.Validate(new() { Key = "stereo" }, mixer));
+        Assert.Null(DuckingSetup.Validate(new() { Keys = ["mic"] }, mixer));
+        // Every kind that can key, eight at once, with the channels left out.
+        Assert.Null(DuckingSetup.Validate(new()
+        {
+            Keys = ["xlr1", "xlr2", "aux", "line", "mic", "voicechat", "game", "browser"], Channels = ["music", "system", "sfx", "stereo"],
+        }, mixer));
+        Assert.Equal(KeysProblem, DuckingSetup.Validate(new() { Keys = ["stereo"] }, mixer));
+        Assert.Equal(KeysProblem, DuckingSetup.Validate(new() { Keys = ["xlr1", "stereo"] }, mixer));
+        Assert.True(mixer.IsDuckingKeyChannel("aux"));
+        Assert.False(mixer.IsDuckingKeyChannel("stereo"));
+        Assert.False(mixer.IsDuckingKeyChannel("gone"));
         Assert.Null(DuckingSetup.Validate(new() { Channels = [], Mixes = [], Processing = "software" }, mixer));
     }
 
@@ -140,7 +156,7 @@ public sealed class DuckingSetupTests
     public void PruningKeepsRenamesDropsTargetsAndDisablesAMissingKeyWithoutAddingNewChannels()
     {
         MixerConfig layout = MixerConfig.Default();
-        var setup = new DuckingSetup { Enabled = true, Key = "mic", Channels = ["music", "game", "xlr1"], Mixes = ["monitor", "stream"] };
+        var setup = new DuckingSetup { Enabled = true, Keys = ["mic"], Channels = ["music", "game", "xlr1"], Mixes = ["monitor", "stream"] };
         layout = layout with { Channels = [.. layout.Channels, new("mic", "Mic") { CaptureSource = "source", CaptureMonoChannel = 0 }] };
         DuckingSetup kept = DuckingSetup.Prune(setup, layout.WithChannelName("music", "Songs").WithMixName("stream", "Live"));
         Assert.True(kept.Enabled);
@@ -151,9 +167,63 @@ public sealed class DuckingSetupTests
         Assert.Equal(["monitor"], kept.Mixes);
         kept = DuckingSetup.Prune(setup, layout.WithoutChannel("mic"));
         Assert.False(kept.Enabled);
-        Assert.Equal("xlr1", kept.Key);
+        Assert.Equal(["xlr1"], kept.Keys);
         Assert.Equal(["music", "game"], kept.Channels);
         Assert.Equal(setup.Channels, DuckingSetup.Prune(setup, layout with { Channels = [.. layout.Channels, new("new", "New")] }).Channels);
+
+        // With several keys a deleted one is dropped and ducking stays on.
+        var keyed = setup with { Keys = ["mic", "voicechat"], Channels = ["music", "game"] };
+        kept = DuckingSetup.Prune(keyed, layout.WithoutChannel("mic"));
+        Assert.True(kept.Enabled);
+        Assert.Equal(["voicechat"], kept.Keys);
+        Assert.Equal(["music", "game"], kept.Channels);
+        // A key that is also a target leaves the targets.
+        Assert.Equal(["game"], DuckingSetup.Prune(keyed with { Keys = ["music"] }, layout).Channels);
+    }
+
+    [Fact]
+    public void ASingleKeyFromBeforeSeveralKeysBecomesTheKeysAndIsSavedAsKeys()
+    {
+        string dir = Directory.CreateTempSubdirectory("openxlr-duck-keys-").FullName;
+        try
+        {
+            string path = Path.Combine(dir, "mixer.json");
+            OpenXlrPaths.WriteAtomic(path, """{"ducking":{"enabled":true,"key":"xlr2","channels":["music","xlr2"],"mixes":["monitor"]}}""");
+            MixerSettings saved = MixerSettings.Load(path, out string? warning)!;
+            DuckingSetup setup = saved.Ducking!;
+            Assert.True(setup.Enabled);
+            Assert.Equal(["xlr2"], setup.Keys);
+            Assert.Null(setup.LegacyKey);
+            Assert.Equal(["music"], setup.Channels);   // the key leaves the targets, with a note
+            Assert.Contains("ducking.channels: dropped 'xlr2'", warning);
+            Assert.Null(saved.Save(path));
+            string written = File.ReadAllText(path);
+            Assert.Contains("\"keys\": [", written);
+            Assert.DoesNotContain("\"key\":", written);
+            Assert.Equal(["xlr2"], MixerSettings.Load(path, out warning)!.Ducking!.Keys);
+            Assert.Null(warning);
+
+            // keys wins over key when a file holds both, in either order.
+            foreach (string both in new[]
+            {
+                """{"ducking":{"key":"xlr1","keys":["xlr2","voicechat"]}}""",
+                """{"ducking":{"keys":["xlr2","voicechat"],"key":"xlr1"}}""",
+            })
+            {
+                OpenXlrPaths.WriteAtomic(path, both);
+                Assert.Equal(["xlr2", "voicechat"], MixerSettings.Load(path, out _)!.Ducking!.Keys);
+            }
+        }
+        finally { Directory.Delete(dir, true); }
+
+        // A profile from before several keys recalls its key as the keys.
+        using var mixer = new Mixer();
+        mixer.ApplyScene(JsonSerializer.Deserialize<MixerScene>("""{"ducking":{"enabled":true,"key":"xlr2","channels":["music"]}}""", Json)!);
+        Assert.Equal(["xlr2"], mixer.DuckingSnapshot().Setup.Keys);
+        Assert.True(mixer.DuckingSnapshot().Setup.Enabled);
+        string exported = JsonSerializer.Serialize(mixer.ExportScene(), Json);
+        Assert.Contains("\"keys\":[\"xlr2\"]", exported);
+        Assert.DoesNotContain("\"key\":", exported);
     }
 
     [Fact]
@@ -188,10 +258,10 @@ public sealed class DuckingSetupTests
         Assert.Equal(["music"], scene.Ducking!.Channels);
         mixer.ApplyScene(new());
         Assert.True(mixer.DuckingSnapshot().Setup.Enabled);
-        mixer.ApplyScene(new() { Ducking = new() { Enabled = true, Key = "gone", Channels = ["game", "missing", "xlr1"], Mixes = ["monitor", "missing"] } });
+        mixer.ApplyScene(new() { Ducking = new() { Enabled = true, Keys = ["gone"], Channels = ["game", "missing", "xlr1"], Mixes = ["monitor", "missing"] } });
         DuckingSetup recalled = mixer.DuckingSnapshot().Setup;
         Assert.False(recalled.Enabled);
-        Assert.Equal("xlr1", recalled.Key);
+        Assert.Equal(["xlr1"], recalled.Keys);
         Assert.Equal(["game"], recalled.Channels);
         Assert.Equal(["monitor"], recalled.Mixes);
         Assert.Equal("software", recalled.Processing);
@@ -208,18 +278,18 @@ public sealed class DuckingSetupTests
         {
             string path = Path.Combine(dir, "mixer.json");
             OpenXlrPaths.WriteAtomic(path, """
-                {"channelVolumes":{"music":0.4},"ducking":{"enabled":true,"key":"music",
+                {"channelVolumes":{"music":0.4},"ducking":{"enabled":true,"key":"gone",
                 "channels":["music","gone","xlr1","game","game",null],"mixes":["monitor","gone","monitor"],
                 "sensitivity":"wrong","amount":"high","speed":null,"processing":"wrong"}}
                 """);
             MixerSettings saved = MixerSettings.Load(path, out string? warning)!;
             Assert.NotNull(warning);
-            foreach (string field in new[] { "key", "channels", "mixes", "sensitivity", "speed", "processing" })
+            foreach (string field in new[] { "keys", "channels", "mixes", "sensitivity", "speed", "processing" })
                 Assert.Contains("ducking." + field, warning);
             Assert.Equal(.4, saved.ChannelVolumes["music"]);
             DuckingSetup setup = saved.Ducking!;
             Assert.False(setup.Enabled);
-            Assert.Equal("xlr1", setup.Key);
+            Assert.Equal(["xlr1"], setup.Keys);
             Assert.Equal(["music", "game"], setup.Channels);
             Assert.Equal(["monitor"], setup.Mixes);
             Assert.Equal(("medium", "high", "medium", "device"), (setup.Sensitivity, setup.Amount, setup.Speed, setup.Processing));
@@ -316,7 +386,9 @@ public sealed class DuckingSetupTests
         using var mixer = new Mixer();
         foreach (DuckingScene invalid in new DuckingScene[]
         {
-            new() { Key = null! }, new() { Channels = null! }, new() { Channels = ["xlr1"] },
+            new() { Keys = null! }, new() { Keys = [] }, new() { Keys = ["xlr1", "xlr1"] }, new() { Keys = [""] },
+            new() { Keys = ["xlr1", "xlr2", "aux", "line", "game", "music", "browser", "system", "voicechat"] },
+            new() { Channels = null! }, new() { Channels = ["xlr1"] }, new() { Keys = ["music"], Channels = ["music"] },
             new() { Channels = ["music", "music"] }, new() { Mixes = [null!] },
             new() { Mixes = ["monitor", "monitor"] }, new() { Sensitivity = "wrong" },
             new() { Amount = "wrong" }, new() { Speed = "wrong" },

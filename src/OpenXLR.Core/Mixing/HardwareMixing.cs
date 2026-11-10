@@ -560,14 +560,9 @@ public static class HardwareMixingPlanner
         if (unitMixes.Count > 0)
         {
             disabled["latencyCompensation"] = "Latency compensation leaves out the mixes the Wave XLR Pro builds.";
-            // The unit ducks the mixes it builds itself, keyed by XLR 1 only,
-            // and never lowers its own inputs.
-            disabled["ducking:key"] = "The Wave XLR Pro ducks the mixes it builds only with XLR 1 as the key.";
-            foreach (string channel in setup.UnitSources.Where(s => s.Key != ProMixSections.Xlr1).Select(s => s.Value))
-            {
-                string name = setup.Channels.FirstOrDefault(c => c.Id == channel)?.Name ?? channel;
-                disabled[$"ducking:channel:{channel}"] = $"The Wave XLR Pro does not duck {name}, its own input, in the mixes it builds.";
-            }
+            // The unit ducks the mixes it builds itself, keyed only by what
+            // it hears: its own inputs and the channels on its pairs.
+            disabled["ducking:key"] = "The Wave XLR Pro ducks the mixes it builds only with its own inputs and the channels on its USB pairs as keys.";
         }
         string NameOf(string channel) => setup.Channels.FirstOrDefault(c => c.Id == channel)?.Name ?? channel;
         foreach (string channel in setup.UnitSources.Values.Where(c => NeedsReturn(setup, c) && !returns.ContainsKey(c)))
