@@ -88,18 +88,20 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
 
     /// <summary>
     /// Live stereo channel and mix levels, plus one reduction value in dB per
-    /// running duck stage, each microphone meter before its chain that a
-    /// client asked for, the Sound Check loop's playhead, and where each
-    /// playing soundboard clip is.
+    /// running duck stage, or per mix the unit ducks while it runs ducking,
+    /// each microphone meter before its chain that a client asked for, the
+    /// Sound Check loop's playhead, and where each playing soundboard clip is.
     /// </summary>
     public IReadOnlyDictionary<string, double[]> ReadMeters()
     {
         IReadOnlyDictionary<string, double[]> levels = _meters.Read();
-        if (_duckMeterHosts.IsEmpty && _inputMeterHosts.IsEmpty && _dynamicsMeterHosts.IsEmpty && _soundCheckProbe is null && _player is null)
+        UnitDuckMeter? unit = _unitDuckMeter;
+        if (_duckMeterHosts.IsEmpty && unit is null && _inputMeterHosts.IsEmpty && _dynamicsMeterHosts.IsEmpty && _soundCheckProbe is null && _player is null)
             return levels;
         var meters = new Dictionary<string, double[]>(levels);
         foreach ((string mix, NativePluginHost host) in _duckMeterHosts)
             if (host.IsHealthy) meters[DuckKey(mix)] = [host.Meters.GetValueOrDefault("reduction")];
+        AddUnitDuckReduction(meters, unit);
         AddInputLevels(meters);
         AddDynamicsLevels(meters);
         AddSoundCheckPosition(meters);

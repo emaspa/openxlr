@@ -609,12 +609,24 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
     // Written with block 0x0001 through WriteMix, which takes the plan's
     // ducking target; block 0x0008 stays with ProDucking's codec.
 
-    /// <summary>Every readable vendor block as hex, for tester diagnostics, with the firmware, the mix sections and each input's EQ decoded.</summary>
+    /// <summary>
+    /// Block 0x0002, the unit's meters, read once and decoded. Nothing polls
+    /// it here: the device manager reads it only while the unit runs ducking
+    /// and a client takes meters. A failed read gives null, so a unit that
+    /// refuses the block still answers every control; a hung one throws.
+    /// </summary>
+    public ProMeterReading? ReadMeters()
+    {
+        try { return ProMeters.Decode(Read(ProMeters.Block, ProMeters.Length)); }
+        catch (IOException ex) when (ex is not UsbHungException) { return null; }
+    }
+
+    /// <summary>Every readable vendor block as hex, for tester diagnostics, with the firmware, the mix sections, the meters and each input's EQ decoded.</summary>
     public IReadOnlyDictionary<string, string> DumpBlocks()
     {
         var blocks = new Dictionary<string, string>();
         foreach ((ushort block, int len) in new (ushort, int)[]
-                 { (BlockIdentity, IdentityLen), (0x0001, 108), (0x0002, 150), (0x0004, 80), (0x0005, 8), (0x0006, 29), (0x0008, 96) })
+                 { (BlockIdentity, IdentityLen), (0x0001, 108), (ProMeters.Block, ProMeters.Length), (0x0004, 80), (0x0005, 8), (0x0006, 29), (0x0008, 96) })
         {
             try
             {
@@ -622,6 +634,8 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
                 blocks[$"0x{block:X4}"] = Convert.ToHexString(read);
                 if (block == ProMixSections.Block)
                     foreach ((string key, string value) in ProMixSections.Describe(read)) blocks[key] = value;
+                if (block == ProMeters.Block)
+                    foreach ((string key, string value) in ProMeters.Describe(read)) blocks[key] = value;
                 if (block == BlockSettings)
                     for (int input = 1; input <= 2; input++)
                     {

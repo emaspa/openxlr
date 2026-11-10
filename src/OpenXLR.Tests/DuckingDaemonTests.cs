@@ -329,7 +329,7 @@ public sealed class DuckingDaemonTests
     });
 
     /// <summary>A Core mixer without a graph that sees the Pro's jacks playing Monitor A, as the hand-over tests build it.</summary>
-    private static Mixer ProMixer(IDeviceDuckingPort port, bool register = true)
+    internal static Mixer ProMixer(IDeviceDuckingPort port, bool register = true)
     {
         var mixer = new Mixer(new PipeWireAdapter { DuckHost = "/missing-openxlr-duck-host" }) { Time = new ManualTime() };
         mixer.SetInputJacks(2, true);

@@ -428,7 +428,8 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
   computer with no added latency. On a Wave XLR Pro whose setup fits what
   the unit can do, the unit runs it instead; otherwise the state says why
   it does not. Saved with the mixer, carried by profiles, and reported as a
-  `duck:<mix>` reduction meter while software runs. Set up in the
+  `duck:<mix>` reduction meter, from the unit's own meters while the Pro
+  runs it. Set up in the
   Ducking window, opened from the SUBMIXER header, the layout editor and
   Options, with
   a key, a channel and a mix checklist, sliders for sensitivity, amount,
@@ -1152,7 +1153,7 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   mixes, the three presets (a custom value set elsewhere shows as a fourth
   choice), and on a Wave XLR Pro the choice between the
   unit and this computer with the reason the unit does not run it. A short
-  bar shows the reduction while software runs it
+  bar shows the reduction, the unit's own while it runs it
   ([manual](manual.md#terminal-ducking))
 - Capture microphones in Inputs show their source, connection and carried
   unit controls. Inserts includes mono and stereo capture chains, using the

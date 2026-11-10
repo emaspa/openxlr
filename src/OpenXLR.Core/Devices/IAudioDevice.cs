@@ -157,6 +157,13 @@ public interface IAudioDevice : IDisposable
     DuckingReadback? ReadDucking() => null;
 
     /// <summary>
+    /// Wave XLR Pro: one read of the unit's meters (<see cref="ProMeters"/>),
+    /// decoded; null on a unit without them or when the read fails. A
+    /// transfer that hangs still throws.
+    /// </summary>
+    ProMeterReading? ReadMeters() => null;
+
+    /// <summary>
     /// Wave XLR Pro: bring block 0x0001 to a plan, the one writer of that
     /// block: the output selectors, the headphone mix's Monitor return and
     /// microphone paths, the USB Aux port's cells and the ducking fields, in

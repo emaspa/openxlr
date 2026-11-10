@@ -26,6 +26,12 @@ public sealed partial class Mixer
     private readonly HashSet<string> _duckingFailed = new(StringComparer.Ordinal);
     private DuckingStateSnapshot? _lastDuckingSnapshot;
 
+    /// <summary>The unit that ducks, its port and the mixes only its ducking is heard in; null while the unit runs none.</summary>
+    private sealed record UnitDuckMeter(IDeviceDuckingPort Port, string Unit, IReadOnlyList<string> Mixes);
+
+    // Read by the meter push without the gate.
+    private volatile UnitDuckMeter? _unitDuckMeter;
+
     /// <summary>The maximum wait for verified off. The device side drops a unit whose transfers time out.</summary>
     internal static readonly TimeSpan DuckingReleaseWait = TimeSpan.FromSeconds(1);
 
@@ -68,6 +74,7 @@ public sealed partial class Mixer
             _duckingManaged = port is not null;
             _duckingWriter = null;
             _duckingOnDevice = false;
+            _unitDuckMeter = null;
             _duckingReleaseDeadline = null;
         }
     }
@@ -125,6 +132,7 @@ public sealed partial class Mixer
     {
         DuckingSetup setup = DuckingSetupLocked();
         DuckingView view = DuckingViewLocked();
+        _unitDuckMeter = null;
         if (!view.MixerRunning)
         {
             _duckingWriter = null;
@@ -170,6 +178,7 @@ public sealed partial class Mixer
             _duckingReleaseDeadline = null;
             _duckingWriter!.Apply(target, owner);
             _duckingOnDevice = true;
+            _unitDuckMeter = UnitDuckMeterOf(setup, verdict, target);
             if (!SameDuckingPlan(_duckPlan, plan)) SetDuckingPlan(plan);
             return;
         }
@@ -182,6 +191,7 @@ public sealed partial class Mixer
             _duckingReleaseDeadline = null;
             _duckingWriter!.Apply(target, owner);
             _duckingOnDevice = true;
+            _unitDuckMeter = UnitDuckMeterOf(setup, verdict, target);
             return;
         }
 
@@ -205,6 +215,29 @@ public sealed partial class Mixer
             _duckingReleaseDeadline = null;
         }
         if (!SameDuckingPlan(_duckPlan, plan)) SetDuckingPlan(plan);
+    }
+
+    /// <summary>
+    /// Where the unit's reduction is reported while it runs the setup: each
+    /// target mix, less those software ducks too in hardware mixing, whose
+    /// own stage reports.
+    /// </summary>
+    private UnitDuckMeter? UnitDuckMeterOf(DuckingSetup setup, DuckingVerdict verdict, ProDuckingTarget target)
+    {
+        if (!target.Enabled || _duckingPort is not { } port || _duckingWriter is not { } writer) return null;
+        List<string> mixes = [.. setup.Mixes.Where(mix => verdict.SoftwareMixes?.Contains(mix) != true)];
+        return mixes.Count == 0 ? null : new(port, writer.Unit, mixes);
+    }
+
+    /// <summary>
+    /// The unit's reduction under <c>duck:&lt;mix&gt;</c> for each mix only its
+    /// ducking is heard in, while it runs the setup and its meters have
+    /// been read; a mix a software stage already reports keeps that reading.
+    /// </summary>
+    private static void AddUnitDuckReduction(Dictionary<string, double[]> meters, UnitDuckMeter? unit)
+    {
+        if (unit?.Port.Reduction(unit.Unit) is not { } db) return;
+        foreach (string mix in unit.Mixes) meters.TryAdd(DuckKey(mix), [db]);
     }
 
     /// <summary>

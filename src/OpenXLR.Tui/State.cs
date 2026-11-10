@@ -349,6 +349,10 @@ internal sealed record DuckingEntry
     public double Depth => Amount.ValueKind == JsonValueKind.Number && Amount.TryGetDouble(out double db) && db > 0 ? db
         : Amount.ValueKind == JsonValueKind.String ? Amount.GetString() switch { "low" => 6, "high" => 24, _ => 12 } : 12;
 
+    /// <summary>Whether a reduction is reported: while it is on and software runs it, or the unit runs it and holds it.</summary>
+    [JsonIgnore]
+    public bool ShowsReduction => Enabled && (Backend == "software" || Backend == "device" && Device is not { Held: false });
+
     /// <summary>True while the unit runs it, or would once switched on.</summary>
     [JsonIgnore]
     public bool OnUnit => Backend == "device"

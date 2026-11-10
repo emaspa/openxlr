@@ -333,14 +333,14 @@ internal static class DuckingWindowTests
             await Until(() => main.Ducking.Processing == "software" && onComputer.IsChecked == true && onUnit.IsChecked == false
                 && note.IsEffectivelyVisible && !onUnit.IsEnabled);
 
-            // Back to XLR 1 alone and the unit: the badge returns and the bar hides.
+            // Back to XLR 1 alone and the unit: the badge returns, and the bar stays for the unit's own reduction.
             Assert.Equal("""["xlr2","xlr1"]""", (await Sent(() => KeyBox("XLR 1").IsChecked = true))["value"]!["keys"]!.ToJsonString());
             await Until(() => daemon.Ducking["keys"]!.AsArray().Count == 2 && KeyBox("XLR 1").IsChecked == true);
             Assert.Equal("""["xlr1"]""", (await Sent(() => KeyBox("XLR 2").IsChecked = false))["value"]!["keys"]!.ToJsonString());
             // The unit can run it again: its side can be pressed, and software by choice needs no note.
             await Until(() => onUnit.IsEnabled && onComputer.IsChecked == true && !note.IsEffectivelyVisible);
             await Sent(() => onUnit.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)));
-            await Until(() => badge.IsEffectivelyVisible && !reduction.IsEffectivelyVisible && onUnit.IsChecked == true
+            await Until(() => badge.IsEffectivelyVisible && reduction.IsEffectivelyVisible && onUnit.IsChecked == true
                 && status.Text == Localizer.Format("DuckingKeysStatusOnUnit", "Wave XLR Pro"));
             foreach (double width in new[] { 640d, 2400 })
             {

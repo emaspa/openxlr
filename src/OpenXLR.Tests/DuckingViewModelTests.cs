@@ -373,13 +373,14 @@ public sealed class DuckingViewModelTests
         Assert.Equal(Localizer.Format("DuckingKeysStatusOnUnit", "Wave XLR Pro"), model.Status);
         Assert.False(model.Warns);
         Assert.Null(model.Note);
-        Assert.False(model.ShowReduction);
+        Assert.True(model.ShowReduction);
         Assert.Equal(Localizer.Format("DuckingKeysProcessingDeviceTip", "Wave XLR Pro"), model.ProcessOnDeviceTip);
 
         // Not holding it yet.
         model.Apply(Ducking(enabled: true, backend: "\"device\"", device: Pro(held: false)), Mixer());
         Assert.Equal(Localizer.Text("DuckingNotHeld"), model.Status);
         Assert.True(model.Warns);
+        Assert.False(model.ShowReduction);
 
         // Chosen but not ready, for a key the unit cannot hear: the daemon's sentence names it, software
         // running it. The switch lights this computer, the unit's side cannot be pressed, and its tooltip says why.
@@ -603,8 +604,12 @@ public sealed class DuckingViewModelTests
         model.ApplyMeters(JsonNode.Parse("""{"duck:monitor":[30.0]}""")!.AsObject());
         Assert.Equal(0.75, model.ReductionLevel);
 
-        // The unit gives no reading: the bar hides while it runs ducking.
+        // The unit reports its own reduction under the same keys while it holds the ducking.
         model.Apply(Ducking(enabled: true, backend: "\"device\"", device: Pro()), Mixer());
+        Assert.True(model.ShowReduction);
+        model.ApplyMeters(JsonNode.Parse("""{"duck:monitor":[6.0]}""")!.AsObject());
+        Assert.Equal(6, model.Reduction);
+        model.Apply(Ducking(enabled: false, backend: "\"device\"", device: Pro()), Mixer());
         Assert.False(model.ShowReduction);
     }
 }
