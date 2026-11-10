@@ -9,6 +9,7 @@ public sealed record BrowserTabRegistration
     public string Site { get; init; } = "";
     public string Title { get; init; } = "";
     public bool Capturing { get; init; }
+    public bool VolumeSupported { get; init; }
     public string? Error { get; init; }
     /// <summary>Where an activation OpenXLR asked for stands in the browser; null when none is in progress.</summary>
     public string? Activation { get; init; }
@@ -17,7 +18,12 @@ public sealed record BrowserTabRegistration
 /// <summary>A connected tab and the output choice the browser companion should apply.</summary>
 public sealed record BrowserTabState(string Session, int Id, string Site, string Title,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] string? ChannelId,
-    bool Remember, bool Capturing, string? Error, string? Activation = null);
+    bool Remember, bool Capturing, string? Error, string? Activation = null)
+{
+    public bool VolumeSupported { get; init; }
+    public double? Volume { get; init; }
+    public bool RememberVolume { get; init; }
+}
 
 public static class BrowserTabRouting
 {
@@ -76,9 +82,13 @@ public static class BrowserTabRouting
 
 public sealed partial class Mixer
 {
-    private sealed record BrowserTab(BrowserTabRegistration Metadata, string PublishedTitle, bool Override = false, string? Channel = null);
+    private sealed record BrowserTab(BrowserTabRegistration Metadata, string PublishedTitle, bool Override = false, string? Channel = null)
+    {
+        public double? Volume { get; init; }
+    }
     private readonly Dictionary<string, Dictionary<int, BrowserTab>> _browserSessions = new(StringComparer.Ordinal);
     private Dictionary<string, string> _browserSiteChannels = new(StringComparer.Ordinal);
+    private Dictionary<string, double> _browserSiteVolumes = new(StringComparer.Ordinal);
     private bool _preserveBrowserOutputs;
 
     // Identities whose streams came from a recognized browser binary. The
@@ -152,11 +162,7 @@ public sealed partial class Mixer
     {
         lock (_gate)
         {
-            if (!_browserSessions.TryGetValue(session, out Dictionary<int, BrowserTab>? tabs) || !tabs.TryGetValue(tabId, out BrowserTab? tab))
-                throw new InvalidOperationException("assignBrowserTab: the browser tab is no longer connected");
-            string expectedSite = BrowserTabRouting.CanonicalSite(site)
-                ?? throw new ArgumentException("assignBrowserTab: supply the tab's HTTP or HTTPS origin");
-            if (tab.Metadata.Site != expectedSite) throw new InvalidOperationException("assignBrowserTab: the tab changed website; select it again");
+            var (tabs, tab) = FindBrowserTabLocked(session, tabId, site, "assignBrowserTab");
             if (channel is not null && !HasApplicationChannel(channel)) throw new ArgumentException("assignBrowserTab: select an application channel or browser default");
             if (remember && channel is not null && !_browserSiteChannels.ContainsKey(tab.Metadata.Site)
                 && _browserSiteChannels.Count >= BrowserTabRouting.MaxSites) throw new InvalidOperationException("At most 128 browser sites can be remembered.");
@@ -170,6 +176,43 @@ public sealed partial class Mixer
         }
     }
 
+    private (Dictionary<int, BrowserTab> Tabs, BrowserTab Tab) FindBrowserTabLocked(string session, int tabId, string site, string command)
+    {
+        if (!_browserSessions.TryGetValue(session, out Dictionary<int, BrowserTab>? tabs) || !tabs.TryGetValue(tabId, out BrowserTab? tab))
+            throw new InvalidOperationException($"{command}: the browser tab is no longer connected");
+        string expected = BrowserTabRouting.CanonicalSite(site)
+            ?? throw new ArgumentException($"{command}: supply the tab's HTTP or HTTPS origin");
+        if (tab.Metadata.Site != expected) throw new InvalidOperationException($"{command}: the tab changed website; select it again");
+        return (tabs, tab);
+    }
+
+    public void SetBrowserTabVolume(string session, int tabId, string site, double? volume, bool remember,
+        Func<MixerSettings, string?> persist)
+    {
+        if (volume is double level && !ValidPlaybackVolume(level))
+            throw new ArgumentOutOfRangeException(nameof(volume), "playback volume must be between 0 and 1");
+        lock (_gate)
+        {
+            var (tabs, tab) = FindBrowserTabLocked(session, tabId, site, "setBrowserTabVolume");
+            if (!tab.Metadata.VolumeSupported) throw new InvalidOperationException("update the browser companion to adjust tab volume");
+            double? next = volume is double value ? SnapPlaybackVolume(value) : null;
+            if (!remember)
+            {
+                tabs[tabId] = tab with { Volume = next };
+                return;
+            }
+            string origin = tab.Metadata.Site;
+            if (next is not null && !_browserSiteVolumes.ContainsKey(origin) && _browserSiteVolumes.Count >= BrowserTabRouting.MaxSites)
+                throw new InvalidOperationException($"at most {BrowserTabRouting.MaxSites} browser site volumes can be remembered");
+            var saved = new Dictionary<string, double>(_browserSiteVolumes, StringComparer.Ordinal);
+            if (next is double kept) saved[origin] = kept;
+            else saved.Remove(origin);
+            if (persist(ExportSettings() with { BrowserSiteVolumes = saved }) is string error) throw new IOException(error);
+            _browserSiteVolumes = saved;
+            tabs[tabId] = tab with { Volume = null };
+        }
+    }
+
     /// <summary>
     /// Check that a connected tab can be asked to start routing: tab routing
     /// is on, the tab still shows the origin the caller saw, it has a channel
@@ -179,10 +222,7 @@ public sealed partial class Mixer
     {
         lock (_gate)
         {
-            if (!_browserSessions.TryGetValue(session, out Dictionary<int, BrowserTab>? tabs) || !tabs.TryGetValue(tabId, out BrowserTab? tab))
-                throw new InvalidOperationException("activateBrowserTab: the browser tab is no longer connected");
-            if (tab.Metadata.Site != BrowserTabRouting.CanonicalSite(site))
-                throw new InvalidOperationException("activateBrowserTab: the tab changed website; select it again");
+            var (_, tab) = FindBrowserTabLocked(session, tabId, site, "activateBrowserTab");
             if (!_preserveBrowserOutputs) throw new InvalidOperationException("activateBrowserTab: enable individual browser tab routing first");
             if ((tab.Override ? tab.Channel : _browserSiteChannels.GetValueOrDefault(tab.Metadata.Site)) is null)
                 throw new InvalidOperationException("activateBrowserTab: choose a channel for the tab first");
@@ -216,11 +256,17 @@ public sealed partial class Mixer
                 t.Metadata.Capturing || (t.Override ? t.Channel : _browserSiteChannels.GetValueOrDefault(t.Metadata.Site)) is not null ? t.PublishedTitle : "",
                 t.Override ? t.Channel : _browserSiteChannels.GetValueOrDefault(t.Metadata.Site),
                 !t.Override && _browserSiteChannels.ContainsKey(t.Metadata.Site), t.Metadata.Capturing, t.Metadata.Error,
-                t.Metadata.Activation)))];
+                t.Metadata.Activation)
+            {
+                VolumeSupported = t.Metadata.VolumeSupported,
+                Volume = t.Volume ?? (_browserSiteVolumes.TryGetValue(t.Metadata.Site, out double volume) ? volume : null),
+                RememberVolume = t.Volume is null && _browserSiteVolumes.ContainsKey(t.Metadata.Site),
+            }))];
 
     private void RestoreBrowserSettingsLocked(MixerSettings settings)
     {
         SetPreserveBrowserOutputs(settings.PreserveBrowserOutputs);
+        _browserSiteVolumes = SavedMixerValidation.PlaybackVolumes(settings.BrowserSiteVolumes, true, null);
         _browserSiteChannels = BrowserTabRouting.SiteChannels(settings.BrowserSiteChannels)
             .Where(p => !_built || HasApplicationChannel(p.Value)).ToDictionary(p => p.Key, p => p.Value, StringComparer.Ordinal);
     }

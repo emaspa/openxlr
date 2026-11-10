@@ -316,6 +316,26 @@ try {
   assert.equal(await worker.evaluate(() => chrome.action.getBadgeText({})), '2');
   console.log('PASS native bridge, two user-activated tabs, toolbar count and isolated 440/880 Hz channel audio');
 
+  await api('POST', 'commands', { cmd: 'assignBrowserTab', session, tabId: chatId, site: chatTab.site, channel: 'music', remember: false });
+  const together = await until(async () => {
+    const audio = await sample('OpenXLR_ch_music');
+    return audio.low > .025 && audio.high > .025 ? audio : null;
+  }, 'both browser tabs play into Music');
+  const volumeEdit = { cmd: 'setBrowserTabVolume', session, tabId: musicId, site: musicTab.site, remember: true };
+  await api('POST', 'commands', { ...volumeEdit, value: .5 });
+  await until(async () => {
+    const audio = await sample('OpenXLR_ch_music');
+    return audio.low > together.low * .08 && audio.low < together.low * .18
+      && Math.abs(audio.high / together.high - 1) < .1;
+  }, 'only the 440 Hz tab is attenuated on the shared channel');
+  await api('POST', 'commands', { ...volumeEdit, value: null });
+  await api('POST', 'commands', { cmd: 'assignBrowserTab', session, tabId: chatId, site: chatTab.site, channel: 'voicechat', remember: true });
+  await until(async () => {
+    const audio = await sample('OpenXLR_ch_music');
+    return audio.low > together.low * .9 && audio.high < .003;
+  }, 'reset restores tab volume without changing its channel');
+  console.log('PASS live tab volume and reset on a channel shared by two captures');
+
   await api('POST', 'commands', { cmd: 'assignBrowserTab', session, tabId: musicId, site: musicTab.site, channel: 'game', remember: false });
   await delay(1000);
   const game = await sample('OpenXLR_ch_game');
@@ -332,6 +352,8 @@ try {
   const stale = await apiResponse('POST', 'commands',
     { cmd: 'assignBrowserTab', session, tabId: musicId, site: musicTab.site, channel: 'game', remember: true });
   assert.equal(stale.ok, false, 'An assignment from the previous page must be refused.');
+  assert.equal((await apiResponse('POST', 'commands', { ...volumeEdit, value: .2 })).ok, false,
+    'A volume edit from the previous page must be refused.');
   assert.equal((await api('GET', 'state')).mixer.browserTabs.find(tab => tab.id === musicId).channelId, 'voicechat');
   console.log('PASS live channel change, cross-origin navigation and independent capture lifetime');
 
@@ -362,6 +384,8 @@ try {
   await until(async () => (await api('GET', 'state')).mixer.browserTabs.find(tab => tab.id === chatId)?.capturing,
     'a capture is active before the daemon disconnects');
   await cdp.send('Target.closeTarget', { targetId: resume.targetId });
+  await api('POST', 'commands', { cmd: 'setBrowserTabVolume', session, tabId: chatId,
+    site: chatTab.site, value: .73, remember: true });
   await stopDaemon();
   await until(() => worker.evaluate(async () => (await chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'] })).length === 0),
     'daemon disconnect closes the audio stages');
@@ -370,7 +394,8 @@ try {
   const restored = await until(async () => {
     const mixer = (await api('GET', 'state')).mixer;
     return mixer.preserveBrowserOutputs && mixer.browserTabs.length === 2
-      && mixer.browserTabs.every(tab => tab.session !== session && tab.channelId === 'voicechat' && !tab.capturing && tab.remember) && mixer;
+      && mixer.browserTabs.every(tab => tab.session !== session && tab.channelId === 'voicechat' && !tab.capturing
+        && tab.remember && tab.volume === .73 && tab.rememberVolume) && mixer;
   }, 'daemon restart creates a new session, restores website choices and keeps captures stopped', 30000);
   assert.equal(new Set(restored.browserTabs.map(tab => tab.session)).size, 1);
   await musicTab.page.goto(musicTab.site);
@@ -378,7 +403,7 @@ try {
     const tab = (await api('GET', 'state')).mixer.browserTabs.find(tab => tab.id === musicId);
     return tab?.site === musicTab.site && tab.channelId === 'music' && tab.remember && !tab.capturing;
   }, 'the original website preference survives a tab-only route and daemon restart');
-  console.log('PASS real daemon restart, fresh connection session, persisted origins and stopped captures');
+  console.log('PASS real daemon restart, fresh connection session, persisted routing and volume, and stopped captures');
 } catch (error) {
   console.error(daemonLog);
   throw error;

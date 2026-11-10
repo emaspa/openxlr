@@ -61,6 +61,7 @@ internal static partial class SkinLayoutWindowTests
             {
                 var app = new AppStreamViewModel(new DaemonClient("ws://127.0.0.1:1/ws"), name.ToLowerInvariant(), name, choices);
                 app.ApplyFromDaemon(choices[i % choices.Length].Id, i % 4 != 1, true);
+                app.PlaybackVolume.Apply(true, true, i % 2 == 0 ? .45 : null);
                 model.Apps.Add(app);
                 return app;
             }
@@ -260,6 +261,9 @@ internal static partial class SkinLayoutWindowTests
             else Assert.Equal(nameWidth, name.Bounds.Width, 0.5);
             AssertInside(name, tiles[i]);
             AssertInside(picker, tiles[i]);
+            var volume = tiles[i].GetVisualDescendants().OfType<Button>().Single(b => b.Name == "PlaybackVolume");
+            AssertInside(volume, tiles[i]);
+            AssertNoOverlap([picker, volume]);
             ItemsControl sizer = picker.GetVisualDescendants().OfType<ItemsControl>().Single(c => c.Name == "ApplicationChannelSizer");
             TextBlock[] names = [.. sizer.GetVisualDescendants().OfType<TextBlock>()];
             Assert.Equal(picker.ItemCount, names.Length);

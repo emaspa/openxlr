@@ -268,6 +268,7 @@ public sealed partial record MixerState
     public string? EnforcedDefaultSource { get; init; }
 
     /// <summary>Application streams currently placed in channels.</summary>
+    public bool AppVolumeSupported { get; init; }
     public IReadOnlyList<StreamAssignment> Streams { get; init; } = [];
 
     public bool PreserveBrowserOutputs { get; init; }
@@ -405,6 +406,9 @@ public sealed record StreamAssignment(int Id, int Serial, string Label, string I
     /// </summary>
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public bool BrowserHeld { get; init; }
+
+    /// <summary>Saved application playback volume. Null leaves stream volume to the desktop.</summary>
+    public double? Volume { get; init; }
 
     /// <summary>
     /// While <see cref="BrowserHeld"/>, the application channel a live stream

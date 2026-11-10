@@ -65,8 +65,16 @@ internal static class BrowserTabsWindowTests
             Assert.False(button.IsVisible);
 
             AppRoutingViewModelTests.Report(model, true);
+            var app = new AppStreamViewModel(client, "discord", "Discord", [new("voicechat", "Voice Chat")]);
+            app.ApplyFromDaemon("voicechat", true, true);
+            app.PlaybackVolume.Apply(true, true, .62);
+            model.Apps.Add(app);
+            model.ActiveApps.Add(app);
+            var capturedTab = BrowserTabViewModelTests.Tab(title: "A long browser tab title with a video, a playlist and more details that must remain within the row", channel: "music", remember: true, capturing: true);
+            capturedTab["volumeSupported"] = true;
+            capturedTab["volume"] = .45;
             BrowserTabViewModelTests.Report(model, true, new JsonArray(
-                BrowserTabViewModelTests.Tab(title: "A long browser tab title with a video, a playlist and more details that must remain within the row", channel: "music", remember: true, capturing: true),
+                capturedTab,
                 BrowserTabViewModelTests.Tab(id: 8, title: "", channel: null),
                 BrowserTabViewModelTests.Tab(id: 9, title: "A call waiting for its audio", channel: "chat")));
             Layout(main, 640, 1000);
@@ -88,6 +96,26 @@ internal static class BrowserTabsWindowTests
             apps.Show();
             Layout(apps, 620, 700);
             AssertNoTabList(apps);
+            Button mainVolume = Assert.Single(main.GetVisualDescendants().OfType<Button>(), b => b.Name == "PlaybackVolume");
+            Button manageVolume = Assert.Single(apps.GetVisualDescendants().OfType<Button>(), b => b.Name == "PlaybackVolume");
+            Assert.Equal("62%", mainVolume.Content);
+            Assert.Equal("62%", manageVolume.Content);
+            app.PlaybackVolume.Apply(true, true, .31);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal("31%", mainVolume.Content);
+            Assert.Equal("31%", manageVolume.Content);
+            var volumeFlyout = Assert.IsType<Flyout>(manageVolume.Flyout);
+            volumeFlyout.ShowAt(manageVolume);
+            Dispatcher.UIThread.RunJobs();
+            var fader = Assert.Single(((StackPanel)volumeFlyout.Content!).GetVisualDescendants().OfType<Slider>());
+            Assert.Equal(.31, fader.Value, 2);
+            fader.Value = .42;
+            Assert.Equal("42%", mainVolume.Content);
+            SliderSync.FlushPending();
+            Dispatcher.UIThread.RunJobs();
+            // The fixture's disconnected daemon refuses the edit.
+            Assert.Equal("31%", manageVolume.Content);
+            volumeFlyout.Hide();
             var automatic = apps.FindControl<CheckBox>("RouteAppsByDefault")!;
             Assert.True(automatic.IsEffectivelyVisible);
             Assert.True(automatic.IsEffectivelyEnabled);
@@ -125,6 +153,10 @@ internal static class BrowserTabsWindowTests
             Assert.True(option.TranslatePoint(default, window)!.Value.Y + option.Bounds.Height
                 <= first.TranslatePoint(default, window)!.Value.Y);
             Assert.False(view.FindControl<TextBlock>("BrowserTabsEmpty")!.IsVisible);
+            Button level = Assert.Single(first.GetVisualDescendants().OfType<Button>(), b => b.Name == "PlaybackVolume");
+            Assert.True(level.IsEffectivelyVisible && level.IsEffectivelyEnabled);
+            Assert.Equal("45%", level.Content);
+            AssertInside(level, first);
             Capture(window, $"browser-tabs-window-{suffix}");
             window.Close();
             Dispatcher.UIThread.RunJobs();

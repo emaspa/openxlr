@@ -48,6 +48,8 @@ internal static class SavedMixerValidation
             MonitorOutputLabels = Mapping(settings.MonitorOutputLabels, "monitorOutputLabels", notes),
             AppOverrides = Mapping(settings.AppOverrides, "appOverrides", notes),
             BrowserSiteChannels = BrowserSites(settings.BrowserSiteChannels, notes),
+            AppVolumes = PlaybackVolumes(settings.AppVolumes, false, notes),
+            BrowserSiteVolumes = PlaybackVolumes(settings.BrowserSiteVolumes, true, notes),
             KnownApps = Apps(settings.KnownApps, notes),
             Inserts = Inserts(settings, notes),
             Eq = Eq(settings.Eq, notes),
@@ -68,6 +70,24 @@ internal static class SavedMixerValidation
             Appearance = Appearance(settings.Appearance, notes),
             BlockSize = BlockSize(settings.BlockSize, notes),
         };
+    }
+
+    internal static Dictionary<string, double> PlaybackVolumes(IReadOnlyDictionary<string, double>? entries,
+        bool sites, List<string>? notes)
+    {
+        var kept = new Dictionary<string, double>(sites ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase);
+        int limit = sites ? BrowserTabRouting.MaxSites : Mixer.MaxAppOverrides;
+        string field = sites ? "browserSiteVolumes" : "appVolumes";
+        if (entries is null) notes?.Add($"{field}: {NullEntry}");
+        foreach ((string key, double volume) in entries ?? new Dictionary<string, double>())
+        {
+            string? name = sites ? BrowserTabRouting.CanonicalSite(key)
+                : Mixer.ValidAppVolumeIdentity(key) ? StreamMatcher.MigrateIdentity(key) : null;
+            if (name is not null && Mixer.ValidPlaybackVolume(volume) && kept.Count < limit)
+                kept.TryAdd(name, Math.Round(volume * 100) / 100);
+            else if (notes is not null && !notes.Contains(field)) notes.Add(field);
+        }
+        return kept;
     }
 
     /// <summary>The dry monitor switches; a null map, which a hand edit can leave, reads as none on.</summary>

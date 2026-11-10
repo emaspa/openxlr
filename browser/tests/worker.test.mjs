@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import test from 'node:test';
-import { HOST, MAX_TABS, deviceFor, errorText, notInvoked, siteOf, tabRecords } from '../chromium/routing.mjs';
+import { HOST, MAX_TABS, deviceFor, errorText, notInvoked, playbackVolume, siteOf, tabRecords } from '../chromium/routing.mjs';
 import { t } from '../chromium/text.mjs';
 
 const workerSource = (await readFile(new URL('../chromium/worker.mjs', import.meta.url), 'utf8'))
@@ -60,12 +60,15 @@ function fixture({ existing = [], recovery } = {}) {
             return { value: [{ kind: 'audiooutput', label: 'OpenXLR Music', deviceId: 'music-device' },
               { kind: 'audiooutput', label: 'OpenXLR Chat', deviceId: 'chat-device' }] };
           case 'start': {
-            f.active.set(message.id, { id: message.id, capturing: true, deviceId: message.deviceId });
+            f.active.set(message.id, { id: message.id, capturing: true, deviceId: message.deviceId, volume: message.volume });
             await f.status(message.id, true);
             const gate = f.startGates.shift();
             if (gate) await gate.promise;
             return { value: null };
           }
+          case 'volume':
+            if (f.active.has(message.id)) f.active.get(message.id).volume = message.volume;
+            return { value: null };
           case 'route':
             if (f.active.has(message.id)) f.active.get(message.id).deviceId = message.deviceId;
             return { value: null };
@@ -119,7 +122,7 @@ function fixture({ existing = [], recovery } = {}) {
     await settle();
     return f.posts.filter(message => message.type === 'tabs').at(-1)?.tabs;
   };
-  vm.runInNewContext(workerSource, { chrome, HOST, MAX_TABS, deviceFor, errorText, notInvoked, siteOf, tabRecords, t,
+  vm.runInNewContext(workerSource, { chrome, HOST, MAX_TABS, deviceFor, errorText, notInvoked, playbackVolume, siteOf, tabRecords, t,
     setTimeout(callback, delay) { f.timers.set(++timer, callback); f.timerDelays.set(timer, delay); return timer; },
     clearTimeout(id) { f.timers.delete(id); f.timerDelays.delete(id); } }, { filename: 'worker.mjs' });
   return f;
@@ -137,6 +140,21 @@ test('independent tabs share one offscreen document and keep separate output sel
   assert.equal(f.active.get(1).deviceId, 'chat-device');
   assert.equal(f.active.get(2).deviceId, 'music-device');
   await f.request('stop', { id: 1 }); assert.deepEqual([...f.active.keys()], [2]);
+});
+
+test('changing one tab volume updates its capture in place, and navigation discards it', { timeout: 2000 }, async () => {
+  const f = await readyFixture();
+  const change = volume => f.publish({ tabs: f.state.tabs.map(tab => tab.id === 1 ? { ...tab, volume } : tab) });
+  await change(.5);
+  assert.equal((await f.request('start', { id: 1 })).error, undefined);
+  f.activate(2); assert.equal((await f.request('start', { id: 2 })).error, undefined);
+  assert.deepEqual([...f.active.values()].map(tab => tab.volume), [.5, 1]);
+  await change(.35); await settle();
+  assert.deepEqual([...f.active.values()].map(tab => tab.volume), [.35, 1]);
+  assert.equal(f.tokens.length, 2);
+  f.update(1, 'https://other.example/watch'); await settle();
+  assert.deepEqual([...f.active.keys()], [2]);
+  assert.equal(f.active.get(2).volume, 1);
 });
 
 test('refused browser capture permission leaves playback alone and explicit retry gets a new token', { timeout: 2000 }, async () => {

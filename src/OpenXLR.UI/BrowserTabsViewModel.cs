@@ -69,7 +69,8 @@ public sealed partial class MainViewModel
             if (session.Length != 32 || !session.All(Uri.IsHexDigit) || id < 0 || !seen.Add((session, id))) continue;
             if (!existing.TryGetValue((session, id), out BrowserTabViewModel? tab))
             {
-                tab = new(session, id, _client.AssignBrowserTabAsync, error => Status = error, _client.ActivateBrowserTabAsync);
+                tab = new(session, id, _client.AssignBrowserTabAsync, error => Status = error, _client.ActivateBrowserTabAsync,
+                    setVolume: _client.SetBrowserTabVolumeAsync);
                 BrowserTabs.Add(tab);
             }
             tab.ApplyFromDaemon(node["title"]?.GetValue<string>() ?? "", node["site"]?.GetValue<string>() ?? "",
@@ -78,11 +79,14 @@ public sealed partial class MainViewModel
                 supported && _preserveBrowserOutputs,
                 node["activation"] is JsonValue activation && activation.TryGetValue<string>(out string? stage)
                     && stage is "starting" or "popup" or "browser" ? stage : null);
+            tab.PlaybackVolume.Apply(node["volumeSupported"]?.GetValue<bool>() == true, tab.CanEdit,
+                node["volume"]?.GetValue<double>(), node["rememberVolume"]?.GetValue<bool>() == true);
         }
         for (int i = BrowserTabs.Count - 1; i >= 0; i--)
             if (!seen.Contains((BrowserTabs[i].Session, BrowserTabs[i].Id)))
             {
                 BrowserTabs[i].SetCanEdit(false);
+                BrowserTabs[i].PlaybackVolume.Cancel();
                 BrowserTabs.RemoveAt(i);
             }
         Raise(nameof(HasBrowserTabs));
@@ -95,7 +99,12 @@ public sealed partial class MainViewModel
         _reportedPreserveBrowserOutputs = false;
         Set(ref _browserTabSupport, false, nameof(BrowserTabSupport));
         Set(ref _preserveBrowserOutputs, false, nameof(PreserveBrowserOutputs));
-        foreach (BrowserTabViewModel tab in BrowserTabs) { tab.SetCanEdit(false); tab.CancelPending(); }
+        foreach (BrowserTabViewModel tab in BrowserTabs)
+        {
+            tab.SetCanEdit(false);
+            tab.CancelPending();
+            tab.PlaybackVolume.Cancel();
+        }
         BrowserTabs.Clear();
         Raise(nameof(CanSetBrowserRouting)); Raise(nameof(HasBrowserTabs));
     }

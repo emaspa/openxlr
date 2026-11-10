@@ -1010,6 +1010,21 @@ routing. A remembered routing change is sent when you choose a different
 channel. When the mixer stops supplying an app list, both the APPLICATIONS
 card and the Manage list clear their stale entries.
 
+Select **Vol.** or the percentage beside a program's channel picker to
+adjust its playback volume from 0 to 100%. The same control in **Manage**
+works for remembered programs that are closed. This level applies to the
+program's playback streams, before the channel and its sends. Two apps
+can share one channel and still have different levels. A program marked
+**Not managed** can also have a saved volume.
+
+OpenXLR remembers the level across playback and daemon restarts. It applies
+an edit on the next mixer sweep and applies the saved level to new streams.
+Desktop volume changes during playback are allowed. **Reset** or **Forget**
+clears the preference and hands volume back to the desktop at its current
+level. The preference is machine state and profiles leave it in place.
+With individual Chromium tab routing enabled, adjust captured browser
+audio under **Browser tabs**. See [Browser tab routing](browser-routing.md).
+
 An app's playback streams and audio client share the same identity even
 when PipeWire puts the process name only on the client. Windows executable
 names such as `Balatro.exe` use the same normalized key as their Wine or

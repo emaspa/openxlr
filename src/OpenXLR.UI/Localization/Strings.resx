@@ -4565,4 +4565,22 @@ When the window is in the tray, open it again from the OpenXLR icon or your app 
   <data name="RestoreWindow" xml:space="preserve">
     <value>Restore</value>
   </data>
+  <data name="PlaybackVolumeShort" xml:space="preserve">
+    <value>Vol.</value>
+  </data>
+  <data name="PlaybackVolume" xml:space="preserve">
+    <value>Playback volume</value>
+  </data>
+  <data name="AppPlaybackVolumeHint" xml:space="preserve">
+    <value>Change this program's level before it enters a mix. Reset lets the desktop handle its volume.</value>
+  </data>
+  <data name="BrowserPlaybackVolumeHeld" xml:space="preserve">
+    <value>Use Browser tabs to adjust captured tabs independently.</value>
+  </data>
+  <data name="TabPlaybackVolumeHint" xml:space="preserve">
+    <value>This level applies when the companion routes this tab.</value>
+  </data>
+  <data name="RememberTabPlaybackVolume" xml:space="preserve">
+    <value>Remember volume for this website</value>
+  </data>
 </root>

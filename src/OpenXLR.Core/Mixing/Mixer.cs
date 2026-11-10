@@ -1658,9 +1658,11 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 MonitorFeeds = new Dictionary<string, string>(_monitorFeeds),
                 MonitorOutputLabels = new Dictionary<string, string>(_monitorOutputLabels, StringComparer.Ordinal),
                 AppOverrides = new Dictionary<string, string>(Matcher.Overrides),
+                AppVolumes = new Dictionary<string, double>(_appVolumes, StringComparer.OrdinalIgnoreCase),
                 RouteAppsByDefault = Matcher.RouteByDefault,
                 BlockSize = _blockSize,
                 PreserveBrowserOutputs = _preserveBrowserOutputs,
+                BrowserSiteVolumes = new Dictionary<string, double>(_browserSiteVolumes, StringComparer.Ordinal),
                 BrowserSiteChannels = _browserSiteChannels.Where(p => HasApplicationChannel(p.Value))
                     .ToDictionary(p => p.Key, p => p.Value, StringComparer.Ordinal),
                 KnownApps = [.. _apps.Values.Select(a => new SavedApp(a.Identity, a.Label, a.ChannelId))],
@@ -1737,6 +1739,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             SetRouteAppsByDefault(s.RouteAppsByDefault);
             SetBlockSize(s.BlockSize);
             RestoreBrowserSettingsLocked(s);
+            _appVolumes = SavedMixerValidation.PlaybackVolumes(s.AppVolumes, false, null);
+            _appVolumeApplied.Clear();
             SetMonitorMuteMicrophones(s.MonitorMuteMicrophones);
             _duckingSetup = DuckingSetup.Prune(s.Ducking ?? DuckingSetup.Default(_config), _config);
             // What the Pro's sections held before a jack feed used them is
@@ -3267,10 +3271,12 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
 
         lock (_gate)
         {
+            if (!_built) return false;
             var seen = new HashSet<int>();
             _browserIdentities.Clear();
             foreach (AudioStream source in live.Concat(clients))
                 if (BrowserTabRouting.IsChromium(source.Binary)) _browserIdentities.Add(source.Identity);
+            int volumeBudget = AppVolumeWritesPerSweep;
             foreach (AudioStream s in live)
             {
                 string identity = s.Identity;
@@ -3377,6 +3383,15 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             {
                 _streams.Remove(gone);
                 changed = true;
+            }
+
+            if (_appVolumes.Count > 0 || _appVolumeApplied.Count > 0)
+            {
+                foreach (AudioStream stream in live)
+                    if (_streams.TryGetValue(stream.Id, out StreamAssignment? placed))
+                        SyncAppVolumeLocked(placed, ref volumeBudget);
+                foreach (int gone in _appVolumeApplied.Keys.Where(id => !seen.Contains(id)).ToArray())
+                    _appVolumeApplied.Remove(gone);
             }
 
             // Every running audio-capable app is listed even before it plays:
@@ -3496,6 +3511,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         {
             identity = StreamMatcher.MigrateIdentity(identity);
             _apps.Remove(identity);
+            if (_appVolumes.Remove(identity)) ClearAppliedAppVolumeLocked(identity);
             Matcher.RemoveOverride(identity);
             foreach ((int id, StreamAssignment placed) in _streams.ToList())
                 if (string.Equals(placed.Identity, identity, StringComparison.OrdinalIgnoreCase))
@@ -3655,8 +3671,10 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 EnforcedDefaultSink = _enforcedSink,
                 EnforcedDefaultSource = _enforcedSource,
                 AuxPortEnabled = _auxPortEnabled,
+                AppVolumeSupported = true,
                 Streams = [.. _apps.Values
-                    .Select(a => a with { Label = _icons.DisplayName(a.Label) })
+                    .Select(a => a with { Label = _icons.DisplayName(a.Label),
+                        Volume = _appVolumes.TryGetValue(a.Identity, out double level) ? level : null })
                     .OrderByDescending(a => a.Active).ThenBy(a => a.Label, StringComparer.OrdinalIgnoreCase)],
                 PreserveBrowserOutputs = _preserveBrowserOutputs,
                 RouteAppsByDefault = Matcher.RouteByDefault,
@@ -3968,6 +3986,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         _pendingCells.Clear();
         _cellRounds = _cellWait = 0;
         _streams.Clear();
+        _appVolumeApplied.Clear();
         _cells.Clear();
         _levels.Clear();
         _channelVolume.Clear();

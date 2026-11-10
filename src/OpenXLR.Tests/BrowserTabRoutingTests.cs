@@ -14,6 +14,57 @@ public sealed class BrowserTabRoutingTests
         => new() { Id = id, Site = site, Title = title };
 
     [Fact]
+    public void TabVolumeIsIndependentOfRoutingAndTabOverridesEndOnNavigation()
+    {
+        using var mixer = new Mixer();
+        Guid owner = Guid.NewGuid();
+        string session = mixer.OpenBrowserSession(owner);
+        var teams = Tab(1) with { VolumeSupported = true };
+        var second = Tab(2) with { VolumeSupported = true };
+        var other = Tab(3, "https://example.com") with { VolumeSupported = true };
+        mixer.SyncBrowserTabs(owner, session, [teams, second, other, Tab(4)]);
+        MixerSettings? saved = null;
+        mixer.SetBrowserTabVolume(session, 1, teams.Site, .45, true, settings => { saved = settings; return null; });
+        Assert.Equal(.45, saved!.BrowserSiteVolumes[teams.Site]);
+        Assert.Empty(saved.BrowserSiteChannels);
+        mixer.SetBrowserTabVolume(session, 2, teams.Site, 0, false, _ => throw new InvalidOperationException());
+        Assert.Equal(new double?[] { .45, 0, null, .45 }, mixer.BrowserTabs.Select(t => t.Volume));
+        Assert.True(mixer.BrowserTabs[0].RememberVolume);
+        Assert.False(mixer.BrowserTabs[1].RememberVolume);
+        Assert.Throws<IOException>(() => mixer.SetBrowserTabVolume(session, 1, teams.Site, .9, true, _ => "disk full"));
+        Assert.Equal(.45, mixer.BrowserTabs[0].Volume);
+        Assert.Throws<InvalidOperationException>(() => mixer.SetBrowserTabVolume(session, 4, teams.Site, .2, false, _ => null));
+
+        mixer.SyncBrowserTabs(owner, session, [teams, second with { Site = other.Site }, other]);
+        Assert.Null(mixer.BrowserTabs[1].Volume);
+        Assert.Throws<InvalidOperationException>(() => mixer.SetBrowserTabVolume(session, 2, teams.Site, .9, false, _ => null));
+        mixer.SetBrowserTabVolume(session, 1, teams.Site, null, true, _ => null);
+        Assert.All(mixer.BrowserTabs, tab => Assert.Null(tab.Volume));
+        using var restored = new Mixer();
+        restored.ApplySettings(saved);
+        string reopened = restored.OpenBrowserSession(owner);
+        restored.SyncBrowserTabs(owner, reopened, [teams]);
+        Assert.Equal(.45, Assert.Single(restored.BrowserTabs).Volume);
+    }
+
+    [Theory]
+    [InlineData("""{"cmd":"setAppVolume","identity":"discord","value":0}""", true)]
+    [InlineData("""{"cmd":"setAppVolume","identity":"discord","value":null}""", true)]
+    [InlineData("""{"cmd":"setAppVolume","identity":"discord"}""", false)]
+    [InlineData("""{"cmd":"setAppVolume","identity":"wine","value":0.5}""", false)]
+    [InlineData("""{"cmd":"setAppVolume","identity":"discord","value":1e999}""", false)]
+    [InlineData("""{"cmd":"setAppVolume","identity":"discord","value":1.01}""", false)]
+    [InlineData("""{"cmd":"setBrowserTabVolume","session":"e3b0c44298fc4c14b9afbf4c8996fb92","tabId":1,"site":"https://example.com","remember":true,"value":0.4}""", true)]
+    [InlineData("""{"cmd":"setBrowserTabVolume","session":"e3b0c44298fc4c14b9afbf4c8996fb92","tabId":1,"site":"https://example.com/path","remember":true,"value":0.4}""", false)]
+    [InlineData("""{"cmd":"setBrowserTabVolume","session":"e3b0c44298fc4c14b9afbf4c8996fb92","tabId":1,"site":"https://example.com","remember":0,"value":0.4}""", false)]
+    public void PlaybackVolumeCommandsCheckRangesAndTargets(string json, bool valid)
+    {
+        using var mixer = new Mixer();
+        Command cmd = JsonSerializer.Deserialize<Command>(json)!;
+        Assert.Equal(valid, CommandValidation.Check(cmd, mixer, _ => null) is null);
+    }
+
+    [Fact]
     public void IdenticalRegistrationsDoNotBroadcastState()
     {
         var config = new ConfigurationBuilder().Build();

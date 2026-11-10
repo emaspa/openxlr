@@ -1410,6 +1410,21 @@ public sealed partial class MixerService : IHostedService, IDisposable
         {
             switch (cmd.Cmd)
             {
+                case "setAppVolume":
+                    _saves.RunSaved(() => _mixer.SetAppVolume(cmd.Identity!,
+                        cmd.Value.ValueKind == System.Text.Json.JsonValueKind.Null ? null : cmd.Value.GetDouble(), s => s.Save()));
+                    Changed?.Invoke();
+                    return null;
+                case "setBrowserTabVolume":
+                {
+                    bool remember = cmd.Remember.GetBoolean();
+                    double? volume = cmd.Value.ValueKind == System.Text.Json.JsonValueKind.Null ? null : cmd.Value.GetDouble();
+                    void ApplyVolume() => _mixer.SetBrowserTabVolume(cmd.Session!, cmd.TabId!.Value, cmd.Site!, volume, remember, s => s.Save());
+                    if (remember) _saves.RunSaved(ApplyVolume);
+                    else ApplyVolume();
+                    Changed?.Invoke();
+                    return null;
+                }
                 case "assignBrowserTab":
                     if (cmd.Remember.GetBoolean())
                         _saves.RunSaved(() => _mixer.AssignBrowserTab(cmd.Session!, cmd.TabId!.Value, cmd.Site!, cmd.Channel, true, s => s.Save()));

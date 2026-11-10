@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace OpenXLR.UI;
 
-internal sealed record BrowserNativeTab(int Id, string Site, string Title, bool Capturing, string? Error = null, string? Activation = null);
+internal sealed record BrowserNativeTab(int Id, string Site, string Title, bool Capturing, string? Error = null, string? Activation = null, bool VolumeSupported = false);
 
 /// <summary>A bounded native-messaging bridge. Only browser routing crosses its standard output.</summary>
 internal sealed class BrowserNativeHost(DaemonClient client, Stream input, Stream output, Func<long>? clock = null)
@@ -422,7 +422,8 @@ internal sealed class BrowserNativeHost(DaemonClient client, Stream input, Strea
             // An address the daemon cannot take in the browser's own form, such
             // as a host holding "*" or an IPv4-mapped IPv6 address, leaves that
             // tab unlisted. The other tabs still register.
-            if (ValidSite(site)) tabs.Add(new(id, site, title, capturing, String(tab, "error"), String(tab, "activation")));
+            if (ValidSite(site)) tabs.Add(new(id, site, title, capturing, String(tab, "error"), String(tab, "activation"),
+                Bool(tab, "volumeSupported")));
         }
         return tabs;
     }
@@ -458,6 +459,11 @@ internal sealed class BrowserNativeHost(DaemonClient client, Stream input, Strea
                     var copy = new JsonObject { ["id"] = id, ["site"] = site, ["title"] = title,
                         ["channelId"] = String(tab, "channelId"), ["remember"] = Bool(tab, "remember"), ["capturing"] = Bool(tab, "capturing") };
                     if (String(tab, "error") is { Length: <= 200 } error && !error.Any(char.IsControl)) copy["error"] = error;
+                    if (Bool(tab, "volumeSupported"))
+                    {
+                        copy["volume"] = tab["volume"] is JsonValue level && level.TryGetValue<double>(out double volume)
+                            && volume is >= 0 and <= 1 ? volume : null;
+                    }
                     tabs.Add(copy);
                 }
         return new JsonObject { ["type"] = "state",

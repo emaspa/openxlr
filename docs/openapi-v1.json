@@ -525,6 +525,25 @@
                     "value": true
                   }
                 },
+                "setApplicationVolume": {
+                  "summary": "Save a playback level for a known application",
+                  "value": {
+                    "cmd": "setAppVolume",
+                    "identity": "discord",
+                    "value": 0.45
+                  }
+                },
+                "setBrowserTabVolume": {
+                  "summary": "Save a playback level for a routed browser tab's website",
+                  "value": {
+                    "cmd": "setBrowserTabVolume",
+                    "session": "e3b0c44298fc4c14b9afbf4c8996fb92",
+                    "tabId": 42,
+                    "site": "https://teams.microsoft.com",
+                    "value": 0.45,
+                    "remember": true
+                  }
+                },
                 "assignBrowserTab": {
                   "summary": "Remember a connected tab's website on an application channel",
                   "value": {
