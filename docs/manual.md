@@ -1033,8 +1033,9 @@ the desktop's volume control, or the program moves its own stream, the
 saved level follows it. A program with nothing saved starts the slider at
 the level it plays at, and its button shows that level when it is below
 100%. **Reset** or **Forget** clears the saved level and puts the program
-back to 100%. The saved level is machine state and profiles leave it in
-place.
+back to 100%. If the program is closed, OpenXLR remembers the reset and
+applies it when playback starts, even after a daemon restart. The saved
+level and pending resets are machine state and profiles leave them in place.
 
 The session manager remembers stream volumes too, under the name a program
 gives PipeWire, and restores one to each new stream. Programs built on one

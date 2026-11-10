@@ -35,6 +35,8 @@ public sealed partial class MixerService : IHostedService, IDisposable
     // user chose after the daemon was gone.
     private readonly CancellationTokenSource _stopping = new();
     private Task _defaultDefense = Task.CompletedTask;
+    private readonly StateBroadcastQueue _appVolumeUpdates;
+    private Task _appVolumeUpdateLoop = Task.CompletedTask;
     // Cancelled once the stop has run for StopBudget: the adapter then kills
     // a helper still running and starts no other, so a stalled audio server
     // ends the stop early instead of each pactl call waiting out its own
@@ -134,6 +136,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
                 else _log.LogWarning("mixer settings not saved: {err}; retrying", error);
             },
             () => Changed?.Invoke());
+        _appVolumeUpdates = new(UpdateAppVolumes, _log, "Application volume update");
         _browserTitles = (time ?? TimeProvider.System).CreateTimer(_ => PublishBrowserTabTitles(), null,
             TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
     }
@@ -832,6 +835,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
         if (_graphWatch is null)
         {
             _graphWatch = _pipeWire.WatchGraph(note => _log.LogInformation("{msg}", note));
+            _appVolumeUpdateLoop = _appVolumeUpdates.RunAsync(_stopping.Token);
             _pipeWire.PlaybackStreamArrived -= OnPlaybackStreamArrived;
             _pipeWire.PlaybackStreamArrived += OnPlaybackStreamArrived;
         }
@@ -1189,6 +1193,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
         // phases instead of starting the rest of its repair work.
         await sweep;
         await meters;
+        await _appVolumeUpdateLoop;
         await _browserTitles.DisposeAsync();
         // Nothing is written to a unit at stop: it keeps the ducking it holds.
         _mixer.SetDeviceDuckingPort(null);
@@ -1218,29 +1223,18 @@ public sealed partial class MixerService : IHostedService, IDisposable
         Interlocked.Exchange(ref _graphWatch, null)?.Dispose();
     }
 
-    private int _streamVolumePass;
-
-    // A new playback stream gets its application's saved level now, not on
-    // the next sweep. The registry reader only hands the work on; one pass
-    // runs at a time and takes every stream that arrived meanwhile.
+    // Keep one pending pass while the current one runs. The registry
+    // reader only signals it and never waits for the mixer.
     private void OnPlaybackStreamArrived()
     {
-        if (_stopping.IsCancellationRequested || Interlocked.Exchange(ref _streamVolumePass, 1) != 0) return;
-        _ = Task.Run(() =>
-        {
-            Interlocked.Exchange(ref _streamVolumePass, 0);
-            try
-            {
-                if (_stopping.IsCancellationRequested) return;
-                bool changed = _mixer.SyncAppVolumes();
-                if (_mixer.TakeAppVolumesChanged()) ScheduleSave();
-                if (changed) Changed?.Invoke();
-            }
-            catch (Exception ex) when (ex is InvalidOperationException or IOException or ObjectDisposedException)
-            {
-                _log.LogDebug("stream volume pass: {msg}", ex.Message);
-            }
-        });
+        if (!_stopping.IsCancellationRequested && _mixer.HasAppVolumeWork) _appVolumeUpdates.Signal();
+    }
+
+    private void UpdateAppVolumes()
+    {
+        bool changed = _mixer.SyncAppVolumes();
+        if (_mixer.TakeAppVolumesChanged()) ScheduleSave();
+        if (changed) Changed?.Invoke();
     }
 
     public string OpenBrowserSession(Guid owner) => _mixer.OpenBrowserSession(owner);
@@ -2007,6 +2001,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
 
     public void Dispose()
     {
+        _stopping.Cancel();
         _browserTitles.Dispose();
         _streamSweep?.Dispose();
         _meterPush?.Dispose();

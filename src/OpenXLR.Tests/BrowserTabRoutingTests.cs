@@ -742,7 +742,7 @@ public sealed class BrowserTabRoutingTests
                 echo "$*" >> "$dir/calls"
                 case "$*" in
                   move-sink-input\ *) [ ! -e "$dir/refuse-moves" ] || exit 0 ;;
-                  set-sink-input-volume\ *) [ ! -e "$dir/refuse-volumes" ] || exit 1 ;;
+                  set-sink-input-volume\ *) [ ! -e "$dir/refuse-volumes" ] && [ ! -e "$dir/refuse-volume-$2" ] || exit 1 ;;
                 esac
                 case "$*" in
                   'list sinks short') printf '1\tOpenXLR_ch_system\n2\tOpenXLR_ch_music\n3\tdesktop\n' ;;
@@ -781,6 +781,8 @@ public sealed class BrowserTabRoutingTests
             if (refuse) File.WriteAllText(path, "");
             else File.Delete(path);
         }
+
+        public void RefuseVolume(int serial) => File.WriteAllText(Path.Combine(_directory, $"refuse-volume-{serial}"), "");
 
         /// <summary>
         /// Replace the registry with these playback nodes, all on the Music

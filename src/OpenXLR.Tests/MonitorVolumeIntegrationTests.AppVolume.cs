@@ -41,13 +41,27 @@ public sealed partial class MonitorVolumeIntegrationTests
             return task;
         }
 
-        void Wait(Func<Dictionary<string, (int Index, string Volume, uint Sink)>, bool> condition)
+        Dictionary<string, (int Index, string Volume, uint Sink)> Wait(
+            Func<Dictionary<string, (int Index, string Volume, uint Sink)>, bool> condition)
         {
+            Dictionary<string, (int Index, string Volume, uint Sink)> items = [];
             Assert.True(SpinWait.SpinUntil(() =>
             {
                 mixer.SyncStreams();
-                return condition(StreamVolumes());
-            }, TimeSpan.FromSeconds(5)), string.Join(", ", StreamVolumes()));
+                items = StreamVolumes();
+                if (condition(items)) return true;
+                Thread.Sleep(20);
+                return false;
+            }, TimeSpan.FromSeconds(5)), string.Join(", ", items));
+            return items;
+        }
+
+        bool RegistrySees(Dictionary<string, (int Index, string Volume, uint Sink)> items, double? appLevel = null)
+        {
+            IReadOnlyList<AudioStream> streams = pw.ListStreams();
+            return items.All(item => streams.Any(stream => stream.Serial == item.Value.Index
+                && stream.Identity == (item.Key == "discord" ? other : app)
+                && (item.Key == "discord" || appLevel is null || stream.Volume == appLevel)));
         }
 
         try
@@ -55,29 +69,40 @@ public sealed partial class MonitorVolumeIntegrationTests
             Task<ProcessResult> firstPlayer = Play(app, "teams-first", first.Token);
             _ = Play(app, "teams-second", all.Token);
             _ = Play(other, "discord", all.Token);
-            Wait(items => items.Count == 3 && mixer.Snapshot().Streams.Any(a => a.Identity == app && a.Active));
-            var before = StreamVolumes();
+            // Pulse and the registry can see a new stream in either order.
+            // Wait for both app streams and the peer to enter the mixer's snapshot.
+            var before = Wait(items => items.Count == 3 && RegistrySees(items));
+            mixer.SyncStreams();
             Assert.Equal(3, before.Count);
             Assert.Single(before.Values.Select(stream => stream.Sink).Distinct());
             int arrivals = 0;
             pw.PlaybackStreamArrived += () => Interlocked.Increment(ref arrivals);
             mixer.SetAppVolume(app.ToUpperInvariant(), .35);
-            // Written before the command returns, with no sweep in between.
-            var after = StreamVolumes();
-            Assert.Equal("35%", after["teams-first"].Volume);
-            Assert.Equal("35%", after["teams-second"].Volume);
+            // A busy server can defer a write or restore an old value.
+            // Both registry echoes must settle before the desktop edit.
+            long? echoedAt = null;
+            var after = Wait(items =>
+            {
+                if (items.Count != 3 || items.GetValueOrDefault("teams-first").Volume != "35%"
+                    || items.GetValueOrDefault("teams-second").Volume != "35%" || !RegistrySees(items, .35))
+                {
+                    echoedAt = null;
+                    return false;
+                }
+                echoedAt ??= Environment.TickCount64;
+                return Environment.TickCount64 - echoedAt.Value >= 400;
+            });
             Assert.Equal(before["discord"], after["discord"]);
             Assert.Equal(before["teams-first"].Sink, after["teams-first"].Sink);
-            // The registry shows the level a moment later; the sweep reads
-            // it as the application's own and writes nothing.
-            await Task.Delay(400, all.Token);
-            Wait(_ => mixer.Snapshot().Streams.Single(a => a.Identity == app).LiveVolume == .35);
+            Assert.Equal(before["teams-second"].Sink, after["teams-second"].Sink);
+            Assert.Equal(.35, mixer.Snapshot().Streams.Single(a => a.Identity == app).LiveVolume);
             Assert.False(mixer.TakeAppVolumesChanged());
 
             // A desktop adjustment of one stream becomes the application's
             // level: the saved one follows it and the other stream gets it.
             pw.SetSinkInputVolume(after["teams-second"].Index, .62);
-            Wait(items => items["teams-first"].Volume == "62%" && items["teams-second"].Volume == "62%");
+            Wait(items => items.GetValueOrDefault("teams-first").Volume == "62%"
+                && items.GetValueOrDefault("teams-second").Volume == "62%");
             Assert.Equal(.62, mixer.ExportSettings().AppVolumes[app]);
             Assert.True(mixer.TakeAppVolumesChanged());
             Assert.Equal(before["discord"], StreamVolumes()["discord"]);
@@ -93,16 +118,20 @@ public sealed partial class MonitorVolumeIntegrationTests
             Assert.True(SpinWait.SpinUntil(() =>
             {
                 mixer.SyncAppVolumes();
-                return StreamVolumes().TryGetValue("teams-restarted", out var stream) && stream.Volume == "62%";
+                var items = StreamVolumes();
+                return items.TryGetValue("teams-restarted", out var stream) && stream.Volume == "62%"
+                    && RegistrySees(items);
             }, TimeSpan.FromSeconds(5)), string.Join(", ", StreamVolumes()));
+            mixer.SyncAppVolumes();
 
             // Reset hands the streams back at full volume.
             mixer.SetAppVolume(app, null);
             Assert.Empty(mixer.ExportSettings().AppVolumes);
-            var reset = StreamVolumes();
-            Assert.Equal("100%", reset["teams-second"].Volume);
-            Assert.Equal("100%", reset["teams-restarted"].Volume);
+            var reset = Wait(items => items.GetValueOrDefault("teams-second").Volume == "100%"
+                && items.GetValueOrDefault("teams-restarted").Volume == "100%");
             Assert.Equal(before["discord"], reset["discord"]);
+            Assert.Equal(before["teams-second"].Sink, reset["teams-second"].Sink);
+            Assert.Equal(before["teams-first"].Sink, reset["teams-restarted"].Sink);
         }
         finally
         {

@@ -97,11 +97,171 @@ public sealed class AppVolumeTests : IDisposable
         _graph.RefuseVolumes(false);
         _graph.ClearCalls();
 
+        _now += 300;
         _mixer.SyncStreams();
         Assert.Equal(["set-sink-input-volume 100 100%"], VolumeWrites);
         _graph.ClearCalls();
         _mixer.SyncStreams();
         Assert.Empty(VolumeWrites);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AStoppedApplicationIsResetWhenItReturnsAfterADaemonRestart(bool forget)
+    {
+        Streams(BrowserGraph.Node(10, 100, Vlc, 0));
+        _mixer.SyncStreams();
+        _mixer.SetAppVolume("vlc", 0);
+        Streams();
+        _mixer.SyncStreams();
+        _graph.ClearCalls();
+
+        if (forget) _mixer.ForgetApp("vlc");
+        else _mixer.SetAppVolume("vlc", null);
+        Assert.Empty(VolumeWrites);
+        MixerSettings saved = _mixer.ExportSettings();
+        Assert.Empty(saved.AppVolumes);
+        Assert.Equal(["vlc"], saved.AppVolumeResets);
+
+        using Mixer restarted = NewMixer();
+        restarted.ApplySettings(saved);
+        _graph.SetStreams(restarted, BrowserGraph.Node(10, 100, Vlc, 0), BrowserGraph.Node(11, 101, Vlc, 0));
+        _graph.ClearCalls();
+        restarted.SyncAppVolumes();
+        Assert.Equal(["set-sink-input-volume 100 100%", "set-sink-input-volume 101 100%"], VolumeWrites);
+
+        // WirePlumber restored the old volume after the first write on one stream.
+        _graph.SetStreams(restarted, BrowserGraph.Node(10, 100, Vlc, 100), BrowserGraph.Node(11, 101, Vlc, 0));
+        _graph.ClearCalls();
+        _now += 2000;
+        restarted.SyncStreams();
+        Assert.Equal(["set-sink-input-volume 101 100%"], VolumeWrites);
+        Assert.Equal(["vlc"], restarted.ExportSettings().AppVolumeResets);
+
+        _graph.SetStreams(restarted, BrowserGraph.Node(10, 100, Vlc, 100), BrowserGraph.Node(11, 101, Vlc, 100));
+        _graph.ClearCalls();
+        _now += 2000;
+        restarted.SyncStreams();
+        Assert.Empty(VolumeWrites);
+        Assert.Empty(restarted.ExportSettings().AppVolumeResets);
+        Assert.True(restarted.TakeAppVolumesChanged());
+
+        // Once done, the reset does not take ownership of later desktop changes.
+        _graph.SetStreams(restarted, BrowserGraph.Node(10, 100, Vlc, 80), BrowserGraph.Node(11, 101, Vlc, 80));
+        restarted.SyncStreams();
+        Assert.Empty(VolumeWrites);
+    }
+
+    [Fact]
+    public void ANewLevelCancelsAStoppedApplicationsPendingReset()
+    {
+        Streams(BrowserGraph.Node(10, 100, Vlc, 0));
+        _mixer.SyncStreams();
+        _mixer.SetAppVolume("vlc", 0);
+        Streams();
+        _mixer.SyncStreams();
+        _mixer.SetAppVolume("vlc", null);
+
+        _mixer.SetAppVolume("vlc", .62);
+        Assert.Empty(_mixer.ExportSettings().AppVolumeResets);
+        Streams(BrowserGraph.Node(11, 101, Vlc, 0));
+        _graph.ClearCalls();
+        _mixer.SyncAppVolumes();
+        Assert.Equal(["set-sink-input-volume 101 62%"], VolumeWrites);
+    }
+
+    [Fact]
+    public void AResetOnAnEstablishedStreamLeavesLaterDesktopEditsAlone()
+    {
+        Streams(BrowserGraph.Node(10, 100, Vlc, 35));
+        _mixer.SyncStreams();
+        _mixer.SetAppVolume("vlc", .35);
+        _now += 1000;
+        _mixer.SyncStreams();
+        _mixer.SetAppVolume("vlc", null);
+        _graph.ClearCalls();
+
+        Streams(BrowserGraph.Node(10, 100, Vlc, 60));
+        _now += 2000;
+        _mixer.SyncStreams();
+        Assert.Empty(VolumeWrites);
+        Assert.Empty(_mixer.ExportSettings().AppVolumeResets);
+        Assert.Equal(.6, App("vlc").LiveVolume);
+    }
+
+    [Fact]
+    public void ResetWritesAtMostOneBatchAndLeavesTheRemainingStreamsForTheSweep()
+    {
+        Streams([.. Enumerable.Range(0, 9).Select(i => BrowserGraph.Node(20 + i, 110 + i, Vlc, 35))]);
+        _mixer.SyncStreams();
+        _mixer.SetAppVolume("vlc", .35);
+        _graph.ClearCalls();
+
+        _mixer.SetAppVolume("vlc", null);
+        Assert.Equal(8, VolumeWrites.Length);
+        Assert.All(VolumeWrites, call => Assert.EndsWith(" 100%", call, StringComparison.Ordinal));
+        _graph.ClearCalls();
+        _mixer.SyncStreams();
+        Assert.Equal(["set-sink-input-volume 118 100%"], VolumeWrites);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AQuickRefusalDoesNotStarveANewStreamOfAnotherApplication(bool reset)
+    {
+        Streams(BrowserGraph.Node(10, 100, Vlc), BrowserGraph.Node(11, 101, Mpv));
+        _mixer.SyncStreams();
+        _graph.RefuseVolume(100);
+        _mixer.SetAppVolume("vlc", .35);
+        if (reset) _mixer.SetAppVolume("vlc", null);
+        _mixer.SetAppVolume("mpv", .5);
+        _graph.ClearCalls();
+
+        Streams(BrowserGraph.Node(10, 100, Vlc), BrowserGraph.Node(11, 101, Mpv, 50), BrowserGraph.Node(12, 102, Mpv));
+        _now += 300;
+        _mixer.SyncStreams();
+        Assert.Equal([$"set-sink-input-volume 100 {(reset ? 100 : 35)}%", "set-sink-input-volume 102 50%"], VolumeWrites);
+
+        _graph.ClearCalls();
+        Streams(BrowserGraph.Node(10, 100, Vlc), BrowserGraph.Node(11, 101, Mpv, 50), BrowserGraph.Node(12, 102, Mpv, 50),
+            BrowserGraph.Node(13, 103, Mpv));
+        _now += 1000;
+        _mixer.SyncStreams();
+        Assert.Equal(["set-sink-input-volume 103 50%"], VolumeWrites);
+    }
+
+    [Fact]
+    public void AFailedResetDoesNotFollowAStreamWhoseApplicationIdentityChanges()
+    {
+        Streams(BrowserGraph.Node(10, 100, Vlc, 0));
+        _mixer.SyncStreams();
+        _mixer.SetAppVolume("vlc", 0);
+        _graph.RefuseVolume(100);
+        _mixer.SetAppVolume("vlc", null);
+        _graph.ClearCalls();
+
+        Streams(BrowserGraph.Node(10, 100, Mpv, 60), BrowserGraph.Node(11, 101, Vlc, 0));
+        _now += 300;
+        _mixer.SyncStreams();
+        Assert.Equal(["set-sink-input-volume 101 100%"], VolumeWrites);
+        Assert.Equal(.6, App("mpv").LiveVolume);
+    }
+
+    [Fact]
+    public void AFullQueueOfStoppedResetsCanStillAcceptNewApplicationLevels()
+    {
+        List<string> older = [.. Enumerable.Range(0, Mixer.MaxAppOverrides).Select(i => $"old-player-{i}")];
+        _mixer.ApplySettings(_mixer.ExportSettings() with { AppVolumeResets = older });
+        Streams(BrowserGraph.Node(10, 100, Vlc));
+        _mixer.SyncStreams();
+        _mixer.SetAppVolume("vlc", .35);
+
+        Streams();
+        _mixer.SyncStreams();
+        _mixer.SetAppVolume("vlc", null);
+        Assert.Equal(older.Skip(1).Append("vlc"), _mixer.ExportSettings().AppVolumeResets);
     }
 
     [Fact]

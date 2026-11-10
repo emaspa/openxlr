@@ -62,17 +62,21 @@ public sealed class SavedMixerValidationTests
         {
             string path = Path.Combine(root, "mixer.json");
             File.WriteAllText(path, """
-                {"appVolumes":{"Discord":0.45,"chrome":0,"wine":0.6,"invalid":1e999}}
+                {"appVolumes":{"Discord":0.45,"chrome":0,"wine":0.6,"invalid":1e999},
+                 "appVolumeResets":["discord", "Music Player", "musicplayer", null, "wine", ".exe"]}
                 """);
             MixerSettings loaded = Assert.IsType<MixerSettings>(MixerSettings.Load(path, out string? warning));
             Assert.Contains("appVolumes", warning);
+            Assert.Contains("appVolumeResets", warning);
             Assert.Equal(0.45, loaded.AppVolumes["discord"]);
             Assert.Equal(0, loaded.AppVolumes["chrome"]);
             Assert.Equal(2, loaded.AppVolumes.Count);
+            Assert.Equal(["musicplayer"], loaded.AppVolumeResets);
             Assert.Null(loaded.Save(path));
             MixerSettings reopened = Assert.IsType<MixerSettings>(MixerSettings.Load(path, out warning));
             Assert.Null(warning);
             Assert.Equal(0.45, reopened.AppVolumes["discord"]);
+            Assert.Equal(["musicplayer"], reopened.AppVolumeResets);
         });
     }
 
