@@ -161,6 +161,9 @@
   "startTimeout": {
     "message": "The browser did not start tab audio in time. Try activating this tab again."
   },
+  "routeTimeout": {
+    "message": "The browser did not switch the tab output in time."
+  },
   "noAudioTrack": {
     "message": "The tab supplied no audio track."
   },

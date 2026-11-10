@@ -130,13 +130,19 @@ export class TabAudio {
     const session = this.sessions.get(id);
     if (!session || session.closed || session.deviceId === deviceId) return;
     session.routing++;
+    let timer;
+    const deadline = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(t('routeTimeout'))), this.timeoutMs);
+    });
     try {
-      await session.context.setSinkId(deviceId);
+      await Promise.race([session.context.setSinkId(deviceId), deadline]);
       if (this.sessions.get(id) === session) { session.deviceId = deviceId; session.routeVersion++; }
     } catch (error) {
-      if (this.sessions.get(id) === session) await this.stop(id, errorText(error));
+      if (this.sessions.get(id) === session)
+        await Promise.race([this.stop(id, errorText(error)), deadline]).catch(() => {});
       throw error;
     } finally {
+      clearTimeout(timer);
       session.routing--;
       if (!session.routing && session.checkAfterRoute && this.sessions.get(id) === session) {
         session.checkAfterRoute = false;

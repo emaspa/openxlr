@@ -161,6 +161,9 @@
   "startTimeout": {
     "message": "El navegador no inició a tiempo el audio de la pestaña. Vuelve a activar esta pestaña."
   },
+  "routeTimeout": {
+    "message": "El navegador no cambió a tiempo la salida de la pestaña."
+  },
   "noAudioTrack": {
     "message": "La pestaña no proporcionó ninguna pista de audio."
   },

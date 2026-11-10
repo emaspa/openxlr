@@ -161,6 +161,9 @@
   "startTimeout": {
     "message": "Der Browser hat das Tab-Audio nicht rechtzeitig gestartet. Diesen Tab erneut aktivieren."
   },
+  "routeTimeout": {
+    "message": "Der Browser hat den Tab-Ausgang nicht rechtzeitig gewechselt."
+  },
   "noAudioTrack": {
     "message": "Der Tab hat keine Audiospur geliefert."
   },

@@ -161,6 +161,9 @@
   "startTimeout": {
     "message": "Hindi nasimulan ng browser sa oras ang audio ng tab. Paganahin muli ang tab na ito."
   },
+  "routeTimeout": {
+    "message": "Hindi nailipat ng browser sa oras ang output ng tab."
+  },
   "noAudioTrack": {
     "message": "Walang ibinigay na audio track ang tab."
   },

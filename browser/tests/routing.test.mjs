@@ -111,6 +111,33 @@ test('tab gain is independent on a shared destination and survives a reroute', a
   await f.audio.stopAll();
 });
 
+test('a stalled live output change stops only that capture', { timeout: 1000 }, async () => {
+  const stalled = deferred(), closing = deferred();
+  let closes = 0;
+  const f = fixture({
+    sink: id => id === 'unresponsive' ? stalled.promise : undefined,
+    close: () => ++closes === 1 ? closing.promise : undefined,
+    timeoutMs: 30,
+  });
+  await f.audio.start(1, 'first', 'music');
+  await f.audio.start(2, 'second', 'chat');
+  try {
+    await assert.rejects(f.audio.route(1, 'unresponsive'), /did not switch.*in time/);
+    assert.equal(f.streams[0].track.stopped, true);
+    assert.equal(f.streams[1].track.stopped, false);
+    assert.deepEqual(f.audio.snapshot().map(item => item.id), [2]);
+    assert.match(f.statuses.at(-1)[2], /did not switch.*in time/);
+
+    stalled.resolve();
+    closing.resolve();
+    await f.audio.start(1, 'retry', 'music');
+    assert.equal(f.audio.snapshot().find(item => item.id === 1).deviceId, 'music');
+  } finally {
+    stalled.resolve(); closing.resolve();
+    await f.audio.stopAll();
+  }
+});
+
 test('refused output permission never takes over tab audio', async () => {
   const f = fixture({ sink: async () => { throw new Error('NotAllowedError'); } });
   await assert.rejects(f.audio.start(1, 'stream', 'chat'), /NotAllowedError/);

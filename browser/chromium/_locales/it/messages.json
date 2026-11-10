@@ -161,6 +161,9 @@
   "startTimeout": {
     "message": "Il browser non ha avviato in tempo l'audio della scheda. Attiva di nuovo questa scheda."
   },
+  "routeTimeout": {
+    "message": "Il browser non ha cambiato in tempo l'uscita della scheda."
+  },
   "noAudioTrack": {
     "message": "La scheda non ha fornito nessuna traccia audio."
   },

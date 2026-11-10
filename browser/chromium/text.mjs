@@ -60,6 +60,7 @@ export const ENGLISH = {
   tooManyCaptures: 'At most $1 tabs can be routed at once.',
   noSinkSelection: 'This browser cannot select a Web Audio output.',
   startTimeout: 'The browser did not start tab audio in time. Try activating this tab again.',
+  routeTimeout: 'The browser did not switch the tab output in time.',
   noAudioTrack: 'The tab supplied no audio track.',
   routingEnded: 'The browser ended tab audio routing.',
   outputGone: 'The selected OpenXLR output disappeared. Normal tab playback has resumed.',

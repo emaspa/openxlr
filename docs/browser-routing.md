@@ -204,7 +204,8 @@ Chrome has no Cebuano, so a browser set to it shows English.
    An older companion ignores the request; the row then returns to its
    usual text after ten seconds.
 5. While active, channel changes in either place reroute that tab. Other
-   active tabs keep their own channel. Stop, closing the tab, navigating
+   active tabs keep their own channel. If switching the output times out,
+   that tab returns to normal playback. Stop, closing the tab, navigating
    to another origin, disabling browser output selection or losing the
    daemon connection releases the takeover. Normal browser playback can
    then resume. Reconnection restores the list, not capture permission.
