@@ -190,6 +190,44 @@ public sealed class AppVolumeTests : IDisposable
         Assert.Equal(.35, restarted.Snapshot().Streams.Single(app => app.Identity == "vlc").Volume);
     }
 
+    [Theory]
+    [InlineData(35)]
+    [InlineData(80)]
+    public void ANewStreamsDelayedVolumeRestoreCannotReplaceTheSavedLevel(int initialLevel)
+    {
+        Streams(BrowserGraph.Node(10, 100, Vlc, 35));
+        _mixer.SyncStreams();
+        _mixer.SetAppVolume("vlc", .35);
+        _now += 1000;
+        _mixer.SyncStreams();
+
+        Streams(BrowserGraph.Node(10, 100, Vlc, 35), BrowserGraph.Node(11, 101, Vlc, initialLevel));
+        _mixer.SyncAppVolumes();
+        _graph.ClearCalls();
+        _now += 300;
+        Streams(BrowserGraph.Node(10, 100, Vlc, 35), BrowserGraph.Node(11, 101, Vlc, 35));
+        _mixer.SyncAppVolumes();
+
+        _now += 200;
+        Streams(BrowserGraph.Node(10, 100, Vlc, 35), BrowserGraph.Node(11, 101, Vlc, 80));
+        _mixer.SyncAppVolumes();
+        Assert.Equal(.35, _mixer.ExportSettings().AppVolumes["vlc"]);
+        Assert.False(_mixer.TakeAppVolumesChanged());
+        Assert.Empty(VolumeWrites);
+
+        _now += 1100;
+        _mixer.SyncAppVolumes();
+        Assert.Equal(["set-sink-input-volume 101 35%"], VolumeWrites);
+        _now += 1600;
+        Streams(BrowserGraph.Node(10, 100, Vlc, 35), BrowserGraph.Node(11, 101, Vlc, 35));
+        _mixer.SyncAppVolumes();
+
+        Streams(BrowserGraph.Node(10, 100, Vlc, 35), BrowserGraph.Node(11, 101, Vlc, 60));
+        _mixer.SyncAppVolumes();
+        Assert.Equal(.60, _mixer.ExportSettings().AppVolumes["vlc"]);
+        Assert.True(_mixer.TakeAppVolumesChanged());
+    }
+
     [Fact]
     public void AStreamWhoseRouteIsStillPendingGetsTheLevelAnyway()
     {

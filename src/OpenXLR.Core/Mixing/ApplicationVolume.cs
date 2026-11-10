@@ -18,6 +18,7 @@ public sealed partial class Mixer
     // How long a write may take to show in the registry. Until then a
     // different level on the stream is the old one, not somebody's change.
     private const int AppVolumeSettleMs = 1500;
+    private const int AppVolumeConfirmMs = 250;
     // The session manager restores a new stream's remembered level, and a
     // program can set its own, a moment after the stream appears. A write
     // that came first is repeated; past this count the stream keeps the
@@ -44,6 +45,7 @@ public sealed partial class Mixer
     private sealed record AppliedAppVolume(int Serial, string Key, double Target, double Written, long At)
     {
         public bool Confirmed { get; init; }
+        public bool NewStream { get; init; }
         public int Attempts { get; init; } = 1;
         /// <summary>When a write the sound server refused is tried again; 0 after one it took.</summary>
         public long RetryAt { get; init; }
@@ -220,15 +222,20 @@ public sealed partial class Mixer
     private static long RetryDelay(long took, bool refusedBefore)
         => took >= AppVolumeWriteWindowMs || refusedBefore ? AppVolumeBackOffMs : AppVolumeRetryMs;
 
-    private void WriteAppVolumeLocked(AudioStream stream, string key, double target, ref AppVolumeWriteBudget budget, int attempt = 1)
+    private void WriteAppVolumeLocked(AudioStream stream, string key, double target, ref AppVolumeWriteBudget budget,
+        int attempt = 1, bool newStream = false)
     {
         _appVolumeResets.Remove(stream.Id);
         long started = Clock();
         if (!budget.TryUse(started)) return;
+        _appVolumeApplied.TryGetValue(stream.Id, out AppliedAppVolume? previous);
+        bool sameStream = previous is not null && previous.Serial == stream.Serial
+            && previous.Key.Equals(key, StringComparison.OrdinalIgnoreCase);
+        newStream |= sameStream && previous is { NewStream: true, Confirmed: false };
         try
         {
             _pw.SetApplicationStreamVolume(stream.Serial, target);
-            _appVolumeApplied[stream.Id] = new(stream.Serial, key, target, target, Clock()) { Attempts = attempt };
+            _appVolumeApplied[stream.Id] = new(stream.Serial, key, target, target, Clock()) { Attempts = attempt, NewStream = newStream };
         }
         catch (InvalidOperationException)
         {
@@ -236,11 +243,9 @@ public sealed partial class Mixer
             // and tried again soon. The rest of the pass goes on: a stall has
             // used up its time already.
             long now = Clock();
-            bool refusedBefore = _appVolumeApplied.TryGetValue(stream.Id, out AppliedAppVolume? previous)
-                && previous.RetryAt != 0 && previous.Serial == stream.Serial
-                && previous.Key.Equals(key, StringComparison.OrdinalIgnoreCase) && previous.Target == target;
+            bool refusedBefore = sameStream && previous is { RetryAt: not 0 } && previous.Target == target;
             _appVolumeApplied[stream.Id] = new(stream.Serial, key, target, double.NaN, now)
-                { Attempts = attempt, RetryAt = now + RetryDelay(now - started, refusedBefore) };
+                { Attempts = attempt, NewStream = newStream, RetryAt = now + RetryDelay(now - started, refusedBefore) };
         }
     }
 
@@ -293,11 +298,12 @@ public sealed partial class Mixer
             if (!_appVolumeApplied.TryGetValue(stream.Id, out AppliedAppVolume? applied) || applied.Serial != stream.Serial
                 || !applied.Key.Equals(key, StringComparison.OrdinalIgnoreCase))
             {
-                // A stream not seen before. One already at its level, as
-                // after a daemon restart, is left alone.
+                // A stream can match the saved level before its session
+                // restore arrives. Keep it in the startup settle window
+                // even when it needs no initial write.
                 if (stream.Volume is double found && SameAppVolume(found, target))
-                    _appVolumeApplied[stream.Id] = new(stream.Serial, key, target, found, now) { Confirmed = true };
-                else WriteAppVolumeLocked(stream, key, target, ref budget);
+                    _appVolumeApplied[stream.Id] = new(stream.Serial, key, target, found, now) { NewStream = true };
+                else WriteAppVolumeLocked(stream, key, target, ref budget, newStream: true);
                 continue;
             }
             if (applied.RetryAt != 0)
@@ -313,9 +319,11 @@ public sealed partial class Mixer
             if (stream.Volume is not double level) continue;
             if (SameAppVolume(level, applied.Written))
             {
-                // Held for a moment before it counts: a restore that lands
-                // just after the write must not read as a later change.
-                if (!applied.Confirmed && now - applied.At >= 250) _appVolumeApplied[stream.Id] = applied with { Confirmed = true };
+                // An established stream only needs a short confirmation
+                // after a fader write. A new stream can still be restored.
+                int confirmAfter = applied.NewStream ? AppVolumeSettleMs : AppVolumeConfirmMs;
+                if (!applied.Confirmed && now - applied.At >= confirmAfter)
+                    _appVolumeApplied[stream.Id] = applied with { Confirmed = true };
                 continue;
             }
             if (!applied.Confirmed)
