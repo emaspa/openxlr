@@ -1742,6 +1742,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             RestoreBrowserSettingsLocked(s);
             _appVolumes = SavedMixerValidation.AppVolumes(s.AppVolumes, null);
             _hasAppVolumes = _appVolumes.Count > 0;
+            _appVolumeRevision++;
             SetMonitorMuteMicrophones(s.MonitorMuteMicrophones);
             _outputVolumeLock = s.OutputVolumeLock;
             _outputVolumeLockRetryAt = 0;
@@ -3275,10 +3276,14 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// on a timer by the daemon. Returns true when anything changed. Streams the
     /// mixer already placed are left alone so manual overrides survive.
     /// </summary>
-    public bool SyncStreams()
+    public bool SyncStreams() => SyncStreams(_pw.ListApplications);
+
+    /// <summary><see cref="SyncStreams()"/> with the registry read supplied.</summary>
+    internal bool SyncStreams(Func<(IReadOnlyList<AudioStream> Streams, IReadOnlyList<AudioStream> Clients)> read)
     {
         if (!_built) return false;
-        var (live, clients) = _pw.ListApplications();
+        long volumeRevision = Interlocked.Read(ref _appVolumeRevision);
+        var (live, clients) = read();
         bool changed = false;
         _icons.Refresh();
         Dictionary<string, string> icons = LiveIcons(live, clients);
@@ -3401,7 +3406,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             }
 
             // A route can still be pending while its playback level is editable.
-            changed |= SyncAppVolumesLocked(live);
+            // A command or a stream's own pass that acted since the read knows
+            // newer levels than it shows; the next sweep reads them.
+            if (volumeRevision == _appVolumeRevision) changed |= SyncAppVolumesLocked(live);
 
             // Every running audio-capable app is listed even before it plays:
             // PipeWire clients cover "running", streams cover "playing".
@@ -3999,6 +4006,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         _pendingCells.Clear();
         _cellRounds = _cellWait = 0;
         _streams.Clear();
+        // The saved levels stay; what was written to which stream does not.
+        ClearAppVolumeStreamsLocked();
         _cells.Clear();
         _levels.Clear();
         _channelVolume.Clear();

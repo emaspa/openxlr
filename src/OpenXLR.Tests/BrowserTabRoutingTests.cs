@@ -742,7 +742,7 @@ public sealed class BrowserTabRoutingTests
                 echo "$*" >> "$dir/calls"
                 case "$*" in
                   move-sink-input\ *) [ ! -e "$dir/refuse-moves" ] || exit 0 ;;
-                  set-sink-input-volume\ *) [ ! -e "$dir/refuse-volumes" ] || exit 1 ;;
+                  set-sink-input-volume\ *) [ ! -e "$dir/refuse-volumes" ] && [ ! -e "$dir/refuse-volume-$2" ] || exit 1 ;;
                 esac
                 case "$*" in
                   'list sinks short') printf '1\tOpenXLR_ch_system\n2\tOpenXLR_ch_music\n3\tdesktop\n' ;;
@@ -771,6 +771,9 @@ public sealed class BrowserTabRoutingTests
             var adapter = (PipeWireAdapter)typeof(Mixer).GetField("_pw", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(Mixer)!;
             typeof(PipeWireAdapter).GetMethod("InvalidateDump", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(adapter, null);
         }
+
+        /// <summary>Make the sound server refuse volume writes to one sink-input only.</summary>
+        public void RefuseVolume(int serial) => File.WriteAllText(Path.Combine(_directory, $"refuse-volume-{serial}"), "");
 
         public void RefuseMoves() => File.WriteAllText(Path.Combine(_directory, "refuse-moves"), "");
 

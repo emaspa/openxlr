@@ -62,7 +62,7 @@ public sealed class SavedMixerValidationTests
         {
             string path = Path.Combine(root, "mixer.json");
             File.WriteAllText(path, """
-                {"appVolumes":{"Discord":0.45,"chrome":0,"wine":0.6,"invalid":1e999}}
+                {"appVolumes":{"Discord":0.45,"chrome":0,"wine":0.6,"invalid":1e999," (deleted)":0.3}}
                 """);
             MixerSettings loaded = Assert.IsType<MixerSettings>(MixerSettings.Load(path, out string? warning));
             Assert.Contains("appVolumes", warning);
