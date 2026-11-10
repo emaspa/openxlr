@@ -1794,8 +1794,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 // the application that was playing. The choice goes with it.
                 if (StreamMatcher.IsWebKitProcess(identity) && label.Length > 0 && !StreamMatcher.IsWebKitProcess(label))
                 {
-                    if (Matcher.Overrides.TryGetValue(identity, out string? shared)) Matcher.SetOverride(label, shared);
-                    identity = label;
+                    string own = StreamMatcher.MigrateIdentity(label);
+                    if (Matcher.Overrides.TryGetValue(identity, out string? shared)) Matcher.SetOverride(own, shared);
+                    identity = own;
                 }
                 if (!_apps.ContainsKey(identity))
                     _apps[identity] = new StreamAssignment(0, 0, label, identity,

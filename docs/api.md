@@ -611,10 +611,13 @@ one runs and the send carries the processed microphone instead.
 Application identities use playback-node metadata, falling back to the
 owning PipeWire client's application name and process binary when absent.
 Windows executable names normalize to the same key as their Wine/Proton
-client, for example `Balatro.exe` becomes `balatro`. A WebKitGTK or WPE
+client, for example `Balatro.exe` becomes `balatro`. A binary or
+application name with a space in it normalizes the same way, so
+`Music Player` becomes `musicplayer` in a playing stream as in a saved
+assignment. A WebKitGTK or WPE
 application plays from the shared `WebKitWebProcess` or `WPEWebProcess`
-binary, so its identity is its application name; an override or remembered
-app saved under the shared binary moves to that name on load. A stream's
+binary, so its identity comes from its application name; an override or
+remembered app saved under the shared binary moves to that name on load. A stream's
 `label` takes the spelling of an installed desktop entry whose name matches
 it but for letter case. `assignApp` and
 `forgetApp` also accept those legacy executable-name identities. When
@@ -892,7 +895,9 @@ and the entry stands for all of them. `identity` is the key an assignment
 is remembered under and the one `assignApp` and `forgetApp` take. It is
 the process binary as PipeWire reports it (`Discord`, `chrome`), `steam`
 for Steam's browser process, and a lowercased game key such as `balatro`
-for a Windows game under Wine or Proton. It is a key, not a name.
+for a Windows game under Wine or Proton. A binary or application name
+with a space in it becomes a key of the same kind, lowercased letters and
+digits only. It is a key, not a name.
 `label` is the name a client shows. The daemon takes it from the stream or
 client's `application.name`, except when that names a runtime such as
 Chromium, Electron, WEBRTC VoiceEngine or Wine, or is an identifier: one
