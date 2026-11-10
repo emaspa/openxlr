@@ -2289,6 +2289,18 @@
   <data name="BankChoiceNotSaved" xml:space="preserve">
     <value>Избор банке важи до затварања прозора, али није сачуван: {0}</value>
   </data>
+  <data name="PlaybackVolumeShort" xml:space="preserve">
+    <value>Јач.</value>
+  </data>
+  <data name="PlaybackVolume" xml:space="preserve">
+    <value>Јачина репродукције</value>
+  </data>
+  <data name="TabPlaybackVolumeHint" xml:space="preserve">
+    <value>Овај ниво важи када проширење усмери ову картицу.</value>
+  </data>
+  <data name="RememberTabPlaybackVolume" xml:space="preserve">
+    <value>Запамти јачину за овај веб-сајт</value>
+  </data>
   <data name="ApplicationChannelName" xml:space="preserve">
     <value>Канал за {0}</value>
   </data>

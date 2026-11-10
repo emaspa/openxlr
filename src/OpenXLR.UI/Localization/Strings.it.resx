@@ -2347,6 +2347,18 @@ Seleziona l'interfaccia gestita da OpenXLR</value>
   <data name="BankChoiceNotSaved" xml:space="preserve">
     <value>La scelta del banco vale finché la finestra non si chiude, ma non è stato possibile salvarla: {0}</value>
   </data>
+  <data name="PlaybackVolumeShort" xml:space="preserve">
+    <value>Vol.</value>
+  </data>
+  <data name="PlaybackVolume" xml:space="preserve">
+    <value>Volume di riproduzione</value>
+  </data>
+  <data name="TabPlaybackVolumeHint" xml:space="preserve">
+    <value>Questo livello vale quando l'estensione instrada questa scheda.</value>
+  </data>
+  <data name="RememberTabPlaybackVolume" xml:space="preserve">
+    <value>Ricorda il volume per questo sito</value>
+  </data>
   <data name="ApplicationChannelName" xml:space="preserve">
     <value>Canale per {0}</value>
   </data>

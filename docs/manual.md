@@ -1070,9 +1070,9 @@ For separate Teams, YouTube or other browser tabs, the optional
 Browser tabs beside Manage to open the Browser tabs window. The option
 at its top, Enable individual browser tab routing, turns tab routing on
 and off. Below it, each tab has a row with its title, website, capture
-light, channel picker, Remember website and Forget website. Until the
-companion reports a tab, the window says so under the option. Its Manual
-button opens the browser routing guide.
+light, channel picker, playback volume, Remember website and Forget
+website. Until the companion reports a tab, the window says so under the
+option. Its Manual button opens the browser routing guide.
 Enable the option, choose a channel and press Activate in the tab's row.
 The button shows on a row with a channel that is not routed yet. The
 browser lets the companion take a tab's audio only after you clicked its
