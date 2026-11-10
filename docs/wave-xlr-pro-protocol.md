@@ -472,8 +472,7 @@ channel returns (Browser 2/3, Music 10/11, Game 12/13, System 14/15).
 | 1 | depth, dB | amount Low `06`, Medium `0c`, High `18` |
 | 2, 3 | attack, LE16 ms | speed Slow 100, Medium 80, Fast 30 |
 | 4, 5 | release, LE16 ms | speed Slow 2000, Medium 1200, Fast 200 |
-| 6 | flags | bit 0 set on a ducked channel; bit 1 unknown |
-| 7 | `00` | |
+| 6, 7 | key mask, LE16 | bit M set when source M keys this entry (section 20) |
 
 What the daemon writes to bytes 0 to 5:
 
@@ -494,25 +493,28 @@ only when the entries disagree.
 
 Each preset change wrote one field in all twelve entries and nothing else
 (three values each). With no key at all Wave Link left byte 6 at `00 02 00
-00 03 00 00 03 03 00 00 00`; the `02` and `03` are unexplained.
+00 03 00 00 03 03 00 00 00`: leftover key masks, XLR 2 (`02`) and XLR 1
+with XLR 2 (`03`), which section 20 explains.
 
 Making XLR Mic 1 the key for Browser, Music, Game and System wrote 0x0008
 (byte 6 bit 0 on entries 5, 9, 10, 11) and block 0x0001 bytes 16 to 17, 34
 to 35 and 52 to 53 `55 55 -> 5d fd`, 8 ms apart, with no 0x0003 commit and
-nothing rolled back. Those two bytes after the `aa` at 15, 33 and 51 are
+nothing rolled back. Those two bytes after byte 15, 33 and 51 are
 eight 2-bit fields, little endian, field k for pair k: `01` normally, `11`
 while the pair is ducked in that mix. The sections at 69 and 87 did not
 change. With XLR 1 loud and no host write the unit lowered the ducked
-pairs by the configured depth (block 0x0002 meters, capture 28). Nothing
-in either block was seen to name the key.
+pairs by the configured depth (block 0x0002 meters, capture 28). Section
+20 shows that byte 6 bit 0 is XLR 1's bit in a key mask.
 
 The daemon writes the same fields
 (`src/OpenXLR.Core/Devices/ProDucking.cs`): the setup's sensitivity,
 amount and speed in bytes 0 to 5 of all twelve entries while ducking is
-on, bit 0 of byte 6 set on the target pairs and
-cleared on every other entry whose bit 1 is clear (an entry with bit 1 set
-keeps byte 6 as read), and the high bit of each pair field in the three
-mix sections. Every other byte of both blocks is copied from a fresh read.
+on, the key mask `01 00` (XLR 1 alone) in bytes 6 and 7 of the target
+pairs' entries and `00 00` in every other entry, so the keys Wave Link
+leaves behind are cleared, and the high bit of each pair field in the
+three mix sections. Every write of block 0x0001 that carries ducking also
+puts an input tap field at `11` back to `10` (section 20). Every other
+byte of both blocks is copied from a fresh read.
 It writes 0x0008, then 0x0001, only the blocks that change, without the
 commit. Its targets are the pairs OpenXLR streams to: 2/3 (the jacks'
 monitor feed) and 10/11 (the Aux mix, through the aux mix's Music cell).
@@ -535,7 +537,7 @@ agreed within 0.5 dB. Every path or selector change was written with the
 0x0008 were restored byte for byte afterwards.
 
 This corrects section 11 and the desk note of 2026-10-21 in three places:
-each pair of field bytes belongs to the section before its `aa`, the
+each pair of field bytes belongs to the section before its byte 15, the
 monitor return is not a path around a mix, and a ducked field must read
 `11`, not only have its high bit set.
 
@@ -549,7 +551,7 @@ and 72. For a section starting at `s`:
 | `s` to `s+11` | one level per source, int8 in half dB, `00` unity, held at +12 dB (`18`) and above |
 | `s+12`, `s+13` | membership, little endian, one bit per source |
 | `s+14` | unknown |
-| `s+15` | `aa` |
+| `s+15` | the four inputs' 2-bit tap fields (section 20); `aa` as Wave Link leaves them |
 | `s+16`, `s+17` | the 2-bit ducking fields, field k for USB pair k |
 
 The sources, as bit and level index: 0 XLR 1, 1 XLR 2, 2 USB Aux, 3 Line
@@ -980,7 +982,8 @@ disturbs audio that the write does not change.
 - Where the playback pairs' 7.9 dB goes (section 16 shows it is fixed and
   uniform, with a limiter above it).
 - Section 0's -21 dB is byte 98 (section 17).
-- Per-channel ducking keys other than XLR 1 (section 11).
+- Per-channel ducking keys other than XLR 1 (section 11); section 20
+  answers it.
 
 ## 16. USB playback pairs in the mix sections (desk probe of 2026-11-02)
 
@@ -1158,9 +1161,8 @@ with every threshold at 0 dB (`00`).
   microphone live on XLR 2, XLR 2 was a member of sections 54 and 72 at
   `00` and entry 1 was flagged with depth 12 dB. While the key was held
   XLR 2 stayed at 0.00 dB in both sections, flagged or not, and pair 7 in
-  the same section dipped its 6.00 dB. The sections have no ducking field
-  for the inputs, so the unit ducks only USB playback pairs, as far as
-  these bytes go.
+  the same section dipped its 6.00 dB. The inputs' own fields are in
+  byte `s+15` (section 20), which this run did not write.
 
 ## 18. The headphone jacks on each section (desk probe of 2026-11-02)
 
@@ -1230,3 +1232,58 @@ afterwards.
   than the section's own capture stream. That is the output and input
   converters together; how it splits between them was not measured.
 
+## 20. Ducking keys and the input taps (2026-11-10)
+
+USB captures of Wave Link on Windows choosing each key, and the unit's own
+meters in block 0x0002 while speaking into one input at a time.
+
+### The key mask in block 0x0008
+
+Bytes 6 and 7 of each entry are one little-endian 16-bit key mask. Bit M
+set means source M keys the entry, with the sources numbered as the
+entries are: 0 XLR 1, 1 XLR 2, 2 USB Aux in, 3 Line In, 4 + k USB
+playback pair k. Making XLR 2 the key set bit 1, Music (pair 5) bit 9 and
+XLR 1 bit 0, in each ducked channel's entry.
+
+- The mask is a union: every set bit is a live key, and the unit's key
+  level is the loudest of the masked sources. With masks `03 02` (XLR 1,
+  XLR 2 and pair 5) on the pairs' entries, speaking into XLR 2 alone
+  ducked those pairs.
+- XLR 1's key level is taken after its insert.
+- A source's own bit in its own entry is ignored: entry 1 with bit 1 set
+  was never keyed.
+- Wave Link sets a bit when a source becomes a key and never clears one,
+  so units carry leftover masks, commonly `02` and `03` (the idle state of
+  section 11). On such a unit XLR 2 ducks whatever those entries' fields
+  mark.
+
+OpenXLR keys by XLR 1 alone: it writes `01 00` on the entries it ducks and
+`00 00` on every other entry, which clears the leftovers. The readback's
+`entries` lists the entries whose mask has bit 0 set; whether the unit
+holds OpenXLR's setting is decided on every byte, so an entry that also
+holds another key does not read as held and is written again.
+
+### The tap fields in block 0x0001
+
+Bytes `s+15`, `s+16` and `s+17` of each of the five mix sections hold
+twelve 2-bit fields, little endian, field M for source M in the same
+numbering: `s+15` the four inputs, `s+16` and `s+17` the eight pairs (the
+ducking fields of sections 11 and 12). A field is where the section takes
+that source:
+
+| Field | Tap |
+|---|---|
+| `00` | before the unit's processing |
+| `01` | after it |
+| `10` | after the insert return |
+| `11` | after the ducker |
+
+Wave Link's usual `aa` at `s+15` is all four inputs at `10`. It wrote `ae`
+(XLR 2 at `11`) and `af` (XLR 1 and XLR 2 at `11`) when it made those
+inputs ducked channels. The pairs' fields follow the same table, which
+is why a ducked pair reads `11`.
+
+OpenXLR never ducks an input. Its decode takes any value at `s+15`, and
+every write of block 0x0001 that carries ducking or hardware mixing, and
+every section it puts back, sets an input field read at `11` to `10` and
+leaves the other input fields as read.

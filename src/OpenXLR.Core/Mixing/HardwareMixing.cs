@@ -22,7 +22,7 @@ public sealed record HardwareMixingUnit
     public bool Connected { get; init; }
     /// <summary>The version block 0x0000 reports, major.minor.patch, or null before it is read.</summary>
     public string? Firmware { get; init; }
-    /// <summary>Block 0x0001 was read and its five sections decode (aa at each section's byte 15).</summary>
+    /// <summary>Block 0x0001 was read and has the layout its codec decodes (see <see cref="ProMixSections.Check"/>).</summary>
     public bool SectionsDecode { get; init; }
 }
 

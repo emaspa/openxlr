@@ -248,25 +248,61 @@ public sealed class ProMixSectionsTests
     }
 
     [Fact]
-    public void ABlockOfAnotherLayoutDoesNotDecode()
+    public void ABlockOfAnotherLengthDoesNotDecode()
     {
         Assert.Equal("block 0x0001 is 107 bytes, not 108", ProMixSections.Check(new byte[107]));
+        Assert.Equal(new Dictionary<string, string> { ["sections"] = "not decoded: block 0x0001 is 107 bytes, not 108" },
+            ProMixSections.Describe(new byte[107]));
+    }
+
+    [Fact]
+    public void AnInputDuckedByWaveLinkDecodes()
+    {
+        // Wave Link wrote ae (XLR 2's tap field at 3, after the ducker) and af
+        // (XLR 1's as well) at byte 15 of a section; any value is a valid
+        // set of four tap fields.
         byte[] b = Desk();
-        b[51] = 0x00;
-        Assert.Equal("section 36 holds 00 at byte 51, not aa", ProMixSections.Check(b));
-        Assert.Equal(new Dictionary<string, string> { ["sections"] = "not decoded: section 36 holds 00 at byte 51, not aa" },
-            ProMixSections.Describe(b));
+        b[15] = 0xae;
+        b[51] = 0xaf;
+        b[87] = 0x00;
+        Assert.Null(ProMixSections.Check(b));
+        Assert.True(ProMixSections.Decodes(b));
+        Assert.Equal([2, 3, 2, 2], Enumerable.Range(0, 4).Select(input => ProMixSections.InputTap(b, 0, input)));
+        Assert.Equal([3, 3, 2, 2], Enumerable.Range(0, 4).Select(input => ProMixSections.InputTap(b, 36, input)));
+        Assert.Equal([0, 0, 0, 0], Enumerable.Range(0, 4).Select(input => ProMixSections.InputTap(b, 72, input)));
+        IReadOnlyDictionary<string, string> d = ProMixSections.Describe(b);
+        Assert.Equal("USB Aux 0 dB, pair 1 0 dB; ducks XLR 2; inputs ae, fields 5501, byte 14 00", d["section0"]);
+        Assert.Equal("pair 5 0 dB; ducks XLR 1, XLR 2; inputs af, fields 5501, byte 50 00", d["section36"]);
+        Assert.Throws<ArgumentOutOfRangeException>(() => ProMixSections.InputTap(b, 0, 4));
+    }
+
+    [Fact]
+    public void ClearingInputDuckingPutsOnlyFieldsAtThreeBackToTwo()
+    {
+        byte[] b = Desk();
+        b[15] = 0xae;
+        b[33] = 0xaf;
+        b[51] = 0x93;   // XLR 1 at 3, XLR 2 at 0, USB Aux at 1, Line In at 2
+        b[69] = 0x55;
+        b[87] = 0xff;
+        byte[] before = (byte[])b.Clone();
+        Assert.True(ProMixSections.ClearInputDucking(b));
+        Assert.Equal(new byte[] { 0xaa, 0xaa, 0x92, 0x55, 0xaa }, ProMixSections.Starts.Select(s => b[s + 15]));
+        for (int i = 0; i < b.Length; i++)
+            if (!ProMixSections.Starts.Contains(i - 15)) Assert.Equal(before[i], b[i]);
+        Assert.False(ProMixSections.ClearInputDucking(b));
+        Assert.Throws<ArgumentException>(() => ProMixSections.ClearInputDucking(new byte[107]));
     }
 
     [Fact]
     public void DiagnosticsDescribeTheDeskBlock()
     {
         IReadOnlyDictionary<string, string> d = ProMixSections.Describe(Desk());
-        Assert.Equal("USB Aux 0 dB, pair 1 0 dB; ducks no pair; fields 5501, byte 14 00", d["section0"]);
-        Assert.Equal("XLR 1 0 dB, XLR 2 0 dB, pair 0 0 dB; ducks no pair; fields 5501, byte 32 00", d["section18"]);
-        Assert.Equal("pair 5 0 dB; ducks no pair; fields 5501, byte 50 00", d["section36"]);
-        Assert.Equal("no members; ducks no pair; fields 5555, byte 68 00", d["section54"]);
-        Assert.Equal("no members; ducks no pair; fields 5555, byte 86 00", d["section72"]);
+        Assert.Equal("USB Aux 0 dB, pair 1 0 dB; ducks nothing; inputs aa, fields 5501, byte 14 00", d["section0"]);
+        Assert.Equal("XLR 1 0 dB, XLR 2 0 dB, pair 0 0 dB; ducks nothing; inputs aa, fields 5501, byte 32 00", d["section18"]);
+        Assert.Equal("pair 5 0 dB; ducks nothing; inputs aa, fields 5501, byte 50 00", d["section36"]);
+        Assert.Equal("no members; ducks nothing; inputs aa, fields 5555, byte 68 00", d["section54"]);
+        Assert.Equal("no members; ducks nothing; inputs aa, fields 5555, byte 86 00", d["section72"]);
         Assert.Equal("Headphones 1 nothing, Headphones 2 nothing, USB Aux port section 36, Line Out nothing", d["outputs"]);
         Assert.Equal("-21 dB (byte 98 54)", d["section0Level"]);
         Assert.Equal("processed (byte 94 02)", d["xlr1Capture"]);
@@ -283,7 +319,7 @@ public sealed class ProMixSectionsTests
         b[ProMixSections.Section0LevelOffset] = 0x00;
         IReadOnlyDictionary<string, string> d = ProMixSections.Describe(b);
         Assert.Equal("Line In -31 dB, pair 1 0 dB, pair 2 -27.5 dB, pair 3 -27.5 dB, pair 4 -27.5 dB, pair 6 -45 dB, pair 7 off; "
-            + "ducks pair 1; fields 5d01, byte 14 00", d["section0"]);
+            + "ducks pair 1; inputs aa, fields 5d01, byte 14 00", d["section0"]);
         Assert.Equal("Headphones 1 section 0, Headphones 2 2f, plays nothing known, USB Aux port section 36, Line Out nothing", d["outputs"]);
         Assert.Equal("0 dB (byte 98 00)", d["section0Level"]);
         Assert.Equal("before the unit's processing (byte 94 00)", d["xlr1Capture"]);
@@ -299,20 +335,22 @@ public sealed class ProMixSectionsTests
         int writes = unit.Calls.Count(c => c.Type == 0x41);
         IReadOnlyDictionary<string, string> dump = pro.DumpBlocks();
         Assert.Equal(DeskBlock, dump["0x0001"], ignoreCase: true);
-        Assert.Equal("pair 5 0 dB; ducks no pair; fields 5501, byte 50 00", dump["section36"]);
+        Assert.Equal("pair 5 0 dB; ducks nothing; inputs aa, fields 5501, byte 50 00", dump["section36"]);
         Assert.Equal("Headphones 1 nothing, Headphones 2 nothing, USB Aux port section 36, Line Out nothing", dump["outputs"]);
         Assert.Equal("-21 dB (byte 98 54)", dump["section0Level"]);
         Assert.Equal(writes, unit.Calls.Count(c => c.Type == 0x41));
     }
 
     [Fact]
-    public void TheDeviceDumpSaysWhenTheSectionsDoNotDecode()
+    public void TheDeviceDumpDecodesABlockOfZeros()
     {
+        // Byte 15 of each section is four tap fields, so a block that reads
+        // 00 there decodes like any other.
         var unit = new ProHardwareEqTests.Unit();
         using var pro = new WaveXlrProDevice(unit);
         pro.Connect();
         IReadOnlyDictionary<string, string> dump = pro.DumpBlocks();
-        Assert.Equal("not decoded: section 0 holds 00 at byte 15, not aa", dump["sections"]);
-        Assert.False(dump.ContainsKey("section0"));
+        Assert.False(dump.ContainsKey("sections"));
+        Assert.Equal("no members; ducks nothing; inputs 00, fields 0000, byte 14 00", dump["section0"]);
     }
 }

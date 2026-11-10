@@ -924,7 +924,10 @@ computer at the same time. The amount and speed are the same everywhere,
 and the reduction meter stays empty for the unit's mixes.
 
 On the Pro, OpenXLR writes the setting every time the unit connects, which
-clears any ducking Wave Link left on it. If another program changes the
+clears any ducking Wave Link left on it, extra keys included. On a unit
+Wave Link used, talking into XLR 2 could also duck the unit's mixes; once
+OpenXLR has written its setting, only XLR 1 does.
+If another program changes the
 setting while OpenXLR runs, OpenXLR writes its own back within a few
 seconds. In hardware-control mode OpenXLR writes nothing and the unit
 keeps what it holds, and the Ducking window shows the setup without

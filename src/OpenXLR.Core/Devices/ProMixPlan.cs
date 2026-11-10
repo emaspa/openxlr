@@ -35,7 +35,12 @@ public static class ProJackFeeds
     /// <summary>The slot of a section, or -1 for a section no jack feed uses.</summary>
     public static int SlotOfSection(int section) => section switch { 0 => 0, 18 => 1, 54 => 2, _ => -1 };
 
-    /// <summary>The bytes of a section a restore puts back: its cells, membership, byte 14 and marker. The ducking fields stay with ducking.</summary>
+    /// <summary>
+    /// The bytes of a section a restore puts back: its cells, membership,
+    /// byte 14 and the inputs' tap fields, any input after the ducker put
+    /// back to 2 (see <see cref="ProMixSections.ClearInputDucking"/>). The
+    /// pairs' ducking fields stay with ducking.
+    /// </summary>
     public const int RestoredLength = ProMixSections.DuckingOffset;
 }
 
@@ -105,7 +110,9 @@ public sealed record ProMixPlan
     /// Hardware mixing: the sections the unit builds, by section start (a
     /// jack's 0, 18 or 54, and 36 for the Aux mix), as their first 14 bytes
     /// (the twelve level cells and the membership mask), written exactly.
-    /// Byte 14, the marker and the ducking fields stay as read. A restore for
+    /// Byte 14 and the tap fields stay as read, except that the plan puts
+    /// any input after the ducker back to 2 in every section, as a ducking
+    /// write does. A restore for
     /// a section named here is skipped. With section 36 here,
     /// <see cref="UsbAux"/> sets the port's selector alone: the section's
     /// cells are the unit's Aux mix, not pair 5's stream.
@@ -318,8 +325,8 @@ public sealed record ProMixPlan
     /// level trimmed the same way while on), USB Aux's bit 2 as section 0
     /// holds it with its level trimmed, and no other source: Line In and every
     /// other pair out. The pair a feed streams on also leaves section 36, so a
-    /// jack's feed never reaches the USB Aux port. Byte 14, the marker and the
-    /// ducking fields stay as read.
+    /// jack's feed never reaches the USB Aux port. Byte 14 and the tap fields
+    /// stay as read.
     /// </summary>
     private bool ApplySections(ReadOnlySpan<byte> held, Span<byte> into)
     {
@@ -365,7 +372,7 @@ public sealed record ProMixPlan
         {
             if (section is not (0 or AuxSection)) throw new ArgumentException($"section {section} is not put back on leaving", nameof(EntryRestore));
             if (!IsRestore(hex)) throw new ArgumentException($"a restore is {ProJackFeeds.RestoredLength} bytes of hex", nameof(EntryRestore));
-            byte[] bytes = Convert.FromHexString(hex);
+            byte[] bytes = Restored(hex);
             if (into.Slice(section, bytes.Length).SequenceEqual(bytes)) continue;
             bytes.CopyTo(into[section..]);
             changed = true;
@@ -378,7 +385,8 @@ public sealed record ProMixPlan
 
     /// <summary>
     /// Hardware mixing's edits on <paramref name="into"/>: the unit-built
-    /// sections and byte 98. Returns the parts that changed a byte.
+    /// sections, no input after the ducker in any section, and byte 98.
+    /// Returns the parts that changed a byte.
     /// </summary>
     private ProMixChanges ApplyUnit(Span<byte> into)
     {
@@ -393,6 +401,7 @@ public sealed record ProMixPlan
                 bytes.CopyTo(into[section..]);
                 changes |= ProMixChanges.UnitSections;
             }
+        if (UnitSections is not null && ProMixSections.ClearInputDucking(into)) changes |= ProMixChanges.UnitSections;
         if (Section0Level is byte level && into[ProMixSections.Section0LevelOffset] != level)
         {
             into[ProMixSections.Section0LevelOffset] = level;
@@ -414,22 +423,39 @@ public sealed record ProMixPlan
         return mic.Direct && HalfDb(HeldLevelDb(into[offset])) != HalfDb(wanted) && Set(into, offset, LevelCell(wanted));
     }
 
-    /// <summary>A restore's bytes, checked: hex of <see cref="ProJackFeeds.RestoredLength"/> bytes for section 18 or 54.</summary>
+    /// <summary>A restore's bytes, checked: hex of <see cref="ProJackFeeds.RestoredLength"/> bytes for section 18 or 54, no input after the ducker.</summary>
     /// <exception cref="ArgumentException">Another section, or hex of another length.</exception>
     public static byte[] RestoreBytes(int section, string hex)
     {
         if (ProJackFeeds.SlotOfSection(section) is not (1 or 2)) throw new ArgumentException($"section {section} is not restored", nameof(section));
         if (!IsRestore(hex)) throw new ArgumentException($"a restore is {ProJackFeeds.RestoredLength} bytes of hex", nameof(hex));
-        return Convert.FromHexString(hex);
+        return Restored(hex);
+    }
+
+    /// <summary>A checked restore's bytes with any input tap field at 3 put back to 2, as every write of the block leaves them.</summary>
+    private static byte[] Restored(string hex) => Restored(Convert.FromHexString(hex));
+
+    private static byte[] Restored(byte[] bytes)
+    {
+        bytes[ProMixSections.InputTapsOffset] = ProMixSections.WithoutInputDucking(bytes[ProMixSections.InputTapsOffset]);
+        return bytes;
     }
 
     /// <summary>Whether a saved restore is <see cref="ProJackFeeds.RestoredLength"/> bytes of hex.</summary>
     public static bool IsRestore(string? hex)
         => hex is { Length: 2 * ProJackFeeds.RestoredLength } && hex.All(Uri.IsHexDigit);
 
-    /// <summary>The bytes of a section a restore would put back, as hex, from a whole block.</summary>
+    /// <summary>The bytes of a section a restore would put back, as hex, from a whole block: no input after the ducker.</summary>
     public static string RestoreOf(ReadOnlySpan<byte> block, int section)
-        => Convert.ToHexString(block.Slice(section, ProJackFeeds.RestoredLength));
+        => Convert.ToHexString(Restored(block.Slice(section, ProJackFeeds.RestoredLength).ToArray()));
+
+    /// <summary>
+    /// Whether a section of the block holds what a kept restore puts back,
+    /// as the restore writes it: a restore kept with an input after the
+    /// ducker is held once that input reads 2.
+    /// </summary>
+    public static bool HoldsRestore(ReadOnlySpan<byte> block, int section, string hex)
+        => IsRestore(hex) && block.Slice(section, ProJackFeeds.RestoredLength).SequenceEqual(Restored(hex));
 
     /// <summary>The unit builds the Aux mix in section 36 (hardware mixing): the port's selector is all <see cref="UsbAux"/> sets.</summary>
     private bool AuxInUnit => UnitSections?.ContainsKey(AuxSection) == true;
