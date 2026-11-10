@@ -38,5 +38,7 @@ internal sealed class DeviceDuckingPort : IDaemonDuckingPort
 
     public DeviceDuckingStatus Status(string unit) => _primary.DuckingStatus(unit);
 
+    public double? Reduction(string unit) => _primary.UnitDuckReduction(unit);
+
     public (string Unit, UnitDuckingSupport Support)? Primary() => _primary.PublishedDuckingSupport;
 }

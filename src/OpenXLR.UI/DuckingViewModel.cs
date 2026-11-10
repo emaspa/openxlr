@@ -374,8 +374,8 @@ public sealed class DuckingViewModel : ViewModelBase
     public bool Warns => _mixerRunning && _reason != "mixerOff" && _enabled && !NothingChosen
         && (SoftwareBroken || (_backend == "device" ? !_held : _backend != "software"));
 
-    /// <summary>The reduction bar shows while this computer runs it.</summary>
-    public bool ShowReduction => CanEdit && _enabled && _backend == "software";
+    /// <summary>The reduction bar shows while this computer runs it, or while the unit runs it and holds it, which reports its own.</summary>
+    public bool ShowReduction => CanEdit && _enabled && (_backend == "software" || _backend == "device" && _held);
 
     /// <summary>The largest reduction across the ducked mixes now, in dB.</summary>
     public double Reduction => _reduction;

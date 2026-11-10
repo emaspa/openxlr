@@ -542,8 +542,30 @@ public sealed class TuiDuckingTests
         app.Link.Receive("""{"type":"meters","levels":{"duck:monitor":[3]}}""");
         Assert.Contains("3 dB", Select(app, "Lowered by"), StringComparison.Ordinal);
 
-        // On the unit the meters carry nothing for ducking, so there is no bar.
+        // Off, there is no bar, wherever it would run.
         Assert.False(Shows(Ready(ProJson).App, "Lowered by"));
+    }
+
+    [Fact]
+    public void TheReductionBarShowsTheUnitsOwnCutWhileTheUnitHoldsIt()
+    {
+        (App app, _) = Ready(Edit(root =>
+        {
+            Ducking(root)["enabled"] = true;
+            Ducking(root)["amount"] = "high";
+        }));
+        Assert.Contains("0 dB", Select(app, "Lowered by"), StringComparison.Ordinal);
+        app.Link.Receive("""{"type":"meters","levels":{"ch:music":[0.5,0.5],"duck:monitor":[12.25]}}""");
+        string row = Select(app, "Lowered by");
+        Assert.Contains("12 dB", row, StringComparison.Ordinal);
+        Assert.Contains('█', row);
+
+        // Not held yet: the unit's reading would not be OpenXLR's setting, so no bar.
+        Assert.False(Shows(Ready(Edit(root =>
+        {
+            Ducking(root)["enabled"] = true;
+            Ducking(root)["device"]!["held"] = false;
+        })).App, "Lowered by"));
     }
 
     /// <summary>

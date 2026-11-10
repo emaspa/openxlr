@@ -857,8 +857,10 @@ the setup without letting you change it:
 Each change applies at once. With the Wave XLR Pro attached, **Runs on**
 offers **This unit** and **This computer** (see below). The line at the
 bottom says what runs ducking and where it sits in the signal, or why
-nothing runs it. While this computer runs it, **Reduction** shows how far
-the chosen channels are lowered now, the deepest of the ducked mixes. If
+nothing runs it. **Reduction** shows how far the chosen channels are
+lowered now, the deepest of the ducked mixes. When this computer runs
+ducking, the reading comes from its own stages. When a Wave XLR Pro runs it
+and holds the setup, it comes from the unit's own meters. If
 the daemon refuses a change, the Ducking window shows why and puts its setup back.
 
 On any device the [terminal mixer](#terminal-ducking) also sets the whole
@@ -931,7 +933,7 @@ microphone cannot, and with one among the keys the jacks' mixes are not
 ducked and the state says why. XLR 1, XLR 2, Aux In and Line In on the
 channel list are lowered where the unit takes them into the mix. Every other ducked mix, such as Stream or Chat, is ducked on this
 computer at the same time. The amount and speed are the same everywhere,
-and the reduction meter stays empty for the unit's mixes.
+and the reduction meter shows the deeper of the two.
 
 Keys other than XLR 1, and the unit's own inputs on the channel list, come
 from Wave Link captures, and nobody has heard them on a unit yet. Aux In
@@ -5981,9 +5983,10 @@ reads "on the unit, before inserts": the Pro listens to its own inputs, so
 a gate or noise suppressor on a microphone does not stop the unit ducking
 on noise. On this computer it reads after the EQ and inserts. While the unit is chosen
 and the setup does not fit it, **Not on unit** gives the reason in a few
-words; the UI shows the whole sentence. While this computer runs it,
-**Lowered by** is a short bar of how far the channels are down right now,
-the deepest of the ducked mixes. If the software side cannot run,
+words; the UI shows the whole sentence. While this computer runs it, or
+the unit runs it and holds the setup, **Lowered by** is a short bar of how
+far the channels are down right now, the deepest of the ducked mixes. If
+the software side cannot run,
 **Software** shows the daemon's reason. In hardware-control mode the card
 says ducking needs the software mixer.
 

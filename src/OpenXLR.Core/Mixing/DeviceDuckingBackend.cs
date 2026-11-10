@@ -95,6 +95,14 @@ public interface IDeviceDuckingPort
 
     /// <summary>The cached status of the last post to this unit.</summary>
     DeviceDuckingStatus Status(string unit);
+
+    /// <summary>
+    /// How far the unit lowers what it ducks now, in dB: the largest
+    /// reduction across its ducked entries, from its own meters. Asking keeps
+    /// the meters read for a second; null while none is read yet, the unit
+    /// holds no ducking, or this unit is not driven. Never waits for USB.
+    /// </summary>
+    double? Reduction(string unit) => null;
 }
 
 /// <summary>

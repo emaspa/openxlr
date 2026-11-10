@@ -1010,6 +1010,7 @@ public sealed partial class DeviceManager : BackgroundService
             }
             // A readback that changed can change whether the unit runs ducking at all.
             changed |= VerifyDuckingLocked(_device);
+            ReadDuckReductionLocked(_device);
             VerifyEqLocked(_device);
             VerifyDynamicsLocked(_device);
             if (changed || recovered) RaiseFromLocked();
@@ -1512,6 +1513,16 @@ public sealed partial class DeviceManager : BackgroundService
     /// <summary>The least time between two rewrites of ducking another program changed.</summary>
     internal static readonly TimeSpan DuckingRewriteSpacing = TimeSpan.FromSeconds(5);
 
+    // The unit's own reduction, from its meters (block 0x0002): read by the
+    // poll only while the unit holds ducking on and someone asked for it
+    // within UnitMetersHold, so an idle daemon adds no USB read.
+    private long? _duckMetersAskedAt;
+    private double? _duckReduction;
+    private long _duckReductionAt;
+
+    /// <summary>How long one ask for the unit's reduction keeps its meters read.</summary>
+    internal static readonly TimeSpan UnitMetersHold = TimeSpan.FromSeconds(1);
+
     /// <summary>What a unit that did not keep a written ducking target reports, after the unit's name.</summary>
     internal const string DuckingNotKept = "did not keep the ducking written to it";
 
@@ -1618,6 +1629,55 @@ public sealed partial class DeviceManager : BackgroundService
         _duckFailed = null;
         _duckMisses = 0;
         _duckReadback = null;
+        _duckReduction = null;
+    }
+
+    /// <summary>
+    /// The driven unit's ducking reduction now, in dB, the largest across the
+    /// entries it ducks, as the poll last read its meters. Each ask keeps the
+    /// poll reading them for <see cref="UnitMetersHold"/>; null for a unit
+    /// that is not driven, before the first read, and once the last read is
+    /// older than the hold. Never waits for the device lock.
+    /// </summary>
+    internal double? UnitDuckReduction(string unit)
+    {
+        if (_published.Info?.InstanceId != unit || _published.Ducking is null) return null;
+        long now = NowMs;
+        lock (_duckGate)
+        {
+            _duckMetersAskedAt = now;
+            return _duckReduction is { } db && now - _duckReductionAt < (long)UnitMetersHold.TotalMilliseconds ? db : null;
+        }
+    }
+
+    /// <summary>
+    /// After the ducking readback: one read of the unit's meters while it
+    /// holds an enabled target, verified and not moved since, and the
+    /// reduction was asked for within the hold. Anything else reads nothing
+    /// and forgets the last reading.
+    /// </summary>
+    private void ReadDuckReductionLocked(IAudioDevice dev)
+    {
+        if (!dev.Capabilities.Ducking) return;
+        long now = NowMs;
+        IReadOnlyList<int> entries;
+        lock (_duckGate)
+        {
+            bool asked = _duckMetersAskedAt is { } at && now - at < (long)UnitMetersHold.TotalMilliseconds;
+            bool held = _duckPending is null && _duckWritten is null && _duckFailed is null && !_duckDrifted;
+            entries = asked && held && _duckVerified is { } verified ? ProMeters.DuckedEntries(verified) : [];
+            if (entries.Count == 0)
+            {
+                _duckReduction = null;
+                return;
+            }
+        }
+        ProMeterReading? meters = dev.ReadMeters();
+        lock (_duckGate)
+        {
+            _duckReduction = meters?.DuckReductionDb(entries);
+            _duckReductionAt = now;
+        }
     }
 
     private void ForgetDucking()

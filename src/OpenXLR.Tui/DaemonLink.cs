@@ -204,7 +204,8 @@ internal sealed class DaemonLink : IAsyncDisposable
 
     /// <summary>
     /// The largest ducking reduction now, in dB, across the mixes a software
-    /// stage runs in; 0 while none reports, and once a reading is a second old.
+    /// stage or the unit ducks; 0 while none reports, and once a reading is a
+    /// second old.
     /// </summary>
     public double DuckReduction()
     {
@@ -568,7 +569,7 @@ internal sealed class DaemonLink : IAsyncDisposable
                         .Take(2).Select(item => item.GetDouble()).ToArray();
                     if (pair.Length == 0) continue;
                     present.Add(entry.Name);
-                    // A ducking stage reports its reduction in dB, not a level on the meter scale.
+                    // A ducking stage or the unit reports its reduction in dB, not a level on the meter scale.
                     if (entry.Name.StartsWith("duck:", StringComparison.Ordinal))
                     {
                         _reductions[entry.Name] = (Math.Clamp(pair[0], 0, 120), now);

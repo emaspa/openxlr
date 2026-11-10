@@ -669,7 +669,7 @@ internal sealed class InputsView : View
         if (ducking.Error is { Length: > 0 } error)
             foreach ((string line, int at) in Wrap(error, 40).Select((line, at) => (line, at)))
                 rows.Add(new TextRow(at == 0 ? "Software" : string.Empty, line));
-        if (ducking.Backend == "software")
+        if (ducking.ShowsReduction)
         {
             double reduction = link.DuckReduction();
             rows.Add(new BarRow("Lowered by", reduction / ducking.Depth, $"{reduction:0} dB"));
