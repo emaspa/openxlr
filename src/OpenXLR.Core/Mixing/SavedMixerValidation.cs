@@ -74,7 +74,9 @@ internal static class SavedMixerValidation
     private static OutputVolumeLock? OutputLock(OutputVolumeLock? held, List<string> notes)
     {
         if (held is null || held.Device is { } device && Mixer.IsLockableOutputName(device)
-            && held.Volume is >= 0 and <= PipeWireAdapter.MaxSinkVolume)
+            && held.Volume is >= 0 and <= PipeWireAdapter.MaxSinkVolume
+            && (held.ChannelVolumes is null || held.ChannelVolumes is { Length: > 0 and <= PipeWireAdapter.MaxSinkChannels } channels
+                && channels[0] == held.Volume && channels.All(volume => volume is >= 0 and <= PipeWireAdapter.MaxSinkVolume)))
             return held;
         notes.Add("outputVolumeLock");
         return null;

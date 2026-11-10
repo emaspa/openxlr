@@ -5548,7 +5548,9 @@ Under **Options → Audio → System default devices**, **Lock active output
 volume** holds the configured PipeWire output at its current level. With no
 configured default it uses the desktop default. If the default is an OpenXLR
 sink, it holds the first selected monitor output. The settings show the device
-and held level. Changes from the desktop are corrected on the next mixer sweep.
+and held level. Changes from the desktop are corrected on the next mixer sweep, including
+changes to just one side of a stereo output. The lock preserves the
+channel balance on outputs with the same channel count.
 OpenXLR's shared MONITOR volume control is disabled when its first output is
 locked. Mix faders, headphone gain and mute controls stay available.
 

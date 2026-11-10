@@ -1,7 +1,10 @@
 namespace OpenXLR.Core.Mixing;
 
 /// <summary>The exact PipeWire node name and the desktop level it should keep.</summary>
-public sealed record OutputVolumeLock(string Device, double Volume = double.NaN);
+public sealed record OutputVolumeLock(string Device, double Volume = double.NaN)
+{
+    public double[]? ChannelVolumes { get; init; }
+}
 
 public sealed partial class Mixer
 {
@@ -37,11 +40,11 @@ public sealed partial class Mixer
                 if (sink is null || !IsLockableOutputName(sink) || IsVolumeControlledByUnitLocked(sink))
                     throw new InvalidOperationException("select a PipeWire output with software-controlled volume");
                 sink = ResolveOutputKeyLocked(sink);
-                double volume = _pw.GetUnclampedSinkVolume(sink)
+                double[] volumes = _pw.GetSinkChannelVolumes(sink)
                     ?? throw new InvalidOperationException("output volume is unavailable");
-                if (volume > PipeWireAdapter.MaxSinkVolume)
+                if (volumes.Any(volume => volume > PipeWireAdapter.MaxSinkVolume))
                     throw new InvalidOperationException("lower the output volume to 150% or less before locking it");
-                next = new(sink, Math.Round(volume * 100) / 100);
+                next = new(sink, volumes[0]) { ChannelVolumes = volumes.All(volume => volume == volumes[0]) ? null : volumes };
             }
 
             if (save(ExportSettings() with { OutputVolumeLock = next }) is { } error) throw new IOException(error);
@@ -58,10 +61,17 @@ public sealed partial class Mixer
     {
         if (_outputVolumeLock is not { } held || IsVolumeControlledByUnitLocked(held.Device)) return null;
         if (Clock() >= _outputVolumeLockRetryAt &&
-            _pw.GetUnclampedSinkVolume(held.Device, skipMissing: true) is double volume &&
-            Math.Abs(volume - held.Volume) > .005)
+            _pw.GetSinkChannelVolumes(held.Device, skipMissing: true) is { } current)
         {
-            try { _pw.SetSinkVolume(held.Device, held.Volume); }
+            try
+            {
+                if (held.ChannelVolumes is { } saved && saved.Length == current.Length)
+                {
+                    if (!saved.SequenceEqual(current)) _pw.SetSinkChannelVolumes(held.Device, saved);
+                }
+                else if (current.Any(volume => volume != held.Volume))
+                    _pw.SetSinkVolume(held.Device, held.Volume);
+            }
             catch (InvalidOperationException) { _outputVolumeLockRetryAt = Clock() + 3000; }
         }
         return held.Volume;

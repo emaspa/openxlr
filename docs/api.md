@@ -188,7 +188,7 @@ name an output that is away; an output not seen since it was selected has
 no entry, and an entry goes when its output is deselected; an older daemon
 does not send it), `outputVolume`, `outputVolumeLock` (null when off, otherwise
 `{device, volume}`, with the exact PipeWire sink name and a desktop level
-from 0 to 1.5), `outputVolumeLockSuspended` (the interface is mixing the
+from 0 to 1.5, plus `channelVolumes` when the levels differ by channel), `outputVolumeLockSuspended` (the interface is mixing the
 locked sink's jacks), `monitorVolumeLocked` (the shared MONITOR volume is
 locked), `monitorMuted` (the selected outputs are paused, independently of mix and
 channel mutes; saved in `mixer.json`, never recalled by a profile),

@@ -65,6 +65,39 @@ public sealed partial class MonitorVolumeIntegrationTests
     }
 
     [MonitorPipeWireFact]
+    public void OutputLockRestoresEachSideOfABalancedStereoSink()
+    {
+        const string sink = "test_locked_stereo_balance";
+        var pw = new PipeWireAdapter();
+        using var watch = pw.WatchGraph();
+        using var mixer = new Mixer(pw);
+        pw.CreateNullSink(sink, "Stereo lock test");
+        mixer.Build(new MixerConfig { Channels = [], Mixes = [] });
+        mixer.SetMainOutput(sink);
+
+        void Write(string left, string right)
+        {
+            ProcessResult result = ProcessRunner.Run("pactl", ["set-sink-volume", sink, left, right]);
+            Assert.True(result.Ok, result.Stderr);
+        }
+        string Read() => ProcessRunner.Run("pactl", ["get-sink-volume", sink]).StdoutText;
+
+        Write("35%", "70%");
+        Assert.True(SpinWait.SpinUntil(() => pw.GetUnclampedSinkVolume(sink) == .35, TimeSpan.FromSeconds(3)));
+        string path = Path.Combine(Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR")!, "stereo-output-lock-test.json");
+        mixer.SetOutputVolumeLock(true, settings => settings.Save(path));
+        Assert.Equal([.35, .70], MixerSettings.Load(path)!.OutputVolumeLock!.ChannelVolumes);
+        Write("35%", "95%");
+        Assert.Contains("95%", Read());
+        Assert.True(SpinWait.SpinUntil(() =>
+        {
+            mixer.SyncDeviceVolumes();
+            return Read().Contains("70%");
+        }, TimeSpan.FromSeconds(3)), Read());
+        Assert.Contains("35%", Read());
+    }
+
+    [MonitorPipeWireFact]
     public void OutputLockSurvivesRestartAndReturnsWithTheSameDevice()
     {
         const string sink = "test_reconnected_locked_output";
