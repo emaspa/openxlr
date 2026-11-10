@@ -34,6 +34,7 @@ export function tabRecords(tabs, captures = new Map(), requests = new Map()) {
       id: tab.id, site: siteOf(tab.url),
       title: boundedText(tab.title || siteOf(tab.url), 160),
       capturing: captures.get(tab.id)?.capturing === true,
+      volumeSupported: true,
       error: captures.get(tab.id)?.error?.slice(0, 200) || null,
       activation: requests.get(tab.id)?.stage ?? null,
     }));
@@ -55,6 +56,10 @@ export function errorText(error) {
   return boundedText(error?.message || error || t('routingFailed'), 200);
 }
 
+export function playbackVolume(value) {
+  return typeof value === 'number' && value >= 0 && value <= 1 ? value : 1;
+}
+
 /** Native Web Audio does the playback. No audio samples enter JavaScript. */
 export class TabAudio {
   constructor({ mediaDevices, createContext, status, timeoutMs = 10000 }) {
@@ -66,10 +71,10 @@ export class TabAudio {
     this.deviceCheck = null;
   }
 
-  async start(id, streamId, deviceId) {
+  async start(id, streamId, deviceId, volume = 1, site = null) {
     const previous = this.sessions.get(id);
     if (!previous && this.sessions.size >= MAX_CAPTURES) throw new Error(t('tooManyCaptures', MAX_CAPTURES));
-    const session = { id, context: null, stream: null, source: null, closed: false, capturing: false, deviceId, routeVersion: 0, routing: 0, checkAfterRoute: false };
+    const session = { id, site, volume: playbackVolume(volume), context: null, stream: null, source: null, gain: null, closed: false, capturing: false, deviceId, routeVersion: 0, routing: 0, checkAfterRoute: false };
     this.sessions.set(id, session);
     let timer;
     try {
@@ -95,7 +100,11 @@ export class TabAudio {
       if (session.stream.getAudioTracks().some(track => track.readyState === 'ended'))
         throw new Error(t('routingEnded'));
       session.source = session.context.createMediaStreamSource(session.stream);
-      session.source.connect(session.context.destination);
+      session.gain = session.context.createGain();
+      // PipeWire's desktop percentage is the cube root of linear amplitude.
+      session.gain.gain.value = session.volume ** 3;
+      session.source.connect(session.gain);
+      session.gain.connect(session.context.destination);
       await session.context.resume();
       if (session.closed) return;
       session.capturing = true;
@@ -105,6 +114,16 @@ export class TabAudio {
       await this.stop(id, errorText(error));
       throw error;
     } finally { clearTimeout(timer); }
+  }
+
+  setVolume(id, volume, site = null) {
+    const session = this.sessions.get(id);
+    if (!session?.gain || session.closed || session.site !== site) return;
+    session.volume = playbackVolume(volume);
+    const gain = session.gain.gain;
+    const now = session.context.currentTime;
+    gain.cancelAndHoldAtTime(now);
+    gain.setTargetAtTime(session.volume ** 3, now, 0.005);
   }
 
   async route(id, deviceId) {
@@ -139,6 +158,7 @@ export class TabAudio {
     session.closed = true;
     session.capturing = false;
     try { session.source?.disconnect(); } catch { /* A partially connected node is already released. */ }
+    try { session.gain?.disconnect(); } catch { /* The context may already be closed. */ }
     session.stream?.getTracks().forEach(track => track.stop());
     try { await session.context?.close(); } catch { /* Tracks have been released even if the context is gone. */ }
   }
@@ -148,7 +168,7 @@ export class TabAudio {
   }
 
   snapshot() {
-    return [...this.sessions.values()].map(session => ({ id: session.id, capturing: session.capturing, deviceId: session.deviceId }));
+    return [...this.sessions.values()].map(({ id, site, volume, capturing, deviceId }) => ({ id, site, volume, capturing, deviceId }));
   }
 
   async checkDevices() {

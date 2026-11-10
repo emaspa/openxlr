@@ -279,6 +279,11 @@ public static class CommandValidation
             case "assignStream":
                 if (cmd.Channel is not null && !IsChannelOrIgnore(layout, cmd.Channel)) return $"assignStream: unknown channel '{Short(cmd.Channel)}'";
                 return null;
+            case "setBrowserTabVolume":
+                if (!BrowserTabRouting.ValidSession(cmd.Session) || cmd.TabId is not >= 0) return "setBrowserTabVolume: supply a browser session and tabId";
+                if (BrowserTabRouting.CanonicalSite(cmd.Site) is null) return "setBrowserTabVolume: supply the tab's HTTP or HTTPS origin";
+                if (cmd.Remember.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return "setBrowserTabVolume: remember must be a boolean";
+                return PlaybackVolume(cmd);
             case "assignBrowserTab":
                 if (!BrowserTabRouting.ValidSession(cmd.Session) || cmd.TabId is not >= 0) return "assignBrowserTab: supply a browser session and tabId";
                 if (BrowserTabRouting.CanonicalSite(cmd.Site) is null) return "assignBrowserTab: supply the tab's HTTP or HTTPS origin";
@@ -463,6 +468,10 @@ public static class CommandValidation
                 return CheckEqBand(cmd);
         }
     }
+
+    private static string? PlaybackVolume(Command cmd)
+        => cmd.Value.ValueKind == JsonValueKind.Null ? null
+            : Finite(cmd, "value") ?? (Mixer.ValidPlaybackVolume(cmd.Value.GetDouble()) ? null : $"{cmd.Cmd}: volume must be between 0 and 1");
 
     /// <summary>
     /// What an EQ command acts on: a microphone or capture input as <c>channel</c>, or, where

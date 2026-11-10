@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import test from 'node:test';
-import { HOST, MAX_TABS, deviceFor, errorText, notInvoked, siteOf, tabRecords } from '../chromium/routing.mjs';
+import { HOST, MAX_TABS, deviceFor, errorText, notInvoked, playbackVolume, siteOf, tabRecords } from '../chromium/routing.mjs';
 import { t } from '../chromium/text.mjs';
 
 const workerSource = (await readFile(new URL('../chromium/worker.mjs', import.meta.url), 'utf8'))
@@ -60,14 +60,19 @@ function fixture({ existing = [], recovery } = {}) {
             return { value: [{ kind: 'audiooutput', label: 'OpenXLR Music', deviceId: 'music-device' },
               { kind: 'audiooutput', label: 'OpenXLR Chat', deviceId: 'chat-device' }] };
           case 'start': {
-            f.active.set(message.id, { id: message.id, capturing: true, deviceId: message.deviceId });
+            f.active.set(message.id, { id: message.id, capturing: true, deviceId: message.deviceId, volume: message.volume, site: message.site });
             await f.status(message.id, true);
             const gate = f.startGates.shift();
             if (gate) await gate.promise;
             return { value: null };
           }
+          case 'volume':
+            if (f.active.has(message.id)) f.active.get(message.id).volume = message.volume;
+            if (f.volumeGate) await f.volumeGate.promise;
+            return { value: null };
           case 'route':
             if (f.active.has(message.id)) f.active.get(message.id).deviceId = message.deviceId;
+            if (f.routeGate) await f.routeGate.promise;
             return { value: null };
           case 'stop':
             f.active.delete(message.id); await f.status(message.id, false, message.error);
@@ -119,7 +124,7 @@ function fixture({ existing = [], recovery } = {}) {
     await settle();
     return f.posts.filter(message => message.type === 'tabs').at(-1)?.tabs;
   };
-  vm.runInNewContext(workerSource, { chrome, HOST, MAX_TABS, deviceFor, errorText, notInvoked, siteOf, tabRecords, t,
+  vm.runInNewContext(workerSource, { chrome, HOST, MAX_TABS, deviceFor, errorText, notInvoked, playbackVolume, siteOf, tabRecords, t,
     setTimeout(callback, delay) { f.timers.set(++timer, callback); f.timerDelays.set(timer, delay); return timer; },
     clearTimeout(id) { f.timers.delete(id); f.timerDelays.delete(id); } }, { filename: 'worker.mjs' });
   return f;
@@ -137,6 +142,60 @@ test('independent tabs share one offscreen document and keep separate output sel
   assert.equal(f.active.get(1).deviceId, 'chat-device');
   assert.equal(f.active.get(2).deviceId, 'music-device');
   await f.request('stop', { id: 1 }); assert.deepEqual([...f.active.keys()], [2]);
+});
+
+test('changing one tab volume updates its capture in place, and navigation discards it', { timeout: 2000 }, async () => {
+  const f = await readyFixture();
+  const change = volume => f.publish({ tabs: f.state.tabs.map(tab => tab.id === 1 ? { ...tab, volume } : tab) });
+  await change(.5);
+  assert.equal((await f.request('start', { id: 1 })).error, undefined);
+  f.activate(2); assert.equal((await f.request('start', { id: 2 })).error, undefined);
+  assert.deepEqual([...f.active.values()].map(tab => tab.volume), [.5, 1]);
+  await change(.35); await settle();
+  assert.deepEqual([...f.active.values()].map(tab => tab.volume), [.35, 1]);
+  assert.equal(f.tokens.length, 2);
+  f.update(1, 'https://other.example/watch'); await settle();
+  assert.deepEqual([...f.active.keys()], [2]);
+  assert.equal(f.active.get(2).volume, 1);
+});
+
+test('returning to the previous volume while an edit is in flight restores the gain', { timeout: 2000 }, async () => {
+  const f = await readyFixture();
+  const change = volume => f.publish({ tabs: f.state.tabs.map(tab => tab.id === 1 ? { ...tab, volume } : tab) });
+  await change(.2);
+  assert.equal((await f.request('start', { id: 1 })).error, undefined);
+  assert.equal(f.active.get(1).volume, .2);
+
+  const reply = f.volumeGate = deferred();
+  await change(.8);
+  assert.equal(f.active.get(1).volume, .8);
+  await change(.2);
+  f.volumeGate = null;
+  reply.resolve();
+  await settle();
+
+  assert.equal(f.active.get(1).volume, .2);
+  assert.deepEqual(f.calls.filter(call => call.type === 'volume').map(call => call.volume), [.8, .2]);
+  assert.deepEqual(f.tokens, [1]);
+});
+
+test('returning to the previous channel during a route change restores the actual output', { timeout: 2000 }, async () => {
+  const f = await readyFixture();
+  const change = channelId => f.publish({ tabs: f.state.tabs.map(tab => tab.id === 1 ? { ...tab, channelId } : tab) });
+  assert.equal((await f.request('start', { id: 1 })).error, undefined);
+  assert.equal(f.active.get(1).deviceId, 'chat-device');
+
+  const reply = f.routeGate = deferred();
+  await change('music');
+  assert.equal(f.active.get(1).deviceId, 'music-device');
+  await change('chat');
+  f.routeGate = null;
+  reply.resolve();
+  await settle();
+
+  assert.equal(f.active.get(1).deviceId, 'chat-device');
+  assert.deepEqual(f.calls.filter(call => call.type === 'route').map(call => call.deviceId), ['music-device', 'chat-device']);
+  assert.deepEqual(f.tokens, [1]);
 });
 
 test('refused browser capture permission leaves playback alone and explicit retry gets a new token', { timeout: 2000 }, async () => {
@@ -472,16 +531,27 @@ test('same-origin navigation preserves an active capture', { timeout: 2000 }, as
 
 test('startup events wait for offscreen recovery before publishing native tab metadata', { timeout: 2000 }, async () => {
   const recovery = deferred();
-  const f = fixture({ recovery, existing: [{ id: 1, capturing: true, deviceId: 'chat-device' }] });
+  const f = fixture({ recovery, existing: [{ id: 1, capturing: true, deviceId: 'chat-device', site: 'https://site1.example' }] });
   f.chrome.runtime.onStartup.emit(); await tick();
   assert.equal(f.ports.length, 0);
   recovery.resolve(); await f.ready;
   assert.equal(f.ports.length, 1); assert.equal(f.posts[0].tabs.find(tab => tab.id === 1).capturing, true);
 });
 
+test('offscreen recovery stops a capture whose origin changed while the worker slept', { timeout: 2000 }, async () => {
+  const f = await readyFixture({ existing: [
+    { id: 1, capturing: true, deviceId: 'chat-device', site: 'https://previous.example', volume: .2 },
+    { id: 2, capturing: true, deviceId: 'music-device', site: 'https://site2.example', volume: .6 },
+  ] });
+  assert.deepEqual([...f.active.keys()], [2]);
+  assert.equal(f.posts[0].tabs.find(tab => tab.id === 1).capturing, false);
+  assert.equal(f.posts[0].tabs.find(tab => tab.id === 2).capturing, true);
+  assert.equal(f.calls.filter(call => call.type === 'volume' && call.id === 1).length, 0);
+});
+
 test('failed offscreen recovery restores normal playback and still connects the provider', { timeout: 2000 }, async () => {
   const recovery = deferred();
-  const f = fixture({ recovery, existing: [{ id: 1, capturing: true, deviceId: 'chat-device' }] });
+  const f = fixture({ recovery, existing: [{ id: 1, capturing: true, deviceId: 'chat-device', site: 'https://site1.example' }] });
   recovery.reject(new Error('Cannot read offscreen sessions')); await f.ready;
   assert.equal(f.document, false); assert.equal(f.active.size, 0);
   assert.equal(f.posts[0].tabs.find(tab => tab.id === 1).capturing, false);

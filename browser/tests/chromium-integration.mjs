@@ -1,6 +1,6 @@
 // Optional real-browser acceptance test. Run inside a device-isolated container
 // with tools/test-monitor-volume.py --command node browser/tests/chromium-integration.mjs.
-// Chrome for Testing 151+ and Playwright are required; this is not a *.test.mjs suite.
+// Chrome 151+ and Playwright are required; this is not a *.test.mjs suite.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { access, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, writeFile } from 'node:fs/promises';
@@ -171,10 +171,22 @@ async function sample(sink) {
   return { low: amplitude(440), high: amplitude(880) };
 }
 
-async function fixture(title, frequency) {
-  const server = createServer((_request, response) => {
+async function fixture(title, frequency, pwa = null) {
+  const server = createServer((request, response) => {
+    if (pwa && request.url === '/manifest.webmanifest') {
+      response.setHeader('Content-Type', 'application/manifest+json');
+      response.end(JSON.stringify({ id: '/', name: title, start_url: '/', display: 'standalone',
+        icons: [{ src: '/icon.svg', sizes: 'any', type: 'image/svg+xml' }] }));
+      return;
+    }
+    if (pwa && request.url === '/icon.svg') {
+      response.setHeader('Content-Type', 'image/svg+xml');
+      response.end('<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192"><rect width="192" height="192" fill="purple"/></svg>');
+      return;
+    }
     response.setHeader('Content-Type', 'text/html');
-    response.end(`<title>${title}</title><button id="play">Play</button><script>
+    response.end(`<title>${title}</title>${pwa ? '<link rel="manifest" href="/manifest.webmanifest">' : ''}
+      <button id="play">Play</button><script>
       document.querySelector('button').onclick = () => {
         const audio = new AudioContext();
         const oscillator = audio.createOscillator();
@@ -188,8 +200,20 @@ async function fixture(title, frequency) {
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
   servers.push(server);
   const site = `http://127.0.0.1:${server.address().port}`;
-  const page = await context.newPage();
-  await page.goto(site);
+  let page;
+  if (pwa) {
+    const manifestId = site + '/';
+    await pwa.send('PWA.install', { manifestId, installUrlOrBundleUrl: site });
+    await pwa.send('PWA.changeAppUserSettings', { manifestId, displayMode: 'standalone' });
+    const opened = context.waitForEvent('page');
+    await pwa.send('PWA.launch', { manifestId });
+    page = await opened;
+    await page.waitForURL(site + '/');
+    assert.ok(await page.evaluate(() => matchMedia('(display-mode: standalone)').matches), 'Teams fixture runs in its own PWA window.');
+  } else {
+    page = await context.newPage();
+    await page.goto(site);
+  }
   await page.click('#play');
   return { site, page };
 }
@@ -201,7 +225,7 @@ try {
   await writeFile(executable, `#!/bin/sh\nexec dotnet ${quote(uiDll)} "$@"\n`, { mode: 0o700 });
   const native = JSON.parse(await readFile(join(root, 'browser/native-host.json'), 'utf8'));
   native.path = executable;
-  for (const location of [join(profile, 'NativeMessagingHosts'), ...['google-chrome-for-testing', 'google-chrome', 'chromium']
+  for (const location of [join(profile, 'NativeMessagingHosts'), ...['google-chrome-for-testing', 'google-chrome', 'google-chrome-beta', 'chromium']
     .flatMap(browser => [join(config, browser, 'NativeMessagingHosts'), join(home, '.config', browser, 'NativeMessagingHosts')])]) {
     await mkdir(location, { recursive: true, mode: 0o700 });
     await writeFile(join(location, `${native.name}.json`), JSON.stringify(native), { mode: 0o600 });
@@ -210,20 +234,20 @@ try {
     executablePath: process.env.OPENXLR_TEST_CHROMIUM,
     headless: !process.env.DISPLAY,
     env: environment,
-    ignoreDefaultArgs: ['--mute-audio'],
+    ignoreDefaultArgs: ['--mute-audio', '--disable-extensions'],
     args: [
       ...(process.getuid() === 0 ? ['--no-sandbox'] : []),
       '--disable-dev-shm-usage', '--autoplay-policy=no-user-gesture-required', '--enable-unsafe-extension-debugging',
-      `--disable-extensions-except=${join(root, 'browser/chromium')}`, `--load-extension=${join(root, 'browser/chromium')}`,
     ],
   });
   const major = Number(context.browser().version().split('.')[0]);
-  assert.ok(major >= 151, 'Extensions.triggerAction requires Chrome for Testing 151+.');
-  const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
-  const extensionId = new URL(worker.url()).host;
+  assert.ok(major >= 151, 'Extensions.triggerAction requires Chrome 151+.');
+  const cdp = await context.browser().newBrowserCDPSession();
+  const { id: extensionId } = await cdp.send('Extensions.loadUnpacked', { path: join(root, 'browser/chromium') });
+  const isWorker = worker => new URL(worker.url()).host === extensionId;
+  const worker = context.serviceWorkers().find(isWorker) ?? await context.waitForEvent('serviceworker', { predicate: isWorker, timeout: 15000 });
   assert.ok(native.allowed_origins.includes(`chrome-extension://${extensionId}/`), 'The test extension must match its native manifest.');
   await context.grantPermissions(['microphone']);
-  const cdp = await context.browser().newBrowserCDPSession();
   let nextId = 1;
   async function targetCall(targetId, method, params) {
     const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: false });
@@ -272,7 +296,7 @@ try {
     .then(reply => reply.value?.state), 'native host connection');
   await control.close();
   const musicTab = await fixture('YouTube test', 440);
-  const chatTab = await fixture('Teams test', 880);
+  const chatTab = await fixture('Teams test PWA', 880, cdp);
   const tabs = await until(async () => {
     const tabs = (await api('GET', 'state')).mixer.browserTabs;
     return tabs.length === 2 && tabs;
@@ -314,7 +338,27 @@ try {
   assert.ok(music.low > .025 && music.high < music.low / 8, 'Only the 440 Hz tab reaches Music.');
   assert.ok(chat.high > .025 && chat.low < chat.high / 8, 'Only the 880 Hz tab reaches Voice Chat.');
   assert.equal(await worker.evaluate(() => chrome.action.getBadgeText({})), '2');
-  console.log('PASS native bridge, two user-activated tabs, toolbar count and isolated 440/880 Hz channel audio');
+  console.log('PASS native bridge, a user-activated tab and standalone PWA, toolbar count and isolated 440/880 Hz channel audio');
+
+  await api('POST', 'commands', { cmd: 'assignBrowserTab', session, tabId: chatId, site: chatTab.site, channel: 'music', remember: false });
+  const together = await until(async () => {
+    const audio = await sample('OpenXLR_ch_music');
+    return audio.low > .025 && audio.high > .025 ? audio : null;
+  }, 'both browser tabs play into Music');
+  const volumeEdit = { cmd: 'setBrowserTabVolume', session, tabId: musicId, site: musicTab.site, remember: true };
+  await api('POST', 'commands', { ...volumeEdit, value: .5 });
+  await until(async () => {
+    const audio = await sample('OpenXLR_ch_music');
+    return audio.low > together.low * .08 && audio.low < together.low * .18
+      && Math.abs(audio.high / together.high - 1) < .1;
+  }, 'only the 440 Hz tab is attenuated on the shared channel');
+  await api('POST', 'commands', { ...volumeEdit, value: null });
+  await api('POST', 'commands', { cmd: 'assignBrowserTab', session, tabId: chatId, site: chatTab.site, channel: 'voicechat', remember: true });
+  await until(async () => {
+    const audio = await sample('OpenXLR_ch_music');
+    return audio.low > together.low * .9 && audio.high < .003;
+  }, 'reset restores tab volume without changing its channel');
+  console.log('PASS live tab volume and reset on a channel shared by two captures');
 
   await api('POST', 'commands', { cmd: 'assignBrowserTab', session, tabId: musicId, site: musicTab.site, channel: 'game', remember: false });
   await delay(1000);
@@ -332,6 +376,8 @@ try {
   const stale = await apiResponse('POST', 'commands',
     { cmd: 'assignBrowserTab', session, tabId: musicId, site: musicTab.site, channel: 'game', remember: true });
   assert.equal(stale.ok, false, 'An assignment from the previous page must be refused.');
+  assert.equal((await apiResponse('POST', 'commands', { ...volumeEdit, value: .2 })).ok, false,
+    'A volume edit from the previous page must be refused.');
   assert.equal((await api('GET', 'state')).mixer.browserTabs.find(tab => tab.id === musicId).channelId, 'voicechat');
   console.log('PASS live channel change, cross-origin navigation and independent capture lifetime');
 
@@ -362,6 +408,8 @@ try {
   await until(async () => (await api('GET', 'state')).mixer.browserTabs.find(tab => tab.id === chatId)?.capturing,
     'a capture is active before the daemon disconnects');
   await cdp.send('Target.closeTarget', { targetId: resume.targetId });
+  await api('POST', 'commands', { cmd: 'setBrowserTabVolume', session, tabId: chatId,
+    site: chatTab.site, value: .73, remember: true });
   await stopDaemon();
   await until(() => worker.evaluate(async () => (await chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'] })).length === 0),
     'daemon disconnect closes the audio stages');
@@ -370,7 +418,8 @@ try {
   const restored = await until(async () => {
     const mixer = (await api('GET', 'state')).mixer;
     return mixer.preserveBrowserOutputs && mixer.browserTabs.length === 2
-      && mixer.browserTabs.every(tab => tab.session !== session && tab.channelId === 'voicechat' && !tab.capturing && tab.remember) && mixer;
+      && mixer.browserTabs.every(tab => tab.session !== session && tab.channelId === 'voicechat' && !tab.capturing
+        && tab.remember && tab.volume === .73 && tab.rememberVolume) && mixer;
   }, 'daemon restart creates a new session, restores website choices and keeps captures stopped', 30000);
   assert.equal(new Set(restored.browserTabs.map(tab => tab.session)).size, 1);
   await musicTab.page.goto(musicTab.site);
@@ -378,7 +427,7 @@ try {
     const tab = (await api('GET', 'state')).mixer.browserTabs.find(tab => tab.id === musicId);
     return tab?.site === musicTab.site && tab.channelId === 'music' && tab.remember && !tab.capturing;
   }, 'the original website preference survives a tab-only route and daemon restart');
-  console.log('PASS real daemon restart, fresh connection session, persisted origins and stopped captures');
+  console.log('PASS real daemon restart, fresh connection session, persisted routing and volume, and stopped captures');
 } catch (error) {
   console.error(daemonLog);
   throw error;

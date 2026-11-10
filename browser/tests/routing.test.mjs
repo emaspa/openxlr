@@ -31,6 +31,9 @@ function fixture({ acquire, sink, resume, close, timeoutMs } = {}) {
   const audio = new TabAudio({ mediaDevices, timeoutMs, status: (...args) => statuses.push(args), createContext() {
     const context = { closed: false, destination: {}, async setSinkId(id) { if (sink) await sink(id); this.sink = id; },
       createMediaStreamSource() { return { connect() {}, disconnect() {} }; },
+      currentTime: 0,
+      createGain() { return this.gain = { gain: { value: 1, cancelAndHoldAtTime() {}, setTargetAtTime(value) { this.value = value; } },
+        connect() {}, disconnect() {} }; },
       async resume() { if (resume) await resume(); }, async close() { if (close) await close(); this.closed = true; } };
     contexts.push(context); return context;
   } });
@@ -58,7 +61,7 @@ test('a tab record carries the stage of an activation OpenXLR asked for', () => 
   const tabs = [{ id: 1, url: 'https://one.example' }, { id: 2, url: 'https://two.example' }];
   const records = tabRecords(tabs, new Map(), new Map([[2, { stage: 'popup' }]]));
   assert.deepEqual(records.map(tab => [tab.id, tab.activation]), [[1, null], [2, 'popup']]);
-  assert.deepEqual(Object.keys(records[0]), ['id', 'site', 'title', 'capturing', 'error', 'activation']);
+  assert.deepEqual(Object.keys(records[0]), ['id', 'site', 'title', 'capturing', 'volumeSupported', 'error', 'activation']);
 });
 
 test('only the refusal for a tab the user did not invoke the extension on counts as one', () => {
@@ -89,6 +92,23 @@ test('two tabs have independent native output contexts and stop independently', 
   assert.equal(f.streams[0].track.stopped, true); assert.equal(f.streams[1].track.stopped, false);
   assert.deepEqual(f.audio.snapshot().map(item => item.id), [2]);
   await f.audio.stopAll(); assert(f.contexts.every(context => context.closed));
+});
+
+test('tab gain is independent on a shared destination and survives a reroute', async () => {
+  const f = fixture();
+  const teams = 'https://teams.example';
+  await f.audio.start(1, 'teams-stream', 'chat', .5, teams);
+  await f.audio.start(2, 'youtube-stream', 'chat');
+  assert.deepEqual(f.contexts.map(context => context.gain.gain.value), [.125, 1]);
+  f.audio.setVolume(1, 0, 'https://old.example');
+  assert.equal(f.contexts[0].gain.gain.value, .125);
+  f.audio.setVolume(1, 0, teams);
+  await f.audio.route(1, 'music');
+  assert.deepEqual(f.contexts.map(context => context.gain.gain.value), [0, 1]);
+  f.audio.setVolume(1, null, teams);
+  assert.equal(f.contexts[0].gain.gain.value, 1);
+  assert.equal(f.acquisitions.length, 2);
+  await f.audio.stopAll();
 });
 
 test('refused output permission never takes over tab audio', async () => {

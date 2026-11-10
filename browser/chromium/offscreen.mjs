@@ -10,7 +10,8 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
   if (sender.id !== chrome.runtime.id || message?.target !== 'offscreen') return;
   const operation = async () => {
     switch (message.type) {
-      case 'start': await audio.start(message.id, message.streamId, message.deviceId); break;
+      case 'start': await audio.start(message.id, message.streamId, message.deviceId, message.volume, message.site); break;
+      case 'volume': audio.setVolume(message.id, message.volume, message.site); break;
       case 'route': await audio.route(message.id, message.deviceId); break;
       case 'stop': await audio.stop(message.id, message.error ?? null); break;
       case 'stopAll': await audio.stopAll(message.error ?? null); break;

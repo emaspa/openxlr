@@ -945,7 +945,10 @@ restores the split profile when it stops.
   User-activated tab audio can follow
   separate application channels, with saved website defaults. Activate
   in a tab's row brings the tab forward in the browser and starts it, or
-  says what the browser still needs. Browser
+  says what the browser still needs. Each routed tab has its own
+  playback volume, set in its row and applied by the companion, so two
+  tabs on one channel can play at different levels. The level is an edit
+  for that tab or saved for its website. Browser
   output selection suspends generic Chromium routing while enabled,
   keeping each browser's saved assignment and showing where it plays
   meanwhile; restarting the browser requires activating tabs again

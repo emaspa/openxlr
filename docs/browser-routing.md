@@ -16,6 +16,22 @@ It does not record an audio file. A call still uses the microphone chosen
 in the browser or website. Check a real call's echo cancellation and delay
 with your headset before relying on this for meetings.
 
+### Playback volume
+
+In OpenXLR's **Browser tabs** window, choose a channel for Teams and
+activate the tab or PWA as usual. Select **Vol.** or the percentage beside
+its channel picker. The level takes effect once the companion routes that
+tab. You can adjust two routed tabs independently even when they play
+into the same channel. A volume change leaves the capture running.
+
+Turn on **Remember volume for this website** to use the same level for
+future tabs on that origin. This is separate from remembering a channel.
+Without it, the edit applies to this tab until it closes or changes origin.
+**Reset** clears the tab's edit. When the volume is remembered, it clears
+the website's saved level. The browser's normal playback level applies
+when there is no volume preference. Update the browser extension and
+OpenXLR together to see the tab volume control.
+
 ## Firefox
 
 Firefox can use OpenXLR's browser-wide channel routing. Play audio in
