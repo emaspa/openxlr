@@ -1511,8 +1511,8 @@ public sealed partial class MainViewModel : ViewModelBase
             bool running = stream["running"]?.GetValue<bool>() ?? true;
             string? icon = stream["icon"] is JsonValue iconValue && iconValue.TryGetValue(out string? named) ? named : null;
             bool browserHeld = stream["browserHeld"] is JsonValue heldValue && heldValue.TryGetValue(out bool held) && held;
-            string? output = stream["outputChannelId"] is JsonValue outputValue && outputValue.TryGetValue(out string? outputId)
-                ? choices.FirstOrDefault(c => c.Id == outputId && c.Id != AppStreamViewModel.Ignore)?.Name : null;
+            ChannelChoice? output = stream["outputChannelId"] is JsonValue outputValue && outputValue.TryGetValue(out string? outputId)
+                ? choices.FirstOrDefault(c => c.Id == outputId && c.Id != AppStreamViewModel.Ignore) : null;
             seen.Add(identity);
             if (!byIdentity.TryGetValue(identity, out AppStreamViewModel? existing))
             {
@@ -1814,12 +1814,22 @@ public sealed class AppStreamViewModel : ViewModelBase
     /// </summary>
     public string? BrowserHeldNote { get => _browserHeldNote; private set => Set(ref _browserHeldNote, value); }
 
+    private bool _browserHeld;
+    private string? _browserOutputChannelId;
+
+    /// <summary>The channel Flow can trace, which can differ from the saved assignment.</summary>
+    internal string? FlowChannelId => _browserHeld ? _browserOutputChannelId : ChannelId;
+
     /// <summary>The daemon's report for a browser held by browser output selection.</summary>
-    public void ApplyBrowserHold(bool held, string? outputChannel)
-        => BrowserHeldNote = !held ? null
+    public void ApplyBrowserHold(bool held, ChannelChoice? outputChannel)
+    {
+        _browserHeld = held;
+        _browserOutputChannelId = outputChannel?.Id;
+        BrowserHeldNote = !held ? null
             : !Active ? Localizer.Text("BrowserOutputHeld")
-            : outputChannel is not null ? Localizer.Format("BrowserOutputHeldOnChannel", outputChannel)
+            : outputChannel is not null ? Localizer.Format("BrowserOutputHeldOnChannel", outputChannel.Name)
             : Localizer.Text("BrowserOutputHeldElsewhere");
+    }
 
     /// <summary>"playing" / "running" / "not running", for the manage dialog.</summary>
     public string StatusText => Active ? Localizer.Text("Playing") : Running ? Localizer.Text("Running") : Localizer.Text("NotRunning");

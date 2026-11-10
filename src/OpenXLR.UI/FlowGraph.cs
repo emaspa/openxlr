@@ -74,7 +74,7 @@ internal sealed record FlowGraph(IReadOnlyList<FlowNode> Nodes, IReadOnlyList<Fl
                 for (int i = 0; i < sources.Count; i++)
                     sources[i] = (sources[i].Key, sources[i].Label, Localizer.Format("FlowResampledTo", vm.Clock.DriverName),
                         sources[i].Icon, sources[i].Active);
-            sources.AddRange(vm.ActiveApps.Where(a => a.ChannelId == channel.Id)
+            sources.AddRange(vm.ActiveApps.Where(a => a.FlowChannelId == channel.Id)
                 .Select(a => ($"app:{a.Identity}", a.Label, a.Active ? Localizer.Text("FlowSoftware") : a.StatusText,
                     FlowIcon.Application, a.Active)));
 
@@ -131,10 +131,11 @@ internal sealed record FlowGraph(IReadOnlyList<FlowNode> Nodes, IReadOnlyList<Fl
             y += laneHeight + Gap;
         }
         // Desktop-managed or stale assignments remain visible without inventing a route.
-        foreach (AppStreamViewModel app in vm.ActiveApps.Where(a => vm.Channels.All(c => c.Id != a.ChannelId)))
+        foreach (AppStreamViewModel app in vm.ActiveApps.Where(a => vm.Channels.All(c => c.Id != a.FlowChannelId)))
         {
             nodes.Add(new FlowNode($"app:{app.Identity}", app.Label,
-                app.ChannelId == AppStreamViewModel.Ignore ? Localizer.Text("DesktopRouting") : Localizer.Text("ChannelUnavailable"),
+                app.BrowserHeldNote ?? (app.ChannelId == AppStreamViewModel.Ignore
+                    ? Localizer.Text("DesktopRouting") : Localizer.Text("ChannelUnavailable")),
                 FlowStage.Input, FlowIcon.Application, y, app.Active));
             y += 58 + Gap;
         }
