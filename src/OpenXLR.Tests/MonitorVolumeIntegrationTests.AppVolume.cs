@@ -28,9 +28,11 @@ public sealed partial class MonitorVolumeIntegrationTests
         var players = new List<Task<ProcessResult>>();
         Task<ProcessResult> Play(string identity, string media, CancellationToken cancel)
         {
+            // Keep the test level out of WirePlumber's saved state. Other
+            // tests on this server use pw-cat as a unity-gain signal source.
             var task = native
                 ? ProcessRunner.RunAsync("pw-cat", ["--raw", "--playback", "--target", system.SinkName,
-                    "--properties", $"{{ application.name = {identity} application.process.binary = {identity} media.name = {media} }}",
+                    "--properties", $"{{ application.id = {identity} application.name = {identity} application.process.binary = {identity} media.name = {media} state.restore-props = false }}",
                     "/dev/zero"], TimeSpan.FromSeconds(30), cancel: cancel)
                 : ProcessRunner.RunAsync("pacat", ["--raw", "--playback", $"--device={system.SinkName}",
                     $"--client-name={identity}", $"--property=application.process.binary={identity}",
