@@ -68,7 +68,8 @@ python3 packaging/flatpak/nuget-sources.py --check  # regenerate with no flag af
 python3 packaging/flatpak/cargo-sources.py --check  # regenerate with no flag after a change to native/deepfilter/Cargo.lock
 python3 packaging/check-deepfilter.py  # every package builds DeepFilterNet in, with the pinned model
 python3 packaging/ppa/test-prune-cargo-vendor.py  # the PPA's pruned crates still pass cargo's checksums
-shellcheck --severity=error tools/check-version.sh tools/check-locked-restore.sh tools/ci-install-packages.sh packaging/ppa/make-source.sh packaging/omarchy/openxlr-omarchy-enable packaging/flatpak/openxlr-flatpak-service packaging/openxlr-control
+shellcheck --severity=error tools/check-version.sh tools/check-locked-restore.sh tools/ci-install-packages.sh tools/ci-test-scope.sh packaging/ppa/make-source.sh packaging/omarchy/openxlr-omarchy-enable packaging/flatpak/openxlr-flatpak-service packaging/openxlr-control
+python3 tools/test-ci-test-scope.py            # CI jobs selected for changed paths
 tools/check-version.sh                          # the six version locations agree
 tools/check-locked-restore.sh                   # every packaging path restores locked
 tools/check-openapi.py docs/openapi-v1.json     # the HTTP API document keeps its shape
