@@ -59,29 +59,45 @@ public sealed partial class MonitorVolumeIntegrationTests
             var before = StreamVolumes();
             Assert.Equal(3, before.Count);
             Assert.Single(before.Values.Select(stream => stream.Sink).Distinct());
-            Assert.Throws<IOException>(() => mixer.SetAppVolume(app, .35, _ => "disk full"));
-            Assert.Empty(mixer.ExportSettings().AppVolumes);
-            mixer.SetAppVolume(app.ToUpperInvariant(), .35, _ => null);
-            Wait(items => items.TryGetValue("teams-first", out var a) && items.TryGetValue("teams-second", out var b)
-                && a.Volume == "35%" && b.Volume == "35%");
+            mixer.SetAppVolume(app.ToUpperInvariant(), .35);
+            // Written before the command returns, with no sweep in between.
             var after = StreamVolumes();
+            Assert.Equal("35%", after["teams-first"].Volume);
+            Assert.Equal("35%", after["teams-second"].Volume);
             Assert.Equal(before["discord"], after["discord"]);
             Assert.Equal(before["teams-first"].Sink, after["teams-first"].Sink);
+            // The registry shows the level a moment later; the sweep reads
+            // it as the application's own and writes nothing.
+            await Task.Delay(400, all.Token);
+            Wait(_ => mixer.Snapshot().Streams.Single(a => a.Identity == app).LiveVolume == .35);
+            Assert.False(mixer.TakeAppVolumesChanged());
 
-            // A setting is applied once per stream, so a desktop adjustment
-            // during this playback is not fought by the next sweep.
+            // A desktop adjustment of one stream becomes the application's
+            // level: the saved one follows it and the other stream gets it.
             pw.SetSinkInputVolume(after["teams-second"].Index, .62);
-            mixer.SyncStreams();
-            Assert.Equal("62%", StreamVolumes()["teams-second"].Volume);
+            Wait(items => items["teams-first"].Volume == "62%" && items["teams-second"].Volume == "62%");
+            Assert.Equal(.62, mixer.ExportSettings().AppVolumes[app]);
+            Assert.True(mixer.TakeAppVolumesChanged());
+            Assert.Equal(before["discord"], StreamVolumes()["discord"]);
+
+            // A stream that starts later gets the level without a sweep.
             first.Cancel();
             await firstPlayer;
             Wait(items => !items.ContainsKey("teams-first"));
             _ = Play(app, "teams-restarted", all.Token);
-            Wait(items => items.TryGetValue("teams-restarted", out var stream) && stream.Volume == "35%");
-            Assert.Equal("62%", StreamVolumes()["teams-second"].Volume);
-            Assert.Equal(.35, mixer.ExportSettings().AppVolumes[app]);
-            mixer.SetAppVolume(app, null, _ => null);
+            Assert.True(SpinWait.SpinUntil(() =>
+            {
+                mixer.SyncAppVolumes();
+                return StreamVolumes().TryGetValue("teams-restarted", out var stream) && stream.Volume == "62%";
+            }, TimeSpan.FromSeconds(5)), string.Join(", ", StreamVolumes()));
+
+            // Reset hands the streams back at full volume.
+            mixer.SetAppVolume(app, null);
             Assert.Empty(mixer.ExportSettings().AppVolumes);
+            var reset = StreamVolumes();
+            Assert.Equal("100%", reset["teams-second"].Volume);
+            Assert.Equal("100%", reset["teams-restarted"].Volume);
+            Assert.Equal(before["discord"], reset["discord"]);
         }
         finally
         {

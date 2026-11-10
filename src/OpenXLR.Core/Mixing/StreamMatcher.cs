@@ -173,6 +173,11 @@ public sealed record AudioStream(int Id, string? AppName, string? Binary, string
     public string? IconName { get; init; }
     /// <summary>The desktop application id: the Flatpak portal's, else <c>application.id</c>; or null.</summary>
     public string? AppId { get; init; }
+    /// <summary>
+    /// The stream's own level on the desktop's percentage scale, its loudest
+    /// channel, as a volume applet shows it; null when the node reports none.
+    /// </summary>
+    public double? Volume { get; init; }
 
     /// <summary>
     /// Stable-ish key for remembering a per-app choice. Prefers the binary, but

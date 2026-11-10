@@ -263,7 +263,7 @@ internal static class SavedMixerValidation
         foreach ((string key, double volume) in entries ?? new Dictionary<string, double>())
         {
             if (Mixer.ValidAppVolumeIdentity(key) && Mixer.ValidPlaybackVolume(volume) && kept.Count < Mixer.MaxAppOverrides)
-                kept.TryAdd(key, Math.Round(volume * 100) / 100);
+                kept.TryAdd(Mixer.AppVolumeKey(key), Math.Round(volume * 100) / 100);
             else if (notes is not null && !notes.Contains(field)) notes.Add(field);
         }
         return kept;

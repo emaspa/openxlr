@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Text.Json.Nodes;
 using System.Threading.Channels;
 using OpenXLR.UI;
+using OpenXLR.UI.Localization;
 
 namespace OpenXLR.Tests;
 
@@ -27,6 +28,33 @@ public sealed class AppRoutingViewModelTests
         Assert.NotNull(app.BrowserHeldNote);
         Assert.True(app.PlaybackVolume.Enabled);
         Assert.Equal(.5, app.PlaybackVolume.Level);
+    }
+
+    [Fact]
+    public async Task AnApplicationWithoutASavedLevelShowsTheOneItPlaysAt()
+    {
+        await using var client = new DaemonClient();
+        var model = new MainViewModel(client);
+        Invoke(model, "ApplyStreams", JsonNode.Parse("""
+            {"appVolumeSupported":true,"streams":[
+             {"identity":"vlc","label":"VLC","channelId":"music","active":true,"liveVolume":0.6},
+             {"identity":"mpv","label":"mpv","channelId":"music","active":true,"liveVolume":1},
+             {"identity":"discord","label":"Discord","channelId":"voicechat","active":true,"volume":0.35,"liveVolume":0.35},
+             {"identity":"signal","label":"Signal","channelId":"voicechat","active":false}]}
+            """));
+        PlaybackVolumeViewModel Volume(string identity) => model.Apps.Single(app => app.Identity == identity).PlaybackVolume;
+        // The slider starts where the stream is, and Reset has nothing to clear.
+        Assert.Equal((.6, "60%", false), (Volume("vlc").Level, Volume("vlc").Label, Volume("vlc").HasLevel));
+        Assert.Equal((1, Localizer.Text("PlaybackVolumeShort"), false), (Volume("mpv").Level, Volume("mpv").Label, Volume("mpv").HasLevel));
+        Assert.Equal((.35, "35%", true), (Volume("discord").Level, Volume("discord").Label, Volume("discord").HasLevel));
+        Assert.Equal((1, Localizer.Text("PlaybackVolumeShort"), false), (Volume("signal").Level, Volume("signal").Label, Volume("signal").HasLevel));
+
+        // The desktop moves the stream: the control follows without an edit of its own.
+        Invoke(model, "ApplyStreams", JsonNode.Parse("""
+            {"appVolumeSupported":true,"streams":[
+             {"identity":"vlc","label":"VLC","channelId":"music","active":true,"liveVolume":0.45}]}
+            """));
+        Assert.Equal((.45, "45%"), (Volume("vlc").Level, Volume("vlc").Label));
     }
 
     [Fact]

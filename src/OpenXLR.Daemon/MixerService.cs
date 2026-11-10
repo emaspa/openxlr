@@ -1055,6 +1055,8 @@ public sealed partial class MixerService : IHostedService, IDisposable
                     string.Join(", ", reloadedChannels));
             stop.ThrowIfCancellationRequested();
             bool changed = _mixer.SyncStreams();
+            // A level the desktop or the program moved is a setting too.
+            if (_mixer.TakeAppVolumesChanged()) ScheduleSave();
             if (_mixer.MigrateCaptureInputs(source => _devices.SupportedUnitFor(source)?.Id))
             {
                 ScheduleSave();
@@ -1410,11 +1412,6 @@ public sealed partial class MixerService : IHostedService, IDisposable
         {
             switch (cmd.Cmd)
             {
-                case "setAppVolume":
-                    _saves.RunSaved(() => _mixer.SetAppVolume(cmd.Identity!,
-                        cmd.Value.ValueKind == System.Text.Json.JsonValueKind.Null ? null : cmd.Value.GetDouble(), s => s.Save()));
-                    Changed?.Invoke();
-                    return null;
                 case "setBrowserTabVolume":
                 {
                     bool remember = cmd.Remember.GetBoolean();
@@ -1577,6 +1574,11 @@ public sealed partial class MixerService : IHostedService, IDisposable
                 case "assignApp":
                     if (cmd.Channel is null || cmd.Identity is null) return "assignApp: need 'channel' and 'identity'";
                     _mixer.AssignApp(cmd.Identity, cmd.Channel, cmd.Label);
+                    break;
+                case "setAppVolume":
+                    // A fader: written to the playing streams now, saved with the next debounced write.
+                    _mixer.SetAppVolume(cmd.Identity!,
+                        cmd.Value.ValueKind == System.Text.Json.JsonValueKind.Null ? null : cmd.Value.GetDouble());
                     break;
                 case "forgetApp":
                     if (cmd.Identity is null) return "forgetApp: need 'identity'";

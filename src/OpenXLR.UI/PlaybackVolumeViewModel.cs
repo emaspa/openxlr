@@ -14,13 +14,16 @@ public sealed class PlaybackVolumeViewModel(Func<double?, bool, Task<string?>> s
     private Choice? _pending;
     private long _version;
     private bool _supported, _enabled, _browserHeld;
+    // What the row plays at now when nothing is saved for it: the desktop's
+    // level, which the slider starts from and the button shows below 100%.
+    private double? _live;
     private string? _error;
 
     public bool Supported => _supported;
     public bool Enabled => _enabled;
     public bool Website => website;
     public bool HasLevel => (_pending ?? _reported).Level is not null;
-    public string Label => (_pending ?? _reported).Level is double level
+    public string Label => ((_pending ?? _reported).Level ?? (_live < 1 ? _live : null)) is double level
         ? $"{level * 100:0}%" : Localizer.Text("PlaybackVolumeShort");
     public string Hint => website ? Localizer.Text("TabPlaybackVolumeHint")
         : _browserHeld ? Localizer.Text("BrowserPlaybackVolumeHint") : Localizer.Text("AppPlaybackVolumeHint");
@@ -28,7 +31,7 @@ public sealed class PlaybackVolumeViewModel(Func<double?, bool, Task<string?>> s
 
     public double Level
     {
-        get => (_pending ?? _reported).Level ?? 1;
+        get => (_pending ?? _reported).Level ?? _live ?? 1;
         set
         {
             if (Enabled && double.IsFinite(value))
@@ -50,15 +53,17 @@ public sealed class PlaybackVolumeViewModel(Func<double?, bool, Task<string?>> s
         if (Enabled && HasLevel) Edit(new(null, Remember));
     }
 
-    internal void Apply(bool supported, bool enabled, double? level, bool remember = false, bool browserHeld = false)
+    internal void Apply(bool supported, bool enabled, double? level, bool remember = false, bool browserHeld = false,
+        double? live = null)
     {
         Set(ref _supported, supported, nameof(Supported));
         Set(ref _enabled, supported && enabled, nameof(Enabled));
         Set(ref _browserHeld, browserHeld, nameof(Hint));
         if (!Enabled && _pending is not null) Cancel();
         var state = new Choice(level, remember);
-        if (_reported == state) return;
+        if (_reported == state && _live == live) return;
         _reported = state;
+        _live = live;
         if (_pending is null) Refresh();
     }
 

@@ -2971,6 +2971,7 @@ public sealed class PipeWireAdapter
                 // The portal's id is set by PipeWire on the client and cannot
                 // be forged by a sandboxed application, so it comes first.
                 AppId = Str(client, "pipewire.access.portal.app_id") ?? AppProperty("application.id"),
+                Volume = SinkLevel(info)?.DesktopVolume,
             });
         }
         return found;

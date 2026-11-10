@@ -421,6 +421,12 @@ public sealed record StreamAssignment(int Id, int Serial, string Label, string I
     public double? Volume { get; init; }
 
     /// <summary>
+    /// The level the application's newest playback stream has now, on the
+    /// same scale, whoever set it; null when none is playing or it reports none.
+    /// </summary>
+    public double? LiveVolume { get; init; }
+
+    /// <summary>
     /// While <see cref="BrowserHeld"/>, the application channel a live stream
     /// of the app actually plays into; null when it plays on another output.
     /// </summary>

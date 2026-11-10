@@ -1741,7 +1741,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             SetBlockSize(s.BlockSize);
             RestoreBrowserSettingsLocked(s);
             _appVolumes = SavedMixerValidation.AppVolumes(s.AppVolumes, null);
-            _appVolumeApplied.Clear();
+            _hasAppVolumes = _appVolumes.Count > 0;
             SetMonitorMuteMicrophones(s.MonitorMuteMicrophones);
             _outputVolumeLock = s.OutputVolumeLock;
             _outputVolumeLockRetryAt = 0;
@@ -1788,10 +1788,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             // an app does not appear twice after its binary was updated.
             foreach (SavedApp app in s.KnownApps)
             {
-                // Volume preferences use the exact published key. A name
-                // with spaces can belong to a different app from its legacy alias.
-                bool exactIdentity = _appVolumes.ContainsKey(app.Identity);
-                string identity = exactIdentity ? app.Identity : StreamMatcher.MigrateIdentity(Sanitize(app.Identity));
+                string identity = StreamMatcher.MigrateIdentity(Sanitize(app.Identity));
                 if (PipeWireAdapter.IsPlumbingIdentity(identity)) continue;   // pre-filter leftovers
                 // A label saved from a helper stream's identifier reads as
                 // the application's own name, as a live stream's now does.
@@ -1802,7 +1799,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 // Saved before WebKitGTK applications were told apart: the
                 // shared web process was the identity, and the label names
                 // the application that was playing. The choice goes with it.
-                if (!exactIdentity && StreamMatcher.IsWebKitProcess(identity) && label.Length > 0 && !StreamMatcher.IsWebKitProcess(label))
+                if (StreamMatcher.IsWebKitProcess(identity) && label.Length > 0 && !StreamMatcher.IsWebKitProcess(label))
                 {
                     string own = StreamMatcher.MigrateIdentity(label);
                     if (Matcher.Overrides.TryGetValue(identity, out string? shared)) Matcher.SetOverride(own, shared);
@@ -3403,15 +3400,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 changed = true;
             }
 
-            if (_appVolumes.Count > 0 || _appVolumeApplied.Count > 0)
-            {
-                // A route can still be pending while its playback level is editable.
-                int volumeBudget = AppVolumeWritesPerSweep;
-                foreach (var (stream, identity) in seen.Values)
-                    SyncAppVolumeLocked(stream, identity, ref volumeBudget);
-                foreach (int gone in _appVolumeApplied.Keys.Where(id => !seen.ContainsKey(id)).ToArray())
-                    _appVolumeApplied.Remove(gone);
-            }
+            // A route can still be pending while its playback level is editable.
+            changed |= SyncAppVolumesLocked(live);
 
             // Every running audio-capable app is listed even before it plays:
             // PipeWire clients cover "running", streams cover "playing".
@@ -3528,10 +3518,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     {
         lock (_gate)
         {
-            if (!_apps.ContainsKey(identity) && !_appVolumes.ContainsKey(identity))
-                identity = StreamMatcher.MigrateIdentity(identity);
+            identity = StreamMatcher.MigrateIdentity(identity);
             _apps.Remove(identity);
-            if (_appVolumes.Remove(identity)) ClearAppliedAppVolumeLocked(identity);
+            ResetAppVolumeLocked(identity);
             Matcher.RemoveOverride(identity);
             foreach ((int id, StreamAssignment placed) in _streams.ToList())
                 if (string.Equals(placed.Identity, identity, StringComparison.OrdinalIgnoreCase))
@@ -3697,7 +3686,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 AppVolumeSupported = true,
                 Streams = [.. _apps.Values
                     .Select(a => a with { Label = _icons.DisplayName(a.Label),
-                        Volume = _appVolumes.TryGetValue(a.Identity, out double level) ? level : null })
+                        Volume = _appVolumes.TryGetValue(AppVolumeKey(a.Identity), out double level) ? level : null,
+                        LiveVolume = _appLiveVolumes.TryGetValue(AppVolumeKey(a.Identity), out double playing) ? playing : null })
                     .OrderByDescending(a => a.Active).ThenBy(a => a.Label, StringComparer.OrdinalIgnoreCase)],
                 PreserveBrowserOutputs = _preserveBrowserOutputs,
                 RouteAppsByDefault = Matcher.RouteByDefault,
@@ -4009,7 +3999,6 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         _pendingCells.Clear();
         _cellRounds = _cellWait = 0;
         _streams.Clear();
-        _appVolumeApplied.Clear();
         _cells.Clear();
         _levels.Clear();
         _channelVolume.Clear();

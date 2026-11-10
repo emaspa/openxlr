@@ -1023,11 +1023,26 @@ program's playback streams, before the channel and its sends. Two apps
 can share one channel and still have different levels. A program marked
 **Not managed** can also have a saved volume.
 
-OpenXLR remembers the level across playback and daemon restarts. It applies
-an edit on the next mixer sweep and applies the saved level to new streams.
-Desktop volume changes during playback are allowed. **Reset** or **Forget**
-clears the preference and hands volume back to the desktop at its current
-level. The preference is machine state and profiles leave it in place.
+The level is the program's stream volume, the one the desktop's volume
+control shows for that program. Moving the slider changes what plays at
+once. OpenXLR saves the level, gives it to every stream the program starts
+later and keeps it across daemon restarts. When you move the program in
+the desktop's volume control, or the program moves its own stream, the
+saved level follows it. A program with nothing saved starts the slider at
+the level it plays at, and its button shows that level when it is below
+100%. **Reset** or **Forget** clears the saved level and puts the program
+back to 100%. The saved level is machine state and profiles leave it in
+place.
+
+The session manager remembers stream volumes too, under the name a program
+gives PipeWire, and restores one to each new stream. Programs built on one
+runtime can share that name, as some Electron programs do. OpenXLR writes
+a saved level over the restored one as soon as the stream appears, so a
+stream can start at another program's level for a moment. A program with
+nothing saved in OpenXLR keeps what the session manager restored, which
+can be the level you set for another program of that name. Its button
+shows the level, and saving one for it settles it.
+
 The browser's application level still applies when individual Chromium
 tab routing is enabled. Set each captured tab or installed web app's
 relative level under **Browser tabs**. See [Browser tab routing](browser-routing.md).

@@ -292,7 +292,7 @@ that final acknowledgement (or an `error` without a request id):
 | `toggleMonitorMuted` | none | atomically toggle the same monitor pause. Use this for keys and repeated presses instead of reading `monitorMuted` and sending its inverse; each accepted command toggles once |
 | `getBrowserSession` | none | WebSocket only; register this connection as a browser companion and return its `browserSession`. Repeated calls on the same connection return the same id |
 | `syncBrowserTabs` | `session`, `tabs` | WebSocket only; replace this companion's complete tab list. Only the connection that obtained the session may publish it; see [browser tabs](#browser-tabs) |
-| `setAppVolume` | `identity`, `value` | set a known application's playback volume from 0 to 1 on the desktop percentage scale. Use the identity from `mixer.streams`, including any spaces in it. `null` clears the preference and leaves the live desktop level. Applies to that application's current and future playback streams. Stored in `mixer.json`, independent of routing and profiles. The browser application level is shared by its playback streams, including captured tabs; tab levels apply separately |
+| `setAppVolume` | `identity`, `value` | set a known application's playback volume from 0 to 1 on the desktop percentage scale, or clear it with `null`. Take the identity from `mixer.streams`; the level is saved under the key `assignApp` uses. The level is written to the application's playing streams before the command is acknowledged, and to each stream it starts later. `null` puts the playing streams back to 100%. Saved in `mixer.json` with the next write, independent of routing and profiles. It is the stream volume the desktop shows, so a change made there or by the application replaces the saved level. The browser application level is shared by its playback streams, including captured tabs; tab levels apply separately |
 | `setBrowserTabVolume` | `session`, `tabId`, `site`, `value`, `remember` | volume from 0 to 1 for a tab whose companion reports `volumeSupported`. The origin must still match the tab. `remember:true` stores a site default independently of routing; `false` overrides only this tab until navigation or closure. `value:null` clears the specified override |
 | `assignBrowserTab` | `session`, `tabId`, `site`, `channel`, `remember` | select an application channel or `null` for browser default for a connected tab. Required `site` is the origin the caller saw; an assignment is refused if that tab has navigated to another origin. `remember` must be boolean; true saves the website origin preference, and `channel:null, remember:true` forgets it. False changes only this tab |
 | `activateBrowserTab` | `session`, `tabId`, `site` | ask the companion that registered a connected tab to bring it forward and start routing it, as its own Activate does. Refused unless `preserveBrowserOutputs` is on, `site` still matches the tab's origin, the tab has a channel, and it is neither capturing nor reporting an `activation`. Success means the request reached the companion, not that capture started; see [browser tabs](#browser-tabs) |
@@ -929,6 +929,11 @@ nothing between the brackets stays as it is. An identity or label saved
 under the wrapper name in `mixer.json` is read back as the program's. Clients
 show `label` and keep `identity` for commands.
 
+An entry's `volume` is the application's saved playback level, null or
+absent when none is saved. `liveVolume` is the level its newest playback
+stream has now, whoever set it, and is null or absent while the application
+is silent. `mixer.appVolumeSupported` advertises `setAppVolume`.
+
 ### Application icons
 
 A `streams` entry carries `icon` when the daemon found one for the app: a
@@ -1419,8 +1424,7 @@ cannot distinguish tabs that share a browser audio process. The companion
 applies `browserTabs[].volume` inside each tab's capture graph. It advertises
 `volumeSupported` in its registration, and `rememberVolume` in the state says
 the level comes from the saved website default. An absent or null volume
-plays at unity. The application's `streams[].volume` is its saved preference,
-not a live measurement, and `mixer.appVolumeSupported` advertises that command.
+plays at unity.
 
 The user enables `preserveBrowserOutputs` before using tab routing. While
 enabled, OpenXLR does not move or unmute recognized Chrome, Chromium, Brave,
