@@ -57,14 +57,19 @@ public sealed class PlaybackVolumeViewModel(Func<double?, bool, Task<string?>> s
         double? live = null)
     {
         Set(ref _supported, supported, nameof(Supported));
-        Set(ref _enabled, supported && enabled, nameof(Enabled));
         Set(ref _browserHeld, browserHeld, nameof(Hint));
-        if (!Enabled && _pending is not null) Cancel();
+        SetEnabled(enabled);
         var state = new Choice(level, remember);
         if (_reported == state && _live == live) return;
         _reported = state;
         _live = live;
         if (_pending is null) Refresh();
+    }
+
+    internal void SetEnabled(bool enabled)
+    {
+        Set(ref _enabled, Supported && enabled, nameof(Enabled));
+        if (!Enabled && _pending is not null) Cancel();
     }
 
     internal void Cancel()
