@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { t } from '../chromium/text.mjs';
 import { deviceFor, errorText, MAX_CAPTURES, notInvoked, siteOf, tabRecords, TabAudio } from '../chromium/routing.mjs';
 
 const deferred = () => {
@@ -116,6 +117,37 @@ test('refused output permission never takes over tab audio', async () => {
   await assert.rejects(f.audio.start(1, 'stream', 'chat'), /NotAllowedError/);
   assert.equal(f.acquisitions.length, 0); assert.equal(f.audio.snapshot().length, 0);
   assert(f.contexts.every(context => context.closed));
+});
+
+for (const stage of ['sink', 'resume']) {
+  test(`a stalled ${stage} times out and frees the capture slot`, { timeout: 1000 }, async () => {
+    const pending = deferred();
+    const f = fixture({ [stage]: () => pending.promise, timeoutMs: 30 });
+    try {
+      await assert.rejects(f.audio.start(1, 'stream', 'chat'), { message: t('startTimeout') });
+      assert.deepEqual(f.audio.snapshot(), []);
+      assert.equal(f.contexts[0].closed, true);
+      assert(f.streams.every(stream => stream.track.stopped));
+      assert.deepEqual(f.statuses.map(([id, capturing]) => [id, capturing]), [[1, false]]);
+      pending.resolve();
+      await f.audio.start(1, 'retry', 'chat');
+      assert.equal(f.audio.snapshot()[0].capturing, true);
+    } finally {
+      pending.resolve();
+      await f.audio.stopAll();
+    }
+  });
+}
+
+test('a pending context close cannot hold a timed-out start open', { timeout: 1000 }, async () => {
+  const resume = deferred(), close = deferred();
+  const f = fixture({ resume: () => resume.promise, close: () => close.promise, timeoutMs: 30 });
+  try {
+    await assert.rejects(f.audio.start(1, 'stream', 'chat'), { message: t('startTimeout') });
+    assert.deepEqual(f.audio.snapshot(), []);
+    assert.equal(f.streams[0].track.stopped, true);
+    assert.equal(f.contexts[0].closed, false);
+  } finally { resume.resolve(); close.resolve(); }
 });
 
 test('failed playback resume releases the capture instead of leaving a silent tab', async () => {

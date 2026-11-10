@@ -77,21 +77,23 @@ export class TabAudio {
     const session = { id, site, volume: playbackVolume(volume), context: null, stream: null, source: null, gain: null, closed: false, capturing: false, deviceId, routeVersion: 0, routing: 0, checkAfterRoute: false };
     this.sessions.set(id, session);
     let timer;
+    const deadline = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(t('startTimeout'))), this.timeoutMs);
+    });
+    const withinStart = operation => Promise.race([operation, deadline]);
     try {
-      if (previous) await this.close(previous);
+      if (previous) await withinStart(this.close(previous));
       if (session.closed || this.sessions.get(id) !== session) return;
       session.context = this.createContext();
       if (typeof session.context.setSinkId !== 'function') throw new Error(t('noSinkSelection'));
-      await session.context.setSinkId(deviceId);
+      await withinStart(session.context.setSinkId(deviceId));
       if (session.closed) return;
       const acquisition = this.mediaDevices.getUserMedia({
         audio: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: streamId } }, video: false,
       });
       // getUserMedia cannot be cancelled. A late result must release its tracks.
       acquisition.then(stream => { if (session.closed) stream.getTracks().forEach(track => track.stop()); }, () => {});
-      session.stream = await Promise.race([acquisition, new Promise((_, reject) => {
-        timer = setTimeout(() => reject(new Error(t('startTimeout'))), this.timeoutMs);
-      })]);
+      session.stream = await withinStart(acquisition);
       if (session.closed) { session.stream.getTracks().forEach(track => track.stop()); return; }
       if (!session.stream.getAudioTracks().length) throw new Error(t('noAudioTrack'));
       for (const track of session.stream.getTracks()) track.addEventListener('ended', () => {
@@ -105,13 +107,15 @@ export class TabAudio {
       session.gain.gain.value = session.volume ** 3;
       session.source.connect(session.gain);
       session.gain.connect(session.context.destination);
-      await session.context.resume();
+      await withinStart(session.context.resume());
       if (session.closed) return;
       session.capturing = true;
       this.status(id, true, null);
     } catch (error) {
       if (this.sessions.get(id) !== session) return;
-      await this.stop(id, errorText(error));
+      // stop releases the slot and tracks synchronously. A stalled
+      // context close must not keep the start request pending.
+      await withinStart(this.stop(id, errorText(error))).catch(() => {});
       throw error;
     } finally { clearTimeout(timer); }
   }
