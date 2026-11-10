@@ -254,7 +254,10 @@ the software and the physical dial reflected back. The settings block's
 bytes 1 and 2 follow the Pro's per-input structure (bit 1 phantom, bit 7
 compressor, byte 2 = 0x04 for ClipGuard off); those three controls were
 exposed at the Pro's positions in 0.1.12 and the same tester confirmed
-each of them works.
+each of them works. Firmware 1.0.15 moved ClipGuard: Wave Link writes
+0x10 in byte 2 for ClipGuard off and 0x04 for the unit's gain lock, so
+OpenXLR switches 0x10 from that firmware and clears a 0x04 an earlier
+release left there.
 
 The XLR Dock MK.2 for the Stream Deck+ is built on the same Wave FX
 platform (80 dB gain, phantom, ClipGuard 2.0, onboard expander, voice
@@ -341,7 +344,7 @@ read.
 |---|---|---|
 | Gain, mute, low cut, expander, voice tune + strength | verified | Wave XLR MK.2: community tester, reads and writes. Dock: all of them on the author's unit |
 | Headphone volume, low impedance, crossfade | verified | Wave XLR MK.2: community tester. Dock: all three on the author's unit (the mic leaves the direct monitor at the PC end of the crossfade) |
-| Phantom 48V, ClipGuard, compressor | verified | at the Pro's bit positions; community tester, 0.1.12. Dock: phantom confirmed with a condenser mic going silent when switched off, ClipGuard and compressor by ear |
+| Phantom 48V, ClipGuard, compressor | verified | at the Pro's bit positions; community tester, 0.1.12. Dock: phantom confirmed with a condenser mic going silent when switched off, ClipGuard and compressor by ear. From firmware 1.0.15 ClipGuard off is byte 2 bit 0x10 and 0x04 is the unit's gain lock, read from Wave Link's writes on a Wave XLR MK.2 on 1.0.15; the dock on 1.0.15 is driven the same way, not yet captured. Older firmware keeps 0x04 for ClipGuard off |
 | Microphone EQ on the unit, firmware 1.0.15 or later | verified | four bands and a switch in the settings block, written whole per change as Wave Link 3.5 writes it; the encoder reproduces 67 of Wave Link's captured writes byte for byte. The dock's filters were measured from Linux against the software EQ's curves, within about 1 dB for every type, and OpenXLR runs the EQ on the unit. On older firmware, or when the version or the EQ fields cannot be read, the EQ runs in software |
 | Compressor and expander settings on the unit | inferred, not checked | the Wave:3 MK.2's fields at bytes 3 to 17 of the settings block ([layout](wave-xlr-pro-protocol.md#compressor-and-expander-on-the-unit)), which a Wave XLR MK.2 on 1.0.15 holds with the same factory values. OpenXLR drives them as the Wave:3 MK.2's, behind the EQ's firmware gate and only when the fields hold values the unit takes. Not yet checked on either unit |
 

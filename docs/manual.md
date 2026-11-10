@@ -146,6 +146,12 @@ giving silence or a buzz: OpenXLR resets it by itself, and Options →
 Audio → INTERFACE has **Recover microphone** for a stall it misses
 ([section 5.2](#dock-silent)).
 
+On the Wave XLR MK.2 and the XLR Dock MK.2 with firmware 1.0.15 or
+later, OpenXLR up to 0.6.5 did not turn ClipGuard off: the switch set the
+unit's gain lock, the one Wave Link offers, and ClipGuard stayed on.
+Switching ClipGuard once with a newer release clears that lock. Older
+firmware is not affected.
+
 If you only want hardware control and no mixer, turn off "Enable software
 mixer" in Options, AUDIO ([section 3.8](#hardware-only)). The daemon restarts in hardware-control mode
 and the `OpenXLR …` devices disappear.

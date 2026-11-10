@@ -10,8 +10,8 @@ namespace OpenXLR.Core.Devices;
 /// Block 0x0004 (38 bytes) is one input struct, the same layout as each of
 /// the Pro's two: gain dB at 0 (0..80), a flag byte at 1 (bit0 mute, bit1
 /// phantom, bit4 low cut, bit5 expander, bit6 voice tune, bit7 compressor),
-/// ClipGuard at 2 (0x04 set = disabled, inverted like the Pro), voice tune
-/// strength at 10. Block 0x0005 (2 bytes): headphone attenuation at 0
+/// ClipGuard at 2 (set = disabled: 0x04 before firmware 1.0.15, 0x10 from
+/// it, where 0x04 is the unit's gain lock), voice tune strength at 10. Block 0x0005 (2 bytes): headphone attenuation at 0
 /// (quarter-dB steps, 0 = loudest, 240 = -60 dB) and bit1 of byte 1 = low
 /// impedance. Block 0x0001 (6 bytes): crossfade at 0 (0..200, 100 = centre).
 /// Decoded from a Wave Link USB capture during the Pro reverse engineering;
@@ -70,8 +70,18 @@ public class WaveXlrMk2Device : IAudioDevice
     private const int SettingsUsed = 11;
     private const int HpUsed = 2;
 
+    // Byte 2 of the settings block. Before firmware 1.0.15, 0x04 set is
+    // ClipGuard off, as a tester's Wave Link dump read and the dock's
+    // ClipGuard sounded on 2026-09-05. From 1.0.15 Wave Link writes 0x10 for
+    // ClipGuard off and 0x04 for the unit's gain lock, which refuses gain
+    // set through the USB volume control (captured on a Wave XLR MK.2 on
+    // 1.0.15, 2026-11-10); 0x08 is the limiter's other mode bit and is
+    // never left set.
     private const int ClipGuardOffset = 2;
-    private const byte ClipGuardOffMask = 0x04;   // set = ClipGuard disabled
+    private const byte ClipGuardOffBefore1015 = 0x04;
+    private const byte LimiterOffMask = 0x10;
+    private const byte LimiterModeMask = 0x18;
+    private const byte GainLockMask = 0x04;
 
     private const byte MuteMask = 0x01;
     private const byte PhantomMask = 0x02;
@@ -107,6 +117,14 @@ public class WaveXlrMk2Device : IAudioDevice
     // The flag byte's low cut bit, which differs between models.
     private readonly byte _lowCutMask;
 
+    // The first firmware whose byte 2 holds the limiter mode at 0x18 and the
+    // gain lock at 0x04; null on a model whose ClipGuard bit has not been
+    // read from Wave Link on its newer firmware, which keeps 0x04.
+    private readonly Version? _limiterModeFirmware;
+
+    // Whether this unit's firmware is the limiter-mode layout, decided at connect.
+    private bool _limiterMode;
+
     /// <summary>The version block 0x0000 reports, as major.minor.patch; null until read.</summary>
     public string? Firmware { get; private set; }
 
@@ -129,7 +147,11 @@ public class WaveXlrMk2Device : IAudioDevice
     /// <param name="vIndex">wIndex of the vendor transfers, see <see cref="_vIndex"/>.</param>
     protected WaveXlrMk2Device(ushort productId, string model, bool physicalControls, ushort vIndex, bool retainsSettings = true,
         ushort? alternateVIndex = null, IUsbTransport? usb = null)
-        : this(productId, model, vIndex, Mk2Capabilities(physicalControls, retainsSettings), WaveFxEq.Mk2EqFirmware, alternateVIndex, usb) { }
+        : this(productId, model, vIndex, Mk2Capabilities(physicalControls, retainsSettings), WaveFxEq.Mk2EqFirmware, alternateVIndex, usb,
+            limiterModeFirmware: LimiterModeFirmware) { }
+
+    /// <summary>The Wave XLR MK.2's and the XLR Dock MK.2's first firmware with the limiter mode and the gain lock in byte 2.</summary>
+    public static Version LimiterModeFirmware { get; } = new(1, 0, 15);
 
     /// <param name="capabilities">The controls the model has; each one this
     /// class can drive and the model lacks is left out of the state and
@@ -144,9 +166,14 @@ public class WaveXlrMk2Device : IAudioDevice
     /// <param name="lowCutMask">The flag byte's low cut bit on the model:
     /// 0x10 on the Wave XLR MK.2 and the XLR Dock MK.2, 0x02 on the Wave:3
     /// MK.2, where 0x02 is phantom power on the others.</param>
+    /// <param name="limiterModeFirmware">The first firmware on which byte 2
+    /// carries ClipGuard at 0x10 and the gain lock at 0x04; null to keep
+    /// 0x04 as ClipGuard on every firmware.</param>
     protected WaveXlrMk2Device(ushort productId, string model, ushort vIndex, DeviceCapabilities capabilities, Version? eqFirmware,
-        ushort? alternateVIndex = null, IUsbTransport? usb = null, bool crossfadeReversed = false, byte lowCutMask = LowCutMask)
+        ushort? alternateVIndex = null, IUsbTransport? usb = null, bool crossfadeReversed = false, byte lowCutMask = LowCutMask,
+        Version? limiterModeFirmware = null)
     {
+        _limiterModeFirmware = limiterModeFirmware;
         _preferredVIndex = _vIndex = vIndex;
         _alternateVIndex = alternateVIndex;
         _usb = usb ?? UsbTransport.Create();
@@ -210,6 +237,7 @@ public class WaveXlrMk2Device : IAudioDevice
     {
         ConnectionNote = null;
         Firmware = null;
+        _limiterMode = false;
         EqSupport = null;
         DynamicsSupport = null;
         Capabilities = _modelCapabilities;
@@ -257,6 +285,8 @@ public class WaveXlrMk2Device : IAudioDevice
             if (n > 0) version = WaveFxEq.FirmwareVersion(identity.AsSpan(0, n));
         }
         Firmware = version is null ? null : WaveFxEq.Format(version);
+        // An unread version keeps the older meaning, as the EQ stays in software.
+        _limiterMode = version is not null && _limiterModeFirmware is not null && version >= _limiterModeFirmware;
         if (_eqFirmware is null) return;
         byte[]? block = null;
         EqSupport = WaveFxEq.Gate(Info.Model, version, _eqFirmware, () =>
@@ -394,7 +424,7 @@ public class WaveXlrMk2Device : IAudioDevice
             VoiceTune = c.VoiceTune && (s[1] & VoiceTuneMask) != 0,
             Phantom = c.Phantom && (s[1] & PhantomMask) != 0,
             Compressor = c.Compressor && (s[1] & CompressorMask) != 0,
-            ClipGuard = c.ClipGuard && (s[ClipGuardOffset] & ClipGuardOffMask) == 0,
+            ClipGuard = c.ClipGuard && (s[ClipGuardOffset] & (_limiterMode ? LimiterOffMask : ClipGuardOffBefore1015)) == 0,
             VoiceTuneStrength = c.VoiceTune ? s[10] : 0,
             HpVolumeDb = -hp[0] / 4.0,
             LowImpedance = c.LowImpedance && (hp[1] & LowZMask) != 0,
@@ -466,9 +496,21 @@ public class WaveXlrMk2Device : IAudioDevice
     public void SetClipGuard(bool on)
     {
         Require(_modelCapabilities.ClipGuard, "ClipGuard");
-        Modify(BlockSettings, SettingsLen, SettingsUsed, b => b[ClipGuardOffset] = on
-            ? (byte)(b[ClipGuardOffset] & ~ClipGuardOffMask)
-            : (byte)(b[ClipGuardOffset] | ClipGuardOffMask));
+        Modify(BlockSettings, SettingsLen, SettingsUsed, b => b[ClipGuardOffset] = ClipGuardByte(b[ClipGuardOffset], on));
+    }
+
+    /// <summary>
+    /// Byte 2 with ClipGuard switched, as Wave Link writes it on the unit's
+    /// firmware. From 1.0.15 the write also clears the gain lock: earlier
+    /// OpenXLR releases wrote 0x04 there for ClipGuard off, which locked the
+    /// gain against the desktop's volume control and left ClipGuard on.
+    /// </summary>
+    private byte ClipGuardByte(byte b, bool on)
+    {
+        if (!_limiterMode)
+            return on ? (byte)(b & ~ClipGuardOffBefore1015) : (byte)(b | ClipGuardOffBefore1015);
+        b = (byte)(b & ~(LimiterModeMask | GainLockMask));
+        return on ? b : (byte)(b | LimiterOffMask);
     }
 
     public bool SetEq(int input, DeviceEq eq)
