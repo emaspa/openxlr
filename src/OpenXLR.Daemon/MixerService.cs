@@ -35,6 +35,8 @@ public sealed partial class MixerService : IHostedService, IDisposable
     // user chose after the daemon was gone.
     private readonly CancellationTokenSource _stopping = new();
     private Task _defaultDefense = Task.CompletedTask;
+    private readonly CoalescedWorkQueue _streamVolumePasses;
+    private readonly Task _streamVolumeWorker;
     // Cancelled once the stop has run for StopBudget: the adapter then kills
     // a helper still running and starts no other, so a stalled audio server
     // ends the stop early instead of each pactl call waiting out its own
@@ -136,6 +138,9 @@ public sealed partial class MixerService : IHostedService, IDisposable
             () => Changed?.Invoke());
         _browserTitles = (time ?? TimeProvider.System).CreateTimer(_ => PublishBrowserTabTitles(), null,
             TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        _streamVolumePasses = new(SyncPlaybackStreamVolumes, _log, "Playback stream volume pass");
+        _streamVolumeWorker = _streamVolumePasses.RunAsync(_stopping.Token);
+        _pipeWire.PlaybackStreamArrived += OnPlaybackStreamArrived;
     }
 
     /// <summary>
@@ -830,11 +835,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
     private void BuildGraph(string? output, StartupDefaults before)
     {
         if (_graphWatch is null)
-        {
             _graphWatch = _pipeWire.WatchGraph(note => _log.LogInformation("{msg}", note));
-            _pipeWire.PlaybackStreamArrived -= OnPlaybackStreamArrived;
-            _pipeWire.PlaybackStreamArrived += OnPlaybackStreamArrived;
-        }
         MixerSettings? saved = MixerSettings.Load(MixerSettings.DefaultPath, out string? settingsWarning);
         if (settingsWarning is not null)
             _log.LogWarning("mixer settings: {warning}{fallback}", settingsWarning, saved is null ? "; starting with defaults" : "");
@@ -1170,6 +1171,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
     {
         // No default-device write may land after the graph is gone.
         _stopping.Cancel();
+        _pipeWire.PlaybackStreamArrived -= OnPlaybackStreamArrived;
         Interlocked.CompareExchange(ref _stopStarted, Environment.TickCount64, 0);
         long spent = Environment.TickCount64 - Interlocked.Read(ref _stopStarted);
         double left = StopBudget.TotalMilliseconds - spent;
@@ -1190,6 +1192,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
         await sweep;
         await meters;
         await _browserTitles.DisposeAsync();
+        await _streamVolumeWorker;
         // Nothing is written to a unit at stop: it keeps the ducking it holds.
         _mixer.SetDeviceDuckingPort(null);
         try { await _defaultDefense.WaitAsync(TimeSpan.FromSeconds(4)); }   // one in-flight pactl call at most, 3 s
@@ -1218,29 +1221,14 @@ public sealed partial class MixerService : IHostedService, IDisposable
         Interlocked.Exchange(ref _graphWatch, null)?.Dispose();
     }
 
-    private int _streamVolumePass;
+    // The registry reader only signals; the worker reads the latest graph.
+    private void OnPlaybackStreamArrived() => _streamVolumePasses.Signal();
 
-    // A new playback stream gets its application's saved level now, not on
-    // the next sweep. The registry reader only hands the work on; one pass
-    // runs at a time and takes every stream that arrived meanwhile.
-    private void OnPlaybackStreamArrived()
+    private void SyncPlaybackStreamVolumes()
     {
-        if (_stopping.IsCancellationRequested || Interlocked.Exchange(ref _streamVolumePass, 1) != 0) return;
-        _ = Task.Run(() =>
-        {
-            Interlocked.Exchange(ref _streamVolumePass, 0);
-            try
-            {
-                if (_stopping.IsCancellationRequested) return;
-                bool changed = _mixer.SyncAppVolumes();
-                if (_mixer.TakeAppVolumesChanged()) ScheduleSave();
-                if (changed) Changed?.Invoke();
-            }
-            catch (Exception ex) when (ex is InvalidOperationException or IOException or ObjectDisposedException)
-            {
-                _log.LogDebug("stream volume pass: {msg}", ex.Message);
-            }
-        });
+        bool changed = _mixer.SyncAppVolumes();
+        if (_mixer.TakeAppVolumesChanged()) ScheduleSave();
+        if (changed) Changed?.Invoke();
     }
 
     public string OpenBrowserSession(Guid owner) => _mixer.OpenBrowserSession(owner);
@@ -2007,6 +1995,8 @@ public sealed partial class MixerService : IHostedService, IDisposable
 
     public void Dispose()
     {
+        _stopping.Cancel();
+        _pipeWire.PlaybackStreamArrived -= OnPlaybackStreamArrived;
         _browserTitles.Dispose();
         _streamSweep?.Dispose();
         _meterPush?.Dispose();

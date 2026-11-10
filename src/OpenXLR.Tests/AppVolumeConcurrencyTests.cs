@@ -1,5 +1,9 @@
 using System.Diagnostics;
+using System.Reflection;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using OpenXLR.Core.Mixing;
+using OpenXLR.Daemon;
 using static OpenXLR.Tests.BrowserTabRoutingTests;
 
 namespace OpenXLR.Tests;
@@ -7,6 +11,59 @@ namespace OpenXLR.Tests;
 [Collection("xdg-config")]
 public sealed class AppVolumeConcurrencyTests
 {
+    [Fact]
+    public async Task ArrivalsDuringAnActiveVolumePassWaitForOneFollowUp()
+    {
+        using var graph = new BrowserGraph();
+        var settings = new ConfigurationBuilder().Build();
+        using var devices = new DeviceManager(NullLogger<DeviceManager>.Instance, settings, () => []);
+        using var service = new MixerService(NullLogger<MixerService>.Instance, settings, devices);
+        var mixer = (Mixer)typeof(MixerService).GetField("_mixer", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(service)!;
+        Action arrive = typeof(MixerService).GetMethod("OnPlaybackStreamArrived", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .CreateDelegate<Action>(service);
+        graph.Build(mixer);
+        string Stream(int id, int serial, int percent) => BrowserGraph.Node(id, serial, BrowserGraph.ChromiumProps, percent);
+        graph.SetStreams(mixer, Stream(10, 100, 35));
+        mixer.SyncStreams();
+        mixer.SetAppVolume("chromium", .35);
+        graph.ClearCalls();
+
+        using var release = new ManualResetEventSlim();
+        var first = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var next = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        int notifications = 0;
+        service.Changed += () =>
+        {
+            if (Interlocked.Increment(ref notifications) == 1)
+            {
+                first.SetResult();
+                release.Wait(TimeSpan.FromSeconds(5));
+            }
+            else next.TrySetResult();
+        };
+        try
+        {
+            graph.SetStreams(mixer, Stream(10, 100, 35), Stream(11, 101, 80));
+            arrive();
+            await first.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            graph.SetStreams(mixer, Stream(10, 100, 35), Stream(11, 101, 35), Stream(12, 102, 20));
+            for (int i = 0; i < 20; i++) arrive();
+            // Give a mistakenly started second worker time to report while
+            // the first is still held in the notification it is delivering.
+            Assert.NotSame(next.Task, await Task.WhenAny(next.Task, Task.Delay(500)));
+            release.Set();
+            await next.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal(["set-sink-input-volume 101 35%", "set-sink-input-volume 102 35%"],
+                graph.Calls.Where(call => call.StartsWith("set-sink-input-volume", StringComparison.Ordinal)));
+        }
+        finally
+        {
+            release.Set();
+        }
+    }
+
     [Fact]
     public async Task AStreamPassReadingBeforeACommandReadsTheRegistryAgain()
     {

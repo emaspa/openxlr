@@ -31,7 +31,7 @@ public sealed class WebSocketHub
     // ever get to tear down.
     private readonly CancellationToken _stopping;
     private readonly IHostApplicationLifetime _lifetime;
-    private readonly StateBroadcastQueue _stateBroadcasts;
+    private readonly CoalescedWorkQueue _stateBroadcasts;
 
     public WebSocketHub(DeviceManager devices, MixerService mixer, ILogger<WebSocketHub> log,
         IHostApplicationLifetime lifetime, WaveInterfaces? waveInterfaces = null)
@@ -50,7 +50,7 @@ public sealed class WebSocketHub
             // Concurrent notifications cannot apply an older unit list last.
             if (_waveInterfaces is not null) _mixer.SetAttachedUnits(_waveInterfaces.AttachedUnits());
             if (!_clients.IsEmpty) Broadcast(Snapshot());
-        }, _log);
+        }, _log, "State broadcast");
         _devices.StateChanged += ignored => _stateBroadcasts.Signal();
         _devices.DeviceArrived += ignored =>
         {

@@ -4,7 +4,7 @@ using OpenXLR.Daemon;
 
 namespace OpenXLR.Tests;
 
-public sealed class StateBroadcastQueueTests
+public sealed class CoalescedWorkQueueTests
 {
     [Fact]
     public async Task SlowSnapshotNeverBlocksProducersAndBurstsBecomeOnePendingSnapshot()
@@ -14,7 +14,7 @@ public sealed class StateBroadcastQueueTests
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var second = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         int calls = 0;
-        var queue = new StateBroadcastQueue(() =>
+        var queue = new CoalescedWorkQueue(() =>
         {
             if (Interlocked.Increment(ref calls) == 1)
             {
@@ -22,7 +22,7 @@ public sealed class StateBroadcastQueueTests
                 Assert.True(release.Wait(TimeSpan.FromSeconds(5)));
             }
             else second.TrySetResult();
-        }, NullLogger.Instance);
+        }, NullLogger.Instance, "Test work");
         Task pump = queue.RunAsync(stop.Token);
         try
         {
@@ -52,7 +52,7 @@ public sealed class StateBroadcastQueueTests
         var first = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var next = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         int calls = 0;
-        var queue = new StateBroadcastQueue(() =>
+        var queue = new CoalescedWorkQueue(() =>
         {
             if (Interlocked.Increment(ref calls) == 1)
             {
@@ -60,7 +60,7 @@ public sealed class StateBroadcastQueueTests
                 throw new InvalidOperationException("simulated snapshot failure");
             }
             next.SetResult();
-        }, NullLogger.Instance);
+        }, NullLogger.Instance, "Test work");
         Task pump = queue.RunAsync(stop.Token);
         try
         {
@@ -80,18 +80,18 @@ public sealed class StateBroadcastQueueTests
     public async Task ARepeatedFailureCarriesItsTraceOnceAndRecoveryIsSaid()
     {
         using var stop = new CancellationTokenSource();
-        var log = new RecordingLogger<StateBroadcastQueueTests>();
+        var log = new RecordingLogger<CoalescedWorkQueueTests>();
         var calls = new[] { new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously),
             new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously),
             new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously),
             new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously) };
         int call = 0;
-        var queue = new StateBroadcastQueue(() =>
+        var queue = new CoalescedWorkQueue(() =>
         {
             int n = Interlocked.Increment(ref call) - 1;
             calls[n].SetResult();
             if (n < 3) throw new InvalidOperationException("read config block: Operation timed out");
-        }, log);
+        }, log, "Test work");
         Task pump = queue.RunAsync(stop.Token);
         try
         {
@@ -117,9 +117,40 @@ public sealed class StateBroadcastQueueTests
     public async Task IdlePumpStopsWithoutAnotherSignal()
     {
         using var stop = new CancellationTokenSource();
-        var queue = new StateBroadcastQueue(() => throw new Exception("unexpected"), NullLogger.Instance);
+        var queue = new CoalescedWorkQueue(() => throw new Exception("unexpected"), NullLogger.Instance, "Test work");
         Task pump = queue.RunAsync(stop.Token);
         stop.Cancel();
         await pump.WaitAsync(TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
+    public async Task StopWaitsForCurrentWorkWithoutStartingPendingWork()
+    {
+        using var stop = new CancellationTokenSource();
+        using var release = new ManualResetEventSlim();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        int calls = 0;
+        var queue = new CoalescedWorkQueue(() =>
+        {
+            Interlocked.Increment(ref calls);
+            entered.TrySetResult();
+            release.Wait(TimeSpan.FromSeconds(5));
+        }, NullLogger.Instance, "Test work");
+        Task pump = queue.RunAsync(stop.Token);
+        try
+        {
+            queue.Signal();
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            queue.Signal();
+            stop.Cancel();
+            Assert.False(pump.IsCompleted);
+        }
+        finally
+        {
+            release.Set();
+            stop.Cancel();
+            await pump.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        Assert.Equal(1, calls);
     }
 }

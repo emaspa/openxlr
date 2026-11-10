@@ -1049,10 +1049,13 @@ The session manager remembers stream volumes too, under the name a program
 gives PipeWire, and restores one to each new stream. Programs built on one
 runtime can share that name, as some Electron programs do. OpenXLR writes
 a saved level over the restored one as soon as the stream appears, so a
-stream can start at another program's level for a moment. A program with
-nothing saved in OpenXLR keeps what the session manager restored, which
-can be the level you set for another program of that name. Its button
-shows the level, and saving one for it settles it.
+stream can start at another program's level for a moment. Streams that
+start together are handled in batches. The mixer's regular check applies
+any levels that were deferred.
+
+A program with nothing saved in OpenXLR keeps what the session manager
+restored, which can be the level you set for another program of that
+name. Its button shows the level, and saving one for it settles it.
 
 The browser's application level still applies when individual Chromium
 tab routing is enabled. Set each captured tab or installed web app's

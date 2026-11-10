@@ -39,7 +39,7 @@ public sealed partial class Mixer
     // Streams still owed full volume after a reset whose write failed or
     // did not fit in the pass, by registry id.
     private readonly Dictionary<int, PendingAppVolumeReset> _appVolumeResets = [];
-    private bool _appVolumesChanged;
+    private int _appVolumesChanged;
 
     private sealed record AppliedAppVolume(int Serial, string Key, double Target, double Written, long At)
     {
@@ -122,17 +122,10 @@ public sealed partial class Mixer
 
     /// <summary>
     /// True once after a stream's level moved from outside and the saved
-    /// level followed it, so the daemon knows to save.
+    /// level followed it, so the daemon knows to save. Consuming this signal
+    /// does not wait for a busy mixer.
     /// </summary>
-    public bool TakeAppVolumesChanged()
-    {
-        lock (_gate)
-        {
-            bool changed = _appVolumesChanged;
-            _appVolumesChanged = false;
-            return changed;
-        }
-    }
+    public bool TakeAppVolumesChanged() => Interlocked.Exchange(ref _appVolumesChanged, 0) != 0;
 
     /// <summary>
     /// Give playback streams their application's saved level without waiting
@@ -333,7 +326,8 @@ public sealed partial class Mixer
             double followed = SnapPlaybackVolume(Math.Min(level, 1));
             _appVolumes[key] = followed;
             _appVolumeApplied[stream.Id] = applied with { Target = followed, Written = level, Confirmed = true };
-            _appVolumesChanged = adopted = true;
+            Volatile.Write(ref _appVolumesChanged, 1);
+            adopted = true;
         }
 
         bool moved = playing.Count != _appLiveVolumes.Count
