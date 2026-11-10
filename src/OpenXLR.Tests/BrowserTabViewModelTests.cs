@@ -469,37 +469,50 @@ public sealed class BrowserTabViewModelTests
         await up.Task.WaitAsync(TimeSpan.FromSeconds(3));
         WebSocket socket = await connected.Task.WaitAsync(TimeSpan.FromSeconds(3));
         typeof(MainViewModel).GetProperty(nameof(MainViewModel.DaemonConnected))!.SetValue(model, true);
-        Report(model, false, new JsonArray(Tab()));
+        Report(model, false, new JsonArray(VolumeTab()));
         model.PreserveBrowserOutputs = true;
         JsonNode first = await commands.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(3));
         Assert.Equal("setPreserveBrowserOutputs", first["cmd"]!.GetValue<string>());
         Assert.False(model.PreserveBrowserOutputs);
         Assert.False(model.CanSetBrowserRouting);
-        Report(model, true, new JsonArray(Tab()));
+        Report(model, true, new JsonArray(VolumeTab()));
         Assert.False(model.PreserveBrowserOutputs);
         Assert.False(model.BrowserTabs[0].CanEdit);
-        Report(model, false, new JsonArray(Tab()));
+        Assert.False(model.BrowserTabs[0].PlaybackVolume.Enabled);
+        Report(model, false, new JsonArray(VolumeTab()));
         await ReplyAndWait(first, "routing unavailable");
         Assert.False(model.PreserveBrowserOutputs);
         Assert.Equal("routing unavailable", model.Status);
         model.PreserveBrowserOutputs = true;
         JsonNode second = await commands.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(3));
-        Report(model, true, new JsonArray(Tab()));
+        Report(model, true, new JsonArray(VolumeTab()));
         await ReplyAndWait(second);
         Assert.True(model.PreserveBrowserOutputs);
         Assert.True(model.BrowserTabs[0].CanEdit);
+        Assert.True(model.BrowserTabs[0].PlaybackVolume.Enabled);
         Assert.False(commands.Reader.TryRead(out _));
 
         // Another client can change the value again before our acknowledgement resumes.
         model.PreserveBrowserOutputs = false;
         JsonNode third = await commands.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(3));
-        Report(model, false, new JsonArray(Tab()));
-        Report(model, true, new JsonArray(Tab()));
+        Report(model, false, new JsonArray(VolumeTab()));
+        Report(model, true, new JsonArray(VolumeTab()));
         await ReplyAndWait(third);
         Assert.True(model.PreserveBrowserOutputs);
-        Report(model, false, new JsonArray(Tab()));
+        model.PreserveBrowserOutputs = false;
+        JsonNode fourth = await commands.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(3));
+        Report(model, false, new JsonArray(VolumeTab()));
+        await ReplyAndWait(fourth);
         Assert.False(model.PreserveBrowserOutputs);
         Assert.False(model.BrowserTabs[0].CanEdit);
+        Assert.False(model.BrowserTabs[0].PlaybackVolume.Enabled);
+
+        static JsonObject VolumeTab()
+        {
+            JsonObject tab = Tab();
+            tab["volumeSupported"] = true;
+            return tab;
+        }
 
         async Task ReplyAndWait(JsonNode command, string? error = null)
         {

@@ -175,6 +175,7 @@ public sealed class BrowserTabViewModel : ViewModelBase
     {
         if (!value) { EndRequest(); CancelPending(); }
         Set(ref _canEdit, value, nameof(CanEdit));
+        PlaybackVolume.SetEnabled(value);
         Raise(nameof(CanRemember));
         Raise(nameof(IsActivating));
         Raise(nameof(CanActivate));

@@ -30,6 +30,9 @@ level, including installed web apps. The tab control adjusts each
 captured tab relative to that shared level. If all tabs are quiet, check
 the shared browser level in **Manage** or the desktop volume controls.
 
+The tab volume control follows the browser output selection switch as soon
+as the daemon confirms the change.
+
 Turn on **Remember volume for this website** to use the same level for
 future tabs on that origin. This is separate from remembering a channel.
 Without it, the edit applies to this tab until it closes or changes origin.
