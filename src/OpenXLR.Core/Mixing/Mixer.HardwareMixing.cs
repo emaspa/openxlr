@@ -256,6 +256,36 @@ public sealed partial class Mixer
     public bool HardwareGraphEntered { get { lock (_gate) return UnitBuildsJacksLocked; } }
 
     /// <summary>
+    /// The unit's own level for each mix it builds alone, over the
+    /// computer's copy in <paramref name="meters"/> (see
+    /// <see cref="UnitMixMeters"/>). Only while the plan runs and the unit
+    /// builds the jacks' mixes; asking the port keeps the device loop
+    /// reading the unit's meters, so nothing is read outside the mode or
+    /// while no client takes meters. A mix keeps the computer's copy for any
+    /// frame the unit's meters are not there for.
+    /// </summary>
+    private void AddUnitMixLevels(Dictionary<string, double[]> meters, (IDeviceDuckingPort Port, string Unit, IReadOnlyDictionary<string, int> Channels)? unit)
+    {
+        if (unit is not { } u) return;
+        UnitMixMeters.Apply(meters, u.Channels, u.Port.Meters(u.Unit));
+    }
+
+    /// <summary>
+    /// The port, unit and level channels the meters read the unit's mixes
+    /// from now; null while the unit builds none. Reads the fields without
+    /// the gate, as the meter push does.
+    /// </summary>
+    private (IDeviceDuckingPort Port, string Unit, IReadOnlyDictionary<string, int> Channels)? UnitMixMeterNow()
+    {
+        if (Volatile.Read(ref _hardwarePlan) is not { Active: true } plan
+            || Volatile.Read(ref _hardwareEntry) is not { Leaving: false } || !Volatile.Read(ref _hardwareGraphEntered)
+            || Volatile.Read(ref _duckingPort) is not { } port || Volatile.Read(ref _drivenUnit) is not { } unit)
+            return null;
+        IReadOnlyDictionary<string, int> channels = UnitMixMeters.Channels(plan);
+        return channels.Count == 0 ? null : (port, unit, channels);
+    }
+
+    /// <summary>
     /// Keep <paramref name="entry"/> as the mode's, before anything is written
     /// to the unit: from here no mix is routed to a jack. The caller saves the
     /// settings, then writes the unit and enters the graph.

@@ -1,3 +1,4 @@
+using OpenXLR.Core.Devices;
 using OpenXLR.Core.Mixing;
 
 namespace OpenXLR.Daemon;
@@ -39,6 +40,8 @@ internal sealed class DeviceDuckingPort : IDaemonDuckingPort
     public DeviceDuckingStatus Status(string unit) => _primary.DuckingStatus(unit);
 
     public double? Reduction(string unit) => _primary.UnitDuckReduction(unit);
+
+    public ProMeterReading? Meters(string unit) => _primary.UnitMeters(unit);
 
     public (string Unit, UnitDuckingSupport Support)? Primary() => _primary.PublishedDuckingSupport;
 }

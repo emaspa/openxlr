@@ -87,18 +87,23 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     public Mixer(PipeWireAdapter? adapter = null) => _pw = adapter ?? new PipeWireAdapter();
 
     /// <summary>
-    /// Live stereo channel and mix levels, plus one reduction value in dB per
-    /// running duck stage, or per mix the unit ducks while it runs ducking,
-    /// each microphone meter before its chain that a client asked for, the
-    /// Sound Check loop's playhead, and where each playing soundboard clip is.
+    /// Live stereo channel and mix levels, the mixes a Wave XLR Pro builds in
+    /// hardware mixing from the unit's own meters, plus one reduction value
+    /// in dB per running duck stage, or per mix the unit ducks while it runs
+    /// ducking, each microphone meter before its chain that a client asked
+    /// for, the Sound Check loop's playhead, and where each playing
+    /// soundboard clip is.
     /// </summary>
     public IReadOnlyDictionary<string, double[]> ReadMeters()
     {
         IReadOnlyDictionary<string, double[]> levels = _meters.Read();
         UnitDuckMeter? unit = _unitDuckMeter;
-        if (_duckMeterHosts.IsEmpty && unit is null && _inputMeterHosts.IsEmpty && _dynamicsMeterHosts.IsEmpty && _soundCheckProbe is null && _player is null)
+        var unitMixes = UnitMixMeterNow();
+        if (_duckMeterHosts.IsEmpty && unit is null && unitMixes is null && _inputMeterHosts.IsEmpty && _dynamicsMeterHosts.IsEmpty
+            && _soundCheckProbe is null && _player is null)
             return levels;
         var meters = new Dictionary<string, double[]>(levels);
+        AddUnitMixLevels(meters, unitMixes);
         foreach ((string mix, NativePluginHost host) in _duckMeterHosts)
             if (host.IsHealthy) meters[DuckKey(mix)] = [host.Meters.GetValueOrDefault("reduction")];
         AddUnitDuckReduction(meters, unit);

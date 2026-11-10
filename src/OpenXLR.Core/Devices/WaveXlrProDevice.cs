@@ -611,9 +611,10 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
 
     /// <summary>
     /// Block 0x0002, the unit's meters, read once and decoded. Nothing polls
-    /// it here: the device manager reads it only while the unit runs ducking
-    /// and a client takes meters. A failed read gives null, so a unit that
-    /// refuses the block still answers every control; a hung one throws.
+    /// it here: the device manager reads it only while a client takes meters
+    /// and the unit runs ducking or builds mixes in hardware mixing. A failed
+    /// read gives null, so a unit that refuses the block still answers every
+    /// control; a hung one throws.
     /// </summary>
     public ProMeterReading? ReadMeters()
     {

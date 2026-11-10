@@ -52,8 +52,9 @@ public sealed record ProMeterReading(IReadOnlyList<ProDuckerMeter> Duckers, IRea
 ///               USB Aux port, left and right each
 ///
 /// A level byte is -4 times dBFS, f0 the floor (silence); a reduction byte
-/// is 4 times dB. Whether a level is a peak or an average, and how long the
-/// unit holds it, is not known. The maximizers, expanders, compressors and
+/// is 4 times dB. Measured on the desk (2026-11-10): a level is a peak
+/// reading, rises within about 40 ms, holds nothing and falls in a straight
+/// line at about 34 dB a second. The maximizers, expanders, compressors and
 /// Voice Tune bytes are decoded for diagnostics only.
 /// </summary>
 public static class ProMeters

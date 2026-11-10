@@ -42,7 +42,8 @@ Wave XLR Pro:
   inputs, which reach the jacks with no delay. Chosen in Options, AUDIO,
   under "Mixes on the Pro's outputs", after a check that lists what the
   layout loses; the terminal mixer's Options tab has the same choice
-  ([manual](manual.md#hardware-mixing))
+  ([manual](manual.md#hardware-mixing)). A mix the unit builds shows the
+  unit's own meter
 - Ducking on the device, mapped from Wave Link on Windows: when the
   [ducking](#submixer) setup fits what the unit can do (every key one of
   its inputs, XLR 1, XLR 2, USB Aux or Line In, and a whole mix on the
