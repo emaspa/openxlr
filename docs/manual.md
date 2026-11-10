@@ -4201,9 +4201,11 @@ channel, such as **Voice Chat keys ducking**, makes that channel a ducking
 key or stops it being one: it lights while the channel is a key, a press
 adds it to the keys or takes it out, and a channel that becomes a key
 stops being lowered. A press that would take out the last key, or add a
-ninth, only flashes an alert. A key's icon can be chosen in its settings, and a
-title typed there replaces the built-in label. An icon name the plugin does
-not know shows the target's default icon. A key or dial whose target is a
+ninth, only flashes an alert. With an older daemon that supports a single
+microphone key, pressing another microphone key selects it instead.
+A key's icon can be chosen in its settings, and a title typed there replaces
+the built-in label. An icon name the plugin does not know shows the target's
+default icon. A key or dial whose target is a
 channel or a mix with an icon or colour from the layout editor
 ([Appearance](#layout)) shows that icon and colour unless the key has its
 own icon chosen. An exclusive group key shows those of the member that is

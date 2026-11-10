@@ -71,7 +71,7 @@ export function outputKey(target) {
 }
 
 // eqProfiles is the state's list of EQ profiles, which lives beside the mixer.
-export function layoutChoices(mixer, devices = [], eqProfiles = []) {
+export function layoutChoices(mixer, devices = [], eqProfiles = [], ducking) {
   const mixes = mixer?.mixes ?? [];
   const channels = mixer?.channels ?? [];
   if (!mixes.length || !channels.length) return { toggleGroups: [], levelGroups: [] };
@@ -93,7 +93,8 @@ export function layoutChoices(mixer, devices = [], eqProfiles = []) {
       `sendmute:${channel.id}:${mix.id}`, `${channel.name} in ${mix.name}`)),
   });
   // Each channel that can key ducking, as a key that adds it to the keys or takes it out.
-  const keyable = channels.filter(canKeyDucking);
+  const multipleKeys = !ducking || Array.isArray(ducking.keys);
+  const keyable = channels.filter(channel => canKeyDucking(channel, multipleKeys));
   if (keyable.length) toggleGroups.push({
     id: "layout-ducking-keys", label: "Ducking keys",
     items: keyable.map((channel) => option(`duckkey:${channel.id}`, `${channel.name} keys ducking`)),

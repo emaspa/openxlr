@@ -157,8 +157,11 @@ export function duckingKeys(state) {
 
 // A channel that can key ducking: a microphone, one of the unit's own inputs
 // or an application channel. A stereo capture input cannot.
-export function canKeyDucking(channel) {
-  return !!channel && (channel.microphone === true || channel.hardware === true || !channel.captureSource);
+export function canKeyDucking(channel, multipleKeys = true) {
+  if (!channel) return false;
+  if (channel.microphone === true) return true;
+  if (multipleKeys) return channel.hardware === true || !channel.captureSource;
+  return channel.microphone == null && (channel.id === "xlr1" || channel.id === "xlr2");
 }
 
 // Whether a channel is one of ducking's keys, or null without ducking or
@@ -166,7 +169,8 @@ export function canKeyDucking(channel) {
 export function duckingKeyOn(state, id) {
   const keys = duckingKeys(state);
   const channel = state?.mixer?.channels?.find(c => c.id === id);
-  return keys === null || !canKeyDucking(channel) ? null : keys.includes(id);
+  if (keys === null || !canKeyDucking(channel, Array.isArray(state.ducking.keys))) return null;
+  return keys.includes(id);
 }
 
 // What a press of a channel's ducking key sends: the keys with the channel
@@ -180,7 +184,8 @@ export function duckingKeyToggle(state, id) {
   if (keys.includes(id))
     return keys.length > 1 ? { cmd: "setDucking", value: { keys: keys.filter(key => key !== id) } } : null;
   if (keys.length >= MAX_DUCKING_KEYS) return null;
-  const value = { keys: [...keys, id] };
+  // Older daemons take a single microphone in the key field.
+  const value = Array.isArray(state.ducking.keys) ? { keys: [...keys, id] } : { key: id };
   const channels = state.ducking.channels;
   if (Array.isArray(channels) && channels.includes(id)) value.channels = channels.filter(channel => channel !== id);
   return { cmd: "setDucking", value };

@@ -28,6 +28,17 @@ test("editable names are paired with stable ids", () => {
   assert.equal(mixName(mixer, "broadcast-vod"), "Broadcast + VOD");
 });
 
+test("a single-key daemon offers only microphones in the ducking key picker", () => {
+  const state = { ...mixer, channels: [...mixer.channels,
+    { id: "aux", name: "Aux", hardware: true },
+    { id: "guest", name: "Guest", microphone: true, captureSource: "usb" },
+  ] };
+  const targets = ducking => layoutChoices(state, [], [], ducking).toggleGroups
+    .find(group => group.id === "layout-ducking-keys").items.map(item => item.target);
+  assert.deepEqual(targets({ key: "xlr1" }), ["duckkey:xlr1", "duckkey:guest"]);
+  assert.deepEqual(targets({ keys: ["xlr1"] }), ["duckkey:xlr1", "duckkey:alerts-new", "duckkey:aux", "duckkey:guest"]);
+});
+
 test("microphone controls follow primary and additional carriers by channel id", () => {
   const state = {...mixer, channels:[
     {id:"primary", name:"Pro mic", captureSource:"old.primary.node", microphone:true, chainWidth:1,

@@ -30,7 +30,7 @@ test("the keys come from the list, or from the one key of an older daemon", () =
 });
 
 test("microphones, the unit's inputs and application channels key ducking; a stereo capture does not", () => {
-  assert.deepEqual(channels.filter(canKeyDucking).map(c => c.id), ["xlr1", "xlr2", "aux", "line", "voicechat", "music", "cap1"]);
+  assert.deepEqual(channels.filter(channel => canKeyDucking(channel)).map(c => c.id), ["xlr1", "xlr2", "aux", "line", "voicechat", "music", "cap1"]);
   assert.equal(canKeyDucking(undefined), false);
   // An older daemon without the microphone field: the hardware strips still key.
   assert.equal(canKeyDucking({id:"xlr1", hardware:true}), true);
@@ -57,12 +57,23 @@ test("a press adds the channel at the end, takes a ducked one out of the channel
   // With two keys either can go.
   const two = stateWith({keys:["xlr1", "voicechat"], key:"xlr1"});
   assert.deepEqual(duckingKeyToggle(two, "xlr1"), {cmd:"setDucking", value:{keys:["voicechat"]}});
-  // An older daemon's one key is the list the press starts from.
-  assert.deepEqual(duckingKeyToggle(stateWith({key:"cap1"}), "xlr1"), {cmd:"setDucking", value:{keys:["cap1", "xlr1"]}});
   // A stereo capture input, a channel that is gone and no ducking send nothing.
   assert.equal(duckingKeyToggle(state, "cap2"), null);
   assert.equal(duckingKeyToggle(state, "gone"), null);
   assert.equal(duckingKeyToggle({mixer:{channels, mixes}}, "xlr1"), null);
+});
+
+test("an older daemon receives a single microphone key in its own wire format", () => {
+  const old = stateWith({key:"xlr1"});
+  const change = duckingKeyToggle(old, "xlr2");
+  assert.deepEqual(change, {cmd:"setDucking", value:{key:"xlr2", channels:["music"]}});
+  assert.deepEqual(duckingKeys(withDucking(old, change.value)), ["xlr2"]);
+  assert.equal(duckingKeyToggle(old, "xlr1"), null);
+  assert.equal(duckingKeyOn(old, "voicechat"), null);
+  assert.equal(duckingKeyToggle(old, "aux"), null);
+  assert.deepEqual(duckingKeyToggle(old, "cap1"), {cmd:"setDucking", value:{key:"cap1"}});
+  const veryOld = { ...old, mixer:{channels:[{id:"xlr2", hardware:true}]} };
+  assert.equal(duckingKeyToggle(veryOld, "xlr2").value.key, "xlr2");
 });
 
 test("two presses before the daemon answers keep both changes", () => {
@@ -84,7 +95,7 @@ test("two presses before the daemon answers keep both changes", () => {
 
 test("a ninth key is not added", () => {
   assert.equal(MAX_DUCKING_KEYS, 8);
-  const many = [...channels.filter(canKeyDucking).map(c => c.id), "a"];
+  const many = [...channels.filter(channel => canKeyDucking(channel)).map(c => c.id), "a"];
   const state = {mixer:{channels:[...channels, {id:"a", name:"A"}, {id:"b", name:"B"}], mixes},
     ducking:{enabled:true, keys:many.slice(0, 8), key:"xlr1", channels:[], mixes:[]}};
   assert.equal(duckingKeyToggle(state, "b"), null);

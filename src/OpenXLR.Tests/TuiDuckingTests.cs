@@ -287,7 +287,7 @@ public sealed class TuiDuckingTests
         Assert.Contains("✓ Guest mic", Select(app, "Keys"), StringComparison.Ordinal);
         app.Handle(new KeyPress(Key.Home));
         app.Handle(Space);
-        Assert.Equal(["cap1", "xlr1"], Ids(Command(sent).GetProperty("keys")));
+        Assert.Equal("xlr1", Command(sent).GetProperty("key").GetString());
         // The key is no channel to lower: the strip's last channel is SFX.
         Select(app, "Channels");
         app.Handle(new KeyPress(Key.End));

@@ -245,25 +245,20 @@ public sealed class DuckingViewModelTests
     }
 
     [Fact]
-    public void AnOlderDaemonsSingleKeyReadsAsOneKeyAndItsEchoClearsTheWait()
+    public void AnOlderDaemonsSingleKeyUsesItsOwnCommandAndEcho()
     {
-        // A daemon from before several keys names one key and no list.
-        var (model, sent, time) = Model(Ducking(key: "xlr2", keys: null, channels: "\"music\""));
+        var (model, sent, _) = Model(Ducking(key: "xlr2", keys: null, channels: "\"xlr1\",\"music\""));
         Assert.Equal(["xlr2"], model.KeyIds);
-        Assert.Equal(["xlr2"], model.Keys.Where(k => k.IsChecked).Select(k => k.Id));
+        Assert.Equal(["xlr1", "xlr2", "headset"], model.Keys.Select(k => k.Id));
         Assert.DoesNotContain(model.Channels, c => c.Id == "xlr2");
 
-        // A newer daemon's echo of a second key; an older report before it does not undo the edit.
         model.Keys.Single(k => k.Id == "xlr1").IsChecked = true;
-        Assert.Equal(["xlr2", "xlr1"], Ids(sent.One()["keys"]));
+        Assert.Equal("""{"key":"xlr1","channels":["music"]}""", sent.One().ToJsonString());
         model.Apply(Ducking(key: "xlr2", keys: null, channels: "\"music\""), Mixer());
-        Assert.Equal(["xlr2", "xlr1"], model.KeyIds);
-        model.Apply(Ducking(key: "xlr2", keys: "\"xlr2\",\"xlr1\"", channels: "\"music\""), Mixer());
-        Assert.Equal(["xlr2", "xlr1"], model.KeyIds);
-        // Once the echo came, a later report wins.
-        time.Advance(DuckingViewModel.EchoWait);
-        model.Apply(Ducking(key: "xlr1", keys: null, channels: "\"music\""), Mixer());
         Assert.Equal(["xlr1"], model.KeyIds);
+        model.Apply(Ducking(key: "xlr1", keys: null, channels: "\"music\""), Mixer());
+        model.Apply(Ducking(key: "xlr2", keys: null, channels: "\"music\""), Mixer());
+        Assert.Equal(["xlr2"], model.KeyIds);
         Assert.Empty(sent.Sent);
     }
 
@@ -293,7 +288,7 @@ public sealed class DuckingViewModelTests
         Assert.True(model.OnDevice);
         Assert.Equal(Localizer.Format("DuckingKeysStatusOnUnit", "Wave XLR Pro"), model.Status);
         // Without the field, XLR 1 and XLR 2 are the microphones: the capture input is not offered as a key.
-        Assert.Equal(["xlr1", "xlr2", "aux", "game", "music", "browser", "system", "voicechat"], model.Keys.Select(k => k.Id));
+        Assert.Equal(["xlr1", "xlr2"], model.Keys.Select(k => k.Id));
         Assert.Equal(["xlr1"], model.KeyIds);
 
         model.Amount.Choose(model.Amount.Marks[1]);

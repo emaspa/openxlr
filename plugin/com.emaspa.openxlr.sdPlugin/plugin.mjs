@@ -53,7 +53,7 @@ const layoutInspectors = new Set();
 let lastLayout = "";
 function publishLayout() {
   if (!layoutInspectors.size) return;
-  const choices = layoutChoices(daemonState?.mixer, daemonState?.devices, daemonState?.eqProfiles);
+  const choices = layoutChoices(daemonState?.mixer, daemonState?.devices, daemonState?.eqProfiles, daemonState?.ducking);
   const serialized = JSON.stringify(choices);
   if (serialized === lastLayout) return;
   lastLayout = serialized;
@@ -399,7 +399,7 @@ host.onmessage = (e) => {
         layoutInspectors.add(m.context);
         // Record what this inspector now shows, so the next state that
         // differs from it is published even if it matches an older one.
-        const choices = layoutChoices(daemonState?.mixer, daemonState?.devices, daemonState?.eqProfiles);
+        const choices = layoutChoices(daemonState?.mixer, daemonState?.devices, daemonState?.eqProfiles, daemonState?.ducking);
         lastLayout = JSON.stringify(choices);
         send({ event: "sendToPropertyInspector", context: m.context, payload: choices });
       }

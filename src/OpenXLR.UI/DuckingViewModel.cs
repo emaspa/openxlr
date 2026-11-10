@@ -88,13 +88,14 @@ public sealed class DuckingViewModel : ViewModelBase
 
     // The layout the lists are drawn from, as the last state named it.
     // A channel can be a key unless it is a capture input on a stereo pair.
-    private sealed record LayoutChannel(string Id, string Name, bool CanKey, bool Application, bool Present);
+    private sealed record LayoutChannel(string Id, string Name, bool CanKey, bool Microphone, bool Application, bool Present);
     private List<LayoutChannel> _layoutChannels = [];
     private List<(string Id, string Name)> _layoutMixes = [];
 
     // The setup, as reported or as just edited.
     private bool _reported, _mixerRunning, _targetsReported, _enabled;
     private List<string> _keys = ["xlr1"];
+    private bool _multipleKeys;
     private List<string> _channels = [], _mixes = [];
     private string _processing = "device";
 
@@ -167,7 +168,7 @@ public sealed class DuckingViewModel : ViewModelBase
         // A list being refilled can write its old rows back as it lets them go: that is not a choice.
         if (_applying || !Keys.Contains(choice)) return;
         List<string> keys = choice.IsChecked
-            ? [.. _keys.Where(k => k != choice.Id), choice.Id]
+            ? (_multipleKeys ? [.. _keys.Where(k => k != choice.Id), choice.Id] : [choice.Id])
             : [.. _keys.Where(k => k != choice.Id)];
         if (keys.Count == 0)
         {
@@ -177,7 +178,9 @@ public sealed class DuckingViewModel : ViewModelBase
         }
         if (keys.SequenceEqual(_keys)) return;
         _keys = keys;
-        var fields = new Dictionary<string, object> { ["keys"] = _keys.ToArray() };
+        var fields = new Dictionary<string, object>();
+        if (_multipleKeys) fields["keys"] = _keys.ToArray();
+        else fields["key"] = choice.Id;
         if (_channels.Contains(choice.Id))
         {
             _channels = [.. _channels.Where(c => c != choice.Id)];
@@ -452,7 +455,7 @@ public sealed class DuckingViewModel : ViewModelBase
                 // A daemon from before the field: XLR 1 and XLR 2 are the microphones.
                 bool microphone = Flag(c["microphone"]) ?? id is "xlr1" or "xlr2";
                 // Microphones, the unit's own inputs and application channels can key; a stereo capture input cannot.
-                return new LayoutChannel(id, Text(c["name"]) ?? id, microphone || hardware || !capture, !hardware && !capture,
+                return new LayoutChannel(id, Text(c["name"]) ?? id, microphone || hardware || !capture, microphone, !hardware && !capture,
                     Flag(c["present"]) ?? true);
             })];
         if (mixer?["mixes"] is JsonArray mixes)
@@ -467,8 +470,14 @@ public sealed class DuckingViewModel : ViewModelBase
         {
             if (Fresh("enabled", ducking["enabled"])) _enabled = Flag(ducking["enabled"]) ?? false;
             // A daemon from before several keys reports one key alone.
-            JsonArray keys = ducking["keys"] is JsonArray reported ? reported : new JsonArray(Text(ducking["key"]) ?? "xlr1");
-            if (Fresh("keys", keys) && Words(keys) is { Count: > 0 } chosen) _keys = chosen;
+            JsonArray? reportedKeys = ducking["keys"] as JsonArray;
+            _multipleKeys = reportedKeys is not null;
+            if (reportedKeys is not null)
+            {
+                if (Fresh("keys", reportedKeys) && Words(reportedKeys) is { Count: > 0 } chosen) _keys = chosen;
+            }
+            else if (Fresh("key", ducking["key"]))
+                _keys = [Text(ducking["key"]) ?? "xlr1"];
             _targetsReported = ducking["channels"] is JsonArray && ducking["mixes"] is JsonArray;
             if (Fresh("channels", ducking["channels"])) _channels = Words(ducking["channels"]);
             if (Fresh("mixes", ducking["mixes"])) _mixes = Words(ducking["mixes"]);
@@ -547,7 +556,7 @@ public sealed class DuckingViewModel : ViewModelBase
         try
         {
             // Every channel that can key and is present, and a key whose channel is not shown by its id.
-            List<(string Id, string Name)> keys = [.. _layoutChannels.Where(c => c.CanKey && (c.Present || _keys.Contains(c.Id)))
+            List<(string Id, string Name)> keys = [.. _layoutChannels.Where(c => (_multipleKeys ? c.CanKey : c.Microphone) && (c.Present || _keys.Contains(c.Id)))
                 .Select(c => (c.Id, c.Name))];
             if (_reported) keys.AddRange(_keys.Where(k => keys.All(c => c.Id != k)).Select(k => (k, k)));
             Sync(Keys, keys, _keys, KeyToggled);

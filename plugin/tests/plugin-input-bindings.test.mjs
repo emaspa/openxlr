@@ -226,8 +226,9 @@ test("hardware keys stay unit controls and are named after the carrying channel"
     assert.equal(alerted("ducking"), 1);
 
     // A channel's ducking key: lit while it is a key, a press adds or takes
-    // it out, and the last key stays with only an alert. This daemon sends
-    // only `key`, which is the one key the presses start from.
+    // it out, and the last key stays with only an alert.
+    state.ducking = {...state.ducking, keys:["xlr1"]};
+    daemon.receive(state);
     key("duck-xlr2", "duckkey:xlr2");
     key("duck-xlr1", "duckkey:xlr1");
     assert.ok(keyImage("duck-xlr2").includes(">Duck key</text>"));

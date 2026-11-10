@@ -607,7 +607,7 @@ internal sealed class InputsView : View
         // list is in view. Space adds a channel at the end or takes it out.
         List<string> keys = ducking.KeyList;
         List<ChannelEntry> keyable = [.. state.Mixer.Channels.Where(channel =>
-            CanKey(channel) && (channel.Present || keys.Contains(channel.Id)))];
+            (ducking.Keys is null ? channel.Mono : CanKey(channel)) && (channel.Present || keys.Contains(channel.Id)))];
         List<(string Id, string Name)> keyChoices = [.. keyable.Select(channel => (channel.Id, channel.Name)),
             .. keys.Where(key => keyable.All(channel => channel.Id != key)).Select(key => (key, $"{key} (missing)"))];
         int keyAt = Math.Max(0, keyChoices.FindIndex(choice => choice.Id == _duckKey));
@@ -707,7 +707,8 @@ internal sealed class InputsView : View
     /// The <c>setDucking</c> value that adds a key at the end of the list or
     /// takes it out, or null when nothing may be sent: the last key stays, and
     /// a ninth is not added. A channel that becomes a key is never ducked, so
-    /// it leaves the channels in the same command.
+    /// it leaves the channels in the same command. An older daemon accepts
+    /// only one key, which selecting another microphone replaces.
     /// </summary>
     internal static JsonObject? FlipKey(DuckingEntry ducking, string key)
     {
@@ -715,7 +716,9 @@ internal sealed class InputsView : View
         if (keys.Contains(key))
             return keys.Count == 1 ? null : new JsonObject { ["keys"] = Ids(keys.Where(id => id != key)) };
         if (keys.Count >= MaxDuckingKeys) return null;
-        JsonObject value = new() { ["keys"] = Ids(keys.Append(key)) };
+        JsonObject value = ducking.Keys is null
+            ? new() { ["key"] = key }
+            : new() { ["keys"] = Ids(keys.Append(key)) };
         if (ducking.Channels is { } channels && channels.Contains(key))
             value["channels"] = Ids(channels.Where(id => id != key));
         return value;
@@ -731,7 +734,7 @@ internal sealed class InputsView : View
         return ducking with
         {
             Keys = keys,
-            Key = keys is { Count: > 0 } ? keys[0] : ducking.Key,
+            Key = value["key"]?.GetValue<string>() ?? (keys is { Count: > 0 } ? keys[0] : ducking.Key),
             Channels = value["channels"] is JsonArray c ? [.. c.Select(id => (string)id!)] : ducking.Channels,
         };
     }
