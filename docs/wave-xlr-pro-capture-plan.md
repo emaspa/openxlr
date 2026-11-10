@@ -37,13 +37,6 @@ the companion log is nearly worthless, the log is what maps bytes to meaning.
 in the installer (or install USBPcap separately from its GitHub releases). Reboot if the
 installer asks.
 
-**Frida (fallback only).** Skip unless USBPcap output turns out to be opaque. If needed:
-`pip install frida-tools` on the Windows Python, then attach to Wave Link and hook
-`WinUsb_ControlTransfer` / `DeviceIoControl`. The symbol names to look for come from the
-LukasParke/wave3-research teardown: `LWT::WaveXLRProDevice`, and the three vendor backend
-strategies (`LegacyUAC1VendorUSBBackendStrategy`, `LegacyUAC2VendorUSBBackendStrategy`,
-`MK2VendorUSBBackendStrategy`), knowing which one constructs for the Pro tells us the request
-scheme. Do the USBPcap pass first regardless.
 
 ---
 
@@ -165,8 +158,7 @@ Wave Link running. Save as `session3-edge.pcapng`.
 
 1. With Wave Link open, **unplug the Pro, wait 5 s, replug**. Log it. Result: the reconnect/re-init
    path (differs from cold start in step 5 of Session 1; a Linux backend needs both).
-2. If Wave Link exposes **hardware submix routing** for the Pro (the teardown showed
-   `EWLWHardwareMixerHelperWaveXLRPro` / `SoftwareMixerHelper`, the Pro may do on-device
+2. If Wave Link exposes **hardware submix routing** for the Pro (the Pro may do on-device
    mixing), poke any per-mix mic level/route controls it offers, one at a time. Log each.
 3. Change the Wave Link **sample rate / buffer** if that's device-facing, once, to see if it
    reconfigures the device. (Optional; log it.)
@@ -174,30 +166,13 @@ Wave Link running. Save as `session3-edge.pcapng`.
 
 ---
 
-## 6. Optional Session 4, Frida (only if USBPcap decoding stalls)
-
-If some control writes an opaque blob USBPcap can't disambiguate, run Frida to get the same
-transfers with call stacks and the pre-serialization arguments:
-
-- Attach to the Wave Link process, hook `WinUsb_ControlTransfer` (and `DeviceIoControl` as a
-  fallback), log `SetupPacket` (bmRequestType/bRequest/wValue/wIndex/wLength) + the data buffer +
-  a short backtrace.
-- Repeat the specific action that was ambiguous. The backtrace through `LWT::WaveXLRProDevice`
-  and whichever `*VendorUSBBackendStrategy` fires tells us the request family.
-
-Skip this unless needed, it's slower and USBPcap is usually sufficient for a controls-only
-protocol.
-
----
-
-## 7. What to hand back to Linux
+## 6. What to hand back to Linux
 
 Copy to a location readable from Linux:
 
 - `session1-init.pcapng` + `session1-init.txt`
 - `session2-controls.pcapng` + `session2-controls.txt`
 - `session3-edge.pcapng` + `session3-edge.txt`
-- (if run) Frida logs
 - The exact Wave Link version string.
 
 Analysis steps on Linux:
@@ -210,7 +185,7 @@ Analysis steps on Linux:
 
 ---
 
-## 8. Quick reference, device facts (verified on Linux)
+## 7. Quick reference, device facts (verified on Linux)
 
 - Wave XLR Pro: `0fd9:00b4`, UAC2, `bcdDevice 04.10`.
 - Interfaces: If0 AudioControl (+ interrupt IN endpoint 0x81, 6 bytes, 1 ms, NOT user input,

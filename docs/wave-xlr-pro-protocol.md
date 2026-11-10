@@ -445,10 +445,10 @@ Bytes 76 to 79 are the USB Aux input tail (section 6).
   the next poll.
 - **18 and 20, band 2 dragged to +12 dB.** 18 and 16 whole-block writes,
   changing only band 2's gain byte (24 or 62) and frequency (25 and 26 or
-  63 and 64), 13 of 13 gains and every frequency matching Wave Link's log,
+  63 and 64), 13 of 13 gains and every frequency matching what Wave Link showed,
   the carry at 256 Hz included.
 - **No commit for EQ writes.** Wave Link sends the 0x0003 commit `04 00`
-  followed by zeros only on its own "Synced standalone parameters" timing,
+  followed by zeros only on its own timing,
   2.5 s to minutes after a change, which looks like a save for standalone
   use; EQ changes read back without it. Whether an EQ written without the
   commit survives a power cycle was not captured.
@@ -1348,6 +1348,18 @@ The 35 level channels:
 A level byte is -4 times dBFS: `00` is 0 dBFS, `50` is -20 dBFS, and `f0`
 is the floor, silence. A reduction byte is 4 times dB: `18` is 6 dB.
 
+Checked on the desk (2026-11-10, firmware 1.0.14):
+
+- A 1 kHz sine at -20 dBFS on a pair reads `50` on that pair's two
+  channels, and only the mixes it plays in move with it. The level is the
+  sine's peak, not its average (-23 dBFS).
+- Levels rise within one read (about 40 ms), hold nothing, and fall in a
+  straight line at about 34 dB a second down to the floor.
+- With the unit ducking at a depth of 24 dB, each ducked entry reads `60`
+  (24 dB), and the pair's level after its ducker sits 24 dB under its level
+  as it arrives. The reduction rises within about 60 ms and falls back
+  with the configured release.
+
 ### What OpenXLR does with it
 
 While the unit runs ducking and holds the setup, and a client takes the
@@ -1359,6 +1371,4 @@ bytes are read for diagnostics only.
 
 ### Open
 
-- The ballistics: whether a level is a peak or an average, and how long the
-  unit holds a peak or a reduction between reads.
 - Which input each maximizer, expander and compressor belongs to.

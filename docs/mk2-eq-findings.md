@@ -94,12 +94,11 @@ frequencies from 20 to 20000 Hz and Q bytes from -64 to +64 (Q 0.1 to 10).
 
 Gain and frequency fit every write Wave Link made while a band was being
 dragged, 23 on the Wave XLR MK.2 and 33 on the updated dock, each against
-the value Wave Link logged just before it. The Q encoding fits the four
-logged Q factors on each device and Wave Link's launch write of band 2's
-Q. The flags byte is read from saved state only. Bit 0 and bits 1 to 3
-fit all eight bands of the two devices against Wave Link's saved
-settings, but no capture yet shows Wave Link changing a band's type or
-enable. Bits 4 and 5 read `0x30` and `0x20` on the dock before its update
+the value Wave Link showed for it. The Q encoding fits the four Q factors
+Wave Link showed on each device and its launch write of band 2's Q. Bit 0
+and bits 1 to 3 of the flags byte fit all eight bands of the two devices
+against the types and switches Wave Link showed, but no capture yet shows
+Wave Link changing a band's type or enable. Bits 4 and 5 read `0x30` and `0x20` on the dock before its update
 and `0x20` in band 4 of the Wave XLR MK.2.
 
 As an example, band 3 of the Wave XLR MK.2 after capture 11 read
@@ -121,28 +120,23 @@ the device's USB recording stream.
    one write changed byte 2 from `01` to `00` and nothing else. Wave Link
    quit, and with it closed the boost was gone.
 
-Nine `Eq_Enabled` lines in Wave Link's log, across captures 10 and 13,
-each map to a write of byte 2 bit 0 with nothing else changed.
+Each time the EQ was switched on or off in Wave Link, across captures 10
+and 13, the unit got a write of byte 2 bit 0 with nothing else changed.
 
 ## How Wave Link drives the equalizer on firmware 1.0.15
 
 The same on the Wave XLR MK.2 and on the updated dock:
 
 - Every EQ change is a write of the whole 38-byte block,
-  `41 01 0004 0203`, sent 50 to 100 ms after Wave Link logs the matching
-  `Set DeviceParameter` line (`Eq_Enabled`, `BandN_GainDb`,
-  `BandN_FrequencyHz`). A drag sends about ten a second. There is no
-  commit: the next read returns the written bytes.
+  `41 01 0004 0203`, sent 50 to 100 ms after the change in Wave Link. A
+  drag sends about ten a second. There is no commit: the next read
+  returns the written bytes.
 - Wave Link reads every block about ten times a second for as long as it
   runs.
 - At launch it writes the block once, setting byte 1 bit 3 and byte 27,
-  band 2's Q, to the logged `Band2_QFactor`. What byte 1 bit 3 does is not
-  mapped; it follows the `IsVSTEnabled` line in the log.
+  band 2's Q. What byte 1 bit 3 does is not mapped.
 - It does not clear the equalizer when it quits. A unit last driven by
   Wave Link 3.5 can reach Linux with its hardware EQ on.
-
-Wave Link's plugin graph still lists WaveEQ in its "Wave XLR MKII Host"
-chain on 1.0.15, marked bypassed in a capture taken with the EQ off.
 
 ## The dock's update to firmware 1.0.15
 
@@ -220,8 +214,7 @@ on 1.0.15 was not mapped and this is not settled.
 ## How Wave Link drove the dock on firmware 1.0.0
 
 This section and the next three were captured with the dock on firmware
-1.0.0, before its update, one action per capture, with Wave Link's own
-log on the same clock.
+1.0.0, before its update, one action per capture.
 
 - At connect Wave Link reads blocks `0x0000`, `0x0001`, `0x0002`,
   `0x0004`, `0x0005`, `0x0006` and `0x0016` every 100 ms for about 2.7 s,
@@ -235,106 +228,11 @@ log on the same clock.
   second of 816 bytes and `0x02` about 480 a second of 1615 bytes, nearly
   all different. The payloads look like sample data in both directions.
   It selects setting 0 again when it quits.
-- Wave Link's log and plugin graph put the dock's input in a mode called
-  "Wave XLR MKII Host". The input gets Wave Link's own WaveEQ,
-  WaveCompressor, WaveExpander and VoiceFocus plugins as nodes in its
-  plugin host, and the log reports software mixing
-  (`Hardware mixing state changed to: False`). In its binaries, hardware
-  mixing and settings sync to the device are named for the Wave XLR Pro
-  only.
+- On 1.0.0, Wave Link ran the dock's EQ, compressor and expander on the
+  computer: none of their changes reached the device (the captures
+  below), while on 1.0.15 the same changes became writes.
 
-## What Wave Link records about its own mode
-
-With the dock on firmware 1.0.0, Wave Link 3.5.0.4892 (Store package
-`Elgato.WaveLink_g54w8ztgkx496`) recorded in its own files that it
-processed the dock's EQ on the computer. Paths below are under
-`%LOCALAPPDATA%\Packages\Elgato.WaveLink_g54w8ztgkx496\LocalState`
-unless they name the install folder.
-
-### The log
-
-`Logs\ElgatoWaveLink_<date-time>.log`, one file per launch.
-
-- `ProSoftwareHardwareMixerTransitionHelper` writes the hardware mixing
-  state on every start:
-
-  ```
-  CheckForXLRProInitialization: XLRProConnectionState=NoneConnected, XLRProInitState=NotStarted, IsHardwareMixingEnabled=False.
-  Hardware mixing state changed to: False.
-  ```
-
-  The flag is `IsHardwareMixingEnabled`, and the state around it is named
-  for the Wave XLR Pro only (`XLRProConnectionState`, `XLRProInitState`).
-  Nothing comparable is logged for the MK.2 models.
-- `EWLWLegacyThesyconBackend::open` opens Wave Link's virtual device
-  (USB product id `0x96`) with `Use device with PID: 0x96 and handle: ...
-  for software mixing`.
-- `PluginHost` builds a plugin rack for the dock's input and names it:
-
-  ```
-  LEWITT plugin rack initialized <Wave XLR MKII Host>
-  Added default plugin: <PCM_IN_01_C_00_SD1 - WaveEQ>, <Wave XLR MKII Host>
-  ```
-
-  The input `PCM_IN_01_C_00_SD1` gets ElgatoSampleRecorder, VoiceFocus,
-  WaveCompressor, WaveEQ and WaveExpander as plugins on the computer.
-- `DeviceSupportService` logs every parameter it hands to the device
-  layer as `Set DeviceParameter: <name> to: <value>`. Through the dock's
-  1.0.0 session it named only `Band1_QFactor` to `Band4_QFactor`,
-  `Comp_ThresholdDb`, `Exp_Ratio`, `HWOutputsSourceSelect`,
-  `USBOutputsSourceSelect`, `IsSampleRecorderOn` and `IsVSTEnabled`, all
-  at connect. None of them produced a vendor write on the wire, and no
-  band gain, frequency, type or enable was ever handed down. On firmware
-  1.0.15 the same service logs `Eq_Enabled` and the band values, and each
-  becomes a write.
-
-### The plugin graph
-
-`AudioPluginCache\graph_visualization.md` (the same data in
-`graph_visualization.json`) is the host's own description of its signal
-flow:
-
-```
-# EWLWPluginHost - Audio Signal Flow
-**Host Mode:** Wave XLR MKII Host
-Audio Input -> ElgatoSampleRecorder -> ElgatoAiCoustics -> WaveCompressor -> WaveEQ -> WaveExpander -> Audio Output
-```
-
-Wave Link uses the same host mode for the Wave XLR MK.2 on 1.0.15, where
-it also writes the EQ to the device, so the mode name alone does not say
-where the EQ runs.
-
-### The program files
-
-In the install folder
-(`C:\Program Files\WindowsApps\Elgato.WaveLink_3.5.0.4892_x64__g54w8ztgkx496`),
-read with `strings` and `objdump` from a copy; nothing was run.
-
-- `EWLWPluginManager.dll` is the JUCE plugin host with WaveEQ,
-  WaveCompressor and WaveExpander built in. WaveEQ has a global
-  `enabled` and four bands of `Band N Filter Enabled`, `Type`,
-  `Frequency` (20 Hz to 20 kHz, 1 Hz steps), `Gain` (-12 to +12 dB,
-  0.25 dB steps) and `Quality` (log10 of Q, -1 to +1, steps of 0.016).
-  The six types are 0 high pass, 1 low shelf, 2 bell (named "Band Pass"),
-  3 notch, 4 high shelf and 5 low pass.
-- `waveapi.dll`, the device API, describes each model's parameter tree.
-  EQ trees appear at the root, under `/mic/`, and once per XLR input of
-  the Wave XLR Pro under `/xlr1/` and `/xlr2/`. Each has
-  `equalizer_enabled` and, for bands 0 to 3, `type`, `enabled`, `gain_dB`,
-  `frequency_Hz` and `quality_log10`; the band type enum is
-  `ven_signal_dsp_fx_band_type_e`. The same file lists signal taps per
-  input (`XLR1_PREFX`, `XLR1_POSTDSP`, `XLR1_POSTVST`) and an output source
-  select "0 - XLR pre 1 - XLR post 2 - XLR VST 3 - Monitor Mix", which is
-  what `HWOutputsSourceSelect` and `USBOutputsSourceSelect` set. Which
-  models own the root and `/mic/` trees is not established. The MK.2
-  models' block `0x0004` EQ, with a master enable and the same five
-  fields per band, is a likely match.
-- `Elgato.WaveLink.AppLogic.dll` names the same fields `Eq_Enabled`,
-  `BandN_Type`, `BandN_IsEnabled`, `BandN_FrequencyHz`, `BandN_GainDb` and
-  `BandN_QFactor` ("Band index must be between 1 and 4"). Hardware mixing
-  and settings sync to the device are named for the Wave XLR Pro only.
-
-### The local API
+## What Wave Link's local API reports
 
 Wave Link 3's local JSON-RPC API, which Stream Deck style plugins use,
 separates software `effects` (such as `"eq"`) from device `dspEffects`
@@ -352,8 +250,8 @@ The EQ is in the software list.
 | 03 | quit and relaunched Wave Link with the EQ on (41, 310, 2172 and 15049 Hz) | none | byte for byte as in the connect capture |
 | 04 | quit and relaunched with the EQ at 130, 792, 3193 and 6238 Hz, ±9.25 dB, then enabled the EQ by hand | none | byte for byte as in the connect capture |
 
-No `Set DeviceParameter` line appeared in Wave Link's log for any of these
-actions, and nothing in the `0x02` stream behaved like a parameter: 815
+Nothing in the `0x02` stream behaved like a parameter for any of these
+actions: 815
 of its byte offsets were constant zero padding and the other 800 changed
 on nearly every transfer.
 

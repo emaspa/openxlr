@@ -74,11 +74,7 @@ driver work.
   interface.
 - No Linux software supported `00b4` at the time: neither openwave
   repository listed it, and a GitHub code search for the id found
-  nothing. The
-  [LukasParke/wave3-research](https://github.com/LukasParke/wave3-research)
-  teardown of Wave Link shows the Pro as `LWT::WaveXLRProDevice` (LWT
-  for Lewitt, Elgato's audio OEM) and three vendor backend strategies;
-  which one the Pro uses was not visible.
+  nothing.
 - Companion hardware: Stream Deck + XL, `0fd9:00c6`, 36 keys, 6
   encoders, a touch strip, one HID interface, on a "USB Dock for Stream
   Deck +" (`0fd9:00ac`) that is a USB billboard device with no audio
