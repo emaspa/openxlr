@@ -18,8 +18,8 @@ permissions:
   contents: read
 
 jobs:
-  # A change that touches only prose, pictures or the deck plugin's script
-  # builds nothing, and the Omarchy QML check runs only for its own files.
+  # Most prose, pictures and deck scripts need no .NET build. Documentation
+  # read by unit tests runs that job. Omarchy QML runs for its own files.
   # Skipped jobs still report, which the required ci-ok check counts as
   # passing; a workflow-level paths-ignore would never report it and leave
   # the pull request waiting. The checks job runs for every change.
@@ -28,6 +28,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       code: ${{ steps.diff.outputs.code }}
+      unit: ${{ steps.diff.outputs.unit }}
       omarchy: ${{ steps.diff.outputs.omarchy }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -37,37 +38,7 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           BEFORE: ${{ github.event.before }}
-        run: |
-          # A pull request checks out its merge commit, whose first parent is
-          # the base. A push to main compares with the previous tip; a run
-          # started by hand has none, so it runs everything.
-          files=""
-          if [ "$EVENT" = pull_request ]; then
-            files=$(git diff --name-only HEAD^1 HEAD)
-          elif [ -n "$BEFORE" ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
-            files=$(git diff --name-only "$BEFORE" HEAD)
-          fi
-          if [ -z "$files" ]; then
-            echo "code=true" >> "$GITHUB_OUTPUT"
-            echo "omarchy=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # No build or test reads these. SkinDocumentTests holds
-          # docs/skins.md to the skin tokens, and the deck plugin's JSON
-          # files are read by tests, so neither is listed.
-          inert='\.md$|^docs/.*\.(png|svg)$|^plugin/com\.emaspa\.openxlr\.sdPlugin/.*\.(mjs|html|css|js)$|^plugin/tests/'
-          if printf '%s\n' "$files" | grep -Ev "$inert" | grep -q . ||
-             printf '%s\n' "$files" | grep -qx 'docs/skins.md'; then
-            echo "code=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "Only prose, pictures or the deck plugin's script changed; skipping the build and tests."
-            echo "code=false" >> "$GITHUB_OUTPUT"
-          fi
-          if printf '%s\n' "$files" | grep -Eq '^packaging/omarchy/|^tools/check-omarchy\.py$|^tools/omarchy-qml-imports/|^\.github/workflows/ci\.yml$'; then
-            echo "omarchy=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "omarchy=false" >> "$GITHUB_OUTPUT"
-          fi
+        run: tools/ci-test-scope.sh "$EVENT" "$BEFORE" >> "$GITHUB_OUTPUT"
 
   # Checks that need no .NET build: generated files, the deck and Omarchy
   # plugins' own tests, the HTTP API description, packaging recipes and
@@ -128,8 +99,11 @@ jobs:
       - name: HTTP API description
         run: python3 tools/check-openapi.py docs/openapi-v1.json
 
+      - name: CI test selection
+        run: python3 tools/test-ci-test-scope.py
+
       - name: Lint shell scripts
-        run: shellcheck --severity=error tools/check-version.sh tools/check-locked-restore.sh tools/ci-install-packages.sh packaging/ppa/make-source.sh packaging/omarchy/openxlr-omarchy-enable packaging/flatpak/openxlr-flatpak-service packaging/openxlr-control
+        run: shellcheck --severity=error tools/check-version.sh tools/check-locked-restore.sh tools/ci-install-packages.sh tools/ci-test-scope.sh packaging/ppa/make-source.sh packaging/omarchy/openxlr-omarchy-enable packaging/flatpak/openxlr-flatpak-service packaging/openxlr-control
 
       - name: Locked restore enforced on every packaging path
         run: tools/check-locked-restore.sh
@@ -163,7 +137,7 @@ jobs:
 
   unit:
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.unit == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
