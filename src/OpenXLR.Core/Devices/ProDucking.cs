@@ -20,9 +20,11 @@ public static class ProReturnPairs
 /// holds across all twelve entries, as the preset word when a preset writes
 /// it and as the number otherwise (<c>custom</c> when the entries
 /// disagree), the USB pairs whose field reads 11 in any of block 0x0001's
-/// five mix sections, and the block 0x0008 entries whose flag bit 0 is
-/// set. <see cref="Raw"/> is the bytes the codec reads, hex, so a check
-/// that the unit holds a setting needs no transfer.
+/// five mix sections, and the block 0x0008 entries XLR 1 keys (bit 0 of
+/// the entry's key mask set, whatever other keys it holds).
+/// <see cref="Raw"/> is the bytes the codec reads, hex, so a check that the
+/// unit holds a setting needs no transfer; it compares every byte, so a key
+/// left beside XLR 1 makes the unit not hold OpenXLR's setting.
 /// </summary>
 public sealed record DuckingReadback(DuckingLevel Sensitivity, DuckingLevel Amount, DuckingSpeed Speed,
     IReadOnlyList<int> Pairs, IReadOnlyList<int> Entries)
@@ -50,14 +52,20 @@ public sealed record DuckingReadback(DuckingLevel Sensitivity, DuckingLevel Amou
 ///               speed Slow 100/2000, Medium 80/1200, Fast 30/200
 /// OpenXLR writes these bytes from the setup: a preset word's values, or a
 /// custom number as is (only the presets were ever seen on a unit).
-///   byte 6      flags: bit 0 this channel is ducked; bit 1 unknown (Wave
-///               Link leaves 02 and 03 on some entries with no key at all)
-///   byte 7      00, kept
-/// Wave Link writes the three presets to all twelve entries.
+///   bytes 6, 7  the key mask, LE16, bit M for source M in the entries'
+///               order (0 XLR 1, 1 XLR 2, 2 USB Aux in, 3 Line In, 4 + k
+///               pair k): every source whose bit is set keys this entry,
+///               and the unit's key level is the loudest of them. An
+///               entry's own bit in its own mask is ignored.
+/// Wave Link writes the three presets to all twelve entries, sets a key's
+/// bit when it is made one and never clears a bit, so units carry leftover
+/// masks (02 and 03 seen with no key chosen at all). OpenXLR keys by XLR 1
+/// alone: it writes 0001 on the entries it ducks and 0000 on every other,
+/// leftovers included, so no other source ducks what it set up.
 ///
 /// Block 0x0001, in the last two bytes of each of its five mix sections
-/// (bytes 16 to 17, 34 to 35, 52 to 53, 70 to 71 and 88 to 89, after each
-/// section's aa): eight 2-bit fields, LE, field k for USB pair k. The first
+/// (bytes 16 to 17, 34 to 35, 52 to 53, 70 to 71 and 88 to 89): eight
+/// 2-bit tap fields, LE, field k for USB pair k. The first
 /// section is the mix the jacks play, the third the aux mix (desk probe of
 /// 2026-10-23), the second and fourth the jacks' second and third feeds; the
 /// fields work in the fourth and fifth too (protocol notes, section 16,
@@ -74,9 +82,11 @@ public sealed record DuckingReadback(DuckingLevel Sensitivity, DuckingLevel Amou
 /// each jack's mix from the channels' pairs) ducks each pair only in the
 /// sections it names, and covers all five.
 ///
-/// How the key input is encoded was not found: only XLR 1 was ever the key,
-/// and nothing in these two blocks names it. Every byte and bit not listed
-/// as written is kept as read.
+/// The byte before them in each section (15, 33, 51, 69 and 87) holds the
+/// four inputs' tap fields; field 3 there puts an input after the ducker,
+/// which OpenXLR never asks for, so every write puts an input field read at
+/// 3 back to 2 (<see cref="ProMixSections.ClearInputDucking"/>). Every byte
+/// and bit not listed as written is kept as read.
 /// </summary>
 public static class ProDucking
 {
@@ -87,10 +97,10 @@ public static class ProDucking
     /// <summary>The entry of USB playback pair 0; pair k is entry k + 4.</summary>
     public const int FirstPairEntry = 4;
     public const int PairCount = 8;
-    public const int FlagsByte = 6;
-    public const byte DuckedBit = 0x01;
-    /// <summary>Unknown; an entry that has it keeps its flags byte as read unless it is a target.</summary>
-    public const byte UnknownBit = 0x02;
+    /// <summary>Bytes 6 and 7 of an entry: its key mask, LE16, bit M set when source M keys the entry.</summary>
+    public const int KeyMaskOffset = 6;
+    /// <summary>The key mask OpenXLR writes on an entry it ducks: XLR 1 alone.</summary>
+    public const ushort KeyXlr1Mask = 1 << ProMixSections.Xlr1;
 
     /// <summary>
     /// The first byte of the eight 2-bit pair fields of the four mix sections
@@ -101,6 +111,10 @@ public static class ProDucking
     /// <summary>The same for all five sections (0 to 72), which a target with sections covers and the readback decodes.</summary>
     public static IReadOnlyList<int> SectionFieldOffsets { get; } = [16, 34, 52, 70, 88];
     public const int MixBlockLength = 108;
+
+    /// <summary>The bytes of each section the readback carries: the inputs' tap fields, then the two of pair fields.</summary>
+    private const int SectionRawLength = 3;
+    private const int RawLength = Length + SectionRawLength * ProMixSections.SectionCount;
 
     public const string KeyXlr1 = "xlr1";
     public const string Device = "device";
@@ -182,9 +196,10 @@ public static class ProDucking
 
     /// <summary>
     /// Write a target into the two blocks: its values while it is on, the
-    /// ducked flag of every entry, and the pair fields of the four mix
+    /// key mask of every entry, and the pair fields of the four mix
     /// sections, both bits set for the target's pairs while it is on and the
-    /// high bit cleared otherwise. Everything else is left as it was.
+    /// high bit cleared otherwise, with no input left after the ducker.
+    /// Everything else is left as it was.
     /// </summary>
     /// <exception cref="ArgumentException">A block has the wrong length or the target a value the unit does not take.</exception>
     public static void Apply(Span<byte> block8, Span<byte> block1, ProDuckingTarget target)
@@ -196,7 +211,8 @@ public static class ProDucking
 
     /// <summary>
     /// Block 0x0008's part of <see cref="Apply"/>: the target's values in
-    /// every entry while it is on, and each entry's ducked flag.
+    /// every entry while it is on, and each entry's key mask, XLR 1 alone on
+    /// the target's pairs while it is on and no key on every other entry.
     /// </summary>
     /// <exception cref="ArgumentException">The block has the wrong length or the target a value the unit does not take.</exception>
     public static void ApplyEntries(Span<byte> block8, ProDuckingTarget target)
@@ -210,8 +226,9 @@ public static class ProDucking
             Span<byte> entry = block8.Slice(e * EntryLength, EntryLength);
             preset?.CopyTo(entry);
             bool wanted = e >= FirstPairEntry && (pairs & 1 << (e - FirstPairEntry)) != 0;
-            if (wanted) entry[FlagsByte] |= DuckedBit;
-            else if ((entry[FlagsByte] & UnknownBit) == 0) entry[FlagsByte] &= unchecked((byte)~DuckedBit);
+            ushort keys = wanted ? KeyXlr1Mask : (ushort)0;
+            entry[KeyMaskOffset] = (byte)keys;
+            entry[KeyMaskOffset + 1] = (byte)(keys >> 8);
         }
     }
 
@@ -219,7 +236,8 @@ public static class ProDucking
     /// Block 0x0001's part of <see cref="Apply"/>, which
     /// <see cref="ProMixPlan"/> writes with the rest of that block: the pair
     /// fields of the four mix sections, or of all five, each with its own
-    /// pairs, for a target with <see cref="ProDuckingTarget.Sections"/>.
+    /// pairs, for a target with <see cref="ProDuckingTarget.Sections"/>, and
+    /// the inputs' tap fields of all five with none after the ducker.
     /// </summary>
     /// <exception cref="ArgumentException">The block has the wrong length or the target a value the unit does not take.</exception>
     public static void ApplyFields(Span<byte> block1, ProDuckingTarget target)
@@ -231,10 +249,13 @@ public static class ProDucking
             foreach (int section in ProMixSections.Starts)
                 SetFields(block1, section + ProMixSections.DuckingOffset,
                     target.Enabled && sections.TryGetValue(section, out IReadOnlySet<int>? ducked) ? Mask(ducked) : 0);
-            return;
         }
-        int pairs = WantedPairs(target);
-        foreach (int at in MixFieldOffsets) SetFields(block1, at, pairs);
+        else
+        {
+            int pairs = WantedPairs(target);
+            foreach (int at in MixFieldOffsets) SetFields(block1, at, pairs);
+        }
+        ProMixSections.ClearInputDucking(block1);
     }
 
     private static int Mask(IEnumerable<int> pairs) => pairs.Aggregate(0, (mask, pair) => mask | 1 << pair);
@@ -261,13 +282,11 @@ public static class ProDucking
     {
         if (block8.Length != Length || block1.Length != MixBlockLength)
             throw new ArgumentException("block 0x0008 is 96 bytes and block 0x0001 108");
-        var raw = new byte[Length + 2 * SectionFieldOffsets.Count];
+        var raw = new byte[RawLength];
         block8.CopyTo(raw);
-        for (int i = 0; i < SectionFieldOffsets.Count; i++)
-        {
-            raw[Length + 2 * i] = block1[SectionFieldOffsets[i]];
-            raw[Length + 2 * i + 1] = block1[SectionFieldOffsets[i] + 1];
-        }
+        for (int i = 0; i < ProMixSections.SectionCount; i++)
+            block1.Slice(ProMixSections.Starts[i] + ProMixSections.InputTapsOffset, SectionRawLength)
+                .CopyTo(raw.AsSpan(Length + SectionRawLength * i));
         return FromRaw(raw);
     }
 
@@ -283,14 +302,15 @@ public static class ProDucking
             : Custom;
         var pairs = new List<int>();
         for (int k = 0; k < PairCount; k++)
-            for (int i = 0; i < SectionFieldOffsets.Count; i++)
+            for (int i = 0; i < ProMixSections.SectionCount; i++)
             {
-                int fields = raw[Length + 2 * i] | raw[Length + 2 * i + 1] << 8;
+                int at = Length + SectionRawLength * i + 1;
+                int fields = raw[at] | raw[at + 1] << 8;
                 if ((fields >> (2 * k) & 3) == 3) { pairs.Add(k); break; }
             }
         var entries = new List<int>();
         for (int e = 0; e < EntryCount; e++)
-            if ((raw[e * EntryLength + FlagsByte] & DuckedBit) != 0) entries.Add(e);
+            if ((raw[e * EntryLength + KeyMaskOffset] & KeyXlr1Mask) != 0) entries.Add(e);
         return new DuckingReadback(sensitivity, amount, speed, pairs, entries) { Raw = Convert.ToHexString(raw) };
     }
 
@@ -314,19 +334,19 @@ public static class ProDucking
 
     /// <summary>
     /// Whether the unit, as last read, holds a target: writing it would
-    /// change no byte. False when the readback carries no raw bytes.
+    /// change no byte, so a key mask with any bit beside the one written, or
+    /// an input left after the ducker, is not held. False when the readback
+    /// carries no raw bytes.
     /// </summary>
     public static bool Holds(DuckingReadback unit, ProDuckingTarget target)
     {
-        if (unit.Raw.Length != 2 * (Length + 2 * SectionFieldOffsets.Count) || Valid(target) is not null) return false;
+        if (unit.Raw.Length != 2 * RawLength || Valid(target) is not null) return false;
         byte[] raw = Convert.FromHexString(unit.Raw);
         byte[] block8 = raw[..Length];
         var block1 = new byte[MixBlockLength];
-        for (int i = 0; i < SectionFieldOffsets.Count; i++)
-        {
-            block1[SectionFieldOffsets[i]] = raw[Length + 2 * i];
-            block1[SectionFieldOffsets[i] + 1] = raw[Length + 2 * i + 1];
-        }
+        for (int i = 0; i < ProMixSections.SectionCount; i++)
+            raw.AsSpan(Length + SectionRawLength * i, SectionRawLength)
+                .CopyTo(block1.AsSpan(ProMixSections.Starts[i] + ProMixSections.InputTapsOffset));
         byte[] want8 = (byte[])block8.Clone(), want1 = (byte[])block1.Clone();
         Apply(want8, want1, target);
         return want8.AsSpan().SequenceEqual(block8) && want1.AsSpan().SequenceEqual(block1);

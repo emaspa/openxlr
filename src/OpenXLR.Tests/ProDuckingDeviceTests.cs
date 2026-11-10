@@ -58,16 +58,17 @@ public sealed class ProDuckingDeviceTests
 
         ProMixWrite write = pro.WriteMix(new ProMixPlan { Ducking = On(ProReturnPairs.Monitor) })!;
         Assert.True(write.Wrote8 && write.Wrote1);
-        // Medium presets in every entry; pairs 5, 6 and 7 (entries 9 to 11, flags at 78, 86, 94) let go.
+        // Medium presets in every entry; pairs 5, 6 and 7 (entries 9 to 11, keys at 78, 86, 94) let go,
+        // and Wave Link's leftover keys cleared (XLR 2 on entry 1, XLR 1 and XLR 2 on entries 4, 7 and 8).
         Assert.StartsWith("0 fd->f4, 1 06->0c, 2 64->50, 4 d0->b0, 5 07->04, 8 fd->f4", write.Change8);
+        Assert.Contains("14 02->00, ", write.Change8);
+        Assert.Contains("38 03->00, ", write.Change8);
         Assert.Contains("78 01->00, ", write.Change8);
         Assert.EndsWith("86 01->00, 88 fd->f4, 89 06->0c, 90 64->50, 92 d0->b0, 93 07->04, 94 01->00", write.Change8);
         Assert.Equal(new ushort[] { 0x0008, 0x0001 }, Writes(unit));
         Assert.All(unit.Calls, c => Assert.Equal(0x0103, c.Bank));
         Assert.Equal(new byte[] { 0x5d, 0x55, 0x5d, 0x55, 0x5d, 0x55, 0x5d, 0x55 }, Fields(unit.Blocks[0x0001]));
-        byte[] flags = (byte[])IdleFlags.Clone();
-        flags[5] = 0x01;
-        Assert.Equal(Block8(MediumBytes, flags), unit.Blocks[0x0008]);
+        Assert.Equal(Block8(MediumBytes, Xlr1Keys(5)), unit.Blocks[0x0008]);
         Assert.Equal([1], pro.ReadDucking()!.Pairs);
 
         unit.Calls.Clear();
@@ -365,17 +366,15 @@ public sealed class ProDuckingDeviceTests
         DeviceDuckingStatus held = manager.DuckingStatus(Unit);
         Assert.Equal((DeviceDuckingPhase.Verified, target), (held.Phase, held.Value));
         Assert.Equal([1, 5], held.Readback!.Pairs);
-        byte[] flags = (byte[])IdleFlags.Clone();
-        flags[5] = flags[9] = 0x01;
-        Assert.Equal(Block8([0xe8, 0x06, 0x1e, 0x00, 0xc8, 0x00], flags), unit.Blocks[0x0008]);
+        Assert.Equal(Block8([0xe8, 0x06, 0x1e, 0x00, 0xc8, 0x00], Xlr1Keys(5, 9)), unit.Blocks[0x0008]);
         Assert.Contains(log.Written, line => line.StartsWith(
             "ducking (connect) on Elgato Wave XLR Pro: on, pairs 1 5, sensitivity high, amount low, speed fast, keyed by XLR 1.", StringComparison.Ordinal));
 
-        // With off posted, the connect clears what Wave Link left.
+        // With off posted, the connect clears what Wave Link left, its leftover keys included.
         manager.PostDucking(Unit, ProDuckingTarget.Off, "XLR 1");
         manager.SweepOnce();
         Replug();
-        Assert.Equal(Block8(LowLowSlowBytes, IdleFlags), unit.Blocks[0x0008]);
+        Assert.Equal(Block8(LowLowSlowBytes, NoKeys), unit.Blocks[0x0008]);
         Assert.Equal(new byte[] { 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55 }, Fields(unit.Blocks[0x0001]));
         Assert.Equal((DeviceDuckingPhase.Verified, ProDuckingTarget.Off), (manager.DuckingStatus(Unit).Phase, manager.DuckingStatus(Unit).Value));
         Assert.Contains(log.Written, line => line.StartsWith("ducking (connect) on Elgato Wave XLR Pro: off. Block 0x0008 written: ", StringComparison.Ordinal)

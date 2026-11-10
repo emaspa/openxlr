@@ -234,4 +234,73 @@ public sealed class HardwareMixingWriteTests
         Assert.False((entry with { Jacks = new() { ["hp3"] = -1 } }).Valid);
         Assert.False((entry with { OutputVolume = 2 }).Valid);
     }
+
+    /// <summary>Block 0x0001 with Wave Link's input ducking left in it: XLR 2 after the ducker in section 0, XLR 1 and XLR 2 in 18, mixed taps in 72.</summary>
+    private static byte[] InputsDucked()
+    {
+        byte[] held = ProMixPlanTests.Neutral();
+        held[0 + 15] = 0xae;
+        held[18 + 15] = 0xaf;
+        held[72 + 15] = 0x93;   // XLR 1 at 3, XLR 2 at 0, USB Aux at 1, Line In at 2
+        return held;
+    }
+
+    private static void AssertInputsPutBack(byte[] held, byte[] after)
+    {
+        Assert.Equal(new byte[] { 0xaa, 0xaa, 0xaa, 0xaa, 0x92 }, ProMixSections.Starts.Select(s => after[s + 15]));
+        for (int i = 0; i < after.Length; i++)
+            if (!ProMixSections.Starts.Contains(i - 15)) Assert.Equal(held[i], after[i]);
+    }
+
+    [Fact]
+    public void HardwareMixingPutsAnInputAfterTheDuckerBackInEverySection()
+    {
+        byte[] held = InputsDucked();
+        // The unit already builds section 0 as wanted: only the taps change.
+        var plan = new ProMixPlan { UnitSections = new Dictionary<int, byte[]> { [0] = held[..ProMixPlan.UnitSectionLength] } };
+        Assert.Equal(ProMixChanges.UnitSections, plan.Needs(held));
+        byte[] after = Apply(plan, held, out ProMixChanges changes);
+        Assert.Equal(ProMixChanges.UnitSections, changes);
+        Assert.False(changes.Commits());
+        AssertInputsPutBack(held, after);
+        Assert.Equal(ProMixChanges.None, plan.Needs(after));
+    }
+
+    [Fact]
+    public void ADuckingWritePutsAnInputAfterTheDuckerBackInEverySection()
+    {
+        byte[] held = InputsDucked();
+        var plan = new ProMixPlan { Ducking = ProDuckingTarget.Off };
+        byte[] after = Apply(plan, held, out ProMixChanges changes);
+        Assert.Equal(ProMixChanges.DuckingFields, changes);
+        Assert.False(changes.Commits());
+        AssertInputsPutBack(held, after);
+    }
+
+    [Fact]
+    public void APlanWithoutDuckingOrUnitSectionsLeavesTheTaps()
+    {
+        byte[] held = InputsDucked();
+        Assert.Equal(ProMixChanges.None, ProMixPlan.Nothing.Needs(held));
+        Assert.Equal(held, Apply(ProMixPlan.Nothing, held, out _));
+    }
+
+    [Fact]
+    public void ARestoreKeptWithAnInputAfterTheDuckerPutsItBackAtTwo()
+    {
+        // A restore kept by an earlier version, with XLR 2 after the ducker.
+        const string kept = "0C0000000000000000000000C10000AE";
+        byte[] held = ProMixPlanTests.Neutral();
+        var plan = new ProMixPlan { Restore = new Dictionary<int, string> { [18] = kept } };
+        byte[] after = Apply(plan, held, out ProMixChanges changes);
+        Assert.Equal(ProMixChanges.FeedSections, changes);
+        Assert.Equal(Convert.FromHexString("0C0000000000000000000000C10000AA"), after[18..34]);
+        Assert.True(ProMixPlan.HoldsRestore(after, 18, kept));
+        Assert.False(ProMixPlan.HoldsRestore(held, 18, kept));
+        Assert.Equal(ProMixChanges.None, plan.Needs(after));
+        // What a restore keeps from a block is what it writes back.
+        byte[] ducked = (byte[])after.Clone();
+        ducked[18 + 15] = 0xae;
+        Assert.Equal("0C0000000000000000000000C10000AA", ProMixPlan.RestoreOf(ducked, 18));
+    }
 }

@@ -2876,7 +2876,7 @@ device}`:
     "note": null,
     "outputs": ["monitor"],
     "held": true,
-    "readback": {"sensitivity": "medium", "amount": "high", "speed": "fast", "pairs": [1], "entries": [4, 5, 7, 8]}
+    "readback": {"sensitivity": "medium", "amount": "high", "speed": "fast", "pairs": [1], "entries": [5]}
   }
 }
 ```
@@ -2930,10 +2930,12 @@ device}`:
   tell a word from its number, so a setup of `-12` reads back `medium`.
   `pairs`, the USB playback pairs
   ducked in any of its mix sections (0 to 7, pair n is channels 2n and
-  2n+1), and `entries`, the block 0x0008 entries whose ducked flag is set
-  (0 to 3 the hardware inputs, 4 to 11 the pairs). Wave Link leaves flags
-  on entries 4, 7 and 8 with no ducking at all; OpenXLR keeps them, so
-  `entries` reads `[4, 7, 8]` on such a unit with ducking off.
+  2n+1), and `entries`, the block 0x0008 entries XLR 1 keys, whatever
+  other keys they hold (0 to 3 the hardware inputs, 4 to 11 the pairs).
+  Wave Link leaves keys on entries 4, 7 and 8 with no ducking at all, so
+  `entries` reads `[4, 7, 8]` on such a unit until OpenXLR writes to it;
+  OpenXLR clears every key it does not set. `held` compares every byte, so
+  a unit whose entries hold another key beside XLR 1 is not held.
 
 Live reduction is a meter, not state: while software runs, the `meters`
 message carries `duck:<mix>` for each ducked mix, the reduction in dB. On

@@ -5,20 +5,37 @@ namespace OpenXLR.Tests;
 
 /// <summary>
 /// The Wave XLR Pro's ducking bytes, against the blocks the Windows captures
-/// of 2026-10-21 recorded (24 to 31): every preset in all twelve entries of
-/// block 0x0008, the ducked flag set and cleared per entry with bit 1 and
-/// the other unknown bits kept, both bits of a ducked pair's 2-bit field in
-/// all three mix sections of block 0x0001 and the high bit alone cleared on
-/// release, every other byte of that block kept, and the decode of what Wave
-/// Link leaves behind.
+/// of 2026-10-21 recorded (24 to 31) and the key masks measured on
+/// 2026-11-10: every preset in all twelve entries of block 0x0008, each
+/// entry's key mask written exactly (XLR 1 alone on a ducked pair, no key
+/// elsewhere, Wave Link's leftover keys cleared), both bits of a ducked
+/// pair's 2-bit field in all three mix sections of block 0x0001 and the
+/// high bit alone cleared on release, no input left after the ducker, every
+/// other byte of that block kept, and the decode of what Wave Link leaves
+/// behind.
 /// </summary>
 public sealed class ProDuckingTests
 {
-    /// <summary>Byte 6 of each entry in Wave Link's state with no key (capture 24, before the write).</summary>
+    /// <summary>
+    /// Byte 6 of each entry, the key mask's low byte, in Wave Link's state
+    /// with no key chosen (capture 24, before the write): leftover keys, XLR
+    /// 2 (02) and XLR 1 with XLR 2 (03).
+    /// </summary>
     internal static readonly byte[] IdleFlags = [0x00, 0x02, 0x00, 0x00, 0x03, 0x00, 0x00, 0x03, 0x03, 0x00, 0x00, 0x00];
 
     /// <summary>Byte 6 after Wave Link made XLR 1 the key for Browser, Music, Game and System (pairs 1, 5, 6, 7).</summary>
     internal static readonly byte[] WaveLinkFlags = [0x00, 0x02, 0x00, 0x00, 0x03, 0x01, 0x00, 0x03, 0x03, 0x01, 0x01, 0x01];
+
+    /// <summary>Byte 6 with no key on any entry, as OpenXLR leaves a unit with nothing ducked.</summary>
+    internal static readonly byte[] NoKeys = new byte[12];
+
+    /// <summary>Byte 6 with XLR 1 alone keying the entries given, as OpenXLR writes them.</summary>
+    internal static byte[] Xlr1Keys(params int[] entries)
+    {
+        var keys = new byte[12];
+        foreach (int e in entries) keys[e] = 0x01;
+        return keys;
+    }
 
     internal static byte[] Block8(byte[] preset, byte[] flags)
     {
@@ -38,8 +55,8 @@ public sealed class ProDuckingTests
     /// <summary>
     /// A block 0x0001 with the bytes the protocol notes name: crossfade at 0,
     /// the jacks' Monitor return level at 5 (unity), the head membership
-    /// bytes 12 and 13, the aa that opens each of the
-    /// five sections at 15, 33, 51, 69 and 87 with 55 55 after it, the aux
+    /// bytes 12 and 13, the inputs' tap fields at aa in each of the five
+    /// sections (15, 33, 51, 69 and 87) with the pairs' 55 55 after them, the aux
     /// cells at 45, 48 and 49 and the output selectors at 90 to 93. Every
     /// other byte holds a pattern, so a write that touches it shows.
     /// </summary>
@@ -111,7 +128,7 @@ public sealed class ProDuckingTests
     }
 
     [Fact]
-    public void OffClearsWhatWaveLinkLeftAndKeepsTheUnknownEntries()
+    public void OffClearsEveryKeyWaveLinkLeft()
     {
         // The unit as Wave Link left it on the desk: Low, Low, Slow on pairs 1, 5, 6 and 7.
         byte[] b8 = Block8(LowLowSlowBytes, WaveLinkFlags);
@@ -119,14 +136,14 @@ public sealed class ProDuckingTests
         byte[] before1 = (byte[])b1.Clone();
         ProDucking.Apply(b8, b1, Off);
 
-        // Wave Link's own state with no key: the 02 and 03 entries stay, the
-        // presets are not written while ducking is off.
-        Assert.Equal(Block8(LowLowSlowBytes, IdleFlags), b8);
+        // No key on any entry, the leftover XLR 2 keys (02, 03) included;
+        // the presets are not written while ducking is off.
+        Assert.Equal(Block8(LowLowSlowBytes, NoKeys), b8);
         foreach (int at in ProDucking.MixFieldOffsets) Assert.Equal(new byte[] { 0x55, 0x55 }, b1[at..(at + 2)]);
         AssertOnlyMixFieldsChanged(before1, b1);
         DuckingReadback unit = ProDucking.Decode(b8, b1);
         Assert.Empty(unit.Pairs);
-        Assert.Equal([4, 7, 8], unit.Entries);
+        Assert.Empty(unit.Entries);
         Assert.True(ProDucking.Holds(unit, Off));
     }
 
@@ -140,9 +157,7 @@ public sealed class ProDuckingTests
         byte[] before1 = (byte[])b1.Clone();
         ProDucking.Apply(b8, b1, On(pair));
 
-        byte[] flags = (byte[])IdleFlags.Clone();
-        flags[entry] |= 0x01;
-        Assert.Equal(Block8(MediumBytes, flags), b8);
+        Assert.Equal(Block8(MediumBytes, Xlr1Keys(entry)), b8);
         foreach (int at in ProDucking.MixFieldOffsets) Assert.Equal(new[] { b16, b17 }, b1[at..(at + 2)]);
         // The fourth and fifth sections, and every other byte, stay.
         AssertOnlyMixFieldsChanged(before1, b1);
@@ -156,12 +171,12 @@ public sealed class ProDuckingTests
         byte[] b1 = Block1();
         ProDucking.Apply(b8, b1, On(ProReturnPairs.Monitor, ProReturnPairs.Aux));
         foreach (int at in ProDucking.MixFieldOffsets) Assert.Equal(new byte[] { 0x5d, 0x5d }, b1[at..(at + 2)]);
-        Assert.Equal([4, 5, 7, 8, 9], ProDucking.Decode(b8, b1).Entries);
+        Assert.Equal([5, 9], ProDucking.Decode(b8, b1).Entries);
 
         // On with no pairs, as for a setup whose mixes nobody hears: the
-        // presets are written and nothing is ducked, the idle state byte for byte.
+        // presets are written and nothing is ducked or keyed.
         ProDucking.Apply(b8, b1, On());
-        Assert.Equal(Block8(MediumBytes, IdleFlags), b8);
+        Assert.Equal(Block8(MediumBytes, NoKeys), b8);
         Assert.Equal(Block1(), b1);
         Assert.True(ProDucking.Holds(ProDucking.Decode(b8, b1), On()));
     }
@@ -172,7 +187,7 @@ public sealed class ProDuckingTests
         byte[] b8 = Block8(LowLowSlowBytes, WaveLinkFlags);
         byte[] b1 = Block1(0x5d, 0xfd);
         ProDucking.Apply(b8, b1, Off with { Pairs = new HashSet<int> { 1, 5 } });
-        Assert.Equal(Block8(LowLowSlowBytes, IdleFlags), b8);
+        Assert.Equal(Block8(LowLowSlowBytes, NoKeys), b8);
         Assert.Empty(ProDucking.Decode(b8, b1).Pairs);
     }
 
@@ -221,10 +236,8 @@ public sealed class ProDuckingTests
         Assert.Equal(new byte[] { 0x5d, 0x55 }, b1[34..36]);
         foreach (int at in new[] { 52, 70, 88 }) Assert.Equal(new byte[] { 0x55, 0x55 }, b1[at..(at + 2)]);
         AssertOnlySectionFieldsChanged(before1, b1);
-        // One depth for every pair: the entries of pairs 1, 2 and 6 flagged.
-        byte[] flags = (byte[])IdleFlags.Clone();
-        foreach (int entry in new[] { 5, 6, 10 }) flags[entry] |= 0x01;
-        Assert.Equal(Block8(MediumBytes, flags), b8);
+        // One depth for every pair: the entries of pairs 1, 2 and 6 keyed by XLR 1.
+        Assert.Equal(Block8(MediumBytes, Xlr1Keys(5, 6, 10)), b8);
         DuckingReadback unit = ProDucking.Decode(b8, b1);
         Assert.Equal([1, 2, 6], unit.Pairs);
         Assert.True(ProDucking.Holds(unit, target));
@@ -289,13 +302,13 @@ public sealed class ProDuckingTests
         };
         var s = new ProDuckingTarget(true, sensitivity, amount, speed, new HashSet<int>());
         byte[] b8 = Block8(LowLowSlowBytes, IdleFlags);
-        for (int e = 0; e < 12; e++) b8[e * 8 + 7] = (byte)(0x40 + e);   // byte 7 is not ours either
+        for (int e = 0; e < 12; e++) b8[e * 8 + 7] = (byte)(0x40 + e);   // the key masks' high bytes: pairs as keys
         byte[] b1 = Block1();
         ProDucking.Apply(b8, b1, s);
         for (int e = 0; e < 12; e++)
         {
             Assert.Equal(new[] { threshold, depth, times[0], times[1], times[2], times[3] }, b8[(e * 8)..(e * 8 + 6)]);
-            Assert.Equal((byte)(0x40 + e), b8[e * 8 + 7]);
+            Assert.Equal(new byte[] { 0x00, 0x00 }, b8[(e * 8 + 6)..(e * 8 + 8)]);
         }
         Assert.Equal(ProDucking.SettingBytes(sensitivity, amount, speed), b8[..6]);
         DuckingReadback unit = ProDucking.Decode(b8, b1);
@@ -304,24 +317,116 @@ public sealed class ProDuckingTests
     }
 
     [Fact]
-    public void UnknownBitsAreKept()
+    public void TheKeyMaskIsWrittenExactlyAndLeftoverKeysAreCleared()
     {
-        // Flag bits 2 to 7 on every entry, bit 1 on some; fields whose low bit is clear.
-        byte[] flags = [0xfc, 0xfe, 0xf4, 0x85, 0xff, 0x7c, 0x04, 0xfe, 0x00, 0xfd, 0x10, 0x03];
-        byte[] b8 = Block8(MediumBytes, flags);
+        // Keys in both bytes of every mask: XLR 2 (bit 1), Music (pair 5,
+        // bit 9) and others, as Wave Link leaves them (it never clears a
+        // bit); 0x0203 on pairs 1 and 5 keyed them by XLR 1, XLR 2 and Music
+        // on the desk. Fields whose low bit is clear.
+        ushort[] masks = [0x00fc, 0x02fe, 0x00f4, 0x0f85, 0x0203, 0x0203, 0x0004, 0xfffe, 0x0200, 0x0203, 0x0010, 0x0003];
+        byte[] b8 = Block8(MediumBytes, NoKeys);
+        for (int e = 0; e < 12; e++)
+        {
+            b8[e * 8 + 6] = (byte)masks[e];
+            b8[e * 8 + 7] = (byte)(masks[e] >> 8);
+        }
         byte[] b1 = Block1(0x00, 0xa0);
         byte[] before1 = (byte[])b1.Clone();
+        DuckingReadback left = ProDucking.Decode(b8, b1);
+        Assert.Equal([3, 4, 5, 9, 11], left.Entries);   // XLR 1 among their keys
+        Assert.False(ProDucking.Holds(left, On(1, 5)));
+
         ProDucking.Apply(b8, b1, On(1, 5));
-        byte[] wanted = (byte[])flags.Clone();
-        wanted[5] |= 0x01;   // pair 1
-        wanted[9] |= 0x01;   // pair 5
-        // Entries without bit 1 lose a ducked bit they should not have; those with it keep theirs.
-        wanted[3] = 0x84;    // Line In: bit 1 clear, so its ducked bit goes
-        wanted[11] = 0x03;   // pair 7 has bit 1: kept as read
-        Assert.Equal(wanted, Enumerable.Range(0, 12).Select(e => b8[e * 8 + 6]));
+        // XLR 1 alone on pairs 1 and 5 (entries 5 and 9), no key anywhere else.
+        for (int e = 0; e < 12; e++)
+            Assert.Equal(e is 5 or 9 ? new byte[] { 0x01, 0x00 } : new byte[] { 0x00, 0x00 }, b8[(e * 8 + 6)..(e * 8 + 8)]);
+        Assert.Equal(Block8(MediumBytes, Xlr1Keys(5, 9)), b8);
         // Both bits set for pairs 1 and 5, the high bit cleared for 6 and 7 (0xa0: field 6 = 10, field 7 = 10).
         foreach (int at in ProDucking.MixFieldOffsets) Assert.Equal(new byte[] { 0x0c, 0x0c }, b1[at..(at + 2)]);
         AssertOnlyMixFieldsChanged(before1, b1);
+        Assert.Equal([5, 9], ProDucking.Decode(b8, b1).Entries);
+    }
+
+    [Fact]
+    public void AUnitWrittenByOpenXlrReadsBackEqualAndOneWithALeftoverKeyDoesNot()
+    {
+        // OpenXLR's own write of pair 1, from a unit with nothing on it.
+        byte[] fresh8 = Block8(MediumBytes, NoKeys);
+        byte[] fresh1 = Block1();
+        ProDucking.Apply(fresh8, fresh1, On(ProReturnPairs.Monitor));
+        DuckingReadback written = ProDucking.Decode(fresh8, fresh1);
+        Assert.True(ProDucking.Holds(written, On(ProReturnPairs.Monitor)));
+
+        // The same write over Wave Link's leftovers reads back byte for byte the same.
+        byte[] left8 = Block8(MediumBytes, IdleFlags);
+        left8[5 * 8 + 7] = 0x02;    // Music (pair 5, bit 9) left as a key of pair 1 too
+        byte[] left1 = Block1();
+        ProDucking.Apply(left8, left1, On(ProReturnPairs.Monitor));
+        Assert.Equal(written, ProDucking.Decode(left8, left1));
+
+        // The pairs and the entries XLR 1 keys are the same with an XLR 2 key
+        // beside it, but the unit does not hold OpenXLR's setting: talking
+        // into XLR 2 would duck pair 1.
+        fresh8[5 * 8 + 6] = 0x03;
+        DuckingReadback xlr2 = ProDucking.Decode(fresh8, fresh1);
+        Assert.Equal(written.Pairs, xlr2.Pairs);
+        Assert.Equal(written.Entries, xlr2.Entries);
+        Assert.NotEqual(written, xlr2);
+        Assert.False(ProDucking.Holds(xlr2, On(ProReturnPairs.Monitor)));
+        fresh8[5 * 8 + 6] = 0x01;
+        fresh8[5 * 8 + 7] = 0x02;
+        Assert.False(ProDucking.Holds(ProDucking.Decode(fresh8, fresh1), On(ProReturnPairs.Monitor)));
+        // A key on an entry OpenXLR does not duck is not held either.
+        fresh8[5 * 8 + 7] = 0x00;
+        fresh8[1 * 8 + 6] = 0x01;
+        Assert.False(ProDucking.Holds(ProDucking.Decode(fresh8, fresh1), On(ProReturnPairs.Monitor)));
+    }
+
+    [Theory]
+    [InlineData(0xae, 0xaa)]   // Wave Link made XLR 2 ducked
+    [InlineData(0xaf, 0xaa)]   // and XLR 1
+    [InlineData(0xff, 0xaa)]
+    [InlineData(0x93, 0x92)]   // XLR 1 at 3, XLR 2 at 0, USB Aux at 1, Line In at 2
+    [InlineData(0xaa, 0xaa)]
+    [InlineData(0x55, 0x55)]
+    [InlineData(0x00, 0x00)]
+    public void EveryWritePutsAnInputAfterTheDuckerBackAndKeepsTheOtherTaps(byte read, byte written)
+    {
+        byte[] b8 = Block8(MediumBytes, NoKeys);
+        byte[] b1 = Block1();
+        foreach (int s in ProMixSections.Starts) b1[s + 15] = read;
+        byte[] before1 = (byte[])b1.Clone();
+        Assert.Null(ProMixSections.Check(b1));
+        DuckingReadback unit = ProDucking.Decode(b8, b1);
+        Assert.Equal(read == written, ProDucking.Holds(unit, Off));
+        Assert.Equal(read == written, ProDucking.Holds(unit, On()));
+
+        foreach (ProDuckingTarget target in new[] { Off, On(ProReturnPairs.Monitor), InSections(new() { [54] = [3] }) })
+        {
+            b1 = (byte[])before1.Clone();
+            ProDucking.Apply(b8, b1, target);
+            foreach (int s in ProMixSections.Starts) Assert.Equal(written, b1[s + 15]);
+            for (int i = 0; i < b1.Length; i++)
+                if (!ProDucking.SectionFieldOffsets.Any(at => i == at || i == at + 1 || i == at - 1))
+                    Assert.True(before1[i] == b1[i], $"block 0x0001 byte {i} changed from {before1[i]:x2} to {b1[i]:x2}");
+            Assert.True(ProDucking.Holds(ProDucking.Decode(b8, b1), target));
+        }
+    }
+
+    [Fact]
+    public void AnInputAfterTheDuckerInOneSectionIsNotHeld()
+    {
+        byte[] b8 = Block8(MediumBytes, NoKeys);
+        byte[] b1 = Block1();
+        ProDucking.Apply(b8, b1, On(ProReturnPairs.Monitor));
+        DuckingReadback held = ProDucking.Decode(b8, b1);
+        Assert.True(ProDucking.Holds(held, On(ProReturnPairs.Monitor)));
+        b1[72 + 15] = 0xae;   // the fifth section, which a whole-output target does not duck in
+        DuckingReadback moved = ProDucking.Decode(b8, b1);
+        Assert.NotEqual(held, moved);
+        Assert.False(ProDucking.Holds(moved, On(ProReturnPairs.Monitor)));
+        ProDucking.Apply(b8, b1, On(ProReturnPairs.Monitor));
+        Assert.Equal(held, ProDucking.Decode(b8, b1));
     }
 
     [Fact]
@@ -414,7 +519,7 @@ public sealed class ProDuckingTests
     [Fact]
     public void DisagreeingEntriesReadAsCustomAndAreNotHeld()
     {
-        byte[] b8 = Block8(MediumBytes, IdleFlags);
+        byte[] b8 = Block8(MediumBytes, NoKeys);
         b8[8 * 3] = 0xe8;               // one entry more sensitive than the rest
         b8[8 * 5 + 1] = 0x09;           // a depth no preset writes, in one entry
         b8[8 * 7 + 4] = 0xb1;           // a release that is not 1200

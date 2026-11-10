@@ -14,11 +14,21 @@ namespace OpenXLR.Core.Devices;
 ///               and above; 88 and below are off, digital zero.
 ///   s+12, s+13  membership, LE16, one bit per source
 ///   s+14        unknown, 00 on every unit read so far, kept
-///   s+15        aa on every unit read so far, the decode check
-///   s+16, s+17  the ducking fields, 2 bits per USB pair, LE16, field k
-///               for pair k; the unit ducks a pair only at 11
+///   s+15 to s+17  twelve 2-bit tap fields, LE, field M for source M, the
+///               point the section takes the source at: 0 before the
+///               unit's processing, 1 after it, 2 after the insert return,
+///               3 after the ducker. s+15 holds the four inputs' fields
+///               (aa, all at 2, as Wave Link leaves them), s+16 and s+17
+///               the eight pairs' (the ducking fields: the unit ducks a pair
+///               only at 3)
 /// The sources, as bit and cell index: 0 XLR 1, 1 XLR 2, 2 USB Aux, 3 Line
 /// In, 4 + k USB playback pair k.
+///
+/// Wave Link makes an input ducked by writing its field at 3 (USB captures
+/// of 2026-11-10: ae, XLR 2's field at 3, and af, XLR 1's and XLR 2's), so
+/// s+15 takes any value.
+/// OpenXLR never ducks an input: every write of the block puts an input
+/// field read at 3 back to 2 (<see cref="ClearInputDucking"/>).
 ///
 /// After the sections: bytes 90 to 93 the selectors of Headphones 1,
 /// Headphones 2, the USB Aux port and Line Out (1e to 22 play sections 0 to
@@ -57,10 +67,13 @@ public static class ProMixSections
 
     public const int MaskOffset = 12;
     public const int Byte14Offset = 14;
-    public const int MarkerOffset = 15;
-    public const byte Marker = 0xAA;
+    /// <summary>The byte of the four inputs' 2-bit tap fields, field M for input M.</summary>
+    public const int InputTapsOffset = 15;
+    public const int InputCount = 4;
     public const int DuckingOffset = 16;
-    /// <summary>The only field value the unit ducks a pair at.</summary>
+    /// <summary>The tap after the insert return, where Wave Link leaves every input (aa).</summary>
+    public const int TapInsertReturn = 0b10;
+    /// <summary>The tap after the ducker: the only field value the unit ducks a source at.</summary>
     public const int Ducked = 0b11;
 
     public const int SelectorHp1 = 90;
@@ -90,15 +103,14 @@ public static class ProMixSections
     /// </summary>
     public const double SmallestTakenGainChange = 0.00088;
 
-    /// <summary>Whether the block has the layout this codec reads: its length and the aa at each section's byte 15.</summary>
+    /// <summary>
+    /// Whether the block has the layout this codec reads: its length. Every
+    /// value of every byte is a valid field: byte 15 of a section, once taken
+    /// for a constant aa, holds the inputs' tap fields and reads otherwise
+    /// after Wave Link ducks an input.
+    /// </summary>
     public static string? Check(ReadOnlySpan<byte> block)
-    {
-        if (block.Length != Length) return $"block 0x0001 is {block.Length} bytes, not {Length}";
-        foreach (int s in Starts)
-            if (block[s + MarkerOffset] != Marker)
-                return $"section {s} holds {block[s + MarkerOffset]:x2} at byte {s + MarkerOffset}, not aa";
-        return null;
-    }
+        => block.Length != Length ? $"block 0x0001 is {block.Length} bytes, not {Length}" : null;
 
     public static bool Decodes(ReadOnlySpan<byte> block) => Check(block) is null;
 
@@ -194,6 +206,37 @@ public static class ProMixSections
         block[at + 1] = (byte)(fields >> 8);
     }
 
+    /// <summary>Input <paramref name="input"/>'s tap field in a section, 0 to 3 (0 XLR 1 to 3 Line In).</summary>
+    public static int InputTap(ReadOnlySpan<byte> block, int start, int input)
+        => block[Base(start) + InputTapsOffset] >> 2 * CheckInput(input) & 0b11;
+
+    /// <summary>A byte of four input tap fields with each field at 3, after the ducker, put back to 2; the others as given.</summary>
+    public static byte WithoutInputDucking(byte taps)
+    {
+        int fields = taps;
+        for (int input = 0; input < InputCount; input++)
+            if ((fields >> 2 * input & 0b11) == Ducked) fields = fields & ~(0b11 << 2 * input) | TapInsertReturn << 2 * input;
+        return (byte)fields;
+    }
+
+    /// <summary>
+    /// Every input tap field at 3 in the five sections put back to 2, so no
+    /// input ducking another program left stays on; the other values stay as
+    /// read. True when a byte changed.
+    /// </summary>
+    public static bool ClearInputDucking(Span<byte> block)
+    {
+        if (block.Length != Length) throw new ArgumentException($"block 0x0001 is {Length} bytes", nameof(block));
+        bool changed = false;
+        foreach (int s in Starts)
+        {
+            byte taps = WithoutInputDucking(block[s + InputTapsOffset]);
+            changed |= taps != block[s + InputTapsOffset];
+            block[s + InputTapsOffset] = taps;
+        }
+        return changed;
+    }
+
     private static int Base(int start) => IndexOf(start) * SectionLength;
     private static int CellAt(int start, int source) => Base(start) + CheckSource(source);
 
@@ -202,6 +245,9 @@ public static class ProMixSections
 
     private static int CheckPair(int pair)
         => pair is >= 0 and < PairCount ? pair : throw new ArgumentOutOfRangeException(nameof(pair));
+
+    private static int CheckInput(int input)
+        => input is >= 0 and < InputCount ? input : throw new ArgumentOutOfRangeException(nameof(input));
 
     // --- diagnostics ---
 
@@ -254,13 +300,15 @@ public static class ProMixSections
                 members.Add($"{SourceName(source)} {(DbOf(cell) is { } db ? Db(db) : "off")}");
             }
         text.Append(members.Count == 0 ? "no members" : string.Join(", ", members));
-        var ducked = new List<int>();
+        var ducked = new List<string>();
+        for (int input = 0; input < InputCount; input++)
+            if (InputTap(block, start, input) == Ducked) ducked.Add(SourceName(input));
         for (int pair = 0; pair < PairCount; pair++)
-            if (DuckingField(block, start, pair) == Ducked) ducked.Add(pair);
-        text.Append("; ducks ").Append(ducked.Count == 0 ? "no pair" : string.Join(", ", ducked.Select(p => $"pair {p}")));
+            if (DuckingField(block, start, pair) == Ducked) ducked.Add(SourceName(SourceOfPair(pair)));
+        text.Append("; ducks ").Append(ducked.Count == 0 ? "nothing" : string.Join(", ", ducked));
         int b = start;
         text.Append(CultureInfo.InvariantCulture,
-            $"; fields {block[b + DuckingOffset]:x2}{block[b + DuckingOffset + 1]:x2}, byte {b + Byte14Offset} {block[b + Byte14Offset]:x2}");
+            $"; inputs {block[b + InputTapsOffset]:x2}, fields {block[b + DuckingOffset]:x2}{block[b + DuckingOffset + 1]:x2}, byte {b + Byte14Offset} {block[b + Byte14Offset]:x2}");
         return text.ToString();
     }
 

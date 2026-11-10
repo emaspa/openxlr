@@ -587,7 +587,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
         foreach ((int section, string bytes) in _mixer.HardwareRestore)
         {
             if (wanted.Contains(section)) continue;
-            if (block is not null && ProMixPlan.RestoreOf(block, section) == bytes)
+            if (block is not null && ProMixPlan.HoldsRestore(block, section, bytes))
             {
                 if (_mixer.ForgetHardwareRestore(section))
                 {

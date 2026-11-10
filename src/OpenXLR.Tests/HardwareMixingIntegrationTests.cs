@@ -199,8 +199,8 @@ public sealed partial class MonitorVolumeIntegrationTests
             Assert.Equal(0, ducked[52] & 0x82);
             Assert.Equal(0, ducked[53] & 0xaa);
             foreach (int at in new[] { 34, 70, 88 }) Assert.Equal(0, (ducked[at] | ducked[at + 1]) & 0xaa);
-            Assert.Equal(0x01, pro.Ducking[5 * 8 + ProDucking.FlagsByte] & 0x01);
-            Assert.Equal(0x01, pro.Ducking[6 * 8 + ProDucking.FlagsByte] & 0x01);
+            Assert.Equal(0x01, pro.Ducking[5 * 8 + ProDucking.KeyMaskOffset]);
+            Assert.Equal(0x01, pro.Ducking[6 * 8 + ProDucking.KeyMaskOffset]);
             Assert.DoesNotContain(service.Meters()!.Keys, k => k.StartsWith("duck:", StringComparison.Ordinal));
             Run(new() { Cmd = "setDucking", Value = JsonSerializer.SerializeToElement(new { enabled = false }) });
             PrimaryWait(() => { Sweep(); return (pro.Block[16] & 0xaa) == 0 && (pro.Block[52] & 0xaa) == 0; });
