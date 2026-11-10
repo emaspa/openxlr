@@ -2307,6 +2307,12 @@ Piliin ang interface na kinokontrol ng OpenXLR</value>
   <data name="PlaybackVolume" xml:space="preserve">
     <value>Volume ng playback</value>
   </data>
+  <data name="AppPlaybackVolumeHint" xml:space="preserve">
+    <value>Baguhin ang level ng program na ito bago ito pumasok sa mix. Sumusunod ang level sa volume control ng desktop, at ibinabalik ng I-reset ang program sa buong volume.</value>
+  </data>
+  <data name="BrowserPlaybackVolumeHint" xml:space="preserve">
+    <value>Inaayos nito ang buong browser. Gamitin ang Mga tab para ayusin nang hiwalay ang bawat naka-route na tab o web app.</value>
+  </data>
   <data name="TabPlaybackVolumeHint" xml:space="preserve">
     <value>Ilalapat ang level na ito kapag nai-route na ng extension ang tab na ito.</value>
   </data>

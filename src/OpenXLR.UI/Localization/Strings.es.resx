@@ -2349,6 +2349,12 @@ Selecciona la interfaz que controla OpenXLR</value>
   <data name="PlaybackVolume" xml:space="preserve">
     <value>Volumen de reproducción</value>
   </data>
+  <data name="AppPlaybackVolumeHint" xml:space="preserve">
+    <value>Cambia el nivel de este programa antes de que entre en una mezcla. El nivel sigue el control de volumen del escritorio, y Restablecer devuelve el programa al volumen máximo.</value>
+  </data>
+  <data name="BrowserPlaybackVolumeHint" xml:space="preserve">
+    <value>Esto ajusta todo el navegador. Usa Pestañas para ajustar por separado cada pestaña o aplicación web enrutada.</value>
+  </data>
   <data name="TabPlaybackVolumeHint" xml:space="preserve">
     <value>Este nivel se aplica cuando la extensión enruta esta pestaña.</value>
   </data>

@@ -2307,6 +2307,12 @@ Pilia ang interface nga kontrolon sa OpenXLR</value>
   <data name="PlaybackVolume" xml:space="preserve">
     <value>Volume sa playback</value>
   </data>
+  <data name="AppPlaybackVolumeHint" xml:space="preserve">
+    <value>Usba ang lebel niining programa sa dili pa kini mosulod sa mix. Mosunod ang lebel sa volume control sa desktop, ug ibalik sa I-reset ang programa sa tibuok volume.</value>
+  </data>
+  <data name="BrowserPlaybackVolumeHint" xml:space="preserve">
+    <value>Gi-adjust niini ang tibuok browser. Gamita ang Mga tab aron bulag nga i-adjust ang matag na-route nga tab o web app.</value>
+  </data>
   <data name="TabPlaybackVolumeHint" xml:space="preserve">
     <value>Ipadapat kini nga lebel kon i-route na sa extension kining tab.</value>
   </data>

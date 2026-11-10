@@ -979,6 +979,13 @@ restores the split profile when it stops.
 - A Manage dialog shows the full registry, each app with the same icon
   or initial as its tile, and an installed-application picker pre-assigns
   channels from `.desktop` entries
+- Each app has a playback volume beside its channel picker, in
+  APPLICATIONS, Manage and the terminal mixer's Apps tab. It is the
+  program's own stream volume, so two programs on one channel can play at
+  different levels without a channel each. OpenXLR saves the level by
+  application and gives it to streams that start later. A change made in
+  the desktop's volume control, or by the program, becomes the saved
+  level, and Reset puts the program back to 100%
 - An app can be set to "Not managed": the mixer hands its streams back to
   the system default output and never touches them again, so a headset
   with separate game and chat sinks keeps its own routing for that app
