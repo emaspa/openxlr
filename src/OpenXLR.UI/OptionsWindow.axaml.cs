@@ -287,6 +287,14 @@ public partial class OptionsWindow : Window
         await mixing.SwitchAsync(hardware: false);
     }
 
+    private async void OnOutputVolumeLock(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not OptionsViewModel vm || sender is not CheckBox box) return;
+        bool value = box.IsChecked == true;
+        box.SetCurrentValue(ToggleButton.IsCheckedProperty, vm.Main.OutputVolumeLocked);
+        await vm.Main.SetOutputVolumeLockAsync(value);
+    }
+
     private void OnSoundboard(object? sender, RoutedEventArgs e)
     {
         // Over Options, owned by neither: the board stays open when Options closes.

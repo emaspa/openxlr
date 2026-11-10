@@ -207,6 +207,16 @@ public sealed partial record MixerState
     /// <summary>Microphone channels follow the monitoring pause. False unless explicitly enabled.</summary>
     public bool MonitorMuteMicrophones { get; init; }
 
+    /// <summary>The device and level held by the output volume lock, or null.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    public OutputVolumeLock? OutputVolumeLock { get; init; }
+
+    /// <summary>The locked sink currently plays jacks mixed by the unit.</summary>
+    public bool OutputVolumeLockSuspended { get; init; }
+
+    /// <summary>The shared Monitor slider controls a locked output.</summary>
+    public bool MonitorVolumeLocked { get; init; }
+
     /// <summary>A microphone channel's requested pause or resume could not yet be confirmed.</summary>
     public bool MicrophonePausePending { get; init; }
 

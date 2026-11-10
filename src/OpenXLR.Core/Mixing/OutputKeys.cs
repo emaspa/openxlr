@@ -16,6 +16,7 @@ public sealed partial class Mixer
         lock (_gate)
         {
             string sink = ResolveOutputKeyLocked(device);
+            RequireEditableOutputVolume(sink);
             // A key may arrive before the first sweep after selecting outputs.
             // Establish that selection's baseline so follow-mode copies this
             // explicit change to the other selected outputs as well.
@@ -37,6 +38,7 @@ public sealed partial class Mixer
         lock (_gate)
         {
             string sink = ResolveOutputKeyLocked(device);
+            RequireEditableOutputVolume(sink);
             if (_enforcedSink == FollowMonitorOutput && _outputVolume is null)
                 SyncDeviceVolumes();
             volume = Math.Clamp(volume, 0, PipeWireAdapter.MaxSinkVolume);

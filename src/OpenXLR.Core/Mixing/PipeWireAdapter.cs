@@ -817,6 +817,9 @@ public sealed class PipeWireAdapter
 
     /// <summary>A sink's desktop volume, within the supported output range.</summary>
     public double? GetSinkVolume(string sinkName)
+        => GetUnclampedSinkVolume(sinkName) is double volume ? Math.Clamp(volume, 0, MaxSinkVolume) : null;
+
+    internal double? GetUnclampedSinkVolume(string sinkName, bool skipMissing = false)
     {
         string bare = BareSink(sinkName);
         JsonElement[]? observed;
@@ -825,9 +828,14 @@ public sealed class PipeWireAdapter
                 ? null : LiveObjects();
         // A sink the registry has not echoed yet, or one without a readable
         // Props volume, is read through Pulse.
-        if (observed is { } objects && FindSink(objects, bare) is { } info
-            && SinkLevel(info, firstChannel: true) is { } level)
-            return Math.Clamp(level.DesktopVolume, 0, MaxSinkVolume);
+        if (observed is { } objects)
+        {
+            if (FindSink(objects, bare) is { } info)
+            {
+                if (SinkLevel(info, firstChannel: true) is { } level) return level.DesktopVolume;
+            }
+            else if (skipMissing) return null;
+        }
         return ParseVolumePercent(TryConfirm("pactl", "get-sink-volume", bare));
     }
 
@@ -951,7 +959,8 @@ public sealed class PipeWireAdapter
     {
         if (pactlOutput is null) return null;
         var m = System.Text.RegularExpressions.Regex.Match(pactlOutput, @"(\d+)%");
-        return m.Success ? Math.Clamp(int.Parse(m.Groups[1].Value) / 100.0, 0, MaxSinkVolume) : null;
+        if (!m.Success || !int.TryParse(m.Groups[1].Value, out int percent)) return null;
+        return percent / 100.0;
     }
 
     /// <summary>The capture device applications record from by default.</summary>

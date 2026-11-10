@@ -1416,6 +1416,10 @@ public sealed partial class MixerService : IHostedService, IDisposable
                     else _mixer.AssignBrowserTab(cmd.Session!, cmd.TabId!.Value, cmd.Site!, cmd.Channel, false, _ => null);
                     Changed?.Invoke();
                     return null;
+                case "setOutputVolumeLock":
+                    _saves.RunSaved(() => _mixer.SetOutputVolumeLock(cmd.Value.GetBoolean(), settings => settings.Save()));
+                    Changed?.Invoke();
+                    return null;
                 case "setRouteAppsByDefault":
                     _saves.RunSaved(() => _mixer.SetRouteAppsByDefault(cmd.Value.GetBoolean(), s => s.Save()));
                     Changed?.Invoke();

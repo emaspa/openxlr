@@ -44,6 +44,7 @@ internal static class SavedMixerValidation
             ChannelMuted = Entries(settings.ChannelMuted, "channelMuted", notes),
             MonitorOutputs = Entries(settings.MonitorOutputs, "monitorOutputs", notes),
             MonitorOutputMutes = MonitorOutputMutes(settings, notes),
+            OutputVolumeLock = OutputLock(settings.OutputVolumeLock, notes),
             MonitorFeeds = Mapping(settings.MonitorFeeds, "monitorFeeds", notes),
             MonitorOutputLabels = Mapping(settings.MonitorOutputLabels, "monitorOutputLabels", notes),
             AppOverrides = Mapping(settings.AppOverrides, "appOverrides", notes),
@@ -68,6 +69,15 @@ internal static class SavedMixerValidation
             Appearance = Appearance(settings.Appearance, notes),
             BlockSize = BlockSize(settings.BlockSize, notes),
         };
+    }
+
+    private static OutputVolumeLock? OutputLock(OutputVolumeLock? held, List<string> notes)
+    {
+        if (held is null || held.Device is { } device && Mixer.IsLockableOutputName(device)
+            && held.Volume is >= 0 and <= PipeWireAdapter.MaxSinkVolume)
+            return held;
+        notes.Add("outputVolumeLock");
+        return null;
     }
 
     /// <summary>The dry monitor switches; a null map, which a hand edit can leave, reads as none on.</summary>

@@ -5544,6 +5544,19 @@ default and mixer routing intact. Unplugged named outputs report an error;
 their bindings remain saved for reconnection. At most 16 output-selection
 shortcuts and 32 focused-channel shortcuts are retained.
 
+Under **Options → Audio → System default devices**, **Lock active output
+volume** holds the configured PipeWire output at its current level. With no
+configured default it uses the desktop default. If the default is an OpenXLR
+sink, it holds the first selected monitor output. The settings show the device
+and held level. Changes from the desktop are corrected on the next mixer sweep.
+OpenXLR's shared MONITOR volume control is disabled when its first output is
+locked. Mix faders, headphone gain and mute controls stay available.
+
+The lock survives an OpenXLR restart or a reconnection of the same sink. To
+lock a different output, release the lock, select the output and enable it
+again. When the Wave XLR Pro mixes its jacks on the interface, the volume lock
+for its sink is suspended until computer mixing resumes.
+
 For OpenDeck, use the Toggle inspector's **System output controls** and
 **Enforced system output** groups. Volume up and down keys are momentary:
 they acknowledge the press and show no state. The mute key lights red while

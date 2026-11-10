@@ -150,6 +150,7 @@ public static class CommandValidation
             case "setRouteAppsByDefault":
             case "setPreserveBrowserOutputs":
             case "setMonitorMuteMicrophones":
+            case "setOutputVolumeLock":
                 return cmd.Value.ValueKind is JsonValueKind.True or JsonValueKind.False
                     ? null : $"{cmd.Cmd}: value must be a boolean";
             case "setMixing":

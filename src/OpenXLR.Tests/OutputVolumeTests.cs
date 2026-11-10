@@ -29,8 +29,9 @@ public sealed class OutputVolumeTests
             "Volume: front-left: 78642 / 120% / 1.58 dB,   front-right: 78642 / 120% / 1.58 dB");
         Assert.Equal(1.2, read);
         Assert.Equal("120%", PipeWireAdapter.VolumePercent(read!.Value));
-        Assert.Equal(PipeWireAdapter.MaxSinkVolume,
-            PipeWireAdapter.ParseVolumePercent("Volume: front-left: 98304 / 200% / 6.02 dB"));
+        // A lock at 150% must still see when the desktop writes a higher level.
+        Assert.Equal(2, PipeWireAdapter.ParseVolumePercent("Volume: front-left: 98304 / 200% / 6.02 dB"));
+        Assert.Null(PipeWireAdapter.ParseVolumePercent("Volume: 999999999999%"));
         Assert.Null(PipeWireAdapter.ParseVolumePercent("Failure: No such entity"));
         Assert.Null(PipeWireAdapter.ParseVolumePercent(null));
     }
