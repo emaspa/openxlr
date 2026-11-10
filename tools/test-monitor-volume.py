@@ -111,8 +111,10 @@ def main():
         processes = []
         with open(runtime + "/servers.log", "w+") as log:
             try:
+                # Activated services must see the private config and runtime
+                # too, including desktop portals started by the browser test.
                 bus = subprocess.Popen(["dbus-daemon", "--session", "--nofork", "--print-address"],
-                                       stdout=subprocess.PIPE, stderr=log, text=True)
+                                       env=env, stdout=subprocess.PIPE, stderr=log, text=True)
                 processes.append(bus)
                 env["DBUS_SESSION_BUS_ADDRESS"] = bus.stdout.readline().strip()
                 # The policy-only session manager never discovers ALSA devices.
