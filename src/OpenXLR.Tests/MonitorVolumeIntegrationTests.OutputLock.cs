@@ -86,7 +86,8 @@ public sealed partial class MonitorVolumeIntegrationTests
         Assert.True(SpinWait.SpinUntil(() => pw.GetUnclampedSinkVolume(sink) == .35, TimeSpan.FromSeconds(3)));
         string path = Path.Combine(Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR")!, "stereo-output-lock-test.json");
         mixer.SetOutputVolumeLock(true, settings => settings.Save(path));
-        Assert.Equal([.35, .70], MixerSettings.Load(path)!.OutputVolumeLock!.ChannelVolumes);
+        var channels = Assert.IsType<double[]>(MixerSettings.Load(path)!.OutputVolumeLock!.ChannelVolumes);
+        Assert.Equal([.35, .70], channels);
         Write("35%", "95%");
         Assert.Contains("95%", Read());
         Assert.True(SpinWait.SpinUntil(() =>
