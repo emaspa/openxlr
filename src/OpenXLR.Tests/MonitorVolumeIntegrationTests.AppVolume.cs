@@ -59,6 +59,8 @@ public sealed partial class MonitorVolumeIntegrationTests
             var before = StreamVolumes();
             Assert.Equal(3, before.Count);
             Assert.Single(before.Values.Select(stream => stream.Sink).Distinct());
+            int arrivals = 0;
+            pw.PlaybackStreamArrived += () => Interlocked.Increment(ref arrivals);
             mixer.SetAppVolume(app.ToUpperInvariant(), .35);
             // Written before the command returns, with no sweep in between.
             var after = StreamVolumes();
@@ -80,11 +82,14 @@ public sealed partial class MonitorVolumeIntegrationTests
             Assert.True(mixer.TakeAppVolumesChanged());
             Assert.Equal(before["discord"], StreamVolumes()["discord"]);
 
-            // A stream that starts later gets the level without a sweep.
+            // A stream that starts later gets the level from the pass the
+            // registry's announcement starts, without a sweep.
             first.Cancel();
             await firstPlayer;
             Wait(items => !items.ContainsKey("teams-first"));
+            int seen = Volatile.Read(ref arrivals);
             _ = Play(app, "teams-restarted", all.Token);
+            Assert.True(SpinWait.SpinUntil(() => Volatile.Read(ref arrivals) > seen, TimeSpan.FromSeconds(5)));
             Assert.True(SpinWait.SpinUntil(() =>
             {
                 mixer.SyncAppVolumes();

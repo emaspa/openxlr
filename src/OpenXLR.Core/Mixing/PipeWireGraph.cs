@@ -26,6 +26,9 @@ internal sealed class PipeWireGraph : IDisposable
     private long _defaultRevision, _portRevision, _clockRevision;
     internal long DefaultRevision { get { lock (_gate) return _defaultRevision; } }
 
+    /// <summary>Called outside the lock, on the reader's thread, when a batch brings a playback stream not held before.</summary>
+    internal Action? PlaybackStreamArrived { get; init; }
+
     internal PipeWireGraph(Action<string>? note = null, string executable = "pw-dump")
     {
         _note = note;
@@ -78,7 +81,8 @@ internal sealed class PipeWireGraph : IDisposable
                         startup.CancelAfter(TimeSpan.FromSeconds(5));
                         await ReadBatchesAsync(stream, batch =>
                         {
-                            if (!Apply(batch)) return;
+                            if (!Apply(batch, out bool streamArrived)) return;
+                            if (streamArrived) PlaybackStreamArrived?.Invoke();
                             startup.CancelAfter(Timeout.InfiniteTimeSpan);
                             if (reported) { _note?.Invoke("PipeWire registry subscription reconnected"); reported = false; }
                         }, startup.Token).ConfigureAwait(false);
@@ -116,8 +120,9 @@ internal sealed class PipeWireGraph : IDisposable
         }
     }
 
-    private bool Apply(JsonElement batch)
+    private bool Apply(JsonElement batch, out bool streamArrived)
     {
+        streamArrived = false;
         lock (_gate)
         {
             var updates = new Dictionary<uint, (JsonElement Value, int Size)>();
@@ -141,6 +146,7 @@ internal sealed class PipeWireGraph : IDisposable
                     _defaultRevision++;
                 if (!portsChanged) portsChanged = PortInputsChanged(old.Value, removed ? default : item);
                 if (!clockChanged) clockChanged = ClockChanged(old.Value, removed ? default : item);
+                if (!removed && old.Value.ValueKind == JsonValueKind.Undefined && IsPlaybackStream(item)) streamArrived = true;
                 if (removed) updates[id] = default;
                 else
                 {
@@ -247,6 +253,11 @@ internal sealed class PipeWireGraph : IDisposable
             && item.GetProperty("info").GetProperty("props").TryGetProperty("media.class", out var kind)
             && kind.ValueKind == JsonValueKind.String && kind.GetString() is { } value
             && value.StartsWith("Audio/", StringComparison.Ordinal) ? name.GetString() : null;
+
+    private static bool IsPlaybackStream(JsonElement item)
+        => NodeInfo(item) is { } info && info.TryGetProperty("props", out var props) && props.ValueKind == JsonValueKind.Object
+            && props.TryGetProperty("media.class", out var kind) && kind.ValueKind == JsonValueKind.String
+            && kind.ValueEquals("Stream/Output/Audio");
 
     private static bool IsDefaultMetadata(JsonElement item)
         => IsType(item, "PipeWire:Interface:Metadata")

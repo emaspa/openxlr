@@ -65,12 +65,18 @@ public sealed class PipeWireAdapter
         && NativePluginHost.SupportsFeatures(info.RequiredFeatures);
 
     /// <summary>Use a registry subscription for this adapter until the returned lease is disposed.</summary>
+    /// <summary>
+    /// Raised on the registry reader's thread when a playback stream appears
+    /// while the graph is watched. A handler hands the work on and returns.
+    /// </summary>
+    public event Action? PlaybackStreamArrived;
+
     public IDisposable WatchGraph(Action<string>? note = null)
     {
         lock (DumpGate)
         {
             if (_graph is not null) throw new InvalidOperationException("PipeWire registry is already subscribed");
-            _graph = new PipeWireGraph(note);
+            _graph = new PipeWireGraph(note) { PlaybackStreamArrived = () => PlaybackStreamArrived?.Invoke() };
             _graph.WaitFor(_ => true, TimeSpan.FromSeconds(5));
             return new GraphWatch(this, _graph);
         }

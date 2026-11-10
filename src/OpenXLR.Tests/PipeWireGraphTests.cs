@@ -186,6 +186,53 @@ public sealed class PipeWireGraphTests
     }
 
     [Fact]
+    public void ANewPlaybackStreamIsAnnouncedOnceAndItsUpdatesAreNot()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "openxlr-graph-streams-" + Guid.NewGuid());
+        Directory.CreateDirectory(dir);
+        string script = Path.Combine(dir, "watch"), stage = Path.Combine(dir, "stage");
+        ExecutableScript.Write(script, """
+            #!/bin/sh
+            exec python3 - "$0" <<'PY'
+            import json, os, sys, time
+            path = os.path.join(os.path.dirname(sys.argv[1]), 'stage')
+            def node(id, kind, volume):
+                return {'id': id, 'type': 'PipeWire:Interface:Node', 'info': {'props': {'media.class': kind},
+                        'params': {'Props': [{'channelVolumes': [volume]}]}}}
+            def wait(text):
+                while not (os.path.exists(path) and open(path).read() == text): time.sleep(.01)
+            print(json.dumps([{'id': 0, 'type': 'PipeWire:Interface:Core'}, node(1, 'Audio/Sink', 1)]), flush=True)
+            wait('stream')
+            print(json.dumps([node(2, 'Stream/Output/Audio', 1)]), flush=True)
+            wait('update')
+            print(json.dumps([node(2, 'Stream/Output/Audio', .5), node(3, 'Stream/Input/Audio', 1), node(1, 'Audio/Sink', .5)]), flush=True)
+            wait('second')
+            print(json.dumps([node(4, 'Stream/Output/Audio', 1), node(5, 'Stream/Output/Audio', 1)]), flush=True)
+            while True: time.sleep(1)
+            PY
+            """);
+        try
+        {
+            int arrivals = 0;
+            using var graph = new PipeWireGraph(executable: script) { PlaybackStreamArrived = () => Interlocked.Increment(ref arrivals) };
+            Assert.True(graph.WaitFor(items => items.Length == 2, TimeSpan.FromSeconds(5)));
+            Assert.Equal(0, Volatile.Read(ref arrivals));
+            File.WriteAllText(stage, "stream");
+            Assert.True(SpinWait.SpinUntil(() => Volatile.Read(ref arrivals) == 1, TimeSpan.FromSeconds(5)));
+            // The stream is in the registry by the time it is announced.
+            Assert.Equal(3, graph.Read().Length);
+            File.WriteAllText(stage, "update");
+            Assert.True(graph.WaitFor(items => items.Length == 4, TimeSpan.FromSeconds(5)));
+            Assert.Equal(1, Volatile.Read(ref arrivals));
+            // One batch is one announcement, however many streams it brings.
+            File.WriteAllText(stage, "second");
+            Assert.True(SpinWait.SpinUntil(() => Volatile.Read(ref arrivals) == 2, TimeSpan.FromSeconds(5)));
+            Assert.Equal(6, graph.Read().Length);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
     public void PortParamUpdatesKeepThePortListAndRenamesReplaceIt()
     {
         // Ports report latency and format changes constantly; rebuilding the
