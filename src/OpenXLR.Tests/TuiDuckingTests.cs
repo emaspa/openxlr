@@ -6,8 +6,8 @@ namespace OpenXLR.Tests;
 
 /// <summary>
 /// The terminal mixer's Ducking group on the Inputs tab, on any device: the
-/// switch, a key that cycles through the microphones, a strip of channels
-/// and one of mixes whose keys each flip one id, the three presets, and on a
+/// switch, a strip of keys, one of channels and one of mixes whose keys
+/// each flip one id, the three presets, and on a
 /// unit that can run it, the choice between the unit and this computer with
 /// the reason it does not. Every key sends one command and the rows follow
 /// the next state. A daemon from before channels and mixes gets the rest.
@@ -26,7 +26,7 @@ public sealed class TuiDuckingTests
           "capabilities": { "gain": true, "mute": true, "xlrInputs": 2, "xlrJacks": true, "hpOutputs": 2,
                             "hpVolume": true, "outputRouting": true, "auxInput": true, "ducking": true },
           "state": { "gainDb": 40, "mute": false },
-          "ducking": { "enabled": false, "key": "xlr1", "channels": ["game", "music", "xlr2"], "mixes": ["monitor"],
+          "ducking": { "enabled": false, "keys": ["xlr1"], "key": "xlr1", "channels": ["game", "music", "xlr2"], "mixes": ["monitor"],
                        "sensitivity": "medium", "amount": "medium", "speed": "medium", "processing": "device",
                        "backend": "device", "available": true, "error": null,
                        "device": { "unit": "0fd9:00b4@00112233445566aa", "name": "Wave XLR Pro", "firmware": null,
@@ -73,6 +73,15 @@ public sealed class TuiDuckingTests
 
     private static JsonNode Ducking(JsonNode root) => root["ducking"]!;
 
+    /// <summary>The keys as the daemon reports them: the list, and the first as <c>key</c>.</summary>
+    private static void SetKeys(JsonNode root, params string[] keys)
+    {
+        Ducking(root)["keys"] = new JsonArray([.. keys.Select(key => (JsonNode?)JsonValue.Create(key))]);
+        Ducking(root)["key"] = keys[0];
+    }
+
+    private static KeyPress Space => new(Key.Char, ' ');
+
     /// <summary>An XLR Dock MK.2: no hardware ducking, so <c>device</c> is null and XLR 2 is not on the unit.</summary>
     private static string DockJson(Action<JsonNode>? change = null) => Edit(root =>
     {
@@ -111,7 +120,7 @@ public sealed class TuiDuckingTests
     /// Walk down the Inputs tab until the selected row is the one with this
     /// label, and return that row from its marker on. Two cards share a line
     /// on a wide terminal, so the marker two cells before the label is what
-    /// says which row it is, and the gap after it tells Key from Key heard.
+    /// says which row it is, and the gap after it tells Keys from Keys heard.
     /// The walk starts from the top, so a row above the cursor is found too.
     /// </summary>
     private static string Select(App app, string label, int width = 160, int height = 80)
@@ -187,38 +196,115 @@ public sealed class TuiDuckingTests
     }
 
     [Fact]
-    public void TheKeyCyclesThroughTheMicrophonesAndLeavesTheChannelsWhenItBecomesOne()
+    public void TheKeysStripAddsAKeyAtTheEndAndTakesItOutOfTheChannels()
     {
         (App app, List<string> sent) = Ready(ProJson);
-        Assert.Contains("XLR 1", Select(app, "Key"), StringComparison.Ordinal);
-        // XLR 2 is ducked, so making it the key takes it off the list in the same command.
+        string strip = Select(app, "Keys");
+        Assert.Contains("✓ XLR 1", strip, StringComparison.Ordinal);
+        Assert.Contains("XLR 2", strip, StringComparison.Ordinal);
+        Assert.DoesNotContain("✓ XLR 2", strip, StringComparison.Ordinal);
+        // Aux In and the application channels key ducking as the microphones do.
+        Assert.Contains("Aux In", strip, StringComparison.Ordinal);
+        Assert.Contains("Game", strip, StringComparison.Ordinal);
+
+        // XLR 1 is the only key, and the last key stays: nothing is sent.
+        app.Handle(Space);
+        Assert.Empty(sent);
+        // XLR 2 is ducked, so making it a key takes it off the channels in the same command.
         app.Handle(new KeyPress(Key.Right));
+        app.Handle(Space);
         JsonElement value = Command(sent);
-        Assert.Equal("xlr2", value.GetProperty("key").GetString());
+        Assert.Equal(["xlr1", "xlr2"], Ids(value.GetProperty("keys")));
         Assert.Equal(["game", "music"], Ids(value.GetProperty("channels")));
-        // Backwards from XLR 1 wraps to the capture microphone, which is not ducked: the key alone.
-        app.Handle(new KeyPress(Key.Left));
+        Assert.False(value.TryGetProperty("key", out _));
+        // Aux In is not ducked: the keys alone. The daemon has not answered
+        // yet, so the press builds on the last one rather than dropping XLR 2.
+        app.Handle(new KeyPress(Key.Right));
+        app.Handle(Space);
         value = Command(sent);
-        Assert.Equal("cap1", value.GetProperty("key").GetString());
+        Assert.Equal(["xlr1", "xlr2", "aux"], Ids(value.GetProperty("keys")));
         Assert.False(value.TryGetProperty("channels", out _));
+        // Once the daemon's state arrives, presses start from it again.
+        app.Link.Receive(Edit(root => SetKeys(root, "xlr1", "aux")));
+        app.Handle(Space);
+        Assert.Equal(["xlr1"], Ids(Command(sent).GetProperty("keys")));
 
-        // Aux In and the application channels are no microphones, so the key never stops on them.
-        (App later, List<string> again) = Ready(Edit(root => Ducking(root)["key"] = "cap1"));
-        Assert.Contains("Guest mic", Select(later, "Key"), StringComparison.Ordinal);
-        later.Handle(new KeyPress(Key.Right));
-        Assert.Equal("xlr1", Command(again).GetProperty("key").GetString());
+        // With several keys every one is ticked, any of them can go, and none is offered as a channel.
+        app.Link.Receive(Edit(root => SetKeys(root, "xlr1", "voicechat")));
+        app.Handle(new KeyPress(Key.Home));
+        Assert.Contains("✓ XLR 1", Select(app, "Keys"), StringComparison.Ordinal);
+        // The strip scrolls to keep the cursor in view: Voice Chat is the eighth.
+        for (int i = 0; i < 7; i++) app.Handle(new KeyPress(Key.Right));
+        Assert.Contains("✓ Voice Chat", Select(app, "Keys"), StringComparison.Ordinal);
+        app.Handle(new KeyPress(Key.Home));
+        app.Handle(Space);
+        Assert.Equal(["voicechat"], Ids(Command(sent).GetProperty("keys")));
+        string channels = Select(app, "Channels");
+        Assert.DoesNotContain("XLR 1", channels, StringComparison.Ordinal);
+        Assert.DoesNotContain("Voice Chat", channels, StringComparison.Ordinal);
+        Assert.Contains("Music", channels, StringComparison.Ordinal);
+    }
 
-        // A dock has no XLR 2, so the key goes from XLR 1 straight to the capture microphone.
-        (App dock, List<string> docked) = Ready(DockJson());
-        Select(dock, "Key");
-        dock.Handle(new KeyPress(Key.Right));
-        Assert.Equal("cap1", Command(docked).GetProperty("key").GetString());
+    [Fact]
+    public void AStereoCaptureInputIsNoKeyAndAMissingKeyStaysShown()
+    {
+        (App app, List<string> sent) = Ready(Edit(root =>
+        {
+            root["mixer"]!["channels"]!.AsArray().Add(JsonNode.Parse("""
+                { "id": "cap2", "name": "Console", "microphone": false, "captureSource": "alsa_input.usb-Console",
+                  "levels": {}, "mutedIn": [], "volume": 1 }
+                """));
+            SetKeys(root, "xlr1", "gone");
+        }));
+        Select(app, "Keys");
+        app.Handle(new KeyPress(Key.End));
+        string strip = Select(app, "Keys");
+        // The capture microphone keys ducking; the stereo capture input does not.
+        Assert.Contains("Guest mic", strip, StringComparison.Ordinal);
+        Assert.DoesNotContain("Console", strip, StringComparison.Ordinal);
+        // A saved key the layout no longer has stays shown at the end, ticked, and can be taken out.
+        Assert.Contains("✓ gone (missing)", strip, StringComparison.Ordinal);
+        Assert.Equal(11, app.Link.State!.Mixer.Channels.Count(InputsView.CanKey) + 1);
+        app.Handle(Space);
+        Assert.Equal(["xlr1"], Ids(Command(sent).GetProperty("keys")));
+        // The stereo capture input is still a channel to lower, the strip's last.
+        Select(app, "Channels");
+        app.Handle(new KeyPress(Key.End));
+        Assert.Contains("Console", Select(app, "Channels"), StringComparison.Ordinal);
+    }
 
-        // A saved key the layout no longer has stays shown, and choosing it again sends nothing.
-        (App lost, List<string> none) = Ready(Edit(root => Ducking(root)["key"] = "gone"));
-        Assert.Contains("gone (missing)", Select(lost, "Key"), StringComparison.Ordinal);
-        lost.Handle(new KeyPress(Key.Right));
-        Assert.Equal("xlr1", Command(none).GetProperty("key").GetString());
+    [Fact]
+    public void ADaemonThatSendsOnlyKeyHasThatOneKeyAndANinthKeyIsNotAdded()
+    {
+        (App app, List<string> sent) = Ready(Edit(root =>
+        {
+            Ducking(root).AsObject().Remove("keys");
+            Ducking(root)["key"] = "cap1";
+        }));
+        Assert.Equal(["cap1"], app.Link.State!.Ducking!.KeyList);
+        Select(app, "Keys");
+        app.Handle(new KeyPress(Key.End));
+        Assert.Contains("✓ Guest mic", Select(app, "Keys"), StringComparison.Ordinal);
+        app.Handle(new KeyPress(Key.Home));
+        app.Handle(Space);
+        Assert.Equal(["cap1", "xlr1"], Ids(Command(sent).GetProperty("keys")));
+        // The key is no channel to lower: the strip's last channel is SFX.
+        Select(app, "Channels");
+        app.Handle(new KeyPress(Key.End));
+        string channels = Select(app, "Channels");
+        Assert.Contains("SFX", channels, StringComparison.Ordinal);
+        Assert.DoesNotContain("Guest mic", channels, StringComparison.Ordinal);
+
+        // Eight keys are the most: a ninth sends nothing, and one can still be taken out.
+        (App full, List<string> quiet) = Ready(Edit(root =>
+            SetKeys(root, "xlr1", "xlr2", "aux", "game", "music", "browser", "system", "voicechat")));
+        Select(full, "Keys");
+        for (int i = 0; i < 8; i++) full.Handle(new KeyPress(Key.Right));
+        full.Handle(Space);
+        Assert.Empty(quiet);
+        full.Handle(new KeyPress(Key.Home));
+        full.Handle(Space);
+        Assert.Equal(["xlr2", "aux", "game", "music", "browser", "system", "voicechat"], Ids(Command(quiet).GetProperty("keys")));
     }
 
     [Fact]
@@ -270,7 +356,7 @@ public sealed class TuiDuckingTests
         app.Link.Receive(Edit(root => Ducking(root)["mixes"] = new JsonArray("monitor", "stream")));
         Assert.Contains("✓ Stream", Select(app, "Mixes"), StringComparison.Ordinal);
         // The key changed to Guest mic: XLR 1 is offered and the guest is not.
-        app.Link.Receive(Edit(root => Ducking(root)["key"] = "cap1"));
+        app.Link.Receive(Edit(root => SetKeys(root, "cap1")));
         channels = Select(app, "Channels");
         Assert.Contains("XLR 1", channels, StringComparison.Ordinal);
         Assert.DoesNotContain("Guest mic", channels, StringComparison.Ordinal);
@@ -302,7 +388,7 @@ public sealed class TuiDuckingTests
     {
         (App app, List<string> sent) = Ready(ProJson);
         Assert.Contains("this unit", Select(app, "Runs on"), StringComparison.Ordinal);
-        Assert.Contains("XLR 1 before inserts", Select(app, "Key heard"), StringComparison.Ordinal);
+        Assert.Contains("on the unit, before inserts", Select(app, "Keys heard"), StringComparison.Ordinal);
         Assert.False(Shows(app, "Not on unit"));
         Select(app, "Runs on");
         app.Handle(new KeyPress(Key.Char, ' '));
@@ -315,7 +401,7 @@ public sealed class TuiDuckingTests
             Ducking(root)["backend"] = "software";
         }));
         Assert.Contains("this computer", Select(software, "Runs on"), StringComparison.Ordinal);
-        Assert.Contains("after the EQ and inserts", Select(software, "Key heard"), StringComparison.Ordinal);
+        Assert.Contains("after the EQ and inserts", Select(software, "Keys heard"), StringComparison.Ordinal);
         Assert.False(Shows(software, "Not on unit"));
         Select(software, "Runs on");
         software.Handle(new KeyPress(Key.Left));
@@ -325,11 +411,11 @@ public sealed class TuiDuckingTests
         foreach ((string reason, string why) in new[]
         {
             ("mixerOff", "the software mixer is off"),
-            ("keyNotSupported", "the unit ducks only with XLR 1"),
+            ("keyNotSupported", "a key the unit cannot hear"),
             ("mixElsewhere", "a ducked mix plays elsewhere too"),
             ("sharedOutput", "the jacks play a mix not ducked"),
             ("partialMix", "a channel in the mix is not ducked"),
-            ("keyInMix", "the key is heard in a ducked mix"),
+            ("keyInMix", "a key is heard in a ducked mix"),
             ("failed", "the unit did not keep the ducking"),
             ("unsupportedBlock", "the unit did not answer a read"),
             ("somethingNew", "The daemon's own sentence."),
@@ -344,7 +430,7 @@ public sealed class TuiDuckingTests
             }));
             Assert.Contains(why, Select(unfit, "Not on unit"), StringComparison.Ordinal);
             Assert.Contains("this unit", Select(unfit, "Runs on"), StringComparison.Ordinal);
-            Assert.Contains("after the EQ and inserts", Select(unfit, "Key heard"), StringComparison.Ordinal);
+            Assert.Contains("after the EQ and inserts", Select(unfit, "Keys heard"), StringComparison.Ordinal);
         }
     }
 
@@ -354,7 +440,7 @@ public sealed class TuiDuckingTests
         (App app, List<string> sent) = Ready(DockJson());
         Assert.True(Shows(app, "Ducking"));
         Assert.False(Shows(app, "Runs on"));
-        Assert.False(Shows(app, "Key heard"));
+        Assert.False(Shows(app, "Keys heard"));
         Assert.False(Shows(app, "Not on unit"));
         // XLR 2 is not on this unit, so it is no channel to lower either.
         Assert.DoesNotContain("XLR 2", Select(app, "Channels"), StringComparison.Ordinal);
@@ -421,10 +507,11 @@ public sealed class TuiDuckingTests
         Assert.False(Shows(app, "Channels"));
         Assert.False(Shows(app, "Mixes"));
         Assert.False(Shows(app, "Runs on"));
-        Select(app, "Key");
+        Select(app, "Keys");
         app.Handle(new KeyPress(Key.Right));
+        app.Handle(Space);
         JsonElement value = Command(sent);
-        Assert.Equal("xlr2", value.GetProperty("key").GetString());
+        Assert.Equal(["xlr1", "xlr2"], Ids(value.GetProperty("keys")));
         Assert.Single(value.EnumerateObject());
         Select(app, "Amount");
         app.Handle(new KeyPress(Key.Right));
@@ -477,11 +564,11 @@ public sealed class TuiDuckingTests
             Ducking(root)["device"]!["reason"] = "partialMix";
         }), width, height);
         Assert.Contains("in software", Select(app, "Ducking", width, height), StringComparison.Ordinal);
-        Assert.Contains("XLR 1", Select(app, "Key", width, height), StringComparison.Ordinal);
+        Assert.Contains("✓ XLR 1", Select(app, "Keys", width, height), StringComparison.Ordinal);
         Assert.Contains("medium, -12 dBFS  >", Select(app, "Sensitivity", width, height), StringComparison.Ordinal);
         Assert.Contains("medium, 12 dB", Select(app, "Amount", width, height), StringComparison.Ordinal);
         Assert.Contains("this unit", Select(app, "Runs on", width, height), StringComparison.Ordinal);
-        Assert.Contains("after the EQ and inserts", Select(app, "Key heard", width, height), StringComparison.Ordinal);
+        Assert.Contains("after the EQ and inserts", Select(app, "Keys heard", width, height), StringComparison.Ordinal);
         Assert.Contains("a channel in the mix is not ducked", Select(app, "Not on unit", width, height), StringComparison.Ordinal);
         Assert.Contains("dB", Select(app, "Lowered by", width, height), StringComparison.Ordinal);
         sent.Clear();

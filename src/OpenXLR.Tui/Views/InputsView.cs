@@ -26,6 +26,14 @@ internal sealed class InputsView : View
     private string _applyingStrip = string.Empty;
     private string _applyingLabel = string.Empty;
     // The ducking strips' cursors, by id, so a key survives a list that changed under it.
+    private string? _duckKey;
+
+    /// <summary>
+    /// The ducking state a key press was built from and the state as it
+    /// reads once the daemon takes that press, until a newer state arrives,
+    /// so a second press before the daemon's answer builds on the first.
+    /// </summary>
+    private (DuckingEntry From, DuckingEntry Sent)? _sentDucking;
     private string? _duckChannel;
     private string? _duckMix;
     private string? _driveAfter;
@@ -574,7 +582,7 @@ internal sealed class InputsView : View
     private static double Decibels(double percent) => -60.0 + Math.Clamp(percent, 0, 100) * 0.6;
 
     /// <summary>
-    /// Ducking, on any device: the switch, the key microphone, a strip of
+    /// Ducking, on any device: the switch, a strip of keys, a strip of
     /// channels to lower and one of mixes to lower them in, the three
     /// presets, and while the unit can run it, the choice between the unit
     /// and this computer with the reason it does not. While software runs it,
@@ -594,35 +602,31 @@ internal sealed class InputsView : View
         rows.Add(new ToggleRow("Ducking", ducking.Enabled, value => Duck(link, "enabled", value))
         { Note = ducking.Note });
 
-        // The key: a microphone strip shown on this device, and the saved key
-        // even when it is not, so cycling starts from where the daemon is.
-        List<ChannelEntry> microphones = [.. state.Mixer.Channels.Where(channel =>
-            channel.Mono && (channel.Present || channel.Id == ducking.Key))];
-        int keyAt = microphones.FindIndex(channel => channel.Id == ducking.Key);
-        List<string> keyNames = [.. microphones.Select(channel => channel.Name)];
-        if (keyAt < 0)
-        {
-            keyNames.Add($"{ducking.Key} (missing)");
-            keyAt = keyNames.Count - 1;
-        }
-        rows.Add(new ChoiceRow("Key", keyNames, keyAt, index =>
-        {
-            if (index >= microphones.Count) return;
-            string key = microphones[index].Id;
-            // The key is never ducked, so a channel that becomes the key leaves the list in the same command.
-            link.Send("setDucking", body =>
+        // The keys: every channel that can key ducking and is shown on this
+        // device, then each saved key the layout lacks, so the daemon's whole
+        // list is in view. Space adds a channel at the end or takes it out.
+        List<string> keys = ducking.KeyList;
+        List<ChannelEntry> keyable = [.. state.Mixer.Channels.Where(channel =>
+            CanKey(channel) && (channel.Present || keys.Contains(channel.Id)))];
+        List<(string Id, string Name)> keyChoices = [.. keyable.Select(channel => (channel.Id, channel.Name)),
+            .. keys.Where(key => keyable.All(channel => channel.Id != key)).Select(key => (key, $"{key} (missing)"))];
+        int keyAt = Math.Max(0, keyChoices.FindIndex(choice => choice.Id == _duckKey));
+        rows.Add(new ToggleStripRow("Keys", [.. keyChoices.Select(choice => (choice.Name, keys.Contains(choice.Id)))], keyAt,
+            index => _duckKey = keyChoices[index].Id,
+            index =>
             {
-                JsonObject value = new() { ["key"] = key };
-                if (ducking.Channels is { } channels && channels.Contains(key))
-                    value["channels"] = Ids(channels.Where(id => id != key));
-                body["value"] = value;
-            });
-        }));
+                string key = keyChoices[index].Id;
+                _duckKey = key;
+                DuckingEntry current = _sentDucking is { } sent && ReferenceEquals(sent.From, ducking) ? sent.Sent : ducking;
+                if (FlipKey(current, key) is not { } value) return;
+                _sentDucking = (ducking, Sent(current, value));
+                link.Send("setDucking", body => body["value"] = value);
+            }));
 
         // A daemon from before channels and mixes keeps them to itself.
         if (ducking.Channels is { } ducked)
         {
-            List<ChannelEntry> candidates = [.. state.Mixer.Shown.Where(channel => channel.Id != ducking.Key)];
+            List<ChannelEntry> candidates = [.. state.Mixer.Shown.Where(channel => !keys.Contains(channel.Id))];
             int at = Math.Max(0, candidates.FindIndex(channel => channel.Id == _duckChannel));
             rows.Add(new ToggleStripRow("Channels", [.. candidates.Select(channel => (channel.Name, ducked.Contains(channel.Id)))], at,
                 index => _duckChannel = candidates[index].Id,
@@ -658,7 +662,7 @@ internal sealed class InputsView : View
         {
             rows.Add(new ChoiceRow("Runs on", ["this unit", "this computer"], ducking.Processing == "software" ? 1 : 0,
                 index => link.Send("setDuckingProcessing", body => body["value"] = index == 1 ? "software" : "device")));
-            rows.Add(new TextRow("Key heard", ducking.KeyHeard));
+            rows.Add(new TextRow("Keys heard", ducking.KeyHeard));
             if (ducking.Why is { Length: > 0 } why) rows.Add(new TextRow("Not on unit", why));
         }
         // The daemon's sentence names the fix, so it is wrapped rather than cut at the card's edge.
@@ -688,6 +692,48 @@ internal sealed class InputsView : View
         }
         if (line.Length > 0) lines.Add(line);
         return lines;
+    }
+
+    /// <summary>The most keys the daemon takes.</summary>
+    internal const int MaxDuckingKeys = 8;
+
+    /// <summary>
+    /// A channel that can key ducking: a microphone, one of the unit's own
+    /// inputs, or an application channel. A stereo capture input cannot.
+    /// </summary>
+    internal static bool CanKey(ChannelEntry channel) => channel.Mono || channel.Hardware || channel.CaptureSource is null;
+
+    /// <summary>
+    /// The <c>setDucking</c> value that adds a key at the end of the list or
+    /// takes it out, or null when nothing may be sent: the last key stays, and
+    /// a ninth is not added. A channel that becomes a key is never ducked, so
+    /// it leaves the channels in the same command.
+    /// </summary>
+    internal static JsonObject? FlipKey(DuckingEntry ducking, string key)
+    {
+        List<string> keys = ducking.KeyList;
+        if (keys.Contains(key))
+            return keys.Count == 1 ? null : new JsonObject { ["keys"] = Ids(keys.Where(id => id != key)) };
+        if (keys.Count >= MaxDuckingKeys) return null;
+        JsonObject value = new() { ["keys"] = Ids(keys.Append(key)) };
+        if (ducking.Channels is { } channels && channels.Contains(key))
+            value["channels"] = Ids(channels.Where(id => id != key));
+        return value;
+    }
+
+    /// <summary>
+    /// Ducking as it reads once the daemon takes the <c>setDucking</c>
+    /// <paramref name="value"/> that <see cref="FlipKey"/> built.
+    /// </summary>
+    internal static DuckingEntry Sent(DuckingEntry ducking, JsonObject value)
+    {
+        List<string>? keys = value["keys"] is JsonArray k ? [.. k.Select(id => (string)id!)] : ducking.Keys;
+        return ducking with
+        {
+            Keys = keys,
+            Key = keys is { Count: > 0 } ? keys[0] : ducking.Key,
+            Channels = value["channels"] is JsonArray c ? [.. c.Select(id => (string)id!)] : ducking.Channels,
+        };
     }
 
     /// <summary>The list with the id added at its end, or taken out.</summary>

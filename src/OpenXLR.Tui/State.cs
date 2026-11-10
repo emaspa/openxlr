@@ -281,8 +281,8 @@ internal sealed record WaveInterfaceEntry
 }
 
 /// <summary>
-/// Ducking as the daemon reports it: the switch, the key microphone, the
-/// channels it lowers and the mixes it lowers them in, the three settings
+/// Ducking as the daemon reports it: the switch, the keys whose level ducks
+/// (<see cref="KeyList"/>), the channels it lowers and the mixes it lowers them in, the three settings
 /// (each a preset word or a custom number, the speed's an object of attack
 /// and release),
 /// where it should run (<see cref="Processing"/>), what runs it now
@@ -294,6 +294,9 @@ internal sealed record DuckingEntry
 {
     public bool Enabled { get; init; }
     public string Key { get; init; } = "xlr1";
+
+    /// <summary>The keys in the order chosen; null from a daemon with one key, which sends only <see cref="Key"/>.</summary>
+    public List<string>? Keys { get; init; }
     public List<string>? Channels { get; init; }
     public List<string>? Mixes { get; init; }
     public JsonElement Sensitivity { get; init; }
@@ -329,6 +332,10 @@ internal sealed record DuckingEntry
         return at >= 0 ? (at, null) : (-1, $"{attack}/{release} ms");
     }
 
+    /// <summary>The keys, or the one key of a daemon from before several keys.</summary>
+    [JsonIgnore]
+    public List<string> KeyList => Keys is { Count: > 0 } keys ? keys : [Key];
+
     /// <summary>A short word for the switch row: where it runs, or what is wrong; null while off.</summary>
     [JsonIgnore]
     public string? Note => !Enabled ? null
@@ -348,12 +355,13 @@ internal sealed record DuckingEntry
         || Backend is null && Processing == "device" && Device is { Ready: true };
 
     /// <summary>
-    /// Where the key is heard, in a few words: the unit listens to its own
-    /// input before anything on this computer, so an insert on XLR 1 does not
-    /// change what ducks; software listens after the microphone's EQ and inserts.
+    /// Where the keys are heard, in a few words: the unit listens to its own
+    /// inputs and USB pairs before anything on this computer, so an insert on
+    /// a microphone does not change what ducks; software listens after the
+    /// microphone's EQ and inserts.
     /// </summary>
     [JsonIgnore]
-    public string KeyHeard => OnUnit ? "XLR 1 before inserts" : "after the EQ and inserts";
+    public string KeyHeard => OnUnit ? "on the unit, before inserts" : "after the EQ and inserts";
 
     /// <summary>
     /// Why the unit does not run it, while the unit is the choice and cannot;
@@ -365,12 +373,12 @@ internal sealed record DuckingEntry
         : device.Reason switch
         {
             "mixerOff" => "the software mixer is off",
-            "keyNotSupported" => "the unit ducks only with XLR 1",
+            "keyNotSupported" => "a key the unit cannot hear",
             "monitorReturn" => "the jacks' feed is not in the unit's mix",
             "mixElsewhere" => "a ducked mix plays elsewhere too",
             "sharedOutput" => "the jacks play a mix not ducked",
             "partialMix" => "a channel in the mix is not ducked",
-            "keyInMix" => "the key is heard in a ducked mix",
+            "keyInMix" => "a key is heard in a ducked mix",
             "failed" => "the unit did not keep the ducking",
             "unsupportedBlock" => "the unit did not answer a read",
             _ => device.Note ?? device.Reason,
