@@ -4,7 +4,7 @@ using OpenXLR.UI.Localization;
 
 namespace OpenXLR.UI;
 
-/// <summary>Volume flyout of a row with a playback level; a website row can remember its level.</summary>
+/// <summary>Volume flyout shared by the application and browser tab lists.</summary>
 public sealed class PlaybackVolumeViewModel(Func<double?, bool, Task<string?>> send, bool website = false) : ViewModelBase
 {
     private readonly record struct Choice(double? Level, bool Remember);
@@ -13,7 +13,7 @@ public sealed class PlaybackVolumeViewModel(Func<double?, bool, Task<string?>> s
     private Choice _reported = new(null, false);
     private Choice? _pending;
     private long _version;
-    private bool _supported, _enabled;
+    private bool _supported, _enabled, _browserHeld;
     private string? _error;
 
     public bool Supported => _supported;
@@ -22,7 +22,8 @@ public sealed class PlaybackVolumeViewModel(Func<double?, bool, Task<string?>> s
     public bool HasLevel => (_pending ?? _reported).Level is not null;
     public string Label => (_pending ?? _reported).Level is double level
         ? $"{level * 100:0}%" : Localizer.Text("PlaybackVolumeShort");
-    public string? Hint => website ? Localizer.Text("TabPlaybackVolumeHint") : null;
+    public string Hint => website ? Localizer.Text("TabPlaybackVolumeHint")
+        : _browserHeld ? Localizer.Text("BrowserPlaybackVolumeHint") : Localizer.Text("AppPlaybackVolumeHint");
     public string? Error { get => _error; private set => Set(ref _error, value); }
 
     public double Level
@@ -49,10 +50,11 @@ public sealed class PlaybackVolumeViewModel(Func<double?, bool, Task<string?>> s
         if (Enabled && HasLevel) Edit(new(null, Remember));
     }
 
-    internal void Apply(bool supported, bool enabled, double? level, bool remember = false)
+    internal void Apply(bool supported, bool enabled, double? level, bool remember = false, bool browserHeld = false)
     {
         Set(ref _supported, supported, nameof(Supported));
         Set(ref _enabled, supported && enabled, nameof(Enabled));
+        Set(ref _browserHeld, browserHeld, nameof(Hint));
         if (!Enabled && _pending is not null) Cancel();
         var state = new Choice(level, remember);
         if (_reported == state) return;

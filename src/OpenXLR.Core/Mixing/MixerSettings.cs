@@ -96,6 +96,9 @@ public sealed record MixerSettings
     /// <summary>Application identity to channel id, from manual assignments.</summary>
     public Dictionary<string, string> AppOverrides { get; init; } = [];
 
+    /// <summary>Remembered playback volume by application identity, independent of its route.</summary>
+    public Dictionary<string, double> AppVolumes { get; init; } = [];
+
     /// <summary>Automatically classify applications without a saved assignment. Machine state, never profile state.</summary>
     public bool RouteAppsByDefault { get; init; } = true;
 

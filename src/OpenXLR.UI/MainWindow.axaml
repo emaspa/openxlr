@@ -24,14 +24,14 @@
          columns template lays tiles of one width out in columns of a skin's
          length (Layout/TileColumnsPanel, made in code since the length
          comes from the skin). All bind the same application objects, show the
-         application's icon before its name, and the picker is the only control. -->
+         application's icon before its name, and keep the playback volume beside the picker. -->
     <ItemsPanelTemplate x:Key="ApplicationChipsPanel">
       <layout:TileColumnsPanel PerColumn="1" MaxTileWidth="{DynamicResource Ox.AppColumns.TileMaxWidth}"/>
     </ItemsPanelTemplate>
     <ItemsPanelTemplate x:Key="ApplicationListPanel"><StackPanel Spacing="4"/></ItemsPanelTemplate>
     <DataTemplate x:Key="ApplicationChip" x:DataType="vm:AppStreamViewModel">
       <Border Classes="tile" Name="ApplicationChip" Padding="8,6" Margin="0,0,4,8">
-        <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8">
+        <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" ColumnSpacing="8">
           <skin:StatusLed IsOn="{Binding Active}" VerticalAlignment="Center"
                           AutomationProperties.Name="{loc:Text Key=StreamState}"
                           ToolTip.Tip="{Binding StatusText}"/>
@@ -41,6 +41,7 @@
           <ComboBox Grid.Column="3" Name="ApplicationChannel" ItemsSource="{Binding Channels}" MinWidth="110" MaxWidth="240"
                     SelectedItem="{Binding SelectedChannel, Mode=TwoWay}" ToolTip.Tip="{Binding BrowserHeldNote}"
                     AutomationProperties.Name="{Binding Label, StringFormat={loc:Text Key=ApplicationChannelName}}"/>
+          <views:PlaybackVolumeButton Grid.Column="4" DataContext="{Binding PlaybackVolume}"/>
         </Grid>
       </Border>
     </DataTemplate>
@@ -59,6 +60,7 @@
             <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="*"/>
             <ColumnDefinition Width="Auto" SharedSizeGroup="ApplicationChannel"/>
+            <ColumnDefinition Width="Auto"/>
           </Grid.ColumnDefinitions>
           <skin:StatusLed IsOn="{Binding Active}" VerticalAlignment="Center"
                           AutomationProperties.Name="{loc:Text Key=StreamState}"
@@ -89,12 +91,13 @@
               </DataTemplate>
             </ComboBox.SelectionBoxItemTemplate>
           </ComboBox>
+          <views:PlaybackVolumeButton Grid.Column="4" DataContext="{Binding PlaybackVolume}"/>
         </Grid>
       </Border>
     </DataTemplate>
     <DataTemplate x:Key="ApplicationLine" x:DataType="vm:AppStreamViewModel">
       <Border Classes="tile" Name="ApplicationLine" Padding="8,4">
-        <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8">
+        <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" ColumnSpacing="8">
           <skin:StatusLed IsOn="{Binding Active}" VerticalAlignment="Center"
                           AutomationProperties.Name="{loc:Text Key=StreamState}"
                           ToolTip.Tip="{Binding StatusText}"/>
@@ -110,6 +113,7 @@
               </DataTemplate>
             </ComboBox.ItemTemplate>
           </ComboBox>
+          <views:PlaybackVolumeButton Grid.Column="4" DataContext="{Binding PlaybackVolume}"/>
         </Grid>
       </Border>
     </DataTemplate>

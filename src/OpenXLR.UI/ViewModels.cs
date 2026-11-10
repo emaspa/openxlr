@@ -1488,6 +1488,7 @@ public sealed partial class MainViewModel : ViewModelBase
     {
         if (mixer?["streams"] is not JsonArray arr)
         {
+            foreach (AppStreamViewModel app in Apps) app.PlaybackVolume.Cancel();
             Apps.Clear();
             ActiveApps.Clear();
             Raise(nameof(HasApps));
@@ -1497,6 +1498,7 @@ public sealed partial class MainViewModel : ViewModelBase
         List<ChannelChoice> choices = [.. Channels.Where(c => c.IsApplication).Select(c => new ChannelChoice(c.Id, c.Name)),
             new ChannelChoice(AppStreamViewModel.Ignore, Localizer.Text("NotManaged"))];
         // Update in place so an open dropdown is not closed by a state push.
+        bool volumeSupported = mixer["appVolumeSupported"]?.GetValue<bool>() ?? false;
         var byIdentity = Apps.ToDictionary(a => a.Identity, StringComparer.OrdinalIgnoreCase);
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (JsonNode? stream in arr)
@@ -1528,9 +1530,15 @@ public sealed partial class MainViewModel : ViewModelBase
                 existing.Icon = icon;
             }
             existing.ApplyBrowserHold(browserHeld, output);
+            existing.PlaybackVolume.Apply(volumeSupported, true,
+                stream["volume"]?.GetValue<double>(), browserHeld: browserHeld);
         }
         for (int i = Apps.Count - 1; i >= 0; i--)
-            if (!seen.Contains(Apps[i].Identity)) Apps.RemoveAt(i);
+            if (!seen.Contains(Apps[i].Identity))
+            {
+                Apps[i].PlaybackVolume.Cancel();
+                Apps.RemoveAt(i);
+            }
 
         // Maintain the running-apps view without disturbing open dropdowns.
         var listed = new HashSet<AppStreamViewModel>(ActiveApps);
@@ -1717,10 +1725,12 @@ public sealed class AppStreamViewModel : ViewModelBase
     public AppStreamViewModel(DaemonClient client, string identity, string label, IReadOnlyList<ChannelChoice> channels)
     {
         _client = client; Identity = identity; _label = label;
+        PlaybackVolume = new((level, _) => client.SetAppVolumeAsync(identity, level));
         foreach (ChannelChoice c in channels) Channels.Add(c);
     }
 
     public string Identity { get; }
+    public PlaybackVolumeViewModel PlaybackVolume { get; }
 
     private string _label;
     public string Label { get => _label; private set => Set(ref _label, value); }

@@ -56,6 +56,27 @@ public sealed class SavedMixerValidationTests
     }
 
     [Fact]
+    public void ApplicationVolumePreferencesKeepOnlyValidApplicationsAndLevels()
+    {
+        InConfig(root =>
+        {
+            string path = Path.Combine(root, "mixer.json");
+            File.WriteAllText(path, """
+                {"appVolumes":{"Discord":0.45,"chrome":0,"wine":0.6,"invalid":1e999}}
+                """);
+            MixerSettings loaded = Assert.IsType<MixerSettings>(MixerSettings.Load(path, out string? warning));
+            Assert.Contains("appVolumes", warning);
+            Assert.Equal(0.45, loaded.AppVolumes["discord"]);
+            Assert.Equal(0, loaded.AppVolumes["chrome"]);
+            Assert.Equal(2, loaded.AppVolumes.Count);
+            Assert.Null(loaded.Save(path));
+            MixerSettings reopened = Assert.IsType<MixerSettings>(MixerSettings.Load(path, out warning));
+            Assert.Null(warning);
+            Assert.Equal(0.45, reopened.AppVolumes["discord"]);
+        });
+    }
+
+    [Fact]
     public void SiteVolumePreferencesKeepOnlyValidOriginsAndLevels()
     {
         InConfig(root =>

@@ -48,6 +48,12 @@ public sealed class BrowserTabRoutingTests
     }
 
     [Theory]
+    [InlineData("""{"cmd":"setAppVolume","identity":"discord","value":0}""", true)]
+    [InlineData("""{"cmd":"setAppVolume","identity":"discord","value":null}""", true)]
+    [InlineData("""{"cmd":"setAppVolume","identity":"discord"}""", false)]
+    [InlineData("""{"cmd":"setAppVolume","identity":"wine","value":0.5}""", false)]
+    [InlineData("""{"cmd":"setAppVolume","identity":"discord","value":1e999}""", false)]
+    [InlineData("""{"cmd":"setAppVolume","identity":"discord","value":1.01}""", false)]
     [InlineData("""{"cmd":"setBrowserTabVolume","session":"e3b0c44298fc4c14b9afbf4c8996fb92","tabId":1,"site":"https://example.com","remember":true,"value":0.4}""", true)]
     [InlineData("""{"cmd":"setBrowserTabVolume","session":"e3b0c44298fc4c14b9afbf4c8996fb92","tabId":1,"site":"https://example.com","remember":false,"value":0}""", true)]
     [InlineData("""{"cmd":"setBrowserTabVolume","session":"e3b0c44298fc4c14b9afbf4c8996fb92","tabId":1,"site":"https://example.com","remember":true,"value":null}""", true)]

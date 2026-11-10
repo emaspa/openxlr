@@ -15,6 +15,21 @@ public sealed class AppRoutingViewModelTests
     }
 
     [Fact]
+    public async Task HeldBrowserKeepsItsPlaybackVolumeControl()
+    {
+        await using var client = new DaemonClient();
+        var model = new MainViewModel(client);
+        Invoke(model, "ApplyStreams", JsonNode.Parse("""
+            {"appVolumeSupported":true,"streams":[{"identity":"chrome","label":"Chrome",
+             "channelId":"browser","active":true,"browserHeld":true,"volume":0.5}]}
+            """));
+        var app = Assert.Single(model.Apps);
+        Assert.NotNull(app.BrowserHeldNote);
+        Assert.True(app.PlaybackVolume.Enabled);
+        Assert.Equal(.5, app.PlaybackVolume.Level);
+    }
+
+    [Fact]
     public async Task OldDaemonsAndDisconnectedClientsCannotSendThePreference()
     {
         await using var client = new DaemonClient();

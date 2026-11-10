@@ -61,7 +61,7 @@
             <ItemsControl ItemsSource="{Binding Apps}" Margin="0,0,16,0">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:AppStreamViewModel">
-                  <Grid Name="ApplicationRow" ColumnDefinitions="10,8,Auto,8,*,130,8,Auto" Margin="0,3">
+                  <Grid Name="ApplicationRow" ColumnDefinitions="10,8,Auto,8,*,130,8,Auto,8,Auto" Margin="0,3">
                     <skin:StatusLed IsOn="{Binding Active}"
                                     AutomationProperties.Name="{loc:Text Key=StreamState}"
                                     ToolTip.Tip="{Binding StatusText}"/>
@@ -73,7 +73,8 @@
                               ItemsSource="{Binding Channels}"
                               SelectedItem="{Binding SelectedChannel, Mode=TwoWay}"
                               ToolTip.Tip="{Binding BrowserHeldNote}"/>
-                    <Button Grid.Column="7" Content="{loc:Text Key=Forget}" Padding="10,3" FontSize="{DynamicResource UiText.FontSize12}"
+                    <views:PlaybackVolumeButton Grid.Column="7" DataContext="{Binding PlaybackVolume}"/>
+                    <Button Grid.Column="9" Content="{loc:Text Key=Forget}" Padding="10,3" FontSize="{DynamicResource UiText.FontSize12}"
                             Click="OnForget"/>
                   </Grid>
                 </DataTemplate>

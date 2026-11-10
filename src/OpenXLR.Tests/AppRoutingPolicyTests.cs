@@ -127,6 +127,69 @@ public sealed class AppRoutingPolicyTests
     }
 
     [Fact]
+    public void PlaybackVolumeAppliesWhileAnApplicationRouteIsWaitingForAMove()
+    {
+        using var graph = new BrowserGraph();
+        graph.Build();
+        graph.Mixer.SyncStreams();
+        graph.Mixer.SetAppVolume("chromium", .35, _ => null);
+        graph.RefuseMoves();
+        graph.Mixer.SetRouteAppsByDefault(false);
+        graph.ClearCalls();
+
+        graph.Mixer.SyncStreams();
+        Assert.Contains("move-sink-input 100 desktop", graph.Calls);
+        Assert.Contains("set-sink-input-volume 100 35%", graph.Calls);
+        graph.ClearCalls();
+        graph.Mixer.SyncStreams();
+        Assert.DoesNotContain("set-sink-input-volume 100 35%", graph.Calls);
+    }
+
+    [Fact]
+    public void PlaybackVolumeKeepsSpacedAndCompactAppIdentitiesSeparate()
+    {
+        const string spaced = "Music Player";
+        const string compact = "musicplayer";
+        using var graph = new BrowserGraph("\"application.name\":\"Music Player\"");
+        graph.Build();
+        graph.Mixer.SyncStreams();
+        graph.Mixer.SetAppVolume(spaced, .35, _ => null);
+        graph.Mixer.SyncStreams();
+        Assert.Contains("set-sink-input-volume 100 35%", graph.Calls);
+
+        graph.SetStream("\"application.process.binary\":\"musicplayer\"", serial: 101);
+        graph.ClearCalls();
+        graph.Mixer.SyncStreams();
+        Assert.DoesNotContain("set-sink-input-volume 101 35%", graph.Calls);
+
+        string path = Path.Combine(graph.Folder, "mixer.json");
+        graph.Mixer.SetAppVolume(compact, .68, settings => settings.Save(path));
+        graph.Mixer.SyncStreams();
+        Assert.Contains("set-sink-input-volume 101 68%", graph.Calls);
+
+        var saved = Assert.IsType<MixerSettings>(MixerSettings.Load(path, out string? warning));
+        Assert.Null(warning);
+        graph.SetStream("\"application.name\":\"Music Player\"");
+        using var restored = new Mixer();
+        graph.Build(restored);
+        restored.ApplySettings(saved);
+        var apps = restored.Snapshot().Streams.ToDictionary(app => app.Identity, StringComparer.Ordinal);
+        Assert.Equal(.35, apps[spaced].Volume);
+        Assert.Equal(.68, apps[compact].Volume);
+        Assert.All(apps.Values, app => Assert.False(app.Active));
+        graph.ClearCalls();
+        restored.SyncStreams();
+        Assert.Contains("set-sink-input-volume 100 35%", graph.Calls);
+
+        restored.SetAppVolume(spaced, null, _ => null);
+        Assert.Equal(.68, Assert.Single(restored.ExportSettings().AppVolumes).Value);
+        restored.SetAppVolume(spaced, .35, _ => null);
+        restored.ForgetApp(spaced);
+        Assert.Equal(compact, Assert.Single(restored.ExportSettings().AppVolumes).Key);
+        Assert.Equal(compact, Assert.Single(restored.Snapshot().Streams).Identity);
+    }
+
+    [Fact]
     public void ADesktopOutputIsLeftAloneAndBrowserPreservationStillWins()
     {
         using var graph = new BrowserGraph();

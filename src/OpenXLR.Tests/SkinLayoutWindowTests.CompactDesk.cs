@@ -27,6 +27,7 @@ internal static partial class SkinLayoutWindowTests
             {
                 var app = new AppStreamViewModel(new DaemonClient("ws://127.0.0.1:1/ws"), name, name, choices);
                 app.ApplyFromDaemon(choices[index % choices.Length].Id, true, true);
+                app.PlaybackVolume.Apply(true, true, index % 2 == 0 ? .62 : null);
                 model.Apps.Add(app);
                 return app;
             })];

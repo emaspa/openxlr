@@ -1410,6 +1410,11 @@ public sealed partial class MixerService : IHostedService, IDisposable
         {
             switch (cmd.Cmd)
             {
+                case "setAppVolume":
+                    _saves.RunSaved(() => _mixer.SetAppVolume(cmd.Identity!,
+                        cmd.Value.ValueKind == System.Text.Json.JsonValueKind.Null ? null : cmd.Value.GetDouble(), s => s.Save()));
+                    Changed?.Invoke();
+                    return null;
                 case "setBrowserTabVolume":
                 {
                     bool remember = cmd.Remember.GetBoolean();
