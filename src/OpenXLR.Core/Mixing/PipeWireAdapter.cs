@@ -703,8 +703,16 @@ public sealed class PipeWireAdapter
 
     /// <summary>Set one sink-input's volume (used for the combine fader legs).</summary>
     public void SetSinkInputVolume(int index, double volume)
+        => SetSinkInputVolume(index, volume, ProcessRunner.DefaultTimeout);
+
+    // Application changes can touch several streams while holding the mixer
+    // lock. Retry an unresponsive Pulse server later instead of waiting 5 s.
+    internal void SetApplicationStreamVolume(int index, double volume)
+        => SetSinkInputVolume(index, volume, TimeSpan.FromMilliseconds(250));
+
+    private void SetSinkInputVolume(int index, double volume, TimeSpan timeout)
     {
-        Run("pactl", "set-sink-input-volume", index.ToString(), $"{SinkInputPercent(volume)}%");
+        Run("pactl", timeout, "set-sink-input-volume", index.ToString(), $"{SinkInputPercent(volume)}%");
         InvalidateDump();
     }
 
@@ -3306,10 +3314,12 @@ public sealed class PipeWireAdapter
         return r.Stdout;
     }
 
-    internal string Run(string exe, params string[] args)
+    internal string Run(string exe, params string[] args) => Run(exe, ProcessRunner.DefaultTimeout, args);
+
+    private string Run(string exe, TimeSpan timeout, params string[] args)
     {
         if (exe == "pw-link") Interlocked.Increment(ref _linkHelperStarts);
-        try { return RunCore(exe, args, _stopDeadline); }
+        try { return RunCore(exe, args, _stopDeadline, timeout); }
         finally { _progress?.Invoke(); }
     }
 
@@ -3319,16 +3329,16 @@ public sealed class PipeWireAdapter
     private static InvalidOperationException StoppedHelper(string exe, string[] args)
         => new($"{exe} {string.Join(' ', args)} not finished: the daemon's stop deadline passed");
 
-    private static string RunCore(string exe, string[] args, CancellationToken stopDeadline)
+    private static string RunCore(string exe, string[] args, CancellationToken stopDeadline, TimeSpan timeout)
     {
         // pactl's human-readable output is parsed ("Sink Input #", "Owner
         // Module:") and pactl is localised; a German desktop would break
         // every fader. The runner puts every helper in the C locale and
         // bounds its time and output.
-        ProcessResult r = ProcessRunner.Run(exe, args, cancel: stopDeadline);
+        ProcessResult r = ProcessRunner.Run(exe, args, timeout, cancel: stopDeadline);
         if (r.Cancelled) throw StoppedHelper(exe, args);
         if (r.TimedOut)
-            throw new InvalidOperationException($"{exe} {string.Join(' ', args)} timed out after {ProcessRunner.DefaultTimeout.TotalSeconds:0} seconds");
+            throw new InvalidOperationException($"{exe} {string.Join(' ', args)} timed out after {timeout.TotalSeconds:0.###} seconds");
         if (r.Truncated)
             throw new InvalidOperationException($"{exe} {string.Join(' ', args)} produced more than {ProcessRunner.DefaultStdoutCap} bytes");
         if (r.Incomplete)

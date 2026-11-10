@@ -29,6 +29,7 @@ internal static class SavedMixerValidation
     {
         var notes = new List<string>();
         dropped = notes;
+        Dictionary<string, double> appVolumes = AppVolumes(settings.AppVolumes, notes);
         return settings with
         {
             InputBindings = InputBindings(settings, notes),
@@ -49,7 +50,8 @@ internal static class SavedMixerValidation
             MonitorOutputLabels = Mapping(settings.MonitorOutputLabels, "monitorOutputLabels", notes),
             AppOverrides = Mapping(settings.AppOverrides, "appOverrides", notes),
             BrowserSiteChannels = BrowserSites(settings.BrowserSiteChannels, notes),
-            AppVolumes = AppVolumes(settings.AppVolumes, notes),
+            AppVolumes = appVolumes,
+            AppVolumeResets = [.. AppVolumeResets(settings.AppVolumeResets, appVolumes, notes).Keys],
             BrowserSiteVolumes = SiteVolumes(settings.BrowserSiteVolumes, notes),
             KnownApps = Apps(settings.KnownApps, notes),
             Inserts = Inserts(settings, notes),
@@ -265,6 +267,27 @@ internal static class SavedMixerValidation
             if (Mixer.ValidAppVolumeIdentity(key) && Mixer.ValidPlaybackVolume(volume) && kept.Count < Mixer.MaxAppOverrides)
                 kept.TryAdd(Mixer.AppVolumeKey(key), Math.Round(volume * 100) / 100);
             else if (notes is not null && !notes.Contains(field)) notes.Add(field);
+        }
+        return kept;
+    }
+
+    internal static OrderedDictionary<string, bool> AppVolumeResets(IEnumerable<string>? entries, IReadOnlyDictionary<string, double> volumes, List<string>? notes)
+    {
+        var kept = new OrderedDictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        const string field = "appVolumeResets";
+        if (entries is null) notes?.Add($"{field}: {NullEntry}");
+        foreach (string identity in entries ?? [])
+        {
+            if (Mixer.ValidAppVolumeIdentity(identity))
+            {
+                string key = Mixer.AppVolumeKey(identity);
+                if (!volumes.ContainsKey(key) && kept.Count < Mixer.MaxAppOverrides)
+                {
+                    kept.TryAdd(key, true);
+                    continue;
+                }
+            }
+            if (notes is not null && !notes.Contains(field)) notes.Add(field);
         }
         return kept;
     }

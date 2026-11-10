@@ -6,7 +6,7 @@ namespace OpenXLR.Daemon;
 /// Carries a dirty flag, not a snapshot: bursts retain at most one pending
 /// update and event producers never acquire the device or mixer locks.
 /// </summary>
-internal sealed class StateBroadcastQueue(Action broadcast, ILogger log)
+internal sealed class StateBroadcastQueue(Action broadcast, ILogger log, string subject = "State broadcast")
 {
     private readonly Channel<bool> _changes = Channel.CreateBounded<bool>(
         new BoundedChannelOptions(1)
@@ -33,7 +33,7 @@ internal sealed class StateBroadcastQueue(Action broadcast, ILogger log)
                     if (_lastError is not null)
                     {
                         _lastError = null;
-                        log.LogInformation("State broadcasts recovered");
+                        log.LogInformation("{Subject} recovered", subject);
                     }
                 }
                 catch (Exception ex)
@@ -44,9 +44,9 @@ internal sealed class StateBroadcastQueue(Action broadcast, ILogger log)
                     if (ex.Message != _lastError)
                     {
                         _lastError = ex.Message;
-                        log.LogWarning(ex, "State broadcast failed (repeats logged at debug level)");
+                        log.LogWarning(ex, "{Subject} failed (repeats logged at debug level)", subject);
                     }
-                    else log.LogDebug("State broadcast failed again: {msg}", ex.Message);
+                    else log.LogDebug("{Subject} failed again: {Message}", subject, ex.Message);
                 }
             }
         }

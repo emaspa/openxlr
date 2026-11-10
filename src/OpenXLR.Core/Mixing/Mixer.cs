@@ -1660,6 +1660,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 MonitorOutputLabels = new Dictionary<string, string>(_monitorOutputLabels, StringComparer.Ordinal),
                 AppOverrides = new Dictionary<string, string>(Matcher.Overrides),
                 AppVolumes = new Dictionary<string, double>(_appVolumes, StringComparer.OrdinalIgnoreCase),
+                AppVolumeResets = [.. _appVolumeResetsOnLaunch.Keys],
                 RouteAppsByDefault = Matcher.RouteByDefault,
                 BlockSize = _blockSize,
                 PreserveBrowserOutputs = _preserveBrowserOutputs,
@@ -1740,8 +1741,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             SetRouteAppsByDefault(s.RouteAppsByDefault);
             SetBlockSize(s.BlockSize);
             RestoreBrowserSettingsLocked(s);
-            _appVolumes = SavedMixerValidation.AppVolumes(s.AppVolumes, null);
-            _hasAppVolumes = _appVolumes.Count > 0;
+            RestoreAppVolumesLocked(s);
             SetMonitorMuteMicrophones(s.MonitorMuteMicrophones);
             _outputVolumeLock = s.OutputVolumeLock;
             _outputVolumeLockRetryAt = 0;
@@ -3278,6 +3278,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     public bool SyncStreams()
     {
         if (!_built) return false;
+        long volumeRevision = Volatile.Read(ref _appVolumeRevision);
         var (live, clients) = _pw.ListApplications();
         bool changed = false;
         _icons.Refresh();
@@ -3401,7 +3402,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             }
 
             // A route can still be pending while its playback level is editable.
-            changed |= SyncAppVolumesLocked(live);
+            // An arrival pass or command may have acted since this snapshot.
+            if (volumeRevision == _appVolumeRevision) changed |= SyncAppVolumesLocked(live);
 
             // Every running audio-capable app is listed even before it plays:
             // PipeWire clients cover "running", streams cover "playing".
@@ -3999,6 +4001,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         _pendingCells.Clear();
         _cellRounds = _cellWait = 0;
         _streams.Clear();
+        ClearAppVolumeStreamsLocked();
         _cells.Clear();
         _levels.Clear();
         _channelVolume.Clear();

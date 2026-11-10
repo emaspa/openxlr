@@ -50,6 +50,12 @@ application list falls back to System so incoming applications have a destinatio
 The settings must be a regular file. Pipes, devices and sockets are refused
 without reading them or replacing an earlier `mixer.json.corrupt` backup.
 
+Application playback levels are kept in `appVolumes`, keyed by the same
+identity as the channel assignment. `appVolumeResets` holds application
+identities whose saved level was cleared and whose playback streams still
+need to return to 100%. These fields are machine settings and are outside
+profiles.
+
 Only hardware inputs and Aux (`auxout`) remain structural. Monitor A
 (`monitor`) and Monitor B (`monitor2`) can be renamed, moved or removed;
 at least one monitor mix must remain. The `ignore` application target is reserved.

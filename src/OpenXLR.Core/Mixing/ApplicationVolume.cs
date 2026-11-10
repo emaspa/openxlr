@@ -3,6 +3,7 @@ namespace OpenXLR.Core.Mixing;
 public sealed partial class Mixer
 {
     private const int AppVolumeWritesPerSweep = 8;
+    private const int AppVolumeWriteWindowMs = 250;
     // How long a write may take to show in the registry. Until then a
     // different level on the stream is the old one, not somebody's change.
     private const int AppVolumeSettleMs = 1500;
@@ -13,16 +14,19 @@ public sealed partial class Mixer
     private const int AppVolumeAttempts = 3;
 
     private Dictionary<string, double> _appVolumes = new(StringComparer.OrdinalIgnoreCase);
-    private volatile bool _hasAppVolumes;
+    // A reset can outlive its streams if WirePlumber is still holding their old level.
+    private OrderedDictionary<string, bool> _appVolumeResetsOnLaunch = new(StringComparer.OrdinalIgnoreCase);
+    private volatile bool _hasAppVolumeWork;
+    private long _appVolumeRevision;
     // What was last written to each playback stream, by registry id.
     private readonly Dictionary<int, AppliedAppVolume> _appVolumeApplied = [];
     // The playback streams of the last pass, so a command reaches them at once.
     private readonly Dictionary<int, AudioStream> _appVolumeStreams = [];
     // The level each application plays at now, by the key its volume is saved under.
     private Dictionary<string, double> _appLiveVolumes = new(StringComparer.OrdinalIgnoreCase);
-    // Streams still owed full volume after a reset whose write failed: id to serial.
-    private readonly Dictionary<int, int> _appVolumeResets = [];
     private bool _appVolumesChanged;
+
+    internal bool HasAppVolumeWork => _hasAppVolumeWork;
 
     private sealed record AppliedAppVolume(int Serial, string Key, double Target, double Written, long At)
     {
@@ -32,13 +36,26 @@ public sealed partial class Mixer
         public long RetryAt { get; init; }
     }
 
+    private struct AppVolumeWriteBudget(long start)
+    {
+        private int _remaining = AppVolumeWritesPerSweep;
+
+        public bool TryUse(long now)
+        {
+            if (_remaining == 0 || now - start >= AppVolumeWriteWindowMs) return false;
+            _remaining--;
+            return true;
+        }
+    }
+
     public const int MaxAppVolumeIdentityLength = 256;
 
     public static bool ValidAppVolumeIdentity(string? identity)
         => identity is { Length: > 0 and <= MaxAppVolumeIdentityLength }
             && !string.IsNullOrWhiteSpace(identity) && !identity.Any(char.IsControl)
             && !PipeWireAdapter.IsPlumbingIdentity(identity)
-            && !PipeWireAdapter.IsPlumbingIdentity(AppVolumeKey(identity));
+            && AppVolumeKey(identity) is { } key && !string.IsNullOrWhiteSpace(key)
+            && !PipeWireAdapter.IsPlumbingIdentity(key);
 
     /// <summary>
     /// The key an application's volume is saved under: the one its channel
@@ -48,9 +65,10 @@ public sealed partial class Mixer
 
     /// <summary>
     /// Set an application's playback volume, or clear it with null. The level
-    /// is written to the application's playing streams before this returns;
-    /// the sweep gives it to streams that start later and repeats a write
-    /// that failed. Clearing puts the playing streams back to full volume.
+    /// is written to playing streams within a short budget. The sweep
+    /// handles remaining writes and streams that start later. Clearing
+    /// restores full volume the next time the application plays if it has
+    /// no stream now.
     /// </summary>
     public void SetAppVolume(string identity, double? volume)
     {
@@ -70,18 +88,26 @@ public sealed partial class Mixer
             if (!_appVolumes.ContainsKey(key) && _appVolumes.Count >= MaxAppOverrides)
                 throw new InvalidOperationException($"at most {MaxAppOverrides} application volumes can be remembered");
             double target = SnapPlaybackVolume(value);
+            bool canceledReset = _appVolumeResetsOnLaunch.Remove(key);
             _appVolumes[key] = target;
-            _hasAppVolumes = true;
-            int budget = AppVolumeWritesPerSweep;
+            _hasAppVolumeWork = true;
+            _appVolumeRevision++;
+            var budget = new AppVolumeWriteBudget(Clock());
             foreach (AudioStream stream in _appVolumeStreams.Values)
+            {
                 if (AppVolumeKey(stream.Identity).Equals(key, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (canceledReset) _appVolumeApplied.Remove(stream.Id);
                     WriteAppVolumeLocked(stream, key, target, ref budget);
+                }
+            }
         }
     }
 
     /// <summary>
     /// True once after a stream's level moved from outside and the saved
-    /// level followed it, so the daemon knows to save.
+    /// level followed it, or the last stream of a pending reset reached full
+    /// volume, so the daemon knows to save.
     /// </summary>
     public bool TakeAppVolumesChanged()
     {
@@ -101,52 +127,72 @@ public sealed partial class Mixer
     /// </summary>
     public bool SyncAppVolumes()
     {
-        if (!_built || !_hasAppVolumes) return false;
+        if (!_built || !HasAppVolumeWork) return false;
+        long revision = Volatile.Read(ref _appVolumeRevision);
         IReadOnlyList<AudioStream> live;
         try { live = _pw.ListStreams(); }
         catch (InvalidOperationException) { return false; }
         // A graph build holds the gate for seconds; the sweep that follows
         // it does this work.
         if (!Monitor.TryEnter(_gate, 200)) return false;
-        try { return _built && SyncAppVolumesLocked(live); }
+        try { return _built && revision == _appVolumeRevision && SyncAppVolumesLocked(live); }
         finally { Monitor.Exit(_gate); }
     }
 
     private void ResetAppVolumeLocked(string key)
     {
         if (!_appVolumes.Remove(key)) return;
-        _hasAppVolumes = _appVolumes.Count > 0;
+        if (_appVolumeResetsOnLaunch.Count >= MaxAppOverrides) _appVolumeResetsOnLaunch.RemoveAt(0);
+        _appVolumeResetsOnLaunch.Add(key, true);
+        _appVolumeRevision++;
+        var budget = new AppVolumeWriteBudget(Clock());
         foreach (AudioStream stream in _appVolumeStreams.Values)
         {
             if (!AppVolumeKey(stream.Identity).Equals(key, StringComparison.OrdinalIgnoreCase)) continue;
-            _appVolumeApplied.Remove(stream.Id);
-            // Without this the stream keeps the last level, and the session
-            // manager restores it to every later stream of the program.
-            try { _pw.SetSinkInputVolume(stream.Serial, 1); }
-            catch (InvalidOperationException) { _appVolumeResets[stream.Id] = stream.Serial; }
+            bool settled = _appVolumeApplied.Remove(stream.Id, out AppliedAppVolume? applied)
+                && applied.Confirmed && applied.Serial == stream.Serial && applied.Key.Equals(key, StringComparison.OrdinalIgnoreCase);
+            WriteAppVolumeLocked(stream, key, 1, ref budget, settled: settled);
         }
     }
 
-    private void WriteAppVolumeLocked(AudioStream stream, string key, double target, ref int budget, int attempt = 1)
+    private void RestoreAppVolumesLocked(MixerSettings settings)
     {
-        if (budget <= 0) return;
-        budget--;
-        _appVolumeResets.Remove(stream.Id);
+        _appVolumes = SavedMixerValidation.AppVolumes(settings.AppVolumes, null);
+        _appVolumeResetsOnLaunch = SavedMixerValidation.AppVolumeResets(settings.AppVolumeResets, _appVolumes, null);
+        _hasAppVolumeWork = _appVolumes.Count != 0 || _appVolumeResetsOnLaunch.Count != 0;
+        _appVolumeRevision++;
+    }
+
+    private void ClearAppVolumeStreamsLocked()
+    {
+        _appVolumeApplied.Clear();
+        _appVolumeStreams.Clear();
+        _appLiveVolumes.Clear();
+        _appVolumeRevision++;
+    }
+
+    private void WriteAppVolumeLocked(AudioStream stream, string key, double target, ref AppVolumeWriteBudget budget,
+        int attempt = 1, bool settled = false)
+    {
         long started = Clock();
+        if (!budget.TryUse(started)) return;
         try
         {
-            _pw.SetSinkInputVolume(stream.Serial, target);
-            _appVolumeApplied[stream.Id] = new(stream.Serial, key, target, target, Clock()) { Attempts = attempt };
+            _pw.SetApplicationStreamVolume(stream.Serial, target);
+            _appVolumeApplied[stream.Id] = new(stream.Serial, key, target, target, Clock()) { Attempts = attempt, Confirmed = settled };
         }
         catch (InvalidOperationException)
         {
-            // A stalled pipewire-pulse should cost one failed write per
-            // pass, so the other streams wait for the next one. A stream it
-            // does not list yet is refused at once and tried again sooner.
+            // A stalled server costs one failure per pass. A quick refusal
+            // only affects this input, and repeated refusals leave room in
+            // the next sweep for streams later in the registry.
             long now = Clock();
+            bool stalled = now - started >= AppVolumeWriteWindowMs;
+            bool repeated = _appVolumeApplied.TryGetValue(stream.Id, out AppliedAppVolume? previous)
+                && previous.Serial == stream.Serial && previous.Key.Equals(key, StringComparison.OrdinalIgnoreCase)
+                && previous.Target == target && previous.RetryAt != 0;
             _appVolumeApplied[stream.Id] = new(stream.Serial, key, target, double.NaN, now)
-                { Attempts = attempt, RetryAt = now + (now - started < 250 ? 250 : 3000) };
-            budget = 0;
+                { Attempts = attempt, RetryAt = now + (stalled || repeated ? 3000 : 250) };
         }
     }
 
@@ -154,41 +200,28 @@ public sealed partial class Mixer
 
     private bool SyncAppVolumesLocked(IReadOnlyList<AudioStream> live)
     {
+        _appVolumeRevision++;
         _appVolumeStreams.Clear();
         var playing = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
-        foreach (AudioStream stream in live)
-        {
-            _appVolumeStreams[stream.Id] = stream;
-            if (stream.Volume is double level) playing[AppVolumeKey(stream.Identity)] = level;
-        }
-        foreach (int gone in _appVolumeApplied.Keys.Where(id => !_appVolumeStreams.ContainsKey(id)).ToArray())
-            _appVolumeApplied.Remove(gone);
-
-        int budget = AppVolumeWritesPerSweep;
-        foreach ((int id, int serial) in _appVolumeResets.ToArray())
-        {
-            if (!_appVolumeStreams.TryGetValue(id, out AudioStream? owed) || owed.Serial != serial)
-            {
-                _appVolumeResets.Remove(id);
-                continue;
-            }
-            if (budget <= 0) continue;
-            budget--;
-            try
-            {
-                _pw.SetSinkInputVolume(serial, 1);
-                _appVolumeResets.Remove(id);
-            }
-            catch (InvalidOperationException) { budget = 0; }
-        }
-
+        var budget = new AppVolumeWriteBudget(Clock());
+        // A reset stays pending while its app is stopped or any of its
+        // streams has not settled. The next launch can restore the old
+        // level after our first write, so watch for it on the same passes.
+        Dictionary<string, bool>? resetDone = _appVolumeResetsOnLaunch.Count == 0 ? null : new(StringComparer.OrdinalIgnoreCase);
         bool adopted = false;
         foreach (AudioStream stream in live)
         {
+            _appVolumeStreams[stream.Id] = stream;
             string key = AppVolumeKey(stream.Identity);
+            if (stream.Volume is double observed) playing[key] = observed;
             if (!_appVolumes.TryGetValue(key, out double target))
             {
-                _appVolumeApplied.Remove(stream.Id);
+                if (resetDone is not null && _appVolumeResetsOnLaunch.ContainsKey(key))
+                {
+                    bool settled = SyncAppVolumeResetLocked(stream, key, ref budget);
+                    resetDone[key] = settled && resetDone.GetValueOrDefault(key, true);
+                }
+                else _appVolumeApplied.Remove(stream.Id);
                 continue;
             }
             long now = Clock();
@@ -202,14 +235,14 @@ public sealed partial class Mixer
                 else WriteAppVolumeLocked(stream, key, target, ref budget);
                 continue;
             }
-            if (applied.RetryAt != 0)
-            {
-                if (now >= applied.RetryAt) WriteAppVolumeLocked(stream, key, target, ref budget, applied.Attempts);
-                continue;
-            }
             if (applied.Target != target)
             {
                 WriteAppVolumeLocked(stream, key, target, ref budget);
+                continue;
+            }
+            if (applied.RetryAt != 0)
+            {
+                if (now >= applied.RetryAt) WriteAppVolumeLocked(stream, key, target, ref budget, applied.Attempts);
                 continue;
             }
             if (stream.Volume is not double level) continue;
@@ -238,9 +271,43 @@ public sealed partial class Mixer
             _appVolumesChanged = adopted = true;
         }
 
+        foreach (int gone in _appVolumeApplied.Keys.Where(id => !_appVolumeStreams.ContainsKey(id)).ToArray())
+            _appVolumeApplied.Remove(gone);
+
+        if (resetDone is not null)
+        {
+            foreach ((string key, bool done) in resetDone)
+                if (done && _appVolumeResetsOnLaunch.Remove(key)) _appVolumesChanged = true;
+            _hasAppVolumeWork = _appVolumes.Count != 0 || _appVolumeResetsOnLaunch.Count != 0;
+        }
         bool moved = playing.Count != _appLiveVolumes.Count
             || playing.Any(p => !_appLiveVolumes.TryGetValue(p.Key, out double before) || before != p.Value);
         _appLiveVolumes = playing;
         return adopted || moved;
+    }
+
+    private bool SyncAppVolumeResetLocked(AudioStream stream, string key, ref AppVolumeWriteBudget budget)
+    {
+        if (!_appVolumeApplied.TryGetValue(stream.Id, out AppliedAppVolume? applied) || applied.Serial != stream.Serial
+            || !applied.Key.Equals(key, StringComparison.OrdinalIgnoreCase) || applied.Target != 1)
+        {
+            WriteAppVolumeLocked(stream, key, 1, ref budget);
+            return false;
+        }
+        if (applied.Confirmed) return true;
+        long now = Clock();
+        if (applied.RetryAt != 0)
+        {
+            if (now >= applied.RetryAt) WriteAppVolumeLocked(stream, key, 1, ref budget, applied.Attempts);
+            return false;
+        }
+        if (now - applied.At < AppVolumeSettleMs) return false;
+        if (stream.Volume is not double level || SameAppVolume(level, 1) || applied.Attempts >= AppVolumeAttempts)
+        {
+            _appVolumeApplied[stream.Id] = applied with { Confirmed = true };
+            return true;
+        }
+        WriteAppVolumeLocked(stream, key, 1, ref budget, applied.Attempts + 1);
+        return false;
     }
 }
