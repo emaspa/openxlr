@@ -4,12 +4,6 @@ export DOTNET_CLI_TELEMETRY_OPTOUT = 1
 export DOTNET_NOLOGO = 1
 export DOTNET_SKIP_FIRST_TIME_EXPERIENCE = 1
 
-# The SDK and NuGet get a home inside the build tree: PPA builders have
-# no writable one, and nothing from a developer's caches leaks in.
-export HOME = $(CURDIR)/debian/.home
-export DOTNET_CLI_HOME = $(HOME)
-export NUGET_PACKAGES = $(HOME)/.nuget/packages
-
 # Launchpad builders are offline; packaging/ppa/make-source.sh vendors
 # the NuGet packages into vendor/nuget and the restore reads only that.
 VENDOR = $(CURDIR)/vendor/nuget
@@ -17,16 +11,27 @@ ifneq (,$(wildcard $(VENDOR)))
 RESTORE_SOURCE = --source $(VENDOR)
 endif
 
+# Local package builds can reuse the user's NuGet and Cargo caches.
+# Give CI, vendored builds and builders without a writable home private caches.
+PACKAGE_HOME = $(CURDIR)/debian/.home
+PRIVATE_HOME_NEEDED := $(shell test -d "$$HOME" && test -w "$$HOME" && test -x "$$HOME" || echo yes)
+ifneq ($(strip $(CI) $(PRIVATE_HOME_NEEDED) $(wildcard $(VENDOR) $(CURDIR)/native/deepfilter/vendor)),)
+export HOME = $(PACKAGE_HOME)
+export DOTNET_CLI_HOME = $(PACKAGE_HOME)
+export NUGET_PACKAGES = $(PACKAGE_HOME)/.nuget/packages
+export CARGO_HOME = $(PACKAGE_HOME)/.cargo
+export OPENXLR_BUILD_CACHE = 0
+endif
+
 # Every package carries DeepFilterNet: the native build fails instead of
 # leaving it out. It runs the distribution's cargo and rustc, not a rustup
 # proxy that may be earlier on the PATH and would look for its toolchains
-# under the HOME above. make-source.sh vendors the crates under
+# under a private home. make-source.sh vendors the crates under
 # native/deepfilter/vendor and puts the model in place for the offline
 # builders; a build with a network (the release workflow) fetches both.
 export DEEPFILTER = 1
 export CARGO ?= /usr/bin/cargo
 export RUSTC ?= /usr/bin/rustc
-export CARGO_HOME = $(HOME)/.cargo
 
 OUT = $(CURDIR)/debian/out
 PKG = $(CURDIR)/debian/openxlr
@@ -122,7 +127,7 @@ override_dh_auto_install:
 	find $(PKG)/usr/share/openxlr -type d -exec chmod 755 {} +
 
 override_dh_auto_clean:
-	rm -rf $(OUT) $(HOME) src/*/bin src/*/obj native/deepfilter/target
+	rm -rf $(OUT) $(PACKAGE_HOME) src/*/bin src/*/obj native/deepfilter/target
 
 override_dh_auto_test:
 

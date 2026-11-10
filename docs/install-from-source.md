@@ -149,13 +149,14 @@ intermediate directory shared by different checkouts can reuse an old
 artifact when source timestamps predate it. The cache lives in the
 directory you set and can be removed when you want to reclaim the space.
 
-#### AUR build cache
+#### Local package build caches
 
-AUR updates extract each release into its own source directory. Local
-builds use the following user caches automatically.
+AUR updates extract each release into its own source directory. AUR and
+other local source builds use these user caches automatically.
 
-- NuGet uses its global packages folder. MSBuild also reuses current
-  outputs when you build again in the same checkout.
+- NuGet uses its global packages folder. Cargo reuses its downloaded
+  crates. MSBuild reuses current outputs when you build again in the
+  same checkout.
 - C and C++ builds use `ccache` if it is installed and its cache is
   writable. Compiler wrappers already selected by the caller keep control.
 - With Cargo 1.91 or newer and Python 3, DeepFilterNet uses
@@ -169,12 +170,22 @@ package download caches. Re-extracting the package or running the usual
 package update does not remove them. Their contents can be reclaimed by
 clearing the respective user caches.
 
+The external AUR recipe can add `ccache` to `makedepends` to have the
+AUR helper install it with the other build tools. The OpenXLR Makefile
+detects it directly, independently of makepkg's `BUILDENV`.
+
+Local Debian and RPM source builds also use the user caches. Offline PPA
+and Flatpak builds use their vendored dependencies. Nix reuses the
+DeepFilterNet derivation through its store. Installing a ready-built
+Arch package, `.deb`, `.rpm` or Flatpak bundle uses the package's
+compiled binaries.
+
 `OPENXLR_BUILD_CACHE=0` disables automatic native caches. An explicit
 `CARGO_BUILD_BUILD_DIR` or a custom Cargo `build.build-dir` takes
 precedence over the OpenXLR Rust cache.
-`OPENXLR_DEEPFILTER_BUILD_CACHE` can set a different location. Root and
-CI builds skip the automatic user caches, and vendored builds keep their
-normal Cargo directory.
+`OPENXLR_DEEPFILTER_BUILD_CACHE` can set a different location. Automatic
+native caches apply to local builds as a regular user outside CI.
+Vendored Rust builds keep their normal Cargo directory.
 
 ## 3. Device access
 
